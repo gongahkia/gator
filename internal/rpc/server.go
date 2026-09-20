@@ -412,7 +412,7 @@ func (s *Server) approve(request protocol.Request) error {
 
 func (s *Server) terminalAttachment() (terminal.Attachment, error) {
 	if s.config.TerminalRegistry == nil {
-		return nil, errors.New("background terminal control is available only through gator serve or the native TUI")
+		return nil, errors.New("background terminal control is available only through gator agent serve or the native TUI")
 	}
 	return s.config.TerminalRegistry.Attachment(), nil
 }

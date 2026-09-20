@@ -391,7 +391,7 @@ func (m Model) openOpenCodeManagement(arguments []string) (tea.Model, tea.Cmd) {
 
 func (m Model) runOpenCodeCommand(action, provider string, arguments []string) (tea.Model, tea.Cmd) {
 	if m.config.NewOpenCodeCommand == nil {
-		m.notice = notice{text: "OpenCode management is unavailable in this Gator build. Use 'gator delegate opencode …' from a shell.", kind: noticeError}
+		m.notice = notice{text: "OpenCode management is unavailable in this Gator build. Use 'gator agent delegate opencode …' from a shell.", kind: noticeError}
 		return m, nil
 	}
 	process, err := m.config.NewOpenCodeCommand(arguments)

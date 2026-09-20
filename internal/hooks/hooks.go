@@ -44,7 +44,7 @@ const (
 	Verification   Event = "verification"
 )
 
-// Trust is persisted in user-owned config after `gator hook trust`. Repository
+// Trust is persisted in user-owned config after `gator config hook trust`. Repository
 // paths are canonical, and Hash is the exact active hook-bundle digest.
 type Trust struct {
 	Repository string `json:"repository"`

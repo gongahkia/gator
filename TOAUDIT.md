@@ -12,10 +12,10 @@ preserve every existing command by default.
 ## Scope and terminology
 
 - **CLI** means a public `gator …` command.
-- **TUI** means a slash command or key action inside `gator` / `gator tui`.
+- **TUI** means a slash command or key action inside `gator`.
 - **Work** is Gator's primary source-to-validated-deliverable workflow.
 - **Code specialist** is the bounded internal implementation delegate used by
-  `gator code` and `gator run`.
+  `gator work code` and `gator work run`.
 - Commands labelled **machine interface** are intentionally designed for
   programs, editors, or a supervised process rather than the interactive TUI.
 
@@ -29,6 +29,32 @@ preserve every existing command by default.
 | `gator update [--check]`, `gator -u` | Check for, or install, a newer release. Development builds can check but cannot self-replace. |
 | `gator doctor [--provider PROVIDER]`, `gator -d` | Inspect local prerequisites, configuration, provider state, sandbox availability, and suggested verification. |
 
+## CLI alias and hierarchy rule
+
+The public command surface has one-letter aliases only for top-level families.
+The long family name and its alias are exact equivalents: for example,
+`gator agent acp` and `gator -a acp` run the same command. Commands that
+would collide at the root live beneath the family that owns their workflow.
+
+| Family | Alias | Nested responsibilities |
+| --- | --- | --- |
+| `agent` | `-a` | profiles, retained children, external delegation, ACP, RPC, and the app server |
+| `browser` | `-b` | controlled browser sessions |
+| `config` | `-c` | persistent settings and hook trust |
+| `doctor` | `-d` | local diagnostics |
+| `extension` | `-e` | extension bundles |
+| `job` | `-j` | scheduled Work and inbox entries |
+| `lsp` | `-l` | LSP trust |
+| `mcp` | `-m` | MCP trust and OAuth |
+| `provider` | `-p` | providers, credentials, custom endpoints, and connectors |
+| `theme` | `-t` | terminal theme selection |
+| `update` | `-u` | release checks and update |
+| `work` | `-w` | Work runs, retained output, and evaluation |
+
+`-h` and `-v` remain the conventional help and version flags. When a free-form
+Work task begins with a reserved subcommand name such as `inspect`, use
+`gator work -- TASK` to make it unambiguously a task.
+
 ## CLI: provider and model configuration
 
 | Command | Current purpose |
@@ -40,6 +66,7 @@ preserve every existing command by default.
 | `gator provider add ID --base-url URL --model MODEL [--model MODEL…] [--api-key-env NAME]` | Add a custom Chat Completions endpoint. API-key values remain in the named environment variable, not in Gator config. |
 | `gator provider discover ID [--apply]` | Preview `/models` discovery, or replace the saved custom-provider catalogue after `--apply`. |
 | `gator provider remove ID --yes` | Remove a custom provider configuration. |
+| `gator provider connector ACTION …` | Configure connected sources, their authentication, and their bounded read/write permissions. |
 
 Every `gator provider …` form also accepts `gator -p …` as its short form.
 
@@ -72,27 +99,22 @@ Every `gator config …` form below also accepts `gator -c …` as its short for
 
 | Command | Current purpose |
 | --- | --- |
-| `gator agent list` | List project profiles and capability-bounded roles. Must run in a Git checkout. |
-| `gator hook ACTION` (`status`, `trust`, or `untrust`) | Inspect or trust the hash of `.gator/hooks.json`. |
-| `gator lsp ACTION` (`status`, `trust`, or `untrust`) | Inspect or trust the hash of `.gator/lsp.json`. A status check does not start an LSP server. |
-| `gator mcp ACTION` (`status`, `trust`, or `untrust`) | Inspect or trust the hash of `.gator/mcp.json`. |
-| `gator mcp login [--client-id ID] [--redirect-url LOOPBACK_URL] SERVER` | Run a resource-bound MCP OAuth login after the current MCP configuration is trusted. |
-| `gator mcp logout SERVER` | Remove the Gator-owned OAuth credential for one MCP server. |
-| `gator extension list` or `gator extension status` | List installed extensions or inspect project-extension status. |
-| `gator extension install [--replace] DIRECTORY_OR_HTTPS_SOURCE` | Stage and install an extension bundle. |
-| `gator extension ACTION ID` (`enable` or `disable`) | Enable or disable an installed extension. |
-| `gator extension remove ID --yes` | Delete an installed extension. |
-| `gator extension ACTION` (`trust` or `untrust`) | Trust or untrust the current project's extension bundle. |
+| `gator agent list`, `gator -a list` | List project profiles and capability-bounded roles. Must run in a Git checkout. |
+| `gator agent child ACTION …` | Inspect retained writer-child and child-batch manifests. |
+| `gator config hook ACTION` (`status`, `trust`, or `untrust`) | Inspect or trust the hash of `.gator/hooks.json`. |
+| `gator lsp ACTION`, `gator -l ACTION` | Inspect or trust the hash of `.gator/lsp.json`. A status check does not start an LSP server. |
+| `gator mcp ACTION`, `gator -m ACTION` | Inspect or trust the hash of `.gator/mcp.json`, including resource-bound OAuth login and logout. |
+| `gator extension ACTION …`, `gator -e ACTION …` | Install, enable, disable, remove, and trust extension bundles. |
 
 ## CLI: Work, analysis, and implementation
 
 | Command | Current purpose |
 | --- | --- |
-| `gator work [OPTIONS] TASK` | Run the general Work workflow: capture a read-only source snapshot, use an explicit outcome contract, and retain validated artifacts in private output. Common options set the source folder, artifact contract, attachments, connectors, authority mode, provider/model, and limits. |
-| `gator inspect [OPTIONS] TASK` | Start Work through its inspect-only route. |
-| `gator code [CODE POLICY] TASK` | Run Work while requiring a verified internal Code-specialist patch candidate. |
-| `gator run [CODE POLICY] TASK` | Compatibility name for the same Code-specialist Work route. |
-| `gator resume [CONVERSATION_ID [TASK]]` | Open a retained Work conversation in the TUI, or run a further Work revision when given a task. |
+| `gator work [OPTIONS] TASK`, `gator -w [OPTIONS] TASK` | Run the general Work workflow: capture a read-only source snapshot, use an explicit outcome contract, and retain validated artifacts in private output. Common options set the source folder, artifact contract, attachments, connectors, authority mode, provider/model, and limits. |
+| `gator work inspect [OPTIONS] TASK` | Start Work through its inspect-only route. |
+| `gator work code [CODE POLICY] TASK` | Run Work while requiring a verified internal Code-specialist patch candidate. |
+| `gator work run [CODE POLICY] TASK` | Compatibility name for the same Code-specialist Work route. |
+| `gator work resume [CONVERSATION_ID [TASK]]` | Open a retained Work conversation in the TUI, or run a further Work revision when given a task. |
 
 ### Work conversation management
 
@@ -108,7 +130,7 @@ Every `gator config …` form below also accepts `gator -c …` as its short for
 
 ### Internal Code policy options
 
-`gator code` and `gator run` accept the Code policy arguments below. `gator work`
+`gator work code` and `gator work run` accept the Code policy arguments below. `gator work`
 also exposes these where the requested Work outcome needs an internal Code
 specialist.
 
@@ -131,20 +153,16 @@ specialist.
 
 | Command | Current purpose |
 | --- | --- |
-| `gator review WORK_BUNDLE [--preview] [--json]` | Verify a Work bundle and display its manifest and optional safe previews. |
-| `gator review RUN_RECORD_PATH [--listen 127.0.0.1:PORT] [--open]` | Start a one-use, loopback-only browser review for a retained coding run. |
-| `gator export WORK_BUNDLE [--to ARCHIVE] [--replace]` | Write a verified Work bundle to a deterministic `tar.gz` archive. |
-| `gator export RUN_RECORD_PATH` | Write the patch from a retained coding run to standard output. |
-| `gator apply WORK_BUNDLE --to DIRECTORY [--check] [--replace] [--json]` | Preflight or copy a verified Work bundle into an explicit destination directory. |
-| `gator apply WORK_BUNDLE --to DIRECTORY --code-patch PATH [--check]` | Preflight or apply a verified Code candidate held by a Work bundle. |
-| `gator apply [--check] RUN_RECORD_PATH` | Preflight or apply a retained coding patch to the current clean Git checkout. |
-| `gator transcript RUN_RECORD_PATH > transcript.html` | Export a retained coding session as local HTML. |
-| `gator snapshot list` | List immutable source snapshots. |
-| `gator snapshot show ID` | Emit one snapshot manifest as JSON. |
-| `gator snapshot gc --yes` | Remove unreferenced snapshots and unreachable blobs. |
-| `gator worktree ACTION` (`list` or `prune`) | List Gator worktrees or prune stale Git worktree metadata. |
-| `gator worktree remove RUN_ID --yes` | Delete a retained Gator worktree while leaving private run records. |
-| `gator child ACTION …` (`list`, `show`, `batches`, or `batch`) | Inspect retained writer-child and child-batch manifests. |
+| `gator work review WORK_BUNDLE [--preview] [--json]` | Verify a Work bundle and display its manifest and optional safe previews. |
+| `gator work review RUN_RECORD_PATH [--listen 127.0.0.1:PORT] [--open]` | Start a one-use, loopback-only browser review for a retained coding run. |
+| `gator work export WORK_BUNDLE [--to ARCHIVE] [--replace]` | Write a verified Work bundle to a deterministic `tar.gz` archive. |
+| `gator work export RUN_RECORD_PATH` | Write the patch from a retained coding run to standard output. |
+| `gator work apply WORK_BUNDLE --to DIRECTORY [--check] [--replace] [--json]` | Preflight or copy a verified Work bundle into an explicit destination directory. |
+| `gator work apply WORK_BUNDLE --to DIRECTORY --code-patch PATH [--check]` | Preflight or apply a verified Code candidate held by a Work bundle. |
+| `gator work apply [--check] RUN_RECORD_PATH` | Preflight or apply a retained coding patch to the current clean Git checkout. |
+| `gator work transcript RUN_RECORD_PATH > transcript.html` | Export a retained coding session as local HTML. |
+| `gator work snapshot list|show ID|gc --yes` | Inspect or explicitly collect immutable source snapshots. |
+| `gator work worktree ACTION` (`list`, `prune`, or `remove`) | List, prune, or explicitly remove retained Gator worktrees. |
 
 ## CLI: connected services, browser sessions, and scheduled Work
 
@@ -152,20 +170,16 @@ specialist.
 
 | Command | Current purpose |
 | --- | --- |
-| `gator connector list` | List configured connectors and their auth status. |
-| `gator connector add ID --kind KIND [OPTIONS]` | Add a `json`, `webhook`, `slack`, `google`, `atlassian`, `notion`, or remote `mcp` connector. |
-| `gator connector status ID` | Show a connector's configuration and operations. |
-| `gator connector login ID [OPTIONS]` | Authenticate one connector. |
-| `gator connector logout ID` | Remove its Gator-managed credential. |
-| `gator connector test ID` | Test live connector access. |
-| `gator connector remove ID [OPTIONS]` | Remove a connector. |
-| `gator connector permission ID OPERATION ACCESS POLICY` | Set one connector operation to `read` or `write` with `allow`, `ask`, `deny`, or `draft`. |
+| `gator provider connector list` | List configured connectors and their auth status. |
+| `gator provider connector add ID --kind KIND [OPTIONS]` | Add a `json`, `webhook`, `slack`, `google`, `atlassian`, `notion`, or remote `mcp` connector. |
+| `gator provider connector status|login|logout|test|remove ID [OPTIONS]` | Inspect, authenticate, test, or remove a connector. |
+| `gator provider connector permission ID OPERATION ACCESS POLICY` | Set one connector operation to `read` or `write` with `allow`, `ask`, `deny`, or `draft`. |
 
 ### Controlled browser sessions
 
 | Command | Current purpose |
 | --- | --- |
-| `gator browser install` | Install Gator's pinned Playwright/Chromium runtime. |
+| `gator browser install`, `gator -b install` | Install Gator's pinned Playwright/Chromium runtime. |
 | `gator browser status` | Show browser runtime and retained session status. |
 | `gator browser start [--headed] [--visual-capture]` | Start a Gator-managed browser session. |
 | `gator browser attach --cdp URL [--visual-capture]` | Attach to an explicitly supplied local CDP endpoint. |
@@ -182,13 +196,13 @@ specialist.
 
 | Command | Current purpose |
 | --- | --- |
-| `gator job add NAME --schedule CRON [OPTIONS] -- TASK` | Create a scheduled Work job. |
+| `gator job add NAME --schedule CRON [OPTIONS] -- TASK`, `gator -j add …` | Create a scheduled Work job. |
 | `gator job list` | List scheduled jobs. |
 | `gator job ACTION ID` (`show`, `edit`, `enable`, `disable`, `run`, `history`, or `remove`) | Inspect or manage an existing job. |
 | `gator job supervisor [--notify=BOOL]` (`true` or `false`) | Run the foreground job supervisor. |
 | `gator job ACTION` (`status` or `stop`) | Inspect or stop a running supervisor. |
-| `gator inbox [--unread]` | List scheduled-work inbox entries. |
-| `gator inbox read ENTRY_ID` | Mark one inbox entry as read and show it. |
+| `gator job inbox [--unread]` | List scheduled-work inbox entries. |
+| `gator job inbox read ENTRY_ID` | Mark one inbox entry as read and show it. |
 
 ## CLI: external-agent delegation
 
@@ -198,18 +212,7 @@ owns its own credentials, tool grants, sandbox, approvals, and session state.
 
 | Command | Current purpose |
 | --- | --- |
-| `gator delegate codex login [--device]` | Invoke Codex CLI sign-in. |
-| `gator delegate codex status` | Ask Codex CLI for login status. |
-| `gator delegate codex run [--model MODEL] --verify 'argv …' TASK` | Delegate a verified task to Codex. |
-| `gator delegate copilot login [--host URL]` | Invoke Copilot CLI sign-in. |
-| `gator delegate copilot run [--model MODEL] --verify 'argv …' TASK` | Delegate a verified task to Copilot. |
-| `gator delegate claude run [--model MODEL] --verify 'argv …' TASK` | Delegate in Claude's API-key-based bare mode. Claude.ai subscription login is intentionally unavailable. |
-| `gator delegate kimi login` | Invoke Kimi CLI sign-in. |
-| `gator delegate kimi run [--model MODEL] --verify 'argv …' TASK` | Delegate a verified task to Kimi. |
-| `gator delegate opencode login --provider PROVIDER [--method METHOD]` | Invoke OpenCode provider login. |
-| `gator delegate opencode status` | Ask OpenCode for status. |
-| `gator delegate opencode run [--model PROVIDER/MODEL] --verify 'argv …' TASK` | Delegate a verified task to OpenCode. |
-| `gator delegate external run --task TASK --verify 'argv …' -- COMMAND [ARG…]` | Delegate to an explicitly provided external command. |
+| `gator agent delegate RUNTIME ACTION [OPTIONS]` | Run an installed vendor or external agent in an isolated worktree. The supported runtimes are Codex, Copilot, Claude, Kimi, OpenCode, and an explicit external command. |
 
 ## CLI: evaluation and machine interfaces
 
@@ -217,25 +220,19 @@ owns its own credentials, tool grants, sandbox, approvals, and session state.
 
 | Command | Current purpose |
 | --- | --- |
-| `gator eval DIR [OPTIONS]` | Run one bounded evaluation fixture. It supports offline scripts or an explicitly selected live model and writes a JSON report. |
-| `gator eval suite DIR --attempts N --environment-id OCI_DIGEST --live [OPTIONS]` | Run a real-model evaluation suite against an immutable OCI environment. |
-| `gator eval work validate DATASET` | Validate a Work evaluation dataset. |
-| `gator eval work run DATASET --report-dir DIR [OPTIONS]` | Run a Work experiment, scripted or explicitly live. |
-| `gator eval work show EXPERIMENT_JSON` | Summarize a Work experiment. |
-| `gator eval work compare FIRST_EXPERIMENT_JSON SECOND_EXPERIMENT_JSON` | Compare two Work experiments. |
-| `gator eval work judge-rubric EXPERIMENT_JSON --live --rubric RUBRIC_JSON --output RESULT_JSON --provider PROVIDER --model MODEL --max-model-requests N --timeout-seconds N` | Run an independent live rubric judge over retained evidence. |
-| `gator eval work calibrate-rubric JUDGE_JSON HUMAN_JSON` | Compare judge and human rubric reports. |
-| `gator eval work export-langsmith EXPERIMENT_JSON` | Export an experiment to LangSmith using its configured environment variables. |
+| `gator work eval DIR [OPTIONS]` | Run one bounded evaluation fixture. It supports offline scripts or an explicitly selected live model and writes a JSON report. |
+| `gator work eval suite DIR --attempts N --environment-id OCI_DIGEST --live [OPTIONS]` | Run a real-model evaluation suite against an immutable OCI environment. |
+| `gator work eval validate|run|show|compare|judge-rubric|calibrate-rubric|export-langsmith …` | Validate, execute, inspect, compare, judge, calibrate, or export Work experiments. |
 
 ### Machine interfaces
 
 | Command | Current purpose |
 | --- | --- |
-| `gator rpc` | Run Gator's local JSONL RPC protocol over standard input/output. |
-| `gator acp [--verify 'argv …']` | Run a local Agent Client Protocol v1 server over standard input/output for editors. |
-| `gator serve token ABSOLUTE_PATH` | Create a private bearer-token file for the app server. |
-| `gator serve --token-file ABSOLUTE_PATH [--listen 127.0.0.1:PORT]` | Run the authenticated loopback HTTP/SSE app server in the foreground. |
-| `gator serve ACTION --token-file ABSOLUTE_PATH` (`start`, `status`, or `stop`) | Supervise the loopback app-server service. |
+| `gator agent rpc` | Run Gator's local JSONL RPC protocol over standard input/output. |
+| `gator agent acp [--verify 'argv …']` | Run a local Agent Client Protocol v1 server over standard input/output for editors. |
+| `gator agent serve token ABSOLUTE_PATH` | Create a private bearer-token file for the app server. |
+| `gator agent serve --token-file ABSOLUTE_PATH [--listen 127.0.0.1:PORT]` | Run the authenticated loopback HTTP/SSE app server in the foreground. |
+| `gator agent serve ACTION --token-file ABSOLUTE_PATH` (`start`, `status`, or `stop`) | Supervise the loopback app-server service. |
 
 The dispatcher also has `gator work-rpc`, plus `--mode rpc` and `--mode acp`.
 These are compatibility/internal entry points rather than documented product

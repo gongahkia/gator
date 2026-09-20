@@ -18,18 +18,18 @@ import (
 )
 
 const delegateUsage = `Usage:
-  gator delegate codex login [--device]
-  gator delegate codex status
-  gator delegate codex run [--model MODEL] --verify 'argv ...' TASK
-  gator delegate copilot login [--host URL]
-  gator delegate copilot run [--model MODEL] --verify 'argv ...' TASK
-  gator delegate claude run [--model MODEL] --verify 'argv ...' TASK
-  gator delegate kimi login
-  gator delegate kimi run [--model MODEL] --verify 'argv ...' TASK
-  gator delegate opencode login --provider PROVIDER [--method METHOD]
-  gator delegate opencode status
-  gator delegate opencode run [--model PROVIDER/MODEL] --verify 'argv ...' TASK
-  gator delegate external run --task TASK --verify 'argv ...' -- COMMAND [ARG ...]
+  gator agent delegate codex login [--device]
+  gator agent delegate codex status
+  gator agent delegate codex run [--model MODEL] --verify 'argv ...' TASK
+  gator agent delegate copilot login [--host URL]
+  gator agent delegate copilot run [--model MODEL] --verify 'argv ...' TASK
+  gator agent delegate claude run [--model MODEL] --verify 'argv ...' TASK
+  gator agent delegate kimi login
+  gator agent delegate kimi run [--model MODEL] --verify 'argv ...' TASK
+  gator agent delegate opencode login --provider PROVIDER [--method METHOD]
+  gator agent delegate opencode status
+  gator agent delegate opencode run [--model PROVIDER/MODEL] --verify 'argv ...' TASK
+  gator agent delegate external run --task TASK --verify 'argv ...' -- COMMAND [ARG ...]
 
 Delegated runtimes use their own installed CLI and credential store. Gator keeps
 the worktree and verification boundary, but the delegated CLI owns its agent
@@ -51,7 +51,7 @@ func delegate(arguments []string, out io.Writer) error {
 			return delegateCodexLogin(arguments[2:], out)
 		case "status":
 			if len(arguments) != 2 {
-				return errors.New("usage: gator delegate codex status")
+				return errors.New("usage: gator agent delegate codex status")
 			}
 			return runDelegateCommand(context.Background(), delegateProgram("codex"), []string{"login", "status"}, "", out, nil)
 		case "run":
@@ -84,7 +84,7 @@ func delegate(arguments []string, out io.Writer) error {
 			return delegateOpenCodeLogin(arguments[2:], out)
 		case "status":
 			if len(arguments) != 2 {
-				return errors.New("usage: gator delegate opencode status")
+				return errors.New("usage: gator agent delegate opencode status")
 			}
 			return runDelegateCommand(context.Background(), delegateProgram("opencode"), []string{"auth", "list"}, "", out, nil)
 		case "run":
@@ -106,7 +106,7 @@ func delegateCodexLogin(arguments []string, out io.Writer) error {
 		return err
 	}
 	if len(flags.Args()) != 0 {
-		return errors.New("usage: gator delegate codex login [--device]")
+		return errors.New("usage: gator agent delegate codex login [--device]")
 	}
 	command := []string{"login"}
 	if *device {
@@ -178,7 +178,7 @@ func delegateCopilotLogin(arguments []string, out io.Writer) error {
 		return err
 	}
 	if len(flags.Args()) != 0 {
-		return errors.New("usage: gator delegate copilot login [--host URL]")
+		return errors.New("usage: gator agent delegate copilot login [--host URL]")
 	}
 	command := []string{"login"}
 	if value := strings.TrimSpace(*host); value != "" {
@@ -203,7 +203,7 @@ func delegateCopilotRun(arguments []string, out io.Writer) error {
 
 func delegateKimiLogin(arguments []string, out io.Writer) error {
 	if len(arguments) != 0 {
-		return errors.New("usage: gator delegate kimi login")
+		return errors.New("usage: gator agent delegate kimi login")
 	}
 	return runDelegateCommand(context.Background(), delegateProgram("kimi"), []string{"login"}, "", out, os.Stdin)
 }
@@ -231,7 +231,7 @@ func delegateOpenCodeLogin(arguments []string, out io.Writer) error {
 		return err
 	}
 	if len(flags.Args()) != 0 || strings.TrimSpace(*provider) == "" {
-		return errors.New("usage: gator delegate opencode login --provider PROVIDER [--method METHOD]")
+		return errors.New("usage: gator agent delegate opencode login --provider PROVIDER [--method METHOD]")
 	}
 	command := []string{"auth", "login", "--provider", strings.TrimSpace(*provider)}
 	if value := strings.TrimSpace(*method); value != "" {

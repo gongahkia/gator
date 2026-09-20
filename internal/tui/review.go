@@ -248,7 +248,7 @@ func (m Model) updateStructuredReview(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.notice = notice{text: "No retained run record is available for patch handoff.", kind: noticeError}
 			return m, nil
 		}
-		m.commandOutput = "Export:  gator export " + m.outcome.StatePath + " > gator-review.patch\nCheck:   gator apply --check " + m.outcome.StatePath + "\nApply:   gator apply " + m.outcome.StatePath
+		m.commandOutput = "Export:  gator work export " + m.outcome.StatePath + " > gator-review.patch\nCheck:   gator work apply --check " + m.outcome.StatePath + "\nApply:   gator work apply " + m.outcome.StatePath
 		m.notice = notice{text: "Patch handoff commands shown. Apply remains explicit and requires a clean compatible checkout.", kind: noticeInfo}
 		return m, nil
 	case "t":

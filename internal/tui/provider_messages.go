@@ -31,7 +31,7 @@ func (m Model) updateConnectDone(msg connectDoneMsg) (tea.Model, tea.Cmd) {
 	}
 	runtime := delegatedRuntimeForProvider(msg.provider)
 	if runtime == "" || m.config.NewDelegateCommand == nil {
-		m.commandOutput = "Provider-owned login completed for " + msg.provider + ". Its credential remains in that vendor CLI's store. Use the matching gator delegate runtime for harness-owned runs."
+		m.commandOutput = "Provider-owned login completed for " + msg.provider + ". Its credential remains in that vendor CLI's store. Use the matching gator agent delegate runtime for harness-owned runs."
 		m.notice = notice{text: "Provider-owned login completed. See the next action below.", kind: noticeSuccess}
 		return m, nil
 	}

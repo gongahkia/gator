@@ -55,7 +55,7 @@ func serveForeground(arguments []string, out io.Writer) error {
 		return err
 	}
 	if len(flags.Args()) != 0 {
-		return errors.New("usage: gator serve --token-file ABSOLUTE_PATH [--listen 127.0.0.1:PORT]")
+		return errors.New("usage: gator agent serve --token-file ABSOLUTE_PATH [--listen 127.0.0.1:PORT]")
 	}
 	if err := validateLoopbackAddress(*listen); err != nil {
 		return err
@@ -152,14 +152,14 @@ func validateLoopbackAddress(address string) error {
 	}
 	ip := net.ParseIP(host)
 	if ip == nil || !ip.IsLoopback() {
-		return errors.New("gator serve accepts loopback addresses only; use SSH port forwarding for remote access")
+		return errors.New("gator agent serve accepts loopback addresses only; use SSH port forwarding for remote access")
 	}
 	return nil
 }
 
 func readServeToken(path string) ([]byte, error) {
 	if strings.TrimSpace(path) == "" {
-		return nil, errors.New("gator serve requires --token-file; create one with 'gator serve token ABSOLUTE_PATH'")
+		return nil, errors.New("gator agent serve requires --token-file; create one with 'gator agent serve token ABSOLUTE_PATH'")
 	}
 	if !filepath.IsAbs(path) {
 		return nil, errors.New("--token-file must be an absolute path")
@@ -212,7 +212,7 @@ func openPrivateServeFile(path string, maxBytes int64, label string) (*os.File, 
 
 func createServeToken(arguments []string, out io.Writer) error {
 	if len(arguments) != 1 || !filepath.IsAbs(arguments[0]) {
-		return errors.New("usage: gator serve token ABSOLUTE_PATH")
+		return errors.New("usage: gator agent serve token ABSOLUTE_PATH")
 	}
 	path := arguments[0]
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
@@ -320,7 +320,7 @@ func startServeService(arguments []string, out io.Writer) error {
 		_ = log.Close()
 		return fmt.Errorf("locate Gator executable for app-server service: %w", err)
 	}
-	command := exec.Command(executable, "serve", "--token-file", options.tokenFile, "--listen", options.listen, "--ready-file", readyPath)
+	command := exec.Command(executable, "agent", "serve", "--token-file", options.tokenFile, "--listen", options.listen, "--ready-file", readyPath)
 	command.Dir = repository
 	command.Stdout, command.Stderr = log, log
 	detachServeProcess(command)
@@ -344,7 +344,7 @@ func startServeService(arguments []string, out io.Writer) error {
 		abortServeProcess(command.Process, done)
 		return err
 	}
-	_, err = fmt.Fprintf(out, "Gator app server started\n  URL: %s\n  PID: %d\n  Log: %s\n  Status: gator serve status --token-file %s\n", service.URL, service.PID, statePath+".log", options.tokenFile)
+	_, err = fmt.Fprintf(out, "Gator app server started\n  URL: %s\n  PID: %d\n  Log: %s\n  Status: gator agent serve status --token-file %s\n", service.URL, service.PID, statePath+".log", options.tokenFile)
 	return err
 }
 
@@ -449,7 +449,7 @@ func parseServeServiceOptions(arguments []string, includeListen bool) (serveServ
 		return serveServiceOptions{}, err
 	}
 	if len(flags.Args()) != 0 {
-		return serveServiceOptions{}, errors.New("usage: gator serve start|status|stop --token-file ABSOLUTE_PATH")
+		return serveServiceOptions{}, errors.New("usage: gator agent serve start|status|stop --token-file ABSOLUTE_PATH")
 	}
 	if includeListen {
 		if err := validateLoopbackAddress(options.listen); err != nil {

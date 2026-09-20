@@ -95,7 +95,7 @@ type Request struct {
 	OnSnapshot           func(snapshot.Manifest)
 	Images               []agent.Image
 	Attachments          []agent.Attachment
-	// RequireCode is used by the compatibility `gator code` route. It keeps the
+	// RequireCode is used by the compatibility `gator work code` route. It keeps the
 	// main Work manager user-facing while requiring concrete Code-specialist
 	// evidence before the run may complete.
 	RequireCode        bool

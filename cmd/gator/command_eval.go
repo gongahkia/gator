@@ -17,7 +17,7 @@ import (
 	"github.com/gongahkia/gator/internal/sandbox"
 )
 
-const evalUsage = "usage: gator eval DIR [--run-id ID] [--report PATH] [--script PATH] [--live] [--provider PROVIDER] [--model MODEL] [--base-url URL] [--environment-id ID] [--require-resolved]"
+const evalUsage = "usage: gator work eval DIR [--run-id ID] [--report PATH] [--script PATH] [--live] [--provider PROVIDER] [--model MODEL] [--base-url URL] [--environment-id ID] [--require-resolved]"
 
 type evalFlags struct {
 	runID           string
@@ -42,11 +42,14 @@ type evalRuntime struct {
 }
 
 func evalCommand(arguments []string, out io.Writer) error {
-	if len(arguments) > 0 && arguments[0] == "work" {
-		return workEvalCommand(arguments[1:], out)
-	}
 	if len(arguments) > 0 && arguments[0] == "suite" {
 		return evalSuiteCommand(arguments[1:], out)
+	}
+	if len(arguments) > 0 {
+		switch arguments[0] {
+		case "validate", "run", "show", "compare", "judge-rubric", "calibrate-rubric", "export-langsmith":
+			return workEvalCommand(arguments, out)
+		}
 	}
 	return evalFixtureCommand(arguments, out)
 }
@@ -57,13 +60,13 @@ func evalFixtureCommand(arguments []string, out io.Writer) error {
 		return err
 	}
 	if strings.TrimSpace(options.reportDirectory) != "" {
-		return errors.New("--report-dir is available only with 'gator eval suite'")
+		return errors.New("--report-dir is available only with 'gator work eval suite'")
 	}
 	if options.live && strings.TrimSpace(options.scriptPath) != "" {
 		return errors.New("--script and --live cannot be used together")
 	}
 	if options.attempts != 1 {
-		return errors.New("--attempts is available only with 'gator eval suite'")
+		return errors.New("--attempts is available only with 'gator work eval suite'")
 	}
 	runtime, err := newEvalRuntime(options)
 	if err != nil {
@@ -99,10 +102,10 @@ func evalSuiteCommand(arguments []string, out io.Writer) error {
 		return err
 	}
 	if strings.TrimSpace(options.reportPath) != "" {
-		return errors.New("--report is available only with 'gator eval DIR'; use --report-dir for a suite")
+		return errors.New("--report is available only with 'gator work eval DIR'; use --report-dir for a suite")
 	}
 	if strings.TrimSpace(options.scriptPath) != "" {
-		return errors.New("--script is available only with 'gator eval DIR'; suite fixtures use their own script.json")
+		return errors.New("--script is available only with 'gator work eval DIR'; suite fixtures use their own script.json")
 	}
 	if !options.live {
 		return errors.New("suite evaluation requires --live; offline scripts exercise harness mechanics, not model quality")
@@ -200,7 +203,7 @@ func parseEvalArguments(name string, arguments []string, suite bool) (string, ev
 	}
 	if strings.TrimSpace(target) == "" {
 		if suite {
-			return "", evalFlags{}, errors.New("usage: gator eval suite DIR [--run-id ID] [--report-dir DIR] --attempts N --environment-id ID --live [--provider PROVIDER] [--model MODEL] [--base-url URL] [--require-resolved]")
+			return "", evalFlags{}, errors.New("usage: gator work eval suite DIR [--run-id ID] [--report-dir DIR] --attempts N --environment-id ID --live [--provider PROVIDER] [--model MODEL] [--base-url URL] [--require-resolved]")
 		}
 		return "", evalFlags{}, errors.New(evalUsage)
 	}

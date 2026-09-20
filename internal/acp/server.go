@@ -396,7 +396,7 @@ func (s *Server) setMode(request inbound) error {
 		session.mode = gatorrun.PlanMode
 	case "execute":
 		if len(session.verification) == 0 {
-			return errors.New("execute mode requires a verification policy; start gator acp with --verify or use a supported project test runner")
+			return errors.New("execute mode requires a verification policy; start gator agent acp with --verify or use a supported project test runner")
 		}
 		if session.statePath != "" {
 			return errors.New("cannot change a retained ACP session from plan to execute; start a new session with a verification policy")

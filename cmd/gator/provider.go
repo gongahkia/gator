@@ -83,7 +83,7 @@ func newExecutor(providerName, modelName, baseURL string) (gatorrun.Executor, er
 		return gatorrun.Executor{}, err
 	}
 	if provider == model.Claude {
-		return gatorrun.Executor{}, fmt.Errorf("Claude.ai subscription OAuth is not a supported native Gator provider; use provider %q with an API key or 'gator delegate claude run ...'", model.Anthropic)
+		return gatorrun.Executor{}, fmt.Errorf("Claude.ai subscription OAuth is not a supported native Gator provider; use provider %q with an API key or 'gator agent delegate claude run ...'", model.Anthropic)
 	}
 	credentials, err := gatorCredentials()
 	if err != nil {

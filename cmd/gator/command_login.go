@@ -47,7 +47,7 @@ func login(arguments []string, out io.Writer) error {
 		return err
 	}
 	if provider == model.Claude {
-		return errors.New("Claude.ai subscription OAuth is not a supported Gator provider login. Use 'gator provider claude' to store an Anthropic API key, then run with --provider anthropic, or use 'gator delegate claude run ...'")
+		return errors.New("Claude.ai subscription OAuth is not a supported Gator provider login. Use 'gator provider claude' to store an Anthropic API key, then run with --provider anthropic, or use 'gator agent delegate claude run ...'")
 	}
 	if !model.SupportsDirect(provider) {
 		return fmt.Errorf("provider %q has no direct Gator API integration", provider)

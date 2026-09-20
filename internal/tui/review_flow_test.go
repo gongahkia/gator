@@ -19,7 +19,7 @@ func TestReviewShowsExplicitPatchHandoffCommands(t *testing.T) {
 		t.Fatal("patch handoff returned an unexpected command")
 	}
 	updated := next.(Model)
-	if !strings.Contains(updated.commandOutput, "gator export /state/run-001") || !strings.Contains(updated.commandOutput, "gator apply --check /state/run-001") {
+	if !strings.Contains(updated.commandOutput, "gator work export /state/run-001") || !strings.Contains(updated.commandOutput, "gator work apply --check /state/run-001") {
 		t.Fatalf("patch handoff = %q", updated.commandOutput)
 	}
 }

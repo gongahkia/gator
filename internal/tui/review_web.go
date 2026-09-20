@@ -46,7 +46,7 @@ func (m Model) openReviewWeb() (tea.Model, tea.Cmd) {
 	}
 	m.screen = reviewWebScreen
 	_ = m.reviewWeb.listen.Focus()
-	m.notice = notice{text: "Loopback-only browser review. The one-use URL is shown after start; this is not gator serve and has no RPC access.", kind: noticeInfo}
+	m.notice = notice{text: "Loopback-only browser review. The one-use URL is shown after start; this is not gator agent serve and has no RPC access.", kind: noticeInfo}
 	return m, nil
 }
 

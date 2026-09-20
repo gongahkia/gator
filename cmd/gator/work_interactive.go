@@ -276,7 +276,7 @@ func workTUIConnectorAction(arguments []string) (string, error) {
 }
 
 func workTUIConnectorCommand(arguments []string) *exec.Cmd {
-	command := exec.Command(os.Args[0], append([]string{"connector"}, arguments...)...)
+	command := exec.Command(os.Args[0], append([]string{"provider", "connector"}, arguments...)...)
 	command.Stdin = os.Stdin
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr

@@ -21,7 +21,7 @@ func TestRunHelp(t *testing.T) {
 		if !strings.Contains(output.String(), "Usage:") {
 			t.Fatalf("help output = %q, want usage", output.String())
 		}
-		for _, value := range []string{"gator --help | -h", "gator provider PROVIDER [OPTIONS]", "gator -p ...", "gator work", "gator inspect", "--actions forbid|draft|approve", "--kind json|webhook", "verify and inspect a Work bundle"} {
+		for _, value := range []string{"gator --help | -h", "gator provider PROVIDER [OPTIONS]", "gator -p ...", "gator agent acp", "gator work", "gator work inspect", "gator work review", "gator -w [OPTIONS] TASK", "--actions forbid|draft|approve", "--kind json|webhook"} {
 			if !strings.Contains(output.String(), value) {
 				t.Fatalf("help output is missing %q", value)
 			}
@@ -77,6 +77,21 @@ func TestRunRejectsRemovedRootAliases(t *testing.T) {
 	}
 }
 
+func TestMovedRootCommandsExplainTheirCanonicalFamily(t *testing.T) {
+	for command, canonical := range map[string]string{
+		"rpc": "gator agent rpc", "serve": "gator agent serve", "acp": "gator agent acp", "child": "gator agent child", "delegate": "gator agent delegate",
+		"hook": "gator config hook", "connector": "gator provider connector", "inbox": "gator job inbox", "snapshot": "gator work snapshot", "worktree": "gator work worktree",
+		"inspect": "gator work inspect", "code": "gator work code", "run": "gator work run", "resume": "gator work resume", "eval": "gator work eval",
+		"transcript": "gator work transcript", "review": "gator work review", "export": "gator work export", "apply": "gator work apply",
+	} {
+		var output bytes.Buffer
+		err := run([]string{command}, &output)
+		if err == nil || !strings.Contains(err.Error(), "has moved") || !strings.Contains(err.Error(), canonical) {
+			t.Fatalf("%s error = %v, want migration to %s", command, err, canonical)
+		}
+	}
+}
+
 func TestShortCLIFormsRouteToTheirCommandFamilies(t *testing.T) {
 	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
 	var output bytes.Buffer
@@ -93,6 +108,59 @@ func TestShortCLIFormsRouteToTheirCommandFamilies(t *testing.T) {
 	if err := run([]string{"-d", "--provider", "not-a-provider"}, io.Discard); err == nil || !strings.Contains(err.Error(), "unknown provider") {
 		t.Fatalf("-d error = %v", err)
 	}
+	output.Reset()
+	if err := run([]string{"-a", "--help"}, &output); err != nil || !strings.Contains(output.String(), "gator agent acp") {
+		t.Fatalf("-a output = %q, err = %v", output.String(), err)
+	}
+	if err := run([]string{"-e"}, io.Discard); err == nil || !strings.Contains(err.Error(), "extension") {
+		t.Fatalf("-e error = %v", err)
+	}
+	if err := run([]string{"-l"}, io.Discard); err == nil || !strings.Contains(err.Error(), "gator lsp") {
+		t.Fatalf("-l error = %v", err)
+	}
+	if err := run([]string{"-m"}, io.Discard); err == nil || !strings.Contains(err.Error(), "gator mcp") {
+		t.Fatalf("-m error = %v", err)
+	}
+	if err := run([]string{"-j", "inbox", "unexpected"}, io.Discard); err == nil || !strings.Contains(err.Error(), "gator job inbox") {
+		t.Fatalf("-j inbox error = %v", err)
+	}
+	if err := run([]string{"-b"}, io.Discard); err == nil || !strings.Contains(err.Error(), "gator browser") {
+		t.Fatalf("-b error = %v", err)
+	}
+	output.Reset()
+	if err := run([]string{"-t", "list"}, &output); err != nil || !strings.Contains(output.String(), "contrast") {
+		t.Fatalf("-t output = %q, err = %v", output.String(), err)
+	}
+	output.Reset()
+	if err := run([]string{"-w", "code", "--help"}, &output); err != nil || !strings.Contains(output.String(), "gator work code") {
+		t.Fatalf("-w code output = %q, err = %v", output.String(), err)
+	}
+}
+
+func TestNestedCommandFamiliesRouteToTheirHandlers(t *testing.T) {
+	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
+	t.Setenv("GATOR_STATE_DIR", t.TempDir())
+	for _, test := range []struct {
+		arguments []string
+		contains  string
+	}{
+		{[]string{"agent", "acp", "unexpected"}, "usage: gator agent acp"},
+		{[]string{"agent", "rpc", "unexpected"}, "usage: gator agent rpc"},
+		{[]string{"agent", "child"}, "gator agent child list"},
+		{[]string{"agent", "delegate"}, "gator agent delegate"},
+		{[]string{"config", "hook"}, "gator config hook status"},
+		{[]string{"provider", "connector", "status"}, "connector ID"},
+		{[]string{"job", "inbox", "unexpected"}, "gator job inbox"},
+		{[]string{"work", "eval"}, "usage: gator work eval"},
+		{[]string{"work", "transcript"}, "usage: gator work transcript"},
+		{[]string{"work", "snapshot", "show"}, "gator work snapshot show"},
+		{[]string{"work", "worktree"}, "gator work worktree list"},
+		{[]string{"work", "review"}, "usage: gator work review"},
+	} {
+		if err := run(test.arguments, io.Discard); err == nil || !strings.Contains(err.Error(), test.contains) {
+			t.Fatalf("%s error = %v, want %q", strings.Join(test.arguments, " "), err, test.contains)
+		}
+	}
 }
 
 func TestCodeAndRunRouteThroughTheMainOrchestrationEntryPoint(t *testing.T) {
@@ -101,7 +169,7 @@ func TestCodeAndRunRouteThroughTheMainOrchestrationEntryPoint(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "")
 	for _, command := range []string{"code", "run"} {
 		var output bytes.Buffer
-		err := run([]string{command, "task without verification"}, &output)
+		err := run([]string{"work", command, "task without verification"}, &output)
 		if err == nil || strings.Contains(err.Error(), "--verify") || !strings.Contains(err.Error(), "OPENAI_API_KEY") {
 			t.Fatalf("%s entry point error = %v", command, err)
 		}
@@ -111,7 +179,7 @@ func TestCodeAndRunRouteThroughTheMainOrchestrationEntryPoint(t *testing.T) {
 func TestCodeCompatibilityRoutesExplainTheManagerOwnedWorkflow(t *testing.T) {
 	for _, command := range []string{"code", "run"} {
 		var output bytes.Buffer
-		if err := run([]string{command, "--help"}, &output); err != nil {
+		if err := run([]string{"work", command, "--help"}, &output); err != nil {
 			t.Fatalf("%s help: %v", command, err)
 		}
 		for _, expected := range []string{"main Gator orchestration path", "internal Code specialist", "--code-capability", "strict sandbox"} {
@@ -125,9 +193,9 @@ func TestCodeCompatibilityRoutesExplainTheManagerOwnedWorkflow(t *testing.T) {
 func TestStandaloneCodeConversationCommandsAreRetired(t *testing.T) {
 	for _, command := range []string{"resume", "fork", "clone"} {
 		var output bytes.Buffer
-		err := run([]string{"code", command, "legacy-id"}, &output)
+		err := run([]string{"work", "code", command, "legacy-id"}, &output)
 		if err == nil || !strings.Contains(err.Error(), "standalone Code sessions are retired") {
-			t.Fatalf("code %s error = %v", command, err)
+			t.Fatalf("work code %s error = %v", command, err)
 		}
 	}
 }

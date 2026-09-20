@@ -14,7 +14,7 @@ import (
 func workRubricCommand(action, path string, args []string, out io.Writer) error {
 	if action == "calibrate-rubric" {
 		if len(args) != 1 {
-			return errors.New("usage: gator eval work calibrate-rubric JUDGE.json HUMAN.json")
+			return errors.New("usage: gator work eval calibrate-rubric JUDGE.json HUMAN.json")
 		}
 		var judge, human eval.RubricReport
 		if err := readWorkJSON(path, &judge); err != nil {

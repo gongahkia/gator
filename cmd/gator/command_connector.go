@@ -42,19 +42,19 @@ func connectorCommandWithIO(arguments []string, in io.Reader, out io.Writer) err
 		return addConnector(id, arguments[2:], out)
 	case "status":
 		if len(arguments) != 2 {
-			return errors.New("usage: gator connector status ID")
+			return errors.New("usage: gator provider connector status ID")
 		}
 		return connectorStatus(id, out)
 	case "login":
 		return loginConnector(id, arguments[2:], in, out)
 	case "logout":
 		if len(arguments) != 2 {
-			return errors.New("usage: gator connector logout ID")
+			return errors.New("usage: gator provider connector logout ID")
 		}
 		return logoutConnector(id, out)
 	case "test":
 		if len(arguments) != 2 {
-			return errors.New("usage: gator connector test ID")
+			return errors.New("usage: gator provider connector test ID")
 		}
 		return testConnector(id, out)
 	case "remove":
@@ -117,7 +117,7 @@ func addConnector(id string, arguments []string, out io.Writer) error {
 		return err
 	}
 	if len(flags.Args()) != 0 {
-		return errors.New("usage: gator connector add ID --kind json|webhook|slack|google|atlassian|notion|mcp [--url URL] [--auth none|bearer|oauth]")
+		return errors.New("usage: gator provider connector add ID --kind json|webhook|slack|google|atlassian|notion|mcp [--url URL] [--auth none|bearer|oauth]")
 	}
 	kind := ""
 	switch strings.ToLower(strings.TrimSpace(*kindName)) {
@@ -198,11 +198,11 @@ func addConnector(id string, arguments []string, out io.Writer) error {
 		return err
 	}
 	if descriptor.Authentication == connector.AuthBearer {
-		_, err = fmt.Fprintf(out, "Authenticate it with: gator connector login %s --from-env TOKEN_ENV\n", descriptor.ID)
+		_, err = fmt.Fprintf(out, "Authenticate it with: gator provider connector login %s --from-env TOKEN_ENV\n", descriptor.ID)
 		return err
 	}
 	if descriptor.Authentication == connector.AuthOAuth {
-		_, err = fmt.Fprintf(out, "Authenticate the user-owned OAuth app with: gator connector login %s [--oauth-client-secret-from-env NAME]\n", descriptor.ID)
+		_, err = fmt.Fprintf(out, "Authenticate the user-owned OAuth app with: gator provider connector login %s [--oauth-client-secret-from-env NAME]\n", descriptor.ID)
 		return err
 	}
 	return nil
@@ -447,7 +447,7 @@ func connectorTestInvocation(descriptor connector.Descriptor) (string, []byte) {
 
 func setConnectorPermission(id string, arguments []string, out io.Writer) error {
 	if len(arguments) != 3 || (arguments[1] != "read" && arguments[1] != "write") {
-		return errors.New("usage: gator connector permission ID OPERATION read|write allow|ask|deny|draft")
+		return errors.New("usage: gator provider connector permission ID OPERATION read|write allow|ask|deny|draft")
 	}
 	descriptor, _, err := configuredConnector(id)
 	if err != nil {

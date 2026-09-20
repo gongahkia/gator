@@ -51,18 +51,18 @@ func interactiveWithOptions(options interactiveOptions) error {
 		return fmt.Errorf("inspect terminal input: %w", err)
 	}
 	if inputInfo.Mode()&os.ModeCharDevice == 0 {
-		return errors.New("interactive mode requires a terminal; use 'gator run' for scripts")
+		return errors.New("interactive mode requires a terminal; use 'gator work run' for scripts")
 	}
 	outputInfo, err := os.Stdout.Stat()
 	if err != nil {
 		return fmt.Errorf("inspect terminal output: %w", err)
 	}
 	if outputInfo.Mode()&os.ModeCharDevice == 0 {
-		return errors.New("interactive mode requires a terminal; use 'gator run' for scripts")
+		return errors.New("interactive mode requires a terminal; use 'gator work run' for scripts")
 	}
 	terminal, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
 	if err != nil {
-		return errors.New("interactive mode requires a controlling terminal; use 'gator run' for scripts")
+		return errors.New("interactive mode requires a controlling terminal; use 'gator work run' for scripts")
 	}
 	if err := terminal.Close(); err != nil {
 		return fmt.Errorf("close terminal check: %w", err)
@@ -153,7 +153,7 @@ func interactiveWithOptions(options interactiveOptions) error {
 			return exec.Command(os.Args[0], "provider", provider), nil
 		},
 		NewDelegateCommand: func(runtime, task, modelName string, verification [][]string, repository string) (tui.DelegateCommand, error) {
-			arguments := []string{"delegate", runtime, "run"}
+			arguments := []string{"agent", "delegate", runtime, "run"}
 			if strings.TrimSpace(modelName) != "" {
 				arguments = append(arguments, "--model", modelName)
 			}
@@ -173,7 +173,7 @@ func interactiveWithOptions(options interactiveOptions) error {
 			if len(arguments) == 0 || (arguments[0] != "status" && arguments[0] != "login") {
 				return nil, errors.New("invalid OpenCode management action")
 			}
-			command := append([]string{"delegate", "opencode"}, arguments...)
+			command := append([]string{"agent", "delegate", "opencode"}, arguments...)
 			return exec.Command(os.Args[0], command...), nil
 		},
 		Build:          tui.BuildInfo{Version: version, Commit: commit, Date: date},

@@ -21,7 +21,7 @@ import (
 
 func workEvalCommand(args []string, out io.Writer) error {
 	if len(args) < 2 {
-		return errors.New("usage: gator eval work validate|run|show|compare DATASET_OR_REPORT [options]")
+		return errors.New("usage: gator work eval validate|run|show|compare DATASET_OR_REPORT [options]")
 	}
 	action, path := args[0], args[1]
 	if action == "judge-rubric" || action == "calibrate-rubric" {

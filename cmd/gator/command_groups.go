@@ -44,8 +44,10 @@ func agentFamilyCommand(arguments []string, out io.Writer) error {
 		return rpcMode(arguments[1:], os.Stdin, out)
 	case "serve":
 		return serveCommand(arguments[1:], out)
-	default:
+	case "list":
 		return agentCommand(arguments, out)
+	default:
+		return errors.New(agentFamilyUsage)
 	}
 }
 
