@@ -356,11 +356,14 @@ func (m Model) submitRunningInput() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.input = ""
-	if prompt == "/quit" && m.cancel != nil {
-		m.quitting = true
-		m.cancel()
-		m.status = "Cancelling before exit…"
-		return m, nil
+	if prompt == "exit" || prompt == "/quit" {
+		if m.cancel != nil {
+			m.quitting = true
+			m.cancel()
+			m.status = "Cancelling before exit…"
+			return m, nil
+		}
+		return m, tea.Quit
 	}
 	if prompt == "/tasks" {
 		var lines []string
@@ -446,6 +449,9 @@ func (m Model) submitComposerInput() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.input = ""
+	if prompt == "exit" {
+		return m.runLocalCommand("exit")
+	}
 	if strings.HasPrefix(prompt, "/") {
 		return m.runLocalCommand(prompt)
 	}
@@ -493,6 +499,9 @@ func (m Model) updateHome(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.input = ""
+		if prompt == "exit" {
+			return m.runLocalCommand("exit")
+		}
 		if strings.HasPrefix(prompt, "/") {
 			return m.runLocalCommand(prompt)
 		}
@@ -586,6 +595,8 @@ func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.launcher = false
 			m.paletteQuery = ""
 			return m.startProviderAction(selected.command, selected.id)
+		case "copy":
+			return m.copySelection(selected.id)
 		case "conversation":
 			m.launcher = false
 			m.paletteQuery = ""
