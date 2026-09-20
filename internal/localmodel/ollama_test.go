@@ -43,6 +43,8 @@ func TestCatalogIncludesPublishedReviewedModelMetadata(t *testing.T) {
 		{category: "Coding", id: "qwen2.5-coder-7b", tag: "qwen2.5-coder:7b", bytes: 4_700_000_000},
 		{category: "Coding", id: "qwen2.5-coder-14b", tag: "qwen2.5-coder:14b", bytes: 9_000_000_000},
 		{category: "Coding", id: "qwen2.5-coder-32b", tag: "qwen2.5-coder:32b", bytes: 20_000_000_000},
+		{category: "Coding", id: "devstral-24b", tag: "devstral:24b", bytes: 14_000_000_000},
+		{category: "Coding", id: "qwen3-coder-30b", tag: "qwen3-coder:30b", bytes: 19_000_000_000},
 	} {
 		t.Run(test.id, func(t *testing.T) {
 			model, found := Resolve(test.id)
@@ -54,10 +56,12 @@ func TestCatalogIncludesPublishedReviewedModelMetadata(t *testing.T) {
 }
 
 func TestCatalogPlacesGeneralWorkModelsBeforeCodingModels(t *testing.T) {
+	seenGeneralWork := false
 	seenCoding := false
 	for _, model := range Catalog() {
 		switch model.Category {
 		case "General Work":
+			seenGeneralWork = true
 			if seenCoding {
 				t.Fatalf("general Work model %q follows a coding model", model.ID)
 			}
@@ -66,6 +70,9 @@ func TestCatalogPlacesGeneralWorkModelsBeforeCodingModels(t *testing.T) {
 		default:
 			t.Fatalf("catalog model %q has unknown category %q", model.ID, model.Category)
 		}
+	}
+	if !seenGeneralWork {
+		t.Fatal("catalog lost its general Work models")
 	}
 	if !seenCoding {
 		t.Fatal("catalog lost its coding models")
