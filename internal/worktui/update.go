@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/agent"
@@ -125,6 +126,7 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 	m.pendingInteractions = nil
 	m.live = nil
 	m.running = false
+	m.runStarted = time.Time{}
 	if m.quitting {
 		return m, tea.Quit
 	}

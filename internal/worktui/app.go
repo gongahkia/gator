@@ -5,6 +5,7 @@ import (
 	"context"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/agent"
@@ -250,6 +251,7 @@ type Model struct {
 	theme                string
 	loadingFrame         int
 	loadingRun           uint64
+	runStarted           time.Time
 	modelStatus          ModelStatus
 	statusLine           []string
 	statusLineConfigured bool

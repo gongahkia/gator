@@ -92,7 +92,11 @@ func (m Model) View() string {
 		view.WriteString(strings.Join(lines[start:end], "\n") + "\n")
 	}
 	if m.running {
-		view.WriteString(accent.Render(rattles.BrailleDots.Frame(m.loadingFrame)+" Working…") + "\n\n")
+		working := rattles.BrailleDots.Frame(m.loadingFrame) + " Working…"
+		if elapsed := m.workElapsed(); elapsed != "" {
+			working += " " + elapsed + " · esc to interrupt"
+		}
+		view.WriteString(accent.Render(working) + "\n\n")
 	}
 	view.WriteString(m.renderComposer(width, !m.running))
 	if footer != "" {

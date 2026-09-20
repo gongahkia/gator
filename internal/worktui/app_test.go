@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
@@ -350,9 +351,13 @@ func TestRunningWorkUsesRattlesLoadingFrames(t *testing.T) {
 	model.home = false
 	model.running = true
 	model.loadingRun = 7
+	model.runStarted = time.Now().Add(-20 * time.Second)
 
 	if view := ansi.Strip(model.View()); !strings.Contains(view, "⠋ Working…") {
 		t.Fatalf("initial loading view = %q", view)
+	}
+	if view := ansi.Strip(model.View()); !strings.Contains(view, "20s · esc to interrupt") {
+		t.Fatalf("initial loading view omitted elapsed work time: %q", view)
 	}
 	updated, command := model.Update(loadingTickMsg{run: 7})
 	model = updated.(Model)

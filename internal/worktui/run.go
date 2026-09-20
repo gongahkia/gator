@@ -2,6 +2,7 @@ package worktui
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -24,7 +25,19 @@ func (m Model) nextLoadingTick() tea.Cmd {
 	})
 }
 
+func (m Model) workElapsed() string {
+	if m.runStarted.IsZero() {
+		return ""
+	}
+	seconds := int(time.Since(m.runStarted).Seconds())
+	if seconds < 0 {
+		seconds = 0
+	}
+	return fmt.Sprintf("%ds", seconds)
+}
+
 func (m Model) startWork(source, conversation, prompt string, options RunOptions) (tea.Model, tea.Cmd) {
+	m.runStarted = time.Now()
 	if !m.config.Live {
 		return m, func() tea.Msg { return runDone(m.config.Run(source, conversation, prompt, options)) }
 	}
