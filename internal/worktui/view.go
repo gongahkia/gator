@@ -9,9 +9,6 @@ import (
 )
 
 func (m Model) View() string {
-	if m.models != nil {
-		return m.models.View()
-	}
 	width := m.width
 	if width <= 0 {
 		width = 80
@@ -24,18 +21,21 @@ func (m Model) View() string {
 	} else if height < 8 {
 		height = 8
 	}
+	if m.models != nil {
+		return m.models.View()
+	}
 	accent, dim, selectedStyle := workStyles(m.theme)
 	if m.launcher {
 		if m.launcherMode == "status-line" {
-			return m.renderStatusLineEditor(width, height, accent, dim, selectedStyle)
+			return m.renderViewport(m.renderStatusLineEditor(width, height, accent, dim, selectedStyle), width, height)
 		}
-		return m.renderPalette(width, height, accent, dim, selectedStyle)
+		return m.renderViewport(m.renderPalette(width, height, accent, dim, selectedStyle), width, height)
 	}
 	if m.section != "" {
-		return m.renderSection(width, accent, dim)
+		return m.renderViewport(m.renderSection(width, accent, dim), width, height)
 	}
 	if m.home {
-		return m.renderHome(width, height, accent, dim)
+		return m.renderViewport(m.renderHome(width, height, accent, dim), width, height)
 	}
 	var view strings.Builder
 	view.WriteString(accent.Render(gatorWordmark))
@@ -98,7 +98,18 @@ func (m Model) View() string {
 	if footer != "" {
 		view.WriteString("\n" + dim.Render(footer))
 	}
-	return view.String()
+	return m.renderViewport(view.String(), width, height)
+}
+
+// renderViewport explicitly paints every terminal cell. Without a background
+// style, transparent terminal emulators show whatever window sits behind
+// Gator in the unused parts of the alternate screen.
+func (m Model) renderViewport(contents string, width, height int) string {
+	background := lipgloss.Color("234")
+	if m.theme == "contrast" || m.theme == "mono" {
+		background = lipgloss.Color("0")
+	}
+	return lipgloss.NewStyle().Width(width).Height(height).Background(background).Render(contents)
 }
 
 func (m Model) renderHome(width, height int, accent, dim lipgloss.Style) string {
