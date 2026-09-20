@@ -183,6 +183,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		m.source = m.config.CurrentFolder
 		m.title = "Work in " + filepath.Base(m.source)
 		m.revision, m.snapshot = "", ""
+		m.clearPromptHistory()
 		m.messages, m.status, m.queue = nil, "", nil
 		m.lastOutput, m.lastBundle = "", BundleSummary{}
 		m.options = RunOptions{MaxSteps: 24, Mode: "auto", Code: CodeOptions{MaxSteps: 16, Sandbox: "strict", Network: "deny"}}
@@ -897,6 +898,7 @@ func workHelp() string {
 Gator manages its internal specialists; the Work TUI has no Code commands.
 
 Navigation
+  ↑/↓       recall sent prompts in this conversation
   ctrl+x    retained conversations
   ctrl+b    inbox
   ctrl+j    scheduled jobs

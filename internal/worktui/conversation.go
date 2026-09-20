@@ -8,6 +8,7 @@ import "strings"
 // artifact-card semantics.
 func (m *Model) restoreConversation(conversationID, announcement string) {
 	m.input = ""
+	m.clearPromptHistory()
 	m.queue = nil
 	m.pendingBundleAction = nil
 	m.lastOutput = ""
@@ -53,6 +54,7 @@ func (m *Model) applyConversationState(conversationID string, state Conversation
 			role: item.Role, text: item.Text, bundle: cloneBundlePointer(item.Bundle),
 		})
 	}
+	m.rebuildPromptHistory()
 }
 
 func retainedRunOptions(options RunOptions) RunOptions {

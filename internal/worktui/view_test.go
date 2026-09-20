@@ -19,3 +19,9 @@ func TestRenderViewportCoversEveryTerminalCell(t *testing.T) {
 		}
 	}
 }
+
+func TestInitRequestsAStartupScreenClear(t *testing.T) {
+	if New(Config{}).Init() == nil {
+		t.Fatal("Work TUI did not request a startup redraw")
+	}
+}

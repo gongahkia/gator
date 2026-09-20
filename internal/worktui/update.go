@@ -269,15 +269,21 @@ func (m Model) updateKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) updateRunningKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch value.String() {
+	case "up":
+		m.recallPreviousPrompt()
+	case "down":
+		m.recallNextPrompt()
 	case "enter":
 		return m.submitRunningInput()
 	case "backspace":
+		m.resetPromptHistoryNavigation()
 		runes := []rune(m.input)
 		if len(runes) > 0 {
 			m.input = string(runes[:len(runes)-1])
 		}
 	default:
 		if value.Type == tea.KeyRunes || value.String() == " " {
+			m.resetPromptHistoryNavigation()
 			m.input += value.String()
 		}
 	}
@@ -352,6 +358,7 @@ func (m Model) submitRunningInput() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.queue = append(m.queue, queuedRun{prompt: prompt, options: cloneRunOptions(m.options)})
+	m.recordPrompt(prompt)
 	m.options.Attachments = nil
 	m.options.RefreshSource = false
 	m.status = fmt.Sprintf("Working from an immutable snapshot… · %d queued", len(m.queue))
@@ -360,9 +367,14 @@ func (m Model) submitRunningInput() (tea.Model, tea.Cmd) {
 
 func (m Model) updateComposerKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch value.String() {
+	case "up":
+		m.recallPreviousPrompt()
+	case "down":
+		m.recallNextPrompt()
 	case "enter":
 		return m.submitComposerInput()
 	case "backspace":
+		m.resetPromptHistoryNavigation()
 		runes := []rune(m.input)
 		if len(runes) > 0 {
 			m.input = string(runes[:len(runes)-1])
@@ -371,6 +383,7 @@ func (m Model) updateComposerKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.openCommandPalette()
 	default:
 		if value.Type == tea.KeyRunes || value.String() == " " {
+			m.resetPromptHistoryNavigation()
 			m.input += value.String()
 		}
 	}
@@ -394,6 +407,7 @@ func (m Model) submitComposerInput() (tea.Model, tea.Cmd) {
 		return m.openModels()
 	}
 	m.messages = append(m.messages, message{role: "You", text: prompt})
+	m.recordPrompt(prompt)
 	m.home = false
 	m.running = true
 	m.status = "Working from an immutable snapshot…"
@@ -415,6 +429,10 @@ func (m Model) updateHome(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	switch key.String() {
+	case "up":
+		m.recallPreviousPrompt()
+	case "down":
+		m.recallNextPrompt()
 	case "enter":
 		prompt := strings.TrimSpace(m.input)
 		if prompt == "" {
@@ -433,6 +451,7 @@ func (m Model) updateHome(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.home = false
 		m.messages = append(m.messages, message{role: "You", text: prompt})
+		m.recordPrompt(prompt)
 		m.running = true
 		m.status = "Working from an immutable snapshot…"
 		run := m.config.Run
@@ -448,6 +467,7 @@ func (m Model) updateHome(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.options.RefreshSource = false
 		return m.startWork(source, conversation, prompt, options)
 	case "backspace":
+		m.resetPromptHistoryNavigation()
 		runes := []rune(m.input)
 		if len(runes) > 0 {
 			m.input = string(runes[:len(runes)-1])
@@ -456,6 +476,7 @@ func (m Model) updateHome(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.openCommandPalette()
 	default:
 		if key.Type == tea.KeyRunes || key.String() == " " {
+			m.resetPromptHistoryNavigation()
 			m.input += key.String()
 		}
 	}

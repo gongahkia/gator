@@ -225,6 +225,9 @@ type Model struct {
 	snapshot             string
 	title                string
 	input                string
+	promptHistory        []string
+	historyIndex         int
+	historyDraft         string
 	messages             []message
 	running              bool
 	status               string
@@ -287,4 +290,7 @@ func New(config Config) Model {
 	return model
 }
 
-func (m Model) Init() tea.Cmd { return nil }
+// Init forces one redraw after the alternate screen has been entered. Some
+// terminal emulators otherwise retain cells from the previous buffer until
+// their first viewport-sized repaint.
+func (m Model) Init() tea.Cmd { return tea.ClearScreen }
