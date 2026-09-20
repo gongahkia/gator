@@ -65,7 +65,7 @@ flow. Near-expiry OAuth credentials refresh before a run. Cursor fails clearly
 because no complete direct Gator integration is available; native Gator never
 falls back to a vendor CLI.
 
-`gator delegate` is deliberately not a native model adapter. It creates the
+`gator agent delegate` is deliberately not a native model adapter. It creates the
 same isolated retained worktree and then starts an explicitly selected installed
 CLI there; Gator runs the developer's verification commands after that CLI
 exits. The delegated CLI owns its own agent loop, context, tools, approvals,
@@ -130,8 +130,8 @@ heartbeat/deadline, and outcome without copying prompt or patch text. A batch
 manifest links the exact two child IDs and saves changed-path evidence plus the
 three-way comparison status, result tree when clean, and bounded diagnostic.
 They remain recoverable after a
-process failure through `gator child list`, `gator child show`, `gator child
-batches`, and `gator child batch`. Each child reloads the same selected profile,
+process failure through `gator agent child list`, `gator agent child show`, `gator agent child
+batches`, and `gator agent child batch`. Each child reloads the same selected profile,
 verifier, sandbox policy, approval callback, and trusted
 extension/LSP/MCP configuration; recursive writer delegation is omitted from
 its tool surface. A validated project `writer` role can specialize the child
@@ -152,20 +152,20 @@ all owned children during normal process shutdown. It must not infer completion
 from a stale PID, restore approvals after restart, or apply a result. This
 release does not detach writer execution from the parent run.
 
-`gator acp` is a separate local stdio ACP v1 agent surface for editors. It
+`gator agent acp` is a separate local stdio ACP v1 agent surface for editors. It
 maps ACP sessions to retained Gator threads, streams normalized model/tool
 events as ACP session updates, and maps Gator command approval to ACP
 `session/request_permission`. It does not give an ACP client authority to
 change repository roots, add filesystem roots, inject MCP servers, or weaken
-the process-level verifier policy. Gator's proprietary `gator rpc` interface
+the process-level verifier policy. Gator's proprietary `gator agent rpc` interface
 remains for automation that needs run IDs, steering, and other Gator-specific
-control-plane operations. `gator serve` is a thin authenticated HTTP/SSE bridge
+control-plane operations. `gator agent serve` is a thin authenticated HTTP/SSE bridge
 over that same RPC server: a literal-loopback listener accepts one RPC request
 per `POST /v1/rpc` and replays/streams correlated output at
 `GET /v1/events/{id}`. It uses a private bearer-token file, rejects browser
 origins, bounds request/replay/subscriber buffers, and does not create a second
 executor, remote mode, or client authority over repository and policy settings.
-`gator serve start` can explicitly supervise one repository-scoped background
+`gator agent serve start` can explicitly supervise one repository-scoped background
 bridge with private URL/PID state and a local log; `status` and `stop` prove
 possession of the configured token against the bridge before acting on its
 state. The native TUI and ACP intentionally do not auto-discover it, and a
@@ -263,7 +263,7 @@ Execute mode exposes these tools:
    waits for allow-once, always-allow-this-argv, or deny;
 5. inspect Git status and diff.
 6. start, read, write, list, and stop bounded persistent pseudo-terminal tasks;
-   in the native TUI or authenticated `gator serve`, request a separately
+   in the native TUI or authenticated `gator agent serve`, request a separately
    approved `terminal_detach` for one task that must remain available after the
    agent run.
 7. when the developer explicitly allows network access, fetch one approved
@@ -273,12 +273,12 @@ Execute mode exposes these tools:
 Terminal-task starts share the run's strict sandbox, worktree root, network
 policy, filtered environment, and developer command approval. They retain only
 bounded in-memory scrollback and ordinary tasks are cancelled at run completion.
-In the native TUI or authenticated `gator serve` process, a model may request
+In the native TUI or authenticated `gator agent serve` process, a model may request
 `terminal_detach`; a distinct developer approval then keeps that existing task
 in the process-local session registry, with its original policy, an
 at-most-two-hour running lifetime, and a session-wide cap of eight retained
 histories. In the native
-TUI, `Ctrl+T` attaches locally; `gator serve` additionally exposes
+TUI, `Ctrl+T` attaches locally; `gator agent serve` additionally exposes
 `terminal_list/read/write/resize/stop/restart` to its authenticated controller. Direct
 commands, plain JSONL RPC, ACP, and child-writer tool surfaces omit detachment.
 The normal shutdown path stops all detached tasks. A model must request a
@@ -357,7 +357,7 @@ Before calling a release useful for daily work, Gator must have:
   time limit, and verifier.
 
 The first, second, third, and fifth items have automated coverage in
-`go test ./...` and `gator eval`. The dogfood log remains a human process;
+`go test ./...` and `gator work eval`. The dogfood log remains a human process;
 the template is in [release evidence](RELEASE_EVIDENCE.md).
 
 Benchmark results can demonstrate a bounded configuration only. They cannot by

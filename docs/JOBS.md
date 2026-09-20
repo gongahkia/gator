@@ -155,8 +155,8 @@ gator job history ID
 gator job supervisor [--notify=false]
 gator job status
 gator job stop
-gator inbox [--unread]
-gator inbox read ENTRY_ID
+gator job inbox [--unread]
+gator job inbox read ENTRY_ID
 gator job remove ID --yes        # keeps immutable history by default
 ```
 

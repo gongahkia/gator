@@ -1,6 +1,6 @@
 # RPC integration
 
-`gator rpc` (or `gator --mode rpc`) is Gator's versioned JSONL interface for
+`gator agent rpc` (or `gator --mode rpc`) is Gator's versioned JSONL interface for
 IDEs, automation, and custom user interfaces. Send one JSON request per line
 to standard input and read responses and lifecycle events from standard
 output. Gator never writes human-formatted output in this mode.
@@ -71,7 +71,7 @@ messages as SSE at `GET /v1/events/{id}`. It is an authenticated loopback
 bridge, not another execution path: client input cannot add setup commands,
 filesystem roots, MCP servers, credentials, or a weaker policy.
 
-`gator serve` additionally exposes control of an already detached terminal
+`gator agent serve` additionally exposes control of an already detached terminal
 task through `terminal_list`, `terminal_read`, `terminal_write`,
 `terminal_resize`, `terminal_stop`, and `terminal_restart`. Restart is allowed
 only after the selected task exits and creates a new task from its exact argv
@@ -79,7 +79,7 @@ and fixed sandbox policy. These methods are advertised only for that server
 process. The complete lifecycle and the direct-developer-input boundary are
 documented in [the app-server guide](APP_SERVER.md#detached-terminals).
 
-For an editor that needs a stable local endpoint, `gator serve start` launches
+For an editor that needs a stable local endpoint, `gator agent serve start` launches
 one explicit repository-scoped background bridge, while `status` and `stop`
 require the same private token file. It is not automatically started or shared
 with the native TUI or ACP client.

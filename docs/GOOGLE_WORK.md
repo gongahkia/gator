@@ -30,8 +30,8 @@ Gator. Enable the Google Tasks, Calendar, Drive, Docs, and Sheets APIs for that
 project, then configure Gator with its client ID:
 
 ```sh
-gator connector add google-work --kind google --oauth-client-id YOUR_CLIENT_ID
-gator connector login google-work --oauth-client-secret-from-env GOOGLE_OAUTH_CLIENT_SECRET
+gator provider connector add google-work --kind google --oauth-client-id YOUR_CLIENT_ID
+gator provider connector login google-work --oauth-client-secret-from-env GOOGLE_OAUTH_CLIENT_SECRET
 ```
 
 The client secret is optional for clients that do not need one. If supplied it
@@ -59,9 +59,9 @@ example, a configuration may permit calendar reads while denying event
 creation:
 
 ```sh
-gator connector permission google-work events_list read allow
-gator connector permission google-work events_create write deny
-gator connector permission google-work tasks_create write ask
+gator provider connector permission google-work events_list read allow
+gator provider connector permission google-work events_create write deny
+gator provider connector permission google-work tasks_create write ask
 ```
 
 Available read operations cover task lists/tasks (including completed and

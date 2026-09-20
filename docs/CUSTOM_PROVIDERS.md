@@ -30,7 +30,7 @@ The first `--model` is the default; subsequent model flags add selectable
 models. Use the configured ID everywhere a built-in provider would appear:
 
 ```sh
-gator run --provider local-llm --verify 'go test ./...' 'Add focused tests'
+gator work run --provider local-llm --verify 'go test ./...' 'Add focused tests'
 gator config set default-provider local-llm
 gator provider list
 gator provider discover local-llm

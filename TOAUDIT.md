@@ -344,6 +344,7 @@ compatibility. They should not be treated as supported product workflows.
 | Entry | Current behavior |
 | --- | --- |
 | `gator tui`, `gator help`, `gator version`, `gator connect`, `gator login`, and `gator logout` | Removed from the public CLI. Use `gator`, `--help`, `--version`, and the `gator provider …` family instead. |
+| Former root commands such as `gator acp`, `gator connector`, `gator code`, `gator eval`, `gator inspect`, `gator serve`, and `gator worktree` | Return migration guidance to their canonical nested family. |
 | `gator code --tui` | Removed as a duplicate TUI entry point; start `gator` instead. |
 | `gator local` | Returns directions to `/model` → Local. |
 | `gator fork` | Returns directions to branch a Work conversation with `gator work resume --parent …`. |

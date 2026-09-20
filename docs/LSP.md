@@ -12,7 +12,7 @@ regular files in that worktree; Gator never executes a server-provided command,
 applies an LSP edit automatically, or follows resource operations such as
 create, rename, or delete. The native agent can turn a returned edit into an
 ordinary reviewable `apply_patch` call. Gator does not expose a persistent
-cross-process server or on-disk index. The authenticated legacy `gator serve`
+cross-process server or on-disk index. The authenticated legacy `gator agent serve`
 machine-integration process can retain a trusted server across compatible
 resumed runs of the same retained worktree. Main-TUI Work delegations are
 one-shot and do not retain a child LSP process between revisions.
@@ -63,7 +63,7 @@ allow-always, or deny approval using an argv-shaped record such as
 path or symbol query. Only after approval does Gator start the server. The
 server runs in Gator's strict sandbox by default with its configured network
 mode. The first approved lookup lazily starts it; later approved lookups reuse
-that same server within the current run. The authenticated `gator serve`
+that same server within the current run. The authenticated `gator agent serve`
 compatibility surface additionally keeps at most eight idle trusted managers
 in memory, keyed by canonical retained-worktree path and exact trusted bundle
 hash. A changed manifest, executable, trust record, or root set retires the old

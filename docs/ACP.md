@@ -1,17 +1,17 @@
 # Agent Client Protocol integration
 
-`gator acp` (or `gator --mode acp`) runs Gator as a local [Agent Client
+`gator agent acp` (or `gator --mode acp`) runs Gator as a local [Agent Client
 Protocol](https://agentclientprotocol.com/) v1 agent over standard input and
-output. It is the editor-facing interface. `gator rpc` remains Gator's own
+output. It is the editor-facing interface. `gator agent rpc` remains Gator's own
 JSONL API for CI and bespoke automation; the two protocols are deliberately
 separate.
 
 Start the process at the root of the checkout that the editor opens:
 
 ```sh
-gator acp
-gator acp --verify 'go test ./...'
-gator acp --verify 'npm test'
+gator agent acp
+gator agent acp --verify 'go test ./...'
+gator agent acp --verify 'npm test'
 ```
 
 The transport is one JSON-RPC 2.0 object per line. It supports the normal ACP
@@ -63,7 +63,7 @@ after `gator mcp trust`. Trusted local LSP diagnostics, read-only navigation,
 informational completion, formatting, rename, and workspace-confined code-action
 suggestions continue to come only from `.gator/lsp.json` after `gator lsp trust`.
 ACP prompts cannot provide a worktree setup command: that capability is limited
-to the local developer's explicit `gator run --setup` invocation, before an
+to the local developer's explicit `gator work run --setup` invocation, before an
 agent session exists.
 
 ACP authentication methods are intentionally not advertised. Configure a

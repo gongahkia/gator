@@ -55,7 +55,7 @@ The exit status is authoritative: Git documents status 0 as clean, 1 as
 conflicted, and other values as execution failure:
 <https://git-scm.com/docs/git-merge-tree#_exit_status>.
 
-No step changes a worktree, index, or ref. `/manage` and `gator child batch`
+No step changes a worktree, index, or ref. `/manage` and `gator agent child batch`
 show both path evidence and Git comparison evidence. A clean result proves only
 that Git found no textual conflict. It does not detect incompatible API,
 schema, migration, behavioral, or test assumptions. The parent must inspect and

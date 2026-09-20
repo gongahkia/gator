@@ -1,6 +1,6 @@
 # Local app server
 
-`gator serve` exposes Gator's existing versioned RPC protocol over an
+`gator agent serve` exposes Gator's existing versioned RPC protocol over an
 authenticated loopback HTTP/SSE transport. It is intended for a local editor,
 desktop client, or CI-side controller that needs event streaming without
 managing a child process's standard input and output.
@@ -10,15 +10,15 @@ Gator creates the file only if it does not exist, with mode `0600`, and never
 prints its contents.
 
 ```sh
-gator serve token "$HOME/.local/share/gator/app-server-token"
+gator agent serve token "$HOME/.local/share/gator/app-server-token"
 
 # Explicitly supervise one repository-scoped background service.
-gator serve start --token-file "$HOME/.local/share/gator/app-server-token"
-gator serve status --token-file "$HOME/.local/share/gator/app-server-token"
-gator serve stop --token-file "$HOME/.local/share/gator/app-server-token"
+gator agent serve start --token-file "$HOME/.local/share/gator/app-server-token"
+gator agent serve status --token-file "$HOME/.local/share/gator/app-server-token"
+gator agent serve stop --token-file "$HOME/.local/share/gator/app-server-token"
 
 # Or keep the server in the foreground with a caller-selected port.
-gator serve --token-file "$HOME/.local/share/gator/app-server-token" \
+gator agent serve --token-file "$HOME/.local/share/gator/app-server-token" \
   --listen 127.0.0.1:49152
 ```
 
@@ -28,7 +28,7 @@ file, browser URL, or repository. `GET /healthz` and `GET /readyz` are the only
 unauthenticated endpoints and disclose only readiness, build version, and RPC
 protocol version.
 
-`gator serve start` is an explicit local service, not an automatic global
+`gator agent serve start` is an explicit local service, not an automatic global
 daemon. It inherits the current repository and configuration, starts on a
 random literal-loopback port by default, and writes private repository-scoped
 metadata and a log under Gator's state directory. `status` and `stop` require
@@ -54,7 +54,7 @@ its run, verifier, worktree, approval, or credential policy.
 ```
 
 The returned `events` path is `GET /v1/events/{id}`. It is an SSE stream of the
-same RPC `response`, `event`, and `error` messages that `gator rpc` writes as
+same RPC `response`, `event`, and `error` messages that `gator agent rpc` writes as
 JSONL. Each SSE item has a monotonic ID. Reconnect with `Last-Event-ID` to
 replay later retained messages. Gator keeps at most 256 messages per request
 ID and 64 queued messages per client; a slow client receives an `overflow`
@@ -74,7 +74,7 @@ defined by [RPC integration](RPC.md).
 
 ## Detached terminals
 
-Only `gator serve` and the native TUI create a process-local terminal registry.
+Only `gator agent serve` and the native TUI create a process-local terminal registry.
 If an execute-mode model starts a terminal task and requests the separately
 approved `terminal_detach` tool, the app server advertises these additional
 methods from `capabilities`:
@@ -98,12 +98,12 @@ are neither sent to the model nor appended to the completed run record.
 
 Detached tasks retain their original policy, are capped at eight retained
 histories per server process, and expire within two hours while running. A
-normal `gator serve` shutdown stops them. The server handles `Ctrl-C` and
+normal `gator agent serve` shutdown stops them. The server handles `Ctrl-C` and
 normal Unix `SIGTERM` shutdown before it releases its terminal registry;
-`gator serve stop` asks the authenticated server's `POST /v1/shutdown`
+`gator agent serve stop` asks the authenticated server's `POST /v1/shutdown`
 endpoint to use that same path, rather than trusting or signaling the PID in a
-state file. Tasks do not survive a `gator serve` restart, and plain `gator
-rpc`, ACP, and child-writer runs do not offer detachment or these controller
+state file. Tasks do not survive a `gator agent serve` restart, and plain `gator
+agent rpc`, ACP, and child-writer runs do not offer detachment or these controller
 methods.
 
 ## Security boundary
