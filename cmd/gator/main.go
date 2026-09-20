@@ -240,14 +240,11 @@ func run(args []string, out io.Writer) error {
 	case "inspect":
 		return inspectTask(args[1:], out)
 	case "code":
-		if len(args) == 1 || len(args) == 2 && args[1] == "--tui" {
-			return workInteractive()
-		}
 		if len(args) == 2 && isHelpArgument(args[1]) {
 			_, err := fmt.Fprintln(out, codeUsage)
 			return err
 		}
-		if args[1] == "resume" || args[1] == "fork" || args[1] == "clone" {
+		if len(args) > 1 && (args[1] == "resume" || args[1] == "fork" || args[1] == "clone") {
 			return errors.New("standalone Code sessions are retired; use 'gator resume CONVERSATION' and Gator revision history")
 		}
 		return runWorkTask(append([]string{"--require-code"}, args[1:]...), os.Stdin, out, nativeWorkModel)

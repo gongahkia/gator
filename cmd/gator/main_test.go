@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -12,30 +13,49 @@ import (
 )
 
 func TestRunHelp(t *testing.T) {
-	var output bytes.Buffer
-	if err := run([]string{"--help"}, &output); err != nil {
-		t.Fatalf("run help: %v", err)
-	}
-	if !strings.Contains(output.String(), "Usage:") {
-		t.Fatalf("help output = %q, want usage", output.String())
-	}
-	for _, value := range []string{"gator work", "gator inspect", "--actions forbid|draft|approve", "--kind json|webhook", "verify and inspect a Work bundle"} {
-		if !strings.Contains(output.String(), value) {
-			t.Fatalf("help output is missing %q", value)
+	for _, command := range []string{"--help", "-h"} {
+		var output bytes.Buffer
+		if err := run([]string{command}, &output); err != nil {
+			t.Fatalf("run %s: %v", command, err)
 		}
-	}
-	if strings.Contains(output.String(), "allow-external-cli") {
-		t.Fatalf("help still exposes delegated CLI approval: %q", output.String())
+		if !strings.Contains(output.String(), "Usage:") {
+			t.Fatalf("help output = %q, want usage", output.String())
+		}
+		for _, value := range []string{"gator --help | -h", "gator provider PROVIDER [OPTIONS]", "gator -p ...", "gator work", "gator inspect", "--actions forbid|draft|approve", "--kind json|webhook", "verify and inspect a Work bundle"} {
+			if !strings.Contains(output.String(), value) {
+				t.Fatalf("help output is missing %q", value)
+			}
+		}
+		for _, removed := range []struct {
+			command string
+			pattern string
+		}{
+			{command: "gator tui", pattern: "\n  gator tui\n"},
+			{command: "gator help", pattern: "\n  gator help\n"},
+			{command: "gator version", pattern: "\n  gator version\n"},
+			{command: "gator connect", pattern: "\n  gator connect "},
+			{command: "gator login", pattern: "\n  gator login "},
+			{command: "gator logout", pattern: "\n  gator logout\n"},
+		} {
+			if strings.Contains(output.String(), removed.pattern) {
+				t.Fatalf("help still exposes removed command %q: %q", removed.command, output.String())
+			}
+		}
+		if strings.Contains(output.String(), "allow-external-cli") {
+			t.Fatalf("help still exposes delegated CLI approval: %q", output.String())
+		}
 	}
 }
 
 func TestRunVersion(t *testing.T) {
-	var output bytes.Buffer
-	if err := run([]string{"--version"}, &output); err != nil {
-		t.Fatalf("run version: %v", err)
-	}
-	if !strings.Contains(output.String(), "gator ") {
-		t.Fatalf("version output = %q", output.String())
+	for _, command := range []string{"--version", "-v"} {
+		var output bytes.Buffer
+		if err := run([]string{command}, &output); err != nil {
+			t.Fatalf("run %s: %v", command, err)
+		}
+		if !strings.Contains(output.String(), "gator ") {
+			t.Fatalf("version output = %q", output.String())
+		}
 	}
 }
 
@@ -69,6 +89,9 @@ func TestShortCLIFormsRouteToTheirCommandFamilies(t *testing.T) {
 	}
 	if err := run([]string{"-u", "unexpected"}, io.Discard); err == nil || !strings.Contains(err.Error(), "usage: gator update") {
 		t.Fatalf("-u error = %v", err)
+	}
+	if err := run([]string{"-d", "--provider", "not-a-provider"}, io.Discard); err == nil || !strings.Contains(err.Error(), "unknown provider") {
+		t.Fatalf("-d error = %v", err)
 	}
 }
 

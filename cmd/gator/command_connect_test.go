@@ -15,7 +15,7 @@ func TestProviderOnboardingUsesProviderOwnedCLIWhereAvailable(t *testing.T) {
 	t.Setenv("GATOR_DELEGATE_LOG", logPath)
 
 	var output bytes.Buffer
-	if err := onboardProvider([]string{"codex", "--device"}, &output); err != nil {
+	if err := providerCommand([]string{"codex", "--device"}, &output); err != nil {
 		t.Fatalf("onboard Codex: %v", err)
 	}
 	logged, err := os.ReadFile(logPath)
@@ -33,7 +33,7 @@ func TestProviderOnboardingUsesOpenCodeForXAIAndStoresClaudeAPIKeys(t *testing.T
 	t.Setenv("GATOR_OPENCODE_COMMAND", opencodeScript)
 	t.Setenv("GATOR_OPENCODE_LOG", opencodeLog)
 	var output bytes.Buffer
-	if err := onboardProvider([]string{"xai"}, &output); err != nil {
+	if err := providerCommand([]string{"xai"}, &output); err != nil {
 		t.Fatalf("onboard xAI: %v", err)
 	}
 	logged, err := os.ReadFile(opencodeLog)
@@ -50,7 +50,7 @@ func TestProviderOnboardingUsesOpenCodeForXAIAndStoresClaudeAPIKeys(t *testing.T
 	t.Setenv("GATOR_STATE_DIR", t.TempDir())
 	t.Setenv("ANTHROPIC_API_KEY", "anthropic-connect-key")
 	output.Reset()
-	if err := onboardProvider([]string{"claude"}, &output); err != nil {
+	if err := providerCommand([]string{"claude"}, &output); err != nil {
 		t.Fatalf("onboard Claude: %v", err)
 	}
 	if strings.Contains(output.String(), "anthropic-connect-key") {
@@ -72,7 +72,7 @@ func TestProviderOnboardingStoresDirectAPIKeysFromEnvironment(t *testing.T) {
 	t.Setenv("GEMINI_API_KEY", "gemini-connect-key")
 	var output bytes.Buffer
 	for _, provider := range []string{"openai", "gemini"} {
-		if err := onboardProvider([]string{provider}, &output); err != nil {
+		if err := providerCommand([]string{provider}, &output); err != nil {
 			t.Fatalf("onboard %s: %v", provider, err)
 		}
 	}
