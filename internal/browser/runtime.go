@@ -86,7 +86,7 @@ func runtimeFilesCurrent(directory string) bool {
 
 // InstallRuntime explicitly installs the lockfile-pinned Playwright package
 // and Chromium below Gator's private state directory. It intentionally never
-// runs during `gator run`, `gator tui`, or session start.
+// runs during `gator run`, `gator`, or session start.
 func InstallRuntime(ctx context.Context, store *Store) (RuntimeStatus, error) {
 	if store == nil {
 		return RuntimeStatus{}, errors.New("browser store is required")

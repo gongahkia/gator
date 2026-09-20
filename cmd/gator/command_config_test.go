@@ -94,15 +94,15 @@ func TestSelectWorkOnboardingProviderPersistsProviderAndDefaultModel(t *testing.
 
 func TestWorkTUIProviderCommandsKeepSecretsOutOfArguments(t *testing.T) {
 	apiKeyLogin := workTUIProviderCommand("login", "openai")
-	if got := strings.Join(apiKeyLogin.Args[1:], " "); got != "login openai --prompt" {
+	if got := strings.Join(apiKeyLogin.Args[1:], " "); got != "provider login openai --prompt" {
 		t.Fatalf("API-key login args = %q", got)
 	}
 	oauthLogin := workTUIProviderCommand("login", "codex")
-	if got := strings.Join(oauthLogin.Args[1:], " "); got != "login codex" {
+	if got := strings.Join(oauthLogin.Args[1:], " "); got != "provider login codex" {
 		t.Fatalf("OAuth login args = %q", got)
 	}
 	setup := workTUIProviderCommand("setup", "anthropic")
-	if got := strings.Join(setup.Args[1:], " "); got != "connect anthropic" {
+	if got := strings.Join(setup.Args[1:], " "); got != "provider anthropic" {
 		t.Fatalf("setup args = %q", got)
 	}
 }

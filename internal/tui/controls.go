@@ -574,15 +574,15 @@ func subscriptionDescription(description, provider string, store auth.Store, sto
 func delegatedConnectCommand(provider string) string {
 	switch provider {
 	case string(modelprovider.Codex):
-		return "gator connect codex"
+		return "gator provider codex"
 	case string(modelprovider.Copilot):
-		return "gator connect copilot"
+		return "gator provider copilot"
 	case string(modelprovider.KimiCoding):
-		return "gator connect kimi"
+		return "gator provider kimi"
 	case string(modelprovider.XAI):
-		return "gator connect xai"
+		return "gator provider xai"
 	case string(modelprovider.Claude):
-		return "gator connect claude"
+		return "gator provider claude"
 	default:
 		return ""
 	}

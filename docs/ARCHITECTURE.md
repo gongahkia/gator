@@ -70,7 +70,7 @@ same isolated retained worktree and then starts an explicitly selected installed
 CLI there; Gator runs the developer's verification commands after that CLI
 exits. The delegated CLI owns its own agent loop, context, tools, approvals,
 sandbox, session state, and credentials, so a delegated run has no native
-steering or Gator session resume. `gator connect` invokes vendor-owned login
+steering or Gator session resume. `gator provider` invokes vendor-owned login
 for Codex, Copilot, and Kimi; it invokes OpenCode's provider login for xAI.
 Those credentials stay in the invoked CLI's store. Claude delegation invokes
 `claude --bare`, with `ANTHROPIC_API_KEY` taken from the environment or Gator's

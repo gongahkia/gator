@@ -108,7 +108,7 @@ func TestDoctorExplainsClaudeSubscriptionBoundary(t *testing.T) {
 	if err := doctor([]string{"--provider", "claude"}, &output); err != nil {
 		t.Fatalf("doctor: %v", err)
 	}
-	if got := output.String(); !strings.Contains(got, "unsupported native Claude.ai subscription OAuth") || !strings.Contains(got, "gator connect claude") {
+	if got := output.String(); !strings.Contains(got, "unsupported native Claude.ai subscription OAuth") || !strings.Contains(got, "gator provider claude") {
 		t.Fatalf("doctor output = %q", got)
 	}
 }

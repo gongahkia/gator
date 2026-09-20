@@ -18,7 +18,7 @@ import (
 
 func login(arguments []string, out io.Writer) error {
 	if len(arguments) == 0 {
-		return errors.New("usage: gator login PROVIDER [--prompt | --api-key KEY | --from-env NAME | --bearer-token TOKEN | --bearer-token-from-env NAME]")
+		return errors.New("usage: gator provider login PROVIDER [--prompt | --api-key KEY | --from-env NAME | --bearer-token TOKEN | --bearer-token-from-env NAME]")
 	}
 	providerName := arguments[0]
 	flags := flag.NewFlagSet("login", flag.ContinueOnError)
@@ -33,7 +33,7 @@ func login(arguments []string, out io.Writer) error {
 		return err
 	}
 	if len(flags.Args()) != 0 {
-		return errors.New("usage: gator login PROVIDER [--prompt | --api-key KEY | --from-env NAME | --bearer-token TOKEN | --bearer-token-from-env NAME]")
+		return errors.New("usage: gator provider login PROVIDER [--prompt | --api-key KEY | --from-env NAME | --bearer-token TOKEN | --bearer-token-from-env NAME]")
 	}
 	credentialModes := countNonEmpty(*apiKey, *bearerToken, *bearerTokenFromEnvironment, *fromEnvironment)
 	if *prompt {
@@ -47,7 +47,7 @@ func login(arguments []string, out io.Writer) error {
 		return err
 	}
 	if provider == model.Claude {
-		return errors.New("Claude.ai subscription OAuth is not a supported Gator login. Use 'gator connect claude' to store an Anthropic API key, then run with --provider anthropic, or use 'gator delegate claude run ...'")
+		return errors.New("Claude.ai subscription OAuth is not a supported Gator provider login. Use 'gator provider claude' to store an Anthropic API key, then run with --provider anthropic, or use 'gator delegate claude run ...'")
 	}
 	if !model.SupportsDirect(provider) {
 		return fmt.Errorf("provider %q has no direct Gator API integration", provider)
@@ -62,7 +62,7 @@ func login(arguments []string, out io.Writer) error {
 		return loginOAuth(provider, out)
 	}
 	if !model.SupportsAPIKeyLogin(provider) {
-		return fmt.Errorf("provider %q uses %s; gator login does not store that credential", provider, model.CredentialHint(provider))
+		return fmt.Errorf("provider %q uses %s; gator provider login does not store that credential", provider, model.CredentialHint(provider))
 	}
 	if token, source := bearerTokenValue(*bearerToken, *bearerTokenFromEnvironment); token != "" {
 		if provider != model.AzureOpenAIResponses {
@@ -284,7 +284,7 @@ func loginCopilot(out io.Writer) error {
 
 func logout(arguments []string, out io.Writer) error {
 	if len(arguments) != 1 {
-		return errors.New("usage: gator logout PROVIDER")
+		return errors.New("usage: gator provider logout PROVIDER")
 	}
 	provider, err := model.ParseProvider(arguments[0])
 	if err != nil {

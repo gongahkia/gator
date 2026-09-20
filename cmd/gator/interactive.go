@@ -150,7 +150,7 @@ func interactiveWithOptions(options interactiveOptions) error {
 		SaveCloudModel:  saveTUICloudModelConfiguration(store, stateDir),
 		ModelManagement: newTUIModelManagementBackend(store, stateDir),
 		NewConnectCommand: func(provider string) (*exec.Cmd, error) {
-			return exec.Command(os.Args[0], "connect", provider), nil
+			return exec.Command(os.Args[0], "provider", provider), nil
 		},
 		NewDelegateCommand: func(runtime, task, modelName string, verification [][]string, repository string) (tui.DelegateCommand, error) {
 			arguments := []string{"delegate", runtime, "run"}

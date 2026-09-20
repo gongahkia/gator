@@ -29,7 +29,7 @@ func key(config Config, provider Provider, environment string) (string, error) {
 		}
 		if found && credential.IsOAuth() && (provider == XAI || provider == Radius) {
 			if credential.Expired(time.Now()) {
-				return "", fmt.Errorf("Gator OAuth credential for %q expired; run 'gator login %s --subscription'", provider, provider)
+				return "", fmt.Errorf("Gator OAuth credential for %q expired; run 'gator provider login %s --subscription'", provider, provider)
 			}
 			return credential.Access, nil
 		}
@@ -110,7 +110,7 @@ func kimiCredential(config Config) (string, bool, error) {
 		}
 		if found && credential.IsOAuth() {
 			if credential.Expired(time.Now()) {
-				return "", false, fmt.Errorf("Gator OAuth credential for %q expired; run 'gator login %s --subscription'", KimiCoding, KimiCoding)
+				return "", false, fmt.Errorf("Gator OAuth credential for %q expired; run 'gator provider login %s --subscription'", KimiCoding, KimiCoding)
 			}
 			return credential.Access, true, nil
 		}
@@ -127,17 +127,17 @@ func kimiCredential(config Config) (string, bool, error) {
 
 func oauthCredential(config Config, provider Provider) (auth.Credential, error) {
 	if config.Credentials == nil {
-		return auth.Credential{}, fmt.Errorf("Gator OAuth credential for %q is required; run 'gator login %s'", provider, provider)
+		return auth.Credential{}, fmt.Errorf("Gator OAuth credential for %q is required; run 'gator provider login %s'", provider, provider)
 	}
 	credential, found, err := config.Credentials.Read(string(provider))
 	if err != nil {
 		return auth.Credential{}, fmt.Errorf("read Gator credential for %q: %w", provider, err)
 	}
 	if !found || !credential.IsOAuth() {
-		return auth.Credential{}, fmt.Errorf("Gator OAuth credential for %q is required; run 'gator login %s'", provider, provider)
+		return auth.Credential{}, fmt.Errorf("Gator OAuth credential for %q is required; run 'gator provider login %s'", provider, provider)
 	}
 	if credential.Expired(time.Now()) {
-		return auth.Credential{}, fmt.Errorf("Gator OAuth credential for %q expired; run 'gator login %s'", provider, provider)
+		return auth.Credential{}, fmt.Errorf("Gator OAuth credential for %q expired; run 'gator provider login %s'", provider, provider)
 	}
 	return credential, nil
 }

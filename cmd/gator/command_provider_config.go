@@ -19,18 +19,42 @@ import (
 	"github.com/gongahkia/gator/internal/model"
 )
 
-const providerConfigUsage = `usage:
+const providerUsage = `usage:
+  gator provider PROVIDER [OPTIONS]
+  gator provider login PROVIDER [--subscription | --prompt | --api-key KEY | --from-env NAME | --bearer-token TOKEN | --bearer-token-from-env NAME]
+  gator provider logout PROVIDER
   gator provider list
   gator provider add ID --base-url URL --model MODEL [--model MODEL...] [--api-key-env NAME]
   gator provider discover ID [--apply]
-  gator provider remove ID --yes`
+  gator provider remove ID --yes
 
-// providerCommand persists custom/local Chat Completions endpoints. It is
-// deliberately separate from provider credentials: keys remain environment
-// variables and are never written to config.json.
+short form:
+  gator -p ...`
+
+// providerCommand owns provider onboarding, Gator-managed credentials, and
+// custom Chat Completions endpoints. API-key values for custom endpoints stay
+// in environment variables and are never written to config.json.
 func providerCommand(arguments []string, out io.Writer) error {
 	if len(arguments) == 0 {
-		return errors.New(providerConfigUsage)
+		return errors.New(providerUsage)
+	}
+	switch arguments[0] {
+	case "--help", "-h":
+		return errors.New(providerUsage)
+	case "login":
+		return login(arguments[1:], out)
+	case "logout":
+		return logout(arguments[1:], out)
+	case "list", "add", "discover", "remove":
+		return customProviderCommand(arguments, out)
+	default:
+		return onboardProvider(arguments, out)
+	}
+}
+
+func customProviderCommand(arguments []string, out io.Writer) error {
+	if len(arguments) == 0 {
+		return errors.New(providerUsage)
 	}
 	store, err := config.DefaultStore()
 	if err != nil {
@@ -43,7 +67,7 @@ func providerCommand(arguments []string, out io.Writer) error {
 	switch arguments[0] {
 	case "list":
 		if len(arguments) != 1 {
-			return errors.New(providerConfigUsage)
+			return errors.New(providerUsage)
 		}
 		if len(settings.CustomProviders) == 0 {
 			_, err := fmt.Fprintln(out, "No custom providers configured.")
@@ -78,13 +102,13 @@ func providerCommand(arguments []string, out io.Writer) error {
 		_, err := fmt.Fprintf(out, "Removed custom provider %q. Its API key environment variable was not changed.\n", arguments[1])
 		return err
 	default:
-		return fmt.Errorf("unknown provider command %q\n%s", arguments[0], providerConfigUsage)
+		return fmt.Errorf("unknown provider command %q\n%s", arguments[0], providerUsage)
 	}
 }
 
 func discoverCustomProvider(arguments []string, store config.Store, settings config.Settings, out io.Writer) error {
 	if len(arguments) != 1 && (len(arguments) != 2 || arguments[1] != "--apply") {
-		return errors.New(providerConfigUsage)
+		return errors.New(providerUsage)
 	}
 	apply := len(arguments) == 2
 	provider, found := findCustomProvider(settings.CustomProviders, arguments[0])
@@ -201,7 +225,7 @@ func modelsEndpoint(baseURL string) (string, error) {
 
 func addCustomProvider(arguments []string, store config.Store, settings config.Settings, out io.Writer) error {
 	if len(arguments) == 0 {
-		return errors.New(providerConfigUsage)
+		return errors.New(providerUsage)
 	}
 	id := strings.TrimSpace(arguments[0])
 	if err := reservedCustomProviderIDError(id); err != nil {
@@ -217,7 +241,7 @@ func addCustomProvider(arguments []string, store config.Store, settings config.S
 		return err
 	}
 	if len(flags.Args()) != 0 || len(models) == 0 || strings.TrimSpace(*baseURL) == "" {
-		return errors.New(providerConfigUsage)
+		return errors.New(providerUsage)
 	}
 	provider := config.CustomProvider{ID: id, BaseURL: strings.TrimSpace(*baseURL), APIKeyEnv: strings.TrimSpace(*apiKeyEnv), Models: models, DefaultModel: models[0]}
 	settings.CustomProviders = setCustomProvider(settings.CustomProviders, provider)

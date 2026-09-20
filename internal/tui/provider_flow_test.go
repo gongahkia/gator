@@ -67,7 +67,7 @@ func TestProviderDropdownOffersVendorCLIWhenNativeOAuthIsUnconfigured(t *testing
 	model.focus = providerField
 	for _, option := range model.dropdownOptions() {
 		if option.value == "codex" {
-			if !strings.Contains(option.description, "gator connect codex") {
+			if !strings.Contains(option.description, "gator provider codex") {
 				t.Fatalf("Codex provider description = %q", option.description)
 			}
 			return
@@ -92,7 +92,7 @@ func TestModelCatalogExplainsVendorCLIPathWhenNativeOAuthIsUnconfigured(t *testi
 		t.Fatal("unconfigured native OAuth should not start a login")
 	}
 	updated := next.(Model)
-	if !strings.Contains(updated.commandOutput, "gator connect copilot") {
+	if !strings.Contains(updated.commandOutput, "gator provider copilot") {
 		t.Fatalf("login guidance = %q", updated.commandOutput)
 	}
 }

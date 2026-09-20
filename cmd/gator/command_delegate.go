@@ -60,7 +60,7 @@ func delegate(arguments []string, out io.Writer) error {
 	case "claude":
 		switch action {
 		case "login":
-			return errors.New("Gator does not offer Claude.ai login. Anthropic requires third-party products to use an API key unless separately approved; set ANTHROPIC_API_KEY or run 'gator connect claude'")
+			return errors.New("Gator does not offer Claude.ai login. Anthropic requires third-party products to use an API key unless separately approved; set ANTHROPIC_API_KEY or run 'gator provider claude'")
 		case "run":
 			return delegateClaudeRun(arguments[2:], out)
 		}
@@ -167,7 +167,7 @@ func delegatedClaudeEnvironment() ([]string, error) {
 	if found && credential.IsAPIKey() && strings.TrimSpace(credential.Key) != "" {
 		return append(os.Environ(), "ANTHROPIC_API_KEY="+credential.Key), nil
 	}
-	return nil, errors.New("an Anthropic API key is required for delegated Claude Code runs; set ANTHROPIC_API_KEY or run 'gator connect claude'. Gator deliberately does not use Claude.ai OAuth or Claude Code's stored credentials")
+	return nil, errors.New("an Anthropic API key is required for delegated Claude Code runs; set ANTHROPIC_API_KEY or run 'gator provider claude'. Gator deliberately does not use Claude.ai OAuth or Claude Code's stored credentials")
 }
 
 func delegateCopilotLogin(arguments []string, out io.Writer) error {

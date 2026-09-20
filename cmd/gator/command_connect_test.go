@@ -8,15 +8,15 @@ import (
 	"testing"
 )
 
-func TestConnectUsesProviderOwnedCLIWhereAvailable(t *testing.T) {
+func TestProviderOnboardingUsesProviderOwnedCLIWhereAvailable(t *testing.T) {
 	logPath := filepath.Join(t.TempDir(), "command.log")
 	script := delegatedFixture(t, "printf '%s\\n' \"$@\" > \"$GATOR_DELEGATE_LOG\"\n")
 	t.Setenv("GATOR_CODEX_COMMAND", script)
 	t.Setenv("GATOR_DELEGATE_LOG", logPath)
 
 	var output bytes.Buffer
-	if err := connect([]string{"codex", "--device"}, &output); err != nil {
-		t.Fatalf("connect Codex: %v", err)
+	if err := onboardProvider([]string{"codex", "--device"}, &output); err != nil {
+		t.Fatalf("onboard Codex: %v", err)
 	}
 	logged, err := os.ReadFile(logPath)
 	if err != nil {
@@ -27,14 +27,14 @@ func TestConnectUsesProviderOwnedCLIWhereAvailable(t *testing.T) {
 	}
 }
 
-func TestConnectXAIUsesOpenCodeAndClaudeStoresAPIKey(t *testing.T) {
+func TestProviderOnboardingUsesOpenCodeForXAIAndStoresClaudeAPIKeys(t *testing.T) {
 	opencodeLog := filepath.Join(t.TempDir(), "opencode.log")
 	opencodeScript := delegatedFixture(t, "printf '%s\\n' \"$@\" > \"$GATOR_OPENCODE_LOG\"\n")
 	t.Setenv("GATOR_OPENCODE_COMMAND", opencodeScript)
 	t.Setenv("GATOR_OPENCODE_LOG", opencodeLog)
 	var output bytes.Buffer
-	if err := connect([]string{"xai"}, &output); err != nil {
-		t.Fatalf("connect xAI: %v", err)
+	if err := onboardProvider([]string{"xai"}, &output); err != nil {
+		t.Fatalf("onboard xAI: %v", err)
 	}
 	logged, err := os.ReadFile(opencodeLog)
 	if err != nil {
@@ -50,8 +50,8 @@ func TestConnectXAIUsesOpenCodeAndClaudeStoresAPIKey(t *testing.T) {
 	t.Setenv("GATOR_STATE_DIR", t.TempDir())
 	t.Setenv("ANTHROPIC_API_KEY", "anthropic-connect-key")
 	output.Reset()
-	if err := connect([]string{"claude"}, &output); err != nil {
-		t.Fatalf("connect Claude: %v", err)
+	if err := onboardProvider([]string{"claude"}, &output); err != nil {
+		t.Fatalf("onboard Claude: %v", err)
 	}
 	if strings.Contains(output.String(), "anthropic-connect-key") {
 		t.Fatalf("Claude connect exposed API key: %q", output.String())
@@ -66,14 +66,14 @@ func TestConnectXAIUsesOpenCodeAndClaudeStoresAPIKey(t *testing.T) {
 	}
 }
 
-func TestConnectDirectAPIKeyProvidersFromEnvironment(t *testing.T) {
+func TestProviderOnboardingStoresDirectAPIKeysFromEnvironment(t *testing.T) {
 	t.Setenv("GATOR_STATE_DIR", t.TempDir())
 	t.Setenv("OPENAI_API_KEY", "openai-connect-key")
 	t.Setenv("GEMINI_API_KEY", "gemini-connect-key")
 	var output bytes.Buffer
 	for _, provider := range []string{"openai", "gemini"} {
-		if err := connect([]string{provider}, &output); err != nil {
-			t.Fatalf("connect %s: %v", provider, err)
+		if err := onboardProvider([]string{provider}, &output); err != nil {
+			t.Fatalf("onboard %s: %v", provider, err)
 		}
 	}
 	credentials, err := gatorCredentials()

@@ -13,7 +13,7 @@ import (
 
 func TestRunHelp(t *testing.T) {
 	var output bytes.Buffer
-	if err := run([]string{"help"}, &output); err != nil {
+	if err := run([]string{"--help"}, &output); err != nil {
 		t.Fatalf("run help: %v", err)
 	}
 	if !strings.Contains(output.String(), "Usage:") {
@@ -31,7 +31,7 @@ func TestRunHelp(t *testing.T) {
 
 func TestRunVersion(t *testing.T) {
 	var output bytes.Buffer
-	if err := run([]string{"version"}, &output); err != nil {
+	if err := run([]string{"--version"}, &output); err != nil {
 		t.Fatalf("run version: %v", err)
 	}
 	if !strings.Contains(output.String(), "gator ") {
@@ -44,6 +44,31 @@ func TestRunRejectsUnknownCommand(t *testing.T) {
 	err := run([]string{"ship"}, &output)
 	if err == nil || !strings.Contains(err.Error(), "unknown command") {
 		t.Fatalf("run error = %v, want unknown-command error", err)
+	}
+}
+
+func TestRunRejectsRemovedRootAliases(t *testing.T) {
+	for _, command := range []string{"tui", "help", "version", "connect", "login", "logout"} {
+		var output bytes.Buffer
+		err := run([]string{command}, &output)
+		if err == nil || !strings.Contains(err.Error(), "unknown command") || !strings.Contains(err.Error(), "gator --help") {
+			t.Fatalf("%s error = %v", command, err)
+		}
+	}
+}
+
+func TestShortCLIFormsRouteToTheirCommandFamilies(t *testing.T) {
+	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
+	var output bytes.Buffer
+	if err := run([]string{"-c"}, &output); err != nil || !strings.Contains(output.String(), "Configuration:") {
+		t.Fatalf("-c output = %q, err = %v", output.String(), err)
+	}
+	output.Reset()
+	if err := run([]string{"-p", "list"}, &output); err != nil || !strings.Contains(output.String(), "No custom providers configured") {
+		t.Fatalf("-p list output = %q, err = %v", output.String(), err)
+	}
+	if err := run([]string{"-u", "unexpected"}, io.Discard); err == nil || !strings.Contains(err.Error(), "usage: gator update") {
+		t.Fatalf("-u error = %v", err)
 	}
 }
 
@@ -102,7 +127,7 @@ func TestLoginAndLogoutStoreOnlyGatorCredential(t *testing.T) {
 	t.Setenv("GATOR_STATE_DIR", stateDir)
 	t.Setenv("OPENAI_API_KEY", "test-key")
 	var output bytes.Buffer
-	if err := run([]string{"login", "openai"}, &output); err != nil {
+	if err := run([]string{"-p", "login", "openai"}, &output); err != nil {
 		t.Fatalf("login: %v", err)
 	}
 	if !strings.Contains(output.String(), "Stored a Gator credential for openai") || strings.Contains(output.String(), "test-key") {
@@ -117,7 +142,7 @@ func TestLoginAndLogoutStoreOnlyGatorCredential(t *testing.T) {
 		t.Fatalf("stored credential = %#v, found=%v, error=%v", credential, found, err)
 	}
 	output.Reset()
-	if err := run([]string{"logout", "openai"}, &output); err != nil {
+	if err := run([]string{"provider", "logout", "openai"}, &output); err != nil {
 		t.Fatalf("logout: %v", err)
 	}
 	if _, found, err := credentials.Read("openai"); err != nil || found {

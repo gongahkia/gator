@@ -53,7 +53,7 @@ func TestOAuthLoginRejectsPromptMode(t *testing.T) {
 func TestLoginRejectsClaudeAISubscriptionOAuth(t *testing.T) {
 	var output bytes.Buffer
 	err := login([]string{"claude"}, &output)
-	if err == nil || !strings.Contains(err.Error(), "not a supported Gator login") || !strings.Contains(err.Error(), "gator connect claude") {
+	if err == nil || !strings.Contains(err.Error(), "not a supported Gator provider login") || !strings.Contains(err.Error(), "gator provider claude") {
 		t.Fatalf("Claude login error = %v", err)
 	}
 }

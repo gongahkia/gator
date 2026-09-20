@@ -250,14 +250,17 @@ func workInteractiveConversation(startConversationID string) error {
 }
 
 func workTUIProviderCommand(action, provider string) *exec.Cmd {
-	arguments := []string{action, provider}
-	if action == "setup" {
-		arguments[0] = "connect"
+	arguments := []string{"provider"}
+	if action == "setup" || action == "connect" {
+		arguments = append(arguments, provider)
 	} else if action == "login" {
+		arguments = append(arguments, "login", provider)
 		parsed, err := model.ParseProvider(provider)
 		if err == nil && model.SupportsAPIKeyLogin(parsed) {
 			arguments = append(arguments, "--prompt")
 		}
+	} else {
+		arguments = append(arguments, action, provider)
 	}
 	command := exec.Command(os.Args[0], arguments...)
 	command.Stdin = os.Stdin

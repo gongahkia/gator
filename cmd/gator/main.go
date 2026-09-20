@@ -21,10 +21,10 @@ const usage = `Gator — terminal-native, inspectable work agent
 
 Usage:
   gator
-  gator tui
-  gator help
-  gator version
+  gator --help | -h
+  gator --version | -v
   gator update [--check]
+  gator -u [--check]
   gator rpc
   gator serve token ABSOLUTE_PATH
   gator serve start --token-file ABSOLUTE_PATH [--listen 127.0.0.1:PORT]
@@ -33,6 +33,7 @@ Usage:
   gator serve --token-file ABSOLUTE_PATH [--listen 127.0.0.1:PORT]
   gator acp [--verify 'argv ...']
   gator config [show]
+  gator -c [show]
   gator config set default-provider PROVIDER
   gator config set default-model MODEL
   gator config set sandbox strict|off
@@ -62,16 +63,20 @@ Usage:
   gator worktree list|prune|remove RUN_ID --yes
   gator extension list|status
   gator extension install [--replace] DIRECTORY
+  gator provider PROVIDER [OPTIONS]
+  gator provider login PROVIDER [--subscription | --prompt | --api-key KEY | --from-env NAME | --bearer-token TOKEN | --bearer-token-from-env NAME]
+  gator provider logout PROVIDER
   gator provider list
   gator provider add ID --base-url URL --model MODEL [--model MODEL...] [--api-key-env NAME]
+  gator provider discover ID [--apply]
+  gator provider remove ID --yes
+  gator -p ...
   gator browser install|status|start|attach|tabs|select|origins|visual|allow-upload|artifacts|export|stop
   gator theme list
   gator theme set gator|contrast|mono
-  gator connect PROVIDER [OPTIONS]
-  gator login PROVIDER [--subscription | --prompt | --api-key KEY | --from-env NAME | --bearer-token TOKEN | --bearer-token-from-env NAME]
-  gator logout PROVIDER
   gator delegate RUNTIME ACTION [OPTIONS]
   gator doctor [--provider PROVIDER]
+  gator -d [--provider PROVIDER]
   gator work [--source DIRECTORY] [--connector ID] [--artifact PATH] [--image PATH] [--attach PATH] [--require-contains PATH=TEXT] [--mode inspect|draft|act] [--actions forbid|draft|approve] [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] [CODE POLICY] [--json] TASK
   gator work list
   gator work show|history|back CONVERSATION
@@ -92,10 +97,7 @@ Usage:
   gator apply [--check] RUN_RECORD_PATH
 
 Commands:
-  tui       open the interactive terminal application (the default command)
-  connect   start a provider-owned or API-key onboarding flow
-  login     store a provider credential in Gator's private local auth file
-  logout    remove a provider credential from Gator's private local auth file
+  provider  onboard providers and manage credentials or custom endpoints
   delegate  run an installed vendor or external agent in an isolated worktree
   serve     run the authenticated loopback HTTP/SSE app-server bridge
   acp       run a local Agent Client Protocol v1 stdio agent for an editor
@@ -107,7 +109,7 @@ Commands:
   inbox     inspect or mark scheduled-work results
   snapshot  inspect or explicitly collect immutable source snapshots
   extension install, enable, trust, or remove Gator extension bundles
-  provider  configure a custom/local Chat Completions provider
+  config    inspect or update persistent Gator settings
   browser   start, attach, and explicitly control a local Playwright/Chromium session
   theme     list or choose Gator's terminal theme
   doctor    report local prerequisites and suggested verification commands
@@ -168,10 +170,10 @@ func run(args []string, out io.Writer) error {
 	if !supportedPlatform(runtime.GOOS) {
 		return fmt.Errorf("Gator supports only Linux and macOS; %s is not supported", runtime.GOOS)
 	}
-	if len(args) == 0 || args[0] == "tui" {
+	if len(args) == 0 {
 		return workInteractive()
 	}
-	if args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
+	if args[0] == "--help" || args[0] == "-h" {
 		_, err := fmt.Fprintln(out, usage)
 		return err
 	}
@@ -181,21 +183,19 @@ func run(args []string, out io.Writer) error {
 	if len(args) == 2 && args[0] == "--mode" && args[1] == "acp" {
 		return acpMode(nil, os.Stdin, out)
 	}
-	if args[0] == "version" || args[0] == "--version" || args[0] == "-v" {
+	if args[0] == "--version" || args[0] == "-v" {
 		_, err := fmt.Fprintf(out, "gator %s (%s, %s)\n", version, commit, date)
 		return err
 	}
 
 	switch args[0] {
-	case "connect":
-		return connect(args[1:], out)
-	case "config":
+	case "config", "-c":
 		return configure(args[1:], out)
 	case "agent":
 		return agentCommand(args[1:], out)
 	case "child":
 		return childCommand(args[1:], out)
-	case "update":
+	case "update", "-u":
 		return update(args[1:], out)
 	case "rpc":
 		return rpcMode(args[1:], os.Stdin, out)
@@ -203,12 +203,8 @@ func run(args []string, out io.Writer) error {
 		return serveCommand(args[1:], out)
 	case "acp":
 		return acpMode(args[1:], os.Stdin, out)
-	case "doctor":
+	case "doctor", "-d":
 		return doctor(args[1:], out)
-	case "login":
-		return login(args[1:], out)
-	case "logout":
-		return logout(args[1:], out)
 	case "delegate":
 		return delegate(args[1:], out)
 	case "extension":
@@ -229,7 +225,7 @@ func run(args []string, out io.Writer) error {
 		return snapshotCommand(args[1:], out)
 	case "worktree":
 		return worktreeCommand(args[1:], out)
-	case "provider":
+	case "provider", "-p":
 		return providerCommand(args[1:], out)
 	case "local":
 		return errors.New("local model management is available in the TUI; start gator, open /model, and choose Local")
@@ -278,7 +274,7 @@ func run(args []string, out io.Writer) error {
 	case "apply":
 		return applyPatch(args[1:], out)
 	default:
-		return fmt.Errorf("unknown command %q; run 'gator help'", args[0])
+		return fmt.Errorf("unknown command %q; run 'gator --help'", args[0])
 	}
 }
 
@@ -287,5 +283,5 @@ func supportedPlatform(goos string) bool {
 }
 
 func isHelpArgument(value string) bool {
-	return value == "--help" || value == "-h" || value == "help"
+	return value == "--help" || value == "-h"
 }

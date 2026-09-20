@@ -123,7 +123,7 @@ func azureResponsesCredential(config Config) (azureResponsesAuth, error) {
 				return azureResponsesAuth{value: credential.Key, source: "Gator Azure OpenAI Responses API-key credential", header: "api-key"}, nil
 			case credential.IsBearerToken():
 				if credential.Expired(time.Now()) {
-					return azureResponsesAuth{}, errors.New("Gator Azure OpenAI Responses bearer token expired; replace it with 'gator login azure-openai-responses --bearer-token' or set AZURE_OPENAI_AUTH_TOKEN")
+					return azureResponsesAuth{}, errors.New("Gator Azure OpenAI Responses bearer token expired; replace it with 'gator provider login azure-openai-responses --bearer-token' or set AZURE_OPENAI_AUTH_TOKEN")
 				}
 				return azureResponsesAuth{value: credential.Access, source: "Gator Azure OpenAI Responses bearer-token credential", header: "Authorization", prefix: "Bearer "}, nil
 			}

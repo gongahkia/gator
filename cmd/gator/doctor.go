@@ -131,7 +131,7 @@ func inspectProviderAuth(custom config.CustomProvider, customProvider bool, prov
 		return authentication, authenticationStatus, nil
 	}
 	if provider == model.Claude {
-		return authentication, "use gator connect claude", nil
+		return authentication, "use gator provider claude", nil
 	}
 	if !model.SupportsDirect(provider) {
 		return authentication, "unsupported", nil

@@ -11,30 +11,30 @@ import (
 	"github.com/gongahkia/gator/internal/model"
 )
 
-const connectUsage = `Usage:
-  gator connect openai
-  gator connect anthropic
-  gator connect gemini
-  gator connect codex [--device]
-  gator connect copilot [--host URL]
-  gator connect kimi
-  gator connect xai
-  gator connect claude
-  gator connect openrouter
-  gator connect radius
+const providerOnboardingUsage = `usage:
+  gator provider openai
+  gator provider anthropic
+  gator provider gemini
+  gator provider codex [--device]
+  gator provider copilot [--host URL]
+  gator provider kimi
+  gator provider xai
+  gator provider claude
+  gator provider openrouter
+  gator provider radius
 
-Connect starts the closest supported sign-in route. It never stores or
+Provider onboarding starts the closest supported sign-in route. It never stores or
 translates a vendor CLI credential into Gator. Claude, Radius, and native xAI
 runs use API credentials held by Gator; their provider account subscription
 flows remain separate.`
 
-// connect is the short, provider-first onboarding path. Native `gator login`
-// remains available for direct Gator API providers and product-owned OAuth
-// clients, while this command uses an installed vendor CLI wherever that is
-// the public, no-client-registration route.
-func connect(arguments []string, out io.Writer) error {
+// onboardProvider is the provider-first onboarding path. Native Gator API
+// credentials and product-owned OAuth live under `gator provider login`, while
+// this path uses an installed vendor CLI wherever that is the public,
+// no-client-registration route.
+func onboardProvider(arguments []string, out io.Writer) error {
 	if len(arguments) == 0 {
-		return errors.New(connectUsage)
+		return errors.New(providerOnboardingUsage)
 	}
 	target := strings.ToLower(strings.TrimSpace(arguments[0]))
 	remaining := arguments[1:]
@@ -47,7 +47,7 @@ func connect(arguments []string, out io.Writer) error {
 		return delegate(append([]string{"kimi", "login"}, remaining...), out)
 	case "xai", "grok":
 		if len(remaining) != 0 {
-			return errors.New("usage: gator connect xai")
+			return errors.New("usage: gator provider xai")
 		}
 		if _, err := fmt.Fprintln(out, "Starting OpenCode's xAI provider login. Choose the browser or headless Grok subscription method, or an API key. Gator does not store or translate the credential."); err != nil {
 			return err
@@ -55,44 +55,44 @@ func connect(arguments []string, out io.Writer) error {
 		return delegate([]string{"opencode", "login", "--provider", "xai"}, out)
 	case "claude", "anthropic":
 		if len(remaining) != 0 {
-			return errors.New("usage: gator connect claude")
+			return errors.New("usage: gator provider claude")
 		}
 		if _, err := fmt.Fprintln(out, "Claude Code delegation uses an Anthropic API key, not Claude.ai subscription OAuth."); err != nil {
 			return err
 		}
-		if err := connectAPIKeyProvider("anthropic", out); err != nil {
-			return fmt.Errorf("connect Claude: %w", err)
+		if err := onboardAPIKeyProvider("anthropic", out); err != nil {
+			return fmt.Errorf("onboard Claude: %w", err)
 		}
 		return nil
 	case "openrouter":
 		if len(remaining) != 0 {
-			return errors.New("usage: gator connect openrouter")
+			return errors.New("usage: gator provider openrouter")
 		}
 		return login([]string{"openrouter", "--subscription"}, out)
 	case "radius":
 		if len(remaining) != 0 {
-			return errors.New("usage: gator connect radius")
+			return errors.New("usage: gator provider radius")
 		}
 		if _, err := fmt.Fprintln(out, "Radius account OAuth requires a Gator-registered client. Connecting with a Radius API key instead."); err != nil {
 			return err
 		}
-		if err := connectAPIKeyProvider("radius", out); err != nil {
-			return fmt.Errorf("connect Radius: %w", err)
+		if err := onboardAPIKeyProvider("radius", out); err != nil {
+			return fmt.Errorf("onboard Radius: %w", err)
 		}
 		return nil
 	default:
 		provider, err := model.ParseProvider(target)
 		if err == nil && model.SupportsAPIKeyLogin(provider) && model.APIKeyEnvironment(provider) != "" {
 			if len(remaining) != 0 {
-				return fmt.Errorf("usage: gator connect %s", target)
+				return fmt.Errorf("usage: gator provider %s", target)
 			}
-			return connectAPIKeyProvider(string(provider), out)
+			return onboardAPIKeyProvider(string(provider), out)
 		}
-		return fmt.Errorf("unknown connection target %q\n\n%s", target, connectUsage)
+		return fmt.Errorf("unknown provider %q\n\n%s", target, providerOnboardingUsage)
 	}
 }
 
-func connectAPIKeyProvider(providerName string, out io.Writer) error {
+func onboardAPIKeyProvider(providerName string, out io.Writer) error {
 	provider, err := model.ParseProvider(providerName)
 	if err != nil {
 		return err
@@ -105,7 +105,7 @@ func connectAPIKeyProvider(providerName string, out io.Writer) error {
 		return login([]string{string(provider), "--from-env", environment}, out)
 	}
 	if !term.IsTerminal(os.Stdin.Fd()) {
-		return fmt.Errorf("no API key found; set %s or run 'gator connect %s' in an interactive terminal", environment, provider)
+		return fmt.Errorf("no API key found; set %s or run 'gator provider %s' in an interactive terminal", environment, provider)
 	}
 	if _, err := fmt.Fprintf(out, "Enter the %s API key (input hidden): ", provider); err != nil {
 		return err

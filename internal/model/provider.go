@@ -58,8 +58,8 @@ func SupportsOAuthLogin(provider Provider) bool {
 	}
 }
 
-// SupportsAPIKeyLogin reports whether gator login can safely persist an API
-// key for the provider. Subscription providers use a separate OAuth flow.
+// SupportsAPIKeyLogin reports whether gator provider login can safely persist
+// an API key for the provider. Subscription providers use a separate OAuth flow.
 func SupportsAPIKeyLogin(provider Provider) bool {
 	return SupportsDirect(provider) && !RequiresOAuthLogin(provider) && provider != GoogleVertex
 }
