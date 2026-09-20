@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
@@ -40,6 +41,38 @@ func TestInferInteractiveWorkHonorsExplicitInspection(t *testing.T) {
 	_, _, err := inferInteractiveWork("write it", worktui.RunOptions{Mode: "inspect", Artifacts: []string{"report.md"}})
 	if err == nil {
 		t.Fatal("inspection accepted an artifact contract")
+	}
+}
+
+func TestLoadWorkTUIConversationOptionsRestoresIgnoredInstructions(t *testing.T) {
+	stateDir := t.TempDir()
+	store, err := worksession.Open(stateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 9, 20, 12, 0, 0, 0, time.UTC)
+	conversation, err := store.Create("Inspect", "/source", "snap-one", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	configuration, err := json.Marshal(struct {
+		IgnoredInstructions []string
+	}{IgnoredInstructions: []string{"AGENTS.md"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.AddRevision(conversation.ID, worksession.Revision{
+		ID: "rev-one", SnapshotID: "snap-one", Objective: "Inspect", BundlePath: "/bundle", Status: "completed", CreatedAt: now,
+		Replay: &worksession.ReplayState{Version: 1, Configuration: configuration},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	options, err := loadWorkTUIConversationOptions(store, conversation.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(options.IgnoredInstructionPaths, []string{"AGENTS.md"}) {
+		t.Fatalf("ignored instructions = %#v", options.IgnoredInstructionPaths)
 	}
 }
 

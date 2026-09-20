@@ -60,42 +60,42 @@ func (p CodePolicy) HasCapability(name string) bool {
 
 // Request describes one bounded local work session.
 type Request struct {
-	DisabledRoles        []string
-	RoleConfiguration    map[string]orchestrator.RoleConfiguration
-	OnSupervisor         func(*orchestrator.Supervisor)
-	OTLPEndpoint         string
-	Limits               agent.Limits
-	Budget               *agent.Budget
-	WebOrigins           []string
-	catalog              *evidenceCatalog
-	researchTools        []agent.Tool
-	DisableDelegation    bool
-	integration          *codeIntegration
-	Project              *projectcapture.Bundle
-	Provider             string
-	SourcePath           string
+	DisabledRoles           []string
+	RoleConfiguration       map[string]orchestrator.RoleConfiguration
+	OnSupervisor            func(*orchestrator.Supervisor)
+	OTLPEndpoint            string
+	Limits                  agent.Limits
+	Budget                  *agent.Budget
+	WebOrigins              []string
+	catalog                 *evidenceCatalog
+	researchTools           []agent.Tool
+	DisableDelegation       bool
+	integration             *codeIntegration
+	Project                 *projectcapture.Bundle
+	Provider                string
+	SourcePath              string
 	IgnoredInstructionPaths []string
-	Objective            string
-	RunID                string
-	MaxSteps             int
-	Mode                 action.Mode
-	Contract             artifact.Contract
-	StateDir             string
-	System               string
-	OnEvent              agent.EventSink
-	Steering             <-chan string
-	ConnectorIDs         []string
-	ApproveAction        action.Approver
-	ApproveConnectorRead func(context.Context, string, string, json.RawMessage) (bool, error)
-	ConversationID       string
-	ParentRevisionID     string
-	SnapshotID           string
-	RefreshSource        bool
-	ConnectorPermissions connector.PermissionSet
-	SnapshotOptions      snapshot.Options
-	OnSnapshot           func(snapshot.Manifest)
-	Images               []agent.Image
-	Attachments          []agent.Attachment
+	Objective               string
+	RunID                   string
+	MaxSteps                int
+	Mode                    action.Mode
+	Contract                artifact.Contract
+	StateDir                string
+	System                  string
+	OnEvent                 agent.EventSink
+	Steering                <-chan string
+	ConnectorIDs            []string
+	ApproveAction           action.Approver
+	ApproveConnectorRead    func(context.Context, string, string, json.RawMessage) (bool, error)
+	ConversationID          string
+	ParentRevisionID        string
+	SnapshotID              string
+	RefreshSource           bool
+	ConnectorPermissions    connector.PermissionSet
+	SnapshotOptions         snapshot.Options
+	OnSnapshot              func(snapshot.Manifest)
+	Images                  []agent.Image
+	Attachments             []agent.Attachment
 	// RequireCode is used by the compatibility `gator work code` route. It keeps the
 	// main Work manager user-facing while requiring concrete Code-specialist
 	// evidence before the run may complete.

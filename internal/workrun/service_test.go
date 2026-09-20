@@ -116,3 +116,19 @@ func TestServiceApprovalIsPendingUntilExplicitResponse(t *testing.T) {
 		t.Fatal("approval replay accepted")
 	}
 }
+
+func TestEffectiveConfigurationRetainsIgnoredInstructions(t *testing.T) {
+	payload, err := json.Marshal(effectiveConfiguration(Request{IgnoredInstructionPaths: []string{"AGENTS.md"}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var configuration struct {
+		IgnoredInstructions []string
+	}
+	if err := json.Unmarshal(payload, &configuration); err != nil {
+		t.Fatal(err)
+	}
+	if len(configuration.IgnoredInstructions) != 1 || configuration.IgnoredInstructions[0] != "AGENTS.md" {
+		t.Fatalf("ignored instructions = %#v", configuration.IgnoredInstructions)
+	}
+}

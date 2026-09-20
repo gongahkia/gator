@@ -128,8 +128,8 @@ func LoadWithOptions(repository string, scopes []string, options Options) (Set, 
 			if isMissingFileError(err) {
 				return nil
 			}
-		if errors.Is(err, workspace.ErrPathEscapesWorkspace) {
-				return fmt.Errorf("project instruction %q resolves outside the selected workspace through a symlink; Gator will not capture external files as agent context. In the Work TUI, run /source ignore %s to skip it for this conversation, or replace it with a regular file inside the workspace or remove the symlink", relative, relative)
+			if errors.Is(err, workspace.ErrPathEscapesWorkspace) {
+				return externalInstructionSymlinkError(relative)
 			}
 			return fmt.Errorf("read project instructions %q: %w", relative, err)
 		}
@@ -148,6 +148,9 @@ func LoadWithOptions(repository string, scopes []string, options Options) (Set, 
 		if _, skip := ignored[override]; !skip {
 			exists, err := regularFileExists(root, override)
 			if err != nil {
+				if errors.Is(err, workspace.ErrPathEscapesWorkspace) {
+					return externalInstructionSymlinkError(override)
+				}
 				return err
 			}
 			if exists {
@@ -446,6 +449,10 @@ func normalizeIgnoredPaths(values []string) (map[string]struct{}, error) {
 	return result, nil
 }
 
+func externalInstructionSymlinkError(relative string) error {
+	return fmt.Errorf("project instruction %q resolves outside the selected workspace through a symlink; Gator will not capture external files as agent context. In the Work TUI, run /source ignore %s to skip it for this conversation, or replace it with a regular file inside the workspace or remove the symlink", relative, relative)
+}
+
 func normalizeScopes(scopes []string) ([]string, error) {
 	seen := make(map[string]struct{}, len(scopes))
 	result := make([]string, 0, len(scopes))
@@ -498,6 +505,9 @@ func loadRules(root workspace.Root, scopes []string, ignored map[string]struct{}
 	if err != nil {
 		if isMissingFileError(err) {
 			return nil, nil, nil
+		}
+		if errors.Is(err, workspace.ErrPathEscapesWorkspace) {
+			return nil, nil, externalInstructionSymlinkError(rulesPath)
 		}
 		return nil, nil, fmt.Errorf("read project rules: %w", err)
 	}
@@ -560,6 +570,9 @@ func loadRules(root workspace.Root, scopes []string, ignored map[string]struct{}
 			}
 			contents, err := root.ReadRegularFile(file, maxFileBytes)
 			if err != nil {
+				if errors.Is(err, workspace.ErrPathEscapesWorkspace) {
+					return nil, nil, externalInstructionSymlinkError(file)
+				}
 				return nil, nil, fmt.Errorf("read project rule %d: %w", index+1, err)
 			}
 			body = strings.TrimSpace(string(contents))

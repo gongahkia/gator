@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/gongahkia/gator/internal/instructions"
 )
 
 func (m *Model) openCommandPalette() {
@@ -44,6 +45,9 @@ func (m *Model) openSourceMenu() {
 	m.entries = []entry{
 		{title: "Change workspace", subtitle: "Current: " + valueOrNone(m.source), kind: "command-input", command: "/source"},
 		{title: "Refresh workspace", subtitle: "Capture a new immutable snapshot on the next turn", kind: "command", command: "/source-refresh"},
+		{title: "Ignore project instruction", subtitle: "Skip one AGENTS or project-rules file for this conversation", kind: "command-input", command: "/source ignore"},
+		{title: "Restore project instruction", subtitle: "Read a previously ignored project instruction again", kind: "command-input", command: "/source unignore"},
+		{title: "List ignored project instructions", subtitle: valueOrNone(strings.Join(m.options.IgnoredInstructionPaths, ", ")), kind: "command", command: "/source ignored"},
 	}
 	m.paletteQuery = ""
 	m.selected = 0
@@ -133,6 +137,8 @@ func commandPaletteEntries() []entry {
 		{title: "/detach", subtitle: "Remove a pending attachment", kind: "command-input", command: "/detach"},
 		{title: "/source", subtitle: "Inspect, change, or refresh the conversation workspace", kind: "command", command: "/source"},
 		{title: "/source-refresh", subtitle: "Capture the selected workspace again", kind: "command", command: "/source-refresh"},
+		{title: "/source ignore", subtitle: "Skip a project instruction file for this conversation", kind: "command-input", command: "/source ignore"},
+		{title: "/source unignore", subtitle: "Restore a skipped project instruction file", kind: "command-input", command: "/source unignore"},
 		{title: "/mode", subtitle: "Set auto, inspect, draft, or act", kind: "command-input", command: "/mode"},
 		{title: "/artifact", subtitle: "Add, remove, or list deliverables", kind: "command-input", command: "/artifact"},
 		{title: "/connector", subtitle: "Select connected sources for this session", kind: "command-input", command: "/connector"},
@@ -242,6 +248,34 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		if value == "" {
 			m.openSourceMenu()
 			return m, nil
+		}
+		if len(fields) >= 2 {
+			switch strings.ToLower(fields[1]) {
+			case "ignore", "unignore":
+				path, normalizeErr := instructions.NormalizeIgnoredPaths([]string{commandRemainder(command, fields[:2])})
+				if normalizeErr != nil {
+					err = normalizeErr
+					break
+				}
+				if strings.EqualFold(fields[1], "ignore") {
+					m.options.IgnoredInstructionPaths = appendUnique(m.options.IgnoredInstructionPaths, path[0])
+					result = "Gator will skip project instruction \"" + path[0] + "\" for this conversation. Resend your request."
+				} else {
+					m.options.IgnoredInstructionPaths = removeString(m.options.IgnoredInstructionPaths, path[0])
+					result = "Gator will read project instruction \"" + path[0] + "\" again when applicable."
+				}
+			case "ignored":
+				if len(fields) != 2 {
+					err = fmt.Errorf("usage: /source ignored")
+				} else if len(m.options.IgnoredInstructionPaths) == 0 {
+					result = "No project instruction files are ignored for this conversation."
+				} else {
+					result = "Ignored project instruction files:\n  " + strings.Join(m.options.IgnoredInstructionPaths, "\n  ")
+				}
+			}
+			if result != "" || err != nil {
+				break
+			}
 		}
 		if m.config.ResolveSource == nil {
 			err = errorsUnavailable("source selection")
@@ -714,9 +748,10 @@ func singleLine(value string) string {
 
 func (m Model) workStatus() string {
 	modelSelection, modelAccess := m.configuredModelStatus()
-	return fmt.Sprintf("Gator orchestration\n  model: %s\n  model access: %s\n  workspace: %s%s\n  conversation: %s\n  selected revision: %s\n  mode: %s\n  deliverables: %s\n  connectors: %s\n  web origins: %s\n  effort: %s (%d manager steps)\n  pending attachments: %s\n  queued prompts: %d\n  internal specialists: managed by Gator",
+	return fmt.Sprintf("Gator orchestration\n  model: %s\n  model access: %s\n  workspace: %s%s\n  ignored project instructions: %s\n  conversation: %s\n  selected revision: %s\n  mode: %s\n  deliverables: %s\n  connectors: %s\n  web origins: %s\n  effort: %s (%d manager steps)\n  pending attachments: %s\n  queued prompts: %d\n  internal specialists: managed by Gator",
 		modelSelection, modelAccess,
 		valueOrNone(m.source), map[bool]string{true: " (refresh next turn)", false: " (frozen per turn)"}[m.options.RefreshSource],
+		valueOrNone(strings.Join(m.options.IgnoredInstructionPaths, ", ")),
 		valueOrNone(m.conversation), valueOrNone(m.revision), valueOrNone(m.options.Mode), valueOrNone(strings.Join(m.options.Artifacts, ", ")),
 		valueOrNone(strings.Join(m.options.ConnectorIDs, ", ")), valueOrNone(strings.Join(m.options.WebOrigins, ", ")),
 		effortName(m.options.MaxSteps), m.options.MaxSteps,
@@ -724,8 +759,8 @@ func (m Model) workStatus() string {
 }
 
 func (m Model) workPermissions() string {
-	return fmt.Sprintf("Gator Work authority\n  workspace: read-only immutable snapshots from %s\n  mode: %s\n  connectors: %s\n  web origins: %s\n  internal specialists: managed by Gator",
-		valueOrNone(m.source), valueOrNone(m.options.Mode), valueOrNone(strings.Join(m.options.ConnectorIDs, ", ")),
+	return fmt.Sprintf("Gator Work authority\n  workspace: read-only immutable snapshots from %s\n  ignored project instructions: %s\n  mode: %s\n  connectors: %s\n  web origins: %s\n  internal specialists: managed by Gator",
+		valueOrNone(m.source), valueOrNone(strings.Join(m.options.IgnoredInstructionPaths, ", ")), valueOrNone(m.options.Mode), valueOrNone(strings.Join(m.options.ConnectorIDs, ", ")),
 		valueOrNone(strings.Join(m.options.WebOrigins, ", ")))
 }
 
@@ -748,6 +783,7 @@ func cloneRunOptions(options RunOptions) RunOptions {
 	result.PreviousArtifacts = append([]string(nil), options.PreviousArtifacts...)
 	result.ConnectorIDs = append([]string(nil), options.ConnectorIDs...)
 	result.WebOrigins = append([]string(nil), options.WebOrigins...)
+	result.IgnoredInstructionPaths = append([]string(nil), options.IgnoredInstructionPaths...)
 	result.Code.Verification = append([]string(nil), options.Code.Verification...)
 	result.Code.Scopes = append([]string(nil), options.Code.Scopes...)
 	result.Code.Setup = append([]string(nil), options.Code.Setup...)
@@ -828,6 +864,9 @@ func workHelp() string {
   /attach PATH                   send one source file with the next prompt
   /detach PATH|all               remove pending attachments
   /source [PATH]                 inspect, select, or refresh the read-only workspace
+  /source ignore PATH            skip one project instruction file for this conversation
+  /source unignore PATH          read a skipped project instruction file again
+  /source ignored                list skipped project instruction files
   /source-refresh                capture changed workspace files next turn
   /mode auto|inspect|draft|act   choose automatic or explicit authority
   /artifact [add|remove] PATH    manage expected deliverables

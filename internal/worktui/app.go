@@ -88,20 +88,20 @@ type BundleActionRequest struct {
 // one prompt. They configure Gator and bound its internal Code specialist;
 // they are never editable by the manager model itself.
 type RunOptions struct {
-	Context           context.Context
-	OnEvent           agent.EventSink
-	Steering          <-chan string
-	OnOperation       func(*workrun.Operation)
-	MaxSteps          int
-	Attachments       []string
-	Mode              string
-	Artifacts         []string
-	PreviousArtifacts []string
-	ConnectorIDs      []string
-	WebOrigins        []string
+	Context                 context.Context
+	OnEvent                 agent.EventSink
+	Steering                <-chan string
+	OnOperation             func(*workrun.Operation)
+	MaxSteps                int
+	Attachments             []string
+	Mode                    string
+	Artifacts               []string
+	PreviousArtifacts       []string
+	ConnectorIDs            []string
+	WebOrigins              []string
 	IgnoredInstructionPaths []string
-	RefreshSource     bool
-	Code              CodeOptions
+	RefreshSource           bool
+	Code                    CodeOptions
 }
 
 type CodeOptions struct {

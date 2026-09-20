@@ -61,6 +61,24 @@ func TestExecutorProducesSealedArtifactsFromNonGitSource(t *testing.T) {
 	}
 }
 
+func TestExecutorSkipsIgnoredExternalInstructionSymlink(t *testing.T) {
+	source := t.TempDir()
+	external := filepath.Join(t.TempDir(), "AGENTS.md")
+	if err := os.WriteFile(external, []byte("global guidance"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(external, filepath.Join(source, "AGENTS.md")); err != nil {
+		t.Fatal(err)
+	}
+	executor := Executor{Model: &scriptedModel{turns: []agent.Turn{{Text: "The workspace is ready to inspect."}}}, StateDir: t.TempDir()}
+	if _, err := executor.Execute(context.Background(), Request{
+		SourcePath: source, Objective: "Inspect this workspace", RunID: "ignore-external-instruction",
+		Mode: action.Inspect, Contract: artifact.InspectionContract(), IgnoredInstructionPaths: []string{"AGENTS.md"},
+	}); err != nil {
+		t.Fatalf("execute with ignored instruction: %v", err)
+	}
+}
+
 func TestExecutorDelegatesCodeAgainstFrozenSourceAndSealsPatchEvidence(t *testing.T) {
 	source := t.TempDir()
 	if err := os.Mkdir(filepath.Join(source, ".gator"), 0700); err != nil {

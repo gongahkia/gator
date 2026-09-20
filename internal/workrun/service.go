@@ -66,20 +66,20 @@ func PolicyDigest(request Request) (string, error) {
 
 func effectiveConfiguration(request Request) any {
 	return struct {
-		Contract          artifact.Contract
-		Mode              action.Mode
-		Code              CodePolicy
-		Connectors        []string
-		Permissions       any
-		WebOrigins        []string
+		Contract            artifact.Contract
+		Mode                action.Mode
+		Code                CodePolicy
+		Connectors          []string
+		Permissions         any
+		WebOrigins          []string
 		IgnoredInstructions []string
-		Limits            agent.Limits
-		MaxSteps          int
-		Provider          string
-		Roles             map[string]orchestrator.RoleConfiguration
-		ProjectSHA256     string
-		DisableDelegation bool
-		DisabledRoles     []string
+		Limits              agent.Limits
+		MaxSteps            int
+		Provider            string
+		Roles               map[string]orchestrator.RoleConfiguration
+		ProjectSHA256       string
+		DisableDelegation   bool
+		DisabledRoles       []string
 	}{request.Contract, request.Mode, request.Code, request.ConnectorIDs, request.ConnectorPermissions, request.WebOrigins, request.IgnoredInstructionPaths, request.Limits, request.MaxSteps, request.Provider, request.RoleConfiguration, func() string {
 		if request.Project != nil {
 			return request.Project.SHA256

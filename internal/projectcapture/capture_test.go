@@ -48,3 +48,17 @@ func TestCaptureSelectedProfileRulesAndPinnedConfiguration(t *testing.T) {
 		t.Fatal("changed configuration installed")
 	}
 }
+
+func TestCaptureSkipsIgnoredExternalInstructionSymlink(t *testing.T) {
+	source := t.TempDir()
+	external := filepath.Join(t.TempDir(), "AGENTS.md")
+	if err := os.WriteFile(external, []byte("global guidance"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(external, filepath.Join(source, "AGENTS.md")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := CaptureWithOptions(source, Options{IgnoredInstructionPaths: []string{"AGENTS.md"}}); err != nil {
+		t.Fatalf("capture with ignored instruction: %v", err)
+	}
+}

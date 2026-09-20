@@ -48,6 +48,7 @@ func TestConversationSessionControlsReachEachRun(t *testing.T) {
 		"/artifact brief.md",
 		"/connector notion",
 		"/web-origin https://example.com",
+		"/source ignore AGENTS.md",
 		"/source-refresh",
 	} {
 		model.input = command
@@ -65,11 +66,30 @@ func TestConversationSessionControlsReachEachRun(t *testing.T) {
 	if got.Mode != "draft" || !got.RefreshSource ||
 		len(got.Artifacts) != 1 || got.Artifacts[0] != "brief.md" ||
 		len(got.ConnectorIDs) != 1 || got.ConnectorIDs[0] != "notion" ||
-		len(got.WebOrigins) != 1 || got.WebOrigins[0] != "https://example.com" {
+		len(got.WebOrigins) != 1 || got.WebOrigins[0] != "https://example.com" ||
+		len(got.IgnoredInstructionPaths) != 1 || got.IgnoredInstructionPaths[0] != "AGENTS.md" {
 		t.Fatalf("run options = %#v", got)
 	}
 	if model.options.RefreshSource {
 		t.Fatal("source refresh was not one-shot")
+	}
+}
+
+func TestSourceIgnoreCommandsManageProjectInstructionPaths(t *testing.T) {
+	model := New(Config{CurrentFolder: "/work"})
+	for _, command := range []string{"/source ignore AGENTS.md", "/source ignored"} {
+		model.input = command
+		updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+		model = updated.(Model)
+	}
+	if len(model.options.IgnoredInstructionPaths) != 1 || model.options.IgnoredInstructionPaths[0] != "AGENTS.md" || !strings.Contains(model.View(), "Ignored project instruction files") {
+		t.Fatalf("ignored instructions = %#v\n%s", model.options.IgnoredInstructionPaths, model.View())
+	}
+	model.input = "/source unignore AGENTS.md"
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if len(model.options.IgnoredInstructionPaths) != 0 {
+		t.Fatalf("ignored instructions were not restored: %#v", model.options.IgnoredInstructionPaths)
 	}
 }
 
@@ -369,7 +389,7 @@ func TestCommandPaletteContainsCurrentCommands(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work"})
 	model.openCommandPalette()
 	expected := []string{
-		"/help", "/new", "/model", "/effort", "/attach", "/detach", "/source", "/source-refresh",
+		"/help", "/new", "/model", "/effort", "/attach", "/detach", "/source", "/source-refresh", "/source ignore", "/source unignore",
 		"/mode", "/artifact", "/connector", "/web-origin", "/status", "/statusline", "/permissions",
 		"/doctor", "/agents", "/settings", "/theme", "/history", "/revision-back", "/revision-forward", "/review",
 		"/save", "/apply", "/copy", "/queue", "/dequeue", "/clear-queue", "exit", "/quit",

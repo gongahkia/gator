@@ -91,6 +91,24 @@ func TestLoadExplainsExternalInstructionSymlink(t *testing.T) {
 	}
 }
 
+func TestLoadSkipsIgnoredExternalInstructionSymlink(t *testing.T) {
+	repository := t.TempDir()
+	external := filepath.Join(t.TempDir(), "AGENTS.md")
+	if err := os.WriteFile(external, []byte("global guidance"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(external, filepath.Join(repository, "AGENTS.md")); err != nil {
+		t.Fatal(err)
+	}
+	set, err := LoadWithOptions(repository, nil, Options{IgnoredPaths: []string{"AGENTS.md"}})
+	if err != nil {
+		t.Fatalf("load with ignored instruction: %v", err)
+	}
+	if set.Content != "" || len(set.Files) != 0 {
+		t.Fatalf("ignored instruction was loaded: %#v", set)
+	}
+}
+
 func TestLoadRejectsUnknownRuleFields(t *testing.T) {
 	repository := t.TempDir()
 	writeInstructionFile(t, repository, ".gator/rules.json", `{

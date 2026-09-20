@@ -287,11 +287,11 @@ func runInteractiveWork(source, conversationID, prompt, stateDir string, options
 	request := workrun.Request{
 		SourcePath: source, ConversationID: conversationID, Objective: prompt,
 		MaxSteps: options.MaxSteps, Mode: mode, Contract: contract,
-		ConnectorIDs:             append([]string(nil), options.ConnectorIDs...),
-		WebOrigins:               append([]string(nil), options.WebOrigins...),
-		IgnoredInstructionPaths:  append([]string(nil), options.IgnoredInstructionPaths...),
-		RefreshSource:            options.RefreshSource,
-		OnEvent:       options.OnEvent, Steering: options.Steering,
+		ConnectorIDs:            append([]string(nil), options.ConnectorIDs...),
+		WebOrigins:              append([]string(nil), options.WebOrigins...),
+		IgnoredInstructionPaths: append([]string(nil), options.IgnoredInstructionPaths...),
+		RefreshSource:           options.RefreshSource,
+		OnEvent:                 options.OnEvent, Steering: options.Steering,
 	}
 	parse := func(values []string) ([][]string, error) {
 		var result verificationFlags
@@ -575,13 +575,13 @@ func loadWorkTUIConversationOptions(store worksession.Store, conversationID stri
 		return options, nil
 	}
 	var configuration struct {
-		Contract   artifact.Contract
-		Mode       action.Mode
-		Code       workrun.CodePolicy
-		Connectors []string
-		WebOrigins []string
+		Contract            artifact.Contract
+		Mode                action.Mode
+		Code                workrun.CodePolicy
+		Connectors          []string
+		WebOrigins          []string
 		IgnoredInstructions []string
-		MaxSteps   int
+		MaxSteps            int
 	}
 	if err := json.Unmarshal(revision.Replay.Configuration, &configuration); err != nil {
 		return worktui.RunOptions{}, fmt.Errorf("decode retained Work settings: %w", err)
