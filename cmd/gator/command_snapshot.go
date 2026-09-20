@@ -31,7 +31,7 @@ func snapshotCommand(arguments []string, out io.Writer) error {
 	switch arguments[0] {
 	case "show":
 		if len(arguments) != 2 {
-			return errors.New("usage: gator snapshot show ID")
+			return errors.New("usage: gator work snapshot show ID")
 		}
 		manifest, err := snapshot.Open(stateDir, arguments[1])
 		if err != nil {

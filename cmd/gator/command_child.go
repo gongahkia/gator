@@ -11,10 +11,10 @@ import (
 )
 
 const childUsage = `usage:
-  gator child list RUN_RECORD_PATH
-  gator child show RUN_RECORD_PATH CHILD_RUN_ID
-  gator child batches RUN_RECORD_PATH
-  gator child batch RUN_RECORD_PATH BATCH_ID`
+  gator agent child list RUN_RECORD_PATH
+  gator agent child show RUN_RECORD_PATH CHILD_RUN_ID
+  gator agent child batches RUN_RECORD_PATH
+  gator agent child batch RUN_RECORD_PATH BATCH_ID`
 
 // childCommand exposes parent-owned writer manifests without replaying model
 // conversation content or patch text. It is a recovery surface for retained

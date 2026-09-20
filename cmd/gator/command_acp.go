@@ -23,7 +23,7 @@ func acpMode(arguments []string, input io.Reader, out io.Writer) error {
 		return err
 	}
 	if len(flags.Args()) != 0 {
-		return errors.New("usage: gator acp [--verify 'argv ...']")
+		return errors.New("usage: gator agent acp [--verify 'argv ...']")
 	}
 	workingDirectory, err := os.Getwd()
 	if err != nil {

@@ -27,6 +27,7 @@ const providerUsage = `usage:
   gator provider add ID --base-url URL --model MODEL [--model MODEL...] [--api-key-env NAME]
   gator provider discover ID [--apply]
   gator provider remove ID --yes
+  gator provider connector list|add|status|login|logout|test|remove|permission [OPTIONS]
 
 short form:
   gator -p ...`
@@ -47,6 +48,8 @@ func providerCommand(arguments []string, out io.Writer) error {
 		return logout(arguments[1:], out)
 	case "list", "add", "discover", "remove":
 		return customProviderCommand(arguments, out)
+	case "connector":
+		return connectorCommand(arguments[1:], out)
 	default:
 		return onboardProvider(arguments, out)
 	}

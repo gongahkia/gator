@@ -12,7 +12,7 @@ import (
 
 func rpcMode(arguments []string, input io.Reader, out io.Writer) error {
 	if len(arguments) != 0 {
-		return errors.New("usage: gator rpc")
+		return errors.New("usage: gator agent rpc")
 	}
 	workingDirectory, err := os.Getwd()
 	if err != nil {

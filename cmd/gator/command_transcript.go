@@ -15,7 +15,7 @@ import (
 // session contents: sharing remains an explicit developer action after review.
 func exportTranscript(arguments []string, out io.Writer) error {
 	if len(arguments) != 1 {
-		return errors.New("usage: gator transcript RUN_RECORD_PATH > transcript.html")
+		return errors.New("usage: gator work transcript RUN_RECORD_PATH > transcript.html")
 	}
 	session, err := journal.LoadSession(arguments[0])
 	if err != nil {

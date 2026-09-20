@@ -12,9 +12,9 @@ import (
 )
 
 const hookUsage = `usage:
-  gator hook status
-  gator hook trust
-  gator hook untrust`
+  gator config hook status
+  gator config hook trust
+  gator config hook untrust`
 
 func hookCommand(arguments []string, out io.Writer) error {
 	if len(arguments) != 1 {

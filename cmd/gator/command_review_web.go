@@ -93,7 +93,7 @@ func parseReviewWebOptions(arguments []string) (reviewWebOptions, error) {
 		return reviewWebOptions{}, err
 	}
 	if len(positional) != 1 || len(flags.Args()) != 0 {
-		return reviewWebOptions{}, errors.New("usage: gator review RUN_RECORD_PATH [--listen 127.0.0.1:PORT] [--open]")
+		return reviewWebOptions{}, errors.New("usage: gator work review RUN_RECORD_PATH [--listen 127.0.0.1:PORT] [--open]")
 	}
 	if err := reviewweb.ValidateListenAddress(*listen); err != nil {
 		return reviewWebOptions{}, err

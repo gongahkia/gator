@@ -16,9 +16,9 @@ import (
 var worktreeID = regexp.MustCompile(`\A[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}\z`)
 
 const worktreeUsage = `usage:
-  gator worktree list
-  gator worktree prune
-  gator worktree remove RUN_ID --yes`
+  gator work worktree list
+  gator work worktree prune
+  gator work worktree remove RUN_ID --yes`
 
 // worktreeCommand manages only Gator's sibling worktrees. It never performs
 // implicit cleanup, because retained worktrees may contain reviewable changes.
@@ -62,7 +62,7 @@ func worktreeCommand(arguments []string, out io.Writer) error {
 		return err
 	case "remove":
 		if len(arguments) != 3 || arguments[2] != "--yes" || !worktreeID.MatchString(arguments[1]) {
-			return errors.New("removing a retained worktree deletes its files; use: gator worktree remove RUN_ID --yes")
+			return errors.New("removing a retained worktree deletes its files; use: gator work worktree remove RUN_ID --yes")
 		}
 		target := filepath.Join(base, arguments[1])
 		info, err := os.Lstat(target)

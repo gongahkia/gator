@@ -57,6 +57,8 @@ func jobCommand(arguments []string, out io.Writer) error {
 		return listJobs(out)
 	}
 	switch arguments[0] {
+	case "inbox":
+		return inboxCommand(arguments[1:], out)
 	case "add":
 		return addJob(arguments[1:], out)
 	case "show", "enable", "disable", "run", "history", "remove", "edit":
@@ -579,7 +581,7 @@ func inboxCommand(arguments []string, out io.Writer) error {
 	if len(arguments) == 1 && arguments[0] == "--unread" {
 		unread = true
 	} else if len(arguments) != 0 {
-		return errors.New("usage: gator inbox [--unread] | gator inbox read ENTRY_ID")
+		return errors.New("usage: gator job inbox [--unread] | gator job inbox read ENTRY_ID")
 	}
 	entries, err := store.List(unread, 100)
 	if err != nil {
