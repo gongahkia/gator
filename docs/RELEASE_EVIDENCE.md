@@ -33,8 +33,8 @@ Evaluation runner checks:
 
 ```sh
 go test ./internal/eval
-gator eval DIR --run-id UNIQUE_ID --script DIR/script.json --report DIR/reports/UNIQUE_ID.json --require-resolved
-gator eval suite DIR --live --provider PROVIDER --model MODEL --environment-id OCI_IMAGE_DIGEST --attempts 3 --report-dir DIR/reports/UNIQUE_ID --require-resolved
+gator work eval DIR --run-id UNIQUE_ID --script DIR/script.json --report DIR/reports/UNIQUE_ID.json --require-resolved
+gator work eval suite DIR --live --provider PROVIDER --model MODEL --environment-id OCI_IMAGE_DIGEST --attempts 3 --report-dir DIR/reports/UNIQUE_ID --require-resolved
 ```
 
 Use a new `--run-id` for every attempt. Reusing an id against a previous
@@ -92,7 +92,7 @@ Record one row per session. Do not silently skip a failed item.
 | Task (one sentence) | |
 | Outcome | patch ready / needs input / policy refusal / failure |
 | Verifier | exact argv and pass/fail |
-| Apply to checkout? | no / `gator apply --check` only / applied |
+| Apply to checkout? | no / `gator work apply --check` only / applied |
 | Usability issues | |
 | Fixes landed or follow-ups | issue ids or “none” |
 
@@ -113,7 +113,7 @@ keep local notes. Do not commit transcripts, session files, or credentials.
 
 ### Minimum dogfood set before calling a release daily-driver
 
-1. Run `gator inspect` on a real non-Git folder and confirm no source byte or
+1. Run `gator work inspect` on a real non-Git folder and confirm no source byte or
    external state changes.
 2. Produce Markdown plus JSON or CSV from a real folder; verify the bundle and
    preview it by ID.
@@ -125,7 +125,7 @@ keep local notes. Do not commit transcripts, session files, or credentials.
    and the review shows escaped exact JSON plus its digest.
 6. In an isolated test endpoint, deny one act-mode proposal and approve another;
    confirm only the approved payload is sent and each decision is requested.
-7. Run `gator code --verify ...` on a real repo and confirm it enters the main
+7. Run `gator work code --verify ...` on a real repo and confirm it enters the main
    Gator orchestration path, retains internal Code patch evidence, and leaves
    the source unchanged.
 8. Give ordinary Gator one mixed research-and-implementation prompt; confirm

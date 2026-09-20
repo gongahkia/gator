@@ -189,10 +189,10 @@ surface shows:
 - a text or structured diff when replacing an existing target; and
 - proposed external actions with their exact target and payload summary.
 
-`gator work` never writes to the source directory. `gator apply` performs a
+`gator work` never writes to the source directory. `gator work apply` performs a
 preflight against an artifact manifest, refuses changed targets unless the user
 explicitly resolves the conflict, and then publishes files atomically where the
-platform supports it. `gator export` copies or archives the immutable reviewed
+platform supports it. `gator work export` copies or archives the immutable reviewed
 bundle without touching the source.
 
 ## Connectors
@@ -245,18 +245,18 @@ The command hierarchy is:
 
 ```text
 gator work [DIRECTORY] TASK       run a general local work task
-gator inspect [DIRECTORY] TASK    produce analysis without artifacts
-gator code TASK                   compatibility route requiring an internal Code patch
-gator review RUN                  inspect artifacts, evidence, and actions
-gator export RUN                  export a sealed artifact bundle
-gator apply RUN                   copy reviewed artifacts to explicit targets
-gator connector ...               manage connected sources and authentication
+gator work inspect [DIRECTORY] TASK produce analysis without artifacts
+gator work code TASK              compatibility route requiring an internal Code patch
+gator work review RUN             inspect artifacts, evidence, and actions
+gator work export RUN             export a sealed artifact bundle
+gator work apply RUN              copy reviewed artifacts to explicit targets
+gator provider connector ...      manage connected sources and authentication
 gator job ...                     manage scheduled work and its supervisor
-gator inbox                       inspect completed and attention-needed jobs
-gator snapshot ...                inspect or collect unreferenced snapshots
+gator job inbox                   inspect completed and attention-needed jobs
+gator work snapshot ...           inspect or collect unreferenced snapshots
 ```
 
-`gator code` and `gator run` are compatibility routes through the same Gator
+`gator work code` and `gator work run` are compatibility routes through the same Gator
 manager. They require Code-specialist evidence but never open a separate Code
 TUI. RPC and ACP retain explicit workflow and outcome-contract fields.
 
@@ -295,9 +295,9 @@ adapters.
 
 ## Compatibility and state
 
-`gator run` remains an alias for the `gator code` compatibility route. New
+`gator work run` remains an alias for the `gator work code` compatibility route. New
 coding requests use Work conversations and revisions. Historical Code run
 records remain readable for review/export compatibility but are never silently
 reinterpreted as Gator conversations. Snapshot collection is explicit and does
-not delete data; `gator snapshot gc --yes` is the only snapshot reclamation
+not delete data; `gator work snapshot gc --yes` is the only snapshot reclamation
 path.

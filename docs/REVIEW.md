@@ -39,8 +39,8 @@ then sends it as a constrained continuation of the retained thread. The code
 excerpt is labeled untrusted context in that follow-up; the agent is told to
 inspect the current worktree before editing.
 
-`e` shows the unchanged explicit `gator export`, `gator apply --check`, and
-`gator apply` handoff commands. Gator's `git_diff` tool also includes staged
+`e` shows the unchanged explicit `gator work export`, `gator work apply --check`, and
+`gator work apply` handoff commands. Gator's `git_diff` tool also includes staged
 changes, so a later continuation does not silently lose an index-only change.
 
 `/review TARGET` loads a retained thread ID, unique prefix, or run-record
@@ -48,15 +48,15 @@ directory instead of the latest completed run. Press `b` to start the same
 loopback browser review the CLI exposes: edit the listen address (loopback
 only), toggle `o` to open the one-use URL, `enter` to start, and `s` to stop.
 The URL is shown on that screen and is not copied into drafts or transcripts.
-This is not `gator serve` and has no RPC access.
+This is not `gator agent serve` and has no RPC access.
 
 ## Browser review
 
 Use a separate foreground local server for a retained run:
 
 ```sh
-gator review RUN_RECORD_PATH --listen 127.0.0.1:0
-gator review RUN_RECORD_PATH --open
+gator work review RUN_RECORD_PATH --listen 127.0.0.1:0
+gator work review RUN_RECORD_PATH --open
 ```
 
 The command prints a one-use URL. Opening it exchanges the URL credential for a
@@ -66,9 +66,9 @@ file and hunk navigation, raw file patches, explicit stage/unstage
 confirmations, and range-scoped feedback. Browser feedback is saved beside the
 retained run and returns the exact constrained continuation text for review and
 copying. Historical standalone Code records remain reviewable, but new work
-continues through `gator resume CONVERSATION` and Gator revision history.
+continues through `gator work resume CONVERSATION` and Gator revision history.
 
-This is intentionally not `gator serve` and not an RPC client. `gator serve`
+This is intentionally not `gator agent serve` and not an RPC client. `gator agent serve`
 continues to reject every browser origin. The review listener accepts literal
 loopback peers only, binds only literal loopback addresses, has no CORS mode,
 requires same-origin mutations, sends `no-store`, `nosniff`, no-referrer, and a
@@ -82,13 +82,13 @@ agent API, or a way to apply the retained patch to the active checkout.
 
 ## Work code application
 
-`gator review RUN_ID --preview` verifies the Work bundle and displays selected
+`gator work review RUN_ID --preview` verifies the Work bundle and displays selected
 Code candidates, their baseline tree and patches, changed paths, and aggregate
 verification results. Failed integration evidence remains visible.
 
 ```sh
-gator apply RUN_ID --code-patch code/SELECTED.patch --to ./target --check
-gator apply RUN_ID --code-patch code/SELECTED.patch --to ./target
+gator work apply RUN_ID --code-patch code/SELECTED.patch --to ./target --check
+gator work apply RUN_ID --code-patch code/SELECTED.patch --to ./target
 ```
 
 Only the explicitly selected verified candidate is applied. Preflight checks the

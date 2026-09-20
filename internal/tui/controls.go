@@ -314,7 +314,7 @@ func (m Model) startOAuthLogin(providerName string) (tea.Model, tea.Cmd) {
 			if provider == modelprovider.Claude {
 				m.commandOutput = "Claude Code uses an Anthropic API key in Gator. Gator does not use Claude.ai or Claude Code's stored subscription credential.\n\nExit this TUI and run:\n  " + command + "\n\nThen send a task through the Claude Code harness."
 			} else {
-				m.commandOutput = "Native Gator OAuth requires " + clientIDEnvironment + ".\n\nFor the no-registration vendor-CLI route, exit this TUI and run:\n  " + command + "\n\nThen use the matching gator delegate runtime."
+				m.commandOutput = "Native Gator OAuth requires " + clientIDEnvironment + ".\n\nFor the no-registration vendor-CLI route, exit this TUI and run:\n  " + command + "\n\nThen use the matching gator agent delegate runtime."
 			}
 			m.notice = notice{text: "Use the vendor-CLI connection command shown below, or configure Gator's own OAuth client.", kind: noticeInfo}
 			return m, nil

@@ -4,7 +4,7 @@
 
 Gator is the only user-facing agent. The original Code application is no
 longer a second terminal product: its isolated Git executor is an internal
-specialist that Gator may call with a bounded task. `gator code` and `gator run`
+specialist that Gator may call with a bounded task. `gator work code` and `gator work run`
 remain compatibility spellings, but both enter the Gator manager and require a
 retained Code patch before the manager can complete.
 
@@ -47,13 +47,13 @@ user controls + objective
 | Initial static scouts and dynamic reader/writer children | Reframe | Gator owns source research, artifact review, and Code delegation; Code cannot recursively delegate |
 | Code thread resume/fork/clone | Replace | Gator Work conversations and immutable revision branches |
 | Code recent-run picker and thread tree | Replace | `Ctrl+X` conversation picker plus `/history`, `/back`, and `/forward`; `Ctrl+P` is reserved for actions |
-| Code diff/review/transcript UI | Replace at product boundary | Sealed Work bundle, subagent patch evidence, root `gator review`, `export`, and historical read compatibility |
+| Code diff/review/transcript UI | Replace at product boundary | Sealed Work bundle, subagent patch evidence, `gator work review`, `gator work export`, and historical read compatibility |
 | Base-ref selection | Retire for managed delegation | Code receives frozen source plus an explicitly selected accepted candidate |
 | Copy ignored files into a worktree | Retire for managed delegation | Snapshot inclusion/exclusion is explicit, bounded, and recorded before delegation |
 | Sandbox-off/network confirmation modal | Replace | The user must type the explicit root flag or `/code` setting; the manager cannot choose it |
 | Attached interactive terminal UX | Retire from Code frontend | Terminal can be an explicitly granted internal tool, but has no child-facing UI |
 | Vim composer mode, mouse-heavy diff controls, Code-only drawers and control center | Retire | They do not improve the single, conversation-first Gator surface enough to justify a second UI state machine |
-| Vendor-harness chooser inside Code | Keep as root boundary, not child convenience | Explicit `gator delegate`; never selected silently by Gator or Code |
+| Vendor-harness chooser inside Code | Keep as root boundary, not child convenience | Explicit `gator agent delegate`; never selected silently by Gator or Code |
 | Extension prompt commands and declarative Code UI cards | Retire from the product surface | Bundle metadata remains readable for compatibility, but only explicitly granted backend tools are active |
 | JSONL RPC, ACP, and app-server transports | Keep as machine-facing backend compatibility | They remain non-TUI integration surfaces around the retained engine; a future incompatible Work-native protocol must use Work conversations and capability envelopes |
 
@@ -69,7 +69,7 @@ user controls + objective
   trees. Parallelism belongs to Gator's manager.
 - Integration names are not grants. A capability must be explicitly enabled,
   and its existing project trust/authentication checks still apply.
-- A compatibility `gator code`/`gator run` request cannot complete without a
+- A compatibility `gator work code`/`gator work run` request cannot complete without a
   successful Code invocation and a retained patch artifact.
 - The child never applies its patch to live source. Review and transfer stay at
   the Gator product boundary.

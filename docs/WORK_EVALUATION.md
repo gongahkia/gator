@@ -1,20 +1,20 @@
 # Full Work evaluation
 
-`gator eval work` evaluates target `work.v1` through the actual Work service,
+`gator work eval` evaluates target `work.v1` through the actual Work service,
 manager, supervisor, Code adapter, tools, contracts, and revision store. Existing
-`gator eval DIR` and `gator eval suite DIR` remain direct Code compatibility
+`gator work eval DIR` and `gator work eval suite DIR` remain direct Code compatibility
 targets. Their fixtures and scoring behavior are preserved.
 
 ## Local experiments
 
 ```sh
-gator eval work validate internal/eval/testdata/work-v1/dataset.json
-gator eval work run internal/eval/testdata/work-v1/dataset.json \
+gator work eval validate internal/eval/testdata/work-v1/dataset.json
+gator work eval run internal/eval/testdata/work-v1/dataset.json \
   --id enabled --attempts 2 --report-dir /tmp/gator-enabled
-gator eval work run internal/eval/testdata/work-v1/dataset.json \
+gator work eval run internal/eval/testdata/work-v1/dataset.json \
   --id disabled --attempts 2 --delegation=false --report-dir /tmp/gator-disabled
-gator eval work compare /tmp/gator-disabled/experiment.json /tmp/gator-enabled/experiment.json
-gator eval work show /tmp/gator-enabled/experiment.json
+gator work eval compare /tmp/gator-disabled/experiment.json /tmp/gator-enabled/experiment.json
+gator work eval show /tmp/gator-enabled/experiment.json
 ```
 
 Use a new report directory for each experiment. For example,
@@ -69,7 +69,7 @@ entailment and cost are not inferred from those counters.
 ## Budgeted live execution
 
 ```sh
-gator eval work run internal/eval/testdata/work-v1/dataset.json \
+gator work eval run internal/eval/testdata/work-v1/dataset.json \
   --id live-baseline --live --provider PROVIDER --model MODEL \
   --max-model-requests 256 --timeout-seconds 1800 --attempts 2 \
   --report-dir /tmp/gator-live-baseline
@@ -92,11 +92,11 @@ and evidence, not the producing agent's private transcript. Nonzero scores must
 cite text actually present in the judging input.
 
 ```sh
-gator eval work judge-rubric /tmp/gator-live-baseline/experiment.json \
+gator work eval judge-rubric /tmp/gator-live-baseline/experiment.json \
   --live --rubric internal/eval/testdata/work-v1/synthesis-rubric.json \
   --provider JUDGE_PROVIDER --model JUDGE_MODEL \
   --max-model-requests 32 --timeout-seconds 300 --output /tmp/judgements.json
-gator eval work calibrate-rubric /tmp/judgements.json /tmp/human-scores.json
+gator work eval calibrate-rubric /tmp/judgements.json /tmp/human-scores.json
 ```
 
 `judge-rubric --live` explicitly sends retained textual artifact/evidence content
@@ -118,7 +118,7 @@ explicit. The OTLP endpoint can target a compatible collector, including a
 Langfuse pipeline, without another custom runtime.
 
 ```sh
-gator eval work export-langsmith /tmp/gator-enabled/experiment.json
+gator work eval export-langsmith /tmp/gator-enabled/experiment.json
 ```
 
 This command requires `LANGSMITH_API_KEY`; `LANGSMITH_ENDPOINT` can override the

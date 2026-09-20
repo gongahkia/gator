@@ -2,7 +2,7 @@
 
 Full Work experiments, independent grading, comparisons and optional export: [WORK_EVALUATION.md](WORK_EVALUATION.md).
 
-`gator eval` is a noninteractive, bounded runner for measuring real Gator
+`gator work eval` is a noninteractive, bounded runner for measuring real Gator
 model runs. It never opens the TUI or asks a person to approve a command. It
 is one foreground process, intended for a CI job, container, or scheduler;
 the caller owns concurrency, resource limits, retries, and process lifetime.
@@ -25,7 +25,7 @@ An offline script is useful to regression-test harness mechanics without a
 provider. It is not model-quality evidence.
 
 ```sh
-gator eval ./internal/eval/testdata/greeting \
+gator work eval ./internal/eval/testdata/greeting \
   --run-id greeting-script-001 \
   --report /tmp/gator-eval/greeting-script-001.json \
   --require-resolved
@@ -38,7 +38,7 @@ state exactly which container supplied Gator, Bubblewrap, language runtimes,
 and dependency caches.
 
 ```sh
-OPENAI_API_KEY=... gator eval suite ./internal/eval/testdata/core-v1 \
+OPENAI_API_KEY=... gator work eval suite ./internal/eval/testdata/core-v1 \
   --live --provider openai --model gpt-5.6 \
   --environment-id 'ghcr.io/acme/gator-eval@sha256:IMAGE_DIGEST' \
   --run-id core-20260830-001 --attempts 3 \
@@ -205,7 +205,7 @@ docker run --rm \
   --mount type=volume,src=gator-eval-state,dst=/state \
   --env OPENAI_API_KEY --env GATOR_STATE_DIR=/state \
   ghcr.io/acme/gator-eval@sha256:IMAGE_DIGEST \
-  gator eval suite /fixtures --live --provider openai --model gpt-5.6 \
+  gator work eval suite /fixtures --live --provider openai --model gpt-5.6 \
     --environment-id 'ghcr.io/acme/gator-eval@sha256:IMAGE_DIGEST' \
     --run-id ci-core-001 --attempts 3 --report-dir /reports --require-resolved
 ```
