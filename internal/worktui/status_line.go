@@ -22,6 +22,7 @@ var statusLineOptions = []statusLineOption{
 	{id: "queue", label: "Queued prompts", description: "Show only when prompts are queued"},
 	{id: "send", label: "Send shortcut", description: "enter send"},
 	{id: "editor", label: "Edit composer", description: "ctrl+g editor"},
+	{id: "source", label: "Change workspace", description: "ctrl+i workspace"},
 	{id: "commands", label: "Command palette", description: "ctrl+p commands"},
 	{id: "conversations", label: "Conversations", description: "ctrl+x conversations"},
 	{id: "inbox", label: "Inbox", description: "ctrl+b inbox"},
@@ -38,7 +39,7 @@ var statusLineOptions = []statusLineOption{
 	{id: "status", label: "Activity status", description: "Most recent transient status"},
 }
 
-var defaultStatusLine = []string{"model", "queue", "current-dir", "mode", "artifacts", "connectors", "send", "editor", "commands", "conversations", "inbox", "jobs"}
+var defaultStatusLine = []string{"model", "queue", "current-dir", "mode", "artifacts", "connectors", "send", "editor", "source", "commands", "conversations", "inbox", "jobs"}
 
 func resolveStatusLine(configured *[]string) ([]string, bool) {
 	if configured == nil {
@@ -82,6 +83,8 @@ func (m Model) statusLineValue(id string) string {
 		return "enter send"
 	case "editor":
 		return "ctrl+g editor"
+	case "source":
+		return "ctrl+i workspace"
 	case "commands":
 		return "ctrl+p commands"
 	case "conversations":

@@ -360,8 +360,8 @@ func (p *ModelCatalogPanel) title(value string) string {
 
 func (p *ModelCatalogPanel) catalogFooter() string {
 	if p.model.localModels.section == localModelSection {
-		return dimStyle.Render("↑/↓ choose  ·  enter use  ·  p download  ·  tab cloud\n" +
-			"s start  ·  i setup  ·  r refresh  ·  esc back  ·  f1 help")
+		return dimStyle.Render("↑/↓ choose  ·  enter use  ·  p download  ·  x remove\n" +
+			"tab cloud  ·  s start  ·  i setup  ·  r refresh  ·  esc back  ·  f1 help")
 	}
 	return dimStyle.Render("↑/↓ choose  ·  enter use  ·  c configure  ·  l sign in\n" +
 		"tab local  ·  n provider  ·  g discover  ·  esc back  ·  f1 help")

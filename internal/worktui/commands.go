@@ -900,6 +900,7 @@ Gator manages its internal specialists; the Work TUI has no Code commands.
 Navigation
   ↑/↓       recall sent prompts in this conversation
   ctrl+g    edit the composer in $VISUAL or $EDITOR (nvim fallback)
+  ctrl+i    choose a workspace directory
   ctrl+x    retained conversations
   ctrl+b    inbox
   ctrl+j    scheduled jobs

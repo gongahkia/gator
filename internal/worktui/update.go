@@ -228,6 +228,10 @@ func (m Model) updateKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.openConversationPicker()
 		return m, nil
 	}
+	if value.Type == tea.KeyCtrlI && !m.running {
+		m.openSourceMenu()
+		return m, nil
+	}
 	if value.Type == tea.KeyCtrlB && !m.running {
 		m.launcher = false
 		m.section = "inbox"

@@ -206,7 +206,7 @@ func (m Model) renderSection(width int, accent, dim lipgloss.Style) string {
 			view.WriteString("\n\n")
 		}
 	}
-	footer := wrapStatusLine([]string{"esc back", "ctrl+p commands", "ctrl+x conversations", "ctrl+b inbox", "ctrl+j jobs"}, width)
+	footer := wrapStatusLine([]string{"esc back", "ctrl+i workspace", "ctrl+p commands", "ctrl+x conversations", "ctrl+b inbox", "ctrl+j jobs"}, width)
 	view.WriteString("\n" + dim.Render(footer))
 	return view.String()
 }

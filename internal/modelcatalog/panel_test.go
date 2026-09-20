@@ -105,7 +105,7 @@ func TestPanelPlacesGeneralWorkModelsBeforeCodingModels(t *testing.T) {
 		{ID: "code", Category: "Coding", Name: "Coding Model", Download: "4.7 GB"},
 	}}
 	plain := ansi.Strip(panel.View())
-	for _, required := range []string{"Recommended for general Work", "Coding · implementation and verification", "General Work Model", "Coding Model"} {
+	for _, required := range []string{"Recommended for general Work", "Coding · implementation and verification", "General Work Model", "Coding Model", "x remove"} {
 		if !strings.Contains(plain, required) {
 			t.Fatalf("model panel omitted %q:\n%s", required, plain)
 		}

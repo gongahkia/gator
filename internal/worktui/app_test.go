@@ -581,8 +581,12 @@ func TestDirectShortcutsOpenConversationsInboxAndJobs(t *testing.T) {
 		model = updated.(Model)
 	}
 	press(tea.KeyMsg{Type: tea.KeyCtrlI})
-	if model.section != "" {
-		t.Fatalf("ctrl+i should remain unbound, state = %#v", model)
+	if !model.launcher || model.launcherMode != "source" || !strings.Contains(model.View(), "Change workspace") {
+		t.Fatalf("workspace shortcut state = %#v", model)
+	}
+	press(tea.KeyMsg{Type: tea.KeyEnter})
+	if model.launcher || model.input != "/source " {
+		t.Fatalf("workspace selection input state = %#v", model)
 	}
 	press(tea.KeyMsg{Type: tea.KeyCtrlB})
 	if model.section != "inbox" || !strings.Contains(model.View(), "Inbox") || model.launcher {

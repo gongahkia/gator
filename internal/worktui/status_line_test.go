@@ -70,12 +70,20 @@ func TestDefaultComposerFooterAdvertisesEditorShortcut(t *testing.T) {
 	}
 }
 
+func TestDefaultComposerFooterAdvertisesWorkspaceShortcut(t *testing.T) {
+	model := New(Config{CurrentFolder: "/work"})
+	model.width, model.height = 100, 24
+	if view := ansi.Strip(model.View()); !strings.Contains(view, "ctrl+i workspace") {
+		t.Fatalf("default footer omitted workspace shortcut: %q", view)
+	}
+}
+
 func TestComposerFooterWrapsWithoutLosingNavigationAtNarrowWidth(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work"})
 	model.home = false
 	model.width, model.height = 32, 24
 	view := ansi.Strip(model.View())
-	for _, item := range []string{"enter send", "ctrl+g editor", "ctrl+p commands", "ctrl+x conversations", "ctrl+b inbox", "ctrl+j jobs"} {
+	for _, item := range []string{"enter send", "ctrl+g editor", "ctrl+i workspace", "ctrl+p commands", "ctrl+x conversations", "ctrl+b inbox", "ctrl+j jobs"} {
 		if !strings.Contains(view, item) {
 			t.Fatalf("narrow view lost %q: %q", item, view)
 		}
