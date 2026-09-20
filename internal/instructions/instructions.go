@@ -30,6 +30,13 @@ type Set struct {
 	Policy  ProfilePolicy
 }
 
+// Options controls the project guidance included in one run.
+// IgnoredPaths are repository-relative paths omitted from prompt context before
+// Gator opens them.
+type Options struct {
+	IgnoredPaths []string
+}
+
 type rulesDocument struct {
 	Version int    `json:"version"`
 	Rules   []rule `json:"rules"`
@@ -86,6 +93,13 @@ const (
 // paths, and matching declarative .gator/rules.json rules. Earlier layers are
 // shown first; more-specific layers therefore appear later and can refine them.
 func Load(repository string, scopes []string) (Set, error) {
+	return LoadWithOptions(repository, scopes, Options{})
+}
+
+// LoadWithOptions collects project guidance after omitting explicitly ignored
+// repository-relative paths. Ignoring a path never grants access to a file
+// outside the repository.
+func LoadWithOptions(repository string, scopes []string, options Options) (Set, error) {
 	root, err := workspace.Open(repository)
 	if err != nil {
 		return Set{}, err
@@ -94,9 +108,16 @@ func Load(repository string, scopes []string) (Set, error) {
 	if err != nil {
 		return Set{}, err
 	}
+	ignored, err := normalizeIgnoredPaths(options.IgnoredPaths)
+	if err != nil {
+		return Set{}, err
+	}
 	var files []string
 	var sections []string
 	appendFile := func(relative string) error {
+		if _, skip := ignored[relative]; skip {
+			return nil
+		}
 		for _, existing := range files {
 			if existing == relative {
 				return nil
@@ -107,8 +128,8 @@ func Load(repository string, scopes []string) (Set, error) {
 			if isMissingFileError(err) {
 				return nil
 			}
-			if errors.Is(err, workspace.ErrPathEscapesWorkspace) {
-				return fmt.Errorf("project instruction %q resolves outside the selected workspace through a symlink; Gator will not capture external files as agent context. Replace it with a regular file inside the workspace or remove the symlink", relative)
+		if errors.Is(err, workspace.ErrPathEscapesWorkspace) {
+				return fmt.Errorf("project instruction %q resolves outside the selected workspace through a symlink; Gator will not capture external files as agent context. In the Work TUI, run /source ignore %s to skip it for this conversation, or replace it with a regular file inside the workspace or remove the symlink", relative, relative)
 			}
 			return fmt.Errorf("read project instructions %q: %w", relative, err)
 		}
@@ -123,16 +144,22 @@ func Load(repository string, scopes []string) (Set, error) {
 		sections = append(sections, "Instructions from "+relative+":\n"+strings.TrimSpace(string(contents)))
 		return nil
 	}
+	appendPreferredFile := func(override, standard string) error {
+		if _, skip := ignored[override]; !skip {
+			exists, err := regularFileExists(root, override)
+			if err != nil {
+				return err
+			}
+			if exists {
+				return appendFile(override)
+			}
+		}
+		return appendFile(standard)
+	}
 
 	// An override replaces the root AGENTS.md layer, mirroring the established
 	// convention without making a project file executable.
-	if exists, err := regularFileExists(root, "AGENTS.override.md"); err != nil {
-		return Set{}, err
-	} else if exists {
-		if err := appendFile("AGENTS.override.md"); err != nil {
-			return Set{}, err
-		}
-	} else if err := appendFile("AGENTS.md"); err != nil {
+	if err := appendPreferredFile("AGENTS.override.md", "AGENTS.md"); err != nil {
 		return Set{}, err
 	}
 	if err := appendFile(".gator/AGENTS.md"); err != nil {
@@ -144,22 +171,12 @@ func Load(repository string, scopes []string) (Set, error) {
 				continue
 			}
 			override := filepath.ToSlash(filepath.Join(directory, "AGENTS.override.md"))
-			exists, err := regularFileExists(root, override)
-			if err != nil {
-				return Set{}, err
-			}
-			if exists {
-				if err := appendFile(override); err != nil {
-					return Set{}, err
-				}
-				continue
-			}
-			if err := appendFile(filepath.ToSlash(filepath.Join(directory, "AGENTS.md"))); err != nil {
+			if err := appendPreferredFile(override, filepath.ToSlash(filepath.Join(directory, "AGENTS.md"))); err != nil {
 				return Set{}, err
 			}
 		}
 	}
-	ruleSections, ruleFiles, err := loadRules(root, normalized)
+	ruleSections, ruleFiles, err := loadRules(root, normalized, ignored)
 	if err != nil {
 		return Set{}, err
 	}
@@ -175,7 +192,13 @@ func Load(repository string, scopes []string) (Set, error) {
 // after ordinary scoped rules. Profiles are selected by the developer rather
 // than being implicitly activated by repository content.
 func LoadWithProfile(repository string, scopes []string, name string) (Set, error) {
-	set, err := Load(repository, scopes)
+	return LoadWithProfileOptions(repository, scopes, name, Options{})
+}
+
+// LoadWithProfileOptions adds a selected profile after loading ordinary
+// guidance with the supplied options.
+func LoadWithProfileOptions(repository string, scopes []string, name string, options Options) (Set, error) {
+	set, err := LoadWithOptions(repository, scopes, options)
 	if err != nil || strings.TrimSpace(name) == "" {
 		return set, err
 	}
@@ -388,6 +411,41 @@ func validProfileName(value string) bool {
 
 func pathpkgClean(value string) string { return path.Clean(value) }
 
+// NormalizeIgnoredPaths validates and canonicalizes exact project-guidance
+// paths supplied by a caller. These paths are never patterns and must stay
+// within the selected repository.
+func NormalizeIgnoredPaths(values []string) ([]string, error) {
+	ignored, err := normalizeIgnoredPaths(values)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]string, 0, len(ignored))
+	for value := range ignored {
+		result = append(result, value)
+	}
+	sort.Strings(result)
+	return result, nil
+}
+
+func normalizeIgnoredPaths(values []string) (map[string]struct{}, error) {
+	if len(values) > 128 {
+		return nil, errors.New("too many ignored project instruction paths")
+	}
+	result := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		original := strings.TrimSpace(value)
+		if original == "" || len(original) > 4096 || strings.ContainsRune(original, 0) {
+			return nil, fmt.Errorf("ignored project instruction path %q is invalid", value)
+		}
+		clean := path.Clean(strings.ReplaceAll(original, "\\", "/"))
+		if strings.HasPrefix(clean, "/") || clean == "." || clean == ".." || strings.HasPrefix(clean, "../") {
+			return nil, fmt.Errorf("ignored project instruction path %q must stay inside the selected workspace", value)
+		}
+		result[clean] = struct{}{}
+	}
+	return result, nil
+}
+
 func normalizeScopes(scopes []string) ([]string, error) {
 	seen := make(map[string]struct{}, len(scopes))
 	result := make([]string, 0, len(scopes))
@@ -429,8 +487,11 @@ func ancestorDirectories(scope string) []string {
 	return result
 }
 
-func loadRules(root workspace.Root, scopes []string) ([]string, []string, error) {
+func loadRules(root workspace.Root, scopes []string, ignored map[string]struct{}) ([]string, []string, error) {
 	if len(scopes) == 0 {
+		return nil, nil, nil
+	}
+	if _, skip := ignored[rulesPath]; skip {
 		return nil, nil, nil
 	}
 	contents, err := root.ReadRegularFile(rulesPath, maxFileBytes)
@@ -494,6 +555,9 @@ func loadRules(root workspace.Root, scopes []string) ([]string, []string, error)
 				return nil, nil, fmt.Errorf("project rule %d file must stay below .gator", index+1)
 			}
 			file = cleanFile
+			if _, skip := ignored[file]; skip {
+				continue
+			}
 			contents, err := root.ReadRegularFile(file, maxFileBytes)
 			if err != nil {
 				return nil, nil, fmt.Errorf("read project rule %d: %w", index+1, err)
