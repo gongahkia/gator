@@ -99,6 +99,7 @@ type RunOptions struct {
 	PreviousArtifacts []string
 	ConnectorIDs      []string
 	WebOrigins        []string
+	IgnoredInstructionPaths []string
 	RefreshSource     bool
 	Code              CodeOptions
 }

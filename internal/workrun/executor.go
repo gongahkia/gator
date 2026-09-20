@@ -147,7 +147,10 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		if parent.ID != "" && !request.RefreshSource {
 			request.Project = parent.Project
 		} else if request.SnapshotID == "" {
-			bundle, captureErr := projectcapture.Capture(sourceSnapshot.SourcePath, request.Code.Scopes, request.Code.Profile, request.Code.Capabilities)
+			bundle, captureErr := projectcapture.CaptureWithOptions(sourceSnapshot.SourcePath, projectcapture.Options{
+				Scopes: request.Code.Scopes, Profile: request.Code.Profile, Capabilities: request.Code.Capabilities,
+				IgnoredInstructionPaths: request.IgnoredInstructionPaths,
+			})
 			if captureErr != nil {
 				return Outcome{}, fmt.Errorf("capture Code configuration: %w", captureErr)
 			}

@@ -32,17 +32,31 @@ type Bundle struct {
 	Files   []File
 }
 
+// Options identifies the project configuration frozen for one run.
+type Options struct {
+	Scopes                  []string
+	Profile                 string
+	Capabilities            []string
+	IgnoredInstructionPaths []string
+}
+
 func Capture(source string, scopes []string, profile string, capabilities []string) (Bundle, error) {
+	return CaptureWithOptions(source, Options{Scopes: scopes, Profile: profile, Capabilities: capabilities})
+}
+
+// CaptureWithOptions freezes selected configuration after omitting explicitly
+// ignored project-instruction paths from prompt guidance.
+func CaptureWithOptions(source string, options Options) (Bundle, error) {
 	root, err := workspace.Open(source)
 	if err != nil {
 		return Bundle{}, err
 	}
-	guidance, err := instructions.LoadWithProfile(root.Path(), scopes, profile)
+	guidance, err := instructions.LoadWithProfileOptions(root.Path(), options.Scopes, options.Profile, instructions.Options{IgnoredPaths: options.IgnoredInstructionPaths})
 	if err != nil {
 		return Bundle{}, err
 	}
 	selected := append([]string(nil), guidance.Files...)
-	for _, name := range capabilities {
+	for _, name := range options.Capabilities {
 		switch name {
 		case "hooks", "mcp", "lsp":
 			selected = append(selected, ".gator/"+name+".json")

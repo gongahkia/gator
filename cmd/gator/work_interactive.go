@@ -287,9 +287,10 @@ func runInteractiveWork(source, conversationID, prompt, stateDir string, options
 	request := workrun.Request{
 		SourcePath: source, ConversationID: conversationID, Objective: prompt,
 		MaxSteps: options.MaxSteps, Mode: mode, Contract: contract,
-		ConnectorIDs:  append([]string(nil), options.ConnectorIDs...),
-		WebOrigins:    append([]string(nil), options.WebOrigins...),
-		RefreshSource: options.RefreshSource,
+		ConnectorIDs:             append([]string(nil), options.ConnectorIDs...),
+		WebOrigins:               append([]string(nil), options.WebOrigins...),
+		IgnoredInstructionPaths:  append([]string(nil), options.IgnoredInstructionPaths...),
+		RefreshSource:            options.RefreshSource,
 		OnEvent:       options.OnEvent, Steering: options.Steering,
 	}
 	parse := func(values []string) ([][]string, error) {
@@ -579,6 +580,7 @@ func loadWorkTUIConversationOptions(store worksession.Store, conversationID stri
 		Code       workrun.CodePolicy
 		Connectors []string
 		WebOrigins []string
+		IgnoredInstructions []string
 		MaxSteps   int
 	}
 	if err := json.Unmarshal(revision.Replay.Configuration, &configuration); err != nil {
@@ -592,6 +594,7 @@ func loadWorkTUIConversationOptions(store worksession.Store, conversationID stri
 	}
 	options.ConnectorIDs = append([]string(nil), configuration.Connectors...)
 	options.WebOrigins = append([]string(nil), configuration.WebOrigins...)
+	options.IgnoredInstructionPaths = append([]string(nil), configuration.IgnoredInstructions...)
 	if configuration.Code.MaxSteps > 0 {
 		options.Code.MaxSteps = configuration.Code.MaxSteps
 	}

@@ -74,6 +74,7 @@ type Request struct {
 	Project              *projectcapture.Bundle
 	Provider             string
 	SourcePath           string
+	IgnoredInstructionPaths []string
 	Objective            string
 	RunID                string
 	MaxSteps             int
