@@ -48,6 +48,20 @@ func TestConfiguredEmptyStatusLineHidesComposerFooter(t *testing.T) {
 	}
 }
 
+func TestDefaultComposerFooterShowsSelectedLocalModel(t *testing.T) {
+	model := New(Config{
+		CurrentFolder: "/work",
+		ModelStatus: func() (ModelStatus, error) {
+			return ModelStatus{Provider: "gator-local", Model: "qwen3:8b", Access: "local model configured"}, nil
+		},
+	})
+	model.width, model.height = 100, 24
+	view := ansi.Strip(model.View())
+	if !strings.Contains(view, "model gator-local/qwen3:8b") {
+		t.Fatalf("default footer omitted selected local model: %q", view)
+	}
+}
+
 func TestComposerFooterWrapsWithoutLosingNavigationAtNarrowWidth(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work"})
 	model.home = false

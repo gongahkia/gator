@@ -97,6 +97,22 @@ func TestStoreRejectsUnknownOrDuplicateStatusLineItems(t *testing.T) {
 	}
 }
 
+func TestStoreAcceptsEveryWorkStatusLineItem(t *testing.T) {
+	store, err := New(t.TempDir())
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	items := []string{
+		"queue", "send", "commands", "conversations", "inbox", "jobs", "model", "model-access",
+		"current-dir", "mode", "artifacts", "connectors", "conversation", "effort", "sandbox", "status",
+	}
+	settings := Default()
+	settings.TUI.StatusLine = &items
+	if err := store.Save(settings); err != nil {
+		t.Fatalf("save all status-line items: %v", err)
+	}
+}
+
 func TestStoreRejectsUnknownVersion(t *testing.T) {
 	store, err := New(t.TempDir())
 	if err != nil {

@@ -37,7 +37,7 @@ var statusLineOptions = []statusLineOption{
 	{id: "status", label: "Activity status", description: "Most recent transient status"},
 }
 
-var defaultStatusLine = []string{"queue", "current-dir", "mode", "artifacts", "connectors", "send", "commands", "conversations", "inbox", "jobs"}
+var defaultStatusLine = []string{"model", "queue", "current-dir", "mode", "artifacts", "connectors", "send", "commands", "conversations", "inbox", "jobs"}
 
 func resolveStatusLine(configured *[]string) ([]string, bool) {
 	if configured == nil {
@@ -90,7 +90,7 @@ func (m Model) statusLineValue(id string) string {
 	case "model":
 		provider, modelName := singleLine(m.modelStatus.Provider), singleLine(m.modelStatus.Model)
 		if provider == "" {
-			return "model none"
+			return ""
 		}
 		if modelName == "" {
 			return "model " + provider

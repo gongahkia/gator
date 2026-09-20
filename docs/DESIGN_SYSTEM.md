@@ -81,8 +81,9 @@ Vendor-CLI credentials are not imported as native Work-provider credentials.
    selection hides the footer. The choice is persisted in `config.json` as an
    ordered `tui.status_line` array; omitting it uses Gator's defaults.
 
-Available status-line identifiers are `queue`, `send`, `commands`,
-`conversations`, `inbox`, `jobs`, `model`, `model-access`, `current-dir`,
+The default footer starts with the selected model. Available status-line
+identifiers are `queue`, `send`, `commands`, `conversations`, `inbox`, `jobs`,
+`model`, `model-access`, `current-dir`, `mode`, `artifacts`, `connectors`,
 `conversation`, `effort`, `sandbox`, and `status`. Configuration excerpt:
 
 ```json
