@@ -136,7 +136,7 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 		m.snapshot = value.SnapshotID
 	}
 	if value.Error != "" {
-		m.messages = append(m.messages, message{role: "Gator", text: "I couldn't finish that run: " + value.Error})
+		m.messages = append(m.messages, message{role: "Gator", text: explainRunFailure(value.Error, m.modelStatus)})
 	} else {
 		text := value.FinalText
 		if text == "" {
