@@ -13,6 +13,10 @@ import (
 	"strings"
 )
 
+// ErrPathEscapesWorkspace marks a path that resolves outside the selected
+// workspace boundary.
+var ErrPathEscapesWorkspace = errors.New("path escapes the workspace")
+
 // Root is the canonical filesystem boundary for a run. It resolves every path
 // component and rejects symlinks that leave the worktree.
 type Root struct {
@@ -103,6 +107,9 @@ func (r Root) ReadRegularFile(path string, maxBytes int64) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	if _, err := r.ResolveFile(cleaned); err != nil {
+		return nil, err
+	}
 	directory, err := os.OpenRoot(r.path)
 	if err != nil {
 		return nil, fmt.Errorf("open workspace root: %w", err)
@@ -190,11 +197,11 @@ func cleanRelativePath(path string) (string, error) {
 		return "", errors.New("workspace-relative path is required")
 	}
 	if filepath.IsAbs(path) {
-		return "", fmt.Errorf("absolute path %q is not allowed", path)
+		return "", fmt.Errorf("%w: absolute path %q is not allowed", ErrPathEscapesWorkspace, path)
 	}
 	cleaned := filepath.Clean(path)
 	if cleaned == "." || cleaned == ".." || strings.HasPrefix(cleaned, ".."+string(filepath.Separator)) {
-		return "", fmt.Errorf("path %q escapes the workspace", path)
+		return "", fmt.Errorf("%w: %q", ErrPathEscapesWorkspace, path)
 	}
 	return cleaned, nil
 }
@@ -205,7 +212,7 @@ func (r Root) assertInside(path string) error {
 		return fmt.Errorf("compare workspace path: %w", err)
 	}
 	if relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || filepath.IsAbs(relative) {
-		return fmt.Errorf("path %q escapes the workspace", path)
+		return fmt.Errorf("%w: %q", ErrPathEscapesWorkspace, path)
 	}
 	return nil
 }

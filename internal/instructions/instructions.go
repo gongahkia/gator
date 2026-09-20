@@ -107,6 +107,9 @@ func Load(repository string, scopes []string) (Set, error) {
 			if isMissingFileError(err) {
 				return nil
 			}
+			if errors.Is(err, workspace.ErrPathEscapesWorkspace) {
+				return fmt.Errorf("project instruction %q resolves outside the selected workspace through a symlink; Gator will not capture external files as agent context. Replace it with a regular file inside the workspace or remove the symlink", relative)
+			}
 			return fmt.Errorf("read project instructions %q: %w", relative, err)
 		}
 		if len(strings.TrimSpace(string(contents))) == 0 {

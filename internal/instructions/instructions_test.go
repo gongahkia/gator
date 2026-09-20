@@ -67,6 +67,30 @@ func TestLoadRejectsEscapingScopeAndRuleFile(t *testing.T) {
 	}
 }
 
+func TestLoadExplainsExternalInstructionSymlink(t *testing.T) {
+	repository := t.TempDir()
+	external := filepath.Join(t.TempDir(), "AGENTS.md")
+	if err := os.WriteFile(external, []byte("global guidance"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(external, filepath.Join(repository, "AGENTS.md")); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Load(repository, nil)
+	if err == nil {
+		t.Fatal("Load accepted an external instruction symlink")
+	}
+	for _, expected := range []string{
+		`project instruction "AGENTS.md" resolves outside the selected workspace through a symlink`,
+		"will not capture external files as agent context",
+		"regular file inside the workspace",
+	} {
+		if !strings.Contains(err.Error(), expected) {
+			t.Fatalf("instruction symlink error = %q, want %q", err, expected)
+		}
+	}
+}
+
 func TestLoadRejectsUnknownRuleFields(t *testing.T) {
 	repository := t.TempDir()
 	writeInstructionFile(t, repository, ".gator/rules.json", `{

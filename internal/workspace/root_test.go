@@ -3,6 +3,7 @@ package workspace
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -207,8 +208,17 @@ func TestRootReadRegularFileStaysInsideWorkspace(t *testing.T) {
 	if err != nil || string(contents) != "inside" {
 		t.Fatalf("read regular file = %q, %v", contents, err)
 	}
+	if err := os.Symlink("inside.txt", filepath.Join(directory, "inside-link.txt")); err != nil {
+		t.Fatal(err)
+	}
+	contents, err = root.ReadRegularFile("inside-link.txt", 64)
+	if err != nil || string(contents) != "inside" {
+		t.Fatalf("read through workspace symlink = %q, %v", contents, err)
+	}
 	if _, err := root.ReadRegularFile("escape.txt", 64); err == nil {
 		t.Fatal("read through outside symlink succeeded")
+	} else if !errors.Is(err, ErrPathEscapesWorkspace) {
+		t.Fatalf("outside symlink error = %v", err)
 	}
 }
 
