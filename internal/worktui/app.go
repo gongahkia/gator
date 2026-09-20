@@ -150,9 +150,6 @@ type Config struct {
 	MoveToRevision          func(conversationID, revisionID string) (string, error)
 	History                 func(conversationID string) (string, error)
 	FirstRun                bool
-	ProviderCommand         func(action, provider string) *exec.Cmd
-	ProviderChoices         func(action string) []string
-	CompleteSetup           func(provider string) error
 	Inspect                 func(topic string) (string, error)
 	Copy                    func(text string) error
 	Theme                   string
@@ -184,12 +181,6 @@ type bundleActionDone struct {
 	err    error
 }
 type loadingTickMsg struct{ run uint64 }
-
-type providerActionDone struct {
-	action   string
-	provider string
-	err      error
-}
 
 type connectorActionDone struct {
 	action string
@@ -236,7 +227,6 @@ type Model struct {
 	messages             []message
 	running              bool
 	status               string
-	onboarding           bool
 	firstRun             bool
 	pendingPrompt        string
 	scroll               int

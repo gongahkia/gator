@@ -22,8 +22,7 @@ screen treatment; it adopts the underlying progressive-disclosure pattern.
 | Home | Centered `🐊 Gator` wordmark and one outcome question | Centered, at most 72 columns | Direct `Ctrl+X`, `Ctrl+B`, and `Ctrl+J` hints |
 | Drafting | Centered `🐊 Gator` wordmark and outcome question | Centered and growing with wrapped input | Available through direct shortcuts |
 | Conversation | Top-left `🐊 Gator` wordmark, transcript, and current run status | Docked below the transcript | Available through direct shortcuts |
-| Command palette | Searchable slash actions only | Hidden | `Ctrl+P`; type to filter, arrows to choose |
-| Provider picker | Providers valid for the selected `/model`, `/connect`, `/login`, or `/logout` action | Hidden | Type to filter, arrows to choose, `Esc` to return |
+| Command palette | Searchable Work commands | Hidden | `Ctrl+P`; type to filter, arrows to choose |
 | Status-line editor | Ordered composer-footer items with a live preview | Hidden | `Space` toggles; left/right reorders; `Enter` saves |
 | Models | Centered, constrained cloud/local catalog with one-line readiness states | Hidden | `Tab` changes section; contextual controls stay in a two-line footer |
 | Conversations | Retained Work conversations only | Hidden | `Ctrl+X` |
@@ -35,20 +34,11 @@ the composer and starts a conversation. Merely opening Gator must not show
 cards, counters, setup prose, or a navigation rail. First-run setup begins only
 after the first submitted prompt, or explicitly through `/model`.
 
-Provider lifecycle commands use progressive disclosure: `/model`, `/connect`,
-`/login`, and `/logout` open focused provider pickers when invoked without an
-argument, while their `[PROVIDER]` forms remain fast and script-like. Secret
-values never enter the composer or command palette; API-key entry temporarily
-suspends the alternate screen for a hidden terminal prompt.
-When no default exists, a successful `/login` or `/connect` also selects that
-provider and resumes any task retained by first-run setup; it must not ask for
-the provider a second time.
-
-When a first task requires setup, `openai`, `anthropic`, and `gemini` open a
-hidden API-key prompt if their normal environment variable is absent. A
-successful setup persists both the selected provider and its stable default
-model before resuming the retained task. Vendor-CLI logins are not presented as
-native Work providers because Gator does not import another CLI's credentials.
+Provider lifecycle is contained in `/model`. Its Cloud section offers
+configuration, provider-owned sign-in, and stored-credential removal without
+placing secret values in the composer or command palette. First-run task setup
+opens this panel and retains the draft until a configured model is selected.
+Vendor-CLI credentials are not imported as native Work-provider credentials.
 
 ## Visual language
 

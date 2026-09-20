@@ -2,8 +2,8 @@ package worktui
 
 import (
 	"context"
-	"errors"
 	"os/exec"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -48,7 +48,7 @@ func TestConversationSessionControlsReachEachRun(t *testing.T) {
 		"/artifact brief.md",
 		"/connector notion",
 		"/web-origin https://example.com",
-		"/refresh-source",
+		"/source-refresh",
 	} {
 		model.input = command
 		updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -123,7 +123,7 @@ func TestRevisionCommandsStayInConversation(t *testing.T) {
 	model.home = false
 	model.conversation = "work-one"
 	model.title = "Work"
-	model.input = "/back"
+	model.input = "/revision-back"
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
 	if !strings.Contains(model.View(), "moved work-one") {
@@ -149,7 +149,7 @@ func TestStartsRequestedConversationAndSelectsForwardBranch(t *testing.T) {
 	if model.launcher || model.home || model.conversation != "work-one" || model.source != "/source" {
 		t.Fatalf("model did not open requested conversation: %#v", model)
 	}
-	model.input = "/forward revision-two"
+	model.input = "/revision-forward revision-two"
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if called != "work-one/revision-two" || !strings.Contains(updated.(Model).View(), "moved") {
 		t.Fatalf("called = %q, view = %s", called, updated.(Model).View())
@@ -235,7 +235,7 @@ func TestRevisionNavigationReloadsSelectedThreadAndBundle(t *testing.T) {
 			return "Moved forward to rev-two.", nil
 		},
 	})
-	model.input = "/back"
+	model.input = "/revision-back"
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
 	view := ansi.Strip(model.View())
@@ -244,7 +244,7 @@ func TestRevisionNavigationReloadsSelectedThreadAndBundle(t *testing.T) {
 		!strings.Contains(view, "Moved back to rev-one.") || model.lastBundle.Path != "/retained/rev-one" {
 		t.Fatalf("navigation did not replace selected thread:\n%s\nstate=%#v", view, model)
 	}
-	model.input = "/forward"
+	model.input = "/revision-forward"
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
 	view = ansi.Strip(model.View())
@@ -352,36 +352,33 @@ func TestCommandPaletteFiltersAndFillsCommandsThatNeedArguments(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work"})
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlP})
 	model = updated.(Model)
-	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("sandbox")})
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("forward")})
 	model = updated.(Model)
 	view := model.View()
-	if !strings.Contains(view, "/code sandbox") || strings.Contains(view, "/help") {
+	if !strings.Contains(view, "/revision-forward") || strings.Contains(view, "/help") {
 		t.Fatalf("filtered palette = %q", view)
 	}
 	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
-	if command != nil || model.launcher || model.input != "/code sandbox " {
+	if command != nil || model.launcher || model.input != "/revision-forward " {
 		t.Fatalf("selected command state = %#v", model)
 	}
 }
 
-func TestCommandPaletteContainsOnlySlashCommands(t *testing.T) {
+func TestCommandPaletteContainsCurrentCommands(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work"})
 	model.openCommandPalette()
 	expected := []string{
-		"/help", "/new", "/model", "/connect", "/login", "/logout", "/effort", "/attach", "/detach",
-		"/source", "/refresh-source", "/mode", "/artifact", "/connector", "/web-origin", "/status", "/statusline", "/permissions",
-		"/doctor", "/agents", "/settings", "/theme", "/history", "/back", "/forward", "/review",
-		"/save", "/apply", "/copy", "/queue", "/dequeue", "/clear-queue", "/code status", "/code verify", "/code scope",
-		"/code profile", "/code setup", "/code allow", "/code allow-prefix", "/code sandbox",
-		"/code network", "/code max-steps", "/code grant", "/code revoke", "/code browser",
-		"/code reset", "/quit",
+		"/help", "/new", "/model", "/effort", "/attach", "/detach", "/source", "/source-refresh",
+		"/mode", "/artifact", "/connector", "/web-origin", "/status", "/statusline", "/permissions",
+		"/doctor", "/agents", "/settings", "/theme", "/history", "/revision-back", "/revision-forward", "/review",
+		"/save", "/apply", "/copy", "/queue", "/dequeue", "/clear-queue", "exit", "/quit",
 	}
 	if len(model.entries) != len(expected) {
 		t.Fatalf("command palette has %d entries, want %d", len(model.entries), len(expected))
 	}
 	for index, item := range model.entries {
-		if !strings.HasPrefix(item.title, "/") || item.kind != "command" && item.kind != "command-input" {
+		if item.kind != "command" && item.kind != "command-input" {
 			t.Fatalf("non-command entry in palette: %#v", item)
 		}
 		if item.title != expected[index] {
@@ -390,36 +387,74 @@ func TestCommandPaletteContainsOnlySlashCommands(t *testing.T) {
 	}
 }
 
-func TestProviderCommandsOpenPickerAndRunSelectedAction(t *testing.T) {
-	called := ""
-	model := New(Config{
-		CurrentFolder: "/work",
-		ProviderChoices: func(action string) []string {
-			if action != "login" {
-				t.Fatalf("provider choices action = %q", action)
-			}
-			return []string{"openai", "anthropic"}
-		},
-		ProviderCommand: func(action, provider string) *exec.Cmd {
-			called = action + "/" + provider
-			return exec.Command("true")
-		},
-	})
-	model.input = "/login"
+func TestSourceMenuIncludesWorkspaceSelectionAndRefresh(t *testing.T) {
+	model := New(Config{CurrentFolder: "/work"})
+	model.input = "/source"
 	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
-	if command != nil || !model.launcher || model.launcherMode != "login" || !strings.Contains(model.View(), "Log in to provider") || !strings.Contains(model.View(), "anthropic") {
-		t.Fatalf("login picker state = %#v\n%s", model, model.View())
+	if command != nil || !model.launcher || model.launcherMode != "source" || !strings.Contains(model.View(), "Current: /work") {
+		t.Fatalf("source menu state = %#v\n%s", model, model.View())
 	}
 	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
-	if command == nil || model.launcher || called != "login/openai" {
-		t.Fatalf("selected provider state = %#v called=%q", model, called)
+	if command != nil || model.launcher || model.input != "/source " {
+		t.Fatalf("source selection input state = %#v", model)
 	}
-	updated, _ = model.Update(providerActionDone{action: "login", provider: "openai"})
+
+	model.openSourceMenu()
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyDown})
 	model = updated.(Model)
-	if !strings.Contains(model.View(), "Login finished for openai") {
-		t.Fatalf("login completion view = %s", model.View())
+	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if command != nil || model.launcher || !model.options.RefreshSource {
+		t.Fatalf("source refresh state = %#v", model)
+	}
+}
+
+func TestCopyPromptsForTheResponseOrDeliverableSummary(t *testing.T) {
+	var copied []string
+	model := New(Config{
+		CurrentFolder: "/work",
+		Copy:          func(text string) error { copied = append(copied, text); return nil },
+	})
+	model.messages = []message{{role: "Gator", text: "First response"}, {role: "Gator", text: "Latest response"}}
+	model.lastBundle = BundleSummary{Path: "/state/bundle", Artifacts: []ArtifactSummary{{Path: "brief.md", Valid: true}}}
+	model.input = "/copy"
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if command != nil || !model.launcher || model.launcherMode != "copy" || len(model.entries) != 3 || !strings.Contains(model.View(), "Verified deliverables") {
+		t.Fatalf("copy picker state = %#v\n%s", model, model.View())
+	}
+	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if command != nil || model.launcher || !reflect.DeepEqual(copied, []string{"Latest response"}) {
+		t.Fatalf("selected copy = %#v, state = %#v", copied, model)
+	}
+}
+
+func TestExitAndQuitLeaveTheTUI(t *testing.T) {
+	for _, input := range []string{"exit", "/quit"} {
+		model := New(Config{CurrentFolder: "/work"})
+		model.input = input
+		updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+		if command == nil {
+			t.Fatalf("%s did not produce an exit command: %#v", input, updated.(Model))
+		}
+		if _, ok := command().(tea.QuitMsg); !ok {
+			t.Fatalf("%s command = %T, want tea.QuitMsg", input, command())
+		}
+	}
+}
+
+func TestProviderSlashCommandsAreNotDispatched(t *testing.T) {
+	model := New(Config{CurrentFolder: "/work"})
+	for _, command := range []string{"/connect openai", "/login openai", "/logout openai"} {
+		model.input = command
+		updated, run := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+		model = updated.(Model)
+		if run != nil || !strings.Contains(model.View(), "unknown command") {
+			t.Fatalf("%s was still dispatched: %#v\n%s", command, model, model.View())
+		}
 	}
 }
 
@@ -485,42 +520,13 @@ func TestConnectorLoginUsesInteractiveCommandAndSelectsOnSuccess(t *testing.T) {
 	}
 }
 
-func TestProviderCommandsAcceptAnExplicitProvider(t *testing.T) {
-	for _, test := range []struct {
-		command string
-		want    string
-	}{
-		{command: "/model OpenAI", want: "setup/openai"},
-		{command: "/connect Anthropic", want: "connect/anthropic"},
-		{command: "/login Gemini", want: "login/gemini"},
-		{command: "/logout OpenAI", want: "logout/openai"},
-	} {
-		t.Run(test.command, func(t *testing.T) {
-			called := ""
-			model := New(Config{
-				CurrentFolder: "/work",
-				ProviderCommand: func(action, provider string) *exec.Cmd {
-					called = action + "/" + provider
-					return exec.Command("true")
-				},
-			})
-			model.input = test.command
-			updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
-			model = updated.(Model)
-			if command == nil || called != test.want {
-				t.Fatalf("explicit provider state = %#v called=%q, want %q", model, called, test.want)
-			}
-		})
-	}
-}
-
 func TestCommandPaletteRowsShareOneLeftColumn(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work"})
 	model.width, model.height = 100, 60
 	model.openCommandPalette()
 	lines := strings.Split(ansi.Strip(model.View()), "\n")
 	position := -1
-	for _, command := range []string{"/help", "/new", "/permissions", "/code grant", "/quit"} {
+	for _, command := range []string{"/help", "/new", "/permissions", "/source-refresh", "/quit"} {
 		found := false
 		for _, line := range lines {
 			if index := strings.Index(line, command); index >= 0 {
@@ -572,16 +578,13 @@ func TestDirectShortcutsOpenConversationsInboxAndJobs(t *testing.T) {
 	}
 }
 
-func TestMainComposerOwnsEffortAttachmentsAndCodePolicy(t *testing.T) {
+func TestMainComposerOwnsEffortAndAttachments(t *testing.T) {
 	var received RunOptions
 	model := New(Config{CurrentFolder: "/work", Run: func(_, _, _ string, options RunOptions) RunResult {
 		received = options
 		return RunResult{FinalText: "done"}
 	}})
-	for _, command := range []string{
-		"/effort high", "/attach design.png", "/code verify go test ./...", "/code scope internal/parser",
-		"/code profile implementer", "/code allow go test ./...", "/code grant lsp",
-	} {
+	for _, command := range []string{"/effort high", "/attach design.png"} {
 		model.input = command
 		updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 		model = updated.(Model)
@@ -594,7 +597,7 @@ func TestMainComposerOwnsEffortAttachmentsAndCodePolicy(t *testing.T) {
 	}
 	updated, _ = model.Update(run())
 	model = updated.(Model)
-	if received.MaxSteps != 48 || received.Code.MaxSteps != 32 || received.Code.Profile != "implementer" || len(received.Attachments) != 1 || len(received.Code.Verification) != 1 || len(received.Code.Scopes) != 1 || len(received.Code.AllowedCommands) != 1 || !sliceContains(received.Code.Capabilities, "lsp") {
+	if received.MaxSteps != 48 || received.Code.MaxSteps != 32 || len(received.Attachments) != 1 {
 		t.Fatalf("received options = %#v", received)
 	}
 	if len(model.options.Attachments) != 0 {
@@ -602,12 +605,9 @@ func TestMainComposerOwnsEffortAttachmentsAndCodePolicy(t *testing.T) {
 	}
 }
 
-func TestComposerCommandsAcceptPathsAndValuesWithFlexibleWhitespace(t *testing.T) {
+func TestComposerCommandsAcceptPathsWithFlexibleWhitespace(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work"})
-	for _, command := range []string{
-		"/attach product briefs/q3 plan.pdf",
-		"/code   verify   go test ./...",
-	} {
+	for _, command := range []string{"/attach product briefs/q3 plan.pdf"} {
 		model.input = command
 		updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 		model = updated.(Model)
@@ -615,13 +615,24 @@ func TestComposerCommandsAcceptPathsAndValuesWithFlexibleWhitespace(t *testing.T
 	if len(model.options.Attachments) != 1 || model.options.Attachments[0] != "product briefs/q3 plan.pdf" {
 		t.Fatalf("attachments = %#v", model.options.Attachments)
 	}
-	if len(model.options.Code.Verification) != 1 || model.options.Code.Verification[0] != "go test ./..." {
-		t.Fatalf("verification = %#v", model.options.Code.Verification)
-	}
 	model.input = "/detach product briefs/q3 plan.pdf"
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if len(updated.(Model).options.Attachments) != 0 {
 		t.Fatalf("attachment was not removed: %#v", updated.(Model).options.Attachments)
+	}
+}
+
+func TestWorkTUIDoesNotAcceptCodeCommands(t *testing.T) {
+	model := New(Config{CurrentFolder: "/work"})
+	initial := cloneRunOptions(model.options)
+	model.input = "/code verify go test ./..."
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if command != nil || !strings.Contains(model.View(), "unknown command /code") {
+		t.Fatalf("Code command was still dispatched: %#v\n%s", model, model.View())
+	}
+	if !reflect.DeepEqual(model.options.Code, initial.Code) {
+		t.Fatalf("Code settings changed from %#v to %#v", initial.Code, model.options.Code)
 	}
 }
 
@@ -672,104 +683,36 @@ func TestQueuedPromptsPauseAfterFailure(t *testing.T) {
 	}
 }
 
-func TestFirstRunRetainsInitialTaskThroughGuidedSetup(t *testing.T) {
-	called := ""
-	selectedProvider := ""
+func TestFirstRunRetainsInitialTaskInModelManagement(t *testing.T) {
+	panel := &testModelPanel{}
 	model := New(Config{
 		CurrentFolder: "/work", FirstRun: true,
-		CompleteSetup: func(provider string) error { selectedProvider = provider; return nil },
-		Run: func(_, _, prompt string, _ RunOptions) RunResult {
-			called = prompt
-			return RunResult{FinalText: "done"}
-		},
+		Models:        func() (ModelPanel, error) { return panel, nil },
+		SelectedModel: func() (string, string, error) { return "openai", "gpt-5", nil },
 	})
 	model.input = "prepare the brief"
 	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
-	if command != nil || !model.onboarding || model.pendingPrompt != "prepare the brief" || called != "" {
-		t.Fatalf("setup state = %#v called=%q", model, called)
+	if command != nil || model.models == nil || model.pendingPrompt != "prepare the brief" {
+		t.Fatalf("model setup state = %#v", model)
 	}
-	updated, command = model.Update(providerActionDone{action: "setup", provider: "openai"})
+	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	model = updated.(Model)
-	if command == nil || !model.running || model.firstRun || selectedProvider != "openai" || len(model.entries) == 0 || model.entries[0].kind == "onboarding" {
-		t.Fatalf("post-setup state = %#v", model)
-	}
-	updated, _ = model.Update(command())
-	model = updated.(Model)
-	if called != "prepare the brief" || model.running || !strings.Contains(model.View(), "done") {
-		t.Fatalf("called=%q state=%#v", called, model)
+	if command != nil || model.models != nil || model.firstRun || model.input != "prepare the brief" || !strings.Contains(model.status, "Selected model: openai / gpt-5") {
+		t.Fatalf("post-model state = %#v", model)
 	}
 }
 
-func TestFirstRunLoginSelectsProviderAndResumesPendingTask(t *testing.T) {
-	calledAction := ""
-	selectedProvider := ""
-	runPrompt := ""
-	model := New(Config{
-		CurrentFolder: "/work", FirstRun: true,
-		ProviderCommand: func(action, provider string) *exec.Cmd {
-			calledAction = action + "/" + provider
-			return exec.Command("true")
-		},
-		CompleteSetup: func(provider string) error {
-			selectedProvider = provider
-			return nil
-		},
-		Run: func(_, _, prompt string, _ RunOptions) RunResult {
-			runPrompt = prompt
-			return RunResult{FinalText: "done"}
-		},
-	})
-	model.input = "test"
-	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	model = updated.(Model)
-	if !model.onboarding || model.pendingPrompt != "test" {
-		t.Fatalf("initial setup state = %#v", model)
-	}
-
-	model.input = "/login gemini"
-	updated, external := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	model = updated.(Model)
-	if external == nil || calledAction != "login/gemini" {
-		t.Fatalf("login was treated as a provider name: state=%#v action=%q", model, calledAction)
-	}
-
-	updated, run := model.Update(providerActionDone{action: "login", provider: "gemini"})
-	model = updated.(Model)
-	if run == nil || model.firstRun || model.onboarding || !model.running || selectedProvider != "gemini" {
-		t.Fatalf("post-login setup state = %#v selected=%q", model, selectedProvider)
-	}
-	updated, _ = model.Update(run())
-	model = updated.(Model)
-	if runPrompt != "test" || model.running || !strings.Contains(model.View(), "done") {
-		t.Fatalf("pending task did not resume: prompt=%q state=%#v", runPrompt, model)
-	}
-}
-
-func TestFirstRunStillStartsSetupAfterLocalCommand(t *testing.T) {
-	model := New(Config{CurrentFolder: "/work", FirstRun: true})
+func TestFirstRunStillOpensModelManagementAfterLocalCommand(t *testing.T) {
+	panel := &testModelPanel{}
+	model := New(Config{CurrentFolder: "/work", FirstRun: true, Models: func() (ModelPanel, error) { return panel, nil }})
 	model.input = "/help"
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
 	model.input = "prepare the brief"
 	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
-	if command != nil || !model.onboarding || model.pendingPrompt != "prepare the brief" {
-		t.Fatalf("setup state = %#v", model)
-	}
-}
-
-func TestFirstRunRetainsSetupStateWhenProviderSelectionCannotBeSaved(t *testing.T) {
-	model := New(Config{
-		CurrentFolder: "/work", FirstRun: true,
-		CompleteSetup: func(string) error { return errors.New("save failed") },
-	})
-	model.home = false
-	model.onboarding = true
-	model.messages = []message{{role: "You", text: "openai"}}
-	updated, command := model.Update(providerActionDone{action: "setup", provider: "openai"})
-	model = updated.(Model)
-	if command != nil || !model.onboarding || !model.firstRun || !strings.Contains(model.View(), "save failed") {
-		t.Fatalf("failed setup state = %#v", model)
+	if command != nil || model.models == nil || model.pendingPrompt != "prepare the brief" {
+		t.Fatalf("model setup state = %#v", model)
 	}
 }

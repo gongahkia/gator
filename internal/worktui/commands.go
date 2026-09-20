@@ -38,28 +38,6 @@ func (m *Model) openConversationPicker() {
 	m.selected = 0
 }
 
-func (m *Model) openProviderPicker(action string) bool {
-	if m.config.ProviderChoices == nil {
-		return false
-	}
-	providers := m.config.ProviderChoices(action)
-	if len(providers) == 0 {
-		return false
-	}
-	m.launcher = true
-	m.launcherMode = action
-	m.entries = make([]entry, 0, len(providers))
-	for _, provider := range providers {
-		m.entries = append(m.entries, entry{
-			title: provider, subtitle: providerActionDescription(action),
-			kind: "provider", id: provider, command: action,
-		})
-	}
-	m.paletteQuery = ""
-	m.selected = 0
-	return true
-}
-
 func (m *Model) openSourceMenu() {
 	m.launcher = true
 	m.launcherMode = "source"
@@ -194,7 +172,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 	case "/help", "/?":
 		result = workHelp()
 	case "/new":
-		m.home, m.onboarding, m.conversation = true, false, ""
+		m.home, m.conversation = true, ""
 		m.section, m.paletteQuery, m.launcherMode = "", "", ""
 		m.source = m.config.CurrentFolder
 		m.title = "Work in " + filepath.Base(m.source)
@@ -339,7 +317,9 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		}
 		if !m.openCopyPicker() {
 			err = fmt.Errorf("there is no Gator response or verified deliverable summary to copy")
+			break
 		}
+		return m, nil
 	case "/queue":
 		result = m.queueStatus()
 	case "/dequeue":
@@ -690,93 +670,6 @@ func formatBundleSummary(bundle BundleSummary) string {
 	return strings.Join(lines, "\n")
 }
 
-func (m *Model) configureCode(fields []string, raw string) (string, error) {
-	if len(fields) == 1 || fields[1] == "status" {
-		return m.codeStatus(), nil
-	}
-	action := strings.ToLower(fields[1])
-	value := commandRemainder(raw, fields[:2])
-	requireValue := func() error {
-		if value == "" {
-			return fmt.Errorf("/code %s requires a value", action)
-		}
-		return nil
-	}
-	switch action {
-	case "reset":
-		m.options.Code = CodeOptions{MaxSteps: 16, Sandbox: "strict", Network: "deny"}
-		return "Reset the internal Code specialist to strict, offline defaults.", nil
-	case "verify":
-		if err := requireValue(); err != nil {
-			return "", err
-		}
-		m.options.Code.Verification = appendUnique(m.options.Code.Verification, value)
-	case "scope":
-		if err := requireValue(); err != nil {
-			return "", err
-		}
-		m.options.Code.Scopes = appendUnique(m.options.Code.Scopes, value)
-	case "profile":
-		if err := requireValue(); err != nil {
-			return "", err
-		}
-		m.options.Code.Profile = value
-	case "setup":
-		if err := requireValue(); err != nil {
-			return "", err
-		}
-		m.options.Code.Setup = appendUnique(m.options.Code.Setup, value)
-	case "allow":
-		if err := requireValue(); err != nil {
-			return "", err
-		}
-		m.options.Code.AllowedCommands = appendUnique(m.options.Code.AllowedCommands, value)
-	case "allow-prefix":
-		if err := requireValue(); err != nil {
-			return "", err
-		}
-		m.options.Code.AllowedCommandPrefixes = appendUnique(m.options.Code.AllowedCommandPrefixes, value)
-	case "sandbox":
-		if value != "strict" && value != "off" {
-			return "", fmt.Errorf("/code sandbox accepts strict or off")
-		}
-		m.options.Code.Sandbox = value
-	case "network":
-		if value != "deny" && value != "allow" {
-			return "", fmt.Errorf("/code network accepts deny or allow")
-		}
-		m.options.Code.Network = value
-	case "max-steps":
-		steps, err := strconv.Atoi(value)
-		if err != nil || steps < 1 || steps > 32 {
-			return "", fmt.Errorf("/code max-steps requires an integer from 1 to 32")
-		}
-		m.options.Code.MaxSteps = steps
-	case "grant", "revoke":
-		capability := normalizeCodeCapability(value)
-		if capability == "" {
-			return "", fmt.Errorf("Code capability must be lsp, mcp, extension, http, browser, or terminal")
-		}
-		if action == "grant" {
-			m.options.Code.Capabilities = appendUnique(m.options.Code.Capabilities, capability)
-		} else {
-			m.options.Code.Capabilities = removeString(m.options.Code.Capabilities, capability)
-			if capability == "browser" {
-				m.options.Code.BrowserSession = ""
-			}
-		}
-	case "browser":
-		if err := requireValue(); err != nil {
-			return "", err
-		}
-		m.options.Code.BrowserSession = value
-		m.options.Code.Capabilities = appendUnique(m.options.Code.Capabilities, "browser")
-	default:
-		return "", fmt.Errorf("unknown /code setting %q; use /code status", action)
-	}
-	return m.codeStatus(), nil
-}
-
 func commandRemainder(raw string, consumed []string) string {
 	remainder := strings.TrimSpace(raw)
 	for _, field := range consumed {
@@ -786,84 +679,6 @@ func commandRemainder(raw string, consumed []string) string {
 		remainder = strings.TrimSpace(strings.TrimPrefix(remainder, field))
 	}
 	return remainder
-}
-
-func (m Model) startProviderAction(action, provider string) (tea.Model, tea.Cmd) {
-	action = strings.ToLower(strings.TrimSpace(action))
-	provider = strings.ToLower(strings.TrimSpace(provider))
-	if action != "setup" && action != "connect" && action != "login" && action != "logout" {
-		m.messages = append(m.messages, message{role: "Gator", text: "Unknown provider action: " + action})
-		return m, nil
-	}
-	if provider == "" {
-		m.messages = append(m.messages, message{role: "Gator", text: "Choose a provider first."})
-		return m, nil
-	}
-	if m.config.ProviderCommand == nil {
-		m.messages = append(m.messages, message{role: "Gator", text: providerActionFailure(action, errorsUnavailable(action))})
-		return m, nil
-	}
-	command := m.config.ProviderCommand(action, provider)
-	if command == nil {
-		m.messages = append(m.messages, message{role: "Gator", text: providerActionFailure(action, errorsUnavailable(action))})
-		return m, nil
-	}
-	if action == "setup" {
-		m.onboarding = true
-		m.title = "Choose a model provider"
-	}
-	return m, tea.ExecProcess(command, func(err error) tea.Msg {
-		return providerActionDone{action: action, provider: provider, err: err}
-	})
-}
-
-func providerActionDescription(action string) string {
-	switch action {
-	case "setup":
-		return "Connect and use as Gator's default"
-	case "connect":
-		return "Start the closest supported setup flow"
-	case "login":
-		return "Store a native Gator credential"
-	case "logout":
-		return "Remove Gator's stored credential"
-	default:
-		return "Provider action"
-	}
-}
-
-func providerActionFailure(action string, err error) string {
-	label := action
-	if action == "setup" {
-		label = "model setup"
-	}
-	command := "/" + action
-	if action == "setup" {
-		command = "/model"
-	}
-	return strings.ToUpper(label[:1]) + label[1:] + " did not finish: " + err.Error() + "\nTry another provider with " + command + "."
-}
-
-func providerActionSuccess(action, provider string) string {
-	switch action {
-	case "connect":
-		return "Connection finished for " + provider + ". Use /model " + provider + " to make it Gator's default."
-	case "login":
-		return "Login finished for " + provider + "."
-	case "logout":
-		return "Logout finished for " + provider + "."
-	default:
-		return "Provider action finished for " + provider + "."
-	}
-}
-
-func (m Model) codeStatus() string {
-	code := m.options.Code
-	modelSelection, modelAccess := m.configuredModelStatus()
-	return fmt.Sprintf("Internal Code specialist\n  effort: %d steps\n  model: %s\n  model access: %s\n  sandbox/network: %s/%s\n  profile: %s\n  scopes: %s\n  verification: %s\n  setup: %s\n  exact command grants: %s\n  prefix grants: %s\n  capabilities: %s\n  browser session: %s",
-		code.MaxSteps, modelSelection, modelAccess, valueOrNone(code.Sandbox), valueOrNone(code.Network), valueOrNone(code.Profile), valueOrNone(strings.Join(code.Scopes, ", ")),
-		valueOrNone(strings.Join(code.Verification, "; ")), valueOrNone(strings.Join(code.Setup, "; ")), valueOrNone(strings.Join(code.AllowedCommands, "; ")),
-		valueOrNone(strings.Join(code.AllowedCommandPrefixes, "; ")), valueOrNone(strings.Join(code.Capabilities, ", ")), valueOrNone(code.BrowserSession))
 }
 
 func (m Model) configuredModelStatus() (string, string) {
@@ -898,12 +713,20 @@ func singleLine(value string) string {
 }
 
 func (m Model) workStatus() string {
-	return fmt.Sprintf("Gator orchestration\n  workspace: %s%s\n  conversation: %s\n  selected revision: %s\n  mode: %s\n  deliverables: %s\n  connectors: %s\n  web origins: %s\n  effort: %s (%d manager steps)\n  pending attachments: %s\n  queued prompts: %d\n\n%s",
+	modelSelection, modelAccess := m.configuredModelStatus()
+	return fmt.Sprintf("Gator orchestration\n  model: %s\n  model access: %s\n  workspace: %s%s\n  conversation: %s\n  selected revision: %s\n  mode: %s\n  deliverables: %s\n  connectors: %s\n  web origins: %s\n  effort: %s (%d manager steps)\n  pending attachments: %s\n  queued prompts: %d\n  internal specialists: managed by Gator",
+		modelSelection, modelAccess,
 		valueOrNone(m.source), map[bool]string{true: " (refresh next turn)", false: " (frozen per turn)"}[m.options.RefreshSource],
 		valueOrNone(m.conversation), valueOrNone(m.revision), valueOrNone(m.options.Mode), valueOrNone(strings.Join(m.options.Artifacts, ", ")),
 		valueOrNone(strings.Join(m.options.ConnectorIDs, ", ")), valueOrNone(strings.Join(m.options.WebOrigins, ", ")),
 		effortName(m.options.MaxSteps), m.options.MaxSteps,
-		valueOrNone(strings.Join(m.options.Attachments, ", ")), len(m.queue), m.codeStatus())
+		valueOrNone(strings.Join(m.options.Attachments, ", ")), len(m.queue))
+}
+
+func (m Model) workPermissions() string {
+	return fmt.Sprintf("Gator Work authority\n  workspace: read-only immutable snapshots from %s\n  mode: %s\n  connectors: %s\n  web origins: %s\n  internal specialists: managed by Gator",
+		valueOrNone(m.source), valueOrNone(m.options.Mode), valueOrNone(strings.Join(m.options.ConnectorIDs, ", ")),
+		valueOrNone(strings.Join(m.options.WebOrigins, ", ")))
 }
 
 func (m Model) queueStatus() string {
@@ -916,15 +739,6 @@ func (m Model) queueStatus() string {
 		lines = append(lines, fmt.Sprintf("  %d. %s", index+1, truncate(item.prompt, 80)))
 	}
 	return strings.Join(lines, "\n")
-}
-
-func (m Model) latestGatorMessage() string {
-	for index := len(m.messages) - 1; index >= 0; index-- {
-		if m.messages[index].role == "Gator" {
-			return m.messages[index].text
-		}
-	}
-	return ""
 }
 
 func cloneRunOptions(options RunOptions) RunOptions {
@@ -986,19 +800,6 @@ func sliceContains(values []string, target string) bool {
 	return false
 }
 
-func normalizeCodeCapability(value string) string {
-	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "lsp", "mcp", "http", "browser", "terminal":
-		return strings.ToLower(strings.TrimSpace(value))
-	case "extension", "extensions":
-		return "extension"
-	case "web", "research":
-		return "http"
-	default:
-		return ""
-	}
-}
-
 func effortName(steps int) string {
 	if steps <= 12 {
 		return "low"
@@ -1022,15 +823,12 @@ func errorsUnavailable(name string) error {
 
 func workHelp() string {
 	return `Gator commands
-  /model                         manage cloud/local models, downloads and deletion
-  /connect [PROVIDER]            start the closest supported setup flow
-  /login [PROVIDER]              store a native Gator credential
-  /logout [PROVIDER]             remove a stored Gator credential
+  /model                         manage cloud/local models, setup, sign-in, downloads and deletion
   /effort low|standard|high      set manager and Code turn budgets
   /attach PATH                   send one source file with the next prompt
   /detach PATH|all               remove pending attachments
-  /source [PATH]                 inspect or select the read-only workspace
-  /refresh-source                capture changed workspace files next turn
+  /source [PATH]                 inspect, select, or refresh the read-only workspace
+  /source-refresh                capture changed workspace files next turn
   /mode auto|inspect|draft|act   choose automatic or explicit authority
   /artifact [add|remove] PATH    manage expected deliverables
   /connector [add|remove] ID     select connected sources for this session
@@ -1042,24 +840,11 @@ func workHelp() string {
                                   set allow/ask/deny/draft policy
   /connector logout|delete ID    remove credentials or the connector
   /web-origin [add|remove] URL   manage bounded web research origins
-  /code status                   inspect the internal Code envelope
-  /code verify COMMAND           add required project verification
-  /code scope PATH               add a project-instruction scope
-  /code profile NAME             select a project profile
-  /code setup COMMAND            add an explicit setup command
-  /code allow COMMAND            pre-approve one exact argv
-  /code allow-prefix PREFIX      pre-approve a literal argv prefix
-  /code grant CAPABILITY         grant hooks/lsp/mcp/extension/http/browser/terminal
-  /code sandbox strict|off       set the child process boundary
-  /code network deny|allow       set child network access
-  /code max-steps N              set the child turn budget
-  /code revoke CAPABILITY        remove a child integration grant
-  /code browser SESSION          select an already controlled browser session
-  /code reset                    restore strict, offline Code defaults
   /status · /permissions         inspect the active orchestration envelope
   /statusline                    choose, order, or hide composer footer items
   /doctor · /agents · /settings inspect local configuration
-  /history · /back · /forward   navigate retained Gator revisions
+  /history · /revision-back · /revision-forward
+                                 navigate retained Gator revisions
   /steer TEXT                    steer the running task
   /tasks · /cancel-task ID        inspect or cancel active specialists
   /approve · /deny                respond to the displayed exact request
@@ -1068,7 +853,9 @@ func workHelp() string {
   /review                        preview verified deliverables in this thread
   /save [--replace] [DIR]        preflight and save deliverables after confirmation
   /apply [CANDIDATE] [DIR]       preflight and apply verified code after confirmation
-  /copy · /theme · /new · /quit
+  /copy · /theme · /new · exit · /quit
+
+Gator manages its internal specialists; the Work TUI has no Code commands.
 
 Navigation
   ctrl+x    retained conversations

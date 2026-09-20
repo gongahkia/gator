@@ -7,6 +7,10 @@ func (m Model) openModels() (tea.Model, tea.Cmd) {
 		m.status = "Finish or cancel the current work before managing models."
 		return m, nil
 	}
+	if m.config.Models == nil {
+		m.status = "Model management is unavailable in this build."
+		return m, nil
+	}
 	panel, err := m.config.Models()
 	if err != nil {
 		m.status = "Open model management: " + err.Error()

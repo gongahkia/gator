@@ -203,7 +203,7 @@ func TestWorkTUIManagesLocalModelsAndUsesSelectionThroughService(t *testing.T) {
 	if calls.Load() != 2 {
 		t.Fatalf("Work model calls = %d", calls.Load())
 	}
-	key("/code")
+	key("/status")
 	key("enter")
 	waitView("model access: local model configured")
 	key("/model")

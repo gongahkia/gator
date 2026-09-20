@@ -127,14 +127,10 @@ func (m Model) renderPalette(width, height int, accent, dim, selectedStyle lipgl
 	title := "Commands"
 	if m.launcherMode == "conversations" {
 		title = "Conversations"
-	} else if m.launcherMode == "setup" {
-		title = "Choose default provider"
-	} else if m.launcherMode == "connect" {
-		title = "Connect provider"
-	} else if m.launcherMode == "login" {
-		title = "Log in to provider"
-	} else if m.launcherMode == "logout" {
-		title = "Log out of provider"
+	} else if m.launcherMode == "source" {
+		title = "Source"
+	} else if m.launcherMode == "copy" {
+		title = "Copy"
 	}
 	panel.WriteString(accent.Render(title) + "\n")
 	query := m.paletteQuery
@@ -147,7 +143,7 @@ func (m Model) renderPalette(width, height int, accent, dim, selectedStyle lipgl
 		if m.launcherMode == "conversations" && m.paletteQuery == "" {
 			empty = "No retained conversations yet."
 		} else if m.launcherMode != "commands" {
-			empty = "No matching providers."
+			empty = "No matching items."
 		}
 		panel.WriteString(dim.Render(empty) + "\n")
 	}

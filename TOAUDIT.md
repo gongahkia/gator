@@ -249,12 +249,13 @@ the same thing as historical TUI documentation or retired Code UI commands.
 | --- | --- |
 | `/help` or `/?` | Show interactive help. |
 | `/new` | Start a clean Work conversation. |
-| `/model` | Open cloud and local model management, clicking /model then brings u to /login /logout and /connect |
+| `/model` | Open cloud and local model management. The Cloud section provides provider configuration, sign-in, and stored-credential removal. |
 | `/mode MODE` (`auto`, `inspect`, `draft`, or `act`) | Set the Work authority mode. |
 | `/effort LEVEL` (`low`, `standard`, or `high`) | Set manager and Code-specialist turn budgets. |
 | `/attach PATH` | Attach one source-relative file to the next prompt. |
 | `/detach TARGET` (a path or `all`) | Remove pending attachment(s). |
-| `/source [PATH]` | Inspect or select the read-only source workspace and have /source-refresh as another command but within the TUI its also a menu under /source. |
+| `/source [PATH]` | Open the source menu to see the current workspace, enter a replacement workspace path, or select a refresh; with `PATH`, select that read-only source workspace directly. |
+| `/source-refresh` | Capture changed workspace files in a new immutable snapshot for the next turn. |
 | `/artifact ACTION [PATH]` (`list`, `add`, or `remove`) | List or manage expected deliverable paths. |
 | `/connector …` | Select a configured connector for this session, or manage connectors using `list`, `add`, `remove`, `clear`, `setup`, `login`, `logout`, `status`, `test`, `permission`, or `delete`. |
 | `/web-origin ACTION [URL]` (`list`, `add`, or `remove`) | Manage bounded HTTPS origins for web research. |
@@ -265,7 +266,7 @@ the same thing as historical TUI documentation or retired Code UI commands.
 | --- | --- |
 | `/status` | Inspect the active Work orchestration state. |
 | `/statusline` | Choose, order, or hide composer-footer items. |
-| `/permissions` | Inspect the current Code capability envelope. |
+| `/permissions` | Inspect the active Work authority: source snapshot, mode, connectors, and web origins. |
 | `/doctor`, `/agents`, `/settings` | Inspect local prerequisites, project roles, or current settings. |
 | `/theme THEME` (`gator`, `contrast`, or `mono`) | Persist a terminal theme. |
 | `/history` | Show revisions in the current conversation. |
@@ -274,13 +275,12 @@ the same thing as historical TUI documentation or retired Code UI commands.
 | `/review` | Preview the latest verified deliverables in this conversation. |
 | `/save [--replace] [DIRECTORY]` | Preflight then save verified deliverables after confirmation. |
 | `/apply [CANDIDATE] [DIRECTORY]` | Preflight then apply a verified Code candidate after confirmation. |
-| `/copy` | Copy the latest Gator response, but it asks which part to copy the same as codex. |
+| `/copy` | Open a chooser for an individual Gator response or the latest verified-deliverables summary, then copy the selected item. |
 | `/queue`, `/dequeue`, `/clear-queue` | Inspect or manage queued prompts. |
 | `exit` and `/quit` | Exit the TUI. |
 
-### TUI Code-specialist policy
-
-Remove all TUI commands for the code, its meant to be a subagent invoked by the gator main agent iygwim
+The Work TUI exposes no Code-specialist commands. Gator invokes and manages
+that internal specialist as part of a Work run.
 
 ### TUI commands available while Work is running
 
@@ -291,7 +291,7 @@ Remove all TUI commands for the code, its meant to be a subagent invoked by the 
 | `/cancel-task TASK_ID` | Cancel one active specialist. |
 | `/approve`, `/deny` | Respond to the currently displayed exact approval request. |
 | `/cancel` | Cancel the active Work run while retaining its outcome. |
-| `/quit` | Cancel the active run and then exit. |
+| `exit` or `/quit` | Cancel the active run and then exit. |
 
 ### Work-TUI keyboard navigation
 

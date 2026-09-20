@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"slices"
 	"strings"
 	"testing"
 
@@ -71,52 +70,5 @@ func TestConfiguredDefaultsPreservesEnvironmentOverride(t *testing.T) {
 	}
 	if provider != "openai" || modelFromEnvironment(provider) != "environment-model" {
 		t.Fatalf("provider/model = %q/%q", provider, modelFromEnvironment(provider))
-	}
-}
-
-func TestSelectWorkOnboardingProviderPersistsProviderAndDefaultModel(t *testing.T) {
-	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
-	if err := selectWorkOnboardingProvider("openai"); err != nil {
-		t.Fatal(err)
-	}
-	store, err := config.DefaultStore()
-	if err != nil {
-		t.Fatal(err)
-	}
-	settings, err := store.Load()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if settings.Defaults.Provider != "openai" || settings.Defaults.Model == "" {
-		t.Fatalf("Work defaults = %#v", settings.Defaults)
-	}
-}
-
-func TestWorkTUIProviderCommandsKeepSecretsOutOfArguments(t *testing.T) {
-	apiKeyLogin := workTUIProviderCommand("login", "openai")
-	if got := strings.Join(apiKeyLogin.Args[1:], " "); got != "provider login openai --prompt" {
-		t.Fatalf("API-key login args = %q", got)
-	}
-	oauthLogin := workTUIProviderCommand("login", "codex")
-	if got := strings.Join(oauthLogin.Args[1:], " "); got != "provider login codex" {
-		t.Fatalf("OAuth login args = %q", got)
-	}
-	setup := workTUIProviderCommand("setup", "anthropic")
-	if got := strings.Join(setup.Args[1:], " "); got != "provider anthropic" {
-		t.Fatalf("setup args = %q", got)
-	}
-}
-
-func TestWorkTUIProviderPickersExposeOnlySupportedActions(t *testing.T) {
-	if got := workTUIProviderChoices("setup"); !slices.Equal(got, []string{"openai", "anthropic", "gemini"}) {
-		t.Fatalf("setup choices = %#v", got)
-	}
-	loginChoices := workTUIProviderChoices("login")
-	if !slices.Contains(loginChoices, "openai") || !slices.Contains(loginChoices, "codex") || slices.Contains(loginChoices, "claude") || slices.Contains(loginChoices, "google-vertex") {
-		t.Fatalf("login choices = %#v", loginChoices)
-	}
-	connectChoices := workTUIProviderChoices("connect")
-	if !slices.Contains(connectChoices, "anthropic") || !slices.Contains(connectChoices, "claude") || slices.Contains(connectChoices, "google-vertex") {
-		t.Fatalf("connect choices = %#v", connectChoices)
 	}
 }

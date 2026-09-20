@@ -23,7 +23,6 @@ import (
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/journal"
-	"github.com/gongahkia/gator/internal/model"
 	"github.com/gongahkia/gator/internal/patch"
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/workrun"
@@ -146,9 +145,6 @@ func workInteractiveConversation(startConversationID string) error {
 		},
 		StartConversationID: startConversationID,
 		FirstRun:            settings.Defaults.Provider == "" && len(conversations) == 0,
-		ProviderCommand:     workTUIProviderCommand,
-		ProviderChoices:     workTUIProviderChoices,
-		CompleteSetup:       selectWorkOnboardingProvider,
 		Run: func(source, conversationID, prompt string, options worktui.RunOptions) worktui.RunResult {
 			return runInteractiveWork(source, conversationID, prompt, stateDir, options)
 		},
@@ -249,26 +245,6 @@ func workInteractiveConversation(startConversationID string) error {
 	return err
 }
 
-func workTUIProviderCommand(action, provider string) *exec.Cmd {
-	arguments := []string{"provider"}
-	if action == "setup" || action == "connect" {
-		arguments = append(arguments, provider)
-	} else if action == "login" {
-		arguments = append(arguments, "login", provider)
-		parsed, err := model.ParseProvider(provider)
-		if err == nil && model.SupportsAPIKeyLogin(parsed) {
-			arguments = append(arguments, "--prompt")
-		}
-	} else {
-		arguments = append(arguments, action, provider)
-	}
-	command := exec.Command(os.Args[0], arguments...)
-	command.Stdin = os.Stdin
-	command.Stdout = os.Stdout
-	command.Stderr = os.Stderr
-	return command
-}
-
 func workTUIConnectorAction(arguments []string) (string, error) {
 	var output bytes.Buffer
 	err := connectorCommandWithIO(arguments, os.Stdin, &output)
@@ -281,64 +257,6 @@ func workTUIConnectorCommand(arguments []string) *exec.Cmd {
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr
 	return command
-}
-
-func workTUIProviderChoices(action string) []string {
-	if action == "setup" {
-		return []string{"openai", "anthropic", "gemini"}
-	}
-	choices := make([]string, 0, len(model.Names()))
-	for _, name := range model.Names() {
-		provider, err := model.ParseProvider(name)
-		if err != nil {
-			continue
-		}
-		include := false
-		switch action {
-		case "connect":
-			include = model.SupportsAPIKeyLogin(provider) && model.APIKeyEnvironment(provider) != ""
-			switch provider {
-			case model.Codex, model.Claude, model.Copilot, model.KimiCoding, model.XAI, model.OpenRouter, model.Radius:
-				include = true
-			}
-		case "login":
-			include = provider != model.Claude && (model.RequiresOAuthLogin(provider) || model.SupportsOAuthLogin(provider) || model.SupportsAPIKeyLogin(provider))
-		case "logout":
-			include = true
-		}
-		if include {
-			choices = append(choices, name)
-		}
-	}
-	return choices
-}
-
-func selectWorkOnboardingProvider(providerName string) error {
-	providerName = strings.ToLower(strings.TrimSpace(providerName))
-	if providerName == "claude" {
-		providerName = "anthropic"
-	}
-	provider, modelName, err := resolveConfiguredProvider(providerName, "")
-	if err != nil {
-		return err
-	}
-	if strings.TrimSpace(modelName) == "" {
-		return fmt.Errorf("provider %q needs an explicit model; configure it from the full model screen", provider)
-	}
-	store, err := config.DefaultStore()
-	if err != nil {
-		return err
-	}
-	settings, err := store.Load()
-	if err != nil {
-		return err
-	}
-	settings.Defaults.Provider = provider
-	settings.Defaults.Model = modelName
-	if err := store.Save(settings); err != nil {
-		return fmt.Errorf("save selected Work provider: %w", err)
-	}
-	return nil
 }
 
 func runInteractiveWork(source, conversationID, prompt, stateDir string, options worktui.RunOptions) worktui.RunResult {

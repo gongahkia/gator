@@ -3,7 +3,6 @@ package worktui
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -33,8 +32,6 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateRunDone(value)
 	case bundleActionDone:
 		return m.updateBundleActionDone(value)
-	case providerActionDone:
-		return m.updateProviderActionDone(value)
 	case connectorActionDone:
 		return m.updateConnectorActionDone(value)
 	case tea.KeyMsg:
@@ -54,7 +51,6 @@ func (m Model) updateModelPanel(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	m.models.Close()
 	m.models = nil
-	m.onboarding = false
 	if m.config.SelectedModel != nil {
 		provider, model, err := m.config.SelectedModel()
 		if err != nil {
@@ -183,68 +179,6 @@ func (m Model) updateBundleActionDone(value bundleActionDone) (tea.Model, tea.Cm
 	m.status = ""
 	m.scroll = 0
 	return m, nil
-}
-
-func (m Model) updateProviderActionDone(value providerActionDone) (tea.Model, tea.Cmd) {
-	if value.err != nil {
-		m.messages = append(m.messages, message{role: "Gator", text: providerActionFailure(value.action, value.err)})
-		return m, nil
-	}
-	selectedDefault := false
-	if value.action != "setup" {
-		if m.firstRun && (value.action == "login" || value.action == "connect") && m.config.CompleteSetup != nil {
-			if err := m.config.CompleteSetup(value.provider); err != nil {
-				m.status = providerActionSuccess(value.action, value.provider)
-				m.messages = append(m.messages, message{role: "Gator", text: m.status + "\nGator could not select it as the default: " + err.Error() + "\nChoose a default with /model."})
-				m.scroll = 0
-				m.refreshModelStatus()
-				return m, nil
-			}
-			selectedDefault = true
-		} else {
-			m.status = providerActionSuccess(value.action, value.provider)
-			m.messages = append(m.messages, message{role: "Gator", text: m.status})
-			m.scroll = 0
-			m.refreshModelStatus()
-			return m, nil
-		}
-	}
-	if !selectedDefault && m.config.CompleteSetup != nil {
-		if err := m.config.CompleteSetup(value.provider); err != nil {
-			m.messages = append(m.messages, message{role: "Gator", text: providerActionFailure(value.action, err)})
-			m.refreshModelStatus()
-			return m, nil
-		}
-	}
-	m.onboarding = false
-	m.firstRun = false
-	m.selected = 0
-	m.home = true
-	m.source = m.config.CurrentFolder
-	m.title = "Work in " + filepath.Base(m.source)
-	m.messages = nil
-	m.status = "Connected to " + value.provider
-	m.refreshModelStatus()
-	if m.pendingPrompt == "" {
-		return m, nil
-	}
-	prompt := m.pendingPrompt
-	m.pendingPrompt = ""
-	m.home = false
-	m.messages = append(m.messages, message{role: "You", text: prompt})
-	m.running = true
-	m.status = "Working from an immutable snapshot…"
-	if m.config.Run == nil {
-		m.running = false
-		m.messages = append(m.messages, message{role: "Gator", text: "Work execution is unavailable in this build."})
-		return m, nil
-	}
-	source, conversation := m.source, m.conversation
-	options := cloneRunOptions(m.options)
-	options.PreviousArtifacts = m.previousArtifactPaths()
-	m.options.Attachments = nil
-	m.options.RefreshSource = false
-	return m.startWork(source, conversation, prompt, options)
 }
 
 func (m Model) updateConnectorActionDone(value connectorActionDone) (tea.Model, tea.Cmd) {
@@ -455,21 +389,9 @@ func (m Model) submitComposerInput() (tea.Model, tea.Cmd) {
 	if strings.HasPrefix(prompt, "/") {
 		return m.runLocalCommand(prompt)
 	}
-	if m.onboarding {
-		provider := strings.ToLower(strings.TrimSpace(prompt))
-		m.messages = append(m.messages, message{role: "You", text: provider})
-		return m.startProviderAction("setup", provider)
-	}
 	if m.firstRun {
-		if m.config.Models != nil {
-			m.pendingPrompt = prompt
-			return m.openModels()
-		}
-		m.onboarding = true
 		m.pendingPrompt = prompt
-		m.title = "Welcome to Gator"
-		m.messages = append(m.messages, message{role: "Gator", text: "Before I start, which model provider do you want to use? Try openai, anthropic, or gemini. API-key entry is hidden."})
-		return m, nil
+		return m.openModels()
 	}
 	m.messages = append(m.messages, message{role: "You", text: prompt})
 	m.home = false
@@ -506,16 +428,8 @@ func (m Model) updateHome(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.runLocalCommand(prompt)
 		}
 		if m.firstRun {
-			if m.config.Models != nil {
-				m.pendingPrompt = prompt
-				return m.openModels()
-			}
-			m.home = false
-			m.onboarding = true
 			m.pendingPrompt = prompt
-			m.title = "Welcome to Gator"
-			m.messages = []message{{role: "Gator", text: "Before I start, which model provider do you want to use? Try openai, anthropic, or gemini. API-key entry is hidden."}}
-			return m, nil
+			return m.openModels()
 		}
 		m.home = false
 		m.messages = append(m.messages, message{role: "You", text: prompt})
@@ -591,10 +505,6 @@ func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.paletteQuery = ""
 			m.section = ""
 			m.input = selected.command + " "
-		case "provider":
-			m.launcher = false
-			m.paletteQuery = ""
-			return m.startProviderAction(selected.command, selected.id)
 		case "copy":
 			return m.copySelection(selected.id)
 		case "conversation":
@@ -602,7 +512,6 @@ func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.paletteQuery = ""
 			m.section = ""
 			m.home = false
-			m.onboarding = false
 			m.source = selected.source
 			m.conversation = selected.id
 			m.title = selected.title
