@@ -112,6 +112,9 @@ Commands:
   update, -u     release checks and self-update
   work, -w       source-to-deliverable workflows and retained outputs
 
+For a free-form Work task that begins with a nested command name, use
+gator work -- TASK to keep it a task rather than dispatching that command.
+
 Cloud providers resolve credentials in this order: --api-key, Gator's private
 local auth file, then the provider environment variable. Native runs keep
 Gator's orchestration loop; gator agent delegate is an explicit installed-

@@ -21,7 +21,7 @@ func TestRunHelp(t *testing.T) {
 		if !strings.Contains(output.String(), "Usage:") {
 			t.Fatalf("help output = %q, want usage", output.String())
 		}
-		for _, value := range []string{"gator --help | -h", "gator provider PROVIDER [OPTIONS]", "gator -p ...", "gator agent acp", "gator work", "gator work inspect", "gator work review", "gator -w [OPTIONS] TASK", "--actions forbid|draft|approve", "--kind json|webhook"} {
+		for _, value := range []string{"gator --help | -h", "gator provider PROVIDER [OPTIONS]", "gator -p ...", "gator agent acp", "gator work", "gator work inspect", "gator work review", "gator -w [OPTIONS] TASK", "gator work -- TASK", "--actions forbid|draft|approve", "--kind json|webhook"} {
 			if !strings.Contains(output.String(), value) {
 				t.Fatalf("help output is missing %q", value)
 			}
@@ -145,13 +145,17 @@ func TestNestedCommandFamiliesRouteToTheirHandlers(t *testing.T) {
 		contains  string
 	}{
 		{[]string{"agent", "acp", "unexpected"}, "usage: gator agent acp"},
+		{[]string{"-a", "acp", "unexpected"}, "usage: gator agent acp"},
 		{[]string{"agent", "rpc", "unexpected"}, "usage: gator agent rpc"},
 		{[]string{"agent", "child"}, "gator agent child list"},
 		{[]string{"agent", "delegate"}, "gator agent delegate"},
 		{[]string{"config", "hook"}, "gator config hook status"},
+		{[]string{"-c", "hook"}, "gator config hook status"},
 		{[]string{"provider", "connector", "status"}, "connector ID"},
+		{[]string{"-p", "connector", "status"}, "connector ID"},
 		{[]string{"job", "inbox", "unexpected"}, "gator job inbox"},
 		{[]string{"work", "eval"}, "usage: gator work eval"},
+		{[]string{"-w", "eval"}, "usage: gator work eval"},
 		{[]string{"work", "transcript"}, "usage: gator work transcript"},
 		{[]string{"work", "snapshot", "show"}, "gator work snapshot show"},
 		{[]string{"work", "worktree"}, "gator work worktree list"},
