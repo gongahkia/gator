@@ -3,7 +3,6 @@ package worktui
 import (
 	"fmt"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -61,6 +60,76 @@ func (m *Model) openProviderPicker(action string) bool {
 	return true
 }
 
+func (m *Model) openSourceMenu() {
+	m.launcher = true
+	m.launcherMode = "source"
+	m.entries = []entry{
+		{title: "Change workspace", subtitle: "Current: " + valueOrNone(m.source), kind: "command-input", command: "/source"},
+		{title: "Refresh workspace", subtitle: "Capture a new immutable snapshot on the next turn", kind: "command", command: "/source-refresh"},
+	}
+	m.paletteQuery = ""
+	m.selected = 0
+}
+
+func (m *Model) openCopyPicker() bool {
+	entries := make([]entry, 0, len(m.messages)+1)
+	for index := len(m.messages) - 1; index >= 0; index-- {
+		item := m.messages[index]
+		if item.role != "Gator" || strings.TrimSpace(item.text) == "" {
+			continue
+		}
+		entries = append(entries, entry{
+			title:    "Gator response",
+			subtitle: truncate(singleLine(item.text), 80),
+			kind:     "copy",
+			id:       fmt.Sprintf("message:%d", index),
+		})
+	}
+	if m.lastBundle.Path != "" {
+		entries = append(entries, entry{
+			title:    "Verified deliverables",
+			subtitle: truncate(singleLine(formatBundleSummary(m.lastBundle)), 80),
+			kind:     "copy",
+			id:       "bundle",
+		})
+	}
+	if len(entries) == 0 {
+		return false
+	}
+	m.launcher = true
+	m.launcherMode = "copy"
+	m.entries = entries
+	m.paletteQuery = ""
+	m.selected = 0
+	return true
+}
+
+func (m Model) copySelection(id string) (tea.Model, tea.Cmd) {
+	m.launcher = false
+	m.paletteQuery = ""
+	var text, label string
+	switch {
+	case id == "bundle":
+		text, label = formatBundleSummary(m.lastBundle), "verified deliverables"
+	case strings.HasPrefix(id, "message:"):
+		var index int
+		if _, err := fmt.Sscanf(id, "message:%d", &index); err == nil && index >= 0 && index < len(m.messages) {
+			text, label = m.messages[index].text, "Gator response"
+		}
+	}
+	if strings.TrimSpace(text) == "" {
+		m.messages = append(m.messages, message{role: "Gator", text: "That item is no longer available to copy."})
+		return m, nil
+	}
+	if err := m.config.Copy(text); err != nil {
+		m.messages = append(m.messages, message{role: "Gator", text: err.Error()})
+		return m, nil
+	}
+	m.messages = append(m.messages, message{role: "Gator", text: "Copied " + label + "."})
+	m.scroll = 0
+	return m, nil
+}
+
 func (m Model) filteredEntries() []entry {
 	query := strings.ToLower(strings.TrimSpace(m.paletteQuery))
 	if query == "" {
@@ -80,50 +149,34 @@ func commandPaletteEntries() []entry {
 	return []entry{
 		{title: "/help", subtitle: "Show Gator commands", kind: "command", command: "/help"},
 		{title: "/new", subtitle: "Start a clean Gator conversation", kind: "command", command: "/new"},
-		{title: "/model", subtitle: "Cloud and local models · download, select, rename, delete", kind: "command", command: "/model"},
-		{title: "/connect", subtitle: "Start guided provider setup", kind: "command", command: "/connect"},
-		{title: "/login", subtitle: "Store a native Gator credential", kind: "command", command: "/login"},
-		{title: "/logout", subtitle: "Remove a stored Gator credential", kind: "command", command: "/logout"},
+		{title: "/model", subtitle: "Cloud and local models · configure, sign in, download, select", kind: "command", command: "/model"},
 		{title: "/effort", subtitle: "Set low, standard, or high effort", kind: "command-input", command: "/effort"},
 		{title: "/attach", subtitle: "Attach a source file to the next prompt", kind: "command-input", command: "/attach"},
 		{title: "/detach", subtitle: "Remove a pending attachment", kind: "command-input", command: "/detach"},
-		{title: "/source", subtitle: "Choose the conversation workspace", kind: "command-input", command: "/source"},
-		{title: "/refresh-source", subtitle: "Capture the selected workspace again", kind: "command", command: "/refresh-source"},
+		{title: "/source", subtitle: "Inspect, change, or refresh the conversation workspace", kind: "command", command: "/source"},
+		{title: "/source-refresh", subtitle: "Capture the selected workspace again", kind: "command", command: "/source-refresh"},
 		{title: "/mode", subtitle: "Set auto, inspect, draft, or act", kind: "command-input", command: "/mode"},
 		{title: "/artifact", subtitle: "Add, remove, or list deliverables", kind: "command-input", command: "/artifact"},
 		{title: "/connector", subtitle: "Select connected sources for this session", kind: "command-input", command: "/connector"},
 		{title: "/web-origin", subtitle: "Select an HTTPS research origin", kind: "command-input", command: "/web-origin"},
 		{title: "/status", subtitle: "Inspect Gator orchestration", kind: "command", command: "/status"},
 		{title: "/statusline", subtitle: "Choose and order composer footer items", kind: "command", command: "/statusline"},
-		{title: "/permissions", subtitle: "Inspect the Code capability envelope", kind: "command", command: "/permissions"},
+		{title: "/permissions", subtitle: "Inspect Gator's active Work authority", kind: "command", command: "/permissions"},
 		{title: "/doctor", subtitle: "Inspect local prerequisites", kind: "command", command: "/doctor"},
 		{title: "/agents", subtitle: "Inspect project profiles and roles", kind: "command", command: "/agents"},
 		{title: "/settings", subtitle: "Inspect current settings", kind: "command", command: "/settings"},
 		{title: "/theme", subtitle: "Choose gator, contrast, or mono", kind: "command-input", command: "/theme"},
 		{title: "/history", subtitle: "Show revisions in this conversation", kind: "command", command: "/history"},
-		{title: "/back", subtitle: "Move to the parent revision", kind: "command", command: "/back"},
-		{title: "/forward", subtitle: "Move to a child or named revision", kind: "command-input", command: "/forward"},
+		{title: "/revision-back", subtitle: "Move to the parent revision", kind: "command", command: "/revision-back"},
+		{title: "/revision-forward", subtitle: "Move to a child or named revision", kind: "command-input", command: "/revision-forward"},
 		{title: "/review", subtitle: "Show latest staged output", kind: "command", command: "/review"},
 		{title: "/save", subtitle: "Save verified deliverables to a folder", kind: "command-input", command: "/save"},
 		{title: "/apply", subtitle: "Apply a verified Code candidate", kind: "command-input", command: "/apply"},
-		{title: "/copy", subtitle: "Copy the latest Gator response", kind: "command", command: "/copy"},
+		{title: "/copy", subtitle: "Choose a response or deliverable summary to copy", kind: "command", command: "/copy"},
 		{title: "/queue", subtitle: "Inspect queued prompts", kind: "command", command: "/queue"},
 		{title: "/dequeue", subtitle: "Remove the next queued prompt", kind: "command", command: "/dequeue"},
 		{title: "/clear-queue", subtitle: "Remove every queued prompt", kind: "command", command: "/clear-queue"},
-		{title: "/code status", subtitle: "Inspect internal Code settings", kind: "command", command: "/code status"},
-		{title: "/code verify", subtitle: "Add a project verifier", kind: "command-input", command: "/code verify"},
-		{title: "/code scope", subtitle: "Add a project-instruction scope", kind: "command-input", command: "/code scope"},
-		{title: "/code profile", subtitle: "Select a project profile", kind: "command-input", command: "/code profile"},
-		{title: "/code setup", subtitle: "Add an explicit setup command", kind: "command-input", command: "/code setup"},
-		{title: "/code allow", subtitle: "Pre-approve one exact command", kind: "command-input", command: "/code allow"},
-		{title: "/code allow-prefix", subtitle: "Pre-approve a literal command prefix", kind: "command-input", command: "/code allow-prefix"},
-		{title: "/code sandbox", subtitle: "Set strict or off", kind: "command-input", command: "/code sandbox"},
-		{title: "/code network", subtitle: "Set deny or allow", kind: "command-input", command: "/code network"},
-		{title: "/code max-steps", subtitle: "Set the child turn budget", kind: "command-input", command: "/code max-steps"},
-		{title: "/code grant", subtitle: "Grant an integration capability", kind: "command-input", command: "/code grant"},
-		{title: "/code revoke", subtitle: "Revoke an integration capability", kind: "command-input", command: "/code revoke"},
-		{title: "/code browser", subtitle: "Select a controlled browser session", kind: "command-input", command: "/code browser"},
-		{title: "/code reset", subtitle: "Restore strict, offline Code defaults", kind: "command", command: "/code reset"},
+		{title: "exit", subtitle: "Exit Gator", kind: "command", command: "exit"},
 		{title: "/quit", subtitle: "Exit Gator", kind: "command", command: "/quit"},
 	}
 }
@@ -150,34 +203,16 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		m.lastOutput, m.lastBundle = "", BundleSummary{}
 		m.options = RunOptions{MaxSteps: 24, Mode: "auto", Code: CodeOptions{MaxSteps: 16, Sandbox: "strict", Network: "deny"}}
 		return m, nil
-	case "/model", "/connect", "/login", "/logout":
-		if fields[0] == "/model" && m.config.Models != nil {
-			if len(fields) != 1 {
-				result = "Use /model to select and manage cloud or local models."
-				break
-			}
-			return m.openModels()
-		}
-		action := strings.TrimPrefix(fields[0], "/")
-		if action == "model" {
-			action = "setup"
-		}
-		if len(fields) > 2 {
-			result = fmt.Sprintf("Usage: %s [PROVIDER]", fields[0])
+	case "/model":
+		if len(fields) != 1 {
+			result = "Use /model to configure, sign in to, and select cloud or local models."
 			break
 		}
-		if len(fields) == 1 {
-			if m.openProviderPicker(action) {
-				return m, nil
-			}
-			result = fmt.Sprintf("No providers are available for %s in this build.", fields[0])
+		if m.config.Models == nil {
+			err = errorsUnavailable("model management")
 			break
 		}
-		provider := strings.ToLower(strings.TrimSpace(fields[1]))
-		if action == "setup" {
-			m.pendingPrompt = ""
-		}
-		return m.startProviderAction(action, provider)
+		return m.openModels()
 	case "/effort":
 		if len(fields) != 2 {
 			result = "Usage: /effort low|standard|high\nCurrent: " + effortName(m.options.MaxSteps)
@@ -227,8 +262,8 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 	case "/source":
 		value := commandRemainder(command, fields[:1])
 		if value == "" {
-			result = "Workspace: " + m.source
-			break
+			m.openSourceMenu()
+			return m, nil
 		}
 		if m.config.ResolveSource == nil {
 			err = errorsUnavailable("source selection")
@@ -245,7 +280,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 				result += "\nThe next turn will capture a new immutable snapshot."
 			}
 		}
-	case "/refresh-source":
+	case "/source-refresh":
 		m.options.RefreshSource = true
 		result = "The next turn will capture a new immutable snapshot of " + m.source + "."
 	case "/mode":
@@ -266,8 +301,6 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		}
 	case "/web-origin":
 		result, err = m.configureWebOrigins(fields)
-	case "/code":
-		result, err = m.configureCode(fields, command)
 	case "/status":
 		result = m.workStatus()
 	case "/statusline", "/status-line":
@@ -278,7 +311,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		m.openStatusLineEditor()
 		return m, nil
 	case "/permissions":
-		result = m.codeStatus()
+		result = m.workPermissions()
 	case "/doctor", "/agents", "/settings":
 		if m.config.Inspect == nil {
 			err = errorsUnavailable(fields[0])
@@ -304,11 +337,8 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 			err = errorsUnavailable("copy")
 			break
 		}
-		text := m.latestGatorMessage()
-		if text == "" {
-			err = fmt.Errorf("there is no Gator response to copy")
-		} else if err = m.config.Copy(text); err == nil {
-			result = "Copied the latest Gator response."
+		if !m.openCopyPicker() {
+			err = fmt.Errorf("there is no Gator response or verified deliverable summary to copy")
 		}
 	case "/queue":
 		result = m.queueStatus()
@@ -334,13 +364,13 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		return m.prepareSave(command)
 	case "/apply":
 		return m.prepareCodeApply(command)
-	case "/back", "/forward", "/history":
+	case "/revision-back", "/revision-forward", "/history":
 		if m.conversation == "" {
 			err = fmt.Errorf("start or resume a conversation before using revision history")
 			break
 		}
 		switch fields[0] {
-		case "/back":
+		case "/revision-back":
 			if m.config.MoveBack != nil {
 				result, err = m.config.MoveBack(m.conversation)
 			}
@@ -348,7 +378,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 			if m.config.History != nil {
 				result, err = m.config.History(m.conversation)
 			}
-		case "/forward":
+		case "/revision-forward":
 			if len(fields) == 2 && m.config.MoveToRevision != nil {
 				result, err = m.config.MoveToRevision(m.conversation, fields[1])
 			} else if m.config.MoveForward != nil {
@@ -360,7 +390,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 			m.scroll = 0
 			return m, nil
 		}
-	case "/quit":
+	case "exit", "/quit":
 		return m, tea.Quit
 	default:
 		err = fmt.Errorf("unknown command %s; use /help", fields[0])

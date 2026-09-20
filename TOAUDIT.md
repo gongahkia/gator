@@ -249,16 +249,12 @@ the same thing as historical TUI documentation or retired Code UI commands.
 | --- | --- |
 | `/help` or `/?` | Show interactive help. |
 | `/new` | Start a clean Work conversation. |
-| `/model` | Open cloud and local model management. |
-| `/connect [PROVIDER]` | Start provider setup. |
-| `/login [PROVIDER]` | Store a native Gator credential. |
-| `/logout [PROVIDER]` | Remove a stored Gator credential. |
+| `/model` | Open cloud and local model management, clicking /model then brings u to /login /logout and /connect |
+| `/mode MODE` (`auto`, `inspect`, `draft`, or `act`) | Set the Work authority mode. |
 | `/effort LEVEL` (`low`, `standard`, or `high`) | Set manager and Code-specialist turn budgets. |
 | `/attach PATH` | Attach one source-relative file to the next prompt. |
 | `/detach TARGET` (a path or `all`) | Remove pending attachment(s). |
-| `/source [PATH]` | Inspect or select the read-only source workspace. |
-| `/refresh-source` | Capture a fresh source snapshot on the next turn. |
-| `/mode MODE` (`auto`, `inspect`, `draft`, or `act`) | Set the Work authority mode. |
+| `/source [PATH]` | Inspect or select the read-only source workspace and have /source-refresh as another command but within the TUI its also a menu under /source. |
 | `/artifact ACTION [PATH]` (`list`, `add`, or `remove`) | List or manage expected deliverable paths. |
 | `/connector …` | Select a configured connector for this session, or manage connectors using `list`, `add`, `remove`, `clear`, `setup`, `login`, `logout`, `status`, `test`, `permission`, or `delete`. |
 | `/web-origin ACTION [URL]` (`list`, `add`, or `remove`) | Manage bounded HTTPS origins for web research. |
@@ -273,33 +269,18 @@ the same thing as historical TUI documentation or retired Code UI commands.
 | `/doctor`, `/agents`, `/settings` | Inspect local prerequisites, project roles, or current settings. |
 | `/theme THEME` (`gator`, `contrast`, or `mono`) | Persist a terminal theme. |
 | `/history` | Show revisions in the current conversation. |
-| `/back` | Move to the parent revision. |
-| `/forward [REVISION_ID]` | Move to a child revision. |
+| `/revision-back` | Move to the parent revision. |
+| `/revision-forward [REVISION_ID]` | Move to a child revision. |
 | `/review` | Preview the latest verified deliverables in this conversation. |
 | `/save [--replace] [DIRECTORY]` | Preflight then save verified deliverables after confirmation. |
 | `/apply [CANDIDATE] [DIRECTORY]` | Preflight then apply a verified Code candidate after confirmation. |
-| `/copy` | Copy the latest Gator response. |
+| `/copy` | Copy the latest Gator response, but it asks which part to copy the same as codex. |
 | `/queue`, `/dequeue`, `/clear-queue` | Inspect or manage queued prompts. |
-| `/quit` | Exit the TUI. |
+| `exit` and `/quit` | Exit the TUI. |
 
 ### TUI Code-specialist policy
 
-| TUI command | Current purpose |
-| --- | --- |
-| `/code status` | Show the internal Code configuration. |
-| `/code verify COMMAND` | Add a required project verification command. |
-| `/code scope PATH` | Add a project-instruction scope. |
-| `/code profile NAME` | Select a policy-narrowing project profile. |
-| `/code setup COMMAND` | Add an explicit setup command. |
-| `/code allow COMMAND` | Pre-approve one exact child command. |
-| `/code allow-prefix PREFIX` | Pre-approve a literal child-command prefix. |
-| `/code grant CAPABILITY` | Grant a Code integration capability. |
-| `/code revoke CAPABILITY` | Revoke a Code integration capability. |
-| `/code sandbox MODE` (`strict` or `off`) | Set the child process boundary. |
-| `/code network MODE` (`deny` or `allow`) | Set Code network access. |
-| `/code max-steps N` | Set the child turn budget. |
-| `/code browser SESSION_ID` | Select an already controlled browser session. |
-| `/code reset` | Restore strict, offline Code defaults. |
+Remove all TUI commands for the code, its meant to be a subagent invoked by the gator main agent iygwim
 
 ### TUI commands available while Work is running
 
@@ -351,14 +332,3 @@ compatibility. They should not be treated as supported product workflows.
 | `gator clone` | Returns directions to continue or branch a retained Work conversation. |
 | Historical `/manage`, `/recent`, `/tree`, `/fork`, `/clone`, `/opencode`, `/version`, and `/update` TUI references | Not dispatched by the active Work TUI. Older parity material describes a retired interface and is not a current command contract. |
 | `gator work-rpc`, `gator --mode rpc`, `gator --mode acp` | Undocumented compatibility/internal protocol entry points. |
-
-## Audit questions
-
-Use this section to record desired changes before implementation.
-
-1. Which command groups should be kept, renamed, combined, or removed?
-2. Which current commands are too low-level for the main product surface?
-3. Which workflows should move from CLI-only to the Work TUI, if any?
-4. Which model-catalog actions or provider flows should change?
-5. Which retired names should become hard errors, aliases, or supported workflows?
-6. What compatibility guarantees are required for automation, scripts, editor integrations, and existing users?
