@@ -190,6 +190,12 @@ type connectorActionDone struct {
 	err    error
 }
 
+type composerEditorDone struct {
+	path   string
+	editor string
+	err    error
+}
+
 type queuedRun struct {
 	prompt  string
 	options RunOptions
@@ -228,6 +234,7 @@ type Model struct {
 	promptHistory        []string
 	historyIndex         int
 	historyDraft         string
+	composerEditorPath   string
 	messages             []message
 	running              bool
 	status               string

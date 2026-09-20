@@ -62,12 +62,20 @@ func TestDefaultComposerFooterShowsSelectedLocalModel(t *testing.T) {
 	}
 }
 
+func TestDefaultComposerFooterAdvertisesEditorShortcut(t *testing.T) {
+	model := New(Config{CurrentFolder: "/work"})
+	model.width, model.height = 100, 24
+	if view := ansi.Strip(model.View()); !strings.Contains(view, "ctrl+g editor") {
+		t.Fatalf("default footer omitted composer editor shortcut: %q", view)
+	}
+}
+
 func TestComposerFooterWrapsWithoutLosingNavigationAtNarrowWidth(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work"})
 	model.home = false
 	model.width, model.height = 32, 24
 	view := ansi.Strip(model.View())
-	for _, item := range []string{"enter send", "ctrl+p commands", "ctrl+x conversations", "ctrl+b inbox", "ctrl+j jobs"} {
+	for _, item := range []string{"enter send", "ctrl+g editor", "ctrl+p commands", "ctrl+x conversations", "ctrl+b inbox", "ctrl+j jobs"} {
 		if !strings.Contains(view, item) {
 			t.Fatalf("narrow view lost %q: %q", item, view)
 		}

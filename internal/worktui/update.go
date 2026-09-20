@@ -34,6 +34,8 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateBundleActionDone(value)
 	case connectorActionDone:
 		return m.updateConnectorActionDone(value)
+	case composerEditorDone:
+		return m.updateComposerEditorDone(value)
 	case tea.KeyMsg:
 		return m.updateKey(value)
 	}
@@ -246,6 +248,9 @@ func (m Model) updateKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.section = ""
 		}
 		return m, nil
+	}
+	if value.Type == tea.KeyCtrlG {
+		return m.openComposerEditor()
 	}
 	if m.home {
 		return m.updateHome(value)
