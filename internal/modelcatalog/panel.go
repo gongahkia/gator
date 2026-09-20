@@ -168,9 +168,17 @@ func (p *ModelCatalogPanel) localRows(width int) string {
 	if len(catalog.Models) == 0 {
 		return strings.Join(append(lines, dimStyle.Render(p.model.localModels.spinner.View()+" Loading reviewed models…")), "\n")
 	}
-	start, end := p.model.visibleRange(len(catalog.Models), p.model.localModels.selected, max(1, p.rowLimit()-2))
+	// Reserve space for the Work and Coding headings. The catalog is intentionally
+	// ordered with broad Work models first, so the default view advertises them
+	// before the coding-focused choices without hiding the selected row later.
+	start, end := p.model.visibleRange(len(catalog.Models), p.model.localModels.selected, max(1, p.rowLimit()-4))
+	category := ""
 	for index := start; index < end; index++ {
 		model := catalog.Models[index]
+		if model.Category != "" && model.Category != category {
+			lines = append(lines, labelStyle.Render(localModelCategoryLabel(model.Category)))
+			category = model.Category
+		}
 		state := "available · " + model.Download
 		modelReady := false
 		if model.BlockedReason != "" {
@@ -185,6 +193,17 @@ func (p *ModelCatalogPanel) localRows(width int) string {
 		lines = append(lines, dimStyle.Render(fmt.Sprintf("  … %d more; keep moving to reveal", len(catalog.Models)-end)))
 	}
 	return strings.Join(lines, "\n")
+}
+
+func localModelCategoryLabel(category string) string {
+	switch category {
+	case "General Work":
+		return "Recommended for general Work · research, analysis, and writing"
+	case "Coding":
+		return "Coding · implementation and verification"
+	default:
+		return category
+	}
 }
 
 func (p *ModelCatalogPanel) row(name, state string, width int, selected, ready bool) string {

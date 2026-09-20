@@ -42,8 +42,9 @@ type LocalDependency struct {
 	Instructions []string
 }
 
-// LocalModel is one selectable reviewed local coding model.
+// LocalModel is one selectable reviewed local Work or coding model.
 type LocalModel struct {
+	Category      string
 	ID            string
 	OllamaModel   string
 	Name          string

@@ -25,25 +25,50 @@ func TestCatalogResolvesOnlyReviewedModels(t *testing.T) {
 	}
 }
 
-func TestCatalogIncludesPublishedQwenCoderSizeRange(t *testing.T) {
+func TestCatalogIncludesPublishedReviewedModelMetadata(t *testing.T) {
 	for _, test := range []struct {
-		id    string
-		tag   string
-		bytes uint64
+		category string
+		id       string
+		tag      string
+		bytes    uint64
 	}{
-		{id: "qwen2.5-coder-0.5b", tag: "qwen2.5-coder:0.5b", bytes: 398_000_000},
-		{id: "qwen2.5-coder-1.5b", tag: "qwen2.5-coder:1.5b", bytes: 986_000_000},
-		{id: "qwen2.5-coder-3b", tag: "qwen2.5-coder:3b", bytes: 1_900_000_000},
-		{id: "qwen2.5-coder-7b", tag: "qwen2.5-coder:7b", bytes: 4_700_000_000},
-		{id: "qwen2.5-coder-14b", tag: "qwen2.5-coder:14b", bytes: 9_000_000_000},
-		{id: "qwen2.5-coder-32b", tag: "qwen2.5-coder:32b", bytes: 20_000_000_000},
+		{category: "General Work", id: "qwen3-4b", tag: "qwen3:4b", bytes: 2_500_000_000},
+		{category: "General Work", id: "qwen3-8b", tag: "qwen3:8b", bytes: 5_200_000_000},
+		{category: "General Work", id: "llama3.1-8b", tag: "llama3.1:8b", bytes: 4_900_000_000},
+		{category: "General Work", id: "qwen3-30b", tag: "qwen3:30b", bytes: 19_000_000_000},
+		{category: "General Work", id: "mistral-small3.2-24b", tag: "mistral-small3.2:24b", bytes: 15_000_000_000},
+		{category: "Coding", id: "qwen2.5-coder-0.5b", tag: "qwen2.5-coder:0.5b", bytes: 398_000_000},
+		{category: "Coding", id: "qwen2.5-coder-1.5b", tag: "qwen2.5-coder:1.5b", bytes: 986_000_000},
+		{category: "Coding", id: "qwen2.5-coder-3b", tag: "qwen2.5-coder:3b", bytes: 1_900_000_000},
+		{category: "Coding", id: "qwen2.5-coder-7b", tag: "qwen2.5-coder:7b", bytes: 4_700_000_000},
+		{category: "Coding", id: "qwen2.5-coder-14b", tag: "qwen2.5-coder:14b", bytes: 9_000_000_000},
+		{category: "Coding", id: "qwen2.5-coder-32b", tag: "qwen2.5-coder:32b", bytes: 20_000_000_000},
 	} {
 		t.Run(test.id, func(t *testing.T) {
 			model, found := Resolve(test.id)
-			if !found || model.OllamaModel != test.tag || model.DownloadBytes != test.bytes {
+			if !found || model.Category != test.category || model.OllamaModel != test.tag || model.DownloadBytes != test.bytes {
 				t.Fatalf("catalog model = %#v, found = %t", model, found)
 			}
 		})
+	}
+}
+
+func TestCatalogPlacesGeneralWorkModelsBeforeCodingModels(t *testing.T) {
+	seenCoding := false
+	for _, model := range Catalog() {
+		switch model.Category {
+		case "General Work":
+			if seenCoding {
+				t.Fatalf("general Work model %q follows a coding model", model.ID)
+			}
+		case "Coding":
+			seenCoding = true
+		default:
+			t.Fatalf("catalog model %q has unknown category %q", model.ID, model.Category)
+		}
+	}
+	if !seenCoding {
+		t.Fatal("catalog lost its coding models")
 	}
 }
 

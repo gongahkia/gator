@@ -138,6 +138,8 @@ func TestWorkTUIManagesLocalModelsAndUsesSelectionThroughService(t *testing.T) {
 			program.Send(tea.KeyMsg{Type: tea.KeyEnter})
 		case "tab":
 			program.Send(tea.KeyMsg{Type: tea.KeyTab})
+		case "down":
+			program.Send(tea.KeyMsg{Type: tea.KeyDown})
 		case "esc":
 			program.Send(tea.KeyMsg{Type: tea.KeyEsc})
 		default:
@@ -170,6 +172,10 @@ func TestWorkTUIManagesLocalModelsAndUsesSelectionThroughService(t *testing.T) {
 	key("enter")
 	waitView("amazon-bedrock")
 	key("tab")
+	waitView("Recommended for general Work")
+	for range 5 {
+		key("down")
+	}
 	waitView("Qwen2.5-Coder 0.5B")
 	key("p")
 	waitView("Confirm download")

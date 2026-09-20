@@ -94,6 +94,27 @@ func TestPanelUsesWorkVisualLanguage(t *testing.T) {
 	}
 }
 
+func TestPanelPlacesGeneralWorkModelsBeforeCodingModels(t *testing.T) {
+	panel := NewModelCatalogPanel(Config{LocalModels: &fakeLocalManager{}})
+	defer panel.Close()
+	panel.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+	panel.model.localModels.action = localModelIdle
+	panel.model.localModels.section = localModelSection
+	panel.model.localModels.catalog = LocalCatalog{RuntimeVersion: "fixture", Models: []LocalModel{
+		{ID: "work", Category: "General Work", Name: "General Work Model", Download: "5.2 GB"},
+		{ID: "code", Category: "Coding", Name: "Coding Model", Download: "4.7 GB"},
+	}}
+	plain := ansi.Strip(panel.View())
+	for _, required := range []string{"Recommended for general Work", "Coding · implementation and verification", "General Work Model", "Coding Model"} {
+		if !strings.Contains(plain, required) {
+			t.Fatalf("model panel omitted %q:\n%s", required, plain)
+		}
+	}
+	if strings.Index(plain, "General Work Model") > strings.Index(plain, "Coding Model") {
+		t.Fatalf("general Work models were not presented first:\n%s", plain)
+	}
+}
+
 type fakeLocalManager struct{ catalog LocalCatalog }
 
 func (m *fakeLocalManager) Status(context.Context) (LocalCatalog, error) { return m.catalog, nil }

@@ -8,11 +8,13 @@ persisted model selection.
 
 Gator uses the existing Ollama runtime and its loopback Chat Completions API.
 Its Work service, tools, specialist boundaries, evidence, and approvals still
-own execution. The current catalog is text-only: direct image prompt inputs are
-reported explicitly, while PDF prompt attachments and frozen source PDFs use
-Gator's bounded native text extraction. Scanned pages are flagged as requiring
-OCR rather than silently treated as empty. No model-quality claim follows from
-being in the catalog.
+own execution. General Work models are listed before coding models so the
+catalog reflects Gator's research, analysis, and deliverable workflows as well
+as implementation work. The catalog is text-only: direct image prompt inputs
+are reported explicitly, while PDF prompt attachments and frozen source PDFs
+use Gator's bounded native text extraction. Scanned pages are flagged as
+requiring OCR rather than silently treated as empty. No model-quality claim
+follows from being in the catalog.
 
 ## Download, select, and delete
 
@@ -83,6 +85,11 @@ headroom for the pull. The current catalog evaluates to:
 
 | Gator ID | Gator RAM guardrail | Gator free-disk guardrail |
 | --- | ---: | ---: |
+| `qwen3-4b` | 4.7 GiB | 2.8 GiB |
+| `qwen3-8b` | 9.7 GiB | 5.8 GiB |
+| `llama3.1-8b` | 9.1 GiB | 5.5 GiB |
+| `qwen3-30b` | 35.4 GiB | 21.2 GiB |
+| `mistral-small3.2-24b` | 27.9 GiB | 16.8 GiB |
 | `qwen2.5-coder-0.5b` | 759 MiB | 455 MiB |
 | `qwen2.5-coder-1.5b` | 1.8 GiB | 1.1 GiB |
 | `qwen2.5-coder-3b` | 3.5 GiB | 2.1 GiB |
@@ -113,6 +120,21 @@ resource-constrained machine.
 
 ## Reviewed catalog
 
+The Local screen presents General Work first, then Coding. The ordering is a
+recommendation about the intended Gator workflow, not a model-quality ranking.
+
+### General Work
+
+| Gator ID | Ollama tag | Published package | Context | Intended use |
+| --- | --- | ---: | ---: | --- |
+| `qwen3-4b` | `qwen3:4b` | 2.5 GB | 256K | compact source synthesis, analysis, and writing |
+| `qwen3-8b` | `qwen3:8b` | 5.2 GB | 40K | balanced research, analysis, and writing |
+| `llama3.1-8b` | `llama3.1:8b` | 4.9 GB | 128K | long-source synthesis, multilingual writing, and tool use |
+| `qwen3-30b` | `qwen3:30b` | 19 GB | 256K | long-context research and source synthesis |
+| `mistral-small3.2-24b` | `mistral-small3.2:24b` | 15 GB | 128K | precise instruction following and tool-backed deliverables |
+
+### Coding
+
 | Gator ID | Ollama tag | Published package | Context | Intended use |
 | --- | --- | --- | --- | --- |
 | `qwen2.5-coder-0.5b` | `qwen2.5-coder:0.5b` | 398 MB | 32K | minimal coding option for constrained hardware |
@@ -124,7 +146,10 @@ resource-constrained machine.
 | `devstral-24b` | `devstral:24b` | 14 GB | 128K | agentic coding with tool use |
 | `qwen3-coder-30b` | `qwen3-coder:30b` | 19 GB | 256K | long-context agentic coding |
 
-The catalog maps only to the linked [Qwen2.5-Coder](https://ollama.com/library/qwen2.5-coder),
+The catalog maps only to the linked [Qwen3](https://ollama.com/library/qwen3),
+[Llama 3.1](https://ollama.com/library/llama3.1),
+[Mistral Small 3.2](https://ollama.com/library/mistral-small3.2),
+[Qwen2.5-Coder](https://ollama.com/library/qwen2.5-coder),
 [Devstral](https://ollama.com/library/devstral), and
 [Qwen3-Coder](https://ollama.com/library/qwen3-coder) packages. It is not a
 live search of Hugging Face, and Gator does not clone, execute, or download
@@ -152,10 +177,11 @@ insecure pull option and never uploads models.
 
 Ollama documents Chat Completions streaming and tool support, which is why the
 catalog can retain Gator's tool loop rather than delegating to another harness.
-The selected coding models are text models, so do not use `--image` with them;
-text attachments retain the normal OpenAI-compatible provider behavior. Gator
-converts selected PDFs to bounded page-marked text before calling a text-only
-model; it does not send PDF bytes over the generic protocol.
+Gator treats every managed local catalog model as text-only, including upstream
+packages that separately advertise vision support, so do not use `--image` with
+them. Text attachments retain the normal OpenAI-compatible provider behavior.
+Gator converts selected PDFs to bounded page-marked text before calling a
+text-only model; it does not send PDF bytes over the generic protocol.
 
 ## Verification of the Work TUI integration
 

@@ -1,10 +1,10 @@
 # Custom providers and local endpoints
 
-For Gator's reviewed Ollama coding-model catalog, use
-[`gator local`](LOCAL_MODELS.md). It downloads a selected package with explicit
-confirmation and binds it to every native Gator interface without manually
-entering an endpoint. This document covers the separate path for a local server
-or compatible endpoint that you operate yourself.
+For Gator's reviewed Ollama Work and coding-model catalog, use the **Local**
+section of [`/model`](LOCAL_MODELS.md). It downloads a selected package with
+explicit confirmation and binds it to every native Gator interface without
+manually entering an endpoint. This document covers the separate path for a
+local server or compatible endpoint that you operate yourself.
 
 Gator's custom-provider path is for an OpenAI-compatible Chat Completions
 endpoint that you operate or have independently documented. It keeps Gator's

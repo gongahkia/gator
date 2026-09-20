@@ -389,6 +389,7 @@ func (manager *localModelManager) catalog(settings config.Settings, client local
 		_, isInstalled := installedNames[model.OllamaModel]
 		eligibility := localmodel.Assess(model, host)
 		models = append(models, modelcatalog.LocalModel{
+			Category:      model.Category,
 			ID:            model.ID,
 			OllamaModel:   model.OllamaModel,
 			Name:          modelDisplayName(settings, localmodel.ProviderID, model.OllamaModel, model.Name),
