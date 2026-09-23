@@ -2,6 +2,8 @@
 
 Current execution, continuity, evidence, Code candidates and bounds: [WORK_DEPTH.md](WORK_DEPTH.md).
 
+Current local browser, desktop, PPTX, and scheduling boundaries: [WORK_CAPABILITIES.md](WORK_CAPABILITIES.md).
+
 ## Product contract
 
 Gator is a terminal-native, local-first work agent. A work run accepts a clear

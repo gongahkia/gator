@@ -4,7 +4,8 @@ Gator can control a real local Chromium session for browser-based development
 and visual verification. It is not a hosted browser, a remote executor, or a
 general computer-use surface. A browser is available to an agent only when the
 developer explicitly starts or attaches a local session, selects specific tabs,
-and grants that session to one Execute-mode run with `--network allow`.
+and grants that session to one Work run. The browser capability is separate
+from ordinary HTTP research and does not imply desktop/app control.
 
 ## Setup and lifecycle
 
@@ -15,7 +16,7 @@ downloads a browser while starting a run or opening the TUI:
 gator browser install
 gator browser start --visual-capture
 gator browser origins SESSION_ID add http://127.0.0.1:3000
-gator work run --network allow --code-capability browser --browser-session SESSION_ID --verify 'go test ./...' 'Test the local UI flow'
+gator work --browser-session SESSION_ID --artifact review.md 'Test the approved local UI flow'
 ```
 
 `browser start` creates a headed Chromium window by default with a new,
@@ -44,7 +45,10 @@ new developer-selected path without overwriting an existing file through
 
 ## Agent surface and consent
 
-With a granted session, Execute-mode native runs receive selected-tab tools:
+With a granted session, the Work manager receives selected-tab tools. An
+internal Code specialist needs a separate `--code-browser-session SESSION_ID`
+and its existing `--code-capability browser` grant; neither role can borrow the
+other's browser authority.
 
 - `browser_tabs`, `browser_snapshot`, and `browser_screenshot` read selected
   browser state. Screenshots need a separate session-level visual-capture
