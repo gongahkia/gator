@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/browser"
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/orchestrator"
@@ -52,6 +53,24 @@ func configuredWorkService(provider, modelName, stateDir string, request *workru
 	request.ConnectorPermissions = connector.PermissionSet(settings.ConnectorPermissions)
 	request.SnapshotOptions = snapshot.Options{Limits: snapshot.Limits{MaxFiles: settings.Snapshots.MaxFiles, MaxTotal: settings.Snapshots.MaxTotalBytes, MaxFileBytes: settings.Snapshots.MaxFileBytes}, Excludes: settings.Snapshots.Excludes}
 	executor := workrun.Executor{Model: backend, StateDir: stateDir, Connectors: connector.Runtime{Registry: registry, Credentials: credentials, StateDir: stateDir}}
+	if request.BrowserSession != "" {
+		store, err := browser.Open(stateDir)
+		if err != nil {
+			return workrun.Service{}, err
+		}
+		client, err := browser.NewClient(store, request.BrowserSession)
+		if err != nil {
+			return workrun.Service{}, err
+		}
+		session, err := client.Session(context.Background(), request.BrowserSession)
+		if err != nil {
+			return workrun.Service{}, err
+		}
+		if len(session.SelectedTabs) == 0 {
+			return workrun.Service{}, errors.New("Work browser session has no developer-selected tabs")
+		}
+		executor.Browser = client
+	}
 	if native, ok := backend.(*nativeWorkBackend); ok {
 		executor.Code = native.codeDelegate(stateDir)
 	}

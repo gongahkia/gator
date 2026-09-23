@@ -311,6 +311,24 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 			request.OnEvent(event)
 		}
 	}
+	if request.BrowserSession != "" {
+		controller := e.Browser
+		if controller == nil {
+			return outcome, errors.New("Work browser session is unavailable on this local runtime")
+		}
+		browserPolicy := tools.CommandPolicy{
+			Approve: request.ApproveBrowser,
+			OnEvent: func(event agent.Event) {
+				event.At = now()
+				emit(event)
+			},
+		}
+		surface = append(surface, tools.BrowserSessionTools(tools.BrowserSessionOptions{
+			SessionID:  request.BrowserSession,
+			Controller: controller,
+			Policy:     browserPolicy,
+		})...)
+	}
 	subagents := make([]artifact.SubagentEvidence, 0, 8)
 	integration := &codeIntegration{request: request, work: work, patches: map[string]string{}, accepted: map[string]string{}}
 	for path, hash := range parent.AcceptedCode {

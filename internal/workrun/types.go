@@ -11,6 +11,7 @@ import (
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/browser"
 	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/projectcapture"
@@ -96,6 +97,13 @@ type Request struct {
 	OnSnapshot              func(snapshot.Manifest)
 	Images                  []agent.Image
 	Attachments             []agent.Attachment
+	// BrowserSession is an explicit developer-selected local browser session
+	// granted to the Work manager itself. It is intentionally separate from
+	// Code.BrowserSession: the manager cannot silently borrow a Code grant.
+	BrowserSession string
+	// ApproveBrowser is invoked for every browser mutation. Unlike command
+	// approval, an "always" decision is never remembered by browser tools.
+	ApproveBrowser func(context.Context, []string) (tools.CommandDecision, error)
 	// RequireCode is used by the compatibility `gator work code` route. It keeps the
 	// main Work manager user-facing while requiring concrete Code-specialist
 	// evidence before the run may complete.
@@ -160,4 +168,7 @@ type Executor struct {
 	StateDir          string
 	Connectors        connector.Runtime
 	Code              CodeDelegate
+	// Browser is the private local controller for an explicitly granted Work
+	// browser session. A nil value fails closed if BrowserSession is requested.
+	Browser browser.Controller
 }
