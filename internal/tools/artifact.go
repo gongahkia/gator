@@ -50,6 +50,7 @@ func WorkFilesWithRendererEvidence(source, output workspace.Root, contract artif
 			WriteTableArtifact{Root: output, Contract: contract},
 			WriteDocumentArtifact{Root: output, Source: source, Contract: contract, OnRenderer: onRenderer},
 			WriteWorkbookArtifact{Root: output, Source: source, Contract: contract, OnRenderer: onRenderer},
+			WritePresentationArtifact{Root: output, Source: source, Contract: contract, OnRenderer: onRenderer},
 			ArtifactStatus{Root: output, Contract: contract},
 		)
 	}

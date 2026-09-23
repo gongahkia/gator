@@ -312,6 +312,9 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		}
 	}
 	if request.BrowserSession != "" {
+		if request.DisableBrowser {
+			return outcome, errors.New("selected local model does not support Work browser or computer-use capability")
+		}
 		controller := e.Browser
 		if controller == nil {
 			return outcome, errors.New("Work browser session is unavailable on this local runtime")
@@ -328,6 +331,18 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 			Controller: controller,
 			Policy:     browserPolicy,
 		})...)
+	}
+	if request.DesktopSession != "" {
+		if e.Desktop == nil {
+			return outcome, errors.New("Work desktop session is unavailable on this local runtime")
+		}
+		if computer, ok := e.Model.(agent.ComputerUseModel); !ok {
+			return outcome, errors.New("Work desktop control requires an explicitly configured OpenAI computer-use model")
+		} else if _, enabled := computer.ComputerUse(); !enabled {
+			return outcome, errors.New("selected model is not enabled for OpenAI computer use")
+		}
+		desktopPolicy := tools.CommandPolicy{Approve: request.ApproveDesktop, OnEvent: func(event agent.Event) { event.At = now(); emit(event) }}
+		surface = append(surface, tools.ComputerAction{SessionID: request.DesktopSession, Controller: e.Desktop, Policy: desktopPolicy})
 	}
 	subagents := make([]artifact.SubagentEvidence, 0, 8)
 	integration := &codeIntegration{request: request, work: work, patches: map[string]string{}, accepted: map[string]string{}}
@@ -444,10 +459,11 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		return outcome, fmt.Errorf("write work manifest: %w", err)
 	}
 	configuration, _ := json.Marshal(effectiveConfiguration(request))
+	replay := sanitizeComputerReplay(result.Messages)
 	if _, err := sessions.AddRevision(conversation.ID, worksession.Revision{
 		AcceptedCode: integration.accepted,
 		Project:      request.Project,
-		Replay:       &worksession.ReplayState{Version: 1, Provider: request.Provider, Messages: result.Messages, Configuration: configuration, CompactionVersion: 1, Summary: summary},
+		Replay:       &worksession.ReplayState{Version: 1, Provider: request.Provider, Messages: replay, Configuration: configuration, CompactionVersion: 1, Summary: summary},
 		ID:           request.RunID, ParentRevisionID: request.ParentRevisionID, SnapshotID: sourceSnapshot.ID,
 		Objective: request.Objective, BundlePath: work.Path, Status: string(manifest.Status), FinalText: result.FinalText, CreatedAt: now(),
 	}); err != nil {
@@ -463,6 +479,49 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		return outcome, errors.New("work outcome contract did not pass")
 	}
 	return outcome, nil
+}
+
+// sanitizeComputerReplay ensures raw desktop screenshots never enter a Work
+// revision. A computer call cannot be replayed without the exact screenshot
+// continuation, so its matching call/output pair is omitted too; the normal
+// manager prose and produced artifacts remain available for later work.
+func sanitizeComputerReplay(messages []agent.Message) []agent.Message {
+	computerCalls := map[string]bool{}
+	for _, message := range messages {
+		if message.Role != agent.RoleAgent {
+			continue
+		}
+		for _, call := range message.ToolCalls {
+			if call.Kind == agent.ToolCallComputer {
+				computerCalls[call.ID] = true
+			}
+		}
+	}
+	if len(computerCalls) == 0 {
+		return messages
+	}
+	result := make([]agent.Message, 0, len(messages))
+	for _, message := range messages {
+		if message.Role == agent.RoleTool && computerCalls[message.ToolCallID] {
+			continue
+		}
+		if message.Role == agent.RoleAgent && len(message.ToolCalls) > 0 {
+			calls := message.ToolCalls[:0]
+			for _, call := range message.ToolCalls {
+				if call.Kind != agent.ToolCallComputer {
+					calls = append(calls, call)
+				}
+			}
+			message.ToolCalls = calls
+		}
+		// Screenshots can only be attached by a computer-call output in this
+		// workflow. Wipe images from every retained tool message defensively.
+		if message.Role == agent.RoleTool {
+			message.Images = nil
+		}
+		result = append(result, message)
+	}
+	return result
 }
 
 func persistConnectedSnapshot(workPath string, result connector.Result) (connector.Provenance, error) {

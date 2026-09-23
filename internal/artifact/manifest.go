@@ -291,10 +291,10 @@ func (e RendererEvidence) Validate() error {
 	if err := validateArtifactPath(e.Path); err != nil {
 		return err
 	}
-	if e.Format != "docx" && e.Format != "pdf" && e.Format != "xlsx" {
+	if e.Format != "docx" && e.Format != "pdf" && e.Format != "xlsx" && e.Format != "pptx" {
 		return errors.New("renderer format is invalid")
 	}
-	if e.Renderer != "gator.document.v1" && e.Renderer != "gator.workbook.v1" {
+	if e.Renderer != "gator.document.v1" && e.Renderer != "gator.workbook.v1" && e.Renderer != "gator.presentation.v1" {
 		return errors.New("renderer identity is invalid")
 	}
 	if !validSHA256(e.ArtifactSHA256) || !validSHA256(e.SpecSHA256) || e.TemplateSHA256 != "" && !validSHA256(e.TemplateSHA256) {

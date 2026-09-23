@@ -81,12 +81,14 @@ func effectiveConfiguration(request Request) any {
 		DisableDelegation   bool
 		DisabledRoles       []string
 		BrowserSession      string
+		DisableBrowser      bool
+		DesktopSession      string
 	}{request.Contract, request.Mode, request.Code, request.ConnectorIDs, request.ConnectorPermissions, request.WebOrigins, request.IgnoredInstructionPaths, request.Limits, request.MaxSteps, request.Provider, request.RoleConfiguration, func() string {
 		if request.Project != nil {
 			return request.Project.SHA256
 		}
 		return ""
-	}(), request.DisableDelegation, request.DisabledRoles, request.BrowserSession}
+	}(), request.DisableDelegation, request.DisabledRoles, request.BrowserSession, request.DisableBrowser, request.DesktopSession}
 }
 
 type Interaction struct {
@@ -223,6 +225,13 @@ func (s Service) Start(ctx context.Context, request Request) *Operation {
 	}
 	request.ApproveBrowser = func(ctx context.Context, argv []string) (tools.CommandDecision, error) {
 		approved, err := ask(ctx, "browser", argv)
+		if approved {
+			return tools.CommandAllowOnce, err
+		}
+		return tools.CommandDeny, err
+	}
+	request.ApproveDesktop = func(ctx context.Context, argv []string) (tools.CommandDecision, error) {
+		approved, err := ask(ctx, "desktop", argv)
 		if approved {
 			return tools.CommandAllowOnce, err
 		}

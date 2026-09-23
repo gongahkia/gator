@@ -147,12 +147,15 @@ func (r Responses) requestBody(turn agent.TurnRequest) (responseRequest, error) 
 	if err != nil {
 		return responseRequest{}, err
 	}
-	tools := make([]functionTool, 0, len(turn.Tools))
+	tools := make([]responseTool, 0, len(turn.Tools)+1)
 	for _, definition := range turn.Tools {
+		if definition.Name == "computer_action" && turn.Computer != nil {
+			continue // CUA is a provider-native computer tool, not a function schema.
+		}
 		if !json.Valid(definition.Parameters) {
 			return responseRequest{}, fmt.Errorf("tool %q has invalid JSON Schema", definition.Name)
 		}
-		tools = append(tools, functionTool{
+		tools = append(tools, responseTool{
 			Type:        "function",
 			Name:        definition.Name,
 			Description: definition.Description,
@@ -160,12 +163,20 @@ func (r Responses) requestBody(turn agent.TurnRequest) (responseRequest, error) 
 			Strict:      false,
 		})
 	}
+	store := false
+	if turn.Computer != nil {
+		if turn.Computer.DisplayWidth < 320 || turn.Computer.DisplayWidth > 8192 || turn.Computer.DisplayHeight < 320 || turn.Computer.DisplayHeight > 8192 || strings.TrimSpace(turn.Computer.Environment) == "" {
+			return responseRequest{}, errors.New("OpenAI computer-use display configuration is invalid")
+		}
+		tools = append(tools, responseTool{Type: "computer", Computer: &computerTool{Environment: turn.Computer.Environment, DisplayWidth: turn.Computer.DisplayWidth, DisplayHeight: turn.Computer.DisplayHeight}})
+		store = turn.Computer.RetainState
+	}
 	return responseRequest{
 		Model:        modelOrDefault(r.Model),
 		Instructions: turn.System,
 		Input:        input,
 		Tools:        tools,
-		Store:        false,
+		Store:        store,
 	}, nil
 }
 
@@ -194,31 +205,48 @@ type responseRequest struct {
 	Model        string         `json:"model"`
 	Instructions string         `json:"instructions,omitempty"`
 	Input        []inputItem    `json:"input"`
-	Tools        []functionTool `json:"tools,omitempty"`
+	Tools        []responseTool `json:"tools,omitempty"`
 	Store        bool           `json:"store"`
 	Stream       bool           `json:"stream,omitempty"`
 }
 
-type functionTool struct {
+type responseTool struct {
 	Type        string          `json:"type"`
 	Name        string          `json:"name"`
 	Description string          `json:"description,omitempty"`
 	Parameters  json.RawMessage `json:"parameters"`
 	Strict      bool            `json:"strict"`
+	Computer    *computerTool   `json:"computer,omitempty"`
+}
+
+type computerTool struct {
+	Environment   string `json:"environment"`
+	DisplayWidth  int    `json:"display_width"`
+	DisplayHeight int    `json:"display_height"`
 }
 
 type inputItem struct {
-	Type      string `json:"type,omitempty"`
-	Role      string `json:"role,omitempty"`
-	Content   any    `json:"content,omitempty"`
-	ID        string `json:"id,omitempty"`
-	CallID    string `json:"call_id,omitempty"`
-	Name      string `json:"name,omitempty"`
-	Arguments string `json:"arguments,omitempty"`
-	Output    string `json:"output,omitempty"`
+	Type      string          `json:"type,omitempty"`
+	Role      string          `json:"role,omitempty"`
+	Content   any             `json:"content,omitempty"`
+	ID        string          `json:"id,omitempty"`
+	CallID    string          `json:"call_id,omitempty"`
+	Name      string          `json:"name,omitempty"`
+	Arguments string          `json:"arguments,omitempty"`
+	Output    any             `json:"output,omitempty"`
+	Action    json.RawMessage `json:"action,omitempty"`
 }
 
 func encodeInput(messages []agent.Message) ([]inputItem, error) {
+	calls := make(map[string]agent.ToolCall)
+	for _, message := range messages {
+		if message.Role != agent.RoleAgent {
+			continue
+		}
+		for _, call := range message.ToolCalls {
+			calls[call.ID] = call
+		}
+	}
 	input := make([]inputItem, 0, len(messages))
 	for _, message := range messages {
 		switch message.Role {
@@ -256,20 +284,26 @@ func encodeInput(messages []agent.Message) ([]inputItem, error) {
 					if strings.TrimSpace(call.ID) == "" || strings.TrimSpace(call.Name) == "" || !json.Valid(call.Arguments) {
 						return nil, errors.New("agent history contains an invalid tool call")
 					}
-					input = append(input, inputItem{
-						Type:      "function_call",
-						ID:        call.ProviderID,
-						CallID:    call.ID,
-						Name:      call.Name,
-						Arguments: string(call.Arguments),
-					})
+					if call.Kind == agent.ToolCallComputer {
+						input = append(input, inputItem{Type: "computer_call", ID: call.ProviderID, CallID: call.ID, Action: append(json.RawMessage(nil), call.Arguments...)})
+					} else {
+						input = append(input, inputItem{Type: "function_call", ID: call.ProviderID, CallID: call.ID, Name: call.Name, Arguments: string(call.Arguments)})
+					}
 				}
 			}
 		case agent.RoleTool:
 			if strings.TrimSpace(message.ToolCallID) == "" {
 				return nil, errors.New("agent history contains a tool result without a call id")
 			}
-			input = append(input, inputItem{Type: "function_call_output", CallID: message.ToolCallID, Output: message.Content})
+			call, known := calls[message.ToolCallID]
+			if known && call.Kind == agent.ToolCallComputer {
+				if len(message.Images) != 1 || message.Images[0].MediaType != "image/png" || len(message.Images[0].Data) == 0 {
+					return nil, errors.New("computer call output requires exactly one transient PNG screenshot")
+				}
+				input = append(input, inputItem{Type: "computer_call_output", CallID: message.ToolCallID, Output: map[string]string{"type": "computer_screenshot", "image_url": imageDataURL(message.Images[0])}})
+			} else {
+				input = append(input, inputItem{Type: "function_call_output", CallID: message.ToolCallID, Output: message.Content})
+			}
 		default:
 			return nil, fmt.Errorf("agent history contains unsupported role %q", message.Role)
 		}
@@ -298,11 +332,12 @@ type responsePayload struct {
 }
 
 type responseOutputItem struct {
-	ID        string `json:"id"`
-	Type      string `json:"type"`
-	CallID    string `json:"call_id"`
-	Name      string `json:"name"`
-	Arguments string `json:"arguments"`
+	ID        string          `json:"id"`
+	Type      string          `json:"type"`
+	CallID    string          `json:"call_id"`
+	Name      string          `json:"name"`
+	Arguments string          `json:"arguments"`
+	Action    json.RawMessage `json:"action"`
 	Content   []struct {
 		Type string `json:"type"`
 		Text string `json:"text"`
@@ -334,6 +369,11 @@ func decodeResponse(contents []byte) (agent.Turn, error) {
 				Name:       item.Name,
 				Arguments:  json.RawMessage(item.Arguments),
 			})
+		case "computer_call":
+			if item.CallID == "" || !json.Valid(item.Action) {
+				return agent.Turn{}, errors.New("OpenAI response contains an invalid computer call")
+			}
+			calls = append(calls, agent.ToolCall{ID: item.CallID, ProviderID: item.ID, Kind: agent.ToolCallComputer, Name: "computer_action", Arguments: append(json.RawMessage(nil), item.Action...)})
 		}
 	}
 	if text.Len() == 0 && len(calls) == 0 {

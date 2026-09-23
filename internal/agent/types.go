@@ -65,17 +65,37 @@ type ToolDefinition struct {
 
 // ToolCall is a model request to invoke one tool.
 type ToolCall struct {
-	ID         string          `json:"id"`
-	ProviderID string          `json:"provider_id,omitempty"`
-	Name       string          `json:"name"`
-	Arguments  json.RawMessage `json:"arguments"`
+	ID         string `json:"id"`
+	ProviderID string `json:"provider_id,omitempty"`
+	// Kind identifies a provider-native invocation that still executes through
+	// a trusted local tool. Empty is the normal function-call kind.
+	Kind      string          `json:"kind,omitempty"`
+	Name      string          `json:"name"`
+	Arguments json.RawMessage `json:"arguments"`
 }
+
+const ToolCallComputer = "computer"
+
+// ComputerUse enables the provider-native structured computer protocol for a
+// model that explicitly implements ComputerUseModel. RetainState must come
+// from a developer-approved local desktop session, never model instructions.
+type ComputerUse struct {
+	Environment   string `json:"environment"`
+	DisplayWidth  int    `json:"display_width"`
+	DisplayHeight int    `json:"display_height"`
+	RetainState   bool   `json:"retain_state"`
+}
+
+// ComputerUseModel is intentionally separate from visual input support: a
+// vision-capable local model is not automatically authorized to control apps.
+type ComputerUseModel interface{ ComputerUse() (ComputerUse, bool) }
 
 // TurnRequest is one model turn. Implementations must not mutate Messages.
 type TurnRequest struct {
 	System   string           `json:"system"`
 	Messages []Message        `json:"messages"`
 	Tools    []ToolDefinition `json:"tools"`
+	Computer *ComputerUse     `json:"computer,omitempty"`
 }
 
 // Turn is a completed model response. Text may accompany tool calls; the loop
@@ -113,7 +133,12 @@ type Tool interface {
 type ToolResult struct {
 	Content      string        `json:"content"`
 	Observations []Observation `json:"-"`
+	// Computer is a provider-native screenshot continuation. It remains
+	// transient in the runner and is stripped before Work replay persistence.
+	Computer *ComputerOutput `json:"-"`
 }
+
+type ComputerOutput struct{ Screenshot Image }
 
 // Observation is local tool output intended for the next model turn. Browser
 // screenshots are the current use case. The runner never journals their raw

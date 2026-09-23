@@ -68,6 +68,8 @@ func jobCommand(arguments []string, out io.Writer) error {
 		return manageJob(arguments[0], arguments[1], arguments[2:], out)
 	case "supervisor":
 		return runJobSupervisor(arguments[1:], out)
+	case "launchagent":
+		return jobLaunchAgent(arguments[1:], out)
 	case "status":
 		return jobSupervisorRequest("health", out)
 	case "stop":
@@ -75,6 +77,116 @@ func jobCommand(arguments []string, out io.Writer) error {
 	default:
 		return fmt.Errorf("unknown job command %q", arguments[0])
 	}
+}
+
+// jobLaunchAgent installs a per-user macOS LaunchAgent for the existing local
+// supervisor. It is intentionally a user-session service: it runs only while
+// the Mac is on and the user is signed in; it does not claim cloud execution,
+// cross-device continuation, or laptop-off scheduling.
+func jobLaunchAgent(arguments []string, out io.Writer) error {
+	if runtime.GOOS != "darwin" {
+		return errors.New("job LaunchAgent scheduling is available only on macOS")
+	}
+	if len(arguments) == 0 {
+		return errors.New("usage: gator job launchagent install|status|remove --yes")
+	}
+	store, stateDir, err := jobStore()
+	if err != nil {
+		return err
+	}
+	_ = store
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	path := filepath.Join(home, "Library", "LaunchAgents", "com.gator.work-supervisor.plist")
+	uid := strconv.Itoa(os.Getuid())
+	label := "com.gator.work-supervisor"
+	switch arguments[0] {
+	case "install":
+		if len(arguments) != 1 {
+			return errors.New("usage: gator job launchagent install")
+		}
+		executable, err := os.Executable()
+		if err != nil {
+			return err
+		}
+		if !filepath.IsAbs(executable) {
+			return errors.New("Gator executable path must be absolute for LaunchAgent installation")
+		}
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			return err
+		}
+		logPath := filepath.Join(stateDir, "gator", "jobs", "launchagent.log")
+		plist := launchAgentPlist(label, executable, stateDir, logPath)
+		if err := writePrivateFile(path, []byte(plist)); err != nil {
+			return err
+		}
+		// bootstrap reports an existing label rather than replacing it. Remove
+		// only this exact per-user label before reloading the freshly-written file.
+		_ = exec.Command("launchctl", "bootout", "gui/"+uid+"/"+label).Run()
+		if output, err := exec.Command("launchctl", "bootstrap", "gui/"+uid, path).CombinedOutput(); err != nil {
+			return fmt.Errorf("load job LaunchAgent: %w (%s)", err, strings.TrimSpace(string(output)))
+		}
+		_, err = fmt.Fprintf(out, "Installed local LaunchAgent %s\n  plist: %s\n  logs: %s\nIt runs the foreground local supervisor while this Mac is on and you are signed in. Desktop/CUA sessions are never scheduled.\n", label, path, logPath)
+		return err
+	case "status":
+		if len(arguments) != 1 {
+			return errors.New("usage: gator job launchagent status")
+		}
+		output, err := exec.Command("launchctl", "print", "gui/"+uid+"/"+label).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("LaunchAgent is not running: %s", strings.TrimSpace(string(output)))
+		}
+		_, err = out.Write(output)
+		return err
+	case "remove":
+		if len(arguments) != 2 || arguments[1] != "--yes" {
+			return errors.New("usage: gator job launchagent remove --yes")
+		}
+		_ = exec.Command("launchctl", "bootout", "gui/"+uid+"/"+label).Run()
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		_, err = fmt.Fprintf(out, "Removed local LaunchAgent %s.\n", label)
+		return err
+	default:
+		return errors.New("usage: gator job launchagent install|status|remove --yes")
+	}
+}
+
+func launchAgentPlist(label, executable, stateDir, logPath string) string {
+	escape := func(value string) string {
+		return strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", "\"", "&quot;", "'", "&apos;").Replace(value)
+	}
+	return `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict><key>Label</key><string>` + escape(label) + `</string><key>ProgramArguments</key><array><string>` + escape(executable) + `</string><string>job</string><string>supervisor</string></array><key>EnvironmentVariables</key><dict><key>GATOR_STATE_DIR</key><string>` + escape(stateDir) + `</string></dict><key>RunAtLoad</key><true/><key>KeepAlive</key><true/><key>ProcessType</key><string>Background</string><key>StandardOutPath</key><string>` + escape(logPath) + `</string><key>StandardErrorPath</key><string>` + escape(logPath) + `</string></dict></plist>`
+}
+
+func writePrivateFile(path string, contents []byte) error {
+	temporary, err := os.CreateTemp(filepath.Dir(path), ".gator-launchagent-*")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	if err := temporary.Chmod(0o600); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if _, err := temporary.Write(contents); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if err := temporary.Sync(); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if err := temporary.Close(); err != nil {
+		return err
+	}
+	return os.Rename(temporaryPath, path)
 }
 
 func jobStore() (jobs.Store, string, error) {

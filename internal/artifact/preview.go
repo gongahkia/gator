@@ -85,6 +85,56 @@ func previewFile(file File, contents []byte) Preview {
 		}
 		preview.Summary = fmt.Sprintf("XLSX workbook, %d sheets, %d bytes", sheets, file.Bytes)
 		return preview
+	case "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+		preview.Kind = "presentation"
+		slides := 0
+		if archive, err := zip.NewReader(bytes.NewReader(contents), int64(len(contents))); err == nil {
+			for _, part := range archive.File {
+				if strings.HasPrefix(part.Name, "ppt/slides/slide") && strings.HasSuffix(part.Name, ".xml") {
+					slides++
+				}
+			}
+		}
+		preview.Summary = fmt.Sprintf("PPTX presentation, %d slides, %d bytes", slides, file.Bytes)
+		var outline []string
+		if archive, err := zip.NewReader(bytes.NewReader(contents), int64(len(contents))); err == nil {
+			for _, part := range archive.File {
+				if !strings.HasPrefix(part.Name, "ppt/slides/slide") || !strings.HasSuffix(part.Name, ".xml") || len(outline) >= 32 {
+					continue
+				}
+				reader, openErr := part.Open()
+				if openErr != nil {
+					continue
+				}
+				data, _ := io.ReadAll(io.LimitReader(reader, 64*1024))
+				_ = reader.Close()
+				text := strings.NewReplacer("</a:t>", "\n").Replace(string(data))
+				var plain strings.Builder
+				inside := false
+				for _, character := range text {
+					if character == '<' {
+						inside = true
+						continue
+					}
+					if character == '>' {
+						inside = false
+						continue
+					}
+					if !inside {
+						plain.WriteRune(character)
+					}
+				}
+				for _, line := range strings.Split(plain.String(), "\n") {
+					line = strings.TrimSpace(line)
+					if line != "" {
+						outline = append(outline, line)
+						break
+					}
+				}
+			}
+		}
+		preview.Content, preview.Truncated = boundedSafeText(strings.Join(outline, "\n"))
+		return preview
 	}
 	if !utf8.Valid(contents) || bytes.IndexByte(contents, 0) >= 0 {
 		return preview

@@ -242,6 +242,8 @@ func validateContents(validation Validation, data []byte) (bool, string) {
 		return validateZipParts(data, "word/document.xml", "[Content_Types].xml")
 	case XLSX:
 		return validateZipParts(data, "xl/workbook.xml", "[Content_Types].xml")
+	case PPTX:
+		return validateZipParts(data, "ppt/presentation.xml", "[Content_Types].xml")
 	case PDF:
 		if !bytes.HasPrefix(data, []byte("%PDF-")) || !bytes.Contains(data[max(0, len(data)-2048):], []byte("%%EOF")) {
 			return false, "artifact is not a complete PDF document"

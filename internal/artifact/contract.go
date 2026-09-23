@@ -59,11 +59,12 @@ const (
 	MediaType      ValidationKind = "media_type"
 	DOCX           ValidationKind = "docx"
 	XLSX           ValidationKind = "xlsx"
+	PPTX           ValidationKind = "pptx"
 	PDF            ValidationKind = "pdf"
 )
 
 var validationKinds = map[ValidationKind]struct{}{
-	ArtifactExists: {}, NonEmpty: {}, UTF8: {}, JSON: {}, CSV: {}, Contains: {}, MediaType: {}, DOCX: {}, XLSX: {}, PDF: {},
+	ArtifactExists: {}, NonEmpty: {}, UTF8: {}, JSON: {}, CSV: {}, Contains: {}, MediaType: {}, DOCX: {}, XLSX: {}, PPTX: {}, PDF: {},
 }
 
 // Validation configures one deterministic check. Value is accepted only by

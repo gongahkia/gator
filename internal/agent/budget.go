@@ -120,3 +120,10 @@ func (m *budgetModel) SupportsVisualInput() bool {
 	}
 	return true
 }
+
+func (m *budgetModel) ComputerUse() (ComputerUse, bool) {
+	if model, ok := m.model.(ComputerUseModel); ok {
+		return model.ComputerUse()
+	}
+	return ComputerUse{}, false
+}

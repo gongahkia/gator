@@ -60,6 +60,12 @@ turnLoop:
 			Messages: append([]Message(nil), messages...),
 			Tools:    definitions,
 		}
+		if computer, ok := r.Model.(ComputerUseModel); ok {
+			configuration, enabled := computer.ComputerUse()
+			if enabled {
+				request.Computer = &configuration
+			}
+		}
 		var streamedText bool
 		var turn Turn
 		var err error
@@ -159,6 +165,9 @@ turnLoop:
 				ToolCallID: call.ID,
 				ToolName:   call.Name,
 			})
+			if result.Computer != nil && toolErr == nil {
+				messages[len(messages)-1].Images = []Image{result.Computer.Screenshot}
+			}
 			event := Event{Kind: EventToolFinished, At: now(), Step: step, ToolCall: cloneCall(call), ToolResult: content}
 			if toolErr != nil {
 				event.ToolError = toolErr.Error()

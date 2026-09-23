@@ -13,6 +13,7 @@ import (
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/browser"
 	"github.com/gongahkia/gator/internal/connector"
+	"github.com/gongahkia/gator/internal/desktop"
 	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/projectcapture"
 	"github.com/gongahkia/gator/internal/sandbox"
@@ -101,9 +102,16 @@ type Request struct {
 	// granted to the Work manager itself. It is intentionally separate from
 	// Code.BrowserSession: the manager cannot silently borrow a Code grant.
 	BrowserSession string
+	// DisableBrowser is set by the local-model route. A local model must never
+	// receive browser/computer-use capability merely because a session exists.
+	DisableBrowser bool
 	// ApproveBrowser is invoked for every browser mutation. Unlike command
 	// approval, an "always" decision is never remembered by browser tools.
 	ApproveBrowser func(context.Context, []string) (tools.CommandDecision, error)
+	// DesktopSession is a macOS app allowlist capability. The desktop tools are
+	// available only to an explicitly computer-use-capable provider model.
+	DesktopSession string
+	ApproveDesktop func(context.Context, []string) (tools.CommandDecision, error)
 	// RequireCode is used by the compatibility `gator work code` route. It keeps the
 	// main Work manager user-facing while requiring concrete Code-specialist
 	// evidence before the run may complete.
@@ -171,4 +179,5 @@ type Executor struct {
 	// Browser is the private local controller for an explicitly granted Work
 	// browser session. A nil value fails closed if BrowserSession is requested.
 	Browser browser.Controller
+	Desktop *desktop.Controller
 }

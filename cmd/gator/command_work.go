@@ -20,6 +20,7 @@ import (
 	"github.com/gongahkia/gator/internal/artifact"
 	gatorbrowser "github.com/gongahkia/gator/internal/browser"
 	"github.com/gongahkia/gator/internal/connector"
+	"github.com/gongahkia/gator/internal/desktop"
 	"github.com/gongahkia/gator/internal/journal"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 	"github.com/gongahkia/gator/internal/sandbox"
@@ -65,6 +66,7 @@ type nativeWorkBackend struct {
 	provider string
 	model    string
 	baseURL  string
+	computer *agent.ComputerUse
 }
 
 func (b *nativeWorkBackend) CompleteStream(ctx context.Context, request agent.TurnRequest, delta func(string)) (agent.Turn, error) {
@@ -78,6 +80,13 @@ func (b *nativeWorkBackend) SupportsVisualInput() bool {
 		return visual.SupportsVisualInput()
 	}
 	return true
+}
+
+func (b *nativeWorkBackend) ComputerUse() (agent.ComputerUse, bool) {
+	if b.computer == nil {
+		return agent.ComputerUse{}, false
+	}
+	return *b.computer, true
 }
 
 func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory workModelFactory) error {
@@ -136,6 +145,7 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	flags.Var(&codeCapabilities, "code-capability", "explicit Code grant: hooks, lsp, mcp, extension, http, browser, or terminal")
 	workBrowserSession := flags.String("browser-session", "", "explicit browser session granted to the Work manager")
 	codeBrowserSession := flags.String("code-browser-session", "", "explicit browser session granted only to the Code specialist")
+	desktopSession := flags.String("desktop-session", "", "explicit macOS desktop session granted to an OpenAI computer-use Work manager")
 	legacyBase := flags.String("base", "", "removed Code worktree base override")
 	legacyCopyIgnored := flags.Bool("copy-ignored", false, "removed Code ignored-file copy mode")
 	if err := flags.Parse(arguments); err != nil {
@@ -169,6 +179,9 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	resolvedProvider, resolvedModel, err := resolveConfiguredProvider(*providerName, *modelName)
 	if err != nil {
 		return err
+	}
+	if strings.TrimSpace(*desktopSession) != "" && resolvedProvider != "openai" {
+		return errors.New("--desktop-session is available only with provider openai; local and other provider models never receive desktop control")
 	}
 	backend, err := modelFactory(resolvedProvider, resolvedModel, *baseURL)
 	if err != nil {
@@ -241,6 +254,29 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		}
 		executor.Browser = client
 	}
+	if strings.TrimSpace(*desktopSession) != "" {
+		store, err := desktop.Open(stateDir)
+		if err != nil {
+			return err
+		}
+		session, err := store.Get(strings.TrimSpace(*desktopSession))
+		if err != nil {
+			return err
+		}
+		if session.State != desktop.StateRunning {
+			return errors.New("--desktop-session is stopped")
+		}
+		controller, err := desktop.NewController(store, desktop.DefaultRuntime())
+		if err != nil {
+			return err
+		}
+		executor.Desktop = controller
+		native, ok := backend.(*nativeWorkBackend)
+		if !ok {
+			return errors.New("--desktop-session requires Gator's native OpenAI Responses adapter")
+		}
+		native.computer = &agent.ComputerUse{Environment: "computer", DisplayWidth: 1440, DisplayHeight: 900, RetainState: session.RetainProviderState}
+	}
 	if native, ok := backend.(*nativeWorkBackend); ok {
 		if strings.TrimSpace(*codeBrowserSession) != "" {
 			if sandbox.Network(*codeNetwork) != sandbox.AllowNetwork {
@@ -306,7 +342,10 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		Images:               images,
 		Attachments:          attachments,
 		BrowserSession:       strings.TrimSpace(*workBrowserSession),
+		DisableBrowser:       resolvedProvider == "gator-local",
 		ApproveBrowser:       workBrowserApprover(*jsonOutput, in, out),
+		DesktopSession:       strings.TrimSpace(*desktopSession),
+		ApproveDesktop:       workDesktopApprover(*jsonOutput, in, out),
 		RequireCode:          *requireCode,
 		Code: workrun.CodePolicy{
 			MaxSteps: *codeMaxSteps, Verification: codeVerification, Scopes: codeScopes, Profile: strings.TrimSpace(*codeProfile),
@@ -399,6 +438,9 @@ func workContract(mode action.Mode, disposition action.Disposition, paths artifa
 		case ".xlsx":
 			requirement.MediaTypes = []string{"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
 			requirement.Validations = append(requirement.Validations, artifact.Validation{Kind: artifact.XLSX})
+		case ".pptx":
+			requirement.MediaTypes = []string{"application/vnd.openxmlformats-officedocument.presentationml.presentation"}
+			requirement.Validations = append(requirement.Validations, artifact.Validation{Kind: artifact.PPTX})
 		case ".pdf":
 			requirement.MediaTypes = []string{"application/pdf"}
 			requirement.Validations = append(requirement.Validations, artifact.Validation{Kind: artifact.PDF})
@@ -596,6 +638,33 @@ func workBrowserApprover(jsonOutput bool, in io.Reader, out io.Writer) func(cont
 		default:
 		}
 		if _, err := fmt.Fprintf(out, "\nBrowser action approval\n  action: %s\nApprove this one browser action? [y/N] ", strings.Join(argv, " ")); err != nil {
+			return tools.CommandDeny, err
+		}
+		line, err := readApprovalLine(in)
+		if errors.Is(err, io.EOF) && line == "" {
+			return tools.CommandDeny, nil
+		}
+		if err != nil && !(errors.Is(err, io.EOF) && line != "") {
+			return tools.CommandDeny, err
+		}
+		if strings.EqualFold(strings.TrimSpace(line), "y") || strings.EqualFold(strings.TrimSpace(line), "yes") {
+			return tools.CommandAllowOnce, nil
+		}
+		return tools.CommandDeny, nil
+	}
+}
+
+func workDesktopApprover(jsonOutput bool, in io.Reader, out io.Writer) func(context.Context, []string) (tools.CommandDecision, error) {
+	if jsonOutput {
+		return nil
+	}
+	return func(ctx context.Context, argv []string) (tools.CommandDecision, error) {
+		select {
+		case <-ctx.Done():
+			return tools.CommandDeny, ctx.Err()
+		default:
+		}
+		if _, err := fmt.Fprintf(out, "\nDesktop action approval\n  action: %s\nApprove this one local macOS action? [y/N] ", strings.Join(argv, " ")); err != nil {
 			return tools.CommandDeny, err
 		}
 		line, err := readApprovalLine(in)

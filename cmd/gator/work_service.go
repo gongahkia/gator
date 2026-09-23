@@ -49,6 +49,7 @@ func configuredWorkService(provider, modelName, stateDir string, request *workru
 	}
 	request.OTLPEndpoint = os.Getenv("GATOR_OTLP_ENDPOINT")
 	request.Provider = provider + "/" + modelName
+	request.DisableBrowser = provider == "gator-local"
 	request.StateDir = stateDir
 	request.ConnectorPermissions = connector.PermissionSet(settings.ConnectorPermissions)
 	request.SnapshotOptions = snapshot.Options{Limits: snapshot.Limits{MaxFiles: settings.Snapshots.MaxFiles, MaxTotal: settings.Snapshots.MaxTotalBytes, MaxFileBytes: settings.Snapshots.MaxFileBytes}, Excludes: settings.Snapshots.Excludes}

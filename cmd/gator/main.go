@@ -60,7 +60,7 @@ Usage:
   gator provider connector add ID --kind json|webhook|slack|google|atlassian|notion|mcp [--url URL] [--name NAME] [--auth none|bearer|oauth]
   gator provider connector status|login|logout|test|remove ID [OPTIONS]
   gator provider connector permission ID OPERATION read|write allow|ask|deny|draft
-  gator job add|list|show|edit|enable|disable|run|history|remove
+  gator job add|list|show|edit|enable|disable|run|history|remove|launchagent
   gator -j ...
   gator job supervisor [--notify=true|false]
   gator job status|stop
@@ -76,6 +76,7 @@ Usage:
   gator -p ...
   gator browser install|status|start|attach|tabs|select|origins|visual|allow-upload|artifacts|export|stop
   gator -b ...
+  gator desktop start|status|stop
   gator doctor [--provider PROVIDER]
   gator -d [--provider PROVIDER]
   gator update [--check]
@@ -101,6 +102,7 @@ Usage:
 Commands:
   agent, -a      profiles, child work, delegated agents, and local agent interfaces
   browser, -b    explicitly control a local Playwright/Chromium session
+  desktop         explicitly control approved macOS application windows
   config, -c     persistent settings and project hook trust
   doctor, -d     local prerequisites and suggested verification commands
   extension, -e  extension bundles
@@ -202,6 +204,8 @@ func run(args []string, out io.Writer) error {
 		return errors.New("local model management is available in the TUI; start gator, open /model, and choose Local")
 	case "browser", "-b":
 		return browserCommand(args[1:], out)
+	case "desktop":
+		return desktopCommand(args[1:], out)
 	case "theme", "-t":
 		return themeCommand(args[1:], out)
 	case "work-rpc":

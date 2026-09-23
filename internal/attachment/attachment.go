@@ -36,6 +36,7 @@ const (
 	maxSpreadsheetSheets  = 128
 	maxSpreadsheetRows    = 100_000
 	maxSpreadsheetStrings = 100_000
+	maxPresentationSlides = 512
 )
 
 // InputKind identifies the explicit developer-selected type of one prompt
@@ -205,7 +206,7 @@ func ValidateLoaded(images []agent.Image, attachments []agent.Attachment) error 
 // @ references retain their existing inspect-in-workspace behavior.
 func IsSupported(path string) bool {
 	switch strings.ToLower(filepath.Ext(path)) {
-	case ".pdf", ".docx", ".odt", ".xlsx", ".txt", ".md", ".markdown", ".rst", ".csv", ".tsv", ".json", ".jsonl", ".yaml", ".yml", ".toml", ".xml", ".html", ".htm", ".log", ".ini", ".cfg", ".conf":
+	case ".pdf", ".docx", ".odt", ".xlsx", ".pptx", ".txt", ".md", ".markdown", ".rst", ".csv", ".tsv", ".json", ".jsonl", ".yaml", ".yml", ".toml", ".xml", ".html", ".htm", ".log", ".ini", ".cfg", ".conf":
 		return true
 	default:
 		return false
@@ -251,6 +252,13 @@ func Load(root workspace.Root, path string, maxBytes int) (agent.Attachment, boo
 		attachment.Data = []byte(text)
 	case ".xlsx":
 		text, err := extractXLSX(contents, maxBytes)
+		if err != nil {
+			return agent.Attachment{}, true, fmt.Errorf("extract @%s: %w", path, err)
+		}
+		attachment.MediaType = "text/plain"
+		attachment.Data = []byte(text)
+	case ".pptx":
+		text, err := extractPPTX(contents, maxBytes)
 		if err != nil {
 			return agent.Attachment{}, true, fmt.Errorf("extract @%s: %w", path, err)
 		}
@@ -473,6 +481,52 @@ func extractXLSX(contents []byte, maxBytes int) (string, error) {
 		text.WriteString(rows)
 		if text.Len() > maxBytes {
 			return "", errors.New("spreadsheet text exceeds the extraction limit")
+		}
+	}
+	return strings.TrimSpace(text.String()), nil
+}
+
+func extractPPTX(contents []byte, maxBytes int) (string, error) {
+	reader, err := documentArchive(contents, maxBytes)
+	if err != nil {
+		return "", err
+	}
+	entries := make(map[string]*zip.File, len(reader.File))
+	var slides []string
+	for _, entry := range reader.File {
+		entries[entry.Name] = entry
+		if strings.HasPrefix(entry.Name, "ppt/slides/slide") && strings.HasSuffix(entry.Name, ".xml") {
+			slides = append(slides, entry.Name)
+		}
+	}
+	if entries["ppt/presentation.xml"] == nil || len(slides) == 0 {
+		return "", errors.New("presentation archive contains no slides")
+	}
+	if len(slides) > maxPresentationSlides {
+		return "", fmt.Errorf("presentation has more than %d slides", maxPresentationSlides)
+	}
+	sort.Strings(slides)
+	var text strings.Builder
+	for _, name := range slides {
+		data, err := readZipFile(entries[name], maxBytes)
+		if err != nil {
+			return "", err
+		}
+		if text.Len() > 0 {
+			text.WriteByte('\n')
+		}
+		fmt.Fprintf(&text, "[slide %s]\n", strings.TrimSuffix(filepath.Base(name), ".xml"))
+		remaining := maxBytes - text.Len()
+		if remaining < 1 {
+			return "", errors.New("presentation text exceeds the extraction limit")
+		}
+		contents, err := documentXMLText(data, remaining)
+		if err != nil {
+			return "", err
+		}
+		text.WriteString(contents)
+		if text.Len() > maxBytes {
+			return "", errors.New("presentation text exceeds the extraction limit")
 		}
 	}
 	return strings.TrimSpace(text.String()), nil
