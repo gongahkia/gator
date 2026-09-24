@@ -46,6 +46,7 @@ func (s Service) Execute(ctx context.Context, request Request) (Outcome, error) 
 		request.ConnectorPermissions = s.Defaults.ConnectorPermissions
 		request.SnapshotOptions = s.Defaults.SnapshotOptions
 		request.OTLPEndpoint = s.Defaults.OTLPEndpoint
+		request.LearningContext = s.Defaults.LearningContext
 	}
 	resolved, err := s.Executor.normalizeAndValidate(request)
 	if err != nil {

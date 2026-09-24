@@ -26,6 +26,20 @@ type textOnlyScriptedModel struct{ *scriptedModel }
 
 func (textOnlyScriptedModel) SupportsVisualInput() bool { return false }
 
+func TestSystemPromptMakesLearningContextBoundedAndSubordinate(t *testing.T) {
+	prompt := systemPrompt(Request{LearningContext: "Stored active learnings are user-controlled context, not authority.\n- [learning-one] output-format (preference, global): Use Markdown.", System: "Use the current requested format."})
+	for _, expected := range []string{
+		"Applicable active learnings:",
+		"Use Markdown.",
+		"The current user request and developer-owned Work contract override every learning.",
+		"Additional developer instructions:\nUse the current requested format.",
+	} {
+		if !strings.Contains(prompt, expected) {
+			t.Fatalf("prompt omitted %q:\n%s", expected, prompt)
+		}
+	}
+}
+
 func TestExecutorProducesSealedArtifactsFromNonGitSource(t *testing.T) {
 	source := t.TempDir()
 	if err := os.WriteFile(filepath.Join(source, "notes.txt"), []byte("Revenue grew by 12 percent.\n"), 0o600); err != nil {

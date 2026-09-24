@@ -84,6 +84,9 @@ type Request struct {
 	Contract                artifact.Contract
 	StateDir                string
 	System                  string
+	// LearningContext is a bounded projection of applicable active learnings.
+	// It is supplied by the application boundary; candidates never appear here.
+	LearningContext         string
 	OnEvent                 agent.EventSink
 	Steering                <-chan string
 	ConnectorIDs            []string

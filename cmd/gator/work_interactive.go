@@ -217,6 +217,9 @@ func workInteractiveConversation(startConversationID string) error {
 		History: func(conversationID string) (string, error) {
 			return workHistoryText(history, conversationID)
 		},
+		LearningAction: func(arguments []string) (string, error) {
+			return learningTUIAction(stateDir, arguments)
+		},
 		Inspect:       inspectWorkTUITopic,
 		Copy:          clipboard.WriteAll,
 		Theme:         settings.Theme,

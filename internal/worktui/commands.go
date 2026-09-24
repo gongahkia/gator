@@ -152,6 +152,7 @@ func commandPaletteEntries() []entry {
 		{title: "/settings", subtitle: "Inspect current settings", kind: "command", command: "/settings"},
 		{title: "/theme", subtitle: "Choose gator, contrast, or mono", kind: "command-input", command: "/theme"},
 		{title: "/history", subtitle: "Show Work executions in this conversation", kind: "command", command: "/history"},
+		{title: "/learnings", subtitle: "Inspect and control scoped guidance for future Work", kind: "command", command: "/learnings"},
 		{title: "/revision-back", subtitle: "Move to the parent revision", kind: "command", command: "/revision-back"},
 		{title: "/revision-forward", subtitle: "Move to a child or named revision", kind: "command-input", command: "/revision-forward"},
 		{title: "/review", subtitle: "Show latest staged output", kind: "command", command: "/review"},
@@ -380,6 +381,12 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 	case "/clear-queue":
 		m.queue = nil
 		result = "Cleared the prompt queue."
+	case "/learnings", "/learning":
+		if m.config.LearningAction == nil {
+			err = errorsUnavailable("learnings")
+			break
+		}
+		result, err = m.config.LearningAction(fields[1:])
 	case "/review":
 		if m.lastBundle.Path == "" {
 			result = "No completed Work output is available yet."
@@ -922,6 +929,8 @@ func workHelp() string {
   /doctor · /agents · /settings inspect local configuration
   /history · /revision-back · /revision-forward
                                  navigate retained Gator revisions
+  /learnings [list|show|add|enable|disable|edit|remove|reject]
+                                 inspect and control scoped guidance
   /steer TEXT                    steer the running task
   /tasks · /cancel-task ID        inspect or cancel active specialists
   /approve · /deny                respond to the displayed exact request

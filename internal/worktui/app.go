@@ -155,6 +155,9 @@ type Config struct {
 	MoveForward             func(conversationID string) (string, error)
 	MoveToRevision          func(conversationID, revisionID string) (string, error)
 	History                 func(conversationID string) (string, error)
+	// LearningAction uses the same local learning service as the CLI. It is a
+	// direct in-process callback, never a TUI shell-out to a command binary.
+	LearningAction          func(arguments []string) (string, error)
 	FirstRun                bool
 	Inspect                 func(topic string) (string, error)
 	Copy                    func(text string) error

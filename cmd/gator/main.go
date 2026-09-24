@@ -56,6 +56,7 @@ Usage:
   gator -e ...
   gator theme list|set
   gator -t list|set
+  gator learnings list|show|add|enable|disable|edit|remove|reject
   gator provider connector list
   gator provider connector add ID --kind json|webhook|slack|google|atlassian|notion|mcp [--url URL] [--name NAME] [--auth none|bearer|oauth]
   gator provider connector status|login|logout|test|remove ID [OPTIONS]
@@ -106,6 +107,7 @@ Commands:
   extension, -e  extension bundles
   job, -j        scheduled Work and its inbox
   lsp, -l        local Language Server Protocol diagnostics
+  learnings       inspect and control scoped user guidance for future Work
   mcp, -m        project MCP configuration and OAuth
   provider, -p   providers, credentials, custom endpoints, and connectors
   theme, -t      terminal themes
@@ -205,6 +207,8 @@ func run(args []string, out io.Writer) error {
 		return desktopCommand(args[1:], out)
 	case "theme", "-t":
 		return themeCommand(args[1:], out)
+	case "learning", "learnings":
+		return learningCommand(args[1:], out)
 	case "work-rpc":
 		return workHeadless(context.Background(), os.Stdin, out)
 	case "work", "-w":

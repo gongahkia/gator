@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/browser"
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/connector"
+	"github.com/gongahkia/gator/internal/learning"
 	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/snapshot"
 	"github.com/gongahkia/gator/internal/workrun"
@@ -51,6 +53,9 @@ func configuredWorkService(provider, modelName, stateDir string, request *workru
 	request.Provider = provider + "/" + modelName
 	request.DisableBrowser = provider == "gator-local"
 	request.StateDir = stateDir
+	if err := applyLearningContext(stateDir, request); err != nil {
+		return workrun.Service{}, err
+	}
 	request.ConnectorPermissions = connector.PermissionSet(settings.ConnectorPermissions)
 	request.SnapshotOptions = snapshot.Options{Limits: snapshot.Limits{MaxFiles: settings.Snapshots.MaxFiles, MaxTotal: settings.Snapshots.MaxTotalBytes, MaxFileBytes: settings.Snapshots.MaxFileBytes}, Excludes: settings.Snapshots.Excludes}
 	executor := workrun.Executor{Model: backend, StateDir: stateDir, Connectors: connector.Runtime{Registry: registry, Credentials: credentials, StateDir: stateDir}}
@@ -79,6 +84,22 @@ func configuredWorkService(provider, modelName, stateDir string, request *workru
 		return workrun.Service{}, err
 	}
 	return workrun.Service{Executor: executor, Defaults: request}, nil
+}
+
+// applyLearningContext keeps learning selection at the one application
+// boundary shared by CLI, TUI, jobs, headless Work, and configured live evals.
+// Invalid hand-edited state fails closed rather than entering model context.
+func applyLearningContext(stateDir string, request *workrun.Request) error {
+	store, err := learning.Open(stateDir)
+	if err != nil {
+		return err
+	}
+	records, err := store.Projection(learning.Context{Project: request.SourcePath})
+	if err != nil {
+		return fmt.Errorf("resolve active learnings: %w", err)
+	}
+	request.LearningContext = learning.RenderProjection(records)
+	return nil
 }
 
 func executeConfiguredWork(ctx context.Context, provider, modelName, stateDir string, request workrun.Request) (workrun.Outcome, error) {

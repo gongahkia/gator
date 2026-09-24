@@ -119,6 +119,27 @@ func TestSourceIgnoreCommandsManageProjectInstructionPaths(t *testing.T) {
 	}
 }
 
+func TestLearningsUseTheConfiguredSharedService(t *testing.T) {
+	var received []string
+	model := New(Config{CurrentFolder: "/work", LearningAction: func(arguments []string) (string, error) {
+		received = append([]string(nil), arguments...)
+		return "learning list", nil
+	}})
+	model.input = "/learnings list"
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if !reflect.DeepEqual(received, []string{"list"}) || !strings.Contains(model.View(), "learning list") {
+		t.Fatalf("learning action = %#v\n%s", received, model.View())
+	}
+	found := false
+	for _, item := range commandPaletteEntries() {
+		found = found || item.command == "/learnings"
+	}
+	if !found {
+		t.Fatal("command palette omitted Learnings")
+	}
+}
+
 func TestVerifiedDeliverablesRenderAndSaveWithOneConfirmation(t *testing.T) {
 	var requests []BundleActionRequest
 	model := New(Config{
