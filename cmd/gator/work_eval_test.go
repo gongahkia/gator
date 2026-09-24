@@ -23,9 +23,25 @@ func TestWorkDepthCorpusThroughProductService(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if report.Split != eval.WorkSplitDevelopment {
+		t.Fatalf("default evaluation split = %q", report.Split)
+	}
+	sawCode := false
 	for _, trial := range report.Trials {
 		if trial.Status != "passed" {
 			t.Errorf("%s: %s; grades %+v", trial.CaseID, trial.Error, trial.Grades)
 		}
+		if trial.Transaction.History.State != "passed" || trial.Transaction.Delivery.State != "not_attempted" {
+			t.Errorf("%s transaction = %#v", trial.CaseID, trial.Transaction)
+		}
+		if trial.CaseID == "single-code-patch" {
+			sawCode = true
+			if trial.Transaction.Work.State != "completed" || trial.Transaction.Verification.State != "passed" || trial.Transaction.Recovery.State != "not_run" {
+				t.Errorf("Code Work transaction = %#v", trial.Transaction)
+			}
+		}
+	}
+	if !sawCode {
+		t.Fatal("development Work corpus no longer exercises a Code transaction")
 	}
 }
