@@ -86,21 +86,21 @@ type Request struct {
 	System                  string
 	// LearningContext is a bounded projection of applicable active learnings.
 	// It is supplied by the application boundary; candidates never appear here.
-	LearningContext         string
-	OnEvent                 agent.EventSink
-	Steering                <-chan string
-	ConnectorIDs            []string
-	ApproveAction           action.Approver
-	ApproveConnectorRead    func(context.Context, string, string, json.RawMessage) (bool, error)
-	ConversationID          string
-	ParentRevisionID        string
-	SnapshotID              string
-	RefreshSource           bool
-	ConnectorPermissions    connector.PermissionSet
-	SnapshotOptions         snapshot.Options
-	OnSnapshot              func(snapshot.Manifest)
-	Images                  []agent.Image
-	Attachments             []agent.Attachment
+	LearningContext      string
+	OnEvent              agent.EventSink
+	Steering             <-chan string
+	ConnectorIDs         []string
+	ApproveAction        action.Approver
+	ApproveConnectorRead func(context.Context, string, string, json.RawMessage) (bool, error)
+	ConversationID       string
+	ParentRevisionID     string
+	SnapshotID           string
+	RefreshSource        bool
+	ConnectorPermissions connector.PermissionSet
+	SnapshotOptions      snapshot.Options
+	OnSnapshot           func(snapshot.Manifest)
+	Images               []agent.Image
+	Attachments          []agent.Attachment
 	// BrowserSession is an explicit developer-selected local browser session
 	// granted to the Work manager itself. It is intentionally separate from
 	// Code.BrowserSession: the manager cannot silently borrow a Code grant.

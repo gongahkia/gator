@@ -157,12 +157,12 @@ type Config struct {
 	History                 func(conversationID string) (string, error)
 	// LearningAction uses the same local learning service as the CLI. It is a
 	// direct in-process callback, never a TUI shell-out to a command binary.
-	LearningAction          func(arguments []string) (string, error)
-	FirstRun                bool
-	Inspect                 func(topic string) (string, error)
-	Copy                    func(text string) error
-	Theme                   string
-	SetTheme                func(name string) error
+	LearningAction func(arguments []string) (string, error)
+	FirstRun       bool
+	Inspect        func(topic string) (string, error)
+	Copy           func(text string) error
+	Theme          string
+	SetTheme       func(name string) error
 	// StatusLine follows the Codex-style ordered-item convention. Nil uses
 	// Gator's defaults; a non-nil empty list hides the composer footer.
 	StatusLine    *[]string

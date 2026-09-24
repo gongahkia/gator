@@ -27,9 +27,9 @@ const (
 type Type string
 
 const (
-	Preference       Type = "preference"
-	EnvironmentFact  Type = "environment_fact"
-	Procedure        Type = "procedure"
+	Preference        Type = "preference"
+	EnvironmentFact   Type = "environment_fact"
+	Procedure         Type = "procedure"
 	FailurePrevention Type = "failure_prevention"
 )
 
