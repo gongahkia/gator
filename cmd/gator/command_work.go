@@ -320,7 +320,7 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-	outcome, runErr := (workrun.Service{Executor: executor}).Execute(ctx, workrun.Request{
+	request := workrun.Request{
 		Limits:               agent.Limits{ModelRequests: *requests, Tokens: *tokens, WallSeconds: *seconds},
 		OTLPEndpoint:         os.Getenv("GATOR_OTLP_ENDPOINT"),
 		WebOrigins:           webOrigins,
@@ -354,7 +354,11 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 			Capabilities: append([]string(nil), codeCapabilities...), BrowserSession: strings.TrimSpace(*codeBrowserSession),
 		},
 		ApproveCodeCommand: codeCommandApprover(*jsonOutput, in, out),
-	})
+	}
+	if err := applyLearningContext(stateDir, &request); err != nil {
+		return err
+	}
+	outcome, runErr := (workrun.Service{Executor: executor}).Execute(ctx, request)
 	if *jsonOutput {
 		if err := writeWorkJSON(out, outcome, runErr); err != nil {
 			return err

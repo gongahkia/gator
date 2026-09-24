@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/learning"
 	"github.com/gongahkia/gator/internal/workrun"
 )
@@ -102,5 +103,26 @@ func TestApplyLearningContextProjectsOnlyActiveApplicableRecords(t *testing.T) {
 	}
 	if request.LearningContext != "" {
 		t.Fatalf("unrelated project context = %q", request.LearningContext)
+	}
+}
+
+func TestWorkCLIProjectsApplicableLearningsIntoTheManagerPrompt(t *testing.T) {
+	state, source := t.TempDir(), t.TempDir()
+	t.Setenv("GATOR_STATE_DIR", state)
+	t.Setenv("GATOR_PROVIDER", "openai")
+	t.Setenv("GATOR_MODEL", "test-model")
+	store, err := learning.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Create(learning.Create{ID: "learning-cli", Type: learning.Preference, Key: "format", Content: "Use Markdown.", Scope: learning.Scope{Kind: learning.Project, Value: source}, Origin: learning.UserAuthored}); err != nil {
+		t.Fatal(err)
+	}
+	model := &workScriptedModel{turns: []agent.Turn{{Text: "Inspected."}}}
+	if err := runWorkTask([]string{"--source", source, "--mode", "inspect", "inspect"}, strings.NewReader(""), &bytes.Buffer{}, func(_, _, _ string) (agent.Model, error) { return model, nil }); err != nil {
+		t.Fatal(err)
+	}
+	if len(model.requests) != 1 || !strings.Contains(model.requests[0].System, "Use Markdown.") {
+		t.Fatalf("manager request did not receive applicable learning: %#v", model.requests)
 	}
 }

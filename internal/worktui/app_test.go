@@ -474,7 +474,7 @@ func TestCommandPaletteContainsCurrentCommands(t *testing.T) {
 	expected := []string{
 		"/help", "/new", "/model", "/effort", "/attach", "/detach", "/source", "/source-refresh", "/source ignore", "/source unignore",
 		"/mode", "/code", "/artifact", "/connector", "/web-origin", "/status", "/statusline", "/permissions",
-		"/doctor", "/agents", "/settings", "/theme", "/history", "/revision-back", "/revision-forward", "/review",
+		"/doctor", "/agents", "/settings", "/theme", "/history", "/learnings", "/revision-back", "/revision-forward", "/review",
 		"/save", "/apply", "/retry", "/copy", "/queue", "/dequeue", "/clear-queue", "exit", "/quit",
 	}
 	if len(model.entries) != len(expected) {

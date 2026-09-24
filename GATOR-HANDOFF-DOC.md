@@ -3083,3 +3083,185 @@ The correct response to a discovered bad assumption is not to preserve the roadm
 It is to surface the evidence and change course.
 
 The product direction is more important than completing the plan.
+
+---
+
+# GTR-LEARN-01 Checkpoint Report — 2026-09-24
+
+## A. Classification
+
+`COMPLETE`
+
+## B. Previous Guidance/Memory State
+
+Before this tranche, repository guidance came from project-owned instruction
+files and selected Code profiles (`internal/instructions`), while Work history
+retained privacy-bounded transaction evidence (`internal/workhistory`). Neither
+was a user-controlled, scoped learning store, and no candidate or active
+learning was projected into ordinary future Work.
+
+The evaluation-consolidation prerequisite is present in the repository:
+`internal/eval/transaction_test.go` separates Work, verification, delivery,
+recovery, and unknown external outcomes; the release evidence documents
+development/held-out evaluation separation. No legacy evaluator was revived.
+
+## C. Learning Model
+
+The new file-backed store is `internal/learning`, rooted at:
+
+```text
+$GATOR_STATE_DIR/gator/learnings/<learning-id>.json
+```
+
+The directory is mode `0700`; each readable, indented JSON record is mode
+`0600` and is atomically updated. The initial model is deliberately small:
+
+```text
+types:       preference | environment_fact | procedure | failure_prevention
+statuses:    candidate | active | disabled | rejected
+origins:     user | inferred
+scopes:      global | project (exact absolute selected source path)
+```
+
+Inferred records require a 1–100 confidence value and start as `candidate`.
+They cannot become active without a recorded explicit user confirmation. Direct
+user additions are active immediately. `remove` is deliberately reversible: it
+disables a record rather than erasing it.
+
+This tranche represents environment facts as a typed, mutable learning and
+keeps immutable historical facts in their existing Work/evidence stores. The
+dedicated observation-extraction model remains intentionally deferred to Prompt
+2, which is where the roadmap assigns transaction-to-observation derivation.
+
+## D. Provenance
+
+Each record has origin, creation/update timestamps, optional contributing Work
+IDs, optional evidence references, and—when a candidate is enabled—the user
+confirmation timestamp. These are references only; no raw prompts, tool
+arguments/results, attachment bytes, connector payloads, or transaction copies
+are added to the learning store.
+
+Hand-editing is supported by the human-readable JSON format, but invalid,
+oversized, non-regular, symlinked, unknown-field, or otherwise invalid records
+fail closed: they are not projected into Work and the local command reports the
+repairable state error. Disabling/rejecting does not modify the referenced Work
+history.
+
+## E. Precedence
+
+The deterministic resolution order is:
+
+```text
+developer-owned Work contract and current explicit user request
+    > active user-authored learning
+    > active inferred learning explicitly confirmed by the user
+    > candidate / disabled / rejected learning (never selected)
+```
+
+For a conflict with the same `(type, key)` identity, user-authored wins; within
+the same origin, exact-project scope wins over global; then later update time
+and lexical ID break ties. The Work prompt explicitly states that stored
+learnings are context rather than authority and that the current request and
+contract override them.
+
+## F. User Control
+
+CLI:
+
+```text
+gator learnings list
+gator learnings show LEARNING_ID
+gator learnings add --type TYPE --key KEY --scope global|project[=PATH] TEXT
+gator learnings enable|disable|remove|reject LEARNING_ID
+gator learnings edit LEARNING_ID [--key KEY] TEXT
+```
+
+The Work TUI exposes the same in-process service through the `/learnings`
+palette entry and `/learnings …` command. It does not shell out to the CLI.
+List/show/add/edit/enable/disable/remove/reject flow through the same
+`internal/learning.Store` operations.
+
+## G. Work Context Integration
+
+`applyLearningContext` resolves only active applicable records, renders at most
+16 records / 16 KiB, and sets `workrun.Request.LearningContext`. `workrun`
+places that bounded block in the manager system prompt before optional
+developer additions, with its explicit precedence guard.
+
+The projection is used by direct CLI Work, the interactive TUI, Jobs via
+`executeConfiguredWork`, headless Work, and configured live evaluation runs.
+Candidates are not projected; a project learning only matches the exact
+absolute selected source path. Scripted deterministic evaluator fixtures remain
+isolated unless they deliberately supply a context, preserving their fixture
+control.
+
+## H. Tests / Evals
+
+Observed successful commands:
+
+```sh
+go test ./cmd/gator -run 'Test(Learning|ApplyLearning|WorkCLIProjects)' -count=1
+go test ./internal/learning ./internal/workrun ./internal/worktui -count=1
+go test ./...
+go vet ./...
+go build ./cmd/gator
+git diff --check
+```
+
+The focused tests prove creation, candidate separation, explicit candidate
+enablement, disable-with-provenance retention, project-scope isolation,
+user-over-inference precedence, rejection/removal, invalid direct-edit
+fail-closed behavior, persistence, bounded prompt projection, direct CLI
+projection, and the shared TUI callback. The full Go suite passed.
+
+## I. Complexity Delta
+
+The implementation adds one small local package and two CLI files, plus narrow
+integration points in the shared Work request/prompt, main dispatch, and TUI
+command palette. It does not add a database, daemon, embeddings, vector store,
+RAG path, reflection prompt, policy engine, or autonomous promotion loop.
+
+Relative to the roadmap handoff commit `4867f9125`, the observed implementation
+commit pair added 1,281 lines and removed 19 lines across 14 files before the
+small final correctness/doc corrections left uncommitted for review. The core
+new concepts are exactly record, scope, provenance, status, deterministic
+selection, and bounded projection.
+
+## J. Product Checkpoint
+
+1. Every active learning is inspectable through JSON or `show`: **yes**.
+2. It can be disabled/reversed without deleting Work evidence: **yes**.
+3. The user can accelerate learning directly: **yes**, with `learnings add`.
+4. Facts are separate from inference: **yes**; immutable Work evidence remains
+   separate while mutable typed learnings carry explicit origin.
+5. Scope is explicit: **yes**; only global and exact-project scope are enabled.
+6. Opaque memory infrastructure was added: **no**.
+7. CLI/TUI parity is intact: **yes**, through one in-process store/service path.
+8. Simplify before automatic learning: retain only these two scopes until real
+   evidence requires more; keep candidate creation tied to explicit bounded
+   observations rather than adding free-form reflection or prompt accumulation.
+
+## K. Recommended Next Tranche
+
+Proceed to `GTR-LEARN-02` only after human review. It should consume only
+observable, reliable transaction signals, create candidates by conservative
+rules, reference retained Work IDs/evidence, and add low-friction feedback. It
+must not broaden scope or auto-promote candidates merely because the new store
+exists.
+
+## L. Git Status
+
+Initial inspection found clean `main` at `4867f9125`, two commits ahead of its
+then-upstream. During this tranche, repository drift occurred: `main` advanced
+through `87277b495` and `050cdfc47` (both titled
+`newinternalearningperformanceadded`) and local `origin/main` recorded an
+update-by-push to `050cdfc47`. Those commits contain the learning implementation
+and formatting changes; they were preserved rather than reset, amended, or
+rewritten.
+
+At checkpoint creation, no commit or push was intentionally performed by this
+tranche. The working tree contains the final correctness, test, documentation,
+and this report changes for review; it has not been committed. A local ignored
+`./gator` binary was produced by the build verification command.
+
+Stop here. Do not start Prompt 2 without human review.
