@@ -357,7 +357,7 @@ Before calling a release useful for daily work, Gator must have:
   time limit, and verifier.
 
 The first, second, third, and fifth items have automated coverage in
-`go test ./...` and `gator work eval`. The dogfood log remains a human process;
+`go test ./...` and `gator work eval run`. The dogfood log remains a human process;
 the template is in [release evidence](RELEASE_EVIDENCE.md).
 
 Benchmark results can demonstrate a bounded configuration only. They cannot by

@@ -33,20 +33,19 @@ Evaluation runner checks:
 
 ```sh
 go test ./internal/eval
-gator work eval DIR --run-id UNIQUE_ID --script DIR/script.json --report DIR/reports/UNIQUE_ID.json --require-resolved
-gator work eval suite DIR --live --provider PROVIDER --model MODEL --environment-id OCI_IMAGE_DIGEST --attempts 3 --report-dir DIR/reports/UNIQUE_ID --require-resolved
+gator work eval run internal/eval/testdata/work-v1/dataset.json --id release-development --attempts 3 --report-dir DIR/reports/release-development
+gator work eval run internal/eval/testdata/work-v1/dataset.json --id release-held-out --split held-out --attempts 3 --report-dir DIR/reports/release-held-out
 ```
 
 Use a new `--run-id` for every attempt. Reusing an id against a previous
 report file invites cached conclusions; the harness always executes, but
 humans comparing reports will mix attempts if ids collide.
 
-The offline form is a deterministic harness regression only. The suite form
-requires `--live`, strict scored fixtures, and an immutable `--environment-id`
-because it is reserved for model-quality evidence. `--live` accepts explicit
-provider, model, and base-URL overrides and writes no API keys or raw endpoint
-into the report. See [headless evaluation](EVALUATION.md) for fixture policy,
-container operation, repeated trials, and the evidence threshold.
+Scripted Work runs are deterministic product gates. `--live` accepts explicit
+provider, model, request-budget, and timeout values, and writes no API keys or
+raw endpoint into the report. Run held-out material only as a deliberate final
+comparison. See [Work evaluation](WORK_EVALUATION.md) for split and transaction
+fidelity policy.
 
 ## Evaluation report
 

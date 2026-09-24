@@ -1,9 +1,8 @@
 # Full Work evaluation
 
 `gator work eval` evaluates target `work.v1` through the actual Work service,
-manager, supervisor, Code adapter, tools, contracts, and revision store. Existing
-`gator work eval DIR` and `gator work eval suite DIR` remain direct Code compatibility
-targets. Their fixtures and scoring behavior are preserved.
+manager, supervisor, Code adapter, tools, contracts, history, and delivery
+store. It is Gator's only product evaluation runtime.
 
 ## Local experiments
 
@@ -11,6 +10,8 @@ targets. Their fixtures and scoring behavior are preserved.
 gator work eval validate internal/eval/testdata/work-v1/dataset.json
 gator work eval run internal/eval/testdata/work-v1/dataset.json \
   --id enabled --attempts 2 --report-dir /tmp/gator-enabled
+gator work eval run internal/eval/testdata/work-v1/dataset.json \
+  --id holdout --split held-out --attempts 2 --report-dir /tmp/gator-holdout
 gator work eval run internal/eval/testdata/work-v1/dataset.json \
   --id disabled --attempts 2 --delegation=false --report-dir /tmp/gator-disabled
 gator work eval compare /tmp/gator-disabled/experiment.json /tmp/gator-enabled/experiment.json
@@ -37,6 +38,11 @@ tests additionally exercise connected/web evidence follow-ups, native Code
 follow-ups with frozen project configuration, live approvals/control, scheduling
 crash boundaries, and apply-time conflicts.
 
+`development` is the default split. `held-out` and `all` require an explicit
+`--split` selection; a development report retains only selected development
+case metadata, rather than copying held-out scripts into its report directory.
+This prevents routine iteration from accidentally consuming held-out material.
+
 Scripted runs exercise product execution and grader mechanics. Disabling a tool
 needed by a fixed script is an execution ablation; the resulting pass-rate change
 is not evidence that delegation improves a live model's reasoning. No provider
@@ -52,7 +58,9 @@ Grader definitions and answers remain outside agent-readable source roots.
 
 Deterministic graders check actual artifact text, workbook cell values, status,
 contract digests, source integrity, quotation/source references, tool denials,
-candidate status, and replay constraints. A passing file-format validator does
+candidate status, and replay constraints. Every Work trial also inspects its
+canonical history, snapshot/revision/manifest provenance, verification state,
+delivery state, recovery eligibility, and external-action safety. A passing file-format validator does
 not imply correct cell values or supported prose. Grader soundness tests include
 fabricated quotations, nonexistent citations, wrong text, missing output, and
 fixture mutations. Source integrity is independently checked after every trial.
