@@ -7,8 +7,12 @@ package desktop
 #include <stdlib.h>
 #include <stdint.h>
 int gator_desktop_accessibility_trusted(void);
-int gator_desktop_front_window(uint32_t *window_id, int *pid, char *bundle_id, int bundle_size, char *title, int title_size);
+int gator_desktop_front_window(uint32_t *window_id, int *pid, double *x, double *y, double *width, double *height, char *bundle_id, int bundle_size, char *title, int title_size);
 int gator_desktop_click(double x, double y);
+int gator_desktop_double_click(double x, double y);
+int gator_desktop_drag(const double *xs, const double *ys, int count);
+int gator_desktop_move(double x, double y);
+int gator_desktop_scroll(double x, double y, int delta_x, int delta_y);
 int gator_desktop_type(const char *value);
 int gator_desktop_press(int keycode);
 int gator_desktop_focused_field_sensitive(int pid);
@@ -40,16 +44,17 @@ func (darwinRuntime) FrontWindow(ctx context.Context) (Window, error) {
 	}
 	var windowID C.uint32_t
 	var pid C.int
+	var x, y, width, height C.double
 	bundle := make([]byte, 512)
 	title := make([]byte, 2048)
-	if C.gator_desktop_front_window(&windowID, &pid, (*C.char)(unsafe.Pointer(&bundle[0])), C.int(len(bundle)), (*C.char)(unsafe.Pointer(&title[0])), C.int(len(title))) != 1 {
+	if C.gator_desktop_front_window(&windowID, &pid, &x, &y, &width, &height, (*C.char)(unsafe.Pointer(&bundle[0])), C.int(len(bundle)), (*C.char)(unsafe.Pointer(&title[0])), C.int(len(title))) != 1 {
 		return Window{}, errors.New("could not identify the current macOS application window")
 	}
 	bundleID := cBuffer(bundle)
 	if bundleID == "" {
 		return Window{}, errors.New("current macOS application has no bundle identifier")
 	}
-	return Window{Application: Application{BundleID: bundleID}, Title: cBuffer(title), ID: uint32(windowID), PID: int(pid)}, nil
+	return Window{Application: Application{BundleID: bundleID}, Title: cBuffer(title), ID: uint32(windowID), PID: int(pid), X: float64(x), Y: float64(y), Width: float64(width), Height: float64(height)}, nil
 }
 
 func (darwinRuntime) Screenshot(ctx context.Context, window Window) ([]byte, error) {
@@ -97,6 +102,53 @@ func (darwinRuntime) Click(ctx context.Context, x, y float64) error {
 	}
 	if C.gator_desktop_click(C.double(x), C.double(y)) != 1 {
 		return errors.New("macOS rejected the desktop click; grant Accessibility permission to Gator")
+	}
+	return nil
+}
+
+func (darwinRuntime) DoubleClick(ctx context.Context, x, y float64) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if C.gator_desktop_double_click(C.double(x), C.double(y)) != 1 {
+		return errors.New("macOS rejected the desktop double click; grant Accessibility permission to Gator")
+	}
+	return nil
+}
+
+func (darwinRuntime) Drag(ctx context.Context, points []Point) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if len(points) < 2 {
+		return errors.New("desktop drag needs at least two points")
+	}
+	xs, ys := make([]C.double, len(points)), make([]C.double, len(points))
+	for index, point := range points {
+		xs[index], ys[index] = C.double(point.X), C.double(point.Y)
+	}
+	if C.gator_desktop_drag(&xs[0], &ys[0], C.int(len(points))) != 1 {
+		return errors.New("macOS rejected the desktop drag; grant Accessibility permission to Gator")
+	}
+	return nil
+}
+
+func (darwinRuntime) Move(ctx context.Context, x, y float64) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if C.gator_desktop_move(C.double(x), C.double(y)) != 1 {
+		return errors.New("macOS rejected the desktop pointer move; grant Accessibility permission to Gator")
+	}
+	return nil
+}
+
+func (darwinRuntime) Scroll(ctx context.Context, x, y float64, deltaX, deltaY int) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if C.gator_desktop_scroll(C.double(x), C.double(y), C.int(deltaX), C.int(deltaY)) != 1 {
+		return errors.New("macOS rejected the desktop scroll; grant Accessibility permission to Gator")
 	}
 	return nil
 }

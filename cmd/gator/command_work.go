@@ -266,6 +266,9 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		if session.State != desktop.StateRunning {
 			return errors.New("--desktop-session is stopped")
 		}
+		if !session.RetainProviderState {
+			return errors.New("--desktop-session requires a session created with --retain-provider-state for the OpenAI computer-use continuation")
+		}
 		controller, err := desktop.NewController(store, desktop.DefaultRuntime())
 		if err != nil {
 			return err

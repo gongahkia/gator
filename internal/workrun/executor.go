@@ -336,6 +336,10 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		if e.Desktop == nil {
 			return outcome, errors.New("Work desktop session is unavailable on this local runtime")
 		}
+		desktopSession, err := e.Desktop.Session(ctx, request.DesktopSession)
+		if err != nil {
+			return outcome, fmt.Errorf("load Work desktop session: %w", err)
+		}
 		if computer, ok := e.Model.(agent.ComputerUseModel); !ok {
 			return outcome, errors.New("Work desktop control requires an explicitly configured OpenAI computer-use model")
 		} else if _, enabled := computer.ComputerUse(); !enabled {
@@ -343,6 +347,9 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		}
 		desktopPolicy := tools.CommandPolicy{Approve: request.ApproveDesktop, OnEvent: func(event agent.Event) { event.At = now(); emit(event) }}
 		surface = append(surface, tools.ComputerAction{SessionID: request.DesktopSession, Controller: e.Desktop, Policy: desktopPolicy})
+		if activate := tools.DesktopActivationTool(tools.DesktopSessionOptions{SessionID: request.DesktopSession, Controller: e.Desktop, Policy: desktopPolicy, ApprovedApplications: desktopSession.Apps}); activate != nil {
+			surface = append(surface, activate)
+		}
 	}
 	subagents := make([]artifact.SubagentEvidence, 0, 8)
 	integration := &codeIntegration{request: request, work: work, patches: map[string]string{}, accepted: map[string]string{}}
@@ -459,7 +466,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		return outcome, fmt.Errorf("write work manifest: %w", err)
 	}
 	configuration, _ := json.Marshal(effectiveConfiguration(request))
-	replay := sanitizeComputerReplay(result.Messages)
+	replay := sanitizeComputerReplay(result.Messages, request.DesktopSession != "")
 	if _, err := sessions.AddRevision(conversation.ID, worksession.Revision{
 		AcceptedCode: integration.accepted,
 		Project:      request.Project,
@@ -481,11 +488,11 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	return outcome, nil
 }
 
-// sanitizeComputerReplay ensures raw desktop screenshots never enter a Work
-// revision. A computer call cannot be replayed without the exact screenshot
-// continuation, so its matching call/output pair is omitted too; the normal
-// manager prose and produced artifacts remain available for later work.
-func sanitizeComputerReplay(messages []agent.Message) []agent.Message {
+// sanitizeComputerReplay ensures raw desktop screenshots and provider-side
+// continuation IDs never enter a Work revision. A desktop session is local and
+// temporary; a later Work run must start a new computer conversation rather
+// than inheriting OpenAI state from an old session.
+func sanitizeComputerReplay(messages []agent.Message, desktopEnabled bool) []agent.Message {
 	computerCalls := map[string]bool{}
 	for _, message := range messages {
 		if message.Role != agent.RoleAgent {
@@ -497,7 +504,7 @@ func sanitizeComputerReplay(messages []agent.Message) []agent.Message {
 			}
 		}
 	}
-	if len(computerCalls) == 0 {
+	if len(computerCalls) == 0 && !desktopEnabled {
 		return messages
 	}
 	result := make([]agent.Message, 0, len(messages))
@@ -506,13 +513,16 @@ func sanitizeComputerReplay(messages []agent.Message) []agent.Message {
 			continue
 		}
 		if message.Role == agent.RoleAgent && len(message.ToolCalls) > 0 {
-			calls := message.ToolCalls[:0]
+			calls := make([]agent.ToolCall, 0, len(message.ToolCalls))
 			for _, call := range message.ToolCalls {
 				if call.Kind != agent.ToolCallComputer {
 					calls = append(calls, call)
 				}
 			}
 			message.ToolCalls = calls
+		}
+		if desktopEnabled && message.Role == agent.RoleAgent {
+			message.ProviderData = nil
 		}
 		// Screenshots can only be attached by a computer-call output in this
 		// workflow. Wipe images from every retained tool message defensively.

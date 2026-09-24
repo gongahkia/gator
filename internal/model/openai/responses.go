@@ -164,19 +164,25 @@ func (r Responses) requestBody(turn agent.TurnRequest) (responseRequest, error) 
 		})
 	}
 	store := false
+	previousResponseID := ""
 	if turn.Computer != nil {
-		if turn.Computer.DisplayWidth < 320 || turn.Computer.DisplayWidth > 8192 || turn.Computer.DisplayHeight < 320 || turn.Computer.DisplayHeight > 8192 || strings.TrimSpace(turn.Computer.Environment) == "" {
-			return responseRequest{}, errors.New("OpenAI computer-use display configuration is invalid")
+		if !turn.Computer.RetainState {
+			return responseRequest{}, errors.New("OpenAI computer use requires explicit provider-state retention consent")
 		}
-		tools = append(tools, responseTool{Type: "computer", Computer: &computerTool{Environment: turn.Computer.Environment, DisplayWidth: turn.Computer.DisplayWidth, DisplayHeight: turn.Computer.DisplayHeight}})
-		store = turn.Computer.RetainState
+		tools = append(tools, responseTool{Type: "computer"})
+		previousResponseID, input, err = computerContinuationInput(turn.Messages)
+		if err != nil {
+			return responseRequest{}, err
+		}
+		store = true
 	}
 	return responseRequest{
-		Model:        modelOrDefault(r.Model),
-		Instructions: turn.System,
-		Input:        input,
-		Tools:        tools,
-		Store:        store,
+		Model:              modelOrDefault(r.Model),
+		Instructions:       turn.System,
+		Input:              input,
+		Tools:              tools,
+		Store:              store,
+		PreviousResponseID: previousResponseID,
 	}, nil
 }
 
@@ -202,39 +208,33 @@ func modelOrDefault(model string) string {
 }
 
 type responseRequest struct {
-	Model        string         `json:"model"`
-	Instructions string         `json:"instructions,omitempty"`
-	Input        []inputItem    `json:"input"`
-	Tools        []responseTool `json:"tools,omitempty"`
-	Store        bool           `json:"store"`
-	Stream       bool           `json:"stream,omitempty"`
+	Model              string         `json:"model"`
+	Instructions       string         `json:"instructions,omitempty"`
+	Input              []inputItem    `json:"input"`
+	Tools              []responseTool `json:"tools,omitempty"`
+	Store              bool           `json:"store"`
+	PreviousResponseID string         `json:"previous_response_id,omitempty"`
+	Stream             bool           `json:"stream,omitempty"`
 }
 
 type responseTool struct {
 	Type        string          `json:"type"`
-	Name        string          `json:"name"`
+	Name        string          `json:"name,omitempty"`
 	Description string          `json:"description,omitempty"`
-	Parameters  json.RawMessage `json:"parameters"`
-	Strict      bool            `json:"strict"`
-	Computer    *computerTool   `json:"computer,omitempty"`
-}
-
-type computerTool struct {
-	Environment   string `json:"environment"`
-	DisplayWidth  int    `json:"display_width"`
-	DisplayHeight int    `json:"display_height"`
+	Parameters  json.RawMessage `json:"parameters,omitempty"`
+	Strict      bool            `json:"strict,omitempty"`
 }
 
 type inputItem struct {
-	Type      string          `json:"type,omitempty"`
-	Role      string          `json:"role,omitempty"`
-	Content   any             `json:"content,omitempty"`
-	ID        string          `json:"id,omitempty"`
-	CallID    string          `json:"call_id,omitempty"`
-	Name      string          `json:"name,omitempty"`
-	Arguments string          `json:"arguments,omitempty"`
-	Output    any             `json:"output,omitempty"`
-	Action    json.RawMessage `json:"action,omitempty"`
+	Type      string            `json:"type,omitempty"`
+	Role      string            `json:"role,omitempty"`
+	Content   any               `json:"content,omitempty"`
+	ID        string            `json:"id,omitempty"`
+	CallID    string            `json:"call_id,omitempty"`
+	Name      string            `json:"name,omitempty"`
+	Arguments string            `json:"arguments,omitempty"`
+	Output    any               `json:"output,omitempty"`
+	Actions   []json.RawMessage `json:"actions,omitempty"`
 }
 
 func encodeInput(messages []agent.Message) ([]inputItem, error) {
@@ -285,7 +285,13 @@ func encodeInput(messages []agent.Message) ([]inputItem, error) {
 						return nil, errors.New("agent history contains an invalid tool call")
 					}
 					if call.Kind == agent.ToolCallComputer {
-						input = append(input, inputItem{Type: "computer_call", ID: call.ProviderID, CallID: call.ID, Action: append(json.RawMessage(nil), call.Arguments...)})
+						var computer struct {
+							Actions []json.RawMessage `json:"actions"`
+						}
+						if err := json.Unmarshal(call.Arguments, &computer); err != nil || len(computer.Actions) == 0 {
+							return nil, errors.New("agent history contains an invalid computer action batch")
+						}
+						input = append(input, inputItem{Type: "computer_call", ID: call.ProviderID, CallID: call.ID, Actions: append([]json.RawMessage(nil), computer.Actions...)})
 					} else {
 						input = append(input, inputItem{Type: "function_call", ID: call.ProviderID, CallID: call.ID, Name: call.Name, Arguments: string(call.Arguments)})
 					}
@@ -300,7 +306,7 @@ func encodeInput(messages []agent.Message) ([]inputItem, error) {
 				if len(message.Images) != 1 || message.Images[0].MediaType != "image/png" || len(message.Images[0].Data) == 0 {
 					return nil, errors.New("computer call output requires exactly one transient PNG screenshot")
 				}
-				input = append(input, inputItem{Type: "computer_call_output", CallID: message.ToolCallID, Output: map[string]string{"type": "computer_screenshot", "image_url": imageDataURL(message.Images[0])}})
+				input = append(input, inputItem{Type: "computer_call_output", CallID: message.ToolCallID, Output: computerScreenshotOutput(message.Images[0])})
 			} else {
 				input = append(input, inputItem{Type: "function_call_output", CallID: message.ToolCallID, Output: message.Content})
 			}
@@ -309,6 +315,77 @@ func encodeInput(messages []agent.Message) ([]inputItem, error) {
 		}
 	}
 	return input, nil
+}
+
+// computerContinuationInput returns only the observations generated after the
+// most recent stored response. OpenAI retains the preceding response chain;
+// replaying its computer_call items would duplicate actions against the local
+// desktop. If this is the first turn, normal full-history encoding is used.
+func computerContinuationInput(messages []agent.Message) (string, []inputItem, error) {
+	responseIndex := -1
+	responseID := ""
+	for index := len(messages) - 1; index >= 0; index-- {
+		message := messages[index]
+		if message.Role != agent.RoleAgent {
+			continue
+		}
+		var state responseProviderState
+		if len(message.ProviderData) == 0 || json.Unmarshal(message.ProviderData, &state) != nil || strings.TrimSpace(state.ResponseID) == "" {
+			// An assistant item without a stored provider response cannot be
+			// represented safely as an incremental continuation.
+			input, err := encodeInput(messages)
+			return "", input, err
+		}
+		responseIndex, responseID = index, state.ResponseID
+		break
+	}
+	if responseIndex < 0 {
+		input, err := encodeInput(messages)
+		return "", input, err
+	}
+
+	calls := make(map[string]agent.ToolCall)
+	for _, message := range messages {
+		if message.Role != agent.RoleAgent {
+			continue
+		}
+		for _, call := range message.ToolCalls {
+			calls[call.ID] = call
+		}
+	}
+	input := make([]inputItem, 0, len(messages)-responseIndex)
+	for _, message := range messages[responseIndex+1:] {
+		switch message.Role {
+		case agent.RoleUser:
+			items, err := encodeInput([]agent.Message{message})
+			if err != nil {
+				return "", nil, err
+			}
+			input = append(input, items...)
+		case agent.RoleTool:
+			if strings.TrimSpace(message.ToolCallID) == "" {
+				return "", nil, errors.New("agent history contains a tool result without a call id")
+			}
+			call, known := calls[message.ToolCallID]
+			if known && call.Kind == agent.ToolCallComputer {
+				if len(message.Images) != 1 || message.Images[0].MediaType != "image/png" || len(message.Images[0].Data) == 0 {
+					return "", nil, errors.New("computer call output requires exactly one transient PNG screenshot")
+				}
+				input = append(input, inputItem{Type: "computer_call_output", CallID: message.ToolCallID, Output: computerScreenshotOutput(message.Images[0])})
+			} else {
+				input = append(input, inputItem{Type: "function_call_output", CallID: message.ToolCallID, Output: message.Content})
+			}
+		case agent.RoleAgent:
+			return "", nil, errors.New("agent history contains an unsupported assistant item after the latest OpenAI response")
+		default:
+			return "", nil, fmt.Errorf("agent history contains unsupported role %q", message.Role)
+		}
+	}
+	return responseID, input, nil
+}
+
+func computerScreenshotOutput(image agent.Image) map[string]string {
+	return map[string]string{"type": "computer_screenshot", "image_url": imageDataURL(image), "detail": "original"}
 }
 
 type responseInputPart struct {
@@ -324,6 +401,7 @@ func imageDataURL(image agent.Image) string {
 }
 
 type responsePayload struct {
+	ID    string `json:"id"`
 	Usage *struct {
 		Input  int64 `json:"input_tokens"`
 		Output int64 `json:"output_tokens"`
@@ -332,12 +410,12 @@ type responsePayload struct {
 }
 
 type responseOutputItem struct {
-	ID        string          `json:"id"`
-	Type      string          `json:"type"`
-	CallID    string          `json:"call_id"`
-	Name      string          `json:"name"`
-	Arguments string          `json:"arguments"`
-	Action    json.RawMessage `json:"action"`
+	ID        string            `json:"id"`
+	Type      string            `json:"type"`
+	CallID    string            `json:"call_id"`
+	Name      string            `json:"name"`
+	Arguments string            `json:"arguments"`
+	Actions   []json.RawMessage `json:"actions"`
 	Content   []struct {
 		Type string `json:"type"`
 		Text string `json:"text"`
@@ -370,20 +448,42 @@ func decodeResponse(contents []byte) (agent.Turn, error) {
 				Arguments:  json.RawMessage(item.Arguments),
 			})
 		case "computer_call":
-			if item.CallID == "" || !json.Valid(item.Action) {
+			if item.CallID == "" || len(item.Actions) == 0 {
 				return agent.Turn{}, errors.New("OpenAI response contains an invalid computer call")
 			}
-			calls = append(calls, agent.ToolCall{ID: item.CallID, ProviderID: item.ID, Kind: agent.ToolCallComputer, Name: "computer_action", Arguments: append(json.RawMessage(nil), item.Action...)})
+			for _, action := range item.Actions {
+				if !json.Valid(action) {
+					return agent.Turn{}, errors.New("OpenAI response contains an invalid computer action")
+				}
+			}
+			arguments, err := json.Marshal(struct {
+				Actions []json.RawMessage `json:"actions"`
+			}{Actions: item.Actions})
+			if err != nil {
+				return agent.Turn{}, fmt.Errorf("encode OpenAI computer action batch: %w", err)
+			}
+			calls = append(calls, agent.ToolCall{ID: item.CallID, ProviderID: item.ID, Kind: agent.ToolCallComputer, Name: "computer_action", Arguments: arguments})
 		}
 	}
 	if text.Len() == 0 && len(calls) == 0 {
 		return agent.Turn{}, errors.New("OpenAI response contained no output text or function calls")
 	}
 	turn := agent.Turn{Text: text.String(), ToolCalls: calls}
+	if strings.TrimSpace(payload.ID) != "" {
+		providerData, err := json.Marshal(responseProviderState{ResponseID: payload.ID})
+		if err != nil {
+			return agent.Turn{}, fmt.Errorf("encode OpenAI response state: %w", err)
+		}
+		turn.ProviderData = providerData
+	}
 	if payload.Usage != nil {
 		turn.Usage = agent.Usage{Reported: true, InputTokens: payload.Usage.Input, OutputTokens: payload.Usage.Output}
 	}
 	return turn, nil
+}
+
+type responseProviderState struct {
+	ResponseID string `json:"response_id"`
 }
 
 func decodeSSE(reader io.Reader, onDelta func(string)) (agent.Turn, error) {

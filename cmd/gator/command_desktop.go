@@ -78,7 +78,7 @@ func startDesktopSession(arguments []string, out io.Writer, store *desktop.Store
 	flags.SetOutput(io.Discard)
 	var appIDs stringFlags
 	flags.Var(&appIDs, "app", "macOS application bundle identifier to approve (repeatable)")
-	retain := flags.Bool("retain-provider-state", false, "consent to the CUA provider retaining state for this desktop session")
+	retain := flags.Bool("retain-provider-state", false, "consent to OpenAI receiving approved-window screenshots and retaining this session's response-chain state")
 	if err := flags.Parse(arguments); err != nil || len(flags.Args()) != 0 || len(appIDs) == 0 {
 		return errors.New("usage: gator desktop start --app BUNDLE_ID [--app BUNDLE_ID...] [--retain-provider-state]")
 	}
@@ -98,6 +98,6 @@ func startDesktopSession(arguments []string, out io.Writer, store *desktop.Store
 	if err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(out, "Started local desktop session %s\n  approved apps: %s\n  CUA provider-state retention: %t\nEvery click, key press, typed value, and app activation still needs a fresh approval. Gator blocks system settings, terminal, Keychain, Finder, clipboard shortcuts, and secure text fields.\n", session.ID, strings.Join(appIDs, ", "), session.RetainProviderState)
+	_, err = fmt.Fprintf(out, "Started local desktop session %s\n  approved apps: %s\n  CUA provider-state retention: %t\nWith retention enabled, OpenAI may receive screenshots of the approved foreground window to continue this local desktop run; Gator never stores those screenshot bytes in Work replay. Every click, key press, typed value, and app activation still needs a fresh approval. Gator blocks system settings, terminal, Keychain, Finder, clipboard shortcuts, and secure text fields.\n", session.ID, strings.Join(appIDs, ", "), session.RetainProviderState)
 	return err
 }

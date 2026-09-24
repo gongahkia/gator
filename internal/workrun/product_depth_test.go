@@ -137,3 +137,19 @@ func TestLegacyReplayProviderChangeAndHeadNavigation(t *testing.T) {
 		t.Fatal("provider state was not normalized")
 	}
 }
+
+func TestSanitizeComputerReplayDropsDesktopContinuationState(t *testing.T) {
+	messages := []agent.Message{
+		{Role: agent.RoleUser, Content: "inspect"},
+		{Role: agent.RoleAgent, ProviderData: json.RawMessage(`{"response_id":"resp_sensitive"}`), ToolCalls: []agent.ToolCall{
+			{ID: "computer", Kind: agent.ToolCallComputer, Name: "computer_action", Arguments: json.RawMessage(`{"actions":[{"type":"screenshot"}]}`)},
+			{ID: "normal", ProviderID: "function-item", Name: "read_file", Arguments: json.RawMessage(`{"path":"source/a.txt"}`)},
+		}},
+		{Role: agent.RoleTool, ToolCallID: "computer", ToolName: "computer_action", Images: []agent.Image{{Name: "window.png", MediaType: "image/png", Data: []byte("private")}}},
+		{Role: agent.RoleTool, ToolCallID: "normal", ToolName: "read_file", Content: `{"ok":true}`, Images: []agent.Image{{Name: "unexpected.png", MediaType: "image/png", Data: []byte("also-private")}}},
+	}
+	replay := sanitizeComputerReplay(messages, true)
+	if len(replay) != 3 || len(replay[1].ProviderData) != 0 || len(replay[1].ToolCalls) != 1 || replay[1].ToolCalls[0].ID != "normal" || len(replay[2].Images) != 0 {
+		t.Fatalf("desktop replay was not safely stripped: %#v", replay)
+	}
+}

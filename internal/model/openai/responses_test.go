@@ -55,10 +55,10 @@ func TestResponsesUsesStructuredComputerToolAndContinuation(t *testing.T) {
 		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
 			t.Fatalf("decode request: %v", err)
 		}
-		if !body.Store || len(body.Tools) != 1 || body.Tools[0].Type != "computer" || body.Tools[0].Computer == nil || body.Tools[0].Computer.Environment != "computer" || body.Tools[0].Computer.DisplayWidth != 1440 {
+		if !body.Store || body.PreviousResponseID != "" || len(body.Tools) != 1 || body.Tools[0].Type != "computer" || body.Tools[0].Name != "" || len(body.Input) != 1 {
 			t.Fatalf("computer request = %#v", body)
 		}
-		_, _ = io.WriteString(writer, `{"output":[{"id":"computer-item","type":"computer_call","call_id":"computer-call","action":{"type":"click","x":20,"y":30}}]}`)
+		_, _ = io.WriteString(writer, `{"id":"resp-first","output":[{"id":"computer-item","type":"computer_call","call_id":"computer-call","actions":[{"type":"click","button":"left","x":20,"y":30}]}]}`)
 	}))
 	defer server.Close()
 	model := Responses{APIKey: "test-key", BaseURL: server.URL, Client: server.Client()}
@@ -70,7 +70,7 @@ func TestResponsesUsesStructuredComputerToolAndContinuation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(turn.ToolCalls) != 1 || turn.ToolCalls[0].Kind != agent.ToolCallComputer || turn.ToolCalls[0].Name != "computer_action" || string(turn.ToolCalls[0].Arguments) != `{"type":"click","x":20,"y":30}` {
+	if len(turn.ToolCalls) != 1 || turn.ToolCalls[0].Kind != agent.ToolCallComputer || turn.ToolCalls[0].Name != "computer_action" || string(turn.ToolCalls[0].Arguments) != `{"actions":[{"type":"click","button":"left","x":20,"y":30}]}` || string(turn.ProviderData) != `{"response_id":"resp-first"}` {
 		t.Fatalf("computer turn = %#v", turn)
 	}
 }
@@ -81,12 +81,12 @@ func TestResponsesReplaysComputerCallWithScreenshotOutput(t *testing.T) {
 		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
 			t.Fatal(err)
 		}
-		if len(body.Input) != 3 || body.Input[1].Type != "computer_call" || string(body.Input[1].Action) != `{"type":"screenshot"}` || body.Input[2].Type != "computer_call_output" {
+		if body.PreviousResponseID != "resp_abc" || len(body.Input) != 1 || body.Input[0].Type != "computer_call_output" {
 			t.Fatalf("computer replay = %#v", body.Input)
 		}
-		output, ok := body.Input[2].Output.(map[string]any)
-		if !ok || output["type"] != "computer_screenshot" || !strings.HasPrefix(output["image_url"].(string), "data:image/png;base64,") {
-			t.Fatalf("computer output = %#v", body.Input[2].Output)
+		output, ok := body.Input[0].Output.(map[string]any)
+		if !ok || output["type"] != "computer_screenshot" || output["detail"] != "original" || !strings.HasPrefix(output["image_url"].(string), "data:image/png;base64,") {
+			t.Fatalf("computer output = %#v", body.Input[0].Output)
 		}
 		_, _ = io.WriteString(writer, `{"output":[{"type":"message","content":[{"type":"output_text","text":"done"}]}]}`)
 	}))
@@ -94,11 +94,21 @@ func TestResponsesReplaysComputerCallWithScreenshotOutput(t *testing.T) {
 	model := Responses{APIKey: "test-key", BaseURL: server.URL, Client: server.Client()}
 	turn, err := model.Complete(context.Background(), agent.TurnRequest{Messages: []agent.Message{
 		{Role: agent.RoleUser, Content: "inspect"},
-		{Role: agent.RoleAgent, ToolCalls: []agent.ToolCall{{ID: "computer-call", ProviderID: "computer-item", Kind: agent.ToolCallComputer, Name: "computer_action", Arguments: json.RawMessage(`{"type":"screenshot"}`)}}},
+		{Role: agent.RoleAgent, ProviderData: json.RawMessage(`{"response_id":"resp_abc"}`), ToolCalls: []agent.ToolCall{{ID: "computer-call", ProviderID: "computer-item", Kind: agent.ToolCallComputer, Name: "computer_action", Arguments: json.RawMessage(`{"actions":[{"type":"screenshot"}]}`)}}},
 		{Role: agent.RoleTool, ToolCallID: "computer-call", ToolName: "computer_action", Images: []agent.Image{{Name: "window.png", MediaType: "image/png", Data: []byte("png")}}},
-	}})
+	}, Computer: &agent.ComputerUse{RetainState: true}})
 	if err != nil || turn.Text != "done" {
 		t.Fatalf("complete = %#v, %v", turn, err)
+	}
+}
+
+func TestResponsesComputerUseRequiresExplicitRetentionConsent(t *testing.T) {
+	_, err := (Responses{}).requestBody(agent.TurnRequest{
+		Messages: []agent.Message{{Role: agent.RoleUser, Content: "inspect"}},
+		Computer: &agent.ComputerUse{},
+	})
+	if err == nil || !strings.Contains(err.Error(), "retention consent") {
+		t.Fatalf("computer request error = %v", err)
 	}
 }
 

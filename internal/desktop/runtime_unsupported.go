@@ -25,6 +25,18 @@ func (unavailableRuntime) Activate(context.Context, string) error {
 func (unavailableRuntime) Click(context.Context, float64, float64) error {
 	return errors.New("desktop control is currently available only on macOS")
 }
+func (unavailableRuntime) DoubleClick(context.Context, float64, float64) error {
+	return errors.New("desktop control is currently available only on macOS")
+}
+func (unavailableRuntime) Drag(context.Context, []Point) error {
+	return errors.New("desktop control is currently available only on macOS")
+}
+func (unavailableRuntime) Move(context.Context, float64, float64) error {
+	return errors.New("desktop control is currently available only on macOS")
+}
+func (unavailableRuntime) Scroll(context.Context, float64, float64, int, int) error {
+	return errors.New("desktop control is currently available only on macOS")
+}
 func (unavailableRuntime) Type(context.Context, string) error {
 	return errors.New("desktop control is currently available only on macOS")
 }

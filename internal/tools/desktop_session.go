@@ -15,9 +15,10 @@ import (
 // capability. The caller must not create these tools for a model that lacks a
 // computer-use protocol; ordinary local models therefore never see them.
 type DesktopSessionOptions struct {
-	SessionID  string
-	Controller *desktop.Controller
-	Policy     CommandPolicy
+	SessionID            string
+	Controller           *desktop.Controller
+	Policy               CommandPolicy
+	ApprovedApplications []desktop.Application
 }
 
 func DesktopSessionTools(options DesktopSessionOptions) []agent.Tool {
@@ -26,9 +27,25 @@ func DesktopSessionTools(options DesktopSessionOptions) []agent.Tool {
 	}
 	shared := desktopSessionTool{sessionID: options.SessionID, controller: options.Controller, policy: options.Policy}
 	return []agent.Tool{
-		desktopWindowTool{shared}, desktopScreenshotTool{shared}, desktopActivateTool{shared},
+		desktopWindowTool{shared}, desktopScreenshotTool{shared}, desktopActivateTool{desktopSessionTool: shared},
 		desktopClickTool{shared}, desktopTypeTool{shared}, desktopPressTool{shared},
 	}
+}
+
+// DesktopActivationTool is the sole function tool paired with the native
+// computer protocol. Structured computer actions cannot activate an app, so
+// this narrowly exposes only a developer-approved bundle identifier. It does
+// not return a screenshot; a subsequent computer screenshot action supplies
+// visual state through the provider-native continuation.
+func DesktopActivationTool(options DesktopSessionOptions) agent.Tool {
+	if strings.TrimSpace(options.SessionID) == "" || options.Controller == nil {
+		return nil
+	}
+	ids := make([]string, 0, len(options.ApprovedApplications))
+	for _, app := range options.ApprovedApplications {
+		ids = append(ids, app.BundleID)
+	}
+	return desktopActivateTool{desktopSessionTool{sessionID: options.SessionID, controller: options.Controller, policy: options.Policy}, ids}
 }
 
 type desktopSessionTool struct {
@@ -38,7 +55,10 @@ type desktopSessionTool struct {
 }
 type desktopWindowTool struct{ desktopSessionTool }
 type desktopScreenshotTool struct{ desktopSessionTool }
-type desktopActivateTool struct{ desktopSessionTool }
+type desktopActivateTool struct {
+	desktopSessionTool
+	approvedBundleIDs []string
+}
 type desktopClickTool struct{ desktopSessionTool }
 type desktopTypeTool struct{ desktopSessionTool }
 type desktopPressTool struct{ desktopSessionTool }
@@ -78,8 +98,12 @@ func (tool desktopScreenshotTool) Execute(ctx context.Context, raw json.RawMessa
 	return result, nil
 }
 
-func (desktopActivateTool) Definition() agent.ToolDefinition {
-	return agent.ToolDefinition{Name: "desktop_activate", Description: "Bring one developer-approved macOS application to the foreground. This action always requires fresh developer approval.", Parameters: schema(`{"type":"object","additionalProperties":false,"required":["bundle_id"],"properties":{"bundle_id":{"type":"string","minLength":3,"maxLength":255}}}`)}
+func (tool desktopActivateTool) Definition() agent.ToolDefinition {
+	approved := "the developer-approved application"
+	if len(tool.approvedBundleIDs) > 0 {
+		approved = strings.Join(tool.approvedBundleIDs, ", ")
+	}
+	return agent.ToolDefinition{Name: "desktop_activate", Description: "Bring one developer-approved macOS application to the foreground. Allowed bundle identifiers: " + approved + ". This action always requires fresh developer approval.", Parameters: schema(`{"type":"object","additionalProperties":false,"required":["bundle_id"],"properties":{"bundle_id":{"type":"string","minLength":3,"maxLength":255}}}`)}
 }
 func (tool desktopActivateTool) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolResult, error) {
 	var arguments struct {

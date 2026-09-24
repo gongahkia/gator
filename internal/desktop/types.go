@@ -51,6 +51,18 @@ type Window struct {
 	Title       string      `json:"title,omitempty"`
 	ID          uint32      `json:"-"`
 	PID         int         `json:"-"`
+	X           float64     `json:"-"`
+	Y           float64     `json:"-"`
+	Width       float64     `json:"-"`
+	Height      float64     `json:"-"`
+}
+
+// Point is a screen coordinate in a model-visible captured window. The
+// controller converts it to a macOS global coordinate only after verifying
+// that the capture and foreground window still match.
+type Point struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
 }
 
 // Capture is deliberately ephemeral. The runner can attach its image to the
@@ -68,6 +80,10 @@ type Runtime interface {
 	Screenshot(context.Context, Window) ([]byte, error)
 	Activate(context.Context, string) error
 	Click(context.Context, float64, float64) error
+	DoubleClick(context.Context, float64, float64) error
+	Drag(context.Context, []Point) error
+	Move(context.Context, float64, float64) error
+	Scroll(context.Context, float64, float64, int, int) error
 	Type(context.Context, string) error
 	Press(context.Context, string) error
 	FocusedFieldSensitive(context.Context, int) (bool, error)
