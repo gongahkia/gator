@@ -114,7 +114,7 @@ func InspectWorkTransaction(stateDir, workID string, expectedMode action.Mode) (
 		}
 		return result, nil
 	}
-	result.Verification = verificationDimension(record, bundle)
+	result.Verification = verificationDimension(stateRoot, record, bundle)
 	result.ExternalActions = externalActionDimension(bundle.Manifest.Actions)
 
 	deliveryStore, err := delivery.Open(stateRoot)
@@ -175,7 +175,14 @@ func openHistoryBundle(record workhistory.Record) (artifact.Bundle, error) {
 	return bundle, nil
 }
 
-func verificationDimension(record workhistory.Record, bundle artifact.Bundle) TransactionDimension {
+func verificationDimension(stateRoot string, record workhistory.Record, bundle artifact.Bundle) TransactionDimension {
+	source, err := snapshot.Open(stateRoot, record.SnapshotID)
+	if err != nil {
+		return TransactionDimension{State: transactionUnavailable, Error: "open recorded source snapshot: " + err.Error()}
+	}
+	if bundle.Manifest.Source.SnapshotSHA256 != source.SHA256 {
+		return TransactionDimension{State: transactionFailed, Error: "retained manifest source snapshot does not match canonical history"}
+	}
 	verification := workhistory.VerificationPassed
 	for _, check := range bundle.Manifest.Validations {
 		if !check.Passed {
@@ -188,9 +195,6 @@ func verificationDimension(record workhistory.Record, bundle artifact.Bundle) Tr
 	}
 	if record.ArtifactStatus != string(bundle.Manifest.Status) || record.VerificationStatus != verification {
 		return TransactionDimension{State: transactionFailed, Error: "history verification projection does not match retained manifest"}
-	}
-	if bundle.Manifest.Source.SnapshotSHA256 == "" {
-		return TransactionDimension{State: transactionUnavailable, Error: "retained manifest has no source snapshot digest"}
 	}
 	if verification == workhistory.VerificationPassed {
 		return TransactionDimension{State: transactionPassed, Evidence: "sealed artifact validations passed"}

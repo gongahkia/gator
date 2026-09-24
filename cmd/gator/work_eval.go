@@ -89,6 +89,7 @@ func workEvalCommand(args []string, out io.Writer) error {
 	model := flags.String("model", "", "live model")
 	requests := flags.Int("max-model-requests", 0, "total live model request budget")
 	seconds := flags.Int("timeout-seconds", 0, "total live wall budget")
+	split := flags.String("split", eval.WorkSplitDevelopment, "dataset split: development (default), held-out, or all")
 	if err := flags.Parse(args[2:]); err != nil {
 		return err
 	}
@@ -108,7 +109,7 @@ func workEvalCommand(args []string, out io.Writer) error {
 		ctx, cancel = context.WithTimeout(ctx, time.Duration(*seconds)*time.Second)
 		defer cancel()
 	}
-	options := eval.WorkEvalOptions{DisabledRoles: disabledRoles, ID: *id, Harness: commit, Provider: *provider, Model: *model, ReportDir: absolute, Attempts: *attempts, Delegation: *delegation, Live: *live, MaxRequests: *requests}
+	options := eval.WorkEvalOptions{DisabledRoles: disabledRoles, ID: *id, Harness: commit, Provider: *provider, Model: *model, ReportDir: absolute, Attempts: *attempts, Delegation: *delegation, Live: *live, MaxRequests: *requests, Split: *split}
 	report, err := eval.RunWorkExperiment(ctx, path, dataset, options, func(c eval.WorkCase, state string) (workrun.Service, error) {
 		if *live {
 			request := workrun.Request{}
@@ -119,7 +120,7 @@ func workEvalCommand(args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(out, "%s: %d/%d trials pass; categories %v. Report: %s\n", report.ID, report.Passed, report.Total, report.Categories, filepath.Join(absolute, "experiment.json"))
+	_, err = fmt.Fprintf(out, "%s: %d/%d trials pass; split=%s; categories %v. Report: %s\n", report.ID, report.Passed, report.Total, report.Split, report.Categories, filepath.Join(absolute, "experiment.json"))
 	if err != nil {
 		return err
 	}

@@ -73,30 +73,31 @@ type Grade struct {
 	Error    string `json:"error,omitempty"`
 }
 type WorkTrial struct {
-	Metrics           WorkMetrics      `json:"metrics"`
-	ExecutionCategory string           `json:"execution_category"`
-	TracePath         string           `json:"trace_path,omitempty"`
-	Spans             []telemetry.Span `json:"spans,omitempty"`
-	Version           int              `json:"version"`
-	ID                string           `json:"id"`
-	CaseID            string           `json:"case_id"`
-	CaseSHA256        string           `json:"case_sha256"`
-	Split             string           `json:"split"`
-	Family            string           `json:"family"`
-	Trial             int              `json:"trial"`
-	Status            string           `json:"status"`
-	Category          string           `json:"category"`
-	Error             string           `json:"error,omitempty"`
-	Grades            []Grade          `json:"grades"`
-	ConversationID    string           `json:"conversation_id"`
-	RevisionID        string           `json:"revision_id"`
-	SnapshotID        string           `json:"snapshot_id"`
-	ContractSHA256    string           `json:"contract_sha256"`
-	PolicySHA256      string           `json:"policy_sha256"`
-	SourceSHA256      string           `json:"source_sha256"`
-	BundlePath        string           `json:"bundle_path"`
-	Usage             agent.Usage      `json:"usage"`
-	DurationMS        int64            `json:"duration_ms"`
+	Metrics           WorkMetrics         `json:"metrics"`
+	Transaction       TransactionFidelity `json:"transaction"`
+	ExecutionCategory string              `json:"execution_category"`
+	TracePath         string              `json:"trace_path,omitempty"`
+	Spans             []telemetry.Span    `json:"spans,omitempty"`
+	Version           int                 `json:"version"`
+	ID                string              `json:"id"`
+	CaseID            string              `json:"case_id"`
+	CaseSHA256        string              `json:"case_sha256"`
+	Split             string              `json:"split"`
+	Family            string              `json:"family"`
+	Trial             int                 `json:"trial"`
+	Status            string              `json:"status"`
+	Category          string              `json:"category"`
+	Error             string              `json:"error,omitempty"`
+	Grades            []Grade             `json:"grades"`
+	ConversationID    string              `json:"conversation_id"`
+	RevisionID        string              `json:"revision_id"`
+	SnapshotID        string              `json:"snapshot_id"`
+	ContractSHA256    string              `json:"contract_sha256"`
+	PolicySHA256      string              `json:"policy_sha256"`
+	SourceSHA256      string              `json:"source_sha256"`
+	BundlePath        string              `json:"bundle_path"`
+	Usage             agent.Usage         `json:"usage"`
+	DurationMS        int64               `json:"duration_ms"`
 }
 type WorkExperiment struct {
 	DisabledRoles   []string       `json:"disabled_roles,omitempty"`
@@ -109,6 +110,7 @@ type WorkExperiment struct {
 	Harness         string         `json:"harness"`
 	Provider        string         `json:"provider"`
 	Model           string         `json:"model"`
+	Split           string         `json:"split"`
 	Scripted        bool           `json:"scripted"`
 	Delegation      bool           `json:"delegation"`
 	Attempts        int            `json:"attempts"`
@@ -123,10 +125,17 @@ type WorkEvalOptions struct {
 	DisabledRoles                           []string
 	MaxRequests                             int
 	ID, Harness, Provider, Model, ReportDir string
+	Split                                   string
 	Attempts                                int
 	Delegation, Live                        bool
 }
 type WorkServiceFactory func(WorkCase, string) (workrun.Service, error)
+
+const (
+	WorkSplitDevelopment = "development"
+	WorkSplitHeldOut     = "held-out"
+	WorkSplitAll         = "all"
+)
 
 func LoadWorkDataset(path string) (WorkDataset, error) {
 	data, err := os.ReadFile(path)
@@ -213,6 +222,30 @@ func workHash(value any) string {
 	hash := sha256.Sum256(data)
 	return hex.EncodeToString(hash[:])
 }
+
+// selectWorkCases makes development evaluation the safe default. Held-out
+// material is still local and inspectable, but callers must deliberately ask
+// for it so routine iteration cannot consume it by accident.
+func selectWorkCases(dataset WorkDataset, requested string) (string, []WorkCase, error) {
+	split := strings.TrimSpace(requested)
+	if split == "" {
+		split = WorkSplitDevelopment
+	}
+	if split != WorkSplitDevelopment && split != WorkSplitHeldOut && split != WorkSplitAll {
+		return "", nil, errors.New("Work evaluation split must be development, held-out, or all")
+	}
+	cases := make([]WorkCase, 0, len(dataset.Cases))
+	for _, item := range dataset.Cases {
+		if split == WorkSplitAll || item.Split == split {
+			cases = append(cases, item)
+		}
+	}
+	if len(cases) == 0 {
+		return "", nil, fmt.Errorf("Work dataset has no %s cases", split)
+	}
+	return split, cases, nil
+}
+
 func RunWorkExperiment(ctx context.Context, datasetPath string, dataset WorkDataset, options WorkEvalOptions, factory WorkServiceFactory) (WorkExperiment, error) {
 	if options.Attempts < 1 || options.Attempts > 10 || !identifierPattern.MatchString(options.ID) || options.ReportDir == "" || factory == nil {
 		return WorkExperiment{}, errors.New("invalid Work experiment options")
@@ -220,10 +253,14 @@ func RunWorkExperiment(ctx context.Context, datasetPath string, dataset WorkData
 	if err := workrun.ValidateDisabledRoles(options.DisabledRoles); err != nil {
 		return WorkExperiment{}, err
 	}
+	split, cases, err := selectWorkCases(dataset, options.Split)
+	if err != nil {
+		return WorkExperiment{}, err
+	}
 	if err := os.Mkdir(options.ReportDir, 0700); err != nil {
 		return WorkExperiment{}, fmt.Errorf("create new experiment directory: %w", err)
 	}
-	report := WorkExperiment{DisabledRoles: append([]string(nil), options.DisabledRoles...), Version: 1, ID: options.ID, Dataset: dataset.ID, DatasetSHA256: workHash(dataset), Target: dataset.Target, Harness: options.Harness, Provider: options.Provider, Model: options.Model, Scripted: !options.Live, Delegation: options.Delegation, Attempts: options.Attempts, Categories: map[string]int{}, Outcomes: map[string]int{}}
+	report := WorkExperiment{DisabledRoles: append([]string(nil), options.DisabledRoles...), Version: 1, ID: options.ID, Dataset: dataset.ID, DatasetSHA256: workHash(dataset), Target: dataset.Target, Harness: options.Harness, Provider: options.Provider, Model: options.Model, Split: split, Scripted: !options.Live, Delegation: options.Delegation, Attempts: options.Attempts, Categories: map[string]int{}, Outcomes: map[string]int{}}
 	var budget *agent.Budget
 	if options.MaxRequests > 0 {
 		budget = &agent.Budget{Limits: agent.Limits{ModelRequests: options.MaxRequests}}
@@ -231,7 +268,7 @@ func RunWorkExperiment(ctx context.Context, datasetPath string, dataset WorkData
 	if err := writeJSON(filepath.Join(options.ReportDir, "dataset.json"), dataset, "retained dataset"); err != nil {
 		return report, err
 	}
-	for _, c := range dataset.Cases {
+	for _, c := range cases {
 		passes := 0
 		for trial := 1; trial <= options.Attempts; trial++ {
 			item := WorkTrial{Version: 1, ID: fmt.Sprintf("%s-%s-%02d", options.ID, c.ID, trial), CaseID: c.ID, CaseSHA256: workHash(c), Split: c.Split, Family: c.Family, Trial: trial, Status: "failed", Category: "task"}
@@ -306,10 +343,21 @@ func RunWorkExperiment(ctx context.Context, datasetPath string, dataset WorkData
 				if runErr == nil {
 					item.ExecutionCategory = "completed"
 				}
+				workID := request.RunID
+				if outcome.Manifest.RunID != "" {
+					workID = outcome.Manifest.RunID
+				}
+				fidelity, fidelityErr := InspectWorkTransaction(state, workID, c.Mode)
+				if fidelityErr != nil {
+					fidelity.History = TransactionDimension{State: transactionFailed, Error: fidelityErr.Error()}
+				}
+				item.Transaction = fidelity
 				after, integrityErr := fixtureDigest(source)
 				integrity := Grade{Kind: "source_integrity", Passed: integrityErr == nil && after == fixture, Evidence: "live fixture tree digest before and after execution"}
 				item.Grades = append(item.Grades, integrity)
-				all := integrity.Passed
+				transaction := transactionHistoryGrade(fidelity)
+				item.Grades = append(item.Grades, transaction)
+				all := integrity.Passed && transaction.Passed
 				for _, grader := range c.Graders {
 					grade := gradeWork(grader, outcome, runErr, c.Contract)
 					item.Grades = append(item.Grades, grade)

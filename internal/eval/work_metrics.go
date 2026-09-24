@@ -99,6 +99,7 @@ func WorkSummary(report WorkExperiment) string {
 	var usage agent.Usage
 	var latency int64
 	var retries, interventions, tools, checks, failed, unsupported int
+	history, verification, delivery, recovery, external := map[string]int{}, map[string]int{}, map[string]int{}, map[string]int{}, map[string]int{}
 	for _, trial := range report.Trials {
 		usageAdd(&usage, trial.Usage)
 		latency += trial.DurationMS
@@ -108,6 +109,11 @@ func WorkSummary(report WorkExperiment) string {
 		checks += trial.Metrics.ArtifactChecks
 		failed += trial.Metrics.FailedArtifactChecks
 		unsupported += trial.Metrics.UnsupportedQuotes
+		history[trial.Transaction.History.State]++
+		verification[trial.Transaction.Verification.State]++
+		delivery[trial.Transaction.Delivery.State]++
+		recovery[trial.Transaction.Recovery.State]++
+		external[trial.Transaction.ExternalActions.State]++
 	}
-	return fmt.Sprintf("%s: %d/%d scored trials; %d cases pass at least once; %d cases pass every trial.\nGrading categories: %v\nExecution outcomes: %v\nRequests: %d (%d without token usage); retries: %d; interventions: %d; tool failures: %d.\nArtifact checks: %d (%d failed); unsupported exact quotations: %d; semantic entailment is not scored by quote matching.\nReported tokens: %d input, %d output; total latency: %d ms; cost: unknown.\nScripted: %t; delegation: %t; provider/model: %s/%s; harness: %s; disabled roles: %v.\n", report.ID, report.Passed, report.Total, report.CasesAtLeastOne, report.CasesAll, report.Categories, report.Outcomes, usage.ModelRequests, usage.UnknownRequests, retries, interventions, tools, checks, failed, unsupported, usage.InputTokens, usage.OutputTokens, latency, report.Scripted, report.Delegation, report.Provider, report.Model, report.Harness, report.DisabledRoles)
+	return fmt.Sprintf("%s: %d/%d scored trials; %d cases pass at least once; %d cases pass every trial.\nSplit: %s. Grading categories: %v\nExecution outcomes: %v\nTransaction: history=%v verification=%v delivery=%v recovery=%v external_actions=%v\nRequests: %d (%d without token usage); retries: %d; interventions: %d; tool failures: %d.\nArtifact checks: %d (%d failed); unsupported exact quotations: %d; semantic entailment is not scored by quote matching.\nReported tokens: %d input, %d output; total latency: %d ms; cost: unknown.\nScripted: %t; delegation: %t; provider/model: %s/%s; harness: %s; disabled roles: %v.\n", report.ID, report.Passed, report.Total, report.CasesAtLeastOne, report.CasesAll, report.Split, report.Categories, report.Outcomes, history, verification, delivery, recovery, external, usage.ModelRequests, usage.UnknownRequests, retries, interventions, tools, checks, failed, unsupported, usage.InputTokens, usage.OutputTokens, latency, report.Scripted, report.Delegation, report.Provider, report.Model, report.Harness, report.DisabledRoles)
 }
