@@ -62,24 +62,22 @@ func workCommand(arguments []string, out io.Writer) error {
 	switch arguments[0] {
 	case "inspect":
 		return inspectTask(arguments[1:], out)
-	case "code", "run":
+	case "code":
 		return codeTask(arguments[1:], out)
 	case "resume":
 		return workResumeCommand(arguments[1:], out)
 	case "eval":
 		return evalCommand(arguments[1:], out)
-	case "transcript":
-		return exportTranscript(arguments[1:], out)
 	case "review":
 		return reviewCommand(arguments[1:], out)
 	case "export":
 		return exportPatch(arguments[1:], out)
 	case "apply":
 		return applyPatch(arguments[1:], out)
+	case "retry":
+		return retryWorkDelivery(arguments[1:], out)
 	case "snapshot":
 		return snapshotCommand(arguments[1:], out)
-	case "worktree":
-		return worktreeCommand(arguments[1:], out)
 	default:
 		return workTask(arguments, out)
 	}
@@ -108,25 +106,21 @@ func workResumeCommand(arguments []string, out io.Writer) error {
 
 func movedCommand(command string) error {
 	canonical := map[string]string{
-		"rpc":        "gator agent rpc",
-		"serve":      "gator agent serve",
-		"acp":        "gator agent acp",
-		"child":      "gator agent child",
-		"delegate":   "gator agent delegate",
-		"hook":       "gator config hook",
-		"connector":  "gator provider connector",
-		"inbox":      "gator job inbox",
-		"snapshot":   "gator work snapshot",
-		"worktree":   "gator work worktree",
-		"inspect":    "gator work inspect",
-		"code":       "gator work code",
-		"run":        "gator work run",
-		"resume":     "gator work resume",
-		"eval":       "gator work eval",
-		"transcript": "gator work transcript",
-		"review":     "gator work review",
-		"export":     "gator work export",
-		"apply":      "gator work apply",
+		"rpc":       "gator agent rpc",
+		"serve":     "gator agent serve",
+		"acp":       "gator agent acp",
+		"child":     "gator agent child",
+		"delegate":  "gator agent delegate",
+		"hook":      "gator config hook",
+		"connector": "gator provider connector",
+		"inbox":     "gator job inbox",
+		"snapshot":  "gator work snapshot",
+		"inspect":   "gator work inspect",
+		"resume":    "gator work resume",
+		"eval":      "gator work eval",
+		"review":    "gator work review",
+		"export":    "gator work export",
+		"apply":     "gator work apply",
 	}
 	return fmt.Errorf("gator %s has moved; use '%s'", command, canonical[command])
 }

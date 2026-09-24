@@ -83,7 +83,4 @@ func TestHostedCodeOmitsNestedScoutAndWriterDelegation(t *testing.T) {
 	if len(omitted) != 2 || omitted[0] != instructions.OmitDelegateWriter || omitted[1] != instructions.OmitDelegateReadOnly {
 		t.Fatalf("omit = %#v", omitted)
 	}
-	if !hostedCodeDisableWriterDelegation {
-		t.Fatal("Work hosted Code must disable writer delegation")
-	}
 }

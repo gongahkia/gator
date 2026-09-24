@@ -79,30 +79,57 @@ func Apply(bundle Bundle, targetPath string, replace bool) (ApplyPlan, error) {
 	if len(conflicts) > 0 {
 		return plan, fmt.Errorf("apply has conflicting targets: %s; review them or pass replace explicitly", strings.Join(conflicts, ", "))
 	}
-	if err := VerifyBundle(bundle); err != nil {
-		return plan, fmt.Errorf("reverify artifact bundle before apply: %w", err)
-	}
-	target, err := workspace.Open(plan.Target)
-	if err != nil {
-		return plan, fmt.Errorf("reopen apply target: %w", err)
-	}
-	for index, operation := range plan.Operations {
+	for _, operation := range plan.Operations {
 		if operation.Disposition == ApplyUnchanged {
 			continue
 		}
-		if err := verifyTargetState(target, operation); err != nil {
-			return plan, fmt.Errorf("target changed after preflight for %q: %w", operation.Path, err)
-		}
-		file := bundle.Manifest.Artifacts[index]
-		contents, err := bundle.Output.ReadRegularFile(filepath.FromSlash(file.Path), bundle.Manifest.Contract.MaxArtifactBytes)
-		if err != nil {
-			return plan, fmt.Errorf("read artifact %q: %w", file.Path, err)
-		}
-		if err := target.WriteRegularFileAtomic(filepath.FromSlash(file.Path), contents, bundle.Manifest.Contract.MaxArtifactBytes); err != nil {
-			return plan, fmt.Errorf("apply artifact %q: %w", file.Path, err)
+		if err := ApplyOne(bundle, plan.Target, operation); err != nil {
+			return plan, err
 		}
 	}
 	return plan, nil
+}
+
+// ApplyOne applies one operation from a verified ApplyPlan. It repeats
+// bundle verification and target precondition checks so a durable delivery
+// record can safely apply one remaining artifact without replaying an entire
+// bundle.
+func ApplyOne(bundle Bundle, targetPath string, operation ApplyOperation) error {
+	if operation.Disposition != ApplyCreate && operation.Disposition != ApplyReplace {
+		return fmt.Errorf("artifact %q is not pending application", operation.Path)
+	}
+	if err := VerifyBundle(bundle); err != nil {
+		return fmt.Errorf("reverify artifact bundle before apply: %w", err)
+	}
+	target, err := workspace.Open(targetPath)
+	if err != nil {
+		return fmt.Errorf("reopen apply target: %w", err)
+	}
+	if pathsOverlap(bundle.Path, target.Path()) {
+		return errors.New("apply target must not overlap the retained artifact bundle")
+	}
+	if err := verifyTargetState(target, operation); err != nil {
+		return fmt.Errorf("target changed after preflight for %q: %w", operation.Path, err)
+	}
+	var file *File
+	for index := range bundle.Manifest.Artifacts {
+		candidate := &bundle.Manifest.Artifacts[index]
+		if candidate.Path == operation.Path {
+			file = candidate
+			break
+		}
+	}
+	if file == nil {
+		return fmt.Errorf("artifact %q is absent from the verified bundle", operation.Path)
+	}
+	contents, err := bundle.Output.ReadRegularFile(filepath.FromSlash(file.Path), bundle.Manifest.Contract.MaxArtifactBytes)
+	if err != nil {
+		return fmt.Errorf("read artifact %q: %w", file.Path, err)
+	}
+	if err := target.WriteRegularFileAtomic(filepath.FromSlash(file.Path), contents, bundle.Manifest.Contract.MaxArtifactBytes); err != nil {
+		return fmt.Errorf("apply artifact %q: %w", file.Path, err)
+	}
+	return nil
 }
 
 func planTarget(target workspace.Root, file File, replace bool) (ApplyOperation, error) {

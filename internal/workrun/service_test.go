@@ -117,18 +117,19 @@ func TestServiceApprovalIsPendingUntilExplicitResponse(t *testing.T) {
 	}
 }
 
-func TestEffectiveConfigurationRetainsIgnoredInstructions(t *testing.T) {
-	payload, err := json.Marshal(effectiveConfiguration(Request{IgnoredInstructionPaths: []string{"AGENTS.md"}}))
+func TestEffectiveConfigurationRetainsWorkAuthority(t *testing.T) {
+	payload, err := json.Marshal(effectiveConfiguration(Request{IgnoredInstructionPaths: []string{"AGENTS.md"}, RequireCode: true}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	var configuration struct {
 		IgnoredInstructions []string
+		RequireCode         bool
 	}
 	if err := json.Unmarshal(payload, &configuration); err != nil {
 		t.Fatal(err)
 	}
-	if len(configuration.IgnoredInstructions) != 1 || configuration.IgnoredInstructions[0] != "AGENTS.md" {
+	if len(configuration.IgnoredInstructions) != 1 || configuration.IgnoredInstructions[0] != "AGENTS.md" || !configuration.RequireCode {
 		t.Fatalf("ignored instructions = %#v", configuration.IgnoredInstructions)
 	}
 }

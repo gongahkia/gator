@@ -102,7 +102,10 @@ type RunOptions struct {
 	WebOrigins              []string
 	IgnoredInstructionPaths []string
 	RefreshSource           bool
-	Code                    CodeOptions
+	// RequireCode makes the next Work execution require retained Code patch
+	// evidence, matching the CLI's explicit `gator work code` route.
+	RequireCode bool
+	Code        CodeOptions
 }
 
 type CodeOptions struct {

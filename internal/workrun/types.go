@@ -1,6 +1,6 @@
-// Package workrun orchestrates provider-independent, non-Git work sessions.
-// It keeps general artifact work separate from the coding workflow in
-// internal/run while sharing the same agent loop and provider adapters.
+// Package workrun orchestrates provider-independent, non-Git Work sessions.
+// Coding is an internal bounded specialist that returns evidence to Work; its
+// native execution engine is intentionally separate from legacy run sessions.
 package workrun
 
 import (
@@ -112,9 +112,9 @@ type Request struct {
 	// available only to an explicitly computer-use-capable provider model.
 	DesktopSession string
 	ApproveDesktop func(context.Context, []string) (tools.CommandDecision, error)
-	// RequireCode is used by the compatibility `gator work code` route. It keeps the
-	// main Work manager user-facing while requiring concrete Code-specialist
-	// evidence before the run may complete.
+	// RequireCode keeps Work user-facing while requiring concrete
+	// Code-specialist evidence before the Work transaction may complete. The
+	// CLI's explicit `gator work code` route and the TUI's /code mode set it.
 	RequireCode        bool
 	Code               CodePolicy
 	ApproveCodeCommand func(context.Context, []string) (tools.CommandDecision, error)
@@ -123,17 +123,18 @@ type Request struct {
 // Outcome retains staged files and trusted evidence even when model execution
 // fails. Source is never modified by the executor.
 type Outcome struct {
-	Work           workspace.Work
-	Manifest       artifact.Manifest
-	Result         agent.Result
-	Events         []agent.Event
-	ConversationID string
-	RevisionID     string
-	SnapshotID     string
-	SourceSnapshot snapshot.Manifest
+	Work             workspace.Work
+	Manifest         artifact.Manifest
+	Result           agent.Result
+	Events           []agent.Event
+	ConversationID   string
+	RevisionID       string
+	ParentRevisionID string
+	SnapshotID       string
+	SourceSnapshot   snapshot.Manifest
 }
 
-// CodeRequest asks the existing Gator Code engine to work against the exact
+// CodeRequest asks Gator's Code specialist to work against the exact
 // frozen source selected by a Work run. The implementation must isolate all
 // writes and return a reviewable patch rather than mutate SourcePath.
 type CodeRequest struct {

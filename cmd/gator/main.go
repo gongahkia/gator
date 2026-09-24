@@ -84,20 +84,19 @@ Usage:
   gator work [--source DIRECTORY] [--connector ID] [--artifact PATH] [--image PATH] [--attach PATH] [--require-contains PATH=TEXT] [--mode inspect|draft|act] [--actions forbid|draft|approve] [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] [CODE POLICY] [--json] TASK
   gator -w [OPTIONS] TASK
   gator work list
-  gator work show|history|back CONVERSATION
+  gator work show WORK_ID|CONVERSATION_ID
+  gator work history|back CONVERSATION_ID
   gator work forward CONVERSATION [REVISION]
   gator work resume [--refresh-source] [--parent REVISION] CONVERSATION TASK
   gator work inspect [OPTIONS] TASK
   gator work code [CODE POLICY] TASK
-  gator work run [CODE POLICY] TASK
   gator work eval DIR [OPTIONS]
   gator work eval suite DIR [OPTIONS]
-  gator work transcript RUN_RECORD_PATH > transcript.html
-  gator work review WORK_BUNDLE|RUN_RECORD_PATH [OPTIONS]
-  gator work export WORK_BUNDLE|RUN_RECORD_PATH [OPTIONS]
-  gator work apply WORK_BUNDLE|RUN_RECORD_PATH [OPTIONS]
+  gator work review WORK_BUNDLE|WORK_ID [OPTIONS]
+  gator work export WORK_BUNDLE|WORK_ID [OPTIONS]
+  gator work apply WORK_BUNDLE|WORK_ID [OPTIONS]
+  gator work retry WORK_ID [--delivery DELIVERY_ID] [--json]
   gator work snapshot list|show ID|gc --yes
-  gator work worktree list|prune|remove RUN_ID --yes
 
 Commands:
   agent, -a      profiles, child work, delegated agents, and local agent interfaces
@@ -128,10 +127,9 @@ const codeUsage = `Gator coding — one Gator manager with an internal Code spec
 
 Usage:
   gator work code [CODE POLICY] TASK
-  gator work run [CODE POLICY] TASK
 
-Both commands use the main Gator orchestration path and require retained Code
-patch evidence. They never open a standalone Code session or TUI.
+This command uses the main Gator orchestration path and requires retained Code
+patch evidence. It never opens a standalone Code session or TUI.
 
 Code policy:
   --code-max-steps N
@@ -212,12 +210,8 @@ func run(args []string, out io.Writer) error {
 		return workHeadless(context.Background(), os.Stdin, out)
 	case "work", "-w":
 		return workCommand(args[1:], out)
-	case "rpc", "serve", "acp", "child", "delegate", "hook", "connector", "inbox", "snapshot", "worktree", "inspect", "code", "run", "resume", "eval", "transcript", "review", "export", "apply":
+	case "rpc", "serve", "acp", "child", "delegate", "hook", "connector", "inbox", "snapshot", "inspect", "resume", "eval", "review", "export", "apply":
 		return movedCommand(args[0])
-	case "fork":
-		return errors.New("standalone Code forks are retired; branch a Gator conversation with 'gator work resume --parent REVISION CONVERSATION TASK'")
-	case "clone":
-		return errors.New("standalone Code clones are retired; continue or branch a retained Gator conversation instead")
 	default:
 		return fmt.Errorf("unknown command %q; run 'gator --help'", args[0])
 	}

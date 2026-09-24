@@ -9,13 +9,17 @@ import (
 
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/auth"
+	"github.com/gongahkia/gator/internal/codeexec"
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/extension"
+	"github.com/gongahkia/gator/internal/hooks"
 	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/localmodel"
+	"github.com/gongahkia/gator/internal/lsp"
+	"github.com/gongahkia/gator/internal/mcp"
 	"github.com/gongahkia/gator/internal/model"
 	"github.com/gongahkia/gator/internal/model/chatcompletions"
-	gatorrun "github.com/gongahkia/gator/internal/run"
+	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/tools"
 )
 
@@ -66,31 +70,53 @@ func modelFromProviderName(provider string) string {
 	return ""
 }
 
-func newExecutor(providerName, modelName, baseURL string) (gatorrun.Executor, error) {
+// nativeExecutorConfiguration is the shared provider/model construction used
+// by the Work-owned Code specialist and the temporary legacy run transport.
+// It is configuration, not an execution lifecycle.
+type nativeExecutorConfiguration struct {
+	Model          agent.Model
+	Extensions     extension.Resolver
+	HookTrusts     []hooks.Trust
+	LSPTrusts      []lsp.Trust
+	MCPTrusts      []mcp.Trust
+	MCPCredentials auth.Store
+	HTTP           tools.HTTPFetchOptions
+	Sandbox        sandbox.Policy
+}
+
+func newCodeExecutor(providerName, modelName, baseURL string) (codeexec.Executor, error) {
+	configuration, err := newNativeExecutorConfiguration(providerName, modelName, baseURL)
+	if err != nil {
+		return codeexec.Executor{}, err
+	}
+	return configuration.codeExecutor(), nil
+}
+
+func newNativeExecutorConfiguration(providerName, modelName, baseURL string) (nativeExecutorConfiguration, error) {
 	settings, err := loadSettings()
 	if err != nil {
-		return gatorrun.Executor{}, err
+		return nativeExecutorConfiguration{}, err
 	}
 	custom, found := configuredCustomProvider(settings, providerName)
 	if found {
-		return newCustomExecutor(settings, custom, modelName, baseURL)
+		return newCustomExecutorConfiguration(settings, custom, modelName, baseURL)
 	}
 	if strings.TrimSpace(baseURL) == "" {
 		baseURL = settings.ProviderEndpoint(providerName)
 	}
 	provider, err := model.ParseProvider(providerName)
 	if err != nil {
-		return gatorrun.Executor{}, err
+		return nativeExecutorConfiguration{}, err
 	}
 	if provider == model.Claude {
-		return gatorrun.Executor{}, fmt.Errorf("Claude.ai subscription OAuth is not a supported native Gator provider; use provider %q with an API key or 'gator agent delegate claude run ...'", model.Anthropic)
+		return nativeExecutorConfiguration{}, fmt.Errorf("Claude.ai subscription OAuth is not a supported native Gator provider; use provider %q with an API key or 'gator agent delegate claude run ...'", model.Anthropic)
 	}
 	credentials, err := gatorCredentials()
 	if err != nil {
-		return gatorrun.Executor{}, err
+		return nativeExecutorConfiguration{}, err
 	}
 	if err := refreshProviderCredential(context.Background(), provider, credentials, oauthFlow, time.Now()); err != nil {
-		return gatorrun.Executor{}, err
+		return nativeExecutorConfiguration{}, err
 	}
 	backend, err := model.New(model.Config{
 		Provider:        provider,
@@ -100,31 +126,31 @@ func newExecutor(providerName, modelName, baseURL string) (gatorrun.Executor, er
 		ProviderOptions: settings.OptionsForProvider(providerName),
 	})
 	if err != nil {
-		return gatorrun.Executor{}, err
+		return nativeExecutorConfiguration{}, err
 	}
-	return executorWithExtensions(backend.Model, settings)
+	return executorConfigurationWithExtensions(backend.Model, settings)
 }
 
-func newCustomExecutor(settings config.Settings, provider config.CustomProvider, modelName, baseURL string) (gatorrun.Executor, error) {
+func newCustomExecutorConfiguration(settings config.Settings, provider config.CustomProvider, modelName, baseURL string) (nativeExecutorConfiguration, error) {
 	if strings.TrimSpace(modelName) == "" {
 		modelName = provider.DefaultModel
 	}
 	if !customProviderSupportsModel(provider, modelName) {
-		return gatorrun.Executor{}, fmt.Errorf("model %q is not configured for custom provider %q", modelName, provider.ID)
+		return nativeExecutorConfiguration{}, fmt.Errorf("model %q is not configured for custom provider %q", modelName, provider.ID)
 	}
 	if strings.TrimSpace(baseURL) == "" {
 		baseURL = provider.BaseURL
 	}
 	if provider.ID == localmodel.ProviderID {
 		if _, err := localmodel.NewClientFromChatCompletionsURL(baseURL); err != nil {
-			return gatorrun.Executor{}, fmt.Errorf("managed local provider endpoint: %w", err)
+			return nativeExecutorConfiguration{}, fmt.Errorf("managed local provider endpoint: %w", err)
 		}
 		reviewed, found := localmodel.Resolve(modelName)
 		if !found {
-			return gatorrun.Executor{}, fmt.Errorf("managed local provider model %q is not in Gator's reviewed catalog", modelName)
+			return nativeExecutorConfiguration{}, fmt.Errorf("managed local provider model %q is not in Gator's reviewed catalog", modelName)
 		}
 		if err := requireLocalModelEligibility(reviewed); err != nil {
-			return gatorrun.Executor{}, err
+			return nativeExecutorConfiguration{}, err
 		}
 	}
 	apiKey := ""
@@ -140,21 +166,21 @@ func newCustomExecutor(settings config.Settings, provider config.CustomProvider,
 		ProviderName:     "custom provider " + provider.ID,
 	}}
 	if provider.ID == localmodel.ProviderID {
-		return executorWithExtensions(localmodel.TextOnlyModel{Backend: backend}, settings)
+		return executorConfigurationWithExtensions(localmodel.TextOnlyModel{Backend: backend}, settings)
 	}
-	return executorWithExtensions(backend, settings)
+	return executorConfigurationWithExtensions(backend, settings)
 }
 
-func executorWithExtensions(backend agent.Model, settings config.Settings) (gatorrun.Executor, error) {
+func executorConfigurationWithExtensions(backend agent.Model, settings config.Settings) (nativeExecutorConfiguration, error) {
 	extensions, err := extension.DefaultResolver(settings)
 	if err != nil {
-		return gatorrun.Executor{}, err
+		return nativeExecutorConfiguration{}, err
 	}
 	credentials, err := gatorCredentials()
 	if err != nil {
-		return gatorrun.Executor{}, err
+		return nativeExecutorConfiguration{}, err
 	}
-	return gatorrun.Executor{
+	return nativeExecutorConfiguration{
 		Model:          backend,
 		Extensions:     extensions,
 		HookTrusts:     settings.HookTrusts,
@@ -166,6 +192,14 @@ func executorWithExtensions(backend agent.Model, settings config.Settings) (gato
 		},
 		Sandbox: settings.Execution,
 	}, nil
+}
+
+func (configuration nativeExecutorConfiguration) codeExecutor() codeexec.Executor {
+	return codeexec.Executor{
+		Model: configuration.Model, Extensions: configuration.Extensions,
+		HookTrusts: configuration.HookTrusts, LSPTrusts: configuration.LSPTrusts, MCPTrusts: configuration.MCPTrusts,
+		MCPCredentials: configuration.MCPCredentials, HTTP: configuration.HTTP, Sandbox: configuration.Sandbox,
+	}
 }
 
 // resolveConfiguredProvider uses the persisted custom-model catalog first,

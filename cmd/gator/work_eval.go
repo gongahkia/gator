@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/codeexec"
 	"github.com/gongahkia/gator/internal/eval"
-	gatorrun "github.com/gongahkia/gator/internal/run"
 	"github.com/gongahkia/gator/internal/workrun"
 )
 
@@ -145,7 +145,7 @@ func scriptedWorkService(c eval.WorkCase, state string) workrun.Service {
 		if specific, ok := c.RoleTurns["code."+request.Task]; ok {
 			turns = specific
 		}
-		backend := &nativeWorkBackend{code: gatorrun.Executor{Model: &eval.ScriptedModel{Turns: replace(turns)}}, provider: "scripted", model: "fixture"}
+		backend := &nativeWorkBackend{code: codeexec.Executor{Model: &eval.ScriptedModel{Turns: replace(turns)}}}
 		return backend.codeDelegate(state)(ctx, request)
 	}
 	return workrun.Service{Executor: executor}

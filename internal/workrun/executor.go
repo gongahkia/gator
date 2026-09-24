@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	gatorrun "github.com/gongahkia/gator/internal/run"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -26,6 +25,7 @@ import (
 	"github.com/gongahkia/gator/internal/snapshot"
 	"github.com/gongahkia/gator/internal/telemetry"
 	"github.com/gongahkia/gator/internal/tools"
+	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/worksession"
 	"github.com/gongahkia/gator/internal/workspace"
 )
@@ -74,6 +74,39 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	}
 	e.RoleModels = roles
 	startedAt := now()
+	policySHA256, err := PolicyDigest(request)
+	if err != nil {
+		return Outcome{}, fmt.Errorf("digest Work policy: %w", err)
+	}
+	history, err := workhistory.Open(request.StateDir)
+	if err != nil {
+		return Outcome{}, err
+	}
+	if _, err := history.Start(workhistory.Start{
+		ID: request.RunID, Objective: request.Objective, Mode: request.Mode, ExternalActions: request.Contract.ExternalActions,
+		PolicySHA256: policySHA256, ConversationID: request.ConversationID, ParentRevisionID: request.ParentRevisionID,
+		StartedAt: startedAt,
+		Evidence: workhistory.EvidenceReferences{
+			TracePath:        filepath.Join(request.StateDir, "gator", "traces", request.RunID, "trace.json"),
+			InteractionsPath: filepath.Join(request.StateDir, "gator", "interactions", request.RunID),
+			TasksPath:        filepath.Join(request.StateDir, "gator", "tasks", request.RunID),
+			CandidatesPath:   filepath.Join(request.StateDir, "gator", "candidates", request.RunID),
+			DeliveriesPath:   filepath.Join(request.StateDir, "gator", "delivery", request.RunID),
+		},
+	}); err != nil {
+		return Outcome{}, fmt.Errorf("start Work history: %w", err)
+	}
+	defer func() {
+		_, err := history.Finish(request.RunID, workhistory.Finish{
+			ConversationID: finalOutcome.ConversationID, RevisionID: finalOutcome.RevisionID, ParentRevisionID: finalOutcome.ParentRevisionID,
+			SnapshotID: finalOutcome.SnapshotID, ArtifactManifestPath: finalOutcome.Work.ManifestPath,
+			ArtifactStatus: string(finalOutcome.Manifest.Status), VerificationStatus: historyVerification(finalOutcome.Manifest),
+			Succeeded: finalErr == nil && finalOutcome.Manifest.Status == artifact.Completed, FinishedAt: now(),
+		})
+		if err != nil {
+			finalErr = errors.Join(finalErr, fmt.Errorf("retain Work history: %w", err))
+		}
+	}()
 	trace := telemetry.New(request.RunID, startedAt)
 	defer func() {
 		if err := trace.Finish(filepath.Join(request.StateDir, "gator", "traces", request.RunID), request.OTLPEndpoint); err != nil {
@@ -167,11 +200,12 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 			return Outcome{}, err
 		}
 	}
+	outcome := Outcome{ConversationID: conversation.ID, ParentRevisionID: request.ParentRevisionID, SnapshotID: sourceSnapshot.ID, SourceSnapshot: sourceSnapshot}
 	work, err := workspace.CreateWork(sourceSnapshot.Materialized, request.StateDir, request.RunID, startedAt)
 	if err != nil {
-		return Outcome{}, err
+		return outcome, err
 	}
-	outcome := Outcome{Work: work, ConversationID: conversation.ID, RevisionID: request.RunID, SnapshotID: sourceSnapshot.ID, SourceSnapshot: sourceSnapshot}
+	outcome.Work = work
 	var previousRoot workspace.Root
 	if request.ParentRevisionID != "" {
 		parent, loadErr := sessions.LoadRevision(conversation.ID, request.ParentRevisionID)
@@ -388,7 +422,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		})
 	}
 
-	initial, summary, compacted, compactErr := gatorrun.CompactContext(ctx, e.Model, initial)
+	initial, summary, compacted, compactErr := compactRetainedContext(ctx, e.Model, initial)
 	if compactErr != nil {
 		return outcome, compactErr
 	}
@@ -479,6 +513,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		}
 		return outcome, fmt.Errorf("retain Work revision: %w", err)
 	}
+	outcome.RevisionID = request.RunID
 	if runErr != nil {
 		return outcome, runErr
 	}
@@ -486,6 +521,21 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		return outcome, errors.New("work outcome contract did not pass")
 	}
 	return outcome, nil
+}
+
+func historyVerification(manifest artifact.Manifest) workhistory.VerificationStatus {
+	if manifest.RunID == "" {
+		return workhistory.VerificationUnavailable
+	}
+	for _, validation := range manifest.Validations {
+		if !validation.Passed {
+			return workhistory.VerificationFailed
+		}
+	}
+	if manifest.Status == artifact.Failed {
+		return workhistory.VerificationFailed
+	}
+	return workhistory.VerificationPassed
 }
 
 // sanitizeComputerReplay ensures raw desktop screenshots and provider-side

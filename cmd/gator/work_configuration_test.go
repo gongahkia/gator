@@ -13,15 +13,16 @@ import (
 
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/codeexec"
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/eval"
 	"github.com/gongahkia/gator/internal/extension"
 	"github.com/gongahkia/gator/internal/hooks"
 	"github.com/gongahkia/gator/internal/lsp"
 	"github.com/gongahkia/gator/internal/mcp"
-	gatorrun "github.com/gongahkia/gator/internal/run"
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/snapshot"
+	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workrun"
 )
 
@@ -100,7 +101,7 @@ func TestWorkCodeResolvesCapturedIntegrationsUsingOriginalTrust(t *testing.T) {
 		t.Fatal(err)
 	}
 	codeScript := &eval.ScriptedModel{Turns: []agent.Turn{depthCall("apply_patch", map[string]string{"patch": "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-base\n+changed\n"}), depthCall("git_status", map[string]any{}), depthCall("git_diff", map[string]any{}), depthCall("run_command", map[string]any{"argv": []string{"git", "diff", "--check"}}), {Text: "Verified"}}}
-	backend := &nativeWorkBackend{provider: "scripted", model: "fixture", code: gatorrun.Executor{HookTrusts: []hooks.Trust{{Repository: source, Hash: hookHash}}, MCPTrusts: []mcp.Trust{{Repository: source, Hash: mcpHash}}, LSPTrusts: []lsp.Trust{{Repository: source, Hash: lspHash}}, Extensions: extension.NewResolver(store, settings), Model: depthModel(func(ctx context.Context, r agent.TurnRequest) (agent.Turn, error) {
+	backend := &nativeWorkBackend{code: codeexec.Executor{HookTrusts: []hooks.Trust{{Repository: source, Hash: hookHash}}, MCPTrusts: []mcp.Trust{{Repository: source, Hash: mcpHash}}, LSPTrusts: []lsp.Trust{{Repository: source, Hash: lspHash}}, Extensions: extension.NewResolver(store, settings), Model: depthModel(func(ctx context.Context, r agent.TurnRequest) (agent.Turn, error) {
 		for _, text := range []string{"amber profile", "amber scoped", "amber extension"} {
 			if !strings.Contains(r.System, text) {
 				t.Errorf("missing frozen instruction %q", text)
@@ -134,6 +135,17 @@ func TestWorkCodeResolvesCapturedIntegrationsUsingOriginalTrust(t *testing.T) {
 	}
 	if len(outcome.Manifest.Subagents) != 1 || outcome.Manifest.Subagents[0].Status != "completed" || initialized.Load() != 1 {
 		t.Fatalf("Code evidence: %+v; initialized=%d", outcome.Manifest.Subagents, initialized.Load())
+	}
+	history, err := workhistory.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := history.Load(outcome.Work.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if record.Status != workhistory.Completed || record.Evidence.ArtifactManifestPath != outcome.Work.ManifestPath || record.SnapshotID != outcome.SnapshotID || record.RevisionID != outcome.RevisionID {
+		t.Fatalf("Code Work transaction = %#v; outcome = %#v", record, outcome)
 	}
 	hookSeen := false
 	for _, event := range outcome.Events {

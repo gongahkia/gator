@@ -76,6 +76,31 @@ func TestConversationSessionControlsReachEachRun(t *testing.T) {
 	}
 }
 
+func TestCodeModeRequiresTheSharedWorkCodeSpecialist(t *testing.T) {
+	var got RunOptions
+	model := New(Config{CurrentFolder: "/work", Run: func(_, _, _ string, options RunOptions) RunResult {
+		got = options
+		return RunResult{FinalText: "done"}
+	}})
+	model.input = "/code on"
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if !model.options.RequireCode {
+		t.Fatal("/code on did not enable the Work Code requirement")
+	}
+	model.input = "implement the patch"
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if command == nil {
+		t.Fatal("Code Work did not start")
+	}
+	updated, _ = model.Update(command())
+	model = updated.(Model)
+	if !got.RequireCode || !strings.Contains(model.View(), "done") {
+		t.Fatalf("Code Work options = %#v\n%s", got, model.View())
+	}
+}
+
 func TestSourceIgnoreCommandsManageProjectInstructionPaths(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work"})
 	for _, command := range []string{"/source ignore AGENTS.md", "/source ignored"} {
@@ -395,7 +420,7 @@ func TestCommandPaletteContainsCurrentCommands(t *testing.T) {
 	model.openCommandPalette()
 	expected := []string{
 		"/help", "/new", "/model", "/effort", "/attach", "/detach", "/source", "/source-refresh", "/source ignore", "/source unignore",
-		"/mode", "/artifact", "/connector", "/web-origin", "/status", "/statusline", "/permissions",
+		"/mode", "/code", "/artifact", "/connector", "/web-origin", "/status", "/statusline", "/permissions",
 		"/doctor", "/agents", "/settings", "/theme", "/history", "/revision-back", "/revision-forward", "/review",
 		"/save", "/apply", "/copy", "/queue", "/dequeue", "/clear-queue", "exit", "/quit",
 	}
@@ -651,16 +676,16 @@ func TestComposerCommandsAcceptPathsWithFlexibleWhitespace(t *testing.T) {
 	}
 }
 
-func TestWorkTUIDoesNotAcceptCodeCommands(t *testing.T) {
+func TestWorkTUIRejectsUnsupportedCodeCommandOptions(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work"})
 	initial := cloneRunOptions(model.options)
 	model.input = "/code verify go test ./..."
 	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
-	if command != nil || !strings.Contains(model.View(), "unknown command /code") {
-		t.Fatalf("Code command was still dispatched: %#v\n%s", model, model.View())
+	if command != nil || !strings.Contains(model.View(), "usage: /code on|off") {
+		t.Fatalf("Code command validation = %#v\n%s", model, model.View())
 	}
-	if !reflect.DeepEqual(model.options.Code, initial.Code) {
+	if model.options.RequireCode || !reflect.DeepEqual(model.options.Code, initial.Code) {
 		t.Fatalf("Code settings changed from %#v to %#v", initial.Code, model.options.Code)
 	}
 }

@@ -13,6 +13,7 @@ import (
 	"unicode"
 
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/delivery"
 )
 
 const maxWorkspaceBuckets = 4096
@@ -103,6 +104,10 @@ func resolveWorkBundle(reference, stateDir string) (artifact.Bundle, bool, error
 }
 
 func reviewWorkBundle(out io.Writer, bundle artifact.Bundle, jsonOutput, includePreviews bool) error {
+	return reviewWorkBundleWithDelivery(out, bundle, nil, jsonOutput, includePreviews)
+}
+
+func reviewWorkBundleWithDelivery(out io.Writer, bundle artifact.Bundle, store *delivery.Store, jsonOutput, includePreviews bool) error {
 	if err := artifact.VerifyBundle(bundle); err != nil {
 		return err
 	}
@@ -114,12 +119,20 @@ func reviewWorkBundle(out io.Writer, bundle artifact.Bundle, jsonOutput, include
 			return err
 		}
 	}
+	deliveries := []delivery.Record(nil)
+	if store != nil {
+		deliveries, err = store.ListWork(bundle.Manifest.RunID)
+		if err != nil {
+			return err
+		}
+	}
 	if jsonOutput {
 		return json.NewEncoder(out).Encode(struct {
-			Verified bool               `json:"verified"`
-			Manifest artifact.Manifest  `json:"manifest"`
-			Previews []artifact.Preview `json:"previews,omitempty"`
-		}{Verified: true, Manifest: bundle.Manifest, Previews: previews})
+			Verified   bool               `json:"verified"`
+			Manifest   artifact.Manifest  `json:"manifest"`
+			Deliveries []delivery.Record  `json:"deliveries,omitempty"`
+			Previews   []artifact.Preview `json:"previews,omitempty"`
+		}{Verified: true, Manifest: bundle.Manifest, Deliveries: deliveries, Previews: previews})
 	}
 	manifest := bundle.Manifest
 	if _, err := fmt.Fprintf(out, "Gator Work Review\n  run: %s\n  status: %s (verified)\n  objective: %s\n  source: %s (sha256:%s)\n  contract: sha256:%s\n", manifest.RunID, manifest.Status, terminalSafe(manifest.Objective), manifest.Source.Name, manifest.Source.IdentitySHA256[:12], manifest.ContractSHA256[:12]); err != nil {
@@ -180,6 +193,26 @@ func reviewWorkBundle(out io.Writer, bundle artifact.Bundle, jsonOutput, include
 	for _, file := range manifest.Artifacts {
 		if _, err := fmt.Fprintf(out, "  ✓ %s  %s  %d bytes  sha256:%s\n", file.Path, file.MediaType, file.Bytes, file.SHA256[:12]); err != nil {
 			return err
+		}
+	}
+	if store != nil {
+		if _, err := fmt.Fprintln(out, "\nDelivery:"); err != nil {
+			return err
+		}
+		if len(deliveries) == 0 {
+			if _, err := fmt.Fprintln(out, "  (not applied to a local target yet)"); err != nil {
+				return err
+			}
+		}
+		for _, record := range deliveries {
+			if _, err := fmt.Fprintf(out, "  %s → %s\n", record.ID, terminalSafe(record.TargetPath)); err != nil {
+				return err
+			}
+			for _, effect := range record.Effects {
+				if _, err := fmt.Fprintf(out, "    %s %s\n", effect.Status, terminalSafe(effect.SourcePath)); err != nil {
+					return err
+				}
+			}
 		}
 	}
 	if _, err := fmt.Fprintln(out, "\nOutcome evidence:"); err != nil {

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,8 +11,9 @@ import (
 
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/codeexec"
 	"github.com/gongahkia/gator/internal/eval"
-	gatorrun "github.com/gongahkia/gator/internal/run"
+	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workrun"
 )
 
@@ -50,7 +52,7 @@ func TestWorkCodeFollowupUsesAcceptedBaselineAndFrozenProfile(t *testing.T) {
 			}
 		}
 		script := &eval.ScriptedModel{Turns: []agent.Turn{depthCall("apply_patch", map[string]string{"patch": "diff --git a/" + name + " b/" + name + "\n--- a/" + name + "\n+++ b/" + name + "\n@@ -1 +1 @@\n-base\n+" + value + "\n"}), depthCall("git_status", map[string]any{}), depthCall("git_diff", map[string]any{}), depthCall("run_command", map[string]any{"argv": []string{"git", "diff", "--check"}}), {Text: "Verified."}}}
-		backend := &nativeWorkBackend{provider: "scripted", model: "fixture", code: gatorrun.Executor{Model: depthModel(func(ctx context.Context, turn agent.TurnRequest) (agent.Turn, error) {
+		backend := &nativeWorkBackend{code: codeexec.Executor{Model: depthModel(func(ctx context.Context, turn agent.TurnRequest) (agent.Turn, error) {
 			if !strings.Contains(turn.System, "amber") || strings.Contains(turn.System, "violet") {
 				t.Error("Code did not load frozen profile")
 			}
@@ -86,5 +88,40 @@ func TestWorkCodeFollowupUsesAcceptedBaselineAndFrozenProfile(t *testing.T) {
 	original, err := os.ReadFile(filepath.Join(source, "a.txt"))
 	if err != nil || string(original) != "base\n" {
 		t.Fatal("live source changed")
+	}
+}
+
+func TestFailedCodeWorkRetainsFailedWorkHistory(t *testing.T) {
+	state := t.TempDir()
+	service := workrun.Service{Executor: workrun.Executor{
+		StateDir: state,
+		Model: &eval.ScriptedModel{Turns: []agent.Turn{
+			depthCall("delegate_agents", map[string]any{"tasks": []any{map[string]string{"agent": "code", "task": "Change a.txt"}}}),
+			{Text: "Code could not finish."},
+		}},
+		Code: func(context.Context, workrun.CodeRequest) (workrun.CodeResult, error) {
+			return workrun.CodeResult{}, errors.New("intentional Code failure")
+		},
+	}}
+	outcome, err := service.Execute(context.Background(), workrun.Request{
+		RunID: "failed-code-work", SourcePath: t.TempDir(), Objective: "Change a.txt", MaxSteps: 2,
+		RequireCode: true, Contract: artifact.DefaultContract("report.md"),
+	})
+	if err == nil {
+		t.Fatal("failed Code Work unexpectedly succeeded")
+	}
+	history, openErr := workhistory.Open(state)
+	if openErr != nil {
+		t.Fatal(openErr)
+	}
+	record, loadErr := history.Load("failed-code-work")
+	if loadErr != nil {
+		t.Fatal(loadErr)
+	}
+	if record.Status != workhistory.Failed || record.Evidence.ArtifactManifestPath == "" || outcome.Manifest.Status != artifact.Failed {
+		t.Fatalf("failed Code Work history = %#v; outcome = %#v; err=%v", record, outcome, err)
+	}
+	if len(outcome.Manifest.Subagents) != 1 || outcome.Manifest.Subagents[0].Agent != "code" || outcome.Manifest.Subagents[0].Status != "failed" {
+		t.Fatalf("failed Code evidence = %#v", outcome.Manifest.Subagents)
 	}
 }

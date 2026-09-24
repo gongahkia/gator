@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -50,21 +49,5 @@ func TestAttachmentFlagsAndSummary(t *testing.T) {
 	}
 	if got := output.String(); !strings.Contains(got, "screen.png (image/png, 6 bytes)") || !strings.Contains(got, "notes.md (text/plain, 5 bytes)") {
 		t.Fatalf("attachment summary = %q", got)
-	}
-}
-
-func TestRunTaskRejectsEscapingExplicitImageBeforeStartingProvider(t *testing.T) {
-	repository := t.TempDir()
-	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
-	t.Chdir(repository)
-
-	err := runTask([]string{
-		"--provider", "cursor",
-		"--verify", "true",
-		"--image", "../outside.png",
-		"describe the screenshot",
-	}, io.Discard)
-	if err == nil || !strings.Contains(err.Error(), "escapes the workspace") {
-		t.Fatalf("run attachment error = %v", err)
 	}
 }

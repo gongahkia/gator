@@ -500,11 +500,17 @@ func jobWorkRequest(definition jobs.Definition) workrun.Request {
 }
 
 func runJobProcessContext(ctx context.Context, definition jobs.Definition, stateDir string, runIDs ...string) (jobResult, error) {
+	return runJobProcessWith(ctx, definition, stateDir, executeConfiguredWork, runIDs...)
+}
+
+// runJobProcessWith keeps the job adapter small and makes clear that each job
+// attempt invokes the same Work service boundary as foreground Work.
+func runJobProcessWith(ctx context.Context, definition jobs.Definition, stateDir string, execute func(context.Context, string, string, string, workrun.Request) (workrun.Outcome, error), runIDs ...string) (jobResult, error) {
 	request := jobWorkRequest(definition)
 	if len(runIDs) > 0 {
 		request.RunID = runIDs[0]
 	}
-	outcome, err := executeConfiguredWork(ctx, definition.Provider, definition.Model, stateDir, request)
+	outcome, err := execute(ctx, definition.Provider, definition.Model, stateDir, request)
 	return jobResult{ConversationID: outcome.ConversationID, RevisionID: outcome.RevisionID, ManifestPath: outcome.Work.ManifestPath, Status: string(outcome.Manifest.Status)}, err
 }
 

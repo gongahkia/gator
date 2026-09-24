@@ -2,14 +2,18 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/jobs"
+	"github.com/gongahkia/gator/internal/workhistory"
+	"github.com/gongahkia/gator/internal/workrun"
 )
 
 func TestJobCommandCreatesDurableInspectSchedule(t *testing.T) {
@@ -74,5 +78,28 @@ func TestJobEditRecapturesExplicitFrozenSource(t *testing.T) {
 			t.Fatalf("explicit source edit did not recapture source/configuration: %+v, %v", updated, err)
 		}
 		original = updated.SnapshotID
+	}
+}
+
+func TestJobWorkUsesCanonicalWorkHistory(t *testing.T) {
+	state, source := t.TempDir(), t.TempDir()
+	definition := jobs.Definition{SourcePath: source, Objective: "Inspect scheduled work", Mode: action.Inspect, Contract: artifact.InspectionContract(), MaxSteps: 1}
+	service := workrun.Service{Executor: workrun.Executor{Model: &workScriptedModel{turns: []agent.Turn{{Text: "Inspected."}}}, StateDir: state}}
+	result, err := runJobProcessWith(context.Background(), definition, state, func(ctx context.Context, _, _, _ string, request workrun.Request) (workrun.Outcome, error) {
+		return service.Execute(ctx, request)
+	}, "job-work-history")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := workhistory.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := store.Load("job-work-history")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if record.Status != workhistory.Completed || record.ConversationID != result.ConversationID || record.RevisionID != result.RevisionID || record.Evidence.ArtifactManifestPath != result.ManifestPath {
+		t.Fatalf("job Work history = %#v; result = %#v", record, result)
 	}
 }

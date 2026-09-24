@@ -25,6 +25,7 @@ import (
 	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/patch"
 	"github.com/gongahkia/gator/internal/sandbox"
+	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workrun"
 	"github.com/gongahkia/gator/internal/worksession"
 	"github.com/gongahkia/gator/internal/workspace"
@@ -53,6 +54,10 @@ func workInteractiveConversation(startConversationID string) error {
 		return err
 	}
 	sessions, err := worksession.Open(stateDir)
+	if err != nil {
+		return err
+	}
+	history, err := workhistory.Open(stateDir)
 	if err != nil {
 		return err
 	}
@@ -212,23 +217,7 @@ func workInteractiveConversation(startConversationID string) error {
 			return "", errors.New("selected revision is not a child of the current head")
 		},
 		History: func(conversationID string) (string, error) {
-			conversation, err := sessions.Load(conversationID)
-			if err != nil {
-				return "", err
-			}
-			revisions, err := sessions.Revisions(conversationID)
-			if err != nil {
-				return "", err
-			}
-			var lines []string
-			for _, revision := range revisions {
-				marker := "  "
-				if revision.ID == conversation.HeadRevision {
-					marker = "→ "
-				}
-				lines = append(lines, marker+revision.ID+" — "+firstLine(revision.Objective))
-			}
-			return strings.Join(lines, "\n"), nil
+			return workHistoryText(history, conversationID)
 		},
 		Inspect:       inspectWorkTUITopic,
 		Copy:          clipboard.WriteAll,
@@ -291,6 +280,7 @@ func runInteractiveWork(source, conversationID, prompt, stateDir string, options
 		WebOrigins:              append([]string(nil), options.WebOrigins...),
 		IgnoredInstructionPaths: append([]string(nil), options.IgnoredInstructionPaths...),
 		RefreshSource:           options.RefreshSource,
+		RequireCode:             options.RequireCode,
 		OnEvent:                 options.OnEvent, Steering: options.Steering,
 	}
 	parse := func(values []string) ([][]string, error) {
@@ -577,6 +567,7 @@ func loadWorkTUIConversationOptions(store worksession.Store, conversationID stri
 	var configuration struct {
 		Contract            artifact.Contract
 		Mode                action.Mode
+		RequireCode         bool
 		Code                workrun.CodePolicy
 		Connectors          []string
 		WebOrigins          []string
@@ -593,6 +584,7 @@ func loadWorkTUIConversationOptions(store worksession.Store, conversationID stri
 		options.PreviousArtifacts = append(options.PreviousArtifacts, requirement.Path)
 	}
 	options.ConnectorIDs = append([]string(nil), configuration.Connectors...)
+	options.RequireCode = configuration.RequireCode
 	options.WebOrigins = append([]string(nil), configuration.WebOrigins...)
 	options.IgnoredInstructionPaths = append([]string(nil), configuration.IgnoredInstructions...)
 	if configuration.Code.MaxSteps > 0 {

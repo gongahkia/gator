@@ -19,10 +19,10 @@ import (
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
 	gatorbrowser "github.com/gongahkia/gator/internal/browser"
+	"github.com/gongahkia/gator/internal/codeexec"
 	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/desktop"
 	"github.com/gongahkia/gator/internal/journal"
-	gatorrun "github.com/gongahkia/gator/internal/run"
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/snapshot"
 	"github.com/gongahkia/gator/internal/tools"
@@ -53,19 +53,16 @@ func runInspectTask(arguments []string, in io.Reader, out io.Writer, modelFactor
 }
 
 func nativeWorkModel(provider, modelName, baseURL string) (agent.Model, error) {
-	executor, err := newExecutor(provider, modelName, baseURL)
+	code, err := newCodeExecutor(provider, modelName, baseURL)
 	if err != nil {
 		return nil, err
 	}
-	return &nativeWorkBackend{Model: executor.Model, code: executor, provider: provider, model: modelName, baseURL: baseURL}, nil
+	return &nativeWorkBackend{Model: code.Model, code: code}, nil
 }
 
 type nativeWorkBackend struct {
 	agent.Model
-	code     gatorrun.Executor
-	provider string
-	model    string
-	baseURL  string
+	code     codeexec.Executor
 	computer *agent.ComputerUse
 }
 

@@ -2,60 +2,39 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
-	"github.com/gongahkia/gator/internal/workspace"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/delivery"
 	"github.com/gongahkia/gator/internal/journal"
-	"github.com/gongahkia/gator/internal/patch"
 )
 
 func exportPatch(arguments []string, out io.Writer) error {
-	if options, eligible, err := parseWorkExportOptions(arguments); err != nil {
-		return err
-	} else if eligible {
-		stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
-		if err != nil {
-			return err
-		}
-		bundle, found, err := resolveWorkBundle(options.reference, stateDir)
-		if err != nil {
-			return err
-		}
-		if found {
-			return exportWorkBundle(out, bundle, options.destination, options.replace)
-		}
-		if options.destination != "" || options.replace {
-			return fmt.Errorf("work bundle %q was not found", options.reference)
-		}
-	}
-	flags := flag.NewFlagSet("export", flag.ContinueOnError)
-	flags.SetOutput(io.Discard)
-	if err := flags.Parse(arguments); err != nil {
-		return err
-	}
-	if len(flags.Args()) != 1 {
-		return errors.New("export requires one run record path")
-	}
-	session, err := journal.LoadSession(flags.Arg(0))
+	options, eligible, err := parseWorkExportOptions(arguments)
 	if err != nil {
 		return err
 	}
-	exported, err := patch.Export(context.Background(), session.WorktreePath, session.BaseCommit)
+	if !eligible {
+		return errors.New("usage: gator work export WORK_BUNDLE|WORK_ID [--to ARCHIVE] [--replace]")
+	}
+	stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {
 		return err
 	}
-	_, err = out.Write(exported)
-	return err
+	bundle, found, err := resolveWorkBundle(options.reference, stateDir)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return fmt.Errorf("work bundle %q was not found", options.reference)
+	}
+	return exportWorkBundle(out, bundle, options.destination, options.replace)
 }
 
 type workExportOptions struct {
@@ -161,63 +140,32 @@ func pathInside(parent, candidate string) bool {
 }
 
 func applyPatch(arguments []string, out io.Writer) error {
-	if options, eligible, err := parseWorkApplyOptions(arguments); err != nil {
-		return err
-	} else if eligible {
-		stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
-		if err != nil {
-			return err
-		}
-		bundle, found, err := resolveWorkBundle(options.reference, stateDir)
-		if err != nil {
-			return err
-		}
-		if found {
-			if options.destination == "" {
-				return errors.New("applying a work bundle requires an explicit --to DIRECTORY")
-			}
-			return applyWorkBundle(out, bundle, options)
-		}
-		if options.destination != "" || options.replace || options.json {
-			return fmt.Errorf("work bundle %q was not found", options.reference)
-		}
-	}
-	flags := flag.NewFlagSet("apply", flag.ContinueOnError)
-	flags.SetOutput(io.Discard)
-	checkOnly := flags.Bool("check", false, "verify that the patch applies without modifying this checkout")
-	if err := flags.Parse(arguments); err != nil {
-		return err
-	}
-	if len(flags.Args()) != 1 {
-		return errors.New("apply requires one run record path")
-	}
-	session, err := journal.LoadSession(flags.Arg(0))
+	options, eligible, err := parseWorkApplyOptions(arguments)
 	if err != nil {
 		return err
 	}
-	workingDirectory, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("get working directory: %w", err)
+	if !eligible {
+		return errors.New("usage: gator work apply WORK_BUNDLE|WORK_ID --to DIRECTORY [--code-patch PATH] [--check] [--replace]")
 	}
-	target, err := gitRepositoryRoot(workingDirectory)
-	if err != nil {
-		return errors.New("apply must start inside the target Git checkout")
+	if options.destination == "" {
+		return errors.New("applying a work bundle requires an explicit --to DIRECTORY")
 	}
-	var result patch.Result
-	if *checkOnly {
-		result, err = patch.Check(context.Background(), session.WorktreePath, session.BaseCommit, target)
-	} else {
-		result, err = patch.Apply(context.Background(), session.WorktreePath, session.BaseCommit, target)
-	}
+	stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {
 		return err
 	}
-	if *checkOnly {
-		_, err = fmt.Fprintf(out, "Patch is compatible with this clean checkout (%d bytes).\n", result.Bytes)
-	} else {
-		_, err = fmt.Fprintf(out, "Applied retained patch to this checkout (%d bytes). Review and commit the resulting changes.\n", result.Bytes)
+	bundle, found, err := resolveWorkBundle(options.reference, stateDir)
+	if err != nil {
+		return err
 	}
-	return err
+	if !found {
+		return fmt.Errorf("work bundle %q was not found", options.reference)
+	}
+	store, err := delivery.Open(stateDir)
+	if err != nil {
+		return err
+	}
+	return applyWorkBundle(out, bundle, store, options)
 }
 
 type workApplyOptions struct {
@@ -269,83 +217,99 @@ func parseWorkApplyOptions(arguments []string) (workApplyOptions, bool, error) {
 	return options, options.reference != "", nil
 }
 
-func applyWorkBundle(out io.Writer, bundle artifact.Bundle, options workApplyOptions) error {
+func applyWorkBundle(out io.Writer, bundle artifact.Bundle, store delivery.Store, options workApplyOptions) error {
 	if options.codePatch != "" {
-		var selected *patch.Candidate
-		for i := range bundle.Manifest.Candidates {
-			candidate := &bundle.Manifest.Candidates[i]
+		candidateID := ""
+		for _, candidate := range bundle.Manifest.Candidates {
 			if candidate.PatchPath == options.codePatch && candidate.Status == "verified" {
-				selected = candidate
+				candidateID = candidate.ID
+				break
 			}
 		}
-		if selected == nil {
+		if candidateID == "" {
 			return errors.New("select a verified code candidate retained by this bundle")
 		}
-		if err := artifact.VerifyBundle(bundle); err != nil {
+		if options.check {
+			candidate, err := delivery.PreviewCandidate(context.Background(), bundle, options.destination, candidateID)
+			if err != nil {
+				return err
+			}
+			_, err = fmt.Fprintf(out, "Code candidate %s: preflight passed\nChanged paths: %s\n", candidate.ID, strings.Join(candidate.ChangedPaths, ", "))
 			return err
 		}
-		root, err := workspace.Open(bundle.Output.Path())
-		if err != nil {
-			return err
-		}
-		payload, err := root.ReadRegularFile(options.codePatch, 16*1024*1024)
-		if err != nil {
-			return err
-		}
-		sum := sha256.Sum256(payload)
-		if hex.EncodeToString(sum[:]) != selected.SHA256 {
-			return errors.New("candidate patch digest mismatch")
-		}
-		if err := patch.ApplyCandidate(context.Background(), options.destination, *selected, payload, options.check); err != nil {
-			return err
-		}
-		_, err = fmt.Fprintf(out, "Code candidate %s: %s\nChanged paths: %s\n", selected.ID, map[bool]string{true: "preflight passed", false: "applied"}[options.check], strings.Join(selected.ChangedPaths, ", "))
-		return err
+		record, err := store.DeliverCandidate(context.Background(), bundle, options.destination, candidateID)
+		return writeDeliveryResult(out, record, err, options.json)
 	}
 
-	var plan artifact.ApplyPlan
-	var applyErr error
 	if options.check {
-		plan, applyErr = artifact.PlanApply(bundle, options.destination, options.replace)
-		if applyErr == nil {
+		plan, err := delivery.PreviewArtifacts(bundle, options.destination, options.replace)
+		if err == nil {
 			for _, operation := range plan.Operations {
 				if operation.Disposition == artifact.ApplyConflict {
-					applyErr = errors.New("apply preflight found conflicts; pass --replace only after reviewing them")
+					err = errors.New("apply preflight found conflicts; pass --replace only after reviewing them")
 					break
 				}
 			}
 		}
-	} else {
-		plan, applyErr = artifact.Apply(bundle, options.destination, options.replace)
-	}
-	if options.json {
-		type response struct {
-			Applied bool               `json:"applied"`
-			Plan    artifact.ApplyPlan `json:"plan"`
-			Error   string             `json:"error,omitempty"`
+		if options.json {
+			type response struct {
+				Applied bool               `json:"applied"`
+				Plan    artifact.ApplyPlan `json:"plan"`
+				Error   string             `json:"error,omitempty"`
+			}
+			result := response{Plan: plan}
+			if err != nil {
+				result.Error = err.Error()
+			}
+			if encodeErr := json.NewEncoder(out).Encode(result); encodeErr != nil {
+				return encodeErr
+			}
+			return err
 		}
-		result := response{Applied: applyErr == nil && !options.check, Plan: plan}
-		if applyErr != nil {
-			result.Error = applyErr.Error()
+		heading := "Apply preflight"
+		if err != nil {
+			heading = "Apply blocked"
+		}
+		if _, writeErr := fmt.Fprintf(out, "%s\n  target: %s\n", heading, plan.Target); writeErr != nil {
+			return writeErr
+		}
+		for _, operation := range plan.Operations {
+			if _, writeErr := fmt.Fprintf(out, "  %s %s\n", operation.Disposition, operation.Path); writeErr != nil {
+				return writeErr
+			}
+		}
+		return err
+	}
+	record, err := store.DeliverArtifacts(context.Background(), bundle, options.destination, options.replace)
+	return writeDeliveryResult(out, record, err, options.json)
+}
+
+func writeDeliveryResult(out io.Writer, record delivery.Record, deliveryErr error, jsonOutput bool) error {
+	if jsonOutput {
+		result := struct {
+			Delivery delivery.Record `json:"delivery"`
+			Applied  bool            `json:"applied"`
+			Error    string          `json:"error,omitempty"`
+		}{Delivery: record, Applied: deliveryErr == nil}
+		if deliveryErr != nil {
+			result.Error = deliveryErr.Error()
 		}
 		if err := json.NewEncoder(out).Encode(result); err != nil {
 			return err
 		}
-		return applyErr
+		return deliveryErr
 	}
-	heading := "Apply preflight"
-	if !options.check && applyErr != nil {
-		heading = "Apply blocked"
-	} else if !options.check {
-		heading = "Applied verified work bundle"
+	heading := "Applied verified Work result"
+	if deliveryErr != nil {
+		heading = "Delivery incomplete"
 	}
-	if _, err := fmt.Fprintf(out, "%s\n  target: %s\n", heading, plan.Target); err != nil {
+	if _, err := fmt.Fprintf(out, "%s\n  delivery: %s\n  target: %s\n", heading, record.ID, record.TargetPath); err != nil {
 		return err
 	}
-	for _, operation := range plan.Operations {
-		if _, err := fmt.Fprintf(out, "  %s %s\n", operation.Disposition, operation.Path); err != nil {
+	for _, effect := range record.Effects {
+		if _, err := fmt.Fprintf(out, "  %s %s\n", effect.Status, effect.SourcePath); err != nil {
 			return err
 		}
 	}
-	return applyErr
+	return deliveryErr
 }

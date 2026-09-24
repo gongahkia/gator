@@ -6,7 +6,7 @@ import (
 
 	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/model"
-	"github.com/gongahkia/gator/internal/tui"
+	"github.com/gongahkia/gator/internal/modelcatalog"
 )
 
 type tuiOAuthLogin struct {
@@ -16,7 +16,7 @@ type tuiOAuthLogin struct {
 	credentials auth.Store
 }
 
-func beginTUIOAuthLogin(providerName string) (tui.OAuthLogin, error) {
+func beginTUIOAuthLogin(providerName string) (modelcatalog.OAuthLogin, error) {
 	provider, err := model.ParseProvider(providerName)
 	if err != nil {
 		return nil, err

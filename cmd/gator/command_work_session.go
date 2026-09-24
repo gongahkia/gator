@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/worksession"
 )
 
@@ -30,6 +31,10 @@ func workSessionCommand(arguments []string, in io.Reader, out io.Writer, modelFa
 		return err
 	}
 	store, err := worksession.Open(stateDir)
+	if err != nil {
+		return err
+	}
+	history, err := workhistory.Open(stateDir)
 	if err != nil {
 		return err
 	}
@@ -56,17 +61,19 @@ func workSessionCommand(arguments []string, in io.Reader, out io.Writer, modelFa
 		}
 		return json.NewEncoder(out).Encode(tasks)
 	case "list":
-		conversations, err := store.List(50)
+		records, err := history.List(50)
 		if err != nil {
 			return err
 		}
-		for _, conversation := range conversations {
-			fmt.Fprintf(out, "%s\t%s\t%s\t%s\n", conversation.ID, conversation.UpdatedAt.Format("2006-01-02 15:04"), conversation.Title, conversation.SourcePath)
-		}
-		return nil
+		return writeWorkHistory(out, records)
 	case "show":
 		if len(arguments) != 2 {
-			return errors.New("usage: gator work show CONVERSATION_ID")
+			return errors.New("usage: gator work show WORK_ID|CONVERSATION_ID")
+		}
+		if record, loadErr := history.Load(arguments[1]); loadErr == nil {
+			return json.NewEncoder(out).Encode(record)
+		} else if !errors.Is(loadErr, os.ErrNotExist) {
+			return loadErr
 		}
 		conversation, err := store.Load(arguments[1])
 		if err != nil {
@@ -81,18 +88,11 @@ func workSessionCommand(arguments []string, in io.Reader, out io.Writer, modelFa
 		if err != nil {
 			return err
 		}
-		revisions, err := store.Revisions(conversation.ID)
+		records, err := history.ListConversation(conversation.ID, 0)
 		if err != nil {
 			return err
 		}
-		for _, revision := range revisions {
-			marker := " "
-			if revision.ID == conversation.HeadRevision {
-				marker = "*"
-			}
-			fmt.Fprintf(out, "%s %s\tparent=%s\t%s\t%s\n", marker, revision.ID, valueOrDash(revision.ParentRevisionID), revision.Status, firstLine(revision.Objective))
-		}
-		return nil
+		return writeWorkHistory(out, records)
 	case "back":
 		if len(arguments) != 2 {
 			return errors.New("usage: gator work back CONVERSATION_ID")

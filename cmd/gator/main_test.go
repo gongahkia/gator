@@ -36,6 +36,7 @@ func TestRunHelp(t *testing.T) {
 			{command: "gator connect", pattern: "\n  gator connect "},
 			{command: "gator login", pattern: "\n  gator login "},
 			{command: "gator logout", pattern: "\n  gator logout\n"},
+			{command: "gator work run", pattern: "\n  gator work run "},
 		} {
 			if strings.Contains(output.String(), removed.pattern) {
 				t.Fatalf("help still exposes removed command %q: %q", removed.command, output.String())
@@ -68,7 +69,7 @@ func TestRunRejectsUnknownCommand(t *testing.T) {
 }
 
 func TestRunRejectsRemovedRootAliases(t *testing.T) {
-	for _, command := range []string{"tui", "help", "version", "connect", "login", "logout"} {
+	for _, command := range []string{"tui", "help", "version", "connect", "login", "logout", "code", "run", "fork", "clone"} {
 		var output bytes.Buffer
 		err := run([]string{command}, &output)
 		if err == nil || !strings.Contains(err.Error(), "unknown command") || !strings.Contains(err.Error(), "gator --help") {
@@ -80,9 +81,9 @@ func TestRunRejectsRemovedRootAliases(t *testing.T) {
 func TestMovedRootCommandsExplainTheirCanonicalFamily(t *testing.T) {
 	for command, canonical := range map[string]string{
 		"rpc": "gator agent rpc", "serve": "gator agent serve", "acp": "gator agent acp", "child": "gator agent child", "delegate": "gator agent delegate",
-		"hook": "gator config hook", "connector": "gator provider connector", "inbox": "gator job inbox", "snapshot": "gator work snapshot", "worktree": "gator work worktree",
-		"inspect": "gator work inspect", "code": "gator work code", "run": "gator work run", "resume": "gator work resume", "eval": "gator work eval",
-		"transcript": "gator work transcript", "review": "gator work review", "export": "gator work export", "apply": "gator work apply",
+		"hook": "gator config hook", "connector": "gator provider connector", "inbox": "gator job inbox", "snapshot": "gator work snapshot",
+		"inspect": "gator work inspect", "resume": "gator work resume", "eval": "gator work eval",
+		"review": "gator work review", "export": "gator work export", "apply": "gator work apply",
 	} {
 		var output bytes.Buffer
 		err := run([]string{command}, &output)
@@ -156,9 +157,7 @@ func TestNestedCommandFamiliesRouteToTheirHandlers(t *testing.T) {
 		{[]string{"job", "inbox", "unexpected"}, "gator job inbox"},
 		{[]string{"work", "eval"}, "usage: gator work eval"},
 		{[]string{"-w", "eval"}, "usage: gator work eval"},
-		{[]string{"work", "transcript"}, "usage: gator work transcript"},
 		{[]string{"work", "snapshot", "show"}, "gator work snapshot show"},
-		{[]string{"work", "worktree"}, "gator work worktree list"},
 		{[]string{"work", "review"}, "usage: gator work review"},
 	} {
 		if err := run(test.arguments, io.Discard); err == nil || !strings.Contains(err.Error(), test.contains) {
@@ -167,11 +166,11 @@ func TestNestedCommandFamiliesRouteToTheirHandlers(t *testing.T) {
 	}
 }
 
-func TestCodeAndRunRouteThroughTheMainOrchestrationEntryPoint(t *testing.T) {
+func TestCodeRouteThroughTheMainOrchestrationEntryPoint(t *testing.T) {
 	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
 	t.Setenv("GATOR_STATE_DIR", t.TempDir())
 	t.Setenv("OPENAI_API_KEY", "")
-	for _, command := range []string{"code", "run"} {
+	for _, command := range []string{"code"} {
 		var output bytes.Buffer
 		err := run([]string{"work", command, "task without verification"}, &output)
 		if err == nil || strings.Contains(err.Error(), "--verify") || !strings.Contains(err.Error(), "OPENAI_API_KEY") {
@@ -180,8 +179,8 @@ func TestCodeAndRunRouteThroughTheMainOrchestrationEntryPoint(t *testing.T) {
 	}
 }
 
-func TestCodeCompatibilityRoutesExplainTheManagerOwnedWorkflow(t *testing.T) {
-	for _, command := range []string{"code", "run"} {
+func TestCodeRouteExplainsTheManagerOwnedWorkflow(t *testing.T) {
+	for _, command := range []string{"code"} {
 		var output bytes.Buffer
 		if err := run([]string{"work", command, "--help"}, &output); err != nil {
 			t.Fatalf("%s help: %v", command, err)
@@ -279,14 +278,6 @@ func TestExecutorReadsWebSearchKeyFromEnvironmentOnly(t *testing.T) {
 	}
 	if executor.HTTP.BraveSearchAPIKey != "do-not-print-this-search-token" {
 		t.Fatalf("web search key did not reach the in-memory executor options")
-	}
-}
-
-func TestRunRejectsUnsupportedCursorProviderWithoutFallback(t *testing.T) {
-	var output bytes.Buffer
-	err := runTask([]string{"--provider", "cursor", "--verify", "go test ./...", "Add a focused feature"}, &output)
-	if err == nil || !strings.Contains(err.Error(), "no supported direct model API integration") || !strings.Contains(err.Error(), "will not launch") {
-		t.Fatalf("cursor run error = %v", err)
 	}
 }
 

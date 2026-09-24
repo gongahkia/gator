@@ -140,6 +140,7 @@ func commandPaletteEntries() []entry {
 		{title: "/source ignore", subtitle: "Skip a project instruction file for this conversation", kind: "command-input", command: "/source ignore"},
 		{title: "/source unignore", subtitle: "Restore a skipped project instruction file", kind: "command-input", command: "/source unignore"},
 		{title: "/mode", subtitle: "Set auto, inspect, draft, or act", kind: "command-input", command: "/mode"},
+		{title: "/code", subtitle: "Require or release the Code specialist for Work", kind: "command-input", command: "/code"},
 		{title: "/artifact", subtitle: "Add, remove, or list deliverables", kind: "command-input", command: "/artifact"},
 		{title: "/connector", subtitle: "Select connected sources for this session", kind: "command-input", command: "/connector"},
 		{title: "/web-origin", subtitle: "Select an HTTPS research origin", kind: "command-input", command: "/web-origin"},
@@ -150,7 +151,7 @@ func commandPaletteEntries() []entry {
 		{title: "/agents", subtitle: "Inspect project profiles and roles", kind: "command", command: "/agents"},
 		{title: "/settings", subtitle: "Inspect current settings", kind: "command", command: "/settings"},
 		{title: "/theme", subtitle: "Choose gator, contrast, or mono", kind: "command-input", command: "/theme"},
-		{title: "/history", subtitle: "Show revisions in this conversation", kind: "command", command: "/history"},
+		{title: "/history", subtitle: "Show Work executions in this conversation", kind: "command", command: "/history"},
 		{title: "/revision-back", subtitle: "Move to the parent revision", kind: "command", command: "/revision-back"},
 		{title: "/revision-forward", subtitle: "Move to a child or named revision", kind: "command-input", command: "/revision-forward"},
 		{title: "/review", subtitle: "Show latest staged output", kind: "command", command: "/review"},
@@ -303,6 +304,17 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		}
 		m.options.Mode = strings.ToLower(fields[1])
 		result = "Work mode set to " + m.options.Mode + "."
+	case "/code":
+		if len(fields) != 2 || !sliceContains([]string{"on", "off"}, strings.ToLower(fields[1])) {
+			err = fmt.Errorf("usage: /code on|off")
+			break
+		}
+		m.options.RequireCode = strings.EqualFold(fields[1], "on")
+		if m.options.RequireCode {
+			result = "Code specialist required for subsequent Work. Gator will retain patch evidence before completion."
+		} else {
+			result = "Code specialist is optional for subsequent Work."
+		}
 	case "/artifact":
 		result, err = m.configureArtifacts(fields, command)
 	case "/connector":
@@ -749,11 +761,11 @@ func singleLine(value string) string {
 
 func (m Model) workStatus() string {
 	modelSelection, modelAccess := m.configuredModelStatus()
-	return fmt.Sprintf("Gator orchestration\n  model: %s\n  model access: %s\n  workspace: %s%s\n  ignored project instructions: %s\n  conversation: %s\n  selected revision: %s\n  mode: %s\n  deliverables: %s\n  connectors: %s\n  web origins: %s\n  effort: %s (%d manager steps)\n  pending attachments: %s\n  queued prompts: %d\n  internal specialists: managed by Gator",
+	return fmt.Sprintf("Gator orchestration\n  model: %s\n  model access: %s\n  workspace: %s%s\n  ignored project instructions: %s\n  conversation: %s\n  selected revision: %s\n  mode: %s\n  code specialist: %s\n  deliverables: %s\n  connectors: %s\n  web origins: %s\n  effort: %s (%d manager steps)\n  pending attachments: %s\n  queued prompts: %d\n  internal specialists: managed by Gator",
 		modelSelection, modelAccess,
 		valueOrNone(m.source), map[bool]string{true: " (refresh next turn)", false: " (frozen per turn)"}[m.options.RefreshSource],
 		valueOrNone(strings.Join(m.options.IgnoredInstructionPaths, ", ")),
-		valueOrNone(m.conversation), valueOrNone(m.revision), valueOrNone(m.options.Mode), valueOrNone(strings.Join(m.options.Artifacts, ", ")),
+		valueOrNone(m.conversation), valueOrNone(m.revision), valueOrNone(m.options.Mode), map[bool]string{true: "required", false: "optional"}[m.options.RequireCode], valueOrNone(strings.Join(m.options.Artifacts, ", ")),
 		valueOrNone(strings.Join(m.options.ConnectorIDs, ", ")), valueOrNone(strings.Join(m.options.WebOrigins, ", ")),
 		effortName(m.options.MaxSteps), m.options.MaxSteps,
 		valueOrNone(strings.Join(m.options.Attachments, ", ")), len(m.queue))
@@ -870,6 +882,7 @@ func workHelp() string {
   /source ignored                list skipped project instruction files
   /source-refresh                capture changed workspace files next turn
   /mode auto|inspect|draft|act   choose automatic or explicit authority
+  /code on|off                   require retained Code patch evidence for Work
   /artifact [add|remove] PATH    manage expected deliverables
   /connector [add|remove] ID     select connected sources for this session
   /connector setup ID CLIENT_ID  configure Google Workspace with desktop OAuth
@@ -895,7 +908,8 @@ func workHelp() string {
   /apply [CANDIDATE] [DIR]       preflight and apply verified code after confirmation
   /copy · /theme · /new · exit · /quit
 
-Gator manages its internal specialists; the Work TUI has no Code commands.
+Gator manages its internal specialists. /code makes the same bounded Code
+specialist required by gator work code; it never opens a separate Code session.
 
 Navigation
   ↑/↓       recall sent prompts in this conversation

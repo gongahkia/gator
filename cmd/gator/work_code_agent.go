@@ -15,19 +15,15 @@ import (
 
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/browser"
+	"github.com/gongahkia/gator/internal/codeexec"
 	"github.com/gongahkia/gator/internal/instructions"
 	"github.com/gongahkia/gator/internal/patch"
 	"github.com/gongahkia/gator/internal/projectcapture"
-	gatorrun "github.com/gongahkia/gator/internal/run"
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/workrun"
 )
 
 const maxCodeSubagentSteps = 32
-
-// hostedCodeDisableWriterDelegation is invariant for Work's hosted Code
-// specialist: one implementation assignment, not nested writer children.
-const hostedCodeDisableWriterDelegation = true
 
 func hostedCodeNestedDelegationOmit() []string {
 	return []string{instructions.OmitDelegateWriter, instructions.OmitDelegateReadOnly}
@@ -126,7 +122,7 @@ func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 				omitted = append(omitted, capability.omit)
 			}
 		}
-		outcome, runErr := code.Execute(ctx, gatorrun.Request{
+		outcome, runErr := code.Execute(ctx, codeexec.Request{
 			RepositoryPath: repository,
 			OnEvent:        request.OnEvent,
 			TrustIdentity: func() string {
@@ -135,25 +131,18 @@ func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 				}
 				return ""
 			}(),
-			Task:                    request.Task,
-			Provider:                b.provider,
-			Model:                   b.model,
-			BaseURL:                 b.baseURL,
-			RunID:                   runID,
-			ThreadID:                runID,
-			StateDir:                stateDir,
-			MaxSteps:                steps,
-			Verification:            verification,
-			Scopes:                  append([]string(nil), request.Policy.Scopes...),
-			WritePaths:              append([]string(nil), request.Policy.Scopes...),
-			Profile:                 request.Policy.Profile,
-			Setup:                   cloneCodeCommands(request.Policy.Setup),
-			AllowedCommands:         cloneCodeCommands(request.Policy.AllowedCommands),
-			AllowedCommandPrefixes:  cloneCodeCommands(request.Policy.AllowedCommandPrefixes),
-			Approve:                 request.Approve,
-			BrowserSession:          request.Policy.BrowserSession,
-			Mode:                    gatorrun.ExecuteMode,
-			DisableWriterDelegation: hostedCodeDisableWriterDelegation,
+			Task:                   request.Task,
+			RunID:                  runID,
+			MaxSteps:               steps,
+			Verification:           verification,
+			Scopes:                 append([]string(nil), request.Policy.Scopes...),
+			WritePaths:             append([]string(nil), request.Policy.Scopes...),
+			Profile:                request.Policy.Profile,
+			Setup:                  cloneCodeCommands(request.Policy.Setup),
+			AllowedCommands:        cloneCodeCommands(request.Policy.AllowedCommands),
+			AllowedCommandPrefixes: cloneCodeCommands(request.Policy.AllowedCommandPrefixes),
+			Approve:                request.Approve,
+			BrowserSession:         request.Policy.BrowserSession,
 			RolePolicy: instructions.ProfilePolicy{
 				MaxSteps: steps, Omit: omitted,
 			},
