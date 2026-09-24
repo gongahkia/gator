@@ -144,7 +144,7 @@ Code policy:
   --sandbox strict|off
   --network deny|allow
   --code-capability lsp|mcp|extension|http|browser|terminal
-  --browser-session ID
+  --code-browser-session ID
   --image PATH
   --attach PATH
 

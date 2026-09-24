@@ -69,9 +69,12 @@ its internal Git-worktree Code specialist. General work uses an ordinary
 directory as a read-only source and a private, isolated output workspace.
 
 Gator now includes durable local conversations, immutable local-source
-snapshots, document/workbook renderers, connected services, and a manual
-foreground scheduler. Cloud execution, cross-device continuation, and arbitrary
-desktop control remain outside the local-first boundary.
+snapshots, document/workbook/presentation renderers, connected services, and a
+local macOS LaunchAgent option for its scheduler. Cloud execution and
+cross-device continuation remain outside the local-first boundary. Desktop
+control is a deliberately narrow OpenAI computer-use capability: it needs a
+local session, an app allowlist, and fresh approval for every action; see
+[WORK_CAPABILITIES.md](WORK_CAPABILITIES.md).
 
 ## Domain model
 

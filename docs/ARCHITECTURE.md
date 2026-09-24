@@ -308,7 +308,7 @@ more than 256 KiB of textual response content.
 
 A real browser is never implied by the network grant. It requires a separately
 started or attached local Chromium session, developer-selected tabs, approved
-origins, and an explicit `--browser-session` grant to an Execute-mode run. The
+origins, and an explicit `--browser-session` grant to a Work-manager run. The
 session exposes `browser_tabs`, `browser_snapshot`, `browser_screenshot`,
 `browser_navigate`, `browser_click`, `browser_fill`, `browser_select`,
 `browser_press`, `browser_download`, and `browser_upload`. It uses a pinned
