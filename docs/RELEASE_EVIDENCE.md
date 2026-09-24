@@ -37,9 +37,8 @@ gator work eval run internal/eval/testdata/work-v1/dataset.json --id release-dev
 gator work eval run internal/eval/testdata/work-v1/dataset.json --id release-held-out --split held-out --attempts 3 --report-dir DIR/reports/release-held-out
 ```
 
-Use a new `--run-id` for every attempt. Reusing an id against a previous
-report file invites cached conclusions; the harness always executes, but
-humans comparing reports will mix attempts if ids collide.
+Use a new `--id` and `--report-dir` for every experiment. Reusing either
+mixes independent trials in a way that makes comparison ambiguous.
 
 Scripted Work runs are deterministic product gates. `--live` accepts explicit
 provider, model, request-budget, and timeout values, and writes no API keys or
@@ -49,32 +48,24 @@ fidelity policy.
 
 ## Evaluation report
 
-Each report is `0600` JSON with:
+Each Work experiment writes `0600` JSON with a selected `dataset.json`, an
+`experiment.json`, and one trial record per case/attempt. Development reports
+contain only development cases; held-out material is included only when the
+caller explicitly selects that split.
 
 | Field | Meaning |
 | --- | --- |
-| `id` | Fixture identity from `eval.json` |
-| `run_id` | This attempt. Must be unique per prediction |
-| `status` | Final `resolved`, `unresolved`, or `error`, including the post-run score outcome |
-| `agent_status` | Agent/verifier outcome before hidden post-run scoring |
-| `task` | Exact task string |
-| `provider` / `model` | Adapter used |
-| `max_steps` / `steps` | Budget and actual turns |
-| `timeout_seconds` | Wall-clock cap |
-| `verify` | Exact argv list that had to pass |
-| `sandbox` / `network` | Requested fixture execution policy |
-| `base_commit` | Fresh baseline commit created from the copied fixture |
-| fixture/harness/environment provenance | `fixture_sha256`, `harness_version`, `harness_commit`, `environment_id`, plus a hashed provider endpoint |
-| `scopes` / command policy / `setup` | Fixed evaluation authority; do not put secrets in these fields |
-| `score` / `score_status` / `score_results` | Trusted hidden oracle argv and bounded post-run diagnostic evidence |
-| `suite_id` / `attempt` / `labels` | Corpus identity, independent trial, and predeclared category |
-| `duration_ns` | Wall time |
-| `error` | Failure text, never credentials |
-| `state_path` / `worktree_path` | Local artifacts for review |
+| experiment `id`, `dataset`, `dataset_sha256`, `split` | Corpus and explicit split provenance |
+| trial `case_id`, `case_sha256`, `trial`, `family` | Fixture identity and independent attempt |
+| `status`, `category`, `error` | Task-grade result and attributable failure category |
+| Work lineage | `conversation_id`, `revision_id`, `snapshot_id`, contract/policy/source digests, and bundle path |
+| `grades` | Deterministic task and transaction-history grader evidence |
+| `transaction` | Independently inspectable Work-history, verification, delivery, recovery, and external-action states |
+| `metrics`, `usage`, `duration_ms` | Bounded operational evidence; never credentials or raw provider prompts |
 
-A resolved report is evidence for that fixture, model, policy, budget, and
-time limit only. It does not make a competitive or agent-quality claim without
-a defined corpus and live results.
+A passing report is evidence for its selected fixtures, provider/model policy,
+budget, and harness only. It separately reports task quality and transaction
+fidelity; it is not a broad model-quality claim.
 
 ## Dogfood checklist
 

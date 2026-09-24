@@ -3,6 +3,7 @@ package eval
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 
@@ -62,7 +63,8 @@ func TestTransactionDeliveryClassifierRecognizesPartialRetryAndConflict(t *testi
 }
 
 func TestRetryLeavesTheOriginalWorkTransactionAndModelUntouched(t *testing.T) {
-	state, outcome := completedTransactionWork(t, "transaction-retry")
+	model := &countingScriptedModel{turns: completedWorkTurns(t)}
+	state, outcome := completedTransactionWorkWithModel(t, "transaction-retry", model)
 	store, err := delivery.Open(state)
 	if err != nil {
 		t.Fatal(err)
@@ -89,6 +91,9 @@ func TestRetryLeavesTheOriginalWorkTransactionAndModelUntouched(t *testing.T) {
 	}
 	if len(before) != 1 || len(after) != 1 || after[0].ID != outcome.Manifest.RunID || len(retried.Effects) != 1 || len(retried.Effects[0].Attempts) != 1 {
 		t.Fatalf("retry fabricated Work or reapplied an effect: before=%#v after=%#v record=%#v", before, after, retried)
+	}
+	if model.calls != 2 {
+		t.Fatalf("delivery retry invoked the Work model %d times", model.calls)
 	}
 }
 
@@ -137,21 +142,46 @@ func TestTransactionInspectorDetectsMissingAndMismatchedHistory(t *testing.T) {
 
 func completedTransactionWork(t *testing.T, runID string) (string, workrun.Outcome) {
 	t.Helper()
+	return completedTransactionWorkWithModel(t, runID, &ScriptedModel{Turns: completedWorkTurns(t)})
+}
+
+func completedTransactionWorkWithModel(t *testing.T, runID string, model agent.Model) (string, workrun.Outcome) {
+	t.Helper()
 	state, source := t.TempDir(), t.TempDir()
-	arguments, err := json.Marshal(map[string]string{"path": "report.md", "content": "verified report\n"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	outcome, err := (workrun.Service{Executor: workrun.Executor{Model: &ScriptedModel{Turns: []agent.Turn{
-		{ToolCalls: []agent.ToolCall{{ID: "write", Name: "write_artifact", Arguments: arguments}}},
-		{Text: "Prepared the report."},
-	}}, StateDir: state}}).Execute(context.Background(), workrun.Request{
+	outcome, err := (workrun.Service{Executor: workrun.Executor{Model: model, StateDir: state}}).Execute(context.Background(), workrun.Request{
 		RunID: runID, SourcePath: source, Objective: "Write a report", Contract: artifact.DefaultContract("report.md"), Mode: action.Draft, MaxSteps: 3,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return state, outcome
+}
+
+func completedWorkTurns(t *testing.T) []agent.Turn {
+	t.Helper()
+	arguments, err := json.Marshal(map[string]string{"path": "report.md", "content": "verified report\n"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "write", Name: "write_artifact", Arguments: arguments}}},
+		{Text: "Prepared the report."},
+	}
+}
+
+type countingScriptedModel struct {
+	turns []agent.Turn
+	calls int
+}
+
+func (m *countingScriptedModel) Complete(_ context.Context, _ agent.TurnRequest) (agent.Turn, error) {
+	m.calls++
+	if len(m.turns) == 0 {
+		return agent.Turn{}, errors.New("script is exhausted")
+	}
+	turn := m.turns[0]
+	m.turns = m.turns[1:]
+	return turn, nil
 }
 
 func mustBundle(t *testing.T, outcome workrun.Outcome) artifact.Bundle {
