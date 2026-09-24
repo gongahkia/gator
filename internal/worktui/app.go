@@ -81,6 +81,7 @@ type BundleActionRequest struct {
 	BundlePath  string
 	Target      string
 	CandidateID string
+	DeliveryID  string
 	Replace     bool
 	Execute     bool
 }

@@ -3,8 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,10 +18,10 @@ import (
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/attachment"
 	"github.com/gongahkia/gator/internal/config"
+	"github.com/gongahkia/gator/internal/delivery"
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/journal"
-	"github.com/gongahkia/gator/internal/patch"
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workrun"
@@ -138,7 +136,7 @@ func workInteractiveConversation(startConversationID string) error {
 		},
 		ConnectorAction:  workTUIConnectorAction,
 		ConnectorCommand: workTUIConnectorCommand,
-		BundleAction:     workTUIBundleAction,
+		BundleAction:     workTUIBundleAction(stateDir),
 		ListConversations: func() ([]worksession.Conversation, error) {
 			return sessions.List(50)
 		},
@@ -458,83 +456,126 @@ func summarizeWorkBundle(path string) (worktui.BundleSummary, error) {
 	return summary, nil
 }
 
-func workTUIBundleAction(request worktui.BundleActionRequest) (string, error) {
-	bundle, err := artifact.OpenBundle(request.BundlePath)
-	if err != nil {
-		return "", err
-	}
-	if err := artifact.VerifyBundle(bundle); err != nil {
-		return "", err
-	}
-	switch request.Action {
-	case "preview":
-		previews, err := artifact.PreviewBundle(bundle)
+func workTUIBundleAction(stateDir string) func(worktui.BundleActionRequest) (string, error) {
+	return func(request worktui.BundleActionRequest) (string, error) {
+		bundle, err := artifact.OpenBundle(request.BundlePath)
 		if err != nil {
 			return "", err
 		}
-		var sections []string
-		for _, preview := range previews {
-			section := preview.Path + " · " + preview.Summary
-			if preview.Content != "" {
-				content := preview.Content
-				if len(content) > 4000 {
-					content = content[:4000] + "\n…"
-				}
-				section += "\n" + content
-			}
-			sections = append(sections, section)
+		if err := artifact.VerifyBundle(bundle); err != nil {
+			return "", err
 		}
-		if len(sections) == 0 {
-			return "This inspection turn has no deliverable files.", nil
+		store, err := delivery.Open(stateDir)
+		if err != nil {
+			return "", err
 		}
-		return strings.Join(sections, "\n\n"), nil
-	case "save":
-		if !request.Execute {
-			plan, err := artifact.PlanApply(bundle, request.Target, request.Replace)
+		switch request.Action {
+		case "preview":
+			previews, err := artifact.PreviewBundle(bundle)
 			if err != nil {
 				return "", err
 			}
-			for _, operation := range plan.Operations {
-				if operation.Disposition == artifact.ApplyConflict {
-					return "", fmt.Errorf("%s already exists with different contents; review it or use /save --replace", operation.Path)
+			sections := make([]string, 0, len(previews)+1)
+			for _, preview := range previews {
+				section := preview.Path + " · " + preview.Summary
+				if preview.Content != "" {
+					content := preview.Content
+					if len(content) > 4000 {
+						content = content[:4000] + "\n…"
+					}
+					section += "\n" + content
+				}
+				sections = append(sections, section)
+			}
+			records, err := store.ListWork(bundle.Manifest.RunID)
+			if err != nil {
+				return "", err
+			}
+			for _, record := range records {
+				sections = append(sections, formatDeliveryRecord("Changes", record, nil))
+			}
+			if len(sections) == 0 {
+				return "This inspection turn has no deliverable files.", nil
+			}
+			return strings.Join(sections, "\n\n"), nil
+		case "save":
+			if !request.Execute {
+				plan, err := delivery.PreviewArtifacts(bundle, request.Target, request.Replace)
+				if err != nil {
+					return "", err
+				}
+				for _, operation := range plan.Operations {
+					if operation.Disposition == artifact.ApplyConflict {
+						return "", fmt.Errorf("%s already exists with different contents; review it or use /save --replace", operation.Path)
+					}
+				}
+				return formatApplyPlan("Save verified deliverables", plan), nil
+			}
+			record, deliveryErr := store.DeliverArtifacts(context.Background(), bundle, request.Target, request.Replace)
+			return formatDeliveryRecord("Saved verified deliverables", record, deliveryErr), nil
+		case "apply-code":
+			if !request.Execute {
+				candidate, err := delivery.PreviewCandidate(context.Background(), bundle, request.Target, request.CandidateID)
+				if err != nil {
+					return "", err
+				}
+				return fmt.Sprintf("Apply verified candidate %s to %s\nChanged paths: %s", candidate.ID, request.Target, strings.Join(candidate.ChangedPaths, ", ")), nil
+			}
+			changedPaths := ""
+			for _, candidate := range bundle.Manifest.Candidates {
+				if candidate.ID == request.CandidateID && candidate.Status == "verified" {
+					changedPaths = strings.Join(candidate.ChangedPaths, ", ")
+					break
 				}
 			}
-			return formatApplyPlan("Save verified deliverables", plan), nil
-		}
-		plan, err := artifact.Apply(bundle, request.Target, request.Replace)
-		if err != nil {
-			return "", err
-		}
-		return formatApplyPlan("Saved verified deliverables", plan), nil
-	case "apply-code":
-		var selected *patch.Candidate
-		for index := range bundle.Manifest.Candidates {
-			if bundle.Manifest.Candidates[index].ID == request.CandidateID && bundle.Manifest.Candidates[index].Status == "verified" {
-				selected = &bundle.Manifest.Candidates[index]
-				break
+			record, deliveryErr := store.DeliverCandidate(context.Background(), bundle, request.Target, request.CandidateID)
+			result := formatDeliveryRecord("Applied verified Code candidate", record, deliveryErr)
+			if changedPaths != "" {
+				result += "\nChanged paths: " + changedPaths
 			}
+			if deliveryErr == nil {
+				result += "\nReview and commit the checkout changes."
+			}
+			return result, nil
+		case "retry":
+			if !request.Execute {
+				record, err := store.PreviewRetry(bundle.Manifest.RunID, request.DeliveryID)
+				if err != nil {
+					return "", err
+				}
+				return formatDeliveryRecord("Retry local changes", record, nil), nil
+			}
+			record, deliveryErr := store.Retry(context.Background(), bundle.Manifest.RunID, request.DeliveryID)
+			return formatDeliveryRecord("Retried local changes", record, deliveryErr), nil
+		default:
+			return "", fmt.Errorf("unknown bundle action %q", request.Action)
 		}
-		if selected == nil {
-			return "", errors.New("select a verified Code candidate retained by this bundle")
-		}
-		payload, err := bundle.Output.ReadRegularFile(filepath.FromSlash(selected.PatchPath), 16*1024*1024)
-		if err != nil {
-			return "", err
-		}
-		sum := sha256.Sum256(payload)
-		if hex.EncodeToString(sum[:]) != selected.SHA256 {
-			return "", errors.New("candidate patch digest mismatch")
-		}
-		if err := patch.ApplyCandidate(context.Background(), request.Target, *selected, payload, !request.Execute); err != nil {
-			return "", err
-		}
-		if !request.Execute {
-			return fmt.Sprintf("Apply verified candidate %s to %s\nChanged paths: %s", selected.ID, request.Target, strings.Join(selected.ChangedPaths, ", ")), nil
-		}
-		return fmt.Sprintf("Applied verified candidate %s.\nChanged paths: %s\nReview and commit the checkout changes.", selected.ID, strings.Join(selected.ChangedPaths, ", ")), nil
-	default:
-		return "", fmt.Errorf("unknown bundle action %q", request.Action)
 	}
+}
+
+func formatDeliveryRecord(title string, record delivery.Record, deliveryErr error) string {
+	if record.ID == "" {
+		return title
+	}
+	lines := []string{title, "Delivery: " + record.ID, "Target: " + record.TargetPath}
+	for _, effect := range record.Effects {
+		mark := "○"
+		switch effect.Status {
+		case delivery.Applied:
+			mark = "✓"
+		case delivery.Failed:
+			mark = "!"
+		case delivery.Unknown:
+			mark = "?"
+		case delivery.Superseded:
+			mark = "~"
+		}
+		lines = append(lines, fmt.Sprintf("%s %s · %s", mark, effect.SourcePath, effect.Status))
+	}
+	if deliveryErr != nil {
+		lines = append(lines, "Delivery incomplete: "+deliveryErr.Error())
+	}
+	return strings.Join(lines, "\n")
 }
 
 func formatApplyPlan(title string, plan artifact.ApplyPlan) string {

@@ -53,6 +53,9 @@ func TestServiceRetainsCompletedWorkHistoryWithoutSensitivePayloads(t *testing.T
 	if _, err := os.Stat(record.Evidence.TracePath); err != nil {
 		t.Fatalf("history trace does not resolve: %v", err)
 	}
+	if want := filepath.Join(state, "gator", "delivery", record.ID); record.Evidence.DeliveriesPath != want {
+		t.Fatalf("delivery history reference = %q, want %q", record.Evidence.DeliveriesPath, want)
+	}
 	sessions, err := worksession.Open(state)
 	if err != nil {
 		t.Fatal(err)

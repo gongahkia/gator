@@ -13,7 +13,9 @@ import (
 
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/delivery"
 	"github.com/gongahkia/gator/internal/workspace"
+	"github.com/gongahkia/gator/internal/worktui"
 )
 
 func TestReviewCommandResolvesVerifiedWorkByID(t *testing.T) {
@@ -147,6 +149,60 @@ func TestApplyCommandPreflightsConflictsAndRequiresReplace(t *testing.T) {
 	contents, readErr = os.ReadFile(targetFile)
 	if readErr != nil || string(contents) != "# CLI report\n" {
 		t.Fatalf("applied target = %q, %v", contents, readErr)
+	}
+}
+
+func TestCLIAndTUIBundleDeliveryUseTheSharedDeliveryStore(t *testing.T) {
+	stateDir := t.TempDir()
+	t.Setenv("GATOR_STATE_DIR", stateDir)
+	work := createCLIWorkBundle(t, stateDir, "shared-delivery-work")
+	target := t.TempDir()
+	var cliOutput bytes.Buffer
+	if err := applyPatch([]string{work.ID, "--to", target}, &cliOutput); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(cliOutput.String(), "delivery:") || !strings.Contains(cliOutput.String(), "applied report.md") {
+		t.Fatalf("CLI delivery output = %q", cliOutput.String())
+	}
+
+	store, err := delivery.Open(stateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cliRecords, err := store.ListWork(work.ID)
+	if err != nil || len(cliRecords) != 1 || cliRecords[0].Effects[0].Status != delivery.Applied {
+		t.Fatalf("CLI delivery record = %#v, %v", cliRecords, err)
+	}
+
+	tuiTarget := t.TempDir()
+	tuiAction := workTUIBundleAction(stateDir)
+	if _, err := tuiAction(worktui.BundleActionRequest{Action: "save", BundlePath: work.Path, Target: tuiTarget}); err != nil {
+		t.Fatal(err)
+	}
+	tuiOutput, err := tuiAction(worktui.BundleActionRequest{Action: "save", BundlePath: work.Path, Target: tuiTarget, Execute: true})
+	if err != nil || !strings.Contains(tuiOutput, "Delivery:") || !strings.Contains(tuiOutput, "report.md · applied") {
+		t.Fatalf("TUI delivery output = %q, %v", tuiOutput, err)
+	}
+	records, err := store.ListWork(work.ID)
+	if err != nil || len(records) != 2 {
+		t.Fatalf("shared delivery records = %#v, %v", records, err)
+	}
+
+	var reviewOutput bytes.Buffer
+	if err := reviewCommand([]string{work.ID}, &reviewOutput); err != nil || !strings.Contains(reviewOutput.String(), "Delivery:") || !strings.Contains(reviewOutput.String(), "applied report.md") {
+		t.Fatalf("review delivery output = %q, %v", reviewOutput.String(), err)
+	}
+}
+
+func TestParseWorkRetryOptions(t *testing.T) {
+	options, err := parseWorkRetryOptions([]string{"work-one", "--delivery", "delivery-one", "--json"})
+	if err != nil || options.workID != "work-one" || options.deliveryID != "delivery-one" || !options.json {
+		t.Fatalf("retry options = %#v, %v", options, err)
+	}
+	for _, arguments := range [][]string{{}, {"work/one"}, {"work-one", "--delivery", "bad/id"}} {
+		if _, err := parseWorkRetryOptions(arguments); err == nil {
+			t.Fatalf("retry arguments %q were accepted", arguments)
+		}
 	}
 }
 

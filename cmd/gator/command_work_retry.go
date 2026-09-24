@@ -57,7 +57,9 @@ func parseWorkRetryOptions(arguments []string) (workRetryOptions, error) {
 			return workRetryOptions{}, errors.New("usage: gator work retry WORK_ID [--delivery DELIVERY_ID] [--json]")
 		}
 	}
-	if options.workID == "" || options.deliveryID == "" && strings.ContainsAny(options.workID, "/\\") || options.deliveryID != "" && strings.ContainsAny(options.deliveryID, "/\\") {
+	if options.workID == "" ||
+		strings.ContainsAny(options.workID, "/\\") ||
+		(options.deliveryID != "" && strings.ContainsAny(options.deliveryID, "/\\")) {
 		return workRetryOptions{}, errors.New("usage: gator work retry WORK_ID [--delivery DELIVERY_ID] [--json]")
 	}
 	return options, nil

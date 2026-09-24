@@ -157,6 +157,7 @@ func commandPaletteEntries() []entry {
 		{title: "/review", subtitle: "Show latest staged output", kind: "command", command: "/review"},
 		{title: "/save", subtitle: "Save verified deliverables to a folder", kind: "command-input", command: "/save"},
 		{title: "/apply", subtitle: "Apply a verified Code candidate", kind: "command-input", command: "/apply"},
+		{title: "/retry", subtitle: "Retry failed or pending local changes", kind: "command-input", command: "/retry"},
 		{title: "/copy", subtitle: "Choose a response or deliverable summary to copy", kind: "command", command: "/copy"},
 		{title: "/queue", subtitle: "Inspect queued prompts", kind: "command", command: "/queue"},
 		{title: "/dequeue", subtitle: "Remove the next queued prompt", kind: "command", command: "/dequeue"},
@@ -391,6 +392,8 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		return m.prepareSave(command)
 	case "/apply":
 		return m.prepareCodeApply(command)
+	case "/retry":
+		return m.prepareRetry(command)
 	case "/revision-back", "/revision-forward", "/history":
 		if m.conversation == "" {
 			err = fmt.Errorf("start or resume a conversation before using revision history")
@@ -680,6 +683,27 @@ func (m Model) prepareCodeApply(raw string) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) prepareRetry(raw string) (tea.Model, tea.Cmd) {
+	if m.lastBundle.Path == "" {
+		m.messages = append(m.messages, message{role: "Gator", text: "No completed Work output is available yet."})
+		return m, nil
+	}
+	if m.config.BundleAction == nil {
+		m.messages = append(m.messages, message{role: "Gator", text: errorsUnavailable("retry").Error()})
+		return m, nil
+	}
+	deliveryID := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(raw), "/retry"))
+	request := BundleActionRequest{Action: "retry", BundlePath: m.lastBundle.Path, DeliveryID: deliveryID}
+	summary, err := m.config.BundleAction(request)
+	if err != nil {
+		m.messages = append(m.messages, message{role: "Gator", text: err.Error()})
+		return m, nil
+	}
+	m.pendingBundleAction = &pendingBundleAction{request: request, summary: summary}
+	m.status = "Confirm retrying remaining local changes"
+	return m, nil
+}
+
 func (m Model) updateBundleConfirmation(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch strings.ToLower(key.String()) {
 	case "y", "enter":
@@ -713,7 +737,7 @@ func formatBundleSummary(bundle BundleSummary) string {
 	if len(lines) == 0 {
 		lines = append(lines, "No files were required for this inspection turn.")
 	}
-	lines = append(lines, "Use /review to preview, /save to keep files, or /apply for a verified patch.")
+	lines = append(lines, "Use /review to preview, /save to keep files, /apply for a verified patch, or /retry after a failed delivery.")
 	return strings.Join(lines, "\n")
 }
 
@@ -906,6 +930,7 @@ func workHelp() string {
   /review                        preview verified deliverables in this thread
   /save [--replace] [DIR]        preflight and save deliverables after confirmation
   /apply [CANDIDATE] [DIR]       preflight and apply verified code after confirmation
+  /retry [DELIVERY_ID]            retry failed or pending local changes after confirmation
   /copy · /theme · /new · exit · /quit
 
 Gator manages its internal specialists. /code makes the same bounded Code

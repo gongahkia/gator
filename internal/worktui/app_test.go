@@ -163,6 +163,38 @@ func TestVerifiedDeliverablesRenderAndSaveWithOneConfirmation(t *testing.T) {
 	}
 }
 
+func TestRetryUsesTheSameConfirmedBundleActionPath(t *testing.T) {
+	var requests []BundleActionRequest
+	model := New(Config{
+		CurrentFolder: "/work",
+		BundleAction: func(request BundleActionRequest) (string, error) {
+			requests = append(requests, request)
+			if request.Execute {
+				return "retry finished", nil
+			}
+			return "report.md · failed", nil
+		},
+	})
+	model.home = false
+	model.lastBundle = BundleSummary{Path: "/state/run"}
+	model.input = "/retry delivery-one"
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if command != nil || model.pendingBundleAction == nil || model.pendingBundleAction.request.Action != "retry" || model.pendingBundleAction.request.DeliveryID != "delivery-one" {
+		t.Fatalf("retry did not prepare a confirmed bundle action: %#v", model.pendingBundleAction)
+	}
+	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if command == nil {
+		t.Fatal("retry confirmation did not start delivery")
+	}
+	updated, _ = model.Update(command())
+	model = updated.(Model)
+	if len(requests) != 2 || requests[0].Action != "retry" || requests[0].Execute || requests[1].Action != "retry" || !requests[1].Execute || !strings.Contains(model.View(), "retry finished") {
+		t.Fatalf("retry requests = %#v", requests)
+	}
+}
+
 func TestRevisionCommandsStayInConversation(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work", Conversations: nil, MoveBack: func(id string) (string, error) { return "moved " + id, nil }})
 	model.launcher = false
@@ -422,7 +454,7 @@ func TestCommandPaletteContainsCurrentCommands(t *testing.T) {
 		"/help", "/new", "/model", "/effort", "/attach", "/detach", "/source", "/source-refresh", "/source ignore", "/source unignore",
 		"/mode", "/code", "/artifact", "/connector", "/web-origin", "/status", "/statusline", "/permissions",
 		"/doctor", "/agents", "/settings", "/theme", "/history", "/revision-back", "/revision-forward", "/review",
-		"/save", "/apply", "/copy", "/queue", "/dequeue", "/clear-queue", "exit", "/quit",
+		"/save", "/apply", "/retry", "/copy", "/queue", "/dequeue", "/clear-queue", "exit", "/quit",
 	}
 	if len(model.entries) != len(expected) {
 		t.Fatalf("command palette has %d entries, want %d", len(model.entries), len(expected))
