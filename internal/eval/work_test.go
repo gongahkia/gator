@@ -9,7 +9,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/workrun"
 )
 
@@ -26,6 +28,49 @@ func TestWorkExperimentRejectsInvalidAblationsBeforeExecution(t *testing.T) {
 		if _, err := os.Stat(directory); !errors.Is(err, os.ErrNotExist) {
 			t.Fatalf("invalid ablation created an experiment: %v", err)
 		}
+	}
+}
+
+func TestWorkExperimentDefaultsToDevelopmentAndRequiresExplicitHeldOutSelection(t *testing.T) {
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, "source"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	dataset := WorkDataset{Version: 1, ID: "splits", Target: "work.v1", Cases: []WorkCase{
+		{ID: "development-case", Split: WorkSplitDevelopment, Source: "source", Objective: "Write report", Contract: artifact.DefaultContract("report.md"), Mode: action.Draft, MaxSteps: 2, Graders: []WorkGrader{{Version: 1, Kind: "file_contains", Path: "report.md", Expected: "ready"}}},
+		{ID: "held-out-case", Split: WorkSplitHeldOut, Source: "source", Objective: "Write report", Contract: artifact.DefaultContract("report.md"), Mode: action.Draft, MaxSteps: 2, Graders: []WorkGrader{{Version: 1, Kind: "file_contains", Path: "report.md", Expected: "ready"}}},
+	}}
+	factory := func(_ WorkCase, state string) (workrun.Service, error) {
+		return workrun.Service{Executor: workrun.Executor{
+			Model: &ScriptedModel{Turns: []agent.Turn{
+				{ToolCalls: []agent.ToolCall{{ID: "write", Name: "write_artifact", Arguments: json.RawMessage(`{"path":"report.md","content":"ready"}`)}}},
+				{Text: "Done."},
+			}},
+			StateDir: state,
+		}}, nil
+	}
+	run := func(id, split string) WorkExperiment {
+		t.Helper()
+		report, err := RunWorkExperiment(context.Background(), filepath.Join(root, "dataset.json"), dataset, WorkEvalOptions{ID: id, Attempts: 1, ReportDir: filepath.Join(root, id), Split: split}, factory)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return report
+	}
+	development := run("development", "")
+	if development.Split != WorkSplitDevelopment || development.Total != 1 || development.Trials[0].Split != WorkSplitDevelopment {
+		t.Fatalf("default split = %#v", development)
+	}
+	heldOut := run("held-out", WorkSplitHeldOut)
+	if heldOut.Split != WorkSplitHeldOut || heldOut.Total != 1 || heldOut.Trials[0].Split != WorkSplitHeldOut {
+		t.Fatalf("held-out split = %#v", heldOut)
+	}
+	all := run("all", WorkSplitAll)
+	if all.Split != WorkSplitAll || all.Total != 2 {
+		t.Fatalf("all split = %#v", all)
+	}
+	if _, _, err := selectWorkCases(dataset, "unexpected"); err == nil {
+		t.Fatal("unknown split accepted")
 	}
 }
 
