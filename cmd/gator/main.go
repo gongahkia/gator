@@ -90,8 +90,7 @@ Usage:
   gator work resume [--refresh-source] [--parent REVISION] CONVERSATION TASK
   gator work inspect [OPTIONS] TASK
   gator work code [CODE POLICY] TASK
-  gator work eval DIR [OPTIONS]
-  gator work eval suite DIR [OPTIONS]
+  gator work eval validate|run|show|compare DATASET_OR_REPORT [OPTIONS]
   gator work review WORK_BUNDLE|WORK_ID [OPTIONS]
   gator work export WORK_BUNDLE|WORK_ID [OPTIONS]
   gator work apply WORK_BUNDLE|WORK_ID [OPTIONS]

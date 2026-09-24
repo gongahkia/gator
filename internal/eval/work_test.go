@@ -61,6 +61,10 @@ func TestWorkExperimentDefaultsToDevelopmentAndRequiresExplicitHeldOutSelection(
 	if development.Split != WorkSplitDevelopment || development.Total != 1 || development.Trials[0].Split != WorkSplitDevelopment {
 		t.Fatalf("default split = %#v", development)
 	}
+	retained, err := os.ReadFile(filepath.Join(root, "development", "dataset.json"))
+	if err != nil || strings.Contains(string(retained), "held-out-case") {
+		t.Fatalf("development report retained held-out material: %s; %v", retained, err)
+	}
 	heldOut := run("held-out", WorkSplitHeldOut)
 	if heldOut.Split != WorkSplitHeldOut || heldOut.Total != 1 || heldOut.Trials[0].Split != WorkSplitHeldOut {
 		t.Fatalf("held-out split = %#v", heldOut)

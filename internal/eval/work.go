@@ -257,15 +257,17 @@ func RunWorkExperiment(ctx context.Context, datasetPath string, dataset WorkData
 	if err != nil {
 		return WorkExperiment{}, err
 	}
+	selectedDataset := dataset
+	selectedDataset.Cases = append([]WorkCase(nil), cases...)
 	if err := os.Mkdir(options.ReportDir, 0700); err != nil {
 		return WorkExperiment{}, fmt.Errorf("create new experiment directory: %w", err)
 	}
-	report := WorkExperiment{DisabledRoles: append([]string(nil), options.DisabledRoles...), Version: 1, ID: options.ID, Dataset: dataset.ID, DatasetSHA256: workHash(dataset), Target: dataset.Target, Harness: options.Harness, Provider: options.Provider, Model: options.Model, Split: split, Scripted: !options.Live, Delegation: options.Delegation, Attempts: options.Attempts, Categories: map[string]int{}, Outcomes: map[string]int{}}
+	report := WorkExperiment{DisabledRoles: append([]string(nil), options.DisabledRoles...), Version: 1, ID: options.ID, Dataset: dataset.ID, DatasetSHA256: workHash(selectedDataset), Target: dataset.Target, Harness: options.Harness, Provider: options.Provider, Model: options.Model, Split: split, Scripted: !options.Live, Delegation: options.Delegation, Attempts: options.Attempts, Categories: map[string]int{}, Outcomes: map[string]int{}}
 	var budget *agent.Budget
 	if options.MaxRequests > 0 {
 		budget = &agent.Budget{Limits: agent.Limits{ModelRequests: options.MaxRequests}}
 	}
-	if err := writeJSON(filepath.Join(options.ReportDir, "dataset.json"), dataset, "retained dataset"); err != nil {
+	if err := writeJSON(filepath.Join(options.ReportDir, "dataset.json"), selectedDataset, "retained dataset"); err != nil {
 		return report, err
 	}
 	for _, c := range cases {
@@ -537,7 +539,7 @@ func LoadWorkExperiment(path string) (WorkExperiment, error) {
 	return report, err
 }
 func CompareWork(a, b WorkExperiment) (string, error) {
-	if a.DatasetSHA256 != b.DatasetSHA256 || a.Attempts != b.Attempts || a.Total != b.Total || a.Scripted != b.Scripted {
+	if a.DatasetSHA256 != b.DatasetSHA256 || a.Split != b.Split || a.Attempts != b.Attempts || a.Total != b.Total || a.Scripted != b.Scripted {
 		return "", errors.New("comparison requires identical dataset and trial counts")
 	}
 	scores := map[string][2]int{}

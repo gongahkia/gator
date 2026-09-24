@@ -67,7 +67,7 @@ func workCommand(arguments []string, out io.Writer) error {
 	case "resume":
 		return workResumeCommand(arguments[1:], out)
 	case "eval":
-		return evalCommand(arguments[1:], out)
+		return workEvalCommand(arguments[1:], out)
 	case "review":
 		return reviewCommand(arguments[1:], out)
 	case "export":
