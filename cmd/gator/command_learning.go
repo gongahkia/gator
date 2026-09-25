@@ -16,10 +16,10 @@ import (
 )
 
 const learningUsage = `usage:
-  gator learnings list
+  gator learnings list [--status active|candidate|disabled|rejected] [--scope global|project[=PATH]]
   gator learnings show LEARNING_ID
   gator learnings add --type preference|environment_fact|procedure|failure_prevention --key KEY [--scope global|project[=PATH]] TEXT
-  gator learnings enable|disable|remove|reject LEARNING_ID
+  gator learnings approve|enable|disable|remove|reject LEARNING_ID
   gator learnings edit LEARNING_ID [--key KEY] TEXT
 
 "remove" is reversible: it disables the learning and retains its provenance.
@@ -48,14 +48,7 @@ func runLearningCommand(stateDir string, arguments []string, out io.Writer) erro
 	}
 	switch arguments[0] {
 	case "list":
-		if len(arguments) != 1 {
-			return errors.New("usage: gator learnings list")
-		}
-		records, err := store.List()
-		if err != nil {
-			return err
-		}
-		return writeLearnings(out, records)
+		return listLearnings(store, arguments[1:], out)
 	case "show":
 		if len(arguments) != 2 {
 			return errors.New("usage: gator learnings show LEARNING_ID")
@@ -67,12 +60,21 @@ func runLearningCommand(stateDir string, arguments []string, out io.Writer) erro
 		return json.NewEncoder(out).Encode(record)
 	case "add":
 		return addLearning(store, arguments[1:], out)
-	case "enable", "disable", "remove", "reject":
+	case "approve", "enable", "disable", "remove", "reject":
 		if len(arguments) != 2 {
 			return fmt.Errorf("usage: gator learnings %s LEARNING_ID", arguments[0])
 		}
 		var record learning.Record
 		switch arguments[0] {
+		case "approve":
+			candidate, loadErr := store.Load(arguments[1])
+			if loadErr != nil {
+				return loadErr
+			}
+			if candidate.Status != learning.Candidate {
+				return errors.New("only a candidate learning can be approved")
+			}
+			record, err = store.Enable(arguments[1])
 		case "enable":
 			record, err = store.Enable(arguments[1])
 		case "disable":
@@ -92,6 +94,48 @@ func runLearningCommand(stateDir string, arguments []string, out io.Writer) erro
 	default:
 		return fmt.Errorf("unknown learning operation %q\n%s", arguments[0], learningUsage)
 	}
+}
+
+func listLearnings(store learning.Store, arguments []string, out io.Writer) error {
+	flags := flag.NewFlagSet("learnings list", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	statusName := flags.String("status", "", "active, candidate, disabled, or rejected")
+	scopeName := flags.String("scope", "", "global or project[=PATH]")
+	if err := flags.Parse(arguments); err != nil || len(flags.Args()) != 0 {
+		return errors.New("usage: gator learnings list [--status active|candidate|disabled|rejected] [--scope global|project[=PATH]]")
+	}
+	var status learning.Status
+	if strings.TrimSpace(*statusName) != "" {
+		status = learning.Status(strings.ToLower(strings.TrimSpace(*statusName)))
+		switch status {
+		case learning.Active, learning.Candidate, learning.Disabled, learning.Rejected:
+		default:
+			return errors.New("learning status must be active, candidate, disabled, or rejected")
+		}
+	}
+	var scope *learning.Scope
+	if strings.TrimSpace(*scopeName) != "" {
+		parsed, err := parseLearningScope(*scopeName)
+		if err != nil {
+			return err
+		}
+		scope = &parsed
+	}
+	records, err := store.List()
+	if err != nil {
+		return err
+	}
+	filtered := records[:0]
+	for _, record := range records {
+		if status != "" && record.Status != status {
+			continue
+		}
+		if scope != nil && record.Scope != *scope {
+			continue
+		}
+		filtered = append(filtered, record)
+	}
+	return writeLearnings(out, filtered)
 }
 
 func addLearning(store learning.Store, arguments []string, out io.Writer) error {

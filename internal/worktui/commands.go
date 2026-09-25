@@ -8,6 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/instructions"
+	"github.com/gongahkia/gator/internal/jobs"
 )
 
 func (m *Model) openCommandPalette() {
@@ -133,40 +134,20 @@ func commandPaletteEntries() []entry {
 		{title: "/help", subtitle: "Show Gator commands", kind: "command", command: "/help"},
 		{title: "/new", subtitle: "Start a clean Gator conversation", kind: "command", command: "/new"},
 		{title: "/model", subtitle: "Cloud and local models · configure, sign in, download, select", kind: "command", command: "/model"},
-		{title: "/effort", subtitle: "Set low, standard, or high effort", kind: "command-input", command: "/effort"},
-		{title: "/attach", subtitle: "Attach a source file to the next prompt", kind: "command-input", command: "/attach"},
-		{title: "/detach", subtitle: "Remove a pending attachment", kind: "command-input", command: "/detach"},
-		{title: "/source", subtitle: "Inspect, change, or refresh the conversation workspace", kind: "command", command: "/source"},
-		{title: "/source-refresh", subtitle: "Capture the selected workspace again", kind: "command", command: "/source-refresh"},
-		{title: "/source ignore", subtitle: "Skip a project instruction file for this conversation", kind: "command-input", command: "/source ignore"},
-		{title: "/source unignore", subtitle: "Restore a skipped project instruction file", kind: "command-input", command: "/source unignore"},
+		{title: "/source", subtitle: "Choose the workspace for this conversation", kind: "command", command: "/source"},
 		{title: "/mode", subtitle: "Set auto, inspect, draft, or act", kind: "command-input", command: "/mode"},
-		{title: "/code", subtitle: "Require or release the Code specialist for Work", kind: "command-input", command: "/code"},
-		{title: "/artifact", subtitle: "Add, remove, or list deliverables", kind: "command-input", command: "/artifact"},
-		{title: "/connector", subtitle: "Select connected sources for this session", kind: "command-input", command: "/connector"},
-		{title: "/web-origin", subtitle: "Select an HTTPS research origin", kind: "command-input", command: "/web-origin"},
-		{title: "/status", subtitle: "Inspect Gator orchestration", kind: "command", command: "/status"},
-		{title: "/statusline", subtitle: "Choose and order composer footer items", kind: "command", command: "/statusline"},
-		{title: "/permissions", subtitle: "Inspect Gator's active Work authority", kind: "command", command: "/permissions"},
-		{title: "/doctor", subtitle: "Inspect local prerequisites", kind: "command", command: "/doctor"},
-		{title: "/agents", subtitle: "Inspect project profiles and roles", kind: "command", command: "/agents"},
 		{title: "/settings", subtitle: "Inspect current settings", kind: "command", command: "/settings"},
 		{title: "/theme", subtitle: "Choose gator, contrast, or mono", kind: "command-input", command: "/theme"},
 		{title: "/history", subtitle: "Show Work executions in this conversation", kind: "command", command: "/history"},
+		{title: "/jobs", subtitle: "Schedule, run, and review repeatable Work", kind: "command-input", command: "/jobs"},
 		{title: "/learnings", subtitle: "Inspect and control scoped guidance for future Work", kind: "command", command: "/learnings"},
 		{title: "/feedback", subtitle: "Accept, reject, correct, or remember this Work result", kind: "command-input", command: "/feedback"},
-		{title: "/revision-back", subtitle: "Move to the parent revision", kind: "command", command: "/revision-back"},
-		{title: "/revision-forward", subtitle: "Move to a child or named revision", kind: "command-input", command: "/revision-forward"},
 		{title: "/review", subtitle: "Show latest staged output", kind: "command", command: "/review"},
 		{title: "/save", subtitle: "Save verified deliverables to a folder", kind: "command-input", command: "/save"},
 		{title: "/apply", subtitle: "Apply a verified Code candidate", kind: "command-input", command: "/apply"},
 		{title: "/retry", subtitle: "Retry failed or pending local changes", kind: "command-input", command: "/retry"},
 		{title: "/copy", subtitle: "Choose a response or deliverable summary to copy", kind: "command", command: "/copy"},
-		{title: "/queue", subtitle: "Inspect queued prompts", kind: "command", command: "/queue"},
-		{title: "/dequeue", subtitle: "Remove the next queued prompt", kind: "command", command: "/dequeue"},
-		{title: "/clear-queue", subtitle: "Remove every queued prompt", kind: "command", command: "/clear-queue"},
 		{title: "exit", subtitle: "Exit Gator", kind: "command", command: "exit"},
-		{title: "/quit", subtitle: "Exit Gator", kind: "command", command: "/quit"},
 	}
 }
 
@@ -181,7 +162,13 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 	var err error
 	switch fields[0] {
 	case "/help", "/?":
-		result = workHelp()
+		if len(fields) == 1 {
+			result = workHelp()
+		} else if len(fields) == 2 && fields[1] == "advanced" {
+			result = workAdvancedHelp()
+		} else {
+			err = fmt.Errorf("usage: /help [advanced]")
+		}
 	case "/new":
 		m.home, m.conversation = true, ""
 		m.section, m.paletteQuery, m.launcherMode = "", "", ""
@@ -332,7 +319,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		result, err = m.configureWebOrigins(fields)
 	case "/status":
 		result = m.workStatus()
-	case "/statusline", "/status-line":
+	case "/statusline":
 		if len(fields) != 1 {
 			err = fmt.Errorf("usage: /statusline")
 			break
@@ -383,7 +370,24 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 	case "/clear-queue":
 		m.queue = nil
 		result = "Cleared the prompt queue."
-	case "/learnings", "/learning":
+	case "/jobs":
+		if len(fields) == 1 {
+			m.section = "jobs"
+			return m, nil
+		}
+		if m.config.JobAction == nil {
+			err = errorsUnavailable("jobs")
+			break
+		}
+		result, err = m.config.JobAction(fields[1:])
+		if err == nil && m.config.RefreshJobs != nil {
+			var refreshed []jobs.Definition
+			refreshed, err = m.config.RefreshJobs()
+			if err == nil {
+				m.config.Jobs = refreshed
+			}
+		}
+	case "/learnings":
 		if m.config.LearningAction == nil {
 			err = errorsUnavailable("learnings")
 			break
@@ -439,7 +443,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 			m.scroll = 0
 			return m, nil
 		}
-	case "exit", "/quit":
+	case "exit":
 		return m, tea.Quit
 	default:
 		err = fmt.Errorf("unknown command %s; use /help", fields[0])
@@ -914,51 +918,28 @@ func errorsUnavailable(name string) error {
 }
 
 func workHelp() string {
-	return `Gator commands
-  /model                         manage cloud/local models, setup, sign-in, downloads and deletion
-  /effort low|standard|high      set manager and Code turn budgets
-  /attach PATH                   send one source file with the next prompt
-  /detach PATH|all               remove pending attachments
-  /source [PATH]                 inspect, select, or refresh the read-only workspace
-  /source ignore PATH            skip one project instruction file for this conversation
-  /source unignore PATH          read a skipped project instruction file again
-  /source ignored                list skipped project instruction files
-  /source-refresh                capture changed workspace files next turn
-  /mode auto|inspect|draft|act   choose automatic or explicit authority
-  /code on|off                   require retained Code patch evidence for Work
-  /artifact [add|remove] PATH    manage expected deliverables
-  /connector [add|remove] ID     select connected sources for this session
-  /connector setup ID CLIENT_ID  configure Google Workspace with desktop OAuth
-  /connector login ID [prompt]   authenticate and select a connector
-  /connector status [ID]         inspect configured connectors and operations
-  /connector test ID             verify live connector access
-  /connector permission ID OPERATION read|write POLICY
-                                  set allow/ask/deny/draft policy
-  /connector logout|delete ID    remove credentials or the connector
-  /web-origin [add|remove] URL   manage bounded web research origins
-  /status · /permissions         inspect the active orchestration envelope
-  /statusline                    choose, order, or hide composer footer items
-  /doctor · /agents · /settings inspect local configuration
-  /history · /revision-back · /revision-forward
-                                 navigate retained Gator revisions
-  /learnings [list|show|add|enable|disable|edit|remove|reject]
-                                 inspect and control scoped guidance
-  /feedback accept|reject|dont-learn [NOTE]
-  /feedback correct|remember [--type TYPE] [--key KEY] [--scope SCOPE] TEXT
-                                 record explicit feedback for this Work
-  /steer TEXT                    steer the running task
-  /tasks · /cancel-task ID        inspect or cancel active specialists
-  /approve · /deny                respond to the displayed exact request
-  /cancel                        cancel and retain the running outcome
-  /queue · /dequeue · /clear-queue
-  /review                        preview verified deliverables in this thread
-  /save [--replace] [DIR]        preflight and save deliverables after confirmation
-  /apply [CANDIDATE] [DIR]       preflight and apply verified code after confirmation
-  /retry [DELIVERY_ID]            retry failed or pending local changes after confirmation
-  /copy · /theme · /new · exit · /quit
+	return `Gator
+  Start Work by writing your request below. Gator retains its output and follows
+  the current workspace, model, and mode.
 
-Gator manages its internal specialists. /code makes the same bounded Code
-specialist required by gator work code; it never opens a separate Code session.
+  /model                         choose or set up a model
+  /source [PATH]                 choose the workspace
+  /mode auto|inspect|draft|act   choose Work authority
+  /code on|off                   require a verified code change
+  /artifact [add|remove] PATH    set expected deliverables
+  /history                       review this conversation's Work
+  /jobs [list|add|show|edit|enable|disable|run|history|remove]
+                                 schedule and review repeatable Work
+  /learnings [list|show|add|approve|enable|disable|edit|remove|reject]
+                                 control guidance for future Work
+  /feedback accept|reject|dont-learn [NOTE]
+  /feedback correct|remember [OPTIONS] TEXT
+                                 record feedback for this Work
+  /review · /save · /apply · /retry
+                                 review and deliver a completed result
+  /settings · /theme · /new · /copy · exit
+
+Use /help advanced for workspace, integration, revision, queue, and diagnostic controls.
 
 Navigation
   ↑/↓       recall sent prompts in this conversation
@@ -968,4 +949,17 @@ Navigation
   ctrl+b    inbox
   ctrl+j    scheduled jobs
   ctrl+p    searchable command palette`
+}
+
+func workAdvancedHelp() string {
+	return `Advanced controls
+  /effort low|standard|high · /attach PATH · /detach PATH|all
+  /source ignore|unignore|ignored PATH · /source-refresh
+  /connector ... · /web-origin ...
+  /status · /permissions · /statusline · /doctor · /agents
+  /revision-back · /revision-forward [REVISION]
+  /queue · /dequeue · /clear-queue
+
+These controls preserve the same Work semantics; they are intentionally kept
+out of the normal command palette. Use /help to return to the main workflow.`
 }

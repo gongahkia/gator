@@ -150,11 +150,15 @@ type Config struct {
 	StartConversationID     string
 	Jobs                    []jobs.Definition
 	Inbox                   []inbox.Entry
-	Run                     func(source, conversationID, prompt string, options RunOptions) RunResult
-	MoveBack                func(conversationID string) (string, error)
-	MoveForward             func(conversationID string) (string, error)
-	MoveToRevision          func(conversationID, revisionID string) (string, error)
-	History                 func(conversationID string) (string, error)
+	// JobAction uses the same local Job service as the CLI. It keeps scheduling
+	// as repeatable Work rather than creating a second TUI-only runtime.
+	JobAction      func(arguments []string) (string, error)
+	RefreshJobs    func() ([]jobs.Definition, error)
+	Run            func(source, conversationID, prompt string, options RunOptions) RunResult
+	MoveBack       func(conversationID string) (string, error)
+	MoveForward    func(conversationID string) (string, error)
+	MoveToRevision func(conversationID, revisionID string) (string, error)
+	History        func(conversationID string) (string, error)
 	// LearningAction uses the same local learning service as the CLI. It is a
 	// direct in-process callback, never a TUI shell-out to a command binary.
 	LearningAction func(arguments []string) (string, error)

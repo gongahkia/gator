@@ -65,7 +65,7 @@ func workSessionCommand(arguments []string, in io.Reader, out io.Writer, modelFa
 		if err != nil {
 			return err
 		}
-		return writeWorkHistory(out, records)
+		return writeWorkHistory(out, stateDir, records)
 	case "show":
 		if len(arguments) != 2 {
 			return errors.New("usage: gator work show WORK_ID|CONVERSATION_ID")
@@ -92,7 +92,7 @@ func workSessionCommand(arguments []string, in io.Reader, out io.Writer, modelFa
 		if err != nil {
 			return err
 		}
-		return writeWorkHistory(out, records)
+		return writeWorkHistory(out, stateDir, records)
 	case "back":
 		if len(arguments) != 2 {
 			return errors.New("usage: gator work back CONVERSATION_ID")

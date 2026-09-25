@@ -148,6 +148,10 @@ func workInteractiveConversation(startConversationID string) error {
 		},
 		StartConversationID: startConversationID,
 		FirstRun:            settings.Defaults.Provider == "" && len(conversations) == 0,
+		JobAction: func(arguments []string) (string, error) {
+			return workTUIJobAction(arguments)
+		},
+		RefreshJobs: jobStore.List,
 		Run: func(source, conversationID, prompt string, options worktui.RunOptions) worktui.RunResult {
 			return runInteractiveWork(source, conversationID, prompt, stateDir, options)
 		},
@@ -215,7 +219,7 @@ func workInteractiveConversation(startConversationID string) error {
 			return "", errors.New("selected revision is not a child of the current head")
 		},
 		History: func(conversationID string) (string, error) {
-			return workHistoryText(history, conversationID)
+			return workHistoryText(stateDir, history, conversationID)
 		},
 		LearningAction: func(arguments []string) (string, error) {
 			return learningTUIAction(stateDir, arguments)
@@ -241,6 +245,12 @@ func workInteractiveConversation(startConversationID string) error {
 func workTUIConnectorAction(arguments []string) (string, error) {
 	var output bytes.Buffer
 	err := connectorCommandWithIO(arguments, os.Stdin, &output)
+	return strings.TrimSpace(output.String()), err
+}
+
+func workTUIJobAction(arguments []string) (string, error) {
+	var output bytes.Buffer
+	err := jobCommand(arguments, &output)
 	return strings.TrimSpace(output.String()), err
 }
 

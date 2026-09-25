@@ -18,12 +18,16 @@ func configure(arguments []string, out io.Writer) error {
 		return err
 	}
 	if len(arguments) == 0 || arguments[0] == "show" {
-		if len(arguments) > 1 {
-			return errors.New("usage: gator config [show]")
+		jsonOutput := len(arguments) == 2 && arguments[0] == "show" && arguments[1] == "--json"
+		if len(arguments) > 1 && !jsonOutput {
+			return errors.New("usage: gator config [show [--json]]")
 		}
 		settings, err := store.Load()
 		if err != nil {
 			return err
+		}
+		if !jsonOutput {
+			return writeSettingsSummary(out, store.Path(), settings)
 		}
 		payload, err := json.MarshalIndent(settings, "", "  ")
 		if err != nil {
@@ -33,7 +37,7 @@ func configure(arguments []string, out io.Writer) error {
 		return err
 	}
 	if len(arguments) != 3 || arguments[0] != "set" {
-		return errors.New("usage: gator config set default-provider PROVIDER | gator config set default-model MODEL | gator config set sandbox strict|off | gator config set network deny|allow")
+		return errors.New("usage: gator config set default-provider PROVIDER | gator config set default-model MODEL | gator config set sandbox strict|off | gator config set network deny|allow\nadvanced settings: gator config show --json")
 	}
 	settings, err := store.Load()
 	if err != nil {
@@ -98,5 +102,18 @@ func configure(arguments []string, out io.Writer) error {
 		return err
 	}
 	_, err = fmt.Fprintf(out, "Updated %s in %s.\n", arguments[1], store.Path())
+	return err
+}
+
+func writeSettingsSummary(out io.Writer, path string, settings config.Settings) error {
+	model := strings.Trim(strings.TrimSpace(settings.Defaults.Provider)+" / "+strings.TrimSpace(settings.Defaults.Model), " / ")
+	if model == "" {
+		model = "choose one with /model or gator config set default-provider"
+	}
+	theme := strings.TrimSpace(settings.Theme)
+	if theme == "" {
+		theme = "gator"
+	}
+	_, err := fmt.Fprintf(out, "Settings\n  Default model: %s\n  Work safeguards: sandbox %s · network %s\n  Interface: %s theme · desktop notifications %t\n  Jobs: %s timezone · missed runs %s\n\nAdvanced configuration and integration details: gator config show --json\nLocation: %s\n", model, settings.Execution.Mode, settings.Execution.Network, theme, settings.Notifications.Desktop, settings.JobDefaults.Timezone, settings.JobDefaults.Missed, path)
 	return err
 }

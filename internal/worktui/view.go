@@ -195,7 +195,7 @@ func (m Model) renderSection(width int, accent, dim lipgloss.Style) string {
 		}
 	} else {
 		if len(m.config.Jobs) == 0 {
-			view.WriteString(dim.Render("No scheduled jobs. Create one with `gator job add`.") + "\n")
+			view.WriteString(dim.Render("No scheduled jobs. Create one with `/jobs add …`.") + "\n")
 		}
 		for _, job := range m.config.Jobs {
 			state := "disabled"
