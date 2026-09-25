@@ -3859,3 +3859,104 @@ GATOR-HANDOFF-DOC.md
 
 No reset, amend, force operation, or push was performed by this tranche.
 Stop here; do not start Prompt 5 in this handoff.
+
+---
+
+# GTR-LIGHT-01 — Completion Report
+
+## A. Classification
+
+| Subsystem | Classification | Current treatment |
+| --- | --- | --- |
+| Work, artifacts, history, delivery/retry, learnings, jobs, config/credentials | CORE | The normal local-first lifecycle. |
+| Native providers and one compatible/custom endpoint path | CORE | Retained; no provider removed without user-value evidence. |
+| Browser, desktop, MCP, LSP, extensions, telemetry, local-model management | OPTIONAL | Explicit capability paths, absent from ordinary startup. |
+| ACP, RPC, app server, supervisor | OPTIONAL / INTEGRATION | Explicit serving or integration entry points, not a second normal Work runtime. |
+| Google Tasks, Calendar, reminders, quick capture, task metadata, and Google SQLite mirror | DELETE | Removed for the explicit product-scope change. |
+
+## B. Baseline Measurements
+
+Environment: macOS Darwin 24.6 on amd64, Go 1.27.0, module language version 1.25.13. Pre-change baseline from `fd628f5b7`, using a warm Go cache: 42,167,352-byte binary; 12.44 s build; `--help` 0.86 s / 17.1 MiB max RSS; `work list` 0.03 s / 17.6 MiB max RSS; 20 direct modules, 92 modules overall, 58 packages, and 481 dependency packages. No Gator child process remained after `work list`.
+
+The initial `go test ./... -count=1` baseline was intentionally interrupted when scope changed to remove Google Tasks and Calendar, so it is not reported as a completed baseline test. Interactive TUI idle RAM and remote-model Work RAM were not measured because they need durable terminal/model sessions and would not be comparable to deterministic CLI checks.
+
+## C. Highest-Cost Subsystems
+
+The source audit found model (256 KiB), Work runtime (164 KiB), browser (140 KiB), LSP (136 KiB), MCP (68 KiB), local-model management / Google Work / extensions (64 KiB each), ACP (60 KiB), desktop and app server (56 KiB each) as larger areas. Google Work was the clearest product-drift deletion: its private SQLite mirror and planner workflows added dependency and binary cost without strengthening the Work thesis.
+
+## D. Deletions
+
+Removed all of `internal/googlework` (capture, reminders, task metadata, SQLite store, tests), all Tasks/Calendar schemas, routes, action construction, and batch eligibility, plus mirror hooks and connector `StateDir` plumbing. Also removed Google local search, quick capture, reminders, task metadata, and their user-facing documentation.
+
+## E. Optionalizations/Lazy Initialization
+
+Existing boundaries already hold: ordinary help/list paths do not initialize browser, desktop, protocol servers, provider clients, or Google integrations. The removal means Google never opens local state or SQLite on a connector operation. The ordinary `work list` check again left no Gator process running.
+
+## F. Provider Surface
+
+Provider adapters and the compatible/custom endpoint remain. No demonstrated low-value provider warranted deletion in this scoped pass; deleting for logo-count reduction would be speculation. Provider breadth remains a final-hardening review item.
+
+## G. Browser/Desktop
+
+Browser automation starts its Node/driver work only after an explicit browser command or selected session. Desktop integration calls platform utilities only from its explicit command. Neither runs from normal help, `work list`, or normal Work setup, and neither needs a resident background process.
+
+## H. Server/Protocol Cleanup
+
+RPC, ACP, app-server, MCP, LSP, and supervisor paths remain explicit integration or serve commands. The audit found no normal-path server startup and no daemon requirement for ordinary Gator use. They are retained for final integration-value review.
+
+## I. Google Scope
+
+Google Workspace now exposes only health, Drive metadata search/get, Docs read/create/update, Sheets read/create/range/batch update, and a typed Docs/Sheets batch. Default OAuth no longer includes Tasks or Calendar. Legacy descriptors are filtered at OAuth login so a new consent flow strips those old planner scopes while preserving other scopes. Existing Google-account grants remain user-controlled until revoked. A temporary-config CLI verification showed only the retained operations in `connector status`.
+
+## J. State/Dependency Cleanup
+
+There is no longer a reader or writer for `STATE_DIR/gator/google-work/`; Gator does not delete an existing user directory automatically. `go mod tidy` removed `modernc.org/sqlite` and its dead C-runtime/tooling transitive chain. The module graph fell from 92 to 74 modules, the package list from 58 to 57, and the dependency list from 481 to 446.
+
+## K. Before/After Measurements
+
+| Measurement | Before | After | Change |
+| --- | ---: | ---: | ---: |
+| Binary size | 42,167,352 B | 35,849,424 B | -6,317,928 B (-15.0%) |
+| Build (`go build ./cmd/gator`, warm cache) | 12.44 s | 7.02 s | faster; cache-sensitive |
+| `gator --help` | 0.86 s / 17.1 MiB max RSS | 0.67 s / 13.9 MiB max RSS | faster, -3.2 MiB |
+| `gator work list` | 0.03 s / 17.6 MiB max RSS | 0.02 s / 14.7 MiB max RSS | faster, -2.9 MiB |
+| Modules / packages / dependencies | 92 / 58 / 481 | 74 / 57 / 446 | -18 / -1 / -35 |
+
+After values use `/usr/bin/time -l`; no idle child process remained after the simple command checks. Build timing is directional, not a cold-cache claim.
+
+## L. Tests / Evals
+
+Passed:
+
+```sh
+git diff --check
+go test ./internal/connector ./cmd/gator -count=1
+go test ./... -count=1
+go mod tidy
+go build ./cmd/gator
+```
+
+The final uncached full suite passed, including Work, Code, history, delivery/retry, learnings, jobs, CLI/TUI, and connectors. Focused coverage proves default scopes exclude planner APIs, all retired operations are absent, and legacy OAuth filtering preserves non-planner scopes.
+
+## M. Complexity Delta
+
+The recorded deletion changes 19 files: 101 insertions and 2,151 deletions, net -2,050 lines. It removes eight dedicated Google-work source/test files, more than 500 runtime lines, and the compiled SQLite dependency chain. The remaining Google model is bounded: Drive, Docs, and Sheets only.
+
+## N. Product Checkpoint
+
+1. Is ordinary Gator materially lighter? **Yes** — binary -15.0%, normal command max RSS about -3 MiB.
+2. Did startup improve or remain excellent? **Improved** on measured paths; cold-cache speed is not claimed.
+3. Are heavy capabilities optional? **Yes** — browser, desktop, protocols, extensions, MCP, LSP, telemetry, and local-model management are explicit paths.
+4. Is a daemon required? **No** — ordinary CLI/TUI and Work use no resident daemon.
+5. Did we remove providers/integrations with weak value? **Yes** — the planner/mirror integration; provider adapters await evidence-based final review.
+6. Did we preserve output quality? **Yes** — the uncached full suite passed.
+7. Is the codebase easier to develop in? **Yes** — no mirror lifecycle, planner routing, task/calendar schemas, or SQLite chain remain.
+8. What substantial bloat remains? **Model/provider breadth and optional browser/protocol integration trees** remain the largest final-hardening candidates.
+
+## O. Recommended Next Tranche
+
+Proceed only to `GTR-RELEASE-01` (Prompt 6): final cross-product regression hardening, architecture/thesis audit, and evidence-based fossil review. Do not begin a new feature tranche first.
+
+## P. Git Status
+
+This pass began clean at `fd628f5b7`. While it ran, the shared checkout advanced to `e974726f1` (`stripoutgooglepaths`), containing the source, dependency, documentation, and test deletion. At this handoff, this report is the remaining working-tree change. No reset, amend, force operation, or history rewrite was performed. Stop here; do not start Prompt 6 in this handoff.
