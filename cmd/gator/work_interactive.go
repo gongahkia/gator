@@ -220,6 +220,9 @@ func workInteractiveConversation(startConversationID string) error {
 		LearningAction: func(arguments []string) (string, error) {
 			return learningTUIAction(stateDir, arguments)
 		},
+		FeedbackAction: func(workID string, arguments []string) (string, error) {
+			return workFeedbackTUIAction(stateDir, workID, arguments)
+		},
 		Inspect:       inspectWorkTUITopic,
 		Copy:          clipboard.WriteAll,
 		Theme:         settings.Theme,

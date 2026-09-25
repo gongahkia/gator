@@ -96,6 +96,7 @@ Usage:
   gator work export WORK_BUNDLE|WORK_ID [OPTIONS]
   gator work apply WORK_BUNDLE|WORK_ID [OPTIONS]
   gator work retry WORK_ID [--delivery DELIVERY_ID] [--json]
+  gator work feedback WORK_ID accept|reject|correct|remember|dont-learn|list [OPTIONS]
   gator work snapshot list|show ID|gc --yes
 
 Commands:

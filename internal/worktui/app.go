@@ -158,6 +158,9 @@ type Config struct {
 	// LearningAction uses the same local learning service as the CLI. It is a
 	// direct in-process callback, never a TUI shell-out to a command binary.
 	LearningAction func(arguments []string) (string, error)
+	// FeedbackAction records explicit feedback against the current Work revision
+	// using the same local service as the Work CLI.
+	FeedbackAction func(workID string, arguments []string) (string, error)
 	FirstRun       bool
 	Inspect        func(topic string) (string, error)
 	Copy           func(text string) error

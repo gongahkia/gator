@@ -76,6 +76,8 @@ func workCommand(arguments []string, out io.Writer) error {
 		return applyPatch(arguments[1:], out)
 	case "retry":
 		return retryWorkDelivery(arguments[1:], out)
+	case "feedback":
+		return workFeedbackCommand(arguments[1:], out)
 	case "snapshot":
 		return snapshotCommand(arguments[1:], out)
 	default:

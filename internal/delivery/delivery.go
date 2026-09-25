@@ -20,6 +20,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/learning"
 	"github.com/gongahkia/gator/internal/patch"
 	"github.com/gongahkia/gator/internal/workspace"
 )
@@ -358,7 +359,9 @@ func (s Store) selectRecord(workID, deliveryID string) (Record, error) {
 	return records[0], nil
 }
 
-func (s Store) deliver(ctx context.Context, record Record) (Record, error) {
+func (s Store) deliver(ctx context.Context, record Record) (result Record, resultErr error) {
+	result = record
+	defer func() { s.observeDelivery(result) }()
 	bundle, err := artifact.OpenBundle(record.BundlePath)
 	if err != nil {
 		return record, fmt.Errorf("open retained Work result: %w", err)
@@ -406,6 +409,41 @@ func (s Store) deliver(ctx context.Context, record Record) (Record, error) {
 		return record, err
 	}
 	return record, incomplete(record)
+}
+
+// observeDelivery records only failed or uncertain delivery outcomes. Applied
+// effects and retry attempts remain in the delivery ledger; no operational
+// outcome can create a candidate rule in this tranche.
+func (s Store) observeDelivery(record Record) {
+	if record.WorkID == "" || record.ID == "" {
+		return
+	}
+	failed, unknown := false, false
+	for _, effect := range record.Effects {
+		failed = failed || effect.Status == Failed
+		unknown = unknown || effect.Status == Unknown
+	}
+	if !failed && !unknown {
+		return
+	}
+	stateDir := filepath.Dir(filepath.Dir(s.root))
+	store, err := learning.Open(stateDir)
+	if err != nil {
+		return
+	}
+	reference := filepath.ToSlash(filepath.Join("gator", "delivery", record.WorkID, record.ID+".json"))
+	if failed {
+		_, _ = store.UpsertObservation(learning.ObservationInput{
+			ID: "observation-delivery-failed-" + record.ID, Signal: learning.DeliveryFailed,
+			WorkID: record.WorkID, Summary: "A local delivery effect failed; inspect the retained delivery record before retrying.", EvidenceRefs: []string{reference},
+		})
+	}
+	if unknown {
+		_, _ = store.UpsertObservation(learning.ObservationInput{
+			ID: "observation-delivery-unknown-" + record.ID, Signal: learning.DeliveryUnknown,
+			WorkID: record.WorkID, Summary: "A delivery effect has an unknown outcome and must not be retried automatically.", EvidenceRefs: []string{reference},
+		})
+	}
 }
 
 func (s Store) reconcileInterrupted(record Record, bundle artifact.Bundle) error {

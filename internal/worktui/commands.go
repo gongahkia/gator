@@ -1,6 +1,7 @@
 package worktui
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -153,6 +154,7 @@ func commandPaletteEntries() []entry {
 		{title: "/theme", subtitle: "Choose gator, contrast, or mono", kind: "command-input", command: "/theme"},
 		{title: "/history", subtitle: "Show Work executions in this conversation", kind: "command", command: "/history"},
 		{title: "/learnings", subtitle: "Inspect and control scoped guidance for future Work", kind: "command", command: "/learnings"},
+		{title: "/feedback", subtitle: "Accept, reject, correct, or remember this Work result", kind: "command-input", command: "/feedback"},
 		{title: "/revision-back", subtitle: "Move to the parent revision", kind: "command", command: "/revision-back"},
 		{title: "/revision-forward", subtitle: "Move to a child or named revision", kind: "command-input", command: "/revision-forward"},
 		{title: "/review", subtitle: "Show latest staged output", kind: "command", command: "/review"},
@@ -387,6 +389,16 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 			break
 		}
 		result, err = m.config.LearningAction(fields[1:])
+	case "/feedback":
+		if m.revision == "" {
+			err = errors.New("finish or resume a Work revision before leaving feedback")
+			break
+		}
+		if m.config.FeedbackAction == nil {
+			err = errorsUnavailable("feedback")
+			break
+		}
+		result, err = m.config.FeedbackAction(m.revision, fields[1:])
 	case "/review":
 		if m.lastBundle.Path == "" {
 			result = "No completed Work output is available yet."
@@ -931,6 +943,9 @@ func workHelp() string {
                                  navigate retained Gator revisions
   /learnings [list|show|add|enable|disable|edit|remove|reject]
                                  inspect and control scoped guidance
+  /feedback accept|reject|dont-learn [NOTE]
+  /feedback correct|remember --type TYPE --key KEY [--scope SCOPE] TEXT
+                                 record explicit feedback for this Work
   /steer TEXT                    steer the running task
   /tasks · /cancel-task ID        inspect or cancel active specialists
   /approve · /deny                respond to the displayed exact request

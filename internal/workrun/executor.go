@@ -20,6 +20,7 @@ import (
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/attachment"
 	"github.com/gongahkia/gator/internal/connector"
+	"github.com/gongahkia/gator/internal/learning"
 	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/projectcapture"
 	"github.com/gongahkia/gator/internal/snapshot"
@@ -96,6 +97,46 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	}); err != nil {
 		return Outcome{}, fmt.Errorf("start Work history: %w", err)
 	}
+	// This runs after the Work-history finalizer below. Observations are
+	// best-effort learning evidence: a failure to retain an optional observation
+	// must never obscure the original Work result or turn a successful Work into
+	// a failure.
+	defer func() {
+		store, openErr := learning.Open(request.StateDir)
+		if openErr != nil {
+			return
+		}
+		var scope *learning.Scope
+		if strings.TrimSpace(request.SourcePath) != "" {
+			value, absErr := filepath.Abs(request.SourcePath)
+			if absErr == nil {
+				scope = &learning.Scope{Kind: learning.Project, Value: value}
+			}
+		}
+		evidence := []string{filepath.ToSlash(filepath.Join("gator", "work-history", request.RunID+".json"))}
+		if finalErr != nil || finalOutcome.Manifest.Status == artifact.Failed {
+			signal := learning.WorkFailed
+			summary := "Work execution failed before a completed, verified result."
+			if historyVerification(finalOutcome.Manifest) == workhistory.VerificationFailed {
+				signal = learning.VerificationFailed
+				summary = "Required Work verification failed."
+			}
+			_, _ = store.UpsertObservation(learning.ObservationInput{
+				ID: "observation-" + string(signal) + "-" + request.RunID, Signal: signal,
+				WorkID: request.RunID, Scope: scope, Summary: summary, EvidenceRefs: evidence,
+			})
+		}
+		for _, record := range finalOutcome.Manifest.Actions {
+			if record.Status != action.Unknown {
+				continue
+			}
+			_, _ = store.UpsertObservation(learning.ObservationInput{
+				ID: "observation-external-unknown-" + request.RunID, Signal: learning.ExternalOutcomeUnknown,
+				WorkID: request.RunID, Scope: scope, Summary: "An external action outcome is unknown and must not be retried automatically.", EvidenceRefs: evidence,
+			})
+			break
+		}
+	}()
 	defer func() {
 		_, err := history.Finish(request.RunID, workhistory.Finish{
 			ConversationID: finalOutcome.ConversationID, RevisionID: finalOutcome.RevisionID, ParentRevisionID: finalOutcome.ParentRevisionID,

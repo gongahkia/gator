@@ -559,27 +559,9 @@ func cloneProvenance(value Provenance) Provenance {
 }
 
 func readRecord(path, expectedID string) (Record, error) {
-	info, err := os.Lstat(path)
-	if err != nil {
-		return Record{}, err
-	}
-	if !info.Mode().IsRegular() || info.Size() > maxRecordBytes {
-		return Record{}, errors.New("learning record must be a bounded regular file")
-	}
-	file, err := os.Open(path)
-	if err != nil {
-		return Record{}, err
-	}
-	defer file.Close()
 	var record Record
-	decoder := json.NewDecoder(io.LimitReader(file, maxRecordBytes+1))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&record); err != nil {
+	if err := readJSONRecord(path, &record); err != nil {
 		return Record{}, err
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		return Record{}, errors.New("expected one learning JSON document")
 	}
 	if record.ID != expectedID || validateRecord(record) != nil {
 		return Record{}, errors.New("learning record is invalid")
@@ -587,8 +569,33 @@ func readRecord(path, expectedID string) (Record, error) {
 	return record, nil
 }
 
-func writeExclusive(path string, record Record) error {
-	data, err := json.MarshalIndent(record, "", "  ")
+func readJSONRecord(path string, target any) error {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() || info.Size() > maxRecordBytes {
+		return errors.New("learning record must be a bounded regular file")
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	decoder := json.NewDecoder(io.LimitReader(file, maxRecordBytes+1))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(target); err != nil {
+		return err
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		return errors.New("expected one learning JSON document")
+	}
+	return nil
+}
+
+func writeExclusive(path string, value any) error {
+	data, err := json.MarshalIndent(value, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -606,8 +613,8 @@ func writeExclusive(path string, record Record) error {
 	return nil
 }
 
-func writeAtomic(path string, record Record) error {
-	data, err := json.MarshalIndent(record, "", "  ")
+func writeAtomic(path string, value any) error {
+	data, err := json.MarshalIndent(value, "", "  ")
 	if err != nil {
 		return err
 	}
