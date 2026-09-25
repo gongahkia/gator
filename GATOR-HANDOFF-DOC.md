@@ -3647,3 +3647,215 @@ GATOR-HANDOFF-DOC.md
 
 No commit, reset, amend, push, or history rewrite was performed by this
 tranche. Stop here; do not start Prompt 4 in this handoff.
+
+---
+
+# GTR-PRODUCT-UX-01 — Completion Report
+
+## A. Classification
+
+The normal product is now organized around **Work, History, Learnings, Jobs,
+and Settings**.
+
+| Surface | Classification | Product treatment |
+| --- | --- | --- |
+| `gator`, quoted task, `work` | NORMAL | Start and continue Work naturally. |
+| `work list/history/show`, review/apply/retry/feedback | NORMAL | Retained results and follow-up actions. |
+| `learnings` | NORMAL | User-controlled future-Work guidance. |
+| `job` | NORMAL | Repeat Work on a schedule. |
+| `config` | NORMAL | Concise settings summary and normal preferences. |
+| model/provider setup | MERGE | `/model` is the TUI normal path; CLI provider detail is advanced. |
+| theme | MERGE | A Settings/UI preference rather than a separate normal product area. |
+| agent, browser, desktop, doctor, extension, LSP, MCP, RPC/ACP, connectors, snapshots, eval, supervisor/platform controls | ADVANCED or INTERNAL | Retained at their canonical paths but removed from normal navigation. |
+| root `local`, root `learning`, TUI `/learning`, TUI `/status-line`, TUI `/quit` | DELETE | Duplicate/legacy aliases removed. |
+
+## B. Before Product Surface
+
+The root help enumerated provider transport, protocol/server, trust, browser,
+extension, snapshot, and low-level scheduling details alongside everyday Work.
+The TUI palette contained 37 entries, including diagnostics, queue mechanics,
+raw authority inspection, source-instruction controls, connector plumbing, and
+duplicate exit/alias commands. Jobs were a read-only TUI section, while History
+was a tab-separated technical record containing IDs, revisions, and snapshots.
+
+## C. After Product Surface
+
+Root help leads with:
+
+```text
+gator
+gator "research X and produce a report"
+```
+
+then groups ordinary actions under the five product areas. The TUI palette has
+17 contextual entries: start/model/workspace/mode, settings/history/jobs/
+learnings/feedback, result delivery, theme/copy, and exit. Advanced controls
+remain keyboard-accessible through typed commands and `/help advanced`, without
+being presented as normal navigation.
+
+## D. CLI/TUI Parity Matrix
+
+| Capability | CLI path | TUI path | Shared service | Surface | Action |
+| --- | --- | --- | --- | --- | --- |
+| Start Work | quoted root task or `work` | composer | Work executor | NORMAL | Direct entry added for quoted task. |
+| Model/setup | `config` / `provider` | `/model` | settings/model configuration | NORMAL/ADVANCED | TUI is the normal setup path. |
+| History | `work list`, `work history` | `/history` | shared History formatter | NORMAL | Replaced raw record rows. |
+| Review/save/apply/retry | `work review/apply/retry` | `/review`, `/save`, `/apply`, `/retry` | artifact/delivery services | NORMAL | Preserved confirmed delivery semantics. |
+| Feedback | `work feedback` | `/feedback` | feedback service | NORMAL | Existing shared adapter retained. |
+| Learnings | `learnings ...` | `/learnings ...` | `runLearningCommand` | NORMAL | Added filter and approve parity. |
+| Jobs | `job ...` | `/jobs ...`, `ctrl+j` | `jobCommand` and job store | NORMAL | Closed the prior read-only TUI gap. |
+| Settings | `config [show]` | `/settings` | `configure` | NORMAL | Normal summary; JSON is advanced. |
+| Connectors/trust/protocols | canonical advanced families | typed advanced controls where applicable | existing services | ADVANCED/INTERNAL | Hidden from normal palette. |
+
+## E. Normal vs Advanced vs Internal
+
+Normal paths use user terms such as Work, results, guidance, schedules, and
+settings. Advanced paths retain evidence IDs, raw JSON, revisions, connector
+permissions, providers, project trust, diagnostics, and platform integration.
+Internal/protocol families retain their canonical commands but are absent from
+the everyday help and palette. `work show`, `work review`, and `learnings show`
+remain the explicit advanced drill-down paths for IDs, evidence, and provenance.
+
+## F. Commands/UI Removed
+
+Actual aliases removed:
+
+```text
+gator local
+gator learning
+/learning
+/status-line
+/quit
+```
+
+The command palette removed 21 advanced/duplicate entries:
+
+```text
+/effort, /attach, /detach, /source-refresh, /source ignore,
+/source unignore, /code, /artifact, /connector, /web-origin, /status,
+/statusline, /permissions, /doctor, /agents, /revision-back,
+/revision-forward, /queue, /dequeue, /clear-queue, /quit
+```
+
+They remain available only where they still provide an advanced capability,
+except for the deleted aliases above. No TUI-only Job runtime was created:
+Jobs now reuse the CLI adapter and refresh the existing Jobs section. History
+and Settings likewise reuse their CLI-backed presentation services.
+
+## G. Work Submission UX
+
+`gator` still opens the focused terminal composer. A one-argument quoted task
+containing whitespace now routes directly to Work, so the documented
+`gator "research X and produce a report"` form works without requiring users
+to know the `work` family. Single-token unknown commands still fail clearly,
+which preserves typo detection and explicit command boundaries.
+
+## H. History UX
+
+History now presents each Work result as an outcome summary:
+
+```text
+objective
+  Status: completed · verification passed · completed
+  Delivery: applied | needs attention | not delivered
+  Artifacts: relevant output paths
+  Feedback: accepted/rejected/corrected/remembered when present
+  Learnings: active/candidate guidance derived from this Work when present
+```
+
+It loads retained artifact, delivery, observation, and learning evidence via
+their existing stores. The normal display deliberately omits revision,
+snapshot, and record identifiers; advanced inspection remains explicit.
+
+## I. Learnings UX
+
+`learnings list` now accepts `--status` and `--scope`; `show` retains full
+provenance inspection. `approve` only promotes a candidate and records the
+existing explicit user-confirmation timestamp. `enable` remains the deliberate
+reactivation control for non-rejected records. Add, edit, disable, remove, and
+reject behavior remains unchanged and is available through the same in-process
+TUI adapter.
+
+## J. Jobs UX
+
+Jobs remain “schedule/repeat Work.” The TUI now supports `/jobs` to open the
+current schedule and `/jobs add|show|edit|enable|disable|run|history|remove`
+for the same operations as the CLI. It invokes `jobCommand` directly, then
+reloads the existing Job store; it never creates a second scheduler or shells
+out to an executable. Supervisor and platform integration remain advanced.
+
+## K. Settings UX
+
+`gator config` and TUI `/settings` now show a concise normal summary: default
+model, Work safeguards, theme/desktop notifications, and job defaults.
+`gator config show --json` is the explicit advanced plumbing view. Existing
+configuration keys remain supported but are no longer presented as peers of
+the ordinary settings path.
+
+## L. Tests / Evals
+
+Successful verification:
+
+```sh
+git diff --check
+go test ./...
+go test ./cmd/gator -count=1 -run 'TestWorkCommandCreatesDefaultValidatedReport|TestWorkCodeFollowupUsesAcceptedBaselineAndFrozenProfile|TestReviewCommandResolvesVerifiedWorkByID|TestApplyCommandPreflightsConflictsAndRequiresReplace|TestJobCommandCreatesDurableInspectSchedule|TestJobWorkUsesCanonicalWorkHistory|TestLearningCLIListsFiltersAndApprovesCandidates|TestWorkHistoryUsesProductTermsForFeedbackAndDerivedLearnings'
+go test ./internal/worktui -count=1 -run 'TestJobsUseTheConfiguredSharedServiceAndRefreshTheSection|TestLearningsUseTheConfiguredSharedService|TestVerifiedDeliverablesRenderAndSaveWithOneConfirmation|TestRetryUsesTheSameConfirmedBundleActionPath'
+```
+
+The focused coverage proves direct quoted Work routing, concise Settings plus
+advanced JSON, filtered/approved Learnings, product History, shared TUI Jobs,
+removed aliases, Code Work, review/apply/retry, and durable scheduled Work.
+
+## M. Complexity Delta
+
+The normal TUI palette fell from 37 to 17 entries (20 fewer visible entries;
+21 prior entries removed while Jobs was added). The normal CLI help is reduced
+from a full implementation-family inventory to five product areas. The pass
+adds two narrow TUI callbacks for Jobs and no new database, scheduler,
+provider, protocol service, or background process.
+
+## N. Product Checkpoint
+
+1. Can a new user understand Gator without knowing implementation architecture?
+   **Yes** — normal help and the palette use the five product areas.
+2. Is there one obvious way to start Work? **Yes** — open `gator` or provide a
+   quoted request.
+3. Can every meaningful normal CLI operation be done in TUI? **Yes** — the
+   prior Jobs gap is closed; normal results, feedback, Learnings, History, and
+   Settings already share services.
+4. Are advanced/internal concepts hidden appropriately? **Yes** — retained but
+   omitted from normal entry points.
+5. Did we remove UI rather than merely rearrange it? **Yes** — aliases were
+   deleted and 21 palette entries no longer populate normal navigation.
+6. Is Gator still keyboard-first and lightweight? **Yes** — typed advanced
+   commands, shortcuts, SSH-friendly terminal rendering, and no new process
+   are preserved.
+7. Did output quality remain intact? **Yes** — full and representative Work,
+   Code, delivery, learning, and job checks pass.
+
+## O. Recommended Next Tranche
+
+Proceed to `GTR-LIGHT-01` (Prompt 5): measure startup/resource/dependency
+costs and remove architectural bloat without reopening the normal product
+surface or altering Work semantics.
+
+## P. Git Status
+
+Repository drift was reconciled rather than rewritten. During this tranche,
+the shared checkout advanced to `a96e91d6f` and then `f531b8b1c` on both
+`main` and `origin/main`; those commits contain the source implementation that
+landed while verification was in progress. At handoff, the remaining working
+tree changes are focused coverage plus this report:
+
+```text
+cmd/gator/command_learning_test.go
+cmd/gator/command_local_test.go
+cmd/gator/main_test.go
+cmd/gator/work_history_test.go
+internal/worktui/app_test.go
+GATOR-HANDOFF-DOC.md
+```
+
+No reset, amend, force operation, or push was performed by this tranche.
+Stop here; do not start Prompt 5 in this handoff.

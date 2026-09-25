@@ -18,32 +18,18 @@ func TestRunHelp(t *testing.T) {
 		if err := run([]string{command}, &output); err != nil {
 			t.Fatalf("run %s: %v", command, err)
 		}
-		if !strings.Contains(output.String(), "Usage:") {
-			t.Fatalf("help output = %q, want usage", output.String())
+		if !strings.Contains(output.String(), "Start Work:") {
+			t.Fatalf("help output = %q, want a Work-first entry point", output.String())
 		}
-		for _, value := range []string{"gator --help | -h", "gator provider PROVIDER [OPTIONS]", "gator -p ...", "gator agent acp", "gator work", "gator work inspect", "gator work review", "gator -w [OPTIONS] TASK", "gator work -- TASK", "--actions forbid|draft|approve", "--kind json|webhook"} {
+		for _, value := range []string{"gator \"research X and produce a report\"", "Work", "History", "Learnings", "Jobs", "Settings", "gator work review", "gator work -- TASK"} {
 			if !strings.Contains(output.String(), value) {
 				t.Fatalf("help output is missing %q", value)
 			}
 		}
-		for _, removed := range []struct {
-			command string
-			pattern string
-		}{
-			{command: "gator tui", pattern: "\n  gator tui\n"},
-			{command: "gator help", pattern: "\n  gator help\n"},
-			{command: "gator version", pattern: "\n  gator version\n"},
-			{command: "gator connect", pattern: "\n  gator connect "},
-			{command: "gator login", pattern: "\n  gator login "},
-			{command: "gator logout", pattern: "\n  gator logout\n"},
-			{command: "gator work run", pattern: "\n  gator work run "},
-		} {
-			if strings.Contains(output.String(), removed.pattern) {
-				t.Fatalf("help still exposes removed command %q: %q", removed.command, output.String())
+		for _, hidden := range []string{"gator agent acp", "--kind json|webhook", "snapshot-max-files", "--actions forbid|draft|approve"} {
+			if strings.Contains(output.String(), hidden) {
+				t.Fatalf("normal help exposes advanced plumbing %q: %q", hidden, output.String())
 			}
-		}
-		if strings.Contains(output.String(), "allow-external-cli") {
-			t.Fatalf("help still exposes delegated CLI approval: %q", output.String())
 		}
 	}
 }
@@ -68,8 +54,17 @@ func TestRunRejectsUnknownCommand(t *testing.T) {
 	}
 }
 
+func TestQuotedWorkRequestUsesTheWorkEntryPoint(t *testing.T) {
+	t.Setenv("GATOR_PROVIDER", "not-a-provider")
+	var output bytes.Buffer
+	err := run([]string{"research release notes and produce a report"}, &output)
+	if err == nil || !strings.Contains(err.Error(), "unknown provider") || strings.Contains(err.Error(), "unknown command") {
+		t.Fatalf("quoted request error = %v", err)
+	}
+}
+
 func TestRunRejectsRemovedRootAliases(t *testing.T) {
-	for _, command := range []string{"tui", "help", "version", "connect", "login", "logout", "code", "run", "fork", "clone"} {
+	for _, command := range []string{"tui", "help", "version", "connect", "login", "logout", "code", "run", "fork", "clone", "local", "learning"} {
 		var output bytes.Buffer
 		err := run([]string{command}, &output)
 		if err == nil || !strings.Contains(err.Error(), "unknown command") || !strings.Contains(err.Error(), "gator --help") {
@@ -96,7 +91,7 @@ func TestMovedRootCommandsExplainTheirCanonicalFamily(t *testing.T) {
 func TestShortCLIFormsRouteToTheirCommandFamilies(t *testing.T) {
 	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
 	var output bytes.Buffer
-	if err := run([]string{"-c"}, &output); err != nil || !strings.Contains(output.String(), "Configuration:") {
+	if err := run([]string{"-c"}, &output); err != nil || !strings.Contains(output.String(), "Settings\n") {
 		t.Fatalf("-c output = %q, err = %v", output.String(), err)
 	}
 	output.Reset()

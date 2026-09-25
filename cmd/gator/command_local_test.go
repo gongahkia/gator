@@ -65,10 +65,10 @@ func TestLocalUseConfiguresNativeProviderForInstalledCuratedModel(t *testing.T) 
 	}
 }
 
-func TestLocalCLIIsRetiredWithoutStartingModelOperations(t *testing.T) {
+func TestLocalCLIIsRemovedWithoutStartingModelOperations(t *testing.T) {
 	for _, action := range []string{"list", "status", "serve", "pull", "use", "remove"} {
 		err := run([]string{"local", action, "qwen3-coder-30b", "--yes"}, io.Discard)
-		if err == nil || !strings.Contains(err.Error(), "/model") {
+		if err == nil || !strings.Contains(err.Error(), "unknown command") {
 			t.Fatalf("local %s: %v", action, err)
 		}
 	}

@@ -508,15 +508,15 @@ func TestCommandPaletteFiltersAndFillsCommandsThatNeedArguments(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work"})
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlP})
 	model = updated.(Model)
-	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("forward")})
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("jobs")})
 	model = updated.(Model)
 	view := model.View()
-	if !strings.Contains(view, "/revision-forward") || strings.Contains(view, "/help") {
+	if !strings.Contains(view, "/jobs") || strings.Contains(view, "/help") {
 		t.Fatalf("filtered palette = %q", view)
 	}
 	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
-	if command != nil || model.launcher || model.input != "/revision-forward " {
+	if command != nil || model.launcher || model.input != "/jobs " {
 		t.Fatalf("selected command state = %#v", model)
 	}
 }
@@ -525,10 +525,7 @@ func TestCommandPaletteContainsCurrentCommands(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work"})
 	model.openCommandPalette()
 	expected := []string{
-		"/help", "/new", "/model", "/effort", "/attach", "/detach", "/source", "/source-refresh", "/source ignore", "/source unignore",
-		"/mode", "/code", "/artifact", "/connector", "/web-origin", "/status", "/statusline", "/permissions",
-		"/doctor", "/agents", "/settings", "/theme", "/history", "/learnings", "/feedback", "/revision-back", "/revision-forward", "/review",
-		"/save", "/apply", "/retry", "/copy", "/queue", "/dequeue", "/clear-queue", "exit", "/quit",
+		"/help", "/new", "/model", "/source", "/mode", "/settings", "/theme", "/history", "/jobs", "/learnings", "/feedback", "/review", "/save", "/apply", "/retry", "/copy", "exit",
 	}
 	if len(model.entries) != len(expected) {
 		t.Fatalf("command palette has %d entries, want %d", len(model.entries), len(expected))
@@ -588,16 +585,25 @@ func TestCopyPromptsForTheResponseOrDeliverableSummary(t *testing.T) {
 	}
 }
 
-func TestExitAndQuitLeaveTheTUI(t *testing.T) {
-	for _, input := range []string{"exit", "/quit"} {
+func TestExitLeavesTheTUI(t *testing.T) {
+	model := New(Config{CurrentFolder: "/work"})
+	model.input = "exit"
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command == nil {
+		t.Fatalf("exit did not produce an exit command: %#v", updated.(Model))
+	}
+	if _, ok := command().(tea.QuitMsg); !ok {
+		t.Fatalf("exit command = %T, want tea.QuitMsg", command())
+	}
+}
+
+func TestRemovedTUIAliasesAreUnknown(t *testing.T) {
+	for _, input := range []string{"/learning list", "/status-line", "/quit"} {
 		model := New(Config{CurrentFolder: "/work"})
 		model.input = input
 		updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
-		if command == nil {
-			t.Fatalf("%s did not produce an exit command: %#v", input, updated.(Model))
-		}
-		if _, ok := command().(tea.QuitMsg); !ok {
-			t.Fatalf("%s command = %T, want tea.QuitMsg", input, command())
+		if command != nil || !strings.Contains(updated.(Model).View(), "unknown command") {
+			t.Fatalf("%s still routes: %#v", input, updated.(Model))
 		}
 	}
 }
@@ -682,7 +688,7 @@ func TestCommandPaletteRowsShareOneLeftColumn(t *testing.T) {
 	model.openCommandPalette()
 	lines := strings.Split(ansi.Strip(model.View()), "\n")
 	position := -1
-	for _, command := range []string{"/help", "/new", "/permissions", "/source-refresh", "/quit"} {
+	for _, command := range []string{"/help", "/new", "/jobs", "/retry", "exit"} {
 		found := false
 		for _, line := range lines {
 			if index := strings.Index(line, command); index >= 0 {

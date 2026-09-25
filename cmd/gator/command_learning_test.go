@@ -77,6 +77,36 @@ func TestLearningTUIActionUsesSameInProcessCommandAdapter(t *testing.T) {
 	}
 }
 
+func TestLearningCLIListsFiltersAndApprovesCandidates(t *testing.T) {
+	state, project := t.TempDir(), t.TempDir()
+	t.Setenv("GATOR_STATE_DIR", state)
+	store, err := learning.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Create(learning.Create{ID: "learning-candidate-filter", Type: learning.Preference, Key: "format", Content: "Use concise Markdown.", Scope: learning.Scope{Kind: learning.Project, Value: project}, Origin: learning.Inferred, Confidence: 85}); err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	if err := run([]string{"learnings", "list", "--status", "candidate", "--scope", "project=" + project}, &output); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "learning-candidate-filter") || !strings.Contains(output.String(), "candidate") {
+		t.Fatalf("filtered candidates = %q", output.String())
+	}
+	output.Reset()
+	if err := run([]string{"learnings", "approve", "learning-candidate-filter"}, &output); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "active") {
+		t.Fatalf("approve output = %q", output.String())
+	}
+	record, err := store.Load("learning-candidate-filter")
+	if err != nil || record.Status != learning.Active || record.Provenance.UserConfirmedAt.IsZero() {
+		t.Fatalf("approved record = %#v, err = %v", record, err)
+	}
+}
+
 func TestApplyLearningContextProjectsOnlyActiveApplicableRecords(t *testing.T) {
 	state := t.TempDir()
 	project, other := t.TempDir(), t.TempDir()
