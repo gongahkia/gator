@@ -138,7 +138,7 @@ func historyFeedback(observations []learning.Observation) string {
 func historyLearnings(workID string, records []learning.Record) string {
 	items := make([]string, 0)
 	for _, record := range records {
-		if !sliceContains(record.Provenance.WorkIDs, workID) {
+		if !historyContains(record.Provenance.WorkIDs, workID) {
 			continue
 		}
 		if record.Status != learning.Active && record.Status != learning.Candidate {
@@ -147,6 +147,15 @@ func historyLearnings(workID string, records []learning.Record) string {
 		items = append(items, string(record.Status)+" “"+firstLine(record.Content)+"”")
 	}
 	return compactHistoryItems(items, 2)
+}
+
+func historyContains(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 func compactHistoryItems(items []string, limit int) string {

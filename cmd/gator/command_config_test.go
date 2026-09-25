@@ -36,8 +36,12 @@ func TestConfigureSetsAndShowsDefaults(t *testing.T) {
 	if err := configure(nil, &output); err != nil {
 		t.Fatalf("show configuration: %v", err)
 	}
-	if !strings.Contains(output.String(), `"provider": "anthropic"`) {
+	if !strings.Contains(output.String(), "Default model: anthropic / claude-sonnet") || strings.Contains(output.String(), `"provider": "anthropic"`) {
 		t.Fatalf("show output = %q", output.String())
+	}
+	output.Reset()
+	if err := configure([]string{"show", "--json"}, &output); err != nil || !strings.Contains(output.String(), `"provider": "anthropic"`) {
+		t.Fatalf("JSON show output = %q, err = %v", output.String(), err)
 	}
 }
 

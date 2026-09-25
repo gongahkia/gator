@@ -10,6 +10,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/worksession"
 )
 
@@ -137,6 +138,32 @@ func TestLearningsUseTheConfiguredSharedService(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("command palette omitted Learnings")
+	}
+}
+
+func TestJobsUseTheConfiguredSharedServiceAndRefreshTheSection(t *testing.T) {
+	var received []string
+	model := New(Config{
+		CurrentFolder: "/work",
+		JobAction: func(arguments []string) (string, error) {
+			received = append([]string(nil), arguments...)
+			return "Job added.", nil
+		},
+		RefreshJobs: func() ([]jobs.Definition, error) {
+			return []jobs.Definition{{ID: "job-daily", Name: "Daily review", Enabled: true, Schedule: "0 9 * * *", Timezone: "UTC"}}, nil
+		},
+	})
+	model.input = "/jobs add daily --schedule 0 9 * * * -- review changes"
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if !reflect.DeepEqual(received, []string{"add", "daily", "--schedule", "0", "9", "*", "*", "*", "--", "review", "changes"}) || len(model.config.Jobs) != 1 || !strings.Contains(model.View(), "Job added.") {
+		t.Fatalf("job action = %#v jobs=%#v\n%s", received, model.config.Jobs, model.View())
+	}
+	model.input = "/jobs"
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if model.section != "jobs" || !strings.Contains(model.View(), "Daily review") {
+		t.Fatalf("jobs section = %#v\n%s", model, model.View())
 	}
 }
 
@@ -426,8 +453,11 @@ func TestInitialViewIsADeclutteredCenteredComposer(t *testing.T) {
 	}
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlP})
 	view = updated.(Model).View()
-	if !strings.Contains(view, "Commands") || !strings.Contains(view, "/attach") || !strings.Contains(view, "/status") {
-		t.Fatalf("palette did not reveal universal commands: %q", view)
+	if !strings.Contains(view, "Commands") || !strings.Contains(view, "/jobs") || !strings.Contains(view, "/learnings") {
+		t.Fatalf("palette did not reveal the product commands: %q", view)
+	}
+	if strings.Contains(view, "/attach") || strings.Contains(view, "/status") {
+		t.Fatalf("palette retained advanced command bloat: %q", view)
 	}
 	if strings.Contains(view, "Work in reports") || strings.Contains(view, "Inbox") || strings.Contains(view, "Scheduled jobs") {
 		t.Fatalf("command palette still mixes destinations with actions: %q", view)
