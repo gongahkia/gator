@@ -12,7 +12,7 @@ Sources are captured before execution. Deliverables,
 code candidates, verification, and external-action 
 proposals remain reviewable before transfer. Users 
 can also keep small, scoped local learnings for future 
-work. These remain inspectable, enableable, and reversible. 
+work. These learning are inspectable, enableable, and reversible. 
 
 Gator currently pins Go 1.25.13.
 
