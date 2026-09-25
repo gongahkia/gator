@@ -285,10 +285,12 @@ The implementation is split around durable concepts:
 - `internal/snapshot`, `internal/worksession`, `internal/jobs`, and
   `internal/inbox`: immutable Work inputs, revision history, schedules, and
   result routing; and
-- `internal/run`: the backend-only isolated coding executor used by Gator's
-  Code specialist and protocol integrations.
+- `internal/codeexec`: the backend-only isolated coding executor used by
+  Gator's Work Code specialist; and
+- `internal/run`: a retained compatibility runtime for legacy protocol
+  integrations, outside the normal Work lifecycle.
 
-Gator Work can call the retained coding workflow as a narrowly scoped `code`
+Gator Work can call the current coding workflow as a narrowly scoped `code`
 specialist. It receives the exact immutable Work source snapshot, runs in a
 private Git worktree, and returns a patch artifact; it never edits the selected
 source. See [Work orchestration](ORCHESTRATION.md).

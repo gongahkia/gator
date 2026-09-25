@@ -3960,3 +3960,157 @@ Proceed only to `GTR-RELEASE-01` (Prompt 6): final cross-product regression hard
 ## P. Git Status
 
 This pass began clean at `fd628f5b7`. While it ran, the shared checkout advanced to `e974726f1` (`stripoutgooglepaths`), containing the source, dependency, documentation, and test deletion. At this handoff, this report is the remaining working-tree change. No reset, amend, force operation, or history rewrite was performed. Stop here; do not start Prompt 6 in this handoff.
+
+---
+
+# GTR-RELEASE-01 — Final Product Checkpoint
+
+## A. Classification
+
+**READY WITH KNOWN GAPS.**
+
+The normal product is coherent and passes deterministic release gates. The remaining gaps are bounded and explicit: no live-model quality claim was made, legacy protocol compatibility still keeps a parallel runtime in the binary, and cross-platform/browser-sidecar release checks were unavailable in this macOS environment.
+
+## B. Current Architecture
+
+    CLI / Work TUI / Jobs / headless Work
+                    |
+                    v
+          configured workrun.Service
+                    |
+                    v
+     frozen snapshot + isolated Work workspace
+                    |
+                    v
+     manager, capability policy, and specialists
+                    |
+                    +-- Code specialist -> internal/codeexec private Git worktree
+                    |
+                    v
+   sealed artifacts, evidence, manifest, and verification
+                    |
+                    v
+     durable Work history + explicit delivery ledger
+                    |
+                    v
+       review / apply / retry / feedback commands
+                    |
+                    v
+  observations -> scoped learning candidates or explicit rules
+                    |
+                    v
+    bounded learning projection into relevant future Work
+                    |
+                    v
+      deterministic Work and learning evaluation reports
+
+CLI, TUI, Jobs, and headless Work all construct the same Work request/service boundary. Jobs cannot approve actions. The one material parallel runtime is internal/run, retained behind RPC, ACP, and app-server compatibility adapters. Normal Work does not import or execute it; the current Work Code specialist uses internal/codeexec. This separation is now documented explicitly.
+
+## C. Product Thesis Audit
+
+| Claim | Assessment | Evidence |
+| --- | --- | --- |
+| Lightweight | ADEQUATE | 35,849,424-byte single binary; no required daemon; optional integrations stay off normal paths. |
+| Local-first | STRONG | Sources, snapshots, bundles, history, deliveries, credentials, and learning state are local; cloud model use is configured rather than mandatory. |
+| General Work | STRONG | All 24 scripted Work corpus cases pass across research, table, coding, and continuation families. |
+| Strong Code | ADEQUATE | Isolated frozen-source Code worktrees, verified patch candidates, scoped writes, and follow-up fixtures pass; live-model coding quality was not evaluated. |
+| Auditable | STRONG | Immutable snapshots, conversations, manifests, evidence references, history, traces, candidates, and delivery records are retained. |
+| Transactional | STRONG | Work state, verification, delivery, recovery, and external-action status are separately durable and inspected by transaction tests/evals. |
+| Replayable | STRONG | Delivery retry reuses retained verified output and tests prevent replaying applied or unknown effects. |
+| Learnable | STRONG | Corrections become inspectable candidates or explicit scoped rules, selected only at the shared Work boundary. |
+| Reversible learning | STRONG | Candidate is inactive until enabled; disable stops projection while retaining provenance; explicit user rules outrank inference. |
+| Evaluated | ADEQUATE | Deterministic Work and learning datasets cover release invariants and held-out cases; no live-provider experiment was run. |
+
+Authority remains coherent: inspect has no write tools, draft retains proposals without execution, act requires fresh approval, jobs cannot approve, and unknown external outcomes are not replay-safe. Learning stores instructions as bounded data and does not grant tool authority or executable privileges.
+
+## D. End-to-End Regression Results
+
+The full uncached suite passed. The following product paths are directly covered by deterministic tests and the release corpus:
+
+| Required path | Evidence |
+| --- | --- |
+| General Work and bounded artifact | TestWorkCommandCreatesDefaultValidatedReport; 24/24 Work corpus trials. |
+| Code Work and follow-up | TestWorkCodeFollowupUsesAcceptedBaselineAndFrozenProfile; coding corpus cases. |
+| Failed Work history | TestServiceRetainsFailedWorkHistory; TestFailedCodeWorkRetainsFailedWorkHistory. |
+| Verified but undelivered | Transaction evaluation records 24 verified/not-attempted deliveries. |
+| Partial delivery | TestDeliverArtifactsRetainsPartialFailureAndRetriesOnlyRemainingEffects. |
+| Retry without regeneration | TestRetryDoesNotRepeatAppliedArtifact; TestRetryLeavesTheOriginalWorkTransactionAndModelUntouched. |
+| Conflict protection | TestDeliverArtifactsRecordsConflictWithoutOverwriting; TestApplyCommandPreflightsConflictsAndRequiresReplace. |
+| Unknown external effect | TestExecutorRetainsUnknownExternalOutcomeWithoutDerivingRetryLearning; TestUnknownExternalActionIsNotClassifiedAsReplaySafe. |
+| Feedback to candidate learning | TestWorkFeedbackCreatesInspectableCandidatesAndExplicitRememberedRules. |
+| Activation, scope, reversal, explicit override | Candidate/disable/scope/override learning-store tests and 12/12 learning probes. |
+| Scheduled Work | TestJobWorkUsesCanonicalWorkHistory and TestJobCommandRejectsUnattendedApproval. |
+| CLI/TUI parity | Shared history, delivery, learning, jobs, feedback, retry, and Code-specialist TUI tests. |
+
+The focused race pass for internal/workrun, internal/worktui, and internal/jobs also passed.
+
+## E. Output Quality Findings
+
+The deterministic full-service Work evaluation passed 24/24 trials with all development and held-out cases selected. It exercises realistic bounded research, document/table reconciliation, Code patch, and continuation tasks. It records 68 artifact checks, source integrity, history/verification/delivery evidence, and explicit unsupported-quotation checks.
+
+The run is scripted, with no provider/model selected and no reported token usage. Expected negative-path evidence includes one budget outcome, one failed verification, eight tool failures, and two failed artifact checks; all are intentional corpus cases and each trial still satisfied its expected result. This proves product plumbing and safety invariants, not semantic quality from a live model.
+
+## F. Learning Findings
+
+The deterministic learning experiment passed 12/12 probes across development and held-out cases. It verifies active applicable projection, unrelated-project non-projection, candidate separation, disable/reversal, and explicit-over-inferred precedence. Store and Work-boundary tests additionally show invalid hand-edited learning state fails closed and observations/provenance remain separate from active rules.
+
+## G. Evaluation Findings
+
+Work evaluation has versioned cases, source/contract digests, isolated state, transaction inspection, deterministic graders, split selection, and optional explicit-budget live evaluation. Learning evaluation similarly separates development from held-out probes. This is sufficient for regression hardening; a configured, budgeted live run is still required before claiming model-output quality.
+
+## H. Resource Measurements
+
+| Measurement | Prompt 5 | Final check | Assessment |
+| --- | ---: | ---: | --- |
+| Binary size | 35,849,424 B | 35,849,424 B | unchanged |
+| Help max RSS | 13.9 MiB | 14.0 MiB | no material regression |
+| Work list max RSS | 14.7 MiB | 15.1 MiB | no material regression |
+| Help elapsed | 0.67 s | 0.91 s | launch-noise-sensitive; still sub-second |
+| Work list elapsed | 0.02 s | 0.04 s | launch-noise-sensitive; still fast |
+| Resident Gator process after check | none | none | no daemon |
+
+Final build elapsed 14.78 s versus 7.02 s in the previous warm-cache measurement, so it is not treated as a regression claim. It is explicitly cache/load-sensitive. Interactive TUI idle RAM and remote-model Work RAM remain unmeasured.
+
+## I. CLI/TUI Parity
+
+Normal product operations share services rather than shelling out: Work uses workrun.Service; history has a shared presentation model; review/apply/retry share delivery state; feedback and Learnings use in-process command adapters; and Jobs invoke shared job/work adapters. Representative parity tests pass for History, Learnings, Jobs, feedback, verified delivery, retry, and Code mode. Advanced connector/protocol details intentionally remain typed advanced paths rather than ordinary TUI navigation.
+
+## J. Remaining Bloat
+
+1. The retained internal/run runtime and its RPC, ACP, and app-server adapters remain compiled for protocol compatibility even though normal Work uses internal/codeexec.
+2. Provider breadth and optional browser, MCP, LSP, extension, telemetry, and desktop integration trees remain significant maintenance surface.
+3. The full suite is comprehensive but its slowest packages are cmd/gator and the legacy internal/run path.
+4. There is no current evidence to delete those integrations safely; they are optional rather than normal-path costs.
+
+## K. Deletions Made
+
+No production capability was deleted merely to inflate this final pass. The only concrete correction was removal of misleading documentation: current Work Code now correctly names internal/codeexec, while internal/run is clearly identified as legacy protocol compatibility. README discovery language now centers Work, History, reviewable delivery, Learnings, Jobs, and Settings.
+
+## L. Known Gaps
+
+- No live provider/model evaluation ran, so semantic output quality, costs, and provider-specific reliability are unproven.
+- macOS amd64 was the only exercised host; Linux sandbox and browser-sidecar release checks were not run here.
+- TUI idle memory and real remote-model steady-state memory were not measured.
+- RPC/ACP/app-server compatibility still represent a separate legacy lifecycle, albeit outside normal Work.
+- There is no user-value evidence yet for final provider or integration pruning.
+
+## M. What Not To Build Yet
+
+- Autonomous policy or learning rewrites.
+- Broad memory/RAG infrastructure or an unbounded prompt-memory blob.
+- More provider logos without measured demand and quality evidence.
+- Social/chat channel expansion.
+- A workflow DSL, distributed scheduler, or enterprise multi-user authority.
+- A second Code/TUI lifecycle or an automatic migration of legacy protocol semantics into Work.
+- A daemon merely to make optional integrations feel persistent.
+
+## N. Next Product Research Questions
+
+1. Which, if any, RPC/ACP/app-server consumers still need the legacy runtime, and can their externally required behavior be projected onto Work without creating a second lifecycle?
+2. Under an explicit cost/request budget, which provider/model combinations produce reliable research, artifact, Code, and correction outcomes on a held-out corpus?
+3. Which optional integrations have observed user value high enough to justify their build and maintenance cost?
+4. What are cold-start and interactive-memory measurements on supported macOS and Linux release builds?
+
+## O. Git Status
+
+This final tranche began from clean commit 3b2aeb71a. The current working tree contains only the three documentation/discoverability corrections and this required final report. No reset, amend, force operation, push, or history rewrite was performed. Stop here.

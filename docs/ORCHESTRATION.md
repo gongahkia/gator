@@ -60,7 +60,7 @@ Host policy is the same for every registered specialist:
 - a shared request/token/wall budget across the manager and children
 - `work_roles` may only select a provider/model pair and narrow `max_steps`
 
-Work's `code` child is `HostedSpecialist("code", ...)`. It runs `internal/run` against a private Git copy of the frozen snapshot and omits scout/writer delegation. Nested coding agents remain a native Code-primary surface, not a Work specialist capability.
+Work's `code` child is `HostedSpecialist("code", ...)`. It runs `internal/codeexec` against a private Git copy of the frozen snapshot and omits scout/writer delegation. `internal/run` remains only behind legacy protocol compatibility, not the normal Work path. Nested coding agents remain a legacy Code-primary capability, not a Work specialist capability.
 
 ## Current specialists
 
