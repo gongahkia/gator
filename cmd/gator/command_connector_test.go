@@ -159,16 +159,32 @@ func TestConnectorCommandDefaultsGoogleToUserOwnedDesktopOAuthAndGranularOperati
 		t.Fatalf("connectors = %#v", settings.Connectors)
 	}
 	descriptor := settings.Connectors[0]
-	if descriptor.Authentication != connector.AuthOAuth || descriptor.OAuthAuthorizeURL != connector.GoogleOAuthAuthorizeURL || descriptor.OAuthTokenURL != connector.GoogleOAuthTokenURL || descriptor.OAuthRedirectURL != connector.GoogleOAuthRedirectURL || !strings.Contains(descriptor.OAuthScopes, "/auth/tasks") {
+	if descriptor.Authentication != connector.AuthOAuth || descriptor.OAuthAuthorizeURL != connector.GoogleOAuthAuthorizeURL || descriptor.OAuthTokenURL != connector.GoogleOAuthTokenURL || descriptor.OAuthRedirectURL != connector.GoogleOAuthRedirectURL || strings.Contains(descriptor.OAuthScopes, "/auth/tasks") || strings.Contains(descriptor.OAuthScopes, "/auth/calendar") {
 		t.Fatalf("Google descriptor = %#v", descriptor)
 	}
 	operations := map[string]bool{}
 	for _, operation := range descriptor.Operations() {
 		operations[operation.ID] = true
 	}
-	for _, required := range []string{"tasks_list", "events_list", "freebusy", "docs_update", "sheets_values_update", "batch", "quick_capture"} {
+	for _, required := range []string{"drive_search", "docs_update", "sheets_values_update", "batch"} {
 		if !operations[required] {
 			t.Fatalf("Google operation %q is missing from %#v", required, operations)
 		}
+	}
+	for _, removed := range []string{
+		"tasklists_list", "tasklists_get", "tasks_list", "tasks_get", "tasks_create", "tasks_update", "tasks_delete", "tasks_move",
+		"calendars_list", "calendars_get", "calendars_create", "calendars_update", "calendars_delete", "calendars_subscribe", "calendars_unsubscribe", "calendars_list_update", "calendar_colors",
+		"events_list", "events_get", "events_create", "events_update", "events_delete", "events_move", "events_respond", "freebusy", "local_search", "quick_capture", "task_metadata_encode", "task_metadata_decode", "reminders_due",
+	} {
+		if operations[removed] {
+			t.Fatalf("removed Google operation %q remains in %#v", removed, operations)
+		}
+	}
+}
+
+func TestWithoutGooglePlannerScopesPreservesOtherOAuthScopes(t *testing.T) {
+	scopes := withoutGooglePlannerScopes([]string{"openid", "https://www.googleapis.com/auth/tasks", "https://www.googleapis.com/auth/documents", "https://www.googleapis.com/auth/calendar"})
+	if actual := strings.Join(scopes, " "); actual != "openid https://www.googleapis.com/auth/documents" {
+		t.Fatalf("scopes = %q", actual)
 	}
 }

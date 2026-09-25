@@ -17,7 +17,6 @@ import (
 	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/connector"
-	"github.com/gongahkia/gator/internal/journal"
 )
 
 const maxConnectorTokenBytes = 64 * 1024
@@ -338,10 +337,14 @@ func loginConnectorOAuth(descriptor connector.Descriptor, credentials auth.Store
 			clientSecret = existing.OAuthClientSecret
 		}
 	}
+	scopes := strings.Fields(descriptor.OAuthScopes)
+	if descriptor.Kind == connector.KindGoogle {
+		scopes = withoutGooglePlannerScopes(scopes)
+	}
 	flow := auth.BrowserFlow{
 		ClientID: descriptor.OAuthClientID, AuthorizationURL: descriptor.OAuthAuthorizeURL,
 		ClientSecret: clientSecret, TokenURL: descriptor.OAuthTokenURL, RedirectURL: descriptor.OAuthRedirectURL,
-		Scopes: strings.Fields(descriptor.OAuthScopes), AllowMissingExpiry: true, RequireBearerToken: true,
+		Scopes: scopes, AllowMissingExpiry: true, RequireBearerToken: true,
 	}
 	var attempt auth.BrowserAttempt
 	var callback *auth.Callback
@@ -379,6 +382,17 @@ func loginConnectorOAuth(descriptor connector.Descriptor, credentials auth.Store
 	return err
 }
 
+func withoutGooglePlannerScopes(scopes []string) []string {
+	filtered := make([]string, 0, len(scopes))
+	for _, scope := range scopes {
+		if scope == "https://www.googleapis.com/auth/tasks" || scope == "https://www.googleapis.com/auth/calendar" {
+			continue
+		}
+		filtered = append(filtered, scope)
+	}
+	return filtered
+}
+
 func logoutConnector(id string, out io.Writer) error {
 	descriptor, credentials, err := configuredConnector(id)
 	if err != nil {
@@ -412,11 +426,7 @@ func testConnector(id string, out io.Writer) error {
 		return err
 	}
 	operation, input := connectorTestInvocation(descriptor)
-	stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
-	if err != nil {
-		return err
-	}
-	result, err := (connector.Runtime{Registry: registry, Credentials: credentials, StateDir: stateDir}).Invoke(context.Background(), action.Inspect, id, operation, input)
+	result, err := (connector.Runtime{Registry: registry, Credentials: credentials}).Invoke(context.Background(), action.Inspect, id, operation, input)
 	if err != nil {
 		return err
 	}

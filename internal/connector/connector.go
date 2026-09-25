@@ -36,7 +36,7 @@ const (
 	GoogleOAuthAuthorizeURL = "https://accounts.google.com/o/oauth2/v2/auth"
 	GoogleOAuthTokenURL     = "https://oauth2.googleapis.com/token"
 	GoogleOAuthRedirectURL  = "http://127.0.0.1:0/oauth/callback"
-	GoogleOAuthScopes       = "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/tasks https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/drive.metadata.readonly https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/spreadsheets"
+	GoogleOAuthScopes       = "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/drive.metadata.readonly https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/spreadsheets"
 )
 
 var idPattern = regexp.MustCompile(`\A[a-z][a-z0-9-]{0,63}\z`)
@@ -246,93 +246,32 @@ func (d Descriptor) Operations() []Operation {
 	}
 }
 
-// googleOperations intentionally keeps Google permissions granular. A user
-// can permit a calendar read while denying task creation, for example; there
-// is no broad "Google Workspace" switch hidden behind the connector.
+// googleOperations keeps live Work context focused on Drive, Docs, and
+// Sheets. Tasks and Calendar are deliberately not a second planner product.
 func googleOperations() []Operation {
 	read := []serviceOperation{
-		{"health", "Verify this Google connection with a live account request; cached Google data is never exposed while disconnected.", action.ConnectedRead},
+		{"health", "Verify this Google connection with a live account request.", action.ConnectedRead},
 		{"drive_search", "Search Google Drive metadata visible to this connection.", action.ConnectedRead},
 		{"drive_get", "Read metadata for one Google Drive file.", action.ConnectedRead},
 		{"docs_get", "Read one Google Doc.", action.ConnectedRead},
 		{"sheets_get", "Read one Google Sheet.", action.ConnectedRead},
 		{"sheets_values_get", "Read a bounded range from one Google Sheet.", action.ConnectedRead},
-		{"tasklists_list", "List Google Task lists.", action.ConnectedRead},
-		{"tasklists_get", "Read one Google Task list.", action.ConnectedRead},
-		{"tasks_list", "List tasks in one Google Task list.", action.ConnectedRead},
-		{"tasks_get", "Read one Google Task by task-list/task ID.", action.ConnectedRead},
-		{"calendars_list", "List Google Calendars available to this connection.", action.ConnectedRead},
-		{"calendars_get", "Read one Google Calendar.", action.ConnectedRead},
-		{"calendar_colors", "Read Google Calendar color definitions.", action.ConnectedRead},
-		{"events_list", "List events from one Google Calendar.", action.ConnectedRead},
-		{"events_get", "Read one Google Calendar event.", action.ConnectedRead},
-		{"freebusy", "Query Google Calendar free/busy information for an explicit time range.", action.ConnectedRead},
-		{"local_search", "Search Gator's private Google mirror after a live connection check. It never returns cached data while Google is disconnected.", action.ConnectedRead},
-		{"quick_capture", "Parse task or event quick-capture text locally into a reviewable Google mutation preview. It never creates anything by itself.", action.ConnectedRead},
-		{"task_metadata_encode", "Build validated portable priority, recurrence, and reminder metadata for a Google Task notes field. It never writes the task by itself.", action.ConnectedRead},
-		{"task_metadata_decode", "Read Gator-owned portable task metadata from one Google Task notes field without changing it.", action.ConnectedRead},
-		{"reminders_due", "After a live Google health check, return newly due explicit calendar or portable task reminders from Gator's private mirror.", action.ConnectedRead},
 	}
 	operations := serviceOperations(read)
 	operations = append(operations, serviceOperations([]serviceOperation{
-		{"tasklists_create", "Prepare Google Task-list creation for exact approval.", action.ConnectedMutate},
-		{"tasklists_update", "Prepare a Google Task-list update for exact approval.", action.ConnectedMutate},
-		{"tasklists_delete", "Prepare Google Task-list deletion for exact approval.", action.ConnectedMutate},
-		{"tasks_create", "Prepare Google Task creation for exact approval.", action.ConnectedMutate},
-		{"tasks_update", "Prepare a Google Task update for exact approval.", action.ConnectedMutate},
-		{"tasks_delete", "Prepare Google Task deletion for exact approval.", action.ConnectedMutate},
-		{"tasks_move", "Prepare moving a Google Task for exact approval.", action.ConnectedMutate},
-		{"calendars_create", "Prepare Google Calendar creation for exact approval.", action.ConnectedMutate},
-		{"calendars_update", "Prepare a Google Calendar update for exact approval.", action.ConnectedMutate},
-		{"calendars_delete", "Prepare Google Calendar deletion for exact approval.", action.ConnectedMutate},
-		{"calendars_subscribe", "Prepare adding an existing Google Calendar to the calendar list for exact approval.", action.ConnectedMutate},
-		{"calendars_unsubscribe", "Prepare removing a subscribed Google Calendar from the calendar list for exact approval.", action.ConnectedMutate},
-		{"calendars_list_update", "Prepare updates to Google Calendar-list preferences for exact approval.", action.ConnectedMutate},
-		{"events_create", "Prepare Google Calendar event creation for exact approval.", action.ConnectedMutate},
-		{"events_update", "Prepare a Google Calendar event update for exact approval.", action.ConnectedMutate},
-		{"events_delete", "Prepare Google Calendar event deletion for exact approval.", action.ConnectedMutate},
-		{"events_move", "Prepare moving a Google Calendar event to another calendar for exact approval.", action.ConnectedMutate},
-		{"events_respond", "Prepare an RSVP response to a Google Calendar event for exact approval.", action.ConnectedMutate},
 		{"docs_create", "Prepare Google Doc creation for exact approval.", action.ConnectedMutate},
 		{"docs_update", "Prepare Google Doc batch updates for exact approval.", action.ConnectedMutate},
 		{"sheets_create", "Prepare Google Sheet creation for exact approval.", action.ConnectedMutate},
 		{"sheets_values_update", "Prepare a Google Sheet range update for exact approval.", action.ConnectedMutate},
 		{"sheets_batch_update", "Prepare Google Sheet batch updates for exact approval.", action.ConnectedMutate},
-		{"batch", "Prepare an ordered batch of Google mutations for one exact approval. Gator never retries an ambiguous batch outcome.", action.ConnectedMutate},
+		{"batch", "Prepare an ordered batch of Google Docs and Sheets mutations for one exact approval. Gator never retries an ambiguous batch outcome.", action.ConnectedMutate},
 	})...)
 	for index := range operations {
-		if operations[index].ID == "freebusy" {
-			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["payload"],"properties":{"payload":{"type":"object"}},"additionalProperties":false}`)
-		}
-		if operations[index].ID == "tasks_list" {
-			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["resource_id"],"properties":{"resource_id":{"type":"string","minLength":1,"maxLength":1024},"cursor":{"type":"string","maxLength":2048},"limit":{"type":"integer","minimum":1,"maximum":100},"include_completed":{"type":"boolean"},"include_hidden":{"type":"boolean"},"include_deleted":{"type":"boolean"}},"additionalProperties":false}`)
-		}
 		if operations[index].ID == "drive_search" {
 			operations[index].InputSchema = json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","maxLength":4096},"cursor":{"type":"string","maxLength":2048},"limit":{"type":"integer","minimum":1,"maximum":100},"fields":{"type":"string","maxLength":4096}},"additionalProperties":false}`)
 		}
 		if operations[index].ID == "drive_get" {
 			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["resource_id"],"properties":{"resource_id":{"type":"string","minLength":1,"maxLength":2048},"fields":{"type":"string","maxLength":4096}},"additionalProperties":false}`)
-		}
-		if operations[index].ID == "calendars_list" {
-			operations[index].InputSchema = json.RawMessage(`{"type":"object","properties":{"cursor":{"type":"string","maxLength":2048},"limit":{"type":"integer","minimum":1,"maximum":100},"include_hidden":{"type":"boolean"},"include_deleted":{"type":"boolean"}},"additionalProperties":false}`)
-		}
-		if operations[index].ID == "events_list" {
-			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["resource_id"],"properties":{"resource_id":{"type":"string","minLength":1,"maxLength":1024},"cursor":{"type":"string","maxLength":2048},"limit":{"type":"integer","minimum":1,"maximum":100},"time_min":{"type":"string","maxLength":64},"time_max":{"type":"string","maxLength":64},"single_events":{"type":"boolean"},"include_deleted":{"type":"boolean"}},"additionalProperties":false}`)
-		}
-		if operations[index].ID == "local_search" {
-			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["query"],"properties":{"query":{"type":"string","minLength":1,"maxLength":512},"kinds":{"type":"array","items":{"type":"string"},"maxItems":16},"limit":{"type":"integer","minimum":1,"maximum":100}},"additionalProperties":false}`)
-		}
-		if operations[index].ID == "quick_capture" {
-			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["text"],"properties":{"text":{"type":"string","minLength":1,"maxLength":4096},"kind":{"type":"string","enum":["task","event"]}},"additionalProperties":false}`)
-		}
-		if operations[index].ID == "task_metadata_encode" {
-			operations[index].InputSchema = json.RawMessage(`{"type":"object","properties":{"notes":{"type":"string","maxLength":8192},"priority":{"type":"string","enum":["none","low","medium","high"]},"recurrence_rrule":{"type":"string","maxLength":128},"reminder_time":{"type":"string","maxLength":5},"reminder_zone":{"type":"string","maxLength":128}},"additionalProperties":false}`)
-		}
-		if operations[index].ID == "task_metadata_decode" {
-			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["notes"],"properties":{"notes":{"type":"string","maxLength":8192}},"additionalProperties":false}`)
-		}
-		if operations[index].ID == "reminders_due" {
-			operations[index].InputSchema = json.RawMessage(`{"type":"object","properties":{"window_minutes":{"type":"integer","minimum":1,"maximum":1440}},"additionalProperties":false}`)
 		}
 		if operations[index].ID == "batch" {
 			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["payload"],"properties":{"payload":{"type":"object","required":["actions"],"properties":{"actions":{"type":"array","minItems":1,"maxItems":25,"items":{"type":"object","required":["operation","payload"],"properties":{"operation":{"type":"string"},"payload":{"type":"object"}},"additionalProperties":false}}},"additionalProperties":false}},"additionalProperties":false}`)

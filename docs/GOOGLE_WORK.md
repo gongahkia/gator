@@ -1,13 +1,13 @@
-# Google Work in Gator
+# Google Workspace in Gator
 
-Gator's Google Work connector is a Go-native port of the useful backend
-workflows from Hot Cross Buns. It is a Work connector, not a separate Google
-planner UI or a `gator google` command hierarchy.
+Gator's Google Workspace connector provides Google Drive, Docs, and Sheets to
+Gator Work. It is not a planner: Google Tasks, Google Calendar, reminders,
+quick capture, and local Google mirrors are not part of this product.
 
-## Set up entirely from the Work TUI
+## Set up from Work
 
-After creating a Desktop OAuth client and enabling the Google APIs described
-below, the remaining setup can stay inside `gator work`:
+After creating a Desktop OAuth client and enabling the Drive, Docs, and Sheets
+APIs, setup can remain inside `gator work`:
 
 ```text
 /connector setup google-work YOUR_CLIENT_ID
@@ -15,104 +15,46 @@ below, the remaining setup can stay inside `gator work`:
 /connector test google-work
 ```
 
-The `prompt` form reads the optional client secret with hidden terminal input.
-Leave it blank for a public client that does not require one. Successful login
-selects the connector for the current conversation. `/connector status
-google-work`, `/connector permission ...`, `/connector logout google-work`,
-and `/connector delete google-work` expose the rest of the connector lifecycle
-without leaving the TUI; `/connector list` shows the selected and configured
-IDs.
+`/connector status google-work`, `/connector permission ...`, `/connector
+logout google-work`, and `/connector delete google-work` cover the rest of the
+connector lifecycle. Select it for a Work run with `--connector google-work`.
 
-## Set up a user-owned Google desktop OAuth app
+## User-owned Google desktop OAuth app
 
-Create or select a **Desktop** OAuth client in your Google Cloud project for
-Gator. Enable the Google Tasks, Calendar, Drive, Docs, and Sheets APIs for that
-project, then configure Gator with its client ID:
+Create or select a **Desktop** OAuth client in your Google Cloud project, then
+enable the Google Drive, Docs, and Sheets APIs:
 
 ```sh
 gator provider connector add google-work --kind google --oauth-client-id YOUR_CLIENT_ID
 gator provider connector login google-work --oauth-client-secret-from-env GOOGLE_OAUTH_CLIENT_SECRET
 ```
 
-The client secret is optional for clients that do not need one. If supplied it
-is retained only in Gator's private `auth.json` alongside the refresh token;
-it is never written to `config.json`, displayed by status, or put in Work
-evidence. Google login uses PKCE and an ephemeral `127.0.0.1` loopback
-callback. It is a new Gator authorization: Gator never reads a Hot Cross Buns
-database, settings file, keychain entry, or credential.
+The client secret is optional for public clients. When supplied, it is retained
+only in Gator's private `auth.json` beside the refresh token; it is never
+written to `config.json`, shown by status, or added to Work evidence. Login
+uses PKCE and an ephemeral `127.0.0.1` loopback callback.
 
-`connector add --kind google` supplies Google's authorization/token endpoints
-and these requested scopes by default:
+The default OAuth scopes are OpenID and email for a live connection check,
+Drive metadata read, and Docs/Sheets read-write. Gator does not request Tasks
+or Calendar scopes. Existing authorizations may retain previously granted
+scopes at Google until the user revokes them; reconnecting uses Gator's reduced
+scope set.
 
-- Tasks and Calendar read/write
-- Drive metadata read
-- Docs and Sheets read/write
-- OpenID and email only for a live connection check
+## Operations and approvals
 
-Select the connector for a Work run with `--connector google-work` or in the
-Work TUI. The model receives only the explicitly selected, typed operations.
+Read operations cover a live connection check, Drive metadata search and file
+metadata, Google Docs, Google Sheets, and bounded Sheet ranges. Mutations cover
+Docs create/batch update and Sheets create/range/batch update, plus an ordered
+batch of those typed mutations. Update payloads may include a Google `etag`;
+Gator binds it to the approved payload and sends it as `If-Match`.
 
-## Granular permissions
+Every mutation requires Work `act` mode and a fresh approval for the exact
+operation, target, and payload hash. A batch contains at most 25 typed
+operations and is never replayed automatically after an ambiguous outcome.
 
-Each operation has its own existing Gator connector-permission key. For
-example, a configuration may permit calendar reads while denying event
-creation:
+## Boundaries
 
-```sh
-gator provider connector permission google-work events_list read allow
-gator provider connector permission google-work events_create write deny
-gator provider connector permission google-work tasks_create write ask
-```
-
-Available read operations cover task lists/tasks (including completed and
-hidden views), calendar lists/colors/events (including bounded agendas and
-expanded recurring instances), free/busy, Drive metadata, Docs, Sheets and
-bounded cell ranges. Mutating operations cover task-list/task lifecycle and
-placement, calendar lifecycle/list subscriptions/preferences, event lifecycle,
-moves and RSVPs, Docs batch updates, Sheets creation/range/batch updates, and
-an ordered Google action batch. Update and delete payloads may include a Google
-`etag`; Gator binds it to the approved payload and sends it as `If-Match`.
-Quick capture recognizes task/event, date, time, duration, priority, and
-simple recurrence phrases and produces a reviewable preview; it never creates
-a remote object by itself. `task_metadata_encode` similarly builds a bounded
-`[GATOR-TASK v1]` notes block for task priority, date-only recurrence, and a
-timezone-aware reminder; a later `tasks_create` or `tasks_update` still needs
-its own fresh approval.
-
-`reminders_due` emits newly due explicit Calendar overrides and Gator portable
-task reminders to an active Work conversation. It health-checks Google before
-opening the mirror, and delivery keys are de-duplicated privately. A foreground
-scheduled Work run can use it; disconnected Google never emits cached
-reminders.
-
-## Connected-only mirror
-
-Google is always live-authoritative. Gator keeps a private per-connector
-SQLite mirror under `STATE_DIR/gator/google-work/` only to make connected
-searches, incremental comparisons, and batching efficient. A successful live
-Google response is the only way data enters it.
-
-`local_search` first makes a live Google health request. If authentication,
-refresh, or that request fails, it returns no cached records. There is no
-offline browse mode, offline mutation queue, cache-to-Work fallback, or
-Hot Cross Buns migration path.
-
-## Mutations and uncertainty
-
-Every Google mutation requires Gator Work `act` mode plus a fresh approval for
-the exact operation, target, and payload hash. The `batch` operation pins an
-ordered canonical list of at most 25 typed Google mutations before a single
-approval. Gator executes that list online without a local outbox.
-
-If a request has an ambiguous result (for example a timeout after sending),
-Gator records it as unknown and does not replay it automatically. Only a
-bounded pre-send transport retry belongs inside an active user-approved action;
-the local mirror is updated only after Google returns success.
-
-## Deliberate boundaries
-
-This port does not include Hot Cross Buns' Python/Textual, Swift/Qt/Electron
-frontends, installer/theme formats, standalone CLI, SQLite migration, or
-credential reuse. Existing HCB checkouts remain untouched. Its useful typed
-domain behavior is being folded into Gator Work so HCB can be retired without
-adding a competing product surface.
+Gator neither reads nor writes its former `STATE_DIR/gator/google-work/`
+SQLite mirror. It does not delete that old local state automatically. There is
+no offline Google browse mode, mutation queue, Hot Cross Buns migration path,
+or credential reuse.

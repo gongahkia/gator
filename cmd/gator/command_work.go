@@ -232,7 +232,7 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 			_, _ = fmt.Fprintf(out, "  snapshot: %s (%d files, %d bytes, %d exclusions)\n", manifest.ID, manifest.Files, manifest.Bytes, len(manifest.Exclusions))
 		}
 	}
-	executor := workrun.Executor{Model: backend, StateDir: stateDir, Connectors: connector.Runtime{Registry: registry, Credentials: credentials, StateDir: stateDir}}
+	executor := workrun.Executor{Model: backend, StateDir: stateDir, Connectors: connector.Runtime{Registry: registry, Credentials: credentials}}
 	if strings.TrimSpace(*workBrowserSession) != "" {
 		store, err := gatorbrowser.Open(stateDir)
 		if err != nil {
