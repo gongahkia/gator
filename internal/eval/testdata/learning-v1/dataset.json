@@ -1,0 +1,318 @@
+{
+  "version": 1,
+  "id": "learning-effectiveness-v1",
+  "target": "learning.v1",
+  "cases": [
+    {
+      "id": "repo-package-manager",
+      "family": "repository-convention",
+      "split": "development",
+      "project": "repos/alpha",
+      "expected_learnings": 1,
+      "learnings": [
+        {
+          "id": "learning-alpha-pnpm",
+          "type": "preference",
+          "key": "package-manager",
+          "content": "Use pnpm for package commands.",
+          "scope": "project",
+          "origin": "user",
+          "status": "active",
+          "work_id": "work-alpha-correction"
+        }
+      ],
+      "phases": [
+        {
+          "id": "episode-b",
+          "probes": [
+            {
+              "id": "same-repository",
+              "project": "repos/alpha",
+              "expect": ["Use pnpm for package commands."],
+              "ablate": true
+            },
+            {
+              "id": "unrelated-repository",
+              "project": "repos/beta",
+              "forbid": ["Use pnpm for package commands."]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "output-format-scope",
+      "family": "output-format",
+      "split": "development",
+      "project": "reports/markdown-team",
+      "expected_learnings": 1,
+      "learnings": [
+        {
+          "id": "learning-markdown-output",
+          "type": "preference",
+          "key": "output-format",
+          "content": "Deliver research reports in Markdown.",
+          "scope": "project",
+          "origin": "user",
+          "status": "active",
+          "work_id": "work-format-correction"
+        }
+      ],
+      "phases": [
+        {
+          "id": "episode-b",
+          "probes": [
+            {
+              "id": "same-task-category",
+              "project": "reports/markdown-team",
+              "expect": ["Deliver research reports in Markdown."],
+              "ablate": true
+            },
+            {
+              "id": "other-report-project",
+              "project": "reports/pdf-team",
+              "forbid": ["Deliver research reports in Markdown."]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "targeted-verification",
+      "family": "failure-prevention",
+      "split": "development",
+      "project": "services/api",
+      "expected_learnings": 1,
+      "learnings": [
+        {
+          "id": "learning-api-targeted-test",
+          "type": "failure_prevention",
+          "key": "api-targeted-test",
+          "content": "Run the API package tests before broader verification.",
+          "scope": "project",
+          "origin": "inferred",
+          "status": "active",
+          "confidence": 100,
+          "confirmed": true,
+          "work_id": "work-api-failure"
+        }
+      ],
+      "phases": [
+        {
+          "id": "episode-b",
+          "probes": [
+            {
+              "id": "relevant-api-change",
+              "project": "services/api",
+              "expect": ["Run the API package tests before broader verification."],
+              "ablate": true
+            },
+            {
+              "id": "unrelated-web-change",
+              "project": "services/web",
+              "forbid": ["Run the API package tests before broader verification."]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "delivery-uncertainty",
+      "family": "operational-safety",
+      "split": "development",
+      "project": "releases/service",
+      "expected_learnings": 0,
+      "observations": [
+        {
+          "id": "observation-delivery-unknown",
+          "signal": "delivery_unknown",
+          "work_id": "work-delivery-unknown",
+          "summary": "Delivery outcome is unknown and requires inspection."
+        },
+        {
+          "id": "observation-external-unknown",
+          "signal": "external_outcome_unknown",
+          "work_id": "work-external-unknown",
+          "summary": "External outcome is unknown and must not be retried automatically."
+        }
+      ],
+      "phases": [
+        {
+          "id": "future-work",
+          "probes": [
+            {
+              "id": "no-unsafe-retry-rule",
+              "project": "releases/service",
+              "forbid": ["must not be retried automatically"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "user-reversal",
+      "family": "reversal",
+      "split": "held-out",
+      "project": "repos/legacy",
+      "expected_learnings": 1,
+      "learnings": [
+        {
+          "id": "learning-legacy-yarn",
+          "type": "preference",
+          "key": "package-manager",
+          "content": "Use yarn for package commands.",
+          "scope": "project",
+          "origin": "user",
+          "status": "active",
+          "work_id": "work-legacy-preference"
+        }
+      ],
+      "phases": [
+        {
+          "id": "active",
+          "probes": [
+            {
+              "id": "before-reversal",
+              "project": "repos/legacy",
+              "expect": ["Use yarn for package commands."],
+              "ablate": true
+            }
+          ]
+        },
+        {
+          "id": "reversed",
+          "mutations": [
+            {"action": "disable", "learning_id": "learning-legacy-yarn"}
+          ],
+          "probes": [
+            {
+              "id": "after-reversal",
+              "project": "repos/legacy",
+              "forbid": ["Use yarn for package commands."]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "explicit-overrides-inference",
+      "family": "precedence",
+      "split": "held-out",
+      "project": "repos/override",
+      "expected_learnings": 2,
+      "learnings": [
+        {
+          "id": "learning-inferred-npm",
+          "type": "preference",
+          "key": "package-manager",
+          "content": "Use npm for package commands.",
+          "scope": "global",
+          "origin": "inferred",
+          "status": "active",
+          "confidence": 100,
+          "confirmed": true,
+          "work_id": "work-inferred-npm"
+        },
+        {
+          "id": "learning-user-pnpm",
+          "type": "preference",
+          "key": "package-manager",
+          "content": "Use pnpm for package commands.",
+          "scope": "global",
+          "origin": "user",
+          "status": "active",
+          "work_id": "work-user-pnpm"
+        }
+      ],
+      "phases": [
+        {
+          "id": "future-work",
+          "probes": [
+            {
+              "id": "explicit-wins",
+              "project": "repos/override",
+              "expect": ["Use pnpm for package commands."],
+              "forbid": ["Use npm for package commands."],
+              "ablate": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "scoped-rule-wins",
+      "family": "scope-precedence",
+      "split": "held-out",
+      "project": "repos/specific",
+      "expected_learnings": 2,
+      "learnings": [
+        {
+          "id": "learning-global-npm",
+          "type": "preference",
+          "key": "package-manager",
+          "content": "Use npm everywhere.",
+          "scope": "global",
+          "origin": "user",
+          "status": "active",
+          "work_id": "work-global-npm"
+        },
+        {
+          "id": "learning-project-pnpm",
+          "type": "preference",
+          "key": "package-manager",
+          "content": "Use pnpm in this repository.",
+          "scope": "project",
+          "origin": "user",
+          "status": "active",
+          "work_id": "work-project-pnpm"
+        }
+      ],
+      "phases": [
+        {
+          "id": "future-work",
+          "probes": [
+            {
+              "id": "specificity-wins",
+              "project": "repos/specific",
+              "expect": ["Use pnpm in this repository."],
+              "forbid": ["Use npm everywhere."],
+              "ablate": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "candidate-only",
+      "family": "candidate-safety",
+      "split": "held-out",
+      "project": "repos/candidate",
+      "expected_learnings": 1,
+      "learnings": [
+        {
+          "id": "learning-candidate-pnpm",
+          "type": "preference",
+          "key": "package-manager",
+          "content": "Use pnpm only after approval.",
+          "scope": "project",
+          "origin": "inferred",
+          "status": "candidate",
+          "confidence": 80,
+          "work_id": "work-candidate-correction"
+        }
+      ],
+      "phases": [
+        {
+          "id": "future-work",
+          "probes": [
+            {
+              "id": "candidate-does-not-leak",
+              "project": "repos/candidate",
+              "forbid": ["Use pnpm only after approval."]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

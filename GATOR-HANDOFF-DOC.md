@@ -3453,3 +3453,197 @@ GATOR-HANDOFF-DOC.md
 
 No commit, reset, amend, push, or other history rewrite was performed by this
 tranche. Stop here; do not start Prompt 3 in this handoff.
+
+---
+
+# GTR-LEARN-EVAL-01 — Completion Report
+
+## A. Classification
+
+`GTR-LEARN-EVAL-01` is complete. It adds a compact, deterministic learning
+product-evaluation corpus and runner. The evaluation exercises a real
+`workrun.Executor` request and inspects the future-Work system prompt, with
+active-learning and no-learning control arms. It does not add a live-model
+benchmark, an autonomous case generator, or a new learning mechanism.
+
+## B. Learning Eval Architecture
+
+`internal/eval/learning.go` defines a versioned `learning.v1` dataset,
+development/held-out selection, structured trial reports, actionable diagnostic
+codes, and an inspectable experiment report. Each case contains only bounded
+learning/observation seeds, mutation phases, and future-Work probes; it never
+retains prompts, artifacts, source payloads, or connector data.
+
+For every probe, the evaluator resolves the same active scoped records used by
+Work, renders that bounded context, and executes a deterministic inspect-mode
+Work request that captures its system prompt. Positive probes can require an
+ablation: an identical no-learning control must not contain the expected
+guidance. Reports retain active IDs, retained-record count, and Work-provenance
+IDs, rather than a single opaque score.
+
+The advanced local entrypoint is:
+
+```text
+gator work eval learning validate DATASET
+gator work eval learning run DATASET --report-dir DIR [--split development|held-out|all]
+gator work eval learning show EXPERIMENT_JSON
+```
+
+Development is the default; held-out/all selection is explicit.
+
+## C. Deterministic Scenarios
+
+The checked-in `learning-effectiveness-v1` corpus covers all requested cases:
+
+1. **Repository convention (development):** the repo-scoped pnpm correction
+   reaches a later Work in that repository, changes from the ablated control,
+   and does not reach an unrelated repository.
+2. **Output-format scope (development):** a Markdown report preference reaches
+   its project/category and not another report project.
+3. **Failure prevention (development):** a confirmed API targeted-test rule
+   reaches later API Work and not unrelated web Work.
+4. **User reversal (held-out):** an active rule reaches Work before disable;
+   after disable it is absent while its retained record and Work provenance
+   remain inspectable.
+5. **Explicit knowledge over inference (held-out):** an active direct pnpm
+   rule wins over an active confirmed inferred npm rule with the same key.
+6. **Conflicting scoped rules (held-out):** the exact-project rule wins over a
+   global rule with the same key.
+7. **Candidate-only (held-out):** an inferred candidate remains absent from a
+   future Work request.
+8. **Delivery/external uncertainty (development):** retained unknown-outcome
+   observations produce no active retry guidance.
+
+## D. Counterfactual/Ablation Support
+
+Relevant positive probes use a matched empty-learning control. A trial fails
+with `ablation_no_effect` if control Work contains the supposed learned
+guidance, and with `retention_missing` if the active arm lacks it. This proves
+the correction changes the actual product input to relevant future Work rather
+than only proving that a JSON record exists.
+
+## E. Held-Out Strategy
+
+The evaluator reuses the established `development`, `held-out`, and `all`
+split semantics. Normal runs retain and execute only development cases; held-out
+content is excluded from the copied experiment dataset unless explicitly
+selected. The held-out set covers reversal, explicit-vs-inferred precedence,
+scoped conflict, and candidate containment so ordinary fixture edits do not
+consume those checks by default.
+
+## F. Real-Failure Regression Workflow
+
+`internal/eval/testdata/learning-v1/README.md` documents the manual path:
+select reviewable retained evidence, sanitize/minimize it, add a human-reviewed
+development fixture with relevant and non-leaking probes, then run the focused
+learning eval. It explicitly prohibits autonomous conversion of Work history
+into eval cases.
+
+## G. Fast vs Slow Suite
+
+The new suite is fast, deterministic, and provider-free. It verifies learning
+selection, precedence, reversal, scope isolation, prompt delivery, provenance,
+and a matched no-learning counterfactual through the real Work request path.
+
+No live-model semantic suite was added or represented as conclusive. Existing
+Work evaluation infrastructure can run explicitly configured live providers,
+but a provider/model/repeated-trial semantic study should remain a separate,
+deliberate follow-up rather than an always-on CI gate.
+
+## H. Findings
+
+The mechanism demonstrably changes relevant future Work input: project rules,
+explicit precedence, and confirmed failure-prevention guidance appear in the
+correct future Work prompt and disappear in matching ablations. Reversal and
+candidate containment behave correctly. The remaining limitation is semantic:
+this deterministic suite cannot prove that every external model will obey a
+prompted rule in every task; it proves Gator delivers the right bounded rule to
+the right Work request.
+
+## I. Overgeneralization Findings
+
+No scope leak was found in the corpus. Exact-project rules did not reach
+unrelated projects; disabled and candidate records did not reach future Work;
+and uncertain operational observations did not produce retry guidance.
+Failures use diagnostics such as `scope_leak`, `retention_missing`, and
+`ablation_no_effect` rather than collapsing to an aggregate learning score.
+
+## J. Tests / Verification
+
+Focused tests prove split discipline, relevant/future Work context, ablation,
+reversal with retained provenance, no active rule from uncertainty, and
+diagnostic reporting. The CLI test validates/runs/shows the development corpus
+through `gator work eval learning`.
+
+Observed successful commands:
+
+```sh
+go test ./internal/eval -run Learning -count=1 -v
+go test ./internal/eval ./cmd/gator -run 'Learning|WorkLearning' -count=1
+go vet ./internal/eval ./cmd/gator
+go build ./cmd/gator
+go test ./...
+go vet ./...
+go build ./cmd/gator
+git diff --check
+```
+
+The full Go suite, vet, build, and diff check completed successfully. The build
+created the ignored local `./gator` binary.
+
+## K. Complexity Delta
+
+This adds one focused evaluator, one small eight-case JSON corpus, a manual
+fixture-authoring guide, and a narrow advanced CLI adapter. It reuses the
+existing evaluation report writer, split values, learning store, and Work
+executor. It adds no provider adapter, background process, model judge,
+database, benchmark service, or autonomous learning feature.
+
+## L. Product Checkpoint
+
+1. Can we prove a correction changes future relevant behavior? **Yes, at the
+   deterministic product-input boundary** — active guidance reaches the real
+   future Work prompt and is absent in a matched control.
+2. Can we prove unrelated tasks remain unaffected? **Yes** — scoped and
+   candidate/reversed probes prove absence from unrelated future Work prompts.
+3. Can user reversal be verified? **Yes** — disable removes future context
+   while retained record and Work provenance remain.
+4. Does explicit knowledge reliably beat inference? **Yes** — held-out
+   explicit-vs-inferred precedence passes.
+5. Are candidates prevented from leaking into behavior? **Yes** — the
+   held-out candidate-only probe passes.
+6. Can failures become regressions? **Yes** — the documented, manual,
+   sanitized-fixture workflow and CLI runner support it.
+7. Are the tests measuring product behavior rather than storage internals?
+   **Yes, primarily** — probes execute Work and inspect its rendered system
+   input; storage is retained only for provenance/reversal checks.
+8. Is learning now good enough to become a core user-facing feature? **Yes,
+   with the stated boundary** — delivery/selection safety is evaluated, while
+   live-model compliance remains deliberately unclaimed.
+
+## M. Recommended Next Tranche
+
+Proceed to `GTR-PRODUCT-UX-01` (Prompt 4) only after review. The learning model
+has earned UX simplification, but that work should preserve the active/candidate
+boundary and keep advanced evaluation surfaces out of normal navigation.
+
+## N. Git Status
+
+At the start of this tranche, prior GTR-LEARN-02 changes had reconciled to
+`c4dde99e7` on both `main` and `origin/main` (`edited readme`). The working tree
+now contains this uncommitted Prompt 3 implementation and report:
+
+```text
+cmd/gator/main.go
+cmd/gator/work_eval.go
+cmd/gator/work_learning_eval.go
+cmd/gator/work_learning_eval_test.go
+internal/eval/learning.go
+internal/eval/learning_test.go
+internal/eval/testdata/learning-v1/dataset.json
+internal/eval/testdata/learning-v1/README.md
+GATOR-HANDOFF-DOC.md
+```
+
+No commit, reset, amend, push, or history rewrite was performed by this
+tranche. Stop here; do not start Prompt 4 in this handoff.
