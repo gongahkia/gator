@@ -19,6 +19,7 @@ import (
 	"github.com/gongahkia/gator/internal/attachment"
 	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/document"
+	"github.com/gongahkia/gator/internal/learning"
 	"github.com/gongahkia/gator/internal/sandbox"
 )
 
@@ -237,7 +238,8 @@ func TestExecutorBlocksPrematureCompletionUntilContractPasses(t *testing.T) {
 
 func TestExecutorRetainsFailedManifestAtStepLimit(t *testing.T) {
 	model := &scriptedModel{turns: []agent.Turn{{Text: "Done without an artifact."}}}
-	outcome, err := (Executor{Model: model, StateDir: t.TempDir()}).Execute(context.Background(), Request{
+	state := t.TempDir()
+	outcome, err := (Executor{Model: model, StateDir: state}).Execute(context.Background(), Request{
 		SourcePath: t.TempDir(), Objective: "Write a report", RunID: "work-incomplete",
 		Contract: artifact.DefaultContract("report.md"), MaxSteps: 1,
 	})
@@ -249,6 +251,14 @@ func TestExecutorRetainsFailedManifestAtStepLimit(t *testing.T) {
 	}
 	if _, statErr := os.Stat(outcome.Work.ManifestPath); statErr != nil {
 		t.Fatalf("failed manifest was not retained: %v", statErr)
+	}
+	store, storeErr := learning.Open(state)
+	if storeErr != nil {
+		t.Fatal(storeErr)
+	}
+	observations, listErr := store.ListObservations("work-incomplete")
+	if listErr != nil || len(observations) != 1 || observations[0].Signal != learning.VerificationFailed || observations[0].WorkID != "work-incomplete" || len(observations[0].LearningIDs) != 0 {
+		t.Fatalf("failed Work observation = %#v, %v", observations, listErr)
 	}
 }
 
@@ -419,6 +429,66 @@ func TestExecutorExecutesExternalActionAfterApproval(t *testing.T) {
 	}
 	if approvals != 1 || requests.Load() != 1 || len(outcome.Manifest.Actions) != 1 || outcome.Manifest.Actions[0].Status != action.Executed {
 		t.Fatalf("approvals=%d requests=%d actions=%#v", approvals, requests.Load(), outcome.Manifest.Actions)
+	}
+}
+
+func TestExecutorRetainsUnknownExternalOutcomeWithoutDerivingRetryLearning(t *testing.T) {
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		requests.Add(1)
+		writer.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+	descriptor := connector.Descriptor{
+		Version: connector.DescriptorVersion, ID: "release", Name: "Release",
+		Kind: connector.KindHTTPWebhook, Resource: server.URL, Authentication: connector.AuthNone,
+	}
+	registry, err := connector.NewRegistry([]connector.Descriptor{descriptor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	model := &scriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "action-1", Name: "connector_release_publish", Arguments: json.RawMessage(`{"payload":{"version":"v1"}}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "write-1", Name: "write_artifact", Arguments: json.RawMessage(`{"path":"receipt.md","content":"The release outcome needs review."}`)}}},
+		{Text: "Created a receipt that preserves the uncertain external outcome."},
+	}}
+	contract := artifact.DefaultContract("receipt.md")
+	contract.ExternalActions = action.Approve
+	state := t.TempDir()
+	outcome, err := (Executor{
+		Model: model, StateDir: state, Connectors: connector.Runtime{Registry: registry, HTTPClient: server.Client()},
+	}).Execute(context.Background(), Request{
+		SourcePath: t.TempDir(), Objective: "Publish a release and preserve uncertainty", RunID: "work-action-unknown",
+		Mode: action.Act, Contract: contract, ConnectorIDs: []string{descriptor.ID}, MaxSteps: 4,
+		ApproveAction: func(context.Context, action.Proposal) (action.Decision, error) { return action.Allow, nil },
+	})
+	if err == nil {
+		t.Fatal("an uncertain external action unexpectedly passed the Work contract")
+	}
+	if requests.Load() != 1 || len(outcome.Manifest.Actions) != 1 || outcome.Manifest.Actions[0].Status != action.Unknown {
+		t.Fatalf("requests=%d actions=%#v", requests.Load(), outcome.Manifest.Actions)
+	}
+	store, storeErr := learning.Open(state)
+	if storeErr != nil {
+		t.Fatal(storeErr)
+	}
+	observations, listErr := store.ListObservations("work-action-unknown")
+	if listErr != nil {
+		t.Fatal(listErr)
+	}
+	var unknown learning.Observation
+	for _, observation := range observations {
+		if observation.Signal == learning.ExternalOutcomeUnknown {
+			unknown = observation
+			break
+		}
+	}
+	if unknown.ID == "" || len(unknown.LearningIDs) != 0 {
+		t.Fatalf("unknown external outcome observation = %#v", observations)
+	}
+	records, listErr := store.List()
+	if listErr != nil || len(records) != 0 {
+		t.Fatalf("unknown external outcome created a retry learning: %#v, %v", records, listErr)
 	}
 }
 

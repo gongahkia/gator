@@ -944,7 +944,7 @@ func workHelp() string {
   /learnings [list|show|add|enable|disable|edit|remove|reject]
                                  inspect and control scoped guidance
   /feedback accept|reject|dont-learn [NOTE]
-  /feedback correct|remember --type TYPE --key KEY [--scope SCOPE] TEXT
+  /feedback correct|remember [--type TYPE] [--key KEY] [--scope SCOPE] TEXT
                                  record explicit feedback for this Work
   /steer TEXT                    steer the running task
   /tasks · /cancel-task ID        inspect or cancel active specialists

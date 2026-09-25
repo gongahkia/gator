@@ -57,8 +57,18 @@ func TestWorkFeedbackCreatesInspectableCandidatesAndExplicitRememberedRules(t *t
 		t.Fatalf("remember output = %q", output.String())
 	}
 	records, err = store.List()
-	if err != nil || len(records) != 2 || records[1].Origin != learning.UserAuthored || records[1].Status != learning.Active || len(records[1].Provenance.WorkIDs) != 1 || records[1].Provenance.WorkIDs[0] != workID {
-		t.Fatalf("remembered learning = %#v, %v", records, err)
+	if err != nil || len(records) != 2 {
+		t.Fatalf("remembered learnings = %#v, %v", records, err)
+	}
+	var remembered learning.Record
+	for _, record := range records {
+		if record.Key == "output-format" {
+			remembered = record
+			break
+		}
+	}
+	if remembered.Origin != learning.UserAuthored || remembered.Status != learning.Active || len(remembered.Provenance.WorkIDs) != 1 || remembered.Provenance.WorkIDs[0] != workID {
+		t.Fatalf("remembered learning = %#v", remembered)
 	}
 	output.Reset()
 	if err := runWorkFeedbackCommand(state, []string{workID, "list"}, &output); err != nil {
@@ -90,6 +100,40 @@ func TestWorkFeedbackDontLearnDoesNotCreateCandidate(t *testing.T) {
 	}
 }
 
+func TestWorkFeedbackDefaultsCorrectionSchemaForLowFrictionFeedback(t *testing.T) {
+	state, workID := feedbackWork(t)
+	var output bytes.Buffer
+	if err := runWorkFeedbackCommand(state, []string{workID, "correct", "Use", "pnpm."}, &output); err != nil {
+		t.Fatal(err)
+	}
+	store, err := learning.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	records, err := store.List()
+	if err != nil || len(records) != 1 || records[0].Type != learning.Preference || records[0].Status != learning.Candidate || !strings.HasPrefix(records[0].Key, "feedback-") {
+		t.Fatalf("default correction candidate = %#v, %v", records, err)
+	}
+	output.Reset()
+	if err := runWorkFeedbackCommand(state, []string{workID, "remember", "Use", "bun."}, &output); err != nil {
+		t.Fatal(err)
+	}
+	records, err = store.List()
+	if err != nil || len(records) != 2 {
+		t.Fatalf("default remembered learning = %#v, %v", records, err)
+	}
+	var remembered learning.Record
+	for _, record := range records {
+		if record.Content == "Use bun." {
+			remembered = record
+			break
+		}
+	}
+	if remembered.Type != learning.Preference || remembered.Status != learning.Active || !strings.HasPrefix(remembered.Key, "feedback-") {
+		t.Fatalf("default remembered learning = %#v", remembered)
+	}
+}
+
 func feedbackWork(t *testing.T) (string, string) {
 	t.Helper()
 	state, source := t.TempDir(), t.TempDir()
@@ -110,7 +154,7 @@ func feedbackWork(t *testing.T) (string, string) {
 	if _, err := history.Start(workhistory.Start{ID: workID, Objective: "Prepare a report", Mode: action.Draft, ExternalActions: action.Forbid, ConversationID: conversation.ID, StartedAt: now}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := history.Finish(workID, workhistory.Finish{ConversationID: conversation.ID, RevisionID: workID, SnapshotID: "snap-feedback", Succeeded: true, FinishedAt: now.Add(time.Second)}); err != nil {
+	if _, err := history.Finish(workID, workhistory.Finish{ConversationID: conversation.ID, RevisionID: workID, SnapshotID: "snap-feedback", VerificationStatus: workhistory.VerificationPassed, Succeeded: true, FinishedAt: now.Add(time.Second)}); err != nil {
 		t.Fatal(err)
 	}
 	return state, workID

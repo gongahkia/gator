@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/learning"
 	"github.com/gongahkia/gator/internal/patch"
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/workspace"
@@ -73,6 +74,14 @@ func TestDeliverArtifactsRetainsPartialFailureAndRetriesOnlyRemainingEffects(t *
 	}
 	if _, err := os.Stat(filepath.Join(target, "c.txt")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("later pending effect was applied: %v", err)
+	}
+	learnings, err := learning.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	observations, err := learnings.ListObservations("delivery-partial")
+	if err != nil || len(observations) != 1 || observations[0].Signal != learning.DeliveryFailed || len(observations[0].LearningIDs) != 0 {
+		t.Fatalf("delivery failure observation = %#v, %v", observations, err)
 	}
 
 	// A fresh store proves retry comes from persisted intent, not retained model

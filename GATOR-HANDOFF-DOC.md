@@ -3265,3 +3265,191 @@ and this report changes for review; it has not been committed. A local ignored
 `./gator` binary was produced by the build verification command.
 
 Stop here. Do not start Prompt 2 without human review.
+
+---
+
+# GTR-LEARN-02 — Completion Report
+
+## A. Classification
+
+`GTR-LEARN-02` is complete. It adds a deliberately narrow learning bridge:
+high-reliability transaction evidence is retained as separate observations,
+and only an explicit user correction can deterministically propose a candidate.
+There is no reflection model, score threshold, background learner, or automatic
+promotion.
+
+## B. Signals Consumed
+
+The inspected product signals are classified as follows:
+
+- **High reliability and consumed:** failed Work/failed verification, failed
+  local delivery, unknown local delivery outcome, unknown external-action
+  outcome, and direct user `accept`, `reject`, `correct`, `remember`, and
+  `dont-learn` feedback.
+- **Observed but intentionally not turned into learning:** successful Work,
+  applied delivery, retries, and existing learning edits. Their current
+  evidence does not justify a generalized behavior rule in this tranche.
+- **Not treated as evidence:** task rephrasing, conversational tone, inferred
+  dissatisfaction, or other ambiguous chat behavior.
+
+All retained signals in this tranche have `high` reliability. No lower-
+reliability signal is silently upgraded to a fact.
+
+## C. Observation Model
+
+`internal/learning.Observation` is a versioned, bounded JSON record under
+`$GATOR_STATE_DIR/gator/observations/`. It contains an ID, signal, reliability,
+Work ID, optional exact-project scope, concise summary, evidence references,
+linked learning IDs, and timestamps. It retains references such as Work-history
+and delivery-ledger paths rather than copying prompts, artifacts, connector
+payloads, or full Work state.
+
+Operational observations use deterministic IDs and are idempotently upserted.
+Explicit feedback gets its own inspectable observation. Candidate and explicit
+learning records link back to the observation; inferred records also retain the
+relevant Work ID and observation evidence reference in their provenance.
+
+## D. Candidate Derivation
+
+Derivation is deterministic only. A `user_corrected` observation can create or
+merge a same type/key/content/scope inferred candidate, preserving every
+distinct Work/evidence reference. Repeated evidence therefore strengthens the
+inspectable provenance without unbounded duplicate candidates.
+
+Failed Work, failed/unknown delivery, and unknown external actions produce
+observations only. They do not claim an unsupported cause, invent a test rule,
+or create a retry instruction. No model-assisted reflection was added.
+
+## E. Promotion / Rejection
+
+New inferred records remain `candidate`; repeated corrections do not activate
+them. The existing explicit `gator learnings enable LEARNING_ID` path promotes
+a candidate and records the user-confirmation timestamp. `reject` preserves the
+candidate and provenance but prevents use; a rejected candidate cannot be
+enabled. Disabled/rejected candidates are excluded from future Work context.
+
+## F. User Feedback UX
+
+CLI feedback is available through:
+
+```text
+gator work feedback WORK_ID list
+gator work feedback WORK_ID accept|reject|dont-learn [NOTE]
+gator work feedback WORK_ID correct [--type TYPE] [--key KEY] [--scope SCOPE] TEXT
+gator work feedback WORK_ID remember [--type TYPE] [--key KEY] [--scope SCOPE] TEXT
+```
+
+`correct` and `remember` default to an exact current-Work project scope,
+`preference` type, and a deterministic bounded key, so ordinary feedback does
+not require schema management. Optional type/key/scope flags remain available
+for deliberate specificity. The Work TUI has the matching `/feedback …`
+palette command and calls the same in-process service with the current revision
+ID; it does not shell out. Feedback never reruns Work or delivery.
+
+## G. “Remember This”
+
+`remember` records `user_remembered` feedback and immediately creates a normal,
+active, user-authored scoped learning with Work and observation provenance. It
+uses the existing learning store, not a shortcut or second memory system.
+
+## H. Transaction Provenance
+
+Every feedback-derived candidate stores its Work ID plus a
+`gator/observations/...` evidence reference. The observation points to the
+Work-history record; operational observations point to their Work/delivery
+evidence. `learnings show` and `work feedback WORK_ID list` expose the durable
+linkage needed for a later `why` surface.
+
+## I. Safety
+
+Only explicit corrections can generate inferred candidates, and candidates are
+never active by default. An uncertain external action is recorded as
+`external_outcome_unknown`; it creates neither a retry nor a learning. Unknown
+delivery receives the same treatment. Scope stays limited to global or the
+exact selected project, and future prompts still receive only active,
+applicable, bounded learnings.
+
+## J. Tests / Verification
+
+Focused coverage now proves:
+
+1. direct negative feedback creates a Work-linked observation;
+2. explicit correction creates an inactive inferred candidate;
+3. explicit enablement activates it, while rejection prevents activation;
+4. direct remember creates active, scoped, user-authored learning;
+5. low-friction correct/remember defaults remain typed and bounded;
+6. failed Work verification, failed delivery, and unknown external outcomes
+   remain distinct observations without retry learnings;
+7. repeated corrections merge provenance rather than duplicate candidates;
+8. observation/learning provenance stays inspectable, and only active records
+   project into future Work; and
+9. the TUI shares the CLI service and includes `/feedback` in its palette.
+
+Observed successful verification commands:
+
+```sh
+go test ./internal/workrun -run 'TestExecutor(ProducesSealedArtifactsFromNonGitSource|RetainsFailedManifestAtStepLimit|RetainsUnknownExternalOutcomeWithoutDerivingRetryLearning)' -count=1 -v
+go test ./internal/delivery -run TestDeliverArtifactsRetainsPartialFailureAndRetriesOnlyRemainingEffects -count=1 -v
+go test ./internal/worktui -run 'Test(FeedbackUsesTheConfiguredSharedServiceForCurrentRevision|CommandPaletteContainsCurrentCommands)' -count=1 -v
+go test ./cmd/gator -run TestWorkFeedback -count=1 -v
+go test ./...
+go vet ./...
+go build ./cmd/gator
+git diff --check
+```
+
+The full suite, vet, build, and diff check completed successfully. The build
+produced the ignored local `./gator` binary.
+
+## K. Complexity Delta
+
+The implementation adds one small observation record type, a bounded
+deterministic proposal operation, a feedback adapter, and narrow Work/delivery
+observation hooks. It adds no database, vector store, embeddings, daemon,
+model-reflection loop, automatic retry logic, or autonomous learning process.
+
+## L. Product Checkpoint
+
+1. Does Gator learn from actual evidence rather than chat vibes? **Yes** —
+   candidate generation requires direct user correction; operations retain only
+   durable transaction outcomes.
+2. Can one bad event silently become global behavior? **No** — operational
+   events create observations only; inferred records start inactive and scoped.
+3. Can the user override/accelerate learning easily? **Yes** — `remember` is
+   immediate, while candidate enable/disable/reject remains explicit.
+4. Is candidate vs active state clear? **Yes** — state is persisted and only
+   active records are projected.
+5. Can every inferred rule explain its provenance? **Yes** — Work IDs and
+   observation references are retained.
+6. Did output quality or UX regress? **No regression found** — focused CLI/TUI
+   and full-suite checks passed; feedback defaults avoid mandatory schema flags.
+7. Is the system ready to evaluate learning effectiveness? **Yes** — it now
+   has the bounded evidence, state, scope, and activation boundaries required
+   for Prompt 3 evaluation.
+
+## M. Recommended Next Tranche
+
+Proceed to `GTR-LEARN-EVAL-01` (Prompt 3) only after review. Evaluate relevant
+future-Work benefit and cross-project contamination using the active/candidate
+boundaries established here. Do not expand derivation sources or add autonomous
+promotion before those results exist.
+
+## N. Git Status
+
+Repository drift was reconciled rather than rewritten. At this checkpoint,
+`main` and `origin/main` are both at `638b00439` (`edited readme`), whose
+history includes the core GTR-LEARN-02 implementation. This tranche added the
+uncommitted focused hardening/coverage and this report in the working tree:
+
+```text
+cmd/gator/command_work_feedback.go
+cmd/gator/command_work_feedback_test.go
+internal/delivery/delivery_test.go
+internal/workrun/executor_test.go
+internal/worktui/app_test.go
+internal/worktui/commands.go
+GATOR-HANDOFF-DOC.md
+```
+
+No commit, reset, amend, push, or other history rewrite was performed by this
+tranche. Stop here; do not start Prompt 3 in this handoff.

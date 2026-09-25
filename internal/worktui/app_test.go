@@ -140,6 +140,29 @@ func TestLearningsUseTheConfiguredSharedService(t *testing.T) {
 	}
 }
 
+func TestFeedbackUsesTheConfiguredSharedServiceForCurrentRevision(t *testing.T) {
+	var workID string
+	var received []string
+	model := New(Config{CurrentFolder: "/work", FeedbackAction: func(id string, arguments []string) (string, error) {
+		workID = id
+		received = append([]string(nil), arguments...)
+		return "feedback recorded", nil
+	}})
+	model.revision = "work-feedback"
+	model.input = "/feedback accept"
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if workID != "work-feedback" || !reflect.DeepEqual(received, []string{"accept"}) || !strings.Contains(model.View(), "feedback recorded") {
+		t.Fatalf("feedback action work=%q args=%#v\n%s", workID, received, model.View())
+	}
+	for _, item := range commandPaletteEntries() {
+		if item.command == "/feedback" {
+			return
+		}
+	}
+	t.Fatal("command palette omitted feedback")
+}
+
 func TestVerifiedDeliverablesRenderAndSaveWithOneConfirmation(t *testing.T) {
 	var requests []BundleActionRequest
 	model := New(Config{
@@ -474,7 +497,7 @@ func TestCommandPaletteContainsCurrentCommands(t *testing.T) {
 	expected := []string{
 		"/help", "/new", "/model", "/effort", "/attach", "/detach", "/source", "/source-refresh", "/source ignore", "/source unignore",
 		"/mode", "/code", "/artifact", "/connector", "/web-origin", "/status", "/statusline", "/permissions",
-		"/doctor", "/agents", "/settings", "/theme", "/history", "/learnings", "/revision-back", "/revision-forward", "/review",
+		"/doctor", "/agents", "/settings", "/theme", "/history", "/learnings", "/feedback", "/revision-back", "/revision-forward", "/review",
 		"/save", "/apply", "/retry", "/copy", "/queue", "/dequeue", "/clear-queue", "exit", "/quit",
 	}
 	if len(model.entries) != len(expected) {

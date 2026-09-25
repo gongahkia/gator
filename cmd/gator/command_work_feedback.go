@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"errors"
 	"flag"
 	"fmt"
@@ -18,8 +19,8 @@ import (
 const workFeedbackUsage = `usage:
   gator work feedback WORK_ID list
   gator work feedback WORK_ID accept|reject|dont-learn [NOTE]
-  gator work feedback WORK_ID correct --type TYPE --key KEY [--scope project|global|project=PATH] TEXT
-  gator work feedback WORK_ID remember --type TYPE --key KEY [--scope project|global|project=PATH] TEXT
+  gator work feedback WORK_ID correct [--type TYPE] [--key KEY] [--scope project|global|project=PATH] TEXT
+  gator work feedback WORK_ID remember [--type TYPE] [--key KEY] [--scope project|global|project=PATH] TEXT
 
 "correct" creates an inspectable candidate only. "remember" creates an
 explicit active scoped learning immediately. Neither retries Work or delivery.`
@@ -95,7 +96,7 @@ func runWorkFeedbackCommand(stateDir string, arguments []string, out io.Writer) 
 func writeCorrectiveFeedback(stateDir string, store learning.Store, history workhistory.Record, actionName string, arguments []string, out io.Writer) error {
 	flags := flag.NewFlagSet("work feedback "+actionName, flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
-	typeName := flags.String("type", "", "learning type")
+	typeName := flags.String("type", string(learning.Preference), "learning type")
 	key := flags.String("key", "", "stable conflict key")
 	scopeName := flags.String("scope", "project", "project, global, or project=PATH")
 	if err := flags.Parse(arguments); err != nil {
@@ -124,9 +125,13 @@ func writeCorrectiveFeedback(stateDir string, store learning.Store, history work
 	if err != nil {
 		return err
 	}
+	learningKey := strings.ToLower(strings.TrimSpace(*key))
+	if learningKey == "" {
+		learningKey = feedbackKey(content)
+	}
 	if actionName == "correct" {
 		candidate, err := store.Propose(learning.Proposal{
-			Observation: observation, Type: typeValue, Key: strings.ToLower(strings.TrimSpace(*key)), Content: content, Scope: scope,
+			Observation: observation, Type: typeValue, Key: learningKey, Content: content, Scope: scope,
 		})
 		if err != nil {
 			return err
@@ -138,7 +143,7 @@ func writeCorrectiveFeedback(stateDir string, store learning.Store, history work
 		return err
 	}
 	explicit, err := store.Create(learning.Create{
-		Type: typeValue, Key: strings.ToLower(strings.TrimSpace(*key)), Content: content, Scope: scope, Origin: learning.UserAuthored,
+		Type: typeValue, Key: learningKey, Content: content, Scope: scope, Origin: learning.UserAuthored,
 		Provenance: learning.Provenance{WorkIDs: []string{history.ID}, EvidenceRefs: []string{observationReference(observation.ID)}},
 	})
 	if err != nil {
@@ -149,6 +154,14 @@ func writeCorrectiveFeedback(stateDir string, store learning.Store, history work
 	}
 	_, err = fmt.Fprintf(out, "Remembered this as active learning %s.\n", explicit.ID)
 	return err
+}
+
+// feedbackKey gives low-friction feedback a stable bounded conflict key while
+// keeping an explicit --key available for users who want to manage a named
+// convention. Candidate identity also includes the content and scope.
+func feedbackKey(content string) string {
+	digest := sha256.Sum256([]byte(strings.ToLower(strings.TrimSpace(content))))
+	return fmt.Sprintf("feedback-%x", digest[:8])
 }
 
 func feedbackScope(stateDir string, history workhistory.Record, value string) (learning.Scope, error) {
