@@ -106,15 +106,11 @@ func (m Model) View() string {
 	return m.renderViewport(view.String(), width, height)
 }
 
-// renderViewport explicitly paints every terminal cell. Without a background
-// style, transparent terminal emulators show whatever window sits behind
-// Gator in the unused parts of the alternate screen.
+// renderViewport occupies every terminal cell so each render clears the prior
+// frame, but deliberately leaves the background unset. This lets a terminal
+// emulator's configured background and transparency show through consistently.
 func (m Model) renderViewport(contents string, width, height int) string {
-	background := lipgloss.Color("234")
-	if m.theme == "contrast" || m.theme == "mono" {
-		background = lipgloss.Color("0")
-	}
-	return lipgloss.NewStyle().Width(width).Height(height).Background(background).Render(contents)
+	return lipgloss.NewStyle().Width(width).Height(height).Render(contents)
 }
 
 func (m Model) renderHome(width, height int, accent, dim lipgloss.Style) string {

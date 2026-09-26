@@ -8,7 +8,11 @@ import (
 )
 
 func TestRenderViewportCoversEveryTerminalCell(t *testing.T) {
-	rendered := ansi.Strip(New(Config{}).renderViewport("Gator", 12, 4))
+	view := New(Config{}).renderViewport("Gator", 12, 4)
+	if strings.Contains(view, "48;5;") {
+		t.Fatalf("viewport must not force an opaque background: %q", view)
+	}
+	rendered := ansi.Strip(view)
 	lines := strings.Split(rendered, "\n")
 	if len(lines) != 4 {
 		t.Fatalf("viewport rows = %d, want 4: %q", len(lines), rendered)
