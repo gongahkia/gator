@@ -55,6 +55,7 @@ func TestDefaultComposerFooterShowsSelectedLocalModel(t *testing.T) {
 			return ModelStatus{Provider: "gator-local", Model: "qwen3:8b", Access: "local model configured"}, nil
 		},
 	})
+	model.home = false
 	model.width, model.height = 100, 24
 	view := ansi.Strip(model.View())
 	if !strings.Contains(view, "model gator-local/qwen3:8b") {
@@ -64,6 +65,7 @@ func TestDefaultComposerFooterShowsSelectedLocalModel(t *testing.T) {
 
 func TestDefaultComposerFooterAdvertisesEditorShortcut(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work"})
+	model.home = false
 	model.width, model.height = 100, 24
 	if view := ansi.Strip(model.View()); !strings.Contains(view, "ctrl+g editor") {
 		t.Fatalf("default footer omitted composer editor shortcut: %q", view)
@@ -72,6 +74,7 @@ func TestDefaultComposerFooterAdvertisesEditorShortcut(t *testing.T) {
 
 func TestDefaultComposerFooterAdvertisesWorkspaceShortcut(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work"})
+	model.home = false
 	model.width, model.height = 100, 24
 	if view := ansi.Strip(model.View()); !strings.Contains(view, "ctrl+i workspace") {
 		t.Fatalf("default footer omitted workspace shortcut: %q", view)

@@ -36,7 +36,7 @@ func (m Model) View() string {
 		return m.renderViewport(m.renderSection(width, height, accent, dim, selectedStyle), width, height)
 	}
 	if m.home {
-		return m.renderViewport(m.renderHome(width, height, accent, dim), width, height)
+		return m.renderViewport(m.renderHome(width, height, accent), width, height)
 	}
 	var view strings.Builder
 	view.WriteString(accent.Render(gatorWordmark))
@@ -113,13 +113,10 @@ func (m Model) renderViewport(contents string, width, height int) string {
 	return lipgloss.NewStyle().Width(width).Height(height).Render(contents)
 }
 
-func (m Model) renderHome(width, height int, accent, dim lipgloss.Style) string {
+func (m Model) renderHome(width, height int, accent lipgloss.Style) string {
 	title := accent.Copy().Bold(true).Render(gatorWordmark)
 	question := lipgloss.NewStyle().Foreground(lipgloss.Color("255")).Render("What do you want to accomplish?")
 	body := title + "\n\n" + question + "\n\n" + m.renderComposer(width, true)
-	if footer := wrapStatusLine(m.statusLineItems(), width); footer != "" {
-		body += "\n" + dim.Render(footer)
-	}
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, body)
 }
 

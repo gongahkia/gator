@@ -416,8 +416,10 @@ func TestInitialViewIsADeclutteredCenteredComposer(t *testing.T) {
 	if strings.Contains(view, "Inbox") || strings.Contains(view, "Scheduled jobs") || strings.Contains(view, "local-first work") {
 		t.Fatalf("initial view exposes launcher clutter: %q", view)
 	}
-	if !strings.Contains(view, "ctrl+p commands") || !strings.Contains(view, "ctrl+x conversations") || !strings.Contains(view, "ctrl+b inbox") || !strings.Contains(view, "ctrl+j jobs") {
-		t.Fatalf("initial view omits direct navigation: %q", view)
+	for _, shortcut := range []string{"ctrl+g editor", "ctrl+i workspace", "ctrl+p commands", "ctrl+x conversations", "ctrl+b inbox", "ctrl+j jobs", "model ", "mode auto"} {
+		if strings.Contains(view, shortcut) {
+			t.Fatalf("initial view exposes status-line clutter %q: %q", shortcut, view)
+		}
 	}
 	typing, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
 	typingModel := typing.(Model)
