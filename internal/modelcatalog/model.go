@@ -51,15 +51,15 @@ type notice struct {
 
 // Model is the private Bubble Tea state behind Panel.
 type Model struct {
-	config          Config
-	catalogOnly     bool
-	screen          screen
-	provider        textinput.Model
-	model           textinput.Model
-	localModels     localModelsState
-	notice          notice
-	width           int
-	height          int
+	config      Config
+	catalogOnly bool
+	screen      screen
+	provider    textinput.Model
+	model       textinput.Model
+	localModels localModelsState
+	notice      notice
+	width       int
+	height      int
 }
 
 func newModel(config Config) Model {

@@ -6,10 +6,8 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
-	"github.com/gongahkia/gator/internal/auth"
 )
 
 func TestRunHelp(t *testing.T) {
@@ -251,35 +249,23 @@ func TestLoginAndLogoutStoreOnlyGatorCredential(t *testing.T) {
 	}
 }
 
-func TestCodexExecutorUsesDirectModelAdapter(t *testing.T) {
+func TestAPIKeyExecutorUsesDirectModelAdapter(t *testing.T) {
 	t.Setenv("GATOR_STATE_DIR", t.TempDir())
-	credentials, err := gatorCredentials()
+	t.Setenv("OPENAI_API_KEY", "test-api-key")
+	executor, err := newCodeExecutor("openai", "", "")
 	if err != nil {
-		t.Fatalf("credentials: %v", err)
-	}
-	if err := credentials.Put("codex", auth.Credential{Type: "oauth", Access: "access-token", Expires: time.Now().Add(time.Hour).UnixMilli(), Extra: map[string]string{"chatgpt_account_id": "account_123"}}); err != nil {
-		t.Fatalf("store Codex OAuth credential: %v", err)
-	}
-	executor, err := newCodeExecutor("codex", "", "")
-	if err != nil {
-		t.Fatalf("new codex executor: %v", err)
+		t.Fatalf("new OpenAI executor: %v", err)
 	}
 	if executor.Model == nil {
-		t.Fatal("Codex did not resolve to a direct model adapter")
+		t.Fatal("OpenAI did not resolve to a direct model adapter")
 	}
 }
 
 func TestExecutorReadsWebSearchKeyFromEnvironmentOnly(t *testing.T) {
 	t.Setenv("GATOR_STATE_DIR", t.TempDir())
+	t.Setenv("OPENAI_API_KEY", "test-api-key")
 	t.Setenv("BRAVE_SEARCH_API_KEY", "do-not-print-this-search-token")
-	credentials, err := gatorCredentials()
-	if err != nil {
-		t.Fatalf("new credentials: %v", err)
-	}
-	if err := credentials.Put("codex", auth.Credential{Type: "oauth", Access: "access-token", Expires: time.Now().Add(time.Hour).UnixMilli(), Extra: map[string]string{"chatgpt_account_id": "account_123"}}); err != nil {
-		t.Fatalf("store Codex credential: %v", err)
-	}
-	executor, err := newCodeExecutor("codex", "", "")
+	executor, err := newCodeExecutor("openai", "", "")
 	if err != nil {
 		t.Fatalf("new executor: %v", err)
 	}

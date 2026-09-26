@@ -92,6 +92,8 @@ func CredentialHint(provider Provider) string {
 		return "OPENAI_API_KEY"
 	case AzureOpenAIResponses:
 		return "AZURE_OPENAI_API_KEY"
+	case CloudflareWorkers, CloudflareGateway:
+		return "CLOUDFLARE_API_TOKEN"
 	case Anthropic:
 		return "ANTHROPIC_API_KEY"
 	case Gemini:
@@ -122,6 +124,8 @@ func APIKeyEnvironment(provider Provider) string {
 		return "OPENAI_API_KEY"
 	case AzureOpenAIResponses:
 		return "AZURE_OPENAI_API_KEY"
+	case CloudflareWorkers, CloudflareGateway:
+		return "CLOUDFLARE_API_TOKEN"
 	case Anthropic:
 		return "ANTHROPIC_API_KEY"
 	case Gemini:

@@ -110,9 +110,9 @@ func (p *ModelCatalogPanel) focused() bool {
 
 func (p *ModelCatalogPanel) choiceView() string {
 	choices := []struct {
-		title string
+		title  string
 		detail string
-		local bool
+		local  bool
 	}{
 		{title: "Cloud API key", detail: "Choose a direct cloud model and configure its API key."},
 		{title: "Local model", detail: "Browse reviewed Ollama models on this machine.", local: true},

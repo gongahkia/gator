@@ -2,7 +2,6 @@ package main
 
 import (
 	"testing"
-	"time"
 
 	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/config"
@@ -32,14 +31,14 @@ func TestCurrentWorkModelStatusReportsConfiguredLocalModel(t *testing.T) {
 	}
 }
 
-func TestCurrentWorkModelStatusReportsProviderAuthentication(t *testing.T) {
+func TestCurrentWorkModelStatusReportsStoredAPIKeyAuthentication(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "")
 	store, err := config.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 	settings := config.Default()
-	settings.Defaults = config.Defaults{Provider: "codex", Model: "gpt-5.6"}
+	settings.Defaults = config.Defaults{Provider: "openai", Model: "gpt-5.6"}
 	if err := store.Save(settings); err != nil {
 		t.Fatal(err)
 	}
@@ -48,19 +47,17 @@ func TestCurrentWorkModelStatusReportsProviderAuthentication(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := credentials.Put("codex", auth.Credential{
-		Type: "oauth", Access: "secret-access-token", Expires: time.Now().Add(time.Hour).UnixMilli(),
-	}); err != nil {
+	if err := credentials.Put("openai", auth.Credential{Type: "api_key", Key: "secret-api-key"}); err != nil {
 		t.Fatal(err)
 	}
 	status, err := currentWorkModelStatus(store, stateDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status.Provider != "codex" || status.Model != "gpt-5.6" || status.Access != "logged in (Gator OAuth credential)" {
+	if status.Provider != "openai" || status.Model != "gpt-5.6" || status.Access != "authenticated with Gator api key" {
 		t.Fatalf("provider status = %#v", status)
 	}
-	if status.Access == "secret-access-token" {
+	if status.Access == "secret-api-key" {
 		t.Fatal("provider status exposed credential material")
 	}
 }

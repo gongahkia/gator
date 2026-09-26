@@ -45,6 +45,7 @@ func TestCloudModelSetupClearsCredentialAndUpdatesSelection(t *testing.T) {
 	})
 	defer panel.Close()
 	panel.model.width, panel.model.height = 100, 42
+	panel.model.screen = localModelsScreen
 	form := newCloudModelSetupForm(modelprovider.AzureOpenAI, "review", "", nil, panel.model.inlineWidth())
 	form.credential.SetValue("secret-api-key")
 	form.endpoint.SetValue("example-resource.openai.azure.com")
@@ -97,6 +98,7 @@ func TestCustomProviderLifecycleRequiresReviewAndKeepsSecretsOut(t *testing.T) {
 	backend := &fakeManagementBackend{}
 	m := newModel(Config{LocalModels: &fakeLocalManager{}, ModelManagement: backend})
 	m.width, m.height = 100, 42
+	m.screen = localModelsScreen
 	m.localModels.section = cloudModelSection
 
 	next, _ := m.updateLocalModels(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
@@ -156,6 +158,7 @@ func TestLocalModelPullAndUseUpdateTheActiveSelection(t *testing.T) {
 	}}
 	m := newModel(Config{LocalModels: manager})
 	m.localModels.catalog = manager.catalog
+	m.screen = localModelsScreen
 	m.localModels.section = localModelSection
 	m.localModels.action = localModelIdle
 

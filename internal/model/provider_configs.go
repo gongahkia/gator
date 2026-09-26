@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"os"
 	"strings"
-
 )
 
 func azureResponsesURL(configured string) (string, error) {

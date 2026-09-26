@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-
 )
 
 func key(config Config, provider Provider, environment string) (string, error) {
@@ -43,7 +42,6 @@ func kimiMessagesURL(baseURL string) string {
 	}
 	return baseURL + "/v1/messages"
 }
-
 
 func requireKey(value, environment string) error {
 	if strings.TrimSpace(value) == "" {

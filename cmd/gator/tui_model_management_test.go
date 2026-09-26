@@ -14,44 +14,6 @@ import (
 	"github.com/gongahkia/gator/internal/modelcatalog"
 )
 
-func TestTUIModelManagementRemovesClaudeCredentialFromAnthropicStore(t *testing.T) {
-	root := t.TempDir()
-	settings, err := config.New(filepath.Join(root, "config"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	stateDir := filepath.Join(root, "state")
-	credentials, err := auth.New(stateDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := credentials.Put("anthropic", auth.Credential{Type: "api_key", Key: "secret-anthropic"}); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("ANTHROPIC_API_KEY", "env-key")
-	backend := newTUIModelManagementBackend(settings, stateDir)
-	result, err := backend.RemoveCredential("claude")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !result.Removed || result.StoreKey != "anthropic" || result.Kind != "API key" {
-		t.Fatalf("result = %#v", result)
-	}
-	if len(result.RemainingSources) != 1 || result.RemainingSources[0] != "ANTHROPIC_API_KEY" {
-		t.Fatalf("remaining = %#v", result.RemainingSources)
-	}
-	if _, found, err := credentials.Read("anthropic"); err != nil || found {
-		t.Fatalf("anthropic credential remains found=%v err=%v", found, err)
-	}
-	notice := describeCredentialRemoval(result)
-	if strings.Contains(notice, "env-key") || strings.Contains(notice, "secret-anthropic") {
-		t.Fatalf("removal notice leaked a secret: %q", notice)
-	}
-	if !strings.Contains(notice, "ANTHROPIC_API_KEY") {
-		t.Fatalf("removal notice omitted remaining source: %q", notice)
-	}
-}
-
 func TestTUIModelManagementCredentialRemovalIsIdempotent(t *testing.T) {
 	root := t.TempDir()
 	settings, err := config.New(filepath.Join(root, "config"))
@@ -161,30 +123,6 @@ func TestModelCatalogClientRejectsOffOriginRedirect(t *testing.T) {
 	_, err := discoverModels(config.CustomProvider{ID: "team-gateway", BaseURL: origin.URL + "/v1/chat/completions"})
 	if err == nil || !strings.Contains(err.Error(), "off origin") {
 		t.Fatalf("redirect error = %v", err)
-	}
-}
-
-func TestLogoutClaudeRemovesAnthropicKey(t *testing.T) {
-	t.Setenv("GATOR_STATE_DIR", t.TempDir())
-	credentials, err := gatorCredentials()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := credentials.Put("anthropic", auth.Credential{Type: "api_key", Key: "claude-secret"}); err != nil {
-		t.Fatal(err)
-	}
-	var output strings.Builder
-	if err := logout([]string{"claude"}, &output); err != nil {
-		t.Fatal(err)
-	}
-	if _, found, err := credentials.Read("anthropic"); err != nil || found {
-		t.Fatalf("anthropic key remains found=%v err=%v", found, err)
-	}
-	if strings.Contains(output.String(), "claude-secret") {
-		t.Fatalf("logout leaked secret: %q", output.String())
-	}
-	if !strings.Contains(output.String(), "Removed the Gator API key for claude") {
-		t.Fatalf("logout output = %q", output.String())
 	}
 }
 

@@ -56,10 +56,11 @@ func TestPanelCloseCancelsPendingRefresh(t *testing.T) {
 }
 
 func TestPanelConfirmationRemainsVisibleInShortTerminal(t *testing.T) {
-	panel := NewModelCatalogPanel(Config{LocalModels: &fakeLocalManager{}})
+	panel := NewModelCatalogPanel(Config{LocalModels: &fakeLocalManager{catalog: LocalCatalog{RuntimeVersion: "fixture", Models: []LocalModel{{Name: "General Work Model", Category: "General Work"}}}}})
 	defer panel.Close()
 	panel.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 	panel.model.localModels.section = localModelSection
+	panel.model.screen = localModelsScreen
 	panel.model.localModels.catalog = LocalCatalog{RuntimeVersion: "fixture", Models: []LocalModel{{
 		ID: "fixture", Name: "Reviewed model", Download: "398 MB", SourceURL: "https://ollama.com/library/qwen2.5-coder",
 	}}}
@@ -78,19 +79,40 @@ func TestPanelUsesWorkVisualLanguage(t *testing.T) {
 	panel.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	panel.model.localModels.action = localModelIdle
 	panel.model.localModels.section = cloudModelSection
+	panel.model.screen = localModelsScreen
 	panel.model.notice = notice{}
 
 	view := panel.View()
 	plain := ansi.Strip(view)
-	for _, required := range []string{"Models", "Cloud", "Local", "gemini", "↑/↓ choose", "esc back", "f1 help"} {
+	for _, required := range []string{"Cloud API key", "gemini", "↑/↓ choose", "esc setup choice", "f1 help"} {
 		if !strings.Contains(plain, required) {
 			t.Fatalf("work-native model panel omitted %q:\n%s", required, plain)
 		}
 	}
-	for _, legacy := range []string{"🐊 Gator  models · gator", "Tab: Cloud / Local", "Readiness is credential/configuration state only", "Cloud models"} {
+	for _, legacy := range []string{"🐊 Gator  models · gator", "Tab: Cloud / Local", "Readiness is credential/configuration state only", "Cloud models", "sign in"} {
 		if strings.Contains(plain, legacy) {
 			t.Fatalf("model panel retained legacy chrome %q:\n%s", legacy, plain)
 		}
+	}
+}
+
+func TestPanelStartsWithLocalOrCloudAPIKeyChoice(t *testing.T) {
+	panel := NewModelCatalogPanel(Config{LocalModels: &fakeLocalManager{}})
+	defer panel.Close()
+	panel.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+	panel.Init()
+	panel.model.localModels.catalog = LocalCatalog{RuntimeVersion: "fixture", Models: []LocalModel{{Name: "General Work Model", Category: "General Work"}}}
+	plain := ansi.Strip(panel.View())
+	for _, required := range []string{"Cloud API key", "Local model", "enter continue"} {
+		if !strings.Contains(plain, required) {
+			t.Fatalf("choice omitted %q:\n%s", required, plain)
+		}
+	}
+	panel.Update(tea.KeyMsg{Type: tea.KeyDown})
+	panel.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	plain = ansi.Strip(panel.View())
+	if !strings.Contains(plain, "Recommended for general Work") {
+		t.Fatalf("local selection did not open local catalog:\n%s", plain)
 	}
 }
 
@@ -100,6 +122,7 @@ func TestPanelPlacesGeneralWorkModelsBeforeCodingModels(t *testing.T) {
 	panel.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	panel.model.localModels.action = localModelIdle
 	panel.model.localModels.section = localModelSection
+	panel.model.screen = localModelsScreen
 	panel.model.localModels.catalog = LocalCatalog{RuntimeVersion: "fixture", Models: []LocalModel{
 		{ID: "work", Category: "General Work", Name: "General Work Model", Download: "5.2 GB"},
 		{ID: "code", Category: "Coding", Name: "Coding Model", Download: "4.7 GB"},

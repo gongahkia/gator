@@ -41,11 +41,11 @@ type cloudModelSetupForm struct {
 }
 
 type cloudModelSetupSavedMsg struct {
-	provider        string
-	model           string
-	baseURL         string
-	options         map[string]string
-	err             error
+	provider string
+	model    string
+	baseURL  string
+	options  map[string]string
+	err      error
 }
 
 func (m Model) beginCloudModelSetup() (tea.Model, tea.Cmd) {
@@ -245,11 +245,11 @@ func (m Model) saveCloudModelSetup() (tea.Model, tea.Cmd) {
 	return m, func() tea.Msg {
 		err := m.config.SaveCloudModel(setup)
 		return cloudModelSetupSavedMsg{
-			provider:        setup.Provider,
-			model:           setup.Model,
-			baseURL:         setup.BaseURL,
-			options:         cloneProviderOptions(setup.Options),
-			err:             err,
+			provider: setup.Provider,
+			model:    setup.Model,
+			baseURL:  setup.BaseURL,
+			options:  cloneProviderOptions(setup.Options),
+			err:      err,
 		}
 	}
 }

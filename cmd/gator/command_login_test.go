@@ -6,54 +6,38 @@ import (
 	"testing"
 )
 
-func TestLoginStoresAzureResponsesBearerTokenFromEnvironment(t *testing.T) {
+func TestLoginStoresAPIKeyFromEnvironment(t *testing.T) {
 	t.Setenv("GATOR_STATE_DIR", t.TempDir())
-	t.Setenv("AZURE_OPENAI_AUTH_TOKEN", "entra-token")
+	t.Setenv("AZURE_OPENAI_API_KEY", "azure-key")
 	var output bytes.Buffer
-	if err := login([]string{"azure-openai-responses", "--bearer-token-from-env", "AZURE_OPENAI_AUTH_TOKEN"}, &output); err != nil {
+	if err := login([]string{"azure-openai-responses", "--from-env", "AZURE_OPENAI_API_KEY"}, &output); err != nil {
 		t.Fatalf("login: %v", err)
 	}
 	credentials, err := gatorCredentials()
 	if err != nil {
-		t.Fatalf("credentials: %v", err)
+		t.Fatal(err)
 	}
 	stored, found, err := credentials.Read("azure-openai-responses")
-	if err != nil || !found || !stored.IsBearerToken() || stored.Access != "entra-token" {
-		t.Fatalf("stored credential = %#v, found=%v, err=%v", stored, found, err)
+	if err != nil || !found || !stored.IsAPIKey() || stored.Key != "azure-key" {
+		t.Fatalf("stored credential = %#v found=%v err=%v", stored, found, err)
 	}
-	if strings.Contains(output.String(), "entra-token") {
-		t.Fatalf("login output leaked bearer token: %q", output.String())
+	if strings.Contains(output.String(), "azure-key") {
+		t.Fatalf("login output leaked API key: %q", output.String())
 	}
 }
 
 func TestLoginRejectsMixedCredentialModes(t *testing.T) {
 	var output bytes.Buffer
-	err := login([]string{"azure-openai-responses", "--api-key", "api-key", "--bearer-token", "entra-token"}, &output)
+	err := login([]string{"openai", "--api-key", "api-key", "--from-env", "OPENAI_API_KEY"}, &output)
 	if err == nil || !strings.Contains(err.Error(), "only one") {
 		t.Fatalf("mixed login modes error = %v", err)
 	}
 }
 
-func TestLoginRejectsPromptCombinedWithAnotherCredentialMode(t *testing.T) {
+func TestLoginRejectsRemovedSubscriptionProvider(t *testing.T) {
 	var output bytes.Buffer
-	err := login([]string{"openai", "--prompt", "--api-key", "api-key"}, &output)
-	if err == nil || !strings.Contains(err.Error(), "only one") {
-		t.Fatalf("mixed prompt login modes error = %v", err)
-	}
-}
-
-func TestOAuthLoginRejectsPromptMode(t *testing.T) {
-	var output bytes.Buffer
-	err := login([]string{"codex", "--prompt"}, &output)
-	if err == nil || !strings.Contains(err.Error(), "subscription OAuth") || !strings.Contains(err.Error(), "--prompt") {
-		t.Fatalf("OAuth prompt error = %v", err)
-	}
-}
-
-func TestLoginRejectsClaudeAISubscriptionOAuth(t *testing.T) {
-	var output bytes.Buffer
-	err := login([]string{"claude"}, &output)
-	if err == nil || !strings.Contains(err.Error(), "not a supported Gator provider login") || !strings.Contains(err.Error(), "gator provider claude") {
-		t.Fatalf("Claude login error = %v", err)
+	err := login([]string{"codex", "--api-key", "must-not-store"}, &output)
+	if err == nil || !strings.Contains(err.Error(), "unknown provider") {
+		t.Fatalf("removed provider error = %v", err)
 	}
 }

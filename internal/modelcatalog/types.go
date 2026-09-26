@@ -123,9 +123,9 @@ type CustomProviderDiscovery struct {
 // CloudModelSetup crosses the UI/command boundary only while a save is in
 // progress. APIKey must never be rendered, drafted, or included in completion.
 type CloudModelSetup struct {
-	Provider        string
-	Model           string
-	BaseURL         string
-	Options         map[string]string
-	APIKey          string
+	Provider string
+	Model    string
+	BaseURL  string
+	Options  map[string]string
+	APIKey   string
 }
