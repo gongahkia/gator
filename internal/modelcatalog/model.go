@@ -116,6 +116,8 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateLocalProgress(msg)
 	case localModelDoneMsg:
 		return m.updateLocalModelDone(msg)
+	case localInstallationDoneMsg:
+		return m.updateLocalInstallationDone(msg)
 	}
 	return m, nil
 }

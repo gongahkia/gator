@@ -298,7 +298,7 @@ func (p *ModelCatalogPanel) focusedView() string {
 		footer = "enter save  ·  esc cancel"
 	case state.dependencyHelp:
 		body = model.localDependencyHelpView()
-		footer = "i/esc close help"
+		footer = "enter review installation  ·  i/esc close help"
 	}
 	sections = append(sections, body)
 	if notice := p.notice(); notice != "" {
@@ -348,6 +348,8 @@ func (p *ModelCatalogPanel) confirmationFooter(confirmation localModelConfirmati
 		return "enter/y start with Gator  ·  n/esc start myself"
 	case localModelConfirmInstall:
 		return "enter/y installation help  ·  n/esc install myself"
+	case localModelConfirmRunInstallation:
+		return "enter/y run shown action  ·  n/esc cancel"
 	case localModelConfirmPull:
 		return "enter/y download  ·  esc/n cancel"
 	default:

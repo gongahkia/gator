@@ -179,6 +179,37 @@ func TestLocalModelPullAndUseUpdateTheActiveSelection(t *testing.T) {
 	}
 }
 
+func TestInstallationHelpReviewsTheOfficialActionBeforeRunningIt(t *testing.T) {
+	manager := &installationLocalManager{fakeLocalManager: fakeLocalManager{catalog: LocalCatalog{Dependencies: []LocalDependency{{
+		ID: "ollama", Name: "Ollama", Purpose: "reviewed local models", Required: true, HelpURL: "https://ollama.com/download",
+	}}}}}
+	m := newModel(Config{LocalModels: manager})
+	m.screen = localModelsScreen
+	m.localModels.section = localModelSection
+	m.localModels.catalog = manager.catalog
+	m.localModels.dependencyHelp = true
+
+	next, command := m.updateLocalModels(tea.KeyMsg{Type: tea.KeyEnter})
+	if command != nil {
+		t.Fatal("reviewing an installation action unexpectedly started a process")
+	}
+	m = next.(Model)
+	if m.localModels.confirmation != localModelConfirmRunInstallation || m.localModels.installation == nil {
+		t.Fatalf("installation action was not held for confirmation: %#v", m.localModels)
+	}
+	view := m.modelCatalogConfirmationView()
+	for _, expected := range []string{"Run Ollama installer?", "curl -fsSL https://ollama.com/install.sh | sh", "Review the exact official action"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("installation review omitted %q:\n%s", expected, view)
+		}
+	}
+	next, _ = m.updateLocalModels(tea.KeyMsg{Type: tea.KeyEsc})
+	m = next.(Model)
+	if m.localModels.confirmation != localModelNoConfirmation || m.localModels.installation != nil {
+		t.Fatal("cancelling an installation review retained an executable action")
+	}
+}
+
 func selectCloudProvider(t *testing.T, m Model, provider string) Model {
 	t.Helper()
 	for index, entry := range m.cloudModels() {
@@ -234,6 +265,19 @@ type lifecycleLocalManager struct {
 	catalog LocalCatalog
 	pulled  bool
 	used    bool
+}
+
+type installationLocalManager struct{ fakeLocalManager }
+
+func (*installationLocalManager) InstallationPlan() (LocalInstallationPlan, error) {
+	return LocalInstallationPlan{
+		Title:          "Run Ollama installer?",
+		Detail:         "Downloads and runs Ollama's official installer.",
+		DisplayCommand: "curl -fsSL https://ollama.com/install.sh | sh",
+		Command:        "sh",
+		Arguments:      []string{"-c", "curl -fsSL https://ollama.com/install.sh | sh"},
+		RefreshAfter:   true,
+	}, nil
 }
 
 func (m *lifecycleLocalManager) Status(context.Context) (LocalCatalog, error) { return m.catalog, nil }

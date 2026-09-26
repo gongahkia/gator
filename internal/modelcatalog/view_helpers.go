@@ -38,7 +38,15 @@ func (m Model) modelCatalogConfirmationView() string {
 	case localModelConfirmStart:
 		return m.fieldView("Start Ollama?", "Gator can start 'ollama serve' as a child of this TUI and stops it when Gator exits. You can instead start it yourself.", "Enter/y  Start with Gator (default)\nn/esc  I'll start it myself")
 	case localModelConfirmInstall:
-		return m.fieldView("Install Ollama?", "Ollama is not installed. Gator can show the official source and platform advice; it never runs a system installer or package manager.", "Enter/y  Open installation help (default)\nn/esc  I'll install it myself")
+		return m.fieldView("Install Ollama?", "Ollama is not installed. Gator can show a reviewed official installation action before it runs anything.", "Enter/y  Review installation help (default)\nn/esc  I'll install it myself")
+	case localModelConfirmRunInstallation:
+		if plan := m.localModels.installation; plan != nil {
+			detail := plan.Detail
+			if plan.DisplayCommand != "" {
+				detail += "\n\nCommand:\n" + plan.DisplayCommand
+			}
+			return m.fieldView(plan.Title, "Review the exact official action before confirming it. It may ask for your system password.", wrapText(detail, m.inlineWidth()))
+		}
 	case localModelConfirmPull:
 		if selected, found := m.selectedLocalModel(); found {
 			return m.fieldView("Confirm download", "Model weights and upstream terms remain governed by the linked source.", selected.Name+" · approximately "+selected.Download+"\n"+selected.SourceURL)
@@ -90,7 +98,47 @@ func (m Model) localDependencyHelpView() string {
 			lines = append(lines, "  "+instruction)
 		}
 	}
-	return m.fieldView("Installation help", "Gator detected these prerequisites as missing. It provides checked-in guidance but does not execute system installers or package managers.", strings.Join(lines, "\n"))
+	if plan, err := m.localInstallationPlan(); err == nil && plan.Command != "" {
+		lines = append(lines, "", "Available through Gator after review:", "  "+plan.Detail)
+		if plan.DisplayCommand != "" {
+			lines = append(lines, "  "+plan.DisplayCommand)
+		}
+		return m.fieldView("Installation help", "Gator found a platform-specific official action. Press Enter to review it before anything runs.", wrapText(strings.Join(lines, "\n"), m.inlineWidth()))
+	}
+	return m.fieldView("Installation help", "Gator detected these prerequisites as missing. Use the official source shown here, install Ollama, then press r to refresh.", wrapText(strings.Join(lines, "\n"), m.inlineWidth()))
+}
+
+func (m Model) localInstallationPlan() (LocalInstallationPlan, error) {
+	installer, ok := m.localModels.manager.(LocalInstaller)
+	if !ok {
+		return LocalInstallationPlan{}, nil
+	}
+	return installer.InstallationPlan()
+}
+
+func wrapText(value string, width int) string {
+	if width < 8 {
+		return value
+	}
+	lines := strings.Split(value, "\n")
+	wrapped := make([]string, 0, len(lines))
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			wrapped = append(wrapped, "")
+			continue
+		}
+		for len(line) > width {
+			breakAt := strings.LastIndex(line[:width+1], " ")
+			if breakAt <= 0 {
+				breakAt = width
+			}
+			wrapped = append(wrapped, strings.TrimSpace(line[:breakAt]))
+			line = strings.TrimSpace(line[breakAt:])
+		}
+		wrapped = append(wrapped, line)
+	}
+	return strings.Join(wrapped, "\n")
 }
 
 func compact(value string, limit int) string {

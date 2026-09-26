@@ -32,6 +32,7 @@ const (
 	localModelConfirmRemoveCustom
 	localModelConfirmSaveCustom
 	localModelConfirmApplyDiscovery
+	localModelConfirmRunInstallation
 )
 
 type localModelOperation struct {
@@ -63,6 +64,11 @@ type localModelDoneMsg struct {
 	done      localModelOperationDone
 }
 
+type localInstallationDoneMsg struct {
+	plan LocalInstallationPlan
+	err  error
+}
+
 type localModelsState struct {
 	manager        LocalManager
 	catalog        LocalCatalog
@@ -85,6 +91,7 @@ type localModelsState struct {
 	credentials    map[string]StoredCredentialStatus
 	startDismissed bool
 	dependencyHelp bool
+	installation   *LocalInstallationPlan
 }
 
 type modelCatalogSection uint8

@@ -143,6 +143,42 @@ func (manager *localModelManager) ollamaPath() (string, error) {
 	return exec.LookPath("ollama")
 }
 
+// InstallationPlan returns a platform-specific action from Ollama's official
+// download path. The TUI shows the exact command and requires a separate
+// confirmation before it runs. It deliberately does not guess a distribution
+// package manager or accept an arbitrary shell command from configuration.
+func (manager *localModelManager) InstallationPlan() (modelcatalog.LocalInstallationPlan, error) {
+	if binary, err := manager.ollamaPath(); err == nil {
+		return modelcatalog.LocalInstallationPlan{}, fmt.Errorf("Ollama is already installed at %s", binary)
+	}
+	return ollamaInstallationPlan(runtime.GOOS)
+}
+
+func ollamaInstallationPlan(osName string) (modelcatalog.LocalInstallationPlan, error) {
+	switch osName {
+	case "linux":
+		return modelcatalog.LocalInstallationPlan{
+			Title:          "Run Ollama's official Linux installer?",
+			Detail:         "Downloads and runs Ollama's official Linux installer in this terminal.",
+			DisplayCommand: "curl -fsSL https://ollama.com/install.sh | sh",
+			Command:        "sh",
+			Arguments:      []string{"-c", "curl -fsSL https://ollama.com/install.sh | sh"},
+			RefreshAfter:   true,
+		}, nil
+	case "darwin":
+		return modelcatalog.LocalInstallationPlan{
+			Title:          "Open Ollama's official macOS download page?",
+			Detail:         "Opens Ollama's official macOS download page. Complete the system installer, then return to Gator.",
+			DisplayCommand: "open https://ollama.com/download/mac",
+			Command:        "open",
+			Arguments:      []string{"https://ollama.com/download/mac"},
+			RefreshAfter:   false,
+		}, nil
+	default:
+		return modelcatalog.LocalInstallationPlan{}, fmt.Errorf("Gator's reviewed local-model catalog currently supports Linux and macOS; install Ollama from https://ollama.com/download for %s", osName)
+	}
+}
+
 func (manager *localModelManager) startRuntime(binary string) (*managedLocalRuntime, error) {
 	manager.runtimeMu.Lock()
 	defer manager.runtimeMu.Unlock()
@@ -465,3 +501,4 @@ func modelDisplayName(settings config.Settings, provider, model, fallback string
 }
 
 var _ modelcatalog.LocalManager = (*localModelManager)(nil)
+var _ modelcatalog.LocalInstaller = (*localModelManager)(nil)

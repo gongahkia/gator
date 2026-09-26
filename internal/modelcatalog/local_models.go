@@ -2,6 +2,7 @@ package modelcatalog
 
 import (
 	"context"
+	"os/exec"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -93,6 +94,8 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "esc", "i":
 			m.localModels.dependencyHelp = false
 			m.notice = notice{text: "Installation help closed.", kind: noticeInfo}
+		case "enter", "y":
+			return m.prepareLocalInstallation()
 		}
 		return m, nil
 	}
@@ -259,7 +262,7 @@ func (m Model) updateLocalModelConfirmation(message tea.KeyMsg) (tea.Model, tea.
 			m.localModels.confirmation = localModelNoConfirmation
 			m.localModels.startDismissed = true
 			m.localModels.dependencyHelp = true
-			m.notice = notice{text: "Installation help is open. Gator does not run system installers or package managers.", kind: noticeInfo}
+			m.notice = notice{text: "Review the official Ollama installation action, then confirm before it runs.", kind: noticeInfo}
 		}
 		return m, nil
 	}
@@ -281,6 +284,7 @@ func (m Model) updateLocalModelConfirmation(message tea.KeyMsg) (tea.Model, tea.
 	case "esc", "n", "ctrl+c":
 		confirmation := m.localModels.confirmation
 		m.localModels.confirmation = localModelNoConfirmation
+		m.localModels.installation = nil
 		m.localModels.pendingCustom = nil
 		m.localModels.discovery = nil
 		switch confirmation {
@@ -322,8 +326,39 @@ func (m Model) updateLocalModelConfirmation(message tea.KeyMsg) (tea.Model, tea.
 			return m.saveReviewedCustomProvider()
 		case localModelConfirmApplyDiscovery:
 			return m.applyCustomProviderDiscovery()
+		case localModelConfirmRunInstallation:
+			plan := m.localModels.installation
+			m.localModels.installation = nil
+			if plan == nil || plan.Command == "" {
+				m.notice = notice{text: "Ollama installation action is no longer available. Open installation help again.", kind: noticeError}
+				return m, nil
+			}
+			command := exec.Command(plan.Command, plan.Arguments...)
+			return m, tea.ExecProcess(command, func(err error) tea.Msg {
+				return localInstallationDoneMsg{plan: *plan, err: err}
+			})
 		}
 	}
+	return m, nil
+}
+
+func (m Model) prepareLocalInstallation() (tea.Model, tea.Cmd) {
+	installer, ok := m.localModels.manager.(LocalInstaller)
+	if !ok {
+		m.notice = notice{text: "This Gator build cannot launch an Ollama installer. Use the official source shown here, then press r to refresh.", kind: noticeInfo}
+		return m, nil
+	}
+	plan, err := installer.InstallationPlan()
+	if err != nil {
+		m.notice = notice{text: "Prepare Ollama installation: " + err.Error(), kind: noticeError}
+		return m, nil
+	}
+	if plan.Command == "" {
+		m.notice = notice{text: "No safe Ollama installation action is available on this host. Use the official source shown here.", kind: noticeInfo}
+		return m, nil
+	}
+	m.localModels.installation = &plan
+	m.localModels.confirmation = localModelConfirmRunInstallation
 	return m, nil
 }
 

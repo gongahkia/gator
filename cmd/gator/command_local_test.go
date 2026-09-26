@@ -266,6 +266,20 @@ func TestLocalModelManagerStartExplainsWhenOllamaIsNotInstalled(t *testing.T) {
 	}
 }
 
+func TestOllamaInstallationPlansUseOfficialPlatformActions(t *testing.T) {
+	linux, err := ollamaInstallationPlan("linux")
+	if err != nil || linux.Command != "sh" || linux.DisplayCommand != "curl -fsSL https://ollama.com/install.sh | sh" || !linux.RefreshAfter {
+		t.Fatalf("linux installation plan = %#v, err=%v", linux, err)
+	}
+	mac, err := ollamaInstallationPlan("darwin")
+	if err != nil || mac.Command != "open" || mac.Arguments[0] != "https://ollama.com/download/mac" || mac.RefreshAfter {
+		t.Fatalf("macOS installation plan = %#v, err=%v", mac, err)
+	}
+	if _, err := ollamaInstallationPlan("windows"); err == nil || !strings.Contains(err.Error(), "Linux and macOS") {
+		t.Fatalf("unsupported platform plan error = %v", err)
+	}
+}
+
 func useGenerousLocalModelHost(t *testing.T) {
 	t.Helper()
 	previous := inspectLocalModelHost

@@ -185,3 +185,18 @@ func (m Model) updateLocalModelDone(msg localModelDoneMsg) (tea.Model, tea.Cmd) 
 	}
 	return m, nil
 }
+
+func (m Model) updateLocalInstallationDone(msg localInstallationDoneMsg) (tea.Model, tea.Cmd) {
+	m.localModels.installation = nil
+	if msg.err != nil {
+		m.notice = notice{text: "Ollama installation did not finish: " + msg.err.Error(), kind: noticeError}
+		return m, nil
+	}
+	if !msg.plan.RefreshAfter {
+		m.notice = notice{text: "Opened the official Ollama download page. Complete the installer, return here, then press r to refresh.", kind: noticeInfo}
+		return m, nil
+	}
+	m.localModels.startDismissed = false
+	m.notice = notice{text: "Ollama installer finished. Checking the local runtime now.", kind: noticeInfo}
+	return m.beginLocalStatus()
+}
