@@ -1,9 +1,17 @@
 # Learning evaluation fixture workflow
 
-This deterministic corpus evaluates whether active scoped learnings reach a
-future Work request and whether inactive, reversed, conflicting, or unrelated
-learnings do not. Development cases are the normal iteration set; held-out
-cases require an explicit selection.
+This deterministic corpus evaluates whether active scoped learnings change a
+future Work result and whether inactive, reversed, conflicting, or unrelated
+learnings do not. Every probe executes the normal Work agent loop: a
+deterministic model receives the ordinary Work system/user context, writes a
+sealed `decision.txt` artifact through the normal artifact tool, and the
+evaluator grades the artifact's observed behavior. It never gives the model
+the learning store or fixture identity directly.
+
+Failure-prevention cases currently evaluate the generated verification plan,
+not host-side verification execution: learnings are prompt context and do not
+yet modify deterministic `codeexec` verification policy. Development cases are
+the normal iteration set; held-out cases require an explicit selection.
 
 To turn a real failure into a regression case:
 

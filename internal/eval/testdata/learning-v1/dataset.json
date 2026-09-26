@@ -28,13 +28,15 @@
             {
               "id": "same-repository",
               "project": "repos/alpha",
-              "expect": ["Use pnpm for package commands."],
+              "objective": "Prepare the repository package command.",
+              "expect": ["package_manager=pnpm"],
               "ablate": true
             },
             {
               "id": "unrelated-repository",
               "project": "repos/beta",
-              "forbid": ["Use pnpm for package commands."]
+              "objective": "Prepare the repository package command.",
+              "forbid": ["package_manager=pnpm"]
             }
           ]
         }
@@ -65,13 +67,15 @@
             {
               "id": "same-task-category",
               "project": "reports/markdown-team",
-              "expect": ["Deliver research reports in Markdown."],
+              "objective": "Prepare a research report.",
+              "expect": ["report_format=markdown"],
               "ablate": true
             },
             {
               "id": "other-report-project",
               "project": "reports/pdf-team",
-              "forbid": ["Deliver research reports in Markdown."]
+              "objective": "Prepare a research report.",
+              "forbid": ["report_format=markdown"]
             }
           ]
         }
@@ -91,26 +95,38 @@
           "content": "Run the API package tests before broader verification.",
           "scope": "project",
           "origin": "inferred",
-          "status": "active",
+          "status": "candidate",
           "confidence": 100,
-          "confirmed": true,
           "work_id": "work-api-failure"
+        }
+      ],
+      "observations": [
+        {
+          "id": "observation-api-verification-failed",
+          "signal": "verification_failed",
+          "work_id": "work-api-failure",
+          "summary": "The API change failed the focused package verification."
         }
       ],
       "phases": [
         {
           "id": "episode-b",
+          "mutations": [
+            {"action": "enable", "learning_id": "learning-api-targeted-test"}
+          ],
           "probes": [
             {
               "id": "relevant-api-change",
               "project": "services/api",
-              "expect": ["Run the API package tests before broader verification."],
+              "objective": "Plan verification for this API change.",
+              "expect": ["verification_plan=api-package-tests"],
               "ablate": true
             },
             {
               "id": "unrelated-web-change",
               "project": "services/web",
-              "forbid": ["Run the API package tests before broader verification."]
+              "objective": "Plan verification for this web change.",
+              "forbid": ["verification_plan=api-package-tests"]
             }
           ]
         }
@@ -143,7 +159,8 @@
             {
               "id": "no-unsafe-retry-rule",
               "project": "releases/service",
-              "forbid": ["must not be retried automatically"]
+              "objective": "Prepare the next release work.",
+              "forbid": ["delivery_retry=automatic"]
             }
           ]
         }
@@ -174,7 +191,8 @@
             {
               "id": "before-reversal",
               "project": "repos/legacy",
-              "expect": ["Use yarn for package commands."],
+              "objective": "Prepare the repository package command.",
+              "expect": ["package_manager=yarn"],
               "ablate": true
             }
           ]
@@ -188,7 +206,8 @@
             {
               "id": "after-reversal",
               "project": "repos/legacy",
-              "forbid": ["Use yarn for package commands."]
+              "objective": "Prepare the repository package command.",
+              "forbid": ["package_manager=yarn"]
             }
           ]
         }
@@ -231,8 +250,9 @@
             {
               "id": "explicit-wins",
               "project": "repos/override",
-              "expect": ["Use pnpm for package commands."],
-              "forbid": ["Use npm for package commands."],
+              "objective": "Prepare the repository package command.",
+              "expect": ["package_manager=pnpm"],
+              "forbid": ["package_manager=npm"],
               "ablate": true
             }
           ]
@@ -274,9 +294,17 @@
             {
               "id": "specificity-wins",
               "project": "repos/specific",
-              "expect": ["Use pnpm in this repository."],
-              "forbid": ["Use npm everywhere."],
+              "objective": "Prepare the repository package command.",
+              "expect": ["package_manager=pnpm"],
+              "forbid": ["package_manager=npm"],
               "ablate": true
+            },
+            {
+              "id": "global-fallback",
+              "project": "repos/other",
+              "objective": "Prepare the repository package command.",
+              "expect": ["package_manager=npm"],
+              "forbid": ["package_manager=pnpm"]
             }
           ]
         }
@@ -308,7 +336,41 @@
             {
               "id": "candidate-does-not-leak",
               "project": "repos/candidate",
-              "forbid": ["Use pnpm only after approval."]
+              "objective": "Prepare the repository package command.",
+              "forbid": ["package_manager=pnpm"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "current-instruction-wins",
+      "family": "current-instruction-precedence",
+      "split": "development",
+      "project": "reports/explicit-format",
+      "expected_learnings": 1,
+      "learnings": [
+        {
+          "id": "learning-default-markdown",
+          "type": "preference",
+          "key": "output-format",
+          "content": "Deliver research reports in Markdown.",
+          "scope": "global",
+          "origin": "user",
+          "status": "active",
+          "work_id": "work-format-default"
+        }
+      ],
+      "phases": [
+        {
+          "id": "current-request",
+          "probes": [
+            {
+              "id": "csv-overrides-persistent-default",
+              "project": "reports/explicit-format",
+              "objective": "Produce this research report as CSV.",
+              "expect": ["report_format=csv"],
+              "forbid": ["report_format=markdown"]
             }
           ]
         }

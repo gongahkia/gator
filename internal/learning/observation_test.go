@@ -95,6 +95,9 @@ func TestCandidateApprovalRejectionAndRepeatedEvidenceRemainInspectable(t *testi
 	if _, err := store.Enable(rejected.ID); err == nil {
 		t.Fatal("rejected candidate was enabled")
 	}
+	if projected, err := store.Projection(Context{}); err != nil || len(projected) != 0 {
+		t.Fatalf("disabled or rejected learning still affects Work: %#v, %v", projected, err)
+	}
 }
 
 func TestFailureAndUnknownSignalsRemainDistinctAndNeverCreateRetryRule(t *testing.T) {
@@ -127,5 +130,28 @@ func TestFailureAndUnknownSignalsRemainDistinctAndNeverCreateRetryRule(t *testin
 	records, err := store.List()
 	if err != nil || len(records) != 0 {
 		t.Fatalf("operational failure created a learning: %#v, %v", records, err)
+	}
+}
+
+func TestFailureObservationCannotProposeCandidateWithoutExplicitCorrection(t *testing.T) {
+	store, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	observation, err := store.RecordObservation(ObservationInput{
+		Signal: VerificationFailed, WorkID: "work-verification-failed", Summary: "The focused verification failed.",
+		EvidenceRefs: []string{"gator/work-history/work-verification-failed.json"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Propose(Proposal{
+		Observation: observation, Type: FailurePrevention, Key: "focused-verification", Content: "Run focused verification.", Scope: Scope{Kind: Global},
+	}); err == nil || !strings.Contains(err.Error(), "explicit user correction") {
+		t.Fatalf("verification failure proposed a candidate without human correction: %v", err)
+	}
+	records, err := store.List()
+	if err != nil || len(records) != 0 {
+		t.Fatalf("failure observation silently created learning: %#v, %v", records, err)
 	}
 }

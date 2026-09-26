@@ -9,8 +9,11 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/delivery"
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
+	"github.com/gongahkia/gator/internal/learning"
+	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workrun"
 	"github.com/gongahkia/gator/internal/worksession"
 )
@@ -158,10 +161,13 @@ type Config struct {
 	MoveBack       func(conversationID string) (string, error)
 	MoveForward    func(conversationID string) (string, error)
 	MoveToRevision func(conversationID, revisionID string) (string, error)
-	History        func(conversationID string) (string, error)
-	// LearningAction uses the same local learning service as the CLI. It is a
-	// direct in-process callback, never a TUI shell-out to a command binary.
-	LearningAction func(arguments []string) (string, error)
+	// The History, Delivery, Learning, and Session stores are the canonical
+	// local product services. The TUI reads and mutates them directly; it never
+	// owns duplicate display state or shells out to the CLI.
+	HistoryStore  *workhistory.Store
+	DeliveryStore *delivery.Store
+	LearningStore *learning.Store
+	SessionStore  *worksession.Store
 	// FeedbackAction records explicit feedback against the current Work revision
 	// using the same local service as the Work CLI.
 	FeedbackAction func(workID string, arguments []string) (string, error)
@@ -271,6 +277,14 @@ type Model struct {
 	statusLineConfigured bool
 	statusLineDraft      []string
 	statusLineDraftSet   bool
+	historyItems         []historyItem
+	historyDetail        *historyDetail
+	historyFilter        workhistory.Status
+	learningItems        []learning.Record
+	learningDetail       *learning.Record
+	learningFilter       learning.Status
+	learningForm         *learningForm
+	sectionNotice        string
 }
 
 func New(config Config) Model {

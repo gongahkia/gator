@@ -21,6 +21,7 @@ import (
 	"github.com/gongahkia/gator/internal/delivery"
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
+	"github.com/gongahkia/gator/internal/learning"
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/workhistory"
@@ -56,6 +57,14 @@ func workInteractiveConversation(startConversationID string) error {
 		return err
 	}
 	history, err := workhistory.Open(stateDir)
+	if err != nil {
+		return err
+	}
+	deliveryStore, err := delivery.Open(stateDir)
+	if err != nil {
+		return err
+	}
+	learningStore, err := learning.Open(stateDir)
 	if err != nil {
 		return err
 	}
@@ -218,12 +227,10 @@ func workInteractiveConversation(startConversationID string) error {
 			}
 			return "", errors.New("selected revision is not a child of the current head")
 		},
-		History: func(conversationID string) (string, error) {
-			return workHistoryText(stateDir, history, conversationID)
-		},
-		LearningAction: func(arguments []string) (string, error) {
-			return learningTUIAction(stateDir, arguments)
-		},
+		HistoryStore:  &history,
+		DeliveryStore: &deliveryStore,
+		LearningStore: &learningStore,
+		SessionStore:  &sessions,
 		FeedbackAction: func(workID string, arguments []string) (string, error) {
 			return workFeedbackTUIAction(stateDir, workID, arguments)
 		},

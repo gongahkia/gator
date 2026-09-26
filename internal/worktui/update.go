@@ -9,6 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/learning"
 	"github.com/gongahkia/gator/internal/rattles"
 	"github.com/gongahkia/gator/internal/workrun"
 )
@@ -250,10 +251,7 @@ func (m Model) updateKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.updateLauncher(value)
 	}
 	if m.section != "" {
-		if value.String() == "esc" {
-			m.section = ""
-		}
-		return m, nil
+		return m.updateSectionKey(value)
 	}
 	if value.Type == tea.KeyCtrlG {
 		return m.openComposerEditor()
@@ -276,6 +274,111 @@ func (m Model) updateKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.updateRunningKey(value)
 	}
 	return m.updateComposerKey(value)
+}
+
+func (m Model) updateSectionKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch m.section {
+	case "history":
+		return m.updateHistorySectionKey(value)
+	case "learnings":
+		return m.updateLearningsSectionKey(value)
+	default:
+		if value.String() == "esc" {
+			m.section = ""
+		}
+		return m, nil
+	}
+}
+
+func (m Model) updateHistorySectionKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.historyDetail != nil {
+		switch value.String() {
+		case "esc", "backspace":
+			m.historyDetail, m.sectionNotice = nil, ""
+		case "r":
+			m.reviewHistoryDetail()
+		case "c":
+			m.resumeHistoryConversation()
+		}
+		return m, nil
+	}
+	switch value.String() {
+	case "esc":
+		m.section = ""
+	case "up":
+		if m.selected > 0 {
+			m.selected--
+		}
+	case "down":
+		if m.selected+1 < len(m.historyItems) {
+			m.selected++
+		}
+	case "enter":
+		m.selectHistoryItem()
+	case "f":
+		m.cycleHistoryFilter()
+	case "r":
+		selectedID := ""
+		if m.selected >= 0 && m.selected < len(m.historyItems) {
+			selectedID = m.historyItems[m.selected].Record.ID
+		}
+		m.refreshGlobalHistory(selectedID)
+	}
+	return m, nil
+}
+
+func (m Model) updateLearningsSectionKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.learningForm != nil {
+		return m.updateLearningFormKey(value)
+	}
+	if m.learningDetail != nil {
+		switch value.String() {
+		case "esc", "backspace":
+			m.learningDetail, m.sectionNotice = nil, ""
+		case "a":
+			if m.learningDetail.Status == learning.Candidate {
+				m.mutateLearning("approve")
+			} else if m.learningDetail.Status == learning.Disabled {
+				m.mutateLearning("enable")
+			} else {
+				m.sectionNotice = "Only a candidate can be approved or a disabled learning enabled."
+			}
+		case "d":
+			m.mutateLearning("disable")
+		case "r":
+			m.mutateLearning("reject")
+		case "e":
+			m.openEditLearning()
+		case "n":
+			m.openNewLearning()
+		}
+		return m, nil
+	}
+	switch value.String() {
+	case "esc":
+		m.section = ""
+	case "up":
+		if m.selected > 0 {
+			m.selected--
+		}
+	case "down":
+		if m.selected+1 < len(m.learningItems) {
+			m.selected++
+		}
+	case "enter":
+		m.selectLearningItem()
+	case "f":
+		m.cycleLearningFilter()
+	case "n":
+		m.openNewLearning()
+	case "r":
+		selectedID := ""
+		if m.selected >= 0 && m.selected < len(m.learningItems) {
+			selectedID = m.learningItems[m.selected].ID
+		}
+		m.refreshLearnings(selectedID)
+	}
+	return m, nil
 }
 
 func (m Model) updateRunningKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {

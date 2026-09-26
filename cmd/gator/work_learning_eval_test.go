@@ -13,7 +13,7 @@ func TestWorkLearningEvalUsesDevelopmentByDefaultAndWritesInspectableReport(t *t
 	if err := workEvalCommand([]string{"learning", "validate", path}, &output); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output.String(), "learning-effectiveness-v1: 8 valid learning cases") {
+	if !strings.Contains(output.String(), "learning-effectiveness-v1: 9 valid learning cases") {
 		t.Fatalf("validation output = %q", output.String())
 	}
 	reportDir := filepath.Join(t.TempDir(), "experiment")

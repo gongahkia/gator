@@ -160,6 +160,33 @@ func TestExplicitUserRuleOutranksConflictingInferredRule(t *testing.T) {
 	}
 }
 
+func TestDifferentKeysRemainDistinctWithoutSemanticConflictResolution(t *testing.T) {
+	store, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	project := t.TempDir()
+	for _, input := range []Create{
+		{ID: "learning-global-format", Type: Preference, Key: "report-default", Content: "Use Markdown for reports.", Scope: Scope{Kind: Global}, Origin: UserAuthored},
+		{ID: "learning-project-format", Type: Preference, Key: "report-exception", Content: "Use HTML for reports.", Scope: Scope{Kind: Project, Value: project}, Origin: UserAuthored},
+	} {
+		if _, err := store.Create(input); err != nil {
+			t.Fatal(err)
+		}
+	}
+	projected, err := store.Projection(Context{Project: project})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(projected) != 2 {
+		t.Fatalf("different keys unexpectedly received semantic conflict resolution: %#v", projected)
+	}
+	projection := RenderProjection(projected)
+	if !strings.Contains(projection, "Use Markdown for reports.") || !strings.Contains(projection, "Use HTML for reports.") {
+		t.Fatalf("conflicting different-key records were not both visible to Work: %q", projection)
+	}
+}
+
 func TestRejectAndRemoveKeepRecordsInspectable(t *testing.T) {
 	store, err := Open(t.TempDir())
 	if err != nil {

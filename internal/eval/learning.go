@@ -13,10 +13,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/learning"
+	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workrun"
 )
 
@@ -24,8 +24,8 @@ const LearningDatasetVersion = 1
 
 // LearningDataset is a small deterministic product-evaluation corpus. Its
 // cases state observable future-Work behavior rather than model-quality
-// assertions: which scoped context reaches a real Work request and which must
-// not. Held-out cases share the established Work-evaluation split values.
+// assertions. Every probe runs the Work agent loop with a deterministic model
+// that receives learning only through the normal system context.
 type LearningDataset struct {
 	Version int            `json:"version"`
 	ID      string         `json:"id"`
@@ -84,11 +84,12 @@ type LearningChange struct {
 // so a passing result describes a behavior change attributable to the active
 // learning rather than mere record presence.
 type LearningProbe struct {
-	ID      string   `json:"id"`
-	Project string   `json:"project"`
-	Expect  []string `json:"expect,omitempty"`
-	Forbid  []string `json:"forbid,omitempty"`
-	Ablate  bool     `json:"ablate,omitempty"`
+	ID        string   `json:"id"`
+	Project   string   `json:"project"`
+	Objective string   `json:"objective"`
+	Expect    []string `json:"expect,omitempty"`
+	Forbid    []string `json:"forbid,omitempty"`
+	Ablate    bool     `json:"ablate,omitempty"`
 }
 
 type LearningDiagnostic struct {
@@ -109,6 +110,10 @@ type LearningTrial struct {
 	LearningCount         int                  `json:"learning_count"`
 	RetainedLearningCount int                  `json:"retained_learning_count"`
 	ProvenanceWorkIDs     []string             `json:"provenance_work_ids,omitempty"`
+	WorkID                string               `json:"work_id,omitempty"`
+	ArtifactPath          string               `json:"artifact_path,omitempty"`
+	Output                string               `json:"output,omitempty"`
+	ControlOutput         string               `json:"control_output,omitempty"`
 	Ablated               bool                 `json:"ablated"`
 	Diagnostics           []LearningDiagnostic `json:"diagnostics,omitempty"`
 }
@@ -205,13 +210,18 @@ func validateLearningSeeds(item LearningCase) error {
 		}
 		probeIDs := map[string]bool{}
 		for _, probe := range phase.Probes {
-			if !identifierPattern.MatchString(probe.ID) || probeIDs[probe.ID] || !validLearningProject(probe.Project) || (len(probe.Expect) == 0 && len(probe.Forbid) == 0) || (probe.Ablate && len(probe.Expect) == 0) || !validProbeTerms(probe.Expect) || !validProbeTerms(probe.Forbid) {
+			if !identifierPattern.MatchString(probe.ID) || probeIDs[probe.ID] || !validLearningProject(probe.Project) || !validLearningObjective(probe.Objective) || (len(probe.Expect) == 0 && len(probe.Forbid) == 0) || (probe.Ablate && len(probe.Expect) == 0) || !validProbeTerms(probe.Expect) || !validProbeTerms(probe.Forbid) {
 				return errors.New("learning probe is invalid")
 			}
 			probeIDs[probe.ID] = true
 		}
 	}
 	return nil
+}
+
+func validLearningObjective(value string) bool {
+	value = strings.TrimSpace(value)
+	return value != "" && len(value) <= 4096 && !strings.ContainsRune(value, 0)
 }
 
 func validLearningType(value string) bool {
@@ -412,7 +422,7 @@ func runLearningProbe(ctx context.Context, state string, store learning.Store, i
 		trial.Diagnostics = append(trial.Diagnostics, LearningDiagnostic{Code: "setup_error", Message: err.Error()})
 		return trial
 	}
-	prompt, records, err := futureWorkPrompt(ctx, state, store, trial.ID, project)
+	result, records, err := futureWorkBehavior(ctx, state, store, trial.ID, project, probe.Objective)
 	trial.LearningCount = len(records)
 	for _, record := range records {
 		trial.ActiveLearningIDs = append(trial.ActiveLearningIDs, record.ID)
@@ -422,6 +432,9 @@ func runLearningProbe(ctx context.Context, state string, store learning.Store, i
 		trial.Diagnostics = append(trial.Diagnostics, LearningDiagnostic{Code: "work_probe_error", Message: err.Error()})
 		return trial
 	}
+	trial.WorkID = result.WorkID
+	trial.ArtifactPath = result.ArtifactPath
+	trial.Output = result.Output
 	retained, listErr := store.List()
 	if listErr != nil {
 		trial.Diagnostics = append(trial.Diagnostics, LearningDiagnostic{Code: "provenance_read_error", Message: listErr.Error()})
@@ -437,13 +450,13 @@ func runLearningProbe(ctx context.Context, state string, store learning.Store, i
 	}
 	sort.Strings(trial.ProvenanceWorkIDs)
 	for _, expected := range probe.Expect {
-		if !strings.Contains(prompt, expected) {
-			trial.Diagnostics = append(trial.Diagnostics, LearningDiagnostic{Code: "retention_missing", Message: fmt.Sprintf("expected active learning content %q was absent from future Work", expected)})
+		if !strings.Contains(trial.Output, expected) {
+			trial.Diagnostics = append(trial.Diagnostics, LearningDiagnostic{Code: "relevant_transfer", Message: fmt.Sprintf("expected behavior %q; observed %q", expected, trial.Output)})
 		}
 	}
 	for _, forbidden := range probe.Forbid {
-		if strings.Contains(prompt, forbidden) {
-			trial.Diagnostics = append(trial.Diagnostics, LearningDiagnostic{Code: "scope_leak", Message: fmt.Sprintf("learning content %q reached unrelated or inactive future Work", forbidden)})
+		if strings.Contains(trial.Output, forbidden) {
+			trial.Diagnostics = append(trial.Diagnostics, LearningDiagnostic{Code: "scope_leak", Message: fmt.Sprintf("forbidden behavior %q; observed %q", forbidden, trial.Output)})
 		}
 	}
 	if probe.Ablate {
@@ -458,12 +471,13 @@ func runLearningProbe(ctx context.Context, state string, store learning.Store, i
 				controlProject := filepath.Join(controlState, "sources", probe.Project)
 				if mkdirErr := os.MkdirAll(controlProject, 0o700); mkdirErr != nil {
 					trial.Diagnostics = append(trial.Diagnostics, LearningDiagnostic{Code: "control_setup_error", Message: mkdirErr.Error()})
-				} else if controlPrompt, _, controlErr := futureWorkPrompt(ctx, controlState, control, trial.ID+"-control", controlProject); controlErr != nil {
+				} else if controlResult, _, controlErr := futureWorkBehavior(ctx, controlState, control, trial.ID+"-control", controlProject, probe.Objective); controlErr != nil {
 					trial.Diagnostics = append(trial.Diagnostics, LearningDiagnostic{Code: "control_work_error", Message: controlErr.Error()})
 				} else {
+					trial.ControlOutput = controlResult.Output
 					for _, expected := range probe.Expect {
-						if strings.Contains(controlPrompt, expected) {
-							trial.Diagnostics = append(trial.Diagnostics, LearningDiagnostic{Code: "ablation_no_effect", Message: fmt.Sprintf("control without learning still contained %q", expected)})
+						if strings.Contains(controlResult.Output, expected) {
+							trial.Diagnostics = append(trial.Diagnostics, LearningDiagnostic{Code: "ablation_no_effect", Message: fmt.Sprintf("control without learning still produced %q: %q", expected, controlResult.Output)})
 						}
 					}
 				}
@@ -476,25 +490,141 @@ func runLearningProbe(ctx context.Context, state string, store learning.Store, i
 	return trial
 }
 
-func futureWorkPrompt(ctx context.Context, state string, store learning.Store, runID, project string) (string, []learning.Record, error) {
-	records, err := store.Projection(learning.Context{Project: project})
-	if err != nil {
-		return "", nil, err
-	}
-	model := &learningPromptModel{}
-	_, err = (workrun.Executor{Model: model, StateDir: state}).Execute(ctx, workrun.Request{
-		RunID: runID, SourcePath: project, Objective: "Inspect the selected project without changing it.",
-		Mode: action.Inspect, Contract: artifact.InspectionContract(), MaxSteps: 1,
-		LearningContext: learning.RenderProjection(records),
-	})
-	return model.system, records, err
+type learningBehaviorResult struct {
+	WorkID       string
+	ArtifactPath string
+	Output       string
 }
 
-type learningPromptModel struct{ system string }
+func futureWorkBehavior(ctx context.Context, state string, store learning.Store, runID, project, objective string) (learningBehaviorResult, []learning.Record, error) {
+	records, err := store.Projection(learning.Context{Project: project})
+	if err != nil {
+		return learningBehaviorResult{}, nil, err
+	}
+	model := &learningBehaviorModel{}
+	outcome, err := (workrun.Service{Executor: workrun.Executor{Model: model, StateDir: state}}).Execute(ctx, workrun.Request{
+		RunID: runID, SourcePath: project, Objective: objective,
+		Contract: artifact.DefaultContract("decision.txt"), MaxSteps: 3,
+		LearningContext: learning.RenderProjection(records),
+	})
+	if err != nil {
+		return learningBehaviorResult{}, records, err
+	}
+	output, err := outcome.Work.Output.ReadRegularFile("decision.txt", 64*1024)
+	if err != nil {
+		return learningBehaviorResult{}, records, err
+	}
+	history, err := workhistory.Open(state)
+	if err != nil {
+		return learningBehaviorResult{}, records, err
+	}
+	record, err := history.Load(outcome.RevisionID)
+	if err != nil {
+		return learningBehaviorResult{}, records, fmt.Errorf("load Work history: %w", err)
+	}
+	if record.RevisionID != outcome.RevisionID || record.Evidence.ArtifactManifestPath != outcome.Work.ManifestPath {
+		return learningBehaviorResult{}, records, errors.New("Work history does not reference the evaluated artifact")
+	}
+	return learningBehaviorResult{WorkID: outcome.RevisionID, ArtifactPath: "decision.txt", Output: string(output)}, records, nil
+}
 
-func (m *learningPromptModel) Complete(_ context.Context, request agent.TurnRequest) (agent.Turn, error) {
-	m.system = request.System
-	return agent.Turn{Text: "Inspection complete."}, nil
+// learningBehaviorModel is a deterministic stand-in for a model. It reads
+// only the system and user messages Work supplies; it does not receive a
+// learning store, learning records, or test-case identity. Its small policy is
+// intentionally generic so the evaluator can grade a sealed Work artifact.
+type learningBehaviorModel struct{ decision string }
+
+func (m *learningBehaviorModel) Complete(_ context.Context, request agent.TurnRequest) (agent.Turn, error) {
+	if m.decision == "" {
+		m.decision = learningBehaviorDecision(request.System, latestUserObjective(request.Messages))
+		arguments, err := json.Marshal(map[string]string{"path": "decision.txt", "content": m.decision})
+		if err != nil {
+			return agent.Turn{}, err
+		}
+		return agent.Turn{ToolCalls: []agent.ToolCall{{ID: "learning-decision", Name: "write_artifact", Arguments: arguments}}}, nil
+	}
+	return agent.Turn{Text: "Recorded " + m.decision + "."}, nil
+}
+
+func latestUserObjective(messages []agent.Message) string {
+	for index := len(messages) - 1; index >= 0; index-- {
+		if messages[index].Role == agent.RoleUser {
+			return messages[index].Content
+		}
+	}
+	return ""
+}
+
+func learningBehaviorDecision(system, objective string) string {
+	active := activeLearningContext(system)
+	return strings.Join([]string{
+		"package_manager=" + behaviorPackageManager(objective, active),
+		"report_format=" + behaviorReportFormat(objective, active),
+		"verification_plan=" + behaviorVerificationPlan(objective, active),
+		"delivery_retry=inspect-before-retry",
+	}, "; ")
+}
+
+func activeLearningContext(system string) string {
+	const marker = "Applicable active learnings:\n"
+	start := strings.Index(system, marker)
+	if start < 0 {
+		return ""
+	}
+	context := system[start+len(marker):]
+	if end := strings.Index(context, "\n\n"); end >= 0 {
+		context = context[:end]
+	}
+	return strings.ToLower(context)
+}
+
+func behaviorPackageManager(objective, active string) string {
+	if selected := packageManagerFrom(strings.ToLower(objective)); selected != "" {
+		return selected
+	}
+	if selected := packageManagerFrom(active); selected != "" {
+		return selected
+	}
+	return "npm"
+}
+
+func packageManagerFrom(value string) string {
+	for _, manager := range []string{"pnpm", "yarn", "bun", "npm"} {
+		if strings.Contains(value, manager) {
+			return manager
+		}
+	}
+	return ""
+}
+
+func behaviorReportFormat(objective, active string) string {
+	if selected := reportFormatFrom(strings.ToLower(objective)); selected != "" {
+		return selected
+	}
+	if selected := reportFormatFrom(active); selected != "" {
+		return selected
+	}
+	return "pdf"
+}
+
+func reportFormatFrom(value string) string {
+	for _, format := range []string{"csv", "markdown", "html", "pdf"} {
+		if strings.Contains(value, format) {
+			return format
+		}
+	}
+	return ""
+}
+
+func behaviorVerificationPlan(objective, active string) string {
+	value := strings.ToLower(objective + "\n" + active)
+	if strings.Contains(value, "api package tests") {
+		return "api-package-tests"
+	}
+	if strings.Contains(value, "web package tests") {
+		return "web-package-tests"
+	}
+	return "standard"
 }
 
 func LearningSummary(report LearningExperiment) string {

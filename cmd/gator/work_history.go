@@ -12,16 +12,6 @@ import (
 	"github.com/gongahkia/gator/internal/workhistory"
 )
 
-// workHistoryText is the shared presentation used by the Work CLI and the
-// active Work TUI. Querying remains in the UI-independent workhistory store.
-func workHistoryText(stateDir string, store workhistory.Store, conversationID string) (string, error) {
-	records, err := store.ListConversation(conversationID, 0)
-	if err != nil {
-		return "", err
-	}
-	return formatWorkHistory(stateDir, records)
-}
-
 func writeWorkHistory(out io.Writer, stateDir string, records []workhistory.Record) error {
 	text, err := formatWorkHistory(stateDir, records)
 	if err != nil {

@@ -2,13 +2,14 @@ package main
 
 import (
 	"bytes"
-	"path/filepath"
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/learning"
 	"github.com/gongahkia/gator/internal/workrun"
+	"github.com/gongahkia/gator/internal/worktui"
 )
 
 func TestLearningCLIProvidesUserControlOverSharedStore(t *testing.T) {
@@ -57,26 +58,6 @@ func TestLearningCLIProvidesUserControlOverSharedStore(t *testing.T) {
 	}
 }
 
-func TestLearningTUIActionUsesSameInProcessCommandAdapter(t *testing.T) {
-	state := t.TempDir()
-	project := t.TempDir()
-	text, err := learningTUIAction(state, []string{"add", "--type", "environment_fact", "--key", "toolchain", "--scope", "project=" + project, "Use", "Go", "tools."})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(text, "Added active learning") {
-		t.Fatalf("TUI action = %q", text)
-	}
-	store, err := learning.Open(state)
-	if err != nil {
-		t.Fatal(err)
-	}
-	records, err := store.List()
-	if err != nil || len(records) != 1 || records[0].Scope.Value != filepath.Clean(project) {
-		t.Fatalf("shared TUI store records = %#v, %v", records, err)
-	}
-}
-
 func TestLearningCLIListsFiltersAndApprovesCandidates(t *testing.T) {
 	state, project := t.TempDir(), t.TempDir()
 	t.Setenv("GATOR_STATE_DIR", state)
@@ -104,6 +85,52 @@ func TestLearningCLIListsFiltersAndApprovesCandidates(t *testing.T) {
 	record, err := store.Load("learning-candidate-filter")
 	if err != nil || record.Status != learning.Active || record.Provenance.UserConfirmedAt.IsZero() {
 		t.Fatalf("approved record = %#v, err = %v", record, err)
+	}
+}
+
+func TestLearningTUIAndCLIImmediatelyShareCanonicalState(t *testing.T) {
+	state, project := t.TempDir(), t.TempDir()
+	t.Setenv("GATOR_STATE_DIR", state)
+	store, err := learning.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidate, err := store.Create(learning.Create{ID: "learning-tui-cli", Type: learning.Preference, Key: "format", Content: "Use Markdown.", Scope: learning.Scope{Kind: learning.Project, Value: project}, Origin: learning.Inferred, Confidence: 80})
+	if err != nil {
+		t.Fatal(err)
+	}
+	model := worktui.New(worktui.Config{CurrentFolder: project, LearningStore: &store})
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlP})
+	model = updated.(worktui.Model)
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("learnings")})
+	model = updated.(worktui.Model)
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command != nil {
+		t.Fatal("opening Learnings scheduled external work")
+	}
+	model = updated.(worktui.Model)
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(worktui.Model)
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	model = updated.(worktui.Model)
+	if !strings.Contains(model.View(), "Status: active") {
+		t.Fatalf("TUI approval did not update learning detail:\n%s", model.View())
+	}
+	var output bytes.Buffer
+	if err := run([]string{"learnings", "show", candidate.ID}, &output); err != nil || !strings.Contains(output.String(), `"status":"active"`) {
+		t.Fatalf("CLI did not observe TUI approval: %q, %v", output.String(), err)
+	}
+	if err := run([]string{"learnings", "disable", candidate.ID}, &output); err != nil {
+		t.Fatal(err)
+	}
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model = updated.(worktui.Model)
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
+	model = updated.(worktui.Model)
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(worktui.Model)
+	if !strings.Contains(model.View(), "Status: disabled") {
+		t.Fatalf("TUI did not observe CLI mutation:\n%s", model.View())
 	}
 }
 

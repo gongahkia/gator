@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/gongahkia/gator/internal/learning"
 	"github.com/gongahkia/gator/internal/rattles"
 )
 
@@ -32,7 +33,7 @@ func (m Model) View() string {
 		return m.renderViewport(m.renderPalette(width, height, accent, dim, selectedStyle), width, height)
 	}
 	if m.section != "" {
-		return m.renderViewport(m.renderSection(width, accent, dim), width, height)
+		return m.renderViewport(m.renderSection(width, height, accent, dim, selectedStyle), width, height)
 	}
 	if m.home {
 		return m.renderViewport(m.renderHome(width, height, accent, dim), width, height)
@@ -177,7 +178,13 @@ func (m Model) renderPalette(width, height int, accent, dim, selectedStyle lipgl
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, panel.String())
 }
 
-func (m Model) renderSection(width int, accent, dim lipgloss.Style) string {
+func (m Model) renderSection(width, height int, accent, dim, selectedStyle lipgloss.Style) string {
+	switch m.section {
+	case "history":
+		return m.renderHistorySection(width, height, accent, dim, selectedStyle)
+	case "learnings":
+		return m.renderLearningsSection(width, height, accent, dim, selectedStyle)
+	}
 	var view strings.Builder
 	title := "Inbox"
 	if m.section == "jobs" {
@@ -209,6 +216,249 @@ func (m Model) renderSection(width int, accent, dim lipgloss.Style) string {
 	footer := wrapStatusLine([]string{"esc back", "ctrl+i workspace", "ctrl+p commands", "ctrl+x conversations", "ctrl+b inbox", "ctrl+j jobs"}, width)
 	view.WriteString("\n" + dim.Render(footer))
 	return view.String()
+}
+
+func (m Model) renderHistorySection(width, height int, accent, dim, selectedStyle lipgloss.Style) string {
+	if m.historyDetail != nil {
+		return m.renderHistoryDetail(width, accent, dim)
+	}
+	var view strings.Builder
+	view.WriteString(accent.Render(gatorWordmark) + dim.Render("  History · "+historyFilterName(m.historyFilter)) + "\n\n")
+	if m.sectionNotice != "" {
+		view.WriteString(dim.Render(m.sectionNotice) + "\n\n")
+	}
+	if len(m.historyItems) == 0 && m.sectionNotice == "" {
+		view.WriteString(dim.Render("No retained Work matches this view yet.") + "\n")
+	}
+	maximum := max(1, (height-7)/2)
+	start, end := sectionWindow(len(m.historyItems), m.selected, maximum)
+	rowStyle := lipgloss.NewStyle().Width(max(20, width-4))
+	for index := start; index < end; index++ {
+		item := m.historyItems[index]
+		row := accent.Render(truncate(item.Record.ObjectiveSummary, max(16, width-8))) + "\n" + dim.Render(historyStatusLine(item.Record, item.Project, item.Delivery))
+		if index == m.selected {
+			view.WriteString(selectedStyle.Width(max(20, width-4)).Render("› "+row) + "\n")
+		} else {
+			view.WriteString(rowStyle.Render("  "+row) + "\n")
+		}
+	}
+	view.WriteString("\n" + dim.Render("↑/↓ select · enter details · f status filter · r refresh · esc back"))
+	return view.String()
+}
+
+func (m Model) renderHistoryDetail(width int, accent, dim lipgloss.Style) string {
+	detail := m.historyDetail
+	var view strings.Builder
+	view.WriteString(accent.Render(gatorWordmark) + dim.Render("  History detail") + "\n\n")
+	view.WriteString(accent.Render(detail.Record.ObjectiveSummary) + "\n")
+	view.WriteString(dim.Render(historyStatusLine(detail.Record, detail.Project, detail.Delivery)) + "\n\n")
+	view.WriteString("Source: " + valueOrNone(detail.Project) + "\n")
+	view.WriteString("Snapshot: " + valueOrNone(detail.Record.SnapshotID) + "\n")
+	view.WriteString("Verification: " + valueOrNone(string(detail.Record.VerificationStatus)) + " · artifact " + valueOrNone(detail.Record.ArtifactStatus) + "\n")
+	writeSectionItems(&view, "Artifacts", historyArtifactLines(detail.Artifacts, detail.ArtifactIssue), dim)
+	writeSectionItems(&view, "Delivery", formatHistoryDeliveries(detail.Deliveries), dim)
+	writeSectionItems(&view, "Feedback", historyFeedbackLines(detail.Observations), dim)
+	writeSectionItems(&view, "Derived learnings", historyLearningLines(detail.Learnings), dim)
+	if detail.Review != "" {
+		writeSectionItems(&view, "Review", []string{detail.Review}, dim)
+	}
+	if m.sectionNotice != "" {
+		view.WriteString("\n" + dim.Render(m.sectionNotice) + "\n")
+	}
+	controls := "esc back · r review retained output"
+	if detail.Record.ConversationID != "" {
+		controls += " · c open conversation"
+	}
+	view.WriteString("\n" + dim.Render(controls))
+	return view.String()
+}
+
+func historyArtifactLines(items []ArtifactSummary, issue string) []string {
+	lines := make([]string, 0, min(3, len(items))+1)
+	for _, item := range items[:min(3, len(items))] {
+		mark := "✓"
+		if !item.Valid {
+			mark = "!"
+		}
+		lines = append(lines, fmt.Sprintf("%s %s · %s · %d bytes", mark, item.Path, item.MediaType, item.Bytes))
+	}
+	if len(items) > 3 {
+		lines = append(lines, fmt.Sprintf("+%d more artifacts", len(items)-3))
+	}
+	if issue != "" {
+		lines = append(lines, issue)
+	}
+	return lines
+}
+
+func historyFeedbackLines(items []learning.Observation) []string {
+	lines := make([]string, 0, min(3, len(items)))
+	for _, item := range items[:min(3, len(items))] {
+		line := string(item.Signal)
+		if item.Summary != "" {
+			line += " · " + singleLine(item.Summary)
+		}
+		lines = append(lines, line)
+	}
+	if len(items) > 3 {
+		lines = append(lines, fmt.Sprintf("+%d more observations", len(items)-3))
+	}
+	return lines
+}
+
+func historyLearningLines(items []learning.Record) []string {
+	lines := make([]string, 0, min(3, len(items)))
+	for _, item := range items[:min(3, len(items))] {
+		lines = append(lines, string(item.Status)+" · "+singleLine(item.Content))
+	}
+	if len(items) > 3 {
+		lines = append(lines, fmt.Sprintf("+%d more learnings", len(items)-3))
+	}
+	return lines
+}
+
+func (m Model) renderLearningsSection(width, height int, accent, dim, selectedStyle lipgloss.Style) string {
+	if m.learningForm != nil {
+		return m.renderLearningForm(width, accent, dim)
+	}
+	if m.learningDetail != nil {
+		return m.renderLearningDetail(width, accent, dim)
+	}
+	var view strings.Builder
+	view.WriteString(accent.Render(gatorWordmark) + dim.Render("  Learnings · "+learningFilterName(m.learningFilter)) + "\n\n")
+	if m.sectionNotice != "" {
+		view.WriteString(dim.Render(m.sectionNotice) + "\n\n")
+	}
+	if len(m.learningItems) == 0 && m.sectionNotice == "" {
+		view.WriteString(dim.Render("No learnings match this view. Press n to add an explicit preference.") + "\n")
+	}
+	maximum := max(1, height-7)
+	start, end := sectionWindow(len(m.learningItems), m.selected, maximum)
+	rowStyle := lipgloss.NewStyle().Width(max(20, width-4))
+	for index := start; index < end; index++ {
+		item := m.learningItems[index]
+		confidence := ""
+		if item.Origin == learning.Inferred {
+			confidence = fmt.Sprintf(" · confidence %d", item.Confidence)
+		}
+		row := truncate(singleLine(item.Content), max(16, width-30)) + "\n" + dim.Render(string(item.Status)+" · "+string(item.Type)+" · "+learningScopeShort(item.Scope)+" · "+string(item.Origin)+confidence)
+		if index == m.selected {
+			view.WriteString(selectedStyle.Width(max(20, width-4)).Render("› "+row) + "\n")
+		} else {
+			view.WriteString(rowStyle.Render("  "+row) + "\n")
+		}
+	}
+	view.WriteString("\n" + dim.Render("↑/↓ select · enter details · n add · f status filter · r refresh · esc back"))
+	return view.String()
+}
+
+func (m Model) renderLearningDetail(width int, accent, dim lipgloss.Style) string {
+	record := m.learningDetail
+	var view strings.Builder
+	view.WriteString(accent.Render(gatorWordmark) + dim.Render("  Learning detail") + "\n\n")
+	view.WriteString(accent.Render(singleLine(record.Content)) + "\n\n")
+	view.WriteString("Status: " + string(record.Status) + " · " + string(record.Origin) + "\n")
+	view.WriteString("Type: " + string(record.Type) + " · scope: " + learningScopeText(record.Scope) + "\n")
+	view.WriteString("Key: " + record.Key + "\n")
+	if record.Origin == learning.Inferred {
+		view.WriteString(fmt.Sprintf("Confidence: %d\n", record.Confidence))
+	}
+	view.WriteString("Created: " + record.CreatedAt.Local().Format("2006-01-02 15:04") + "\n")
+	if !record.Provenance.UserConfirmedAt.IsZero() {
+		view.WriteString("Confirmed: " + record.Provenance.UserConfirmedAt.Local().Format("2006-01-02 15:04") + "\n")
+	}
+	writeSectionItems(&view, "Derived from Work", compactLines(record.Provenance.WorkIDs, 3), dim)
+	writeSectionItems(&view, "Evidence", compactLines(record.Provenance.EvidenceRefs, 3), dim)
+	if m.sectionNotice != "" {
+		view.WriteString("\n" + dim.Render(m.sectionNotice) + "\n")
+	}
+	controls := []string{"esc back", "n add"}
+	switch record.Status {
+	case learning.Candidate:
+		controls = append(controls, "a approve", "r reject")
+	case learning.Active:
+		controls = append(controls, "d disable")
+	case learning.Disabled:
+		controls = append(controls, "a enable")
+	}
+	if record.Origin == learning.UserAuthored {
+		controls = append(controls, "e edit")
+	}
+	view.WriteString("\n" + dim.Render(strings.Join(controls, " · ")))
+	return view.String()
+}
+
+func (m Model) renderLearningForm(width int, accent, dim lipgloss.Style) string {
+	form := m.learningForm
+	labels := []string{
+		"Type: " + string(form.Type) + "  (left/right)",
+		"Scope: " + learningScopeText(form.Scope) + "  (left/right)",
+		"Key: " + valueOrNone(form.Key),
+		"Text: " + valueOrNone(form.Content),
+	}
+	if form.EditingID != "" {
+		labels[0] = "Type: " + string(form.Type) + "  (retained)"
+		labels[1] = "Scope: " + learningScopeText(form.Scope) + "  (retained)"
+	}
+	var view strings.Builder
+	title := "Add explicit learning"
+	if form.EditingID != "" {
+		title = "Edit explicit learning"
+	}
+	view.WriteString(accent.Render(gatorWordmark) + dim.Render("  "+title) + "\n\n")
+	for index, label := range labels {
+		if index == form.Field {
+			view.WriteString(accent.Render("› "+label) + "\n")
+		} else {
+			view.WriteString("  " + label + "\n")
+		}
+	}
+	if m.sectionNotice != "" {
+		view.WriteString("\n" + dim.Render(m.sectionNotice) + "\n")
+	}
+	view.WriteString("\n" + dim.Render("tab next field · enter continue/save · esc cancel"))
+	return view.String()
+}
+
+func writeSectionItems(view *strings.Builder, title string, items []string, dim lipgloss.Style) {
+	if len(items) == 0 {
+		items = []string{"none"}
+	}
+	view.WriteString("\n" + title + ":\n")
+	for _, item := range items {
+		view.WriteString(dim.Render("  "+item) + "\n")
+	}
+}
+
+func compactLines(items []string, limit int) []string {
+	if len(items) == 0 {
+		return nil
+	}
+	result := append([]string(nil), items[:min(limit, len(items))]...)
+	if len(items) > limit {
+		result = append(result, fmt.Sprintf("+%d more", len(items)-limit))
+	}
+	return result
+}
+
+func sectionWindow(total, selected, maximum int) (int, int) {
+	if total == 0 {
+		return 0, 0
+	}
+	maximum = max(1, maximum)
+	selected = min(max(0, selected), total-1)
+	start := max(0, selected-maximum/2)
+	end := min(total, start+maximum)
+	start = max(0, end-maximum)
+	return start, end
+}
+
+func boundedSectionText(value string) string {
+	value = strings.TrimSpace(value)
+	if len(value) <= 4000 {
+		return value
+	}
+	return strings.TrimSpace(value[:3997]) + "…"
 }
 
 func (m Model) renderComposer(width int, focused bool) string {

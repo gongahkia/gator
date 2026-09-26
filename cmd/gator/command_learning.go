@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -250,10 +249,4 @@ func formatLearningScope(scope learning.Scope) string {
 		return string(learning.Global)
 	}
 	return string(scope.Kind) + ":" + scope.Value
-}
-
-func learningTUIAction(stateDir string, arguments []string) (string, error) {
-	var output bytes.Buffer
-	err := runLearningCommand(stateDir, arguments, &output)
-	return strings.TrimSpace(output.String()), err
 }

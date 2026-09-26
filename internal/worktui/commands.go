@@ -138,9 +138,9 @@ func commandPaletteEntries() []entry {
 		{title: "/mode", subtitle: "Set auto, inspect, draft, or act", kind: "command-input", command: "/mode"},
 		{title: "/settings", subtitle: "Inspect current settings", kind: "command", command: "/settings"},
 		{title: "/theme", subtitle: "Choose gator, contrast, or mono", kind: "command-input", command: "/theme"},
-		{title: "/history", subtitle: "Show Work executions in this conversation", kind: "command", command: "/history"},
+		{title: "/history", subtitle: "Browse all retained Work", kind: "command", command: "/history"},
 		{title: "/jobs", subtitle: "Schedule, run, and review repeatable Work", kind: "command-input", command: "/jobs"},
-		{title: "/learnings", subtitle: "Inspect and control scoped guidance for future Work", kind: "command", command: "/learnings"},
+		{title: "/learnings", subtitle: "Browse and manage scoped guidance", kind: "command", command: "/learnings"},
 		{title: "/feedback", subtitle: "Accept, reject, correct, or remember this Work result", kind: "command-input", command: "/feedback"},
 		{title: "/review", subtitle: "Show latest staged output", kind: "command", command: "/review"},
 		{title: "/save", subtitle: "Save verified deliverables to a folder", kind: "command-input", command: "/save"},
@@ -387,12 +387,36 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 				m.config.Jobs = refreshed
 			}
 		}
-	case "/learnings":
-		if m.config.LearningAction == nil {
-			err = errorsUnavailable("learnings")
+	case "/history":
+		if len(fields) > 2 {
+			err = fmt.Errorf("usage: /history [all|running|completed|failed]")
 			break
 		}
-		result, err = m.config.LearningAction(fields[1:])
+		if len(fields) == 1 {
+			m.historyFilter = ""
+		} else {
+			err = m.setHistoryFilter(fields[1])
+			if err != nil {
+				break
+			}
+		}
+		m.openGlobalHistory()
+		return m, nil
+	case "/learnings":
+		if len(fields) > 2 {
+			err = fmt.Errorf("usage: /learnings [all|active|candidate|disabled|rejected]")
+			break
+		}
+		if len(fields) == 1 {
+			m.learningFilter = ""
+		} else {
+			err = m.setLearningFilter(fields[1])
+			if err != nil {
+				break
+			}
+		}
+		m.openLearnings()
+		return m, nil
 	case "/feedback":
 		if m.revision == "" {
 			err = errors.New("finish or resume a Work revision before leaving feedback")
@@ -417,7 +441,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		return m.prepareCodeApply(command)
 	case "/retry":
 		return m.prepareRetry(command)
-	case "/revision-back", "/revision-forward", "/history":
+	case "/revision-back", "/revision-forward":
 		if m.conversation == "" {
 			err = fmt.Errorf("start or resume a conversation before using revision history")
 			break
@@ -426,10 +450,6 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		case "/revision-back":
 			if m.config.MoveBack != nil {
 				result, err = m.config.MoveBack(m.conversation)
-			}
-		case "/history":
-			if m.config.History != nil {
-				result, err = m.config.History(m.conversation)
 			}
 		case "/revision-forward":
 			if len(fields) == 2 && m.config.MoveToRevision != nil {
@@ -927,11 +947,10 @@ func workHelp() string {
   /mode auto|inspect|draft|act   choose Work authority
   /code on|off                   require a verified code change
   /artifact [add|remove] PATH    set expected deliverables
-  /history                       review this conversation's Work
+  /history [STATUS]              browse all retained Work
   /jobs [list|add|show|edit|enable|disable|run|history|remove]
                                  schedule and review repeatable Work
-  /learnings [list|show|add|approve|enable|disable|edit|remove|reject]
-                                 control guidance for future Work
+  /learnings [STATUS]            browse and manage guidance for future Work
   /feedback accept|reject|dont-learn [NOTE]
   /feedback correct|remember [OPTIONS] TEXT
                                  record feedback for this Work
