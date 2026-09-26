@@ -27,7 +27,7 @@ const (
 // Refresh. OAuthClientSecret is optional private OAuth client material for a
 // user-owned desktop app; unlike Extra it is never public metadata and is
 // stored only in this private file. Extra holds public protocol metadata such
-// as an account identifier or a Copilot endpoint; it must never contain
+// as an account identifier or a provider endpoint; it must never contain
 // another credential.
 type Credential struct {
 	Type              string            `json:"type"`

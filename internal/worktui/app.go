@@ -176,7 +176,7 @@ type Config struct {
 	Copy           func(text string) error
 	Theme          string
 	SetTheme       func(name string) error
-	// StatusLine follows the Codex-style ordered-item convention. The visible
+	// StatusLine follows an ordered-item convention. The visible
 	// status surface is separately opt-in so normal Work stays uncluttered.
 	StatusLine        *[]string
 	StatusLineEnabled bool
