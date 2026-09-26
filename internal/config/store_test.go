@@ -60,6 +60,7 @@ func TestStorePersistsExplicitEmptyStatusLine(t *testing.T) {
 	empty := []string{}
 	settings := Default()
 	settings.TUI.StatusLine = &empty
+	settings.TUI.StatusLineEnabled = true
 	if err := store.Save(settings); err != nil {
 		t.Fatalf("save: %v", err)
 	}
@@ -67,7 +68,7 @@ func TestStorePersistsExplicitEmptyStatusLine(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if loaded.TUI.StatusLine == nil || len(*loaded.TUI.StatusLine) != 0 {
+	if !loaded.TUI.StatusLineEnabled || loaded.TUI.StatusLine == nil || len(*loaded.TUI.StatusLine) != 0 {
 		t.Fatalf("loaded status line = %#v, want explicit empty list", loaded.TUI.StatusLine)
 	}
 	contents, err := os.ReadFile(filepath.Join(root, "gator", "config.json"))

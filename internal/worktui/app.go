@@ -176,10 +176,11 @@ type Config struct {
 	Copy           func(text string) error
 	Theme          string
 	SetTheme       func(name string) error
-	// StatusLine follows the Codex-style ordered-item convention. Nil uses
-	// Gator's defaults; a non-nil empty list hides the composer footer.
-	StatusLine    *[]string
-	SetStatusLine func(items *[]string) error
+	// StatusLine follows the Codex-style ordered-item convention. The visible
+	// status surface is separately opt-in so normal Work stays uncluttered.
+	StatusLine        *[]string
+	StatusLineEnabled bool
+	SetStatusLine     func(enabled bool, items *[]string) error
 }
 
 type ModelPanel interface {
@@ -228,63 +229,65 @@ type pendingBundleAction struct {
 }
 
 type Model struct {
-	models               ModelPanel
-	tasks                map[string]string
-	quitting             bool
-	live                 <-chan tea.Msg
-	cancel               context.CancelFunc
-	operation            *workrun.Operation
-	interaction          *workrun.Interaction
-	pendingInteractions  []workrun.Interaction
-	config               Config
-	width                int
-	height               int
-	home                 bool
-	launcher             bool
-	launcherMode         string
-	paletteQuery         string
-	section              string
-	selected             int
-	entries              []entry
-	source               string
-	conversation         string
-	revision             string
-	snapshot             string
-	title                string
-	input                string
-	promptHistory        []string
-	historyIndex         int
-	historyDraft         string
-	composerEditorPath   string
-	messages             []message
-	running              bool
-	status               string
-	firstRun             bool
-	pendingPrompt        string
-	scroll               int
-	options              RunOptions
-	queue                []queuedRun
-	lastOutput           string
-	lastBundle           BundleSummary
-	pendingBundleAction  *pendingBundleAction
-	pendingConnectorCmd  tea.Cmd
-	theme                string
-	loadingFrame         int
-	loadingRun           uint64
-	runStarted           time.Time
-	modelStatus          ModelStatus
-	statusLine           []string
-	statusLineConfigured bool
-	statusLineDraft      []string
-	statusLineDraftSet   bool
-	historyItems         []historyItem
-	historyDetail        *historyDetail
-	historyFilter        workhistory.Status
-	learningItems        []learning.Record
-	learningDetail       *learning.Record
-	learningFilter       learning.Status
-	learningForm         *learningForm
-	sectionNotice        string
+	models                 ModelPanel
+	tasks                  map[string]string
+	quitting               bool
+	live                   <-chan tea.Msg
+	cancel                 context.CancelFunc
+	operation              *workrun.Operation
+	interaction            *workrun.Interaction
+	pendingInteractions    []workrun.Interaction
+	config                 Config
+	width                  int
+	height                 int
+	home                   bool
+	launcher               bool
+	launcherMode           string
+	paletteQuery           string
+	section                string
+	selected               int
+	entries                []entry
+	source                 string
+	conversation           string
+	revision               string
+	snapshot               string
+	title                  string
+	input                  string
+	promptHistory          []string
+	historyIndex           int
+	historyDraft           string
+	composerEditorPath     string
+	messages               []message
+	running                bool
+	status                 string
+	firstRun               bool
+	pendingPrompt          string
+	scroll                 int
+	options                RunOptions
+	queue                  []queuedRun
+	lastOutput             string
+	lastBundle             BundleSummary
+	pendingBundleAction    *pendingBundleAction
+	pendingConnectorCmd    tea.Cmd
+	theme                  string
+	loadingFrame           int
+	loadingRun             uint64
+	runStarted             time.Time
+	modelStatus            ModelStatus
+	statusLine             []string
+	statusLineConfigured   bool
+	statusLineEnabled      bool
+	statusLineDraft        []string
+	statusLineDraftSet     bool
+	statusLineDraftEnabled bool
+	historyItems           []historyItem
+	historyDetail          *historyDetail
+	historyFilter          workhistory.Status
+	learningItems          []learning.Record
+	learningDetail         *learning.Record
+	learningFilter         learning.Status
+	learningForm           *learningForm
+	sectionNotice          string
 }
 
 func New(config Config) Model {
@@ -301,6 +304,7 @@ func New(config Config) Model {
 	}
 	model.entries = commandPaletteEntries()
 	model.statusLine, model.statusLineConfigured = resolveStatusLine(config.StatusLine)
+	model.statusLineEnabled = config.StatusLineEnabled
 	model.refreshModelStatus()
 	if config.StartConversationID != "" {
 		found := false

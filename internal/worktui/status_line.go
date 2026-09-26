@@ -207,10 +207,13 @@ func (m *Model) openStatusLineEditor() {
 	m.selected = 0
 	m.statusLineDraft = append([]string(nil), m.statusLine...)
 	m.statusLineDraftSet = m.statusLineConfigured
+	m.statusLineDraftEnabled = m.statusLineEnabled
 }
 
 func (m Model) updateStatusLineEditor(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch key.String() {
+	case "v":
+		m.statusLineDraftEnabled = !m.statusLineDraftEnabled
 	case "up":
 		if m.selected > 0 {
 			m.selected--
@@ -256,20 +259,21 @@ func (m Model) updateStatusLineEditor(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			configured = &items
 		}
 		if m.config.SetStatusLine != nil {
-			if err := m.config.SetStatusLine(configured); err != nil {
+			if err := m.config.SetStatusLine(m.statusLineDraftEnabled, configured); err != nil {
 				m.status = "Save status line: " + err.Error()
 				return m, nil
 			}
 		}
 		m.statusLine = append([]string(nil), m.statusLineDraft...)
 		m.statusLineConfigured = m.statusLineDraftSet
+		m.statusLineEnabled = m.statusLineDraftEnabled
 		m.launcher = false
 		m.launcherMode = ""
 		m.statusLineDraft = nil
-		if m.statusLineConfigured && len(m.statusLine) == 0 {
+		if !m.statusLineEnabled || len(m.statusLine) == 0 {
 			m.status = "Status line hidden."
 		} else if !m.statusLineConfigured {
-			m.status = "Status line restored to defaults."
+			m.status = "Default status line enabled."
 		} else {
 			m.status = "Status line updated."
 		}
@@ -285,7 +289,11 @@ func (m Model) renderStatusLineEditor(width, height int, accent, dim, selectedSt
 	end := min(len(statusLineOptions), start+maximum)
 	var panel strings.Builder
 	panel.WriteString(accent.Render(ansi.Wrap("Configure status line", panelWidth, " ")) + "\n")
-	panel.WriteString(dim.Render(ansi.Wrap("Choose items shown below the composer; selected order is preserved.", panelWidth, " ")) + "\n\n")
+	visibility := "hidden"
+	if m.statusLineDraftEnabled {
+		visibility = "shown"
+	}
+	panel.WriteString(dim.Render(ansi.Wrap("Status line is "+visibility+". Choose its items; selected order is preserved.", panelWidth, " ")) + "\n\n")
 	for index := start; index < end; index++ {
 		option := statusLineOptions[index]
 		order := selectedStatusLineIndex(m.statusLineDraft, option.id)
@@ -307,12 +315,12 @@ func (m Model) renderStatusLineEditor(width, height int, accent, dim, selectedSt
 		panel.WriteString(line + "\n")
 	}
 	preview := m.statusLineDraftValues()
-	if len(preview) == 0 {
+	if !m.statusLineDraftEnabled || len(preview) == 0 {
 		panel.WriteString("\n" + dim.Render("Preview: hidden"))
 	} else {
 		panel.WriteString("\n" + dim.Render("Preview\n"+wrapStatusLine(preview, panelWidth)))
 	}
-	controls := wrapStatusLine([]string{"space toggle", "←/→ reorder", "r defaults", "enter save", "esc cancel"}, panelWidth)
+	controls := wrapStatusLine([]string{"v show/hide", "space toggle", "←/→ reorder", "r defaults", "enter save", "esc cancel"}, panelWidth)
 	panel.WriteString("\n\n" + dim.Render(controls))
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, panel.String())
 }

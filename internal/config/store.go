@@ -61,10 +61,12 @@ type Settings struct {
 	JobDefaults          JobDefaults                `json:"job_defaults"`
 }
 
-// TUISettings contains display-only terminal preferences. A nil StatusLine
-// uses Gator's default footer; an explicit empty list hides it.
+// TUISettings contains display-only terminal preferences. Status lines are
+// opt-in: older configurations that only contain StatusLine remain hidden
+// until their owner explicitly enables the surface.
 type TUISettings struct {
-	StatusLine *[]string `json:"status_line,omitempty"`
+	StatusLine        *[]string `json:"status_line,omitempty"`
+	StatusLineEnabled bool      `json:"status_line_enabled,omitempty"`
 }
 
 type SnapshotSettings struct {

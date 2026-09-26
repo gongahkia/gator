@@ -234,12 +234,13 @@ func workInteractiveConversation(startConversationID string) error {
 		FeedbackAction: func(workID string, arguments []string) (string, error) {
 			return workFeedbackTUIAction(stateDir, workID, arguments)
 		},
-		Inspect:       inspectWorkTUITopic,
-		Copy:          clipboard.WriteAll,
-		Theme:         settings.Theme,
-		SetTheme:      saveTheme,
-		StatusLine:    settings.TUI.StatusLine,
-		SetStatusLine: saveWorkStatusLine(settingsStore),
+		Inspect:           inspectWorkTUITopic,
+		Copy:              clipboard.WriteAll,
+		Theme:             settings.Theme,
+		SetTheme:          saveTheme,
+		StatusLine:        settings.TUI.StatusLine,
+		StatusLineEnabled: settings.TUI.StatusLineEnabled,
+		SetStatusLine:     saveWorkStatusLine(settingsStore),
 	})
 	program := tea.NewProgram(application, tea.WithAltScreen())
 	final, err := program.Run()

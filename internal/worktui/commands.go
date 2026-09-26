@@ -137,6 +137,7 @@ func commandPaletteEntries() []entry {
 		{title: "/source", subtitle: "Choose the workspace for this conversation", kind: "command", command: "/source"},
 		{title: "/mode", subtitle: "Set auto, inspect, draft, or act", kind: "command-input", command: "/mode"},
 		{title: "/settings", subtitle: "Inspect current settings", kind: "command", command: "/settings"},
+		{title: "/settings statusline", subtitle: "Show or hide the optional status line", kind: "command", command: "/settings statusline"},
 		{title: "/theme", subtitle: "Choose gator, contrast, or mono", kind: "command-input", command: "/theme"},
 		{title: "/history", subtitle: "Browse all retained Work", kind: "command", command: "/history"},
 		{title: "/jobs", subtitle: "Schedule, run, and review repeatable Work", kind: "command-input", command: "/jobs"},
@@ -328,7 +329,17 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "/permissions":
 		result = m.workPermissions()
-	case "/doctor", "/agents", "/settings":
+	case "/settings":
+		if len(fields) == 2 && fields[1] == "statusline" {
+			m.openStatusLineEditor()
+			return m, nil
+		}
+		if len(fields) != 1 {
+			err = fmt.Errorf("usage: /settings [statusline]")
+			break
+		}
+		fallthrough
+	case "/doctor", "/agents":
 		if m.config.Inspect == nil {
 			err = errorsUnavailable(fields[0])
 		} else {
@@ -956,7 +967,7 @@ func workHelp() string {
                                  record feedback for this Work
   /review · /save · /apply · /retry
                                  review and deliver a completed result
-  /settings · /theme · /new · /copy · exit
+  /settings [statusline] · /theme · /new · /copy · exit
 
 Use /help advanced for workspace, integration, revision, queue, and diagnostic controls.
 

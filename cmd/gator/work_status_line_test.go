@@ -14,30 +14,30 @@ func TestSaveWorkStatusLinePersistsItemsHideAndReset(t *testing.T) {
 	}
 	save := saveWorkStatusLine(store)
 	items := []string{"model", "model-access", "current-dir"}
-	if err := save(&items); err != nil {
+	if err := save(true, &items); err != nil {
 		t.Fatalf("save items: %v", err)
 	}
 	settings, err := store.Load()
 	if err != nil {
 		t.Fatalf("load items: %v", err)
 	}
-	if settings.TUI.StatusLine == nil || !reflect.DeepEqual(*settings.TUI.StatusLine, items) {
+	if !settings.TUI.StatusLineEnabled || settings.TUI.StatusLine == nil || !reflect.DeepEqual(*settings.TUI.StatusLine, items) {
 		t.Fatalf("status line = %#v, want %#v", settings.TUI.StatusLine, items)
 	}
 
 	empty := []string{}
-	if err := save(&empty); err != nil {
+	if err := save(false, &empty); err != nil {
 		t.Fatalf("hide: %v", err)
 	}
 	settings, err = store.Load()
 	if err != nil {
 		t.Fatalf("load hidden: %v", err)
 	}
-	if settings.TUI.StatusLine == nil || len(*settings.TUI.StatusLine) != 0 {
+	if settings.TUI.StatusLineEnabled || settings.TUI.StatusLine == nil || len(*settings.TUI.StatusLine) != 0 {
 		t.Fatalf("hidden status line = %#v", settings.TUI.StatusLine)
 	}
 
-	if err := save(nil); err != nil {
+	if err := save(false, nil); err != nil {
 		t.Fatalf("reset: %v", err)
 	}
 	settings, err = store.Load()

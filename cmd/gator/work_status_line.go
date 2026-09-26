@@ -2,8 +2,8 @@ package main
 
 import "github.com/gongahkia/gator/internal/config"
 
-func saveWorkStatusLine(store config.Store) func(*[]string) error {
-	return func(items *[]string) error {
+func saveWorkStatusLine(store config.Store) func(enabled bool, items *[]string) error {
+	return func(enabled bool, items *[]string) error {
 		settings, err := store.Load()
 		if err != nil {
 			return err
@@ -15,6 +15,7 @@ func saveWorkStatusLine(store config.Store) func(*[]string) error {
 			copy(copyOfItems, *items)
 			settings.TUI.StatusLine = &copyOfItems
 		}
+		settings.TUI.StatusLineEnabled = enabled
 		return store.Save(settings)
 	}
 }

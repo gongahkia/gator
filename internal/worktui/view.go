@@ -79,7 +79,7 @@ func (m Model) View() string {
 		transcript.WriteString("\n\n")
 	}
 	footer := ""
-	if m.statusLineConfigured {
+	if m.statusLineEnabled {
 		footer = wrapStatusLine(m.statusLineItems(), width)
 	}
 	composer := m.renderComposer(width, !m.running)
