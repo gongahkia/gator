@@ -8,10 +8,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/agent"
-	gatorrun "github.com/gongahkia/gator/internal/run"
-	"github.com/gongahkia/gator/internal/tools"
-	"github.com/gongahkia/gator/internal/workspace"
+	"github.com/gongahkia/gator/internal/workrun"
 )
 
 const (
@@ -34,7 +33,7 @@ type Config struct {
 	DefaultVerification [][]string
 	AgentVersion        string
 	ResolveProvider     func(provider, model string) (string, string, error)
-	NewExecutor         func(provider, model, baseURL string) (gatorrun.Executor, error)
+	NewWorkService      func(provider, model string, request *workrun.Request) (workrun.Service, error)
 }
 
 // Server accepts one JSON-RPC message per stdio line. A prompt executes in a
@@ -49,7 +48,7 @@ type Server struct {
 
 	initialized bool
 	sessions    map[string]*session
-	permissions map[string]chan tools.CommandDecision
+	permissions map[string]permission
 	next        atomic.Uint64
 	wait        sync.WaitGroup
 }
@@ -57,13 +56,13 @@ type Server struct {
 type session struct {
 	id           string
 	cwd          string
-	additional   []workspace.Root
 	provider     string
 	model        string
 	verification [][]string
-	mode         gatorrun.Mode
+	mode         action.Mode
 	title        string
-	statePath    string
+	conversation string
+	revision     string
 	messages     []agent.Message
 	updatedAt    time.Time
 	active       *activePrompt
@@ -74,6 +73,12 @@ type activePrompt struct {
 	cancel    context.CancelFunc
 	messageID string
 	done      chan struct{}
+	operation *workrun.Operation
+}
+
+type permission struct {
+	operation     *workrun.Operation
+	interactionID int
 }
 
 type inbound struct {

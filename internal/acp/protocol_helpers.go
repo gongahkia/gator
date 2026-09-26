@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	gatorrun "github.com/gongahkia/gator/internal/run"
+	"github.com/gongahkia/gator/internal/action"
 )
 
 func decodeParams(raw json.RawMessage, destination any) error {
@@ -79,11 +79,11 @@ func promptText(blocks []json.RawMessage) (string, error) {
 	return task.String(), nil
 }
 
-func defaultMode(verification [][]string) gatorrun.Mode {
+func defaultMode(verification [][]string) action.Mode {
 	if len(verification) == 0 {
-		return gatorrun.PlanMode
+		return action.Inspect
 	}
-	return gatorrun.ExecuteMode
+	return action.Draft
 }
 
 func titleFor(value string) string {
