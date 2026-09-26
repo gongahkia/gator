@@ -363,6 +363,7 @@ func TestRevisionNavigationReloadsSelectedThreadAndBundle(t *testing.T) {
 			return "Moved forward to rev-two.", nil
 		},
 	})
+	model.height = 60
 	model.input = "/revision-back"
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
@@ -405,7 +406,7 @@ func TestConversationPickerRefreshesRetainedConversationList(t *testing.T) {
 	}
 }
 
-func TestInitialViewIsADeclutteredCenteredComposer(t *testing.T) {
+func TestInitialViewIsADeclutteredBottomComposer(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work/reports"})
 	model.width = 100
 	model.height = 30
@@ -425,7 +426,7 @@ func TestInitialViewIsADeclutteredCenteredComposer(t *testing.T) {
 	typingModel := typing.(Model)
 	typingView := typingModel.View()
 	if !typingModel.home || !strings.Contains(typingView, "What do you want to accomplish?") || !strings.Contains(typingView, gatorWordmark) || strings.Contains(typingView, "Work in reports") {
-		t.Fatalf("composer did not stay centered while drafting: %q", typingView)
+		t.Fatalf("composer did not stay bottom-anchored while drafting: %q", typingView)
 	}
 	submitted, _ := typingModel.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	submittedModel := submitted.(Model)
@@ -440,8 +441,8 @@ func TestInitialViewIsADeclutteredCenteredComposer(t *testing.T) {
 			break
 		}
 	}
-	if composerRow < submittedModel.height/3 || composerRow > submittedModel.height*2/3 {
-		t.Fatalf("composer row = %d, want the middle third of %d rows:\n%s", composerRow, submittedModel.height, submittedView)
+	if composerRow < submittedModel.height-3 {
+		t.Fatalf("composer row = %d, want the bottom of %d rows:\n%s", composerRow, submittedModel.height, submittedView)
 	}
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlP})
 	view = updated.(Model).View()
@@ -459,13 +460,13 @@ func TestInitialViewIsADeclutteredCenteredComposer(t *testing.T) {
 	}
 }
 
-func TestCenteredHomeComposerGrowsForWrappedDrafts(t *testing.T) {
+func TestBottomHomeComposerGrowsForWrappedDrafts(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work/reports"})
 	model.width, model.height = 60, 30
 	model.input = strings.Repeat("draft ", 30)
 	view := ansi.Strip(model.View())
 	if !strings.Contains(view, "What do you want to accomplish?") || strings.Count(view, "│") <= 2 {
-		t.Fatalf("centered composer did not grow across wrapped rows: %q", view)
+		t.Fatalf("bottom composer did not grow across wrapped rows: %q", view)
 	}
 }
 

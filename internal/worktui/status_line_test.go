@@ -48,9 +48,11 @@ func TestConfiguredEmptyStatusLineHidesComposerFooter(t *testing.T) {
 	}
 }
 
-func TestDefaultComposerFooterShowsSelectedLocalModel(t *testing.T) {
+func TestConfiguredStatusLineShowsSelectedLocalModel(t *testing.T) {
+	items := []string{"model"}
 	model := New(Config{
 		CurrentFolder: "/work",
+		StatusLine:    &items,
 		ModelStatus: func() (ModelStatus, error) {
 			return ModelStatus{Provider: "gator-local", Model: "qwen3:8b", Access: "local model configured"}, nil
 		},
@@ -59,30 +61,33 @@ func TestDefaultComposerFooterShowsSelectedLocalModel(t *testing.T) {
 	model.width, model.height = 100, 24
 	view := ansi.Strip(model.View())
 	if !strings.Contains(view, "model gator-local/qwen3:8b") {
-		t.Fatalf("default footer omitted selected local model: %q", view)
+		t.Fatalf("configured status line omitted selected local model: %q", view)
 	}
 }
 
-func TestDefaultComposerFooterAdvertisesEditorShortcut(t *testing.T) {
-	model := New(Config{CurrentFolder: "/work"})
+func TestConfiguredStatusLineAdvertisesEditorShortcut(t *testing.T) {
+	items := []string{"editor"}
+	model := New(Config{CurrentFolder: "/work", StatusLine: &items})
 	model.home = false
 	model.width, model.height = 100, 24
 	if view := ansi.Strip(model.View()); !strings.Contains(view, "ctrl+g editor") {
-		t.Fatalf("default footer omitted composer editor shortcut: %q", view)
+		t.Fatalf("configured status line omitted composer editor shortcut: %q", view)
 	}
 }
 
-func TestDefaultComposerFooterAdvertisesWorkspaceShortcut(t *testing.T) {
-	model := New(Config{CurrentFolder: "/work"})
+func TestConfiguredStatusLineAdvertisesWorkspaceShortcut(t *testing.T) {
+	items := []string{"source"}
+	model := New(Config{CurrentFolder: "/work", StatusLine: &items})
 	model.home = false
 	model.width, model.height = 100, 24
 	if view := ansi.Strip(model.View()); !strings.Contains(view, "ctrl+i workspace") {
-		t.Fatalf("default footer omitted workspace shortcut: %q", view)
+		t.Fatalf("configured status line omitted workspace shortcut: %q", view)
 	}
 }
 
 func TestComposerFooterWrapsWithoutLosingNavigationAtNarrowWidth(t *testing.T) {
-	model := New(Config{CurrentFolder: "/work"})
+	items := append([]string(nil), defaultStatusLine...)
+	model := New(Config{CurrentFolder: "/work", StatusLine: &items})
 	model.home = false
 	model.width, model.height = 32, 24
 	view := ansi.Strip(model.View())

@@ -78,38 +78,38 @@ func (m Model) View() string {
 			Render(confirmation))
 		transcript.WriteString("\n\n")
 	}
-	footer := wrapStatusLine(m.statusLineItems(), width)
-	footerRows := 0
-	if footer != "" {
-		footerRows = strings.Count(footer, "\n") + 1
+	footer := ""
+	if m.statusLineConfigured {
+		footer = wrapStatusLine(m.statusLineItems(), width)
 	}
 	composer := m.renderComposer(width, !m.running)
 	composerRows := strings.Count(composer, "\n") + 1
-	// Keep composition in the same general area as the empty Work screen.
-	// Conversation output is allowed to use the space above it, rather than
-	// pushing the primary input to the bottom of the terminal.
-	composerTop := max(2, height/2-composerRows/2)
+	// The composer is always anchored to the bottom of the viewport. History
+	// fills the available space above it instead of moving the input around.
+	composerTop := max(2, height-composerRows)
 	workingRows := 0
 	if m.running {
 		workingRows = 2
 	}
 	lines := strings.Split(strings.TrimSuffix(transcript.String(), "\n"), "\n")
 	headerRows := strings.Count(view.String(), "\n")
-	aboveComposer := max(0, composerTop-headerRows-workingRows)
-	footerSpace := 0
-	if footerRows > 0 {
-		footerSpace = footerRows + 1
+	footerRows := 0
+	if footer != "" {
+		footerRows = strings.Count(footer, "\n") + 1
 	}
-	belowComposer := max(0, height-composerTop-composerRows-footerSpace)
-	available := aboveComposer + belowComposer
+	footerTop := max(headerRows, composerTop-footerRows)
+	aboveComposer := max(0, footerTop-headerRows-workingRows)
+	available := aboveComposer
 	maxScroll := max(0, len(lines)-available)
 	scroll := min(m.scroll, maxScroll)
 	end := len(lines) - scroll
 	start := max(0, end-available)
 	visible := lines[start:end]
-	aboveEnd := min(aboveComposer, len(visible))
-	if aboveEnd > 0 && visible[0] != "" {
-		view.WriteString(strings.Join(visible[:aboveEnd], "\n") + "\n")
+	for len(visible) > 0 && visible[0] == "" {
+		visible = visible[1:]
+	}
+	if len(visible) > 0 {
+		view.WriteString(strings.Join(visible, "\n") + "\n")
 	}
 	if m.running {
 		working := rattles.BrailleDots.Frame(m.loadingFrame) + " Working…"
@@ -118,16 +118,13 @@ func (m Model) View() string {
 		}
 		view.WriteString(accent.Render(working) + "\n\n")
 	}
-	if currentRow := strings.Count(view.String(), "\n"); currentRow < composerTop {
-		view.WriteString(strings.Repeat("\n", composerTop-currentRow))
-	}
-	view.WriteString(composer)
-	if aboveEnd < len(visible) {
-		view.WriteString("\n" + strings.Join(visible[aboveEnd:], "\n"))
+	if currentRow := strings.Count(view.String(), "\n"); currentRow < footerTop {
+		view.WriteString(strings.Repeat("\n", footerTop-currentRow))
 	}
 	if footer != "" {
-		view.WriteString("\n" + dim.Render(footer))
+		view.WriteString(dim.Render(footer) + "\n")
 	}
+	view.WriteString(composer)
 	return m.renderViewport(view.String(), width, height)
 }
 
@@ -142,7 +139,7 @@ func (m Model) renderHome(width, height int, accent lipgloss.Style) string {
 	title := accent.Copy().Bold(true).Render(gatorWordmark)
 	question := lipgloss.NewStyle().Foreground(lipgloss.Color("255")).Render("What do you want to accomplish?")
 	body := title + "\n\n" + question + "\n\n" + m.renderComposer(width, true)
-	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, body)
+	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Bottom, body)
 }
 
 func (m Model) renderPalette(width, height int, accent, dim, selectedStyle lipgloss.Style) string {
