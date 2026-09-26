@@ -146,6 +146,8 @@ func (m Model) localModelActionLabel() string {
 		return "downloading selected model"
 	case localModelStarting:
 		return "starting Ollama"
+	case localModelInstalling:
+		return "installing Ollama"
 	case localModelUsing:
 		return "selecting local model"
 	case localModelRemoving:

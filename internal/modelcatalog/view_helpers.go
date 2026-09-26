@@ -45,7 +45,11 @@ func (m Model) modelCatalogConfirmationView() string {
 			if plan.DisplayCommand != "" {
 				detail += "\n\nCommand:\n" + plan.DisplayCommand
 			}
-			return m.fieldView(plan.Title, "Review the exact official action before confirming it. It may ask for your system password.", wrapText(detail, m.inlineWidth()))
+			hint := "Review the exact official action before confirming it."
+			if plan.RequiresElevation {
+				hint += " Gator will request your system password in this terminal, then stream progress here."
+			}
+			return m.fieldView(plan.Title, hint, wrapText(detail, m.inlineWidth()))
 		}
 	case localModelConfirmPull:
 		if selected, found := m.selectedLocalModel(); found {

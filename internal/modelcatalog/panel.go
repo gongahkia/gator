@@ -154,10 +154,13 @@ func (p *ModelCatalogPanel) catalogView() string {
 	}
 	if p.model.localModels.action != localModelIdle {
 		detail := p.model.localModelActionLabel()
-		if p.model.localModels.action == localModelPulling {
+		if p.model.localModels.action == localModelPulling || p.model.localModels.action == localModelInstalling {
 			detail = p.model.localModelProgressLabel()
 		}
 		sections = append(sections, "", keyStyle.Render(p.model.localModels.spinner.View()+" "+detail))
+		if p.model.localModels.action == localModelInstalling && len(p.model.localModels.installerLogs) > 0 {
+			sections = append(sections, dimStyle.Render(wrapText("Installer output:\n"+strings.Join(p.model.localModels.installerLogs, "\n"), p.panelWidth())))
+		}
 	}
 	if notice := p.notice(); notice != "" {
 		sections = append(sections, "", notice)

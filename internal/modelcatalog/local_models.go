@@ -328,11 +328,27 @@ func (m Model) updateLocalModelConfirmation(message tea.KeyMsg) (tea.Model, tea.
 			return m.applyCustomProviderDiscovery()
 		case localModelConfirmRunInstallation:
 			plan := m.localModels.installation
-			m.localModels.installation = nil
 			if plan == nil || plan.Command == "" {
+				m.localModels.installation = nil
 				m.notice = notice{text: "Ollama installation action is no longer available. Open installation help again.", kind: noticeError}
 				return m, nil
 			}
+			if plan.RefreshAfter {
+				if plan.RequiresElevation {
+					return m, tea.ExecProcess(exec.Command("sudo", "-v"), func(err error) tea.Msg {
+						return localInstallerAuthorizationDoneMsg{err: err}
+					})
+				}
+				installer, ok := m.localModels.manager.(LocalInstaller)
+				if !ok {
+					m.localModels.installation = nil
+					m.notice = notice{text: "This Gator build cannot run the Ollama installer. Use the official source shown here.", kind: noticeError}
+					return m, nil
+				}
+				m.localModels.installation = nil
+				return m.beginLocalInstallation(installer)
+			}
+			m.localModels.installation = nil
 			command := exec.Command(plan.Command, plan.Arguments...)
 			return m, tea.ExecProcess(command, func(err error) tea.Msg {
 				return localInstallationDoneMsg{plan: *plan, err: err}
@@ -360,6 +376,21 @@ func (m Model) prepareLocalInstallation() (tea.Model, tea.Cmd) {
 	m.localModels.installation = &plan
 	m.localModels.confirmation = localModelConfirmRunInstallation
 	return m, nil
+}
+
+func (m Model) beginLocalInstallation(installer LocalInstaller) (tea.Model, tea.Cmd) {
+	m.cancelLocalOperation()
+	m.localModels.dependencyHelp = false
+	m.localModels.action = localModelInstalling
+	m.localModels.progress = LocalProgress{Status: "starting official Ollama installer"}
+	m.localModels.installerLogs = []string{"Starting Ollama's official installer…"}
+	m.localModels.err = nil
+	operation := startLocalModelOperation(func(ctx context.Context, report func(LocalProgress)) localModelOperationDone {
+		err := installer.Install(ctx, report)
+		return localModelOperationDone{installation: true, err: err}
+	})
+	m.localModels.operation = operation
+	return m, tea.Batch(m.localModels.spinner.Tick, waitForLocalModelOperation(operation))
 }
 
 func (m *Model) requestLocalRuntimeRecovery() {

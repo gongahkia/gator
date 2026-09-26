@@ -280,6 +280,34 @@ func TestOllamaInstallationPlansUseOfficialPlatformActions(t *testing.T) {
 	}
 }
 
+func TestSplitOllamaInstallerOutputStreamsCarriageReturnProgress(t *testing.T) {
+	advance, token, err := splitOllamaInstallerOutput([]byte("download 20%\rdownload 40%"), false)
+	if err != nil || advance != len("download 20%\r") || string(token) != "download 20%" {
+		t.Fatalf("first installer progress split = advance:%d token:%q err:%v", advance, token, err)
+	}
+	advance, token, err = splitOllamaInstallerOutput([]byte("final line"), true)
+	if err != nil || advance != len("final line") || string(token) != "final line" {
+		t.Fatalf("final installer progress split = advance:%d token:%q err:%v", advance, token, err)
+	}
+}
+
+func TestStreamOllamaInstallerReportsOutputInProgressOrder(t *testing.T) {
+	var updates []string
+	command := exec.Command("sh", "-c", "printf 'download 20%%\\rdownload 40%%\\nfinished\\n'")
+	err := streamOllamaInstaller(command, context.Background(), func(progress modelcatalog.LocalProgress) {
+		updates = append(updates, progress.Status)
+	})
+	if err != nil {
+		t.Fatalf("stream installer: %v", err)
+	}
+	joined := strings.Join(updates, "\n")
+	for _, expected := range []string{"official installer started", "download 20%", "download 40%", "finished"} {
+		if !strings.Contains(joined, expected) {
+			t.Fatalf("installer progress omitted %q: %#v", expected, updates)
+		}
+	}
+}
+
 func useGenerousLocalModelHost(t *testing.T) {
 	t.Helper()
 	previous := inspectLocalModelHost

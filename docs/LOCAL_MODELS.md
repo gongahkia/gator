@@ -50,9 +50,11 @@ If the Ollama executable is missing, the screen offers installation help with th
 [official download source](https://ollama.com/download) and platform guidance.
 On Linux, Enter first shows the exact official `curl -fsSL
 https://ollama.com/install.sh | sh` action, then requires a second confirmation
-before it runs in the restored terminal; it may request a system password. On
-macOS, Gator opens Ollama's official download page so the system installer remains
-visible to you. Gator does not guess distribution package-manager commands.
+before it runs. When elevation is needed, Gator asks for the system password in
+the same terminal once, then returns to the TUI and streams bounded installer
+output while the download runs. On macOS, Gator opens Ollama's official download
+page so the system installer remains visible to you. Gator does not guess
+distribution package-manager commands.
 Once installed, refresh from the Local screen; model downloads, selection,
 deletion and runtime startup require no separate Gator CLI commands.
 

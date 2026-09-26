@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"runtime"
@@ -151,7 +153,94 @@ func (manager *localModelManager) InstallationPlan() (modelcatalog.LocalInstalla
 	if binary, err := manager.ollamaPath(); err == nil {
 		return modelcatalog.LocalInstallationPlan{}, fmt.Errorf("Ollama is already installed at %s", binary)
 	}
-	return ollamaInstallationPlan(runtime.GOOS)
+	plan, err := ollamaInstallationPlan(runtime.GOOS)
+	if err != nil {
+		return modelcatalog.LocalInstallationPlan{}, err
+	}
+	plan.RequiresElevation = plan.RefreshAfter && os.Geteuid() != 0
+	return plan, nil
+}
+
+// Install runs only the reviewed Linux plan and streams bounded installer
+// output back to the TUI. A command that needs interactive elevation reports
+// its own diagnostic instead of attempting to capture or fabricate a password.
+func (manager *localModelManager) Install(ctx context.Context, report func(modelcatalog.LocalProgress)) error {
+	plan, err := manager.InstallationPlan()
+	if err != nil {
+		return err
+	}
+	if !plan.RefreshAfter {
+		return errors.New("this platform uses Ollama's graphical installer; open the official download page instead")
+	}
+	command := exec.CommandContext(ctx, plan.Command, plan.Arguments...)
+	return streamOllamaInstaller(command, ctx, report)
+}
+
+func streamOllamaInstaller(command *exec.Cmd, ctx context.Context, report func(modelcatalog.LocalProgress)) error {
+	stdout, err := command.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("capture Ollama installer output: %w", err)
+	}
+	stderr, err := command.StderrPipe()
+	if err != nil {
+		return fmt.Errorf("capture Ollama installer diagnostics: %w", err)
+	}
+	if err := command.Start(); err != nil {
+		return fmt.Errorf("start Ollama installer: %w", err)
+	}
+	if report != nil {
+		report(modelcatalog.LocalProgress{Status: "official installer started"})
+	}
+	lines := make(chan string, 32)
+	var scanners sync.WaitGroup
+	for _, output := range []io.Reader{stdout, stderr} {
+		scanners.Add(1)
+		go func(reader io.Reader) {
+			defer scanners.Done()
+			scanner := bufio.NewScanner(reader)
+			scanner.Buffer(make([]byte, 1024), 64*1024)
+			scanner.Split(splitOllamaInstallerOutput)
+			for scanner.Scan() {
+				line := strings.TrimSpace(scanner.Text())
+				if line == "" {
+					continue
+				}
+				select {
+				case lines <- line:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}(output)
+	}
+	completed := make(chan error, 1)
+	go func() {
+		err := command.Wait()
+		scanners.Wait()
+		close(lines)
+		completed <- err
+	}()
+	for line := range lines {
+		if report != nil {
+			report(modelcatalog.LocalProgress{Status: line})
+		}
+	}
+	if err := <-completed; err != nil {
+		return fmt.Errorf("Ollama installer: %w", err)
+	}
+	return nil
+}
+
+func splitOllamaInstallerOutput(data []byte, atEOF bool) (advance int, token []byte, err error) {
+	for index, value := range data {
+		if value == '\n' || value == '\r' {
+			return index + 1, data[:index], nil
+		}
+	}
+	if atEOF && len(data) > 0 {
+		return len(data), data, nil
+	}
+	return 0, nil, nil
 }
 
 func ollamaInstallationPlan(osName string) (modelcatalog.LocalInstallationPlan, error) {

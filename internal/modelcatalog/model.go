@@ -118,6 +118,8 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateLocalModelDone(msg)
 	case localInstallationDoneMsg:
 		return m.updateLocalInstallationDone(msg)
+	case localInstallerAuthorizationDoneMsg:
+		return m.updateLocalInstallerAuthorizationDone(msg)
 	}
 	return m, nil
 }

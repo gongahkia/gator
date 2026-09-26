@@ -280,6 +280,13 @@ func (*installationLocalManager) InstallationPlan() (LocalInstallationPlan, erro
 	}, nil
 }
 
+func (*installationLocalManager) Install(_ context.Context, report func(LocalProgress)) error {
+	if report != nil {
+		report(LocalProgress{Status: "downloading Ollama"})
+	}
+	return nil
+}
+
 func (m *lifecycleLocalManager) Status(context.Context) (LocalCatalog, error) { return m.catalog, nil }
 func (m *lifecycleLocalManager) Start(context.Context) (LocalCatalog, error)  { return m.catalog, nil }
 func (m *lifecycleLocalManager) Pull(_ context.Context, _ string, report func(LocalProgress)) (LocalCatalog, error) {

@@ -25,18 +25,20 @@ type LocalManager interface {
 // itself; it runs the command only after an explicit confirmation.
 type LocalInstaller interface {
 	InstallationPlan() (LocalInstallationPlan, error)
+	Install(context.Context, func(LocalProgress)) error
 }
 
 // LocalInstallationPlan is one platform-specific installation action. Command
 // and Arguments are intentionally structured so the TUI does not invoke a
 // shell from free-form display text.
 type LocalInstallationPlan struct {
-	Title          string
-	Detail         string
-	DisplayCommand string
-	Command        string
-	Arguments      []string
-	RefreshAfter   bool
+	Title             string
+	Detail            string
+	DisplayCommand    string
+	Command           string
+	Arguments         []string
+	RefreshAfter      bool
+	RequiresElevation bool
 }
 
 // LocalCatalog is display-safe state for the reviewed local catalog.

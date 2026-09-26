@@ -1,6 +1,10 @@
 package modelcatalog
 
-import tea "github.com/charmbracelet/bubbletea"
+import (
+	"strings"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
 
 func (m Model) updateCloudModelSetupSaved(msg cloudModelSetupSavedMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
@@ -146,6 +150,9 @@ func (m Model) updateLocalProgress(msg localModelProgressMsg) (tea.Model, tea.Cm
 		return m, nil
 	}
 	m.localModels.progress = msg.progress
+	if m.localModels.action == localModelInstalling {
+		m.recordInstallerLog(msg.progress.Status)
+	}
 	return m, waitForLocalModelOperation(m.localModels.operation)
 }
 
@@ -160,6 +167,11 @@ func (m Model) updateLocalModelDone(msg localModelDoneMsg) (tea.Model, tea.Cmd) 
 	if msg.done.err != nil {
 		m.notice = notice{text: "Local model operation stopped: " + msg.done.err.Error(), kind: noticeError}
 		return m, nil
+	}
+	if msg.done.installation {
+		m.localModels.startDismissed = false
+		m.notice = notice{text: "Ollama installer finished. Checking the local runtime now.", kind: noticeInfo}
+		return m.beginLocalStatus()
 	}
 	if msg.done.aliases != nil {
 		m.applyModelAliases(msg.done.aliases)
@@ -186,6 +198,22 @@ func (m Model) updateLocalModelDone(msg localModelDoneMsg) (tea.Model, tea.Cmd) 
 	return m, nil
 }
 
+func (m *Model) recordInstallerLog(value string) {
+	value = strings.Join(strings.Fields(value), " ")
+	if value == "" {
+		return
+	}
+	value = compact(value, 160)
+	if len(m.localModels.installerLogs) > 0 && m.localModels.installerLogs[len(m.localModels.installerLogs)-1] == value {
+		return
+	}
+	m.localModels.installerLogs = append(m.localModels.installerLogs, value)
+	const maxInstallerLogs = 6
+	if len(m.localModels.installerLogs) > maxInstallerLogs {
+		m.localModels.installerLogs = append([]string(nil), m.localModels.installerLogs[len(m.localModels.installerLogs)-maxInstallerLogs:]...)
+	}
+}
+
 func (m Model) updateLocalInstallationDone(msg localInstallationDoneMsg) (tea.Model, tea.Cmd) {
 	m.localModels.installation = nil
 	if msg.err != nil {
@@ -199,4 +227,25 @@ func (m Model) updateLocalInstallationDone(msg localInstallationDoneMsg) (tea.Mo
 	m.localModels.startDismissed = false
 	m.notice = notice{text: "Ollama installer finished. Checking the local runtime now.", kind: noticeInfo}
 	return m.beginLocalStatus()
+}
+
+func (m Model) updateLocalInstallerAuthorizationDone(msg localInstallerAuthorizationDoneMsg) (tea.Model, tea.Cmd) {
+	plan := m.localModels.installation
+	if msg.err != nil {
+		m.localModels.installation = nil
+		m.notice = notice{text: "Authorize Ollama installation: " + msg.err.Error(), kind: noticeError}
+		return m, nil
+	}
+	if plan == nil {
+		m.notice = notice{text: "Ollama installation action is no longer available. Open installation help again.", kind: noticeError}
+		return m, nil
+	}
+	installer, ok := m.localModels.manager.(LocalInstaller)
+	if !ok {
+		m.localModels.installation = nil
+		m.notice = notice{text: "This Gator build cannot run the Ollama installer. Use the official source shown here.", kind: noticeError}
+		return m, nil
+	}
+	m.localModels.installation = nil
+	return m.beginLocalInstallation(installer)
 }

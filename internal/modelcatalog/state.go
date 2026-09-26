@@ -14,6 +14,7 @@ const (
 	localModelRefreshing
 	localModelPulling
 	localModelStarting
+	localModelInstalling
 	localModelUsing
 	localModelRemoving
 	localModelRenaming
@@ -42,10 +43,11 @@ type localModelOperation struct {
 }
 
 type localModelOperationDone struct {
-	catalog *LocalCatalog
-	update  *LocalUpdate
-	aliases map[string]string
-	err     error
+	catalog      *LocalCatalog
+	update       *LocalUpdate
+	aliases      map[string]string
+	installation bool
+	err          error
 }
 
 type localModelStatusMsg struct {
@@ -68,6 +70,8 @@ type localInstallationDoneMsg struct {
 	plan LocalInstallationPlan
 	err  error
 }
+
+type localInstallerAuthorizationDoneMsg struct{ err error }
 
 type localModelsState struct {
 	manager        LocalManager
@@ -92,6 +96,7 @@ type localModelsState struct {
 	startDismissed bool
 	dependencyHelp bool
 	installation   *LocalInstallationPlan
+	installerLogs  []string
 }
 
 type modelCatalogSection uint8
