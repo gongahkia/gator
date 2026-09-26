@@ -429,8 +429,19 @@ func TestInitialViewIsADeclutteredCenteredComposer(t *testing.T) {
 	}
 	submitted, _ := typingModel.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	submittedModel := submitted.(Model)
-	if submittedModel.home || strings.Contains(submittedModel.View(), "What do you want to accomplish?") || !strings.Contains(submittedModel.View(), "Work in reports") {
-		t.Fatalf("composer did not dock after submission: %q", submittedModel.View())
+	submittedView := ansi.Strip(submittedModel.View())
+	if submittedModel.home || strings.Contains(submittedView, "What do you want to accomplish?") || !strings.Contains(submittedView, "Work in reports") {
+		t.Fatalf("composer did not enter the Work view after submission: %q", submittedView)
+	}
+	composerRow := -1
+	for row, line := range strings.Split(submittedView, "\n") {
+		if strings.Contains(line, "Ask Gator to work on something") {
+			composerRow = row
+			break
+		}
+	}
+	if composerRow < submittedModel.height/3 || composerRow > submittedModel.height*2/3 {
+		t.Fatalf("composer row = %d, want the middle third of %d rows:\n%s", composerRow, submittedModel.height, submittedView)
 	}
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlP})
 	view = updated.(Model).View()

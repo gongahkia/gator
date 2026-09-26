@@ -83,14 +83,33 @@ func (m Model) View() string {
 	if footer != "" {
 		footerRows = strings.Count(footer, "\n") + 1
 	}
+	composer := m.renderComposer(width, !m.running)
+	composerRows := strings.Count(composer, "\n") + 1
+	// Keep composition in the same general area as the empty Work screen.
+	// Conversation output is allowed to use the space above it, rather than
+	// pushing the primary input to the bottom of the terminal.
+	composerTop := max(2, height/2-composerRows/2)
+	workingRows := 0
+	if m.running {
+		workingRows = 2
+	}
 	lines := strings.Split(strings.TrimSuffix(transcript.String(), "\n"), "\n")
-	available := max(4, height-9-footerRows)
+	headerRows := strings.Count(view.String(), "\n")
+	aboveComposer := max(0, composerTop-headerRows-workingRows)
+	footerSpace := 0
+	if footerRows > 0 {
+		footerSpace = footerRows + 1
+	}
+	belowComposer := max(0, height-composerTop-composerRows-footerSpace)
+	available := aboveComposer + belowComposer
 	maxScroll := max(0, len(lines)-available)
 	scroll := min(m.scroll, maxScroll)
 	end := len(lines) - scroll
 	start := max(0, end-available)
-	if len(lines) > 0 && lines[0] != "" {
-		view.WriteString(strings.Join(lines[start:end], "\n") + "\n")
+	visible := lines[start:end]
+	aboveEnd := min(aboveComposer, len(visible))
+	if aboveEnd > 0 && visible[0] != "" {
+		view.WriteString(strings.Join(visible[:aboveEnd], "\n") + "\n")
 	}
 	if m.running {
 		working := rattles.BrailleDots.Frame(m.loadingFrame) + " Working…"
@@ -99,7 +118,13 @@ func (m Model) View() string {
 		}
 		view.WriteString(accent.Render(working) + "\n\n")
 	}
-	view.WriteString(m.renderComposer(width, !m.running))
+	if currentRow := strings.Count(view.String(), "\n"); currentRow < composerTop {
+		view.WriteString(strings.Repeat("\n", composerTop-currentRow))
+	}
+	view.WriteString(composer)
+	if aboveEnd < len(visible) {
+		view.WriteString("\n" + strings.Join(visible[aboveEnd:], "\n"))
+	}
 	if footer != "" {
 		view.WriteString("\n" + dim.Render(footer))
 	}
