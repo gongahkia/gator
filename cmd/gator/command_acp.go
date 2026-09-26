@@ -8,7 +8,8 @@ import (
 	"os"
 
 	internalacp "github.com/gongahkia/gator/internal/acp"
-	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/state"
+	"github.com/gongahkia/gator/internal/workrun"
 )
 
 // acpMode starts Gator as a local stdio ACP agent. Verification is process
@@ -40,14 +41,17 @@ func acpMode(arguments []string, input io.Reader, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
+	stateDir, err := state.ResolveDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {
 		return err
 	}
 	server, err := internalacp.New(internalacp.Config{
-		Input: input, Output: out, RepositoryPath: repository, StateDir: stateDir,
-		DefaultProvider: defaults.Provider, DefaultModel: defaults.Model, DefaultBaseURL: os.Getenv("GATOR_BASE_URL"),
-		DefaultVerification: verification, AgentVersion: version, ResolveProvider: resolveConfiguredProvider, NewExecutor: newExecutor,
+		Input: input, Output: out, RepositoryPath: repository,
+		DefaultProvider: defaults.Provider, DefaultModel: defaults.Model,
+		DefaultVerification: verification, AgentVersion: version, ResolveProvider: resolveConfiguredProvider,
+		NewWorkService: func(provider, modelName string, request *workrun.Request) (workrun.Service, error) {
+			return configuredWorkService(provider, modelName, stateDir, request)
+		},
 	})
 	if err != nil {
 		return err
