@@ -145,7 +145,7 @@ func (m Model) renderHome(width, height int, accent lipgloss.Style) string {
 	if currentRow := strings.Count(view.String(), "\n"); currentRow < composerTop {
 		view.WriteString(strings.Repeat("\n", composerTop-currentRow))
 	}
-	view.WriteString(lipgloss.Place(width, composerRows, lipgloss.Center, lipgloss.Top, composer))
+	view.WriteString(composer)
 	return view.String()
 }
 

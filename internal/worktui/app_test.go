@@ -418,6 +418,11 @@ func TestInitialViewIsADeclutteredBottomComposer(t *testing.T) {
 	if !strings.HasPrefix(initialLines[0], gatorWordmark) {
 		t.Fatalf("initial logo is not top-left: %q", initialLines[0])
 	}
+	for _, line := range initialLines {
+		if strings.Contains(line, "Ask Gator to work on something") && !strings.HasPrefix(line, "│") {
+			t.Fatalf("initial composer is not left-aligned: %q", line)
+		}
+	}
 	if strings.Contains(view, "Inbox") || strings.Contains(view, "Scheduled jobs") || strings.Contains(view, "local-first work") {
 		t.Fatalf("initial view exposes launcher clutter: %q", view)
 	}
