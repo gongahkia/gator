@@ -299,6 +299,8 @@ func (m Model) updateHistorySectionKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.reviewHistoryDetail()
 		case "c":
 			m.resumeHistoryConversation()
+		case "t":
+			return m.prepareHistoryRetry()
 		}
 		return m, nil
 	}

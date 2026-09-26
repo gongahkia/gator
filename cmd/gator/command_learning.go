@@ -33,9 +33,9 @@ func learningCommand(arguments []string, out io.Writer) error {
 	return runLearningCommand(stateDir, arguments, out)
 }
 
-// runLearningCommand is the shared local presentation adapter used by both
-// the CLI and the Work TUI. It invokes the same file-backed learning service;
-// the TUI never shells out to the CLI.
+// runLearningCommand is the CLI presentation adapter over the file-backed
+// learning service. The Work TUI calls that same service directly so it can
+// render structured records rather than parsing CLI-oriented text.
 func runLearningCommand(stateDir string, arguments []string, out io.Writer) error {
 	store, err := learning.Open(stateDir)
 	if err != nil {

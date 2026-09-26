@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/delivery"
 	"github.com/gongahkia/gator/internal/learning"
@@ -245,6 +246,49 @@ func (m *Model) resumeHistoryConversation() {
 	conversationID := m.historyDetail.Record.ConversationID
 	m.section, m.historyDetail, m.sectionNotice = "", nil, ""
 	m.restoreConversation(conversationID, "Opened from History.")
+}
+
+func (m Model) prepareHistoryRetry() (tea.Model, tea.Cmd) {
+	if m.historyDetail == nil {
+		return m, nil
+	}
+	if m.config.BundleAction == nil {
+		m.sectionNotice = "Delivery retry is unavailable in this build."
+		return m, nil
+	}
+	if len(m.historyDetail.Deliveries) != 1 {
+		m.sectionNotice = "Retry is available when this Work has one selected delivery record."
+		return m, nil
+	}
+	record := m.historyDetail.Deliveries[0]
+	eligible := false
+	for _, effect := range record.Effects {
+		eligible = eligible || effect.Retryable && (effect.Status == delivery.Pending || effect.Status == delivery.Failed)
+	}
+	if !eligible {
+		m.sectionNotice = "This delivery has no known retryable effects. Unknown outcomes require inspection."
+		return m, nil
+	}
+	path := m.historyDetail.Record.Evidence.ArtifactManifestPath
+	if path == "" {
+		m.sectionNotice = "This Work has no retained output for a delivery retry."
+		return m, nil
+	}
+	m.lastBundle = BundleSummary{Path: filepath.Dir(path)}
+	m.section, m.historyDetail, m.sectionNotice = "", nil, ""
+	return m.prepareRetry("/retry " + record.ID)
+}
+
+func (m Model) historyRetryAvailable() bool {
+	if m.historyDetail == nil || m.config.BundleAction == nil || len(m.historyDetail.Deliveries) != 1 || m.historyDetail.Record.Evidence.ArtifactManifestPath == "" {
+		return false
+	}
+	for _, effect := range m.historyDetail.Deliveries[0].Effects {
+		if effect.Retryable && (effect.Status == delivery.Pending || effect.Status == delivery.Failed) {
+			return true
+		}
+	}
+	return false
 }
 
 func historyFilterName(value workhistory.Status) string {

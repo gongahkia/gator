@@ -266,6 +266,9 @@ func (m Model) renderHistoryDetail(width int, accent, dim lipgloss.Style) string
 		view.WriteString("\n" + dim.Render(m.sectionNotice) + "\n")
 	}
 	controls := "esc back · r review retained output"
+	if m.historyRetryAvailable() {
+		controls += " · t retry delivery"
+	}
 	if detail.Record.ConversationID != "" {
 		controls += " · c open conversation"
 	}

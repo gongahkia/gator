@@ -62,6 +62,11 @@ func TestGlobalHistoryUsesCanonicalStoreForAllWorkDetailAndReview(t *testing.T) 
 	if model.section != "history" || len(model.historyItems) != 3 || model.historyItems[0].Record.ID != "work-running" || !strings.Contains(model.View(), "Prepare the project report") || !strings.Contains(model.View(), "Repair the failed import") {
 		t.Fatalf("global history = %#v\n%s", model.historyItems, model.View())
 	}
+	for _, want := range []string{"running · inspect", "failed · draft", "completed · draft", "verification failed", "delivery not delivered"} {
+		if !strings.Contains(model.View(), want) {
+			t.Fatalf("history list omitted truthful state %q:\n%s", want, model.View())
+		}
+	}
 	for index, item := range model.historyItems {
 		if item.Record.ID == "work-completed" {
 			model.selected = index
@@ -73,7 +78,7 @@ func TestGlobalHistoryUsesCanonicalStoreForAllWorkDetailAndReview(t *testing.T) 
 		t.Fatalf("history detail = %#v", model.historyDetail)
 	}
 	view := model.View()
-	for _, want := range []string{"Snapshot: snap-history", "not delivered", "user_corrected", "Use concise sections."} {
+	for _, want := range []string{"Snapshot: snap-history", "not delivered", "user_corrected", "Use concise sections.", "Artifact bundle unavailable"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("history detail omitted %q:\n%s", want, view)
 		}
@@ -89,6 +94,90 @@ func TestGlobalHistoryUsesCanonicalStoreForAllWorkDetailAndReview(t *testing.T) 
 	model = updated.(Model)
 	if model.historyFilter != workhistory.Running || len(model.historyItems) != 1 || model.historyItems[0].Record.ID != "work-running" {
 		t.Fatalf("history status filter = %q %#v", model.historyFilter, model.historyItems)
+	}
+}
+
+func TestHistoryDeliveryStateRepresentsPendingAppliedFailedAndUnknown(t *testing.T) {
+	tests := []struct {
+		name    string
+		effects []delivery.Effect
+		want    string
+	}{
+		{name: "empty", want: "not delivered"},
+		{name: "applied", effects: []delivery.Effect{{Status: delivery.Applied}}, want: "applied"},
+		{name: "failed", effects: []delivery.Effect{{Status: delivery.Failed}}, want: "needs attention"},
+		{name: "unknown", effects: []delivery.Effect{{Status: delivery.Unknown}}, want: "needs attention"},
+		{name: "pending", effects: []delivery.Effect{{Status: delivery.Pending}}, want: "needs attention"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var records []delivery.Record
+			if test.effects != nil {
+				records = []delivery.Record{{Effects: test.effects}}
+			}
+			if got := historyDeliveryState(records); got != test.want {
+				t.Fatalf("delivery state = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
+func TestHistoryRetryUsesTheExistingConfirmedDeliveryAction(t *testing.T) {
+	var requests []BundleActionRequest
+	model := New(Config{CurrentFolder: "/work", BundleAction: func(request BundleActionRequest) (string, error) {
+		requests = append(requests, request)
+		if request.Execute {
+			return "retry complete", nil
+		}
+		return "retry preview", nil
+	}})
+	model.home = false
+	model.section = "history"
+	model.historyDetail = &historyDetail{
+		historyItem: historyItem{Record: workhistory.Record{Evidence: workhistory.EvidenceReferences{ArtifactManifestPath: "/state/work/manifest.json"}}},
+		Deliveries:  []delivery.Record{{ID: "delivery-retry", Effects: []delivery.Effect{{Status: delivery.Failed, Retryable: true}}}},
+	}
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("t")})
+	model = updated.(Model)
+	if command != nil || model.pendingBundleAction == nil || model.pendingBundleAction.request.Action != "retry" || model.pendingBundleAction.request.DeliveryID != "delivery-retry" || model.section != "" {
+		t.Fatalf("history retry did not prepare normal delivery confirmation: %#v", model)
+	}
+	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if command == nil {
+		t.Fatal("history retry confirmation did not invoke delivery action")
+	}
+	updated, _ = model.Update(command())
+	model = updated.(Model)
+	if len(requests) != 2 || requests[0].Execute || !requests[1].Execute || !strings.Contains(model.View(), "retry complete") {
+		t.Fatalf("history retry delivery requests = %#v\n%s", requests, model.View())
+	}
+}
+
+func TestHistoryAndLearningsHaveUsefulEmptyStates(t *testing.T) {
+	state := t.TempDir()
+	history, err := workhistory.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deliveries, err := delivery.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	learnings, err := learning.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	model := New(Config{CurrentFolder: t.TempDir(), HistoryStore: &history, DeliveryStore: &deliveries, LearningStore: &learnings})
+	model = submitTUICommand(t, model, "/history")
+	if !strings.Contains(model.View(), "No retained Work matches this view yet.") {
+		t.Fatalf("empty history state = %s", model.View())
+	}
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model = updated.(Model)
+	model = submitTUICommand(t, model, "/learnings")
+	if !strings.Contains(model.View(), "No learnings match this view.") {
+		t.Fatalf("empty learning state = %s", model.View())
 	}
 }
 
