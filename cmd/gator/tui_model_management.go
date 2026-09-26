@@ -257,9 +257,6 @@ func credentialKindLabel(credential auth.Credential) string {
 }
 
 func gatorCredentialStoreKey(provider model.Provider) string {
-	if provider == model.Claude {
-		return string(model.Anthropic)
-	}
 	return string(provider)
 }
 
@@ -282,37 +279,7 @@ func remainingCredentialSources(provider model.Provider) []string {
 			add(name)
 		}
 	}
-	switch provider {
-	case model.Claude, model.Anthropic:
-		addEnv("ANTHROPIC_API_KEY")
-	case model.AzureOpenAI, model.AzureOpenAIResponses:
-		addEnv("AZURE_OPENAI_API_KEY")
-		addEnv("AZURE_OPENAI_AUTH_TOKEN")
-	case model.AmazonBedrock:
-		addEnv("AWS_BEARER_TOKEN_BEDROCK")
-		if model.AmbientCredentialAvailable(provider) {
-			if source := model.AmbientCredentialSource(provider); source != "" {
-				add(source)
-			} else {
-				add("standard AWS credential chain")
-			}
-		}
-	case model.GoogleVertex:
-		addEnv("GATOR_VERTEX_ACCESS_TOKEN")
-		addEnv("GOOGLE_APPLICATION_CREDENTIALS")
-		if model.AmbientCredentialAvailable(provider) {
-			add("Google Application Default Credentials")
-		}
-	default:
-		addEnv(model.APIKeyEnvironment(provider))
-		if model.AmbientCredentialAvailable(provider) {
-			if source := model.AmbientCredentialSource(provider); source != "" {
-				add(source)
-			} else {
-				add(model.CredentialHint(provider))
-			}
-		}
-	}
+	addEnv(model.APIKeyEnvironment(provider))
 	return sources
 }
 

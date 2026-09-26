@@ -133,7 +133,7 @@ func commandPaletteEntries() []entry {
 	return []entry{
 		{title: "/help", subtitle: "Show Gator commands", kind: "command", command: "/help"},
 		{title: "/new", subtitle: "Start a clean Gator conversation", kind: "command", command: "/new"},
-		{title: "/model", subtitle: "Cloud and local models · configure, sign in, download, select", kind: "command", command: "/model"},
+		{title: "/model", subtitle: "Choose Cloud API key or Local model · configure, download, select", kind: "command", command: "/model"},
 		{title: "/source", subtitle: "Choose the workspace for this conversation", kind: "command", command: "/source"},
 		{title: "/mode", subtitle: "Set auto, inspect, draft, or act", kind: "command-input", command: "/mode"},
 		{title: "/settings", subtitle: "Inspect current settings", kind: "command", command: "/settings"},
@@ -181,9 +181,9 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		m.lastOutput, m.lastBundle = "", BundleSummary{}
 		m.options = RunOptions{MaxSteps: 24, Mode: "auto", Code: CodeOptions{MaxSteps: 16, Sandbox: "strict", Network: "deny"}}
 		return m, nil
-	case "/model":
+	case "/model", "/models":
 		if len(fields) != 1 {
-			result = "Use /model to configure, sign in to, and select cloud or local models."
+			result = "Use /model to choose a cloud API key or local model."
 			break
 		}
 		if m.config.Models == nil {
@@ -953,7 +953,7 @@ func workHelp() string {
   Start Work by writing your request below. Gator retains its output and follows
   the current workspace, model, and mode.
 
-  /model                         choose or set up a model
+  /model                         choose Cloud API key or Local model
   /source [PATH]                 choose the workspace
   /mode auto|inspect|draft|act   choose Work authority
   /code on|off                   require a verified code change

@@ -12,75 +12,23 @@ import (
 )
 
 const providerOnboardingUsage = `usage:
-  gator provider openai
-  gator provider anthropic
-  gator provider gemini
-  gator provider codex
-  gator provider copilot
-  gator provider kimi
-  gator provider xai
-  gator provider claude
-  gator provider openrouter
-  gator provider radius
+  gator provider PROVIDER
 
-Provider onboarding starts Gator's supported sign-in route. Claude, Radius,
-and native xAI runs use API credentials held by Gator; their provider account
-subscription flows remain separate.`
+Provider onboarding stores a direct provider API key. Use gator provider list
+to inspect custom OpenAI-compatible endpoints, or /model in the TUI to choose
+Cloud API key or Local model.`
 
-// onboardProvider is the provider-first onboarding path. It always creates a
-// Gator-managed credential or starts a Gator-owned OAuth flow; it never starts
-// an external agent runtime.
+// onboardProvider is the provider-first API-key setup path. Gator does not
+// authenticate through subscription or external coding-agent harnesses.
 func onboardProvider(arguments []string, out io.Writer) error {
-	if len(arguments) == 0 {
+	if len(arguments) != 1 {
 		return errors.New(providerOnboardingUsage)
 	}
-	target := strings.ToLower(strings.TrimSpace(arguments[0]))
-	remaining := arguments[1:]
-	switch target {
-	case "codex", "copilot", "kimi", "kimi-coding":
-		if len(remaining) != 0 {
-			return fmt.Errorf("usage: gator provider %s", target)
-		}
-		return login([]string{target}, out)
-	case "xai", "grok":
-		if len(remaining) != 0 {
-			return errors.New("usage: gator provider xai")
-		}
-		return onboardAPIKeyProvider("xai", out)
-	case "claude", "anthropic":
-		if len(remaining) != 0 {
-			return errors.New("usage: gator provider claude")
-		}
-		if err := onboardAPIKeyProvider("anthropic", out); err != nil {
-			return fmt.Errorf("onboard Claude: %w", err)
-		}
-		return nil
-	case "openrouter":
-		if len(remaining) != 0 {
-			return errors.New("usage: gator provider openrouter")
-		}
-		return login([]string{"openrouter", "--subscription"}, out)
-	case "radius":
-		if len(remaining) != 0 {
-			return errors.New("usage: gator provider radius")
-		}
-		if _, err := fmt.Fprintln(out, "Radius account OAuth requires a Gator-registered client. Connecting with a Radius API key instead."); err != nil {
-			return err
-		}
-		if err := onboardAPIKeyProvider("radius", out); err != nil {
-			return fmt.Errorf("onboard Radius: %w", err)
-		}
-		return nil
-	default:
-		provider, err := model.ParseProvider(target)
-		if err == nil && model.SupportsAPIKeyLogin(provider) && model.APIKeyEnvironment(provider) != "" {
-			if len(remaining) != 0 {
-				return fmt.Errorf("usage: gator provider %s", target)
-			}
-			return onboardAPIKeyProvider(string(provider), out)
-		}
-		return fmt.Errorf("unknown provider %q\n\n%s", target, providerOnboardingUsage)
+	provider, err := model.ParseProvider(strings.ToLower(strings.TrimSpace(arguments[0])))
+	if err != nil || !model.SupportsAPIKeyLogin(provider) {
+		return fmt.Errorf("unknown API-key provider %q\n\n%s", arguments[0], providerOnboardingUsage)
 	}
+	return onboardAPIKeyProvider(string(provider), out)
 }
 
 func onboardAPIKeyProvider(providerName string, out io.Writer) error {

@@ -50,10 +50,7 @@ func (m Model) modelCatalogConfirmationView() string {
 	case localModelConfirmRemoveCredential:
 		if cloud, found := m.selectedCloudModel(); found {
 			status := m.storedCredential(cloud.provider)
-			detail := cloud.provider + " · stored " + status.Kind + "\nOnly Gator's private credential file is changed. Environment variables, AWS/ADC, one-run keys, and vendor CLI logins remain."
-			if cloud.provider == "claude" {
-				detail = "Claude Code · stored Anthropic API key\nThis removes the Gator-owned Anthropic key. ANTHROPIC_API_KEY in the environment is not unset."
-			}
+			detail := cloud.provider + " · stored " + status.Kind + "\nOnly Gator's private credential file is changed. Environment variables and one-run keys are unchanged."
 			return m.fieldView("Remove stored Gator credential?", "This does not revoke the upstream key and does not log you out of vendor CLIs.", detail)
 		}
 	case localModelConfirmRemoveCustom:

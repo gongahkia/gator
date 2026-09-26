@@ -112,12 +112,6 @@ func inspectProviderAuth(custom config.CustomProvider, customProvider bool, prov
 		} else {
 			authentication = "API key from " + custom.APIKeyEnv
 		}
-	} else if provider == model.Claude {
-		authentication = "unsupported native Claude.ai subscription OAuth; use provider anthropic with an API key"
-	} else if provider == model.GoogleVertex {
-		authentication = model.CredentialHint(provider)
-	} else if provider == model.AmazonBedrock {
-		authentication += " or " + model.CredentialHint(provider)
 	} else if model.SupportsAPIKeyLogin(provider) {
 		authentication += " or " + model.CredentialHint(provider)
 	}
@@ -130,17 +124,8 @@ func inspectProviderAuth(custom config.CustomProvider, customProvider bool, prov
 		}
 		return authentication, authenticationStatus, nil
 	}
-	if provider == model.Claude {
-		return authentication, "use gator provider claude", nil
-	}
 	if !model.SupportsDirect(provider) {
 		return authentication, "unsupported", nil
-	}
-	if provider == model.GoogleVertex {
-		if model.AmbientCredentialAvailable(provider) {
-			authenticationStatus = "configured"
-		}
-		return authentication, authenticationStatus, nil
 	}
 	credentials, err := gatorCredentials()
 	if err != nil {
@@ -153,12 +138,8 @@ func inspectProviderAuth(custom config.CustomProvider, customProvider bool, prov
 	switch {
 	case stored && credential.Expired(time.Now()):
 		authenticationStatus = "expired"
-	case stored && (credential.IsAPIKey() || credential.IsBearerToken() || credential.IsOAuth()):
+	case stored && credential.IsAPIKey():
 		authenticationStatus = "stored"
-	case provider == model.AmazonBedrock && model.AmbientCredentialAvailable(provider):
-		authenticationStatus = model.AmbientCredentialSource(provider)
-	case provider == model.AzureOpenAIResponses && model.AmbientCredentialAvailable(provider):
-		authenticationStatus = "set in environment"
 	case model.SupportsAPIKeyLogin(provider) && model.APIKeyEnvironment(provider) != "" && os.Getenv(model.APIKeyEnvironment(provider)) != "":
 		authenticationStatus = "set in environment"
 	}

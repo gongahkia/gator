@@ -1,11 +1,9 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/auth"
@@ -107,14 +105,8 @@ func newNativeExecutorConfiguration(providerName, modelName, baseURL string) (na
 	if err != nil {
 		return nativeExecutorConfiguration{}, err
 	}
-	if provider == model.Claude {
-		return nativeExecutorConfiguration{}, fmt.Errorf("Claude.ai subscription OAuth is not a supported native Gator provider; use provider %q with an API key", model.Anthropic)
-	}
 	credentials, err := gatorCredentials()
 	if err != nil {
-		return nativeExecutorConfiguration{}, err
-	}
-	if err := refreshProviderCredential(context.Background(), provider, credentials, oauthFlow, time.Now()); err != nil {
 		return nativeExecutorConfiguration{}, err
 	}
 	backend, err := model.New(model.Config{
@@ -250,42 +242,6 @@ func customProviderSupportsModel(provider config.CustomProvider, modelName strin
 		}
 	}
 	return false
-}
-
-func refreshProviderCredential(ctx context.Context, provider model.Provider, credentials auth.Store, flowFor func(model.Provider) (auth.BrowserFlow, error), now time.Time) error {
-	if !model.SupportsOAuthLogin(provider) {
-		return nil
-	}
-	credential, found, err := credentials.Read(string(provider))
-	if err != nil || !found || !credential.IsOAuth() || credential.Expires == 0 || credential.Expires > now.Add(5*time.Minute).UnixMilli() {
-		return err
-	}
-	if provider == model.Copilot {
-		refreshContext, cancel := context.WithTimeout(ctx, 30*time.Second)
-		defer cancel()
-		refreshed, err := refreshCopilotCredential(refreshContext, credential)
-		if err != nil {
-			return fmt.Errorf("refresh %s OAuth credential: %w", provider, err)
-		}
-		if err := credentials.Put(string(provider), refreshed); err != nil {
-			return fmt.Errorf("store refreshed %s OAuth credential: %w", provider, err)
-		}
-		return nil
-	}
-	flow, err := flowFor(provider)
-	if err != nil {
-		return fmt.Errorf("refresh %s OAuth credential: %w", provider, err)
-	}
-	refreshContext, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	refreshed, err := flow.Refresh(refreshContext, credential)
-	if err != nil {
-		return fmt.Errorf("refresh %s OAuth credential: %w", provider, err)
-	}
-	if err := credentials.Put(string(provider), refreshed); err != nil {
-		return fmt.Errorf("store refreshed %s OAuth credential: %w", provider, err)
-	}
-	return nil
 }
 
 func gatorCredentials() (auth.Store, error) {

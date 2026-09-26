@@ -50,10 +50,10 @@ func currentWorkModelStatus(settingsStore config.Store, stateDir string) (worktu
 		kind := strings.ToLower(credentialKindLabel(credential))
 		if credential.Expired(time.Now()) {
 			status.Access = "stored " + kind + " expired"
-		} else if credential.IsOAuth() {
-			status.Access = "logged in (Gator OAuth credential)"
-		} else {
+		} else if credential.IsAPIKey() {
 			status.Access = "authenticated with Gator " + kind
+		} else {
+			status.Access = "stored non-API credential is not supported; configure an API key"
 		}
 		return status, nil
 	}
@@ -61,11 +61,7 @@ func currentWorkModelStatus(settingsStore config.Store, stateDir string) (worktu
 		status.Access = "authenticated via " + strings.Join(sources, ", ")
 		return status, nil
 	}
-	if model.RequiresOAuthLogin(provider) {
-		status.Access = "not logged in"
-	} else {
-		status.Access = "not authenticated; requires " + model.CredentialHint(provider)
-	}
+	status.Access = "not authenticated; requires " + model.CredentialHint(provider)
 	return status, nil
 }
 

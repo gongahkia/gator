@@ -21,7 +21,7 @@ import (
 
 const providerUsage = `usage:
   gator provider PROVIDER [OPTIONS]
-  gator provider login PROVIDER [--subscription | --prompt | --api-key KEY | --from-env NAME | --bearer-token TOKEN | --bearer-token-from-env NAME]
+  gator provider login PROVIDER [--prompt | --api-key KEY | --from-env NAME]
   gator provider logout PROVIDER
   gator provider list
   gator provider add ID --base-url URL --model MODEL [--model MODEL...] [--api-key-env NAME]
