@@ -3,9 +3,7 @@
 package model
 
 import (
-	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/gongahkia/gator/internal/model/anthropic"
@@ -49,26 +47,6 @@ func newBackend(provider Provider, config Config) (Backend, error) {
 			AuthorizationPrefix: credential.prefix,
 			Client:              config.Client,
 		}}, nil
-	case Codex:
-		credential, err := oauthCredential(config, provider)
-		if err != nil {
-			return Backend{}, err
-		}
-		accountID, err := codexAccountID(credential)
-		if err != nil {
-			return Backend{}, err
-		}
-		return Backend{Provider: provider, Model: openai.Responses{
-			APIKey:  credential.Access,
-			Model:   config.Model,
-			BaseURL: codexResponsesURL(config.BaseURL),
-			Headers: http.Header{
-				"Chatgpt-Account-Id": []string{accountID},
-				"Openai-Beta":        []string{"responses=experimental"},
-				"Originator":         []string{"gator"},
-			},
-			Client: config.Client,
-		}}, nil
 	case Anthropic:
 		apiKey, err := key(config, provider, "ANTHROPIC_API_KEY")
 		if err != nil {
@@ -78,55 +56,19 @@ func newBackend(provider Provider, config Config) (Backend, error) {
 			return Backend{}, err
 		}
 		return Backend{Provider: provider, Model: anthropic.Messages{APIKey: apiKey, Model: config.Model, BaseURL: config.BaseURL, Client: config.Client}}, nil
-	case Claude:
-		credential, err := oauthCredential(config, provider)
-		if err != nil {
-			return Backend{}, err
-		}
-		return Backend{Provider: provider, Model: anthropic.Messages{
-			APIKey:     credential.Access,
-			Model:      config.Model,
-			BaseURL:    config.BaseURL,
-			BearerAuth: true,
-			Headers: http.Header{
-				"Anthropic-Dangerous-Direct-Browser-Access": []string{"true"},
-				"Anthropic-Beta": []string{"oauth-2025-04-20"},
-			},
-			Client: config.Client,
-		}}, nil
-	case Copilot:
-		credential, err := oauthCredential(config, provider)
-		if err != nil {
-			return Backend{}, err
-		}
-		if strings.TrimSpace(config.Model) == "" {
-			return Backend{}, errors.New("--model is required for provider \"copilot\"; choose an enabled account model")
-		}
-		return Backend{Provider: provider, Model: chatcompletions.Model{Config: chatcompletions.Config{
-			APIKey:       credential.Access,
-			APIKeyEnv:    "Gator Copilot OAuth credential",
-			BaseURL:      copilotChatURL(config.BaseURL, credential.Extra["base_url"]),
-			Model:        config.Model,
-			ProviderName: "GitHub Copilot",
-			Headers: http.Header{
-				"User-Agent":             []string{"GitHubCopilotChat/0.35.0"},
-				"Editor-Version":         []string{"vscode/1.107.0"},
-				"Editor-Plugin-Version":  []string{"copilot-chat/0.35.0"},
-				"Copilot-Integration-Id": []string{"vscode-chat"},
-			},
-			RequestHeaders: copilotRequestHeaders,
-			Client:         config.Client,
-		}}}, nil
 	case KimiCoding:
-		apiKey, bearer, err := kimiCredential(config)
+		apiKey, err := key(config, provider, "KIMI_API_KEY")
 		if err != nil {
+			return Backend{}, err
+		}
+		if err := requireKey(apiKey, "KIMI_API_KEY"); err != nil {
 			return Backend{}, err
 		}
 		return Backend{Provider: provider, Model: anthropic.Messages{
 			APIKey:     apiKey,
 			Model:      config.Model,
 			BaseURL:    kimiMessagesURL(config.BaseURL),
-			BearerAuth: bearer,
+			BearerAuth: true,
 			Client:     config.Client,
 		}}, nil
 	case Radius:
@@ -184,26 +126,12 @@ func newBackend(provider Provider, config Config) (Backend, error) {
 		return Backend{Provider: provider, Model: chatcompletions.Model{Config: compatible}}, nil
 	case CloudflareGateway:
 		return cloudflareGatewayBackend(config)
-	case AmazonBedrock:
-		compatible, err := bedrockConfig(config)
-		if err != nil {
-			return Backend{}, err
-		}
-		return Backend{Provider: provider, Model: chatcompletions.Model{Config: compatible}}, nil
-	case GoogleVertex:
-		compatible, err := vertexConfig(config)
-		if err != nil {
-			return Backend{}, err
-		}
-		return Backend{Provider: provider, Model: chatcompletions.Model{Config: compatible}}, nil
 	case AzureOpenAI, Mistral, XAI, Groq, OpenRouter, Together, Fireworks, DeepSeek, Cerebras, NVIDIA, HuggingFace, MoonshotAI, ZAI, ZAICodingCN, Baseten, VercelAIGateway, AntLing, Xiaomi, MoonshotAICN, QwenTokenPlan, QwenTokenPlanCN, QwenTokenPlanIndividual, XiaomiTokenPlanCN, XiaomiTokenPlanAMS, XiaomiTokenPlanSGP, OpenAICompatible:
 		compatible, err := compatibleConfig(provider, config)
 		if err != nil {
 			return Backend{}, err
 		}
 		return Backend{Provider: provider, Model: chatcompletions.Model{Config: compatible}}, nil
-	case Cursor:
-		return Backend{}, fmt.Errorf("provider %q has no supported direct model API integration; Gator will not launch the %s CLI", provider, provider)
 	default:
 		return Backend{}, fmt.Errorf("unsupported provider %q", provider)
 	}

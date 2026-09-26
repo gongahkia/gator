@@ -12,7 +12,7 @@ func (m Model) openModelCatalog() (tea.Model, tea.Cmd) {
 		m.notice = notice{text: "Model management is unavailable in this TUI session.", kind: noticeError}
 		return m, nil
 	}
-	m.screen = localModelsScreen
+	m.screen = chooseModelScreen
 	m.localModels.confirmation = localModelNoConfirmation
 	m.localModels.dependencyHelp = false
 	m.localModels.err = nil
@@ -70,11 +70,8 @@ func (m *Model) cancelLocalOperation() {
 }
 
 func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if message.String() == "ctrl+c" && m.oauthLogin != nil {
-		m.oauthCancel()
-		m.oauthLogin.Cancel()
-		m.notice = notice{text: "OAuth login cancellation requested.", kind: noticeInfo}
-		return m, nil
+	if m.screen == chooseModelScreen {
+		return m.updateModelCatalogChoice(message)
 	}
 	if m.localModels.cloudSetup != nil {
 		return m.updateCloudModelSetup(message)
@@ -116,9 +113,9 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.localModels.generation++
 			m.localModels.action = localModelIdle
 		}
-		m.screen = closedScreen
-		m.notice = notice{text: "Returned to the composer. The selected model remains available for the next run.", kind: noticeInfo}
-		return m, m.focusField()
+		m.screen = chooseModelScreen
+		m.notice = notice{text: "Choose local or cloud API-key setup.", kind: noticeInfo}
+		return m, nil
 	case "r":
 		return m.beginLocalStatus()
 	case "s":
@@ -136,11 +133,6 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.localModels.dependencyHelp = true
-	case "tab", "left", "right":
-		m.toggleModelCatalogSection()
-		if m.localModels.section == localModelSection && m.localModels.catalog.RuntimeError != "" && !m.localModels.startDismissed {
-			m.localModels.confirmation = m.localRuntimeConfirmation()
-		}
 	case "up", "k", "ctrl+p":
 		m.moveModelCatalogSelection(-1)
 	case "down", "j", "ctrl+n":
@@ -163,21 +155,6 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.beginCustomProviderDiscover()
 	case "d":
 		return m.beginRemoveCloudCredential()
-	case "l":
-		if m.localModels.section != cloudModelSection {
-			m.notice = notice{text: "Cloud sign-in is available from the Cloud section.", kind: noticeInfo}
-			return m, nil
-		}
-		cloud, found := m.selectedCloudModel()
-		if !found {
-			m.notice = notice{text: "No cloud model is selected.", kind: noticeError}
-			return m, nil
-		}
-		if !cloud.canLogin {
-			m.notice = notice{text: cloud.name + " · " + cloud.status + ".", kind: noticeInfo}
-			return m, nil
-		}
-		return m.startOAuthLogin(cloud.provider)
 	case "p":
 		if m.localModels.section != localModelSection {
 			m.notice = notice{text: "Downloads are available only for reviewed local models.", kind: noticeInfo}
@@ -242,6 +219,25 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.localModels.confirmation = localModelConfirmRemove
+	}
+	return m, nil
+}
+
+func (m Model) updateModelCatalogChoice(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch message.String() {
+	case "up", "k", "ctrl+p", "down", "j", "ctrl+n", "tab", "left", "right":
+		m.toggleModelCatalogSection()
+		return m, nil
+	case "enter":
+		m.screen = localModelsScreen
+		if m.localModels.section == localModelSection && m.localModels.catalog.RuntimeError != "" && !m.localModels.startDismissed {
+			m.localModels.confirmation = m.localRuntimeConfirmation()
+		}
+		return m, nil
+	case "esc", "q":
+		m.screen = closedScreen
+		m.notice = notice{text: "Returned to Work. The selected model remains available for the next run.", kind: noticeInfo}
+		return m, m.focusField()
 	}
 	return m, nil
 }

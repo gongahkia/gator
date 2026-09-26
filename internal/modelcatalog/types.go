@@ -128,6 +128,4 @@ type CloudModelSetup struct {
 	BaseURL         string
 	Options         map[string]string
 	APIKey          string
-	CredentialType  string
-	DelegateRuntime string
 }

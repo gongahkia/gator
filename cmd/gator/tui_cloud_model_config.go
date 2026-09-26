@@ -22,7 +22,7 @@ func saveTUICloudModelConfiguration(settingsStore config.Store, stateDir string)
 		if !model.SupportsDirect(provider) {
 			return fmt.Errorf("provider %q has no direct Gator cloud configuration", provider)
 		}
-		credentialProvider, credential, storeCredential, err := tuiCloudCredential(provider, setup.APIKey, setup.CredentialType)
+		credentialProvider, credential, storeCredential, err := tuiCloudCredential(provider, setup.APIKey)
 		if err != nil {
 			return err
 		}
@@ -30,10 +30,8 @@ func saveTUICloudModelConfiguration(settingsStore config.Store, stateDir string)
 		if err != nil {
 			return err
 		}
-		if provider != model.Claude {
-			settings.Defaults.Provider = string(provider)
-			settings.Defaults.Model = strings.TrimSpace(setup.Model)
-		}
+		settings.Defaults.Provider = string(provider)
+		settings.Defaults.Model = strings.TrimSpace(setup.Model)
 		if settings.ProviderEndpoints == nil {
 			settings.ProviderEndpoints = make(map[string]string)
 		}
@@ -71,38 +69,15 @@ func saveTUICloudModelConfiguration(settingsStore config.Store, stateDir string)
 // tuiCloudCredential validates the credential mode before any non-secret
 // settings are written. This prevents an account-mode submission from
 // partially changing the selected provider or endpoint.
-func tuiCloudCredential(provider model.Provider, value, credentialType string) (string, auth.Credential, bool, error) {
+func tuiCloudCredential(provider model.Provider, value string) (string, auth.Credential, bool, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return "", auth.Credential{}, false, nil
 	}
-	credentialType = strings.TrimSpace(credentialType)
-	switch {
-	case provider == model.Claude:
-		if credentialType != "" && credentialType != "api_key" {
-			return "", auth.Credential{}, false, fmt.Errorf("Claude Code accepts an Anthropic API key")
-		}
-		return string(model.Anthropic), auth.Credential{Type: "api_key", Key: value}, true, nil
-	case provider == model.AzureOpenAIResponses:
-		if credentialType == "" || credentialType == "api_key" {
-			return string(provider), auth.Credential{Type: "api_key", Key: value}, true, nil
-		}
-		if credentialType == "bearer_token" {
-			return string(provider), auth.Credential{Type: "bearer_token", Access: value}, true, nil
-		}
-	case provider == model.AmazonBedrock || provider == model.GoogleVertex:
-		if credentialType == "" || credentialType == "bearer_token" {
-			return string(provider), auth.Credential{Type: "bearer_token", Access: value}, true, nil
-		}
-	case model.SupportsAPIKeyLogin(provider):
-		if credentialType == "" || credentialType == "api_key" {
-			return string(provider), auth.Credential{Type: "api_key", Key: value}, true, nil
-		}
-		return "", auth.Credential{}, false, fmt.Errorf("provider %q accepts an API key, not %q", provider, credentialType)
-	default:
-		return "", auth.Credential{}, false, fmt.Errorf("provider %q uses account sign-in; use the sign-in action in /model", provider)
+	if !model.SupportsAPIKeyLogin(provider) {
+		return "", auth.Credential{}, false, fmt.Errorf("provider %q has no API-key setup", provider)
 	}
-	return "", auth.Credential{}, false, fmt.Errorf("provider %q does not support credential type %q", provider, credentialType)
+	return string(provider), auth.Credential{Type: "api_key", Key: value}, true, nil
 }
 
 func cloneTUIProviderOptions(options map[string]string) map[string]string {

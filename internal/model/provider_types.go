@@ -7,8 +7,7 @@ import (
 	"github.com/gongahkia/gator/internal/auth"
 )
 
-// Provider identifies a direct model backend or a retained legacy session
-// provider that now fails without a fallback.
+// Provider identifies a direct model API backend.
 type Provider string
 
 const (
@@ -39,8 +38,6 @@ const (
 	MoonshotAICN            Provider = "moonshotai-cn"
 	CloudflareWorkers       Provider = "cloudflare-workers-ai"
 	CloudflareGateway       Provider = "cloudflare-ai-gateway"
-	AmazonBedrock           Provider = "amazon-bedrock"
-	GoogleVertex            Provider = "google-vertex"
 	QwenTokenPlan           Provider = "qwen-token-plan"
 	QwenTokenPlanCN         Provider = "qwen-token-plan-cn"
 	QwenTokenPlanIndividual Provider = "qwen-token-plan-individual"
@@ -48,14 +45,10 @@ const (
 	XiaomiTokenPlanAMS      Provider = "xiaomi-token-plan-ams"
 	XiaomiTokenPlanSGP      Provider = "xiaomi-token-plan-sgp"
 	OpenAICompatible        Provider = "openai-compatible"
-	Codex                   Provider = "codex"
-	Claude                  Provider = "claude"
-	Copilot                 Provider = "copilot"
 	KimiCoding              Provider = "kimi-coding"
 	Radius                  Provider = "radius"
 	OpenCode                Provider = "opencode"
 	OpenCodeGo              Provider = "opencode-go"
-	Cursor                  Provider = "cursor"
 )
 
 // Config selects one provider. APIKey is optional only because the factory can

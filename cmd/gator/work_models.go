@@ -27,9 +27,6 @@ func workModelPanel(store config.Store, stateDir string, local modelcatalog.Loca
 			SaveModelSelection: defaults.SetDefaults,
 			SaveCloudModel:     saveTUICloudModelConfiguration(store, stateDir),
 			ModelManagement:    newTUIModelManagementBackend(store, stateDir),
-			BeginOAuthLogin: func(provider string) (modelcatalog.OAuthLogin, error) {
-				return beginTUIOAuthLogin(provider)
-			},
 		}), nil
 	}
 }

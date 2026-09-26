@@ -100,7 +100,6 @@ type cloudModelEntry struct {
 	name       string
 	status     string
 	selectable bool
-	canLogin   bool
 	custom     bool
 }
 

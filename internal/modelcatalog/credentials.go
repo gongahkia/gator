@@ -12,9 +12,6 @@ import (
 )
 
 func gatorCredentialCacheKey(provider string) string {
-	if provider == string(modelprovider.Claude) {
-		return string(modelprovider.Anthropic)
-	}
 	return provider
 }
 
@@ -183,7 +180,6 @@ func (m *Model) applyCustomProviders(providers []config.CustomProvider, selectID
 		m.provider.SetValue(custom.ID)
 		m.model.SetValue(custom.DefaultModel)
 		m.config.BaseURL = custom.BaseURL
-		m.delegateRuntime = ""
 		m.persistDraft()
 		m.refreshPreflight()
 		m.selectActiveModelCatalogEntry()
@@ -193,7 +189,6 @@ func (m *Model) applyCustomProviders(providers []config.CustomProvider, selectID
 		m.provider.SetValue(string(modelprovider.OpenAI))
 		m.model.SetValue(modelprovider.DefaultModel(modelprovider.OpenAI))
 		m.config.BaseURL = strings.TrimSpace(m.config.ProviderEndpoints[string(modelprovider.OpenAI)])
-		m.delegateRuntime = ""
 		m.persistDraft()
 		m.refreshPreflight()
 		m.selectActiveModelCatalogEntry()

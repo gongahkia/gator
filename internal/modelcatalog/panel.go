@@ -22,7 +22,7 @@ type catalogPanelMessage struct {
 
 func NewModelCatalogPanel(config Config) *ModelCatalogPanel {
 	m := newModel(config)
-	m.notice = notice{text: "Choose a cloud or local model. Esc returns to Work.", kind: noticeInfo}
+	m.notice = notice{text: "Choose a local model or a cloud API key. Esc returns to Work.", kind: noticeInfo}
 	return &ModelCatalogPanel{model: m}
 }
 
@@ -64,7 +64,7 @@ func (p *ModelCatalogPanel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		next, command = p.model.Update(message)
 	}
 	p.model = next.(Model)
-	if p.model.screen != localModelsScreen {
+	if p.model.screen == closedScreen {
 		p.Close()
 		return p, nil
 	}
@@ -93,6 +93,9 @@ func (p *ModelCatalogPanel) View() string {
 	if p.help {
 		return p.place(p.helpView())
 	}
+	if p.model.screen == chooseModelScreen {
+		return p.place(p.choiceView())
+	}
 	if p.focused() {
 		return p.place(p.focusedView())
 	}
@@ -102,14 +105,43 @@ func (p *ModelCatalogPanel) View() string {
 func (p *ModelCatalogPanel) focused() bool {
 	state := p.model.localModels
 	return state.confirmation != localModelNoConfirmation || state.renaming != nil ||
-		state.cloudSetup != nil || state.customSetup != nil || state.dependencyHelp ||
-		p.model.oauthLogin != nil
+		state.cloudSetup != nil || state.customSetup != nil || state.dependencyHelp
+}
+
+func (p *ModelCatalogPanel) choiceView() string {
+	choices := []struct {
+		title string
+		detail string
+		local bool
+	}{
+		{title: "Cloud API key", detail: "Choose a direct cloud model and configure its API key."},
+		{title: "Local model", detail: "Browse reviewed Ollama models on this machine.", local: true},
+	}
+	lines := []string{p.title("Models"), ""}
+	for _, choice := range choices {
+		selected := (choice.local && p.model.localModels.section == localModelSection) || (!choice.local && p.model.localModels.section == cloudModelSection)
+		line := choice.title + "  " + dimStyle.Render(choice.detail)
+		if selected {
+			lines = append(lines, p.selectedStyle().Width(p.panelWidth()).Render("› "+line))
+		} else {
+			lines = append(lines, "  "+line)
+		}
+	}
+	if notice := p.notice(); notice != "" {
+		lines = append(lines, "", notice)
+	}
+	lines = append(lines, "", dimStyle.Render("↑/↓ choose  ·  enter continue  ·  esc back  ·  f1 help"))
+	return strings.Join(lines, "\n")
 }
 
 func (p *ModelCatalogPanel) catalogView() string {
 	width := p.panelWidth()
 	var sections []string
-	sections = append(sections, p.title("Models"), p.tabs())
+	title := "Cloud API key"
+	if p.model.localModels.section == localModelSection {
+		title = "Local models"
+	}
+	sections = append(sections, p.title(title))
 
 	if p.model.localModels.manager == nil {
 		sections = append(sections, "", errorStyle.Render("Model management is unavailable."))
@@ -233,7 +265,7 @@ func (p *ModelCatalogPanel) status(value string, ready bool) string {
 
 func catalogReady(status string) bool {
 	status = strings.ToLower(status)
-	for _, marker := range []string{"signed in", "configured", "stored", "api key set", "ambient credential"} {
+	for _, marker := range []string{"configured", "stored", "api key set"} {
 		if strings.Contains(status, marker) {
 			return true
 		}
@@ -244,7 +276,11 @@ func catalogReady(status string) bool {
 func (p *ModelCatalogPanel) focusedView() string {
 	model := p.model
 	model.width = p.panelWidth()
-	sections := []string{p.title("Models"), p.tabs(), ""}
+	title := "Cloud API key"
+	if model.localModels.section == localModelSection {
+		title = "Local models"
+	}
+	sections := []string{p.title(title), ""}
 	var body, footer string
 	state := model.localModels
 	switch {
@@ -254,9 +290,6 @@ func (p *ModelCatalogPanel) focusedView() string {
 	case state.cloudSetup != nil:
 		body = p.cloudSetupView(state.cloudSetup)
 		footer = "tab next field  ·  enter save  ·  esc cancel"
-		if state.cloudSetup.canUseBearerToken() {
-			footer = "tab next field  ·  a auth type  ·  enter save  ·  esc cancel"
-		}
 	case state.customSetup != nil:
 		body = p.customSetupView(state.customSetup)
 		footer = "tab next field  ·  enter review  ·  esc cancel"
@@ -266,9 +299,6 @@ func (p *ModelCatalogPanel) focusedView() string {
 	case state.dependencyHelp:
 		body = model.localDependencyHelpView()
 		footer = "i/esc close help"
-	case model.oauthLogin != nil:
-		body = model.fieldView("Cloud sign-in", "Complete sign-in in your browser.", model.commandOutput)
-		footer = "ctrl+c cancel sign-in"
 	}
 	sections = append(sections, body)
 	if notice := p.notice(); notice != "" {
@@ -330,10 +360,10 @@ func (p *ModelCatalogPanel) helpView() string {
 		p.title("Models"),
 		"",
 		labelStyle.Render("Browse"),
-		"↑/↓ choose  ·  enter use  ·  tab cloud/local  ·  r refresh",
+		"↑/↓ choose  ·  enter use  ·  esc choose another setup  ·  r refresh",
 		"",
-		labelStyle.Render("Cloud"),
-		"c configure  ·  l sign in  ·  n new provider  ·  g discover",
+		labelStyle.Render("Cloud API key"),
+		"c configure API key  ·  n new provider  ·  g discover",
 		"d remove credential  ·  x remove provider  ·  e rename",
 		"",
 		labelStyle.Render("Local"),
@@ -345,9 +375,9 @@ func (p *ModelCatalogPanel) helpView() string {
 }
 
 func (p *ModelCatalogPanel) tabs() string {
-	cloud, local := dimStyle.Render("Cloud"), dimStyle.Render("Local")
+	cloud, local := dimStyle.Render("Cloud API key"), dimStyle.Render("Local")
 	if p.model.localModels.section == cloudModelSection {
-		cloud = keyStyle.Render("Cloud")
+		cloud = keyStyle.Render("Cloud API key")
 	} else {
 		local = keyStyle.Render("Local")
 	}
@@ -361,19 +391,15 @@ func (p *ModelCatalogPanel) title(value string) string {
 func (p *ModelCatalogPanel) catalogFooter() string {
 	if p.model.localModels.section == localModelSection {
 		return dimStyle.Render("↑/↓ choose  ·  enter use  ·  p download  ·  x remove\n" +
-			"tab cloud  ·  s start  ·  i setup  ·  r refresh  ·  esc back  ·  f1 help")
+			"s start  ·  i setup  ·  r refresh  ·  esc setup choice  ·  f1 help")
 	}
-	loginAction := "l sign in"
-	if cloud, found := p.model.selectedCloudModel(); found && !cloud.canLogin {
-		loginAction = "l sign-in setup"
-	}
-	return dimStyle.Render("↑/↓ choose  ·  enter use  ·  c configure  ·  " + loginAction + "\n" +
-		"tab local  ·  n provider  ·  g discover  ·  esc back  ·  f1 help")
+	return dimStyle.Render("↑/↓ choose  ·  enter use  ·  c configure API key  ·  d forget\n" +
+		"n provider  ·  g discover  ·  esc setup choice  ·  f1 help")
 }
 
 func (p *ModelCatalogPanel) notice() string {
 	text := strings.TrimSpace(p.model.notice.text)
-	if text == "" || strings.HasPrefix(text, "Choose a cloud or local model") ||
+	if text == "" || strings.HasPrefix(text, "Choose a local model or a cloud API key") ||
 		text == "Local model catalog refreshed." ||
 		strings.HasPrefix(text, "Ollama is not installed. Open the Local section") ||
 		strings.HasPrefix(text, "Local runtime is unavailable. Open the Local section") {
@@ -433,10 +459,4 @@ func (p *ModelCatalogPanel) Close() {
 	}
 	p.closed = true
 	p.model.cancelLocalOperation()
-	if p.model.oauthCancel != nil {
-		p.model.oauthCancel()
-	}
-	if p.model.oauthLogin != nil {
-		p.model.oauthLogin.Cancel()
-	}
 }

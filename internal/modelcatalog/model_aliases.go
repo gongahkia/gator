@@ -114,7 +114,6 @@ func (m *Model) applyLocalUpdate(update LocalUpdate) {
 	m.config.CustomProviders = append([]config.CustomProvider(nil), update.CustomProviders...)
 	m.provider.SetValue(update.Provider)
 	m.model.SetValue(update.Model)
-	m.delegateRuntime = ""
 	m.persistDraft()
 	m.refreshPreflight()
 }

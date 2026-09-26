@@ -1,7 +1,6 @@
 package modelcatalog
 
 import (
-	"context"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -10,14 +9,6 @@ import (
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/rattles"
 )
-
-// OAuthLogin is an application-owned browser login. The panel displays its URL
-// and retains cancellation while the command layer owns credential storage.
-type OAuthLogin interface {
-	URL() string
-	Complete(context.Context) error
-	Cancel()
-}
 
 // Config contains only the state and callbacks required by model management.
 // It intentionally excludes composer, execution, review, and worktree state.
@@ -35,13 +26,13 @@ type Config struct {
 	ModelManagement    ManagementBackend
 	SaveModelSelection func(provider, model string) error
 	SaveCloudModel     func(CloudModelSetup) error
-	BeginOAuthLogin    func(provider string) (OAuthLogin, error)
 }
 
 type screen uint8
 
 const (
-	localModelsScreen screen = iota
+	chooseModelScreen screen = iota
+	localModelsScreen
 	closedScreen
 )
 
@@ -67,11 +58,6 @@ type Model struct {
 	model           textinput.Model
 	localModels     localModelsState
 	notice          notice
-	oauthLogin      OAuthLogin
-	oauthCancel     context.CancelFunc
-	oauthProvider   string
-	delegateRuntime string
-	commandOutput   string
 	width           int
 	height          int
 }
@@ -92,7 +78,7 @@ func newModel(config Config) Model {
 	return Model{
 		config:      config,
 		catalogOnly: true,
-		screen:      localModelsScreen,
+		screen:      chooseModelScreen,
 		provider:    provider,
 		model:       model,
 		localModels: newLocalModelsState(config.LocalModels, localSpinner),
@@ -132,8 +118,6 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateLocalProgress(msg)
 	case localModelDoneMsg:
 		return m.updateLocalModelDone(msg)
-	case oauthLoginDoneMsg:
-		return m.updateOAuthLoginDone(msg)
 	}
 	return m, nil
 }

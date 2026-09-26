@@ -2,13 +2,10 @@ package model
 
 import (
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 
-	"github.com/gongahkia/gator/internal/model/bedrock"
 	"github.com/gongahkia/gator/internal/model/openai"
-	"github.com/gongahkia/gator/internal/model/vertex"
 )
 
 func ParseProvider(value string) (Provider, error) {
@@ -36,32 +33,10 @@ func SupportsDirect(provider Provider) bool {
 	return ok
 }
 
-// RequiresOAuthLogin reports providers whose Gator adapter is backed by a
-// subscription OAuth credential rather than a normal provider API key.
-func RequiresOAuthLogin(provider Provider) bool {
-	switch provider {
-	case Codex, Claude, Copilot:
-		return true
-	default:
-		return false
-	}
-}
-
-// SupportsOAuthLogin reports providers that can use a Gator-managed OAuth
-// credential in addition to, or instead of, their normal API-key path.
-func SupportsOAuthLogin(provider Provider) bool {
-	switch provider {
-	case Codex, Claude, Copilot, KimiCoding, Radius, XAI, OpenRouter:
-		return true
-	default:
-		return false
-	}
-}
-
-// SupportsAPIKeyLogin reports whether gator provider login can safely persist
-// an API key for the provider. Subscription providers use a separate OAuth flow.
+// SupportsAPIKeyLogin reports whether Gator can persist an API key for a
+// supported direct backend.
 func SupportsAPIKeyLogin(provider Provider) bool {
-	return SupportsDirect(provider) && !RequiresOAuthLogin(provider) && provider != GoogleVertex
+	return SupportsDirect(provider) && APIKeyEnvironment(provider) != ""
 }
 
 // SupportsPDFAttachments reports whether Gator's adapter can encode a PDF
@@ -69,7 +44,7 @@ func SupportsAPIKeyLogin(provider Provider) bool {
 // Completions endpoints do not share a stable file-input contract.
 func SupportsPDFAttachments(provider Provider) bool {
 	switch provider {
-	case OpenAI, Codex, Anthropic, Claude, Gemini:
+	case OpenAI, Anthropic, Gemini:
 		return true
 	default:
 		return false
@@ -80,13 +55,13 @@ func SupportsPDFAttachments(provider Provider) bool {
 // guessing a catalog-specific model. Empty means the user must provide one.
 func DefaultModel(provider Provider) string {
 	switch provider {
-	case OpenAI, Codex:
+	case OpenAI:
 		return openai.DefaultModel()
 	case OpenCode:
 		return "gpt-5.6-terra"
 	case OpenCodeGo:
 		return "kimi-k2.6"
-	case Anthropic, Claude:
+	case Anthropic:
 		return "claude-sonnet-5"
 	case KimiCoding:
 		return "kimi-for-coding"
@@ -116,33 +91,21 @@ func CredentialHint(provider Provider) string {
 	case OpenAI:
 		return "OPENAI_API_KEY"
 	case AzureOpenAIResponses:
-		return "AZURE_OPENAI_API_KEY or AZURE_OPENAI_AUTH_TOKEN"
-	case AmazonBedrock:
-		return "AWS_BEARER_TOKEN_BEDROCK or standard AWS credential chain"
-	case Codex:
-		return "Gator Codex OAuth credential"
+		return "AZURE_OPENAI_API_KEY"
 	case Anthropic:
 		return "ANTHROPIC_API_KEY"
-	case Claude:
-		return "Gator Claude OAuth credential"
 	case Gemini:
 		return "GEMINI_API_KEY"
-	case Copilot:
-		return "Gator GitHub Copilot OAuth credential"
 	case KimiCoding:
-		return "KIMI_API_KEY or Gator Kimi Code OAuth credential"
+		return "KIMI_API_KEY"
 	case Radius:
-		return "RADIUS_API_KEY or Gator Radius OAuth credential"
+		return "RADIUS_API_KEY"
 	case MiniMax:
 		return "MINIMAX_API_KEY"
 	case MiniMaxCN:
 		return "MINIMAX_CN_API_KEY"
 	case OpenCode, OpenCodeGo:
 		return "OPENCODE_API_KEY"
-	case Cursor:
-		return "no supported direct credential"
-	case GoogleVertex:
-		return "GATOR_VERTEX_ACCESS_TOKEN or Google Application Default Credentials"
 	default:
 		if definition, ok := compatibleProviders[provider]; ok {
 			return definition.apiKeyEnv
@@ -151,34 +114,8 @@ func CredentialHint(provider Provider) string {
 	}
 }
 
-// AmbientCredentialAvailable reports whether a provider with externally
-// managed credentials has a configured, readable credential source.
-func AmbientCredentialAvailable(provider Provider) bool {
-	switch provider {
-	case GoogleVertex:
-		return vertex.FromEnvironment().Available()
-	case AmazonBedrock:
-		_, available := bedrock.AmbientSource()
-		return available
-	case AzureOpenAIResponses:
-		return strings.TrimSpace(os.Getenv("AZURE_OPENAI_API_KEY")) != "" || strings.TrimSpace(os.Getenv("AZURE_OPENAI_AUTH_TOKEN")) != ""
-	default:
-		return false
-	}
-}
-
-// AmbientCredentialSource returns a non-secret description suitable for local
-// diagnostics. It is empty when a provider has no configured ambient source.
-func AmbientCredentialSource(provider Provider) string {
-	if provider == AmazonBedrock {
-		source, _ := bedrock.AmbientSource()
-		return source
-	}
-	return ""
-}
-
 // APIKeyEnvironment returns the ambient API-key variable for providers that
-// support one. OAuth-only providers return an empty string.
+// support one.
 func APIKeyEnvironment(provider Provider) string {
 	switch provider {
 	case OpenAI:

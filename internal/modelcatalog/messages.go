@@ -30,7 +30,6 @@ func (m Model) updateCloudModelSetupSaved(msg cloudModelSetupSavedMsg) (tea.Mode
 	} else {
 		m.config.ProviderOptions[msg.provider] = cloneProviderOptions(msg.options)
 	}
-	m.delegateRuntime = msg.delegateRuntime
 	m.persistDraft()
 	m.refreshPreflight()
 	m.selectActiveModelCatalogEntry()

@@ -3,7 +3,6 @@ package modelcatalog
 import (
 	"fmt"
 	"net/url"
-	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -19,24 +18,13 @@ const (
 	cloudSetupCredentialField
 	cloudSetupEndpointField
 	cloudSetupAPIVersionField
-	cloudSetupProjectField
-	cloudSetupLocationField
 	cloudSetupAccountIDField
 	cloudSetupGatewayIDField
 	cloudSetupGatewayProtocolField
-	cloudSetupRegionField
-	cloudSetupAWSProfileField
-	cloudSetupCredentialsPathField
 	cloudSetupGatewayField
 )
 
-const (
-	cloudCredentialAPIKey = "api_key"
-	cloudCredentialBearer = "bearer_token"
-)
-
 var cloudIdentifierPattern = regexp.MustCompile(`^[A-Za-z0-9._:-]{1,256}$`)
-var cloudRegionPattern = regexp.MustCompile(`^[a-z]{2}(?:-gov)?-[a-z]+-\d+$`)
 
 type cloudModelSetupForm struct {
 	provider        string
@@ -44,16 +32,10 @@ type cloudModelSetupForm struct {
 	credential      textinput.Model
 	endpoint        textinput.Model
 	apiVersion      textinput.Model
-	project         textinput.Model
-	location        textinput.Model
 	accountID       textinput.Model
 	gatewayID       textinput.Model
 	gatewayProtocol textinput.Model
-	region          textinput.Model
-	awsProfile      textinput.Model
-	credentialsPath textinput.Model
 	gateway         textinput.Model
-	credentialType  string
 	focus           cloudSetupField
 	saving          bool
 }
@@ -63,7 +45,6 @@ type cloudModelSetupSavedMsg struct {
 	model           string
 	baseURL         string
 	options         map[string]string
-	delegateRuntime string
 	err             error
 }
 
@@ -98,38 +79,24 @@ func newCloudModelSetupForm(provider modelprovider.Provider, selectedModel, endp
 		credential:      cloudSetupInput("leave empty to keep the current credential", width),
 		endpoint:        cloudSetupInput("provider default endpoint", width),
 		apiVersion:      cloudSetupInput("v1", width),
-		project:         cloudSetupInput("project ID (or leave empty to use the environment)", width),
-		location:        cloudSetupInput("location, for example us-central1", width),
 		accountID:       cloudSetupInput("account ID (or leave empty to use the environment)", width),
 		gatewayID:       cloudSetupInput("AI Gateway ID (or leave empty to use the environment)", width),
 		gatewayProtocol: cloudSetupInput("openai-responses, anthropic-messages, or workers-ai-chat-completions", width),
-		region:          cloudSetupInput("AWS region, for example us-east-1", width),
-		awsProfile:      cloudSetupInput("optional AWS shared profile", width),
-		credentialsPath: cloudSetupInput("optional absolute ADC credentials path", width),
 		gateway:         cloudSetupInput("optional Radius gateway URL", width),
-		credentialType:  cloudCredentialAPIKey,
 	}
 	form.model.SetValue(modelName)
 	form.endpoint.SetValue(strings.TrimSpace(endpoint))
 	form.credential.EchoMode = textinput.EchoPassword
 	form.credential.EchoCharacter = '•'
-	form.project.SetValue(strings.TrimSpace(options["project"]))
-	form.location.SetValue(strings.TrimSpace(options["location"]))
 	form.accountID.SetValue(strings.TrimSpace(options["account_id"]))
 	form.gatewayID.SetValue(strings.TrimSpace(options["gateway_id"]))
 	form.gatewayProtocol.SetValue(strings.TrimSpace(options["gateway_protocol"]))
-	form.region.SetValue(strings.TrimSpace(options["region"]))
-	form.awsProfile.SetValue(strings.TrimSpace(options["profile"]))
-	form.credentialsPath.SetValue(strings.TrimSpace(options["credentials_path"]))
 	form.gateway.SetValue(strings.TrimSpace(options["gateway"]))
 	if parsed, err := url.Parse(endpoint); err == nil {
 		form.apiVersion.SetValue(parsed.Query().Get("api-version"))
 	}
 	if strings.TrimSpace(form.apiVersion.Value()) == "" {
 		form.apiVersion.SetValue("v1")
-	}
-	if provider == modelprovider.AmazonBedrock || provider == modelprovider.GoogleVertex {
-		form.credentialType = cloudCredentialBearer
 	}
 	return form
 }
@@ -154,17 +121,8 @@ func (form *cloudModelSetupForm) usesAzureFields() bool {
 	return provider == modelprovider.AzureOpenAI || provider == modelprovider.AzureOpenAIResponses
 }
 
-func (form *cloudModelSetupForm) canUseBearerToken() bool {
-	return form.providerKind() == modelprovider.AzureOpenAIResponses
-}
-
 func (form *cloudModelSetupForm) needsCredentialInput() bool {
-	switch form.providerKind() {
-	case modelprovider.Codex, modelprovider.Copilot:
-		return false
-	default:
-		return true
-	}
+	return true
 }
 
 func (form *cloudModelSetupForm) fields() []cloudSetupField {
@@ -174,14 +132,8 @@ func (form *cloudModelSetupForm) fields() []cloudSetupField {
 		fields = append(fields, cloudSetupCredentialField)
 	}
 	switch provider {
-	case modelprovider.Claude:
-		return fields
 	case modelprovider.AzureOpenAI, modelprovider.AzureOpenAIResponses:
 		return append(fields, cloudSetupEndpointField, cloudSetupAPIVersionField)
-	case modelprovider.AmazonBedrock:
-		return append(fields, cloudSetupEndpointField, cloudSetupRegionField, cloudSetupAWSProfileField)
-	case modelprovider.GoogleVertex:
-		return append(fields, cloudSetupEndpointField, cloudSetupProjectField, cloudSetupLocationField, cloudSetupCredentialsPathField)
 	case modelprovider.CloudflareWorkers:
 		return append(fields, cloudSetupEndpointField, cloudSetupAccountIDField)
 	case modelprovider.CloudflareGateway:
@@ -201,22 +153,12 @@ func (form *cloudModelSetupForm) focusedInput() *textinput.Model {
 		return &form.endpoint
 	case cloudSetupAPIVersionField:
 		return &form.apiVersion
-	case cloudSetupProjectField:
-		return &form.project
-	case cloudSetupLocationField:
-		return &form.location
 	case cloudSetupAccountIDField:
 		return &form.accountID
 	case cloudSetupGatewayIDField:
 		return &form.gatewayID
 	case cloudSetupGatewayProtocolField:
 		return &form.gatewayProtocol
-	case cloudSetupRegionField:
-		return &form.region
-	case cloudSetupAWSProfileField:
-		return &form.awsProfile
-	case cloudSetupCredentialsPathField:
-		return &form.credentialsPath
 	case cloudSetupGatewayField:
 		return &form.gateway
 	default:
@@ -278,17 +220,6 @@ func (m Model) updateCloudModelSetup(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, form.moveFocus(1)
 	case "shift+tab", "up":
 		return m, form.moveFocus(-1)
-	case "a":
-		if form.canUseBearerToken() {
-			if form.credentialType == cloudCredentialAPIKey {
-				form.credentialType = cloudCredentialBearer
-			} else {
-				form.credentialType = cloudCredentialAPIKey
-			}
-			form.credential.Reset()
-			m.notice = notice{text: "Azure Responses credential type changed. Enter a replacement only when you want to overwrite the stored credential.", kind: noticeInfo}
-			return m, form.focusInput()
-		}
 	case "enter":
 		if !form.isLastField() {
 			return m, form.moveFocus(1)
@@ -318,7 +249,6 @@ func (m Model) saveCloudModelSetup() (tea.Model, tea.Cmd) {
 			model:           setup.Model,
 			baseURL:         setup.BaseURL,
 			options:         cloneProviderOptions(setup.Options),
-			delegateRuntime: setup.DelegateRuntime,
 			err:             err,
 		}
 	}
@@ -355,33 +285,20 @@ func (form *cloudModelSetupForm) configuration() (CloudModelSetup, error) {
 		return CloudModelSetup{}, err
 	}
 	setup := CloudModelSetup{
-		Provider:       string(provider),
-		Model:          modelName,
-		BaseURL:        baseURL,
-		Options:        options,
-		APIKey:         form.credential.Value(),
-		CredentialType: form.credentialType,
-	}
-	if provider == modelprovider.Claude {
-		setup.DelegateRuntime = "claude"
-	}
-	if !form.needsCredentialInput() {
-		setup.APIKey = ""
-		setup.CredentialType = ""
+		Provider: string(provider),
+		Model:    modelName,
+		BaseURL:  baseURL,
+		Options:  options,
+		APIKey:   form.credential.Value(),
 	}
 	return setup, nil
 }
 
 func cloudProviderOptions(form *cloudModelSetupForm) map[string]string {
 	values := map[string]string{
-		"project":          form.project.Value(),
-		"location":         form.location.Value(),
 		"account_id":       form.accountID.Value(),
 		"gateway_id":       form.gatewayID.Value(),
 		"gateway_protocol": form.gatewayProtocol.Value(),
-		"region":           form.region.Value(),
-		"profile":          form.awsProfile.Value(),
-		"credentials_path": form.credentialsPath.Value(),
 		"gateway":          form.gateway.Value(),
 	}
 	options := make(map[string]string, len(values))
@@ -399,16 +316,10 @@ func validateCloudProviderOptions(provider modelprovider.Provider, options map[s
 			return fmt.Errorf("%s cannot contain a newline", strings.ReplaceAll(name, "_", " "))
 		}
 	}
-	for _, name := range []string{"project", "location", "account_id", "gateway_id", "profile"} {
+	for _, name := range []string{"account_id", "gateway_id"} {
 		if value := options[name]; value != "" && !cloudIdentifierPattern.MatchString(value) {
 			return fmt.Errorf("%s contains unsupported characters", strings.ReplaceAll(name, "_", " "))
 		}
-	}
-	if region := options["region"]; region != "" && !cloudRegionPattern.MatchString(region) {
-		return fmt.Errorf("AWS region must look like us-east-1")
-	}
-	if path := options["credentials_path"]; path != "" && !filepath.IsAbs(path) {
-		return fmt.Errorf("ADC credentials path must be absolute")
 	}
 	if gateway := options["gateway"]; gateway != "" {
 		if err := validateCloudURL(gateway, "Radius gateway"); err != nil {
@@ -494,18 +405,7 @@ func cloneProviderOptions(options map[string]string) map[string]string {
 }
 
 func (form *cloudModelSetupForm) configurationHint() string {
-	switch form.providerKind() {
-	case modelprovider.AmazonBedrock:
-		return "Credentials are masked and stored only in Gator's private auth file. Leave the bearer token empty to keep one already stored or use the standard AWS credential chain."
-	case modelprovider.GoogleVertex:
-		return "Credentials are masked and stored only in Gator's private auth file. Leave the access token empty to keep one already stored or use Application Default Credentials."
-	case modelprovider.Claude:
-		return "Enter an Anthropic API key for Claude Code. It is masked and stored only in Gator's private auth file; Claude.ai subscription credentials are never imported."
-	case modelprovider.Codex, modelprovider.Copilot:
-		return "No credential is entered here. Use the provider-owned OAuth sign-in action from the Cloud catalog."
-	default:
-		return "Credentials are masked and saved only in Gator's private auth file. Leaving the credential field empty preserves any existing stored credential."
-	}
+	return "API keys are masked and saved only in Gator's private auth file. Leaving the field empty preserves any existing stored key."
 }
 
 func (form *cloudModelSetupForm) fieldPresentation(field cloudSetupField) (string, string, *textinput.Model) {
@@ -513,18 +413,6 @@ func (form *cloudModelSetupForm) fieldPresentation(field cloudSetupField) (strin
 	case cloudSetupCredentialField:
 		label := "API key"
 		hint := "Masked. Leave empty to retain the stored credential."
-		switch form.providerKind() {
-		case modelprovider.AzureOpenAIResponses:
-			if form.credentialType == cloudCredentialBearer {
-				label, hint = "Azure bearer token", "Masked Microsoft Entra token. Gator does not refresh user-supplied tokens."
-			}
-		case modelprovider.AmazonBedrock:
-			label, hint = "AWS bearer token", "Optional and masked. Leave empty to use or retain standard AWS credentials."
-		case modelprovider.GoogleVertex:
-			label, hint = "Google Cloud access token", "Optional and masked. Leave empty to use or retain Application Default Credentials."
-		case modelprovider.Claude:
-			label, hint = "Anthropic API key", "Masked. It is passed only to the Claude Code child process for a delegated run."
-		}
 		return label, hint, &form.credential
 	case cloudSetupEndpointField:
 		if form.usesAzureFields() {
@@ -533,22 +421,12 @@ func (form *cloudModelSetupForm) fieldPresentation(field cloudSetupField) (strin
 		return "Endpoint override", "Optional. Leave empty to use the provider default endpoint.", &form.endpoint
 	case cloudSetupAPIVersionField:
 		return "Azure API version", "Saved into the endpoint URL. Use the version enabled for this Azure resource.", &form.apiVersion
-	case cloudSetupProjectField:
-		return "Google Cloud project", "Optional only when GOOGLE_CLOUD_PROJECT or GCLOUD_PROJECT is already configured.", &form.project
-	case cloudSetupLocationField:
-		return "Google Cloud location", "Optional only when GOOGLE_CLOUD_LOCATION is already configured.", &form.location
 	case cloudSetupAccountIDField:
 		return "Cloudflare account ID", "Optional only when CLOUDFLARE_ACCOUNT_ID is already configured or the endpoint is fully explicit.", &form.accountID
 	case cloudSetupGatewayIDField:
 		return "Cloudflare AI Gateway ID", "Optional only when CLOUDFLARE_AI_GATEWAY_ID is already configured.", &form.gatewayID
 	case cloudSetupGatewayProtocolField:
 		return "Cloudflare AI Gateway protocol", "Choose the request protocol compatible with the selected model family.", &form.gatewayProtocol
-	case cloudSetupRegionField:
-		return "AWS region", "Optional. Overrides AWS SDK region resolution for this provider only.", &form.region
-	case cloudSetupAWSProfileField:
-		return "AWS shared profile", "Optional. Selects an existing AWS shared profile without copying its credentials.", &form.awsProfile
-	case cloudSetupCredentialsPathField:
-		return "ADC credentials path", "Optional absolute Google Application Default Credentials file path. Gator reads it only when it needs a token.", &form.credentialsPath
 	case cloudSetupGatewayField:
 		return "Radius gateway URL", "Optional Gator Radius gateway override.", &form.gateway
 	default:

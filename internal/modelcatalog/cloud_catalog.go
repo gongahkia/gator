@@ -3,7 +3,6 @@ package modelcatalog
 import (
 	"os"
 	"strings"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/auth"
@@ -18,26 +17,16 @@ func (m Model) cloudModels() []cloudModelEntry {
 		if err != nil {
 			continue
 		}
-		if provider == modelprovider.Claude {
-			if m.catalogOnly {
-				continue
-			}
-			entries = append(entries, claudeCodeHarnessEntry(credentialStore, credentialStoreErr, m.localModels.credentials))
-			continue
-		}
-
 		models := modelprovider.CuratedModels(provider)
 		if providerName == strings.TrimSpace(m.provider.Value()) {
 			models = prependModelIfMissing(models, strings.TrimSpace(m.model.Value()))
 		}
 		status := cloudProviderStatus(provider, credentialStore, credentialStoreErr, m.localModels.credentials)
-		canLogin := oauthLoginAvailable(provider)
 		if len(models) == 0 {
 			entries = append(entries, cloudModelEntry{
 				provider: providerName,
 				name:     providerName + " · account model required",
 				status:   status,
-				canLogin: canLogin,
 			})
 			continue
 		}
@@ -48,7 +37,6 @@ func (m Model) cloudModels() []cloudModelEntry {
 				name:       providerName + " · " + m.modelDisplayName(providerName, modelName, modelName),
 				status:     status,
 				selectable: true,
-				canLogin:   canLogin,
 			})
 		}
 	}
@@ -81,63 +69,21 @@ func prependModelIfMissing(models []string, model string) []string {
 	return append([]string{model}, models...)
 }
 
-func claudeCodeHarnessEntry(store auth.Store, storeErr error, cached map[string]StoredCredentialStatus) cloudModelEntry {
-	status := "requires ANTHROPIC_API_KEY"
-	if cachedStatus, ok := cached[string(modelprovider.Anthropic)]; ok && cachedStatus.Present {
-		status = "Anthropic API key stored by Gator"
-	} else if storeErr == nil {
-		credential, found, err := store.Read(string(modelprovider.Anthropic))
-		if err == nil && found && credential.IsAPIKey() {
-			status = "Anthropic API key stored by Gator"
-		}
-	}
-	if modelprovider.AmbientCredentialAvailable(modelprovider.Anthropic) {
-		status = "API key set: ANTHROPIC_API_KEY"
-	}
-	return cloudModelEntry{
-		provider: string(modelprovider.Claude),
-		name:     "Claude Code · API-key harness",
-		status:   status,
-		canLogin: true,
-	}
-}
-
 func cloudProviderStatus(provider modelprovider.Provider, store auth.Store, storeErr error, cached map[string]StoredCredentialStatus) string {
-	if status, ok := cached[gatorCredentialCacheKey(string(provider))]; ok && status.Present {
+	if status, ok := cached[gatorCredentialCacheKey(string(provider))]; ok && status.Present && status.Kind == "API key" {
 		if status.Expired {
 			return "stored credential expired"
-		}
-		if status.Kind == "OAuth credential" {
-			return "signed in"
 		}
 		return "Gator credential stored"
 	}
 	if storeErr == nil {
 		credential, found, err := store.Read(gatorCredentialCacheKey(string(provider)))
-		if err == nil && found {
-			if credential.Expired(time.Now()) {
-				return "stored credential expired"
-			}
-			if credential.IsOAuth() {
-				return "signed in"
-			}
+		if err == nil && found && credential.IsAPIKey() {
 			return "Gator credential stored"
 		}
 	}
-	if modelprovider.AmbientCredentialAvailable(provider) {
-		if source := modelprovider.AmbientCredentialSource(provider); source != "" {
-			return "ambient credentials: " + source
-		}
-		return "ambient credentials configured"
-	}
 	if environment := modelprovider.APIKeyEnvironment(provider); environment != "" && strings.TrimSpace(os.Getenv(environment)) != "" {
 		return "API key set: " + environment
-	}
-	if modelprovider.SupportsOAuthLogin(provider) {
-		if !oauthLoginAvailable(provider) {
-			return "sign-in needs " + oauthClientIDEnvironment(string(provider))
-		}
-		return "sign-in available"
 	}
 	return "requires " + modelprovider.CredentialHint(provider)
 }
@@ -194,10 +140,6 @@ func (m *Model) moveModelCatalogSelection(delta int) {
 
 func (m Model) useCloudModel(cloud cloudModelEntry) (tea.Model, tea.Cmd) {
 	if !cloud.selectable {
-		if cloud.provider == string(modelprovider.Claude) {
-			m.notice = notice{text: "Claude Code is a harness. Press l to provide an Anthropic API key, then send a task through the Claude Code harness.", kind: noticeInfo}
-			return m, nil
-		}
 		m.notice = notice{text: "This provider requires an account-specific deployment or model ID. Press c to configure it.", kind: noticeInfo}
 		return m, nil
 	}
@@ -214,7 +156,6 @@ func (m Model) useCloudModel(cloud cloudModelEntry) (tea.Model, tea.Cmd) {
 	} else {
 		m.config.BaseURL = strings.TrimSpace(m.config.ProviderEndpoints[strings.ToLower(strings.TrimSpace(cloud.provider))])
 	}
-	m.delegateRuntime = ""
 	m.persistDraft()
 	m.refreshPreflight()
 	m.notice = notice{text: "Selected " + cloud.name + ". Return to the composer and send a task when its readiness is configured.", kind: noticeSuccess}

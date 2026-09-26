@@ -12,39 +12,6 @@ import (
 	"github.com/gongahkia/gator/internal/model/openai"
 )
 
-func vertexConfig(config Config) (chatcompletions.Config, error) {
-	project := providerOption(config, "project", "GOOGLE_CLOUD_PROJECT")
-	if project == "" {
-		project = strings.TrimSpace(os.Getenv("GCLOUD_PROJECT"))
-	}
-	if project == "" {
-		return chatcompletions.Config{}, errors.New("GOOGLE_CLOUD_PROJECT or GCLOUD_PROJECT is required")
-	}
-	location := providerOption(config, "location", "GOOGLE_CLOUD_LOCATION")
-	if location == "" {
-		return chatcompletions.Config{}, errors.New("GOOGLE_CLOUD_LOCATION is required")
-	}
-	baseURL := strings.TrimSpace(config.BaseURL)
-	if baseURL == "" {
-		baseURL = "https://" + location + "-aiplatform.googleapis.com/v1/projects/" + project + "/locations/" + location + "/endpoints/openapi/chat/completions"
-	}
-	if strings.TrimSpace(config.Model) == "" {
-		return chatcompletions.Config{}, fmt.Errorf("--model is required for provider %q", GoogleVertex)
-	}
-	credentials, err := vertexCredentialSource(config)
-	if err != nil {
-		return chatcompletions.Config{}, err
-	}
-	return chatcompletions.Config{
-		APIKeySource: credentials.Token,
-		APIKeyEnv:    "GATOR_VERTEX_ACCESS_TOKEN or Google Application Default Credentials",
-		BaseURL:      baseURL,
-		Model:        config.Model,
-		ProviderName: "Google Vertex AI",
-		Client:       config.Client,
-	}, nil
-}
-
 func cloudflareWorkersConfig(config Config) (chatcompletions.Config, error) {
 	apiKey, err := key(config, CloudflareWorkers, "CLOUDFLARE_API_TOKEN")
 	if err != nil {
