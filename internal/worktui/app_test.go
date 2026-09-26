@@ -411,8 +411,12 @@ func TestInitialViewIsADeclutteredBottomComposer(t *testing.T) {
 	model.width = 100
 	model.height = 30
 	view := model.View()
-	if !model.home || model.launcher || !strings.Contains(view, gatorWordmark) || !strings.Contains(view, "What do you want to accomplish?") || !strings.Contains(view, "Ask Gator to work on something") {
+	if !model.home || model.launcher || !strings.Contains(view, gatorWordmark) || strings.Contains(view, "What do you want to accomplish?") || !strings.Contains(view, "Ask Gator to work on something") {
 		t.Fatalf("initial view = %q", view)
+	}
+	initialLines := strings.Split(ansi.Strip(view), "\n")
+	if !strings.HasPrefix(initialLines[0], gatorWordmark) {
+		t.Fatalf("initial logo is not top-left: %q", initialLines[0])
 	}
 	if strings.Contains(view, "Inbox") || strings.Contains(view, "Scheduled jobs") || strings.Contains(view, "local-first work") {
 		t.Fatalf("initial view exposes launcher clutter: %q", view)
@@ -425,7 +429,7 @@ func TestInitialViewIsADeclutteredBottomComposer(t *testing.T) {
 	typing, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
 	typingModel := typing.(Model)
 	typingView := typingModel.View()
-	if !typingModel.home || !strings.Contains(typingView, "What do you want to accomplish?") || !strings.Contains(typingView, gatorWordmark) || strings.Contains(typingView, "Work in reports") {
+	if !typingModel.home || strings.Contains(typingView, "What do you want to accomplish?") || !strings.Contains(typingView, gatorWordmark) || strings.Contains(typingView, "Work in reports") {
 		t.Fatalf("composer did not stay bottom-anchored while drafting: %q", typingView)
 	}
 	submitted, _ := typingModel.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -465,7 +469,7 @@ func TestBottomHomeComposerGrowsForWrappedDrafts(t *testing.T) {
 	model.width, model.height = 60, 30
 	model.input = strings.Repeat("draft ", 30)
 	view := ansi.Strip(model.View())
-	if !strings.Contains(view, "What do you want to accomplish?") || strings.Count(view, "│") <= 2 {
+	if strings.Contains(view, "What do you want to accomplish?") || strings.Count(view, "│") <= 2 {
 		t.Fatalf("bottom composer did not grow across wrapped rows: %q", view)
 	}
 }

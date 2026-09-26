@@ -137,9 +137,16 @@ func (m Model) renderViewport(contents string, width, height int) string {
 
 func (m Model) renderHome(width, height int, accent lipgloss.Style) string {
 	title := accent.Copy().Bold(true).Render(gatorWordmark)
-	question := lipgloss.NewStyle().Foreground(lipgloss.Color("255")).Render("What do you want to accomplish?")
-	body := title + "\n\n" + question + "\n\n" + m.renderComposer(width, true)
-	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Bottom, body)
+	composer := m.renderComposer(width, true)
+	composerRows := strings.Count(composer, "\n") + 1
+	composerTop := max(1, height-composerRows)
+	var view strings.Builder
+	view.WriteString(title + "\n")
+	if currentRow := strings.Count(view.String(), "\n"); currentRow < composerTop {
+		view.WriteString(strings.Repeat("\n", composerTop-currentRow))
+	}
+	view.WriteString(lipgloss.Place(width, composerRows, lipgloss.Center, lipgloss.Top, composer))
+	return view.String()
 }
 
 func (m Model) renderPalette(width, height int, accent, dim, selectedStyle lipgloss.Style) string {
