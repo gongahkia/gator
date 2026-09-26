@@ -71,7 +71,7 @@ func (m Model) updateModelPanel(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 	if m.pendingPrompt != "" {
 		m.input, m.pendingPrompt = m.pendingPrompt, ""
 	}
-	return m, nil
+	return m, tea.ClearScreen
 }
 
 func (m Model) updateLoading(value loadingTickMsg) (tea.Model, tea.Cmd) {

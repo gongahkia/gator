@@ -363,7 +363,11 @@ func (p *ModelCatalogPanel) catalogFooter() string {
 		return dimStyle.Render("↑/↓ choose  ·  enter use  ·  p download  ·  x remove\n" +
 			"tab cloud  ·  s start  ·  i setup  ·  r refresh  ·  esc back  ·  f1 help")
 	}
-	return dimStyle.Render("↑/↓ choose  ·  enter use  ·  c configure  ·  l sign in\n" +
+	loginAction := "l sign in"
+	if cloud, found := p.model.selectedCloudModel(); found && !cloud.canLogin {
+		loginAction = "l sign-in setup"
+	}
+	return dimStyle.Render("↑/↓ choose  ·  enter use  ·  c configure  ·  " + loginAction + "\n" +
 		"tab local  ·  n provider  ·  g discover  ·  esc back  ·  f1 help")
 }
 

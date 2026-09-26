@@ -174,7 +174,7 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if !cloud.canLogin {
-			m.notice = notice{text: "This provider uses " + cloud.status + ".", kind: noticeInfo}
+			m.notice = notice{text: cloud.name + " · " + cloud.status + ".", kind: noticeInfo}
 			return m, nil
 		}
 		return m.startOAuthLogin(cloud.provider)

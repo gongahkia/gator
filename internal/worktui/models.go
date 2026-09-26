@@ -20,7 +20,7 @@ func (m Model) openModels() (tea.Model, tea.Cmd) {
 	m.launcher = false
 	next, resize := panel.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
 	m.models = next.(ModelPanel)
-	return m, tea.Batch(resize, m.models.Init())
+	return m, tea.Sequence(tea.ClearScreen, resize, m.models.Init())
 }
 
 // Close releases a model operation if the terminal closes while its panel is open.

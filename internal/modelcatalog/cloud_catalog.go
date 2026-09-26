@@ -31,12 +31,13 @@ func (m Model) cloudModels() []cloudModelEntry {
 			models = prependModelIfMissing(models, strings.TrimSpace(m.model.Value()))
 		}
 		status := cloudProviderStatus(provider, credentialStore, credentialStoreErr, m.localModels.credentials)
+		canLogin := oauthLoginAvailable(provider)
 		if len(models) == 0 {
 			entries = append(entries, cloudModelEntry{
 				provider: providerName,
 				name:     providerName + " · account model required",
 				status:   status,
-				canLogin: modelprovider.SupportsOAuthLogin(provider),
+				canLogin: canLogin,
 			})
 			continue
 		}
@@ -47,7 +48,7 @@ func (m Model) cloudModels() []cloudModelEntry {
 				name:       providerName + " · " + m.modelDisplayName(providerName, modelName, modelName),
 				status:     status,
 				selectable: true,
-				canLogin:   modelprovider.SupportsOAuthLogin(provider),
+				canLogin:   canLogin,
 			})
 		}
 	}
@@ -133,6 +134,9 @@ func cloudProviderStatus(provider modelprovider.Provider, store auth.Store, stor
 		return "API key set: " + environment
 	}
 	if modelprovider.SupportsOAuthLogin(provider) {
+		if !oauthLoginAvailable(provider) {
+			return "sign-in needs " + oauthClientIDEnvironment(string(provider))
+		}
 		return "sign-in available"
 	}
 	return "requires " + modelprovider.CredentialHint(provider)

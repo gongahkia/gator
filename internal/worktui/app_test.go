@@ -850,14 +850,14 @@ func TestFirstRunRetainsInitialTaskInModelManagement(t *testing.T) {
 		SelectedModel: func() (string, string, error) { return "openai", "gpt-5", nil },
 	})
 	model.input = "prepare the brief"
-	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
-	if command != nil || model.models == nil || model.pendingPrompt != "prepare the brief" {
+	if model.models == nil || model.pendingPrompt != "prepare the brief" {
 		t.Fatalf("model setup state = %#v", model)
 	}
-	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	model = updated.(Model)
-	if command != nil || model.models != nil || model.firstRun || model.input != "prepare the brief" || !strings.Contains(model.status, "Selected model: openai / gpt-5") {
+	if model.models != nil || model.firstRun || model.input != "prepare the brief" || !strings.Contains(model.status, "Selected model: openai / gpt-5") {
 		t.Fatalf("post-model state = %#v", model)
 	}
 }
@@ -869,9 +869,9 @@ func TestFirstRunStillOpensModelManagementAfterLocalCommand(t *testing.T) {
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
 	model.input = "prepare the brief"
-	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
-	if command != nil || model.models == nil || model.pendingPrompt != "prepare the brief" {
+	if model.models == nil || model.pendingPrompt != "prepare the brief" {
 		t.Fatalf("model setup state = %#v", model)
 	}
 }

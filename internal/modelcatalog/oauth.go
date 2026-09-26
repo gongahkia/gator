@@ -37,7 +37,7 @@ func (m Model) startOAuthLogin(providerName string) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if clientIDEnvironment := oauthClientIDEnvironment(string(provider)); clientIDEnvironment != "" && strings.TrimSpace(os.Getenv(clientIDEnvironment)) == "" {
-		m.notice = notice{text: "This sign-in requires Gator's OAuth client configuration. Select a provider with an available sign-in, or press c to configure an API credential.", kind: noticeInfo}
+		m.notice = notice{text: oauthClientConfigurationHint(string(provider), clientIDEnvironment), kind: noticeInfo}
 		return m, nil
 	}
 	if provider == modelprovider.Claude {
@@ -62,6 +62,19 @@ func (m Model) startOAuthLogin(providerName string) (tea.Model, tea.Cmd) {
 	return m, func() tea.Msg {
 		return oauthLoginDoneMsg{provider: string(provider), err: login.Complete(loginContext)}
 	}
+}
+
+func oauthLoginAvailable(provider modelprovider.Provider) bool {
+	if !modelprovider.SupportsOAuthLogin(provider) {
+		return false
+	}
+	clientIDEnvironment := oauthClientIDEnvironment(string(provider))
+	return clientIDEnvironment == "" || strings.TrimSpace(os.Getenv(clientIDEnvironment)) != ""
+}
+
+func oauthClientConfigurationHint(provider, clientIDEnvironment string) string {
+	return strings.ToUpper(provider) + " sign-in needs " + clientIDEnvironment +
+		". Gator has no bundled OAuth client ID; set it before starting Gator, then reopen Models and press l."
 }
 
 func (m Model) updateOAuthLoginDone(msg oauthLoginDoneMsg) (tea.Model, tea.Cmd) {
