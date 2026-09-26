@@ -101,7 +101,7 @@ package manager.
 | `fork` | `/tree`, `/fork`, or `/fork TARGET [instruction…]` | complete | Exact CLI `--max-steps` remains `/run` / `/effort`. |
 | `clone` | `/clone` or `/clone TARGET [instruction…]` | complete | Exact CLI `--max-steps` remains `/run` / `/effort`. |
 | `transcript RUN_RECORD_PATH` | `/manage` selects retained runs and writes private HTML exports below Gator's state directory; active transcript remains scrollable and copyable | complete | — |
-| `review RUN_RECORD_PATH [--open]` | `/review`, `/review TARGET`, and `b` loopback browser review | complete | Listen stays loopback-only. This is not `gator agent serve`. |
+| `review RUN_RECORD_PATH [--open]` | `/review`, `/review TARGET`, and `b` loopback browser review | complete | Listen stays loopback-only and is not an execution API. |
 | `export RUN_RECORD_PATH` | `/manage` selects retained runs and writes private patch exports below Gator's state directory | complete | — |
 | `apply [--check] RUN_RECORD_PATH` | `/manage` requires a successful clean-checkout compatibility check for the selected run, then a separate apply confirmation | complete | — |
 | `eval DIR` | None | CLI only | Offline `--script` or `--live` evaluation; writes a JSON report. Not a TUI workflow. |
@@ -149,7 +149,7 @@ defines the next bounded iteration rather than implying broad parity.
    An instruction after the target starts that continuation immediately.
    `/recent` also accepts a typed target (`p`). Review `b` starts the
    loopback browser listener with an editable listen address and optional
-   open; it is not `gator agent serve` and has no RPC.
+   open; it is a review-only loopback surface with no machine protocol.
 9. **Diagnostics and vendor harnesses** — implemented: `/doctor` is a get-only
    local report; `/opencode status`, `/opencode login PROVIDER [METHOD]`, and
    `/opencode use PROVIDER/MODEL` expose the installed OpenCode harness without

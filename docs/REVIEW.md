@@ -48,7 +48,8 @@ directory instead of the latest completed run. Press `b` to start the same
 loopback browser review the CLI exposes: edit the listen address (loopback
 only), toggle `o` to open the one-use URL, `enter` to start, and `s` to stop.
 The URL is shown on that screen and is not copied into drafts or transcripts.
-This is not `gator agent serve` and has no RPC access.
+This review listener is isolated from agent execution and exposes no machine
+protocol.
 
 ## Browser review
 
@@ -64,21 +65,21 @@ The command prints a one-use URL. Opening it exchanges the URL credential for a
 without the credential. The browser page provides the same all/unstaged/staged
 file and hunk navigation, raw file patches, explicit stage/unstage
 confirmations, and range-scoped feedback. Browser feedback is saved beside the
-retained run and returns the exact constrained continuation text for review and
-copying. Historical standalone Code records remain reviewable, but new work
-continues through `gator work resume CONVERSATION` and Gator revision history.
+retained Work evidence and returns the exact constrained continuation text for
+review and copying. Continued work uses `gator work resume CONVERSATION` and
+Gator revision history.
 
-This is intentionally not `gator agent serve` and not an RPC client. `gator agent serve`
-continues to reject every browser origin. The review listener accepts literal
-loopback peers only, binds only literal loopback addresses, has no CORS mode,
+This is intentionally not a general agent API or an RPC client. The review
+listener accepts literal loopback peers only, binds only literal loopback
+addresses, has no CORS mode,
 requires same-origin mutations, sends `no-store`, `nosniff`, no-referrer, and a
 nonce-bound restrictive Content Security Policy, and never loads external
 assets. It can be reached over an SSH tunnel only by deliberately forwarding a
 loopback port; do not expose it with a public reverse proxy.
 
 The page is a review and index-management surface, not a remote executor. It
-does not expose provider credentials, the app-server bearer token, a generic
-agent API, or a way to apply the retained patch to the active checkout.
+does not expose provider credentials, a generic agent API, or a way to apply
+the retained patch to the active checkout.
 
 ## Work code application
 

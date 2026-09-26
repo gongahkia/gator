@@ -64,7 +64,7 @@ func TestQuotedWorkRequestUsesTheWorkEntryPoint(t *testing.T) {
 }
 
 func TestRunRejectsRemovedRootAliases(t *testing.T) {
-	for _, command := range []string{"tui", "help", "version", "connect", "login", "logout", "code", "run", "fork", "clone", "local", "learning"} {
+	for _, command := range []string{"tui", "help", "version", "connect", "login", "logout", "code", "run", "fork", "clone", "local", "learning", "rpc", "serve", "child", "delegate"} {
 		var output bytes.Buffer
 		err := run([]string{command}, &output)
 		if err == nil || !strings.Contains(err.Error(), "unknown command") || !strings.Contains(err.Error(), "gator --help") {
@@ -73,9 +73,24 @@ func TestRunRejectsRemovedRootAliases(t *testing.T) {
 	}
 }
 
+func TestLegacyProtocolAndDelegationCommandsAreRemoved(t *testing.T) {
+	for _, arguments := range [][]string{{"agent", "rpc"}, {"agent", "serve"}, {"agent", "child"}, {"agent", "delegate"}, {"--mode", "rpc"}} {
+		var output bytes.Buffer
+		err := run(arguments, &output)
+		if err == nil {
+			t.Fatalf("%s unexpectedly succeeded", strings.Join(arguments, " "))
+		}
+		for _, removed := range []string{"gator agent rpc", "gator agent serve", "gator agent child", "gator agent delegate"} {
+			if strings.Contains(err.Error(), removed) || strings.Contains(output.String(), removed) {
+				t.Fatalf("%s still exposes removed surface %q: error=%q output=%q", strings.Join(arguments, " "), removed, err, output.String())
+			}
+		}
+	}
+}
+
 func TestMovedRootCommandsExplainTheirCanonicalFamily(t *testing.T) {
 	for command, canonical := range map[string]string{
-		"rpc": "gator agent rpc", "serve": "gator agent serve", "acp": "gator agent acp", "child": "gator agent child", "delegate": "gator agent delegate",
+		"acp":  "gator agent acp",
 		"hook": "gator config hook", "connector": "gator provider connector", "inbox": "gator job inbox", "snapshot": "gator work snapshot",
 		"inspect": "gator work inspect", "resume": "gator work resume", "eval": "gator work eval",
 		"review": "gator work review", "export": "gator work export", "apply": "gator work apply",
@@ -142,9 +157,6 @@ func TestNestedCommandFamiliesRouteToTheirHandlers(t *testing.T) {
 	}{
 		{[]string{"agent", "acp", "unexpected"}, "usage: gator agent acp"},
 		{[]string{"-a", "acp", "unexpected"}, "usage: gator agent acp"},
-		{[]string{"agent", "rpc", "unexpected"}, "usage: gator agent rpc"},
-		{[]string{"agent", "child"}, "gator agent child list"},
-		{[]string{"agent", "delegate"}, "gator agent delegate"},
 		{[]string{"config", "hook"}, "gator config hook status"},
 		{[]string{"-c", "hook"}, "gator config hook status"},
 		{[]string{"provider", "connector", "status"}, "connector ID"},
@@ -248,7 +260,7 @@ func TestCodexExecutorUsesDirectModelAdapter(t *testing.T) {
 	if err := credentials.Put("codex", auth.Credential{Type: "oauth", Access: "access-token", Expires: time.Now().Add(time.Hour).UnixMilli(), Extra: map[string]string{"chatgpt_account_id": "account_123"}}); err != nil {
 		t.Fatalf("store Codex OAuth credential: %v", err)
 	}
-	executor, err := newExecutor("codex", "", "")
+	executor, err := newCodeExecutor("codex", "", "")
 	if err != nil {
 		t.Fatalf("new codex executor: %v", err)
 	}
@@ -267,7 +279,7 @@ func TestExecutorReadsWebSearchKeyFromEnvironmentOnly(t *testing.T) {
 	if err := credentials.Put("codex", auth.Credential{Type: "oauth", Access: "access-token", Expires: time.Now().Add(time.Hour).UnixMilli(), Extra: map[string]string{"chatgpt_account_id": "account_123"}}); err != nil {
 		t.Fatalf("store Codex credential: %v", err)
 	}
-	executor, err := newExecutor("codex", "", "")
+	executor, err := newCodeExecutor("codex", "", "")
 	if err != nil {
 		t.Fatalf("new executor: %v", err)
 	}

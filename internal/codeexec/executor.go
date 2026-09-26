@@ -62,7 +62,7 @@ type Outcome struct {
 }
 
 // Executor contains provider-neutral native code tools and their trusted
-// local integrations. It is intentionally independent of internal/run.
+// local integrations. It is invoked only as a bounded Work specialist.
 type Executor struct {
 	Model      agent.Model
 	Now        func() time.Time

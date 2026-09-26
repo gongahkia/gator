@@ -16,7 +16,7 @@ import (
 	"time"
 
 	gatorbrowser "github.com/gongahkia/gator/internal/browser"
-	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/state"
 )
 
 const browserUsage = `usage:
@@ -37,7 +37,7 @@ func browserCommand(arguments []string, out io.Writer) error {
 	if len(arguments) == 0 {
 		return errors.New(browserUsage)
 	}
-	stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
+	stateDir, err := state.ResolveDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {
 		return err
 	}
@@ -436,7 +436,7 @@ func browserDaemon(arguments []string, store *gatorbrowser.Store, stateDir strin
 	if err != nil {
 		return err
 	}
-	ctx, stop := signal.NotifyContext(context.Background(), serveSignals()...)
+	ctx, stop := signal.NotifyContext(context.Background(), shutdownSignals()...)
 	defer stop()
 	driver, err := gatorbrowser.StartSidecar(ctx, gatorbrowser.SidecarConfig{Store: store, Mode: gatorbrowser.Mode(*mode), Headed: *headed, CDPEndpoint: *endpoint})
 	if err != nil {

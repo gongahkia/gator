@@ -21,8 +21,8 @@ import (
 	"github.com/gongahkia/gator/internal/delivery"
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
-	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/sandbox"
+	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workrun"
 	"github.com/gongahkia/gator/internal/worksession"
@@ -47,7 +47,7 @@ func workInteractiveConversation(startConversationID string) error {
 	if err != nil || output.Mode()&os.ModeCharDevice == 0 {
 		return errors.New("interactive Work requires a terminal; use 'gator work' for scripts")
 	}
-	stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
+	stateDir, err := state.ResolveDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {
 		return err
 	}
@@ -726,7 +726,7 @@ func unifiedResume(arguments []string, out io.Writer) error {
 	if len(arguments) == 0 {
 		return workInteractive()
 	}
-	stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
+	stateDir, err := state.ResolveDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {
 		return err
 	}

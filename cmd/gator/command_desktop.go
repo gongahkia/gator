@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/gongahkia/gator/internal/desktop"
-	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/state"
 )
 
 const desktopUsage = `usage:
@@ -25,7 +25,7 @@ func desktopCommand(arguments []string, out io.Writer) error {
 	if len(arguments) == 0 {
 		return errors.New(desktopUsage)
 	}
-	stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
+	stateDir, err := state.ResolveDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {
 		return err
 	}

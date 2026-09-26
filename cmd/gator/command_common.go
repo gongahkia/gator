@@ -117,3 +117,10 @@ func parseSuggestedVerification(commands []string) [][]string {
 	}
 	return result
 }
+
+func valueOrDash(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return "-"
+	}
+	return value
+}

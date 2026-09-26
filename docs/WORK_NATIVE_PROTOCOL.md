@@ -1,8 +1,7 @@
 # Work-native protocol v1
 
 `gator work-rpc` accepts newline-delimited JSON on stdin and emits versioned JSON
-on stdout. This is a Work application surface. Existing RPC, ACP and app-server
-requests retain their coding-engine semantics.
+on stdout. This is the canonical machine-facing Work application surface.
 
 The first frame is `{"version":1,"type":"start","request":{...}}`. Request fields:
 

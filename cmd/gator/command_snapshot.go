@@ -8,13 +8,13 @@ import (
 	"os"
 
 	"github.com/gongahkia/gator/internal/jobs"
-	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/snapshot"
+	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/worksession"
 )
 
 func snapshotCommand(arguments []string, out io.Writer) error {
-	stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
+	stateDir, err := state.ResolveDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {
 		return err
 	}

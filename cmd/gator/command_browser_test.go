@@ -8,13 +8,13 @@ import (
 	"testing"
 
 	gatorbrowser "github.com/gongahkia/gator/internal/browser"
-	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/state"
 )
 
 func TestBrowserStopRevokesUnavailableSession(t *testing.T) {
 	stateDir := t.TempDir()
 	t.Setenv("GATOR_STATE_DIR", stateDir)
-	resolvedStateDir, err := journal.ResolveStateDir(stateDir)
+	resolvedStateDir, err := state.ResolveDir(stateDir)
 	if err != nil {
 		t.Fatalf("ResolveStateDir: %v", err)
 	}

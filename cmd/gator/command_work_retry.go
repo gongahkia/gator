@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/gongahkia/gator/internal/delivery"
-	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/state"
 )
 
 type workRetryOptions struct {
@@ -22,7 +22,7 @@ func retryWorkDelivery(arguments []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
+	stateDir, err := state.ResolveDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {
 		return err
 	}

@@ -9,11 +9,7 @@ import (
 
 const agentFamilyUsage = `usage:
   gator agent list
-  gator agent child list|show|batches|batch RUN_RECORD_PATH [CHILD_RUN_ID|BATCH_ID]
-  gator agent delegate RUNTIME ACTION [OPTIONS]
   gator agent acp [--verify 'argv ...']
-  gator agent rpc
-  gator agent serve ACTION [OPTIONS]
 
 short form:
   gator -a ...`
@@ -34,16 +30,8 @@ func agentFamilyCommand(arguments []string, out io.Writer) error {
 		return err
 	}
 	switch arguments[0] {
-	case "child":
-		return childCommand(arguments[1:], out)
-	case "delegate":
-		return delegate(arguments[1:], out)
 	case "acp":
 		return acpMode(arguments[1:], os.Stdin, out)
-	case "rpc":
-		return rpcMode(arguments[1:], os.Stdin, out)
-	case "serve":
-		return serveCommand(arguments[1:], out)
 	case "list":
 		return agentCommand(arguments, out)
 	default:
@@ -108,11 +96,7 @@ func workResumeCommand(arguments []string, out io.Writer) error {
 
 func movedCommand(command string) error {
 	canonical := map[string]string{
-		"rpc":       "gator agent rpc",
-		"serve":     "gator agent serve",
 		"acp":       "gator agent acp",
-		"child":     "gator agent child",
-		"delegate":  "gator agent delegate",
 		"hook":      "gator config hook",
 		"connector": "gator provider connector",
 		"inbox":     "gator job inbox",

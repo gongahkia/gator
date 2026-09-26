@@ -27,7 +27,7 @@ import (
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
-	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/state"
 )
 
 type jobResult struct {
@@ -190,7 +190,7 @@ func writePrivateFile(path string, contents []byte) error {
 }
 
 func jobStore() (jobs.Store, string, error) {
-	stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
+	stateDir, err := state.ResolveDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {
 		return jobs.Store{}, "", err
 	}

@@ -12,7 +12,7 @@ import (
 
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/delivery"
-	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/state"
 )
 
 func exportPatch(arguments []string, out io.Writer) error {
@@ -23,7 +23,7 @@ func exportPatch(arguments []string, out io.Writer) error {
 	if !eligible {
 		return errors.New("usage: gator work export WORK_BUNDLE|WORK_ID [--to ARCHIVE] [--replace]")
 	}
-	stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
+	stateDir, err := state.ResolveDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {
 		return err
 	}
@@ -150,7 +150,7 @@ func applyPatch(arguments []string, out io.Writer) error {
 	if options.destination == "" {
 		return errors.New("applying a work bundle requires an explicit --to DIRECTORY")
 	}
-	stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
+	stateDir, err := state.ResolveDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {
 		return err
 	}

@@ -39,14 +39,14 @@ func TestLocalUseConfiguresNativeProviderForInstalledCuratedModel(t *testing.T) 
 	if !found || provider.BaseURL != server.URL+"/v1/chat/completions" || provider.DefaultModel != "qwen2.5-coder:7b" || settings.Defaults.Provider != localmodel.ProviderID || settings.Defaults.Model != "qwen2.5-coder:7b" {
 		t.Fatalf("local settings = %#v", settings)
 	}
-	executor, err := newExecutor(localmodel.ProviderID, "", "")
+	executor, err := newCodeExecutor(localmodel.ProviderID, "", "")
 	if err != nil || executor.Model == nil {
 		t.Fatalf("local executor = %#v, err = %v", executor, err)
 	}
 	if _, ok := executor.Model.(localmodel.TextOnlyModel); !ok {
 		t.Fatalf("local executor model = %T, want text-only local wrapper", executor.Model)
 	}
-	if _, err := newExecutor(localmodel.ProviderID, "", "http://models.example.com/v1/chat/completions"); err == nil || !strings.Contains(err.Error(), "loopback") {
+	if _, err := newCodeExecutor(localmodel.ProviderID, "", "http://models.example.com/v1/chat/completions"); err == nil || !strings.Contains(err.Error(), "loopback") {
 		t.Fatalf("managed local remote override error = %v", err)
 	}
 	if _, err := executor.Model.Complete(context.Background(), agent.TurnRequest{Messages: []agent.Message{{Role: agent.RoleUser, Images: []agent.Image{{Name: "design.png"}}}}}); err == nil || !strings.Contains(err.Error(), "text only") {
@@ -154,7 +154,7 @@ func TestLocalEligibilityBlocksPullUseAndManagedExecution(t *testing.T) {
 	if err := store.Save(settings); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := newExecutor(localmodel.ProviderID, "", ""); err == nil || !strings.Contains(err.Error(), "disabled on this host") {
+	if _, err := newCodeExecutor(localmodel.ProviderID, "", ""); err == nil || !strings.Contains(err.Error(), "disabled on this host") {
 		t.Fatalf("blocked local executor error = %v", err)
 	}
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
-	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/workrun"
 	"io"
 	"os"
@@ -53,7 +53,7 @@ func workHeadless(ctx context.Context, in io.Reader, out io.Writer) (resultErr e
 			_ = sendWorkFrame(out, "result", map[string]any{"status": "failed", "category": "setup", "error": resultErr.Error(), "conversation_id": "", "revision_id": ""})
 		}
 	}()
-	stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
+	stateDir, err := state.ResolveDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {
 		return err
 	}

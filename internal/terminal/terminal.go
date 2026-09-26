@@ -185,7 +185,7 @@ func (m *Manager) Attachment() Attachment {
 }
 
 // DeveloperInput identifies direct terminal input without retaining the bytes.
-// It is suitable for activity/journal metadata only.
+// It is suitable for activity metadata only.
 type DeveloperInput struct {
 	Bytes  int    `json:"bytes"`
 	SHA256 string `json:"sha256"`
@@ -194,7 +194,7 @@ type DeveloperInput struct {
 
 // Task describes bounded, non-sensitive terminal state. Output is retrieved
 // separately with Read so status events never put raw terminal data in the
-// journal.
+// Work evidence.
 type Task struct {
 	ID              string    `json:"id"`
 	Argv            []string  `json:"argv"`

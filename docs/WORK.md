@@ -263,7 +263,7 @@ gator work snapshot ...           inspect or collect unreferenced snapshots
 
 `gator work code` and `gator work run` are compatibility routes through the same Gator
 manager. They require Code-specialist evidence but never open a separate Code
-TUI. RPC and ACP retain explicit workflow and outcome-contract fields.
+TUI. ACP is a thin Work adapter; `work-rpc` is the canonical machine protocol.
 
 Headless operation is a primary product surface. Structured output, stable exit
 codes, stdin-compatible task input, and immutable manifests make Gator useful in
@@ -286,25 +286,21 @@ The implementation is split around durable concepts:
   `internal/inbox`: immutable Work inputs, revision history, schedules, and
   result routing; and
 - `internal/codeexec`: the backend-only isolated coding executor used by
-  Gator's Work Code specialist; and
-- `internal/run`: a retained compatibility runtime for legacy protocol
-  integrations, outside the normal Work lifecycle.
+  Gator's Work Code specialist.
 
 Gator Work can call the current coding workflow as a narrowly scoped `code`
 specialist. It receives the exact immutable Work source snapshot, runs in a
 private Git worktree, and returns a patch artifact; it never edits the selected
 source. See [Work orchestration](ORCHESTRATION.md).
 
-Provider adapters, the agent runner, sandbox, journal transport, terminal
-manager, browser controller, attachment parser, and event stream remain shared.
+Provider adapters, the agent runner, sandbox, terminal manager, browser
+controller, attachment parser, and event stream remain shared.
 Format-specific artifact code must not leak into the agent runner or provider
 adapters.
 
 ## Compatibility and state
 
-`gator work run` remains an alias for the `gator work code` compatibility route. New
-coding requests use Work conversations and revisions. Historical Code run
-records remain readable for review/export compatibility but are never silently
-reinterpreted as Gator conversations. Snapshot collection is explicit and does
-not delete data; `gator work snapshot gc --yes` is the only snapshot reclamation
-path.
+`gator work run` remains an alias for the `gator work code` compatibility route.
+New coding requests use Work conversations and revisions. Snapshot collection is
+explicit and does not delete data; `gator work snapshot gc --yes` is the only
+snapshot reclamation path.

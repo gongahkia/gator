@@ -1,5 +1,8 @@
 # Gator product depth and engineering assessment
 
+> Historical research report. It predates the Work-convergence tranche; legacy
+> runtime and protocol references below are archival, not supported behavior.
+
 Gator should develop into a provider-independent terminal work environment where a continuing conversation produces reviewable documents, analyses, code changes, and proposed actions. Its strongest differentiator is already present: explicit sources, isolated execution, developer-owned outcome contracts, and retained evidence. The next investment should connect those foundations into complete workflows, deepen the specialist lifecycle, and measure the actual Work product.
 
 The recommended implementation remains native Go. Extend the existing orchestration and evaluation packages; add optional OpenTelemetry export and a LangSmith experiment integration. A wholesale LangChain or LangGraph migration would introduce another runtime and require re-establishing Gator's existing provider, permission, isolation, and evidence behavior. This is an architectural recommendation based on the present code, not a claim that those frameworks cannot be useful.

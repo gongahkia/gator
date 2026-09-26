@@ -51,7 +51,7 @@ local HTTP fixtures, not an external research account.
 The native Code follow-up fixture accepts the first staged patch, starts the next
 revision from that candidate, and verifies the cumulative change while live project
 configuration has changed. The original source remains unchanged. Code is still
-an internal specialist; legacy Code RPC/ACP/app-server surfaces remain compatible.
+an internal specialist; retained machine protocols enter canonical Work.
 
 ## Commands and results
 
@@ -62,8 +62,8 @@ GOTOOLCHAIN=go1.25.13 make check
 GOTOOLCHAIN=go1.25.13 go test -race ./internal/agent ./internal/orchestrator \
   ./internal/workrun ./internal/worksession ./internal/jobs ./internal/worktui \
   ./internal/telemetry ./cmd/gator
-GOTOOLCHAIN=go1.25.13 go test -race ./internal/run ./internal/patch \
-  ./internal/sandbox ./internal/mcp ./internal/rpc ./internal/acp ./internal/appserver
+GOTOOLCHAIN=go1.25.13 go test -race ./internal/codeexec ./internal/patch \
+  ./internal/sandbox ./internal/mcp ./internal/acp ./internal/delivery
 GOTOOLCHAIN=go1.25.13 GATOR_BROWSER_INTEGRATION=1 \
   go test -count=1 -run TestSidecarManagedBrowserIntegration ./internal/browser
 ```

@@ -10,8 +10,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/learning"
+	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/worksession"
 )
@@ -26,7 +26,7 @@ const workFeedbackUsage = `usage:
 explicit active scoped learning immediately. Neither retries Work or delivery.`
 
 func workFeedbackCommand(arguments []string, out io.Writer) error {
-	stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
+	stateDir, err := state.ResolveDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {
 		return err
 	}

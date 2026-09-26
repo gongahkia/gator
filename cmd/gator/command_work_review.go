@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/gongahkia/gator/internal/delivery"
-	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/state"
 )
 
 // reviewCommand is the single human-facing review path. Work bundles retain
@@ -18,7 +18,7 @@ func reviewCommand(arguments []string, out io.Writer) error {
 	if !eligible {
 		return errors.New("usage: gator work review WORK_BUNDLE|WORK_ID [--preview] [--json]")
 	}
-	stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
+	stateDir, err := state.ResolveDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {
 		return err
 	}

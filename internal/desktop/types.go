@@ -29,7 +29,7 @@ type Application struct {
 // Session contains only display-safe local desktop capability metadata.
 // RetainProviderState records the developer's explicit consent for a CUA
 // provider session to retain state for its lifetime; screenshot bytes are not
-// retained in this record or in the Work journal.
+// retained in this record or in Work evidence.
 type Session struct {
 	ID                  string        `json:"id"`
 	State               State         `json:"state"`
@@ -66,7 +66,7 @@ type Point struct {
 }
 
 // Capture is deliberately ephemeral. The runner can attach its image to the
-// next model turn but must never write the raw screenshot to the journal.
+// next model turn but must never write the raw screenshot to Work evidence.
 type Capture struct {
 	Window Window
 	PNG    []byte

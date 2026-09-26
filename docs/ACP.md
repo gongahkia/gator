@@ -1,83 +1,35 @@
 # Agent Client Protocol integration
 
-`gator agent acp` (or `gator --mode acp`) runs Gator as a local [Agent Client
-Protocol](https://agentclientprotocol.com/) v1 agent over standard input and
-output. It is the editor-facing interface. `gator agent rpc` remains Gator's own
-JSONL API for CI and bespoke automation; the two protocols are deliberately
-separate.
-
-Start the process at the root of the checkout that the editor opens:
+`gator agent acp` (or `gator --mode acp`) exposes Gator to a local
+[Agent Client Protocol](https://agentclientprotocol.com/) v1 editor over
+standard input and output. It is an editor-facing adapter over canonical Work;
+it has no private execution engine, journal, worktree lifecycle, or review
+state.
 
 ```sh
 gator agent acp
 gator agent acp --verify 'go test ./...'
-gator agent acp --verify 'npm test'
 ```
 
-The transport is one JSON-RPC 2.0 object per line. It supports the normal ACP
-v1 lifecycle: `initialize`, `session/new`, `session/prompt`, `session/cancel`,
-`session/set_mode`, `session/list`, `session/load`, `session/resume`, and
-`session/close`. Model text streams as `session/update` agent-message chunks;
-tool calls and their terminal status stream as structured ACP tool updates.
-Gator-owned subagent, terminal-exit, hook, compaction, and steering lifecycle
-events also stream as completed `other` tool calls, so an ACP client can show
-progress without treating coordinator messages as model text.
-Gator sends `session/request_permission` for each non-verification command and
-waits for a standard permission response with `allow_once`, `allow_always`, or
-`reject_once`.
+ACP accepts one JSON-RPC 2.0 object per line. It supports `initialize`,
+`session/new`, `session/prompt`, `session/cancel`, `session/set_mode`,
+`session/list`, `session/load`, `session/resume`, and `session/close`. Model
+text and Work tool events stream as ACP `session/update` messages. Work
+interactions are translated to `session/request_permission`; every selection is
+an exact approval for that Work operation.
 
-The server supports one active prompt per ACP session. A cancel notification is
-processed while a prompt is running. Closing a session cancels its active work
-and waits for the executor to release the retained worktree before completing
-the close request. Retained Gator thread IDs are ACP session IDs, so
-`session/list` and `session/load`/`session/resume` restore local conversations
-without exposing private run-record paths. `session/load` replays retained user,
-agent, and structured tool-call updates before its response; `session/resume`
-restores context without replay for a reconnecting client.
+`plan` maps to read-only Work inspection. When `--verify` or a bounded project
+suggestion is available, `execute` maps to draft Work requiring Code-specialist
+evidence. It produces a reviewable Work artifact/candidate and never directly
+applies a checkout mutation.
 
-## Execution policy
+An ACP session ID is a process-local protocol handle, not a Work ID. Prompts in
+that session continue the canonical Work conversation/revision returned by the
+previous prompt. `session/list`, `session/load`, and `session/resume` therefore
+operate only while the ACP process is alive; durable conversation and history
+remain available through normal Gator Work state rather than a protocol-specific
+journal.
 
-Gator never accepts an execution policy from an ACP prompt. If `--verify` is
-given, the session starts in Execute mode and completion requires that exact
-argv list, plus final `git_status` and `git_diff` evidence. Without an explicit
-flag, Gator uses its bounded project suggestions (`go test ./...`, `npm test`,
-`pytest`, or `cargo test`) when applicable; otherwise the session starts in
-read-only Plan mode. ACP clients can switch an unused session between Plan and
-Execute only when the process has a verifier policy. A retained Plan thread
-cannot be converted to Execute in place because Gator preserves a thread's
-original command authority.
-
-The same strict process sandbox, isolated worktree, hook policy, project MCP
-and LSP trust, and provider credential handling used by the TUI apply to ACP
-runs. `cwd` must be the repository Gator was started for and `mcpServers` must
-be empty. ACP clients may additionally supply up to 32 existing absolute
-directories through `additionalDirectories`; they are canonicalized and become
-read-only context for `read_file`, `list_files`, `search_files`, and trusted LSP
-navigation/indexing. External-root paths are absolute, while primary-worktree
-paths remain relative. They never widen patch, command, or terminal authority;
-formatting, rename, and code-action edits are unavailable for external files.
-The complete root list must be supplied again on `session/load` and
-`session/resume` and is never restored implicitly from the retained session.
-Trusted project MCP configuration continues to come only from `.gator/mcp.json`
-after `gator mcp trust`. Trusted local LSP diagnostics, read-only navigation,
-informational completion, formatting, rename, and workspace-confined code-action
-suggestions continue to come only from `.gator/lsp.json` after `gator lsp trust`.
-ACP prompts cannot provide a worktree setup command: that capability is limited
-to the local developer's explicit `gator work run --setup` invocation, before an
-agent session exists.
-
-ACP authentication methods are intentionally not advertised. Configure a
-provider through Gator's existing `login`, `connect`, environment, or local
-credential workflow before starting the agent. Gator does not ask an editor to
-forward provider credentials.
-
-## Current protocol boundary
-
-This is a local stdio profile, not a hosted ACP endpoint. It does not provide
-the draft streamable-HTTP/WebSocket transport, client-provided MCP servers,
-ACP-client direct user terminal attachment or delegated vendor-terminal control,
-image/audio prompt blocks, embedded resource content, or JSON-RPC batch
-envelopes. Execute-mode ACP sessions can still expose Gator's approved native
-terminal-task tools as ordinary ACP tool calls. Batch envelopes receive a clear
-`-32600` error rather than a partial response. These are intentional unsupported
-surfaces, not fallbacks to Gator's proprietary RPC protocol.
+The adapter fixes its repository root at process start. Client-supplied MCP
+servers and additional directories are not accepted, and clients cannot weaken
+the Work authority, sandbox, provider credentials, or verification policy.

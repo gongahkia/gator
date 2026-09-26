@@ -26,7 +26,6 @@ type Config struct {
 	Input               io.Reader
 	Output              io.Writer
 	RepositoryPath      string
-	StateDir            string
 	DefaultProvider     string
 	DefaultModel        string
 	DefaultBaseURL      string

@@ -290,6 +290,7 @@ func (s *Server) executePrompt(ctx context.Context, cancel context.CancelFunc, s
 	}
 	s.mu.Unlock()
 	completion := s.forwardWork(sessionID, messageID, operation)
+	s.clearPermissions(operation)
 	if completion.Outcome.ConversationID != "" || completion.Outcome.RevisionID != "" {
 		s.mu.Lock()
 		if session, found := s.sessions[sessionID]; found {
@@ -365,7 +366,9 @@ func (s *Server) finishPrompt(response json.RawMessage, ctx context.Context, err
 }
 
 func (s *Server) cancel(request inbound) error {
-	var params struct{ SessionID string `json:"sessionId"` }
+	var params struct {
+		SessionID string `json:"sessionId"`
+	}
 	if err := decodeParams(request.Params, &params); err != nil {
 		return fmt.Errorf("session/cancel parameters: %w", err)
 	}
@@ -515,7 +518,9 @@ func (s *Server) replaySession(sessionID string, messages []agent.Message) {
 }
 
 func (s *Server) closeSession(request inbound) error {
-	var params struct{ SessionID string `json:"sessionId"` }
+	var params struct {
+		SessionID string `json:"sessionId"`
+	}
 	if err := decodeParams(request.Params, &params); err != nil {
 		return fmt.Errorf("session/close parameters: %w", err)
 	}
@@ -554,8 +559,8 @@ func (s *Server) requestPermission(sessionID string, operation *workrun.Operatio
 	}
 	s.send(outbound{JSONRPC: "2.0", ID: json.RawMessage(strconv.Quote(id)), Method: "session/request_permission", Params: map[string]any{
 		"sessionId": sessionID,
-		"toolCall": map[string]any{"toolCallId": id, "title": "Approve Work " + interaction.Kind, "kind": kind, "status": "pending", "rawInput": interaction.Preview},
-		"options": []map[string]any{{"optionId": "allow_once", "name": "Allow once", "kind": "allow_once"}, {"optionId": "allow_always", "name": "Allow once for this Work", "kind": "allow_once"}, {"optionId": "reject_once", "name": "Deny", "kind": "reject_once"}},
+		"toolCall":  map[string]any{"toolCallId": id, "title": "Approve Work " + interaction.Kind, "kind": kind, "status": "pending", "rawInput": interaction.Preview},
+		"options":   []map[string]any{{"optionId": "allow_once", "name": "Allow once", "kind": "allow_once"}, {"optionId": "allow_always", "name": "Allow once for this Work", "kind": "allow_once"}, {"optionId": "reject_once", "name": "Deny", "kind": "reject_once"}},
 	}})
 }
 
@@ -589,6 +594,19 @@ func (s *Server) handleResponse(response inbound) {
 		}
 	}
 	_ = pending.operation.Respond(pending.interactionID, approved)
+}
+
+// clearPermissions discards protocol response handles when the Work operation
+// completes or is cancelled. Work remains the authority for the interaction;
+// ACP merely stops accepting late responses for a completed operation.
+func (s *Server) clearPermissions(operation *workrun.Operation) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for id, pending := range s.permissions {
+		if pending.operation == operation {
+			delete(s.permissions, id)
+		}
+	}
 }
 
 func (s *Server) sendEvent(sessionID, messageID string, event agent.Event) {
@@ -697,7 +715,9 @@ func (s *Server) newSessionID() (string, error) {
 	return "acp-" + hex.EncodeToString(value[:]), nil
 }
 
-func (s *Server) nextID(prefix string) string { return fmt.Sprintf("gator-%s-%d", prefix, s.next.Add(1)) }
+func (s *Server) nextID(prefix string) string {
+	return fmt.Sprintf("gator-%s-%d", prefix, s.next.Add(1))
+}
 
 func (s *Server) sendResult(id json.RawMessage, result any) {
 	if len(id) != 0 {

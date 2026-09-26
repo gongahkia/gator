@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/learning"
+	"github.com/gongahkia/gator/internal/state"
 )
 
 const learningUsage = `usage:
@@ -27,7 +27,7 @@ Candidate learnings are created only from future transaction-outcome work; this
 foundation lets users inspect, enable, disable, or reject them when present.`
 
 func learningCommand(arguments []string, out io.Writer) error {
-	stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
+	stateDir, err := state.ResolveDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {
 		return err
 	}

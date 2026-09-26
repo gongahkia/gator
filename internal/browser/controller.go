@@ -46,7 +46,7 @@ type Element struct {
 }
 
 // Capture carries private screenshot bytes to the agent runner; it is never
-// written into a session journal. Artifact metadata may be retained locally.
+// written into Work session evidence. Artifact metadata may be retained locally.
 type Capture struct {
 	Artifact Artifact
 	PNG      []byte

@@ -17,7 +17,7 @@ The release must make these workflows concrete:
 
 Follow the applicable `AGENTS.md`. Inspect `go.mod`, Makefile, relevant scripts, CI/release configuration, and Git status before editing. This is a Go application with a pinned Playwright sidecar; do not introduce a frontend framework because of unrelated instruction boilerplate.
 
-Read `docs/research/product-depth-report.md`, `docs/WORK.md`, `docs/CODE_TO_GATOR_MIGRATION.md`, `docs/ORCHESTRATION.md`, `docs/EVALUATION.md`, `docs/WRITERS.md`, and the implementation paths they identify. Inspect the retained Gator Code engine and the available pre-Work Git history. If another original Gator Code repository is available, compare it explicitly; otherwise state that limitation and proceed using the retained code and history.
+Read `docs/research/product-depth-report.md`, `docs/WORK.md`, `docs/CODE_TO_GATOR_MIGRATION.md`, `docs/ORCHESTRATION.md`, and `docs/EVALUATION.md`, plus the implementation paths they identify. Inspect the retained Gator Code engine and the available pre-Work Git history. If another original Gator Code repository is available, compare it explicitly; otherwise state that limitation and proceed using the retained code and history.
 
 The research baseline is commit `70adf39b57e7bd5469d792e3674ca7f331f5512e`. Verify the current tree: another instance may have changed it. Preserve all unrelated work and treat current code as authoritative. The report is evidence and a recommended design, not permission to assume every finding remains unchanged.
 

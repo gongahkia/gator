@@ -34,7 +34,7 @@ func TestProviderCommandPersistsKeylessLocalEndpoint(t *testing.T) {
 	if err != nil || resolved != "local-llm" || modelName != "qwen3-coder" {
 		t.Fatalf("resolve = %q %q %v", resolved, modelName, err)
 	}
-	executor, err := newExecutor("local-llm", "", "")
+	executor, err := newCodeExecutor("local-llm", "", "")
 	if err != nil || executor.Model == nil {
 		t.Fatalf("new executor = %#v, err = %v", executor, err)
 	}

@@ -92,9 +92,6 @@ func run(args []string, out io.Writer) error {
 		_, err := fmt.Fprintln(out, usage)
 		return err
 	}
-	if len(args) == 2 && args[0] == "--mode" && args[1] == "rpc" {
-		return rpcMode(nil, os.Stdin, out)
-	}
 	if len(args) == 2 && args[0] == "--mode" && args[1] == "acp" {
 		return acpMode(nil, os.Stdin, out)
 	}
@@ -134,7 +131,7 @@ func run(args []string, out io.Writer) error {
 		return workHeadless(context.Background(), os.Stdin, out)
 	case "work", "-w":
 		return workCommand(args[1:], out)
-	case "rpc", "serve", "acp", "child", "delegate", "hook", "connector", "inbox", "snapshot", "inspect", "resume", "eval", "review", "export", "apply":
+	case "acp", "hook", "connector", "inbox", "snapshot", "inspect", "resume", "eval", "review", "export", "apply":
 		return movedCommand(args[0])
 	default:
 		if isQuotedWorkRequest(args) {

@@ -13,13 +13,13 @@ import (
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/extension"
 	"github.com/gongahkia/gator/internal/hooks"
-	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/localmodel"
 	"github.com/gongahkia/gator/internal/lsp"
 	"github.com/gongahkia/gator/internal/mcp"
 	"github.com/gongahkia/gator/internal/model"
 	"github.com/gongahkia/gator/internal/model/chatcompletions"
 	"github.com/gongahkia/gator/internal/sandbox"
+	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/tools"
 )
 
@@ -70,9 +70,8 @@ func modelFromProviderName(provider string) string {
 	return ""
 }
 
-// nativeExecutorConfiguration is the shared provider/model construction used
-// by the Work-owned Code specialist and the temporary legacy run transport.
-// It is configuration, not an execution lifecycle.
+// nativeExecutorConfiguration is shared provider/model construction for the
+// Work-owned model and Code specialist. It is configuration, not execution.
 type nativeExecutorConfiguration struct {
 	Model          agent.Model
 	Extensions     extension.Resolver
@@ -109,7 +108,7 @@ func newNativeExecutorConfiguration(providerName, modelName, baseURL string) (na
 		return nativeExecutorConfiguration{}, err
 	}
 	if provider == model.Claude {
-		return nativeExecutorConfiguration{}, fmt.Errorf("Claude.ai subscription OAuth is not a supported native Gator provider; use provider %q with an API key or 'gator agent delegate claude run ...'", model.Anthropic)
+		return nativeExecutorConfiguration{}, fmt.Errorf("Claude.ai subscription OAuth is not a supported native Gator provider; use provider %q with an API key", model.Anthropic)
 	}
 	credentials, err := gatorCredentials()
 	if err != nil {
@@ -290,7 +289,7 @@ func refreshProviderCredential(ctx context.Context, provider model.Provider, cre
 }
 
 func gatorCredentials() (auth.Store, error) {
-	stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
+	stateDir, err := state.ResolveDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {
 		return auth.Store{}, err
 	}

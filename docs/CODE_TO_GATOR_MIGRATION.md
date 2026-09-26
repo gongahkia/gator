@@ -43,7 +43,7 @@ user controls + objective
 | Interactive approval prompts | Keep only where the invoking root CLI owns stdin | Headless JSON/TUI child runs require pre-grants; no model-created approval |
 | Sandbox and network selection | Promote as explicit Code envelope | Strict/deny by default; `gator work --sandbox` and `--network` |
 | LSP, MCP, extensions, HTTP/web research, browser, terminal | Promote as two-key grants | Existing trust/configuration plus a per-run `gator work --code-capability`; browser also requires a selected session and network |
-| Git isolation, repository instructions, journaling, final diff/status, patch export | Keep in backend | `internal/run`, invoked only through `work_code_agent.go` for product use |
+| Git isolation, repository instructions, final diff/status, patch evidence | Keep in backend | `internal/codeexec`, invoked only through `work_code_agent.go` for product use |
 | Initial static scouts and dynamic reader/writer children | Reframe | Gator owns source research, artifact review, and Code delegation; Code cannot recursively delegate |
 | Code thread resume/fork/clone | Replace | Gator Work conversations and immutable revision branches |
 | Code recent-run picker and thread tree | Replace | `Ctrl+X` conversation picker plus `/history`, `/revision-back`, and `/revision-forward`; `Ctrl+P` is reserved for actions |
@@ -53,9 +53,9 @@ user controls + objective
 | Sandbox-off/network confirmation modal | Replace | The user must type the explicit `gator work` flag; the manager cannot choose it |
 | Attached interactive terminal UX | Retire from Code frontend | Terminal can be an explicitly granted internal tool, but has no child-facing UI |
 | Vim composer mode, mouse-heavy diff controls, Code-only drawers and control center | Retire | They do not improve the single, conversation-first Gator surface enough to justify a second UI state machine |
-| Vendor-harness chooser inside Code | Keep as root boundary, not child convenience | Explicit `gator agent delegate`; never selected silently by Gator or Code |
+| Vendor-harness chooser inside Code | Retire | Starting another agent runtime would create a second execution and history model |
 | Extension prompt commands and declarative Code UI cards | Retire from the product surface | Bundle metadata remains readable for compatibility, but only explicitly granted backend tools are active |
-| JSONL RPC, ACP, and app-server transports | Keep as machine-facing backend compatibility | They remain non-TUI integration surfaces around the retained engine; a future incompatible Work-native protocol must use Work conversations and capability envelopes |
+| Machine protocols | Retain only Work-native adapters | `gator work-rpc` is the canonical machine surface and ACP is a thin Work adapter; legacy RPC and app-server transports are retired |
 
 ## Delegation invariants
 
@@ -89,8 +89,8 @@ mode, artifact paths, connected sources, and bounded web origins are session
 controls shown by `/status`.
 See [state migrations](WORK_DEPTH_MIGRATIONS.md) and [current behavior](WORK_DEPTH.md).
 
-The standalone Code frontend remains retired. Historical Code journals, direct
-Code evaluation fixtures, RPC, ACP, app-server, and legacy review remain readable
-compatibility surfaces. A full historical diff browser and terminal attachment
-are not reintroduced into the Work TUI. Root management commands continue to
-manage providers, browser sessions, integration installation, and project trust.
+The standalone Code frontend, its journals, and legacy RPC/app-server transports
+are retired. ACP and `work-rpc` enter the same Work execution path as the CLI,
+TUI, and jobs. A full historical diff browser and terminal attachment are not
+reintroduced into the Work TUI. Root management commands continue to manage
+providers, browser sessions, integration installation, and project trust.

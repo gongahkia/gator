@@ -15,23 +15,21 @@ const providerOnboardingUsage = `usage:
   gator provider openai
   gator provider anthropic
   gator provider gemini
-  gator provider codex [--device]
-  gator provider copilot [--host URL]
+  gator provider codex
+  gator provider copilot
   gator provider kimi
   gator provider xai
   gator provider claude
   gator provider openrouter
   gator provider radius
 
-Provider onboarding starts the closest supported sign-in route. It never stores or
-translates a vendor CLI credential into Gator. Claude, Radius, and native xAI
-runs use API credentials held by Gator; their provider account subscription
-flows remain separate.`
+Provider onboarding starts Gator's supported sign-in route. Claude, Radius,
+and native xAI runs use API credentials held by Gator; their provider account
+subscription flows remain separate.`
 
-// onboardProvider is the provider-first onboarding path. Native Gator API
-// credentials and product-owned OAuth live under `gator provider login`, while
-// this path uses an installed vendor CLI wherever that is the public,
-// no-client-registration route.
+// onboardProvider is the provider-first onboarding path. It always creates a
+// Gator-managed credential or starts a Gator-owned OAuth flow; it never starts
+// an external agent runtime.
 func onboardProvider(arguments []string, out io.Writer) error {
 	if len(arguments) == 0 {
 		return errors.New(providerOnboardingUsage)
@@ -39,26 +37,19 @@ func onboardProvider(arguments []string, out io.Writer) error {
 	target := strings.ToLower(strings.TrimSpace(arguments[0]))
 	remaining := arguments[1:]
 	switch target {
-	case "codex":
-		return delegate(append([]string{"codex", "login"}, remaining...), out)
-	case "copilot":
-		return delegate(append([]string{"copilot", "login"}, remaining...), out)
-	case "kimi", "kimi-coding":
-		return delegate(append([]string{"kimi", "login"}, remaining...), out)
+	case "codex", "copilot", "kimi", "kimi-coding":
+		if len(remaining) != 0 {
+			return fmt.Errorf("usage: gator provider %s", target)
+		}
+		return login([]string{target}, out)
 	case "xai", "grok":
 		if len(remaining) != 0 {
 			return errors.New("usage: gator provider xai")
 		}
-		if _, err := fmt.Fprintln(out, "Starting OpenCode's xAI provider login. Choose the browser or headless Grok subscription method, or an API key. Gator does not store or translate the credential."); err != nil {
-			return err
-		}
-		return delegate([]string{"opencode", "login", "--provider", "xai"}, out)
+		return onboardAPIKeyProvider("xai", out)
 	case "claude", "anthropic":
 		if len(remaining) != 0 {
 			return errors.New("usage: gator provider claude")
-		}
-		if _, err := fmt.Fprintln(out, "Claude Code delegation uses an Anthropic API key, not Claude.ai subscription OAuth."); err != nil {
-			return err
 		}
 		if err := onboardAPIKeyProvider("anthropic", out); err != nil {
 			return fmt.Errorf("onboard Claude: %w", err)

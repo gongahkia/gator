@@ -515,7 +515,7 @@ func TokenPath(store *Store, sessionID string) string { return tokenPath(store, 
 
 // CreateToken writes a fresh private session capability for a daemon parent.
 // The token file is removed when the daemon stops; it never enters session
-// metadata or a run journal.
+// metadata or Work evidence.
 func CreateToken(store *Store, sessionID string) (string, []byte, error) {
 	if store == nil {
 		return "", nil, errors.New("browser store is required")
