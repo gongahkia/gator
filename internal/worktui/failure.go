@@ -41,10 +41,15 @@ func explainRunFailure(runError string, status ModelStatus) string {
 			"Detail: " + detail + "\n" +
 			"Recovery: open /model to verify the selected provider and endpoint, then make sure its service is running and reachable."
 	}
+	if strings.Contains(lower, "unknown provider") || strings.Contains(lower, "no direct gator") {
+		return "The selected model provider is no longer available.\n" +
+			"Detail: " + detail + "\n" +
+			"Recovery: open /model and choose Cloud API key or Local model before sending the request again."
+	}
 	if strings.Contains(lower, "unauthorized") || strings.Contains(lower, "forbidden") || strings.Contains(lower, "status 401") || strings.Contains(lower, "status 403") {
 		return "Model authentication failed for " + selected + ".\n" +
 			"Detail: " + detail + "\n" +
-			"Recovery: open /model to sign in again or update its credential, then resend your request."
+			"Recovery: open /model, choose Cloud API key, and update its API key, then resend your request."
 	}
 	return "I couldn't finish that run: " + detail
 }

@@ -25,7 +25,7 @@ func (m Model) cloudModels() []cloudModelEntry {
 		if len(models) == 0 {
 			entries = append(entries, cloudModelEntry{
 				provider: providerName,
-				name:     providerName + " · account model required",
+				name:     providerName + " · model ID required",
 				status:   status,
 			})
 			continue

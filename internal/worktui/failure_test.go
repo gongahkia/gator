@@ -36,3 +36,12 @@ func TestProviderAuthenticationFailureSuggestsModelSetup(t *testing.T) {
 		}
 	}
 }
+
+func TestRemovedProviderFailureSuggestsModelSetup(t *testing.T) {
+	message := explainRunFailure(`unknown provider "codex"; choose one of: openai`, ModelStatus{Provider: "codex", Model: "gpt-5.6"})
+	for _, expected := range []string{"no longer available", "open /model", "Cloud API key", "Local model"} {
+		if !strings.Contains(message, expected) {
+			t.Fatalf("recovery omitted %q:\n%s", expected, message)
+		}
+	}
+}

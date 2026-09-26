@@ -17,7 +17,7 @@ func (m Model) openModelCatalog() (tea.Model, tea.Cmd) {
 	m.localModels.dependencyHelp = false
 	m.localModels.err = nil
 	m.selectActiveModelCatalogEntry()
-	return m.beginLocalStatus()
+	return m, nil
 }
 
 // openLocalModels remains a private compatibility bridge for TUI callers that
@@ -36,11 +36,14 @@ func (m Model) beginLocalStatus() (tea.Model, tea.Cmd) {
 	m.localModels.err = nil
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	m.localModels.statusCancel = cancel
-	commands := []tea.Cmd{m.localModels.spinner.Tick, loadLocalModelStatus(ctx, cancel, m.localModels.manager, m.localModels.generation)}
-	if m.config.ModelManagement != nil {
-		commands = append(commands, loadCredentialStatuses(m.config.ModelManagement))
+	return m, tea.Batch(m.localModels.spinner.Tick, loadLocalModelStatus(ctx, cancel, m.localModels.manager, m.localModels.generation))
+}
+
+func (m Model) beginCloudCredentialStatus() (tea.Model, tea.Cmd) {
+	if m.config.ModelManagement == nil {
+		return m, nil
 	}
-	return m, tea.Batch(commands...)
+	return m, loadCredentialStatuses(m.config.ModelManagement)
 }
 
 func loadCredentialStatuses(backend ManagementBackend) tea.Cmd {
@@ -230,10 +233,13 @@ func (m Model) updateModelCatalogChoice(message tea.KeyMsg) (tea.Model, tea.Cmd)
 		return m, nil
 	case "enter":
 		m.screen = localModelsScreen
-		if m.localModels.section == localModelSection && m.localModels.catalog.RuntimeError != "" && !m.localModels.startDismissed {
-			m.localModels.confirmation = m.localRuntimeConfirmation()
+		if m.localModels.section == localModelSection {
+			if m.localModels.catalog.RuntimeError != "" && !m.localModels.startDismissed {
+				m.localModels.confirmation = m.localRuntimeConfirmation()
+			}
+			return m.beginLocalStatus()
 		}
-		return m, nil
+		return m.beginCloudCredentialStatus()
 	case "esc", "q":
 		m.screen = closedScreen
 		m.notice = notice{text: "Returned to Work. The selected model remains available for the next run.", kind: noticeInfo}

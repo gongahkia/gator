@@ -19,6 +19,15 @@ func TestModelManagementCannotOpenDuringWork(t *testing.T) {
 	}
 }
 
+func TestModelsAliasOpensTheSameModelPicker(t *testing.T) {
+	panel := &testModelPanel{}
+	m := New(Config{Models: func() (ModelPanel, error) { return panel, nil }})
+	next, _ := m.runLocalCommand("/models")
+	if next.(Model).models != panel {
+		t.Fatal("/models did not open the canonical model picker")
+	}
+}
+
 func TestModelManagementReturnsToSameConversationAndCancelsOnTerminalClose(t *testing.T) {
 	panel := &testModelPanel{}
 	m := New(Config{Models: func() (ModelPanel, error) { return panel, nil }})

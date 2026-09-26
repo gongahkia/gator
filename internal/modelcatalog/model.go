@@ -52,7 +52,6 @@ type notice struct {
 // Model is the private Bubble Tea state behind Panel.
 type Model struct {
 	config      Config
-	catalogOnly bool
 	screen      screen
 	provider    textinput.Model
 	model       textinput.Model
@@ -77,7 +76,6 @@ func newModel(config Config) Model {
 	}), spinner.WithStyle(keyStyle))
 	return Model{
 		config:      config,
-		catalogOnly: true,
 		screen:      chooseModelScreen,
 		provider:    provider,
 		model:       model,

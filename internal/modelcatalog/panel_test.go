@@ -45,7 +45,18 @@ func TestPanelPersistsSelectionAndIgnoresAnotherVisitMessages(t *testing.T) {
 func TestPanelCloseCancelsPendingRefresh(t *testing.T) {
 	manager := &refreshCancellationManager{entered: make(chan struct{}), cancelled: make(chan struct{})}
 	panel := NewModelCatalogPanel(Config{LocalModels: manager})
-	batch := panel.Init()().(tea.BatchMsg)
+	if command := panel.Init(); command != nil {
+		t.Fatal("opening the Local-or-Cloud choice should not probe Ollama")
+	}
+	select {
+	case <-manager.entered:
+		t.Fatal("opening the Local-or-Cloud choice probed Ollama")
+	default:
+	}
+	panel.model.localModels.section = localModelSection
+	next, command := panel.model.beginLocalStatus()
+	panel.model = next.(Model)
+	batch := command().(tea.BatchMsg)
 	done := make(chan struct{})
 	go func() { defer close(done); batch[1]() }()
 	<-manager.entered

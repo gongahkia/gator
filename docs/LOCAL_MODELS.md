@@ -1,10 +1,11 @@
 # Local models in the Work TUI
 
-Start `gator`, enter `/model`, then press Tab for **Local**. The same screen is
-available from the command palette and first-run model selection. All local model
-management happens here; the former `gator local` CLI commands are retired and
-return directions to this screen. Automation and headless Work can still use the
-persisted model selection.
+Start `gator`, enter `/model`, then choose **Local model**. The first screen
+always asks whether you want a **Cloud API key** or **Local model**; the same
+screen is available from the command palette and first-run model selection. All
+local model management happens here; the former `gator local` CLI commands are
+retired and return directions to this screen. Automation and headless Work can
+still use the persisted model selection.
 
 Gator uses the existing Ollama runtime and its loopback Chat Completions API.
 Its Work service, tools, specialist boundaries, evidence, and approvals still
@@ -43,7 +44,7 @@ If Ollama is installed but stopped, the Local screen offers **Start with Gator**
 Enter or `y` starts `ollama serve` as a child of the Work TUI. It remains running
 when the model screen closes and stops when Gator exits. Gator does not adopt or
 stop a runtime that was already running. Press `s` to revisit runtime startup.
-Closing the TUI cancels a pending model operation or sign-in.
+Closing the TUI cancels a pending model operation.
 
 If the Ollama executable is missing, the screen offers installation help with the
 [official download source](https://ollama.com/download) and platform guidance.
@@ -54,12 +55,12 @@ startup require no separate Gator CLI commands.
 
 ## Cloud and custom models
 
-Tab switches back to Cloud. Press `c` to configure a provider/model with masked
-credential entry and provider-specific endpoint fields, `l` for an available
-native OAuth sign-in, and `u`/Enter to select a model. The selection is persisted
-for Work. The screen reports credential/configuration readiness, not a live
-account entitlement check. Sign-ins requiring an unconfigured OAuth client are
-reported as unavailable.
+Choose **Cloud API key** from the first screen to configure a provider/model
+with masked API-key entry and provider-specific endpoint fields, then press
+`u`/Enter to select a model. The selection is persisted for Work. The screen
+reports API-key/configuration readiness, not a live account entitlement check.
+Gator does not use provider subscriptions, browser sign-in, vendor CLIs, or
+external coding-agent harnesses for model access.
 
 Press `n` to add a custom Chat Completions endpoint, `g` to preview model discovery,
 `e` to rename an entry, `d` to remove a stored Gator credential, and `x` to remove a
