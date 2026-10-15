@@ -38,6 +38,34 @@ tests additionally exercise connected/web evidence follow-ups, native Code
 follow-ups with frozen project configuration, live approvals/control, scheduling
 crash boundaries, and apply-time conflicts.
 
+The separate [User Work benchmark](USER_WORK_BENCHMARK.md) contains eight
+non-coding tasks with small realistic source folders. It probes whether Gator
+can finish source comparison, action extraction, exact arithmetic, table
+reconciliation, uncertainty handling, untrusted-source handling, continuation,
+and CSV cleanup. Its scripted turns calibrate the harness and graders; live
+model runs are needed to assess usefulness. All eight current cases are
+development cases because each has been inspected during iteration.
+
+The [expanded User Work benchmark](USER_WORK_V2_BENCHMARK.md) contains 21
+non-coding tasks with briefs, email drafts, presentations, and a saved-web
+source interpretation case. It retains the first eight probes and reserves four
+new tasks as a held-out split.
+
+The [30-task User Work benchmark](USER_WORK_V3_BENCHMARK.md) preserves those
+21 cases and adds nine distinct jobs: inbox triage, scheduling across UTC and
+SGT, policy comparison, survey analysis, budget scenarios, file cataloging,
+transcript decision reversal, customer FAQ drafting, and a coordinated
+internal/customer update. The nine new cases are six development and three
+held-out tasks. Scripted checks calibrate the corpus; live model performance
+has not yet been measured for version 3.
+
+The [50-task User Work benchmark](USER_WORK_V4_BENCHMARK.md) keeps the prior
+30 cases and adds document generation, visual/design assets, formula-driven
+workbooks and charts, PDF intake, deck editing, batch file organization, and
+longer research synthesis. New deterministic graders inspect document text,
+workbook formulas, and chart presence. Its scripted pass rate is a harness check,
+not a live usefulness score.
+
 `development` is the default split. `held-out` and `all` require an explicit
 `--split` selection; a development report retains only selected development
 case metadata, rather than copying held-out scripts into its report directory.
@@ -70,7 +98,8 @@ refusal may pass its test while still appearing as budget exhaustion in executio
 counts. Categories include task, fixture, provider, sandbox/setup, grader,
 timeout, cancellation, and budget. Reports display denominators, per-case trial
 counts, at-least-one success, and success on every trial. Model requests,
-unreported usage, retries, interventions, tool failures, artifact checks,
+unreported usage, retries, malformed-call tool-surface fallbacks, interventions,
+tool failures, artifact checks,
 unsupported exact quotations, latency, and token totals are reported. Semantic
 entailment and cost are not inferred from those counters.
 

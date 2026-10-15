@@ -1,0 +1,7 @@
+item,value
+registrations,180
+expected_show_rate,0.75
+attendees_per_staff,30
+staff_daily_cost_usd,220
+venue_fixed_cost_usd,800
+event_cost_cap_usd,2000

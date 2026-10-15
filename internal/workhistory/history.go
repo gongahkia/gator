@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gongahkia/gator/internal/action"
 )
@@ -361,7 +362,11 @@ func summary(objective string) string {
 		objective = strings.TrimSpace(line)
 	}
 	if len(objective) > 160 {
-		return strings.TrimSpace(objective[:159]) + "…"
+		limit := 160 - len("…")
+		for limit > 0 && !utf8.RuneStart(objective[limit]) {
+			limit--
+		}
+		return strings.TrimSpace(objective[:limit]) + "…"
 	}
 	return objective
 }

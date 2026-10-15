@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"path/filepath"
 	"strings"
 
@@ -107,7 +108,7 @@ func (t WritePresentationArtifact) Definition() agent.ToolDefinition {
 	return agent.ToolDefinition{
 		Name:        "work_write_presentation",
 		Description: "Create a polished PPTX from a semantic presentation spec, or edit a source-relative PPTX with explicit bounded operations. New decks support titles, body text, speaker notes, and fade/push/wipe transitions. Existing decks preserve untouched media, embedded objects, unsupported animations, and VBA raw parts; Gator never reads, authors, edits, or executes VBA.",
-		Parameters:  schema(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","pattern":"\\.pptx$"},"template_path":{"type":"string","description":"Source-relative existing PPTX to edit; requires edits and cannot be combined with presentation"},"presentation":{"type":"object","description":"Required for a new deck; cannot be combined with template_path","properties":{"version":{"type":"integer"},"title":{"type":"string"},"theme":{"enum":["professional","minimal","report"]},"slides":{"type":"array","items":{"type":"object"}}}},"edits":{"type":"array","maxItems":256,"items":{"type":"object"}}}}`),
+		Parameters:  schema(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","pattern":"\\.pptx$"},"template_path":{"type":"string","description":"Source-relative existing PPTX to edit; requires edits and cannot be combined with presentation"},"presentation":{"type":"object","description":"Required for a new deck; cannot be combined with template_path","required":["title","slides"],"properties":{"version":{"type":"integer"},"title":{"type":"string"},"theme":{"enum":["professional","minimal","report"]},"slides":{"type":"array","items":{"type":"object","required":["title","body"],"properties":{"title":{"type":"string"},"body":{"type":"array","minItems":1,"items":{"type":"string"},"description":"Visible slide text; put key facts here, not only in speaker notes"},"notes":{"type":"string"},"transition":{"enum":["none","fade","push","wipe"]}}}}}},"edits":{"type":"array","maxItems":256,"items":{"type":"object","required":["operation"],"properties":{"operation":{"type":"string"},"slide":{"type":"integer"},"to":{"type":"integer"},"find":{"type":"string"},"replace":{"type":"string"},"title":{"type":"string"},"body":{"type":"array","items":{"type":"string"}},"notes":{"type":"string"},"transition":{"enum":["none","fade","push","wipe"]}}}}}}`),
 	}
 }
 
@@ -192,7 +193,7 @@ func (t WriteWorkbookArtifact) Execute(_ context.Context, raw json.RawMessage) (
 	if strings.ToLower(filepath.Ext(arguments.Path)) != ".xlsx" {
 		return agent.ToolResult{}, errors.New("workbook artifact path must end in .xlsx")
 	}
-	var template *bytes.Reader
+	var template io.Reader
 	var templateBytes []byte
 	if arguments.TemplatePath != "" {
 		data, readErr := t.Source.ReadRegularFile(filepath.FromSlash(arguments.TemplatePath), 64*1024*1024)

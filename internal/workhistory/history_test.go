@@ -3,8 +3,10 @@ package workhistory
 import (
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gongahkia/gator/internal/action"
 )
@@ -55,4 +57,19 @@ func recordIDs(records []Record) []string {
 		ids = append(ids, record.ID)
 	}
 	return ids
+}
+
+func TestStoreAcceptsLongUTF8WorkObjective(t *testing.T) {
+	store, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	objective := strings.Repeat("Compare the selected files and explain the result. ", 5) + strings.Repeat("資料", 8)
+	record, err := store.Start(Start{ID: "long-objective", Objective: objective, Mode: action.Draft, ExternalActions: action.Forbid, StartedAt: time.Now()})
+	if err != nil {
+		t.Fatalf("ordinary long Work request was rejected: %v", err)
+	}
+	if len(record.ObjectiveSummary) > 160 || !utf8.ValidString(record.ObjectiveSummary) || !strings.HasSuffix(record.ObjectiveSummary, "…") {
+		t.Fatalf("invalid bounded summary %q (%d bytes)", record.ObjectiveSummary, len(record.ObjectiveSummary))
+	}
 }

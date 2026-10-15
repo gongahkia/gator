@@ -1,0 +1,5 @@
+time_utc,event
+02:10,Export queue delay first detected by alert
+02:22,On-call acknowledged
+03:05,Queue processing restored
+04:30,Eleven of fourteen delayed exports replayed

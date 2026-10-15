@@ -1,0 +1,5 @@
+id,task,owner,status,due,depends_on
+T-11,Finalize migration checklist,Ana,done,2026-10-19,
+T-12,Run rollback rehearsal,Ben,blocked,2026-10-22,T-14
+T-13,Publish customer guide,Cai,open,2026-10-23,T-12
+T-14,Approve staging access,Devon,open,2026-10-20,

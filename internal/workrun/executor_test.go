@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -38,6 +39,103 @@ func TestSystemPromptMakesLearningContextBoundedAndSubordinate(t *testing.T) {
 		if !strings.Contains(prompt, expected) {
 			t.Fatalf("prompt omitted %q:\n%s", expected, prompt)
 		}
+	}
+}
+
+func TestOrdinaryWorkCannotDelegateCodeForArtifactTask(t *testing.T) {
+	called := false
+	model := &scriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "wrong-route", Name: "delegate_agents", Arguments: json.RawMessage(`{"tasks":[{"agent":"code","task":"write clean.csv"}]}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "write", Name: "write_artifact", Arguments: json.RawMessage(`{"path":"clean.csv","content":"ticket_id,status\nT-20,closed\n"}`)}}},
+		{Text: "Created clean.csv."},
+	}}
+	service := Service{Executor: Executor{Model: model, StateDir: t.TempDir(), Code: func(context.Context, CodeRequest) (CodeResult, error) {
+		called = true
+		return CodeResult{}, nil
+	}}}
+	outcome, err := service.Execute(context.Background(), Request{RunID: "ordinary-artifact", SourcePath: t.TempDir(), Objective: "Clean a CSV into clean.csv", Contract: artifact.DefaultContract("clean.csv"), Mode: action.Draft})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if called {
+		t.Fatal("ordinary artifact Work invoked the patch specialist")
+	}
+	if len(model.requests) == 0 {
+		t.Fatal("model received no Work request")
+	}
+	for _, tool := range model.requests[0].Tools {
+		if tool.Name == "integrate_code" {
+			t.Fatal("patch integration was advertised in ordinary artifact Work")
+		}
+	}
+	if _, err := outcome.Work.Output.ReadRegularFile("clean.csv", 1024); err != nil {
+		t.Fatalf("ordinary artifact was not produced: %v", err)
+	}
+}
+
+func TestOrdinaryWorkRecoversFromMalformedSpecialistToolCall(t *testing.T) {
+	call := 0
+	model := researchModel(func(request agent.TurnRequest) (agent.Turn, error) {
+		call++
+		hasTool := func(name string) bool {
+			for _, tool := range request.Tools {
+				if tool.Name == name {
+					return true
+				}
+			}
+			return false
+		}
+		switch call {
+		case 1:
+			if !hasTool("delegate_agents") {
+				t.Fatal("initial Work turn lacked optional specialists")
+			}
+			return agent.Turn{}, agent.TransientError{Err: agent.MalformedToolCallError{Err: errors.New("MALFORMED_FUNCTION_CALL")}}
+		case 2:
+			if hasTool("delegate_agents") || hasTool("work_write_presentation") || hasTool("work_write_workbook") || hasTool("work_write_document") || !hasTool("write_artifact") {
+				t.Fatal("fallback did not retain only relevant artifact tools while dropping specialists")
+			}
+			return agent.Turn{ToolCalls: []agent.ToolCall{{ID: "write", Name: "write_artifact", Arguments: json.RawMessage(`{"path":"brief.md","content":"Ready for review.\n"}`)}}}, nil
+		case 3:
+			if hasTool("delegate_agents") {
+				t.Fatal("specialists returned after fallback")
+			}
+			return agent.Turn{Text: "Created brief.md."}, nil
+		default:
+			return agent.Turn{}, errors.New("unexpected model turn")
+		}
+	})
+	service := Service{Executor: Executor{Model: model, StateDir: t.TempDir()}}
+	outcome, err := service.Execute(context.Background(), Request{RunID: "malformed-recovery", SourcePath: t.TempDir(), Objective: "Create a brief", Contract: artifact.DefaultContract("brief.md"), Mode: action.Draft})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if call != 3 || outcome.Manifest.Status != artifact.Completed {
+		t.Fatalf("calls=%d manifest=%#v", call, outcome.Manifest)
+	}
+	if data, err := outcome.Work.Output.ReadRegularFile("brief.md", 1024); err != nil || string(data) != "Ready for review.\n" {
+		t.Fatalf("artifact = %q, error = %v", data, err)
+	}
+	fallbacks := 0
+	for _, event := range outcome.Events {
+		if event.Kind == agent.EventToolSurfaceReduced {
+			fallbacks++
+		}
+	}
+	if fallbacks != 1 {
+		t.Fatalf("fallback events = %d", fallbacks)
+	}
+}
+
+func TestMalformedCallFallbackRetainsRequiredRichWriter(t *testing.T) {
+	dropped := nonessentialArtifactTools(artifact.DefaultContract("deck.pptx", "memo.md"))
+	for _, name := range dropped {
+		if name == "work_write_presentation" {
+			t.Fatal("presentation writer was dropped for a required deck")
+		}
+	}
+	if !slices.Contains(dropped, "work_write_workbook") || !slices.Contains(dropped, "write_json_artifact") {
+		t.Fatalf("unneeded rich writers remained: %v", dropped)
 	}
 }
 

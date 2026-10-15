@@ -46,6 +46,8 @@ func (r Runner) Run(ctx context.Context, options RunOptions) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
+	activeDefinitions := definitions
+	fallbackApplied := false
 	messages := cloneMessages(options.InitialMessages)
 	if len(messages) == 0 {
 		messages = []Message{{Role: RoleUser, Content: options.Task, Images: cloneImages(options.Images), Attachments: cloneAttachments(options.Attachments)}}
@@ -58,7 +60,7 @@ turnLoop:
 		request := TurnRequest{
 			System:   options.System,
 			Messages: append([]Message(nil), messages...),
-			Tools:    definitions,
+			Tools:    activeDefinitions,
 		}
 		if computer, ok := r.Model.(ComputerUseModel); ok {
 			configuration, enabled := computer.ComputerUse()
@@ -88,8 +90,48 @@ turnLoop:
 			if err == nil {
 				break
 			}
+			wasReduced := fallbackApplied
+			if attempt < maxTransientAttempts && !streamedText && !fallbackApplied && IsMalformedToolCall(err) && len(options.MalformedCallFallback) > 0 {
+				dropped := make(map[string]bool, len(options.MalformedCallFallback))
+				for _, name := range options.MalformedCallFallback {
+					dropped[name] = true
+				}
+				var reduced []ToolDefinition
+				for _, definition := range activeDefinitions {
+					if !dropped[definition.Name] {
+						reduced = append(reduced, definition)
+					}
+				}
+				if len(reduced) < len(activeDefinitions) {
+					activeDefinitions = reduced
+					request.Tools = activeDefinitions
+					fallbackApplied = true
+					r.emit(options.OnEvent, Event{Kind: EventToolSurfaceReduced, At: now(), Step: step, Attempt: attempt, Text: fmt.Sprintf("Reduced available tools from %d to %d after a malformed function call.", len(definitions), len(reduced))})
+				}
+			}
+			if attempt < maxTransientAttempts && !streamedText && wasReduced && IsMalformedToolCall(err) {
+				request.Messages = append(append([]Message(nil), messages...), Message{Role: RoleUser, Content: "The previous response had a malformed function call. Retry with one available tool call and valid JSON arguments, or answer in plain text if no tool is needed. Do not claim an artifact exists unless a tool created it."})
+			}
 			if streamedText || !IsTransient(err) || attempt == maxTransientAttempts {
 				return Result{Messages: messages, Steps: step}, formatTurnError(step, err)
+			}
+			var retryAfter RetryAfterError
+			if errors.As(err, &retryAfter) && retryAfter.Delay > 0 {
+				// A multi-hour or deadline-exceeding quota reset belongs to the
+				// caller's scheduler, not an in-process retry loop.
+				if retryAfter.Delay > time.Minute {
+					return Result{Messages: messages, Steps: step}, formatTurnError(step, err)
+				}
+				if deadline, ok := ctx.Deadline(); ok && time.Until(deadline) < retryAfter.Delay {
+					return Result{Messages: messages, Steps: step}, formatTurnError(step, err)
+				}
+				timer := time.NewTimer(retryAfter.Delay)
+				select {
+				case <-ctx.Done():
+					timer.Stop()
+					return Result{Messages: messages, Steps: step}, ctx.Err()
+				case <-timer.C:
+				}
 			}
 		}
 		// A steering instruction that arrived during model generation supersedes

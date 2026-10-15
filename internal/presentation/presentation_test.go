@@ -43,6 +43,41 @@ func TestRenderInspectAndEditPPTX(t *testing.T) {
 	}
 }
 
+func TestNewDeckRejectsNotesOnlyContent(t *testing.T) {
+	_, _, err := RenderPPTX(Spec{Title: "Daily brief", Slides: []Slide{{Title: "Results", Notes: "Facts hidden from slide"}}})
+	if err == nil || !strings.Contains(err.Error(), "visible body text") {
+		t.Fatalf("notes-only deck was accepted: %v", err)
+	}
+}
+
+func TestEditPPTXReplacesTextAcrossSlides(t *testing.T) {
+	contents, _, err := RenderPPTX(Spec{Title: "Monthly review", Slides: []Slide{
+		{Title: "Review", Body: []string{"September 2026 draft"}},
+		{Title: "Health", Body: []string{"Availability: 99.2%", "Open priority-one tickets: 2"}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, _, err := EditPPTX(contents, []Edit{
+		{Operation: "replace_text", Find: "September 2026 draft", Replace: "October 2026 update"},
+		{Operation: "replace_text", Find: "99.2%", Replace: "99.7%"},
+		{Operation: "replace_text", Find: "Open priority-one tickets: 2", Replace: "Open priority-one tickets: 1"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	slides, err := SlideTexts(updated)
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(slides, "\n")
+	for _, expected := range []string{"October 2026 update", "99.7%", "priority-one tickets: 1"} {
+		if !strings.Contains(joined, expected) {
+			t.Fatalf("edited deck lacks %q: %s", expected, joined)
+		}
+	}
+}
+
 func TestEditPPTXPreservesVBAAndUnknownParts(t *testing.T) {
 	contents, _, err := RenderPPTX(Spec{Title: "Title", Slides: []Slide{{Title: "One", Body: []string{"body"}}}})
 	if err != nil {

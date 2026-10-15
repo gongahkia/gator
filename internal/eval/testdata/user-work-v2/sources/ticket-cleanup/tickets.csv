@@ -1,0 +1,6 @@
+ticket_id,updated_at,status,owner
+T-20,2026-10-11,open,Ana
+T-21,2026-10-12,closed,Ben
+T-20,2026-10-14,resolved,Ana
+T-22,2026-10-13,in progress,Cai
+T-21,2026-10-15,done,Ben

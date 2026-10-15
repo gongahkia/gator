@@ -1,0 +1,4 @@
+item,quantity,unit_usd,status
+half-day workshop,2,1800,approved
+setup review,1,400,approved
+analytics module,1,600,optional unapproved

@@ -1,0 +1,5 @@
+deal,account,amount_usd,stage,risk,updated_at
+D-10,Aster,50000,negotiation,high,2026-10-14
+D-11,Beacon,24000,closed-won,none,2026-10-14
+D-12,Cedar,18000,proposal,medium,2026-10-13
+D-13,Dune,12000,discovery,low,2026-10-12

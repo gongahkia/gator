@@ -38,7 +38,7 @@ func TestWorkCodeFollowupUsesAcceptedBaselineAndFrozenProfile(t *testing.T) {
 		}
 	}
 	state := t.TempDir()
-	request := workrun.Request{RunID: "first", SourcePath: source, Objective: "Stage alpha", Contract: artifact.DefaultContract("report.md"), Code: workrun.CodePolicy{Profile: "implementer"}}
+	request := workrun.Request{RunID: "first", SourcePath: source, Objective: "Stage alpha", Contract: artifact.DefaultContract("report.md"), EnableCode: true, Code: workrun.CodePolicy{Profile: "implementer"}}
 	manager := func(run, task, baseline string) agent.Model {
 		return &eval.ScriptedModel{Turns: []agent.Turn{depthCall("delegate_agents", map[string]any{"tasks": []any{map[string]string{"agent": "code", "task": task, "baseline_patch": baseline}}}), depthCall("integrate_code", map[string]any{"patches": []string{"code/" + run + "-subagent-001.patch"}}), depthCall("write_artifact", map[string]string{"path": "report.md", "content": "Staged verified " + task}), {Text: "Prepared."}}}
 	}

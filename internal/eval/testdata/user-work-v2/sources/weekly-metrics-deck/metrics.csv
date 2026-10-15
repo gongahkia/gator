@@ -1,0 +1,4 @@
+metric,week_41,week_42,unit
+signups,1200,1320,count
+activation_rate,45,42,percent
+churn_rate,1.8,2.1,percent

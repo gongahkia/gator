@@ -1,0 +1,9 @@
+id,comment
+R1,Exports arrive late after the scheduled run.
+R2,I cannot tell if a scheduled export failed.
+R3,The export job occasionally makes duplicate files.
+R4,We need reliable delivery of scheduled exports.
+R5,The first workspace setup has too many steps.
+R6,Inviting teammates during onboarding is confusing.
+R7,The initial role settings are hard to understand.
+R8,The team tier price is too high for a small group.

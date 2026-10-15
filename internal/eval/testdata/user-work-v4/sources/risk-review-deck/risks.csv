@@ -1,0 +1,4 @@
+id,risk,severity,owner,status
+R-4,data export backlog,high,Priya,open
+R-5,training gap,medium,Lee,mitigating
+R-6,archive cost,low,Nora,monitoring

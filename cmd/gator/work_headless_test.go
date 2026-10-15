@@ -18,7 +18,7 @@ import (
 )
 
 func TestWorkHeadlessControlsRunningApprovalAndPreservesContract(t *testing.T) {
-	request := workrun.Request{SourcePath: t.TempDir(), Objective: "Prepare reviewed output", Contract: artifact.DefaultContract("report.md")}
+	request := workrun.Request{SourcePath: t.TempDir(), Objective: "Prepare reviewed output", Contract: artifact.DefaultContract("report.md"), EnableCode: true}
 	request.Contract.MaxArtifactBytes = 4096
 	state := t.TempDir()
 	service := func() workrun.Service {
@@ -112,7 +112,7 @@ func TestWorkHeadlessControlsRunningApprovalAndPreservesContract(t *testing.T) {
 	if outcome.Manifest.PolicySHA256 != bundle.Manifest.PolicySHA256 {
 		t.Fatal("headless changed effective policy")
 	}
-	jobRequest := jobWorkRequest(jobs.Definition{SourcePath: request.SourcePath, Objective: request.Objective, Contract: request.Contract})
+	jobRequest := jobWorkRequest(jobs.Definition{SourcePath: request.SourcePath, Objective: request.Objective, Contract: request.Contract, EnableCode: true})
 	jobRequest.ApproveCodeCommand = request.ApproveCodeCommand
 	outcome, err = service().Execute(ctx, jobRequest)
 	if err != nil {

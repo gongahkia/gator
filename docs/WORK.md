@@ -63,10 +63,11 @@ first supported workflows are:
 2. clean, compare, and summarize CSV or spreadsheet data; and
 3. research a bounded subject and produce a source-backed deliverable.
 
-Coding remains a first-class capability, but it is not a second user-facing
-workflow. Gator owns the conversation and delegates bounded implementation to
-its internal Git-worktree Code specialist. General work uses an ordinary
-directory as a read-only source and a private, isolated output workspace.
+Coding remains an explicit capability, but it is not the default route for
+ordinary file work. Gator owns the conversation and can delegate bounded
+implementation to its internal Git-worktree Code specialist when the host
+enables it. General work uses an ordinary directory as a read-only source and
+a private, isolated output workspace.
 
 Gator now includes durable local conversations, immutable local-source
 snapshots, document/workbook/presentation renderers, connected services, and a

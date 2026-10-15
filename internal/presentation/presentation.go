@@ -95,6 +95,9 @@ func (s Spec) Validate() error {
 		if err := slide.validate(); err != nil {
 			return fmt.Errorf("slide %d: %w", index+1, err)
 		}
+		if len(slide.Body) == 0 {
+			return fmt.Errorf("slide %d: new presentations require visible body text on each slide", index+1)
+		}
 	}
 	return nil
 }
@@ -181,6 +184,20 @@ func InspectPPTX(contents []byte) (Preview, error) {
 		preview.Warnings = append(preview.Warnings, "Contains animation data; unsupported animation details are preserved unchanged.")
 	}
 	return preview, nil
+}
+
+// SlideTexts returns visible text from each slide in presentation order.
+// It uses the same bounded package reader as InspectPPTX and omits notes.
+func SlideTexts(contents []byte) ([]string, error) {
+	deck, err := openDeck(contents)
+	if err != nil {
+		return nil, err
+	}
+	texts := make([]string, 0, len(deck.slides))
+	for _, slide := range deck.slides {
+		texts = append(texts, strings.Join(xmlText(slide.contents, 32*1024), "\n"))
+	}
+	return texts, nil
 }
 
 // EditPPTX applies bounded safe operations to a PPTX. Untouched package parts
@@ -789,7 +806,11 @@ func xmlEscape(value string) string {
 
 func decodeXMLText(value []byte) string {
 	var output strings.Builder
-	decoder := xml.NewDecoder(bytes.NewReader(append([]byte("<x>"), append(value, []byte("</x>")...)...)))
+	wrapped := make([]byte, 0, len(value)+len("<x></x>"))
+	wrapped = append(wrapped, "<x>"...)
+	wrapped = append(wrapped, value...)
+	wrapped = append(wrapped, "</x>"...)
+	decoder := xml.NewDecoder(bytes.NewReader(wrapped))
 	for {
 		token, err := decoder.Token()
 		if err != nil {

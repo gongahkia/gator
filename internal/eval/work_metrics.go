@@ -17,6 +17,7 @@ import (
 type WorkMetrics struct {
 	ModelRequests        int `json:"model_requests"`
 	Retries              int `json:"retries"`
+	ToolSurfaceFallbacks int `json:"tool_surface_fallbacks"`
 	Interventions        int `json:"interventions"`
 	ToolFailures         int `json:"tool_failures"`
 	ArtifactChecks       int `json:"artifact_checks"`
@@ -29,6 +30,9 @@ func (m *WorkMetrics) observe(outcome workrun.Outcome) {
 	for _, event := range outcome.Events {
 		if event.Kind == agent.EventModelAttemptStarted && event.Attempt > 1 {
 			m.Retries++
+		}
+		if event.Kind == agent.EventToolSurfaceReduced {
+			m.ToolSurfaceFallbacks++
 		}
 		if event.Kind == agent.EventCommandApprovalRequested || event.Kind == agent.EventSteeringApplied {
 			m.Interventions++
@@ -98,12 +102,13 @@ func usageAdd(total *agent.Usage, next agent.Usage) {
 func WorkSummary(report WorkExperiment) string {
 	var usage agent.Usage
 	var latency int64
-	var retries, interventions, tools, checks, failed, unsupported int
+	var retries, fallbacks, interventions, tools, checks, failed, unsupported int
 	history, verification, delivery, recovery, external := map[string]int{}, map[string]int{}, map[string]int{}, map[string]int{}, map[string]int{}
 	for _, trial := range report.Trials {
 		usageAdd(&usage, trial.Usage)
 		latency += trial.DurationMS
 		retries += trial.Metrics.Retries
+		fallbacks += trial.Metrics.ToolSurfaceFallbacks
 		interventions += trial.Metrics.Interventions
 		tools += trial.Metrics.ToolFailures
 		checks += trial.Metrics.ArtifactChecks
@@ -115,5 +120,5 @@ func WorkSummary(report WorkExperiment) string {
 		recovery[trial.Transaction.Recovery.State]++
 		external[trial.Transaction.ExternalActions.State]++
 	}
-	return fmt.Sprintf("%s: %d/%d scored trials; %d cases pass at least once; %d cases pass every trial.\nSplit: %s. Grading categories: %v\nExecution outcomes: %v\nTransaction: history=%v verification=%v delivery=%v recovery=%v external_actions=%v\nRequests: %d (%d without token usage); retries: %d; interventions: %d; tool failures: %d.\nArtifact checks: %d (%d failed); unsupported exact quotations: %d; semantic entailment is not scored by quote matching.\nReported tokens: %d input, %d output; total latency: %d ms; cost: unknown.\nScripted: %t; delegation: %t; provider/model: %s/%s; harness: %s; disabled roles: %v.\n", report.ID, report.Passed, report.Total, report.CasesAtLeastOne, report.CasesAll, report.Split, report.Categories, report.Outcomes, history, verification, delivery, recovery, external, usage.ModelRequests, usage.UnknownRequests, retries, interventions, tools, checks, failed, unsupported, usage.InputTokens, usage.OutputTokens, latency, report.Scripted, report.Delegation, report.Provider, report.Model, report.Harness, report.DisabledRoles)
+	return fmt.Sprintf("%s: %d/%d scored trials; %d cases pass at least once; %d cases pass every trial.\nSplit: %s. Grading categories: %v\nExecution outcomes: %v\nTransaction: history=%v verification=%v delivery=%v recovery=%v external_actions=%v\nRequests: %d (%d without token usage); retries: %d; tool-surface fallbacks: %d; interventions: %d; tool failures: %d.\nArtifact checks: %d (%d failed); unsupported exact quotations: %d; semantic entailment is not scored by quote matching.\nReported tokens: %d input, %d output; total latency: %d ms; cost: unknown.\nScripted: %t; delegation: %t; provider/model: %s/%s; harness: %s; disabled roles: %v.\n", report.ID, report.Passed, report.Total, report.CasesAtLeastOne, report.CasesAll, report.Split, report.Categories, report.Outcomes, history, verification, delivery, recovery, external, usage.ModelRequests, usage.UnknownRequests, retries, fallbacks, interventions, tools, checks, failed, unsupported, usage.InputTokens, usage.OutputTokens, latency, report.Scripted, report.Delegation, report.Provider, report.Model, report.Harness, report.DisabledRoles)
 }

@@ -31,6 +31,7 @@ type Definition struct {
 	Project         *projectcapture.Bundle `json:"project_configuration,omitempty"`
 	SnapshotID      string                 `json:"snapshot_id,omitempty"`
 	Code            workrun.CodePolicy     `json:"code_policy,omitempty"`
+	EnableCode      bool                   `json:"enable_code,omitempty"`
 	Version         int                    `json:"version"`
 	ID              string                 `json:"id"`
 	Name            string                 `json:"name"`

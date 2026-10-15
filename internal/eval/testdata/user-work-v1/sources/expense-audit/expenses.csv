@@ -1,0 +1,7 @@
+claim_id,updated_at,category,amount,status
+C-101,2026-10-05,travel,45.10,submitted
+C-102,2026-10-06,meals,22.40,submitted
+C-103,2026-10-07,supplies,18.35,submitted
+C-101,2026-10-09,travel,45.10,submitted
+C-104,2026-10-10,travel,12.05,rejected
+C-105,2026-10-11,travel,10.25,submitted

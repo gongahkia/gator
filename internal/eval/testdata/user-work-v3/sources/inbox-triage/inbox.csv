@@ -1,0 +1,5 @@
+id,from,subject,received_utc,requested_deadline_utc
+M-201,Delta Operations,Rollout blocked by invoice mismatch,2026-10-16 08:10,2026-10-16 10:00
+M-202,Design,Slide review for Monday,2026-10-16 07:30,2026-10-19 12:00
+M-203,Community,October newsletter,2026-10-15 15:00,none
+M-204,Harbor Support,Export warning,2026-10-16 06:00,2026-10-16 09:00

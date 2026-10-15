@@ -1,6 +1,7 @@
 package eval
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -10,13 +11,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/attachment"
+	"github.com/gongahkia/gator/internal/presentation"
 	"github.com/gongahkia/gator/internal/telemetry"
 	"github.com/gongahkia/gator/internal/workrun"
 	"github.com/xuri/excelize/v2"
@@ -43,6 +48,7 @@ type WorkCase struct {
 	MaxSteps      int                     `json:"max_steps"`
 	Limits        agent.Limits            `json:"limits"`
 	Code          workrun.CodePolicy      `json:"code"`
+	EnableCode    bool                    `json:"enable_code,omitempty"`
 	Capabilities  []string                `json:"capabilities"`
 	Turns         []agent.Turn            `json:"script"`
 	CodeTurns     []agent.Turn            `json:"code_script,omitempty"`
@@ -204,9 +210,12 @@ func LoadWorkDataset(path string) (WorkDataset, error) {
 				return dataset, errors.New("unsupported grader version")
 			}
 			switch g.Kind {
-			case "child_tool_error_contains", "unsupported_quote", "evidence_reference", "file_equals", "file_contains", "cell_equals", "context_contains", "context_absent", "status", "tool_error_contains", "candidate_status", "source_unchanged", "contract_digest":
+			case "child_tool_error_contains", "unsupported_quote", "evidence_reference", "file_equals", "file_contains", "file_excludes", "file_regex", "file_not_regex", "document_text_contains", "document_text_excludes", "cell_equals", "cell_formula_equals", "xlsx_chart_count", "context_contains", "context_absent", "status", "tool_error_contains", "candidate_status", "source_unchanged", "contract_digest", "json_pointer_equals", "json_pointer_contains", "json_pointer_absent", "pptx_slide_contains", "pptx_slide_excludes", "pptx_text_contains", "pptx_text_excludes", "pptx_slide_count":
 			default:
 				return dataset, fmt.Errorf("unknown grader %q", g.Kind)
+			}
+			if err := validateStructuredGrader(g); err != nil {
+				return dataset, fmt.Errorf("case %s grader %s: %w", c.ID, g.Kind, err)
 			}
 		}
 		for i, f := range c.Followups {
@@ -283,7 +292,7 @@ func RunWorkExperiment(ctx context.Context, datasetPath string, dataset WorkData
 			evaluated.ID = item.ID
 			service, setupErr := factory(evaluated, state)
 			source := filepath.Join(filepath.Dir(datasetPath), c.Source)
-			request := workrun.Request{RunID: item.ID, Budget: budget, Provider: options.Provider + "/" + options.Model, WebOrigins: c.WebOrigins, SourcePath: source, Objective: c.Objective, MaxSteps: c.MaxSteps, Contract: c.Contract, Mode: c.Mode, Code: c.Code, Limits: c.Limits, DisableDelegation: !options.Delegation, DisabledRoles: options.DisabledRoles}
+			request := workrun.Request{RunID: item.ID, Budget: budget, Provider: options.Provider + "/" + options.Model, WebOrigins: c.WebOrigins, SourcePath: source, Objective: c.Objective, MaxSteps: c.MaxSteps, Contract: c.Contract, Mode: c.Mode, Code: c.Code, EnableCode: c.EnableCode, Limits: c.Limits, DisableDelegation: !options.Delegation, DisabledRoles: options.DisabledRoles}
 			var outcome workrun.Outcome
 			var runErr error
 			fixture, fixtureErr := fixtureDigest(source)
@@ -311,10 +320,10 @@ func RunWorkExperiment(ctx context.Context, datasetPath string, dataset WorkData
 				usageAdd(&item.Usage, outcome.Manifest.Usage)
 				revisions := []string{outcome.RevisionID}
 				for followIndex, follow := range c.Followups {
-					request.RunID = fmt.Sprintf("%s-rev%d", item.ID, followIndex+1)
-					if outcome.ConversationID == "" {
+					if runErr != nil || outcome.Manifest.Status != artifact.Completed || outcome.ConversationID == "" {
 						break
 					}
+					request.RunID = fmt.Sprintf("%s-rev%d", item.ID, followIndex+1)
 					request.ConversationID = outcome.ConversationID
 					request.ParentRevisionID = revisions[follow.Parent]
 					request.RefreshSource = follow.Refresh
@@ -467,21 +476,131 @@ func gradeWork(g WorkGrader, outcome workrun.Outcome, runErr error, contract art
 		data, readErr := outcome.Work.Source.ReadRegularFile(g.Path, 512*1024)
 		actual = string(data)
 		err = readErr
-	case "file_equals", "file_contains":
+	case "file_equals", "file_contains", "file_excludes", "file_regex", "file_not_regex":
 		data, readErr := outcome.Work.Output.ReadRegularFile(g.Path, 512*1024)
 		actual = string(data)
 		err = readErr
-	case "cell_equals":
+	case "document_text_contains", "document_text_excludes":
+		if strings.EqualFold(filepath.Ext(g.Path), ".pdf") {
+			data, readErr := outcome.Work.Output.ReadRegularFile(g.Path, 16*1024*1024)
+			if readErr != nil {
+				err = readErr
+				break
+			}
+			extracted, extractErr := attachment.ExtractPDFText(context.Background(), data, attachment.MaxPDFExtractedBytes)
+			if extractErr != nil {
+				err = extractErr
+				break
+			}
+			actual, err = extracted.PlainText(attachment.MaxPDFExtractedBytes)
+		} else {
+			doc, supported, loadErr := attachment.Load(outcome.Work.Output, g.Path, attachment.MaxDocumentBytes)
+			err = loadErr
+			if !supported && err == nil {
+				err = errors.New("unsupported document output")
+			}
+			actual = string(doc.Data)
+		}
+	case "json_pointer_equals", "json_pointer_contains", "json_pointer_absent":
+		data, readErr := outcome.Work.Output.ReadRegularFile(g.Path, 512*1024)
+		if readErr != nil {
+			if errors.Is(readErr, os.ErrNotExist) {
+				grade.Evidence = "required output is absent"
+			} else {
+				grade.Error = readErr.Error()
+			}
+			return grade
+		}
+		value, found, pointerErr := jsonPointerValue(data, g.Locator)
+		if pointerErr != nil {
+			grade.Error = pointerErr.Error()
+			return grade
+		}
+		if g.Kind == "json_pointer_absent" {
+			grade.Passed = !found
+		} else if g.Kind == "json_pointer_contains" {
+			actualText, ok := value.(string)
+			grade.Passed = found && ok && strings.Contains(actualText, g.Expected)
+		} else {
+			expected, parseErr := decodeJSONValue([]byte(g.Expected))
+			if parseErr != nil {
+				grade.Error = parseErr.Error()
+				return grade
+			}
+			grade.Passed = found && jsonValuesEqual(value, expected)
+		}
+		grade.Evidence = fmt.Sprintf("JSON pointer %q present=%t; artifact SHA-256 %s", g.Locator, found, workHash(string(data)))
+		return grade
+	case "pptx_slide_contains", "pptx_slide_excludes", "pptx_text_contains", "pptx_text_excludes", "pptx_slide_count":
+		data, readErr := outcome.Work.Output.ReadRegularFile(g.Path, 16*1024*1024)
+		if readErr != nil {
+			grade.Error = readErr.Error()
+			return grade
+		}
+		slides, inspectErr := presentation.SlideTexts(data)
+		if inspectErr != nil {
+			grade.Error = inspectErr.Error()
+			return grade
+		}
+		if g.Kind == "pptx_slide_count" {
+			grade.Passed = fmt.Sprint(len(slides)) == g.Expected
+			grade.Evidence = fmt.Sprintf("observed %d slides", len(slides))
+			return grade
+		}
+		if g.Kind == "pptx_text_contains" || g.Kind == "pptx_text_excludes" {
+			actual = strings.Join(slides, "\n")
+			grade.Passed = strings.Contains(actual, g.Expected)
+			if g.Kind == "pptx_text_excludes" {
+				grade.Passed = !grade.Passed
+			}
+			grade.Evidence = fmt.Sprintf("visible deck text SHA-256 %s", workHash(actual))
+			return grade
+		}
+		index, parseErr := strconv.Atoi(g.Locator)
+		if parseErr != nil || index < 1 || index > len(slides) {
+			grade.Evidence = fmt.Sprintf("slide %q unavailable in %d-slide deck", g.Locator, len(slides))
+			return grade
+		}
+		actual = slides[index-1]
+		grade.Passed = strings.Contains(actual, g.Expected)
+		if g.Kind == "pptx_slide_excludes" {
+			grade.Passed = !grade.Passed
+		}
+		grade.Evidence = fmt.Sprintf("slide %d text SHA-256 %s", index, workHash(actual))
+		return grade
+	case "cell_equals", "cell_formula_equals":
 		data, readErr := outcome.Work.Output.ReadRegularFile(g.Path, 16*1024*1024)
 		err = readErr
 		if err == nil {
 			file, openErr := excelize.OpenReader(bytes.NewReader(data))
 			err = openErr
 			if err == nil {
-				actual, err = file.GetCellValue(g.Sheet, g.Cell)
+				if g.Kind == "cell_formula_equals" {
+					actual, err = file.GetCellFormula(g.Sheet, g.Cell)
+				} else {
+					actual, err = file.GetCellValue(g.Sheet, g.Cell)
+				}
 				file.Close()
 			}
 		}
+	case "xlsx_chart_count":
+		data, readErr := outcome.Work.Output.ReadRegularFile(g.Path, 16*1024*1024)
+		if readErr != nil {
+			err = readErr
+			break
+		}
+		archive, openErr := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+		if openErr != nil {
+			err = openErr
+			break
+		}
+		count := 0
+		for _, part := range archive.File {
+			if strings.HasPrefix(part.Name, "xl/charts/chart") && strings.HasSuffix(part.Name, ".xml") {
+				count++
+			}
+		}
+		actual = strconv.Itoa(count)
 	case "context_contains", "context_absent":
 		for _, message := range outcome.Result.Messages {
 			actual += message.Content + "\n"
@@ -516,8 +635,24 @@ func gradeWork(g WorkGrader, outcome workrun.Outcome, runErr error, contract art
 		return grade
 	}
 	switch g.Kind {
+	case "file_regex", "file_not_regex":
+		matched, matchErr := regexp.MatchString(g.Expected, actual)
+		if matchErr != nil {
+			grade.Error = matchErr.Error()
+			return grade
+		}
+		grade.Passed = matched
+		if g.Kind == "file_not_regex" {
+			grade.Passed = !matched
+		}
 	case "child_tool_error_contains", "unsupported_quote", "file_contains", "context_contains", "tool_error_contains", "candidate_status":
 		grade.Passed = strings.Contains(actual, g.Expected)
+	case "document_text_contains":
+		grade.Passed = strings.Contains(strings.ToLower(actual), strings.ToLower(g.Expected))
+	case "document_text_excludes":
+		grade.Passed = !strings.Contains(strings.ToLower(actual), strings.ToLower(g.Expected))
+	case "file_excludes":
+		grade.Passed = !strings.Contains(actual, g.Expected)
 	case "context_absent":
 		grade.Passed = !strings.Contains(actual, g.Expected)
 	default:

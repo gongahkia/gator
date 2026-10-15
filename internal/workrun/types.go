@@ -118,10 +118,15 @@ type Request struct {
 	// RequireCode keeps Work user-facing while requiring concrete
 	// Code-specialist evidence before the Work transaction may complete. The
 	// CLI's explicit `gator work code` route and the TUI's /code mode set it.
+	// EnableCode grants the internal patch specialist to a Work request without
+	// requiring a patch to complete. Ordinary file and data Work leaves it off.
+	EnableCode         bool
 	RequireCode        bool
 	Code               CodePolicy
 	ApproveCodeCommand func(context.Context, []string) (tools.CommandDecision, error)
 }
+
+func (r Request) codeEnabled() bool { return r.EnableCode || r.RequireCode }
 
 // Outcome retains staged files and trusted evidence even when model execution
 // fails. Source is never modified by the executor.

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -202,6 +203,89 @@ func TestRunnerRetriesTransientProviderErrorsWithoutMutatingHistory(t *testing.T
 	if agents != 1 {
 		t.Fatalf("retry debris entered history: %#v", result.Messages)
 	}
+}
+
+func TestRunnerReducesOptionalToolsAfterMalformedFunctionCall(t *testing.T) {
+	model := &scriptedModel{
+		failures: []error{TransientError{Err: MalformedToolCallError{Err: errors.New("MALFORMED_FUNCTION_CALL")}}},
+		turns: []Turn{
+			{ToolCalls: []ToolCall{{ID: "read-1", Name: "read_file", Arguments: json.RawMessage(`{"path":"notes.md"}`)}}},
+			{Text: "done"},
+		},
+	}
+	var events []Event
+	runner := Runner{Model: model, Tools: []Tool{&recordingTool{}, optionalTool{}}, Now: fixedClock()}
+	result, err := runner.Run(context.Background(), RunOptions{
+		Task: "read notes", MalformedCallFallback: []string{"delegate_agents"},
+		OnEvent: func(event Event) { events = append(events, event) },
+	})
+	if err != nil || result.FinalText != "done" {
+		t.Fatalf("result = %#v, error = %v", result, err)
+	}
+	if len(model.requests) != 3 || len(model.requests[0].Tools) != 2 || len(model.requests[1].Tools) != 1 || len(model.requests[2].Tools) != 1 || model.requests[1].Tools[0].Name != "read_file" {
+		t.Fatalf("tool surface across retries = %#v", model.requests)
+	}
+	if len(model.requests[0].Messages) != len(model.requests[1].Messages) {
+		t.Fatal("malformed retry changed conversation history")
+	}
+	if !slices.Contains(eventKinds(events), EventToolSurfaceReduced) {
+		t.Fatalf("fallback was not recorded: %v", eventKinds(events))
+	}
+}
+
+func TestRunnerGuidesSecondMalformedRetryWithoutPersistingIt(t *testing.T) {
+	malformed := TransientError{Err: MalformedToolCallError{Err: errors.New("MALFORMED_FUNCTION_CALL")}}
+	model := &scriptedModel{
+		failures: []error{malformed, malformed},
+		turns: []Turn{
+			{ToolCalls: []ToolCall{{ID: "read-1", Name: "read_file", Arguments: json.RawMessage(`{"path":"notes.md"}`)}}},
+			{Text: "done"},
+		},
+	}
+	result, err := (Runner{Model: model, Tools: []Tool{&recordingTool{}, optionalTool{}}, Now: fixedClock()}).Run(context.Background(), RunOptions{
+		Task: "read notes", MalformedCallFallback: []string{"delegate_agents"},
+	})
+	if err != nil || result.FinalText != "done" || len(model.requests) != 4 {
+		t.Fatalf("result = %#v, error = %v, requests = %d", result, err, len(model.requests))
+	}
+	if len(model.requests[2].Messages) != len(model.requests[1].Messages)+1 || !strings.Contains(model.requests[2].Messages[len(model.requests[2].Messages)-1].Content, "malformed function call") {
+		t.Fatalf("second malformed retry lacked guidance: %#v", model.requests[2].Messages)
+	}
+	for _, message := range result.Messages {
+		if strings.Contains(message.Content, "malformed function call") {
+			t.Fatal("retry-only guidance entered retained conversation")
+		}
+	}
+}
+
+func TestRunnerHonorsProviderRetryDelayAndCancellation(t *testing.T) {
+	model := &scriptedModel{failures: []error{HTTPStatusErrorWithRetry(429, errors.New("quota"), 15*time.Millisecond)}, turns: []Turn{{Text: "done"}}}
+	started := time.Now()
+	result, err := (Runner{Model: model, Now: fixedClock()}).Run(context.Background(), RunOptions{Task: "retry"})
+	if err != nil || result.FinalText != "done" || time.Since(started) < 10*time.Millisecond {
+		t.Fatalf("retry result = %#v, error = %v, elapsed = %s", result, err, time.Since(started))
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	model = &scriptedModel{failures: []error{HTTPStatusErrorWithRetry(429, errors.New("quota"), time.Minute)}}
+	if _, err := (Runner{Model: model, Now: fixedClock()}).Run(ctx, RunOptions{Task: "retry"}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancelled retry returned %v", err)
+	}
+	model = &scriptedModel{failures: []error{HTTPStatusErrorWithRetry(429, errors.New("daily quota"), 8*time.Hour)}}
+	started = time.Now()
+	if _, err := (Runner{Model: model, Now: fixedClock()}).Run(context.Background(), RunOptions{Task: "retry"}); err == nil || len(model.requests) != 1 || time.Since(started) > time.Second {
+		t.Fatalf("long quota wait was retried: error=%v requests=%d elapsed=%s", err, len(model.requests), time.Since(started))
+	}
+}
+
+type optionalTool struct{}
+
+func (optionalTool) Definition() ToolDefinition {
+	return ToolDefinition{Name: "delegate_agents", Parameters: json.RawMessage(`{"type":"object"}`)}
+}
+
+func (optionalTool) Execute(context.Context, json.RawMessage) (ToolResult, error) {
+	return ToolResult{}, errors.New("optional tool should not execute")
 }
 
 func TestRunnerDoesNotRetryPermanentProviderErrors(t *testing.T) {

@@ -169,6 +169,7 @@ const (
 	EventCompletionBlocked        EventKind = "completion_blocked"
 	EventSteeringApplied          EventKind = "steering_applied"
 	EventContextCompacted         EventKind = "context_compacted"
+	EventToolSurfaceReduced       EventKind = "tool_surface_reduced"
 	EventCommandApprovalRequested EventKind = "command_approval_requested"
 	EventCommandApprovalResolved  EventKind = "command_approval_resolved"
 	EventHook                     EventKind = "hook"
@@ -214,6 +215,10 @@ type RunOptions struct {
 	// CompletionCheck may require concrete evidence, such as a diff inspection
 	// or a named verifier, before a final response is accepted.
 	CompletionCheck func([]Message) error
+	// MalformedCallFallback drops these optional tools after a provider reports
+	// a malformed function call, then retries the same turn without changing
+	// conversation history. The reduced set stays active for the run.
+	MalformedCallFallback []string
 	// BeforeTool and AfterTool are trusted host lifecycle boundaries. A returned
 	// error is surfaced to the model as a failed tool call.
 	BeforeTool func(context.Context, ToolCall) error

@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "id": "user-work-v3-review",
+  "criteria": [
+    {
+      "id": "factual_support",
+      "description": "Are material facts, arithmetic, statuses, and certainty supported by the supplied sources? Score the visible artifact, not the producing agent's summary.",
+      "anchors": [
+        "No usable factual result or core facts are invented.",
+        "Several material claims are false, unsupported, or contradictory.",
+        "The main answer is present but at least one consequential claim is unsupported or wrong.",
+        "Core facts are supported; only a minor claim or qualification needs correction.",
+        "All material facts and qualifications are supported, and uncertainty is retained."
+      ]
+    },
+    {
+      "id": "task_completion",
+      "description": "Does the artifact complete the requested user job, including required figures, decisions, next actions, and follow-up constraints?",
+      "anchors": [
+        "No usable deliverable was produced.",
+        "The deliverable misses the main purpose of the task.",
+        "A useful start exists, but consequential requested elements are missing.",
+        "The requested job is mostly complete with small omissions or cleanup.",
+        "The requested job is complete and directly usable."
+      ]
+    },
+    {
+      "id": "audience_fit",
+      "description": "Is the text appropriate for the specified audience, especially when turning internal material into customer or partner communication? For presentations, score visible slide text only; visual layout requires separate human inspection.",
+      "anchors": [
+        "The artifact exposes prohibited information or is unusable for the audience.",
+        "Tone or content has a serious audience mismatch.",
+        "Audience fit is mixed and requires substantial rewriting.",
+        "Audience fit is good with minor tone or clarity edits.",
+        "The artifact is clear, concise, and appropriate for the audience."
+      ]
+    },
+    {
+      "id": "manual_rework",
+      "description": "How much work would a user need before using the artifact? Judge only what is visible in the deliverable and supplied evidence.",
+      "anchors": [
+        "The user must redo the task from scratch.",
+        "The user must rebuild most of the deliverable.",
+        "The user must make several substantive edits.",
+        "Only small edits or formatting cleanup remain.",
+        "No material edits are needed."
+      ]
+    }
+  ]
+}

@@ -3,6 +3,7 @@ package agent
 import (
 	"errors"
 	"fmt"
+	"time"
 )
 
 // maxTransientAttempts is one initial Complete plus two retries. Failed
@@ -14,6 +15,36 @@ const maxTransientAttempts = 3
 // history. Adapters use it for HTTP 429 and 503. Other 4xx/5xx stay fatal.
 type TransientError struct {
 	Err error
+}
+
+// RetryAfterError carries a bounded provider-supplied wait for a transient
+// response. Runner waits without mutating conversation history.
+type RetryAfterError struct {
+	Err   error
+	Delay time.Duration
+}
+
+func (e RetryAfterError) Error() string { return e.Err.Error() }
+func (e RetryAfterError) Unwrap() error { return e.Err }
+
+// MalformedToolCallError identifies a provider turn that attempted an invalid
+// function call before any tool ran. Callers may retry with a smaller tool set.
+type MalformedToolCallError struct {
+	Err error
+}
+
+func (e MalformedToolCallError) Error() string {
+	if e.Err == nil {
+		return "model generated a malformed function call"
+	}
+	return e.Err.Error()
+}
+
+func (e MalformedToolCallError) Unwrap() error { return e.Err }
+
+func IsMalformedToolCall(err error) bool {
+	var malformed MalformedToolCallError
+	return errors.As(err, &malformed)
 }
 
 func (e TransientError) Error() string {
@@ -43,6 +74,14 @@ func HTTPStatusError(status int, err error) error {
 		return TransientError{Err: err}
 	}
 	return err
+}
+
+func HTTPStatusErrorWithRetry(status int, err error, delay time.Duration) error {
+	wrapped := HTTPStatusError(status, err)
+	if !IsTransient(wrapped) || delay <= 0 {
+		return wrapped
+	}
+	return RetryAfterError{Err: wrapped, Delay: delay}
 }
 
 func formatTurnError(step int, err error) error {

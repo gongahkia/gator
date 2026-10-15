@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -65,9 +66,38 @@ func (g GenerateContent) Complete(ctx context.Context, turn agent.TurnRequest) (
 		return agent.Turn{}, fmt.Errorf("read Gemini response: %w", err)
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return agent.Turn{}, agent.HTTPStatusError(response.StatusCode, describeAPIError(response.StatusCode, contents))
+		return agent.Turn{}, agent.HTTPStatusErrorWithRetry(response.StatusCode, describeAPIError(response.StatusCode, contents), retryDelay(response.Header, contents))
 	}
 	return decodeResponse(contents)
+}
+
+func retryDelay(header http.Header, contents []byte) time.Duration {
+	if value := strings.TrimSpace(header.Get("Retry-After")); value != "" {
+		if seconds, err := strconv.ParseFloat(value, 64); err == nil && seconds > 0 {
+			return time.Duration(seconds * float64(time.Second))
+		}
+		if at, err := http.ParseTime(value); err == nil {
+			if delay := time.Until(at); delay > 0 {
+				return delay
+			}
+		}
+	}
+	const hint = "Please retry in "
+	text := string(contents)
+	index := strings.Index(text, hint)
+	if index < 0 {
+		return 0
+	}
+	rest := text[index+len(hint):]
+	end := strings.IndexAny(rest, " \r\n\"\\")
+	if end >= 0 {
+		rest = rest[:end]
+	}
+	delay, err := time.ParseDuration(strings.TrimRight(rest, "."))
+	if err != nil || delay <= 0 {
+		return 0
+	}
+	return delay
 }
 
 func (g GenerateContent) endpoint() string {
@@ -86,9 +116,16 @@ func (g GenerateContent) client() *http.Client {
 }
 
 type request struct {
-	SystemInstruction *content  `json:"systemInstruction,omitempty"`
-	Contents          []content `json:"contents"`
-	Tools             []tool    `json:"tools,omitempty"`
+	SystemInstruction *content    `json:"systemInstruction,omitempty"`
+	Contents          []content   `json:"contents"`
+	Tools             []tool      `json:"tools,omitempty"`
+	ToolConfig        *toolConfig `json:"toolConfig,omitempty"`
+}
+
+type toolConfig struct {
+	FunctionCallingConfig struct {
+		Mode string `json:"mode"`
+	} `json:"functionCallingConfig"`
 }
 
 type tool struct {
@@ -127,6 +164,10 @@ func requestBody(turn agent.TurnRequest) (request, error) {
 		tools = append(tools, tool{FunctionDeclarations: declarations})
 	}
 	body := request{Contents: contents, Tools: tools}
+	if len(tools) > 0 {
+		body.ToolConfig = &toolConfig{}
+		body.ToolConfig.FunctionCallingConfig.Mode = "VALIDATED"
+	}
 	if strings.TrimSpace(turn.System) != "" {
 		body.SystemInstruction = &content{Parts: []json.RawMessage{partText(turn.System)}}
 	}
@@ -196,7 +237,7 @@ func encodeContents(source []agent.Message) ([]content, error) {
 				parts = append(parts, partFunctionResponse(result.ToolCallID, result.ToolName, result.Content))
 				index++
 			}
-			contents = append(contents, content{Role: "tool", Parts: parts})
+			contents = append(contents, content{Role: "user", Parts: parts})
 		default:
 			return nil, fmt.Errorf("agent history contains unsupported role %q", item.Role)
 		}
@@ -263,12 +304,16 @@ func partFunctionResponse(id, name, result string) json.RawMessage {
 }
 
 type response struct {
+	PromptFeedback *struct {
+		BlockReason string `json:"blockReason"`
+	} `json:"promptFeedback"`
 	Usage *struct {
 		Input  int64 `json:"promptTokenCount"`
 		Output int64 `json:"candidatesTokenCount"`
 	} `json:"usageMetadata"`
 	Candidates []struct {
-		Content json.RawMessage `json:"content"`
+		Content      json.RawMessage `json:"content"`
+		FinishReason string          `json:"finishReason"`
 	} `json:"candidates"`
 }
 
@@ -277,14 +322,26 @@ func decodeResponse(contents []byte) (agent.Turn, error) {
 	if err := json.Unmarshal(contents, &payload); err != nil {
 		return agent.Turn{}, fmt.Errorf("decode Gemini response: %w", err)
 	}
-	if len(payload.Candidates) == 0 || !json.Valid(payload.Candidates[0].Content) {
-		return agent.Turn{}, errors.New("Gemini response contained no candidate content")
+	if len(payload.Candidates) == 0 {
+		reason := "unspecified"
+		if payload.PromptFeedback != nil && payload.PromptFeedback.BlockReason != "" {
+			reason = payload.PromptFeedback.BlockReason
+		}
+		return agent.Turn{}, fmt.Errorf("Gemini response contained no candidate content (prompt block reason: %s)", reason)
+	}
+	candidateResponse := payload.Candidates[0]
+	if candidateResponse.FinishReason == "MALFORMED_FUNCTION_CALL" {
+		err := fmt.Errorf("Gemini response contained a malformed function call (finish reason: %s)", candidateResponse.FinishReason)
+		return agent.Turn{}, agent.TransientError{Err: agent.MalformedToolCallError{Err: err}}
+	}
+	if !json.Valid(candidateResponse.Content) {
+		return agent.Turn{}, fmt.Errorf("Gemini response contained invalid candidate content (finish reason: %s)", finishReason(candidateResponse.FinishReason))
 	}
 	var candidate content
-	if err := json.Unmarshal(payload.Candidates[0].Content, &candidate); err != nil {
+	if err := json.Unmarshal(candidateResponse.Content, &candidate); err != nil {
 		return agent.Turn{}, fmt.Errorf("decode Gemini candidate content: %w", err)
 	}
-	turn := agent.Turn{ProviderData: append(json.RawMessage(nil), payload.Candidates[0].Content...)}
+	turn := agent.Turn{ProviderData: append(json.RawMessage(nil), candidateResponse.Content...)}
 	if payload.Usage != nil {
 		turn.Usage = agent.Usage{Reported: true, InputTokens: payload.Usage.Input, OutputTokens: payload.Usage.Output}
 	}
@@ -314,9 +371,22 @@ func decodeResponse(contents []byte) (agent.Turn, error) {
 	}
 	turn.Text = text.String()
 	if strings.TrimSpace(turn.Text) == "" && len(turn.ToolCalls) == 0 {
-		return agent.Turn{}, errors.New("Gemini response contained no output text or function calls")
+		err := fmt.Errorf("Gemini response contained no output text or function calls (finish reason: %s)", finishReason(candidateResponse.FinishReason))
+		switch candidateResponse.FinishReason {
+		case "", "STOP", "OTHER":
+			return agent.Turn{}, agent.TransientError{Err: err}
+		default:
+			return agent.Turn{}, err
+		}
 	}
 	return turn, nil
+}
+
+func finishReason(value string) string {
+	if value == "" {
+		return "unspecified"
+	}
+	return value
 }
 
 func describeAPIError(status int, contents []byte) error {

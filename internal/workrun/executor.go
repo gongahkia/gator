@@ -432,7 +432,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		integration.accepted[path] = hash
 	}
 	request.integration = integration
-	if request.Mode != action.Inspect && e.Code != nil {
+	if request.Mode != action.Inspect && e.Code != nil && request.codeEnabled() {
 		surface = append(surface, integration)
 	}
 	delegationSurface, closeSpecialists, err := e.subagentTools(ctx, request, work, previousRoot, emit, func(record orchestrator.Record) {
@@ -446,6 +446,13 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	defer closeSpecialists()
 	surface = append(surface, delegationSurface...)
 	runner := agent.Runner{Model: e.Model, Tools: surface, Now: now}
+	var malformedCallFallback []string
+	if !request.codeEnabled() {
+		for _, tool := range delegationSurface {
+			malformedCallFallback = append(malformedCallFallback, tool.Definition().Name)
+		}
+		malformedCallFallback = append(malformedCallFallback, nonessentialArtifactTools(request.Contract)...)
+	}
 	var check func([]agent.Message) error
 	if request.Mode != action.Inspect {
 		check = outcomeCompletionCheck(work.Output, request.Contract, func() bool {
@@ -495,15 +502,16 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		}
 	}
 	result, runErr := runner.Run(ctx, agent.RunOptions{
-		InitialMessages: initial,
-		Task:            request.Objective,
-		Images:          request.Images,
-		Attachments:     request.Attachments,
-		System:          systemPrompt(request),
-		MaxSteps:        request.MaxSteps,
-		OnEvent:         emit,
-		Steering:        request.Steering,
-		CompletionCheck: check,
+		InitialMessages:       initial,
+		Task:                  request.Objective,
+		Images:                request.Images,
+		Attachments:           request.Attachments,
+		System:                systemPrompt(request),
+		MaxSteps:              request.MaxSteps,
+		OnEvent:               emit,
+		Steering:              request.Steering,
+		CompletionCheck:       check,
+		MalformedCallFallback: malformedCallFallback,
 	})
 	closeSpecialists()
 	outcome.Result = result
@@ -562,6 +570,32 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		return outcome, errors.New("work outcome contract did not pass")
 	}
 	return outcome, nil
+}
+
+func nonessentialArtifactTools(contract artifact.Contract) []string {
+	required := map[string]bool{}
+	for _, item := range contract.Artifacts {
+		switch strings.ToLower(filepath.Ext(item.Path)) {
+		case ".json":
+			required["write_json_artifact"] = true
+		case ".csv":
+			required["write_table_artifact"] = true
+		case ".docx", ".pdf":
+			required["work_write_document"] = true
+		case ".xlsx":
+			required["work_write_workbook"] = true
+			required["reconcile_tables"] = true
+		case ".pptx":
+			required["work_write_presentation"] = true
+		}
+	}
+	var dropped []string
+	for _, name := range []string{"write_json_artifact", "write_table_artifact", "work_write_document", "work_write_workbook", "work_write_presentation", "reconcile_tables"} {
+		if !required[name] {
+			dropped = append(dropped, name)
+		}
+	}
+	return dropped
 }
 
 func historyVerification(manifest artifact.Manifest) workhistory.VerificationStatus {

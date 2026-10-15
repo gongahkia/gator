@@ -492,7 +492,7 @@ func runJobProcess(definition jobs.Definition, stateDir string) (jobResult, erro
 	return runJobProcessContext(context.Background(), definition, stateDir)
 }
 func jobWorkRequest(definition jobs.Definition) workrun.Request {
-	request := workrun.Request{Limits: definition.Limits, WebOrigins: definition.WebOrigins, Project: definition.Project, SourcePath: definition.SourcePath, SnapshotID: definition.SnapshotID, Objective: definition.Objective, Mode: definition.Mode, Contract: definition.Contract, Code: definition.Code, MaxSteps: definition.MaxSteps, ConnectorIDs: definition.ConnectorIDs}
+	request := workrun.Request{Limits: definition.Limits, WebOrigins: definition.WebOrigins, Project: definition.Project, SourcePath: definition.SourcePath, SnapshotID: definition.SnapshotID, Objective: definition.Objective, Mode: definition.Mode, Contract: definition.Contract, Code: definition.Code, EnableCode: definition.EnableCode, MaxSteps: definition.MaxSteps, ConnectorIDs: definition.ConnectorIDs}
 	if definition.RefreshSnapshot {
 		request.SnapshotID = ""
 	}

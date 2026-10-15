@@ -81,6 +81,7 @@ func effectiveConfiguration(request Request) any {
 		ProjectSHA256       string
 		DisableDelegation   bool
 		DisabledRoles       []string
+		EnableCode          bool
 		RequireCode         bool
 		BrowserSession      string
 		DisableBrowser      bool
@@ -90,7 +91,7 @@ func effectiveConfiguration(request Request) any {
 			return request.Project.SHA256
 		}
 		return ""
-	}(), request.DisableDelegation, request.DisabledRoles, request.RequireCode, request.BrowserSession, request.DisableBrowser, request.DesktopSession}
+	}(), request.DisableDelegation, request.DisabledRoles, request.EnableCode, request.RequireCode, request.BrowserSession, request.DisableBrowser, request.DesktopSession}
 }
 
 type Interaction struct {

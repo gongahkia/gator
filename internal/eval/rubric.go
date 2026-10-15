@@ -11,6 +11,8 @@ import (
 
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/attachment"
+	"github.com/gongahkia/gator/internal/presentation"
 )
 
 type Rubric struct {
@@ -113,6 +115,59 @@ func rubricInput(path string) (string, error) {
 	}
 	var text strings.Builder
 	for _, file := range bundle.Manifest.Artifacts {
+		if strings.EqualFold(filepath.Ext(file.Path), ".docx") {
+			doc, supported, err := attachment.Load(bundle.Output, file.Path, attachment.MaxDocumentBytes)
+			if err != nil {
+				return "", err
+			}
+			if !supported {
+				return "", errors.New("rubric document format is unsupported")
+			}
+			fmt.Fprintf(&text, "Artifact %s, extracted document text\n%s\n", file.Path, doc.Data)
+			if text.Len() > 512*1024 {
+				return "", errors.New("rubric input exceeds 512 KiB")
+			}
+			continue
+		}
+		if strings.EqualFold(filepath.Ext(file.Path), ".pdf") {
+			data, err := bundle.Output.ReadRegularFile(file.Path, 16*1024*1024)
+			if err != nil {
+				return "", err
+			}
+			extracted, err := attachment.ExtractPDFText(context.Background(), data, attachment.MaxPDFExtractedBytes)
+			if err != nil {
+				return "", err
+			}
+			plain, err := extracted.PlainText(attachment.MaxPDFExtractedBytes)
+			if err != nil {
+				return "", err
+			}
+			fmt.Fprintf(&text, "Artifact %s, extracted PDF text\n%s\n", file.Path, plain)
+			if text.Len() > 512*1024 {
+				return "", errors.New("rubric input exceeds 512 KiB")
+			}
+			continue
+		}
+		if file.MediaType == "application/vnd.openxmlformats-officedocument.presentationml.presentation" {
+			if file.Bytes > 16*1024*1024 {
+				return "", errors.New("rubric presentation exceeds 16 MiB")
+			}
+			data, err := bundle.Output.ReadRegularFile(file.Path, 16*1024*1024)
+			if err != nil {
+				return "", err
+			}
+			slides, err := presentation.SlideTexts(data)
+			if err != nil {
+				return "", err
+			}
+			for index, slide := range slides {
+				fmt.Fprintf(&text, "Artifact %s, visible slide %d\n%s\n", file.Path, index+1, slide)
+				if text.Len() > 512*1024 {
+					return "", errors.New("rubric input exceeds 512 KiB")
+				}
+			}
+			continue
+		}
 		if !strings.HasPrefix(file.MediaType, "text/") && file.MediaType != "application/json" {
 			continue
 		}

@@ -86,7 +86,7 @@ func TestServiceApprovalIsPendingUntilExplicitResponse(t *testing.T) {
 		close(executed)
 		return CodeResult{Summary: "Approved command received"}, nil
 	}}}
-	operation := service.Start(context.Background(), Request{RunID: "approval-run", SourcePath: t.TempDir(), Objective: "prepare", Contract: artifact.DefaultContract("report.md")})
+	operation := service.Start(context.Background(), Request{RunID: "approval-run", SourcePath: t.TempDir(), Objective: "prepare", Contract: artifact.DefaultContract("report.md"), EnableCode: true})
 	defer operation.Cancel()
 	interaction := <-operation.Interactions
 	select {
