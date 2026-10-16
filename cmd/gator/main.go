@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -72,7 +73,7 @@ func run(args []string, out io.Writer) error {
 		return err
 	}
 	if len(args) == 2 && args[0] == "--mode" && args[1] == "acp" {
-		return acpMode(nil, os.Stdin, out)
+		return errors.New("ACP Code mode is retired; use Gator conversations or work-rpc for automation")
 	}
 	if args[0] == "--version" || args[0] == "-v" {
 		_, err := fmt.Fprintf(out, "gator %s (%s, %s)\n", version, commit, date)
@@ -120,7 +121,9 @@ func run(args []string, out io.Writer) error {
 		return workHeadless(context.Background(), os.Stdin, out)
 	case "work", "-w":
 		return workCommand(args[1:], out)
-	case "acp", "hook", "connector", "inbox", "snapshot", "inspect", "resume", "eval", "review", "export", "apply":
+	case "acp":
+		return errors.New("ACP Code mode is retired; use Gator conversations or work-rpc for automation")
+	case "hook", "connector", "inbox", "snapshot", "inspect", "resume", "eval", "review", "export", "apply":
 		return movedCommand(args[0])
 	default:
 		if isQuotedWorkRequest(args) {

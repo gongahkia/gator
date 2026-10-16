@@ -261,9 +261,9 @@ gator job inbox                   inspect completed and attention-needed jobs
 gator work snapshot ...           inspect or collect unreferenced snapshots
 ```
 
-Gator exposes one conversation-first Work entry point. Direct Code mode is
-retired; the isolated patch executor remains an internal specialist. ACP is a
-thin Work adapter; `work-rpc` is the canonical machine protocol.
+Gator exposes one conversation-first Work entry point. Direct Code and ACP
+Code modes are retired; the isolated patch executor remains an internal
+specialist. `work-rpc` is the canonical machine protocol.
 
 Headless operation is a primary product surface. Structured output, stable exit
 codes, stdin-compatible task input, and immutable manifests make Gator useful in

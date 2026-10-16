@@ -1,7 +1,8 @@
 # Product capability audit
 
-This is a source-backed product audit as of 2026-09-09, not a model-quality
-benchmark. It compares the committed Gator architecture and tests with public
+This is a historical source-backed product audit as of 2026-09-09, not a model-quality
+benchmark. The current personal-agent direction is in
+[PERSONAL_AGENT_DIRECTION.md](PERSONAL_AGENT_DIRECTION.md). It compares the then-current Gator architecture and tests with public
 primary documentation. A documented competitor capability is not evidence that
 it is reliable in every environment; it is the feature bar users can reasonably
 expect.

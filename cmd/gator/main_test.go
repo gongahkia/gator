@@ -88,7 +88,6 @@ func TestLegacyProtocolAndDelegationCommandsAreRemoved(t *testing.T) {
 
 func TestMovedRootCommandsExplainTheirCanonicalFamily(t *testing.T) {
 	for command, canonical := range map[string]string{
-		"acp":  "gator agent acp",
 		"hook": "gator config hook", "connector": "gator provider connector", "inbox": "gator job inbox", "snapshot": "gator work snapshot",
 		"inspect": "gator work inspect", "resume": "gator work resume", "eval": "gator work eval",
 		"review": "gator work review", "export": "gator work export", "apply": "gator work apply",
@@ -97,6 +96,14 @@ func TestMovedRootCommandsExplainTheirCanonicalFamily(t *testing.T) {
 		err := run([]string{command}, &output)
 		if err == nil || !strings.Contains(err.Error(), "has moved") || !strings.Contains(err.Error(), canonical) {
 			t.Fatalf("%s error = %v, want migration to %s", command, err, canonical)
+		}
+	}
+}
+
+func TestACPCodeEntryPointsAreRetired(t *testing.T) {
+	for _, arguments := range [][]string{{"acp"}, {"agent", "acp"}, {"--mode", "acp"}} {
+		if err := run(arguments, io.Discard); err == nil || !strings.Contains(err.Error(), "ACP Code mode is retired") {
+			t.Fatalf("%v error = %v", arguments, err)
 		}
 	}
 }
@@ -118,7 +125,7 @@ func TestShortCLIFormsRouteToTheirCommandFamilies(t *testing.T) {
 		t.Fatalf("-d error = %v", err)
 	}
 	output.Reset()
-	if err := run([]string{"-a", "--help"}, &output); err != nil || !strings.Contains(output.String(), "gator agent acp") {
+	if err := run([]string{"-a", "--help"}, &output); err != nil || !strings.Contains(output.String(), "gator agent list") || strings.Contains(output.String(), "gator agent acp") {
 		t.Fatalf("-a output = %q, err = %v", output.String(), err)
 	}
 	if err := run([]string{"-e"}, io.Discard); err == nil || !strings.Contains(err.Error(), "extension") {
@@ -152,8 +159,8 @@ func TestNestedCommandFamiliesRouteToTheirHandlers(t *testing.T) {
 		arguments []string
 		contains  string
 	}{
-		{[]string{"agent", "acp", "unexpected"}, "usage: gator agent acp"},
-		{[]string{"-a", "acp", "unexpected"}, "usage: gator agent acp"},
+		{[]string{"agent", "acp", "unexpected"}, "ACP Code mode is retired"},
+		{[]string{"-a", "acp", "unexpected"}, "ACP Code mode is retired"},
 		{[]string{"config", "hook"}, "gator config hook status"},
 		{[]string{"-c", "hook"}, "gator config hook status"},
 		{[]string{"provider", "connector", "status"}, "connector ID"},

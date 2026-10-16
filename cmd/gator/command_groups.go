@@ -4,12 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 )
 
 const agentFamilyUsage = `usage:
   gator agent list
-  gator agent acp [--verify 'argv ...']
 
 short form:
   gator -a ...`
@@ -31,7 +29,7 @@ func agentFamilyCommand(arguments []string, out io.Writer) error {
 	}
 	switch arguments[0] {
 	case "acp":
-		return acpMode(arguments[1:], os.Stdin, out)
+		return errors.New("ACP Code mode is retired; use Gator conversations or work-rpc for automation")
 	case "list":
 		return agentCommand(arguments, out)
 	default:
@@ -85,7 +83,6 @@ func workResumeCommand(arguments []string, out io.Writer) error {
 
 func movedCommand(command string) error {
 	canonical := map[string]string{
-		"acp":       "gator agent acp",
 		"hook":      "gator config hook",
 		"connector": "gator provider connector",
 		"inbox":     "gator job inbox",

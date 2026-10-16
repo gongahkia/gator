@@ -54,7 +54,7 @@ user controls + objective
 | Vim composer mode, mouse-heavy diff controls, Code-only drawers and control center | Retire | They do not improve the single, conversation-first Gator surface enough to justify a second UI state machine |
 | Vendor-harness chooser inside Code | Retire | Starting another agent runtime would create a second execution and history model |
 | Extension prompt commands and declarative Code UI cards | Retire from the product surface | Bundle metadata remains readable for compatibility, but only explicitly granted backend tools are active |
-| Machine protocols | Retain only Work-native adapters | `gator work-rpc` is the canonical machine surface and ACP is a thin Work adapter; legacy RPC and app-server transports are retired |
+| Machine protocols | Retain only Work-native adapters | `gator work-rpc` is the canonical machine surface; ACP Code mode and legacy RPC/app-server transports are retired |
 
 ## Delegation invariants
 

@@ -64,7 +64,7 @@ package manager.
 | `update [--check]` | `/update` | partial | The TUI checks only; download and self-replacement remain an explicit post-exit CLI action. |
 | `rpc` | None | intentionally CLI only | Stdio protocol for programmatic clients. |
 | `serve token/start/status/stop` | None | intentionally CLI only | Loopback app-server lifecycle for external clients. |
-| `acp [--verify …]` | None | intentionally CLI only | Stdio editor-agent protocol. |
+| ACP editor adapter | None | retired | Coding-oriented editor protocol is outside the terminal companion surface. |
 | `config show` | `/manage` → Config | complete | Bounded redacted inspector never reads `auth.json`; secret-shaped values and sensitive URL query values are hidden. |
 | `config set default-provider/default-model` | `/manage` saves the provider/model currently selected in `/model` after confirmation | complete | — |
 | `config set sandbox/network` | `/manage` shows and confirms strict/off sandbox and deny/allow network defaults; `/permissions` explains the effective policy | complete | — |
