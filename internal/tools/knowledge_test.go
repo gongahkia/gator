@@ -35,6 +35,10 @@ func TestKnowledgeToolsKeepGoalBoundariesAndSkillsReadOnly(t *testing.T) {
 	if _, err := memories.Add("decision", "Prefer the blue deck", goalA, "user", time.Time{}); err != nil {
 		t.Fatal(err)
 	}
+	flight, err := memories.Add("fact", "The flight ticket is booked for Friday", goalA, "user", time.Time{})
+	if err != nil {
+		t.Fatal(err)
+	}
 	skill, err := notes.AddSkill("brief-writing", "Use for daily briefs", "## Procedure\nCite dates and source files.")
 	if err != nil {
 		t.Fatal(err)
@@ -46,6 +50,13 @@ func TestKnowledgeToolsKeepGoalBoundariesAndSkillsReadOnly(t *testing.T) {
 	searched, err := toolsByName["knowledge_search"].Execute(context.Background(), json.RawMessage(`{"query":"blue deck"}`))
 	if err != nil || !strings.Contains(searched.Content, local.ID) || strings.Contains(searched.Content, other.ID) {
 		t.Fatalf("scoped search = %q, %v", searched.Content, err)
+	}
+	searched, err = toolsByName["knowledge_search"].Execute(context.Background(), json.RawMessage(`{"query":"airfare","alternates":["flight"]}`))
+	if err != nil || !strings.Contains(searched.Content, flight.ID) || !strings.Contains(searched.Content, `"matched_query":"flight"`) {
+		t.Fatalf("expanded search = %q, %v", searched.Content, err)
+	}
+	if _, err := toolsByName["knowledge_search"].Execute(context.Background(), json.RawMessage(`{"query":"airfare","alternates":["", "flight"]}`)); err == nil {
+		t.Fatal("empty alternate query accepted")
 	}
 	if _, err := toolsByName["knowledge_read"].Execute(context.Background(), json.RawMessage(`{"id":"`+other.ID+`"}`)); err == nil {
 		t.Fatal("cross-goal read accepted")

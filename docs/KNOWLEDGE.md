@@ -38,7 +38,10 @@ returned to another goal's Work tools. Search is lexical and bounded. It indexes
 source reference terms so a note can be found by a document name, but it does
 not claim semantic recall. Source references are user-maintained provenance
 labels, not proof that the source still says the same thing; check the current
-source before relying on them. Short `gator memory` records retain their separate
+source before relying on them. The agent may try up to three alternate terms
+when its first knowledge search misses, and each result shows which query
+matched. This remains lexical search and can miss a different paraphrase or
+return a weak match. Short `gator memory` records retain their separate
 expiry and correction controls. `knowledge_search` and `knowledge_read` let the
 main agent retrieve both notes and active memories during Work. They accept IDs
 and query text, never arbitrary filesystem paths.

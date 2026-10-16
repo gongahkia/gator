@@ -19,7 +19,7 @@ Meta describes Muse as a personal agent that develops plans for goals, works acr
 | Need | Existing asset | Gap to close |
 | --- | --- | --- |
 | Continue a conversation | Durable Work conversations, replay, branching, goal records, TUI picker, and structured goal plans | Plan updates are still user maintained; the agent cannot propose a reviewed change |
-| Remember preferences and decisions | Scoped learnings, searchable memories, source-linked Markdown notes, explicit skills, and reviewed model suggestions | Lexical retrieval misses paraphrases; suggestion quality and source-link accuracy need live evaluation |
+| Remember preferences and decisions | Scoped learnings, searchable memories, source-linked Markdown notes, bounded alternate-query search, explicit skills, and reviewed model suggestions | Retrieval still depends on good terms; suggestion quality and source-link accuracy need live evaluation |
 | Act through tools | Local files, browser, connectors, approval broker, internal specialists, reviewed goal-plan suggestions | Tool setup and selection are still technical; no automatic goal-level plan/action loop |
 | Work over time | Goal-linked jobs, attempts, inbox, exact duplicate-result suppression, opt-in local change gate, macOS opt-in LaunchAgent | No event push trigger or semantic change detection; Linux has no installed service command |
 | Extend behavior | Extensions, user-created text skills, MCP, role routing, read-only goal reviewer | Skills are explicit text procedures; model-authored suggestions and measured workflow selection need evaluation |
