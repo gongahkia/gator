@@ -1,0 +1,1709 @@
+{
+  "version": 1,
+  "id": "personal-continuity-v1",
+  "target": "work.v1",
+  "cases": [
+    {
+      "id": "venue-change",
+      "family": "event",
+      "split": "development",
+      "source": "sources/venue-change",
+      "objective": "Read status.md and give me a brief status and next step for this ongoing goal.",
+      "goal": {
+        "title": "Choose a venue for the November offsite.",
+        "context": "Choose a venue for the November offsite.",
+        "outcome": "Choose a venue for the November offsite.",
+        "steps": [
+          "Check current source",
+          "Decide next action"
+        ],
+        "memory": [
+          "Prefer a morning event."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial status: Venue A is available for 90 people; quote $1,800. Venue B is available for 90 people; quote $2,100."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Several days have passed. Check the latest source and tell me the current state and the next useful step. Be explicit when an old assumption changed.",
+          "parent": 0,
+          "refresh": true,
+          "source_edits": [
+            {
+              "path": "status.md",
+              "content": "# Current source\n\nVenue A is no longer available. Venue B is available for 90 people; quote $2,100.\n"
+            }
+          ],
+          "script": [
+            {
+              "text": "Current state: Venue A is no longer available. Venue B is available for 90 people; quote $2,100. Next: act on the updated source."
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "Venue B"
+        }
+      ]
+    },
+    {
+      "id": "budget-revision",
+      "family": "finance",
+      "split": "development",
+      "source": "sources/budget-revision",
+      "objective": "Read status.md and give me a brief status and next step for this ongoing goal.",
+      "goal": {
+        "title": "Book a workshop within the approved budget.",
+        "context": "Book a workshop within the approved budget.",
+        "outcome": "Book a workshop within the approved budget.",
+        "steps": [
+          "Check current source",
+          "Decide next action"
+        ],
+        "memory": [
+          "Never recommend an option above the current cap."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial status: Workshop budget cap is $4,000. Supplier Oak quotes $3,700; Pine quotes $4,300."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Several days have passed. Check the latest source and tell me the current state and the next useful step. Be explicit when an old assumption changed.",
+          "parent": 0,
+          "refresh": true,
+          "source_edits": [
+            {
+              "path": "status.md",
+              "content": "# Current source\n\nWorkshop budget cap is now $3,500. Supplier Oak offers a revised quote of $3,300; Pine quotes $4,300.\n"
+            }
+          ],
+          "script": [
+            {
+              "text": "Current state: Workshop budget cap is now $3,500. Supplier Oak offers a revised quote of $3,300; Pine quotes $4,300. Next: act on the updated source."
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "Oak"
+        }
+      ]
+    },
+    {
+      "id": "launch-deadline",
+      "family": "project",
+      "split": "development",
+      "source": "sources/launch-deadline",
+      "objective": "Read status.md and give me a brief status and next step for this ongoing goal.",
+      "goal": {
+        "title": "Track the launch review and blockers.",
+        "context": "Track the launch review and blockers.",
+        "outcome": "Track the launch review and blockers.",
+        "steps": [
+          "Check current source",
+          "Decide next action"
+        ],
+        "memory": [
+          "Put unresolved approvals before publicity."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial status: Launch review is scheduled for 5 November; design approval is pending."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Several days have passed. Check the latest source and tell me the current state and the next useful step. Be explicit when an old assumption changed.",
+          "parent": 0,
+          "refresh": true,
+          "source_edits": [
+            {
+              "path": "status.md",
+              "content": "# Current source\n\nLaunch review moved to 12 November; design approval is still pending.\n"
+            }
+          ],
+          "script": [
+            {
+              "text": "Current state: Launch review moved to 12 November; design approval is still pending. Next: act on the updated source."
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "12 November"
+        }
+      ]
+    },
+    {
+      "id": "meeting-owner",
+      "family": "meeting",
+      "split": "held-out",
+      "source": "sources/meeting-owner",
+      "objective": "Read status.md and give me a brief status and next step for this ongoing goal.",
+      "goal": {
+        "title": "Prepare the next customer follow-up.",
+        "context": "Prepare the next customer follow-up.",
+        "outcome": "Prepare the next customer follow-up.",
+        "steps": [
+          "Check current source",
+          "Decide next action"
+        ],
+        "memory": [
+          "Keep emails concise."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial status: Customer follow-up owner is Amira; next call is Tuesday."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Several days have passed. Check the latest source and tell me the current state and the next useful step. Be explicit when an old assumption changed.",
+          "parent": 0,
+          "refresh": true,
+          "source_edits": [
+            {
+              "path": "status.md",
+              "content": "# Current source\n\nCustomer follow-up owner changed to Jules; next call is Thursday.\n"
+            }
+          ],
+          "script": [
+            {
+              "text": "Current state: Customer follow-up owner changed to Jules; next call is Thursday. Next: act on the updated source."
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "Jules"
+        }
+      ]
+    },
+    {
+      "id": "invoice-status",
+      "family": "finance",
+      "split": "development",
+      "source": "sources/invoice-status",
+      "objective": "Read status.md and give me a brief status and next step for this ongoing goal.",
+      "goal": {
+        "title": "Track invoice INV-104 until reconciled.",
+        "context": "Track invoice INV-104 until reconciled.",
+        "outcome": "Track invoice INV-104 until reconciled.",
+        "steps": [
+          "Check current source",
+          "Decide next action"
+        ],
+        "memory": [
+          "Do not send a payment chase after confirmation."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial status: Invoice INV-104 is unpaid; finance should ask for remittance."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Several days have passed. Check the latest source and tell me the current state and the next useful step. Be explicit when an old assumption changed.",
+          "parent": 0,
+          "refresh": true,
+          "source_edits": [
+            {
+              "path": "status.md",
+              "content": "# Current source\n\nInvoice INV-104 was paid on 15 October; finance should reconcile the ledger.\n"
+            }
+          ],
+          "script": [
+            {
+              "text": "Current state: Invoice INV-104 was paid on 15 October; finance should reconcile the ledger. Next: act on the updated source."
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "reconcile the ledger"
+        }
+      ]
+    },
+    {
+      "id": "travel-cancellation",
+      "family": "travel",
+      "split": "development",
+      "source": "sources/travel-cancellation",
+      "objective": "Read status.md and give me a brief status and next step for this ongoing goal.",
+      "goal": {
+        "title": "Get to the conference on time.",
+        "context": "Get to the conference on time.",
+        "outcome": "Get to the conference on time.",
+        "steps": [
+          "Check current source",
+          "Decide next action"
+        ],
+        "memory": [
+          "Allow 30 minutes between arrival and first meeting."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial status: The 08:30 train is booked; hotel check-in is 14:00."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Several days have passed. Check the latest source and tell me the current state and the next useful step. Be explicit when an old assumption changed.",
+          "parent": 0,
+          "refresh": true,
+          "source_edits": [
+            {
+              "path": "status.md",
+              "content": "# Current source\n\nThe 08:30 train was cancelled; the 10:15 train is available, hotel check-in is 14:00.\n"
+            }
+          ],
+          "script": [
+            {
+              "text": "Current state: The 08:30 train was cancelled; the 10:15 train is available, hotel check-in is 14:00. Next: act on the updated source."
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "10:15 train"
+        }
+      ]
+    },
+    {
+      "id": "pilot-blocker",
+      "family": "sales",
+      "split": "development",
+      "source": "sources/pilot-blocker",
+      "objective": "Read status.md and give me a brief status and next step for this ongoing goal.",
+      "goal": {
+        "title": "Advance the customer pilot.",
+        "context": "Advance the customer pilot.",
+        "outcome": "Advance the customer pilot.",
+        "steps": [
+          "Check current source",
+          "Decide next action"
+        ],
+        "memory": [
+          "Do not call the pilot approved until sign-off."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial status: Pilot security review is complete; customer sign-off is pending."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Several days have passed. Check the latest source and tell me the current state and the next useful step. Be explicit when an old assumption changed.",
+          "parent": 0,
+          "refresh": true,
+          "source_edits": [
+            {
+              "path": "status.md",
+              "content": "# Current source\n\nPilot security review reopened after a new data-flow question; customer sign-off is still pending.\n"
+            }
+          ],
+          "script": [
+            {
+              "text": "Current state: Pilot security review reopened after a new data-flow question; customer sign-off is still pending. Next: act on the updated source."
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "data-flow question"
+        }
+      ]
+    },
+    {
+      "id": "interview-reschedule",
+      "family": "hiring",
+      "split": "held-out",
+      "source": "sources/interview-reschedule",
+      "objective": "Read status.md and give me a brief status and next step for this ongoing goal.",
+      "goal": {
+        "title": "Prepare the candidate interview.",
+        "context": "Prepare the candidate interview.",
+        "outcome": "Prepare the candidate interview.",
+        "steps": [
+          "Check current source",
+          "Decide next action"
+        ],
+        "memory": [
+          "Use local time in interview notes."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial status: Candidate interview is Monday at 10:00 with Morgan."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Several days have passed. Check the latest source and tell me the current state and the next useful step. Be explicit when an old assumption changed.",
+          "parent": 0,
+          "refresh": true,
+          "source_edits": [
+            {
+              "path": "status.md",
+              "content": "# Current source\n\nCandidate interview moved to Wednesday at 15:00 with Morgan.\n"
+            }
+          ],
+          "script": [
+            {
+              "text": "Current state: Candidate interview moved to Wednesday at 15:00 with Morgan. Next: act on the updated source."
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "Wednesday at 15:00"
+        }
+      ]
+    },
+    {
+      "id": "policy-update",
+      "family": "operations",
+      "split": "development",
+      "source": "sources/policy-update",
+      "objective": "Read status.md and give me a brief status and next step for this ongoing goal.",
+      "goal": {
+        "title": "Help the team file expenses accurately.",
+        "context": "Help the team file expenses accurately.",
+        "outcome": "Help the team file expenses accurately.",
+        "steps": [
+          "Check current source",
+          "Decide next action"
+        ],
+        "memory": [
+          "Use the current policy version."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial status: Expense policy allows meals up to $60 per person."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Several days have passed. Check the latest source and tell me the current state and the next useful step. Be explicit when an old assumption changed.",
+          "parent": 0,
+          "refresh": true,
+          "source_edits": [
+            {
+              "path": "status.md",
+              "content": "# Current source\n\nExpense policy changed to $45 per person, effective immediately.\n"
+            }
+          ],
+          "script": [
+            {
+              "text": "Current state: Expense policy changed to $45 per person, effective immediately. Next: act on the updated source."
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "45 per person"
+        }
+      ]
+    },
+    {
+      "id": "board-date",
+      "family": "leadership",
+      "split": "development",
+      "source": "sources/board-date",
+      "objective": "Read status.md and give me a brief status and next step for this ongoing goal.",
+      "goal": {
+        "title": "Finish the board packet.",
+        "context": "Finish the board packet.",
+        "outcome": "Finish the board packet.",
+        "steps": [
+          "Check current source",
+          "Decide next action"
+        ],
+        "memory": [
+          "Call out unverified financial numbers."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial status: Board packet is due 20 October; finance numbers are ready."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Several days have passed. Check the latest source and tell me the current state and the next useful step. Be explicit when an old assumption changed.",
+          "parent": 0,
+          "refresh": true,
+          "source_edits": [
+            {
+              "path": "status.md",
+              "content": "# Current source\n\nBoard packet is due 23 October; finance numbers need a fresh review.\n"
+            }
+          ],
+          "script": [
+            {
+              "text": "Current state: Board packet is due 23 October; finance numbers need a fresh review. Next: act on the updated source."
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "fresh review"
+        }
+      ]
+    },
+    {
+      "id": "rsvp-capacity",
+      "family": "event",
+      "split": "development",
+      "source": "sources/rsvp-capacity",
+      "objective": "Read status.md and give me a brief status and next step for this ongoing goal.",
+      "goal": {
+        "title": "Manage the event guest list.",
+        "context": "Manage the event guest list.",
+        "outcome": "Manage the event guest list.",
+        "steps": [
+          "Check current source",
+          "Decide next action"
+        ],
+        "memory": [
+          "Do not exceed venue capacity."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial status: Forty guests accepted; venue capacity is 50."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Several days have passed. Check the latest source and tell me the current state and the next useful step. Be explicit when an old assumption changed.",
+          "parent": 0,
+          "refresh": true,
+          "source_edits": [
+            {
+              "path": "status.md",
+              "content": "# Current source\n\nFifty-two guests accepted; venue capacity remains 50.\n"
+            }
+          ],
+          "script": [
+            {
+              "text": "Current state: Fifty-two guests accepted; venue capacity remains 50. Next: act on the updated source."
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "capacity"
+        }
+      ]
+    },
+    {
+      "id": "editor-feedback",
+      "family": "writing",
+      "split": "held-out",
+      "source": "sources/editor-feedback",
+      "objective": "Read status.md and give me a brief status and next step for this ongoing goal.",
+      "goal": {
+        "title": "Finish the article for publication.",
+        "context": "Finish the article for publication.",
+        "outcome": "Finish the article for publication.",
+        "steps": [
+          "Check current source",
+          "Decide next action"
+        ],
+        "memory": [
+          "Cite claims before publication."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial status: The article draft needs a stronger headline."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Several days have passed. Check the latest source and tell me the current state and the next useful step. Be explicit when an old assumption changed.",
+          "parent": 0,
+          "refresh": true,
+          "source_edits": [
+            {
+              "path": "status.md",
+              "content": "# Current source\n\nThe editor approved the headline but asked for a source on the second claim.\n"
+            }
+          ],
+          "script": [
+            {
+              "text": "Current state: The editor approved the headline but asked for a source on the second claim. Next: act on the updated source."
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "source on the second claim"
+        }
+      ]
+    },
+    {
+      "id": "renewal-pricing",
+      "family": "procurement",
+      "split": "development",
+      "source": "sources/renewal-pricing",
+      "objective": "Read status.md and give me a brief status and next step for this ongoing goal.",
+      "goal": {
+        "title": "Decide whether to renew the tool.",
+        "context": "Decide whether to renew the tool.",
+        "outcome": "Decide whether to renew the tool.",
+        "steps": [
+          "Check current source",
+          "Decide next action"
+        ],
+        "memory": [
+          "Compare annual cost before deciding."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial status: Renewal price is $900 per month through December."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Several days have passed. Check the latest source and tell me the current state and the next useful step. Be explicit when an old assumption changed.",
+          "parent": 0,
+          "refresh": true,
+          "source_edits": [
+            {
+              "path": "status.md",
+              "content": "# Current source\n\nRenewal offer is $1,050 per month starting January; cancellation notice is due 30 November.\n"
+            }
+          ],
+          "script": [
+            {
+              "text": "Current state: Renewal offer is $1,050 per month starting January; cancellation notice is due 30 November. Next: act on the updated source."
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "30 November"
+        }
+      ]
+    },
+    {
+      "id": "experiment-result",
+      "family": "research",
+      "split": "development",
+      "source": "sources/experiment-result",
+      "objective": "Read status.md and give me a brief status and next step for this ongoing goal.",
+      "goal": {
+        "title": "Evaluate the signup experiment.",
+        "context": "Evaluate the signup experiment.",
+        "outcome": "Evaluate the signup experiment.",
+        "steps": [
+          "Check current source",
+          "Decide next action"
+        ],
+        "memory": [
+          "Avoid strong conclusions from small samples."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial status: Experiment variant B is at 8% conversion after 100 visits; results are preliminary."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Several days have passed. Check the latest source and tell me the current state and the next useful step. Be explicit when an old assumption changed.",
+          "parent": 0,
+          "refresh": true,
+          "source_edits": [
+            {
+              "path": "status.md",
+              "content": "# Current source\n\nVariant B is at 6% conversion after 1,000 visits; control is at 7%.\n"
+            }
+          ],
+          "script": [
+            {
+              "text": "Current state: Variant B is at 6% conversion after 1,000 visits; control is at 7%. Next: act on the updated source."
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "control is at 7%"
+        }
+      ]
+    },
+    {
+      "id": "vendor-security",
+      "family": "procurement",
+      "split": "development",
+      "source": "sources/vendor-security",
+      "objective": "Read status.md and give me a brief status and next step for this ongoing goal.",
+      "goal": {
+        "title": "Assess vendor Cedar for procurement.",
+        "context": "Assess vendor Cedar for procurement.",
+        "outcome": "Assess vendor Cedar for procurement.",
+        "steps": [
+          "Check current source",
+          "Decide next action"
+        ],
+        "memory": [
+          "Do not treat expired evidence as current."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial status: Vendor Cedar has a completed SOC 2 report."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Several days have passed. Check the latest source and tell me the current state and the next useful step. Be explicit when an old assumption changed.",
+          "parent": 0,
+          "refresh": true,
+          "source_edits": [
+            {
+              "path": "status.md",
+              "content": "# Current source\n\nVendor Cedar SOC 2 report expired; renewal evidence is pending.\n"
+            }
+          ],
+          "script": [
+            {
+              "text": "Current state: Vendor Cedar SOC 2 report expired; renewal evidence is pending. Next: act on the updated source."
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "renewal evidence"
+        }
+      ]
+    },
+    {
+      "id": "submission-deadline",
+      "family": "writing",
+      "split": "held-out",
+      "source": "sources/submission-deadline",
+      "objective": "Read status.md and give me a brief status and next step for this ongoing goal.",
+      "goal": {
+        "title": "Submit the conference proposal.",
+        "context": "Submit the conference proposal.",
+        "outcome": "Submit the conference proposal.",
+        "steps": [
+          "Check current source",
+          "Decide next action"
+        ],
+        "memory": [
+          "Leave a day for final review."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial status: Conference proposal deadline is 1 December."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Several days have passed. Check the latest source and tell me the current state and the next useful step. Be explicit when an old assumption changed.",
+          "parent": 0,
+          "refresh": true,
+          "source_edits": [
+            {
+              "path": "status.md",
+              "content": "# Current source\n\nConference proposal deadline moved earlier to 24 November.\n"
+            }
+          ],
+          "script": [
+            {
+              "text": "Current state: Conference proposal deadline moved earlier to 24 November. Next: act on the updated source."
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "24 November"
+        }
+      ]
+    },
+    {
+      "id": "volunteer-shift",
+      "family": "community",
+      "split": "development",
+      "source": "sources/volunteer-shift",
+      "objective": "Read status.md and give me a brief status and next step for this ongoing goal.",
+      "goal": {
+        "title": "Staff the community food drive.",
+        "context": "Staff the community food drive.",
+        "outcome": "Staff the community food drive.",
+        "steps": [
+          "Check current source",
+          "Decide next action"
+        ],
+        "memory": [
+          "Confirm staffing before opening."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial status: Volunteer shift starts at 09:00; two helpers confirmed."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Several days have passed. Check the latest source and tell me the current state and the next useful step. Be explicit when an old assumption changed.",
+          "parent": 0,
+          "refresh": true,
+          "source_edits": [
+            {
+              "path": "status.md",
+              "content": "# Current source\n\nVolunteer shift starts at 08:00; one helper withdrew.\n"
+            }
+          ],
+          "script": [
+            {
+              "text": "Current state: Volunteer shift starts at 08:00; one helper withdrew. Next: act on the updated source."
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "08:00"
+        }
+      ]
+    },
+    {
+      "id": "partner-reply",
+      "family": "email",
+      "split": "development",
+      "source": "sources/partner-reply",
+      "objective": "Read status.md and give me a brief status and next step for this ongoing goal.",
+      "goal": {
+        "title": "Prepare a reply to the partner.",
+        "context": "Prepare a reply to the partner.",
+        "outcome": "Prepare a reply to the partner.",
+        "steps": [
+          "Check current source",
+          "Decide next action"
+        ],
+        "memory": [
+          "Draft an email but do not send without approval."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial status: Partner asked for the draft contract by Friday."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Several days have passed. Check the latest source and tell me the current state and the next useful step. Be explicit when an old assumption changed.",
+          "parent": 0,
+          "refresh": true,
+          "source_edits": [
+            {
+              "path": "status.md",
+              "content": "# Current source\n\nPartner sent revised terms and asked for a response by Wednesday.\n"
+            }
+          ],
+          "script": [
+            {
+              "text": "Current state: Partner sent revised terms and asked for a response by Wednesday. Next: act on the updated source."
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "Wednesday"
+        }
+      ]
+    },
+    {
+      "id": "design-handoff",
+      "family": "design",
+      "split": "development",
+      "source": "sources/design-handoff",
+      "objective": "Read status.md and give me a brief status and next step for this ongoing goal.",
+      "goal": {
+        "title": "Prepare the event poster for print.",
+        "context": "Prepare the event poster for print.",
+        "outcome": "Prepare the event poster for print.",
+        "steps": [
+          "Check current source",
+          "Decide next action"
+        ],
+        "memory": [
+          "Keep the approved brand palette."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial status: Poster uses the blue brand palette and is waiting for copy."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Several days have passed. Check the latest source and tell me the current state and the next useful step. Be explicit when an old assumption changed.",
+          "parent": 0,
+          "refresh": true,
+          "source_edits": [
+            {
+              "path": "status.md",
+              "content": "# Current source\n\nPoster copy is approved; the print shop requires a 3 mm bleed.\n"
+            }
+          ],
+          "script": [
+            {
+              "text": "Current state: Poster copy is approved; the print shop requires a 3 mm bleed. Next: act on the updated source."
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "3 mm bleed"
+        }
+      ]
+    },
+    {
+      "id": "daily-brief",
+      "family": "brief",
+      "split": "held-out",
+      "source": "sources/daily-brief",
+      "objective": "Read status.md and give me a brief status and next step for this ongoing goal.",
+      "goal": {
+        "title": "Prepare a useful daily brief.",
+        "context": "Prepare a useful daily brief.",
+        "outcome": "Prepare a useful daily brief.",
+        "steps": [
+          "Check current source",
+          "Decide next action"
+        ],
+        "memory": [
+          "Lead with decisions and blockers."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial status: Today has a 10:00 planning call and a 15:00 review. The risk log is clear."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Several days have passed. Check the latest source and tell me the current state and the next useful step. Be explicit when an old assumption changed.",
+          "parent": 0,
+          "refresh": true,
+          "source_edits": [
+            {
+              "path": "status.md",
+              "content": "# Current source\n\nToday has a 10:00 planning call; the 15:00 review moved to tomorrow. The risk log now has a blocked vendor approval.\n"
+            }
+          ],
+          "script": [
+            {
+              "text": "Current state: Today has a 10:00 planning call; the 15:00 review moved to tomorrow. The risk log now has a blocked vendor approval. Next: act on the updated source."
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "blocked vendor approval"
+        }
+      ]
+    },
+    {
+      "id": "brief-preference-correction",
+      "family": "brief",
+      "split": "development",
+      "source": "sources/brief-preference-correction",
+      "objective": "Summarize the current goal direction.",
+      "goal": {
+        "title": "Prepare the daily briefing.",
+        "context": "The user initially asked for a long daily brief.",
+        "outcome": "Prepare the daily briefing.",
+        "steps": [
+          "Check latest user direction"
+        ],
+        "memory": [
+          "The user prefers a long daily brief."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial direction: The user initially asked for a long daily brief."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Resume this ongoing goal. What is the current user direction, and how should you proceed?",
+          "parent": 0,
+          "refresh": false,
+          "goal_context": "The user corrected the standing preference: provide a three-bullet daily brief, with decisions first.",
+          "script": [
+            {
+              "text": "Current user direction: The user corrected the standing preference: provide a three-bullet daily brief, with decisions first. Next: follow the correction."
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "three-bullet"
+        }
+      ]
+    },
+    {
+      "id": "travel-accessibility",
+      "family": "travel",
+      "split": "held-out",
+      "source": "sources/travel-accessibility",
+      "objective": "Summarize the current goal direction.",
+      "goal": {
+        "title": "Plan the trip to the client workshop.",
+        "context": "The travel plan assumed stairs were acceptable.",
+        "outcome": "Plan the trip to the client workshop.",
+        "steps": [
+          "Check latest user direction"
+        ],
+        "memory": [
+          "Stairs are acceptable."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial direction: The travel plan assumed stairs were acceptable."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Resume this ongoing goal. What is the current user direction, and how should you proceed?",
+          "parent": 0,
+          "refresh": false,
+          "goal_context": "The user clarified that step-free access is required for every station transfer.",
+          "script": [
+            {
+              "text": "Current user direction: The user clarified that step-free access is required for every station transfer. Next: follow the correction."
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "step-free"
+        }
+      ]
+    },
+    {
+      "id": "meeting-privacy",
+      "family": "meeting",
+      "split": "development",
+      "source": "sources/meeting-privacy",
+      "objective": "Summarize the current goal direction.",
+      "goal": {
+        "title": "Prepare meeting notes for a personnel discussion.",
+        "context": "Meeting notes were being shared with the whole project channel.",
+        "outcome": "Prepare meeting notes for a personnel discussion.",
+        "steps": [
+          "Check latest user direction"
+        ],
+        "memory": [
+          "Share notes in the project channel."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial direction: Meeting notes were being shared with the whole project channel."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Resume this ongoing goal. What is the current user direction, and how should you proceed?",
+          "parent": 0,
+          "refresh": false,
+          "goal_context": "The user corrected the goal: keep personnel discussion private to the named attendees.",
+          "script": [
+            {
+              "text": "Current user direction: The user corrected the goal: keep personnel discussion private to the named attendees. Next: follow the correction."
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "private"
+        }
+      ]
+    },
+    {
+      "id": "outreach-tone",
+      "family": "email",
+      "split": "held-out",
+      "source": "sources/outreach-tone",
+      "objective": "Summarize the current goal direction.",
+      "goal": {
+        "title": "Draft a customer follow-up.",
+        "context": "The team used an assertive sales follow-up.",
+        "outcome": "Draft a customer follow-up.",
+        "steps": [
+          "Check latest user direction"
+        ],
+        "memory": [
+          "Use assertive sales language."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial direction: The team used an assertive sales follow-up."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Resume this ongoing goal. What is the current user direction, and how should you proceed?",
+          "parent": 0,
+          "refresh": false,
+          "goal_context": "The user asked for a warm, low-pressure follow-up that leaves the customer room to decline.",
+          "script": [
+            {
+              "text": "Current user direction: The user asked for a warm, low-pressure follow-up that leaves the customer room to decline. Next: follow the correction."
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "low-pressure"
+        }
+      ]
+    },
+    {
+      "id": "goal-priority-change",
+      "family": "project",
+      "split": "development",
+      "source": "sources/goal-priority-change",
+      "objective": "Summarize the current goal direction.",
+      "goal": {
+        "title": "Advance the launch safely.",
+        "context": "The original goal was to publish the launch announcement this week.",
+        "outcome": "Advance the launch safely.",
+        "steps": [
+          "Check latest user direction"
+        ],
+        "memory": [
+          "Publish the launch announcement first."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial direction: The original goal was to publish the launch announcement this week."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Resume this ongoing goal. What is the current user direction, and how should you proceed?",
+          "parent": 0,
+          "refresh": false,
+          "goal_context": "The goal changed: resolve the security blocker before any launch announcement.",
+          "script": [
+            {
+              "text": "Current user direction: The goal changed: resolve the security blocker before any launch announcement. Next: follow the correction."
+            }
+          ],
+          "plan_changes": [
+            {
+              "kind": "set_outcome",
+              "expected_revision": 2,
+              "outcome": "Resolve the security blocker before announcing launch"
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "security blocker"
+        }
+      ]
+    }
+  ]
+}

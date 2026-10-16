@@ -23,7 +23,7 @@ Meta describes Muse as a personal agent that develops plans for goals, works acr
 | Act through tools | Local files, browser, connectors, approval broker, internal specialists, reviewed goal-plan suggestions | Tool setup and selection are still technical; no automatic goal-level plan/action loop |
 | Work over time | Goal-linked jobs, attempts, inbox, exact duplicate-result suppression, opt-in local change gate, macOS opt-in LaunchAgent | No event push trigger or semantic change detection; Linux has no installed service command |
 | Extend behavior | Extensions, user-created text skills, MCP, role routing, read-only goal reviewer | Skills are explicit text procedures; model-authored suggestions and measured workflow selection need evaluation |
-| Prove value | Fifty synthetic Work tasks with artifact graders | No longitudinal benchmark for continuity, changing facts, action choice, or follow-through; scripted pass is not model success |
+| Prove value | Fifty Work tasks and 25 two-turn personal continuity cases with a same-model baseline switch | No live continuity comparison yet; scripted pass is not model success |
 
 ## Implemented continuity and follow-up
 
@@ -67,6 +67,11 @@ Inside a goal chat, `/plan` shows that plan. `/plan outcome TEXT`, `/plan add TI
 5. **Measure runtime cost.** Benchmark idle RAM, peak RAM, cold start, first response, and task cost against representative terminal agents on the same machine and model. Treat low RAM as a target until measured.
 
 ## Evaluation reset
+
+The [personal continuity benchmark](PERSONAL_CONTINUITY_BENCHMARK.md) now supplies
+25 two-turn cases and a `--baseline-no-goal` ablation under the same model.
+Scripted agent and baseline both passed 25/25, which validates the harness only;
+the live comparison has not been run for this corpus.
 
 Keep the existing Work corpus as regression coverage for files and deliverables. Add a separate longitudinal corpus of multi-turn, multi-day simulations. Each case should supply an initial goal, source changes, later user messages, allowed tools, expected next actions, and forbidden actions. Include at least:
 

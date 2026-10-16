@@ -21,6 +21,7 @@ import (
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/attachment"
+	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/presentation"
 	"github.com/gongahkia/gator/internal/telemetry"
 	"github.com/gongahkia/gator/internal/workrun"
@@ -54,13 +55,28 @@ type WorkCase struct {
 	CodeTurns     []agent.Turn            `json:"code_script,omitempty"`
 	RoleTurns     map[string][]agent.Turn `json:"role_scripts,omitempty"`
 	Followups     []WorkFollowup          `json:"followups,omitempty"`
+	Goal          *WorkGoalSeed           `json:"goal,omitempty"`
 	Graders       []WorkGrader            `json:"graders"`
 }
+type WorkGoalSeed struct {
+	Title   string   `json:"title"`
+	Context string   `json:"context,omitempty"`
+	Outcome string   `json:"outcome,omitempty"`
+	Steps   []string `json:"steps,omitempty"`
+	Memory  []string `json:"memory,omitempty"`
+}
+type WorkSourceEdit struct {
+	Path    string `json:"path"`
+	Content string `json:"content"`
+}
 type WorkFollowup struct {
-	Objective string       `json:"objective"`
-	Parent    int          `json:"parent"`
-	Refresh   bool         `json:"refresh"`
-	Turns     []agent.Turn `json:"script"`
+	Objective   string            `json:"objective"`
+	Parent      int               `json:"parent"`
+	Refresh     bool              `json:"refresh"`
+	Turns       []agent.Turn      `json:"script"`
+	SourceEdits []WorkSourceEdit  `json:"source_edits,omitempty"`
+	GoalContext string            `json:"goal_context,omitempty"`
+	PlanChanges []goal.PlanChange `json:"plan_changes,omitempty"`
 }
 type WorkGrader struct {
 	Locator  string `json:"locator,omitempty"`
@@ -119,6 +135,7 @@ type WorkExperiment struct {
 	Split           string         `json:"split"`
 	Scripted        bool           `json:"scripted"`
 	Delegation      bool           `json:"delegation"`
+	BaselineNoGoal  bool           `json:"baseline_no_goal,omitempty"`
 	Attempts        int            `json:"attempts"`
 	Trials          []WorkTrial    `json:"trials"`
 	Categories      map[string]int `json:"categories"`
@@ -134,6 +151,7 @@ type WorkEvalOptions struct {
 	Split                                   string
 	Attempts                                int
 	Delegation, Live                        bool
+	BaselineNoGoal                          bool
 }
 type WorkServiceFactory func(WorkCase, string) (workrun.Service, error)
 
@@ -210,7 +228,7 @@ func LoadWorkDataset(path string) (WorkDataset, error) {
 				return dataset, errors.New("unsupported grader version")
 			}
 			switch g.Kind {
-			case "child_tool_error_contains", "unsupported_quote", "evidence_reference", "file_equals", "file_contains", "file_excludes", "file_regex", "file_not_regex", "document_text_contains", "document_text_excludes", "cell_equals", "cell_formula_equals", "xlsx_chart_count", "context_contains", "context_absent", "status", "tool_error_contains", "candidate_status", "source_unchanged", "contract_digest", "json_pointer_equals", "json_pointer_contains", "json_pointer_absent", "pptx_slide_contains", "pptx_slide_excludes", "pptx_text_contains", "pptx_text_excludes", "pptx_slide_count":
+			case "child_tool_error_contains", "unsupported_quote", "evidence_reference", "file_equals", "file_contains", "file_excludes", "file_regex", "file_not_regex", "document_text_contains", "document_text_excludes", "cell_equals", "cell_formula_equals", "xlsx_chart_count", "context_contains", "context_absent", "final_contains", "final_excludes", "status", "tool_error_contains", "candidate_status", "source_unchanged", "contract_digest", "json_pointer_equals", "json_pointer_contains", "json_pointer_absent", "pptx_slide_contains", "pptx_slide_excludes", "pptx_text_contains", "pptx_text_excludes", "pptx_slide_count":
 			default:
 				return dataset, fmt.Errorf("unknown grader %q", g.Kind)
 			}
@@ -222,6 +240,17 @@ func LoadWorkDataset(path string) (WorkDataset, error) {
 			if f.Parent < 0 || f.Parent > i {
 				return dataset, errors.New("followup parent is not a preceding revision")
 			}
+			if len(f.SourceEdits) > 16 || len(f.GoalContext) > 8192 || len(f.PlanChanges) > 16 {
+				return dataset, errors.New("followup changes exceed limits")
+			}
+			for _, edit := range f.SourceEdits {
+				if edit.Path == "" || filepath.IsAbs(edit.Path) || filepath.Clean(edit.Path) != edit.Path || edit.Path == ".." || strings.HasPrefix(edit.Path, "../") || len(edit.Content) > 64*1024 {
+					return dataset, errors.New("followup source edit escapes fixture or exceeds size limit")
+				}
+			}
+		}
+		if c.Goal != nil && (strings.TrimSpace(c.Goal.Title) == "" || len(c.Goal.Title) > 256 || len(c.Goal.Context) > 8192 || len(c.Goal.Outcome) > 2048 || len(c.Goal.Steps) > 32 || len(c.Goal.Memory) > 16) {
+			return dataset, errors.New("goal seed is invalid")
 		}
 	}
 	return dataset, nil
@@ -271,7 +300,7 @@ func RunWorkExperiment(ctx context.Context, datasetPath string, dataset WorkData
 	if err := os.Mkdir(options.ReportDir, 0700); err != nil {
 		return WorkExperiment{}, fmt.Errorf("create new experiment directory: %w", err)
 	}
-	report := WorkExperiment{DisabledRoles: append([]string(nil), options.DisabledRoles...), Version: 1, ID: options.ID, Dataset: dataset.ID, DatasetSHA256: workHash(selectedDataset), Target: dataset.Target, Harness: options.Harness, Provider: options.Provider, Model: options.Model, Split: split, Scripted: !options.Live, Delegation: options.Delegation, Attempts: options.Attempts, Categories: map[string]int{}, Outcomes: map[string]int{}}
+	report := WorkExperiment{DisabledRoles: append([]string(nil), options.DisabledRoles...), Version: 1, ID: options.ID, Dataset: dataset.ID, DatasetSHA256: workHash(selectedDataset), Target: dataset.Target, Harness: options.Harness, Provider: options.Provider, Model: options.Model, Split: split, Scripted: !options.Live, Delegation: options.Delegation, BaselineNoGoal: options.BaselineNoGoal, Attempts: options.Attempts, Categories: map[string]int{}, Outcomes: map[string]int{}}
 	var budget *agent.Budget
 	if options.MaxRequests > 0 {
 		budget = &agent.Budget{Limits: agent.Limits{ModelRequests: options.MaxRequests}}
@@ -292,7 +321,25 @@ func RunWorkExperiment(ctx context.Context, datasetPath string, dataset WorkData
 			evaluated.ID = item.ID
 			service, setupErr := factory(evaluated, state)
 			source := filepath.Join(filepath.Dir(datasetPath), c.Source)
-			request := workrun.Request{RunID: item.ID, Budget: budget, Provider: options.Provider + "/" + options.Model, WebOrigins: c.WebOrigins, SourcePath: source, Objective: c.Objective, MaxSteps: c.MaxSteps, Contract: c.Contract, Mode: c.Mode, Code: c.Code, EnableCode: c.EnableCode, Limits: c.Limits, DisableDelegation: !options.Delegation, DisabledRoles: options.DisabledRoles}
+			runSource := source
+			if c.Goal != nil || hasSourceEdits(c) {
+				runSource = filepath.Join(state, "case-source")
+				if copyErr := copyWorkFixture(source, runSource); copyErr != nil {
+					setupErr = copyErr
+				} else if canonical, canonicalErr := filepath.EvalSymlinks(runSource); canonicalErr == nil {
+					runSource = canonical
+				} else {
+					setupErr = canonicalErr
+				}
+			}
+			request := workrun.Request{RunID: item.ID, Budget: budget, Provider: options.Provider + "/" + options.Model, WebOrigins: c.WebOrigins, SourcePath: runSource, Objective: c.Objective, MaxSteps: c.MaxSteps, Contract: c.Contract, Mode: c.Mode, Code: c.Code, EnableCode: c.EnableCode, Limits: c.Limits, DisableDelegation: !options.Delegation, DisabledRoles: options.DisabledRoles}
+			var evalGoalID string
+			if setupErr == nil && c.Goal != nil {
+				evalGoalID, setupErr = seedWorkGoal(state, runSource, *c.Goal)
+				if setupErr == nil && !options.BaselineNoGoal {
+					setupErr = applyEvalGoalContext(state, evalGoalID, &request)
+				}
+			}
 			var outcome workrun.Outcome
 			var runErr error
 			fixture, fixtureErr := fixtureDigest(source)
@@ -324,9 +371,19 @@ func RunWorkExperiment(ctx context.Context, datasetPath string, dataset WorkData
 						break
 					}
 					request.RunID = fmt.Sprintf("%s-rev%d", item.ID, followIndex+1)
+					if err := applyWorkFollowupChanges(state, runSource, evalGoalID, follow); err != nil {
+						runErr = err
+						break
+					}
+					if evalGoalID != "" && !options.BaselineNoGoal {
+						if err := applyEvalGoalContext(state, evalGoalID, &request); err != nil {
+							runErr = err
+							break
+						}
+					}
 					request.ConversationID = outcome.ConversationID
 					request.ParentRevisionID = revisions[follow.Parent]
-					request.RefreshSource = follow.Refresh
+					request.RefreshSource = follow.Refresh || len(follow.SourceEdits) > 0
 					request.Objective = follow.Objective
 					if !options.Live {
 						service.Executor.Model = &ScriptedModel{Turns: append([]agent.Turn(nil), follow.Turns...)}
@@ -368,7 +425,7 @@ func RunWorkExperiment(ctx context.Context, datasetPath string, dataset WorkData
 				item.Grades = append(item.Grades, integrity)
 				transaction := transactionHistoryGrade(fidelity)
 				item.Grades = append(item.Grades, transaction)
-				all := integrity.Passed && transaction.Passed
+				all := runErr == nil && integrity.Passed && transaction.Passed
 				for _, grader := range c.Graders {
 					grade := gradeWork(grader, outcome, runErr, c.Contract)
 					item.Grades = append(item.Grades, grade)
@@ -605,6 +662,8 @@ func gradeWork(g WorkGrader, outcome workrun.Outcome, runErr error, contract art
 		for _, message := range outcome.Result.Messages {
 			actual += message.Content + "\n"
 		}
+	case "final_contains", "final_excludes":
+		actual = outcome.Result.FinalText
 	case "unsupported_quote":
 		for _, event := range outcome.Events {
 			if event.ToolCall != nil && event.ToolCall.Name == "check_claims" {
@@ -647,12 +706,16 @@ func gradeWork(g WorkGrader, outcome workrun.Outcome, runErr error, contract art
 		}
 	case "child_tool_error_contains", "unsupported_quote", "file_contains", "context_contains", "tool_error_contains", "candidate_status":
 		grade.Passed = strings.Contains(actual, g.Expected)
+	case "final_contains":
+		grade.Passed = strings.Contains(strings.ToLower(actual), strings.ToLower(g.Expected))
 	case "document_text_contains":
 		grade.Passed = strings.Contains(strings.ToLower(actual), strings.ToLower(g.Expected))
 	case "document_text_excludes":
 		grade.Passed = !strings.Contains(strings.ToLower(actual), strings.ToLower(g.Expected))
 	case "file_excludes":
 		grade.Passed = !strings.Contains(actual, g.Expected)
+	case "final_excludes":
+		grade.Passed = !strings.Contains(strings.ToLower(actual), strings.ToLower(g.Expected))
 	case "context_absent":
 		grade.Passed = !strings.Contains(actual, g.Expected)
 	default:
@@ -674,8 +737,8 @@ func LoadWorkExperiment(path string) (WorkExperiment, error) {
 	return report, err
 }
 func CompareWork(a, b WorkExperiment) (string, error) {
-	if a.DatasetSHA256 != b.DatasetSHA256 || a.Split != b.Split || a.Attempts != b.Attempts || a.Total != b.Total || a.Scripted != b.Scripted {
-		return "", errors.New("comparison requires identical dataset and trial counts")
+	if a.DatasetSHA256 != b.DatasetSHA256 || a.Split != b.Split || a.Attempts != b.Attempts || a.Total != b.Total || a.Scripted != b.Scripted || a.Provider != b.Provider || a.Model != b.Model {
+		return "", errors.New("comparison requires identical dataset, model, and trial counts")
 	}
 	scores := map[string][2]int{}
 	for _, trial := range a.Trials {

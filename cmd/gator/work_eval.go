@@ -88,6 +88,7 @@ func workEvalCommand(args []string, out io.Writer) error {
 	var disabledRoles stringFlags
 	flags.Var(&disabledRoles, "disable-role", "omit one specialist role for a matched ablation")
 	live := flags.Bool("live", false, "use real provider models")
+	baselineNoGoal := flags.Bool("baseline-no-goal", false, "same-model ablation without saved goal plan or memory context")
 	provider := flags.String("provider", "", "live provider")
 	model := flags.String("model", "", "live model")
 	requests := flags.Int("max-model-requests", 0, "total live model request budget")
@@ -112,7 +113,7 @@ func workEvalCommand(args []string, out io.Writer) error {
 		ctx, cancel = context.WithTimeout(ctx, time.Duration(*seconds)*time.Second)
 		defer cancel()
 	}
-	options := eval.WorkEvalOptions{DisabledRoles: disabledRoles, ID: *id, Harness: commit, Provider: *provider, Model: *model, ReportDir: absolute, Attempts: *attempts, Delegation: *delegation, Live: *live, MaxRequests: *requests, Split: *split}
+	options := eval.WorkEvalOptions{DisabledRoles: disabledRoles, ID: *id, Harness: commit, Provider: *provider, Model: *model, ReportDir: absolute, Attempts: *attempts, Delegation: *delegation, Live: *live, BaselineNoGoal: *baselineNoGoal, MaxRequests: *requests, Split: *split}
 	report, err := eval.RunWorkExperiment(ctx, path, dataset, options, func(c eval.WorkCase, state string) (workrun.Service, error) {
 		if *live {
 			request := workrun.Request{}

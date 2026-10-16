@@ -101,6 +101,48 @@ func TestWorkExperimentDoesNotContinueFailedParent(t *testing.T) {
 	}
 }
 
+func TestPersonalContinuityCorpusExercisesChangedSourceAndGoalState(t *testing.T) {
+	path := "testdata/personal-continuity-v1/dataset.json"
+	dataset, err := LoadWorkDataset(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dataset.Cases) < 20 {
+		t.Fatalf("continuity corpus has %d cases", len(dataset.Cases))
+	}
+	selected := map[string]bool{"venue-change": true, "brief-preference-correction": true, "goal-priority-change": true}
+	var cases []WorkCase
+	for _, item := range dataset.Cases {
+		if selected[item.ID] {
+			cases = append(cases, item)
+		}
+	}
+	dataset.Cases = cases
+	factory := func(item WorkCase, state string) (workrun.Service, error) {
+		return workrun.Service{Executor: workrun.Executor{Model: &ScriptedModel{Turns: item.Turns}, StateDir: state}}, nil
+	}
+	root := t.TempDir()
+	options := WorkEvalOptions{ID: "personal-agent", Provider: "scripted", Model: "same", Attempts: 1, ReportDir: filepath.Join(root, "agent"), Split: WorkSplitAll}
+	agentReport, err := RunWorkExperiment(context.Background(), path, dataset, options, factory)
+	if err != nil || agentReport.Passed != 3 {
+		t.Fatalf("agent report = %#v, %v", agentReport, err)
+	}
+	options.ID, options.ReportDir, options.BaselineNoGoal = "personal-baseline", filepath.Join(root, "baseline"), true
+	baselineReport, err := RunWorkExperiment(context.Background(), path, dataset, options, factory)
+	if err != nil || baselineReport.Total != 3 || !baselineReport.BaselineNoGoal {
+		t.Fatalf("baseline report = %#v, %v", baselineReport, err)
+	}
+	if _, err := CompareWork(baselineReport, agentReport); err != nil {
+		t.Fatalf("same-model comparison failed: %v", err)
+	}
+	if baselineReport.Trials[0].PolicySHA256 == agentReport.Trials[0].PolicySHA256 || baselineReport.Trials[0].PolicySHA256 == "" {
+		t.Fatal("baseline retained the same goal-aware policy")
+	}
+	if original, err := os.ReadFile(filepath.Join(filepath.Dir(path), "sources", "venue-change", "status.md")); err != nil || !strings.Contains(string(original), "Venue A is available") {
+		t.Fatalf("fixture was changed by trial: %q, %v", original, err)
+	}
+}
+
 func TestWorkGradersRejectFalseCitationsAndSemanticallyWrongOutput(t *testing.T) {
 	path := "testdata/work-v1/dataset.json"
 	dataset, err := LoadWorkDataset(path)
