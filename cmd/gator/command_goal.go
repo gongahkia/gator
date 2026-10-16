@@ -115,6 +115,7 @@ func goalCommand(args []string, out io.Writer) error {
 		modeName := flags.String("mode", "inspect", "inspect or draft")
 		artifactPath := flags.String("artifact", "", "required artifact for draft mode")
 		task := flags.String("task", "", "recurring check instruction")
+		changeOnly := flags.Bool("change-only", false, "skip a local-only check when files and saved context are unchanged")
 		if err := flags.Parse(args[2:]); err != nil {
 			return err
 		}
@@ -146,7 +147,7 @@ func goalCommand(args []string, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		definition, err := jobStore.Save(jobs.Definition{Name: record.Title, GoalID: record.ID, Enabled: true, Schedule: *cron, Timezone: *timezone, Missed: *missed, SourcePath: record.SourcePath, RefreshSnapshot: true, Objective: strings.TrimSpace(*task), Mode: mode, Contract: contract, MaxSteps: 24})
+		definition, err := jobStore.Save(jobs.Definition{Name: record.Title, GoalID: record.ID, Enabled: true, Schedule: *cron, Timezone: *timezone, Missed: *missed, SourcePath: record.SourcePath, RefreshSnapshot: true, ChangeOnly: *changeOnly, Objective: strings.TrimSpace(*task), Mode: mode, Contract: contract, MaxSteps: 24})
 		if err != nil {
 			return err
 		}

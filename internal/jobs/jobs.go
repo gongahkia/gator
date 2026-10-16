@@ -42,6 +42,7 @@ type Definition struct {
 	Missed          string                 `json:"missed"`
 	SourcePath      string                 `json:"source_path"`
 	RefreshSnapshot bool                   `json:"refresh_snapshot"`
+	ChangeOnly      bool                   `json:"change_only,omitempty"`
 	Objective       string                 `json:"objective"`
 	Provider        string                 `json:"provider,omitempty"`
 	Model           string                 `json:"model,omitempty"`
@@ -70,6 +71,7 @@ type Attempt struct {
 	BundlePath               string         `json:"bundle_path,omitempty"`
 	Summary                  string         `json:"summary,omitempty"`
 	ResultSHA256             string         `json:"result_sha256,omitempty"`
+	InputSHA256              string         `json:"input_sha256,omitempty"`
 	NotificationPolicySHA256 string         `json:"notification_policy_sha256,omitempty"`
 	Error                    string         `json:"error,omitempty"`
 }
@@ -206,6 +208,9 @@ func (d Definition) Validate() error {
 	}
 	if d.MaxSteps < 1 || d.MaxSteps > 1_000 || len(d.ConnectorIDs) > 16 {
 		return errors.New("job execution limits are invalid")
+	}
+	if d.ChangeOnly && (!d.RefreshSnapshot || len(d.ConnectorIDs) > 0 || len(d.WebOrigins) > 0) {
+		return errors.New("change-only jobs require refreshed local source and no connected or web reads")
 	}
 	for _, connectorID := range d.ConnectorIDs {
 		if invalidID(connectorID) {

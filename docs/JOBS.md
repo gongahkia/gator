@@ -128,6 +128,23 @@ with the app server, but it is a different lifecycle and state owner.
 
 ## Scheduling semantics
 
+`gator job add ... --change-only` and `gator goal schedule ID ... --change-only`
+opt into a local input gate. Before each scheduled run, Gator hashes the
+selected regular files, goal context and plan, visible notes, enabled skills,
+and active memories. If they exactly match the most recent successful run
+under the same job policy, it records an `unchanged` attempt and skips the
+model call and notification. A failure or changed job policy runs normally.
+The gate rejects jobs with web origins or connectors, because those sources
+can change independently of local files. It also requires refreshed source
+capture. The file scan is capped at 10,000 files, 16 MiB per file, and 64 MiB
+total; an oversized or non-regular source fails the check rather than claiming
+that nothing changed. `.git` is excluded. Use ordinary cron jobs for checks
+whose result depends on time passing even when local inputs stay the same.
+
+Completed runs also retain a short final-response summary and an output
+digest. The inbox suppresses exact repeated results under the same job policy;
+it does not attempt semantic equivalence between different phrasings.
+
 - Cron is evaluated in an explicit IANA timezone and claimed in UTC.
 - `missed` is either `skip` or `run_once`; replaying every missed interval
   is intentionally unsupported in the first version.

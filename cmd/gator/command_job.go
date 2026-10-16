@@ -242,6 +242,7 @@ func addJob(arguments []string, out io.Writer) error {
 	missed := flags.String("missed", settings.JobDefaults.Missed, "skip or run_once")
 	source := flags.String("source", ".", "local source directory")
 	refresh := flags.Bool("refresh-snapshot", true, "capture current source for each attempt; false freezes at creation")
+	changeOnly := flags.Bool("change-only", false, "skip a local-only run if files and saved context are unchanged")
 	contractPath := flags.String("contract", "", "complete outcome contract JSON")
 	codePath := flags.String("code-policy", "", "complete Code policy JSON")
 	requests := flags.Int("max-model-requests", 256, "aggregate request bound")
@@ -298,7 +299,7 @@ func addJob(arguments []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	definition, err := store.Save(jobs.Definition{Name: name, Enabled: true, Schedule: *schedule, Timezone: *timezone, Missed: *missed, SourcePath: absolute, RefreshSnapshot: *refresh, Code: codePolicy, Limits: agent.Limits{ModelRequests: *requests, Tokens: *tokens, WallSeconds: *seconds}, WebOrigins: webOrigins, Objective: objective, Provider: *provider, Model: *model, Mode: mode, Contract: contract, ConnectorIDs: connectors, MaxSteps: *maxSteps})
+	definition, err := store.Save(jobs.Definition{Name: name, Enabled: true, Schedule: *schedule, Timezone: *timezone, Missed: *missed, SourcePath: absolute, RefreshSnapshot: *refresh, ChangeOnly: *changeOnly, Code: codePolicy, Limits: agent.Limits{ModelRequests: *requests, Tokens: *tokens, WallSeconds: *seconds}, WebOrigins: webOrigins, Objective: objective, Provider: *provider, Model: *model, Mode: mode, Contract: contract, ConnectorIDs: connectors, MaxSteps: *maxSteps})
 	if err != nil {
 		return err
 	}
@@ -339,7 +340,11 @@ func manageJob(command, id string, arguments []string, out io.Writer) error {
 			return err
 		}
 		for _, attempt := range history {
-			fmt.Fprintf(out, "%s\t%s\ttry=%d\t%s\t%s\n", attempt.ID, attempt.StartedAt.Format(time.RFC3339), attempt.Try, attempt.Status, attempt.Error)
+			detail := attempt.Error
+			if detail == "" {
+				detail = attempt.Summary
+			}
+			fmt.Fprintf(out, "%s\t%s\ttry=%d\t%s\t%s\n", attempt.ID, attempt.StartedAt.Format(time.RFC3339), attempt.Try, attempt.Status, detail)
 		}
 		return nil
 	case "run":
@@ -386,6 +391,7 @@ func manageJob(command, id string, arguments []string, out io.Writer) error {
 		source := flags.String("source", "", "new source")
 		objective := flags.String("task", "", "new task")
 		missed := flags.String("missed", "", "new missed policy")
+		changeOnly := flags.Bool("change-only", definition.ChangeOnly, "skip unchanged local inputs")
 		if err := flags.Parse(arguments); err != nil {
 			return err
 		}
@@ -422,6 +428,7 @@ func manageJob(command, id string, arguments []string, out io.Writer) error {
 		if *missed != "" {
 			definition.Missed = *missed
 		}
+		definition.ChangeOnly = *changeOnly
 		definition, err = store.Save(definition)
 		if err != nil {
 			return err
@@ -439,6 +446,21 @@ func executeJobContext(ctx context.Context, definition jobs.Definition, attempt 
 	var result jobResult
 	var runErr error
 	store, runErr := jobs.Open(stateDir)
+	if runErr == nil && definition.ChangeOnly {
+		attempt.InputSHA256, runErr = localJobInputHash(definition, stateDir)
+		if runErr == nil {
+			history, historyErr := store.History(definition.ID, 50)
+			if historyErr != nil {
+				runErr = historyErr
+			} else if unchangedJobInput(history, attempt, jobNotificationPolicyHash(definition)) {
+				attempt.Status = "unchanged"
+				attempt.Summary = "Local inputs unchanged since the last completed run."
+				attempt.FinishedAt = time.Now().UTC()
+				attempt.NotificationPolicySHA256 = jobNotificationPolicyHash(definition)
+				return attempt
+			}
+		}
+	}
 	for try := 1; runErr == nil && try <= 3; try++ {
 		attempt.Try = try
 		reference := jobs.RunReference{Try: try, RunID: attempt.ID + "-try-" + strconv.Itoa(try)}
@@ -495,6 +517,16 @@ func executeJobContext(ctx context.Context, definition jobs.Definition, attempt 
 	}
 	_ = notify // notification follows durable recording and duplicate suppression.
 	return attempt
+}
+
+func unchangedJobInput(history []jobs.Attempt, current jobs.Attempt, policy string) bool {
+	for _, previous := range history {
+		if previous.ID == current.ID || previous.Status == "running" || previous.Status == "unchanged" {
+			continue
+		}
+		return previous.Status == "completed" && previous.InputSHA256 != "" && previous.InputSHA256 == current.InputSHA256 && previous.NotificationPolicySHA256 == policy
+	}
+	return false
 }
 
 func runJobProcess(definition jobs.Definition, stateDir string) (jobResult, error) {
@@ -738,6 +770,9 @@ func runDueJobsContext(ctx context.Context, store jobs.Store, stateDir string, n
 }
 
 func recordJobInbox(stateDir string, definition jobs.Definition, attempt jobs.Attempt) (inbox.Entry, error) {
+	if attempt.Status == "unchanged" {
+		return inbox.Entry{}, nil
+	}
 	if attempt.Status == "completed" && attempt.ResultSHA256 != "" {
 		jobStore, err := jobs.Open(stateDir)
 		if err != nil {
