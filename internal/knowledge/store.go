@@ -94,8 +94,14 @@ func (s Store) AddNote(title, body, goalID string) (Document, error) {
 	if _, err := rand.Read(random[:]); err != nil {
 		return Document{}, err
 	}
+	return s.AddNoteWithID("note-"+hex.EncodeToString(random[:]), title, body, goalID)
+}
+
+// AddNoteWithID supports idempotent, user-approved suggestion application.
+// The caller chooses a valid random-looking ID bound to the proposal identity.
+func (s Store) AddNoteWithID(id, title, body, goalID string) (Document, error) {
 	now := s.clock()
-	d := Document{Version: Version, ID: "note-" + hex.EncodeToString(random[:]), Kind: "note", Title: strings.TrimSpace(title), GoalID: strings.TrimSpace(goalID), CreatedAt: now, UpdatedAt: now, Body: strings.TrimSpace(body)}
+	d := Document{Version: Version, ID: id, Kind: "note", Title: strings.TrimSpace(title), GoalID: strings.TrimSpace(goalID), CreatedAt: now, UpdatedAt: now, Body: strings.TrimSpace(body)}
 	if err := validate(d); err != nil {
 		return Document{}, err
 	}

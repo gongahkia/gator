@@ -165,6 +165,7 @@ func commandPaletteEntries() []entry {
 		{title: "/jobs", subtitle: "Schedule, run, and review repeatable Work", kind: "command-input", command: "/jobs"},
 		{title: "/goals", subtitle: "Resume an ongoing goal", kind: "command", command: "/goals"},
 		{title: "/plan", subtitle: "Show or update the current goal plan", kind: "command-input", command: "/plan"},
+		{title: "/suggestions", subtitle: "Review proposed notes, skills, and plan changes", kind: "command-input", command: "/suggestions"},
 		{title: "/memory", subtitle: "Search or manage saved knowledge", kind: "command-input", command: "/memory"},
 		{title: "/note", subtitle: "Save and search longer personal notes", kind: "command-input", command: "/note"},
 		{title: "/skill", subtitle: "Create and load reusable procedures", kind: "command-input", command: "/skill"},
@@ -449,6 +450,12 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 			break
 		}
 		result, err = m.config.PlanAction(commandRemainder(command, fields[:1]))
+	case "/suggestions":
+		if m.config.SuggestionAction == nil {
+			err = errorsUnavailable("suggestions")
+			break
+		}
+		result, err = m.config.SuggestionAction(fields[1:])
 	case "/memory":
 		if m.config.MemoryAction == nil {
 			err = errorsUnavailable("memory")
@@ -1033,6 +1040,8 @@ func workHelp() string {
   /goals                         resume an ongoing goal
   /plan [outcome|add|step|review-at|reviewed|remove]
                                  inspect or update the current goal plan
+  /suggestions [list|show|accept|reject]
+                                 review proposed durable changes
   /memory add|list|search|show|correct|forget ...
                                  manage explicit saved knowledge
   /note add TITLE | BODY          save a Markdown note in the current goal

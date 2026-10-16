@@ -77,3 +77,20 @@ Stored notes, skill text, source files, and prior model responses are reference
 data. Their contents cannot change Gator's host-owned authority. The existing
 Code specialist still uses its strict process sandbox for any command execution;
 the knowledge tools themselves do not start a process.
+
+## Review agent suggestions
+
+During Work, Gator may queue a candidate note, skill, or goal-plan edit. The
+candidate records its source Work ID and is not used as knowledge until you
+accept it. Review from the terminal UI with `/suggestions` or from the shell:
+
+```sh
+gator suggestion list
+gator suggestion show SUGGESTION_ID
+gator suggestion accept SUGGESTION_ID
+gator suggestion reject SUGGESTION_ID
+```
+
+A plan suggestion carries the exact plan revision it was based on. If you
+changed the plan since then, acceptance fails and leaves the suggestion pending
+for review or rejection.

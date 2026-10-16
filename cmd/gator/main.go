@@ -141,6 +141,8 @@ func run(args []string, out io.Writer) error {
 		return noteCommand(args[1:], out)
 	case "skill", "skills":
 		return skillCommand(args[1:], out)
+	case "suggestion", "suggestions":
+		return suggestionCommand(args[1:], out)
 	case "work-rpc":
 		return workHeadless(context.Background(), os.Stdin, out)
 	case "work", "-w":

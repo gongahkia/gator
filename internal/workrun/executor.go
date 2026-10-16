@@ -26,6 +26,7 @@ import (
 	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/projectcapture"
 	"github.com/gongahkia/gator/internal/snapshot"
+	"github.com/gongahkia/gator/internal/suggestion"
 	"github.com/gongahkia/gator/internal/telemetry"
 	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/workhistory"
@@ -317,6 +318,11 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	if len(notes)+len(skills)+len(memories) > 0 {
 		surface = append(surface, (tools.PersonalKnowledge{Notes: knowledgeStore, Memories: memoryStore, GoalID: request.GoalID}).Tools()...)
 	}
+	suggestions, err := suggestion.Open(request.StateDir)
+	if err != nil {
+		return outcome, fmt.Errorf("open change suggestions: %w", err)
+	}
+	surface = append(surface, tools.SuggestChange{Store: suggestions, GoalID: request.GoalID, WorkID: request.RunID})
 	for i, tool := range surface {
 		switch tool.Definition().Name {
 		case "read_file", "extract_document", "inspect_table":

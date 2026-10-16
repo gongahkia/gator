@@ -299,6 +299,9 @@ func validateChange(change PlanChange) error {
 	return nil
 }
 
+// ValidatePlanChange checks a proposed edit without applying it.
+func ValidatePlanChange(change PlanChange) error { return validateChange(change) }
+
 func validatePlan(plan Plan) error {
 	if plan.Version != PlanVersion || !validID(plan.GoalID) || plan.Revision < 0 || plan.Revision > 1000000 || len(plan.Steps) > 32 || len(plan.Outcome) > 2048 || !utf8.ValidString(plan.Outcome) || strings.ContainsRune(plan.Outcome, 0) {
 		return errors.New("invalid goal plan")

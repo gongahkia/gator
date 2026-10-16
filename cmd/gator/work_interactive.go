@@ -179,6 +179,11 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			}
 			return workTUIPlanAction(goalStore, goalID, command)
 		},
+		SuggestionAction: func(arguments []string) (string, error) {
+			var output bytes.Buffer
+			err := suggestionCommand(arguments, &output)
+			return strings.TrimSpace(output.String()), err
+		},
 		MemoryAction: func(arguments []string) (string, error) {
 			if goalID != "" && len(arguments) > 0 && (arguments[0] == "add" || arguments[0] == "list" || arguments[0] == "search") {
 				hasGoal := false
