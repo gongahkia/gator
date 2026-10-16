@@ -17,17 +17,19 @@ var (
 	date    = "unknown"
 )
 
-const usage = `Gator — terminal-native Work
+const usage = `Gator — terminal-native personal agent
 
 Start Work:
   gator
   gator "research X and produce a report"
   gator work [OPTIONS] TASK
   gator work code [OPTIONS] TASK
+  gator work --goal ID TASK
 
 Product areas:
   Work        gator work [TASK] · gator work resume CONVERSATION TASK
   History     gator work list · gator work history CONVERSATION · gator work show ID
+  Goals       gator goal add|list|show|context|pause|resume|complete
   Learnings   gator learnings list [--status STATUS] [--scope SCOPE]
               gator learnings add|edit|approve|reject|enable|disable ...
   Jobs        gator job add|list|show|edit|enable|disable|run|history|remove
@@ -127,6 +129,8 @@ func run(args []string, out io.Writer) error {
 		return themeCommand(args[1:], out)
 	case "learnings":
 		return learningCommand(args[1:], out)
+	case "goal", "goals":
+		return goalCommand(args[1:], out)
 	case "work-rpc":
 		return workHeadless(context.Background(), os.Stdin, out)
 	case "work", "-w":

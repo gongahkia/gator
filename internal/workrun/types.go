@@ -86,7 +86,10 @@ type Request struct {
 	System                  string
 	// LearningContext is a bounded projection of applicable active learnings.
 	// It is supplied by the application boundary; candidates never appear here.
-	LearningContext      string
+	LearningContext string
+	// GoalContext is explicitly user-maintained ongoing context. It conveys
+	// neither tool authority nor an instruction that overrides the current task.
+	GoalContext          string
 	OnEvent              agent.EventSink
 	Steering             <-chan string
 	ConnectorIDs         []string

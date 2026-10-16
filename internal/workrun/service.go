@@ -77,6 +77,7 @@ func effectiveConfiguration(request Request) any {
 		Limits              agent.Limits
 		MaxSteps            int
 		Provider            string
+		GoalContext         string
 		Roles               map[string]orchestrator.RoleConfiguration
 		ProjectSHA256       string
 		DisableDelegation   bool
@@ -86,7 +87,7 @@ func effectiveConfiguration(request Request) any {
 		BrowserSession      string
 		DisableBrowser      bool
 		DesktopSession      string
-	}{request.Contract, request.Mode, request.Code, request.ConnectorIDs, request.ConnectorPermissions, request.WebOrigins, request.IgnoredInstructionPaths, request.Limits, request.MaxSteps, request.Provider, request.RoleConfiguration, func() string {
+	}{request.Contract, request.Mode, request.Code, request.ConnectorIDs, request.ConnectorPermissions, request.WebOrigins, request.IgnoredInstructionPaths, request.Limits, request.MaxSteps, request.Provider, request.GoalContext, request.RoleConfiguration, func() string {
 		if request.Project != nil {
 			return request.Project.SHA256
 		}

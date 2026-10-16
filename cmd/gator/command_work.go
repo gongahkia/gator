@@ -22,6 +22,7 @@ import (
 	"github.com/gongahkia/gator/internal/codeexec"
 	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/desktop"
+	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/snapshot"
 	"github.com/gongahkia/gator/internal/state"
@@ -110,6 +111,7 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	requireCode := flags.Bool("require-code", false, "require an internal Code specialist patch")
 	runID := flags.String("run-id", "", "stable run identifier")
 	conversationID := flags.String("conversation", "", "continue a retained Work conversation")
+	goalID := flags.String("goal", "", "continue an ongoing goal and its conversation")
 	parentRevisionID := flags.String("parent", "", "branch from a retained Work revision")
 	refreshSource := flags.Bool("refresh-source", false, "capture a new immutable source snapshot")
 	jsonOutput := flags.Bool("json", false, "emit one machine-readable result")
@@ -187,6 +189,26 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	stateDir, err := state.ResolveDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {
 		return err
+	}
+	var selectedGoal goal.Record
+	var goalStore goal.Store
+	if strings.TrimSpace(*goalID) != "" {
+		if strings.TrimSpace(*conversationID) != "" || strings.TrimSpace(*parentRevisionID) != "" {
+			return errors.New("--goal selects its own conversation; omit --conversation and --parent")
+		}
+		goalStore, err = goal.Open(stateDir)
+		if err != nil {
+			return err
+		}
+		selectedGoal, err = goalStore.Load(strings.TrimSpace(*goalID))
+		if err != nil {
+			return err
+		}
+		if selectedGoal.Status != goal.Active {
+			return fmt.Errorf("goal %s is %s; resume it before running Work", selectedGoal.ID, selectedGoal.Status)
+		}
+		*sourcePath = selectedGoal.SourcePath
+		*conversationID = selectedGoal.ConversationID
 	}
 	if strings.TrimSpace(*conversationID) != "" {
 		sessions, err := worksession.Open(stateDir)
@@ -327,6 +349,7 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		SourcePath:           *sourcePath,
 		Provider:             resolvedProvider + "/" + resolvedModel,
 		Objective:            objective,
+		GoalContext:          goalContext(selectedGoal),
 		RunID:                *runID,
 		MaxSteps:             *maxSteps,
 		Mode:                 mode,
@@ -359,6 +382,11 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		return err
 	}
 	outcome, runErr := (workrun.Service{Executor: executor}).Execute(ctx, request)
+	if selectedGoal.ID != "" && outcome.ConversationID != "" {
+		if _, err := goalStore.AttachConversation(selectedGoal.ID, outcome.ConversationID); err != nil && runErr == nil {
+			runErr = fmt.Errorf("retain goal conversation: %w", err)
+		}
+	}
 	if *jsonOutput {
 		if err := writeWorkJSON(out, outcome, runErr); err != nil {
 			return err
@@ -369,6 +397,13 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		}
 	}
 	return runErr
+}
+
+func goalContext(record goal.Record) string {
+	if record.ID == "" {
+		return ""
+	}
+	return fmt.Sprintf("Goal: %s\nTitle: %s\nBackground: %s", record.ID, record.Title, record.Context)
 }
 
 func workObjective(arguments []string, in io.Reader) (string, error) {
