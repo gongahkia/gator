@@ -25,6 +25,7 @@ type Entry struct {
 	Title          string    `json:"title"`
 	Summary        string    `json:"summary"`
 	JobID          string    `json:"job_id,omitempty"`
+	GoalID         string    `json:"goal_id,omitempty"`
 	ConversationID string    `json:"conversation_id,omitempty"`
 	RevisionID     string    `json:"revision_id,omitempty"`
 	Status         string    `json:"status"`
@@ -55,7 +56,7 @@ func (s Store) Add(entry Entry) (Entry, error) {
 	if entry.CreatedAt.IsZero() {
 		entry.CreatedAt = time.Now().UTC()
 	}
-	if entry.Version != Version || !idPattern.MatchString(entry.ID) || strings.TrimSpace(entry.Title) == "" || len(entry.Title) > 256 || strings.TrimSpace(entry.Status) == "" || len(entry.Status) > 64 || len(entry.Summary) > 4096 || strings.ContainsRune(entry.Summary, 0) {
+	if entry.Version != Version || !idPattern.MatchString(entry.ID) || (entry.GoalID != "" && (!strings.HasPrefix(entry.GoalID, "goal-") || len(entry.GoalID) != 29)) || strings.TrimSpace(entry.Title) == "" || len(entry.Title) > 256 || strings.TrimSpace(entry.Status) == "" || len(entry.Status) > 64 || len(entry.Summary) > 4096 || strings.ContainsRune(entry.Summary, 0) {
 		return Entry{}, errors.New("inbox entry is invalid")
 	}
 	payload, err := json.MarshalIndent(entry, "", "  ")

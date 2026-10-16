@@ -19,10 +19,10 @@ Meta describes Muse as a personal agent that develops plans for goals, works acr
 | Need | Existing asset | Gap to close |
 | --- | --- | --- |
 | Continue a conversation | Durable Work conversations, replay, branching, goal records and TUI picker | Goal-level plans and next steps are still user maintained |
-| Remember preferences and decisions | Scoped learnings plus searchable global and goal memories | Lexical retrieval misses paraphrases; automatic suggestions and document-linked recall need evaluation |
+| Remember preferences and decisions | Scoped learnings, searchable memories, longer Markdown notes, and explicit skills | Lexical retrieval misses paraphrases; automatic suggestions and document-linked recall need evaluation |
 | Act through tools | Local files, browser, connectors, approval broker, internal specialists | Tool setup and selection are still technical; no clear goal-level plan/action loop |
 | Work over time | Goal-linked jobs, attempts, inbox, macOS opt-in LaunchAgent | No change detection or quiet notification policy; Linux has no installed service command |
-| Extend behavior | Extensions, skills, MCP, role routing | Skills are configured, not a simple personal-agent workflow |
+| Extend behavior | Extensions, user-created text skills, MCP, role routing, read-only goal reviewer | Skills are explicit text procedures; model-authored suggestions and measured workflow selection need evaluation |
 | Prove value | Fifty synthetic Work tasks with artifact graders | No longitudinal benchmark for continuity, changing facts, action choice, or follow-through; scripted pass is not model success |
 
 ## Implemented continuity and follow-up
@@ -43,6 +43,8 @@ The terminal home lists active goals and unread follow-up results. `/goals` open
 `gator goal schedule ID --cron '0 9 * * *' --task 'Check what changed'` creates a goal-linked job. At each run it reloads the latest goal context and source, retrieves relevant memories, continues that job's prior conversation, and places the result in the inbox. Paused or completed goals are skipped. A foreground supervisor is available on Linux and macOS; macOS also has an opt-in per-user LaunchAgent for operation after the CLI closes. Connected mutations still require exact-action live approval and cannot be scheduled.
 
 The goal context and memories are explicitly user maintained. Gator does not infer a durable fact from every conversation, silently rewrite a goal plan, or claim to monitor the machine while it is off. A recurring check repeats the user's saved task; it does not yet automatically choose a new goal-level strategy or suppress an unchanged result.
+
+The knowledge base now stores inspectable Markdown notes and skills under the private state directory. The main agent can search/read scoped notes and active memories, and list/load an enabled skill when relevant. For active goals, it may delegate a read-only `goal_reviewer` to compare current context, recent turns, saved knowledge, follow-up results, and frozen source evidence. [Knowledge and skill commands](KNOWLEDGE.md) describe the lifecycle and boundaries. The model does not automatically write durable knowledge or skills.
 
 ## Next engineering sequence
 

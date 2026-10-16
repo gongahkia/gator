@@ -32,6 +32,7 @@ Gator manager ────────────────────> fina
               |
               +── source_researcher  (read-only frozen source)
               +── artifact_reviewer  (read-only source and staged output)
+              +── goal_reviewer      (read-only goal history and knowledge)
               +── code               (isolated Gator Code worktree)
 ```
 
@@ -72,6 +73,7 @@ Work's `code` child is `HostedSpecialist("code", ...)`. It runs `internal/codeex
 | `claim_verifier` | LLM | Claims need independent quotation checks | Selected evidence catalog | Unsupported and conflicting claims; quote match is not entailment |
 | `connected_researcher` | LLM | Selected services or allowed web need a separate read | Read-only connector/web evidence | Evidence IDs and missing-source disclosure |
 | `spreadsheet_analyst` | LLM | Tables or documents need cell-level inspection | `inspect_table`, `extract_document` on frozen source | Row/cell evidence without writes |
+| `goal_reviewer` | LLM | An active goal needs a comparison of current context, prior turns, saved knowledge, follow-ups, and frozen source | Read-only goal snapshot, source, and scoped knowledge tools | Changes, next action, blockers, and record/source IDs |
 
 The Code specialist never edits the user's source and is not directly
 user-facing. Strict sandboxing, denied network, no recursive writer/scout

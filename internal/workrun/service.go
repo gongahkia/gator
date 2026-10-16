@@ -27,7 +27,7 @@ type Service struct {
 	Defaults *Request
 }
 
-var workRoleNames = []string{"source_researcher", "artifact_reviewer", "claim_verifier", "connected_researcher", "spreadsheet_analyst", "code"}
+var workRoleNames = []string{"source_researcher", "artifact_reviewer", "claim_verifier", "connected_researcher", "spreadsheet_analyst", "goal_reviewer", "code"}
 
 func ValidateDisabledRoles(roles []string) error {
 	seen := map[string]bool{}

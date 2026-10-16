@@ -528,7 +528,7 @@ func TestCommandPaletteContainsCurrentCommands(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work"})
 	model.openCommandPalette()
 	expected := []string{
-		"/help", "/new", "/model", "/source", "/mode", "/settings", "/settings statusline", "/theme", "/history", "/jobs", "/goals", "/memory", "/learnings", "/feedback", "/review", "/save", "/apply", "/retry", "/copy", "exit",
+		"/help", "/new", "/model", "/source", "/mode", "/settings", "/settings statusline", "/theme", "/history", "/jobs", "/goals", "/memory", "/note", "/skill", "/learnings", "/feedback", "/review", "/save", "/apply", "/retry", "/copy", "exit",
 	}
 	if len(model.entries) != len(expected) {
 		t.Fatalf("command palette has %d entries, want %d", len(model.entries), len(expected))

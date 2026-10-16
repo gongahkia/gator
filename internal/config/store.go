@@ -292,7 +292,7 @@ func validate(settings Settings) error {
 		}
 		seenRoles[role.Name] = true
 		switch role.Name {
-		case "source_researcher", "artifact_reviewer", "connected_researcher", "spreadsheet_analyst", "claim_verifier", "code":
+		case "source_researcher", "artifact_reviewer", "connected_researcher", "spreadsheet_analyst", "claim_verifier", "goal_reviewer", "code":
 		default:
 			return errors.New("unknown Work role")
 		}

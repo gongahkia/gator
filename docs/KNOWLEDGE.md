@@ -1,0 +1,79 @@
+# Personal knowledge and skills
+
+Gator keeps short facts and decisions in `gator memory`. Longer Markdown notes
+and reusable procedures live in a private filesystem knowledge base under the
+resolved state directory:
+
+```text
+gator/knowledge/
+  notes/note-<id>/meta.json
+  notes/note-<id>/content.md
+  skills/<name>/meta.json
+  skills/<name>/SKILL.md
+```
+
+Directories are private (`0700`) and files are private (`0600`). Gator accepts
+only bounded UTF-8 text, exact generated note IDs or validated skill names, and
+regular files. Symlinks and path traversal are rejected at the store boundary.
+The Markdown is inspectable and may be edited directly; invalid or oversized
+edits fail closed the next time Gator loads that entry. No skill content is
+executed as a shell command or loaded as a plugin.
+
+## Notes
+
+```sh
+gator note add --title 'Venue decision' --goal GOAL_ID --body 'Venue B is preferred; verify capacity by Friday.'
+gator note add --title 'Meeting notes' --file ./meeting.md
+gator note search --goal GOAL_ID 'venue capacity'
+gator note show NOTE_ID
+gator note edit NOTE_ID --file ./revised-meeting.md
+gator note path NOTE_ID
+gator note remove NOTE_ID --yes
+```
+
+A note is either global or attached to one goal. Goal-scoped notes are never
+returned to another goal's Work tools. Search is lexical and bounded; it does
+not claim semantic recall. Short `gator memory` records retain their separate
+expiry and correction controls. `knowledge_search` and `knowledge_read` let the
+main agent retrieve both notes and active memories during Work. They accept IDs
+and query text, never arbitrary filesystem paths.
+
+In the TUI, `/note add TITLE | BODY`, `/note list`, `/note search QUERY`, and
+`/note edit ID | BODY` use the current goal by default. The terminal CLI supports
+larger files and full metadata options.
+
+## Skills
+
+```sh
+gator skill create daily-brief --description 'Use for morning briefings' --file ./SKILL.md
+gator skill list
+gator skill show daily-brief
+gator skill edit daily-brief --description 'Use for daily briefings' --file ./revised-SKILL.md
+gator skill disable daily-brief
+gator skill enable daily-brief
+gator skill remove daily-brief --yes
+```
+
+In the TUI, `/skill create NAME | WHEN_TO_USE | BODY` and
+`/skill edit NAME | WHEN_TO_USE | BODY` save a procedure directly. During Work,
+the model can call `skill_list` to see enabled descriptions and `skill_read` to
+load one full procedure. Skills are not automatically copied into every prompt.
+They cannot create tools, grant connected access, widen the process sandbox,
+or authorize an external action. A user creates or edits them explicitly; the
+model currently cannot silently persist a skill or a note.
+
+## Goal reviewer
+
+For an active goal, the main agent can delegate a read-only `goal_reviewer`.
+Its snapshot includes the current goal, up to five revisions from each relevant
+conversation branch, up to eight goal-linked follow-up results, and bounded
+references to saved notes and memories. It can inspect the run's frozen source
+and use goal-scoped knowledge search/read. It has no write, command, connector,
+browser, scheduling, or recursive delegation tool. Its recommendation returns
+to the main agent, which remains responsible for checking evidence and deciding
+what to tell or ask the user.
+
+Stored notes, skill text, source files, and prior model responses are reference
+data. Their contents cannot change Gator's host-owned authority. The existing
+Code specialist still uses its strict process sandbox for any command execution;
+the knowledge tools themselves do not start a process.

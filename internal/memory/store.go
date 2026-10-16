@@ -163,7 +163,7 @@ func (s Store) Search(query, goalID string, limit int) ([]Record, error) {
 				score++
 			}
 		}
-		if score > 0 {
+		if score >= min(2, len(terms)) {
 			if goalID != "" && record.GoalID == goalID {
 				score += 2
 			}

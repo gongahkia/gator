@@ -190,6 +190,8 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			err := memoryCommand(arguments, &output)
 			return strings.TrimSpace(output.String()), err
 		},
+		NoteAction:  func(command string) (string, error) { return workTUINoteAction(command, goalID) },
+		SkillAction: workTUISkillAction,
 		ResolveSource: func(path string) (string, error) {
 			if !filepath.IsAbs(path) {
 				path = filepath.Join(workingDirectory, path)

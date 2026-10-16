@@ -165,6 +165,8 @@ func commandPaletteEntries() []entry {
 		{title: "/jobs", subtitle: "Schedule, run, and review repeatable Work", kind: "command-input", command: "/jobs"},
 		{title: "/goals", subtitle: "Resume an ongoing goal", kind: "command", command: "/goals"},
 		{title: "/memory", subtitle: "Search or manage saved knowledge", kind: "command-input", command: "/memory"},
+		{title: "/note", subtitle: "Save and search longer personal notes", kind: "command-input", command: "/note"},
+		{title: "/skill", subtitle: "Create and load reusable procedures", kind: "command-input", command: "/skill"},
 		{title: "/learnings", subtitle: "Browse and manage scoped guidance", kind: "command", command: "/learnings"},
 		{title: "/feedback", subtitle: "Accept, reject, correct, or remember this Work result", kind: "command-input", command: "/feedback"},
 		{title: "/review", subtitle: "Show latest staged output", kind: "command", command: "/review"},
@@ -446,6 +448,18 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 			break
 		}
 		result, err = m.config.MemoryAction(fields[1:])
+	case "/note":
+		if m.config.NoteAction == nil {
+			err = errorsUnavailable("notes")
+			break
+		}
+		result, err = m.config.NoteAction(commandRemainder(command, fields[:1]))
+	case "/skill":
+		if m.config.SkillAction == nil {
+			err = errorsUnavailable("skills")
+			break
+		}
+		result, err = m.config.SkillAction(commandRemainder(command, fields[:1]))
 	case "/history":
 		if len(fields) > 2 {
 			err = fmt.Errorf("usage: /history [all|running|completed|failed]")
@@ -1012,6 +1026,12 @@ func workHelp() string {
   /goals                         resume an ongoing goal
   /memory add|list|search|show|correct|forget ...
                                  manage explicit saved knowledge
+  /note add TITLE | BODY          save a Markdown note in the current goal
+  /note list|search|show|edit     find and revise saved notes
+  /skill create NAME | WHEN | BODY
+                                 save a reusable text procedure
+  /skill list|show|edit|enable|disable
+                                 inspect and manage procedures
   /learnings [STATUS]            browse and manage guidance for future Work
   /feedback accept|reject|dont-learn [NOTE]
   /feedback correct|remember [OPTIONS] TEXT

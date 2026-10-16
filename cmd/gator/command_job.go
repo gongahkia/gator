@@ -729,7 +729,7 @@ func recordJobInbox(stateDir string, definition jobs.Definition, attempt jobs.At
 	if attempt.Status != "completed" {
 		summary = "Scheduled Work needs attention: " + attempt.Error
 	}
-	return store.Add(inbox.Entry{Kind: "job", Title: definition.Name, Summary: boundedJobError(summary), JobID: definition.ID, ConversationID: attempt.Conversation, RevisionID: attempt.Revision, Status: attempt.Status})
+	return store.Add(inbox.Entry{Kind: "job", Title: definition.Name, Summary: boundedJobError(summary), JobID: definition.ID, GoalID: definition.GoalID, ConversationID: attempt.Conversation, RevisionID: attempt.Revision, Status: attempt.Status})
 }
 
 func inboxCommand(arguments []string, out io.Writer) error {

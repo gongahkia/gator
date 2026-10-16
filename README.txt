@@ -18,6 +18,12 @@ macOS, an opt-in LaunchAgent can keep it running after the CLI closes. External
 changes still require explicit approval. See docs/PERSONAL_AGENT_DIRECTION.md
 for the product scope and current limits.
 
+Longer notes and reusable text skills can be saved with `gator note` and
+`gator skill` (or `/note` and `/skill` in the terminal UI). They live in a
+private, inspectable knowledge directory and are loaded only through bounded
+read tools. An active goal can use a read-only goal reviewer to compare recent
+work and follow-ups before recommending a next step. See docs/KNOWLEDGE.md.
+
 Gator currently pins Go 1.25.13.
 
 = = = = = = = =

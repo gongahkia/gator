@@ -32,6 +32,8 @@ Product areas:
   Goals       gator goal add|chat|list|show|context|pause|resume|complete
               gator goal schedule|schedules|unschedule
   Memory      gator memory add|list|search|show|correct|forget
+  Notes       gator note add|list|search|show|edit|remove
+  Skills      gator skill create|list|show|edit|enable|disable|remove
   Learnings   gator learnings list [--status STATUS] [--scope SCOPE]
               gator learnings add|edit|approve|reject|enable|disable ...
   Jobs        gator job add|list|show|edit|enable|disable|run|history|remove
@@ -135,6 +137,10 @@ func run(args []string, out io.Writer) error {
 		return goalCommand(args[1:], out)
 	case "memory":
 		return memoryCommand(args[1:], out)
+	case "note", "notes":
+		return noteCommand(args[1:], out)
+	case "skill", "skills":
+		return skillCommand(args[1:], out)
 	case "work-rpc":
 		return workHeadless(context.Background(), os.Stdin, out)
 	case "work", "-w":

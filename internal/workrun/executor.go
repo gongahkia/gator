@@ -20,7 +20,9 @@ import (
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/attachment"
 	"github.com/gongahkia/gator/internal/connector"
+	"github.com/gongahkia/gator/internal/knowledge"
 	"github.com/gongahkia/gator/internal/learning"
+	"github.com/gongahkia/gator/internal/memory"
 	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/projectcapture"
 	"github.com/gongahkia/gator/internal/snapshot"
@@ -292,6 +294,29 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		tableRoots = append(tableRoots, workspace.NamedRoot{Name: "previous", Root: previousRoot})
 	}
 	surface = append(surface, tools.ExtractDocument{Root: work.Source}, tools.InspectTable{Root: work.Source, NamedRoots: tableRoots})
+	knowledgeStore, err := knowledge.Open(request.StateDir)
+	if err != nil {
+		return outcome, fmt.Errorf("open personal knowledge: %w", err)
+	}
+	memoryStore, err := memory.Open(request.StateDir)
+	if err != nil {
+		return outcome, fmt.Errorf("open saved memories: %w", err)
+	}
+	notes, err := knowledgeStore.ListNotes(request.GoalID)
+	if err != nil {
+		return outcome, fmt.Errorf("list saved notes: %w", err)
+	}
+	skills, err := knowledgeStore.ListSkills(true)
+	if err != nil {
+		return outcome, fmt.Errorf("list saved skills: %w", err)
+	}
+	memories, err := memoryStore.List(request.GoalID, false)
+	if err != nil {
+		return outcome, fmt.Errorf("list saved memories: %w", err)
+	}
+	if len(notes)+len(skills)+len(memories) > 0 {
+		surface = append(surface, (tools.PersonalKnowledge{Notes: knowledgeStore, Memories: memoryStore, GoalID: request.GoalID}).Tools()...)
+	}
 	for i, tool := range surface {
 		switch tool.Definition().Name {
 		case "read_file", "extract_document", "inspect_table":
