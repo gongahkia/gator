@@ -35,7 +35,6 @@ var statusLineOptions = []statusLineOption{
 	{id: "connectors", label: "Connected sources", description: "Selected connector IDs"},
 	{id: "conversation", label: "Conversation", description: "Current conversation ID"},
 	{id: "effort", label: "Effort", description: "Current manager effort"},
-	{id: "sandbox", label: "Sandbox", description: "Code sandbox and network policy"},
 	{id: "status", label: "Activity status", description: "Most recent transient status"},
 }
 
@@ -130,8 +129,6 @@ func (m Model) statusLineValue(id string) string {
 		return "conversation " + valueOrNone(singleLine(m.conversation))
 	case "effort":
 		return "effort " + effortName(m.options.MaxSteps)
-	case "sandbox":
-		return "code " + valueOrNone(m.options.Code.Sandbox) + "/" + valueOrNone(m.options.Code.Network)
 	case "status":
 		return singleLine(m.status)
 	default:

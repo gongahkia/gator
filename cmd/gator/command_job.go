@@ -246,7 +246,6 @@ func addJob(arguments []string, out io.Writer) error {
 	refresh := flags.Bool("refresh-snapshot", true, "capture current source for each attempt; false freezes at creation")
 	changeOnly := flags.Bool("change-only", false, "skip a local-only run if files and saved context are unchanged")
 	contractPath := flags.String("contract", "", "complete outcome contract JSON")
-	codePath := flags.String("code-policy", "", "complete Code policy JSON")
 	requests := flags.Int("max-model-requests", 256, "aggregate request bound")
 	tokens := flags.Int64("max-tokens", 0, "reported token bound; zero disables")
 	seconds := flags.Int("timeout-seconds", 1800, "run wall bound")
@@ -281,12 +280,6 @@ func addJob(arguments []string, out io.Writer) error {
 			return err
 		}
 	}
-	var codePolicy workrun.CodePolicy
-	if *codePath != "" {
-		if err := readWorkJSON(*codePath, &codePolicy); err != nil {
-			return err
-		}
-	}
 	absolute, err := filepath.Abs(*source)
 	if err != nil {
 		return err
@@ -301,7 +294,7 @@ func addJob(arguments []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	definition, err := store.Save(jobs.Definition{Name: name, Enabled: true, Schedule: *schedule, Timezone: *timezone, Missed: *missed, SourcePath: absolute, RefreshSnapshot: *refresh, ChangeOnly: *changeOnly, Code: codePolicy, Limits: agent.Limits{ModelRequests: *requests, Tokens: *tokens, WallSeconds: *seconds}, WebOrigins: webOrigins, Objective: objective, Provider: *provider, Model: *model, Mode: mode, Contract: contract, ConnectorIDs: connectors, MaxSteps: *maxSteps})
+	definition, err := store.Save(jobs.Definition{Name: name, Enabled: true, Schedule: *schedule, Timezone: *timezone, Missed: *missed, SourcePath: absolute, RefreshSnapshot: *refresh, ChangeOnly: *changeOnly, Limits: agent.Limits{ModelRequests: *requests, Tokens: *tokens, WallSeconds: *seconds}, WebOrigins: webOrigins, Objective: objective, Provider: *provider, Model: *model, Mode: mode, Contract: contract, ConnectorIDs: connectors, MaxSteps: *maxSteps})
 	if err != nil {
 		return err
 	}

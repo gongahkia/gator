@@ -42,7 +42,6 @@ type workInput struct {
 	Refresh          bool               `json:"refresh_source,omitempty"`
 	Mode             action.Mode        `json:"mode"`
 	Contract         artifact.Contract  `json:"contract"`
-	Code             workrun.CodePolicy `json:"code"`
 	MaxSteps         int                `json:"max_steps"`
 	Connectors       []string           `json:"connectors,omitempty"`
 }
@@ -70,7 +69,7 @@ func workHeadless(ctx context.Context, in io.Reader, out io.Writer) (resultErr e
 		return errors.New("expected Work v1 start frame")
 	}
 	input := first.Request
-	request := workrun.Request{Limits: input.Limits, WebOrigins: input.WebOrigins, Images: input.Images, Attachments: input.Attachments, SourcePath: input.Source, Objective: input.Objective, ConversationID: input.ConversationID, ParentRevisionID: input.ParentRevisionID, SnapshotID: input.SnapshotID, RefreshSource: input.Refresh, Mode: input.Mode, Contract: input.Contract, Code: input.Code, MaxSteps: input.MaxSteps, ConnectorIDs: input.Connectors}
+	request := workrun.Request{Limits: input.Limits, WebOrigins: input.WebOrigins, Images: input.Images, Attachments: input.Attachments, SourcePath: input.Source, Objective: input.Objective, ConversationID: input.ConversationID, ParentRevisionID: input.ParentRevisionID, SnapshotID: input.SnapshotID, RefreshSource: input.Refresh, Mode: input.Mode, Contract: input.Contract, MaxSteps: input.MaxSteps, ConnectorIDs: input.Connectors}
 	service, err := configuredWorkService(input.Provider, input.Model, stateDir, &request)
 	if err != nil {
 		return err

@@ -35,13 +35,13 @@ user controls + objective
 | Copy latest answer | Promote | Main `/copy` chooser for individual responses or the verified-deliverables summary |
 | Themes | Promote | Main `/theme` and persisted root theme setting |
 | Help, status, permissions, doctor, agent/profile and settings inspection | Promote | Main `/help`, `/status`, `/permissions`, `/doctor`, `/agents`, and `/settings` |
-| Code project verifiers | Promote into delegation policy | Auto-detected for common project roots; repeatable `gator work --verify` |
-| Scoped `AGENTS.md`, rules, and named profiles | Promote into delegation policy | `gator work --scope` and `--profile` |
-| Worktree setup commands | Promote with explicit user ownership | `gator work --setup`; never accepted from the manager model |
-| Exact and prefix command approvals | Promote with explicit user ownership | `gator work --allow-command` and `--allow-command-prefix` |
+| Code project verifiers | Retain in the internal delegation policy | Auto-detected for common project roots; direct Work flags are retired |
+| Scoped `AGENTS.md`, rules, and named profiles | Retain in the internal delegation policy | Captured for internal Code requests; no direct user Code mode |
+| Worktree setup commands | Retain in backend | Never accepted from the manager model |
+| Exact and prefix command approvals | Retain in backend | No user-facing Code command grants |
 | Interactive approval prompts | Keep only where the invoking root CLI owns stdin | Headless JSON/TUI child runs require pre-grants; no model-created approval |
-| Sandbox and network selection | Promote as explicit Code envelope | Strict/deny by default; `gator work --sandbox` and `--network` |
-| LSP, MCP, extensions, HTTP/web research, browser, terminal | Promote as two-key grants | Existing trust/configuration plus a per-run `gator work --code-capability`; browser also requires a selected session and network |
+| Sandbox and network selection | Retain as internal Code envelope | Strict/deny by default; no direct Work Code policy flags |
+| LSP, MCP, extensions, HTTP/web research, browser, terminal | Retain as two-key grants | Existing trust/configuration plus an internal request grant; browser also requires a selected session and network |
 | Git isolation, repository instructions, final diff/status, patch evidence | Keep in backend | `internal/codeexec`, invoked only through `work_code_agent.go` for product use |
 | Initial static scouts and dynamic reader/writer children | Reframe | Gator owns source research, artifact review, and Code delegation; Code cannot recursively delegate |
 | Code thread resume/fork/clone | Replace | Gator Work conversations and immutable revision branches |
@@ -49,7 +49,7 @@ user controls + objective
 | Code diff/review/transcript UI | Replace at product boundary | Sealed Work bundle, subagent patch evidence, `gator work review`, `gator work export`, and historical read compatibility |
 | Base-ref selection | Retire for managed delegation | Code receives frozen source plus an explicitly selected accepted candidate |
 | Copy ignored files into a worktree | Retire for managed delegation | Snapshot inclusion/exclusion is explicit, bounded, and recorded before delegation |
-| Sandbox-off/network confirmation modal | Replace | The user must type the explicit `gator work` flag; the manager cannot choose it |
+| Sandbox-off/network confirmation modal | Retire from the conversation surface | The manager cannot widen its internal Code envelope |
 | Attached interactive terminal UX | Retire from Code frontend | Terminal can be an explicitly granted internal tool, but has no child-facing UI |
 | Vim composer mode, mouse-heavy diff controls, Code-only drawers and control center | Retire | They do not improve the single, conversation-first Gator surface enough to justify a second UI state machine |
 | Vendor-harness chooser inside Code | Retire | Starting another agent runtime would create a second execution and history model |

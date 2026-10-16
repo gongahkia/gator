@@ -207,8 +207,8 @@ does not automatically repeat their effects.
 
 `job add --refresh-snapshot=false` captures source and selected project
 configuration at creation. The default refreshes for each attempt. `--contract`
-accepts the entire contract JSON; `--code-policy` accepts complete Code policy
-JSON. Model request, token and wall limits and repeatable `--web-origin` grants
+accepts the entire contract JSON. Code policy remains an internal concern.
+Model request, token and wall limits and repeatable `--web-origin` grants
 are retained. These values reach Work without a CLI-flag round trip.
 
 `job edit ID --source PATH` captures the explicitly selected source again for a

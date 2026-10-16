@@ -23,7 +23,6 @@ import (
 	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/desktop"
 	"github.com/gongahkia/gator/internal/goal"
-	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/snapshot"
 	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/tools"
@@ -107,7 +106,6 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	requests := flags.Int("max-model-requests", 256, "aggregate manager and child requests")
 	tokens := flags.Int64("max-tokens", 0, "reported token limit; zero disables")
 	seconds := flags.Int("timeout-seconds", 1800, "aggregate wall time")
-	codeMaxSteps := flags.Int("code-max-steps", 0, "maximum internal Code specialist turns")
 	runID := flags.String("run-id", "", "stable run identifier")
 	conversationID := flags.String("conversation", "", "continue a retained Work conversation")
 	goalID := flags.String("goal", "", "continue an ongoing goal and its conversation")
@@ -126,31 +124,10 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	flags.Var(&imagePaths, "image", "source-relative PNG, JPEG, or WebP image to include in the initial prompt (repeatable)")
 	var documentPaths attachmentFlags
 	flags.Var(&documentPaths, "attach", "source-relative PDF or supported document/text file to include in the initial prompt (repeatable)")
-	var codeVerification verificationFlags
-	flags.Var(&codeVerification, "verify", "Code specialist verification argv (repeatable)")
-	var codeScopes stringFlags
-	flags.Var(&codeScopes, "scope", "Code specialist project-instruction scope (repeatable)")
-	codeProfile := flags.String("profile", "", "Code specialist project profile")
-	var codeSetup verificationFlags
-	flags.Var(&codeSetup, "setup", "Code specialist worktree setup argv (repeatable)")
-	var codeAllowed verificationFlags
-	flags.Var(&codeAllowed, "allow-command", "pre-approve an exact Code specialist argv (repeatable)")
-	var codePrefixes verificationFlags
-	flags.Var(&codePrefixes, "allow-command-prefix", "pre-approve a literal Code specialist argv prefix (repeatable)")
-	codeSandbox := flags.String("sandbox", string(sandbox.Strict), "Code specialist sandbox: strict or off")
-	codeNetwork := flags.String("network", string(sandbox.DenyNetwork), "Code specialist network: deny or allow")
-	var codeCapabilities stringFlags
-	flags.Var(&codeCapabilities, "code-capability", "explicit Code grant: hooks, lsp, mcp, extension, http, browser, or terminal")
 	workBrowserSession := flags.String("browser-session", "", "explicit browser session granted to the Work manager")
-	codeBrowserSession := flags.String("code-browser-session", "", "explicit browser session granted only to the Code specialist")
 	desktopSession := flags.String("desktop-session", "", "explicit macOS desktop session granted to an OpenAI computer-use Work manager")
-	legacyBase := flags.String("base", "", "removed Code worktree base override")
-	legacyCopyIgnored := flags.Bool("copy-ignored", false, "removed Code ignored-file copy mode")
 	if err := flags.Parse(arguments); err != nil {
 		return err
-	}
-	if strings.TrimSpace(*legacyBase) != "" || *legacyCopyIgnored {
-		return errors.New("--base and --copy-ignored belonged to the standalone Code frontend; Gator now delegates against its immutable source snapshot")
 	}
 	objective, err := workObjective(flags.Args(), in)
 	if err != nil {
@@ -307,37 +284,10 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		native.computer = &agent.ComputerUse{Environment: "computer", DisplayWidth: 1440, DisplayHeight: 900, RetainState: session.RetainProviderState}
 	}
 	if native, ok := backend.(*nativeWorkBackend); ok {
-		if strings.TrimSpace(*codeBrowserSession) != "" {
-			if sandbox.Network(*codeNetwork) != sandbox.AllowNetwork {
-				return errors.New("--browser-session requires --network allow for the internal Code specialist")
-			}
-			if !containsString(codeCapabilities, workrun.CodeCapabilityBrowser) {
-				return errors.New("--browser-session requires --code-capability browser")
-			}
-			store, err := gatorbrowser.Open(stateDir)
-			if err != nil {
-				return err
-			}
-			client, err := gatorbrowser.NewClient(store, *codeBrowserSession)
-			if err != nil {
-				return err
-			}
-			session, err := client.Session(context.Background(), *codeBrowserSession)
-			if err != nil {
-				return err
-			}
-			if len(session.SelectedTabs) == 0 {
-				return errors.New("--browser-session has no developer-selected tabs")
-			}
-			native.code.Browser = client
-		}
 		executor.Code = native.codeDelegate(stateDir)
 	}
 	if err := configureWorkRoles(&executor, settings, stateDir); err != nil {
 		return err
-	}
-	if len(codeVerification) == 0 {
-		codeVerification = parseSuggestedVerification(suggestedVerificationCommands(*sourcePath))
 	}
 	var approve action.Approver
 	var approveRead func(context.Context, string, string, json.RawMessage) (bool, error)
@@ -377,13 +327,6 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		ApproveBrowser:       workBrowserApprover(*jsonOutput, in, out),
 		DesktopSession:       strings.TrimSpace(*desktopSession),
 		ApproveDesktop:       workDesktopApprover(*jsonOutput, in, out),
-		Code: workrun.CodePolicy{
-			MaxSteps: *codeMaxSteps, Verification: codeVerification, Scopes: codeScopes, Profile: strings.TrimSpace(*codeProfile),
-			Setup: codeSetup, AllowedCommands: codeAllowed, AllowedCommandPrefixes: codePrefixes,
-			Sandbox:      sandbox.Policy{Mode: sandbox.Mode(*codeSandbox), Network: sandbox.Network(*codeNetwork)},
-			Capabilities: append([]string(nil), codeCapabilities...), BrowserSession: strings.TrimSpace(*codeBrowserSession),
-		},
-		ApproveCodeCommand: codeCommandApprover(*jsonOutput, in, out),
 	}
 	if err := applyLearningContext(stateDir, &request); err != nil {
 		return err
@@ -650,37 +593,6 @@ func readApprovalLine(in io.Reader) (string, error) {
 	return line.String(), errors.New("approval response is too long")
 }
 
-func codeCommandApprover(jsonOutput bool, in io.Reader, out io.Writer) func(context.Context, []string) (tools.CommandDecision, error) {
-	if jsonOutput {
-		return nil
-	}
-	return func(ctx context.Context, argv []string) (tools.CommandDecision, error) {
-		select {
-		case <-ctx.Done():
-			return tools.CommandDeny, ctx.Err()
-		default:
-		}
-		if _, err := fmt.Fprintf(out, "\nInternal Code command approval\n  argv: %s\nAllow this command? [y once/a always/N] ", strings.Join(argv, " ")); err != nil {
-			return tools.CommandDeny, err
-		}
-		line, err := readApprovalLine(in)
-		if errors.Is(err, io.EOF) && line == "" {
-			return tools.CommandDeny, nil
-		}
-		if err != nil && !(errors.Is(err, io.EOF) && line != "") {
-			return tools.CommandDeny, err
-		}
-		switch strings.ToLower(strings.TrimSpace(line)) {
-		case "y", "yes":
-			return tools.CommandAllowOnce, nil
-		case "a", "always":
-			return tools.CommandAllowAlways, nil
-		default:
-			return tools.CommandDeny, nil
-		}
-	}
-}
-
 // workBrowserApprover deliberately never grants a remembered approval: page
 // state can change between actions, including after an otherwise harmless
 // click. The argument vector is generated by the trusted browser tool and is
@@ -737,15 +649,6 @@ func workDesktopApprover(jsonOutput bool, in io.Reader, out io.Writer) func(cont
 		}
 		return tools.CommandDeny, nil
 	}
-}
-
-func containsString(values []string, target string) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
 }
 
 type artifactFlags []string

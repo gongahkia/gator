@@ -145,7 +145,7 @@ func TestWorkCommandRejectsRetiredStandaloneSnapshotControls(t *testing.T) {
 		t.Fatal("model factory called for retired standalone option")
 		return nil, nil
 	})
-	if err == nil || !strings.Contains(err.Error(), "immutable source snapshot") {
+	if err == nil || !strings.Contains(err.Error(), "flag provided but not defined") {
 		t.Fatalf("retired option error = %v", err)
 	}
 }

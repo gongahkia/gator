@@ -178,6 +178,15 @@ func TestDirectCodeRouteIsRetired(t *testing.T) {
 	}
 }
 
+func TestWorkRejectsRetiredCodePolicyFlags(t *testing.T) {
+	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
+	for _, flag := range []string{"--require-code", "--verify", "--code-capability", "--code-browser-session", "--code-max-steps"} {
+		if err := run([]string{"work", flag, "task"}, io.Discard); err == nil || !strings.Contains(err.Error(), "flag provided but not defined") {
+			t.Fatalf("work %s error = %v", flag, err)
+		}
+	}
+}
+
 func TestSupportedPlatformAllowsOnlyLinuxAndMacOS(t *testing.T) {
 	for _, goos := range []string{"linux", "darwin"} {
 		if !supportedPlatform(goos) {

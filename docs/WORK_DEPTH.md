@@ -102,8 +102,8 @@ changes no authority. There is no automatic cross-provider fallback.
 The effective policy digest covers the full normalized contract, mode, Code
 policy, selected services, connector permissions, web origins, aggregate limits,
 manager/provider identity, role routes, and project configuration digest. The
-private replay retains this configuration. A foreground CLI may add detected
-project verifier commands; explicit `--verify` replaces that detection.
+private replay retains this configuration. Internal Code evaluations may add
+detected project verifier commands to a granted specialist request.
 
 Defaults are 24 manager turns, at most 8 turns for non-Code specialists, at most
 32 Code turns, 8 child invocations, and 3 concurrent children. Shared budgets
