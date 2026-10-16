@@ -87,6 +87,9 @@ type Request struct {
 	// LearningContext is a bounded projection of applicable active learnings.
 	// It is supplied by the application boundary; candidates never appear here.
 	LearningContext string
+	// MemoryContext is a bounded selection of explicit user memories.
+	MemoryContext string
+	GoalID        string
 	// GoalContext is explicitly user-maintained ongoing context. It conveys
 	// neither tool authority nor an instruction that overrides the current task.
 	GoalContext          string

@@ -19,6 +19,7 @@ import (
 	"github.com/gongahkia/gator/internal/attachment"
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/delivery"
+	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/learning"
@@ -36,6 +37,14 @@ func workInteractive() error {
 }
 
 func workInteractiveConversation(startConversationID string) error {
+	return workInteractiveConversationForGoal(startConversationID, "")
+}
+
+func workInteractiveGoal(goalID string) error {
+	return workInteractiveConversationForGoal("", goalID)
+}
+
+func workInteractiveConversationForGoal(startConversationID, goalID string) error {
 	workingDirectory, err := os.Getwd()
 	if err != nil {
 		return err
@@ -51,6 +60,23 @@ func workInteractiveConversation(startConversationID string) error {
 	stateDir, err := state.ResolveDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {
 		return err
+	}
+	goalStore, err := goal.Open(stateDir)
+	if err != nil {
+		return err
+	}
+	var goalTitle string
+	if goalID != "" {
+		currentGoal, loadErr := goalStore.Load(goalID)
+		if loadErr != nil {
+			return loadErr
+		}
+		if currentGoal.Status != goal.Active {
+			return fmt.Errorf("goal %s is %s; resume it before chatting", goalID, currentGoal.Status)
+		}
+		workingDirectory = currentGoal.SourcePath
+		goalTitle = currentGoal.Title
+		startConversationID = currentGoal.ConversationID
 	}
 	sessions, err := worksession.Open(stateDir)
 	if err != nil {
@@ -93,11 +119,22 @@ func workInteractiveConversation(startConversationID string) error {
 	if err != nil {
 		return err
 	}
+	supervisorRunning := false
+	for _, definition := range definitions {
+		if definition.Enabled {
+			supervisorRunning = jobSupervisorRequest("health", io.Discard) == nil
+			break
+		}
+	}
 	inboxStore, err := inbox.Open(stateDir)
 	if err != nil {
 		return err
 	}
 	inboxEntries, err := inboxStore.List(false, 20)
+	if err != nil {
+		return err
+	}
+	goals, err := goalStore.List()
 	if err != nil {
 		return err
 	}
@@ -121,7 +158,38 @@ func workInteractiveConversation(startConversationID string) error {
 			return currentWorkModelStatus(settingsStore, stateDir)
 		},
 		Live:          true,
-		CurrentFolder: workingDirectory, Conversations: conversations, Jobs: definitions, Inbox: inboxEntries,
+		InitialTitle:  goalTitle,
+		CurrentFolder: workingDirectory, Conversations: conversations, Jobs: definitions, SupervisorRunning: supervisorRunning, Inbox: inboxEntries, Goals: goals,
+		ListGoals: goalStore.List,
+		SelectGoal: func(id string) (worktui.GoalState, error) {
+			record, err := goalStore.Load(id)
+			if err != nil {
+				return worktui.GoalState{}, err
+			}
+			if record.Status != goal.Active {
+				return worktui.GoalState{}, fmt.Errorf("goal %s is %s", id, record.Status)
+			}
+			goalID = id
+			return worktui.GoalState{Title: record.Title, SourcePath: record.SourcePath, ConversationID: record.ConversationID}, nil
+		},
+		ClearGoal: func() { goalID = "" },
+		MemoryAction: func(arguments []string) (string, error) {
+			if goalID != "" && len(arguments) > 0 && (arguments[0] == "add" || arguments[0] == "list" || arguments[0] == "search") {
+				hasGoal := false
+				for _, argument := range arguments {
+					if argument == "--goal" || strings.HasPrefix(argument, "--goal=") {
+						hasGoal = true
+						break
+					}
+				}
+				if !hasGoal {
+					arguments = append([]string{arguments[0], "--goal", goalID}, arguments[1:]...)
+				}
+			}
+			var output bytes.Buffer
+			err := memoryCommand(arguments, &output)
+			return strings.TrimSpace(output.String()), err
+		},
 		ResolveSource: func(path string) (string, error) {
 			if !filepath.IsAbs(path) {
 				path = filepath.Join(workingDirectory, path)
@@ -162,6 +230,25 @@ func workInteractiveConversation(startConversationID string) error {
 		},
 		RefreshJobs: jobStore.List,
 		Run: func(source, conversationID, prompt string, options worktui.RunOptions) worktui.RunResult {
+			if goalID != "" {
+				currentGoal, loadErr := goalStore.Load(goalID)
+				if loadErr != nil {
+					return worktui.RunResult{Error: loadErr.Error()}
+				}
+				if currentGoal.Status != goal.Active {
+					return worktui.RunResult{Error: fmt.Sprintf("goal %s is %s", goalID, currentGoal.Status)}
+				}
+				if source != currentGoal.SourcePath || (conversationID != "" && currentGoal.ConversationID != "" && conversationID != currentGoal.ConversationID) {
+					return worktui.RunResult{Error: "this chat is bound to its goal workspace and conversation; use gator to work elsewhere"}
+				}
+				result := runInteractiveWorkGoal(currentGoal.SourcePath, currentGoal.ConversationID, prompt, stateDir, options, currentGoal)
+				if result.ConversationID != "" {
+					if _, attachErr := goalStore.AttachConversation(goalID, result.ConversationID); attachErr != nil && result.Error == "" {
+						result.Error = attachErr.Error()
+					}
+				}
+				return result
+			}
 			return runInteractiveWork(source, conversationID, prompt, stateDir, options)
 		},
 		MoveBack: func(conversationID string) (string, error) {
@@ -271,6 +358,10 @@ func workTUIConnectorCommand(arguments []string) *exec.Cmd {
 }
 
 func runInteractiveWork(source, conversationID, prompt, stateDir string, options worktui.RunOptions) worktui.RunResult {
+	return runInteractiveWorkGoal(source, conversationID, prompt, stateDir, options, goal.Record{})
+}
+
+func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, options worktui.RunOptions, currentGoal goal.Record) worktui.RunResult {
 	ctx := options.Context
 	if ctx == nil {
 		ctx = context.Background()
@@ -298,10 +389,12 @@ func runInteractiveWork(source, conversationID, prompt, stateDir string, options
 	request := workrun.Request{
 		SourcePath: source, ConversationID: conversationID, Objective: prompt,
 		MaxSteps: options.MaxSteps, Mode: mode, Contract: contract,
+		GoalContext:             goalContext(currentGoal),
+		GoalID:                  currentGoal.ID,
 		ConnectorIDs:            append([]string(nil), options.ConnectorIDs...),
 		WebOrigins:              append([]string(nil), options.WebOrigins...),
 		IgnoredInstructionPaths: append([]string(nil), options.IgnoredInstructionPaths...),
-		RefreshSource:           options.RefreshSource,
+		RefreshSource:           options.RefreshSource || currentGoal.ID != "",
 		RequireCode:             options.RequireCode,
 		OnEvent:                 options.OnEvent, Steering: options.Steering,
 	}

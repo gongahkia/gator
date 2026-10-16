@@ -8,7 +8,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/goal"
+	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/state"
 )
 
@@ -19,6 +22,10 @@ const goalUsage = `Gator goals — ongoing responsibilities
   gator goal show ID
   gator goal context ID TEXT
   gator goal pause|resume|complete ID
+  gator goal chat ID
+  gator goal schedule ID --cron '0 9 * * *' [--timezone AREA/CITY] [--mode inspect|draft] [--artifact PATH] --task TEXT
+  gator goal schedules ID
+  gator goal unschedule ID JOB_ID
 
 Use gator work --goal ID "what should we do next?" to continue a goal's
 conversation. A goal remembers its own context and conversation across runs.
@@ -38,10 +45,15 @@ func goalCommand(args []string, out io.Writer) error {
 		return err
 	}
 	switch args[0] {
+	case "chat":
+		if len(args) != 2 {
+			return errors.New("usage: gator goal chat ID")
+		}
+		return workInteractiveGoal(args[1])
 	case "add":
 		flags := flag.NewFlagSet("goal add", flag.ContinueOnError)
 		flags.SetOutput(io.Discard)
-		source := flags.String("source", ".", "source directory")
+		source := flags.String("source", "", "source directory (default: private empty goal workspace)")
 		context := flags.String("context", "", "background and next steps")
 		if err := flags.Parse(args[1:]); err != nil {
 			return err
@@ -76,6 +88,109 @@ func goalCommand(args []string, out io.Writer) error {
 			return err
 		}
 		_, err = fmt.Fprintf(out, "Goal: %s\nTitle: %s\nStatus: %s\nSource: %s\nConversation: %s\nContext: %s\n", record.ID, record.Title, record.Status, record.SourcePath, valueOrDash(record.ConversationID), valueOrDash(record.Context))
+		return err
+	case "schedule":
+		if len(args) < 2 {
+			return errors.New("usage: gator goal schedule ID --cron CRON --task TEXT")
+		}
+		record, err := store.Load(args[1])
+		if err != nil {
+			return err
+		}
+		if record.Status != goal.Active {
+			return errors.New("resume this goal before scheduling it")
+		}
+		settings, err := loadSettings()
+		if err != nil {
+			return err
+		}
+		flags := flag.NewFlagSet("goal schedule", flag.ContinueOnError)
+		flags.SetOutput(io.Discard)
+		cron := flags.String("cron", "", "five-field cron schedule")
+		timezone := flags.String("timezone", settings.JobDefaults.Timezone, "IANA timezone")
+		missed := flags.String("missed", "run_once", "skip or run_once")
+		modeName := flags.String("mode", "inspect", "inspect or draft")
+		artifactPath := flags.String("artifact", "", "required artifact for draft mode")
+		task := flags.String("task", "", "recurring check instruction")
+		if err := flags.Parse(args[2:]); err != nil {
+			return err
+		}
+		if len(flags.Args()) != 0 {
+			return errors.New("unexpected goal schedule arguments; use --task TEXT")
+		}
+		if *cron == "" || strings.TrimSpace(*task) == "" {
+			return errors.New("goal schedule requires --cron and --task")
+		}
+		mode := action.Mode(*modeName)
+		var contract artifact.Contract
+		if mode == action.Inspect {
+			if *artifactPath != "" {
+				return errors.New("--artifact requires --mode draft")
+			}
+			contract = artifact.InspectionContract()
+		} else if mode == action.Draft {
+			if *artifactPath == "" {
+				return errors.New("draft schedule requires --artifact PATH")
+			}
+			contract, err = workContract(mode, action.Forbid, artifactFlags{*artifactPath}, nil)
+			if err != nil {
+				return err
+			}
+		} else {
+			return errors.New("scheduled goals may only inspect or draft")
+		}
+		jobStore, _, err := jobStore()
+		if err != nil {
+			return err
+		}
+		definition, err := jobStore.Save(jobs.Definition{Name: record.Title, GoalID: record.ID, Enabled: true, Schedule: *cron, Timezone: *timezone, Missed: *missed, SourcePath: record.SourcePath, RefreshSnapshot: true, Objective: strings.TrimSpace(*task), Mode: mode, Contract: contract, MaxSteps: 24})
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(out, "Scheduled %s for %s (%s %s). Run 'gator job supervisor' or install the macOS LaunchAgent to execute it while Gator is closed.\n", record.ID, definition.ID, definition.Schedule, definition.Timezone)
+		return err
+	case "schedules":
+		if len(args) != 2 {
+			return errors.New("usage: gator goal schedules ID")
+		}
+		if _, err := store.Load(args[1]); err != nil {
+			return err
+		}
+		jobStore, _, err := jobStore()
+		if err != nil {
+			return err
+		}
+		definitions, err := jobStore.List()
+		if err != nil {
+			return err
+		}
+		for _, definition := range definitions {
+			if definition.GoalID == args[1] {
+				if _, err := fmt.Fprintf(out, "%s  %t  %s %s  %s\n", definition.ID, definition.Enabled, definition.Schedule, definition.Timezone, definition.Objective); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	case "unschedule":
+		if len(args) != 3 {
+			return errors.New("usage: gator goal unschedule ID JOB_ID")
+		}
+		jobStore, _, err := jobStore()
+		if err != nil {
+			return err
+		}
+		definition, err := jobStore.Load(args[2])
+		if err != nil {
+			return err
+		}
+		if definition.GoalID != args[1] {
+			return errors.New("job does not belong to this goal")
+		}
+		if err := jobStore.Remove(args[2]); err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(out, "Unscheduled %s.\n", args[2])
 		return err
 	case "context":
 		if len(args) < 3 {

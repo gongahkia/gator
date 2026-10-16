@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/state"
@@ -499,6 +500,45 @@ func jobWorkRequest(definition jobs.Definition) workrun.Request {
 	return request
 }
 
+func preparedJobWorkRequest(definition jobs.Definition, stateDir string) (workrun.Request, error) {
+	request := jobWorkRequest(definition)
+	if definition.GoalID == "" {
+		return request, nil
+	}
+	goals, err := goal.Open(stateDir)
+	if err != nil {
+		return request, err
+	}
+	record, err := goals.Load(definition.GoalID)
+	if err != nil {
+		return request, err
+	}
+	if record.Status != goal.Active {
+		return request, fmt.Errorf("goal %s is %s", record.ID, record.Status)
+	}
+	request.GoalID = record.ID
+	request.GoalContext = goalContext(record)
+	request.SourcePath = record.SourcePath
+	request.SnapshotID = ""
+	request.RefreshSource = true
+	request.Project = nil
+	store, err := jobs.Open(stateDir)
+	if err != nil {
+		return request, err
+	}
+	history, err := store.History(definition.ID, 50)
+	if err != nil {
+		return request, err
+	}
+	for _, attempt := range history {
+		if attempt.Status == "completed" && attempt.Conversation != "" {
+			request.ConversationID = attempt.Conversation
+			break
+		}
+	}
+	return request, nil
+}
+
 func runJobProcessContext(ctx context.Context, definition jobs.Definition, stateDir string, runIDs ...string) (jobResult, error) {
 	return runJobProcessWith(ctx, definition, stateDir, executeConfiguredWork, runIDs...)
 }
@@ -506,7 +546,10 @@ func runJobProcessContext(ctx context.Context, definition jobs.Definition, state
 // runJobProcessWith keeps the job adapter small and makes clear that each job
 // attempt invokes the same Work service boundary as foreground Work.
 func runJobProcessWith(ctx context.Context, definition jobs.Definition, stateDir string, execute func(context.Context, string, string, string, workrun.Request) (workrun.Outcome, error), runIDs ...string) (jobResult, error) {
-	request := jobWorkRequest(definition)
+	request, err := preparedJobWorkRequest(definition, stateDir)
+	if err != nil {
+		return jobResult{}, err
+	}
 	if len(runIDs) > 0 {
 		request.RunID = runIDs[0]
 	}
@@ -650,6 +693,16 @@ func runDueJobsContext(ctx context.Context, store jobs.Store, stateDir string, n
 	for _, definition := range definitions {
 		if !definition.Enabled {
 			continue
+		}
+		if definition.GoalID != "" {
+			goals, err := goal.Open(stateDir)
+			if err != nil {
+				continue
+			}
+			record, err := goals.Load(definition.GoalID)
+			if err != nil || record.Status != goal.Active {
+				continue
+			}
 		}
 		scheduled, due, err := jobs.Due(definition, now)
 		if err != nil || !due {

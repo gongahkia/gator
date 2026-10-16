@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/delivery"
+	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/learning"
@@ -135,12 +136,15 @@ type ModelStatus struct {
 	Access   string
 }
 
+type GoalState struct{ Title, SourcePath, ConversationID string }
+
 type Config struct {
 	Models                  func() (ModelPanel, error)
 	SelectedModel           func() (provider, model string, err error)
 	ModelStatus             func() (ModelStatus, error)
 	Live                    bool
 	CurrentFolder           string
+	InitialTitle            string
 	ResolveSource           func(path string) (string, error)
 	ConnectorChoices        func() []string
 	ConnectorAction         func(arguments []string) (string, error)
@@ -152,7 +156,13 @@ type Config struct {
 	Conversations           []worksession.Conversation
 	StartConversationID     string
 	Jobs                    []jobs.Definition
+	SupervisorRunning       bool
 	Inbox                   []inbox.Entry
+	Goals                   []goal.Record
+	ListGoals               func() ([]goal.Record, error)
+	SelectGoal              func(id string) (GoalState, error)
+	ClearGoal               func()
+	MemoryAction            func(arguments []string) (string, error)
 	// JobAction uses the same local Job service as the CLI. It keeps scheduling
 	// as repeatable Work rather than creating a second TUI-only runtime.
 	JobAction      func(arguments []string) (string, error)
@@ -327,6 +337,10 @@ func New(config Config) Model {
 			model.title = "Restoring conversation"
 			model.restoreConversation(config.StartConversationID, "")
 		}
+	}
+	if config.InitialTitle != "" {
+		model.home = false
+		model.title = config.InitialTitle
 	}
 	return model
 }

@@ -3,16 +3,20 @@ maybe someone can learn something from looking at mine.
 
 = = = = = = = =
 
-Gator is a tiny terminal work agent.
+Gator is a terminal-native personal agent for ongoing goals.
 
-Gator researches selected sources, reconciles tables, writes documents, and
-delegates bounded coding work inside one persistent conversation. Sources are
-captured before execution. History retains deliverables, code candidates,
-verification, delivery outcomes, and external-action proposals for review
-before transfer. Users can keep small, scoped local learnings for future Work;
-they are inspectable, enableable, and reversible. Jobs repeat the same Work
-lifecycle, while Settings keep provider and optional-capability setup separate
-from everyday Work.
+Gator lets you keep an ongoing goal and continue its conversation across
+terminal sessions. The terminal home shows active goals and unread follow-up
+results; /goals resumes one. You can save facts, preferences, decisions, and
+notes with gator memory (or /memory), then search, correct, expire, or forget
+them. Relevant active memories are retrieved for each Work turn alongside the
+selected goal's current context. Gator can answer questions, research selected
+sources, analyze data, create documents, and prepare actions through selected
+tools. A goal can have a recurring check with gator goal schedule. The local
+job supervisor runs scheduled checks and sends results to Gator's inbox; on
+macOS, an opt-in LaunchAgent can keep it running after the CLI closes. External
+changes still require explicit approval. See docs/PERSONAL_AGENT_DIRECTION.md
+for the product scope and current limits.
 
 Gator currently pins Go 1.25.13.
 

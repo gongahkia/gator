@@ -35,6 +35,7 @@ type Definition struct {
 	Version         int                    `json:"version"`
 	ID              string                 `json:"id"`
 	Name            string                 `json:"name"`
+	GoalID          string                 `json:"goal_id,omitempty"`
 	Enabled         bool                   `json:"enabled"`
 	Schedule        string                 `json:"schedule"`
 	Timezone        string                 `json:"timezone"`
@@ -179,6 +180,14 @@ func (d Definition) Validate() error {
 	}
 	if d.CreatedAt.IsZero() || d.UpdatedAt.IsZero() || d.UpdatedAt.Before(d.CreatedAt) || len(d.Schedule) > 256 || len(d.Provider) > 128 || len(d.Model) > 512 || strings.ContainsAny(d.Provider+d.Model, "\x00\r\n") {
 		return errors.New("job metadata is invalid")
+	}
+	if d.GoalID != "" && (len(d.GoalID) != 29 || !strings.HasPrefix(d.GoalID, "goal-") || invalidID(d.GoalID)) {
+		return errors.New("job goal ID is invalid")
+	}
+	if d.GoalID != "" {
+		if _, err := hex.DecodeString(d.GoalID[5:]); err != nil {
+			return errors.New("job goal ID is invalid")
+		}
 	}
 	if d.Mode != action.Inspect && d.Mode != action.Draft {
 		return errors.New("scheduled jobs may only inspect or draft")

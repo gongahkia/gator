@@ -16,10 +16,10 @@ func TestRunHelp(t *testing.T) {
 		if err := run([]string{command}, &output); err != nil {
 			t.Fatalf("run %s: %v", command, err)
 		}
-		if !strings.Contains(output.String(), "Start Work:") {
-			t.Fatalf("help output = %q, want a Work-first entry point", output.String())
+		if !strings.Contains(output.String(), "Start:") {
+			t.Fatalf("help output = %q, want a terminal-agent entry point", output.String())
 		}
-		for _, value := range []string{"gator \"research X and produce a report\"", "Work", "History", "Learnings", "Jobs", "Settings", "gator work review", "gator work -- TASK"} {
+		for _, value := range []string{"gator goal add", "gator work --goal GOAL_ID", "gator \"research X and produce a report\"", "Work", "History", "Goals", "Learnings", "Jobs", "Settings", "gator work review", "gator work -- TASK"} {
 			if !strings.Contains(output.String(), value) {
 				t.Fatalf("help output is missing %q", value)
 			}

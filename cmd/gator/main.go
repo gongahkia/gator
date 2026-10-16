@@ -19,17 +19,19 @@ var (
 
 const usage = `Gator — terminal-native personal agent
 
-Start Work:
+Start:
   gator
+  gator goal add "Plan the offsite"
+  gator work --goal GOAL_ID "What should I do next?"
   gator "research X and produce a report"
   gator work [OPTIONS] TASK
-  gator work code [OPTIONS] TASK
-  gator work --goal ID TASK
 
 Product areas:
   Work        gator work [TASK] · gator work resume CONVERSATION TASK
   History     gator work list · gator work history CONVERSATION · gator work show ID
-  Goals       gator goal add|list|show|context|pause|resume|complete
+  Goals       gator goal add|chat|list|show|context|pause|resume|complete
+              gator goal schedule|schedules|unschedule
+  Memory      gator memory add|list|search|show|correct|forget
   Learnings   gator learnings list [--status STATUS] [--scope SCOPE]
               gator learnings add|edit|approve|reject|enable|disable ...
   Jobs        gator job add|list|show|edit|enable|disable|run|history|remove
@@ -131,6 +133,8 @@ func run(args []string, out io.Writer) error {
 		return learningCommand(args[1:], out)
 	case "goal", "goals":
 		return goalCommand(args[1:], out)
+	case "memory":
+		return memoryCommand(args[1:], out)
 	case "work-rpc":
 		return workHeadless(context.Background(), os.Stdin, out)
 	case "work", "-w":

@@ -10,6 +10,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/worksession"
 )
@@ -527,7 +528,7 @@ func TestCommandPaletteContainsCurrentCommands(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work"})
 	model.openCommandPalette()
 	expected := []string{
-		"/help", "/new", "/model", "/source", "/mode", "/settings", "/settings statusline", "/theme", "/history", "/jobs", "/learnings", "/feedback", "/review", "/save", "/apply", "/retry", "/copy", "exit",
+		"/help", "/new", "/model", "/source", "/mode", "/settings", "/settings statusline", "/theme", "/history", "/jobs", "/goals", "/memory", "/learnings", "/feedback", "/review", "/save", "/apply", "/retry", "/copy", "exit",
 	}
 	if len(model.entries) != len(expected) {
 		t.Fatalf("command palette has %d entries, want %d", len(model.entries), len(expected))
@@ -539,6 +540,28 @@ func TestCommandPaletteContainsCurrentCommands(t *testing.T) {
 		if item.title != expected[index] {
 			t.Fatalf("command %d = %q, want %q", index, item.title, expected[index])
 		}
+	}
+}
+
+func TestGoalPickerResumesSelectedGoal(t *testing.T) {
+	id := "goal-0123456789abcdef01234567"
+	selected := ""
+	model := New(Config{CurrentFolder: "/work", Goals: []goal.Record{{ID: id, Title: "Daily brief", Status: goal.Active}}, SelectGoal: func(value string) (GoalState, error) {
+		selected = value
+		return GoalState{Title: "Daily brief", SourcePath: "/briefs"}, nil
+	}})
+	if !strings.Contains(model.View(), "Daily brief") {
+		t.Fatalf("home does not show goal: %s", model.View())
+	}
+	updated, _ := model.runLocalCommand("/goals")
+	model = updated.(Model)
+	if !model.launcher || model.launcherMode != "goals" {
+		t.Fatalf("goal picker = %#v", model)
+	}
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if selected != id || model.home || model.source != "/briefs" || model.title != "Daily brief" {
+		t.Fatalf("selected goal = %q, model = %#v", selected, model)
 	}
 }
 

@@ -157,6 +157,13 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	if err != nil {
 		return err
 	}
+	if strings.TrimSpace(*goalID) != "" && len(artifacts) == 0 {
+		modeExplicit := false
+		flags.Visit(func(value *flag.Flag) { modeExplicit = modeExplicit || value.Name == "mode" })
+		if !modeExplicit {
+			*modeName = string(action.Inspect)
+		}
+	}
 	mode := action.Mode(strings.ToLower(strings.TrimSpace(*modeName)))
 	if err := mode.Validate(); err != nil {
 		return err
@@ -182,10 +189,6 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	if strings.TrimSpace(*desktopSession) != "" && resolvedProvider != "openai" {
 		return errors.New("--desktop-session is available only with provider openai; local and other provider models never receive desktop control")
 	}
-	backend, err := modelFactory(resolvedProvider, resolvedModel, *baseURL)
-	if err != nil {
-		return err
-	}
 	stateDir, err := state.ResolveDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {
 		return err
@@ -209,6 +212,7 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		}
 		*sourcePath = selectedGoal.SourcePath
 		*conversationID = selectedGoal.ConversationID
+		*refreshSource = true
 	}
 	if strings.TrimSpace(*conversationID) != "" {
 		sessions, err := worksession.Open(stateDir)
@@ -220,6 +224,10 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 			return fmt.Errorf("load Work conversation: %w", err)
 		}
 		*sourcePath = conversation.SourcePath
+	}
+	backend, err := modelFactory(resolvedProvider, resolvedModel, *baseURL)
+	if err != nil {
+		return err
 	}
 	images, attachments, err := loadPromptAttachments(*sourcePath, imagePaths, documentPaths)
 	if err != nil {
@@ -350,6 +358,7 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		Provider:             resolvedProvider + "/" + resolvedModel,
 		Objective:            objective,
 		GoalContext:          goalContext(selectedGoal),
+		GoalID:               selectedGoal.ID,
 		RunID:                *runID,
 		MaxSteps:             *maxSteps,
 		Mode:                 mode,
@@ -379,6 +388,9 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		ApproveCodeCommand: codeCommandApprover(*jsonOutput, in, out),
 	}
 	if err := applyLearningContext(stateDir, &request); err != nil {
+		return err
+	}
+	if err := applyMemoryContext(stateDir, &request); err != nil {
 		return err
 	}
 	outcome, runErr := (workrun.Service{Executor: executor}).Execute(ctx, request)

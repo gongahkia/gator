@@ -16,6 +16,7 @@ import (
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/goal"
 )
 
 func TestWorkCommandCreatesDefaultValidatedReport(t *testing.T) {
@@ -60,6 +61,59 @@ func TestWorkCommandReadsObjectiveFromStdinAndEmitsJSON(t *testing.T) {
 	}
 	if result["status"] != "completed" || result["final_text"] != "Inspected." {
 		t.Fatalf("JSON result = %#v", result)
+	}
+}
+
+func TestGoalWorkResumesConversationWithUpdatedUserContext(t *testing.T) {
+	stateDir := t.TempDir()
+	t.Setenv("GATOR_STATE_DIR", stateDir)
+	t.Setenv("GATOR_PROVIDER", "openai")
+	t.Setenv("GATOR_MODEL", "test-model")
+	store, err := goal.Open(stateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := store.Add("Prepare launch", "The partner deadline is Friday", t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := &workScriptedModel{turns: []agent.Turn{{Text: "I will track the partner deadline."}}}
+	var output bytes.Buffer
+	if err := runWorkTask([]string{"--goal", record.ID, "--json", "What matters next?"}, strings.NewReader(""), &output, func(_, _, _ string) (agent.Model, error) { return first, nil }); err != nil {
+		t.Fatal(err)
+	}
+	attached, err := store.Load(record.ID)
+	if err != nil || attached.ConversationID == "" {
+		t.Fatalf("goal conversation = %#v, %v", attached, err)
+	}
+	if len(first.requests) != 1 || !strings.Contains(first.requests[0].System, "The partner deadline is Friday") {
+		t.Fatalf("first goal context = %#v", first.requests)
+	}
+	if _, err := store.SetContext(record.ID, "The deadline moved to Monday"); err != nil {
+		t.Fatal(err)
+	}
+	second := &workScriptedModel{turns: []agent.Turn{{Text: "The deadline is now Monday."}}}
+	output.Reset()
+	if err := runWorkTask([]string{"--goal", record.ID, "--json", "What changed?"}, strings.NewReader(""), &output, func(_, _, _ string) (agent.Model, error) { return second, nil }); err != nil {
+		t.Fatal(err)
+	}
+	var result struct {
+		ConversationID string `json:"conversation_id"`
+	}
+	if err := json.Unmarshal(output.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.ConversationID != attached.ConversationID || len(second.requests) != 1 || !strings.Contains(second.requests[0].System, "The deadline moved to Monday") || !strings.Contains(second.requests[0].Messages[0].Content, "What matters next?") {
+		t.Fatalf("continuation = %#v; request = %#v", result, second.requests)
+	}
+	if _, err := store.SetStatus(record.ID, goal.Paused); err != nil {
+		t.Fatal(err)
+	}
+	if err := runWorkTask([]string{"--goal", record.ID, "--mode", "inspect", "What now?"}, strings.NewReader(""), &bytes.Buffer{}, func(_, _, _ string) (agent.Model, error) {
+		t.Fatal("paused goal reached model")
+		return nil, nil
+	}); err == nil {
+		t.Fatal("paused goal accepted work")
 	}
 }
 

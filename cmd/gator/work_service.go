@@ -10,6 +10,7 @@ import (
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/learning"
+	"github.com/gongahkia/gator/internal/memory"
 	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/snapshot"
 	"github.com/gongahkia/gator/internal/workrun"
@@ -56,6 +57,9 @@ func configuredWorkService(provider, modelName, stateDir string, request *workru
 	if err := applyLearningContext(stateDir, request); err != nil {
 		return workrun.Service{}, err
 	}
+	if err := applyMemoryContext(stateDir, request); err != nil {
+		return workrun.Service{}, err
+	}
 	request.ConnectorPermissions = connector.PermissionSet(settings.ConnectorPermissions)
 	request.SnapshotOptions = snapshot.Options{Limits: snapshot.Limits{MaxFiles: settings.Snapshots.MaxFiles, MaxTotal: settings.Snapshots.MaxTotalBytes, MaxFileBytes: settings.Snapshots.MaxFileBytes}, Excludes: settings.Snapshots.Excludes}
 	executor := workrun.Executor{Model: backend, StateDir: stateDir, Connectors: connector.Runtime{Registry: registry, Credentials: credentials}}
@@ -99,6 +103,20 @@ func applyLearningContext(stateDir string, request *workrun.Request) error {
 		return fmt.Errorf("resolve active learnings: %w", err)
 	}
 	request.LearningContext = learning.RenderProjection(records)
+	return nil
+}
+
+func applyMemoryContext(stateDir string, request *workrun.Request) error {
+	store, err := memory.Open(stateDir)
+	if err != nil {
+		return err
+	}
+	query := request.Objective + " " + request.GoalContext
+	records, err := store.Search(query, request.GoalID, 8)
+	if err != nil {
+		return fmt.Errorf("resolve relevant memories: %w", err)
+	}
+	request.MemoryContext = memory.Render(records)
 	return nil
 }
 

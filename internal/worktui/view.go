@@ -142,6 +142,40 @@ func (m Model) renderHome(width, height int, accent lipgloss.Style) string {
 	composerTop := max(1, height-composerRows)
 	var view strings.Builder
 	view.WriteString(title + "\n")
+	available := max(0, composerTop-strings.Count(view.String(), "\n")-2)
+	if len(m.config.Goals) > 0 && available > 2 {
+		view.WriteString("\nOngoing goals  ·  /goals to resume\n")
+		shown := 0
+		for _, goal := range m.config.Goals {
+			if goal.Status != "active" {
+				continue
+			}
+			view.WriteString("  " + truncate(goal.Title, max(20, width-10)) + "\n")
+			shown++
+			if shown == min(5, available-2) {
+				break
+			}
+		}
+	}
+	if len(m.config.Inbox) > 0 && strings.Count(view.String(), "\n")+2 < composerTop {
+		unread := 0
+		for _, entry := range m.config.Inbox {
+			if entry.ReadAt.IsZero() {
+				unread++
+			}
+		}
+		if unread > 0 {
+			view.WriteString(fmt.Sprintf("\n%d unread follow-up result(s)  ·  ctrl+b to review\n", unread))
+		}
+	}
+	if !m.config.SupervisorRunning && strings.Count(view.String(), "\n")+2 < composerTop {
+		for _, job := range m.config.Jobs {
+			if job.Enabled {
+				view.WriteString("\nRecurring checks need a running supervisor  ·  gator job supervisor\n")
+				break
+			}
+		}
+	}
 	if currentRow := strings.Count(view.String(), "\n"); currentRow < composerTop {
 		view.WriteString(strings.Repeat("\n", composerTop-currentRow))
 	}
@@ -165,6 +199,8 @@ func (m Model) renderPalette(width, height int, accent, dim, selectedStyle lipgl
 	title := "Commands"
 	if m.launcherMode == "conversations" {
 		title = "Conversations"
+	} else if m.launcherMode == "goals" {
+		title = "Ongoing goals"
 	} else if m.launcherMode == "source" {
 		title = "Source"
 	} else if m.launcherMode == "copy" {

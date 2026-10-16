@@ -41,6 +41,28 @@ func (m *Model) openConversationPicker() {
 	m.selected = 0
 }
 
+func (m *Model) openGoalPicker() {
+	if m.config.ListGoals != nil {
+		goals, err := m.config.ListGoals()
+		if err != nil {
+			m.status = "List goals: " + err.Error()
+		} else {
+			m.config.Goals = goals
+		}
+	}
+	m.launcher = true
+	m.launcherMode = "goals"
+	m.entries = nil
+	for _, goal := range m.config.Goals {
+		if goal.Status != "active" {
+			continue
+		}
+		m.entries = append(m.entries, entry{title: goal.Title, subtitle: goal.Context, kind: "goal", id: goal.ID})
+	}
+	m.paletteQuery = ""
+	m.selected = 0
+}
+
 func (m *Model) openSourceMenu() {
 	m.launcher = true
 	m.launcherMode = "source"
@@ -141,6 +163,8 @@ func commandPaletteEntries() []entry {
 		{title: "/theme", subtitle: "Choose gator, contrast, or mono", kind: "command-input", command: "/theme"},
 		{title: "/history", subtitle: "Browse all retained Work", kind: "command", command: "/history"},
 		{title: "/jobs", subtitle: "Schedule, run, and review repeatable Work", kind: "command-input", command: "/jobs"},
+		{title: "/goals", subtitle: "Resume an ongoing goal", kind: "command", command: "/goals"},
+		{title: "/memory", subtitle: "Search or manage saved knowledge", kind: "command-input", command: "/memory"},
 		{title: "/learnings", subtitle: "Browse and manage scoped guidance", kind: "command", command: "/learnings"},
 		{title: "/feedback", subtitle: "Accept, reject, correct, or remember this Work result", kind: "command-input", command: "/feedback"},
 		{title: "/review", subtitle: "Show latest staged output", kind: "command", command: "/review"},
@@ -171,6 +195,9 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 			err = fmt.Errorf("usage: /help [advanced]")
 		}
 	case "/new":
+		if m.config.ClearGoal != nil {
+			m.config.ClearGoal()
+		}
 		m.home, m.conversation = true, ""
 		m.section, m.paletteQuery, m.launcherMode = "", "", ""
 		m.source = m.config.CurrentFolder
@@ -278,6 +305,14 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		var resolved string
 		resolved, err = m.config.ResolveSource(value)
 		if err == nil {
+			if m.config.ClearGoal != nil {
+				m.config.ClearGoal()
+			}
+			if m.source != resolved {
+				m.conversation = ""
+				m.revision = ""
+				m.messages = nil
+			}
 			m.source = resolved
 			m.title = "Work in " + filepath.Base(resolved)
 			m.options.RefreshSource = m.conversation != ""
@@ -398,6 +433,19 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 				m.config.Jobs = refreshed
 			}
 		}
+	case "/goals":
+		if len(fields) != 1 {
+			err = fmt.Errorf("usage: /goals")
+			break
+		}
+		m.openGoalPicker()
+		return m, nil
+	case "/memory":
+		if m.config.MemoryAction == nil {
+			err = errorsUnavailable("memory")
+			break
+		}
+		result, err = m.config.MemoryAction(fields[1:])
 	case "/history":
 		if len(fields) > 2 {
 			err = fmt.Errorf("usage: /history [all|running|completed|failed]")
@@ -961,6 +1009,9 @@ func workHelp() string {
   /history [STATUS]              browse all retained Work
   /jobs [list|add|show|edit|enable|disable|run|history|remove]
                                  schedule and review repeatable Work
+  /goals                         resume an ongoing goal
+  /memory add|list|search|show|correct|forget ...
+                                 manage explicit saved knowledge
   /learnings [STATUS]            browse and manage guidance for future Work
   /feedback accept|reject|dont-learn [NOTE]
   /feedback correct|remember [OPTIONS] TEXT

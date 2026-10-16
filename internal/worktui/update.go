@@ -645,6 +645,13 @@ func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "copy":
 			return m.copySelection(selected.id)
 		case "conversation":
+			if m.running {
+				m.status = "Finish the current task before switching conversations"
+				return m, nil
+			}
+			if m.config.ClearGoal != nil {
+				m.config.ClearGoal()
+			}
 			m.launcher = false
 			m.paletteQuery = ""
 			m.section = ""
@@ -653,6 +660,38 @@ func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.conversation = selected.id
 			m.title = selected.title
 			m.restoreConversation(selected.id, "")
+			m.scroll = 0
+		case "goal":
+			if m.running {
+				m.status = "Finish the current task before switching goals"
+				return m, nil
+			}
+			if m.config.SelectGoal == nil {
+				m.status = "Goal selection is unavailable"
+				return m, nil
+			}
+			state, err := m.config.SelectGoal(selected.id)
+			if err != nil {
+				m.status = "Open goal: " + err.Error()
+				return m, nil
+			}
+			m.launcher = false
+			m.paletteQuery = ""
+			m.section = ""
+			m.home = false
+			m.source = state.SourcePath
+			m.conversation = state.ConversationID
+			m.title = state.Title
+			m.messages = nil
+			m.revision = ""
+			m.snapshot = ""
+			m.lastBundle = BundleSummary{}
+			m.lastOutput = ""
+			m.options = RunOptions{MaxSteps: 24, Mode: "auto", Code: CodeOptions{MaxSteps: 16, Sandbox: "strict", Network: "deny"}}
+			if state.ConversationID != "" {
+				m.restoreConversation(state.ConversationID, "")
+			}
+			m.title = state.Title
 			m.scroll = 0
 		}
 	default:

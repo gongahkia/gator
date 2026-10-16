@@ -7,13 +7,16 @@ server into a scheduler. Those components own live resources in one process;
 they do not provide durable ownership, missed-run policy, or restart safety.
 
 Scheduled Work runs through a separate local supervisor backed by versioned job
-definitions and immutable attempt records. The user starts it in a foreground
-terminal with `gator job supervisor`; Gator deliberately does not install an OS
-service or stretch its process-local TUI queue into a scheduler.
+definitions and immutable attempt records. The user can start it in a foreground
+terminal with `gator job supervisor`. On macOS, `gator job launchagent install`
+installs an opt-in per-user service that keeps the supervisor running while the
+Mac is on and the user is signed in. Gator does not stretch its process-local
+TUI queue into a scheduler.
 
-This is a product boundary, not a missing alias. A command that merely sleeps
-in the background would look persistent while losing jobs on logout, upgrade,
-crash, or machine restart.
+This is a product boundary. The supervisor reconciles interrupted attempts and
+applies the configured missed-run policy after a restart. It does not run when
+the machine is off. The macOS service must be reinstalled when the executable
+path changes.
 
 ## Authority boundary
 
@@ -158,6 +161,9 @@ gator job stop
 gator job inbox [--unread]
 gator job inbox read ENTRY_ID
 gator job remove ID --yes        # keeps immutable history by default
+gator job launchagent install    # macOS, opt-in per-user supervisor
+gator job launchagent status
+gator job launchagent remove --yes
 ```
 
 Cron uses five fields and an explicit IANA timezone. `skip` is the default
@@ -167,8 +173,9 @@ connected mutation or publish operation.
 
 ## Operational boundary
 
-The supervisor is intentionally foreground-only: it does not install a launchd
-unit, systemd unit, login item, or background daemon. `gator job stop` verifies
+The supervisor runs in the foreground by default. On macOS the separate
+`launchagent` command can install or remove a per-user launchd unit; no systemd
+unit is installed on Linux. `gator job stop` verifies
 the private bearer token, literal loopback endpoint, PID, and instance nonce
 before requesting shutdown. Stop cancels the active Work context and joins its
 children. Startup reconciliation marks interrupted attempts for inspection; it

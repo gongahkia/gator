@@ -65,3 +65,17 @@ func TestGoalRejectsTraversalAndSymlinkRecord(t *testing.T) {
 		t.Fatal("accepted symlink goal")
 	}
 }
+
+func TestGoalWithoutSourceGetsPrivateWorkspace(t *testing.T) {
+	store, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := store.Add("Track a trip", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info, err := os.Stat(record.SourcePath); err != nil || !info.IsDir() {
+		t.Fatalf("private goal workspace = %q, %v", record.SourcePath, err)
+	}
+}

@@ -62,11 +62,26 @@ func Open(stateDir string) (Store, error) {
 }
 
 func (s Store) Add(title, context, sourcePath string) (Record, error) {
+	title, context = strings.TrimSpace(title), strings.TrimSpace(context)
+	if title == "" || len(title) > 256 || len(context) > 8192 || strings.ContainsRune(title+context, 0) {
+		return Record{}, errors.New("invalid goal title or context")
+	}
 	var bytes [12]byte
 	if _, err := rand.Read(bytes[:]); err != nil {
 		return Record{}, err
 	}
+	id := "goal-" + hex.EncodeToString(bytes[:])
+	if strings.TrimSpace(sourcePath) == "" {
+		sourcePath = filepath.Join(s.root, "sources", id)
+		if err := os.MkdirAll(sourcePath, 0700); err != nil {
+			return Record{}, err
+		}
+	}
 	abs, err := filepath.Abs(sourcePath)
+	if err != nil {
+		return Record{}, err
+	}
+	abs, err = filepath.EvalSymlinks(abs)
 	if err != nil {
 		return Record{}, err
 	}
@@ -78,7 +93,7 @@ func (s Store) Add(title, context, sourcePath string) (Record, error) {
 		return Record{}, errors.New("goal source must be a directory")
 	}
 	now := s.now().UTC()
-	record := Record{Version: Version, ID: "goal-" + hex.EncodeToString(bytes[:]), Title: strings.TrimSpace(title), Context: strings.TrimSpace(context), SourcePath: filepath.Clean(abs), Status: Active, CreatedAt: now, UpdatedAt: now}
+	record := Record{Version: Version, ID: id, Title: title, Context: context, SourcePath: filepath.Clean(abs), Status: Active, CreatedAt: now, UpdatedAt: now}
 	if err := validate(record); err != nil {
 		return Record{}, err
 	}
