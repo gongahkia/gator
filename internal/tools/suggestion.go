@@ -20,7 +20,7 @@ type SuggestChange struct {
 }
 
 func (SuggestChange) Definition() agent.ToolDefinition {
-	return agent.ToolDefinition{Name: "suggest_change", Description: "Queue a note, reusable skill, or typed goal-plan change for user review. It does not activate the suggestion. Use only for durable information or progress that the user is likely to want retained; never infer a personal fact from weak evidence.", Parameters: json.RawMessage(`{"type":"object","required":["kind"],"properties":{"kind":{"type":"string","enum":["note","skill","plan"]},"title":{"type":"string","maxLength":256},"body":{"type":"string","maxLength":24576},"skill_id":{"type":"string","maxLength":64},"description":{"type":"string","maxLength":512},"plan_change":{"type":"object"}},"additionalProperties":false}`)}
+	return agent.ToolDefinition{Name: "suggest_change", Description: "Queue a note, reusable skill, or typed goal-plan change for user review. It does not activate the suggestion. For notes include exact source references when available; never infer a personal fact from weak evidence.", Parameters: json.RawMessage(`{"type":"object","required":["kind"],"properties":{"kind":{"type":"string","enum":["note","skill","plan"]},"title":{"type":"string","maxLength":256},"body":{"type":"string","maxLength":24576},"source_refs":{"type":"array","maxItems":15,"items":{"type":"string","maxLength":512}},"skill_id":{"type":"string","maxLength":64},"description":{"type":"string","maxLength":512},"plan_change":{"type":"object"}},"additionalProperties":false}`)}
 }
 
 func (t SuggestChange) Execute(_ context.Context, raw json.RawMessage) (agent.ToolResult, error) {
@@ -28,6 +28,7 @@ func (t SuggestChange) Execute(_ context.Context, raw json.RawMessage) (agent.To
 		Kind        string          `json:"kind"`
 		Title       string          `json:"title"`
 		Body        string          `json:"body"`
+		SourceRefs  []string        `json:"source_refs"`
 		SkillID     string          `json:"skill_id"`
 		Description string          `json:"description"`
 		PlanChange  goal.PlanChange `json:"plan_change"`
@@ -48,7 +49,7 @@ func (t SuggestChange) Execute(_ context.Context, raw json.RawMessage) (agent.To
 	if args.Kind == "plan" && strings.TrimSpace(args.Body) != "" {
 		return agent.ToolResult{}, errors.New("plan changes must use plan_change, not body text")
 	}
-	record, err := t.Store.Create(suggestion.Record{Kind: args.Kind, Title: args.Title, Body: args.Body, SkillID: args.SkillID, Description: args.Description, GoalID: goalID, WorkID: t.WorkID, PlanChange: args.PlanChange})
+	record, err := t.Store.Create(suggestion.Record{Kind: args.Kind, Title: args.Title, Body: args.Body, SourceRefs: args.SourceRefs, SkillID: args.SkillID, Description: args.Description, GoalID: goalID, WorkID: t.WorkID, PlanChange: args.PlanChange})
 	if err != nil {
 		return agent.ToolResult{}, err
 	}

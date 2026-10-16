@@ -84,6 +84,32 @@ func TestNotesAndSkillsPersistWithScopeAndCorrection(t *testing.T) {
 	}
 }
 
+func TestSourceLinkedNoteCanBeFoundAndCorrected(t *testing.T) {
+	store, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	note, err := store.AddNoteWithRefs("Venue choice", "Capacity is 90", "", []string{"source/venue-email.md:12", "work:work-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	matched, err := store.SearchNotes("venue-email", "", 8)
+	if err != nil || len(matched) != 1 || matched[0].ID != note.ID {
+		t.Fatalf("source-linked search = %#v, %v", matched, err)
+	}
+	updated, err := store.UpdateNoteWithRefs(note.ID, "Venue choice", "Capacity is 85", []string{"source/revised-venue.md:4"})
+	if err != nil || len(updated.SourceRefs) != 1 || updated.SourceRefs[0] != "source/revised-venue.md:4" {
+		t.Fatalf("corrected note = %#v, %v", updated, err)
+	}
+	matched, err = store.SearchNotes("venue-email", "", 8)
+	if err != nil || len(matched) != 0 {
+		t.Fatalf("old source remained searchable = %#v, %v", matched, err)
+	}
+	if _, err := store.AddNoteWithRefs("Bad", "body", "", []string{"line\nbreak"}); err == nil {
+		t.Fatal("invalid source reference accepted")
+	}
+}
+
 func TestKnowledgeRejectsTraversalSymlinksAndOversizedBodies(t *testing.T) {
 	store, err := Open(t.TempDir())
 	if err != nil {

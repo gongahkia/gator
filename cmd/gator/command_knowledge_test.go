@@ -19,10 +19,18 @@ func TestNoteAndSkillCommandsCreatePrivatePersistentKnowledge(t *testing.T) {
 	}
 	goalID := strings.Fields(out.String())[0]
 	out.Reset()
-	if err := run([]string{"note", "add", "--title", "Launch meeting", "--goal", goalID, "--body", "Decision moved to Tuesday"}, &out); err != nil {
+	if err := run([]string{"note", "add", "--title", "Launch meeting", "--goal", goalID, "--source-ref", "source/meeting.md:8", "--body", "Decision moved to Tuesday"}, &out); err != nil {
 		t.Fatal(err)
 	}
 	noteID := strings.Fields(out.String())[0]
+	out.Reset()
+	if err := run([]string{"note", "show", noteID}, &out); err != nil || !strings.Contains(out.String(), "source/meeting.md:8") {
+		t.Fatalf("source reference not shown: %q, %v", out.String(), err)
+	}
+	out.Reset()
+	if err := run([]string{"note", "edit", noteID, "--clear-source-refs"}, &out); err != nil {
+		t.Fatal(err)
+	}
 	out.Reset()
 	if err := run([]string{"note", "search", "--goal", goalID, "Tuesday"}, &out); err != nil || !strings.Contains(out.String(), noteID) {
 		t.Fatalf("note search = %q, %v", out.String(), err)

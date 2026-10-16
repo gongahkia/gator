@@ -22,18 +22,23 @@ executed as a shell command or loaded as a plugin.
 ## Notes
 
 ```sh
-gator note add --title 'Venue decision' --goal GOAL_ID --body 'Venue B is preferred; verify capacity by Friday.'
+gator note add --title 'Venue decision' --goal GOAL_ID --source-ref 'source/venue-email.md:12' --body 'Venue B is preferred; verify capacity by Friday.'
 gator note add --title 'Meeting notes' --file ./meeting.md
 gator note search --goal GOAL_ID 'venue capacity'
 gator note show NOTE_ID
 gator note edit NOTE_ID --file ./revised-meeting.md
+gator note edit NOTE_ID --source-ref 'source/revised-venue.md:4'
+gator note edit NOTE_ID --clear-source-refs
 gator note path NOTE_ID
 gator note remove NOTE_ID --yes
 ```
 
 A note is either global or attached to one goal. Goal-scoped notes are never
-returned to another goal's Work tools. Search is lexical and bounded; it does
-not claim semantic recall. Short `gator memory` records retain their separate
+returned to another goal's Work tools. Search is lexical and bounded. It indexes
+source reference terms so a note can be found by a document name, but it does
+not claim semantic recall. Source references are user-maintained provenance
+labels, not proof that the source still says the same thing; check the current
+source before relying on them. Short `gator memory` records retain their separate
 expiry and correction controls. `knowledge_search` and `knowledge_read` let the
 main agent retrieve both notes and active memories during Work. They accept IDs
 and query text, never arbitrary filesystem paths.

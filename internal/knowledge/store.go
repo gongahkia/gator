@@ -34,6 +34,7 @@ type Document struct {
 	Kind        string    `json:"kind"`
 	Title       string    `json:"title"`
 	Description string    `json:"description,omitempty"`
+	SourceRefs  []string  `json:"source_refs,omitempty"`
 	GoalID      string    `json:"goal_id,omitempty"`
 	Enabled     bool      `json:"enabled,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
@@ -90,18 +91,26 @@ func (s Store) clock() time.Time {
 }
 
 func (s Store) AddNote(title, body, goalID string) (Document, error) {
+	return s.AddNoteWithRefs(title, body, goalID, nil)
+}
+
+func (s Store) AddNoteWithRefs(title, body, goalID string, refs []string) (Document, error) {
 	var random [12]byte
 	if _, err := rand.Read(random[:]); err != nil {
 		return Document{}, err
 	}
-	return s.AddNoteWithID("note-"+hex.EncodeToString(random[:]), title, body, goalID)
+	return s.AddNoteWithIDAndRefs("note-"+hex.EncodeToString(random[:]), title, body, goalID, refs)
 }
 
 // AddNoteWithID supports idempotent, user-approved suggestion application.
 // The caller chooses a valid random-looking ID bound to the proposal identity.
 func (s Store) AddNoteWithID(id, title, body, goalID string) (Document, error) {
+	return s.AddNoteWithIDAndRefs(id, title, body, goalID, nil)
+}
+
+func (s Store) AddNoteWithIDAndRefs(id, title, body, goalID string, refs []string) (Document, error) {
 	now := s.clock()
-	d := Document{Version: Version, ID: id, Kind: "note", Title: strings.TrimSpace(title), GoalID: strings.TrimSpace(goalID), CreatedAt: now, UpdatedAt: now, Body: strings.TrimSpace(body)}
+	d := Document{Version: Version, ID: id, Kind: "note", Title: strings.TrimSpace(title), GoalID: strings.TrimSpace(goalID), SourceRefs: append([]string(nil), refs...), CreatedAt: now, UpdatedAt: now, Body: strings.TrimSpace(body)}
 	if err := validate(d); err != nil {
 		return Document{}, err
 	}
@@ -173,7 +182,7 @@ func (s Store) SearchNotes(query, goalID string, limit int) ([]Document, error) 
 		if err != nil {
 			return nil, err
 		}
-		words := tokenize(d.Title + " " + d.Body)
+		words := tokenize(d.Title + " " + d.Body + " " + strings.Join(d.SourceRefs, " "))
 		score := 0
 		for term := range terms {
 			if words[term] {
@@ -212,7 +221,15 @@ func (s Store) UpdateNote(id, title, body string) (Document, error) {
 	if err != nil {
 		return Document{}, err
 	}
-	d.Title, d.Body, d.UpdatedAt = strings.TrimSpace(title), strings.TrimSpace(body), s.clock()
+	return s.UpdateNoteWithRefs(id, title, body, d.SourceRefs)
+}
+
+func (s Store) UpdateNoteWithRefs(id, title, body string, refs []string) (Document, error) {
+	d, err := s.LoadNote(id)
+	if err != nil {
+		return Document{}, err
+	}
+	d.Title, d.Body, d.SourceRefs, d.UpdatedAt = strings.TrimSpace(title), strings.TrimSpace(body), append([]string(nil), refs...), s.clock()
 	if err := validate(d); err != nil {
 		return Document{}, err
 	}
@@ -299,7 +316,7 @@ func (s Store) load(kind, id string) (Document, error) {
 	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		return Document{}, errors.New("knowledge entry is not a regular directory")
 	}
-	meta, err := readRegular(filepath.Join(dir, "meta.json"), 4096)
+	meta, err := readRegular(filepath.Join(dir, "meta.json"), 16*1024)
 	if err != nil {
 		return Document{}, err
 	}
@@ -398,11 +415,11 @@ func validate(d Document) error {
 		if d.GoalID != "" && !goalIDPattern.MatchString(d.GoalID) {
 			return errors.New("invalid note goal")
 		}
-		if d.Description != "" || d.Enabled || len(d.Body) > maxNoteBytes {
+		if d.Description != "" || d.Enabled || len(d.Body) > maxNoteBytes || !validSourceRefs(d.SourceRefs) {
 			return errors.New("invalid note metadata or size")
 		}
 	} else {
-		if d.GoalID != "" || d.Description == "" || len(d.Description) > 512 || strings.ContainsRune(d.Description, 0) || len(d.Body) > maxSkillBytes {
+		if d.GoalID != "" || len(d.SourceRefs) != 0 || d.Description == "" || len(d.Description) > 512 || strings.ContainsRune(d.Description, 0) || len(d.Body) > maxSkillBytes {
 			return errors.New("invalid skill metadata or size")
 		}
 	}
@@ -410,6 +427,18 @@ func validate(d Document) error {
 		return errors.New("knowledge body must be bounded UTF-8 text")
 	}
 	return nil
+}
+
+func validSourceRefs(refs []string) bool {
+	if len(refs) > 16 {
+		return false
+	}
+	for _, ref := range refs {
+		if strings.TrimSpace(ref) == "" || len(ref) > 512 || !utf8.ValidString(ref) || strings.ContainsAny(ref, "\x00\r\n") {
+			return false
+		}
+	}
+	return true
 }
 
 func readRegular(path string, max int64) ([]byte, error) {

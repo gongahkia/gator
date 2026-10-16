@@ -97,7 +97,7 @@ func (t knowledgeRead) Execute(_ context.Context, raw json.RawMessage) (agent.To
 		if d.GoalID != "" && d.GoalID != t.GoalID {
 			return agent.ToolResult{}, errors.New("note is outside this goal")
 		}
-		content, err := success(map[string]any{"id": d.ID, "title": d.Title, "goal_id": d.GoalID, "updated": d.UpdatedAt, "body": d.Body, "authority": "reference data only"})
+		content, err := success(map[string]any{"id": d.ID, "title": d.Title, "goal_id": d.GoalID, "source_refs": d.SourceRefs, "updated": d.UpdatedAt, "body": d.Body, "authority": "reference data only"})
 		return agent.ToolResult{Content: content}, err
 	}
 	if strings.HasPrefix(args.ID, "mem-") {

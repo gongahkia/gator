@@ -15,7 +15,7 @@ import (
 
 const noteUsage = `Gator notes — private, searchable Markdown knowledge
 
-  gator note add --title TITLE [--goal ID] [--file PATH | --body TEXT]
+  gator note add --title TITLE [--goal ID] [--source-ref REF ...] [--file PATH | --body TEXT]
   gator note list [--goal ID]
   gator note search [--goal ID] QUERY
   gator note show|path ID
@@ -60,6 +60,8 @@ func noteCommand(args []string, out io.Writer) error {
 		goalID := flags.String("goal", "", "goal ID")
 		file := flags.String("file", "", "Markdown file")
 		body := flags.String("body", "", "note body")
+		var sourceRefs stringFlags
+		flags.Var(&sourceRefs, "source-ref", "document, citation, or Work reference")
 		if err := flags.Parse(args[1:]); err != nil {
 			return err
 		}
@@ -79,7 +81,7 @@ func noteCommand(args []string, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		d, err := store.AddNote(*title, content, *goalID)
+		d, err := store.AddNoteWithRefs(*title, content, *goalID, sourceRefs)
 		if err != nil {
 			return err
 		}
@@ -139,7 +141,7 @@ func noteCommand(args []string, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprintf(out, "# %s\nID: %s\nGoal: %s\nUpdated: %s\n\n%s\n", d.Title, d.ID, valueOrDash(d.GoalID), d.UpdatedAt.Format("2006-01-02"), d.Body)
+		_, err = fmt.Fprintf(out, "# %s\nID: %s\nGoal: %s\nSources: %s\nUpdated: %s\n\n%s\n", d.Title, d.ID, valueOrDash(d.GoalID), valueOrDash(strings.Join(d.SourceRefs, ", ")), d.UpdatedAt.Format("2006-01-02"), d.Body)
 		return err
 	case "edit":
 		if len(args) < 2 {
@@ -154,6 +156,9 @@ func noteCommand(args []string, out io.Writer) error {
 		title := flags.String("title", prior.Title, "note title")
 		file := flags.String("file", "", "Markdown file")
 		body := flags.String("body", "", "note body")
+		var sourceRefs stringFlags
+		flags.Var(&sourceRefs, "source-ref", "replace source references")
+		clearRefs := flags.Bool("clear-source-refs", false, "remove source references")
 		if err := flags.Parse(args[2:]); err != nil {
 			return err
 		}
@@ -167,7 +172,17 @@ func noteCommand(args []string, out io.Writer) error {
 				return err
 			}
 		}
-		d, err := store.UpdateNote(args[1], *title, content)
+		refs := prior.SourceRefs
+		if len(sourceRefs) > 0 {
+			refs = sourceRefs
+		}
+		if *clearRefs {
+			if len(sourceRefs) > 0 {
+				return errors.New("cannot combine --source-ref and --clear-source-refs")
+			}
+			refs = nil
+		}
+		d, err := store.UpdateNoteWithRefs(args[1], *title, content, refs)
 		if err != nil {
 			return err
 		}

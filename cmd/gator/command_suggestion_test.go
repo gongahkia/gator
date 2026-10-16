@@ -39,7 +39,7 @@ func TestReviewSuggestionsActivatesOnlyAcceptedChanges(t *testing.T) {
 	if err != nil || accepted.Status != "accepted" {
 		t.Fatalf("accepted = %#v, %v", accepted, err)
 	}
-	if saved, err := knowledgeStore.LoadNote(accepted.ResultID); err != nil || saved.Body != note.Body {
+	if saved, err := knowledgeStore.LoadNote(accepted.ResultID); err != nil || saved.Body != note.Body || len(saved.SourceRefs) != 1 || saved.SourceRefs[0] != "work:work-1" {
 		t.Fatalf("saved note = %#v, %v", saved, err)
 	}
 	if err := suggestionCommand([]string{"accept", note.ID}, &output); err == nil {

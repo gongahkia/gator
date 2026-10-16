@@ -31,6 +31,7 @@ type Record struct {
 	Status      string          `json:"status"`
 	Title       string          `json:"title,omitempty"`
 	Body        string          `json:"body,omitempty"`
+	SourceRefs  []string        `json:"source_refs,omitempty"`
 	SkillID     string          `json:"skill_id,omitempty"`
 	Description string          `json:"description,omitempty"`
 	GoalID      string          `json:"goal_id,omitempty"`
@@ -261,8 +262,13 @@ func validate(record Record) error {
 	if record.Status == "pending" && !record.ResolvedAt.IsZero() || record.Status != "pending" && record.ResolvedAt.IsZero() {
 		return errors.New("invalid suggestion resolution time")
 	}
-	if len(record.Title) > 256 || len(record.Body) > 24*1024 || len(record.Description) > 512 || !utf8.ValidString(record.Title+record.Body+record.Description) || strings.ContainsRune(record.Title+record.Body+record.Description, 0) {
+	if len(record.Title) > 256 || len(record.Body) > 24*1024 || len(record.Description) > 512 || !utf8.ValidString(record.Title+record.Body+record.Description) || strings.ContainsRune(record.Title+record.Body+record.Description, 0) || len(record.SourceRefs) > 15 {
 		return errors.New("invalid suggestion content")
+	}
+	for _, ref := range record.SourceRefs {
+		if strings.TrimSpace(ref) == "" || len(ref) > 512 || !utf8.ValidString(ref) || strings.ContainsAny(ref, "\x00\r\n") {
+			return errors.New("invalid suggestion source reference")
+		}
 	}
 	switch record.Kind {
 	case "note":
@@ -270,11 +276,11 @@ func validate(record Record) error {
 			return errors.New("note suggestion needs title and body")
 		}
 	case "skill":
-		if !skillIDPattern.MatchString(record.SkillID) || strings.TrimSpace(record.Description) == "" || strings.TrimSpace(record.Body) == "" || record.GoalID != "" {
+		if !skillIDPattern.MatchString(record.SkillID) || strings.TrimSpace(record.Description) == "" || strings.TrimSpace(record.Body) == "" || record.GoalID != "" || len(record.SourceRefs) != 0 {
 			return errors.New("skill suggestion needs a global name, description, and procedure")
 		}
 	case "plan":
-		if !validGoalID(record.GoalID) || goal.ValidatePlanChange(record.PlanChange) != nil {
+		if !validGoalID(record.GoalID) || goal.ValidatePlanChange(record.PlanChange) != nil || len(record.SourceRefs) != 0 {
 			return errors.New("plan suggestion needs a goal and typed change")
 		}
 	default:

@@ -91,10 +91,11 @@ func applySuggestion(stateDir string, record suggestion.Record) (string, error) 
 			return "", err
 		}
 		id := "note-" + strings.TrimPrefix(record.ID, "suggestion-")
-		created, err := store.AddNoteWithID(id, record.Title, record.Body, record.GoalID)
+		refs := append(append([]string(nil), record.SourceRefs...), "work:"+record.WorkID)
+		created, err := store.AddNoteWithIDAndRefs(id, record.Title, record.Body, record.GoalID, refs)
 		if os.IsExist(err) {
 			existing, loadErr := store.LoadNote(id)
-			if loadErr == nil && existing.Title == record.Title && existing.Body == record.Body && existing.GoalID == record.GoalID {
+			if loadErr == nil && existing.Title == record.Title && existing.Body == record.Body && existing.GoalID == record.GoalID && strings.Join(existing.SourceRefs, "\x00") == strings.Join(refs, "\x00") {
 				return id, nil
 			}
 		}
