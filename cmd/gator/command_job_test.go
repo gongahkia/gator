@@ -7,10 +7,12 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workrun"
@@ -101,5 +103,69 @@ func TestJobWorkUsesCanonicalWorkHistory(t *testing.T) {
 	}
 	if record.Status != workhistory.Completed || record.ConversationID != result.ConversationID || record.RevisionID != result.RevisionID || record.Evidence.ArtifactManifestPath != result.ManifestPath {
 		t.Fatalf("job Work history = %#v; result = %#v", record, result)
+	}
+}
+
+func TestScheduledInboxIsQuietForRepeatedResult(t *testing.T) {
+	state := t.TempDir()
+	store, err := jobs.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	definition, err := store.Save(jobs.Definition{Name: "daily brief", Enabled: true, Schedule: "0 9 * * *", SourcePath: t.TempDir(), Objective: "Check the brief", Mode: action.Inspect, Contract: artifact.InspectionContract()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	complete := func(summary, digest, status string) string {
+		t.Helper()
+		attempt, err := store.Begin(definition, time.Now())
+		if err != nil {
+			t.Fatal(err)
+		}
+		attempt.Status, attempt.Summary, attempt.ResultSHA256 = status, summary, digest
+		attempt.NotificationPolicySHA256 = jobNotificationPolicyHash(definition)
+		attempt.FinishedAt = time.Now().UTC()
+		if status == "failed" {
+			attempt.Error = "provider unavailable"
+		}
+		if err := store.Record(attempt); err != nil {
+			t.Fatal(err)
+		}
+		entry, err := recordJobInbox(state, definition, attempt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return entry.ID
+	}
+	if id := complete("No change in the brief", "same", "completed"); id == "" {
+		t.Fatal("first result was suppressed")
+	}
+	if id := complete("No change in the brief", "same", "completed"); id != "" {
+		t.Fatal("identical result created a new inbox item")
+	}
+	if id := complete("The deadline moved", "changed", "completed"); id == "" {
+		t.Fatal("changed result was suppressed")
+	}
+	if id := complete("", "", "failed"); id == "" {
+		t.Fatal("failure was suppressed")
+	}
+	if id := complete("The deadline moved", "changed", "completed"); id == "" {
+		t.Fatal("recovery after failure was suppressed")
+	}
+	mailbox, err := inbox.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries, err := mailbox.List(false, 20)
+	if err != nil || len(entries) != 4 || entries[0].Summary != "The deadline moved" {
+		t.Fatalf("entries = %#v, %v", entries, err)
+	}
+}
+
+func TestJobResultDigestIncludesArtifactContent(t *testing.T) {
+	a := digestJobResult("No change", []artifact.File{{Path: "brief.md", SHA256: "one"}})
+	b := digestJobResult("No change", []artifact.File{{Path: "brief.md", SHA256: "two"}})
+	if a == b || summarizeJobResult("\n The deadline moved.\nMore detail", nil) != "The deadline moved." {
+		t.Fatal("result digest or summary missed material output")
 	}
 }

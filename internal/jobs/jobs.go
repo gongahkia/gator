@@ -55,20 +55,23 @@ type Definition struct {
 }
 
 type Attempt struct {
-	Runs             []RunReference `json:"runs,omitempty"`
-	Version          int            `json:"version"`
-	ID               string         `json:"id"`
-	JobID            string         `json:"job_id"`
-	DefinitionSHA256 string         `json:"definition_sha256"`
-	ScheduledAt      time.Time      `json:"scheduled_at"`
-	StartedAt        time.Time      `json:"started_at"`
-	FinishedAt       time.Time      `json:"finished_at"`
-	Try              int            `json:"try"`
-	Status           string         `json:"status"`
-	Conversation     string         `json:"conversation_id,omitempty"`
-	Revision         string         `json:"revision_id,omitempty"`
-	BundlePath       string         `json:"bundle_path,omitempty"`
-	Error            string         `json:"error,omitempty"`
+	Runs                     []RunReference `json:"runs,omitempty"`
+	Version                  int            `json:"version"`
+	ID                       string         `json:"id"`
+	JobID                    string         `json:"job_id"`
+	DefinitionSHA256         string         `json:"definition_sha256"`
+	ScheduledAt              time.Time      `json:"scheduled_at"`
+	StartedAt                time.Time      `json:"started_at"`
+	FinishedAt               time.Time      `json:"finished_at"`
+	Try                      int            `json:"try"`
+	Status                   string         `json:"status"`
+	Conversation             string         `json:"conversation_id,omitempty"`
+	Revision                 string         `json:"revision_id,omitempty"`
+	BundlePath               string         `json:"bundle_path,omitempty"`
+	Summary                  string         `json:"summary,omitempty"`
+	ResultSHA256             string         `json:"result_sha256,omitempty"`
+	NotificationPolicySHA256 string         `json:"notification_policy_sha256,omitempty"`
+	Error                    string         `json:"error,omitempty"`
 }
 
 type RunReference struct {

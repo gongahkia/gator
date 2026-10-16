@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -25,6 +26,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
@@ -36,6 +38,8 @@ type jobResult struct {
 	RevisionID     string `json:"revision_id"`
 	ManifestPath   string `json:"manifest_path"`
 	Status         string `json:"status"`
+	Summary        string `json:"summary,omitempty"`
+	ResultSHA256   string `json:"result_sha256,omitempty"`
 	Error          string `json:"error"`
 }
 
@@ -350,11 +354,14 @@ func manageJob(command, id string, arguments []string, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		attempt = executeJob(definition, attempt, stateDir, true)
+		attempt = executeJob(definition, attempt, stateDir, false)
 		if err := store.Record(attempt); err != nil {
 			return err
 		}
-		_, _ = recordJobInbox(stateDir, definition, attempt)
+		entry, inboxErr := recordJobInbox(stateDir, definition, attempt)
+		if inboxErr == nil && entry.ID != "" {
+			desktopNotification(definition.Name, entry.Summary)
+		}
 		encoder := json.NewEncoder(out)
 		return encoder.Encode(attempt)
 	case "remove":
@@ -471,6 +478,9 @@ func executeJobContext(ctx context.Context, definition jobs.Definition, attempt 
 	attempt.FinishedAt = time.Now().UTC()
 	attempt.Conversation = result.ConversationID
 	attempt.Revision = result.RevisionID
+	attempt.Summary = result.Summary
+	attempt.ResultSHA256 = result.ResultSHA256
+	attempt.NotificationPolicySHA256 = jobNotificationPolicyHash(definition)
 	if result.ManifestPath != "" {
 		attempt.BundlePath = filepath.Dir(result.ManifestPath)
 	}
@@ -483,9 +493,7 @@ func executeJobContext(ctx context.Context, definition jobs.Definition, attempt 
 			attempt.Status = "completed"
 		}
 	}
-	if notify {
-		desktopNotification(definition.Name, attempt.Status)
-	}
+	_ = notify // notification follows durable recording and duplicate suppression.
 	return attempt
 }
 
@@ -494,6 +502,7 @@ func runJobProcess(definition jobs.Definition, stateDir string) (jobResult, erro
 }
 func jobWorkRequest(definition jobs.Definition) workrun.Request {
 	request := workrun.Request{Limits: definition.Limits, WebOrigins: definition.WebOrigins, Project: definition.Project, SourcePath: definition.SourcePath, SnapshotID: definition.SnapshotID, Objective: definition.Objective, Mode: definition.Mode, Contract: definition.Contract, Code: definition.Code, EnableCode: definition.EnableCode, MaxSteps: definition.MaxSteps, ConnectorIDs: definition.ConnectorIDs}
+	request.System = "This is a scheduled check. In the final response, briefly state what changed, what needs the user's attention, or that nothing material changed. Mention evidence or output paths when relevant. Do not claim a change without evidence."
 	if definition.RefreshSnapshot {
 		request.SnapshotID = ""
 	}
@@ -554,7 +563,12 @@ func runJobProcessWith(ctx context.Context, definition jobs.Definition, stateDir
 		request.RunID = runIDs[0]
 	}
 	outcome, err := execute(ctx, definition.Provider, definition.Model, stateDir, request)
-	return jobResult{ConversationID: outcome.ConversationID, RevisionID: outcome.RevisionID, ManifestPath: outcome.Work.ManifestPath, Status: string(outcome.Manifest.Status)}, err
+	result := jobResult{ConversationID: outcome.ConversationID, RevisionID: outcome.RevisionID, ManifestPath: outcome.Work.ManifestPath, Status: string(outcome.Manifest.Status)}
+	if err == nil && result.Status == "completed" {
+		result.Summary = summarizeJobResult(outcome.Result.FinalText, outcome.Manifest.Artifacts)
+		result.ResultSHA256 = digestJobResult(outcome.Result.FinalText, outcome.Manifest.Artifacts)
+	}
+	return result, err
 }
 
 func runJobSupervisor(arguments []string, out io.Writer) error {
@@ -712,24 +726,89 @@ func runDueJobsContext(ctx context.Context, store jobs.Store, stateDir string, n
 		if err != nil || !ok {
 			continue
 		}
-		attempt = executeJobContext(ctx, claimed, attempt, stateDir, notify)
+		attempt = executeJobContext(ctx, claimed, attempt, stateDir, false)
 		if err := store.Record(attempt); err != nil {
 			continue
 		}
-		_, _ = recordJobInbox(stateDir, claimed, attempt)
+		entry, err := recordJobInbox(stateDir, claimed, attempt)
+		if err == nil && notify && entry.ID != "" {
+			desktopNotification(claimed.Name, entry.Summary)
+		}
 	}
 }
 
 func recordJobInbox(stateDir string, definition jobs.Definition, attempt jobs.Attempt) (inbox.Entry, error) {
+	if attempt.Status == "completed" && attempt.ResultSHA256 != "" {
+		jobStore, err := jobs.Open(stateDir)
+		if err != nil {
+			return inbox.Entry{}, err
+		}
+		history, err := jobStore.History(definition.ID, 50)
+		if err != nil {
+			return inbox.Entry{}, err
+		}
+		for _, previous := range history {
+			if previous.ID == attempt.ID || previous.Status == "running" {
+				continue
+			}
+			if previous.Status == "completed" && previous.NotificationPolicySHA256 != "" && previous.NotificationPolicySHA256 == attempt.NotificationPolicySHA256 && previous.ResultSHA256 == attempt.ResultSHA256 {
+				return inbox.Entry{}, nil
+			}
+			break
+		}
+	}
 	store, err := inbox.Open(stateDir)
 	if err != nil {
 		return inbox.Entry{}, err
 	}
-	summary := "Scheduled Work completed."
+	summary := attempt.Summary
+	if summary == "" {
+		summary = "Scheduled Work completed."
+	}
 	if attempt.Status != "completed" {
 		summary = "Scheduled Work needs attention: " + attempt.Error
 	}
 	return store.Add(inbox.Entry{Kind: "job", Title: definition.Name, Summary: boundedJobError(summary), JobID: definition.ID, GoalID: definition.GoalID, ConversationID: attempt.Conversation, RevisionID: attempt.Revision, Status: attempt.Status})
+}
+
+func summarizeJobResult(finalText string, artifacts []artifact.File) string {
+	for _, line := range strings.Split(finalText, "\n") {
+		line = strings.Join(strings.Fields(line), " ")
+		if line != "" {
+			value := []rune(line)
+			if len(value) > 360 {
+				value = value[:360]
+			}
+			return string(value)
+		}
+	}
+	if len(artifacts) > 0 {
+		return "Updated " + artifacts[0].Path
+	}
+	return "Scheduled Work completed."
+}
+
+func digestJobResult(finalText string, artifacts []artifact.File) string {
+	value := strings.Join(strings.Fields(finalText), " ")
+	for _, file := range artifacts {
+		value += "\n" + file.Path + " " + file.SHA256
+	}
+	if value == "" {
+		return ""
+	}
+	digest := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(digest[:])
+}
+
+func jobNotificationPolicyHash(definition jobs.Definition) string {
+	definition.UpdatedAt = time.Time{}
+	definition.LastScheduledAt = time.Time{}
+	data, err := json.Marshal(definition)
+	if err != nil {
+		return ""
+	}
+	digest := sha256.Sum256(data)
+	return hex.EncodeToString(digest[:])
 }
 
 func inboxCommand(arguments []string, out io.Writer) error {
