@@ -151,7 +151,7 @@ func goalCommand(args []string, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprintf(out, "Scheduled %s for %s (%s %s). Run 'gator job supervisor' or install the macOS LaunchAgent to execute it while Gator is closed.\n", record.ID, definition.ID, definition.Schedule, definition.Timezone)
+		_, err = fmt.Fprintf(out, "Scheduled %s for %s (%s %s). Run 'gator job supervisor' or install the per-user macOS/Linux service to execute it while Gator is closed.\n", record.ID, definition.ID, definition.Schedule, definition.Timezone)
 		return err
 	case "schedules":
 		if len(args) != 2 {

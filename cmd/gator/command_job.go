@@ -75,6 +75,8 @@ func jobCommand(arguments []string, out io.Writer) error {
 		return runJobSupervisor(arguments[1:], out)
 	case "launchagent":
 		return jobLaunchAgent(arguments[1:], out)
+	case "systemd":
+		return jobSystemd(arguments[1:], out)
 	case "status":
 		return jobSupervisorRequest("health", out)
 	case "stop":

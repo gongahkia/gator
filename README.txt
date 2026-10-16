@@ -14,8 +14,8 @@ selected goal's current context. Gator can answer questions, research selected
 sources, analyze data, create documents, and prepare actions through selected
 tools. A goal can have a recurring check with gator goal schedule. The local
 job supervisor runs scheduled checks and sends results to Gator's inbox; on
-macOS, an opt-in LaunchAgent can keep it running after the CLI closes. External
-changes still require explicit approval. See docs/PERSONAL_AGENT_DIRECTION.md
+macOS and Linux, opt-in per-user services can keep it running after the CLI
+closes. External changes still require explicit approval. See docs/PERSONAL_AGENT_DIRECTION.md
 for the product scope and current limits.
 
 Longer notes and reusable text skills can be saved with `gator note` and
