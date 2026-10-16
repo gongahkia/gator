@@ -164,6 +164,25 @@ func (s Store) MarkRead(entryID string, now time.Time) error {
 	return err
 }
 
+// Has checks a durable entry by exact ID without scanning or truncating the
+// inbox. The local supervisor uses this for one reminder per goal review time.
+func (s Store) Has(entryID string) (bool, error) {
+	if !idPattern.MatchString(entryID) {
+		return false, errors.New("invalid inbox entry ID")
+	}
+	info, err := os.Lstat(filepath.Join(s.root, entryID+".json"))
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+		return false, errors.New("inbox entry is not a regular file")
+	}
+	return true, nil
+}
+
 func id() string {
 	value := make([]byte, 8)
 	_, _ = rand.Read(value)

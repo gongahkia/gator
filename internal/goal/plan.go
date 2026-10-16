@@ -191,6 +191,9 @@ func (s Store) ApplyPlanChange(goalID string, change PlanChange) (Plan, error) {
 		plan.NextReviewAt = time.Time{}
 	case "mark_reviewed":
 		plan.LastReviewAt = now
+		if !plan.NextReviewAt.IsZero() && !plan.NextReviewAt.After(now) {
+			plan.NextReviewAt = time.Time{}
+		}
 	}
 	plan.Revision++
 	plan.UpdatedAt = now

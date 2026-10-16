@@ -21,7 +21,7 @@ Meta describes Muse as a personal agent that develops plans for goals, works acr
 | Continue a conversation | Durable Work conversations, replay, branching, goal records, TUI picker, and structured goal plans | Plan updates are still user maintained; the agent cannot propose a reviewed change |
 | Remember preferences and decisions | Scoped learnings, searchable memories, source-linked Markdown notes, bounded alternate-query search, explicit skills, and reviewed model suggestions | Retrieval still depends on good terms; suggestion quality and source-link accuracy need live evaluation |
 | Act through tools | Local files, browser, connectors, approval broker, internal specialists, reviewed goal-plan suggestions | Tool setup and selection are still technical; no automatic goal-level plan/action loop |
-| Work over time | Goal-linked jobs, attempts, inbox, exact duplicate-result suppression, opt-in local change gate, macOS opt-in LaunchAgent | No event push trigger or semantic change detection; Linux has no installed service command |
+| Work over time | Goal-linked jobs, due review reminders, attempts, inbox, exact duplicate-result suppression, opt-in local change gate, macOS opt-in LaunchAgent | No event push trigger or semantic change detection; Linux has no installed service command |
 | Extend behavior | Extensions, user-created text skills, MCP, role routing, read-only goal reviewer | Skills are explicit text procedures; model-authored suggestions and measured workflow selection need evaluation |
 | Prove value | Fifty Work tasks and 25 two-turn personal continuity cases with a same-model baseline switch | No live continuity comparison yet; scripted pass is not model success |
 
@@ -57,6 +57,11 @@ gator goal plan GOAL_ID review-at 2026-10-21T09:00:00+08:00
 ```
 
 Inside a goal chat, `/plan` shows that plan. `/plan outcome TEXT`, `/plan add TITLE | RFC3339_DUE | EVIDENCE`, `/plan step STEP_ID done | EVIDENCE`, and `/plan review-at RFC3339` make common edits in place; `/plan help` shows the syntax.
+When the local job supervisor is running, a due `review-at` creates one inbox
+reminder without a model call. `/plan reviewed` records that the user reviewed
+the goal and clears a due review time. The reminder will appear after the CLI
+closes only while the local supervisor is running (or its macOS LaunchAgent is
+installed and the user session remains active).
 
 ## Next engineering sequence
 

@@ -689,6 +689,7 @@ func runJobSupervisor(arguments []string, out io.Writer) error {
 	defer os.Remove(filepath.Join(store.Root(), "supervisor.token"))
 	fmt.Fprintf(out, "Gator job supervisor running at %s (PID %d). Keep this terminal open.\n", state.URL, state.PID)
 	runDueJobsContext(ctx, store, stateDir, *notify, time.Now())
+	runDueGoalReviews(stateDir, *notify, time.Now())
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 	for {
@@ -700,6 +701,7 @@ func runJobSupervisor(arguments []string, out io.Writer) error {
 			return nil
 		case now := <-ticker.C:
 			runDueJobsContext(ctx, store, stateDir, *notify, now)
+			runDueGoalReviews(stateDir, *notify, now)
 		}
 	}
 }
