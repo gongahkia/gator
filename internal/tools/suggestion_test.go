@@ -17,6 +17,9 @@ func TestSuggestChangeQueuesScopedProposal(t *testing.T) {
 	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"kind":"plan","plan_change":{"kind":"add_step","title":"Check source"}}`)); err == nil {
 		t.Fatal("unbound goal plan proposal accepted")
 	}
+	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"kind":"schedule","cron":"0 9 * * *","timezone":"UTC","task":"Check"}`)); err == nil {
+		t.Fatal("unbound goal schedule proposal accepted")
+	}
 	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"kind":"note","title":"Preference","body":"Use short briefs"}`)); err != nil {
 		t.Fatal(err)
 	}

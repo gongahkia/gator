@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/gongahkia/gator/internal/goal"
+	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/knowledge"
 	"github.com/gongahkia/gator/internal/suggestion"
 )
@@ -85,5 +86,52 @@ func TestAcceptedPlanSuggestionChecksCurrentRevision(t *testing.T) {
 	loaded, err := queue.Load(proposal.ID)
 	if err != nil || loaded.Status != "pending" {
 		t.Fatalf("stale proposal status = %#v, %v", loaded, err)
+	}
+}
+
+func TestAcceptedScheduleSuggestionCreatesInspectOnlyGoalJob(t *testing.T) {
+	state := t.TempDir()
+	t.Setenv("GATOR_STATE_DIR", state)
+	goals, err := goal.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := goals.Add("Daily project check", "", t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	queue, err := suggestion.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proposal, err := queue.Create(suggestion.Record{Kind: "schedule", GoalID: record.ID, WorkID: "work-1", Cron: "0 9 * * 1-5", Timezone: "Asia/Singapore", Task: "Check changed blockers", ChangeOnly: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	jobStore, err := jobs.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before, err := jobStore.List(); err != nil || len(before) != 0 {
+		t.Fatalf("pending schedule created job: %#v, %v", before, err)
+	}
+	firstID, err := applySuggestion(state, proposal)
+	if err != nil || firstID == "" {
+		t.Fatalf("first schedule application = %q, %v", firstID, err)
+	}
+	if err := suggestionCommand([]string{"accept", proposal.ID}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	accepted, err := queue.Load(proposal.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	job, err := jobStore.Load(accepted.ResultID)
+	if err != nil || job.GoalID != record.ID || !job.ChangeOnly || job.Mode != "inspect" || job.Contract.ExternalActions != "forbid" {
+		t.Fatalf("accepted job = %#v, %v", job, err)
+	}
+	all, err := jobStore.List()
+	if err != nil || len(all) != 1 || accepted.ResultID != firstID {
+		t.Fatalf("schedule retry created a duplicate: %#v, %v", all, err)
 	}
 }

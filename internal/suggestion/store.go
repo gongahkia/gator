@@ -18,6 +18,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/gongahkia/gator/internal/goal"
+	"github.com/robfig/cron/v3"
 )
 
 const Version = 1
@@ -37,6 +38,10 @@ type Record struct {
 	GoalID      string          `json:"goal_id,omitempty"`
 	WorkID      string          `json:"work_id"`
 	PlanChange  goal.PlanChange `json:"plan_change,omitempty"`
+	Cron        string          `json:"cron,omitempty"`
+	Task        string          `json:"task,omitempty"`
+	Timezone    string          `json:"timezone,omitempty"`
+	ChangeOnly  bool            `json:"change_only,omitempty"`
 	ResultID    string          `json:"result_id,omitempty"`
 	CreatedAt   time.Time       `json:"created_at"`
 	ResolvedAt  time.Time       `json:"resolved_at,omitempty"`
@@ -282,6 +287,17 @@ func validate(record Record) error {
 	case "plan":
 		if !validGoalID(record.GoalID) || goal.ValidatePlanChange(record.PlanChange) != nil || len(record.SourceRefs) != 0 {
 			return errors.New("plan suggestion needs a goal and typed change")
+		}
+	case "schedule":
+		if !validGoalID(record.GoalID) || strings.TrimSpace(record.Task) == "" || len(record.Task) > 8192 || !utf8.ValidString(record.Task) || strings.ContainsRune(record.Task, 0) || len(record.Cron) > 256 || len(record.Timezone) > 128 || len(record.SourceRefs) != 0 {
+			return errors.New("schedule suggestion needs a goal, bounded task, and cron")
+		}
+		parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+		if _, err := parser.Parse(record.Cron); err != nil {
+			return fmt.Errorf("invalid suggested cron: %w", err)
+		}
+		if _, err := time.LoadLocation(record.Timezone); err != nil {
+			return fmt.Errorf("invalid suggested timezone: %w", err)
 		}
 	default:
 		return fmt.Errorf("invalid suggestion kind %q", record.Kind)

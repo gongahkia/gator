@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+
+	"github.com/gongahkia/gator/internal/goal"
 )
 
 func TestSuggestionRemainsPendingUntilOneReviewDecision(t *testing.T) {
@@ -57,6 +59,12 @@ func TestSuggestionRejectsSymlinkAndInvalidPlan(t *testing.T) {
 	}
 	if _, err := store.Create(Record{Kind: "plan", GoalID: "goal-000000000000000000000000", WorkID: "work-1"}); err == nil {
 		t.Fatal("invalid plan accepted")
+	}
+	if _, err := store.Create(Record{Kind: "schedule", GoalID: "goal-000000000000000000000000", WorkID: "work-1", Cron: "every minute", Timezone: "UTC", Task: "Check"}); err == nil {
+		t.Fatal("invalid schedule accepted")
+	}
+	if _, err := store.Create(Record{Kind: "plan", GoalID: "goal-000000000000000000000000", WorkID: "work-1", PlanChange: goal.PlanChange{Kind: "set_outcome", Outcome: "valid", ExpectedRevision: 0}}); err != nil {
+		t.Fatal(err)
 	}
 	record, err := store.Create(Record{Kind: "note", Title: "Title", Body: "Body", WorkID: "work-1"})
 	if err != nil {

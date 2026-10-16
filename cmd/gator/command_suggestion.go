@@ -8,7 +8,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/goal"
+	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/knowledge"
 	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/suggestion"
@@ -80,6 +83,9 @@ func suggestionLabel(record suggestion.Record) string {
 	if record.SkillID != "" {
 		return record.SkillID
 	}
+	if record.Kind == "schedule" {
+		return record.Cron + "  " + record.Task
+	}
 	return record.PlanChange.Kind
 }
 
@@ -123,6 +129,33 @@ func applySuggestion(stateDir string, record suggestion.Record) (string, error) 
 			return "", err
 		}
 		return fmt.Sprintf("%s@%d", record.GoalID, plan.Revision), nil
+	case "schedule":
+		goals, err := goal.Open(stateDir)
+		if err != nil {
+			return "", err
+		}
+		current, err := goals.Load(record.GoalID)
+		if err != nil {
+			return "", err
+		}
+		if current.Status != goal.Active {
+			return "", errors.New("resume the goal before accepting its schedule")
+		}
+		store, err := jobs.Open(stateDir)
+		if err != nil {
+			return "", err
+		}
+		id := "job-" + record.ID
+		if existing, err := store.Load(id); err == nil {
+			if existing.GoalID == current.ID && existing.Schedule == record.Cron && existing.Timezone == record.Timezone && existing.Objective == record.Task && existing.ChangeOnly == record.ChangeOnly && existing.Mode == action.Inspect {
+				return id, nil
+			}
+			return "", errors.New("suggested schedule ID already exists with different settings")
+		} else if !os.IsNotExist(err) {
+			return "", err
+		}
+		definition, err := store.Save(jobs.Definition{ID: id, Name: current.Title, GoalID: current.ID, Enabled: true, Schedule: record.Cron, Timezone: record.Timezone, Missed: "run_once", SourcePath: current.SourcePath, RefreshSnapshot: true, ChangeOnly: record.ChangeOnly, Objective: record.Task, Mode: action.Inspect, Contract: artifact.InspectionContract(), MaxSteps: 24, CreatedAt: record.CreatedAt})
+		return definition.ID, err
 	default:
 		return "", errors.New("unsupported suggestion kind")
 	}

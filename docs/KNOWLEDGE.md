@@ -88,7 +88,8 @@ the knowledge tools themselves do not start a process.
 
 ## Review agent suggestions
 
-During Work, Gator may queue a candidate note, skill, or goal-plan edit. The
+During Work, Gator may queue a candidate note, skill, goal-plan edit, or
+goal-linked recurring check. The
 candidate records its source Work ID and is not used as knowledge until you
 accept it. Review from the terminal UI with `/suggestions` or from the shell:
 
@@ -102,3 +103,7 @@ gator suggestion reject SUGGESTION_ID
 A plan suggestion carries the exact plan revision it was based on. If you
 changed the plan since then, acceptance fails and leaves the suggestion pending
 for review or rejection.
+
+A schedule suggestion shows its five-field cron expression, IANA timezone,
+task, and optional local change gate before acceptance. Accepting it creates an
+inspect-only goal job; it cannot grant unattended sending or publishing.
