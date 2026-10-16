@@ -63,6 +63,11 @@ func jobSystemd(arguments []string, out io.Writer) error {
 		if output, err := command("enable", "--now", jobSystemdUnitName); err != nil {
 			return fmt.Errorf("enable Gator user service: %w (%s)", err, strings.TrimSpace(string(output)))
 		}
+		// enable --now does not restart a unit that was already active. Restart
+		// after daemon-reload so reinstalling a moved binary takes effect.
+		if output, err := command("restart", jobSystemdUnitName); err != nil {
+			return fmt.Errorf("restart Gator user service: %w (%s)", err, strings.TrimSpace(string(output)))
+		}
 		_, err = fmt.Fprintf(out, "Installed local user service %s\n  unit: %s\nIt runs while your Linux user manager is active. Desktop/CUA sessions are never scheduled.\n", jobSystemdUnitName, unitPath)
 		return err
 	case "status":

@@ -74,7 +74,7 @@ func TestJobSystemdManagesOnlyItsUserUnit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"--user daemon-reload", "--user enable --now " + jobSystemdUnitName, "--user --no-pager status " + jobSystemdUnitName, "--user disable --now " + jobSystemdUnitName} {
+	for _, want := range []string{"--user daemon-reload", "--user enable --now " + jobSystemdUnitName, "--user restart " + jobSystemdUnitName, "--user --no-pager status " + jobSystemdUnitName, "--user disable --now " + jobSystemdUnitName} {
 		if !strings.Contains(string(logData), want) {
 			t.Fatalf("systemctl calls missing %q:\n%s", want, logData)
 		}
