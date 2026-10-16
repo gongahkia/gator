@@ -56,6 +56,8 @@ gator goal plan GOAL_ID step STEP_ID done --evidence 'user-confirmed: room holds
 gator goal plan GOAL_ID review-at 2026-10-21T09:00:00+08:00
 ```
 
+Inside a goal chat, `/plan` shows that plan. `/plan outcome TEXT`, `/plan add TITLE | RFC3339_DUE | EVIDENCE`, `/plan step STEP_ID done | EVIDENCE`, and `/plan review-at RFC3339` make common edits in place; `/plan help` shows the syntax.
+
 ## Next engineering sequence
 
 1. **Measure continuity quality.** Test multi-day goals with corrections, expiry, scope boundaries, and changing source facts. Compare live model behavior against a same-model baseline; passing storage tests alone does not prove agent usefulness.

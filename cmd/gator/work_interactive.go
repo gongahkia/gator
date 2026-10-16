@@ -173,6 +173,12 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			return worktui.GoalState{Title: record.Title, SourcePath: record.SourcePath, ConversationID: record.ConversationID}, nil
 		},
 		ClearGoal: func() { goalID = "" },
+		PlanAction: func(command string) (string, error) {
+			if goalID == "" {
+				return "", errors.New("select an active goal with /goals before using /plan")
+			}
+			return workTUIPlanAction(goalStore, goalID, command)
+		},
 		MemoryAction: func(arguments []string) (string, error) {
 			if goalID != "" && len(arguments) > 0 && (arguments[0] == "add" || arguments[0] == "list" || arguments[0] == "search") {
 				hasGoal := false

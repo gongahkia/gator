@@ -163,6 +163,7 @@ type Config struct {
 	SelectGoal              func(id string) (GoalState, error)
 	ClearGoal               func()
 	MemoryAction            func(arguments []string) (string, error)
+	PlanAction              func(command string) (string, error)
 	NoteAction              func(command string) (string, error)
 	SkillAction             func(command string) (string, error)
 	// JobAction uses the same local Job service as the CLI. It keeps scheduling
