@@ -13,8 +13,8 @@ folders and explicitly connected data become validated, reviewable artifact
 bundles. The source is read-only, output is isolated, completion is checked by
 a developer-owned contract, and external actions are independently proposed
 and approved. The existing isolated coding workflow remains available under
-the user-facing Gator manager as a backend-only specialist. `gator work code` is a
-compatibility spelling for that same orchestration path, not a second product.
+the user-facing Gator manager as a backend-only specialist. Direct Code mode
+was retired as the product shifted toward a persistent terminal companion.
 
 This is a credible local Work application, not yet a full replacement for
 ChatGPT Work or Claude Cowork. It now includes a conversation-oriented TUI,

@@ -51,7 +51,7 @@ func workCommand(arguments []string, out io.Writer) error {
 	case "inspect":
 		return inspectTask(arguments[1:], out)
 	case "code":
-		return codeTask(arguments[1:], out)
+		return errors.New("direct Code mode is retired; describe the outcome in a Gator conversation")
 	case "resume":
 		return workResumeCommand(arguments[1:], out)
 	case "eval":
@@ -71,17 +71,6 @@ func workCommand(arguments []string, out io.Writer) error {
 	default:
 		return workTask(arguments, out)
 	}
-}
-
-func codeTask(arguments []string, out io.Writer) error {
-	if len(arguments) == 1 && isHelpArgument(arguments[0]) {
-		_, err := fmt.Fprintln(out, codeUsage)
-		return err
-	}
-	if len(arguments) > 0 && (arguments[0] == "resume" || arguments[0] == "fork" || arguments[0] == "clone") {
-		return errors.New("standalone Code sessions are retired; use 'gator work resume CONVERSATION' and Gator revision history")
-	}
-	return runWorkTask(append([]string{"--require-code"}, arguments...), os.Stdin, out, nativeWorkModel)
 }
 
 func workResumeCommand(arguments []string, out io.Writer) error {

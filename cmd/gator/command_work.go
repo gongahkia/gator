@@ -108,7 +108,6 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	tokens := flags.Int64("max-tokens", 0, "reported token limit; zero disables")
 	seconds := flags.Int("timeout-seconds", 1800, "aggregate wall time")
 	codeMaxSteps := flags.Int("code-max-steps", 0, "maximum internal Code specialist turns")
-	requireCode := flags.Bool("require-code", false, "require an internal Code specialist patch")
 	runID := flags.String("run-id", "", "stable run identifier")
 	conversationID := flags.String("conversation", "", "continue a retained Work conversation")
 	goalID := flags.String("goal", "", "continue an ongoing goal and its conversation")
@@ -378,7 +377,6 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		ApproveBrowser:       workBrowserApprover(*jsonOutput, in, out),
 		DesktopSession:       strings.TrimSpace(*desktopSession),
 		ApproveDesktop:       workDesktopApprover(*jsonOutput, in, out),
-		RequireCode:          *requireCode,
 		Code: workrun.CodePolicy{
 			MaxSteps: *codeMaxSteps, Verification: codeVerification, Scopes: codeScopes, Profile: strings.TrimSpace(*codeProfile),
 			Setup: codeSetup, AllowedCommands: codeAllowed, AllowedCommandPrefixes: codePrefixes,

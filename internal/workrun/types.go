@@ -122,9 +122,7 @@ type Request struct {
 	// available only to an explicitly computer-use-capable provider model.
 	DesktopSession string
 	ApproveDesktop func(context.Context, []string) (tools.CommandDecision, error)
-	// RequireCode keeps Work user-facing while requiring concrete
-	// Code-specialist evidence before the Work transaction may complete. The
-	// CLI's explicit `gator work code` route and the TUI's /code mode set it.
+	// RequireCode is reserved for internal evaluation of patch evidence.
 	// EnableCode grants the internal patch specialist to a Work request without
 	// requiring a patch to complete. Ordinary file and data Work leaves it off.
 	EnableCode         bool

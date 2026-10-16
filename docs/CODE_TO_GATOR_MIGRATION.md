@@ -4,9 +4,8 @@
 
 Gator is the only user-facing agent. The original Code application is no
 longer a second terminal product: its isolated Git executor is an internal
-specialist that Gator may call with a bounded task. `gator work code` and `gator work run`
-remain compatibility spellings, but both enter the Gator manager and require a
-retained Code patch before the manager can complete.
+specialist that Gator may call with a bounded task. Direct Code mode is retired;
+users describe an outcome in the Gator conversation.
 
 The authority direction is one-way:
 
@@ -69,7 +68,7 @@ user controls + objective
   trees. Parallelism belongs to Gator's manager.
 - Integration names are not grants. A capability must be explicitly enabled,
   and its existing project trust/authentication checks still apply.
-- A compatibility `gator work code`/`gator work run` request cannot complete without a
+- Internal requests that require Code evidence cannot complete without a
   successful Code invocation and a retained patch artifact.
 - The child never applies its patch to live source. Review and transfer stay at
   the Gator product boundary.

@@ -115,11 +115,10 @@ keep local notes. Do not commit transcripts, session files, or credentials.
    and the review shows escaped exact JSON plus its digest.
 6. In an isolated test endpoint, deny one act-mode proposal and approve another;
    confirm only the approved payload is sent and each decision is requested.
-7. Run `gator work code --verify ...` on a real repo and confirm it enters the main
-   Gator orchestration path, retains internal Code patch evidence, and leaves
-   the source unchanged.
-8. Give ordinary Gator one mixed research-and-implementation prompt; confirm
-   the manager delegates Code only for the bounded implementation portion.
+7. Confirm `gator work code` and the TUI `/code` switch are unavailable.
+8. In an internal evaluation that grants the Code specialist, confirm a mixed
+   research-and-implementation prompt delegates only the bounded implementation
+   portion and leaves the source unchanged.
 9. Resume a Work conversation, branch from an earlier revision, and confirm the
    original revision and source snapshot remain unchanged.
 10. Queue a second main-TUI prompt, force the active run to fail, and confirm

@@ -408,7 +408,6 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 		WebOrigins:              append([]string(nil), options.WebOrigins...),
 		IgnoredInstructionPaths: append([]string(nil), options.IgnoredInstructionPaths...),
 		RefreshSource:           options.RefreshSource || currentGoal.ID != "",
-		RequireCode:             options.RequireCode,
 		OnEvent:                 options.OnEvent, Steering: options.Steering,
 	}
 	parse := func(values []string) ([][]string, error) {
@@ -744,7 +743,6 @@ func loadWorkTUIConversationOptions(store worksession.Store, conversationID stri
 	var configuration struct {
 		Contract            artifact.Contract
 		Mode                action.Mode
-		RequireCode         bool
 		Code                workrun.CodePolicy
 		Connectors          []string
 		WebOrigins          []string
@@ -761,7 +759,6 @@ func loadWorkTUIConversationOptions(store worksession.Store, conversationID stri
 		options.PreviousArtifacts = append(options.PreviousArtifacts, requirement.Path)
 	}
 	options.ConnectorIDs = append([]string(nil), configuration.Connectors...)
-	options.RequireCode = configuration.RequireCode
 	options.WebOrigins = append([]string(nil), configuration.WebOrigins...)
 	options.IgnoredInstructionPaths = append([]string(nil), configuration.IgnoredInstructions...)
 	if configuration.Code.MaxSteps > 0 {

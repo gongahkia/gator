@@ -61,8 +61,7 @@ Supported document/workbook rendering remains in the existing trusted renderers.
 ## Code candidates
 
 Ordinary Work does not advertise the Code patch specialist. A host-owned
-`EnableCode` grant or the coding compatibility route's `RequireCode` flag makes
-it available for a run. This keeps file and data tasks on the Work artifact
+`EnableCode` grant makes it available for an internal run. This keeps file and data tasks on the Work artifact
 tools; the Code specialist returns patches, not requested CSV/document output.
 
 The manager selects Code assignments; Code cannot recursively delegate. Each

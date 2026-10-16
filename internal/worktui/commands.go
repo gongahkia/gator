@@ -335,17 +335,6 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		}
 		m.options.Mode = strings.ToLower(fields[1])
 		result = "Work mode set to " + m.options.Mode + "."
-	case "/code":
-		if len(fields) != 2 || !sliceContains([]string{"on", "off"}, strings.ToLower(fields[1])) {
-			err = fmt.Errorf("usage: /code on|off")
-			break
-		}
-		m.options.RequireCode = strings.EqualFold(fields[1], "on")
-		if m.options.RequireCode {
-			result = "Code specialist required for subsequent Work. Gator will retain patch evidence before completion."
-		} else {
-			result = "Code specialist is optional for subsequent Work."
-		}
 	case "/artifact":
 		result, err = m.configureArtifacts(fields, command)
 	case "/connector":
@@ -915,11 +904,11 @@ func singleLine(value string) string {
 
 func (m Model) workStatus() string {
 	modelSelection, modelAccess := m.configuredModelStatus()
-	return fmt.Sprintf("Gator orchestration\n  model: %s\n  model access: %s\n  workspace: %s%s\n  ignored project instructions: %s\n  conversation: %s\n  selected revision: %s\n  mode: %s\n  code specialist: %s\n  deliverables: %s\n  connectors: %s\n  web origins: %s\n  effort: %s (%d manager steps)\n  pending attachments: %s\n  queued prompts: %d\n  internal specialists: managed by Gator",
+	return fmt.Sprintf("Gator orchestration\n  model: %s\n  model access: %s\n  workspace: %s%s\n  ignored project instructions: %s\n  conversation: %s\n  selected revision: %s\n  mode: %s\n  deliverables: %s\n  connectors: %s\n  web origins: %s\n  effort: %s (%d manager steps)\n  pending attachments: %s\n  queued prompts: %d\n  internal specialists: managed by Gator",
 		modelSelection, modelAccess,
 		valueOrNone(m.source), map[bool]string{true: " (refresh next turn)", false: " (frozen per turn)"}[m.options.RefreshSource],
 		valueOrNone(strings.Join(m.options.IgnoredInstructionPaths, ", ")),
-		valueOrNone(m.conversation), valueOrNone(m.revision), valueOrNone(m.options.Mode), map[bool]string{true: "required", false: "optional"}[m.options.RequireCode], valueOrNone(strings.Join(m.options.Artifacts, ", ")),
+		valueOrNone(m.conversation), valueOrNone(m.revision), valueOrNone(m.options.Mode), valueOrNone(strings.Join(m.options.Artifacts, ", ")),
 		valueOrNone(strings.Join(m.options.ConnectorIDs, ", ")), valueOrNone(strings.Join(m.options.WebOrigins, ", ")),
 		effortName(m.options.MaxSteps), m.options.MaxSteps,
 		valueOrNone(strings.Join(m.options.Attachments, ", ")), len(m.queue))
@@ -1032,7 +1021,6 @@ func workHelp() string {
   /model                         choose Cloud API key or Local model
   /source [PATH]                 choose the workspace
   /mode auto|inspect|draft|act   choose Work authority
-  /code on|off                   require a verified code change
   /artifact [add|remove] PATH    set expected deliverables
   /history [STATUS]              browse all retained Work
   /jobs [list|add|show|edit|enable|disable|run|history|remove]

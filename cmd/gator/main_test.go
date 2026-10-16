@@ -140,9 +140,8 @@ func TestShortCLIFormsRouteToTheirCommandFamilies(t *testing.T) {
 	if err := run([]string{"-t", "list"}, &output); err != nil || !strings.Contains(output.String(), "contrast") {
 		t.Fatalf("-t output = %q, err = %v", output.String(), err)
 	}
-	output.Reset()
-	if err := run([]string{"-w", "code", "--help"}, &output); err != nil || !strings.Contains(output.String(), "gator work code") {
-		t.Fatalf("-w code output = %q, err = %v", output.String(), err)
+	if err := run([]string{"-w", "code", "--help"}, io.Discard); err == nil || !strings.Contains(err.Error(), "direct Code mode is retired") {
+		t.Fatalf("-w code error = %v", err)
 	}
 }
 
@@ -171,39 +170,10 @@ func TestNestedCommandFamiliesRouteToTheirHandlers(t *testing.T) {
 	}
 }
 
-func TestCodeRouteThroughTheMainOrchestrationEntryPoint(t *testing.T) {
-	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
-	t.Setenv("GATOR_STATE_DIR", t.TempDir())
-	t.Setenv("OPENAI_API_KEY", "")
-	for _, command := range []string{"code"} {
-		var output bytes.Buffer
-		err := run([]string{"work", command, "task without verification"}, &output)
-		if err == nil || strings.Contains(err.Error(), "--verify") || !strings.Contains(err.Error(), "OPENAI_API_KEY") {
-			t.Fatalf("%s entry point error = %v", command, err)
-		}
-	}
-}
-
-func TestCodeRouteExplainsTheManagerOwnedWorkflow(t *testing.T) {
-	for _, command := range []string{"code"} {
-		var output bytes.Buffer
-		if err := run([]string{"work", command, "--help"}, &output); err != nil {
-			t.Fatalf("%s help: %v", command, err)
-		}
-		for _, expected := range []string{"main Gator orchestration path", "internal Code specialist", "--code-capability", "strict sandbox"} {
-			if !strings.Contains(output.String(), expected) {
-				t.Fatalf("%s help is missing %q: %s", command, expected, output.String())
-			}
-		}
-	}
-}
-
-func TestStandaloneCodeConversationCommandsAreRetired(t *testing.T) {
-	for _, command := range []string{"resume", "fork", "clone"} {
-		var output bytes.Buffer
-		err := run([]string{"work", "code", command, "legacy-id"}, &output)
-		if err == nil || !strings.Contains(err.Error(), "standalone Code sessions are retired") {
-			t.Fatalf("work code %s error = %v", command, err)
+func TestDirectCodeRouteIsRetired(t *testing.T) {
+	for _, args := range [][]string{{"work", "code", "task"}, {"work", "code", "--help"}, {"work", "code", "resume", "legacy-id"}} {
+		if err := run(args, io.Discard); err == nil || !strings.Contains(err.Error(), "direct Code mode is retired") {
+			t.Fatalf("%v error = %v", args, err)
 		}
 	}
 }

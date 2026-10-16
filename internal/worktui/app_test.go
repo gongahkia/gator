@@ -78,28 +78,13 @@ func TestConversationSessionControlsReachEachRun(t *testing.T) {
 	}
 }
 
-func TestCodeModeRequiresTheSharedWorkCodeSpecialist(t *testing.T) {
-	var got RunOptions
-	model := New(Config{CurrentFolder: "/work", Run: func(_, _, _ string, options RunOptions) RunResult {
-		got = options
-		return RunResult{FinalText: "done"}
-	}})
+func TestDirectCodeCommandIsNotExposed(t *testing.T) {
+	model := New(Config{CurrentFolder: "/work"})
 	model.input = "/code on"
-	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	model = updated.(Model)
-	if !model.options.RequireCode {
-		t.Fatal("/code on did not enable the Work Code requirement")
-	}
-	model.input = "implement the patch"
 	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
-	if command == nil {
-		t.Fatal("Code Work did not start")
-	}
-	updated, _ = model.Update(command())
-	model = updated.(Model)
-	if !got.RequireCode || !strings.Contains(model.View(), "done") {
-		t.Fatalf("Code Work options = %#v\n%s", got, model.View())
+	if command != nil || !strings.Contains(model.View(), "unknown command /code") || strings.Contains(model.View(), "/code on|off") {
+		t.Fatalf("unexpected direct Code route: %s", model.View())
 	}
 }
 
@@ -810,20 +795,6 @@ func TestComposerCommandsAcceptPathsWithFlexibleWhitespace(t *testing.T) {
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if len(updated.(Model).options.Attachments) != 0 {
 		t.Fatalf("attachment was not removed: %#v", updated.(Model).options.Attachments)
-	}
-}
-
-func TestWorkTUIRejectsUnsupportedCodeCommandOptions(t *testing.T) {
-	model := New(Config{CurrentFolder: "/work"})
-	initial := cloneRunOptions(model.options)
-	model.input = "/code verify go test ./..."
-	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	model = updated.(Model)
-	if command != nil || !strings.Contains(model.View(), "usage: /code on|off") {
-		t.Fatalf("Code command validation = %#v\n%s", model, model.View())
-	}
-	if model.options.RequireCode || !reflect.DeepEqual(model.options.Code, initial.Code) {
-		t.Fatalf("Code settings changed from %#v to %#v", initial.Code, model.options.Code)
 	}
 }
 

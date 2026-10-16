@@ -53,33 +53,6 @@ Advanced and integration families remain available when needed:
 For a free-form Work task that begins with a nested command name, use
 gator work -- TASK to keep it a task rather than dispatching that command.`
 
-const codeUsage = `Gator coding — one Gator manager with an internal Code specialist
-
-Usage:
-  gator work code [CODE POLICY] TASK
-
-This command uses the main Gator orchestration path and requires retained Code
-patch evidence. It never opens a standalone Code session or TUI.
-
-Code policy:
-  --code-max-steps N
-  --verify 'argv ...'
-  --scope PATH
-  --profile NAME
-  --setup 'argv ...'
-  --allow-command 'argv ...'
-  --allow-command-prefix 'argv ...'
-  --sandbox strict|off
-  --network deny|allow
-  --code-capability lsp|mcp|extension|http|browser|terminal
-  --code-browser-session ID
-  --image PATH
-  --attach PATH
-
-Defaults are a strict sandbox, denied process network, no integration grants,
-and git diff --check verification. Use gator work resume and Work revision history
-for continuation and branching.`
-
 func main() {
 	if err := run(os.Args[1:], os.Stdout); err != nil {
 		fmt.Fprintln(os.Stderr, "gator:", err)

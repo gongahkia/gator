@@ -252,7 +252,6 @@ The command hierarchy is:
 ```text
 gator work [DIRECTORY] TASK       run a general local work task
 gator work inspect [DIRECTORY] TASK produce analysis without artifacts
-gator work code TASK              compatibility route requiring an internal Code patch
 gator work review RUN             inspect artifacts, evidence, and actions
 gator work export RUN             export a sealed artifact bundle
 gator work apply RUN              copy reviewed artifacts to explicit targets
@@ -262,9 +261,9 @@ gator job inbox                   inspect completed and attention-needed jobs
 gator work snapshot ...           inspect or collect unreferenced snapshots
 ```
 
-`gator work code` and `gator work run` are compatibility routes through the same Gator
-manager. They require Code-specialist evidence but never open a separate Code
-TUI. ACP is a thin Work adapter; `work-rpc` is the canonical machine protocol.
+Gator exposes one conversation-first Work entry point. Direct Code mode is
+retired; the isolated patch executor remains an internal specialist. ACP is a
+thin Work adapter; `work-rpc` is the canonical machine protocol.
 
 Headless operation is a primary product surface. Structured output, stable exit
 codes, stdin-compatible task input, and immutable manifests make Gator useful in
@@ -301,7 +300,6 @@ adapters.
 
 ## Compatibility and state
 
-`gator work run` remains an alias for the `gator work code` compatibility route.
-New coding requests use Work conversations and revisions. Snapshot collection is
+New requests use Work conversations and revisions. Snapshot collection is
 explicit and does not delete data; `gator work snapshot gc --yes` is the only
 snapshot reclamation path.
