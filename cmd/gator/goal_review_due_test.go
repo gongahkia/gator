@@ -4,8 +4,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/inbox"
+	"github.com/gongahkia/gator/internal/jobs"
 )
 
 func TestDueGoalReviewCreatesOneReminderUntilMarkedReviewed(t *testing.T) {
@@ -52,5 +55,46 @@ func TestDueGoalReviewCreatesOneReminderUntilMarkedReviewed(t *testing.T) {
 	entries, err = mailbox.List(false, 10)
 	if err != nil || len(entries) != 1 {
 		t.Fatalf("reviewed goal reminded again: %#v, %v", entries, err)
+	}
+}
+
+func TestEnabledWatchOwnsDueGoalReview(t *testing.T) {
+	state, source := t.TempDir(), t.TempDir()
+	goals, err := goal.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := goals.Add("Plan offsite", "", source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := goals.ApplyPlanChange(record.ID, goal.PlanChange{Kind: "set_next_review", ExpectedRevision: 0, NextReviewAt: time.Now().UTC().Add(-time.Minute)}); err != nil {
+		t.Fatal(err)
+	}
+	store, err := jobs.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	definition, err := store.Save(jobs.Definition{Name: "Offsite", GoalID: record.ID, GoalWatch: true, Enabled: true, Schedule: "* * * * *", Missed: "run_once", SourcePath: source, RefreshSnapshot: true, ChangeOnly: true, Objective: "Review goal", Mode: action.Inspect, Contract: artifact.InspectionContract()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runDueGoalReviews(state, false, time.Now().UTC())
+	mailbox, err := inbox.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries, err := mailbox.List(false, 0)
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("watch created duplicate reminder: %#v, %v", entries, err)
+	}
+	definition.Enabled = false
+	if _, err := store.Save(definition); err != nil {
+		t.Fatal(err)
+	}
+	runDueGoalReviews(state, false, time.Now().UTC())
+	entries, err = mailbox.List(false, 0)
+	if err != nil || len(entries) != 1 || entries[0].Kind != "goal_review" {
+		t.Fatalf("disabled watch swallowed reminder: %#v, %v", entries, err)
 	}
 }

@@ -142,6 +142,27 @@ total; an oversized or non-regular source fails the check rather than claiming
 that nothing changed. `.git` is excluded. Use ordinary cron jobs for checks
 whose result depends on time passing even when local inputs stay the same.
 
+`gator goal watch ID [--task TEXT] [--artifact venue-reply.md]` creates one
+active local watch for a goal. The supervisor polls its selected local files,
+saved context, and plan once per minute while running. A due plan step or
+`review-at` crossing also changes the watch input, even when files do not.
+The first poll runs the model; later identical inputs are recorded as
+`unchanged` without a model call. This is bounded polling, not a filesystem
+event subscription, and it stops while the host or per-user service is off.
+The watch resumes one missed check after a restart. Existing goal review
+reminders are owned by the watch while it is enabled, so one due review does
+not create a second inbox entry.
+
+A watch asks Work for an explicit `attention` decision and an evidence-backed
+summary. A quiet completed run stays out of the inbox. A draft artifact or a
+successful reviewed suggestion always surfaces, even if the model marks its
+response quiet; malformed responses also surface. A watch can only use local
+source material and cannot send mail or approve a connected action. With
+`--artifact`, Work must create that draft on each model run, so use it for
+tasks where each source change merits a draft. The user must still accept a
+plan suggestion explicitly. Content relevance and model decisions require
+live evaluation; the host only verifies the gating and review boundary.
+
 Completed runs also retain a short final-response summary and an output
 digest. The inbox suppresses exact repeated results under the same job policy;
 it does not attempt semantic equivalence between different phrasings.

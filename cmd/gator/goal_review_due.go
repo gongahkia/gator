@@ -7,6 +7,7 @@ import (
 
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/inbox"
+	"github.com/gongahkia/gator/internal/jobs"
 )
 
 // runDueGoalReviews sends one local reminder for each user-selected plan
@@ -24,8 +25,18 @@ func runDueGoalReviews(stateDir string, notify bool, now time.Time) {
 	if err != nil {
 		return
 	}
+	ownedByWatch := map[string]bool{}
+	if jobStore, err := jobs.Open(stateDir); err == nil {
+		if definitions, err := jobStore.List(); err == nil {
+			for _, definition := range definitions {
+				if definition.GoalWatch && definition.Enabled {
+					ownedByWatch[definition.GoalID] = true
+				}
+			}
+		}
+	}
 	for _, record := range records {
-		if record.Status != goal.Active {
+		if record.Status != goal.Active || ownedByWatch[record.ID] {
 			continue
 		}
 		plan, err := goals.LoadPlan(record.ID)

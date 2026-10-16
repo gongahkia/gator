@@ -20,8 +20,8 @@ Meta describes Muse as a personal agent that develops plans for goals, works acr
 | --- | --- | --- |
 | Continue a conversation | Durable Work conversations, replay, branching, goal records, TUI picker, structured goal plans, and reviewed plan suggestions | Live tests must show that suggestions actually help users complete goals |
 | Remember preferences and decisions | Scoped learnings, searchable memories, source-linked Markdown notes, bounded alternate-query search, explicit skills, and reviewed model suggestions | Retrieval still depends on good terms; suggestion quality and source-link accuracy need live evaluation |
-| Act through tools | Local files, browser, connectors, approval broker, internal specialists, reviewed goal-plan suggestions | Tool setup and selection are still technical; no automatic goal-level plan/action loop |
-| Work over time | Goal-linked jobs, due review reminders, attempts, inbox, exact duplicate-result suppression, opt-in local change gate, opt-in macOS and Linux per-user services | No event push trigger or semantic change detection |
+| Act through tools | Local files, browser, connectors, approval broker, internal specialists, reviewed goal-plan suggestions | Local watches can propose a next step, but connected app signals and autonomous approved action are still absent |
+| Work over time | Goal-linked jobs and watches, due review checks, attempts, inbox, exact duplicate-result suppression, local change gate, opt-in macOS and Linux per-user services | Watches poll local inputs; no event push trigger or proven semantic change detection |
 | Extend behavior | Extensions, user-created text skills, MCP, role routing, read-only goal reviewer | Skills are explicit text procedures; model-authored suggestions and measured workflow selection need evaluation |
 | Prove value | Fifty Work tasks and 25 two-turn personal continuity cases with a same-model baseline switch | No live continuity comparison yet; scripted pass is not model success |
 
@@ -42,7 +42,9 @@ The terminal home lists active goals and unread follow-up results. `/goals` open
 
 `gator goal schedule ID --cron '0 9 * * *' --task 'Check what changed'` creates a goal-linked job. At each run it reloads the latest goal context and source, retrieves relevant memories, and continues that job's prior conversation. The run records a bounded summary and a digest of its final answer and artifact content. An identical completed result under the same job policy stays out of the inbox; a changed result, failure, or recovery is surfaced. This is exact duplicate suppression, not a semantic claim that two different phrasings mean the same thing. Paused or completed goals are skipped. A foreground supervisor is available on Linux and macOS; both platforms have opt-in per-user services for operation after the CLI closes. Connected mutations still require exact-action live approval and cannot be scheduled.
 
-The goal context and memories remain user controlled. Gator can now queue a suggested note, skill, typed goal-plan change, or recurring check with a retained Work ID. `/suggestions` or `gator suggestion list/show` lets the user inspect it; `accept` applies it and `reject` discards it. A proposed plan change carries the revision it saw, so it fails if the user updated the plan meanwhile. A queued suggestion is not active knowledge, completed progress, or a running schedule. Gator does not infer a durable fact from every conversation, silently rewrite a goal plan, or claim to monitor the machine while it is off. A recurring check repeats the user's saved task; `--change-only` can skip a model call when local files and saved context are identical to the last successful run. It does not detect changes in the background before the next scheduled check or decide a new goal-level strategy on its own.
+`gator goal watch ID --task 'Watch venue changes' --artifact venue-reply.md` adds a local goal loop for files and due steps. While the supervisor runs, it checks each minute, calls the model only after input or due state changes, and asks for a next step with source evidence. Work may queue a reviewed plan suggestion and produce a draft; it cannot send the draft or silently change the plan. Quiet completed checks stay out of the inbox, and restarts retain the last completed input hash. This is bounded polling, so it requires a running local supervisor and is not an app event subscription. `--artifact` requires a draft on every model run and is best for tasks where every source change warrants one.
+
+The goal context and memories remain user controlled. Gator can now queue a suggested note, skill, typed goal-plan change, or recurring check with a retained Work ID. `/suggestions` or `gator suggestion list/show` lets the user inspect it; `accept` applies it and `reject` discards it. A proposed plan change carries the revision it saw, so it fails if the user updated the plan meanwhile. A queued suggestion is not active knowledge, completed progress, or a running schedule. Gator does not infer a durable fact from every conversation, silently rewrite a goal plan, or claim to monitor the machine while it is off. A recurring check repeats the user's saved task; `--change-only` can skip a model call when local files and saved context are identical to the last successful run. The watch adds a bounded, model-proposed next step after a local change or due transition; it does not autonomously apply the proposal.
 
 The knowledge base now stores inspectable Markdown notes and skills under the private state directory. The main agent can search/read scoped notes and active memories, and list/load an enabled skill when relevant. For active goals, it may delegate a read-only `goal_reviewer` to compare current context, recent turns, saved knowledge, follow-up results, and frozen source evidence. [Knowledge and skill commands](KNOWLEDGE.md) describe the lifecycle and boundaries. The model does not automatically write durable knowledge or skills.
 
@@ -58,7 +60,8 @@ gator goal plan GOAL_ID review-at 2026-10-21T09:00:00+08:00
 
 Inside a goal chat, `/plan` shows that plan. `/plan outcome TEXT`, `/plan add TITLE | RFC3339_DUE | EVIDENCE`, `/plan step STEP_ID done | EVIDENCE`, and `/plan review-at RFC3339` make common edits in place; `/plan help` shows the syntax.
 When the local job supervisor is running, a due `review-at` creates one inbox
-reminder without a model call. `/plan reviewed` records that the user reviewed
+reminder without a model call unless an enabled watch owns that goal's review.
+`/plan reviewed` records that the user reviewed
 the goal and clears a due review time. The reminder will appear after the CLI
 closes only while the local supervisor is running (or its per-user service is
 installed and the user session remains active).
@@ -67,8 +70,8 @@ installed and the user session remains active).
 
 1. **Measure continuity quality.** Test multi-day goals with corrections, expiry, scope boundaries, and changing source facts. Compare live model behavior against a same-model baseline; passing storage tests alone does not prove agent usefulness.
 2. **Improve recall.** Measure lexical misses and false matches, then add source-linked retrieval over retained notes and documents. Preserve explicit correction and forgetting controls.
-3. **Goal-aware action loop.** Let the agent propose a next step, select existing tools/skills, execute bounded local or connected reads, and ask for exact approval before external changes. Save completed and pending steps with evidence and timestamps.
-4. **Quiet follow-up.** Compare snapshots and prior results so recurring checks notify only on meaningful change or an action due. Keep the lifecycle and resource cost visible.
+3. **Broaden the goal loop.** The first watch covers local files and due times. Measure its next-step and draft quality, then add selected connected read signals and a clear review flow for proposed actions. Keep exact approval before external changes.
+4. **Improve quiet follow-up.** The watch avoids unchanged model calls and honors an explicit attention decision. Measure false alerts and missed material changes before claiming semantic change detection.
 5. **Measure runtime cost.** Use the [runtime measurement tool](RUNTIME_BENCHMARK.md) to compare idle RAM, peak RAM, cold start, first response, and task cost against representative terminal agents on the same machine and model. Treat low RAM as a target until comparative runs exist.
 
 ## Evaluation reset
@@ -77,6 +80,10 @@ The [personal continuity benchmark](PERSONAL_CONTINUITY_BENCHMARK.md) now suppli
 25 two-turn cases and a `--baseline-no-goal` ablation under the same model.
 Scripted agent and baseline both passed 25/25, which validates the harness only;
 the live comparison has not been run for this corpus.
+The local watch has deterministic tests for changed files, due crossings,
+quiet restarts, a retained conversation after many quiet attempts, and an
+offsite reply draft with a pending plan suggestion. These tests verify the
+workflow and approval boundary, not live model judgment or user value.
 
 Keep the existing Work corpus as regression coverage for files and deliverables. Add a separate longitudinal corpus of multi-turn, multi-day simulations. Each case should supply an initial goal, source changes, later user messages, allowed tools, expected next actions, and forbidden actions. Include at least:
 

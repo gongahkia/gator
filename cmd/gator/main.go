@@ -31,7 +31,7 @@ Product areas:
   Work        gator work [TASK] · gator work resume CONVERSATION TASK
   History     gator work list · gator work history CONVERSATION · gator work show ID
   Goals       gator goal add|chat|list|show|context|pause|resume|complete
-              gator goal schedule|schedules|unschedule
+              gator goal schedule|watch|schedules|unschedule
   Memory      gator memory add|list|search|show|correct|forget
   Notes       gator note add|list|search|show|edit|remove
   Skills      gator skill create|list|show|edit|enable|disable|remove

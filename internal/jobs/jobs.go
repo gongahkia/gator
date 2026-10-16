@@ -43,6 +43,7 @@ type Definition struct {
 	SourcePath      string                 `json:"source_path"`
 	RefreshSnapshot bool                   `json:"refresh_snapshot"`
 	ChangeOnly      bool                   `json:"change_only,omitempty"`
+	GoalWatch       bool                   `json:"goal_watch,omitempty"`
 	Objective       string                 `json:"objective"`
 	Provider        string                 `json:"provider,omitempty"`
 	Model           string                 `json:"model,omitempty"`
@@ -72,6 +73,7 @@ type Attempt struct {
 	Summary                  string         `json:"summary,omitempty"`
 	ResultSHA256             string         `json:"result_sha256,omitempty"`
 	InputSHA256              string         `json:"input_sha256,omitempty"`
+	WatchAttention           bool           `json:"watch_attention,omitempty"`
 	NotificationPolicySHA256 string         `json:"notification_policy_sha256,omitempty"`
 	Error                    string         `json:"error,omitempty"`
 }
@@ -211,6 +213,9 @@ func (d Definition) Validate() error {
 	}
 	if d.ChangeOnly && (!d.RefreshSnapshot || len(d.ConnectorIDs) > 0 || len(d.WebOrigins) > 0) {
 		return errors.New("change-only jobs require refreshed local source and no connected or web reads")
+	}
+	if d.GoalWatch && (d.GoalID == "" || !d.ChangeOnly || d.Schedule != "* * * * *" || d.Missed != "run_once" || d.EnableCode) {
+		return errors.New("goal watches require a local goal, one-minute polling, run_once catch-up, and no code delegation")
 	}
 	for _, connectorID := range d.ConnectorIDs {
 		if invalidID(connectorID) {

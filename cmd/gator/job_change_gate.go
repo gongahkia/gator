@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/jobs"
@@ -21,6 +22,10 @@ import (
 // with web or connector reads cannot use the change gate because those inputs
 // may change without a local file changing.
 func localJobInputHash(definition jobs.Definition, stateDir string) (string, error) {
+	return localJobInputHashAt(definition, stateDir, time.Now())
+}
+
+func localJobInputHashAt(definition jobs.Definition, stateDir string, now time.Time) (string, error) {
 	if !definition.ChangeOnly || !definition.RefreshSnapshot || len(definition.ConnectorIDs) > 0 || len(definition.WebOrigins) > 0 {
 		return "", errors.New("change gate requires a local-only refreshed job")
 	}
@@ -50,9 +55,12 @@ func localJobInputHash(definition jobs.Definition, stateDir string) (string, err
 		return err
 	}
 	if err := write(struct {
-		Objective string
-		Goal      goal.Record
-	}{definition.Objective, currentGoal}); err != nil {
+		Objective   string
+		GoalTitle   string
+		GoalContext string
+		GoalSource  string
+		GoalStatus  goal.Status
+	}{definition.Objective, currentGoal.Title, currentGoal.Context, currentGoal.SourcePath, currentGoal.Status}); err != nil {
 		return "", err
 	}
 	if definition.GoalID != "" {
@@ -66,6 +74,23 @@ func localJobInputHash(definition jobs.Definition, stateDir string) (string, err
 		}
 		if err := write(plan); err != nil {
 			return "", err
+		}
+		if definition.GoalWatch {
+			// Crossing a due time is a new input even when every file stays
+			// identical. The boolean stays stable after the crossing, so it
+			// triggers one review rather than a model call every minute.
+			due := struct {
+				Review bool
+				Steps  []string
+			}{Review: !plan.NextReviewAt.IsZero() && !plan.NextReviewAt.After(now) && plan.LastReviewAt.Before(plan.NextReviewAt)}
+			for _, step := range plan.Steps {
+				if step.Status != goal.StepDone && !step.DueAt.IsZero() && !step.DueAt.After(now) {
+					due.Steps = append(due.Steps, step.ID)
+				}
+			}
+			if err := write(due); err != nil {
+				return "", err
+			}
 		}
 	}
 	notes, err := knowledge.Open(stateDir)

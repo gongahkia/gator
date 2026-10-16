@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/artifact"
@@ -25,6 +26,7 @@ const goalUsage = `Gator goals — ongoing responsibilities
   gator goal pause|resume|complete ID
   gator goal chat ID
   gator goal schedule ID --cron '0 9 * * *' [--timezone AREA/CITY] [--mode inspect|draft] [--artifact PATH] --task TEXT
+  gator goal watch ID [--task TEXT] [--artifact PATH]
   gator goal schedules ID
   gator goal unschedule ID JOB_ID
 
@@ -147,11 +149,59 @@ func goalCommand(args []string, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		definition, err := jobStore.Save(jobs.Definition{Name: record.Title, GoalID: record.ID, Enabled: true, Schedule: *cron, Timezone: *timezone, Missed: *missed, SourcePath: record.SourcePath, RefreshSnapshot: true, ChangeOnly: *changeOnly, Objective: strings.TrimSpace(*task), Mode: mode, Contract: contract, MaxSteps: 24})
+		definition, err := jobStore.Save(jobs.Definition{Name: goalJobName(record), GoalID: record.ID, Enabled: true, Schedule: *cron, Timezone: *timezone, Missed: *missed, SourcePath: record.SourcePath, RefreshSnapshot: true, ChangeOnly: *changeOnly, Objective: strings.TrimSpace(*task), Mode: mode, Contract: contract, MaxSteps: 24})
 		if err != nil {
 			return err
 		}
 		_, err = fmt.Fprintf(out, "Scheduled %s for %s (%s %s). Run 'gator job supervisor' or install the per-user macOS/Linux service to execute it while Gator is closed.\n", record.ID, definition.ID, definition.Schedule, definition.Timezone)
+		return err
+	case "watch":
+		if len(args) < 2 {
+			return errors.New("usage: gator goal watch ID [--task TEXT] [--artifact PATH]")
+		}
+		record, err := store.Load(args[1])
+		if err != nil {
+			return err
+		}
+		if record.Status != goal.Active {
+			return errors.New("resume this goal before watching it")
+		}
+		flags := flag.NewFlagSet("goal watch", flag.ContinueOnError)
+		flags.SetOutput(io.Discard)
+		task := flags.String("task", "Review changes and due steps, identify the next useful action, and propose any plan update for approval", "goal watch instruction")
+		artifactPath := flags.String("artifact", "", "required draft on every model run, such as venue-reply.md")
+		if err := flags.Parse(args[2:]); err != nil {
+			return err
+		}
+		if len(flags.Args()) != 0 || strings.TrimSpace(*task) == "" {
+			return errors.New("usage: gator goal watch ID [--task TEXT] [--artifact PATH]")
+		}
+		mode, contract := action.Inspect, artifact.InspectionContract()
+		if *artifactPath != "" {
+			mode = action.Draft
+			contract, err = workContract(mode, action.Forbid, artifactFlags{*artifactPath}, nil)
+			if err != nil {
+				return err
+			}
+		}
+		jobStore, _, err := jobStore()
+		if err != nil {
+			return err
+		}
+		definitions, err := jobStore.List()
+		if err != nil {
+			return err
+		}
+		for _, definition := range definitions {
+			if definition.GoalID == record.ID && definition.GoalWatch && definition.Enabled {
+				return fmt.Errorf("goal already has an active watch %s; edit or disable it before adding another", definition.ID)
+			}
+		}
+		definition, err := jobStore.Save(jobs.Definition{Name: goalJobName(record), GoalID: record.ID, GoalWatch: true, Enabled: true, Schedule: "* * * * *", Timezone: "UTC", Missed: "run_once", SourcePath: record.SourcePath, RefreshSnapshot: true, ChangeOnly: true, Objective: strings.TrimSpace(*task), Mode: mode, Contract: contract, MaxSteps: 24})
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(out, "Watching %s with %s. Start 'gator job supervisor' or install its per-user service; it checks about once a minute while running. Review follow-ups in gator inbox.\n", record.ID, definition.ID)
 		return err
 	case "schedules":
 		if len(args) != 2 {
@@ -220,4 +270,13 @@ func goalCommand(args []string, out io.Writer) error {
 	default:
 		return fmt.Errorf("unknown goal command %q; run 'gator goal --help'", args[0])
 	}
+}
+
+func goalJobName(record goal.Record) string {
+	name := strings.Join(strings.Fields(record.Title), " ")
+	for len(name) > 128 {
+		_, size := utf8.DecodeLastRuneInString(name)
+		name = name[:len(name)-size]
+	}
+	return strings.TrimSpace(name)
 }
