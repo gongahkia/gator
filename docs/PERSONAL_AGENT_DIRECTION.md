@@ -69,7 +69,7 @@ installed and the user session remains active).
 2. **Improve recall.** Measure lexical misses and false matches, then add source-linked retrieval over retained notes and documents. Preserve explicit correction and forgetting controls.
 3. **Goal-aware action loop.** Let the agent propose a next step, select existing tools/skills, execute bounded local or connected reads, and ask for exact approval before external changes. Save completed and pending steps with evidence and timestamps.
 4. **Quiet follow-up.** Compare snapshots and prior results so recurring checks notify only on meaningful change or an action due. Keep the lifecycle and resource cost visible.
-5. **Measure runtime cost.** Benchmark idle RAM, peak RAM, cold start, first response, and task cost against representative terminal agents on the same machine and model. Treat low RAM as a target until measured.
+5. **Measure runtime cost.** Use the [runtime measurement tool](RUNTIME_BENCHMARK.md) to compare idle RAM, peak RAM, cold start, first response, and task cost against representative terminal agents on the same machine and model. Treat low RAM as a target until comparative runs exist.
 
 ## Evaluation reset
 
