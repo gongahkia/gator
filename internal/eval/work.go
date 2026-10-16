@@ -342,6 +342,7 @@ func RunWorkExperiment(ctx context.Context, datasetPath string, dataset WorkData
 			}
 			var outcome workrun.Outcome
 			var runErr error
+			followupSetupFailed := false
 			fixture, fixtureErr := fixtureDigest(source)
 			if ctx.Err() != nil {
 				setupErr = ctx.Err()
@@ -373,11 +374,13 @@ func RunWorkExperiment(ctx context.Context, datasetPath string, dataset WorkData
 					request.RunID = fmt.Sprintf("%s-rev%d", item.ID, followIndex+1)
 					if err := applyWorkFollowupChanges(state, runSource, evalGoalID, follow); err != nil {
 						runErr = err
+						followupSetupFailed = true
 						break
 					}
 					if evalGoalID != "" && !options.BaselineNoGoal {
 						if err := applyEvalGoalContext(state, evalGoalID, &request); err != nil {
 							runErr = err
+							followupSetupFailed = true
 							break
 						}
 					}
@@ -425,7 +428,7 @@ func RunWorkExperiment(ctx context.Context, datasetPath string, dataset WorkData
 				item.Grades = append(item.Grades, integrity)
 				transaction := transactionHistoryGrade(fidelity)
 				item.Grades = append(item.Grades, transaction)
-				all := runErr == nil && integrity.Passed && transaction.Passed
+				all := !followupSetupFailed && integrity.Passed && transaction.Passed
 				for _, grader := range c.Graders {
 					grade := gradeWork(grader, outcome, runErr, c.Contract)
 					item.Grades = append(item.Grades, grade)
