@@ -8,6 +8,7 @@ import (
 
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/jobs"
+	"github.com/gongahkia/gator/internal/workrun"
 )
 
 func TestGoalCommandsCreateAndManageOngoingGoal(t *testing.T) {
@@ -85,5 +86,31 @@ func TestScheduledGoalUsesFreshContextAndStopsWhenPaused(t *testing.T) {
 	}
 	if _, err := preparedJobWorkRequest(definitions[0], stateDir); err == nil {
 		t.Fatal("paused goal was allowed to run")
+	}
+}
+
+func TestGoalPlanCommandsAppearInWorkContext(t *testing.T) {
+	stateDir := t.TempDir()
+	t.Setenv("GATOR_STATE_DIR", stateDir)
+	var output bytes.Buffer
+	if err := run([]string{"goal", "add", "Plan offsite"}, &output); err != nil {
+		t.Fatal(err)
+	}
+	id := strings.Fields(output.String())[0]
+	output.Reset()
+	if err := run([]string{"goal", "plan", id, "outcome", "Book a venue by Friday"}, &output); err != nil {
+		t.Fatal(err)
+	}
+	output.Reset()
+	if err := run([]string{"goal", "plan", id, "add", "--title", "Confirm headcount", "--due", "2026-10-20T09:00:00+08:00", "--evidence", "user: offsite request"}, &output); err != nil {
+		t.Fatal(err)
+	}
+	output.Reset()
+	if err := run([]string{"goal", "plan", id}, &output); err != nil || !strings.Contains(output.String(), "Confirm headcount") || !strings.Contains(output.String(), "Book a venue") {
+		t.Fatalf("plan output = %q, %v", output.String(), err)
+	}
+	request := &workrun.Request{GoalID: id}
+	if err := applyGoalPlanContext(stateDir, request); err != nil || !strings.Contains(request.GoalPlanContext, "Confirm headcount") || !strings.Contains(request.GoalPlanContext, "user: offsite request") {
+		t.Fatalf("plan Work context = %q, %v", request.GoalPlanContext, err)
 	}
 }

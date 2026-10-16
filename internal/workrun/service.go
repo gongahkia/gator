@@ -49,6 +49,7 @@ func (s Service) Execute(ctx context.Context, request Request) (Outcome, error) 
 		request.LearningContext = s.Defaults.LearningContext
 		request.MemoryContext = s.Defaults.MemoryContext
 		request.GoalID = s.Defaults.GoalID
+		request.GoalPlanContext = s.Defaults.GoalPlanContext
 	}
 	resolved, err := s.Executor.normalizeAndValidate(request)
 	if err != nil {
@@ -80,6 +81,7 @@ func effectiveConfiguration(request Request) any {
 		MaxSteps            int
 		Provider            string
 		GoalContext         string
+		GoalPlanContext     string
 		GoalID              string
 		MemoryContext       string
 		Roles               map[string]orchestrator.RoleConfiguration
@@ -91,7 +93,7 @@ func effectiveConfiguration(request Request) any {
 		BrowserSession      string
 		DisableBrowser      bool
 		DesktopSession      string
-	}{request.Contract, request.Mode, request.Code, request.ConnectorIDs, request.ConnectorPermissions, request.WebOrigins, request.IgnoredInstructionPaths, request.Limits, request.MaxSteps, request.Provider, request.GoalContext, request.GoalID, request.MemoryContext, request.RoleConfiguration, func() string {
+	}{request.Contract, request.Mode, request.Code, request.ConnectorIDs, request.ConnectorPermissions, request.WebOrigins, request.IgnoredInstructionPaths, request.Limits, request.MaxSteps, request.Provider, request.GoalContext, request.GoalPlanContext, request.GoalID, request.MemoryContext, request.RoleConfiguration, func() string {
 		if request.Project != nil {
 			return request.Project.SHA256
 		}

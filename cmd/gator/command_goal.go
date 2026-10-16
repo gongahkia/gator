@@ -20,6 +20,7 @@ const goalUsage = `Gator goals — ongoing responsibilities
   gator goal add [--source DIR] [--context TEXT] TITLE
   gator goal list
   gator goal show ID
+  gator goal plan ID [outcome|add|step|remove|review-at|reviewed ...]
   gator goal context ID TEXT
   gator goal pause|resume|complete ID
   gator goal chat ID
@@ -45,6 +46,8 @@ func goalCommand(args []string, out io.Writer) error {
 		return err
 	}
 	switch args[0] {
+	case "plan":
+		return goalPlanCommand(store, args[1:], out)
 	case "chat":
 		if len(args) != 2 {
 			return errors.New("usage: gator goal chat ID")

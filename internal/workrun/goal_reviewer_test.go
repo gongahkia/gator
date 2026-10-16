@@ -49,6 +49,12 @@ func TestGoalReviewSnapshotIncludesCurrentBranchAndScopedFollowups(t *testing.T)
 	if _, err := goals.AttachConversation(record.ID, conversation.ID); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := goals.ApplyPlanChange(record.ID, goal.PlanChange{Kind: "set_outcome", ExpectedRevision: 0, Outcome: "Pick a venue by Friday"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := goals.ApplyPlanChange(record.ID, goal.PlanChange{Kind: "add_step", ExpectedRevision: 1, Title: "Confirm venue capacity", Evidence: []string{"source/venue.md:3"}}); err != nil {
+		t.Fatal(err)
+	}
 	notes, err := knowledge.Open(state)
 	if err != nil {
 		t.Fatal(err)
@@ -77,7 +83,7 @@ func TestGoalReviewSnapshotIncludesCurrentBranchAndScopedFollowups(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{"Prepare the offsite", "Venue A is unavailable", "Venue decision due Monday", "Venue checklist", "Venue B is preferred", "Venue A changed availability"} {
+	for _, expected := range []string{"Prepare the offsite", "Venue A is unavailable", "Venue decision due Monday", "Venue checklist", "Venue B is preferred", "Venue A changed availability", "Pick a venue by Friday", "Confirm venue capacity"} {
 		if !strings.Contains(result.Content, expected) {
 			t.Fatalf("snapshot omitted %q: %s", expected, result.Content)
 		}

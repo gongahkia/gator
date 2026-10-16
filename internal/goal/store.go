@@ -58,6 +58,17 @@ func Open(stateDir string) (Store, error) {
 	if err := os.Chmod(root, 0700); err != nil {
 		return Store{}, err
 	}
+	plans := filepath.Join(root, "plans")
+	if err := os.Mkdir(plans, 0700); err != nil && !os.IsExist(err) {
+		return Store{}, err
+	}
+	info, err := os.Lstat(plans)
+	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return Store{}, errors.New("goal plans path is not a directory")
+	}
+	if err := os.Chmod(plans, 0700); err != nil {
+		return Store{}, err
+	}
 	return Store{root: root, now: time.Now}, nil
 }
 

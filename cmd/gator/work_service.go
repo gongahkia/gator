@@ -9,6 +9,7 @@ import (
 	"github.com/gongahkia/gator/internal/browser"
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/connector"
+	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/learning"
 	"github.com/gongahkia/gator/internal/memory"
 	"github.com/gongahkia/gator/internal/orchestrator"
@@ -16,6 +17,7 @@ import (
 	"github.com/gongahkia/gator/internal/workrun"
 	"io"
 	"os"
+	"strings"
 )
 
 // configuredWorkService assembles trusted adapters; execution stays in workrun.Service.
@@ -58,6 +60,9 @@ func configuredWorkService(provider, modelName, stateDir string, request *workru
 		return workrun.Service{}, err
 	}
 	if err := applyMemoryContext(stateDir, request); err != nil {
+		return workrun.Service{}, err
+	}
+	if err := applyGoalPlanContext(stateDir, request); err != nil {
 		return workrun.Service{}, err
 	}
 	request.ConnectorPermissions = connector.PermissionSet(settings.ConnectorPermissions)
@@ -117,6 +122,44 @@ func applyMemoryContext(stateDir string, request *workrun.Request) error {
 		return fmt.Errorf("resolve relevant memories: %w", err)
 	}
 	request.MemoryContext = memory.Render(records)
+	return nil
+}
+
+func applyGoalPlanContext(stateDir string, request *workrun.Request) error {
+	request.GoalPlanContext = ""
+	if request.GoalID == "" {
+		return nil
+	}
+	store, err := goal.Open(stateDir)
+	if err != nil {
+		return err
+	}
+	plan, err := store.LoadPlan(request.GoalID)
+	if err != nil {
+		return fmt.Errorf("load goal plan: %w", err)
+	}
+	var lines []string
+	if plan.Outcome != "" {
+		lines = append(lines, "Outcome: "+plan.Outcome)
+	}
+	for _, step := range plan.Steps {
+		line := fmt.Sprintf("- [%s] %s: %s", step.ID, step.Status, step.Title)
+		if !step.DueAt.IsZero() {
+			line += " (due " + step.DueAt.Format("2006-01-02T15:04Z07:00") + ")"
+		}
+		if len(step.Evidence) > 0 {
+			line += " [evidence: " + strings.Join(step.Evidence, ", ") + "]"
+		}
+		if len(strings.Join(lines, "\n"))+len(line) > 8*1024 {
+			lines = append(lines, "- Additional steps omitted; inspect the goal plan before deciding.")
+			break
+		}
+		lines = append(lines, line)
+	}
+	if !plan.NextReviewAt.IsZero() {
+		lines = append(lines, "Next review: "+plan.NextReviewAt.Format("2006-01-02T15:04Z07:00"))
+	}
+	request.GoalPlanContext = strings.Join(lines, "\n")
 	return nil
 }
 

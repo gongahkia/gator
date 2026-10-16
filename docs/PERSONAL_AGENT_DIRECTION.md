@@ -18,7 +18,7 @@ Meta describes Muse as a personal agent that develops plans for goals, works acr
 
 | Need | Existing asset | Gap to close |
 | --- | --- | --- |
-| Continue a conversation | Durable Work conversations, replay, branching, goal records and TUI picker | Goal-level plans and next steps are still user maintained |
+| Continue a conversation | Durable Work conversations, replay, branching, goal records, TUI picker, and structured goal plans | Plan updates are still user maintained; the agent cannot propose a reviewed change |
 | Remember preferences and decisions | Scoped learnings, searchable memories, longer Markdown notes, and explicit skills | Lexical retrieval misses paraphrases; automatic suggestions and document-linked recall need evaluation |
 | Act through tools | Local files, browser, connectors, approval broker, internal specialists | Tool setup and selection are still technical; no clear goal-level plan/action loop |
 | Work over time | Goal-linked jobs, attempts, inbox, macOS opt-in LaunchAgent | No change detection or quiet notification policy; Linux has no installed service command |
@@ -45,6 +45,16 @@ The terminal home lists active goals and unread follow-up results. `/goals` open
 The goal context and memories are explicitly user maintained. Gator does not infer a durable fact from every conversation, silently rewrite a goal plan, or claim to monitor the machine while it is off. A recurring check repeats the user's saved task; it does not yet automatically choose a new goal-level strategy or suppress an unchanged result.
 
 The knowledge base now stores inspectable Markdown notes and skills under the private state directory. The main agent can search/read scoped notes and active memories, and list/load an enabled skill when relevant. For active goals, it may delegate a read-only `goal_reviewer` to compare current context, recent turns, saved knowledge, follow-up results, and frozen source evidence. [Knowledge and skill commands](KNOWLEDGE.md) describe the lifecycle and boundaries. The model does not automatically write durable knowledge or skills.
+
+A goal also has a structured plan with an outcome, up to 32 steps, status, deadlines, evidence references, and review times. Plan edits use revision checks so a stale conversation cannot overwrite a later correction. The plan is included as bounded reference context in goal-linked Work and goal reviews. For example:
+
+```sh
+gator goal plan GOAL_ID outcome 'Choose a venue and confirm the budget'
+gator goal plan GOAL_ID add --title 'Confirm room capacity' --due 2026-10-20T09:00:00+08:00 --evidence 'venues.md:12'
+gator goal plan GOAL_ID
+gator goal plan GOAL_ID step STEP_ID done --evidence 'user-confirmed: room holds 90'
+gator goal plan GOAL_ID review-at 2026-10-21T09:00:00+08:00
+```
 
 ## Next engineering sequence
 

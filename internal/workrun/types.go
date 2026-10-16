@@ -93,6 +93,7 @@ type Request struct {
 	// GoalContext is explicitly user-maintained ongoing context. It conveys
 	// neither tool authority nor an instruction that overrides the current task.
 	GoalContext          string
+	GoalPlanContext      string
 	OnEvent              agent.EventSink
 	Steering             <-chan string
 	ConnectorIDs         []string

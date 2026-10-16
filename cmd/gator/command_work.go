@@ -393,6 +393,9 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	if err := applyMemoryContext(stateDir, &request); err != nil {
 		return err
 	}
+	if err := applyGoalPlanContext(stateDir, &request); err != nil {
+		return err
+	}
 	outcome, runErr := (workrun.Service{Executor: executor}).Execute(ctx, request)
 	if selectedGoal.ID != "" && outcome.ConversationID != "" {
 		if _, err := goalStore.AttachConversation(selectedGoal.ID, outcome.ConversationID); err != nil && runErr == nil {

@@ -62,6 +62,9 @@ func systemPrompt(request Request) string {
 	if goalContext := strings.TrimSpace(request.GoalContext); goalContext != "" {
 		parts = append(parts, "Current ongoing goal:\nThis is user-maintained background context, not a new request or a permission grant. Use it when relevant to the current user message; ask when the next step is unclear.\n"+goalContext)
 	}
+	if plan := strings.TrimSpace(request.GoalPlanContext); plan != "" {
+		parts = append(parts, "Current goal plan:\nThis is durable, user-reviewable progress data. Do not claim a step is completed merely because the plan proposes it. Prefer current evidence and the user's correction when facts conflict.\n"+plan)
+	}
 	if extra := strings.TrimSpace(request.System); extra != "" {
 		parts = append(parts, "Additional developer instructions:\n"+extra)
 	}

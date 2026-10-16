@@ -66,15 +66,44 @@ func (t goalReviewSnapshot) Execute(_ context.Context, raw json.RawMessage) (age
 		Title   string    `json:"title"`
 		Updated time.Time `json:"updated"`
 	}
+	type planStep struct {
+		ID       string          `json:"id"`
+		Title    string          `json:"title"`
+		Status   goal.StepStatus `json:"status"`
+		DueAt    time.Time       `json:"due_at,omitempty"`
+		Evidence []string        `json:"evidence,omitempty"`
+	}
 	result := struct {
 		GoalID    string      `json:"goal_id"`
 		Title     string      `json:"title"`
 		Context   string      `json:"context"`
 		Updated   time.Time   `json:"updated"`
+		Outcome   string      `json:"outcome,omitempty"`
+		PlanRev   int         `json:"plan_revision"`
+		Steps     []planStep  `json:"plan_steps,omitempty"`
+		NextCheck time.Time   `json:"next_review_at,omitempty"`
 		Turns     []turn      `json:"recent_turns"`
 		Followups []followup  `json:"recent_followups"`
 		Knowledge []reference `json:"saved_knowledge"`
 	}{GoalID: record.ID, Title: record.Title, Context: boundedReview(record.Context, 4000), Updated: record.UpdatedAt}
+	plan, err := goals.LoadPlan(record.ID)
+	if err != nil {
+		return agent.ToolResult{}, err
+	}
+	result.Outcome, result.PlanRev, result.NextCheck = boundedReview(plan.Outcome, 1000), plan.Revision, plan.NextReviewAt
+	for _, step := range plan.Steps {
+		if len(result.Steps) == 12 {
+			break
+		}
+		item := planStep{ID: step.ID, Title: boundedReview(step.Title, 160), Status: step.Status, DueAt: step.DueAt}
+		for _, evidence := range step.Evidence {
+			if len(item.Evidence) == 2 {
+				break
+			}
+			item.Evidence = append(item.Evidence, boundedReview(evidence, 120))
+		}
+		result.Steps = append(result.Steps, item)
+	}
 	sessions, err := worksession.Open(t.StateDir)
 	if err != nil {
 		return agent.ToolResult{}, err
