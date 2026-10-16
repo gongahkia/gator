@@ -57,6 +57,65 @@ func TestGoogleDriveOperationsUsePinnedEndpoints(t *testing.T) {
 	}
 }
 
+func TestGoogleDailyContextReadsUsePinnedHostsAndBoundedWindows(t *testing.T) {
+	descriptor := Descriptor{Version: DescriptorVersion, ID: "google", Name: "Google", Kind: KindGoogle, Resource: "https://www.googleapis.com", Authentication: AuthNone}
+	calendar, method, _, err := serviceRead(descriptor, "calendar_events", serviceInput{TimeMin: "2026-10-16T00:00:00+08:00", TimeMax: "2026-10-17T00:00:00+08:00", Limit: 20})
+	if err != nil || method != "GET" || !strings.HasPrefix(calendar, "https://www.googleapis.com/calendar/v3/calendars/primary/events?") || !strings.Contains(calendar, "singleEvents=true") {
+		t.Fatalf("calendar endpoint = %q, %q, %v", calendar, method, err)
+	}
+	if _, _, _, err := serviceRead(descriptor, "calendar_events", serviceInput{TimeMin: "2026-10-17T00:00:00Z", TimeMax: "2026-10-16T00:00:00Z"}); err == nil {
+		t.Fatal("reversed calendar window accepted")
+	}
+	mail, _, _, err := serviceRead(descriptor, "gmail_list", serviceInput{Query: "is:unread", Limit: 10})
+	if err != nil || !strings.HasPrefix(mail, "https://gmail.googleapis.com/gmail/v1/users/me/messages?") || !strings.Contains(mail, "maxResults=10") {
+		t.Fatalf("Gmail list endpoint = %q, %v", mail, err)
+	}
+	message, _, _, err := serviceRead(descriptor, "gmail_get", serviceInput{ResourceID: "abc123"})
+	if err != nil || message != "https://gmail.googleapis.com/gmail/v1/users/me/messages/abc123?format=full" {
+		t.Fatalf("Gmail message endpoint = %q, %v", message, err)
+	}
+	if _, _, _, err := serviceRead(descriptor, "gmail_get", serviceInput{}); err == nil {
+		t.Fatal("empty Gmail message ID accepted")
+	}
+}
+
+func TestGoogleDailyReadsRetainEndpointProvenance(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		switch request.URL.Path {
+		case "/calendar/v3/calendars/primary/events":
+			if request.URL.Query().Get("timeMin") == "" || request.URL.Query().Get("singleEvents") != "true" {
+				t.Errorf("calendar query = %v", request.URL.Query())
+			}
+			_, _ = writer.Write([]byte(`{"items":[{"id":"meeting-1","summary":"Review"}]}`))
+		case "/gmail/v1/users/me/messages":
+			_, _ = writer.Write([]byte(`{"messages":[{"id":"mail-1"}]}`))
+		case "/gmail/v1/users/me/messages/mail-1":
+			_, _ = writer.Write([]byte(`{"id":"mail-1","snippet":"Decision needed","payload":{"headers":[{"name":"Subject","value":"Venue"}]}}`))
+		default:
+			t.Errorf("unexpected path %s", request.URL.Path)
+			writer.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	descriptor := Descriptor{Version: DescriptorVersion, ID: "google", Name: "Google", Kind: KindGoogle, Resource: server.URL, Authentication: AuthNone}
+	registry, err := NewRegistry([]Descriptor{descriptor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime := Runtime{Registry: registry, HTTPClient: server.Client()}
+	for _, input := range []struct{ operation, args, marker string }{
+		{"calendar_events", `{"time_min":"2026-10-16T00:00:00+08:00","time_max":"2026-10-17T00:00:00+08:00"}`, "meeting-1"},
+		{"gmail_list", `{"query":"is:unread"}`, "mail-1"},
+		{"gmail_get", `{"resource_id":"mail-1"}`, "Decision needed"},
+	} {
+		result, err := runtime.Invoke(context.Background(), action.Inspect, descriptor.ID, input.operation, json.RawMessage(input.args))
+		if err != nil || !bytes.Contains(result.Data, []byte(input.marker)) || result.Provenance.Operation != input.operation || result.Provenance.SHA256 == "" {
+			t.Fatalf("%s = %#v, %v", input.operation, result, err)
+		}
+	}
+}
+
 func TestGoogleBatchPinsCanonicalPayloadAndDoesNotSendDuringPreparation(t *testing.T) {
 	requests := 0
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {

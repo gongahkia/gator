@@ -218,6 +218,8 @@ type serviceInput struct {
 	Limit      int             `json:"limit,omitempty"`
 	Payload    json.RawMessage `json:"payload,omitempty"`
 	Fields     string          `json:"fields,omitempty"`
+	TimeMin    string          `json:"time_min,omitempty"`
+	TimeMax    string          `json:"time_max,omitempty"`
 }
 
 func (r Runtime) invokeService(ctx context.Context, descriptor Descriptor, operation Operation, raw json.RawMessage) (Result, error) {
@@ -227,7 +229,7 @@ func (r Runtime) invokeService(ctx context.Context, descriptor Descriptor, opera
 	if err := decoder.Decode(&input); err != nil {
 		return Result{}, fmt.Errorf("decode connector operation input: %w", err)
 	}
-	if input.Limit < 0 || input.Limit > 100 || len(input.Query) > 4096 || len(input.ResourceID) > 2048 || len(input.Cursor) > 2048 || len(input.Payload) > maxHTTPActionBytes || len(input.Fields) > 4096 {
+	if input.Limit < 0 || input.Limit > 100 || len(input.Query) > 4096 || len(input.ResourceID) > 2048 || len(input.Cursor) > 2048 || len(input.Payload) > maxHTTPActionBytes || len(input.Fields) > 4096 || len(input.TimeMin) > 64 || len(input.TimeMax) > 64 {
 		return Result{}, errors.New("connector operation input exceeds its limits")
 	}
 	if len(input.Payload) > 0 {
@@ -314,6 +316,50 @@ func serviceRead(descriptor Descriptor, operation string, input serviceInput) (s
 			return "", "", nil, err
 		}
 		path = "/v4/spreadsheets/" + url.PathEscape(sheetID) + "/values/" + url.PathEscape(cellRange)
+	case KindGoogle + "/calendar_events":
+		minTime, minErr := time.Parse(time.RFC3339, input.TimeMin)
+		maxTime, maxErr := time.Parse(time.RFC3339, input.TimeMax)
+		if minErr != nil || maxErr != nil || !maxTime.After(minTime) {
+			return "", "", nil, errors.New("calendar events require time_min and time_max as an increasing RFC3339 window")
+		}
+		calendarID := input.ResourceID
+		if calendarID == "" {
+			calendarID = "primary"
+		}
+		path = "/calendar/v3/calendars/" + url.PathEscape(calendarID) + "/events"
+		query.Set("timeMin", minTime.Format(time.RFC3339))
+		query.Set("timeMax", maxTime.Format(time.RFC3339))
+		query.Set("singleEvents", "true")
+		query.Set("orderBy", "startTime")
+		limit := input.Limit
+		if limit == 0 {
+			limit = 20
+		}
+		query.Set("maxResults", fmt.Sprint(limit))
+		if input.Cursor != "" {
+			query.Set("pageToken", input.Cursor)
+		}
+	case KindGoogle + "/gmail_list":
+		path = "/gmail/v1/users/me/messages"
+		search := input.Query
+		if search == "" {
+			search = "in:inbox newer_than:1d"
+		}
+		query.Set("q", search)
+		limit := input.Limit
+		if limit == 0 {
+			limit = 20
+		}
+		query.Set("maxResults", fmt.Sprint(limit))
+		if input.Cursor != "" {
+			query.Set("pageToken", input.Cursor)
+		}
+	case KindGoogle + "/gmail_get":
+		if strings.TrimSpace(input.ResourceID) == "" {
+			return "", "", nil, errors.New("Gmail read requires resource_id")
+		}
+		path = "/gmail/v1/users/me/messages/" + url.PathEscape(input.ResourceID)
+		query.Set("format", "full")
 	case KindAtlassian + "/jira_search":
 		path = "/rest/api/3/search/jql"
 		query.Set("jql", input.Query)
@@ -447,6 +493,9 @@ func serviceBase(descriptor Descriptor, operation string) string {
 	}
 	if strings.HasPrefix(operation, "sheets_") {
 		return "https://sheets.googleapis.com"
+	}
+	if strings.HasPrefix(operation, "gmail_") {
+		return "https://gmail.googleapis.com"
 	}
 	return base
 }

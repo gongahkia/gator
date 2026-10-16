@@ -37,6 +37,7 @@ const (
 	GoogleOAuthTokenURL     = "https://oauth2.googleapis.com/token"
 	GoogleOAuthRedirectURL  = "http://127.0.0.1:0/oauth/callback"
 	GoogleOAuthScopes       = "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/drive.metadata.readonly https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/spreadsheets"
+	GoogleDailyOAuthScopes  = "https://www.googleapis.com/auth/calendar.events.readonly https://www.googleapis.com/auth/gmail.readonly"
 )
 
 var idPattern = regexp.MustCompile(`\A[a-z][a-z0-9-]{0,63}\z`)
@@ -210,7 +211,25 @@ func (d Descriptor) Operations() []Operation {
 			{"update_message", "Prepare an update to one Slack message for exact approval.", action.ConnectedMutate},
 		})
 	case KindGoogle:
-		return googleOperations()
+		operations := googleOperations()
+		if d.Authentication != AuthOAuth {
+			return operations
+		}
+		granted := map[string]bool{}
+		for _, scope := range strings.Fields(d.OAuthScopes) {
+			granted[scope] = true
+		}
+		filtered := operations[:0]
+		for _, operation := range operations {
+			if operation.ID == "calendar_events" && !granted["https://www.googleapis.com/auth/calendar.events.readonly"] {
+				continue
+			}
+			if (operation.ID == "gmail_list" || operation.ID == "gmail_get") && !granted["https://www.googleapis.com/auth/gmail.readonly"] {
+				continue
+			}
+			filtered = append(filtered, operation)
+		}
+		return filtered
 	case KindAtlassian:
 		return serviceOperations([]serviceOperation{
 			{"jira_search", "Search Jira issues with JQL.", action.ConnectedRead},
@@ -246,8 +265,8 @@ func (d Descriptor) Operations() []Operation {
 	}
 }
 
-// googleOperations keeps live Work context focused on Drive, Docs, and
-// Sheets. Tasks and Calendar are deliberately not a second planner product.
+// googleOperations exposes bounded reads for daily context and typed document
+// work. Google data remains untrusted and external writes require approval.
 func googleOperations() []Operation {
 	read := []serviceOperation{
 		{"health", "Verify this Google connection with a live account request.", action.ConnectedRead},
@@ -256,6 +275,9 @@ func googleOperations() []Operation {
 		{"docs_get", "Read one Google Doc.", action.ConnectedRead},
 		{"sheets_get", "Read one Google Sheet.", action.ConnectedRead},
 		{"sheets_values_get", "Read a bounded range from one Google Sheet.", action.ConnectedRead},
+		{"calendar_events", "Read a bounded window of events from a Google Calendar. Use resource_id=primary for the current user's calendar.", action.ConnectedRead},
+		{"gmail_list", "List recent Gmail message IDs; use gmail_get to read a selected message.", action.ConnectedRead},
+		{"gmail_get", "Read one selected Gmail message, including headers, snippet, and bounded body data.", action.ConnectedRead},
 	}
 	operations := serviceOperations(read)
 	operations = append(operations, serviceOperations([]serviceOperation{
@@ -272,6 +294,15 @@ func googleOperations() []Operation {
 		}
 		if operations[index].ID == "drive_get" {
 			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["resource_id"],"properties":{"resource_id":{"type":"string","minLength":1,"maxLength":2048},"fields":{"type":"string","maxLength":4096}},"additionalProperties":false}`)
+		}
+		if operations[index].ID == "calendar_events" {
+			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["time_min","time_max"],"properties":{"resource_id":{"type":"string","maxLength":2048},"time_min":{"type":"string","maxLength":64},"time_max":{"type":"string","maxLength":64},"limit":{"type":"integer","minimum":1,"maximum":100},"cursor":{"type":"string","maxLength":2048}},"additionalProperties":false}`)
+		}
+		if operations[index].ID == "gmail_list" {
+			operations[index].InputSchema = json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","maxLength":4096},"limit":{"type":"integer","minimum":1,"maximum":100},"cursor":{"type":"string","maxLength":2048}},"additionalProperties":false}`)
+		}
+		if operations[index].ID == "gmail_get" {
+			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["resource_id"],"properties":{"resource_id":{"type":"string","minLength":1,"maxLength":2048}},"additionalProperties":false}`)
 		}
 		if operations[index].ID == "batch" {
 			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["payload"],"properties":{"payload":{"type":"object","required":["actions"],"properties":{"actions":{"type":"array","minItems":1,"maxItems":25,"items":{"type":"object","required":["operation","payload"],"properties":{"operation":{"type":"string"},"payload":{"type":"object"}},"additionalProperties":false}}},"additionalProperties":false}},"additionalProperties":false}`)

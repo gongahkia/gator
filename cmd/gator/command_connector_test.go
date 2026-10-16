@@ -159,7 +159,7 @@ func TestConnectorCommandDefaultsGoogleToUserOwnedDesktopOAuthAndGranularOperati
 		t.Fatalf("connectors = %#v", settings.Connectors)
 	}
 	descriptor := settings.Connectors[0]
-	if descriptor.Authentication != connector.AuthOAuth || descriptor.OAuthAuthorizeURL != connector.GoogleOAuthAuthorizeURL || descriptor.OAuthTokenURL != connector.GoogleOAuthTokenURL || descriptor.OAuthRedirectURL != connector.GoogleOAuthRedirectURL || strings.Contains(descriptor.OAuthScopes, "/auth/tasks") || strings.Contains(descriptor.OAuthScopes, "/auth/calendar") {
+	if descriptor.Authentication != connector.AuthOAuth || descriptor.OAuthAuthorizeURL != connector.GoogleOAuthAuthorizeURL || descriptor.OAuthTokenURL != connector.GoogleOAuthTokenURL || descriptor.OAuthRedirectURL != connector.GoogleOAuthRedirectURL || strings.Contains(descriptor.OAuthScopes, "/auth/tasks") || strings.Contains(descriptor.OAuthScopes, "/auth/calendar") || strings.Contains(descriptor.OAuthScopes, "/auth/gmail") {
 		t.Fatalf("Google descriptor = %#v", descriptor)
 	}
 	operations := map[string]bool{}
@@ -171,6 +171,11 @@ func TestConnectorCommandDefaultsGoogleToUserOwnedDesktopOAuthAndGranularOperati
 			t.Fatalf("Google operation %q is missing from %#v", required, operations)
 		}
 	}
+	for _, hidden := range []string{"calendar_events", "gmail_list", "gmail_get"} {
+		if operations[hidden] {
+			t.Fatalf("Google operation %q exposed without its scope", hidden)
+		}
+	}
 	for _, removed := range []string{
 		"tasklists_list", "tasklists_get", "tasks_list", "tasks_get", "tasks_create", "tasks_update", "tasks_delete", "tasks_move",
 		"calendars_list", "calendars_get", "calendars_create", "calendars_update", "calendars_delete", "calendars_subscribe", "calendars_unsubscribe", "calendars_list_update", "calendar_colors",
@@ -178,6 +183,28 @@ func TestConnectorCommandDefaultsGoogleToUserOwnedDesktopOAuthAndGranularOperati
 	} {
 		if operations[removed] {
 			t.Fatalf("removed Google operation %q remains in %#v", removed, operations)
+		}
+	}
+}
+
+func TestGoogleDailyContextRequiresExplicitScopes(t *testing.T) {
+	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
+	t.Setenv("GATOR_STATE_DIR", t.TempDir())
+	if err := connectorCommandWithIO([]string{"add", "daily-google", "--kind", "google", "--oauth-client-id", "desktop-client", "--daily-context"}, strings.NewReader(""), &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	settings, err := loadSettings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	descriptor := settings.Connectors[0]
+	operations := map[string]bool{}
+	for _, operation := range descriptor.Operations() {
+		operations[operation.ID] = true
+	}
+	for _, required := range []string{"calendar_events", "gmail_list", "gmail_get"} {
+		if !operations[required] {
+			t.Fatalf("daily context operation %q missing", required)
 		}
 	}
 }
