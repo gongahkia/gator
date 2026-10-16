@@ -492,6 +492,12 @@ func workContract(mode action.Mode, disposition action.Disposition, paths artifa
 		case ".pptx":
 			requirement.MediaTypes = []string{"application/vnd.openxmlformats-officedocument.presentationml.presentation"}
 			requirement.Validations = append(requirement.Validations, artifact.Validation{Kind: artifact.PPTX})
+		case ".svg":
+			requirement.MediaTypes = []string{"image/svg+xml"}
+			requirement.Validations = append(requirement.Validations, artifact.Validation{Kind: artifact.UTF8})
+		case ".html", ".htm":
+			requirement.MediaTypes = []string{"text/html"}
+			requirement.Validations = append(requirement.Validations, artifact.Validation{Kind: artifact.UTF8})
 		case ".pdf":
 			requirement.MediaTypes = []string{"application/pdf"}
 			requirement.Validations = append(requirement.Validations, artifact.Validation{Kind: artifact.PDF})

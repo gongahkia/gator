@@ -489,7 +489,7 @@ func inferInteractiveWork(prompt string, options worktui.RunOptions) (action.Mod
 	}
 	codeWork := containsAny(lower, "implement ", "fix ", "refactor ", "add a test", "create a test", "write code", "write a script", "add a feature", "add support", "change the code", "update the code", "patch ")
 	createWork := containsAny(lower, "write ", "create ", "draft ", "produce ", "generate ", "prepare ", "build ", "reconcile ", "turn this into", "make a ")
-	documentWork := containsAny(lower, "report", "brief", "memo", "document", "spreadsheet", "workbook", "csv", "json", "pdf", "docx")
+	documentWork := containsAny(lower, "report", "brief", "memo", "document", "spreadsheet", "workbook", "csv", "json", "pdf", "docx", "presentation", "slide", "deck", "pptx", "poster", "svg", "html", "web page", "webpage", "dashboard")
 	if !codeWork && !createWork && !documentWork {
 		return action.Inspect, nil, nil
 	}
@@ -512,7 +512,7 @@ func inferArtifactPaths(prompt string) []string {
 	for _, field := range strings.Fields(prompt) {
 		candidate := strings.Trim(field, "`'\".,:;()[]{}")
 		switch strings.ToLower(filepath.Ext(candidate)) {
-		case ".md", ".txt", ".json", ".csv", ".yaml", ".yml", ".docx", ".xlsx", ".pdf":
+		case ".md", ".txt", ".json", ".csv", ".yaml", ".yml", ".docx", ".xlsx", ".pdf", ".pptx", ".svg", ".html", ".htm":
 			candidate = filepath.ToSlash(filepath.Base(candidate))
 			if artifact.ValidateOutputPath(candidate) == nil {
 				return []string{candidate}
@@ -520,6 +520,12 @@ func inferArtifactPaths(prompt string) []string {
 		}
 	}
 	switch {
+	case containsAny(prompt, "presentation", "slide deck", "slides", "pptx", "deck"):
+		return []string{"deck.pptx"}
+	case containsAny(prompt, "poster", "svg", "vector graphic"):
+		return []string{"design.svg"}
+	case containsAny(prompt, "html", "web page", "webpage", "dashboard", "prototype"):
+		return []string{"prototype.html"}
 	case strings.Contains(prompt, "reconcile") || strings.Contains(prompt, "workbook"):
 		return []string{"checked.xlsx", "memo.md"}
 	case strings.Contains(prompt, "spreadsheet"):

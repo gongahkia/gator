@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/worksession"
 	"github.com/gongahkia/gator/internal/worktui"
 )
@@ -23,6 +24,11 @@ func TestInferInteractiveWorkKeepsConversationNatural(t *testing.T) {
 		{name: "question", prompt: "What conflicts are in these notes?", mode: action.Inspect},
 		{name: "brief", prompt: "Write a cited brief", mode: action.Draft, paths: []string{"brief.md"}},
 		{name: "named output", prompt: "Create summary.json", mode: action.Draft, paths: []string{"summary.json"}},
+		{name: "named deck", prompt: "Create launch.pptx from the notes", mode: action.Draft, paths: []string{"launch.pptx"}},
+		{name: "presentation", prompt: "Prepare a slide deck for the board", mode: action.Draft, paths: []string{"deck.pptx"}},
+		{name: "vector poster", prompt: "Design an accessible event poster", mode: action.Draft, paths: []string{"design.svg"}},
+		{name: "html prototype", prompt: "Build a responsive dashboard prototype", mode: action.Draft, paths: []string{"prototype.html"}},
+		{name: "named svg", prompt: "Create poster.svg", mode: action.Draft, paths: []string{"poster.svg"}},
 		{name: "table workflow", prompt: "Reconcile these invoices", mode: action.Draft, paths: []string{"checked.xlsx", "memo.md"}},
 		{name: "code without fake report", prompt: "Implement the missing parser", mode: action.Draft},
 		{name: "continued artifact", prompt: "Tighten it", opts: worktui.RunOptions{PreviousArtifacts: []string{"memo.md"}}, mode: action.Draft, paths: []string{"memo.md"}},
@@ -42,6 +48,30 @@ func TestInferInteractiveWorkHonorsExplicitInspection(t *testing.T) {
 	if err == nil {
 		t.Fatal("inspection accepted an artifact contract")
 	}
+}
+
+func TestDesignOutputsReceiveTypedContracts(t *testing.T) {
+	for path, mediaType := range map[string]string{"poster.svg": "image/svg+xml", "prototype.html": "text/html", "deck.pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation"} {
+		contract, err := workContract(action.Draft, action.Forbid, artifactFlags{path}, nil)
+		if err != nil {
+			t.Fatalf("%s contract: %v", path, err)
+		}
+		if len(contract.Artifacts) != 1 || !reflect.DeepEqual(contract.Artifacts[0].MediaTypes, []string{mediaType}) {
+			t.Fatalf("%s media types = %#v", path, contract.Artifacts)
+		}
+		if path != "deck.pptx" && !hasValidation(contract.Artifacts[0].Validations, artifact.UTF8) {
+			t.Fatalf("%s missing UTF-8 validation", path)
+		}
+	}
+}
+
+func hasValidation(validations []artifact.Validation, kind artifact.ValidationKind) bool {
+	for _, validation := range validations {
+		if validation.Kind == kind {
+			return true
+		}
+	}
+	return false
 }
 
 func TestLoadWorkTUIConversationOptionsRestoresIgnoredInstructions(t *testing.T) {
