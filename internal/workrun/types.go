@@ -97,6 +97,7 @@ type Request struct {
 	OnEvent              agent.EventSink
 	Steering             <-chan string
 	ConnectorIDs         []string
+	OAuthRefreshPins     map[string]string
 	ApproveAction        action.Approver
 	ApproveConnectorRead func(context.Context, string, string, json.RawMessage) (bool, error)
 	ConversationID       string

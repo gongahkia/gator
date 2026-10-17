@@ -49,7 +49,7 @@ func connectedGoalWatchSnapshot(ctx context.Context, definition jobs.Definition,
 	if err := verifyGoalOAuthPins(definition, registry, credentials); err != nil {
 		return "", nil, err
 	}
-	runtime := connector.Runtime{Registry: registry, Credentials: credentials}
+	runtime := connector.Runtime{Registry: registry, Credentials: credentials, OAuthRefreshPins: definition.OAuthRefreshPins}
 	permissions := connector.PermissionSet(settings.ConnectorPermissions)
 	digest := sha256.New()
 	_, _ = digest.Write([]byte(local))

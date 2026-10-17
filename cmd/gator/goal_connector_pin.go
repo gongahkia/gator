@@ -1,8 +1,6 @@
 package main
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -34,7 +32,7 @@ func captureGoalOAuthPins(selected []string, registry connector.Registry, creden
 		if pins == nil {
 			pins = make(map[string]string)
 		}
-		pins[id] = goalOAuthPin(descriptor, credential)
+		pins[id] = connector.OAuthGrantPin(descriptor, credential.Refresh)
 	}
 	return pins, nil
 }
@@ -60,17 +58,24 @@ func captureConfiguredGoalOAuthPins(selected []string) (map[string]string, error
 
 func verifyGoalOAuthPins(definition jobs.Definition, registry connector.Registry, credentials auth.Store) error {
 	for id, pinned := range definition.OAuthRefreshPins {
-		descriptor, found := registry.Get(id)
-		if !found || descriptor.Kind != connector.KindGoogle || descriptor.Authentication != connector.AuthOAuth {
-			return fmt.Errorf("Google connector %q changed; recreate this scheduled check after reviewing its source", id)
+		if err := verifyGoalOAuthPin(id, pinned, registry, credentials); err != nil {
+			return err
 		}
-		credential, found, err := credentials.Read(descriptor.CredentialRef())
-		if err != nil {
-			return errors.New("Google connector credential status is unavailable")
-		}
-		if !found || !credential.IsOAuth() || credential.Refresh == "" || goalOAuthPin(descriptor, credential) != pinned {
-			return fmt.Errorf("Google connector %q authorization changed; recreate this scheduled check after confirming the account", id)
-		}
+	}
+	return nil
+}
+
+func verifyGoalOAuthPin(id, pinned string, registry connector.Registry, credentials auth.Store) error {
+	descriptor, found := registry.Get(id)
+	if !found || descriptor.Kind != connector.KindGoogle || descriptor.Authentication != connector.AuthOAuth {
+		return fmt.Errorf("Google connector %q changed; recreate this scheduled check after reviewing its source", id)
+	}
+	credential, found, err := credentials.Read(descriptor.CredentialRef())
+	if err != nil {
+		return errors.New("Google connector credential status is unavailable")
+	}
+	if !found || !credential.IsOAuth() || credential.Refresh == "" || connector.OAuthGrantPin(descriptor, credential.Refresh) != pinned {
+		return fmt.Errorf("Google connector %q authorization changed; recreate this scheduled check after confirming the account", id)
 	}
 	return nil
 }
@@ -92,9 +97,4 @@ func verifyConfiguredGoalOAuthPins(definition jobs.Definition) error {
 		return err
 	}
 	return verifyGoalOAuthPins(definition, registry, credentials)
-}
-
-func goalOAuthPin(descriptor connector.Descriptor, credential auth.Credential) string {
-	digest := sha256.Sum256([]byte(descriptor.CredentialRef() + "\x00" + credential.Refresh))
-	return hex.EncodeToString(digest[:])
 }

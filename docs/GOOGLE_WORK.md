@@ -63,6 +63,17 @@ so publishing a broadly available OAuth app may require Google's verification
 process. Existing authorizations may retain previously granted scopes at
 Google until the user revokes them.
 
+New goal schedules and watches using a Google OAuth connector pin the selected
+refresh grant by a SHA-256 digest in the job definition. Gator checks that pin
+before polling or starting scheduled Work. If the authorization changes,
+including a refresh-token rotation or another login under the same connector
+ID, the check stops before reading connected data and `gator goal activity ID`
+shows the mismatch. Confirm the intended account, then use
+`gator goal unschedule GOAL_ID JOB_ID` and recreate the schedule or watch to
+bind the new grant. Older checks without a pin remain usable but appear as
+unbound in activity; recreate them to gain this protection. The digest does
+not establish the account's identity or replace a live access check.
+
 ## Operations and approvals
 
 Read operations cover a live connection check, Drive metadata search and file

@@ -390,7 +390,9 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		},
 		OnAction: func(record action.Record) { stateMu.Lock(); defer stateMu.Unlock(); actions = append(actions, record) },
 	}
-	connectorSurface, err := tools.ConnectorTools(e.Connectors, request.ConnectorIDs, connectorPolicy)
+	connectedRuntime := e.Connectors
+	connectedRuntime.OAuthRefreshPins = request.OAuthRefreshPins
+	connectorSurface, err := tools.ConnectorTools(connectedRuntime, request.ConnectorIDs, connectorPolicy)
 	if err != nil {
 		return outcome, err
 	}
@@ -400,7 +402,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	readPolicy.Mode = action.Inspect
 	readPolicy.ExternalActions = action.Forbid
 	readPolicy.Approve = nil
-	connectedReads, err := tools.ConnectorTools(e.Connectors, request.ConnectorIDs, readPolicy)
+	connectedReads, err := tools.ConnectorTools(connectedRuntime, request.ConnectorIDs, readPolicy)
 	if err != nil {
 		return outcome, err
 	}

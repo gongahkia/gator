@@ -18,6 +18,7 @@ import (
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/attachment"
+	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/document"
 	"github.com/gongahkia/gator/internal/learning"
@@ -449,6 +450,52 @@ func TestExecutorSealsExplicitConnectorProvenance(t *testing.T) {
 	}
 	if !strings.Contains(model.requests[0].System, "Explicitly selected connected sources: metrics") {
 		t.Fatalf("system prompt = %q", model.requests[0].System)
+	}
+}
+
+func TestWorkRequestOAuthPinAppliesToModelConnectorRead(t *testing.T) {
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		requests.Add(1)
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"messages":[]}`))
+	}))
+	defer server.Close()
+	descriptor := connector.Descriptor{
+		Version: connector.DescriptorVersion, ID: "google", Name: "Google", Kind: connector.KindGoogle,
+		Resource: server.URL, Authentication: connector.AuthOAuth,
+		OAuthClientID: "client", OAuthAuthorizeURL: server.URL + "/authorize", OAuthTokenURL: server.URL + "/token",
+		OAuthRedirectURL: "http://127.0.0.1:1457/oauth/callback", OAuthScopes: connector.GoogleOAuthScopes + " " + connector.GoogleDailyOAuthScopes,
+	}
+	registry, err := connector.NewRegistry([]connector.Descriptor{descriptor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	credentials, err := auth.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := credentials.Put(descriptor.CredentialRef(), auth.Credential{Type: "oauth", Access: "access-B", Refresh: "refresh-B", Expires: time.Now().Add(time.Hour).UnixMilli()}); err != nil {
+		t.Fatal(err)
+	}
+	model := &scriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "mail", Name: "connector_google_gmail_list", Arguments: json.RawMessage(`{"query":"label:offsite"}`)}}},
+		{Text: "Could not read the selected account."},
+	}}
+	outcome, err := (Executor{Model: model, StateDir: t.TempDir(), Connectors: connector.Runtime{Registry: registry, Credentials: credentials, HTTPClient: server.Client()}}).Execute(context.Background(), Request{
+		SourcePath: t.TempDir(), Objective: "Inspect selected offsite mail", RunID: "work-pinned-google",
+		Mode: action.Inspect, Contract: artifact.InspectionContract(), ConnectorIDs: []string{"google"},
+		OAuthRefreshPins: map[string]string{"google": connector.OAuthGrantPin(descriptor, "refresh-A")}, MaxSteps: 3,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	listed := false
+	for _, tool := range model.requests[0].Tools {
+		listed = listed || tool.Name == "connector_google_gmail_list"
+	}
+	if !listed || requests.Load() != 0 || len(outcome.Manifest.ConnectedSources) != 0 {
+		t.Fatalf("Work ignored credential pin: listed=%t requests=%d sources=%#v", listed, requests.Load(), outcome.Manifest.ConnectedSources)
 	}
 }
 

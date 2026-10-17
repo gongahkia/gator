@@ -180,6 +180,13 @@ func (d Descriptor) CredentialRef() string {
 	return "connector-" + d.ID + "-" + hex.EncodeToString(digest[:8])
 }
 
+// OAuthGrantPin is a non-secret fingerprint of one connector's refresh grant.
+// It changes when a login replaces that grant, including for the same account.
+func OAuthGrantPin(descriptor Descriptor, refreshToken string) string {
+	digest := sha256.Sum256([]byte(descriptor.CredentialRef() + "\x00" + refreshToken))
+	return hex.EncodeToString(digest[:])
+}
+
 // Operations returns independent, Gator-owned operation metadata.
 func (d Descriptor) Operations() []Operation {
 	switch d.Kind {

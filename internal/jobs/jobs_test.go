@@ -86,6 +86,27 @@ func TestJobsCannotApproveActions(t *testing.T) {
 	}
 }
 
+func TestJobOAuthPinMustBelongToSelectedConnectorAndBeCanonical(t *testing.T) {
+	store, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	definition, err := store.Save(Definition{Name: "Google follow-up", Enabled: true, Schedule: "0 9 * * *", Timezone: "UTC", SourcePath: t.TempDir(), Objective: "Check changes", Mode: action.Inspect, Contract: artifact.InspectionContract(), ConnectorIDs: []string{"google"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, pins := range []map[string]string{
+		{"other": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+		{"google": "not-a-digest"},
+		{"google": "ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789"},
+	} {
+		definition.OAuthRefreshPins = pins
+		if err := definition.Validate(); err == nil {
+			t.Fatalf("invalid OAuth grant pin accepted: %#v", pins)
+		}
+	}
+}
+
 func TestRunOnceCatchesScheduleMissedSinceCreation(t *testing.T) {
 	created := time.Date(2026, 9, 9, 0, 0, 0, 0, time.UTC)
 	definition := Definition{Version: 1, ID: "job-catchup", Name: "Catch up", Enabled: true, Schedule: "0 1 * * *", Timezone: "UTC", Missed: "run_once", SourcePath: t.TempDir(), Objective: "Write", Mode: action.Draft, Contract: artifact.DefaultContract("brief.md"), MaxSteps: 1, CreatedAt: created, UpdatedAt: created}

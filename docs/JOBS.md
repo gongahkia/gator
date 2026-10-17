@@ -68,9 +68,11 @@ private file. Its version-2 shape extends the following legacy example with `sna
 ```
 
 The stored definition includes the normalized outcome contract, optional
-provider/model selection, maximum turns, and connector IDs. Secrets remain in
-Gator's credential store. A definition never embeds an API key, bearer token,
-or approval.
+provider/model selection, maximum turns, and connector IDs. New goal checks
+using a Google OAuth connector also store a SHA-256 pin of its refresh grant;
+if that grant changes, the check stops before reading the connector. Secrets
+remain in Gator's credential store. A definition never embeds an API key,
+bearer token, refresh token, or approval.
 
 Each invocation creates an immutable `intent.json` before model work starts,
 appends lifecycle events to `events.jsonl`, and publishes one terminal

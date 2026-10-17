@@ -53,6 +53,10 @@ type Runtime struct {
 	Credentials auth.Store
 	HTTPClient  *http.Client
 	Now         func() time.Time
+	// OAuthRefreshPins bind unattended reads to the grant selected when a
+	// recurring job was created. The check occurs on the credential used for
+	// each request, rather than only at job startup.
+	OAuthRefreshPins map[string]string
 }
 
 // Invoke validates a connector operation and its exact input before any I/O.
@@ -917,6 +921,9 @@ func (r Runtime) executeGoogleBatch(ctx context.Context, descriptor Descriptor, 
 }
 
 func (r Runtime) bearerToken(ctx context.Context, descriptor Descriptor) (string, error) {
+	if r.OAuthRefreshPins[descriptor.ID] != "" && descriptor.Authentication != AuthOAuth {
+		return "", fmt.Errorf("connector %q authorization mode changed since this Work run was configured", descriptor.ID)
+	}
 	if descriptor.Authentication != AuthBearer && descriptor.Authentication != AuthOAuth {
 		return "", nil
 	}
@@ -926,6 +933,11 @@ func (r Runtime) bearerToken(ctx context.Context, descriptor Descriptor) (string
 	}
 	if !found {
 		return "", fmt.Errorf("connector %q is not authenticated", descriptor.ID)
+	}
+	if pin := r.OAuthRefreshPins[descriptor.ID]; pin != "" {
+		if descriptor.Authentication != AuthOAuth || !credential.IsOAuth() || credential.Refresh == "" || OAuthGrantPin(descriptor, credential.Refresh) != pin {
+			return "", fmt.Errorf("connector %q authorization changed since this Work run was configured", descriptor.ID)
+		}
 	}
 	if credential.Expired(r.now()) {
 		if descriptor.Authentication != AuthOAuth || !credential.IsOAuth() || credential.Refresh == "" {
@@ -940,6 +952,9 @@ func (r Runtime) bearerToken(ctx context.Context, descriptor Descriptor) (string
 			return "", fmt.Errorf("store refreshed connector credential: %w", err)
 		}
 		credential = refreshed
+		if pin := r.OAuthRefreshPins[descriptor.ID]; pin != "" && OAuthGrantPin(descriptor, credential.Refresh) != pin {
+			return "", fmt.Errorf("connector %q authorization changed during refresh", descriptor.ID)
+		}
 	}
 	if !credential.IsBearerToken() && !credential.IsOAuth() {
 		return "", fmt.Errorf("connector %q requires a bearer credential", descriptor.ID)

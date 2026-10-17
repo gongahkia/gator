@@ -56,13 +56,22 @@ func probeGoalAccess(ctx context.Context, stateDir, goalID string, out io.Writer
 		if definition.GoalID != goalID || !definition.GoalWatch {
 			continue
 		}
+		pinErr := verifyGoalOAuthPins(definition, registry, credentials)
+		boundRuntime := runtime
+		boundRuntime.OAuthRefreshPins = definition.OAuthRefreshPins
 		for _, source := range definition.WatchSources {
 			count++
 			if count > 8 {
 				continue
 			}
+			if pinErr != nil {
+				if _, err := fmt.Fprintf(out, "  %s %s/%s: %s\n", definition.ID, source.ConnectorID, source.Operation, activityLine(pinErr.Error(), 160)); err != nil {
+					return err
+				}
+				continue
+			}
 			probeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-			status := probeGoalWatchSource(probeCtx, runtime, registry, permissions, credentials, source, time.Now())
+			status := probeGoalWatchSource(probeCtx, boundRuntime, registry, permissions, credentials, source, time.Now())
 			cancel()
 			if _, err := fmt.Fprintf(out, "  %s %s/%s: %s\n", definition.ID, source.ConnectorID, source.Operation, status); err != nil {
 				return err
