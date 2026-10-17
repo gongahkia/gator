@@ -10,6 +10,7 @@ import (
 	"io"
 	"path/filepath"
 
+	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
@@ -111,6 +112,12 @@ func VerifyBundle(bundle Bundle) error {
 	expected := Completed
 	if !inspection.Passed || bundle.Manifest.Failure != "" {
 		expected = Failed
+	}
+	for _, record := range bundle.Manifest.Actions {
+		if record.Status == action.Failed || record.Status == action.Unknown {
+			expected = Failed
+			break
+		}
 	}
 	if bundle.Manifest.Status != expected {
 		return fmt.Errorf("artifact status %q does not match verified evidence", bundle.Manifest.Status)

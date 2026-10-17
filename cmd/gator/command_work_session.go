@@ -1,16 +1,17 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/gongahkia/gator/internal/orchestrator"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/worksession"
@@ -18,7 +19,7 @@ import (
 
 func isWorkSessionCommand(value string) bool {
 	switch value {
-	case "list", "show", "history", "resume", "back", "forward", "tasks":
+	case "list", "show", "history", "resume", "back", "forward", "tasks", "reconcile":
 		return true
 	default:
 		return false
@@ -29,6 +30,12 @@ func workSessionCommand(arguments []string, in io.Reader, out io.Writer, modelFa
 	stateDir, err := state.ResolveDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {
 		return err
+	}
+	if arguments[0] == "reconcile" {
+		if len(arguments) != 3 {
+			return errors.New("usage: gator work reconcile WORK_ID CORRELATION_ID")
+		}
+		return reconcileGmailSend(context.Background(), stateDir, arguments[1], arguments[2], out)
 	}
 	store, err := worksession.Open(stateDir)
 	if err != nil {

@@ -525,6 +525,15 @@ func serviceActionMethod(descriptor Descriptor, operation string) string {
 	}
 }
 
+// GmailSendTarget identifies the exact endpoint a configured Google connector
+// used for a Gmail send, even if its current scopes no longer include sending.
+func GmailSendTarget(descriptor Descriptor) (string, error) {
+	if err := descriptor.Validate(); err != nil || descriptor.Kind != KindGoogle {
+		return "", errors.New("a configured Google connector is required")
+	}
+	return serviceBase(descriptor, "gmail_send") + "/gmail/v1/users/me/messages/send", nil
+}
+
 func serviceBase(descriptor Descriptor, operation string) string {
 	base := strings.TrimRight(descriptor.Resource, "/")
 	if descriptor.Kind != KindGoogle || base != "https://www.googleapis.com" {

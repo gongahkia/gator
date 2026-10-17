@@ -12,6 +12,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/delivery"
 )
@@ -247,6 +248,11 @@ func reviewWorkBundleWithDelivery(out io.Writer, bundle artifact.Bundle, store *
 			if record.Proposal.CorrelationID != "" {
 				if _, err := fmt.Fprintf(out, "    reconciliation ID: %s\n", record.Proposal.CorrelationID); err != nil {
 					return err
+				}
+				if record.Status == action.Unknown && record.Proposal.Operation == "gmail_send" {
+					if _, err := fmt.Fprintf(out, "    check Sent: gator work reconcile %s %s\n", manifest.RunID, record.Proposal.CorrelationID); err != nil {
+						return err
+					}
 				}
 			}
 			if record.Error != "" {

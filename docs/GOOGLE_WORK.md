@@ -85,8 +85,21 @@ Gmail's message ID in the action record in the Work bundle. Every prepared send
 also has a unique reconciliation ID, embedded in its MIME `Message-ID` header
 and retained with the action record. It distinguishes two separately approved
 sends with identical text. If the API outcome is uncertain, Gator records that
-uncertainty and does not retry automatically. The header enables a later
-read-scoped Sent-mail lookup; it does not establish delivery by itself.
+uncertainty and does not retry automatically. For an action marked `unknown`,
+use the IDs shown by `gator work review WORK_ID` to check Sent:
+
+```sh
+gator work reconcile WORK_ID CORRELATION_ID
+```
+
+This read-only check searches the same Google connector's Sent mailbox, opens
+the matching message, and checks its `SENT` label and exact `Message-ID` header.
+It requires the connector's Gmail read-only scope and allowed list/detail
+reads. Gator stores the latest check under
+`STATE_DIR/gator/reconciliations/WORK_ID/CORRELATION_ID.json` and leaves the
+sealed Work action as `unknown`. A match confirms a Sent mailbox copy, not
+recipient delivery. No match is inconclusive because indexing can lag, and
+multiple matches require manual inspection. The check never sends or retries.
 Google's [messages.list API](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/list)
 supports an `rfc822msgid:` query with a Gmail read scope. The `gmail.send`
 scope alone cannot perform that search, and a missing result must not be
