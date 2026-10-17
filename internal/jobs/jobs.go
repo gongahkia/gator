@@ -54,6 +54,7 @@ type Definition struct {
 	Mode                action.Mode            `json:"mode"`
 	Contract            artifact.Contract      `json:"contract"`
 	ConnectorIDs        []string               `json:"connector_ids,omitempty"`
+	OAuthRefreshPins    map[string]string      `json:"oauth_refresh_pins,omitempty"`
 	MaxSteps            int                    `json:"max_steps"`
 	CreatedAt           time.Time              `json:"created_at"`
 	UpdatedAt           time.Time              `json:"updated_at"`
@@ -296,6 +297,15 @@ func (d Definition) Validate() error {
 	for _, connectorID := range d.ConnectorIDs {
 		if invalidID(connectorID) {
 			return errors.New("job connector identity is invalid")
+		}
+	}
+	for connectorID, pin := range d.OAuthRefreshPins {
+		if !seenConnector[connectorID] || len(pin) != sha256.Size*2 {
+			return errors.New("job OAuth credential pin is invalid")
+		}
+		decoded, err := hex.DecodeString(pin)
+		if err != nil || hex.EncodeToString(decoded) != pin {
+			return errors.New("job OAuth credential pin is invalid")
 		}
 	}
 	if _, err := Schedule(d); err != nil {
