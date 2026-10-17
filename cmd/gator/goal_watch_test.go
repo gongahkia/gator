@@ -149,6 +149,22 @@ func TestGoalWatchAttentionCannotHideArtifactsOrSuggestions(t *testing.T) {
 	}
 }
 
+func TestGoalWatchAlertShowsBoundedEvidenceOrReviewWarning(t *testing.T) {
+	withEvidence := `{"attention":true,"summary":"Venue changed.","evidence":["source/venue.md:3","source/venue.md:3","goal plan step 2"]}`
+	attention, summary := classifyGoalWatchResult(withEvidence, nil, nil)
+	if !attention || !strings.Contains(summary, "[evidence: source/venue.md:3; goal plan step 2]") {
+		t.Fatalf("evidence was not shown: %t %q", attention, summary)
+	}
+	withoutEvidence := `{"attention":true,"summary":"Venue changed.","evidence":[]}`
+	attention, summary = classifyGoalWatchResult(withoutEvidence, nil, nil)
+	if !attention || !strings.Contains(summary, "evidence missing; review Work run") {
+		t.Fatalf("unsupported alert was not flagged: %t %q", attention, summary)
+	}
+	if value := boundedWatchEvidence([]string{"source/a.md:1\nspoofed", strings.Repeat("x", 120)}); strings.Contains(value, "\n") || len(value) > 210 {
+		t.Fatalf("unsafe evidence: %q", value)
+	}
+}
+
 func TestGoalWatchRetainsGateAndConversationAfterManyQuietMinutes(t *testing.T) {
 	state, source := t.TempDir(), t.TempDir()
 	goals, err := goal.Open(state)
