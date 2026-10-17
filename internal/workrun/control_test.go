@@ -284,3 +284,120 @@ func TestWorkControlHelperProcess(t *testing.T) {
 	}
 	fmt.Println("FINAL:" + strings.ReplaceAll(result.Outcome.Result.FinalText, "\n", " "))
 }
+
+type specialistControlModel struct {
+	calls   int
+	release chan struct{}
+}
+
+func (m *specialistControlModel) Complete(ctx context.Context, _ agent.TurnRequest) (agent.Turn, error) {
+	m.calls++
+	switch m.calls {
+	case 1:
+		return agent.Turn{ToolCalls: []agent.ToolCall{{ID: "specialist", Name: "start_agent", Arguments: json.RawMessage(`{"agent":"code","task":"wait for cancellation"}`)}}}, nil
+	case 2:
+		select {
+		case <-m.release:
+			return agent.Turn{ToolCalls: []agent.ToolCall{{ID: "write", Name: "write_artifact", Arguments: json.RawMessage(`{"path":"report.md","content":"parent continued"}`)}}}, nil
+		case <-ctx.Done():
+			return agent.Turn{}, ctx.Err()
+		}
+	default:
+		return agent.Turn{Text: "parent completed"}, nil
+	}
+}
+
+func TestWorkSpecialistCancelAcrossProcesses(t *testing.T) {
+	state, source := t.TempDir(), t.TempDir()
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	child := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestWorkSpecialistCancelHelperProcess$")
+	child.Env = append(os.Environ(), "GATOR_TASK_CANCEL_HELPER=1", "GATOR_CONTROL_STATE="+state, "GATOR_CONTROL_SOURCE="+source)
+	stdout, err := child.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdin, err := child.StdinPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stderr bytes.Buffer
+	child.Stderr = &stderr
+	if err := child.Start(); err != nil {
+		t.Fatal(err)
+	}
+	scanner := bufio.NewScanner(stdout)
+	if !scanner.Scan() || scanner.Text() != "READY" {
+		t.Fatalf("specialist did not start: %q, %v, %s", scanner.Text(), scanner.Err(), stderr.String())
+	}
+	if err := SendWorkTaskCancel(ctx, state, "cross-process-specialist", "../subagent-001"); err == nil {
+		t.Fatal("malformed specialist ID was accepted")
+	}
+	if err := SendWorkTaskCancel(ctx, state, "cross-process-specialist", "subagent-002"); err == nil || !strings.Contains(err.Error(), "HTTP 409") {
+		t.Fatalf("unknown specialist was accepted: %v", err)
+	}
+	if err := SendWorkTaskCancel(ctx, state, "cross-process-specialist", "subagent-001"); err != nil {
+		t.Fatal(err)
+	}
+	if !scanner.Scan() || scanner.Text() != "CANCELLED" {
+		t.Fatalf("specialist did not cancel: %q, %v, %s", scanner.Text(), scanner.Err(), stderr.String())
+	}
+	if err := SendWorkTaskCancel(ctx, state, "cross-process-specialist", "subagent-001"); err == nil || !strings.Contains(err.Error(), "HTTP 409") {
+		t.Fatalf("completed cancellation replay was accepted: %v", err)
+	}
+	if _, err := io.WriteString(stdin, "release\n"); err != nil {
+		t.Fatal(err)
+	}
+	_ = stdin.Close()
+	if !scanner.Scan() || scanner.Text() != "DONE" {
+		t.Fatalf("parent did not continue: %q, %v, %s", scanner.Text(), scanner.Err(), stderr.String())
+	}
+	if err := child.Wait(); err != nil {
+		t.Fatalf("child failed: %v, %s", err, stderr.String())
+	}
+	if err := SendWorkTaskCancel(context.Background(), state, "cross-process-specialist", "subagent-001"); err == nil {
+		t.Fatal("finished Work run accepted specialist cancellation")
+	}
+}
+
+func TestWorkSpecialistCancelHelperProcess(t *testing.T) {
+	if os.Getenv("GATOR_TASK_CANCEL_HELPER") != "1" {
+		return
+	}
+	state, source := os.Getenv("GATOR_CONTROL_STATE"), os.Getenv("GATOR_CONTROL_SOURCE")
+	model := &specialistControlModel{release: make(chan struct{})}
+	started := make(chan struct{})
+	service := Service{Executor: Executor{Model: model, StateDir: state, Code: func(ctx context.Context, _ CodeRequest) (CodeResult, error) {
+		close(started)
+		<-ctx.Done()
+		return CodeResult{}, ctx.Err()
+	}}}
+	operation := service.Start(context.Background(), Request{RunID: "cross-process-specialist", SourcePath: source, Objective: "Prepare", Contract: artifact.DefaultContract("report.md"), EnableCode: true})
+	<-started
+	fmt.Println("READY")
+	deadline := time.After(5 * time.Second)
+	for {
+		task, err := operation.InspectTask("subagent-001")
+		if err == nil && task.Status == "cancelled" {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("specialist cancellation was not retained: %v, %+v", err, task)
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	fmt.Println("CANCELLED")
+	line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+	if line != "release\n" {
+		t.Fatalf("unexpected release signal %q", line)
+	}
+	close(model.release)
+	for range operation.Events {
+	}
+	result := <-operation.Done
+	if result.Err != nil {
+		t.Fatal(result.Err)
+	}
+	fmt.Println("DONE")
+}

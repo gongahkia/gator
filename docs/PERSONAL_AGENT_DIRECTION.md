@@ -81,6 +81,9 @@ run, another CLI can queue steering with `gator work steer WORK_ID TEXT` or
 request cancellation with `gator work stop WORK_ID`. If the run continues,
 queued steering applies at the next model boundary; it cannot interrupt an
 in-flight provider request or guarantee that a nearly finished run uses it.
+`gator work cancel-task WORK_ID TASK_ID` requests cancellation of one active
+specialist and its descendants; its parent run can continue. The retained task
+record shows whether cancellation completed.
 Pending interactive Work approvals can also be answered from another terminal
 with `gator work answer WORK_ID DECISION_ID` after reviewing the exact escaped
 preview. The answer is tied to the original in-memory request and is accepted

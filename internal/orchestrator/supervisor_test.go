@@ -45,6 +45,9 @@ func TestSupervisorPersistsEachPeerAndRecoversWithoutReexecution(t *testing.T) {
 	if err != nil || task.Status != "completed" {
 		t.Fatalf("%+v %v", task, err)
 	}
+	if err := s.Cancel(fast.ID); err == nil {
+		t.Fatal("completed specialist accepted cancellation")
+	}
 	data, err := os.ReadFile(filepath.Join(options.StatePath, fast.ID+".json"))
 	if err != nil {
 		t.Fatal(err)

@@ -49,6 +49,11 @@ run ID. Another terminal can use `gator work steer RUN_ID TEXT` to queue an
 instruction for the next model boundary if the run continues, or
 `gator work stop RUN_ID` to request
 cancellation. A queued instruction may not apply if the run finishes first.
+`gator work cancel-task RUN_ID TASK_ID` requests cancellation of one active
+specialist and its descendants while the parent continues. It fails for an
+unknown or finished task; inspect `gator work tasks RUN_ID TASK_ID` to see the
+terminal status. Cancellation is a request, not proof that an external side
+effect was undone.
 An active foreground run exposes a private loopback endpoint with
 an ephemeral token in a mode-0600 state file; commands verify the run lease and
 endpoint identity. For a pending interactive Work decision, another terminal

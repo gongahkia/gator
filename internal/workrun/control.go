@@ -44,7 +44,7 @@ type workControl struct {
 // local CLI process. The token is confined to a private state file. A decision
 // endpoint exists only when the foreground operation has an exact pending
 // interaction and checks the original in-memory preview digest.
-func startWorkControl(ctx context.Context, stateDir, runID string, cancel context.CancelFunc, incoming <-chan string, direct chan string, respond func(int, string, bool) error) (*workControl, <-chan string, error) {
+func startWorkControl(ctx context.Context, stateDir, runID string, cancel context.CancelFunc, incoming <-chan string, direct chan string, respond func(int, string, bool) error, cancelTask func(string) error) (*workControl, <-chan string, error) {
 	if !validInteractionRunID(runID) {
 		return nil, nil, errors.New("invalid Work control run ID")
 	}
@@ -187,6 +187,35 @@ func startWorkControl(ctx context.Context, stateDir, runID string, cancel contex
 		}
 		writer.WriteHeader(http.StatusAccepted)
 	}))
+	mux.HandleFunc("/task/cancel", authorized(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method != http.MethodPost {
+			http.Error(writer, "method", http.StatusMethodNotAllowed)
+			return
+		}
+		if cancelTask == nil || ctx.Err() != nil {
+			http.Error(writer, "task cancellation unavailable", http.StatusConflict)
+			return
+		}
+		var command struct {
+			ID string `json:"id"`
+		}
+		decoder := json.NewDecoder(http.MaxBytesReader(writer, request.Body, 256))
+		decoder.DisallowUnknownFields()
+		if decoder.Decode(&command) != nil || !validSpecialistTaskID(command.ID) {
+			http.Error(writer, "invalid task ID", http.StatusBadRequest)
+			return
+		}
+		var trailing any
+		if decoder.Decode(&trailing) != io.EOF {
+			http.Error(writer, "invalid task cancellation request", http.StatusBadRequest)
+			return
+		}
+		if cancelTask(command.ID) != nil {
+			http.Error(writer, "task is not active", http.StatusConflict)
+			return
+		}
+		writer.WriteHeader(http.StatusAccepted)
+	}))
 	control := &workControl{server: &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}, listener: listener, root: root, name: runID + ".json"}
 	go func() { _ = control.server.Serve(listener) }()
 	payload, err := json.Marshal(state)
@@ -220,6 +249,14 @@ func (c *workControl) Close() error {
 
 func validWorkSteering(text string) bool {
 	return strings.TrimSpace(text) != "" && len(text) <= maxWorkSteeringBytes && utf8.ValidString(text) && !strings.ContainsRune(text, 0)
+}
+
+func validSpecialistTaskID(id string) bool {
+	if !strings.HasPrefix(id, "subagent-") {
+		return false
+	}
+	number, err := strconv.Atoi(strings.TrimPrefix(id, "subagent-"))
+	return err == nil && number >= 1 && number <= 32 && id == fmt.Sprintf("subagent-%03d", number)
 }
 
 // SendWorkControl checks both the active Work lease and the endpoint's nonce
@@ -275,6 +312,36 @@ func SendWorkDecision(ctx context.Context, stateDir, runID string, id int, diges
 	_ = response.Body.Close()
 	if response.StatusCode != http.StatusAccepted {
 		return fmt.Errorf("Work decision returned HTTP %d", response.StatusCode)
+	}
+	return nil
+}
+
+// SendWorkTaskCancel requests cancellation of one active specialist in a live
+// foreground Work run. Descendants are cancelled by the supervisor as well.
+func SendWorkTaskCancel(ctx context.Context, stateDir, runID, taskID string) error {
+	if !validSpecialistTaskID(taskID) {
+		return errors.New("invalid specialist task ID")
+	}
+	client, state, err := connectWorkControl(ctx, stateDir, runID)
+	if err != nil {
+		return err
+	}
+	payload, err := json.Marshal(struct {
+		ID string `json:"id"`
+	}{taskID})
+	if err != nil {
+		return err
+	}
+	request, _ := http.NewRequestWithContext(ctx, http.MethodPost, state.URL+"/task/cancel", bytes.NewReader(payload))
+	request.Header.Set("Authorization", "Bearer "+state.Token)
+	request.Header.Set("Content-Type", "application/json")
+	response, err := client.Do(request)
+	if err != nil {
+		return fmt.Errorf("Work task cancellation failed: %w", err)
+	}
+	_ = response.Body.Close()
+	if response.StatusCode != http.StatusAccepted {
+		return fmt.Errorf("Work task cancellation returned HTTP %d", response.StatusCode)
 	}
 	return nil
 }

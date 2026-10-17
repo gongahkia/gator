@@ -264,6 +264,7 @@ func (s Service) Start(ctx context.Context, request Request) *Operation {
 	request.Steering = o.steering
 	request.controlSteering = o.steering
 	request.controlRespond = o.respondBound
+	request.controlCancelTask = o.CancelTask
 	sink := request.OnEvent
 	request.OnEvent = func(event agent.Event) {
 		if sink != nil {

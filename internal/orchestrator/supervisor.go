@@ -376,8 +376,12 @@ func (s *Supervisor) Await(ctx context.Context, id string) (Task, error) {
 func (s *Supervisor) Cancel(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.tasks[id] == nil {
+	execution := s.tasks[id]
+	if execution == nil {
 		return errors.New("unknown task")
+	}
+	if execution.task.Status != "queued" && execution.task.Status != "running" {
+		return errors.New("task is no longer active")
 	}
 	selected := map[string]bool{id: true}
 	for changed := true; changed; {

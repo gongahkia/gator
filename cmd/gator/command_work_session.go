@@ -21,7 +21,7 @@ import (
 
 func isWorkSessionCommand(value string) bool {
 	switch value {
-	case "list", "show", "history", "resume", "back", "forward", "tasks", "decisions", "answer", "reconcile", "stop", "steer":
+	case "list", "show", "history", "resume", "back", "forward", "tasks", "decisions", "answer", "reconcile", "stop", "steer", "cancel-task":
 		return true
 	default:
 		return false
@@ -47,6 +47,16 @@ func workSessionCommand(arguments []string, in io.Reader, out io.Writer, modelFa
 	}
 	if arguments[0] == "stop" || arguments[0] == "steer" {
 		return workControlCommand(stateDir, arguments, out)
+	}
+	if arguments[0] == "cancel-task" {
+		if len(arguments) != 3 {
+			return errors.New("usage: gator work cancel-task RUN_ID TASK_ID")
+		}
+		if err := workrun.SendWorkTaskCancel(context.Background(), stateDir, arguments[1], arguments[2]); err != nil {
+			return err
+		}
+		_, err := fmt.Fprintf(out, "Cancellation requested for specialist %s in Work run %s.\n", arguments[2], arguments[1])
+		return err
 	}
 	store, err := worksession.Open(stateDir)
 	if err != nil {
