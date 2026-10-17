@@ -96,7 +96,11 @@ whose returned resource ID is missing or differs from the approved target is
 recorded as uncertain, so it must be inspected before any retry. The resource
 ID identifies a document or spreadsheet, not a unique edit receipt; the digest
 does not prove the requested change is visible in a later read. Ordered batches
-still lack per-step receipts and are not transactional.
+retain each attempted step's status and, when Google confirms a step, its
+resource ID and response digest. If a later step fails before its request,
+the batch is still marked uncertain because earlier steps may already have
+changed remote state. Batches are not transactional and are never retried
+automatically; a response digest is not a provider-issued mutation ID.
 
 `gmail_send` accepts exactly `from`, `to`, `subject`, and `body` in its action
 payload. It creates a plain-text MIME message for one recipient, with no

@@ -28,6 +28,29 @@ func TestActionRecordAcceptsOnlyExecutedProviderEvidence(t *testing.T) {
 	}
 }
 
+func TestBatchRecordRequiresOrderedAndConsistentSteps(t *testing.T) {
+	proposal, err := NewProposal("action-batch", ConnectedMutate, "google", "batch", "https://google.example/gator/google-batch", "Edit two documents", []byte(`{}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	executed := BatchStep{Index: 1, Operation: "docs_create", Target: "https://docs.example/v1/documents", Status: Executed, ProviderResourceID: "doc-1", ResponseSHA256: strings.Repeat("a", 64)}
+	failed := BatchStep{Index: 2, Operation: "docs_create", Target: "https://docs.example/v1/documents", Status: Failed}
+	partial := Record{Proposal: proposal, Status: Unknown, Error: "step 2 could not start", BatchSteps: []BatchStep{executed, failed}}
+	if err := partial.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	for _, change := range []Record{
+		{Proposal: proposal, Status: Failed, Error: "step 2 could not start", BatchSteps: []BatchStep{executed, failed}},
+		{Proposal: proposal, Status: Executed, BatchSteps: []BatchStep{executed, failed}},
+		{Proposal: proposal, Status: Unknown, Error: "step 2 could not start", BatchSteps: []BatchStep{executed, {Index: 3, Operation: "docs_create", Target: failed.Target, Status: Failed}}},
+		{Proposal: proposal, Status: Unknown, Error: "step 2 could not start", BatchSteps: []BatchStep{{Index: 1, Operation: "docs_create", Target: executed.Target, Status: Executed, ProviderResourceID: "doc-1"}, failed}},
+	} {
+		if err := change.Validate(); err == nil {
+			t.Fatalf("inconsistent batch accepted: %#v", change)
+		}
+	}
+}
+
 func TestModeAuthorityIsMonotonic(t *testing.T) {
 	t.Parallel()
 

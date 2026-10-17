@@ -494,6 +494,19 @@ func writeWorkSummary(out io.Writer, outcome workrun.Outcome) error {
 				return err
 			}
 		}
+		for _, step := range record.BatchSteps {
+			if _, err := fmt.Fprintf(out, "    step %d %s %s", step.Index, step.Status, terminalSafe(step.Operation)); err != nil {
+				return err
+			}
+			if step.ProviderResourceID != "" {
+				if _, err := fmt.Fprintf(out, ": %s", terminalSafe(step.ProviderResourceID)); err != nil {
+					return err
+				}
+			}
+			if _, err := fmt.Fprintln(out); err != nil {
+				return err
+			}
+		}
 	}
 	if outcome.Result.FinalText != "" {
 		_, err := fmt.Fprintf(out, "\n%s\n", outcome.Result.FinalText)

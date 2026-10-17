@@ -109,10 +109,20 @@ func TestWorkReviewShowsGoogleActionEvidence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	batchProposal, err := action.NewProposal("action-2", action.ConnectedMutate, "google", "batch", "https://google.example/gator/google-batch", `{"actions":[]}`, []byte(`{"actions":[]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
 	digest := strings.Repeat("a", 64)
 	manifest, err := artifact.Seal(work.Output, contract, artifact.SealOptions{
 		RunID: work.ID, Objective: "Update brief", Source: work.Source,
-		Actions:   []action.Record{{Proposal: proposal, Status: action.Executed, ProviderResourceID: "doc-1", ResponseSHA256: digest}},
+		Actions: []action.Record{
+			{Proposal: proposal, Status: action.Executed, ProviderResourceID: "doc-1", ResponseSHA256: digest},
+			{Proposal: batchProposal, Status: action.Unknown, Error: "step 2 did not start", BatchSteps: []action.BatchStep{
+				{Index: 1, Operation: "docs_create", Target: "https://docs.example/v1/documents", Status: action.Executed, ProviderResourceID: "doc-2", ResponseSHA256: digest},
+				{Index: 2, Operation: "docs_create", Target: "https://docs.example/v1/documents", Status: action.Failed},
+			}},
+		},
 		StartedAt: work.CreatedAt, FinishedAt: work.CreatedAt,
 	})
 	if err != nil {
@@ -129,7 +139,7 @@ func TestWorkReviewShowsGoogleActionEvidence(t *testing.T) {
 	if err := reviewWorkBundle(&output, bundle, false, false); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output.String(), "provider resource ID: doc-1") || !strings.Contains(output.String(), "provider response sha256:"+digest) {
+	if !strings.Contains(output.String(), "provider resource ID: doc-1") || !strings.Contains(output.String(), "provider response sha256:"+digest) || !strings.Contains(output.String(), "batch step 1: executed docs_create") || !strings.Contains(output.String(), "batch step 2: failed docs_create") {
 		t.Fatalf("action evidence missing from review: %q", output.String())
 	}
 }

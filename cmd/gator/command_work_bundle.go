@@ -260,6 +260,21 @@ func reviewWorkBundleWithDelivery(out io.Writer, bundle artifact.Bundle, store *
 					return err
 				}
 			}
+			for _, step := range record.BatchSteps {
+				if _, err := fmt.Fprintf(out, "    batch step %d: %s %s → %s\n", step.Index, step.Status, terminalSafe(step.Operation), terminalSafe(step.Target)); err != nil {
+					return err
+				}
+				if step.ProviderResourceID != "" {
+					if _, err := fmt.Fprintf(out, "      provider resource ID: %s\n", terminalSafe(step.ProviderResourceID)); err != nil {
+						return err
+					}
+				}
+				if step.ResponseSHA256 != "" {
+					if _, err := fmt.Fprintf(out, "      provider response sha256:%s\n", step.ResponseSHA256); err != nil {
+						return err
+					}
+				}
+			}
 			if record.Proposal.CorrelationID != "" {
 				if _, err := fmt.Fprintf(out, "    reconciliation ID: %s\n", record.Proposal.CorrelationID); err != nil {
 					return err

@@ -10,11 +10,61 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/connector"
 )
+
+func TestGoogleBatchToolKeepsPartialEvidenceInUnknownAction(t *testing.T) {
+	credentials, err := auth.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	requests := 0
+	var descriptor connector.Descriptor
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		requests++
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"documentId":"doc-1"}`))
+		if err := credentials.Delete(descriptor.CredentialRef()); err != nil {
+			t.Error(err)
+		}
+	}))
+	defer server.Close()
+	descriptor = connector.Descriptor{Version: connector.DescriptorVersion, ID: "google", Name: "Google", Kind: connector.KindGoogle, Resource: server.URL, Authentication: connector.AuthBearer}
+	credential, err := auth.NewBearerToken("test-token", time.Time{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := credentials.Put(descriptor.CredentialRef(), credential); err != nil {
+		t.Fatal(err)
+	}
+	registry, err := connector.NewRegistry([]connector.Descriptor{descriptor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var records []action.Record
+	surface, err := ConnectorTools(connector.Runtime{Registry: registry, Credentials: credentials, HTTPClient: server.Client()}, []string{descriptor.ID}, ConnectorPolicy{
+		Mode: action.Act, ExternalActions: action.Approve,
+		Approve:  func(context.Context, action.Proposal) (action.Decision, error) { return action.Allow, nil },
+		OnAction: func(record action.Record) { records = append(records, record) },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result string
+	for _, tool := range surface {
+		if tool.Definition().Name == "connector_google_batch" {
+			result = executeTool(t, tool, `{"payload":{"actions":[{"operation":"docs_create","payload":{"title":"First"}},{"operation":"docs_create","payload":{"title":"Second"}}]}}`)
+			break
+		}
+	}
+	if requests != 1 || len(records) != 1 || records[0].Status != action.Unknown || len(records[0].BatchSteps) != 2 || records[0].BatchSteps[0].Status != action.Executed || records[0].BatchSteps[1].Status != action.Failed || records[0].Validate() != nil || !strings.Contains(result, `"batch_steps"`) || !strings.Contains(result, `"status":"unknown"`) {
+		t.Fatalf("requests=%d records=%#v result=%s", requests, records, result)
+	}
+}
 
 func TestGoogleDocumentActionRetainsProviderEvidenceAfterApproval(t *testing.T) {
 	response := `{"documentId":"doc-1","replies":[]}`
