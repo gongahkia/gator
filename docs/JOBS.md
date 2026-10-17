@@ -167,12 +167,14 @@ the terminal inbox; quiet hours do not defer or drop them.
 
 A connected watch can select up to four read surfaces with `--connector ID`.
 An HTTP JSON connector polls its configured resource. A Google connector needs
-`--gmail-query QUERY`, `--calendar-days N` (1-30), or both; Gmail reads up to
-100 matching messages and their details, and Calendar reads up to 100 events.
-If either source has another results page, the poll fails and surfaces an error
-instead of claiming nothing changed. Connected watches poll every five minutes
-while the local supervisor runs. Their combined input hash persists across
-restarts; no push subscription or provider event cursor is installed. Connector
+`--gmail-query QUERY`, `--calendar-days N` (1-30), or both; Gmail and Calendar
+watches each read up to 500 selected items across bounded pages. If either
+source exceeds that limit or returns invalid pagination, the poll fails and
+surfaces an error instead of claiming nothing changed. Connected watches poll
+every five minutes while the local supervisor runs. Their combined input hash
+persists across restarts. Gmail retains a mailbox history cursor to avoid
+rereading unchanged message details; Calendar rereads its selected window on
+every poll. Neither watch installs a push subscription. Connector
 read permissions and credentials are checked on each poll. The model runs only
 when the local or connected content hash changes, then reads current evidence
 again in Work. A source can change between those two reads; the next poll will

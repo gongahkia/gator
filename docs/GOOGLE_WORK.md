@@ -20,8 +20,9 @@ visible. Gmail history identifies which existing message details need rereading;
 an expired cursor, too much history, or a 24-hour full-sync interval causes a
 full detail scan. The cursor is mailbox-wide and does not make the watch a push
 subscription. A query with more than 500 Gmail matches or a Calendar window
-with more than 100 events fails for review; narrow the scope. There is no
-automatic email sending.
+with more than 500 events fails for review; narrow the scope. Calendar's moving
+time window cannot use the [`events.list` sync token](https://developers.google.com/workspace/calendar/api/v3/reference/events/list), so the watch reads each
+bounded page of that window on every poll. There is no automatic email sending.
 
 Gmail's [history API](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.history/list)
 can return HTTP 404 for an expired cursor; Gator then performs a full selected

@@ -373,54 +373,60 @@ func validWatchHistoryID(value string) bool {
 	return true
 }
 
+const maxCalendarWatchEvents = 500
+
 func hashCalendarWatch(ctx context.Context, digest hash.Hash, runtime connector.Runtime, source jobs.WatchSource, now time.Time) ([]jobs.WatchItem, error) {
 	day := now.UTC().Truncate(24 * time.Hour)
-	input, _ := json.Marshal(map[string]any{
-		"time_min": day.Add(-24 * time.Hour).Format(time.RFC3339),
-		"time_max": day.Add(time.Duration(source.Days+1) * 24 * time.Hour).Format(time.RFC3339),
-		"limit":    100,
-	})
-	result, err := runtime.Invoke(ctx, action.Inspect, source.ConnectorID, "calendar_events", input)
-	if err != nil {
-		return nil, fmt.Errorf("poll Calendar %s: %w", source.ConnectorID, err)
-	}
-	var listing struct {
-		Items         []json.RawMessage `json:"items"`
-		NextPageToken string            `json:"nextPageToken"`
-	}
-	if err := json.Unmarshal(result.Data, &listing); err != nil {
-		return nil, fmt.Errorf("decode Calendar events: %w", err)
-	}
-	var envelope map[string]json.RawMessage
-	if err := json.Unmarshal(result.Data, &envelope); err != nil || envelope["error"] != nil || envelope["items"] == nil || listing.Items == nil {
-		return nil, errors.New("Calendar watch returned an invalid events response")
-	}
-	if listing.NextPageToken != "" || len(listing.Items) > 100 {
-		return nil, errors.New("Calendar watch has more than 100 events; narrow its window before relying on this watch")
-	}
-	items := make([]string, 0, len(listing.Items))
-	watchItems := make([]jobs.WatchItem, 0, len(listing.Items))
+	windowStart := day.Add(-24 * time.Hour).Format(time.RFC3339)
+	windowEnd := day.Add(time.Duration(source.Days+1) * 24 * time.Hour).Format(time.RFC3339)
+	items := make([]string, 0)
+	watchItems := make([]jobs.WatchItem, 0)
 	seen := make(map[string]bool)
-	for _, item := range listing.Items {
-		var value map[string]any
-		if err := json.Unmarshal(item, &value); err != nil || value == nil {
-			return nil, errors.New("Calendar watch received an invalid event")
-		}
-		canonical, err := json.Marshal(value)
+	seenPages := make(map[string]bool)
+	page := ""
+	for pages := 0; pages < 5; pages++ {
+		input, _ := json.Marshal(map[string]any{"time_min": windowStart, "time_max": windowEnd, "limit": 100, "cursor": page})
+		result, err := runtime.Invoke(ctx, action.Inspect, source.ConnectorID, "calendar_events", input)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("poll Calendar %s: %w", source.ConnectorID, err)
 		}
-		items = append(items, string(canonical))
-		fingerprint := sha256.Sum256(canonical)
-		id, _ := value["id"].(string)
-		if id == "" {
-			id = "content-" + hex.EncodeToString(fingerprint[:8])
+		var listing struct {
+			Items         []json.RawMessage `json:"items"`
+			NextPageToken string            `json:"nextPageToken"`
 		}
-		if !validWatchItemID(id) || seen[id] {
-			return nil, errors.New("Calendar watch received an invalid or duplicate event ID")
+		var envelope map[string]json.RawMessage
+		if json.Unmarshal(result.Data, &listing) != nil || json.Unmarshal(result.Data, &envelope) != nil || envelope == nil || envelope["error"] != nil || envelope["items"] == nil || listing.Items == nil || len(listing.Items) > 100 {
+			return nil, errors.New("Calendar watch returned an invalid events response")
 		}
-		seen[id] = true
-		watchItems = append(watchItems, jobs.WatchItem{Source: source.ConnectorID + "/calendar_events", ID: id, SHA256: hex.EncodeToString(fingerprint[:])})
+		for _, item := range listing.Items {
+			var value map[string]any
+			if err := json.Unmarshal(item, &value); err != nil || value == nil {
+				return nil, errors.New("Calendar watch received an invalid event")
+			}
+			canonical, err := json.Marshal(value)
+			if err != nil {
+				return nil, err
+			}
+			items = append(items, string(canonical))
+			fingerprint := sha256.Sum256(canonical)
+			id, _ := value["id"].(string)
+			if id == "" {
+				id = "content-" + hex.EncodeToString(fingerprint[:8])
+			}
+			if !validWatchItemID(id) || seen[id] {
+				return nil, errors.New("Calendar watch received an invalid or duplicate event ID")
+			}
+			seen[id] = true
+			watchItems = append(watchItems, jobs.WatchItem{Source: source.ConnectorID + "/calendar_events", ID: id, SHA256: hex.EncodeToString(fingerprint[:])})
+		}
+		if listing.NextPageToken == "" {
+			break
+		}
+		if len(items) >= maxCalendarWatchEvents || pages == 4 || len(listing.NextPageToken) > 2048 || seenPages[listing.NextPageToken] {
+			return nil, errors.New("Calendar watch has more than 500 events or invalid pagination; narrow its window")
+		}
+		seenPages[listing.NextPageToken] = true
+		page = listing.NextPageToken
 	}
 	sort.Strings(items)
 	if err := writeWatchHash(digest, items); err != nil {
