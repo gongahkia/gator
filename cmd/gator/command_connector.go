@@ -588,7 +588,10 @@ func connectorAuthStatus(descriptor connector.Descriptor, credentials auth.Store
 		return "login required", nil
 	}
 	if credential.Expired(time.Now()) {
-		return "credential expired", nil
+		if descriptor.Authentication == connector.AuthOAuth && credential.IsOAuth() && credential.Refresh != "" {
+			return "credential expired; refresh available on next read", nil
+		}
+		return "credential expired; login required", nil
 	}
 	return "authenticated", nil
 }

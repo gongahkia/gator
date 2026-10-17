@@ -104,6 +104,9 @@ func renderGoalActivity(stateDir, goalID string, out io.Writer) error {
 			state = "goal " + string(record.Status)
 		}
 		fmt.Fprintf(&view, "  %s %s (%s): %s\n", kind, definition.ID, state, activityLine(definition.Objective, 100))
+		for _, readiness := range goalConnectorReadiness(definition) {
+			fmt.Fprintf(&view, "    source: %s\n", activityLine(readiness, 180))
+		}
 		if definition.Enabled && record.Status == goal.Active {
 			schedule, err := jobs.Schedule(definition)
 			if err != nil {
