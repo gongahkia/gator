@@ -2,6 +2,8 @@
 
 Decision recorded 2026-10-16. The intended references are [Meta Muse](https://about.fb.com/news/2026/09/introducing-muse-personal-ai-agent/), [OpenAI dots](https://learn.chatgpt.com/docs/dots), and [Hermes Agent](https://github.com/NousResearch/hermes-agent). The GitHub project named [`plyght/dot`](https://github.com/plyght/dot) is a separate terminal coding agent.
 
+The [Muse and dots feature map](MUSE_DOTS_FEATURE_MAP.md) compares first-party product claims with Gator's implemented boundaries and sets an evidence-based order for closing the most valuable gaps.
+
 ## Product promise
 
 **Gator is a terminal-native personal agent that remembers your ongoing goals, works across local files and selected tools, and checks with you before consequential actions.**
