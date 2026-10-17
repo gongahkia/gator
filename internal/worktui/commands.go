@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -922,7 +923,7 @@ func singleLine(value string) string {
 
 func (m Model) workStatus() string {
 	modelSelection, modelAccess := m.configuredModelStatus()
-	return fmt.Sprintf("Gator orchestration\n  model: %s\n  model access: %s\n  workspace: %s%s\n  ignored project instructions: %s\n  conversation: %s\n  selected revision: %s\n  mode: %s\n  deliverables: %s\n  connectors: %s\n  web origins: %s\n  effort: %s (%d manager steps)\n  pending attachments: %s\n  queued prompts: %d\n  internal specialists: managed by Gator",
+	status := fmt.Sprintf("Gator orchestration\n  model: %s\n  model access: %s\n  workspace: %s%s\n  ignored project instructions: %s\n  conversation: %s\n  selected revision: %s\n  mode: %s\n  deliverables: %s\n  connectors: %s\n  web origins: %s\n  effort: %s (%d manager steps)\n  pending attachments: %s\n  queued prompts: %d\n  internal specialists: managed by Gator",
 		modelSelection, modelAccess,
 		valueOrNone(m.source), map[bool]string{true: " (refresh next turn)", false: " (frozen per turn)"}[m.options.RefreshSource],
 		valueOrNone(strings.Join(m.options.IgnoredInstructionPaths, ", ")),
@@ -930,6 +931,40 @@ func (m Model) workStatus() string {
 		valueOrNone(strings.Join(m.options.ConnectorIDs, ", ")), valueOrNone(strings.Join(m.options.WebOrigins, ", ")),
 		effortName(m.options.MaxSteps), m.options.MaxSteps,
 		valueOrNone(strings.Join(m.options.Attachments, ", ")), len(m.queue))
+	if !m.running {
+		return status + "\n  current work: idle"
+	}
+	status += "\n  current work: running (/cancel)"
+	if m.operation != nil {
+		status += "; steer with /steer MESSAGE"
+	}
+	activeTasks := make([]string, 0, len(m.tasks))
+	for id, taskStatus := range m.tasks {
+		if strings.HasSuffix(taskStatus, ": queued") || strings.HasSuffix(taskStatus, ": running") {
+			activeTasks = append(activeTasks, id+" "+taskStatus)
+		}
+	}
+	sort.Strings(activeTasks)
+	status += fmt.Sprintf("\n  live specialists: %d", len(activeTasks))
+	if m.operation != nil {
+		status += " (/tasks, /cancel-task ID)"
+	}
+	for index, task := range activeTasks {
+		if index == 3 {
+			status += fmt.Sprintf("\n    ... and %d more", len(activeTasks)-3)
+			break
+		}
+		status += "\n    " + task
+	}
+	pending := len(m.pendingInteractions)
+	if m.interaction != nil {
+		pending++
+	}
+	status += fmt.Sprintf("\n  pending approvals: %d", pending)
+	if m.interaction != nil {
+		status += fmt.Sprintf(" (current: %s #%d; /approve or /deny)", m.interaction.Kind, m.interaction.ID)
+	}
+	return status
 }
 
 func (m Model) workPermissions() string {

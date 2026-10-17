@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/gongahkia/gator/internal/workrun"
 )
 
 func TestWorkStatusShowsSelectedModelAndAccess(t *testing.T) {
@@ -19,6 +21,38 @@ func TestWorkStatusShowsSelectedModelAndAccess(t *testing.T) {
 		if !strings.Contains(status, expected) {
 			t.Fatalf("status omitted %q:\n%s", expected, status)
 		}
+	}
+}
+
+func TestWorkStatusShowsCurrentSpecialistsAndApprovalControls(t *testing.T) {
+	m := New(Config{})
+	m.running = true
+	m.operation = &workrun.Operation{}
+	m.tasks = map[string]string{
+		"subagent-001": "source_researcher: running",
+		"subagent-002": "claim_verifier: queued",
+		"subagent-003": "artifact_reviewer: completed",
+	}
+	m.interaction = &workrun.Interaction{ID: 7, Kind: "action", Preview: "private payload"}
+	m.pendingInteractions = []workrun.Interaction{{ID: 8, Kind: "connected_read"}}
+	status := m.workStatus()
+	for _, expected := range []string{
+		"current work: running (/cancel); steer with /steer MESSAGE",
+		"live specialists: 2 (/tasks, /cancel-task ID)",
+		"subagent-001 source_researcher: running",
+		"subagent-002 claim_verifier: queued",
+		"pending approvals: 2 (current: action #7; /approve or /deny)",
+	} {
+		if !strings.Contains(status, expected) {
+			t.Fatalf("live status omitted %q:\n%s", expected, status)
+		}
+	}
+	if strings.Contains(status, "private payload") || strings.Contains(status, "artifact_reviewer") {
+		t.Fatalf("status included approval payload or completed specialist: %s", status)
+	}
+	m.running = false
+	if idle := m.workStatus(); !strings.Contains(idle, "current work: idle") || strings.Contains(idle, "pending approvals") {
+		t.Fatalf("idle status = %s", idle)
 	}
 }
 
