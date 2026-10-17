@@ -44,6 +44,10 @@ func TestReadInteractionRecordsValidatesAndScopesRetainedDecisions(t *testing.T)
 	if err != nil || len(one) != 1 || one[0].Status != "pending" || one[0].LiveStatus != "unknown" {
 		t.Fatalf("scoped records = %#v, %v", one, err)
 	}
+	single, err := ReadInteractionRecord(state, "run-one", 1)
+	if err != nil || single.Interaction.ID != 1 || single.Status != "pending" || single.LiveStatus != "unknown" {
+		t.Fatalf("exact decision = %#v, %v", single, err)
+	}
 	if _, err := ReadInteractionRecords(state, "../outside"); err == nil {
 		t.Fatal("accepted escaping run ID")
 	}
@@ -52,6 +56,61 @@ func TestReadInteractionRecordsValidatesAndScopesRetainedDecisions(t *testing.T)
 	}
 	if _, err := ReadInteractionRecords(state, "run-one"); err == nil {
 		t.Fatal("accepted interaction ID mismatch")
+	}
+	if single, err := ReadInteractionRecord(state, "run-one", 1); err != nil || single.Interaction.ID != 1 {
+		t.Fatalf("unrelated invalid decision blocked exact read: %#v, %v", single, err)
+	}
+}
+
+func TestInteractionDigestSurvivesRetainedActionPreview(t *testing.T) {
+	proposal, err := action.NewProposal("send-1", action.ConnectedMutate, "google", "gmail_send", "recipient@example.com", `{"to":"recipient@example.com","subject":"Update"}`, []byte("exact MIME payload"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := Interaction{ID: 1, Kind: "action", Preview: proposal}
+	want, err := InteractionDigest(original)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload, err := json.Marshal(InteractionRecord{Version: 1, Status: "pending", Interaction: original})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var retained InteractionRecord
+	if err := json.Unmarshal(payload, &retained); err != nil {
+		t.Fatal(err)
+	}
+	got, err := InteractionDigest(retained.Interaction)
+	if err != nil || got != want {
+		t.Fatalf("retained exact-action digest = %q, wanted %q: %v", got, want, err)
+	}
+}
+
+func TestInteractionDigestPreservesLargeJSONNumber(t *testing.T) {
+	state := t.TempDir()
+	directory := filepath.Join(state, "gator", "interactions", "numeric-run")
+	if err := os.MkdirAll(directory, 0700); err != nil {
+		t.Fatal(err)
+	}
+	original := Interaction{ID: 1, Kind: "desktop", Preview: json.RawMessage(`{"coordinate":9007199254740993}`)}
+	want, err := InteractionDigest(original)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload, err := json.Marshal(InteractionRecord{Version: 1, Status: "pending", Interaction: original})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(directory, "1.json"), payload, 0600); err != nil {
+		t.Fatal(err)
+	}
+	retained, err := ReadInteractionRecord(state, "numeric-run", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := InteractionDigest(retained.Interaction)
+	if err != nil || got != want {
+		t.Fatalf("large coordinate digest changed: %q, wanted %q: %v", got, want, err)
 	}
 }
 

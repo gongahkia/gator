@@ -17,9 +17,136 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/workspace"
 )
+
+func TestWorkDecisionAcrossProcesses(t *testing.T) {
+	for _, approved := range []bool{true, false} {
+		name := "deny"
+		if approved {
+			name = "approve"
+		}
+		t.Run(name, func(t *testing.T) {
+			state, source := t.TempDir(), t.TempDir()
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			child := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestWorkDecisionHelperProcess$")
+			child.Env = append(os.Environ(), "GATOR_DECISION_HELPER=1", "GATOR_CONTROL_STATE="+state, "GATOR_CONTROL_SOURCE="+source)
+			stdout, err := child.StdoutPipe()
+			if err != nil {
+				t.Fatal(err)
+			}
+			var stderr bytes.Buffer
+			child.Stderr = &stderr
+			if err := child.Start(); err != nil {
+				t.Fatal(err)
+			}
+			scanner := bufio.NewScanner(stdout)
+			if !scanner.Scan() || scanner.Text() != "READY" {
+				t.Fatalf("child did not ask for approval: %q, %v, %s", scanner.Text(), scanner.Err(), stderr.String())
+			}
+			records, err := ReadInteractionRecords(state, "cross-process-decision")
+			if err != nil || len(records) != 1 || records[0].Status != "pending" || records[0].LiveStatus != "active" {
+				t.Fatalf("pending decision = %#v, %v", records, err)
+			}
+			id := records[0].Interaction.ID
+			digest, err := InteractionDigest(records[0].Interaction)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if approved {
+				if err := SendWorkDecision(ctx, state, "cross-process-decision", id, strings.Repeat("0", 64), true); err == nil || !strings.Contains(err.Error(), "HTTP 409") {
+					t.Fatalf("wrong preview digest was accepted: %v", err)
+				}
+				root, err := workspace.Open(filepath.Join(state, "gator", "interactions", "cross-process-decision"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				original, err := root.ReadRegularFile("1.json", 1024*1024)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var tampered InteractionRecord
+				if err := json.Unmarshal(original, &tampered); err != nil {
+					t.Fatal(err)
+				}
+				tampered.Interaction.Preview = []string{"send all files"}
+				changed, _ := json.Marshal(tampered)
+				if err := root.WriteRegularFileAtomic("1.json", changed, 1024*1024); err != nil {
+					t.Fatal(err)
+				}
+				forgedDigest, _ := InteractionDigest(tampered.Interaction)
+				if err := SendWorkDecision(ctx, state, "cross-process-decision", id, forgedDigest, true); err == nil || !strings.Contains(err.Error(), "HTTP 409") {
+					t.Fatalf("edited preview was accepted: %v", err)
+				}
+				if err := root.WriteRegularFileAtomic("1.json", original, 1024*1024); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := SendWorkDecision(ctx, state, "cross-process-decision", id, digest, approved); err != nil {
+				t.Fatal(err)
+			}
+			if err := SendWorkDecision(ctx, state, "cross-process-decision", id, digest, approved); err == nil || !strings.Contains(err.Error(), "HTTP 409") {
+				t.Fatalf("decision replay was accepted: %v", err)
+			}
+			if !scanner.Scan() {
+				t.Fatalf("child produced no result: %v, %s", scanner.Err(), stderr.String())
+			}
+			expected := "DENIED"
+			if approved {
+				expected = "APPROVED"
+			}
+			if scanner.Text() != expected {
+				t.Fatalf("child result = %q, wanted %q", scanner.Text(), expected)
+			}
+			if err := child.Wait(); err != nil {
+				t.Fatalf("child failed: %v, %s", err, stderr.String())
+			}
+			records, err = ReadInteractionRecords(state, "cross-process-decision")
+			if err != nil || len(records) != 1 || records[0].Status != "resolved" || records[0].Approved == nil || *records[0].Approved != approved {
+				t.Fatalf("resolved decision = %#v, %v", records, err)
+			}
+		})
+	}
+}
+
+func TestWorkDecisionHelperProcess(t *testing.T) {
+	if os.Getenv("GATOR_DECISION_HELPER") != "1" {
+		return
+	}
+	state, source := os.Getenv("GATOR_CONTROL_STATE"), os.Getenv("GATOR_CONTROL_SOURCE")
+	model := &scriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "child", Name: "delegate_agents", Arguments: json.RawMessage(`{"tasks":[{"agent":"code","task":"approval"}]}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "write", Name: "write_artifact", Arguments: json.RawMessage(`{"path":"report.md","content":"decision recorded"}`)}}},
+		{Text: "done"},
+	}}
+	wasApproved := false
+	service := Service{Executor: Executor{Model: model, StateDir: state, Code: func(ctx context.Context, request CodeRequest) (CodeResult, error) {
+		decision, err := request.Approve(ctx, []string{"reviewed-command"})
+		if err != nil {
+			return CodeResult{}, err
+		}
+		wasApproved = decision == tools.CommandAllowOnce
+		return CodeResult{Summary: "Decision recorded"}, nil
+	}}}
+	operation := service.Start(context.Background(), Request{RunID: "cross-process-decision", SourcePath: source, Objective: "Prepare", Contract: artifact.DefaultContract("report.md"), EnableCode: true})
+	<-operation.Interactions
+	fmt.Println("READY")
+	for range operation.Events {
+	}
+	result := <-operation.Done
+	if result.Err != nil {
+		t.Fatal(result.Err)
+	}
+	if wasApproved {
+		fmt.Println("APPROVED")
+	} else {
+		fmt.Println("DENIED")
+	}
+}
 
 func TestWorkControlRejectsUnauthorizedAndRedirectedCommands(t *testing.T) {
 	state := t.TempDir()

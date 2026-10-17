@@ -83,6 +83,7 @@ type Request struct {
 	// private loopback endpoint. It never grants action approval authority.
 	EnableControl   bool
 	controlSteering chan string
+	controlRespond  func(int, string, bool) error
 	MaxSteps        int
 	Mode            action.Mode
 	Contract        artifact.Contract

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -9,8 +10,50 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/workrun"
 )
+
+func TestWorkAnswerRequiresExactInteractiveResponse(t *testing.T) {
+	state := t.TempDir()
+	t.Setenv("GATOR_STATE_DIR", state)
+	model := &workScriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "child", Name: "delegate_agents", Arguments: json.RawMessage(`{"tasks":[{"agent":"code","task":"approval"}]}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "write", Name: "write_artifact", Arguments: json.RawMessage(`{"path":"report.md","content":"approved"}`)}}},
+		{Text: "done"},
+	}}
+	approved := false
+	service := workrun.Service{Executor: workrun.Executor{Model: model, StateDir: state, Code: func(ctx context.Context, request workrun.CodeRequest) (workrun.CodeResult, error) {
+		decision, err := request.Approve(ctx, []string{"reviewed-command"})
+		approved = decision == tools.CommandAllowOnce
+		return workrun.CodeResult{Summary: "Decision recorded"}, err
+	}}}
+	operation := service.Start(context.Background(), workrun.Request{RunID: "cli-answer", SourcePath: t.TempDir(), Objective: "Prepare", Contract: artifact.DefaultContract("report.md"), Mode: action.Draft, EnableCode: true})
+	defer operation.Cancel()
+	interaction := <-operation.Interactions
+	if interaction.ID != 1 || !isWorkSessionCommand("answer") {
+		t.Fatalf("pending answer command = %#v", interaction)
+	}
+	var output bytes.Buffer
+	if err := workSessionCommand([]string{"answer", operation.RunID, "1"}, strings.NewReader(""), &output, nil); err == nil || !strings.Contains(err.Error(), "not answered") {
+		t.Fatalf("empty answer changed pending decision: %v", err)
+	}
+	output.Reset()
+	if err := workSessionCommand([]string{"answer", operation.RunID, "1"}, strings.NewReader("yes\n"), &output, nil); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "reviewed-command") || !strings.Contains(output.String(), "exact preview (escaped)") || !strings.Contains(output.String(), "submitted") {
+		t.Fatalf("answer prompt omitted the exact request: %q", output.String())
+	}
+	for range operation.Events {
+	}
+	if result := <-operation.Done; result.Err != nil || !approved {
+		t.Fatalf("approved response did not reach live run: %v, approved=%t", result.Err, approved)
+	}
+}
 
 func TestWorkDecisionsShowsPendingAcrossRunsAndHistoryForOneRun(t *testing.T) {
 	state := t.TempDir()

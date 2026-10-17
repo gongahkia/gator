@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -40,9 +41,10 @@ type workControl struct {
 }
 
 // startWorkControl makes one active foreground run addressable from another
-// local CLI process. The token is confined to a private state file; no endpoint
-// accepts approvals or extends the run's tool permissions.
-func startWorkControl(ctx context.Context, stateDir, runID string, cancel context.CancelFunc, incoming <-chan string, direct chan string) (*workControl, <-chan string, error) {
+// local CLI process. The token is confined to a private state file. A decision
+// endpoint exists only when the foreground operation has an exact pending
+// interaction and checks the original in-memory preview digest.
+func startWorkControl(ctx context.Context, stateDir, runID string, cancel context.CancelFunc, incoming <-chan string, direct chan string, respond func(int, string, bool) error) (*workControl, <-chan string, error) {
 	if !validInteractionRunID(runID) {
 		return nil, nil, errors.New("invalid Work control run ID")
 	}
@@ -144,6 +146,47 @@ func startWorkControl(ctx context.Context, stateDir, runID string, cancel contex
 			http.Error(writer, "steering queue is full", http.StatusTooManyRequests)
 		}
 	}))
+	mux.HandleFunc("/decision", authorized(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method != http.MethodPost {
+			http.Error(writer, "method", http.StatusMethodNotAllowed)
+			return
+		}
+		if respond == nil || ctx.Err() != nil {
+			http.Error(writer, "decision unavailable", http.StatusConflict)
+			return
+		}
+		var answer struct {
+			ID       int    `json:"id"`
+			Digest   string `json:"digest"`
+			Approved *bool  `json:"approved"`
+		}
+		decoder := json.NewDecoder(http.MaxBytesReader(writer, request.Body, 4096))
+		decoder.DisallowUnknownFields()
+		if decoder.Decode(&answer) != nil || answer.ID < 1 || len(answer.Digest) != 64 || answer.Approved == nil {
+			http.Error(writer, "invalid decision", http.StatusBadRequest)
+			return
+		}
+		var trailing any
+		if decoder.Decode(&trailing) != io.EOF {
+			http.Error(writer, "invalid decision", http.StatusBadRequest)
+			return
+		}
+		record, err := ReadInteractionRecord(stateDir, runID, answer.ID)
+		if err != nil {
+			http.Error(writer, "decision is unavailable", http.StatusConflict)
+			return
+		}
+		digest, err := InteractionDigest(record.Interaction)
+		if record.Status != "pending" || record.LiveStatus != "active" || err != nil || digest != answer.Digest {
+			http.Error(writer, "pending decision changed", http.StatusConflict)
+			return
+		}
+		if respond(answer.ID, answer.Digest, *answer.Approved) != nil {
+			http.Error(writer, "decision is no longer pending", http.StatusConflict)
+			return
+		}
+		writer.WriteHeader(http.StatusAccepted)
+	}))
 	control := &workControl{server: &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}, listener: listener, root: root, name: runID + ".json"}
 	go func() { _ = control.server.Serve(listener) }()
 	payload, err := json.Marshal(state)
@@ -186,51 +229,9 @@ func SendWorkControl(ctx context.Context, stateDir, runID, command, text string)
 	if !validInteractionRunID(runID) || command != "stop" && command != "steer" || command == "steer" && !validWorkSteering(text) || command == "stop" && text != "" {
 		return errors.New("invalid Work control request")
 	}
-	history, err := workhistory.Open(stateDir)
+	client, state, err := connectWorkControl(ctx, stateDir, runID)
 	if err != nil {
 		return err
-	}
-	record, err := history.Load(runID)
-	if err != nil {
-		return err
-	}
-	if record.Status != workhistory.Running || record.LiveStatus != "active" {
-		return errors.New("Work run is not active")
-	}
-	root, err := workspace.Open(filepath.Join(stateDir, "gator", "work-control"))
-	if err != nil {
-		return errors.New("active Work run has no control endpoint")
-	}
-	payload, err := root.ReadRegularFile(runID+".json", 4096)
-	if err != nil {
-		return errors.New("active Work run has no readable control endpoint")
-	}
-	var state workControlState
-	if json.Unmarshal(payload, &state) != nil || state.Version != 1 || state.RunID != runID || len(state.Token) != 64 || len(state.Nonce) != 32 {
-		return errors.New("Work control state is invalid")
-	}
-	if _, err := hex.DecodeString(state.Token); err != nil {
-		return errors.New("Work control token is invalid")
-	}
-	if _, err := hex.DecodeString(state.Nonce); err != nil {
-		return errors.New("Work control nonce is invalid")
-	}
-	endpoint, err := url.Parse(state.URL)
-	if err != nil || endpoint.Scheme != "http" || endpoint.Hostname() != "127.0.0.1" || endpoint.Port() == "" || endpoint.User != nil || endpoint.Path != "" || endpoint.RawQuery != "" || endpoint.Fragment != "" {
-		return errors.New("Work control endpoint must be literal loopback")
-	}
-	client := &http.Client{Timeout: 5 * time.Second, Transport: &http.Transport{Proxy: nil}}
-	healthRequest, _ := http.NewRequestWithContext(ctx, http.MethodGet, state.URL+"/health", nil)
-	healthRequest.Header.Set("Authorization", "Bearer "+state.Token)
-	healthResponse, err := client.Do(healthRequest)
-	if err != nil {
-		return errors.New("Work control endpoint is stale or unreachable")
-	}
-	var identity struct{ RunID, Nonce string }
-	decodeErr := json.NewDecoder(io.LimitReader(healthResponse.Body, 1024)).Decode(&identity)
-	_ = healthResponse.Body.Close()
-	if healthResponse.StatusCode != http.StatusOK || decodeErr != nil || identity.RunID != runID || identity.Nonce != state.Nonce {
-		return errors.New("Work control identity verification failed")
 	}
 	request, _ := http.NewRequestWithContext(ctx, http.MethodPost, state.URL+"/"+command, bytes.NewBufferString(text))
 	request.Header.Set("Authorization", "Bearer "+state.Token)
@@ -243,4 +244,94 @@ func SendWorkControl(ctx context.Context, stateDir, runID, command, text string)
 		return fmt.Errorf("Work control %s returned HTTP %d", command, response.StatusCode)
 	}
 	return nil
+}
+
+// SendWorkDecision answers only the exact, still-pending interaction that was
+// displayed to the user. The live operation compares the digest against its
+// original in-memory request before it releases the approval callback.
+func SendWorkDecision(ctx context.Context, stateDir, runID string, id int, digest string, approved bool) error {
+	if id < 1 || len(digest) != 64 {
+		return errors.New("invalid Work decision")
+	}
+	client, state, err := connectWorkControl(ctx, stateDir, runID)
+	if err != nil {
+		return err
+	}
+	payload, err := json.Marshal(struct {
+		ID       int    `json:"id"`
+		Digest   string `json:"digest"`
+		Approved bool   `json:"approved"`
+	}{id, digest, approved})
+	if err != nil {
+		return err
+	}
+	request, _ := http.NewRequestWithContext(ctx, http.MethodPost, state.URL+"/decision", bytes.NewReader(payload))
+	request.Header.Set("Authorization", "Bearer "+state.Token)
+	request.Header.Set("Content-Type", "application/json")
+	response, err := client.Do(request)
+	if err != nil {
+		return fmt.Errorf("Work decision failed: %w", err)
+	}
+	_ = response.Body.Close()
+	if response.StatusCode != http.StatusAccepted {
+		return fmt.Errorf("Work decision returned HTTP %d", response.StatusCode)
+	}
+	return nil
+}
+
+func connectWorkControl(ctx context.Context, stateDir, runID string) (*http.Client, workControlState, error) {
+	if !validInteractionRunID(runID) {
+		return nil, workControlState{}, errors.New("invalid Work control run ID")
+	}
+	history, err := workhistory.Open(stateDir)
+	if err != nil {
+		return nil, workControlState{}, err
+	}
+	record, err := history.Load(runID)
+	if err != nil {
+		return nil, workControlState{}, err
+	}
+	if record.Status != workhistory.Running || record.LiveStatus != "active" {
+		return nil, workControlState{}, errors.New("Work run is not active")
+	}
+	root, err := workspace.Open(filepath.Join(stateDir, "gator", "work-control"))
+	if err != nil {
+		return nil, workControlState{}, errors.New("active Work run has no control endpoint")
+	}
+	payload, err := root.ReadRegularFile(runID+".json", 4096)
+	if err != nil {
+		return nil, workControlState{}, errors.New("active Work run has no readable control endpoint")
+	}
+	var state workControlState
+	if json.Unmarshal(payload, &state) != nil || state.Version != 1 || state.RunID != runID || len(state.Token) != 64 || len(state.Nonce) != 32 {
+		return nil, workControlState{}, errors.New("Work control state is invalid")
+	}
+	if _, err := hex.DecodeString(state.Token); err != nil {
+		return nil, workControlState{}, errors.New("Work control token is invalid")
+	}
+	if _, err := hex.DecodeString(state.Nonce); err != nil {
+		return nil, workControlState{}, errors.New("Work control nonce is invalid")
+	}
+	endpoint, err := url.Parse(state.URL)
+	if err != nil || endpoint.Scheme != "http" || endpoint.Hostname() != "127.0.0.1" || endpoint.Port() == "" || endpoint.User != nil || endpoint.Path != "" || endpoint.RawQuery != "" || endpoint.Fragment != "" {
+		return nil, workControlState{}, errors.New("Work control endpoint must be literal loopback")
+	}
+	port, err := strconv.Atoi(endpoint.Port())
+	if err != nil || port < 1 || port > 65535 {
+		return nil, workControlState{}, errors.New("Work control endpoint port is invalid")
+	}
+	client := &http.Client{Timeout: 5 * time.Second, Transport: &http.Transport{Proxy: nil}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	healthRequest, _ := http.NewRequestWithContext(ctx, http.MethodGet, state.URL+"/health", nil)
+	healthRequest.Header.Set("Authorization", "Bearer "+state.Token)
+	healthResponse, err := client.Do(healthRequest)
+	if err != nil {
+		return nil, workControlState{}, errors.New("Work control endpoint is stale or unreachable")
+	}
+	var identity struct{ RunID, Nonce string }
+	decodeErr := json.NewDecoder(io.LimitReader(healthResponse.Body, 1024)).Decode(&identity)
+	_ = healthResponse.Body.Close()
+	if healthResponse.StatusCode != http.StatusOK || decodeErr != nil || identity.RunID != runID || identity.Nonce != state.Nonce {
+		return nil, workControlState{}, errors.New("Work control identity verification failed")
+	}
+	return client, state, nil
 }

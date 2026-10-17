@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/gongahkia/gator/internal/orchestrator"
@@ -20,7 +21,7 @@ import (
 
 func isWorkSessionCommand(value string) bool {
 	switch value {
-	case "list", "show", "history", "resume", "back", "forward", "tasks", "decisions", "reconcile", "stop", "steer":
+	case "list", "show", "history", "resume", "back", "forward", "tasks", "decisions", "answer", "reconcile", "stop", "steer":
 		return true
 	default:
 		return false
@@ -40,6 +41,9 @@ func workSessionCommand(arguments []string, in io.Reader, out io.Writer, modelFa
 	}
 	if arguments[0] == "decisions" {
 		return workDecisionsCommand(stateDir, arguments[1:], out)
+	}
+	if arguments[0] == "answer" {
+		return workAnswerCommand(stateDir, arguments, in, out)
 	}
 	if arguments[0] == "stop" || arguments[0] == "steer" {
 		return workControlCommand(stateDir, arguments, out)
@@ -219,6 +223,52 @@ func workControlCommand(stateDir string, arguments []string, out io.Writer) erro
 	return err
 }
 
+func workAnswerCommand(stateDir string, arguments []string, in io.Reader, out io.Writer) error {
+	if len(arguments) != 3 {
+		return errors.New("usage: gator work answer RUN_ID DECISION_ID")
+	}
+	id, err := strconv.Atoi(arguments[2])
+	if err != nil || id < 1 {
+		return errors.New("decision ID must be positive")
+	}
+	selected, err := workrun.ReadInteractionRecord(stateDir, arguments[1], id)
+	if err != nil {
+		return err
+	}
+	if selected.Status != "pending" || selected.LiveStatus != "active" {
+		return errors.New("decision is not pending in an active foreground run")
+	}
+	digest, err := workrun.InteractionDigest(selected.Interaction)
+	if err != nil {
+		return err
+	}
+	preview, err := json.Marshal(selected.Interaction)
+	if err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(out, "\nPending Work decision\n  run: %s\n  decision: %d (%s)\n  preview sha256: %s\n  exact preview (escaped): %s\nApprove this exact request? [y/N] ", arguments[1], id, strconv.QuoteToASCII(selected.Interaction.Kind), digest, strconv.QuoteToASCII(string(preview))); err != nil {
+		return err
+	}
+	line, err := readApprovalLine(in)
+	if err != nil && !(errors.Is(err, io.EOF) && line != "") {
+		return errors.New("decision was not answered")
+	}
+	var approved bool
+	switch strings.ToLower(strings.TrimSpace(line)) {
+	case "y", "yes":
+		approved = true
+	case "n", "no":
+		approved = false
+	default:
+		return errors.New("type yes or no to answer this decision")
+	}
+	if err := workrun.SendWorkDecision(context.Background(), stateDir, arguments[1], id, digest, approved); err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(out, "Decision %d submitted for Work run %s; inspect its result before assuming the action completed.\n", id, arguments[1])
+	return err
+}
+
 func workDecisionsCommand(stateDir string, arguments []string, out io.Writer) error {
 	var runID string
 	var jsonOutput bool
@@ -247,7 +297,7 @@ func workDecisionsCommand(stateDir string, arguments []string, out io.Writer) er
 			Decisions  []workrun.InteractionRecord `json:"decisions"`
 		}{LiveStatus: "per_run_lock", Decisions: records})
 	}
-	if _, err := fmt.Fprintln(out, "Recorded Work decisions (read-only; answer approvals in the original foreground run):"); err != nil {
+	if _, err := fmt.Fprintln(out, "Recorded Work decisions (answer an active pending request with gator work answer RUN_ID DECISION_ID):"); err != nil {
 		return err
 	}
 	if len(records) == 0 {

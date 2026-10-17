@@ -110,8 +110,9 @@ type Interaction struct {
 }
 
 // InteractionRecord is the retained state of a foreground decision. A pending
-// record is only historical evidence of a request; it is not a remote approval
-// capability and may be stale if the original process exited unexpectedly.
+// record alone grants no approval authority and may be stale if the original
+// process exited unexpectedly. Remote answers additionally need a live run,
+// a private control token, and the original preview digest.
 type InteractionRecord struct {
 	Version     int         `json:"version"`
 	Status      string      `json:"status"`
@@ -134,8 +135,13 @@ type Operation struct {
 	steering     chan string
 	mu           sync.Mutex
 	next         int
-	pending      map[int]chan bool
+	pending      map[int]pendingInteraction
 	stopped      <-chan struct{}
+}
+
+type pendingInteraction struct {
+	response chan bool
+	digest   string
 }
 
 func (o *Operation) Cancel() { o.cancel() }
@@ -156,14 +162,28 @@ func (o *Operation) Steer(text string) error {
 	}
 }
 func (o *Operation) Respond(id int, approved bool) error {
+	return o.respond(id, "", approved)
+}
+
+func (o *Operation) respondBound(id int, digest string, approved bool) error {
+	if digest == "" {
+		return errors.New("interaction digest is required")
+	}
+	return o.respond(id, digest, approved)
+}
+
+func (o *Operation) respond(id int, digest string, approved bool) error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	response, ok := o.pending[id]
+	pending, ok := o.pending[id]
 	if !ok {
 		return errors.New("interaction is no longer pending")
 	}
+	if digest != "" && pending.digest != digest {
+		return errors.New("pending interaction preview changed")
+	}
 	delete(o.pending, id)
-	response <- approved
+	pending.response <- approved
 	return nil
 }
 func (s Service) Start(ctx context.Context, request Request) *Operation {
@@ -197,7 +217,7 @@ func (s Service) Start(ctx context.Context, request Request) *Operation {
 	events := make(chan agent.Event, 128)
 	interactions := make(chan Interaction, 8)
 	done := make(chan Completion, 1)
-	o := &Operation{RunID: request.RunID, Events: events, Interactions: interactions, Done: done, cancel: cancel, steering: make(chan string, 16), pending: map[int]chan bool{}, stopped: ctx.Done()}
+	o := &Operation{RunID: request.RunID, Events: events, Interactions: interactions, Done: done, cancel: cancel, steering: make(chan string, 16), pending: map[int]pendingInteraction{}, stopped: ctx.Done()}
 	var lockOnce sync.Once
 	var liveLock *os.File
 	var lockErr error
@@ -213,10 +233,15 @@ func (s Service) Start(ctx context.Context, request Request) *Operation {
 		o.next++
 		id := o.next
 		response := make(chan bool, 1)
-		o.pending[id] = response
+		interaction := Interaction{id, kind, preview}
+		digest, err := InteractionDigest(interaction)
+		if err != nil {
+			o.mu.Unlock()
+			return false, err
+		}
+		o.pending[id] = pendingInteraction{response: response, digest: digest}
 		o.mu.Unlock()
 		defer func() { o.mu.Lock(); delete(o.pending, id); o.mu.Unlock() }()
-		interaction := Interaction{id, kind, preview}
 		if err := persistInteraction(InteractionRecord{Version: 1, Status: "pending", Interaction: interaction}, id); err != nil {
 			return false, err
 		}
@@ -238,6 +263,7 @@ func (s Service) Start(ctx context.Context, request Request) *Operation {
 	request.OnSupervisor = func(supervisor *orchestrator.Supervisor) { o.mu.Lock(); o.tasks = supervisor; o.mu.Unlock() }
 	request.Steering = o.steering
 	request.controlSteering = o.steering
+	request.controlRespond = o.respondBound
 	sink := request.OnEvent
 	request.OnEvent = func(event agent.Event) {
 		if sink != nil {

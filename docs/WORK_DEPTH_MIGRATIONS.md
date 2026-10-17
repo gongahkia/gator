@@ -51,8 +51,12 @@ instruction for the next model boundary if the run continues, or
 cancellation. A queued instruction may not apply if the run finishes first.
 An active foreground run exposes a private loopback endpoint with
 an ephemeral token in a mode-0600 state file; commands verify the run lease and
-endpoint identity. These controls cannot approve an external action. Only the
-original foreground run can answer an approval. Deliberate cancellation records
-the decision as cancelled. Restarting does not grant
+endpoint identity. For a pending interactive Work decision, another terminal
+can run `gator work answer RUN_ID DECISION_ID`, inspect the escaped exact preview
+and its SHA-256 digest, and type `yes` or `no`. The live operation compares that
+digest with its original in-memory request before accepting the one-time answer;
+edited previews and replays fail. One-shot CLI Work still uses its own foreground
+approval prompt. Deliberate cancellation records the decision as cancelled.
+Restarting does not grant
 approval. macOS runtime verification and
 hosted service checks are listed separately in the verification record.

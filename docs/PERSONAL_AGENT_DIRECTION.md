@@ -81,7 +81,10 @@ run, another CLI can queue steering with `gator work steer WORK_ID TEXT` or
 request cancellation with `gator work stop WORK_ID`. If the run continues,
 queued steering applies at the next model boundary; it cannot interrupt an
 in-flight provider request or guarantee that a nearly finished run uses it.
-Approvals remain in the original foreground session.
+Pending interactive Work approvals can also be answered from another terminal
+with `gator work answer WORK_ID DECISION_ID` after reviewing the exact escaped
+preview. The answer is tied to the original in-memory request and is accepted
+once. One-shot CLI Work still asks in its own foreground terminal.
 
 ## Next engineering sequence
 
