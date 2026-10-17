@@ -826,6 +826,13 @@ func prepareGoogleBatch(descriptor Descriptor, payload []byte) ([]googlePrepared
 	steps := make([]googlePreparedStep, 0, len(input.Actions))
 	for _, item := range input.Actions {
 		operationID := strings.TrimSpace(item.Operation)
+		// A single batch approval is reserved for document and sheet edits.
+		// Publication, including Gmail send, must have its own exact approval.
+		switch operationID {
+		case "docs_create", "docs_update", "sheets_create", "sheets_values_update", "sheets_batch_update":
+		default:
+			return nil, nil, fmt.Errorf("Google batch action %q is not an allowed Docs or Sheets mutation", operationID)
+		}
 		_, operation, err := (&Registry{byID: map[string]Descriptor{descriptor.ID: descriptor}}).Operation(descriptor.ID, operationID)
 		if err != nil || operationID == "batch" || !action.RequiresFreshApproval(operation.Capability) {
 			return nil, nil, fmt.Errorf("Google batch action %q is not an allowed Google mutation", operationID)

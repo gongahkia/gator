@@ -148,6 +148,25 @@ func TestGoogleBatchPinsCanonicalPayloadAndDoesNotSendDuringPreparation(t *testi
 	}
 }
 
+func TestGoogleBatchRejectsGmailSendBeforeApprovalOrNetwork(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		requests++
+		writer.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+	descriptor := Descriptor{Version: DescriptorVersion, ID: "google", Name: "Google", Kind: KindGoogle, Resource: server.URL, Authentication: AuthNone}
+	registry, err := NewRegistry([]Descriptor{descriptor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := json.RawMessage(`{"payload":{"actions":[{"operation":"gmail_send","payload":{"from":"me@example.com","to":"you@example.com","subject":"Hello","body":"Hi"}}]}}`)
+	_, err = (Runtime{Registry: registry, HTTPClient: server.Client()}).PrepareAction(descriptor.ID, "batch", input)
+	if err == nil || !strings.Contains(err.Error(), "not an allowed Docs or Sheets mutation") || requests != 0 {
+		t.Fatalf("Gmail batch preparation = %v, requests=%d", err, requests)
+	}
+}
+
 func TestPreparedGoogleActionRejectsAChangedApprovalEnvelope(t *testing.T) {
 	requests := 0
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
