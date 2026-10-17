@@ -76,8 +76,12 @@ installed and the user session remains active).
 
 `gator work list`, `gator work show WORK_ID`, and the TUI History view report
 whether a running Work record has an active process-held lease, a stopped lease
-after interruption, or no lease from an older run. This is read-only process
-visibility: another CLI cannot steer that run or answer its approvals.
+after interruption, or no lease from an older run. For an active foreground
+run, another CLI can queue steering with `gator work steer WORK_ID TEXT` or
+request cancellation with `gator work stop WORK_ID`. If the run continues,
+queued steering applies at the next model boundary; it cannot interrupt an
+in-flight provider request or guarantee that a nearly finished run uses it.
+Approvals remain in the original foreground session.
 
 ## Next engineering sequence
 

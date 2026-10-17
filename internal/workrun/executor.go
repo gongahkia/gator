@@ -167,7 +167,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		}
 	}()
 	if request.EnableControl {
-		control, steering, err := startWorkControl(ctx, request.StateDir, request.RunID, cancel, request.Steering)
+		control, steering, err := startWorkControl(ctx, request.StateDir, request.RunID, cancel, request.Steering, request.controlSteering)
 		if err != nil {
 			return Outcome{}, fmt.Errorf("start Work control: %w", err)
 		}

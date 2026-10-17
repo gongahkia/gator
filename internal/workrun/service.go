@@ -237,6 +237,7 @@ func (s Service) Start(ctx context.Context, request Request) *Operation {
 	}
 	request.OnSupervisor = func(supervisor *orchestrator.Supervisor) { o.mu.Lock(); o.tasks = supervisor; o.mu.Unlock() }
 	request.Steering = o.steering
+	request.controlSteering = o.steering
 	sink := request.OnEvent
 	request.OnEvent = func(event agent.Event) {
 		if sink != nil {

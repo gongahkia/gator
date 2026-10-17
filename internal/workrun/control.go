@@ -42,7 +42,7 @@ type workControl struct {
 // startWorkControl makes one active foreground run addressable from another
 // local CLI process. The token is confined to a private state file; no endpoint
 // accepts approvals or extends the run's tool permissions.
-func startWorkControl(ctx context.Context, stateDir, runID string, cancel context.CancelFunc, incoming <-chan string) (*workControl, <-chan string, error) {
+func startWorkControl(ctx context.Context, stateDir, runID string, cancel context.CancelFunc, incoming <-chan string, direct chan string) (*workControl, <-chan string, error) {
 	if !validInteractionRunID(runID) {
 		return nil, nil, errors.New("invalid Work control run ID")
 	}
@@ -72,8 +72,11 @@ func startWorkControl(ctx context.Context, stateDir, runID string, cancel contex
 		return nil, nil, err
 	}
 	state := workControlState{Version: 1, RunID: runID, URL: "http://" + listener.Addr().String(), Token: hex.EncodeToString(tokenBytes), Nonce: hex.EncodeToString(nonceBytes)}
-	steering := make(chan string, 16)
-	if incoming != nil {
+	steering := direct
+	if steering == nil {
+		steering = make(chan string, 16)
+	}
+	if incoming != nil && direct == nil {
 		go func() {
 			for {
 				select {

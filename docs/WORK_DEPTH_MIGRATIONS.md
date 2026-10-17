@@ -45,8 +45,14 @@ previews and the retained resolution for one run. New foreground runs hold a
 local process lock while they can ask for approvals; the command labels a
 recorded pending decision as active, stale after the process exits, or
 unconfirmed for older records without a lock. `/status` shows the current Work
-run ID for inspection from another terminal. Only the original foreground run
-can answer an approval. Deliberate cancellation records the decision as
-cancelled. Restarting does not grant
+run ID. Another terminal can use `gator work steer RUN_ID TEXT` to queue an
+instruction for the next model boundary if the run continues, or
+`gator work stop RUN_ID` to request
+cancellation. A queued instruction may not apply if the run finishes first.
+An active foreground run exposes a private loopback endpoint with
+an ephemeral token in a mode-0600 state file; commands verify the run lease and
+endpoint identity. These controls cannot approve an external action. Only the
+original foreground run can answer an approval. Deliberate cancellation records
+the decision as cancelled. Restarting does not grant
 approval. macOS runtime verification and
 hosted service checks are listed separately in the verification record.

@@ -215,7 +215,7 @@ func workControlCommand(stateDir string, arguments []string, out io.Writer) erro
 		_, err := fmt.Fprintf(out, "Stop requested for Work run %s.\n", arguments[1])
 		return err
 	}
-	_, err := fmt.Fprintf(out, "Steering queued for Work run %s; it will apply before the next model turn.\n", arguments[1])
+	_, err := fmt.Fprintf(out, "Steering queued for Work run %s; if the run continues, it will apply at the next model boundary.\n", arguments[1])
 	return err
 }
 
