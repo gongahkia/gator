@@ -27,35 +27,36 @@ import (
 const Version = 2
 
 type Definition struct {
-	Limits          agent.Limits           `json:"limits"`
-	WebOrigins      []string               `json:"web_origins,omitempty"`
-	Project         *projectcapture.Bundle `json:"project_configuration,omitempty"`
-	SnapshotID      string                 `json:"snapshot_id,omitempty"`
-	Code            workrun.CodePolicy     `json:"code_policy,omitempty"`
-	EnableCode      bool                   `json:"enable_code,omitempty"`
-	Version         int                    `json:"version"`
-	ID              string                 `json:"id"`
-	Name            string                 `json:"name"`
-	GoalID          string                 `json:"goal_id,omitempty"`
-	Enabled         bool                   `json:"enabled"`
-	Schedule        string                 `json:"schedule"`
-	Timezone        string                 `json:"timezone"`
-	Missed          string                 `json:"missed"`
-	SourcePath      string                 `json:"source_path"`
-	RefreshSnapshot bool                   `json:"refresh_snapshot"`
-	ChangeOnly      bool                   `json:"change_only,omitempty"`
-	GoalWatch       bool                   `json:"goal_watch,omitempty"`
-	WatchSources    []WatchSource          `json:"watch_sources,omitempty"`
-	Objective       string                 `json:"objective"`
-	Provider        string                 `json:"provider,omitempty"`
-	Model           string                 `json:"model,omitempty"`
-	Mode            action.Mode            `json:"mode"`
-	Contract        artifact.Contract      `json:"contract"`
-	ConnectorIDs    []string               `json:"connector_ids,omitempty"`
-	MaxSteps        int                    `json:"max_steps"`
-	CreatedAt       time.Time              `json:"created_at"`
-	UpdatedAt       time.Time              `json:"updated_at"`
-	LastScheduledAt time.Time              `json:"last_scheduled_at,omitempty"`
+	Limits              agent.Limits           `json:"limits"`
+	WebOrigins          []string               `json:"web_origins,omitempty"`
+	Project             *projectcapture.Bundle `json:"project_configuration,omitempty"`
+	SnapshotID          string                 `json:"snapshot_id,omitempty"`
+	Code                workrun.CodePolicy     `json:"code_policy,omitempty"`
+	EnableCode          bool                   `json:"enable_code,omitempty"`
+	Version             int                    `json:"version"`
+	ID                  string                 `json:"id"`
+	Name                string                 `json:"name"`
+	GoalID              string                 `json:"goal_id,omitempty"`
+	Enabled             bool                   `json:"enabled"`
+	Schedule            string                 `json:"schedule"`
+	Timezone            string                 `json:"timezone"`
+	Missed              string                 `json:"missed"`
+	SourcePath          string                 `json:"source_path"`
+	RefreshSnapshot     bool                   `json:"refresh_snapshot"`
+	ChangeOnly          bool                   `json:"change_only,omitempty"`
+	GoalWatch           bool                   `json:"goal_watch,omitempty"`
+	WatchSources        []WatchSource          `json:"watch_sources,omitempty"`
+	RuntimeWatchChanges []WatchChange          `json:"-"`
+	Objective           string                 `json:"objective"`
+	Provider            string                 `json:"provider,omitempty"`
+	Model               string                 `json:"model,omitempty"`
+	Mode                action.Mode            `json:"mode"`
+	Contract            artifact.Contract      `json:"contract"`
+	ConnectorIDs        []string               `json:"connector_ids,omitempty"`
+	MaxSteps            int                    `json:"max_steps"`
+	CreatedAt           time.Time              `json:"created_at"`
+	UpdatedAt           time.Time              `json:"updated_at"`
+	LastScheduledAt     time.Time              `json:"last_scheduled_at,omitempty"`
 }
 
 // WatchSource is a user-selected read surface for a polled goal watch. It
@@ -65,6 +66,20 @@ type WatchSource struct {
 	Operation   string `json:"operation"`
 	Query       string `json:"query,omitempty"`
 	Days        int    `json:"days,omitempty"`
+}
+
+// WatchItem retains a content fingerprint and bounded source identifier, not
+// the contents of a private connected result.
+type WatchItem struct {
+	Source string `json:"source"`
+	ID     string `json:"id"`
+	SHA256 string `json:"sha256"`
+}
+
+type WatchChange struct {
+	Source string `json:"source"`
+	ID     string `json:"id"`
+	Kind   string `json:"kind"`
 }
 
 type Attempt struct {
@@ -85,6 +100,8 @@ type Attempt struct {
 	ResultSHA256             string         `json:"result_sha256,omitempty"`
 	InputSHA256              string         `json:"input_sha256,omitempty"`
 	WatchAttention           bool           `json:"watch_attention,omitempty"`
+	WatchItems               []WatchItem    `json:"watch_items,omitempty"`
+	WatchChanges             []WatchChange  `json:"watch_changes,omitempty"`
 	NotificationPolicySHA256 string         `json:"notification_policy_sha256,omitempty"`
 	Error                    string         `json:"error,omitempty"`
 }

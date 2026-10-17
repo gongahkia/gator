@@ -108,7 +108,7 @@ func renderGoalActivity(stateDir, goalID string, out io.Writer) error {
 			}
 			fmt.Fprintf(&view, "    next: %s\n", schedule.Next(now).Format(time.RFC3339))
 		}
-		history, err := jobStore.History(definition.ID, 1)
+		history, err := jobStore.History(definition.ID, 0)
 		if err != nil {
 			return err
 		}
@@ -121,6 +121,23 @@ func renderGoalActivity(stateDir, goalID string, out io.Writer) error {
 				fmt.Fprintf(&view, " — %s", activityLine(last.Summary, 140))
 			}
 			view.WriteByte('\n')
+			changes := last.WatchChanges
+			if len(changes) == 0 {
+				for _, prior := range history[1:] {
+					if prior.Status == "completed" && len(prior.WatchChanges) > 0 {
+						changes = prior.WatchChanges
+						fmt.Fprintf(&view, "    last detected change: %s\n", prior.ScheduledAt.Local().Format(time.RFC3339))
+						break
+					}
+				}
+			}
+			for index, change := range changes {
+				if index == 3 {
+					fmt.Fprintf(&view, "    ... and %d more changed items\n", len(changes)-3)
+					break
+				}
+				fmt.Fprintf(&view, "    changed: %s %s %s\n", change.Kind, activityLine(change.Source, 60), activityLine(change.ID, 80))
+			}
 		}
 	}
 	if jobCount == 0 {

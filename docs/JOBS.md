@@ -165,7 +165,12 @@ restarts; no push subscription or provider event cursor is installed. Connector
 read permissions and credentials are checked on each poll. The model runs only
 when the local or connected content hash changes, then reads current evidence
 again in Work. A source can change between those two reads; the next poll will
-detect it. The host does not verify whether a changed message is relevant.
+detect it. Completed attempts also retain bounded item IDs and SHA-256
+fingerprints, then pass an added/updated/removed item list to the next model
+check. This metadata helps the model look at the right message or event; it
+does not retain message bodies in scheduler state or prove that a change matters.
+Unchanged attempts keep only the combined input digest. The host does not
+verify whether a changed message is relevant.
 
 A watch asks Work for an explicit `attention` decision and an evidence-backed
 summary. A quiet completed run stays out of the inbox. A draft artifact or a

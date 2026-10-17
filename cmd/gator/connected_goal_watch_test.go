@@ -51,8 +51,12 @@ func TestConnectedJSONGoalWatchSkipsUnchangedPollAfterRestart(t *testing.T) {
 	}
 	now := time.Now().UTC().Truncate(5 * time.Minute).Add(5 * time.Minute)
 	calls := 0
-	execute := func(_ context.Context, _ jobs.Definition, _ string, _ ...string) (jobResult, error) {
+	execute := func(_ context.Context, current jobs.Definition, _ string, _ ...string) (jobResult, error) {
 		calls++
+		request := jobWorkRequest(current)
+		if calls == 1 && !strings.Contains(request.System, `"kind":"added"`) || calls == 2 && !strings.Contains(request.System, `"kind":"updated"`) {
+			t.Errorf("model was not told which watched item changed: %s", request.System)
+		}
 		return jobResult{Status: "completed", Summary: "Checked venue", ResultSHA256: "result", WatchAttention: false}, nil
 	}
 	runDueJobsContextWith(context.Background(), store, state, false, now, execute)
@@ -75,6 +79,9 @@ func TestConnectedJSONGoalWatchSkipsUnchangedPollAfterRestart(t *testing.T) {
 	history, err := store.History(definitions[0].ID, 0)
 	if err != nil || len(history) != 3 || history[0].Status != "completed" || history[1].Status != "unchanged" || history[1].InputSHA256 == "" {
 		t.Fatalf("durable connected watch history = %#v, %v", history, err)
+	}
+	if len(history[0].WatchChanges) != 1 || history[0].WatchChanges[0].Source != "planning/fetch" || history[0].WatchChanges[0].Kind != "updated" {
+		t.Fatalf("item-level change was not retained: %#v", history[0].WatchChanges)
 	}
 }
 
