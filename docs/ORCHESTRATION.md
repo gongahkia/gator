@@ -130,5 +130,8 @@ checks, or shows Work alone when no goal is selected.
 `gator work cancel-task RUN_ID TASK_ID` requests cancellation of an
 active specialist and its descendants from another terminal; it does not stop
 the parent Work run. Inspect its retained status to confirm cancellation.
+`gator work steer-task RUN_ID TASK_ID TEXT` queues a bounded instruction for an
+active LLM specialist. The runner applies it at the next model boundary if
+the specialist continues. Hosted Code specialists reject live steering.
 See [current bounds](WORK_DEPTH.md), [migration/recovery](WORK_DEPTH_MIGRATIONS.md),
 and [matched evaluation](WORK_EVALUATION.md).

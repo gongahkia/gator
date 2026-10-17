@@ -21,7 +21,7 @@ import (
 
 func isWorkSessionCommand(value string) bool {
 	switch value {
-	case "list", "show", "history", "resume", "back", "forward", "tasks", "activity", "decisions", "answer", "reconcile", "stop", "steer", "cancel-task":
+	case "list", "show", "history", "resume", "back", "forward", "tasks", "activity", "decisions", "answer", "reconcile", "stop", "steer", "cancel-task", "steer-task":
 		return true
 	default:
 		return false
@@ -59,6 +59,16 @@ func workSessionCommand(arguments []string, in io.Reader, out io.Writer, modelFa
 			return err
 		}
 		_, err := fmt.Fprintf(out, "Cancellation requested for specialist %s in Work run %s.\n", arguments[2], arguments[1])
+		return err
+	}
+	if arguments[0] == "steer-task" {
+		if len(arguments) < 4 {
+			return errors.New("usage: gator work steer-task RUN_ID TASK_ID TEXT")
+		}
+		if err := workrun.SendWorkTaskSteer(context.Background(), stateDir, arguments[1], arguments[2], strings.Join(arguments[3:], " ")); err != nil {
+			return err
+		}
+		_, err := fmt.Fprintf(out, "Steering queued for specialist %s in Work run %s; it applies at the next model boundary if the specialist continues.\n", arguments[2], arguments[1])
 		return err
 	}
 	store, err := worksession.Open(stateDir)

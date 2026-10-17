@@ -48,6 +48,7 @@ Common follow-up actions:
   gator work answer RUN_ID DECISION_ID
   gator work steer RUN_ID TEXT · gator work stop RUN_ID
   gator work cancel-task RUN_ID TASK_ID
+  gator work steer-task RUN_ID TASK_ID TEXT
   gator work apply WORK_ID [OPTIONS]
   gator work retry WORK_ID [OPTIONS]
   gator work feedback WORK_ID accept|reject|correct|remember|dont-learn|list

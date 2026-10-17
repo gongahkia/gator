@@ -45,6 +45,7 @@ type Invocation struct {
 	OnEvent  agent.EventSink
 	ID       string
 	Task     string
+	Steering <-chan string
 }
 
 // Result is the bounded information returned from a specialist to its manager.

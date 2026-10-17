@@ -84,8 +84,20 @@ func writeWorkActivity(out io.Writer, activity workrun.Activity) error {
 			if _, err := fmt.Fprintf(out, "  controls: gator work steer %s TEXT | gator work stop %s\n", run.ID, run.ID); err != nil {
 				return err
 			}
-			if len(run.Tasks) > 0 {
+			var activeTask, steerableTask bool
+			for _, task := range run.Tasks {
+				if task.Status == "queued" || task.Status == "running" {
+					activeTask = true
+					steerableTask = steerableTask || task.Role != "code"
+				}
+			}
+			if activeTask {
 				if _, err := fmt.Fprintf(out, "            gator work cancel-task %s TASK_ID\n", run.ID); err != nil {
+					return err
+				}
+			}
+			if steerableTask {
+				if _, err := fmt.Fprintf(out, "            gator work steer-task %s TASK_ID TEXT (LLM specialists)\n", run.ID); err != nil {
 					return err
 				}
 			}

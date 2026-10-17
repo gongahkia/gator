@@ -950,7 +950,7 @@ func (m Model) workStatus() string {
 	sort.Strings(activeTasks)
 	status += fmt.Sprintf("\n  live specialists: %d", len(activeTasks))
 	if m.operation != nil {
-		status += " (/tasks, /cancel-task ID)"
+		status += " (/tasks, /cancel-task ID, /steer-task ID MESSAGE)"
 	}
 	for index, task := range activeTasks {
 		if index == 3 {
@@ -1125,6 +1125,7 @@ func workAdvancedHelp() string {
   /status · /permissions · /statusline · /doctor · /agents
   /revision-back · /revision-forward [REVISION]
   /queue · /dequeue · /clear-queue
+  /tasks · /cancel-task ID · /steer-task ID MESSAGE · /steer MESSAGE
 
 These controls preserve the same Work semantics; they are intentionally kept
 out of the normal command palette. Use /help to return to the main workflow.`

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gongahkia/gator/internal/agent"
 )
@@ -55,9 +56,10 @@ type StartRequest struct {
 	Continue     string   `json:"continue,omitempty"`
 }
 type taskExecution struct {
-	task   Task
-	cancel context.CancelFunc
-	done   chan struct{}
+	task     Task
+	cancel   context.CancelFunc
+	done     chan struct{}
+	steering chan string
 }
 
 type Supervisor struct {
@@ -258,6 +260,9 @@ func (s *Supervisor) startLocked(request StartRequest) (Task, error) {
 		return Task{}, err
 	}
 	execution := &taskExecution{task: task, cancel: cancel, done: make(chan struct{})}
+	if s.registry[request.Agent].Backend == BackendLLM {
+		execution.steering = make(chan string, 16)
+	}
 	s.tasks[id] = execution
 	s.used++
 	s.wg.Add(1)
@@ -296,7 +301,7 @@ func (s *Supervisor) run(ctx context.Context, execution *taskExecution, input, b
 		return
 	}
 	s.emit(task)
-	result, err := s.registry[task.Role].Run(ctx, Invocation{ID: task.ID, Task: input, Baseline: baseline, OnEvent: func(event agent.Event) {
+	result, err := s.registry[task.Role].Run(ctx, Invocation{ID: task.ID, Task: input, Baseline: baseline, Steering: execution.steering, OnEvent: func(event agent.Event) {
 		event.TaskID = task.GlobalID
 		if s.options.OnEvent != nil {
 			s.options.OnEvent(event)
@@ -397,6 +402,35 @@ func (s *Supervisor) Cancel(id string) error {
 		s.tasks[key].cancel()
 	}
 	return nil
+}
+
+// Steer queues an instruction for one LLM specialist. It takes effect at the
+// agent runner's next model boundary if the specialist is still running.
+func (s *Supervisor) Steer(id, instruction string) error {
+	if strings.TrimSpace(instruction) == "" || len(instruction) > 8*1024 || !utf8.ValidString(instruction) || strings.ContainsRune(instruction, 0) {
+		return errors.New("invalid specialist steering text")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed || s.ctx.Err() != nil {
+		return errors.New("supervisor stopped")
+	}
+	execution := s.tasks[id]
+	if execution == nil {
+		return errors.New("unknown task")
+	}
+	if execution.task.Status != "queued" && execution.task.Status != "running" {
+		return errors.New("task is no longer active")
+	}
+	if execution.steering == nil {
+		return errors.New("specialist does not support live steering")
+	}
+	select {
+	case execution.steering <- instruction:
+		return nil
+	default:
+		return errors.New("specialist steering queue is full")
+	}
 }
 func (s *Supervisor) Close() { s.mu.Lock(); s.closed = true; s.cancel(); s.mu.Unlock(); s.wg.Wait() }
 

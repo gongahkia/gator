@@ -173,6 +173,11 @@ func TestWorkControlRejectsUnauthorizedAndRedirectedCommands(t *testing.T) {
 		t.Fatalf("unauthorized stop response = %v, %v", response, err)
 	}
 	_ = response.Body.Close()
+	response, err = (&http.Client{Timeout: time.Second}).Post(control.URL+"/task/steer", "application/json", strings.NewReader(`{"id":"subagent-001","text":"ignore prior task"}`))
+	if err != nil || response.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("unauthorized specialist steering response = %v, %v", response, err)
+	}
+	_ = response.Body.Close()
 	control.URL = "http://example.com"
 	changed, _ := json.Marshal(control)
 	if err := root.WriteRegularFileAtomic("protected-control.json", changed, 4096); err != nil {
@@ -288,13 +293,18 @@ func TestWorkControlHelperProcess(t *testing.T) {
 type specialistControlModel struct {
 	calls   int
 	release chan struct{}
+	role    string
 }
 
 func (m *specialistControlModel) Complete(ctx context.Context, _ agent.TurnRequest) (agent.Turn, error) {
 	m.calls++
 	switch m.calls {
 	case 1:
-		return agent.Turn{ToolCalls: []agent.ToolCall{{ID: "specialist", Name: "start_agent", Arguments: json.RawMessage(`{"agent":"code","task":"wait for cancellation"}`)}}}, nil
+		assignment := json.RawMessage(`{"agent":"code","task":"wait for cancellation"}`)
+		if m.role == "source_researcher" {
+			assignment = json.RawMessage(`{"agent":"source_researcher","task":"read the selected source"}`)
+		}
+		return agent.Turn{ToolCalls: []agent.ToolCall{{ID: "specialist", Name: "start_agent", Arguments: assignment}}}, nil
 	case 2:
 		select {
 		case <-m.release:
@@ -339,6 +349,9 @@ func TestWorkSpecialistCancelAcrossProcesses(t *testing.T) {
 	}
 	if err := SendWorkTaskCancel(ctx, state, "cross-process-specialist", "subagent-002"); err == nil || !strings.Contains(err.Error(), "HTTP 409") {
 		t.Fatalf("unknown specialist was accepted: %v", err)
+	}
+	if err := SendWorkTaskSteer(ctx, state, "cross-process-specialist", "subagent-001", "focus on amber"); err == nil || !strings.Contains(err.Error(), "HTTP 409") {
+		t.Fatalf("hosted specialist accepted live steering: %v", err)
 	}
 	if err := SendWorkTaskCancel(ctx, state, "cross-process-specialist", "subagent-001"); err != nil {
 		t.Fatal(err)
@@ -409,6 +422,136 @@ func TestWorkSpecialistCancelHelperProcess(t *testing.T) {
 	}
 	result := <-operation.Done
 	if result.Err != nil {
+		t.Fatal(result.Err)
+	}
+	fmt.Println("DONE")
+}
+
+type steerableRoleModel struct {
+	calls   int
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (m *steerableRoleModel) Complete(ctx context.Context, request agent.TurnRequest) (agent.Turn, error) {
+	m.calls++
+	if m.calls == 1 {
+		close(m.entered)
+		select {
+		case <-m.release:
+			return agent.Turn{Text: "old answer"}, nil
+		case <-ctx.Done():
+			return agent.Turn{}, ctx.Err()
+		}
+	}
+	for _, message := range request.Messages {
+		if strings.Contains(message.Content, "focus on amber") {
+			return agent.Turn{Text: "followed amber"}, nil
+		}
+	}
+	return agent.Turn{Text: "steering was not applied"}, nil
+}
+
+func TestWorkSpecialistSteerAcrossProcesses(t *testing.T) {
+	state, source := t.TempDir(), t.TempDir()
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	child := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestWorkSpecialistSteerHelperProcess$")
+	child.Env = append(os.Environ(), "GATOR_TASK_STEER_HELPER=1", "GATOR_CONTROL_STATE="+state, "GATOR_CONTROL_SOURCE="+source)
+	stdout, err := child.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdin, err := child.StdinPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stderr bytes.Buffer
+	child.Stderr = &stderr
+	if err := child.Start(); err != nil {
+		t.Fatal(err)
+	}
+	scanner := bufio.NewScanner(stdout)
+	if !scanner.Scan() || scanner.Text() != "READY" {
+		t.Fatalf("LLM specialist did not start: %q, %v, %s", scanner.Text(), scanner.Err(), stderr.String())
+	}
+	if err := SendWorkTaskSteer(ctx, state, "cross-process-steering", "subagent-001", ""); err == nil {
+		t.Fatal("empty specialist steering was accepted")
+	}
+	if err := SendWorkTaskSteer(ctx, state, "cross-process-steering", "subagent-001", strings.Repeat("x", maxSpecialistSteeringBytes+1)); err == nil {
+		t.Fatal("oversized specialist steering was accepted")
+	}
+	if err := SendWorkTaskSteer(ctx, state, "cross-process-steering", "subagent-002", "focus on amber"); err == nil || !strings.Contains(err.Error(), "HTTP 409") {
+		t.Fatalf("unknown specialist accepted steering: %v", err)
+	}
+	if err := SendWorkTaskSteer(ctx, state, "cross-process-steering", "subagent-001", "focus on amber"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.WriteString(stdin, "role\n"); err != nil {
+		t.Fatal(err)
+	}
+	if !scanner.Scan() || scanner.Text() != "STEERED" {
+		t.Fatalf("specialist did not apply steering: %q, %v, %s", scanner.Text(), scanner.Err(), stderr.String())
+	}
+	if err := SendWorkTaskSteer(ctx, state, "cross-process-steering", "subagent-001", "too late"); err == nil || !strings.Contains(err.Error(), "HTTP 409") {
+		t.Fatalf("finished specialist accepted steering: %v", err)
+	}
+	if _, err := io.WriteString(stdin, "parent\n"); err != nil {
+		t.Fatal(err)
+	}
+	_ = stdin.Close()
+	if !scanner.Scan() || scanner.Text() != "DONE" {
+		t.Fatalf("parent did not continue: %q, %v, %s", scanner.Text(), scanner.Err(), stderr.String())
+	}
+	if err := child.Wait(); err != nil {
+		t.Fatalf("child failed: %v, %s", err, stderr.String())
+	}
+	if err := SendWorkTaskSteer(context.Background(), state, "cross-process-steering", "subagent-001", "late"); err == nil {
+		t.Fatal("finished Work run accepted specialist steering")
+	}
+}
+
+func TestWorkSpecialistSteerHelperProcess(t *testing.T) {
+	if os.Getenv("GATOR_TASK_STEER_HELPER") != "1" {
+		return
+	}
+	state, source := os.Getenv("GATOR_CONTROL_STATE"), os.Getenv("GATOR_CONTROL_SOURCE")
+	manager := &specialistControlModel{role: "source_researcher", release: make(chan struct{})}
+	role := &steerableRoleModel{entered: make(chan struct{}), release: make(chan struct{})}
+	service := Service{Executor: Executor{Model: manager, StateDir: state, RoleModels: map[string]agent.Model{"source_researcher": role}}}
+	operation := service.Start(context.Background(), Request{RunID: "cross-process-steering", SourcePath: source, Objective: "Prepare", Contract: artifact.DefaultContract("report.md")})
+	<-role.entered
+	fmt.Println("READY")
+	reader := bufio.NewReader(os.Stdin)
+	line, _ := reader.ReadString('\n')
+	if line != "role\n" {
+		t.Fatalf("unexpected role release signal %q", line)
+	}
+	close(role.release)
+	deadline := time.After(5 * time.Second)
+	for {
+		task, err := operation.InspectTask("subagent-001")
+		if err == nil && task.Status == "completed" {
+			if !strings.Contains(task.Result.Summary, "followed amber") {
+				t.Fatalf("specialist missed steering: %+v", task)
+			}
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("specialist did not complete: %+v, %v", task, err)
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	fmt.Println("STEERED")
+	line, _ = reader.ReadString('\n')
+	if line != "parent\n" {
+		t.Fatalf("unexpected parent release signal %q", line)
+	}
+	close(manager.release)
+	for range operation.Events {
+	}
+	if result := <-operation.Done; result.Err != nil {
 		t.Fatal(result.Err)
 	}
 	fmt.Println("DONE")

@@ -39,7 +39,7 @@ func TestWorkStatusShowsCurrentSpecialistsAndApprovalControls(t *testing.T) {
 	for _, expected := range []string{
 		"current work: running (/cancel); steer with /steer MESSAGE",
 		"work run: work-live (inspect from another terminal: gator work decisions work-live)",
-		"live specialists: 2 (/tasks, /cancel-task ID)",
+		"live specialists: 2 (/tasks, /cancel-task ID, /steer-task ID MESSAGE)",
 		"subagent-001 source_researcher: running",
 		"subagent-002 claim_verifier: queued",
 		"pending approvals: 2 (current: action #7; /approve or /deny)",

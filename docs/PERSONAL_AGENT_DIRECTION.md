@@ -88,6 +88,10 @@ Work view alongside the selected goal, or shows it alone when no goal is selecte
 `gator work cancel-task WORK_ID TASK_ID` requests cancellation of one active
 specialist and its descendants; its parent run can continue. The retained task
 record shows whether cancellation completed.
+`gator work steer-task WORK_ID TASK_ID TEXT` queues an instruction for one
+active LLM specialist from another terminal; `/steer-task TASK_ID MESSAGE`
+does the same for the current foreground run. It can apply only at the next
+model boundary if the specialist continues. Hosted Code cannot be steered live.
 Pending interactive Work approvals can also be answered from another terminal
 with `gator work answer WORK_ID DECISION_ID` after reviewing the exact escaped
 preview. The answer is tied to the original in-memory request and is accepted

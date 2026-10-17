@@ -437,6 +437,22 @@ func (m Model) submitRunningInput() (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
+	if (prompt == "/steer-task" || strings.HasPrefix(prompt, "/steer-task ")) && m.operation != nil {
+		remainder := strings.TrimSpace(strings.TrimPrefix(prompt, "/steer-task"))
+		parts := strings.Fields(remainder)
+		if len(parts) < 2 {
+			m.status = "usage: /steer-task TASK_ID MESSAGE"
+			return m, nil
+		}
+		id := parts[0]
+		instruction := strings.TrimSpace(strings.TrimPrefix(remainder, id))
+		if err := m.operation.SteerTask(id, strings.TrimSpace(instruction)); err != nil {
+			m.status = err.Error()
+		} else {
+			m.status = "Steering queued for specialist " + id
+		}
+		return m, nil
+	}
 	if strings.HasPrefix(prompt, "/steer ") && m.operation != nil {
 		err := m.operation.Steer(strings.TrimSpace(strings.TrimPrefix(prompt, "/steer ")))
 		if err != nil {

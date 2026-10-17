@@ -85,6 +85,7 @@ type Request struct {
 	controlSteering   chan string
 	controlRespond    func(int, string, bool) error
 	controlCancelTask func(string) error
+	controlSteerTask  func(string, string) error
 	MaxSteps          int
 	Mode              action.Mode
 	Contract          artifact.Contract

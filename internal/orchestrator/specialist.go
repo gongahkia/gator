@@ -62,7 +62,7 @@ func LLMSpecialist(name, description string, model agent.Model, tools []agent.To
 			}
 			usage := &agent.Budget{Limits: agent.Limits{ModelRequests: 4096}}
 			result, err := (agent.Runner{Model: agent.WithBudget(model, usage), Tools: tools, Now: now}).Run(ctx, agent.RunOptions{
-				Task: invocation.Task, System: system, MaxSteps: maxSteps, OnEvent: invocation.OnEvent,
+				Task: invocation.Task, System: system, MaxSteps: maxSteps, OnEvent: invocation.OnEvent, Steering: invocation.Steering,
 			})
 			return Result{Summary: result.FinalText, Steps: result.Steps, Usage: usage.Usage()}, err
 		},

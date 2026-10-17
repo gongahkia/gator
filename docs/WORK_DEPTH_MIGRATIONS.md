@@ -58,6 +58,12 @@ specialist and its descendants while the parent continues. It fails for an
 unknown or finished task; inspect `gator work tasks RUN_ID TASK_ID` to see the
 terminal status. Cancellation is a request, not proof that an external side
 effect was undone.
+`gator work steer-task RUN_ID TASK_ID TEXT` queues a bounded instruction for
+one active LLM specialist through the same private endpoint. The instruction
+applies only at a later model boundary if that specialist continues; a queued
+instruction may never apply if the task finishes first. Hosted Code specialists
+reject live steering. In the foreground terminal, `/steer-task TASK_ID MESSAGE`
+uses the same specialist queue.
 An active foreground run exposes a private loopback endpoint with
 an ephemeral token in a mode-0600 state file; commands verify the run lease and
 endpoint identity. For a pending interactive Work decision, another terminal
