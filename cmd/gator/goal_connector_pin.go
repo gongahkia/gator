@@ -75,6 +75,25 @@ func verifyGoalOAuthPins(definition jobs.Definition, registry connector.Registry
 	return nil
 }
 
+func verifyConfiguredGoalOAuthPins(definition jobs.Definition) error {
+	if len(definition.OAuthRefreshPins) == 0 {
+		return nil
+	}
+	settings, err := loadSettings()
+	if err != nil {
+		return err
+	}
+	registry, err := connector.NewRegistry(settings.Connectors)
+	if err != nil {
+		return err
+	}
+	credentials, err := gatorCredentials()
+	if err != nil {
+		return err
+	}
+	return verifyGoalOAuthPins(definition, registry, credentials)
+}
+
 func goalOAuthPin(descriptor connector.Descriptor, credential auth.Credential) string {
 	digest := sha256.Sum256([]byte(descriptor.CredentialRef() + "\x00" + credential.Refresh))
 	return hex.EncodeToString(digest[:])
