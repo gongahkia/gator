@@ -166,6 +166,7 @@ func commandPaletteEntries() []entry {
 		{title: "/goals", subtitle: "Resume an ongoing goal", kind: "command", command: "/goals"},
 		{title: "/plan", subtitle: "Show or update the current goal plan", kind: "command-input", command: "/plan"},
 		{title: "/activity", subtitle: "Show checks and decisions for the current goal", kind: "command", command: "/activity"},
+		{title: "/notifications", subtitle: "Set desktop alerts and quiet hours for the current goal", kind: "command-input", command: "/notifications"},
 		{title: "/suggestions", subtitle: "Review proposed notes, skills, and plan changes", kind: "command-input", command: "/suggestions"},
 		{title: "/memory", subtitle: "Search or manage saved knowledge", kind: "command-input", command: "/memory"},
 		{title: "/note", subtitle: "Save and search longer personal notes", kind: "command-input", command: "/note"},
@@ -450,6 +451,12 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 			break
 		}
 		result, err = m.config.ActivityAction()
+	case "/notifications":
+		if m.config.NotificationAction == nil {
+			err = errorsUnavailable("goal notifications")
+			break
+		}
+		result, err = m.config.NotificationAction(fields[1:])
 	case "/suggestions":
 		if m.config.SuggestionAction == nil {
 			err = errorsUnavailable("suggestions")
@@ -1040,6 +1047,8 @@ func workHelp() string {
   /plan [outcome|add|step|review-at|reviewed|remove]
                                  inspect or update the current goal plan
   /activity                     show current goal checks and pending decisions
+  /notifications [--desktop on|off] [--quiet HH:MM-HH:MM --timezone AREA/CITY | --clear-quiet]
+                                 set desktop alerts for the current goal
   /suggestions [list|show|accept|reject]
                                  review proposed durable changes
   /memory add|list|search|show|correct|forget ...

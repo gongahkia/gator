@@ -154,6 +154,13 @@ The watch resumes one missed check after a restart. Existing goal review
 reminders are owned by the watch while it is enabled, so one due review does
 not create a second inbox entry.
 
+`gator goal notifications ID` shows that goal's desktop delivery policy.
+`--desktop off` mutes desktop alerts for that goal, while `--quiet
+22:00-08:00 --timezone Asia/Singapore` suppresses them during local quiet
+hours. These settings only narrow desktop alerts when the supervisor's global
+notification option is enabled. Completed results and failures still go to
+the terminal inbox; quiet hours do not defer or drop them.
+
 A connected watch can select up to four read surfaces with `--connector ID`.
 An HTTP JSON connector polls its configured resource. A Google connector needs
 `--gmail-query QUERY`, `--calendar-days N` (1-30), or both; Gmail reads up to

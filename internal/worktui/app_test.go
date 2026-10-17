@@ -513,7 +513,7 @@ func TestCommandPaletteContainsCurrentCommands(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work"})
 	model.openCommandPalette()
 	expected := []string{
-		"/help", "/new", "/model", "/source", "/mode", "/settings", "/settings statusline", "/theme", "/history", "/jobs", "/goals", "/plan", "/activity", "/suggestions", "/memory", "/note", "/skill", "/learnings", "/feedback", "/review", "/save", "/apply", "/retry", "/copy", "exit",
+		"/help", "/new", "/model", "/source", "/mode", "/settings", "/settings statusline", "/theme", "/history", "/jobs", "/goals", "/plan", "/activity", "/notifications", "/suggestions", "/memory", "/note", "/skill", "/learnings", "/feedback", "/review", "/save", "/apply", "/retry", "/copy", "exit",
 	}
 	if len(model.entries) != len(expected) {
 		t.Fatalf("command palette has %d entries, want %d", len(model.entries), len(expected))
@@ -536,6 +536,19 @@ func TestActivityCommandShowsCurrentGoalState(t *testing.T) {
 	model = updated.(Model)
 	if command != nil || len(model.messages) == 0 || !strings.Contains(model.messages[len(model.messages)-1].text, "pending venue decision") {
 		t.Fatalf("activity command result = %#v", model.messages)
+	}
+}
+
+func TestNotificationsCommandPassesGoalPolicyArguments(t *testing.T) {
+	var received []string
+	model := New(Config{CurrentFolder: "/work", NotificationAction: func(arguments []string) (string, error) {
+		received = arguments
+		return "Quiet hours: 22:00-08:00 Asia/Singapore", nil
+	}})
+	updated, command := model.runLocalCommand("/notifications --quiet 22:00-08:00 --timezone Asia/Singapore")
+	model = updated.(Model)
+	if command != nil || len(received) != 4 || received[1] != "22:00-08:00" || len(model.messages) == 0 || !strings.Contains(model.messages[len(model.messages)-1].text, "Quiet hours") {
+		t.Fatalf("notification command = %#v, messages=%#v", received, model.messages)
 	}
 }
 

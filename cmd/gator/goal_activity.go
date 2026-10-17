@@ -55,6 +55,7 @@ func renderGoalActivity(stateDir, goalID string, out io.Writer) error {
 	}
 	var view bytes.Buffer
 	fmt.Fprintf(&view, "%s  %s\nStatus: %s\n", record.ID, activityLine(record.Title, 120), record.Status)
+	fmt.Fprintf(&view, "Goal desktop policy: %s (if globally enabled); quiet hours: %s\n", goalDesktopStatus(record.Notifications), goalQuietStatus(record.Notifications))
 	if plan.Outcome != "" {
 		fmt.Fprintf(&view, "Outcome: %s\n", activityLine(plan.Outcome, 160))
 	}
@@ -177,7 +178,7 @@ func renderGoalActivity(stateDir, goalID string, out io.Writer) error {
 	} else if count > 5 {
 		fmt.Fprintf(&view, "  ... and %d more; gator job inbox and gator suggestion list\n", count-5)
 	}
-	fmt.Fprintf(&view, "\nControl: gator goal chat %s | gator goal pause %s | gator goal resume %s | gator goal schedules %s\n", goalID, goalID, goalID, goalID)
+	fmt.Fprintf(&view, "\nControl: gator goal chat %s | gator goal pause %s | gator goal resume %s | gator goal schedules %s | gator goal notifications %s\n", goalID, goalID, goalID, goalID, goalID)
 	_, err = out.Write(view.Bytes())
 	return err
 }

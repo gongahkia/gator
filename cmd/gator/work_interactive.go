@@ -187,6 +187,14 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			err := renderGoalActivity(stateDir, goalID, &output)
 			return strings.TrimSpace(output.String()), err
 		},
+		NotificationAction: func(arguments []string) (string, error) {
+			if goalID == "" {
+				return "", errors.New("select an active goal with /goals before using /notifications")
+			}
+			var output bytes.Buffer
+			err := goalNotificationsCommand(goalStore, append([]string{goalID}, arguments...), &output)
+			return strings.TrimSpace(output.String()), err
+		},
 		SuggestionAction: func(arguments []string) (string, error) {
 			var output bytes.Buffer
 			err := suggestionCommand(arguments, &output)

@@ -27,15 +27,16 @@ const (
 )
 
 type Record struct {
-	Version        int       `json:"version"`
-	ID             string    `json:"id"`
-	Title          string    `json:"title"`
-	Context        string    `json:"context,omitempty"`
-	SourcePath     string    `json:"source_path"`
-	ConversationID string    `json:"conversation_id,omitempty"`
-	Status         Status    `json:"status"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	Version        int                `json:"version"`
+	ID             string             `json:"id"`
+	Title          string             `json:"title"`
+	Context        string             `json:"context,omitempty"`
+	SourcePath     string             `json:"source_path"`
+	ConversationID string             `json:"conversation_id,omitempty"`
+	Status         Status             `json:"status"`
+	Notifications  NotificationPolicy `json:"notifications,omitempty"`
+	CreatedAt      time.Time          `json:"created_at"`
+	UpdatedAt      time.Time          `json:"updated_at"`
 }
 
 type Store struct {
@@ -223,6 +224,18 @@ func (s Store) SetStatus(id string, status Status) (Record, error) {
 	return s.save(record)
 }
 
+func (s Store) SetNotificationPolicy(id string, policy NotificationPolicy) (Record, error) {
+	if err := policy.Validate(); err != nil {
+		return Record{}, err
+	}
+	record, err := s.Load(id)
+	if err != nil {
+		return Record{}, err
+	}
+	record.Notifications = policy
+	return s.save(record)
+}
+
 func (s Store) AttachConversation(id, conversationID string) (Record, error) {
 	record, err := s.Load(id)
 	if err != nil {
@@ -295,6 +308,9 @@ func validate(record Record) error {
 	}
 	if record.ConversationID != "" && !strings.HasPrefix(record.ConversationID, "work-") {
 		return errors.New("invalid goal conversation")
+	}
+	if err := record.Notifications.Validate(); err != nil {
+		return err
 	}
 	return nil
 }

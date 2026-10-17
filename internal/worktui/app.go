@@ -162,6 +162,7 @@ type Config struct {
 	MemoryAction            func(arguments []string) (string, error)
 	PlanAction              func(command string) (string, error)
 	ActivityAction          func() (string, error)
+	NotificationAction      func(arguments []string) (string, error)
 	SuggestionAction        func(arguments []string) (string, error)
 	NoteAction              func(command string) (string, error)
 	SkillAction             func(command string) (string, error)

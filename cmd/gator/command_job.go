@@ -360,7 +360,8 @@ func manageJob(command, id string, arguments []string, out io.Writer) error {
 			return err
 		}
 		entry, inboxErr := recordJobInbox(stateDir, definition, attempt)
-		if inboxErr == nil && entry.ID != "" {
+		settings, settingsErr := loadSettings()
+		if inboxErr == nil && settingsErr == nil && settings.Notifications.Desktop && entry.ID != "" && goalAllowsDesktopNotification(stateDir, definition.GoalID, time.Now()) {
 			desktopNotification(definition.Name, entry.Summary)
 		}
 		encoder := json.NewEncoder(out)
@@ -793,7 +794,7 @@ func runDueJobsContextWith(ctx context.Context, store jobs.Store, stateDir strin
 			continue
 		}
 		entry, err := recordJobInbox(stateDir, claimed, attempt)
-		if err == nil && notify && entry.ID != "" {
+		if err == nil && notify && entry.ID != "" && goalAllowsDesktopNotification(stateDir, claimed.GoalID, now) {
 			desktopNotification(claimed.Name, entry.Summary)
 		}
 	}
