@@ -171,6 +171,9 @@ func printMemories(out io.Writer, records []memory.Record) error {
 		if record.SourceStatus == "changed" || record.SourceStatus == "unavailable" {
 			line += " [source " + record.SourceStatus + "; excluded from automatic recall]"
 		}
+		if len(record.MatchedTerms) > 0 {
+			line += " [lexical match: " + strings.Join(record.MatchedTerms, ", ") + "; scope: " + record.MatchScope + "]"
+		}
 		if _, err := fmt.Fprintf(out, "%s  %-10s %-29s %s\n", record.ID, record.Kind, valueOrDash(record.GoalID), line); err != nil {
 			return err
 		}

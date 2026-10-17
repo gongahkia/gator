@@ -38,6 +38,9 @@ func TestMemoryPersistsScopedCorrectionsAndExpiry(t *testing.T) {
 	if err != nil || len(results) != 1 || results[0].ID != local.ID {
 		t.Fatalf("search = %#v, %v", results, err)
 	}
+	if strings.Join(results[0].MatchedTerms, ",") != "deck,launch" || results[0].MatchScope != "goal" || !strings.Contains(Render(results), "selected by lexical match: deck, launch (goal)") {
+		t.Fatalf("memory recall reason = %#v; rendered=%q", results[0], Render(results))
+	}
 	results, err = reopened.Search("venue", goalID, 8)
 	if err != nil || len(results) != 0 {
 		t.Fatalf("cross-goal leak = %#v, %v", results, err)
@@ -45,6 +48,9 @@ func TestMemoryPersistsScopedCorrectionsAndExpiry(t *testing.T) {
 	results, err = reopened.Search("briefs", goalID, 8)
 	if err != nil || len(results) != 1 || results[0].ID != global.ID {
 		t.Fatalf("global memory = %#v, %v", results, err)
+	}
+	if results[0].MatchScope != "global" || strings.Join(results[0].MatchedTerms, ",") != "briefs" {
+		t.Fatalf("global memory reason = %#v", results[0])
 	}
 	if _, err := reopened.Correct(local.ID, "Send the launch deck on Monday", "meeting notes"); err != nil {
 		t.Fatal(err)

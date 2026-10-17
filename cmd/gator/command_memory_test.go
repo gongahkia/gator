@@ -27,8 +27,12 @@ func TestMemoryCLIAndPromptProjection(t *testing.T) {
 	if err := applyMemoryContext(state, &request); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(request.MemoryContext, memoryID) || !strings.Contains(request.MemoryContext, "Monday") {
+	if !strings.Contains(request.MemoryContext, memoryID) || !strings.Contains(request.MemoryContext, "Monday") || !strings.Contains(request.MemoryContext, "selected by lexical match: deck, launch (goal)") {
 		t.Fatalf("projection = %q", request.MemoryContext)
+	}
+	output.Reset()
+	if err := run([]string{"memory", "search", "--goal", goalID, "launch deck"}, &output); err != nil || !strings.Contains(output.String(), "[lexical match: deck, launch; scope: goal]") {
+		t.Fatalf("memory search explanation = %q, %v", output.String(), err)
 	}
 	output.Reset()
 	if err := run([]string{"memory", "correct", memoryID, "Present the launch deck on Tuesday"}, &output); err != nil {

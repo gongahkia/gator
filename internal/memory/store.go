@@ -30,6 +30,8 @@ type Record struct {
 	Source       string    `json:"source,omitempty"`
 	SourceSHA256 string    `json:"source_sha256,omitempty"`
 	SourceStatus string    `json:"-"`
+	MatchedTerms []string  `json:"-"`
+	MatchScope   string    `json:"-"`
 	ExpiresAt    time.Time `json:"expires_at,omitempty"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
@@ -182,16 +184,20 @@ func (s Store) Search(query, goalID string, limit int) ([]Record, error) {
 			continue
 		}
 		words := tokenize(record.Text + " " + record.Kind + " " + record.Source)
-		seen := words
-		score := 0
+		var matched []string
 		for term := range terms {
-			if seen[term] {
-				score++
+			if words[term] {
+				matched = append(matched, term)
 			}
 		}
+		score := len(matched)
 		if score >= min(2, len(terms)) {
+			sort.Strings(matched)
+			record.MatchedTerms = matched
+			record.MatchScope = "global"
 			if goalID != "" && record.GoalID == goalID {
 				score += 2
+				record.MatchScope = "goal"
 			}
 			matches = append(matches, scored{record, score})
 		}
@@ -200,7 +206,10 @@ func (s Store) Search(query, goalID string, limit int) ([]Record, error) {
 		if matches[i].score != matches[j].score {
 			return matches[i].score > matches[j].score
 		}
-		return matches[i].record.UpdatedAt.After(matches[j].record.UpdatedAt)
+		if !matches[i].record.UpdatedAt.Equal(matches[j].record.UpdatedAt) {
+			return matches[i].record.UpdatedAt.After(matches[j].record.UpdatedAt)
+		}
+		return matches[i].record.ID < matches[j].record.ID
 	})
 	if limit < 0 {
 		limit = 0
@@ -265,6 +274,9 @@ func Render(records []Record) string {
 		}
 		if record.SourceStatus != "" {
 			line += ", source status: " + record.SourceStatus
+		}
+		if len(record.MatchedTerms) > 0 {
+			line += ", selected by lexical match: " + strings.Join(record.MatchedTerms, ", ") + " (" + record.MatchScope + ")"
 		}
 		if !record.ExpiresAt.IsZero() {
 			line += ", expires: " + record.ExpiresAt.Format("2006-01-02")

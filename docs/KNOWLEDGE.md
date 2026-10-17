@@ -28,6 +28,11 @@ fact and its fingerprint. The fingerprint detects file changes; it does not
 prove that the file supports the memory's claim. Plain `--source REF` remains
 an unverified label.
 
+`gator memory search QUERY` and the memory context selected for Work show the
+lexical terms that matched and whether the memory was global or scoped to the
+current goal. These are retrieval reasons, not evidence that the remembered
+fact is true. Current sources still take precedence when they disagree.
+
 ## Notes
 
 ```sh
