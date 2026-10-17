@@ -161,6 +161,9 @@ func (t connectorTool) executeAction(ctx context.Context, arguments json.RawMess
 		record.ProviderResourceID = evidence.ProviderResourceID
 		record.ResponseSHA256 = evidence.ResponseSHA256
 	}
+	// Batch steps are useful even when a later request fails or has an
+	// uncertain outcome. The broker's parent status remains authoritative.
+	record.BatchSteps = evidence.BatchSteps
 	if t.policy.OnAction != nil {
 		t.policy.OnAction(record)
 	}

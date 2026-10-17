@@ -47,13 +47,15 @@ type ExecutionEvidence struct {
 	ReceiptID          string
 	ProviderResourceID string
 	ResponseSHA256     string
+	BatchSteps         []action.BatchStep
 }
 
 type googlePreparedStep struct {
-	operation string
-	target    string
-	payload   []byte
-	ifMatch   string
+	operation          string
+	target             string
+	payload            []byte
+	ifMatch            string
+	expectedResourceID string
 }
 
 // Runtime invokes user-configured connectors under a work-mode capability
@@ -229,7 +231,7 @@ func (r Runtime) ExecutePreparedWithEvidence(ctx context.Context, mode action.Mo
 		return ExecutionEvidence{}, nil
 	}
 	if descriptor.Kind == KindGoogle && operation.ID == "batch" {
-		return ExecutionEvidence{}, r.executeGoogleBatch(ctx, descriptor, prepared.googleSteps)
+		return r.executeGoogleBatch(ctx, descriptor, prepared.googleSteps)
 	}
 	method := serviceActionMethod(descriptor, operation.ID)
 	result, err := r.requestJSONWithPrecondition(ctx, descriptor, operation.ID, method, prepared.target, prepared.requestPayload, prepared.ifMatch, true)
@@ -248,7 +250,11 @@ func (r Runtime) ExecutePreparedWithEvidence(ctx context.Context, mode action.Mo
 		return evidence, nil
 	}
 	if descriptor.Kind == KindGoogle {
-		resourceID, err := googleActionResourceID(operation.ID, prepared.payload, result.Data)
+		expected, err := expectedGoogleActionResourceID(operation.ID, prepared.payload)
+		if err != nil {
+			return ExecutionEvidence{}, err
+		}
+		resourceID, err := googleActionResourceID(operation.ID, expected, result.Data)
 		if err != nil {
 			return ExecutionEvidence{}, action.MarkUncertain(err)
 		}
@@ -257,7 +263,7 @@ func (r Runtime) ExecutePreparedWithEvidence(ctx context.Context, mode action.Mo
 	return evidence, nil
 }
 
-func googleActionResourceID(operation string, payload, response json.RawMessage) (string, error) {
+func googleActionResourceID(operation, expectedID string, response json.RawMessage) (string, error) {
 	field := ""
 	switch operation {
 	case "docs_create", "docs_update":
@@ -275,22 +281,26 @@ func googleActionResourceID(operation string, payload, response json.RawMessage)
 	if err := json.Unmarshal(body[field], &id); err != nil || !validGoogleResourceID(id) {
 		return "", fmt.Errorf("Google %s returned no valid %s after action", operation, field)
 	}
-	if operation == "docs_update" || operation == "sheets_batch_update" || operation == "sheets_values_update" {
-		expected, _, err := extractResourceID(payload)
+	if expectedID != "" && id != expectedID {
+		return "", fmt.Errorf("Google %s returned a different %s after action", operation, field)
+	}
+	return id, nil
+}
+
+func expectedGoogleActionResourceID(operation string, payload []byte) (string, error) {
+	switch operation {
+	case "docs_update", "sheets_batch_update", "sheets_values_update":
+		id, _, err := extractResourceID(payload)
 		if err != nil {
 			return "", err
 		}
 		if operation == "sheets_values_update" {
-			expected, _, err = splitGoogleID(expected, "sheet ID and range")
-			if err != nil {
-				return "", err
-			}
+			id, _, err = splitGoogleID(id, "sheet ID and range")
 		}
-		if id != expected {
-			return "", fmt.Errorf("Google %s returned a different %s after action", operation, field)
-		}
+		return id, err
+	default:
+		return "", nil
 	}
-	return id, nil
 }
 
 func validGoogleResourceID(id string) bool {
@@ -952,6 +962,10 @@ func prepareGoogleBatch(descriptor Descriptor, payload []byte) ([]googlePrepared
 		if err != nil {
 			return nil, nil, fmt.Errorf("Google batch %s payload: %w", operationID, err)
 		}
+		expectedResourceID, err := expectedGoogleActionResourceID(operationID, canonical)
+		if err != nil {
+			return nil, nil, fmt.Errorf("Google batch %s payload: %w", operationID, err)
+		}
 		requestPayload, ifMatch, err := googlePrecondition(descriptor, canonical)
 		if err != nil {
 			return nil, nil, fmt.Errorf("Google batch %s: %w", operationID, err)
@@ -960,7 +974,10 @@ func prepareGoogleBatch(descriptor Descriptor, payload []byte) ([]googlePrepared
 		if err != nil {
 			return nil, nil, fmt.Errorf("Google batch %s: %w", operationID, err)
 		}
-		steps = append(steps, googlePreparedStep{operation: operationID, target: target, payload: transportBody, ifMatch: ifMatch})
+		if len(target) > 2048 {
+			return nil, nil, fmt.Errorf("Google batch %s target exceeds 2048 bytes", operationID)
+		}
+		steps = append(steps, googlePreparedStep{operation: operationID, target: target, payload: transportBody, ifMatch: ifMatch, expectedResourceID: expectedResourceID})
 		canonicalActions = append(canonicalActions, canonicalAction{Operation: operationID, Payload: canonical})
 	}
 	canonical, err := json.Marshal(struct {
@@ -984,19 +1001,41 @@ func canonicalJSONObject(raw json.RawMessage) ([]byte, error) {
 	return result, nil
 }
 
-func (r Runtime) executeGoogleBatch(ctx context.Context, descriptor Descriptor, steps []googlePreparedStep) error {
+func (r Runtime) executeGoogleBatch(ctx context.Context, descriptor Descriptor, steps []googlePreparedStep) (ExecutionEvidence, error) {
 	if len(steps) == 0 || len(steps) > 25 {
-		return errors.New("prepared Google batch is invalid")
+		return ExecutionEvidence{}, errors.New("prepared Google batch is invalid")
 	}
-	for _, step := range steps {
-		_, err := r.requestJSONWithPrecondition(ctx, descriptor, step.operation, serviceActionMethod(descriptor, step.operation), step.target, step.payload, step.ifMatch, true)
+	evidence := ExecutionEvidence{BatchSteps: make([]action.BatchStep, 0, len(steps))}
+	for index, step := range steps {
+		record := action.BatchStep{Index: index + 1, Operation: step.operation, Target: step.target}
+		result, err := r.requestJSONWithPrecondition(ctx, descriptor, step.operation, serviceActionMethod(descriptor, step.operation), step.target, step.payload, step.ifMatch, true)
 		if err != nil {
-			// In particular, do not replay an earlier request after an unknown
-			// timeout or connection close. The caller gets the uncertain record.
-			return err
+			record.Status = action.Failed
+			var uncertain interface{ OutcomeUncertain() bool }
+			if errors.As(err, &uncertain) && uncertain.OutcomeUncertain() {
+				record.Status = action.Unknown
+			}
+			evidence.BatchSteps = append(evidence.BatchSteps, record)
+			wrapped := fmt.Errorf("Google batch step %d (%s): %w", index+1, step.operation, err)
+			if index > 0 && record.Status == action.Failed {
+				// An earlier step changed remote state even if this request
+				// definitely did not begin. The batch as a whole is partial.
+				wrapped = action.MarkUncertain(wrapped)
+			}
+			return evidence, wrapped
 		}
+		record.ResponseSHA256 = result.Provenance.SHA256
+		resourceID, err := googleActionResourceID(step.operation, step.expectedResourceID, result.Data)
+		if err != nil {
+			record.Status = action.Unknown
+			evidence.BatchSteps = append(evidence.BatchSteps, record)
+			return evidence, action.MarkUncertain(fmt.Errorf("Google batch step %d (%s): %w", index+1, step.operation, err))
+		}
+		record.Status = action.Executed
+		record.ProviderResourceID = resourceID
+		evidence.BatchSteps = append(evidence.BatchSteps, record)
 	}
-	return nil
+	return evidence, nil
 }
 
 func (r Runtime) bearerToken(ctx context.Context, descriptor Descriptor) (string, error) {

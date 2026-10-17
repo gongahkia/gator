@@ -215,11 +215,81 @@ func TestGoogleBatchPinsCanonicalPayloadAndDoesNotSendDuringPreparation(t *testi
 	if requests != 0 || !bytes.Contains([]byte(prepared.Proposal.Preview), []byte(`"operation":"docs_create"`)) {
 		t.Fatalf("prepared request count=%d proposal=%#v", requests, prepared.Proposal)
 	}
-	if err := runtime.ExecutePrepared(context.Background(), action.Act, prepared); err != nil {
+	evidence, err := runtime.ExecutePreparedWithEvidence(context.Background(), action.Act, prepared)
+	if err != nil || requests != 1 || len(evidence.BatchSteps) != 1 || evidence.BatchSteps[0].Status != action.Executed || evidence.BatchSteps[0].ProviderResourceID != "doc-1" || evidence.BatchSteps[0].ResponseSHA256 == "" {
+		t.Fatalf("batch evidence=%#v, err=%v, requests=%d", evidence, err, requests)
+	}
+}
+
+func TestGoogleBatchRetainsCompletedStepsWhenLaterCredentialDisappears(t *testing.T) {
+	credentials, err := auth.New(t.TempDir())
+	if err != nil {
 		t.Fatal(err)
 	}
-	if requests != 1 {
-		t.Fatalf("requests = %d", requests)
+	requests := 0
+	var descriptor Descriptor
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		requests++
+		if request.Header.Get("Authorization") != "Bearer test-token" || requests != 1 {
+			t.Errorf("unexpected batch request %d", requests)
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"documentId":"doc-1"}`))
+		if err := credentials.Delete(descriptor.CredentialRef()); err != nil {
+			t.Error(err)
+		}
+	}))
+	defer server.Close()
+	descriptor = Descriptor{Version: DescriptorVersion, ID: "google", Name: "Google", Kind: KindGoogle, Resource: server.URL, Authentication: AuthBearer}
+	credential, err := auth.NewBearerToken("test-token", time.Time{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := credentials.Put(descriptor.CredentialRef(), credential); err != nil {
+		t.Fatal(err)
+	}
+	registry, err := NewRegistry([]Descriptor{descriptor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime := Runtime{Registry: registry, Credentials: credentials, HTTPClient: server.Client()}
+	prepared, err := runtime.PrepareAction(descriptor.ID, "batch", json.RawMessage(`{"payload":{"actions":[{"operation":"docs_create","payload":{"title":"First"}},{"operation":"docs_create","payload":{"title":"Second"}}]}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	evidence, err := runtime.ExecutePreparedWithEvidence(context.Background(), action.Act, prepared)
+	var uncertain interface{ OutcomeUncertain() bool }
+	if err == nil || !errors.As(err, &uncertain) || !uncertain.OutcomeUncertain() || requests != 1 || len(evidence.BatchSteps) != 2 || evidence.BatchSteps[0].Status != action.Executed || evidence.BatchSteps[0].ProviderResourceID != "doc-1" || evidence.BatchSteps[1].Status != action.Failed {
+		t.Fatalf("partial batch evidence=%#v, err=%v, requests=%d", evidence, err, requests)
+	}
+}
+
+func TestGoogleBatchRetainsUnknownStepAfterSuccessResponseWithoutID(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		requests++
+		writer.Header().Set("Content-Type", "application/json")
+		if requests == 1 {
+			_, _ = writer.Write([]byte(`{"documentId":"doc-1"}`))
+		} else {
+			_, _ = writer.Write([]byte(`{}`))
+		}
+	}))
+	defer server.Close()
+	descriptor := Descriptor{Version: DescriptorVersion, ID: "google", Name: "Google", Kind: KindGoogle, Resource: server.URL, Authentication: AuthNone}
+	registry, err := NewRegistry([]Descriptor{descriptor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime := Runtime{Registry: registry, HTTPClient: server.Client()}
+	prepared, err := runtime.PrepareAction(descriptor.ID, "batch", json.RawMessage(`{"payload":{"actions":[{"operation":"docs_create","payload":{"title":"First"}},{"operation":"docs_create","payload":{"title":"Second"}}]}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	evidence, err := runtime.ExecutePreparedWithEvidence(context.Background(), action.Act, prepared)
+	var uncertain interface{ OutcomeUncertain() bool }
+	if err == nil || !errors.As(err, &uncertain) || !uncertain.OutcomeUncertain() || requests != 2 || len(evidence.BatchSteps) != 2 || evidence.BatchSteps[0].Status != action.Executed || evidence.BatchSteps[1].Status != action.Unknown || evidence.BatchSteps[1].ResponseSHA256 == "" {
+		t.Fatalf("unknown batch evidence=%#v, err=%v, requests=%d", evidence, err, requests)
 	}
 }
 

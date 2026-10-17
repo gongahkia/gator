@@ -224,12 +224,25 @@ const (
 // Record is safe to persist in a work manifest. It contains the bounded
 // proposal envelope and outcome, never the action payload or a credential.
 type Record struct {
-	Proposal           Proposal `json:"proposal"`
-	Status             Status   `json:"status"`
-	Error              string   `json:"error,omitempty"`
-	ReceiptID          string   `json:"receipt_id,omitempty"`
-	ProviderResourceID string   `json:"provider_resource_id,omitempty"`
-	ResponseSHA256     string   `json:"response_sha256,omitempty"`
+	Proposal           Proposal    `json:"proposal"`
+	Status             Status      `json:"status"`
+	Error              string      `json:"error,omitempty"`
+	ReceiptID          string      `json:"receipt_id,omitempty"`
+	ProviderResourceID string      `json:"provider_resource_id,omitempty"`
+	ResponseSHA256     string      `json:"response_sha256,omitempty"`
+	BatchSteps         []BatchStep `json:"batch_steps,omitempty"`
+}
+
+// BatchStep records one attempted operation in an approved ordered batch.
+// Executed means its provider returned a matching resource ID. A later step
+// may still fail, so the parent batch can be unknown with executed steps.
+type BatchStep struct {
+	Index              int    `json:"index"`
+	Operation          string `json:"operation"`
+	Target             string `json:"target"`
+	Status             Status `json:"status"`
+	ProviderResourceID string `json:"provider_resource_id,omitempty"`
+	ResponseSHA256     string `json:"response_sha256,omitempty"`
 }
 
 // Decision is a one-shot human decision for one exact proposal. Decisions are
@@ -339,6 +352,34 @@ func (r Record) Validate() error {
 		decoded, err := hex.DecodeString(r.ResponseSHA256)
 		if err != nil || len(decoded) != sha256.Size || hex.EncodeToString(decoded) != r.ResponseSHA256 || r.Status != Executed {
 			return errors.New("action provider response digest is invalid")
+		}
+	}
+	if len(r.BatchSteps) > 25 || len(r.BatchSteps) > 0 && (r.Proposal.Operation != "batch" || r.Status != Executed && r.Status != Failed && r.Status != Unknown) {
+		return errors.New("action batch steps are invalid")
+	}
+	for index, step := range r.BatchSteps {
+		if step.Index != index+1 || len(step.Operation) == 0 || len(step.Operation) > maxIdentifierBytes || strings.ContainsFunc(step.Operation, unicode.IsControl) || len(step.Target) == 0 || len(step.Target) > maxTargetBytes || strings.ContainsFunc(step.Target, unicode.IsControl) {
+			return errors.New("action batch step identity is invalid")
+		}
+		if step.Status != Executed && step.Status != Failed && step.Status != Unknown || index < len(r.BatchSteps)-1 && step.Status != Executed {
+			return errors.New("action batch step status is invalid")
+		}
+		if len(step.ProviderResourceID) > 2048 || strings.ContainsFunc(step.ProviderResourceID, unicode.IsControl) || step.Status == Executed && step.ProviderResourceID == "" || step.Status != Executed && step.ProviderResourceID != "" {
+			return errors.New("action batch step provider resource ID is invalid")
+		}
+		if step.ResponseSHA256 != "" {
+			decoded, err := hex.DecodeString(step.ResponseSHA256)
+			if err != nil || len(decoded) != sha256.Size || hex.EncodeToString(decoded) != step.ResponseSHA256 || step.Status == Failed {
+				return errors.New("action batch step response digest is invalid")
+			}
+		} else if step.Status == Executed {
+			return errors.New("executed batch step requires a response digest")
+		}
+	}
+	if len(r.BatchSteps) > 0 {
+		last := r.BatchSteps[len(r.BatchSteps)-1].Status
+		if r.Status == Executed && last != Executed || r.Status == Failed && (len(r.BatchSteps) != 1 || last != Failed) || r.Status == Unknown && last != Unknown && last != Failed {
+			return errors.New("action batch outcome conflicts with step outcomes")
 		}
 	}
 	return nil
