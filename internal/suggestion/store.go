@@ -26,25 +26,28 @@ const Version = 1
 var skillIDPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,63}$`)
 
 type Record struct {
-	Version     int             `json:"version"`
-	ID          string          `json:"id"`
-	Kind        string          `json:"kind"`
-	Status      string          `json:"status"`
-	Title       string          `json:"title,omitempty"`
-	Body        string          `json:"body,omitempty"`
-	SourceRefs  []string        `json:"source_refs,omitempty"`
-	SkillID     string          `json:"skill_id,omitempty"`
-	Description string          `json:"description,omitempty"`
-	GoalID      string          `json:"goal_id,omitempty"`
-	WorkID      string          `json:"work_id"`
-	PlanChange  goal.PlanChange `json:"plan_change,omitempty"`
-	Cron        string          `json:"cron,omitempty"`
-	Task        string          `json:"task,omitempty"`
-	Timezone    string          `json:"timezone,omitempty"`
-	ChangeOnly  bool            `json:"change_only,omitempty"`
-	ResultID    string          `json:"result_id,omitempty"`
-	CreatedAt   time.Time       `json:"created_at"`
-	ResolvedAt  time.Time       `json:"resolved_at,omitempty"`
+	Version        int             `json:"version"`
+	ID             string          `json:"id"`
+	Kind           string          `json:"kind"`
+	Status         string          `json:"status"`
+	Title          string          `json:"title,omitempty"`
+	Body           string          `json:"body,omitempty"`
+	SourceRefs     []string        `json:"source_refs,omitempty"`
+	SkillID        string          `json:"skill_id,omitempty"`
+	Description    string          `json:"description,omitempty"`
+	GoalID         string          `json:"goal_id,omitempty"`
+	GoalSourcePath string          `json:"goal_source_path,omitempty"`
+	GoalOutcome    string          `json:"goal_outcome,omitempty"`
+	GoalSteps      []string        `json:"goal_steps,omitempty"`
+	WorkID         string          `json:"work_id"`
+	PlanChange     goal.PlanChange `json:"plan_change,omitempty"`
+	Cron           string          `json:"cron,omitempty"`
+	Task           string          `json:"task,omitempty"`
+	Timezone       string          `json:"timezone,omitempty"`
+	ChangeOnly     bool            `json:"change_only,omitempty"`
+	ResultID       string          `json:"result_id,omitempty"`
+	CreatedAt      time.Time       `json:"created_at"`
+	ResolvedAt     time.Time       `json:"resolved_at,omitempty"`
 }
 
 type Store struct{ root string }
@@ -275,7 +278,38 @@ func validate(record Record) error {
 			return errors.New("invalid suggestion source reference")
 		}
 	}
+	if record.Kind != "goal" && (record.GoalSourcePath != "" || record.GoalOutcome != "" || len(record.GoalSteps) != 0) {
+		return errors.New("goal proposal fields require a goal suggestion")
+	}
 	switch record.Kind {
+	case "goal":
+		if strings.TrimSpace(record.Title) == "" || len(record.Body) > 8192 || record.GoalID != "" || len(record.SourceRefs) != 0 || strings.TrimSpace(record.GoalOutcome) == "" || len(record.GoalOutcome) > 2048 || !utf8.ValidString(record.GoalOutcome) || strings.ContainsRune(record.GoalOutcome, 0) || len(record.GoalSteps) == 0 || len(record.GoalSteps) > 8 {
+			return errors.New("goal suggestion needs a title, outcome, and 1-8 plan steps")
+		}
+		if record.GoalSourcePath != "" && (!filepath.IsAbs(record.GoalSourcePath) || filepath.Clean(record.GoalSourcePath) != record.GoalSourcePath || len(record.GoalSourcePath) > 4096) {
+			return errors.New("goal suggestion source must be a bounded absolute path")
+		}
+		for _, step := range record.GoalSteps {
+			if strings.TrimSpace(step) == "" || len(step) > 512 || !utf8.ValidString(step) || strings.ContainsRune(step, 0) {
+				return errors.New("invalid suggested goal step")
+			}
+		}
+		if record.Cron == "" {
+			if record.Task != "" || record.Timezone != "" || record.ChangeOnly {
+				return errors.New("goal follow-up task requires a schedule")
+			}
+		} else {
+			if strings.TrimSpace(record.Task) == "" || len(record.Task) > 8192 || !utf8.ValidString(record.Task) || strings.ContainsRune(record.Task, 0) || len(record.Cron) > 256 || len(record.Timezone) > 128 {
+				return errors.New("invalid suggested goal follow-up")
+			}
+			parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+			if _, err := parser.Parse(record.Cron); err != nil {
+				return fmt.Errorf("invalid suggested goal cron: %w", err)
+			}
+			if _, err := time.LoadLocation(record.Timezone); err != nil {
+				return fmt.Errorf("invalid suggested goal timezone: %w", err)
+			}
+		}
 	case "note":
 		if strings.TrimSpace(record.Title) == "" || strings.TrimSpace(record.Body) == "" || record.GoalID != "" && !validGoalID(record.GoalID) {
 			return errors.New("note suggestion needs title and body")

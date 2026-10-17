@@ -2,14 +2,82 @@ package main
 
 import (
 	"bytes"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/knowledge"
 	"github.com/gongahkia/gator/internal/suggestion"
 )
+
+func TestAcceptedChatGoalProposalCreatesPlanAndReadOnlyFollowUpOnce(t *testing.T) {
+	state := t.TempDir()
+	source := t.TempDir()
+	source, err := filepath.EvalSymlinks(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GATOR_STATE_DIR", state)
+	queue, err := suggestion.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proposal, err := queue.Create(suggestion.Record{
+		Kind: "goal", Title: "Plan the offsite", Body: "Compare venues and decide by Friday.",
+		GoalSourcePath: source, GoalOutcome: "Choose a venue and confirm the budget",
+		GoalSteps: []string{"Confirm capacity", "Compare prices"}, WorkID: "work-chat-1",
+		Cron: "0 9 * * 1-5", Timezone: "Asia/Singapore", Task: "Review the offsite plan and changed sources",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	goals, err := goal.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before, err := goals.List(); err != nil || len(before) != 0 {
+		t.Fatalf("pending proposal created a goal: %#v, %v", before, err)
+	}
+	jobStore, err := jobs.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before, err := jobStore.List(); err != nil || len(before) != 0 {
+		t.Fatalf("pending proposal created a schedule: %#v, %v", before, err)
+	}
+	firstID, err := applySuggestion(state, proposal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	if err := suggestionCommand([]string{"accept", proposal.ID}, &output); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "gator goal chat "+firstID) {
+		t.Fatalf("missing continuation command: %s", output.String())
+	}
+	accepted, err := queue.Load(proposal.ID)
+	if err != nil || accepted.Status != "accepted" || accepted.ResultID != firstID {
+		t.Fatalf("accepted proposal = %#v, %v", accepted, err)
+	}
+	created, err := goals.Load(firstID)
+	if err != nil || created.Title != proposal.Title || created.Context != proposal.Body || created.SourcePath != source {
+		t.Fatalf("created goal = %#v, %v", created, err)
+	}
+	plan, err := goals.LoadPlan(firstID)
+	if err != nil || plan.Outcome != proposal.GoalOutcome || len(plan.Steps) != 2 || plan.Steps[0].Title != "Confirm capacity" || plan.Steps[0].Status != goal.StepPending {
+		t.Fatalf("initial plan = %#v, %v", plan, err)
+	}
+	if jobsFound, err := jobStore.List(); err != nil || len(jobsFound) != 1 || jobsFound[0].GoalID != firstID || jobsFound[0].Mode != action.Inspect || jobsFound[0].Contract.ExternalActions != action.Forbid {
+		t.Fatalf("read-only follow-up = %#v, %v", jobsFound, err)
+	}
+	if again, err := goals.List(); err != nil || len(again) != 1 {
+		t.Fatalf("repeated apply created another goal: %#v, %v", again, err)
+	}
+}
 
 func TestReviewSuggestionsActivatesOnlyAcceptedChanges(t *testing.T) {
 	state := t.TempDir()

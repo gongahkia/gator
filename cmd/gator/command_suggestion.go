@@ -70,6 +70,9 @@ func suggestionCommand(args []string, out io.Writer) error {
 			return err
 		}
 		_, err = fmt.Fprintf(out, "%s %s. Result: %s\n", strings.Title(record.Status), record.ID, record.ResultID)
+		if err == nil && record.Kind == "goal" && record.Status == "accepted" {
+			_, err = fmt.Fprintf(out, "Continue in terminal: gator goal chat %s\n", record.ResultID)
+		}
 		return err
 	default:
 		return errors.New(suggestionUsage)
@@ -91,6 +94,27 @@ func suggestionLabel(record suggestion.Record) string {
 
 func applySuggestion(stateDir string, record suggestion.Record) (string, error) {
 	switch record.Kind {
+	case "goal":
+		store, err := goal.Open(stateDir)
+		if err != nil {
+			return "", err
+		}
+		id := "goal-" + strings.TrimPrefix(record.ID, "suggestion-")
+		created, err := store.AddWithID(id, record.Title, record.Body, record.GoalSourcePath)
+		if err != nil {
+			return "", err
+		}
+		if _, err := store.InitializePlan(created.ID, record.GoalOutcome, record.GoalSteps); err != nil {
+			return "", err
+		}
+		if record.Cron != "" {
+			scheduled := record
+			scheduled.Kind, scheduled.GoalID = "schedule", created.ID
+			if _, err := applySuggestion(stateDir, scheduled); err != nil {
+				return "", err
+			}
+		}
+		return created.ID, nil
 	case "note":
 		store, err := knowledge.Open(stateDir)
 		if err != nil {

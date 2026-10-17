@@ -71,6 +71,64 @@ func (s Store) LoadPlan(goalID string) (Plan, error) {
 	return s.loadPlan(goalID)
 }
 
+// InitializePlan publishes an entire reviewed starting plan in one file write.
+// Reapplying the same proposal returns the existing plan without resetting any
+// later user edits to its steps or review time.
+func (s Store) InitializePlan(goalID, outcome string, titles []string) (Plan, error) {
+	if _, err := s.Load(goalID); err != nil {
+		return Plan{}, err
+	}
+	outcome = strings.TrimSpace(outcome)
+	if outcome == "" || len(outcome) > 2048 || !utf8.ValidString(outcome) || strings.ContainsRune(outcome, 0) || len(titles) == 0 || len(titles) > 8 {
+		return Plan{}, errors.New("invalid initial goal plan")
+	}
+	for _, title := range titles {
+		if !validStepTitle(title) {
+			return Plan{}, errors.New("invalid initial goal step")
+		}
+	}
+	lock, err := s.lockPlan(goalID)
+	if err != nil {
+		return Plan{}, err
+	}
+	defer func() { _ = syscall.Flock(int(lock.Fd()), syscall.LOCK_UN); _ = lock.Close() }()
+	current, err := s.loadPlan(goalID)
+	if err != nil {
+		return Plan{}, err
+	}
+	if current.Revision > 0 {
+		if current.Outcome != outcome || len(current.Steps) < len(titles) {
+			return Plan{}, errors.New("goal already has a different plan")
+		}
+		for i, title := range titles {
+			if current.Steps[i].Title != strings.TrimSpace(title) {
+				return Plan{}, errors.New("goal already has a different plan")
+			}
+		}
+		return current, nil
+	}
+	now := s.now().UTC()
+	plan := Plan{Version: PlanVersion, GoalID: goalID, Revision: 1, Outcome: outcome, UpdatedAt: now}
+	for _, title := range titles {
+		var random [8]byte
+		if _, err := rand.Read(random[:]); err != nil {
+			return Plan{}, err
+		}
+		plan.Steps = append(plan.Steps, Step{ID: "step-" + hex.EncodeToString(random[:]), Title: strings.TrimSpace(title), Status: StepPending, UpdatedAt: now})
+	}
+	if err := validatePlan(plan); err != nil {
+		return Plan{}, err
+	}
+	data, err := json.MarshalIndent(plan, "", "  ")
+	if err != nil {
+		return Plan{}, err
+	}
+	if err := writePrivatePlan(s.planPath(goalID), data); err != nil {
+		return Plan{}, err
+	}
+	return plan, nil
+}
+
 func (s Store) loadPlan(goalID string) (Plan, error) {
 	plan := Plan{Version: PlanVersion, GoalID: goalID}
 	path := s.planPath(goalID)

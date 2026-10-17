@@ -88,8 +88,8 @@ the knowledge tools themselves do not start a process.
 
 ## Review agent suggestions
 
-During Work, Gator may queue a candidate note, skill, goal-plan edit, or
-goal-linked recurring check. The
+During Work, Gator may queue a candidate ongoing goal, note, skill, goal-plan edit, or
+goal-linked recurring check. A goal proposal includes a starting plan and may include an inspect-only recurring check. The
 candidate records its source Work ID and is not used as knowledge until you
 accept it. Review from the terminal UI with `/suggestions` or from the shell:
 

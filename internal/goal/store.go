@@ -73,15 +73,20 @@ func Open(stateDir string) (Store, error) {
 }
 
 func (s Store) Add(title, context, sourcePath string) (Record, error) {
-	title, context = strings.TrimSpace(title), strings.TrimSpace(context)
-	if title == "" || len(title) > 256 || len(context) > 8192 || strings.ContainsRune(title+context, 0) {
-		return Record{}, errors.New("invalid goal title or context")
-	}
 	var bytes [12]byte
 	if _, err := rand.Read(bytes[:]); err != nil {
 		return Record{}, err
 	}
-	id := "goal-" + hex.EncodeToString(bytes[:])
+	return s.AddWithID("goal-"+hex.EncodeToString(bytes[:]), title, context, sourcePath)
+}
+
+// AddWithID lets a reviewed proposal use a host-derived ID so applying it is
+// safe to retry if the process stops after the goal is written.
+func (s Store) AddWithID(id, title, context, sourcePath string) (Record, error) {
+	title, context = strings.TrimSpace(title), strings.TrimSpace(context)
+	if !validID(id) || title == "" || len(title) > 256 || len(context) > 8192 || strings.ContainsRune(title+context, 0) {
+		return Record{}, errors.New("invalid goal ID, title, or context")
+	}
 	if strings.TrimSpace(sourcePath) == "" {
 		sourcePath = filepath.Join(s.root, "sources", id)
 		if err := os.MkdirAll(sourcePath, 0700); err != nil {
@@ -108,12 +113,30 @@ func (s Store) Add(title, context, sourcePath string) (Record, error) {
 	if err := validate(record); err != nil {
 		return Record{}, err
 	}
+	if existing, err := s.Load(id); err == nil {
+		if existing.Title == record.Title && existing.Context == record.Context && existing.SourcePath == record.SourcePath {
+			return existing, nil
+		}
+		return Record{}, errors.New("goal ID already exists with different content")
+	} else if !os.IsNotExist(err) {
+		return Record{}, err
+	}
 	data, err := json.MarshalIndent(record, "", "  ")
 	if err != nil {
 		return Record{}, err
 	}
 	file, err := os.OpenFile(s.path(record.ID), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
+		if os.IsExist(err) {
+			existing, loadErr := s.Load(id)
+			if loadErr == nil && existing.Title == record.Title && existing.Context == record.Context && existing.SourcePath == record.SourcePath {
+				return existing, nil
+			}
+			if loadErr != nil {
+				return Record{}, loadErr
+			}
+			return Record{}, errors.New("goal ID already exists with different content")
+		}
 		return Record{}, err
 	}
 	_, writeErr := file.Write(data)
