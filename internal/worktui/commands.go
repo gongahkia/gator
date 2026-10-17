@@ -166,7 +166,7 @@ func commandPaletteEntries() []entry {
 		{title: "/jobs", subtitle: "Schedule, run, and review repeatable Work", kind: "command-input", command: "/jobs"},
 		{title: "/goals", subtitle: "Resume an ongoing goal", kind: "command", command: "/goals"},
 		{title: "/plan", subtitle: "Show or update the current goal plan", kind: "command-input", command: "/plan"},
-		{title: "/activity", subtitle: "Show checks and decisions for the current goal", kind: "command", command: "/activity"},
+		{title: "/activity", subtitle: "Show current goal checks and running Work", kind: "command", command: "/activity"},
 		{title: "/notifications", subtitle: "Set desktop alerts and quiet hours for the current goal", kind: "command-input", command: "/notifications"},
 		{title: "/suggestions", subtitle: "Review proposed notes, skills, and plan changes", kind: "command-input", command: "/suggestions"},
 		{title: "/memory", subtitle: "Search or manage saved knowledge", kind: "command-input", command: "/memory"},
@@ -1084,7 +1084,7 @@ func workHelp() string {
   /goals                         resume an ongoing goal
   /plan [outcome|add|step|review-at|reviewed|remove]
                                  inspect or update the current goal plan
-  /activity                     show current goal checks and pending decisions
+  /activity                     show goal checks, running Work, and decisions
   /notifications [--desktop on|off] [--quiet HH:MM-HH:MM --timezone AREA/CITY | --clear-quiet]
                                  set desktop alerts for the current goal
   /suggestions [list|show|accept|reject]

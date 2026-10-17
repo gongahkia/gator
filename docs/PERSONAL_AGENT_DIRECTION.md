@@ -82,8 +82,9 @@ request cancellation with `gator work stop WORK_ID`.
 `gator work activity [--json]` brings running Work records, specialist
 checkpoints, and pending decision IDs into one read-only view; it labels stale
 records for recovery. If the run continues, queued steering applies at the next
-model boundary; it cannot interrupt an
-in-flight provider request or guarantee that a nearly finished run uses it.
+model boundary; it cannot interrupt an in-flight provider request or guarantee
+that a nearly finished run uses it. Interactive `/activity` includes the same
+Work view alongside the selected goal, or shows it alone when no goal is selected.
 `gator work cancel-task WORK_ID TASK_ID` requests cancellation of one active
 specialist and its descendants; its parent run can continue. The retained task
 record shows whether cancellation completed.

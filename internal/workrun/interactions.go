@@ -163,6 +163,15 @@ func ReadPendingInteractionRecords(stateDir string) ([]InteractionRecord, error)
 	return readInteractionRecords(stateDir, "", true)
 }
 
+// ReadPendingInteractionRecordsForRun keeps the activity view usable after a
+// run has accumulated more resolved decisions than the display result cap.
+func ReadPendingInteractionRecordsForRun(stateDir, runID string) ([]InteractionRecord, error) {
+	if !validInteractionRunID(runID) {
+		return nil, errors.New("invalid Work run ID")
+	}
+	return readInteractionRecords(stateDir, runID, true)
+}
+
 func readInteractionRecords(stateDir, runID string, pendingOnly bool) ([]InteractionRecord, error) {
 	if runID != "" && !validInteractionRunID(runID) {
 		return nil, errors.New("invalid Work run ID")

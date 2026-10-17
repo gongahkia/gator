@@ -73,7 +73,7 @@ func ReadActivity(stateDir string) (Activity, error) {
 			run.Tasks = append(run.Tasks, ActivityTask{ID: task.ID, Role: task.Role, Status: task.Status, Summary: activitySummary(task.SelectedInput)})
 		}
 		slices.SortFunc(run.Tasks, func(a, b ActivityTask) int { return strings.Compare(a.ID, b.ID) })
-		decisions, err := ReadInteractionRecords(stateDir, record.ID)
+		decisions, err := ReadPendingInteractionRecordsForRun(stateDir, record.ID)
 		if err != nil {
 			return Activity{}, fmt.Errorf("read decisions for Work run %s: %w", record.ID, err)
 		}

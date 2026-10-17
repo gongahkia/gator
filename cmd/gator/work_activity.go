@@ -22,6 +22,10 @@ func workActivityCommand(stateDir string, arguments []string, out io.Writer) err
 	if len(arguments) == 1 {
 		return json.NewEncoder(out).Encode(activity)
 	}
+	return writeWorkActivity(out, activity)
+}
+
+func writeWorkActivity(out io.Writer, activity workrun.Activity) error {
 	if len(activity.Runs) == 0 {
 		_, err := fmt.Fprintln(out, "No running Work records.")
 		return err
@@ -95,4 +99,25 @@ func workActivityCommand(stateDir string, arguments []string, out io.Writer) err
 		}
 	}
 	return nil
+}
+
+func renderWorkTUIActivity(stateDir, goalID string, out io.Writer) error {
+	if goalID != "" {
+		if err := renderGoalActivity(stateDir, goalID, out); err != nil {
+			return err
+		}
+	}
+	activity, err := workrun.ReadActivity(stateDir)
+	if err != nil {
+		return err
+	}
+	if len(activity.Runs) == 0 && goalID != "" {
+		return nil
+	}
+	if goalID != "" {
+		if _, err := fmt.Fprintln(out); err != nil {
+			return err
+		}
+	}
+	return writeWorkActivity(out, activity)
 }

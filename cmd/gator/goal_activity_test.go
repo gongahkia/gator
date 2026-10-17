@@ -16,6 +16,7 @@ import (
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/suggestion"
+	"github.com/gongahkia/gator/internal/workhistory"
 )
 
 func TestGoalActivityShowsDurableChecksAndPendingDecisions(t *testing.T) {
@@ -89,6 +90,26 @@ func TestGoalActivityShowsDurableChecksAndPendingDecisions(t *testing.T) {
 	}
 	if strings.Contains(output.String(), "Unrelated private alert") {
 		t.Fatalf("activity leaked another goal's inbox item:\n%s", output.String())
+	}
+	history, err := workhistory.Open(stateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := history.Start(workhistory.Start{ID: "work-live-goal", Objective: "Draft the offsite update", Mode: action.Draft, ExternalActions: action.Forbid, StartedAt: time.Now().UTC()}); err != nil {
+		t.Fatal(err)
+	}
+	lease, err := history.AcquireRun("work-live-goal")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lease.Close()
+	output.Reset()
+	if err := renderWorkTUIActivity(stateDir, record.ID, &output); err != nil || !strings.Contains(output.String(), "Outcome: Choose a venue") || !strings.Contains(output.String(), "work-live-goal") || strings.Contains(output.String(), "Unrelated private alert") {
+		t.Fatalf("joined goal and Work activity = %q, %v", output.String(), err)
+	}
+	output.Reset()
+	if err := renderWorkTUIActivity(stateDir, "", &output); err != nil || !strings.Contains(output.String(), "work-live-goal") || strings.Contains(output.String(), "Outcome: Choose a venue") {
+		t.Fatalf("Work activity without selected goal = %q, %v", output.String(), err)
 	}
 	if err := goalCommand([]string{"pause", record.ID}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)

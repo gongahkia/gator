@@ -3,6 +3,7 @@ package workrun
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -59,6 +60,40 @@ func TestReadInteractionRecordsValidatesAndScopesRetainedDecisions(t *testing.T)
 	}
 	if single, err := ReadInteractionRecord(state, "run-one", 1); err != nil || single.Interaction.ID != 1 {
 		t.Fatalf("unrelated invalid decision blocked exact read: %#v, %v", single, err)
+	}
+}
+
+func TestPendingDecisionReadIgnoresResolvedDisplayCap(t *testing.T) {
+	state := t.TempDir()
+	directory := filepath.Join(state, "gator", "interactions", "long-run")
+	if err := os.MkdirAll(directory, 0700); err != nil {
+		t.Fatal(err)
+	}
+	denied := false
+	for id := 1; id <= 260; id++ {
+		record := InteractionRecord{Version: 1, Status: "resolved", Interaction: Interaction{ID: id, Kind: "action"}, Approved: &denied}
+		payload, err := json.Marshal(record)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(directory, fmt.Sprintf("%d.json", id)), payload, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	pending := InteractionRecord{Version: 1, Status: "pending", Interaction: Interaction{ID: 261, Kind: "action"}}
+	payload, err := json.Marshal(pending)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(directory, "261.json"), payload, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadInteractionRecords(state, "long-run"); err == nil {
+		t.Fatal("full decision history unexpectedly fit the display cap")
+	}
+	records, err := ReadPendingInteractionRecordsForRun(state, "long-run")
+	if err != nil || len(records) != 1 || records[0].Interaction.ID != 261 || records[0].Status != "pending" {
+		t.Fatalf("pending decision was lost behind resolved history: %#v, %v", records, err)
 	}
 }
 
