@@ -22,6 +22,7 @@ const goalUsage = `Gator goals — ongoing responsibilities
   gator goal add [--source DIR] [--context TEXT] TITLE
   gator goal list
   gator goal show ID
+  gator goal activity ID
   gator goal plan ID [outcome|add|step|remove|review-at|reviewed ...]
   gator goal context ID TEXT
   gator goal pause|resume|complete ID
@@ -95,6 +96,11 @@ func goalCommand(args []string, out io.Writer) error {
 		}
 		_, err = fmt.Fprintf(out, "Goal: %s\nTitle: %s\nStatus: %s\nSource: %s\nConversation: %s\nContext: %s\n", record.ID, record.Title, record.Status, record.SourcePath, valueOrDash(record.ConversationID), valueOrDash(record.Context))
 		return err
+	case "activity":
+		if len(args) != 2 {
+			return errors.New("usage: gator goal activity ID")
+		}
+		return renderGoalActivity(stateDir, args[1], out)
 	case "schedule":
 		if len(args) < 2 {
 			return errors.New("usage: gator goal schedule ID --cron CRON --task TEXT")

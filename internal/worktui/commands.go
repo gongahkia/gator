@@ -165,6 +165,7 @@ func commandPaletteEntries() []entry {
 		{title: "/jobs", subtitle: "Schedule, run, and review repeatable Work", kind: "command-input", command: "/jobs"},
 		{title: "/goals", subtitle: "Resume an ongoing goal", kind: "command", command: "/goals"},
 		{title: "/plan", subtitle: "Show or update the current goal plan", kind: "command-input", command: "/plan"},
+		{title: "/activity", subtitle: "Show checks and decisions for the current goal", kind: "command", command: "/activity"},
 		{title: "/suggestions", subtitle: "Review proposed notes, skills, and plan changes", kind: "command-input", command: "/suggestions"},
 		{title: "/memory", subtitle: "Search or manage saved knowledge", kind: "command-input", command: "/memory"},
 		{title: "/note", subtitle: "Save and search longer personal notes", kind: "command-input", command: "/note"},
@@ -439,6 +440,16 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 			break
 		}
 		result, err = m.config.PlanAction(commandRemainder(command, fields[:1]))
+	case "/activity":
+		if len(fields) != 1 {
+			err = fmt.Errorf("usage: /activity")
+			break
+		}
+		if m.config.ActivityAction == nil {
+			err = errorsUnavailable("goal activity")
+			break
+		}
+		result, err = m.config.ActivityAction()
 	case "/suggestions":
 		if m.config.SuggestionAction == nil {
 			err = errorsUnavailable("suggestions")
@@ -1028,6 +1039,7 @@ func workHelp() string {
   /goals                         resume an ongoing goal
   /plan [outcome|add|step|review-at|reviewed|remove]
                                  inspect or update the current goal plan
+  /activity                     show current goal checks and pending decisions
   /suggestions [list|show|accept|reject]
                                  review proposed durable changes
   /memory add|list|search|show|correct|forget ...

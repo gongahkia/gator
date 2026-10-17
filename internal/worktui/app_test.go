@@ -513,7 +513,7 @@ func TestCommandPaletteContainsCurrentCommands(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work"})
 	model.openCommandPalette()
 	expected := []string{
-		"/help", "/new", "/model", "/source", "/mode", "/settings", "/settings statusline", "/theme", "/history", "/jobs", "/goals", "/plan", "/suggestions", "/memory", "/note", "/skill", "/learnings", "/feedback", "/review", "/save", "/apply", "/retry", "/copy", "exit",
+		"/help", "/new", "/model", "/source", "/mode", "/settings", "/settings statusline", "/theme", "/history", "/jobs", "/goals", "/plan", "/activity", "/suggestions", "/memory", "/note", "/skill", "/learnings", "/feedback", "/review", "/save", "/apply", "/retry", "/copy", "exit",
 	}
 	if len(model.entries) != len(expected) {
 		t.Fatalf("command palette has %d entries, want %d", len(model.entries), len(expected))
@@ -525,6 +525,17 @@ func TestCommandPaletteContainsCurrentCommands(t *testing.T) {
 		if item.title != expected[index] {
 			t.Fatalf("command %d = %q, want %q", index, item.title, expected[index])
 		}
+	}
+}
+
+func TestActivityCommandShowsCurrentGoalState(t *testing.T) {
+	model := New(Config{CurrentFolder: "/work", ActivityAction: func() (string, error) {
+		return "Next check: tomorrow; pending venue decision", nil
+	}})
+	updated, command := model.runLocalCommand("/activity")
+	model = updated.(Model)
+	if command != nil || len(model.messages) == 0 || !strings.Contains(model.messages[len(model.messages)-1].text, "pending venue decision") {
+		t.Fatalf("activity command result = %#v", model.messages)
 	}
 }
 
