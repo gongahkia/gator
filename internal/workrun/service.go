@@ -168,6 +168,7 @@ func (o *Operation) Respond(id int, approved bool) error {
 }
 func (s Service) Start(ctx context.Context, request Request) *Operation {
 	ctx, cancel := context.WithCancel(ctx)
+	request.EnableControl = true
 	if request.StateDir == "" {
 		request.StateDir = s.Executor.StateDir
 	}

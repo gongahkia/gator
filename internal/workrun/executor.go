@@ -166,6 +166,18 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 			finalErr = errors.Join(finalErr, fmt.Errorf("retain local telemetry: %w", err))
 		}
 	}()
+	if request.EnableControl {
+		control, steering, err := startWorkControl(ctx, request.StateDir, request.RunID, cancel, request.Steering)
+		if err != nil {
+			return Outcome{}, fmt.Errorf("start Work control: %w", err)
+		}
+		request.Steering = steering
+		defer func() {
+			if err := control.Close(); err != nil {
+				finalErr = errors.Join(finalErr, fmt.Errorf("close Work control: %w", err))
+			}
+		}()
+	}
 	sessions, err := worksession.Open(request.StateDir)
 	if err != nil {
 		return Outcome{}, err

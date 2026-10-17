@@ -309,6 +309,7 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		GoalContext:          goalContext(selectedGoal),
 		GoalID:               selectedGoal.ID,
 		RunID:                *runID,
+		EnableControl:        true,
 		MaxSteps:             *maxSteps,
 		Mode:                 mode,
 		Contract:             contract,

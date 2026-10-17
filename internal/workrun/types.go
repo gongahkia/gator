@@ -79,11 +79,14 @@ type Request struct {
 	IgnoredInstructionPaths []string
 	Objective               string
 	RunID                   string
-	MaxSteps                int
-	Mode                    action.Mode
-	Contract                artifact.Contract
-	StateDir                string
-	System                  string
+	// EnableControl exposes stop and steering for this foreground run through a
+	// private loopback endpoint. It never grants action approval authority.
+	EnableControl bool
+	MaxSteps      int
+	Mode          action.Mode
+	Contract      artifact.Contract
+	StateDir      string
+	System        string
 	// LearningContext is a bounded projection of applicable active learnings.
 	// It is supplied by the application boundary; candidates never appear here.
 	LearningContext string

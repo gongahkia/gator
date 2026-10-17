@@ -20,7 +20,7 @@ import (
 
 func isWorkSessionCommand(value string) bool {
 	switch value {
-	case "list", "show", "history", "resume", "back", "forward", "tasks", "decisions", "reconcile":
+	case "list", "show", "history", "resume", "back", "forward", "tasks", "decisions", "reconcile", "stop", "steer":
 		return true
 	default:
 		return false
@@ -40,6 +40,9 @@ func workSessionCommand(arguments []string, in io.Reader, out io.Writer, modelFa
 	}
 	if arguments[0] == "decisions" {
 		return workDecisionsCommand(stateDir, arguments[1:], out)
+	}
+	if arguments[0] == "stop" || arguments[0] == "steer" {
+		return workControlCommand(stateDir, arguments, out)
 	}
 	store, err := worksession.Open(stateDir)
 	if err != nil {
@@ -191,6 +194,29 @@ func workSessionCommand(arguments []string, in io.Reader, out io.Writer, modelFa
 		return runWorkTask(forwarded, in, out, modelFactory)
 	}
 	return errors.New("unknown Work conversation command")
+}
+
+func workControlCommand(stateDir string, arguments []string, out io.Writer) error {
+	command := arguments[0]
+	if command == "stop" && len(arguments) != 2 {
+		return errors.New("usage: gator work stop RUN_ID")
+	}
+	if command == "steer" && len(arguments) < 3 {
+		return errors.New("usage: gator work steer RUN_ID TEXT")
+	}
+	text := ""
+	if command == "steer" {
+		text = strings.Join(arguments[2:], " ")
+	}
+	if err := workrun.SendWorkControl(context.Background(), stateDir, arguments[1], command, text); err != nil {
+		return err
+	}
+	if command == "stop" {
+		_, err := fmt.Fprintf(out, "Stop requested for Work run %s.\n", arguments[1])
+		return err
+	}
+	_, err := fmt.Fprintf(out, "Steering queued for Work run %s; it will apply before the next model turn.\n", arguments[1])
+	return err
 }
 
 func workDecisionsCommand(stateDir string, arguments []string, out io.Writer) error {
