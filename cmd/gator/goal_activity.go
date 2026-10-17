@@ -171,6 +171,7 @@ func renderGoalActivity(stateDir, goalID string, out io.Writer) error {
 		fmt.Fprintf(&view, "  ... and %d more; gator goal schedules %s\n", jobCount-8, goalID)
 	}
 	if jobCount > 0 {
+		fmt.Fprintf(&view, "  Live source check: gator goal access %s (reads selected watch sources without changing watch state).\n", goalID)
 		if err := jobSupervisorRequest("health", io.Discard); err != nil {
 			view.WriteString("  Supervisor: offline; checks resume when its per-user service or foreground process runs.\n")
 		} else {

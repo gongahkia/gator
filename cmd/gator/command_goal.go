@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -23,6 +24,7 @@ const goalUsage = `Gator goals — ongoing responsibilities
   gator goal list
   gator goal show ID
   gator goal activity ID
+  gator goal access ID
   gator goal notifications ID [--desktop on|off] [--quiet HH:MM-HH:MM --timezone AREA/CITY | --clear-quiet]
   gator goal plan ID [outcome|add|step|remove|review-at|reviewed ...]
   gator goal context ID TEXT
@@ -102,6 +104,11 @@ func goalCommand(args []string, out io.Writer) error {
 			return errors.New("usage: gator goal activity ID")
 		}
 		return renderGoalActivity(stateDir, args[1], out)
+	case "access":
+		if len(args) != 2 {
+			return errors.New("usage: gator goal access ID")
+		}
+		return probeGoalAccess(context.Background(), stateDir, args[1], out)
 	case "notifications":
 		return goalNotificationsCommand(store, args[1:], out)
 	case "schedule":
