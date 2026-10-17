@@ -135,8 +135,9 @@ selected regular files, goal context and plan, visible notes, enabled skills,
 and active memories. If they exactly match the most recent successful run
 under the same job policy, it records an `unchanged` attempt and skips the
 model call and notification. A failure or changed job policy runs normally.
-The gate rejects jobs with web origins or connectors, because those sources
-can change independently of local files. It also requires refreshed source
+The local gate rejects ordinary jobs with web origins or connectors, because those sources
+can change independently of local files. Connected goal watches use a separate bounded
+connector poll and combine its content digest with the local gate. Both require refreshed source
 capture. The file scan is capped at 10,000 files, 16 MiB per file, and 64 MiB
 total; an oversized or non-regular source fails the check rather than claiming
 that nothing changed. `.git` is excluded. Use ordinary cron jobs for checks
@@ -153,11 +154,24 @@ The watch resumes one missed check after a restart. Existing goal review
 reminders are owned by the watch while it is enabled, so one due review does
 not create a second inbox entry.
 
+A connected watch can select up to four read surfaces with `--connector ID`.
+An HTTP JSON connector polls its configured resource. A Google connector needs
+`--gmail-query QUERY`, `--calendar-days N` (1-30), or both; Gmail reads up to
+100 matching messages and their details, and Calendar reads up to 100 events.
+If either source has another results page, the poll fails and surfaces an error
+instead of claiming nothing changed. Connected watches poll every five minutes
+while the local supervisor runs. Their combined input hash persists across
+restarts; no push subscription or provider event cursor is installed. Connector
+read permissions and credentials are checked on each poll. The model runs only
+when the local or connected content hash changes, then reads current evidence
+again in Work. A source can change between those two reads; the next poll will
+detect it. The host does not verify whether a changed message is relevant.
+
 A watch asks Work for an explicit `attention` decision and an evidence-backed
 summary. A quiet completed run stays out of the inbox. A draft artifact or a
 successful reviewed suggestion always surfaces, even if the model marks its
-response quiet; malformed responses also surface. A watch can only use local
-source material and cannot send mail or approve a connected action. With
+response quiet; malformed responses also surface. A watch can use selected
+read-only connector material but cannot send mail or approve a connected action. With
 `--artifact`, Work must create that draft on each model run, so use it for
 tasks where each source change merits a draft. The user must still accept a
 plan suggestion explicitly. Content relevance and model decisions require

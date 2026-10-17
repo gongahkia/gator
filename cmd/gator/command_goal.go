@@ -27,7 +27,7 @@ const goalUsage = `Gator goals — ongoing responsibilities
   gator goal pause|resume|complete ID
   gator goal chat ID
   gator goal schedule ID --cron '0 9 * * *' [--timezone AREA/CITY] [--connector ID] [--mode inspect|draft] [--artifact PATH] --task TEXT
-  gator goal watch ID [--task TEXT] [--artifact PATH]
+  gator goal watch ID [--task TEXT] [--artifact PATH] [--connector ID] [--gmail-query QUERY] [--calendar-days N]
   gator goal schedules ID
   gator goal unschedule ID JOB_ID
 
@@ -195,11 +195,78 @@ func goalCommand(args []string, out io.Writer) error {
 		flags.SetOutput(io.Discard)
 		task := flags.String("task", "Review changes and due steps, identify the next useful action, and propose any plan update for approval", "goal watch instruction")
 		artifactPath := flags.String("artifact", "", "required draft on every model run, such as venue-reply.md")
+		var selected connectorFlags
+		flags.Var(&selected, "connector", "configured Google or JSON connector to poll")
+		gmailQuery := flags.String("gmail-query", "", "explicit Gmail search query for selected Google connectors")
+		calendarDays := flags.Int("calendar-days", 0, "watch the next 1-30 calendar days on selected Google connectors")
 		if err := flags.Parse(args[2:]); err != nil {
 			return err
 		}
 		if len(flags.Args()) != 0 || strings.TrimSpace(*task) == "" {
-			return errors.New("usage: gator goal watch ID [--task TEXT] [--artifact PATH]")
+			return errors.New("usage: gator goal watch ID [--task TEXT] [--artifact PATH] [--connector ID] [--gmail-query QUERY] [--calendar-days N]")
+		}
+		if *calendarDays < 0 || *calendarDays > 30 || len(selected) == 0 && (*gmailQuery != "" || *calendarDays != 0) {
+			return errors.New("goal watch needs a selected Google connector for Gmail or Calendar reads")
+		}
+		var watchSources []jobs.WatchSource
+		if len(selected) > 0 {
+			settings, err := loadSettings()
+			if err != nil {
+				return err
+			}
+			registry, err := connector.NewRegistry(settings.Connectors)
+			if err != nil {
+				return err
+			}
+			seen := make(map[string]bool)
+			hasGoogle := false
+			for _, id := range selected {
+				if seen[id] {
+					return fmt.Errorf("connector %q is selected more than once", id)
+				}
+				seen[id] = true
+				descriptor, found := registry.Get(id)
+				if !found {
+					return fmt.Errorf("connector %q is not configured", id)
+				}
+				switch descriptor.Kind {
+				case connector.KindHTTPJSON:
+					watchSources = append(watchSources, jobs.WatchSource{ConnectorID: id, Operation: "fetch"})
+				case connector.KindGoogle:
+					hasGoogle = true
+					if *gmailQuery == "" && *calendarDays == 0 {
+						return errors.New("Google goal watch requires --gmail-query or --calendar-days")
+					}
+					if *gmailQuery != "" {
+						watchSources = append(watchSources, jobs.WatchSource{ConnectorID: id, Operation: "gmail_list", Query: *gmailQuery})
+					}
+					if *calendarDays > 0 {
+						watchSources = append(watchSources, jobs.WatchSource{ConnectorID: id, Operation: "calendar_events", Days: *calendarDays})
+					}
+				default:
+					return fmt.Errorf("connector %q has no bounded goal watch reader", id)
+				}
+			}
+			if !hasGoogle && (*gmailQuery != "" || *calendarDays != 0) {
+				return errors.New("Gmail and Calendar watch options require a selected Google connector")
+			}
+			if len(watchSources) > 4 {
+				return errors.New("goal watch supports at most four connected read sources")
+			}
+			for _, source := range watchSources {
+				descriptor, operation, err := registry.Operation(source.ConnectorID, source.Operation)
+				if err != nil {
+					return err
+				}
+				if descriptor.ID == "" || connector.PermissionSet(settings.ConnectorPermissions).Resolve(source.ConnectorID, source.Operation, operation.Capability) != connector.PermissionAllow {
+					return fmt.Errorf("connector %q operation %q cannot be read unattended", source.ConnectorID, source.Operation)
+				}
+				if source.Operation == "gmail_list" {
+					if _, detail, err := registry.Operation(source.ConnectorID, "gmail_get"); err != nil || connector.PermissionSet(settings.ConnectorPermissions).Resolve(source.ConnectorID, "gmail_get", detail.Capability) != connector.PermissionAllow {
+						return fmt.Errorf("connector %q cannot read watched Gmail message details unattended", source.ConnectorID)
+					}
+				}
+			}
 		}
 		mode, contract := action.Inspect, artifact.InspectionContract()
 		if *artifactPath != "" {
@@ -222,11 +289,15 @@ func goalCommand(args []string, out io.Writer) error {
 				return fmt.Errorf("goal already has an active watch %s; edit or disable it before adding another", definition.ID)
 			}
 		}
-		definition, err := jobStore.Save(jobs.Definition{Name: goalJobName(record), GoalID: record.ID, GoalWatch: true, Enabled: true, Schedule: "* * * * *", Timezone: "UTC", Missed: "run_once", SourcePath: record.SourcePath, RefreshSnapshot: true, ChangeOnly: true, Objective: strings.TrimSpace(*task), Mode: mode, Contract: contract, MaxSteps: 24})
+		schedule := "* * * * *"
+		if len(watchSources) > 0 {
+			schedule = "*/5 * * * *"
+		}
+		definition, err := jobStore.Save(jobs.Definition{Name: goalJobName(record), GoalID: record.ID, GoalWatch: true, Enabled: true, Schedule: schedule, Timezone: "UTC", Missed: "run_once", SourcePath: record.SourcePath, RefreshSnapshot: true, ChangeOnly: true, Objective: strings.TrimSpace(*task), Mode: mode, Contract: contract, ConnectorIDs: selected, WatchSources: watchSources, MaxSteps: 24})
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprintf(out, "Watching %s with %s. Start 'gator job supervisor' or install its per-user service; it checks about once a minute while running. Review follow-ups in gator inbox.\n", record.ID, definition.ID)
+		_, err = fmt.Fprintf(out, "Watching %s with %s. Start 'gator job supervisor' or install its per-user service; it checks on %s while running. Review follow-ups in gator inbox.\n", record.ID, definition.ID, schedule)
 		return err
 	case "schedules":
 		if len(args) != 2 {

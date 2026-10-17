@@ -18,16 +18,16 @@ import (
 	"github.com/gongahkia/gator/internal/memory"
 )
 
-// localJobInputHash is intentionally limited to selected local material. Jobs
-// with web or connector reads cannot use the change gate because those inputs
-// may change without a local file changing.
+// localJobInputHash covers selected local material. A connected goal watch may
+// compose this with a separately fetched remote digest; ordinary connector
+// jobs cannot use this local-only result as their complete input gate.
 func localJobInputHash(definition jobs.Definition, stateDir string) (string, error) {
 	return localJobInputHashAt(definition, stateDir, time.Now())
 }
 
 func localJobInputHashAt(definition jobs.Definition, stateDir string, now time.Time) (string, error) {
-	if !definition.ChangeOnly || !definition.RefreshSnapshot || len(definition.ConnectorIDs) > 0 || len(definition.WebOrigins) > 0 {
-		return "", errors.New("change gate requires a local-only refreshed job")
+	if !definition.ChangeOnly || !definition.RefreshSnapshot || len(definition.WebOrigins) > 0 || len(definition.ConnectorIDs) > 0 && len(definition.WatchSources) == 0 {
+		return "", errors.New("change gate requires refreshed local input and bounded watch sources")
 	}
 	source := definition.SourcePath
 	var currentGoal goal.Record

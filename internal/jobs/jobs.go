@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/agent"
@@ -44,6 +45,7 @@ type Definition struct {
 	RefreshSnapshot bool                   `json:"refresh_snapshot"`
 	ChangeOnly      bool                   `json:"change_only,omitempty"`
 	GoalWatch       bool                   `json:"goal_watch,omitempty"`
+	WatchSources    []WatchSource          `json:"watch_sources,omitempty"`
 	Objective       string                 `json:"objective"`
 	Provider        string                 `json:"provider,omitempty"`
 	Model           string                 `json:"model,omitempty"`
@@ -54,6 +56,15 @@ type Definition struct {
 	CreatedAt       time.Time              `json:"created_at"`
 	UpdatedAt       time.Time              `json:"updated_at"`
 	LastScheduledAt time.Time              `json:"last_scheduled_at,omitempty"`
+}
+
+// WatchSource is a user-selected read surface for a polled goal watch. It
+// never grants authority beyond the configured connector's read permissions.
+type WatchSource struct {
+	ConnectorID string `json:"connector_id"`
+	Operation   string `json:"operation"`
+	Query       string `json:"query,omitempty"`
+	Days        int    `json:"days,omitempty"`
 }
 
 type Attempt struct {
@@ -211,11 +222,58 @@ func (d Definition) Validate() error {
 	if d.MaxSteps < 1 || d.MaxSteps > 1_000 || len(d.ConnectorIDs) > 16 {
 		return errors.New("job execution limits are invalid")
 	}
-	if d.ChangeOnly && (!d.RefreshSnapshot || len(d.ConnectorIDs) > 0 || len(d.WebOrigins) > 0) {
-		return errors.New("change-only jobs require refreshed local source and no connected or web reads")
+	if d.ChangeOnly && (!d.RefreshSnapshot || len(d.WebOrigins) > 0 || len(d.ConnectorIDs) > 0 && len(d.WatchSources) == 0) {
+		return errors.New("change-only jobs require refreshed local source and only bounded watch connector reads")
 	}
-	if d.GoalWatch && (d.GoalID == "" || !d.ChangeOnly || d.Schedule != "* * * * *" || d.Missed != "run_once" || d.EnableCode) {
-		return errors.New("goal watches require a local goal, one-minute polling, run_once catch-up, and no code delegation")
+	if d.GoalWatch && (d.GoalID == "" || !d.ChangeOnly || d.Missed != "run_once" || d.EnableCode || len(d.WebOrigins) != 0 || len(d.WatchSources) == 0 && d.Schedule != "* * * * *" || len(d.WatchSources) > 0 && d.Schedule != "*/5 * * * *") {
+		return errors.New("goal watches require a local goal, bounded polling, run_once catch-up, and no code delegation")
+	}
+	if len(d.WatchSources) > 4 || len(d.WatchSources) > 0 && !d.GoalWatch {
+		return errors.New("watch sources require a goal watch with at most four sources")
+	}
+	seenWatch := make(map[string]bool)
+	seenConnector := make(map[string]bool)
+	for _, connectorID := range d.ConnectorIDs {
+		if seenConnector[connectorID] {
+			return errors.New("job connector is selected more than once")
+		}
+		seenConnector[connectorID] = true
+	}
+	for _, source := range d.WatchSources {
+		key := source.ConnectorID + "/" + source.Operation
+		if invalidID(source.ConnectorID) || seenWatch[key] || !seenConnector[source.ConnectorID] {
+			return errors.New("watch source must use one selected connector operation")
+		}
+		seenWatch[key] = true
+		switch source.Operation {
+		case "fetch":
+			if source.Query != "" || source.Days != 0 {
+				return errors.New("JSON watch accepts no query or calendar window")
+			}
+		case "gmail_list":
+			if strings.TrimSpace(source.Query) == "" || len(source.Query) > 4096 || !utf8.ValidString(source.Query) || strings.ContainsRune(source.Query, 0) || source.Days != 0 {
+				return errors.New("Gmail watch requires a bounded search query")
+			}
+		case "calendar_events":
+			if source.Query != "" || source.Days < 1 || source.Days > 30 {
+				return errors.New("Calendar watch requires a 1-30 day window")
+			}
+		default:
+			return errors.New("unsupported goal watch operation")
+		}
+	}
+	if len(d.WatchSources) > 0 {
+		for _, id := range d.ConnectorIDs {
+			used := false
+			for _, source := range d.WatchSources {
+				if source.ConnectorID == id {
+					used = true
+				}
+			}
+			if !used {
+				return errors.New("connected goal watch has an unscoped connector")
+			}
+		}
 	}
 	for _, connectorID := range d.ConnectorIDs {
 		if invalidID(connectorID) {
