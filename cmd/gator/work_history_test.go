@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +15,43 @@ import (
 	"github.com/gongahkia/gator/internal/worksession"
 	"github.com/gongahkia/gator/internal/worktui"
 )
+
+func TestWorkHistoryAndShowDistinguishActiveFromStaleRun(t *testing.T) {
+	state := t.TempDir()
+	t.Setenv("GATOR_STATE_DIR", state)
+	history, err := workhistory.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := history.Start(workhistory.Start{ID: "work-active-view", Objective: "Prepare the daily brief", Mode: action.Draft, ExternalActions: action.Forbid, StartedAt: time.Now().UTC()}); err != nil {
+		t.Fatal(err)
+	}
+	lease, err := history.AcquireRun("work-active-view")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var list bytes.Buffer
+	if err := workSessionCommand([]string{"list"}, nil, &list, nil); err != nil || !strings.Contains(list.String(), "Status: running (active)") {
+		t.Fatalf("active Work list = %q, %v", list.String(), err)
+	}
+	var shown bytes.Buffer
+	if err := workSessionCommand([]string{"show", "work-active-view"}, nil, &shown, nil); err != nil {
+		t.Fatal(err)
+	}
+	var record struct {
+		LiveStatus string `json:"live_status"`
+	}
+	if err := json.Unmarshal(shown.Bytes(), &record); err != nil || record.LiveStatus != "active" {
+		t.Fatalf("active Work show = %q, %v", shown.String(), err)
+	}
+	if err := lease.Close(); err != nil {
+		t.Fatal(err)
+	}
+	list.Reset()
+	if err := workSessionCommand([]string{"list"}, nil, &list, nil); err != nil || !strings.Contains(list.String(), "Status: running (stale)") {
+		t.Fatalf("stale Work list = %q, %v", list.String(), err)
+	}
+}
 
 func TestWorkCLIAndTUIHistoryReadTheSameGlobalWorkRecords(t *testing.T) {
 	state := t.TempDir()

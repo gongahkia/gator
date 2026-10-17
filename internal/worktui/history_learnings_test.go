@@ -62,7 +62,7 @@ func TestGlobalHistoryUsesCanonicalStoreForAllWorkDetailAndReview(t *testing.T) 
 	if model.section != "history" || len(model.historyItems) != 3 || model.historyItems[0].Record.ID != "work-running" || !strings.Contains(model.View(), "Prepare the project report") || !strings.Contains(model.View(), "Repair the failed import") {
 		t.Fatalf("global history = %#v\n%s", model.historyItems, model.View())
 	}
-	for _, want := range []string{"running · inspect", "failed · draft", "completed · draft", "verification failed", "delivery not delivered"} {
+	for _, want := range []string{"running (unconfirmed) · inspect", "failed · draft", "completed · draft", "verification failed", "delivery not delivered"} {
 		if !strings.Contains(model.View(), want) {
 			t.Fatalf("history list omitted truthful state %q:\n%s", want, model.View())
 		}

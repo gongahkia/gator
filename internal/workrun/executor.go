@@ -86,6 +86,15 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	if err != nil {
 		return Outcome{}, err
 	}
+	runLease, err := history.AcquireRun(request.RunID)
+	if err != nil {
+		return Outcome{}, fmt.Errorf("acquire Work run lease: %w", err)
+	}
+	defer func() {
+		if err := runLease.Close(); err != nil {
+			finalErr = errors.Join(finalErr, fmt.Errorf("release Work run lease: %w", err))
+		}
+	}()
 	if _, err := history.Start(workhistory.Start{
 		ID: request.RunID, Objective: request.Objective, Mode: request.Mode, ExternalActions: request.Contract.ExternalActions,
 		PolicySHA256: policySHA256, ConversationID: request.ConversationID, ParentRevisionID: request.ParentRevisionID,

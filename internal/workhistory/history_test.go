@@ -51,6 +51,38 @@ func TestStoreListsRecordsDeterministically(t *testing.T) {
 	}
 }
 
+func TestRunningWorkLivenessFollowsProcessHeldLease(t *testing.T) {
+	store, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	started := time.Now().UTC()
+	for _, id := range []string{"work-leased", "work-legacy"} {
+		if _, err := store.Start(Start{ID: id, Objective: "Prepare a brief", Mode: action.Draft, ExternalActions: action.Forbid, StartedAt: started}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if legacy, err := store.Load("work-legacy"); err != nil || legacy.LiveStatus != "unknown" {
+		t.Fatalf("legacy run = %#v, %v", legacy, err)
+	}
+	lease, err := store.AcquireRun("work-leased")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.AcquireRun("work-leased"); err == nil {
+		t.Fatal("second process lease acquired the same run")
+	}
+	if active, err := store.Load("work-leased"); err != nil || active.LiveStatus != "active" {
+		t.Fatalf("active run = %#v, %v", active, err)
+	}
+	if err := lease.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if stopped, err := store.Load("work-leased"); err != nil || stopped.LiveStatus != "stopped" {
+		t.Fatalf("stopped run = %#v, %v", stopped, err)
+	}
+}
+
 func recordIDs(records []Record) []string {
 	ids := make([]string, 0, len(records))
 	for _, record := range records {

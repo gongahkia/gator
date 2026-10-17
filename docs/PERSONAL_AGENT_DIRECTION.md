@@ -74,6 +74,11 @@ the goal and clears a due review time. The reminder will appear after the CLI
 closes only while the local supervisor is running (or its per-user service is
 installed and the user session remains active).
 
+`gator work list`, `gator work show WORK_ID`, and the TUI History view report
+whether a running Work record has an active process-held lease, a stopped lease
+after interruption, or no lease from an older run. This is read-only process
+visibility: another CLI cannot steer that run or answer its approvals.
+
 ## Next engineering sequence
 
 1. **Measure continuity quality.** Test multi-day goals with corrections, expiry, scope boundaries, and changing source facts. Compare live model behavior against a same-model baseline; passing storage tests alone does not prove agent usefulness.

@@ -23,6 +23,7 @@ import (
 	"github.com/gongahkia/gator/internal/document"
 	"github.com/gongahkia/gator/internal/learning"
 	"github.com/gongahkia/gator/internal/sandbox"
+	"github.com/gongahkia/gator/internal/workhistory"
 )
 
 type textOnlyScriptedModel struct{ *scriptedModel }
@@ -48,12 +49,13 @@ func TestSystemPromptMakesSavedContextSubordinate(t *testing.T) {
 
 func TestOrdinaryWorkCannotDelegateCodeForArtifactTask(t *testing.T) {
 	called := false
+	stateDir := t.TempDir()
 	model := &scriptedModel{turns: []agent.Turn{
 		{ToolCalls: []agent.ToolCall{{ID: "wrong-route", Name: "delegate_agents", Arguments: json.RawMessage(`{"tasks":[{"agent":"code","task":"write clean.csv"}]}`)}}},
 		{ToolCalls: []agent.ToolCall{{ID: "write", Name: "write_artifact", Arguments: json.RawMessage(`{"path":"clean.csv","content":"ticket_id,status\nT-20,closed\n"}`)}}},
 		{Text: "Created clean.csv."},
 	}}
-	service := Service{Executor: Executor{Model: model, StateDir: t.TempDir(), Code: func(context.Context, CodeRequest) (CodeResult, error) {
+	service := Service{Executor: Executor{Model: model, StateDir: stateDir, Code: func(context.Context, CodeRequest) (CodeResult, error) {
 		called = true
 		return CodeResult{}, nil
 	}}}
@@ -74,6 +76,13 @@ func TestOrdinaryWorkCannotDelegateCodeForArtifactTask(t *testing.T) {
 	}
 	if _, err := outcome.Work.Output.ReadRegularFile("clean.csv", 1024); err != nil {
 		t.Fatalf("ordinary artifact was not produced: %v", err)
+	}
+	history, err := workhistory.Open(stateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status, err := history.LiveStatus("ordinary-artifact"); err != nil || status != "stopped" {
+		t.Fatalf("completed Work lease = %q, %v", status, err)
 	}
 }
 

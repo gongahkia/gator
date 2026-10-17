@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 	"unicode/utf8"
 
@@ -73,8 +74,26 @@ type Record struct {
 	ArtifactStatus     string             `json:"artifact_status,omitempty"`
 	VerificationStatus VerificationStatus `json:"verification_status,omitempty"`
 	Status             Status             `json:"status"`
+	LiveStatus         string             `json:"-"` // transient process-held lease state
 	StartedAt          time.Time          `json:"started_at"`
 	FinishedAt         time.Time          `json:"finished_at,omitempty"`
+}
+
+// DisplayStatus keeps the durable lifecycle distinct from the transient run
+// lease. A stopped lease on a still-running record indicates an interrupted
+// run whose terminal history could not be retained.
+func (r Record) DisplayStatus() string {
+	if r.Status != Running {
+		return string(r.Status)
+	}
+	switch r.LiveStatus {
+	case "active":
+		return "running (active)"
+	case "stopped":
+		return "running (stale)"
+	default:
+		return "running (unconfirmed)"
+	}
 }
 
 // Start is the bounded request projection retained when a Work execution
@@ -127,6 +146,72 @@ func Open(stateDir string) (Store, error) {
 }
 
 func (s Store) Root() string { return s.root }
+
+// AcquireRun holds a kernel-released lease for one executing Work run. It is
+// an observation signal, not a remote steering or approval channel.
+func (s Store) AcquireRun(id string) (*os.File, error) {
+	if err := validateID(id); err != nil {
+		return nil, err
+	}
+	root, err := os.OpenRoot(s.root)
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+	file, err := root.OpenFile(id+".lock", os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW, 0600)
+	if err != nil {
+		return nil, err
+	}
+	info, err := file.Stat()
+	if err != nil || !info.Mode().IsRegular() {
+		file.Close()
+		return nil, errors.New("invalid Work run lease")
+	}
+	if err := file.Chmod(0600); err != nil {
+		file.Close()
+		return nil, err
+	}
+	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		file.Close()
+		if errors.Is(err, syscall.EWOULDBLOCK) {
+			return nil, errors.New("Work run is already active")
+		}
+		return nil, err
+	}
+	return file, nil
+}
+
+// LiveStatus reports whether a process currently holds the run's lease.
+// Older runs without a lease are unconfirmed, not assumed stopped.
+func (s Store) LiveStatus(id string) (string, error) {
+	if err := validateID(id); err != nil {
+		return "", err
+	}
+	root, err := os.OpenRoot(s.root)
+	if err != nil {
+		return "", err
+	}
+	defer root.Close()
+	file, err := root.OpenFile(id+".lock", os.O_RDWR|syscall.O_NOFOLLOW, 0)
+	if errors.Is(err, os.ErrNotExist) {
+		return "unknown", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil || !info.Mode().IsRegular() {
+		return "", errors.New("invalid Work run lease")
+	}
+	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		if errors.Is(err, syscall.EWOULDBLOCK) {
+			return "active", nil
+		}
+		return "", err
+	}
+	return "stopped", syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+}
 
 // Start creates an immutable Work identity in the running lifecycle state.
 func (s Store) Start(start Start) (Record, error) {
@@ -238,6 +323,13 @@ func (s Store) Load(id string) (Record, error) {
 	}
 	if record.ID != id || validateRecord(record) != nil {
 		return Record{}, errors.New("Work history record is invalid")
+	}
+	if record.Status == Running {
+		status, err := s.LiveStatus(id)
+		if err != nil {
+			return Record{}, fmt.Errorf("inspect Work run liveness: %w", err)
+		}
+		record.LiveStatus = status
 	}
 	return record, nil
 }

@@ -299,7 +299,7 @@ func historyFilterName(value workhistory.Status) string {
 }
 
 func historyStatusLine(record workhistory.Record, project, delivery string) string {
-	parts := []string{string(record.Status), string(record.Mode), "verification " + valueOrNone(string(record.VerificationStatus)), "delivery " + delivery}
+	parts := []string{record.DisplayStatus(), string(record.Mode), "verification " + valueOrNone(string(record.VerificationStatus)), "delivery " + delivery}
 	if project != "" {
 		parts = append(parts, "project "+filepath.Base(project))
 	}

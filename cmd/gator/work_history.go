@@ -56,7 +56,7 @@ func formatWorkHistory(stateDir string, records []workhistory.Record) (string, e
 }
 
 func formatWorkHistoryRecord(record workhistory.Record, deliveries []delivery.Record, observations []learning.Observation, learnings []learning.Record) string {
-	lines := []string{record.ObjectiveSummary, fmt.Sprintf("  Status: %s · verification %s · %s", record.Status, valueOrDash(string(record.VerificationStatus)), valueOrDash(record.ArtifactStatus))}
+	lines := []string{record.ObjectiveSummary, fmt.Sprintf("  Status: %s · verification %s · %s", record.DisplayStatus(), valueOrDash(string(record.VerificationStatus)), valueOrDash(record.ArtifactStatus))}
 	lines = append(lines, "  Delivery: "+historyDeliveryState(deliveries))
 	lines = append(lines, "  Artifacts: "+historyArtifacts(record))
 	lines = append(lines, "  Feedback: "+historyFeedback(observations))

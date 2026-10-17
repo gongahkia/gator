@@ -82,7 +82,10 @@ func workSessionCommand(arguments []string, in io.Reader, out io.Writer, modelFa
 			return errors.New("usage: gator work show WORK_ID|CONVERSATION_ID")
 		}
 		if record, loadErr := history.Load(arguments[1]); loadErr == nil {
-			return json.NewEncoder(out).Encode(record)
+			return json.NewEncoder(out).Encode(struct {
+				workhistory.Record
+				LiveStatus string `json:"live_status,omitempty"`
+			}{Record: record, LiveStatus: record.LiveStatus})
 		} else if !errors.Is(loadErr, os.ErrNotExist) {
 			return loadErr
 		}
