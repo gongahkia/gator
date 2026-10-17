@@ -109,6 +109,12 @@ gator suggestion accept SUGGESTION_ID
 gator suggestion reject SUGGESTION_ID
 ```
 
+`gator suggestion show` includes `reference_integrity` for note source references
+and proposed plan evidence. It checks them against the retained, verified Work
+bundle and current local source files. `verified` means the reference points to
+observed material; it does not mean the material supports the suggested claim.
+`unverified` or `work_unavailable` calls for manual review before acceptance.
+
 A plan suggestion carries the exact plan revision it was based on. If you
 changed the plan since then, acceptance fails and leaves the suggestion pending
 for review or rejection.

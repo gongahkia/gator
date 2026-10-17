@@ -61,7 +61,10 @@ func suggestionCommand(args []string, out io.Writer) error {
 		}
 		encoder := json.NewEncoder(out)
 		encoder.SetIndent("", "  ")
-		return encoder.Encode(record)
+		return encoder.Encode(struct {
+			suggestion.Record
+			ReferenceIntegrity suggestionEvidenceCheck `json:"reference_integrity"`
+		}{Record: record, ReferenceIntegrity: checkSuggestionEvidence(stateDir, record)})
 	case "accept", "reject":
 		record, err := store.Resolve(args[1], args[0], func(record suggestion.Record) (string, error) {
 			return applySuggestion(stateDir, record)

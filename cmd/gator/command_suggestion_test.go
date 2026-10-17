@@ -2,16 +2,94 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/knowledge"
 	"github.com/gongahkia/gator/internal/suggestion"
+	"github.com/gongahkia/gator/internal/workspace"
 )
+
+func TestSuggestionShowChecksRetainedReferencesAndSourceChanges(t *testing.T) {
+	stateDir := t.TempDir()
+	t.Setenv("GATOR_STATE_DIR", stateDir)
+	work := createCLIWorkBundle(t, stateDir, "suggestion-evidence")
+	retained, err := workspace.OpenWork(work.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contents := []byte("Venue A capacity is 80.\n")
+	if err := os.WriteFile(filepath.Join(retained.Source.Path(), "venue.md"), contents, 0600); err != nil {
+		t.Fatal(err)
+	}
+	digest := sha256.Sum256(contents)
+	hash := hex.EncodeToString(digest[:])
+	root, err := workspace.Open(work.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := root.WriteRegularFileAtomic("evidence/"+hash+".txt", contents, 512*1024); err != nil {
+		t.Fatal(err)
+	}
+	bundle, err := artifact.OpenBundle(work.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest := bundle.Manifest
+	manifest.Evidence = []artifact.Evidence{{ID: "evidence-venue", Locator: "source/venue.md", SHA256: hash, SnapshotPath: "evidence/" + hash + ".txt", RetrievedAt: time.Now().UTC()}}
+	if err := artifact.WriteManifest(work.ManifestPath, manifest); err != nil {
+		t.Fatal(err)
+	}
+	queue, err := suggestion.Open(stateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := queue.Create(suggestion.Record{Kind: "note", Title: "Venue", Body: "Capacity is 80", WorkID: work.ID, SourceRefs: []string{"source/venue.md:1", "source/venue.md:99"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	check := func() suggestionEvidenceCheck {
+		var output bytes.Buffer
+		if err := suggestionCommand([]string{"show", record.ID}, &output); err != nil {
+			t.Fatal(err)
+		}
+		var displayed struct {
+			ID                 string                  `json:"id"`
+			ReferenceIntegrity suggestionEvidenceCheck `json:"reference_integrity"`
+		}
+		if err := json.Unmarshal(output.Bytes(), &displayed); err != nil || displayed.ID != record.ID {
+			t.Fatalf("suggestion show = %s, %v", output.String(), err)
+		}
+		return displayed.ReferenceIntegrity
+	}
+	first := check()
+	if first.Status != "unverified" || len(first.Verified) != 1 || first.Verified[0] != "source/venue.md:1" || len(first.Unverified) != 1 || first.Unverified[0] != "source/venue.md:99" {
+		t.Fatalf("initial source check = %#v", first)
+	}
+	if err := os.WriteFile(filepath.Join(retained.Source.Path(), "venue.md"), []byte("Venue A capacity is 100.\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	after := check()
+	if after.Status != "unverified" || len(after.Verified) != 0 || len(after.Unverified) != 2 {
+		t.Fatalf("changed source remained verified: %#v", after)
+	}
+	if err := os.WriteFile(filepath.Join(work.Output.Path(), "report.md"), []byte("tampered\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if tampered := check(); tampered.Status != "work_unavailable" || len(tampered.Verified) != 0 {
+		t.Fatalf("tampered Work bundle backed a suggestion: %#v", tampered)
+	}
+}
 
 func TestAcceptedChatGoalProposalCreatesPlanAndReadOnlyFollowUpOnce(t *testing.T) {
 	state := t.TempDir()
