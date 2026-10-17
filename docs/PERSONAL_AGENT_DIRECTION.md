@@ -29,6 +29,8 @@ Meta describes Muse as a personal agent that develops plans for goals, works acr
 
 ## Implemented continuity and follow-up
 
+A timed goal check can select configured connectors with repeated `--connector ID` flags. It rereads those services on each run; this is not an event subscription or durable remote cursor. The local `--change-only` gate is unavailable with connectors because remote data can change independently of files. Connector read permissions and credentials are checked again at execution.
+
 `gator goal` now stores an explicit user-owned goal with a title, optional background context, status, and one retained conversation. Without `--source`, it creates a private empty workspace; with `--source`, it follows a selected local directory. `gator goal chat ID` opens the existing terminal UI bound to that goal. `gator work --goal ID "..."` loads the same context, resumes the goal's conversation, and refreshes the source capture each time. A goal chat defaults to inspect mode so a question does not force a `report.md`; `--artifact` or an explicit Work mode can request a deliverable or action. The context is data, not a permission grant. Paused and completed goals cannot run until resumed.
 
 ```sh

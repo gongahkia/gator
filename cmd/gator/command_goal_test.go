@@ -89,6 +89,45 @@ func TestScheduledGoalUsesFreshContextAndStopsWhenPaused(t *testing.T) {
 	}
 }
 
+func TestGoalScheduleCanSelectConfiguredReadConnector(t *testing.T) {
+	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
+	stateDir := t.TempDir()
+	t.Setenv("GATOR_STATE_DIR", stateDir)
+	if err := connectorCommandWithIO([]string{"add", "planning", "--url", "https://example.com/planning.json"}, strings.NewReader(""), &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	goals, err := goal.Open(stateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := goals.Add("Review planning updates", "", t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	arguments := []string{"schedule", record.ID, "--cron", "0 9 * * *", "--connector", "planning", "--task", "Check new planning facts"}
+	if err := goalCommand(arguments, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	store, err := jobs.Open(stateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	definitions, err := store.List()
+	if err != nil || len(definitions) != 1 || len(definitions[0].ConnectorIDs) != 1 || definitions[0].ConnectorIDs[0] != "planning" || definitions[0].ChangeOnly {
+		t.Fatalf("connected goal job = %#v, %v", definitions, err)
+	}
+	request, err := preparedJobWorkRequest(definitions[0], stateDir)
+	if err != nil || len(request.ConnectorIDs) != 1 || request.ConnectorIDs[0] != "planning" {
+		t.Fatalf("connected goal request = %#v, %v", request, err)
+	}
+	if err := goalCommand([]string{"schedule", record.ID, "--cron", "0 9 * * *", "--connector", "missing", "--task", "Check"}, &bytes.Buffer{}); err == nil {
+		t.Fatal("unknown connector was scheduled")
+	}
+	if err := goalCommand([]string{"schedule", record.ID, "--cron", "0 9 * * *", "--connector", "planning", "--change-only", "--task", "Check"}, &bytes.Buffer{}); err == nil {
+		t.Fatal("local-only change gate was used with a connector")
+	}
+}
+
 func TestGoalPlanCommandsAppearInWorkContext(t *testing.T) {
 	stateDir := t.TempDir()
 	t.Setenv("GATOR_STATE_DIR", stateDir)

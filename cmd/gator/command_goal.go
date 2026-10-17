@@ -11,6 +11,7 @@ import (
 
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/state"
@@ -25,7 +26,7 @@ const goalUsage = `Gator goals — ongoing responsibilities
   gator goal context ID TEXT
   gator goal pause|resume|complete ID
   gator goal chat ID
-  gator goal schedule ID --cron '0 9 * * *' [--timezone AREA/CITY] [--mode inspect|draft] [--artifact PATH] --task TEXT
+  gator goal schedule ID --cron '0 9 * * *' [--timezone AREA/CITY] [--connector ID] [--mode inspect|draft] [--artifact PATH] --task TEXT
   gator goal watch ID [--task TEXT] [--artifact PATH]
   gator goal schedules ID
   gator goal unschedule ID JOB_ID
@@ -118,6 +119,8 @@ func goalCommand(args []string, out io.Writer) error {
 		artifactPath := flags.String("artifact", "", "required artifact for draft mode")
 		task := flags.String("task", "", "recurring check instruction")
 		changeOnly := flags.Bool("change-only", false, "skip a local-only check when files and saved context are unchanged")
+		var connectors connectorFlags
+		flags.Var(&connectors, "connector", "selected connected source for this recurring check")
 		if err := flags.Parse(args[2:]); err != nil {
 			return err
 		}
@@ -126,6 +129,28 @@ func goalCommand(args []string, out io.Writer) error {
 		}
 		if *cron == "" || strings.TrimSpace(*task) == "" {
 			return errors.New("goal schedule requires --cron and --task")
+		}
+		if len(connectors) > 0 {
+			registry, err := connector.NewRegistry(settings.Connectors)
+			if err != nil {
+				return err
+			}
+			for _, id := range connectors {
+				descriptor, found := registry.Get(id)
+				if !found {
+					return fmt.Errorf("connector %q is not configured", id)
+				}
+				readable := false
+				for _, operation := range descriptor.Operations() {
+					if operation.Capability == action.ConnectedRead && connector.PermissionSet(settings.ConnectorPermissions).Resolve(id, operation.ID, operation.Capability) == connector.PermissionAllow {
+						readable = true
+						break
+					}
+				}
+				if !readable {
+					return fmt.Errorf("connector %q has no unattended read operation; review its scopes and permissions", id)
+				}
+			}
 		}
 		mode := action.Mode(*modeName)
 		var contract artifact.Contract
@@ -149,7 +174,7 @@ func goalCommand(args []string, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		definition, err := jobStore.Save(jobs.Definition{Name: goalJobName(record), GoalID: record.ID, Enabled: true, Schedule: *cron, Timezone: *timezone, Missed: *missed, SourcePath: record.SourcePath, RefreshSnapshot: true, ChangeOnly: *changeOnly, Objective: strings.TrimSpace(*task), Mode: mode, Contract: contract, MaxSteps: 24})
+		definition, err := jobStore.Save(jobs.Definition{Name: goalJobName(record), GoalID: record.ID, Enabled: true, Schedule: *cron, Timezone: *timezone, Missed: *missed, SourcePath: record.SourcePath, RefreshSnapshot: true, ChangeOnly: *changeOnly, Objective: strings.TrimSpace(*task), Mode: mode, Contract: contract, ConnectorIDs: connectors, MaxSteps: 24})
 		if err != nil {
 			return err
 		}

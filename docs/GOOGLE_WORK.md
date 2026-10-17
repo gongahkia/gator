@@ -6,6 +6,11 @@ daily brief that combines local notes, today's calendar, and selected inbox
 messages, then drafts a local document or email for review. Gator does not
 send email or change calendar events through this connector.
 
+An ongoing goal can select this connector in a timed, read-only follow-up with
+`gator goal schedule GOAL_ID --cron '0 9 * * *' --connector google-work --task 'Prepare the daily brief from selected mail and calendar events'`.
+This runs only while the local supervisor is available and does not provide
+event monitoring, remote cursors, or automatic email sending.
+
 ## Set up from Work
 
 After creating a Desktop OAuth client and enabling the Drive, Docs, Sheets,
