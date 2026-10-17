@@ -1,0 +1,209 @@
+{
+  "version": 1,
+  "id": "personal-continuity-smoke",
+  "target": "work.v1",
+  "cases": [
+    {
+      "id": "venue-change",
+      "family": "event",
+      "split": "development",
+      "source": "sources/venue-change",
+      "objective": "Read status.md and give me a brief status and next step for this ongoing goal.",
+      "goal": {
+        "title": "Choose a venue for the November offsite.",
+        "context": "Choose a venue for the November offsite.",
+        "outcome": "Choose a venue for the November offsite.",
+        "steps": [
+          "Check current source",
+          "Decide next action"
+        ],
+        "memory": [
+          "Prefer a morning event."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial status: Venue A is available for 90 people; quote $1,800. Venue B is available for 90 people; quote $2,100."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Several days have passed. Check the latest source and tell me the current state and the next useful step. Be explicit when an old assumption changed.",
+          "parent": 0,
+          "refresh": true,
+          "source_edits": [
+            {
+              "path": "status.md",
+              "content": "# Current source\n\nVenue A is no longer available. Venue B is available for 90 people; quote $2,100.\n"
+            }
+          ],
+          "script": [
+            {
+              "text": "Current state: Venue A is no longer available. Venue B is available for 90 people; quote $2,100. Next: act on the updated source."
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "Venue B"
+        }
+      ]
+    },
+    {
+      "id": "brief-preference-correction",
+      "family": "brief",
+      "split": "development",
+      "source": "sources/brief-preference-correction",
+      "objective": "Summarize the current goal direction.",
+      "goal": {
+        "title": "Prepare the daily briefing.",
+        "context": "The user initially asked for a long daily brief.",
+        "outcome": "Prepare the daily briefing.",
+        "steps": [
+          "Check latest user direction"
+        ],
+        "memory": [
+          "The user prefers a long daily brief."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial direction: The user initially asked for a long daily brief."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Resume this ongoing goal. What is the current user direction, and how should you proceed?",
+          "parent": 0,
+          "refresh": false,
+          "goal_context": "The user corrected the standing preference: provide a three-bullet daily brief, with decisions first.",
+          "script": [
+            {
+              "text": "Current user direction: The user corrected the standing preference: provide a three-bullet daily brief, with decisions first. Next: follow the correction."
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "three-bullet"
+        }
+      ]
+    },
+    {
+      "id": "goal-priority-change",
+      "family": "project",
+      "split": "development",
+      "source": "sources/goal-priority-change",
+      "objective": "Summarize the current goal direction.",
+      "goal": {
+        "title": "Advance the launch safely.",
+        "context": "The original goal was to publish the launch announcement this week.",
+        "outcome": "Advance the launch safely.",
+        "steps": [
+          "Check latest user direction"
+        ],
+        "memory": [
+          "Publish the launch announcement first."
+        ]
+      },
+      "contract": {
+        "version": 1,
+        "artifacts": null,
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "inspect",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 32,
+        "wall_seconds": 180
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "text": "Initial direction: The original goal was to publish the launch announcement this week."
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Resume this ongoing goal. What is the current user direction, and how should you proceed?",
+          "parent": 0,
+          "refresh": false,
+          "goal_context": "The goal changed: resolve the security blocker before any launch announcement.",
+          "script": [
+            {
+              "text": "Current user direction: The goal changed: resolve the security blocker before any launch announcement. Next: follow the correction."
+            }
+          ],
+          "plan_changes": [
+            {
+              "kind": "set_outcome",
+              "expected_revision": 2,
+              "outcome": "Resolve the security blocker before announcing launch"
+            }
+          ]
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "completed"
+        },
+        {
+          "version": 1,
+          "kind": "final_contains",
+          "expected": "security blocker"
+        }
+      ]
+    }
+  ]
+}
