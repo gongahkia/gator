@@ -47,6 +47,7 @@ type Definition struct {
 	GoalWatch           bool                   `json:"goal_watch,omitempty"`
 	WatchSources        []WatchSource          `json:"watch_sources,omitempty"`
 	RuntimeWatchChanges []WatchChange          `json:"-"`
+	RuntimeWatchItems   []WatchItem            `json:"-"`
 	Objective           string                 `json:"objective"`
 	Provider            string                 `json:"provider,omitempty"`
 	Model               string                 `json:"model,omitempty"`

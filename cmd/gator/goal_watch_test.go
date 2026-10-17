@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -13,11 +15,13 @@ import (
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/suggestion"
 	"github.com/gongahkia/gator/internal/workrun"
+	"github.com/gongahkia/gator/internal/workspace"
 )
 
 func TestGoalWatchChangedSourceIsQuietAcrossRestart(t *testing.T) {
@@ -132,36 +136,107 @@ func TestGoalWatchHashCrossesDueTimeOnce(t *testing.T) {
 
 func TestGoalWatchAttentionCannotHideArtifactsOrSuggestions(t *testing.T) {
 	quiet := `{"attention":false,"summary":"No new decision is needed.","evidence":[]}`
-	if attention, _ := classifyGoalWatchResult(quiet, nil, nil); attention {
+	if attention, _ := classifyGoalWatchResult(quiet, nil, nil, watchReferenceSet{}); attention {
 		t.Fatal("explicit quiet response was surfaced")
 	}
-	if attention, _ := classifyGoalWatchResult(quiet, nil, []artifact.File{{Path: "reply.md"}}); !attention {
+	if attention, _ := classifyGoalWatchResult(quiet, nil, []artifact.File{{Path: "reply.md"}}, watchReferenceSet{}); !attention {
 		t.Fatal("draft artifact was hidden by quiet response")
 	}
-	if attention, _ := classifyGoalWatchResult(quiet, []agent.Message{{Role: agent.RoleTool, ToolName: "suggest_change", Content: `{"ok":true}`}}, nil); !attention {
+	if attention, _ := classifyGoalWatchResult(quiet, []agent.Message{{Role: agent.RoleTool, ToolName: "suggest_change", Content: `{"ok":true}`}}, nil, watchReferenceSet{}); !attention {
 		t.Fatal("reviewable suggestion was hidden by quiet response")
 	}
-	if attention, summary := classifyGoalWatchResult(quiet, []agent.Message{{Role: agent.RoleTool, ToolName: "suggest_change", Content: `{"ok":false,"error":"invalid plan"}`}}, nil); !attention || !strings.Contains(summary, "could not queue") {
+	if attention, summary := classifyGoalWatchResult(quiet, []agent.Message{{Role: agent.RoleTool, ToolName: "suggest_change", Content: `{"ok":false,"error":"invalid plan"}`}}, nil, watchReferenceSet{}); !attention || !strings.Contains(summary, "could not queue") {
 		t.Fatalf("failed suggestion was hidden: attention=%t summary=%q", attention, summary)
 	}
-	if attention, _ := classifyGoalWatchResult("I found a changed date.", nil, nil); !attention {
+	if attention, _ := classifyGoalWatchResult("I found a changed date.", nil, nil, watchReferenceSet{}); !attention {
 		t.Fatal("unstructured response was hidden")
 	}
 }
 
 func TestGoalWatchAlertShowsBoundedEvidenceOrReviewWarning(t *testing.T) {
+	source := t.TempDir()
+	contents := []byte("Venue changed.\n")
+	if err := os.WriteFile(filepath.Join(source, "venue.md"), contents, 0600); err != nil {
+		t.Fatal(err)
+	}
+	root, err := workspace.Open(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := sha256.Sum256(contents)
+	references := newWatchReferenceSet(artifact.Manifest{Evidence: []artifact.Evidence{{ID: "local-venue", Locator: "source/venue.md", SHA256: hex.EncodeToString(digest[:]), SnapshotPath: "evidence/retained.txt"}}}, nil, goal.Plan{Steps: []goal.Step{{ID: "2"}}}, workspace.Work{Source: root})
 	withEvidence := `{"attention":true,"summary":"Venue changed.","evidence":["source/venue.md:3","source/venue.md:3","goal plan step 2"]}`
-	attention, summary := classifyGoalWatchResult(withEvidence, nil, nil)
-	if !attention || !strings.Contains(summary, "[evidence: source/venue.md:3; goal plan step 2]") {
+	attention, summary := classifyGoalWatchResult(withEvidence, nil, nil, references)
+	if !attention || !strings.Contains(summary, "[evidence: goal plan step 2]") || !strings.Contains(summary, "other references unverified") {
 		t.Fatalf("evidence was not shown: %t %q", attention, summary)
 	}
+	valid := `{"attention":true,"summary":"Venue changed.","evidence":["source/venue.md:1"]}`
+	if attention, summary = classifyGoalWatchResult(valid, nil, nil, references); !attention || !strings.Contains(summary, "[evidence: source/venue.md:1]") {
+		t.Fatalf("retained line reference was rejected: %t %q", attention, summary)
+	}
+	if err := os.WriteFile(filepath.Join(source, "venue.md"), []byte("Changed after the run.\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if references.allows("source/venue.md:1") {
+		t.Fatal("changed source line was accepted as retained evidence")
+	}
+	fabricated := `{"attention":true,"summary":"Venue changed.","evidence":["source/missing.md:1"]}`
+	if attention, summary = classifyGoalWatchResult(fabricated, nil, nil, references); !attention || !strings.Contains(summary, "evidence missing or unverified") {
+		t.Fatalf("fabricated reference was treated as evidence: %t %q", attention, summary)
+	}
 	withoutEvidence := `{"attention":true,"summary":"Venue changed.","evidence":[]}`
-	attention, summary = classifyGoalWatchResult(withoutEvidence, nil, nil)
-	if !attention || !strings.Contains(summary, "evidence missing; review Work run") {
+	attention, summary = classifyGoalWatchResult(withoutEvidence, nil, nil, references)
+	if !attention || !strings.Contains(summary, "evidence missing or unverified; review Work run") {
 		t.Fatalf("unsupported alert was not flagged: %t %q", attention, summary)
 	}
-	if value := boundedWatchEvidence([]string{"source/a.md:1\nspoofed", strings.Repeat("x", 120)}); strings.Contains(value, "\n") || len(value) > 210 {
+	value, _ := boundedWatchEvidence([]string{"source/venue.md:1\nspoofed", strings.Repeat("x", 120)}, references)
+	if strings.Contains(value, "\n") || len(value) > 210 {
 		t.Fatalf("unsafe evidence: %q", value)
+	}
+}
+
+func TestGoalWatchConnectedReferencesRequireObservedOperationAndSelectedItem(t *testing.T) {
+	workPath := t.TempDir()
+	if err := os.Mkdir(filepath.Join(workPath, "connected"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	makeSource := func(operation, name, data string) connector.Provenance {
+		t.Helper()
+		path := "connected/" + name
+		if err := os.WriteFile(filepath.Join(workPath, path), []byte(data), 0600); err != nil {
+			t.Fatal(err)
+		}
+		digest := sha256.Sum256([]byte(data))
+		return connector.Provenance{ConnectorID: "google", Operation: operation, SnapshotPath: path, SHA256: hex.EncodeToString(digest[:])}
+	}
+	manifest := artifact.Manifest{ConnectedSources: []connector.Provenance{
+		makeSource("gmail_list", "list.json", `{"messages":[{"id":"mail-1"}]}`),
+		makeSource("gmail_get", "detail.json", `{"id":"mail-1","snippet":"Venue changed"}`),
+	}}
+	items := []jobs.WatchItem{{Source: "google/gmail_list", ID: "mail-1"}, {Source: "google/calendar_events", ID: "event-1"}}
+	references := newWatchReferenceSet(manifest, items, goal.Plan{}, workspace.Work{Path: workPath})
+	listOnly := newWatchReferenceSet(artifact.Manifest{ConnectedSources: manifest.ConnectedSources[:1]}, items, goal.Plan{}, workspace.Work{Path: workPath})
+	if listOnly.allows("google/gmail_list mail-1") {
+		t.Fatal("Gmail list ID was treated as message-content evidence without a detail read")
+	}
+	if !references.allows("google/gmail_list mail-1") || !references.allows("google/gmail_list") {
+		t.Fatal("observed Gmail reference was rejected")
+	}
+	for _, candidate := range []string{"google/gmail_list mail-2", "google/calendar_events event-1", "google/gmail_get mail-1"} {
+		if references.allows(candidate) {
+			t.Fatalf("unobserved connected item or operation was accepted: %q", candidate)
+		}
+	}
+	attention, summary := classifyGoalWatchResult(`{"attention":true,"summary":"Mail changed.","evidence":["google/gmail_list mail-1","google/gmail_list mail-2"]}`, nil, nil, references)
+	if !attention || !strings.Contains(summary, "[evidence: google/gmail_list mail-1]") || !strings.Contains(summary, "other references unverified") {
+		t.Fatalf("connected reference result = %t %q", attention, summary)
+	}
+	if err := os.WriteFile(filepath.Join(workPath, "connected", "detail.json"), []byte(`{"id":"mail-2"}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	tampered := newWatchReferenceSet(manifest, items, goal.Plan{}, workspace.Work{Path: workPath})
+	if tampered.allows("google/gmail_list mail-1") {
+		t.Fatal("tampered connected detail was treated as retained evidence")
 	}
 }
 

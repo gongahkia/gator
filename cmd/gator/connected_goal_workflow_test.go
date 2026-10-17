@@ -101,7 +101,7 @@ func TestConnectedGoalWatchReadsLocalMailCalendarAndDraftsForReview(t *testing.T
 	observedSources := map[string]bool{}
 	result := executeJobContextWith(context.Background(), definition, attempt, state, false, func(ctx context.Context, current jobs.Definition, stateDir string, runIDs ...string) (jobResult, error) {
 		return runJobProcessWith(ctx, current, stateDir, func(ctx context.Context, _, _, _ string, request workrun.Request) (workrun.Outcome, error) {
-			if !strings.Contains(request.System, "changed-item metadata") {
+			if !strings.Contains(request.System, "changed-item metadata") || !strings.Contains(request.System, "Gator checks reference integrity") {
 				t.Error("connected watch change metadata was not supplied to Work")
 			}
 			outcome, err := service.Execute(ctx, request)
