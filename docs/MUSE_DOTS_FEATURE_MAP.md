@@ -8,6 +8,19 @@ The product goal remains a **terminal-native personal agent that remembers goals
 
 The compact source labels in the tables identify the linked documents: **M1** Muse design, **M2** Muse launch, **M3** Muse security, **M4** Meta's later Connect announcement; **D1–D5** OpenAI dots documentation; **G1–G8** Gator repository documentation. The links beside each label open the specific source.
 
+## Status at a glance
+
+Of the 28 capabilities below, **5 are present with stated limits, 18 are partial, and 5 are absent**. These are implementation classifications, not measured success rates. The partial items are:
+
+| Area | Partial capabilities | Main remaining proof or capability |
+| --- | --- | --- |
+| Goals and follow-through (6) | Turn a request into a durable goal and plan; notice a change and revise the next step; event monitoring in apps; work while the user is away; decide when to be quiet; propose useful work before being asked | Prove useful goal setup, relevant changes and next steps, and quiet follow-up in live use. App watches poll, and local work stops when the host is off. |
+| Conversation and memory (5) | One continuing relationship with separate task contexts; accept interruptions and concurrent requests; delegate specialist work and follow up; remember preferences and ongoing context; reusable skills and tools | Make concurrent conversations and direct task follow-up usable; measure scoped recall and whether selected specialists or skills improve outcomes. |
+| Sources and actions (4) | Read across connected services; connect facts across sources into a useful answer; take external actions across apps; browser navigation and account handoff | Validate connected reads and cross-source answers on real accounts; broaden approved actions only with reliable receipts and recovery. |
+| Trust and control (3) | Keep credentials outside model context; inspect activity, steer, stop, and recover; control interruption level and destination | Test secret and prompt-injection boundaries and whether users can recover work. Collect explicit ratings for shown alerts and separately measure missed changes; delivery and urgency policies remain limited. |
+
+The latest alert-feedback slice adds `gator job inbox rate` and goal-level counts for **shown** job alerts. It does not change either partial status: no real user ratings have been collected, and quiet or missed changes are not represented in those counts.
+
 ## 1. Own work over time
 
 | User-visible capability | Muse | dots | Gator today | Gator priority and acceptance bar |
@@ -67,7 +80,7 @@ Some competitor capabilities are distribution or infrastructure choices, not nec
 ## Ordered work and proof
 
 1. **P0: Measure an honest baseline.** Run the cross-source and continuity corpora with a live model and a same-model no-goal baseline when provider capacity is available. Human-blind grade goal progress, correct next step, evidence support, forbidden actions, alert precision/recall, user rework, elapsed time, model requests, and peak RSS. Preserve raw traces and count failures, including quota and tool failures. The scripted 8/8 and 25/25 results are harness checks.
-2. **P1: Prove one connected recurring loop.** A user can establish an offsite-planning or daily-brief goal with selected Gmail and Calendar reads; bounded polling, item-level change records, a draft, and configured connector readiness in activity are wired. Test actual connected reads against relevant changes, duplicate messages, ambiguous timestamps, expired access, and quiet days. Show a source-supported next step without noisy alerts. Configured readiness cannot prove that an API request will succeed.
+2. **P1: Prove one connected recurring loop.** A user can establish an offsite-planning or daily-brief goal with selected Gmail and Calendar reads; bounded polling, item-level change records, a draft, configured connector readiness in activity, and explicit ratings for surfaced job alerts are wired. Test actual connected reads against relevant changes, duplicate messages, ambiguous timestamps, expired access, and quiet days. Collect ratings for shown alerts and separately audit important changes that stayed quiet. Show a source-supported next step without noisy alerts. Configured readiness cannot prove that an API request will succeed.
 3. **P1: Make the loop legible in terminal chat.** Goal activity shows the last check, next check, latest detected change, selected connector status, latest specialist checkpoints, inbox items, suggestions, and pause/resume controls. The Work activity CLI and `/activity` in terminal chat now join running runs, specialist checkpoints, and pending decision IDs. Cross-terminal steering of active LLM specialists is wired. Test whether users can understand, steer, and recover work without digging into job IDs.
 4. **P1/P2: Finish memory and action recovery.** Local file-linked memories now become unavailable for automatic recall when their file changes or disappears; measure wrong recall and extend validation to other source types. The narrow Gmail send path has exact foreground approval, a receipt for successful sends, and a manual read-scoped Sent check for uncertain sends. Validate the check with a real Gmail account; then add receipts for other actions and idempotency where a provider supports it. Never automatically retry an uncertain send.
 5. **Later: Make explicit product decisions.** Cloud continuity, standing action grants, messaging channels, voice/identity, and purchases remain absent. Evaluate each after the local recurring loop has live outcome evidence. They require distinct hosting, authority, integration, interface, or payment designs; local components do not imply parity.
