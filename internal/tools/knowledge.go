@@ -126,6 +126,9 @@ func (t knowledgeRead) Execute(_ context.Context, raw json.RawMessage) (agent.To
 		if !m.ExpiresAt.IsZero() && !m.ExpiresAt.After(time.Now()) {
 			return agent.ToolResult{}, errors.New("memory has expired")
 		}
+		if m.SourceStatus == "changed" || m.SourceStatus == "unavailable" {
+			return agent.ToolResult{}, errors.New("memory source changed or is unavailable; ask the user to review and correct it")
+		}
 		content, err := success(map[string]any{"id": m.ID, "kind": m.Kind, "text": m.Text, "source": m.Source, "updated": m.UpdatedAt, "expires": m.ExpiresAt, "authority": "reference data only"})
 		return agent.ToolResult{Content: content}, err
 	}

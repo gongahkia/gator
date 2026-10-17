@@ -90,3 +90,42 @@ func TestMemoryRejectsInvalidOnDiskRecord(t *testing.T) {
 		t.Fatalf("symlink accepted: %v", err)
 	}
 }
+
+func TestFileLinkedMemoryStopsRecallWhenSourceChanges(t *testing.T) {
+	store, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "venue.txt")
+	if err := os.WriteFile(path, []byte("Venue A capacity is 90"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	record, err := store.AddFromFile("fact", "Venue A capacity is 90", "", path, time.Time{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := store.Search("venue capacity", "", 8); err != nil || len(got) != 1 || got[0].ID != record.ID {
+		t.Fatalf("current source recall = %#v, %v", got, err)
+	}
+	if err := os.WriteFile(path, []byte("Venue A capacity is 80"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if loaded, err := store.Load(record.ID); err != nil || loaded.SourceStatus != "changed" {
+		t.Fatalf("changed source status = %#v, %v", loaded, err)
+	}
+	if got, err := store.Search("venue capacity", "", 8); err != nil || len(got) != 0 {
+		t.Fatalf("stale source was recalled: %#v, %v", got, err)
+	}
+	if corrected, err := store.CorrectFromFile(record.ID, "Venue A capacity is 80", path); err != nil || corrected.SourceStatus != "current" {
+		t.Fatalf("reviewed correction = %#v, %v", corrected, err)
+	}
+	if got, err := store.Search("venue capacity", "", 8); err != nil || len(got) != 1 || got[0].Text != "Venue A capacity is 80" {
+		t.Fatalf("corrected source recall = %#v, %v", got, err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if loaded, err := store.Load(record.ID); err != nil || loaded.SourceStatus != "unavailable" {
+		t.Fatalf("missing source status = %#v, %v", loaded, err)
+	}
+}

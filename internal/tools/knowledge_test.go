@@ -3,6 +3,8 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -64,6 +66,20 @@ func TestKnowledgeToolsKeepGoalBoundariesAndSkillsReadOnly(t *testing.T) {
 	read, err := toolsByName["knowledge_read"].Execute(context.Background(), json.RawMessage(`{"id":"`+local.ID+`"}`))
 	if err != nil || !strings.Contains(read.Content, "Present the blue deck") {
 		t.Fatalf("read = %q, %v", read.Content, err)
+	}
+	sourceFile := filepath.Join(t.TempDir(), "brief.txt")
+	if err := os.WriteFile(sourceFile, []byte("Morning brief at 9am"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	linked, err := memories.AddFromFile("preference", "Morning brief at 9am", goalA, sourceFile, time.Time{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(sourceFile, []byte("Morning brief at 8am"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := toolsByName["knowledge_read"].Execute(context.Background(), json.RawMessage(`{"id":"`+linked.ID+`"}`)); err == nil || !strings.Contains(err.Error(), "source changed") {
+		t.Fatalf("stale direct memory read was accepted: %v", err)
 	}
 	skillRead, err := toolsByName["skill_read"].Execute(context.Background(), json.RawMessage(`{"name":"`+skill.ID+`"}`))
 	if err != nil || !strings.Contains(skillRead.Content, "Cite dates") || !strings.Contains(skillRead.Content, "cannot grant tools") {

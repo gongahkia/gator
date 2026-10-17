@@ -16,11 +16,11 @@ import (
 
 const memoryUsage = `Gator memory — explicit, inspectable personal knowledge
 
-  gator memory add [--kind fact|preference|decision|note] [--goal ID] [--source REF] [--expires YYYY-MM-DD] TEXT
+  gator memory add [--kind fact|preference|decision|note] [--goal ID] [--source REF|--source-file PATH] [--expires YYYY-MM-DD] TEXT
   gator memory list [--goal ID] [--all]
   gator memory search [--goal ID] QUERY
   gator memory show ID
-  gator memory correct ID TEXT
+  gator memory correct ID [--source-file PATH] TEXT
   gator memory forget ID
 
 Goal memories are visible only in that goal; global memories are shared.
@@ -46,6 +46,7 @@ func memoryCommand(args []string, out io.Writer) error {
 		kind := flags.String("kind", "fact", "memory kind")
 		goalID := flags.String("goal", "", "goal ID")
 		source := flags.String("source", "user", "source reference")
+		sourceFile := flags.String("source-file", "", "link to a bounded local file and detect changes")
 		expires := flags.String("expires", "", "expiry date")
 		if err := flags.Parse(args[1:]); err != nil {
 			return err
@@ -70,7 +71,15 @@ func memoryCommand(args []string, out io.Writer) error {
 				return errors.New("expiry must be in the future")
 			}
 		}
-		record, err := store.Add(*kind, strings.Join(flags.Args(), " "), *goalID, *source, expiry)
+		if *sourceFile != "" && *source != "user" {
+			return errors.New("choose --source or --source-file, not both")
+		}
+		var record memory.Record
+		if *sourceFile != "" {
+			record, err = store.AddFromFile(*kind, strings.Join(flags.Args(), " "), *goalID, *sourceFile, expiry)
+		} else {
+			record, err = store.Add(*kind, strings.Join(flags.Args(), " "), *goalID, *source, expiry)
+		}
 		if err != nil {
 			return err
 		}
@@ -112,17 +121,31 @@ func memoryCommand(args []string, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprintf(out, "ID: %s\nKind: %s\nGoal: %s\nSource: %s\nExpires: %s\nCreated: %s\nUpdated: %s\nText: %s\n", record.ID, record.Kind, valueOrDash(record.GoalID), valueOrDash(record.Source), formatMemoryExpiry(record.ExpiresAt), record.CreatedAt.Format(time.RFC3339), record.UpdatedAt.Format(time.RFC3339), record.Text)
+		_, err = fmt.Fprintf(out, "ID: %s\nKind: %s\nGoal: %s\nSource: %s\nSource status: %s\nExpires: %s\nCreated: %s\nUpdated: %s\nText: %s\n", record.ID, record.Kind, valueOrDash(record.GoalID), valueOrDash(record.Source), valueOrDash(record.SourceStatus), formatMemoryExpiry(record.ExpiresAt), record.CreatedAt.Format(time.RFC3339), record.UpdatedAt.Format(time.RFC3339), record.Text)
 		return err
 	case "correct":
 		if len(args) < 3 {
-			return errors.New("usage: gator memory correct ID TEXT")
+			return errors.New("usage: gator memory correct ID [--source-file PATH] TEXT")
+		}
+		flags := flag.NewFlagSet("memory correct", flag.ContinueOnError)
+		flags.SetOutput(io.Discard)
+		sourceFile := flags.String("source-file", "", "relink to a reviewed local source file")
+		if err := flags.Parse(args[2:]); err != nil {
+			return err
+		}
+		if len(flags.Args()) == 0 {
+			return errors.New("memory correction text is required")
 		}
 		previous, err := store.Load(args[1])
 		if err != nil {
 			return err
 		}
-		record, err := store.Correct(args[1], strings.Join(args[2:], " "), previous.Source)
+		var record memory.Record
+		if *sourceFile != "" {
+			record, err = store.CorrectFromFile(args[1], strings.Join(flags.Args(), " "), *sourceFile)
+		} else {
+			record, err = store.Correct(args[1], strings.Join(flags.Args(), " "), previous.Source)
+		}
 		if err != nil {
 			return err
 		}
@@ -144,7 +167,11 @@ func memoryCommand(args []string, out io.Writer) error {
 
 func printMemories(out io.Writer, records []memory.Record) error {
 	for _, record := range records {
-		if _, err := fmt.Fprintf(out, "%s  %-10s %-29s %s\n", record.ID, record.Kind, valueOrDash(record.GoalID), record.Text); err != nil {
+		line := record.Text
+		if record.SourceStatus == "changed" || record.SourceStatus == "unavailable" {
+			line += " [source " + record.SourceStatus + "; excluded from automatic recall]"
+		}
+		if _, err := fmt.Fprintf(out, "%s  %-10s %-29s %s\n", record.ID, record.Kind, valueOrDash(record.GoalID), line); err != nil {
 			return err
 		}
 	}

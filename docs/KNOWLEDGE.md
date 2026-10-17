@@ -19,6 +19,15 @@ The Markdown is inspectable and may be edited directly; invalid or oversized
 edits fail closed the next time Gator loads that entry. No skill content is
 executed as a shell command or loaded as a plugin.
 
+For a short memory supported by a local file, use `gator memory add
+--source-file PATH TEXT`. Gator stores the path and a fingerprint of the file
+(up to 4 MiB). If it changes or disappears, `memory show` reports the source
+status and automatic recall skips that memory. After reviewing the current
+file, use `gator memory correct ID --source-file PATH TEXT` to update both the
+fact and its fingerprint. The fingerprint detects file changes; it does not
+prove that the file supports the memory's claim. Plain `--source REF` remains
+an unverified label.
+
 ## Notes
 
 ```sh
