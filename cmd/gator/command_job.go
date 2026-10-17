@@ -915,11 +915,43 @@ func inboxCommand(arguments []string, out io.Writer) error {
 		_, err := fmt.Fprintf(out, "Marked inbox entry %s read.\n", arguments[1])
 		return err
 	}
+	if len(arguments) == 2 && arguments[0] == "show" {
+		entry, err := store.Load(arguments[1])
+		if err != nil {
+			return err
+		}
+		rating := entry.Rating
+		if rating == "" {
+			rating = "unrated"
+		}
+		_, err = fmt.Fprintf(out, "Inbox %s\n  title: %s\n  summary: %s\n  status: %s\n  goal: %s\n  job: %s\n  rating: %s\n", entry.ID, strconv.QuoteToASCII(entry.Title), strconv.QuoteToASCII(entry.Summary), strconv.QuoteToASCII(entry.Status), strconv.QuoteToASCII(entry.GoalID), strconv.QuoteToASCII(entry.JobID), rating)
+		return err
+	}
+	if len(arguments) == 3 && arguments[0] == "rate" {
+		entry, err := store.Rate(arguments[1], arguments[2], time.Now())
+		if err != nil {
+			return err
+		}
+		rating := entry.Rating
+		if rating == "" {
+			rating = "unrated"
+		}
+		_, err = fmt.Fprintf(out, "Inbox entry %s rated %s.\n", entry.ID, rating)
+		return err
+	}
+	if len(arguments) == 2 && arguments[0] == "report" {
+		summary, err := store.RatingsForGoal(arguments[1])
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(out, "Goal %s job alerts: %d total, %d useful, %d noise, %d wrong, %d unrated. Ratings are user judgments about shown alerts; this does not measure missed alerts.\n", arguments[1], summary.Total, summary.Useful, summary.Noise, summary.Wrong, summary.Unrated)
+		return err
+	}
 	unread := false
 	if len(arguments) == 1 && arguments[0] == "--unread" {
 		unread = true
 	} else if len(arguments) != 0 {
-		return errors.New("usage: gator job inbox [--unread] | gator job inbox read ENTRY_ID")
+		return errors.New("usage: gator job inbox [--unread] | show ENTRY_ID | read ENTRY_ID | rate ENTRY_ID useful|noise|wrong|clear | report GOAL_ID")
 	}
 	entries, err := store.List(unread, 100)
 	if err != nil {
@@ -930,7 +962,11 @@ func inboxCommand(arguments []string, out io.Writer) error {
 		if entry.ReadAt.IsZero() {
 			marker = "*"
 		}
-		fmt.Fprintf(out, "%s %s\t%s\t%s\t%s\n", marker, entry.ID, entry.CreatedAt.Format("2006-01-02 15:04"), entry.Status, entry.Title)
+		fmt.Fprintf(out, "%s %s\t%s\t%s\t%s", marker, entry.ID, entry.CreatedAt.Format("2006-01-02 15:04"), entry.Status, entry.Title)
+		if entry.Rating != "" {
+			fmt.Fprintf(out, "\t[%s]", entry.Rating)
+		}
+		fmt.Fprintln(out)
 	}
 	return nil
 }

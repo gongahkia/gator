@@ -39,6 +39,7 @@ Product areas:
   Learnings   gator learnings list [--status STATUS] [--scope SCOPE]
               gator learnings add|edit|approve|reject|enable|disable ...
   Jobs        gator job add|list|show|edit|enable|disable|run|history|remove
+              gator job inbox show|read|rate|report
   Settings    gator config [show] · gator config set default-provider|default-model|sandbox|network VALUE
 
 Common follow-up actions:

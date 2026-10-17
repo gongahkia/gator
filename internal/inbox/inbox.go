@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/gongahkia/gator/internal/workspace"
 )
 
 const Version = 1
@@ -31,6 +33,16 @@ type Entry struct {
 	Status         string    `json:"status"`
 	CreatedAt      time.Time `json:"created_at"`
 	ReadAt         time.Time `json:"read_at,omitempty"`
+	Rating         string    `json:"rating,omitempty"`
+	RatedAt        time.Time `json:"rated_at,omitempty"`
+}
+
+type RatingSummary struct {
+	Total   int `json:"total"`
+	Useful  int `json:"useful"`
+	Noise   int `json:"noise"`
+	Wrong   int `json:"wrong"`
+	Unrated int `json:"unrated"`
 }
 
 type Store struct{ root string }
@@ -56,8 +68,8 @@ func (s Store) Add(entry Entry) (Entry, error) {
 	if entry.CreatedAt.IsZero() {
 		entry.CreatedAt = time.Now().UTC()
 	}
-	if entry.Version != Version || !idPattern.MatchString(entry.ID) || (entry.GoalID != "" && (!strings.HasPrefix(entry.GoalID, "goal-") || len(entry.GoalID) != 29)) || strings.TrimSpace(entry.Title) == "" || len(entry.Title) > 256 || strings.TrimSpace(entry.Status) == "" || len(entry.Status) > 64 || len(entry.Summary) > 4096 || strings.ContainsRune(entry.Summary, 0) {
-		return Entry{}, errors.New("inbox entry is invalid")
+	if err := validateEntry(entry); err != nil {
+		return Entry{}, err
 	}
 	payload, err := json.MarshalIndent(entry, "", "  ")
 	if err != nil {
@@ -109,21 +121,9 @@ func (s Store) List(unreadOnly bool, limit int) ([]Entry, error) {
 		if file.IsDir() || filepath.Ext(file.Name()) != ".json" {
 			continue
 		}
-		path := filepath.Join(s.root, file.Name())
-		info, err := os.Lstat(path)
-		if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
-			return nil, errors.New("inbox entry is not a regular file")
-		}
-		payload, err := os.ReadFile(path)
+		entry, err := s.Load(strings.TrimSuffix(file.Name(), ".json"))
 		if err != nil {
 			return nil, err
-		}
-		var entry Entry
-		if err := json.Unmarshal(payload, &entry); err != nil {
-			return nil, err
-		}
-		if !idPattern.MatchString(entry.ID) || entry.ID+".json" != file.Name() {
-			return nil, errors.New("inbox entry identity does not match its file")
 		}
 		if !unreadOnly || entry.ReadAt.IsZero() {
 			entries = append(entries, entry)
@@ -136,32 +136,107 @@ func (s Store) List(unreadOnly bool, limit int) ([]Entry, error) {
 	return entries, nil
 }
 
-func (s Store) MarkRead(entryID string, now time.Time) error {
+func (s Store) Load(entryID string) (Entry, error) {
 	if !idPattern.MatchString(entryID) {
-		return errors.New("invalid inbox entry ID")
+		return Entry{}, errors.New("invalid inbox entry ID")
 	}
-	path := filepath.Join(s.root, entryID+".json")
-	info, err := os.Lstat(path)
+	root, err := workspace.Open(s.root)
 	if err != nil {
-		return err
+		return Entry{}, err
 	}
-	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
-		return errors.New("inbox entry is not a regular file")
-	}
-	payload, err := os.ReadFile(path)
+	payload, err := root.ReadRegularFile(entryID+".json", 16*1024)
 	if err != nil {
-		return err
+		return Entry{}, err
 	}
 	var entry Entry
 	if err := json.Unmarshal(payload, &entry); err != nil {
-		return err
+		return Entry{}, err
 	}
 	if entry.ID != entryID {
-		return errors.New("inbox entry identity does not match")
+		return Entry{}, errors.New("inbox entry identity does not match its file")
+	}
+	if err := validateEntry(entry); err != nil {
+		return Entry{}, err
+	}
+	return entry, nil
+}
+
+func (s Store) MarkRead(entryID string, now time.Time) error {
+	entry, err := s.Load(entryID)
+	if err != nil {
+		return err
 	}
 	entry.ReadAt = now.UTC()
 	_, err = s.Add(entry)
 	return err
+}
+
+// Rate records explicit feedback about a surfaced job alert. It does not infer
+// that reading or dismissing an alert means the alert was noise.
+func (s Store) Rate(entryID, rating string, now time.Time) (Entry, error) {
+	if rating != "useful" && rating != "noise" && rating != "wrong" && rating != "clear" {
+		return Entry{}, errors.New("rating must be useful, noise, wrong, or clear")
+	}
+	if now.IsZero() {
+		return Entry{}, errors.New("rating time is required")
+	}
+	entry, err := s.Load(entryID)
+	if err != nil {
+		return Entry{}, err
+	}
+	if entry.Kind != "job" {
+		return Entry{}, errors.New("only job alerts can be rated")
+	}
+	if rating == "clear" {
+		entry.Rating = ""
+		entry.RatedAt = time.Time{}
+	} else {
+		entry.Rating = rating
+		entry.RatedAt = now.UTC()
+	}
+	return s.Add(entry)
+}
+
+// RatingsForGoal counts explicitly rated job alerts for one goal. Unrated
+// alerts are not counted as noise, and quiet checks have no inbox entry.
+func (s Store) RatingsForGoal(goalID string) (RatingSummary, error) {
+	if !strings.HasPrefix(goalID, "goal-") || len(goalID) != 29 {
+		return RatingSummary{}, errors.New("invalid goal ID")
+	}
+	entries, err := s.List(false, 0)
+	if err != nil {
+		return RatingSummary{}, err
+	}
+	var result RatingSummary
+	for _, entry := range entries {
+		if entry.GoalID != goalID || entry.Kind != "job" {
+			continue
+		}
+		result.Total++
+		switch entry.Rating {
+		case "useful":
+			result.Useful++
+		case "noise":
+			result.Noise++
+		case "wrong":
+			result.Wrong++
+		default:
+			result.Unrated++
+		}
+	}
+	return result, nil
+}
+
+func validateEntry(entry Entry) error {
+	if entry.Version != Version || !idPattern.MatchString(entry.ID) || (entry.GoalID != "" && (!strings.HasPrefix(entry.GoalID, "goal-") || len(entry.GoalID) != 29)) || strings.TrimSpace(entry.Title) == "" || len(entry.Title) > 256 || strings.TrimSpace(entry.Status) == "" || len(entry.Status) > 64 || len(entry.Summary) > 4096 || strings.ContainsRune(entry.Summary, 0) {
+		return errors.New("inbox entry is invalid")
+	}
+	if (entry.Rating != "" && entry.Rating != "useful" && entry.Rating != "noise" && entry.Rating != "wrong") ||
+		(entry.Rating == "" && !entry.RatedAt.IsZero()) ||
+		(entry.Rating != "" && entry.RatedAt.IsZero()) {
+		return errors.New("inbox rating is invalid")
+	}
+	return nil
 }
 
 // Has checks a durable entry by exact ID without scanning or truncating the

@@ -47,6 +47,10 @@ func renderGoalActivity(stateDir, goalID string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
+	ratings, err := inboxStore.RatingsForGoal(goalID)
+	if err != nil {
+		return err
+	}
 	suggestionStore, err := suggestion.Open(stateDir)
 	if err != nil {
 		return err
@@ -58,6 +62,9 @@ func renderGoalActivity(stateDir, goalID string, out io.Writer) error {
 	var view bytes.Buffer
 	fmt.Fprintf(&view, "%s  %s\nStatus: %s\n", record.ID, activityLine(record.Title, 120), record.Status)
 	fmt.Fprintf(&view, "Goal desktop policy: %s (if globally enabled); quiet hours: %s\n", goalDesktopStatus(record.Notifications), goalQuietStatus(record.Notifications))
+	if ratings.Total > 0 {
+		fmt.Fprintf(&view, "Shown job alerts: %d (%d useful, %d noise, %d wrong, %d unrated; user ratings, not missed-alert recall)\n", ratings.Total, ratings.Useful, ratings.Noise, ratings.Wrong, ratings.Unrated)
+	}
 	if plan.Outcome != "" {
 		fmt.Fprintf(&view, "Outcome: %s\n", activityLine(plan.Outcome, 160))
 	}

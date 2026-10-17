@@ -198,6 +198,14 @@ live evaluation; the host only verifies the gating and review boundary.
 Completed runs also retain a short final-response summary and an output
 digest. The inbox suppresses exact repeated results under the same job policy;
 it does not attempt semantic equivalence between different phrasings.
+Use `gator job inbox show ENTRY_ID` to inspect a retained result and
+`gator job inbox rate ENTRY_ID useful|noise|wrong|clear` to record or correct
+your judgment of a surfaced job alert. `gator job inbox report GOAL_ID` counts
+the shown job alerts and their ratings for one goal; `gator goal activity GOAL_ID`
+shows the same count. Reading an alert does not rate it, and quiet checks do
+not create an inbox entry. These ratings describe only alerts that were shown;
+they cannot measure missed important changes or establish alert accuracy on
+their own.
 
 - Cron is evaluated in an explicit IANA timezone and claimed in UTC.
 - `missed` is either `skip` or `run_once`; replaying every missed interval
@@ -230,7 +238,10 @@ gator job supervisor [--notify=false]
 gator job status
 gator job stop
 gator job inbox [--unread]
+gator job inbox show ENTRY_ID
 gator job inbox read ENTRY_ID
+gator job inbox rate ENTRY_ID useful|noise|wrong|clear
+gator job inbox report GOAL_ID
 gator job remove ID --yes        # keeps immutable history by default
 gator job launchagent install    # macOS, opt-in per-user supervisor
 gator job launchagent status
