@@ -38,6 +38,22 @@ func TestWorkAnswerRequiresExactInteractiveResponse(t *testing.T) {
 		t.Fatalf("pending answer command = %#v", interaction)
 	}
 	var output bytes.Buffer
+	if err := workSessionCommand([]string{"activity", "--json"}, nil, &output, nil); err != nil {
+		t.Fatal(err)
+	}
+	var activity struct {
+		Runs []struct {
+			ID               string `json:"id"`
+			LiveStatus       string `json:"live_status"`
+			PendingDecisions []struct {
+				ID int `json:"id"`
+			} `json:"pending_decisions"`
+		} `json:"runs"`
+	}
+	if err := json.Unmarshal(output.Bytes(), &activity); err != nil || len(activity.Runs) != 1 || activity.Runs[0].ID != operation.RunID || activity.Runs[0].LiveStatus != "active" || len(activity.Runs[0].PendingDecisions) != 1 || activity.Runs[0].PendingDecisions[0].ID != interaction.ID || strings.Contains(output.String(), "reviewed-command") {
+		t.Fatalf("activity exposed a preview or lost a decision: %q, %v", output.String(), err)
+	}
+	output.Reset()
 	if err := workSessionCommand([]string{"answer", operation.RunID, "1"}, strings.NewReader(""), &output, nil); err == nil || !strings.Contains(err.Error(), "not answered") {
 		t.Fatalf("empty answer changed pending decision: %v", err)
 	}

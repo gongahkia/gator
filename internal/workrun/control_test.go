@@ -330,6 +330,10 @@ func TestWorkSpecialistCancelAcrossProcesses(t *testing.T) {
 	if !scanner.Scan() || scanner.Text() != "READY" {
 		t.Fatalf("specialist did not start: %q, %v, %s", scanner.Text(), scanner.Err(), stderr.String())
 	}
+	activity, err := ReadActivity(state)
+	if err != nil || len(activity.Runs) != 1 || activity.Runs[0].LiveStatus != "active" || len(activity.Runs[0].Tasks) != 1 || activity.Runs[0].Tasks[0].Status != "running" {
+		t.Fatalf("live specialist activity = %+v, %v", activity, err)
+	}
 	if err := SendWorkTaskCancel(ctx, state, "cross-process-specialist", "../subagent-001"); err == nil {
 		t.Fatal("malformed specialist ID was accepted")
 	}
@@ -341,6 +345,10 @@ func TestWorkSpecialistCancelAcrossProcesses(t *testing.T) {
 	}
 	if !scanner.Scan() || scanner.Text() != "CANCELLED" {
 		t.Fatalf("specialist did not cancel: %q, %v, %s", scanner.Text(), scanner.Err(), stderr.String())
+	}
+	activity, err = ReadActivity(state)
+	if err != nil || len(activity.Runs) != 1 || activity.Runs[0].LiveStatus != "active" || len(activity.Runs[0].Tasks) != 1 || activity.Runs[0].Tasks[0].Status != "cancelled" {
+		t.Fatalf("parent activity after specialist cancellation = %+v, %v", activity, err)
 	}
 	if err := SendWorkTaskCancel(ctx, state, "cross-process-specialist", "subagent-001"); err == nil || !strings.Contains(err.Error(), "HTTP 409") {
 		t.Fatalf("completed cancellation replay was accepted: %v", err)
@@ -354,6 +362,10 @@ func TestWorkSpecialistCancelAcrossProcesses(t *testing.T) {
 	}
 	if err := child.Wait(); err != nil {
 		t.Fatalf("child failed: %v, %s", err, stderr.String())
+	}
+	activity, err = ReadActivity(state)
+	if err != nil || len(activity.Runs) != 0 {
+		t.Fatalf("completed run remains in live activity: %+v, %v", activity, err)
 	}
 	if err := SendWorkTaskCancel(context.Background(), state, "cross-process-specialist", "subagent-001"); err == nil {
 		t.Fatal("finished Work run accepted specialist cancellation")

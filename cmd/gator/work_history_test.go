@@ -48,6 +48,10 @@ func TestWorkHistoryAndShowDistinguishActiveFromStaleRun(t *testing.T) {
 		t.Fatal(err)
 	}
 	list.Reset()
+	if err := workSessionCommand([]string{"activity"}, nil, &list, nil); err != nil || !strings.Contains(list.String(), "running (stale)") || !strings.Contains(list.String(), "gator work show work-active-view") || strings.Contains(list.String(), "gator work stop work-active-view") {
+		t.Fatalf("stale activity = %q, %v", list.String(), err)
+	}
+	list.Reset()
 	if err := workSessionCommand([]string{"list"}, nil, &list, nil); err != nil || !strings.Contains(list.String(), "Status: running (stale)") {
 		t.Fatalf("stale Work list = %q, %v", list.String(), err)
 	}

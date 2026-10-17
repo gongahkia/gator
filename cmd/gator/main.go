@@ -30,6 +30,7 @@ Start:
 Product areas:
   Work        gator work [TASK] · gator work resume CONVERSATION TASK
   History     gator work list · gator work history CONVERSATION · gator work show ID
+  Activity    gator work activity [--json]
   Goals       gator goal add|chat|list|show|context|pause|resume|complete
               gator goal schedule|watch|schedules|unschedule
   Memory      gator memory add|list|search|show|correct|forget

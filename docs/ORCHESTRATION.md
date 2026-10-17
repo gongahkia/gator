@@ -122,7 +122,10 @@ evidence. A shared request/token/wall budget covers the entire tree and retries.
 TUI and Work headless controls inspect the same live tasks. `gator work tasks RUN`
 inspects retained records without taking ownership. Completed parent-revision
 tasks can be explicitly continued by global ID; interrupted outcomes require
-inspection. `gator work cancel-task RUN_ID TASK_ID` requests cancellation of an
+inspection. `gator work activity` joins running Work records, retained
+specialist checkpoints, and pending decision IDs in one read-only CLI view;
+stale run records are labeled and their task status is only a checkpoint.
+`gator work cancel-task RUN_ID TASK_ID` requests cancellation of an
 active specialist and its descendants from another terminal; it does not stop
 the parent Work run. Inspect its retained status to confirm cancellation.
 See [current bounds](WORK_DEPTH.md), [migration/recovery](WORK_DEPTH_MIGRATIONS.md),

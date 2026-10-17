@@ -175,7 +175,7 @@ func readInteractionRecords(stateDir, runID string, pendingOnly bool) ([]Interac
 	if err != nil {
 		return nil, fmt.Errorf("list Work interactions: %w", err)
 	}
-	if len(entries) > maxInteractionRuns {
+	if runID == "" && len(entries) > maxInteractionRuns {
 		return nil, errors.New("too many retained Work runs to scan; specify a run ID")
 	}
 	root, err := workspace.Open(base)

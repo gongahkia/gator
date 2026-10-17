@@ -41,8 +41,12 @@ through that shortcut.
 The execution model is bounded durable state, not instruction-level checkpoint
 replay or exactly-once external execution. `gator work decisions` shows recorded
 pending approvals across runs; `gator work decisions RUN_ID --json` includes exact
-previews and the retained resolution for one run. New foreground runs hold a
-local process lock while they can ask for approvals; the command labels a
+previews and the retained resolution for one run. `gator work activity [--json]`
+joins running Work records, specialist statuses, and pending decision IDs
+without exposing approval previews. Stale run records
+remain visible for recovery, but their task checkpoints are not live evidence.
+New foreground runs hold a local process lock while they can ask for approvals;
+`gator work decisions` labels a
 recorded pending decision as active, stale after the process exits, or
 unconfirmed for older records without a lock. `/status` shows the current Work
 run ID. Another terminal can use `gator work steer RUN_ID TEXT` to queue an

@@ -21,7 +21,7 @@ import (
 
 func isWorkSessionCommand(value string) bool {
 	switch value {
-	case "list", "show", "history", "resume", "back", "forward", "tasks", "decisions", "answer", "reconcile", "stop", "steer", "cancel-task":
+	case "list", "show", "history", "resume", "back", "forward", "tasks", "activity", "decisions", "answer", "reconcile", "stop", "steer", "cancel-task":
 		return true
 	default:
 		return false
@@ -41,6 +41,9 @@ func workSessionCommand(arguments []string, in io.Reader, out io.Writer, modelFa
 	}
 	if arguments[0] == "decisions" {
 		return workDecisionsCommand(stateDir, arguments[1:], out)
+	}
+	if arguments[0] == "activity" {
+		return workActivityCommand(stateDir, arguments[1:], out)
 	}
 	if arguments[0] == "answer" {
 		return workAnswerCommand(stateDir, arguments, in, out)
