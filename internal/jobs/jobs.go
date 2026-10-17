@@ -85,6 +85,15 @@ type WatchChange struct {
 	Kind   string `json:"kind"`
 }
 
+// WatchCursor is a bounded provider checkpoint for one selected source. It
+// contains no message content and is valid only with the attempt's definition.
+type WatchCursor struct {
+	Source      string    `json:"source"`
+	ScopeSHA256 string    `json:"scope_sha256"`
+	HistoryID   string    `json:"history_id"`
+	FullSyncAt  time.Time `json:"full_sync_at"`
+}
+
 type Attempt struct {
 	Runs                     []RunReference `json:"runs,omitempty"`
 	Version                  int            `json:"version"`
@@ -105,6 +114,7 @@ type Attempt struct {
 	WatchAttention           bool           `json:"watch_attention,omitempty"`
 	WatchItems               []WatchItem    `json:"watch_items,omitempty"`
 	WatchChanges             []WatchChange  `json:"watch_changes,omitempty"`
+	WatchCursors             []WatchCursor  `json:"watch_cursors,omitempty"`
 	NotificationPolicySHA256 string         `json:"notification_policy_sha256,omitempty"`
 	Error                    string         `json:"error,omitempty"`
 }
@@ -444,6 +454,26 @@ func (s Store) Begin(definition Definition, scheduledAt time.Time) (Attempt, err
 func (s Store) Record(attempt Attempt) error {
 	if invalidID(attempt.ID) || invalidID(attempt.JobID) || len(attempt.DefinitionSHA256) != sha256.Size*2 || attempt.StartedAt.IsZero() || attempt.FinishedAt.Before(attempt.StartedAt) || attempt.Try < 1 || strings.TrimSpace(attempt.Status) == "" || attempt.Status == "running" {
 		return errors.New("job attempt is invalid")
+	}
+	if len(attempt.WatchCursors) > 4 {
+		return errors.New("job watch has too many provider cursors")
+	}
+	seenCursors := make(map[string]bool)
+	for _, cursor := range attempt.WatchCursors {
+		connectorID, operation, found := strings.Cut(cursor.Source, "/")
+		if !found || invalidID(connectorID) || operation != "gmail_list" || seenCursors[cursor.Source] || cursor.FullSyncAt.IsZero() || len(cursor.HistoryID) == 0 || len(cursor.HistoryID) > 32 || len(cursor.ScopeSHA256) != sha256.Size*2 {
+			return errors.New("job watch provider cursor is invalid")
+		}
+		decoded, err := hex.DecodeString(cursor.ScopeSHA256)
+		if err != nil || len(decoded) != sha256.Size || hex.EncodeToString(decoded) != cursor.ScopeSHA256 {
+			return errors.New("job watch provider cursor scope is invalid")
+		}
+		for _, digit := range cursor.HistoryID {
+			if digit < '0' || digit > '9' {
+				return errors.New("job watch provider cursor is invalid")
+			}
+		}
+		seenCursors[cursor.Source] = true
 	}
 	directory := filepath.Join(s.root, "history", attempt.JobID, attempt.ID)
 	if info, err := os.Lstat(directory); err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {

@@ -25,6 +25,17 @@ const maxHTTPJSONBytes = 256 * 1024
 
 const maxHTTPActionBytes = 12 * 1024
 
+// HTTPStatusError keeps provider status available for recovery decisions
+// without exposing response bodies, tokens, or account data.
+type HTTPStatusError struct {
+	ConnectorID string
+	StatusCode  int
+}
+
+func (e HTTPStatusError) Error() string {
+	return fmt.Sprintf("connector %q returned HTTP %d", e.ConnectorID, e.StatusCode)
+}
+
 // PreparedAction contains a proposal and connector-private payload. Callers
 // can review the proposal but can execute the payload only through Runtime,
 // which revalidates their binding before any network request.
@@ -100,6 +111,43 @@ func (r Runtime) Invoke(ctx context.Context, mode action.Mode, connectorID, oper
 	default:
 		return Result{}, fmt.Errorf("connector operation %s/%s has no runtime", descriptor.ID, operation.ID)
 	}
+}
+
+// GmailWatchProfile reads only the mailbox history cursor. The caller must
+// enforce the same selected Gmail read permission as its watched query.
+func (r Runtime) GmailWatchProfile(ctx context.Context, connectorID string) (Result, error) {
+	descriptor, found := r.Registry.Get(connectorID)
+	if !found || descriptor.Kind != KindGoogle {
+		return Result{}, errors.New("Google connector is required for Gmail watch profile")
+	}
+	return r.requestJSON(ctx, descriptor, "gmail_watch_profile", http.MethodGet, serviceBase(descriptor, "gmail_profile")+"/gmail/v1/users/me/profile", nil, false)
+}
+
+// GmailWatchHistory reads a bounded page of mailbox changes after a retained
+// cursor. It is an internal watch primitive, not a model-visible operation.
+func (r Runtime) GmailWatchHistory(ctx context.Context, connectorID, historyID, pageToken string) (Result, error) {
+	descriptor, found := r.Registry.Get(connectorID)
+	if !found || descriptor.Kind != KindGoogle || !validGmailHistoryID(historyID) || len(pageToken) > 2048 || strings.ContainsAny(pageToken, "\x00\r\n") {
+		return Result{}, errors.New("invalid Gmail watch history request")
+	}
+	query := url.Values{"startHistoryId": {historyID}, "maxResults": {"100"}}
+	if pageToken != "" {
+		query.Set("pageToken", pageToken)
+	}
+	endpoint := serviceBase(descriptor, "gmail_history") + "/gmail/v1/users/me/history?" + query.Encode()
+	return r.requestJSON(ctx, descriptor, "gmail_watch_history", http.MethodGet, endpoint, nil, false)
+}
+
+func validGmailHistoryID(value string) bool {
+	if len(value) == 0 || len(value) > 32 {
+		return false
+	}
+	for _, digit := range value {
+		if digit < '0' || digit > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // PrepareAction validates and pins a high-risk connector payload without
@@ -752,7 +800,7 @@ func (r Runtime) requestJSONWithPrecondition(ctx context.Context, descriptor Des
 		return Result{}, readErr
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		err := fmt.Errorf("connector %q returned HTTP %d", descriptor.ID, response.StatusCode)
+		err := HTTPStatusError{ConnectorID: descriptor.ID, StatusCode: response.StatusCode}
 		if uncertain {
 			return Result{}, action.MarkUncertain(err)
 		}

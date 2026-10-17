@@ -31,6 +31,8 @@ func TestConnectedGoalWatchReadsLocalMailCalendarAndDraftsForReview(t *testing.T
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
 		switch request.URL.Path {
+		case "/gmail/v1/users/me/profile":
+			_, _ = writer.Write([]byte(`{"historyId":"100"}`))
 		case "/gmail/v1/users/me/messages":
 			if request.URL.Query().Get("q") != "label:offsite newer_than:7d" {
 				t.Errorf("Gmail watch query = %q", request.URL.Query().Get("q"))

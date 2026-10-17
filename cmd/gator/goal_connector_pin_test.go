@@ -34,6 +34,10 @@ func TestGoogleGoalWatchFollowsSameAccountAndStopsBeforeReadingDifferentAccount(
 			return
 		}
 		connectedReads.Add(1)
+		if request.URL.Path == "/gmail/v1/users/me/profile" {
+			_, _ = writer.Write([]byte(`{"historyId":"100"}`))
+			return
+		}
 		if request.URL.Path == "/gmail/v1/users/me/messages" {
 			_, _ = writer.Write([]byte(`{"messages":[]}`))
 			return

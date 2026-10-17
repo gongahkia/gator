@@ -13,9 +13,26 @@ An ongoing goal can select this connector in a timed, read-only follow-up with
 This runs only while the local supervisor is available. For a bounded connected
 poll, use `gator goal watch GOAL_ID --connector google-work --gmail-query 'label:offsite newer_than:7d' --calendar-days 14`.
 It checks about every five minutes, requires the needed read scopes, and keeps a
-durable content hash. It does not provide push events, a provider event cursor,
-or automatic email sending. A query with more than 100 Gmail matches or a
-Calendar window with more than 100 events fails for review; narrow the scope.
+durable content hash. Gmail watches retain a mailbox history cursor alongside
+selected message fingerprints. They still list the selected search query on
+every poll, so messages entering or leaving a time-relative query remain
+visible. Gmail history identifies which existing message details need rereading;
+an expired cursor, too much history, or a 24-hour full-sync interval causes a
+full detail scan. The cursor is mailbox-wide and does not make the watch a push
+subscription. A query with more than 500 Gmail matches or a Calendar window
+with more than 100 events fails for review; narrow the scope. There is no
+automatic email sending.
+
+Gmail's [history API](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.history/list)
+can return HTTP 404 for an expired cursor; Gator then performs a full selected
+scan and obtains a new cursor from the
+[profile API](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users/getProfile).
+The selected query is still fetched on every poll because mailbox history has
+no search-query filter. A failed or incomplete scan does not advance the
+retained cursor. Gator binds a reusable cursor to the connector endpoint and
+query. Authenticated recurring checks need an account or grant pin before they
+reuse cached message fingerprints; older unpinned checks continue with full
+detail scans so a changed account cannot inherit another account's cache.
 
 ## Set up from Work
 

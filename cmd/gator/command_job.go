@@ -448,31 +448,28 @@ func executeJobContextWith(ctx context.Context, definition jobs.Definition, atte
 	var runErr error
 	store, runErr := jobs.Open(stateDir)
 	if runErr == nil && definition.ChangeOnly {
-		if len(definition.WatchSources) > 0 {
-			attempt.InputSHA256, attempt.WatchItems, runErr = connectedGoalWatchSnapshot(ctx, definition, stateDir, time.Now())
+		policy := jobNotificationPolicyHash(definition)
+		history, historyErr := store.History(definition.ID, 0)
+		if historyErr != nil {
+			runErr = historyErr
+		} else if len(definition.WatchSources) > 0 {
+			attempt.InputSHA256, attempt.WatchItems, attempt.WatchCursors, runErr = connectedGoalWatchSnapshotWithPrevious(ctx, definition, stateDir, time.Now(), previousWatchSnapshot(history, policy))
 		} else {
 			attempt.InputSHA256, runErr = localJobInputHash(definition, stateDir)
 		}
 		if runErr == nil {
-			history, historyErr := store.History(definition.ID, 0)
-			if historyErr != nil {
-				runErr = historyErr
-			} else {
-				policy := jobNotificationPolicyHash(definition)
-				if len(definition.WatchSources) > 0 {
-					attempt.WatchChanges = diffGoalWatchItems(history, attempt.WatchItems, policy)
-					definition.RuntimeWatchChanges = attempt.WatchChanges
-					definition.RuntimeWatchItems = attempt.WatchItems
-				}
-				if unchangedJobInput(history, attempt, policy) {
-					attempt.Status = "unchanged"
-					attempt.Summary = "Watched inputs unchanged since the last completed run."
-					attempt.WatchItems = nil
-					attempt.WatchChanges = nil
-					attempt.FinishedAt = time.Now().UTC()
-					attempt.NotificationPolicySHA256 = policy
-					return attempt
-				}
+			if len(definition.WatchSources) > 0 {
+				attempt.WatchChanges = diffGoalWatchItems(history, attempt.WatchItems, policy)
+				definition.RuntimeWatchChanges = attempt.WatchChanges
+				definition.RuntimeWatchItems = attempt.WatchItems
+			}
+			if unchangedJobInput(history, attempt, policy) {
+				attempt.Status = "unchanged"
+				attempt.Summary = "Watched inputs unchanged since the last completed run."
+				attempt.WatchChanges = nil
+				attempt.FinishedAt = time.Now().UTC()
+				attempt.NotificationPolicySHA256 = policy
+				return attempt
 			}
 		}
 	}
@@ -533,6 +530,16 @@ func executeJobContextWith(ctx context.Context, definition jobs.Definition, atte
 	}
 	_ = notify // notification follows durable recording and duplicate suppression.
 	return attempt
+}
+
+func previousWatchSnapshot(history []jobs.Attempt, policySHA256 string) *jobs.Attempt {
+	for index := range history {
+		attempt := &history[index]
+		if attempt.NotificationPolicySHA256 == policySHA256 && (attempt.Status == "completed" || attempt.Status == "unchanged") && len(attempt.WatchItems) > 0 {
+			return attempt
+		}
+	}
+	return nil
 }
 
 func unchangedJobInput(history []jobs.Attempt, current jobs.Attempt, policy string) bool {
