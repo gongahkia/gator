@@ -84,6 +84,16 @@ func TestProposalRejectsReadOnlyAndUnsafeEnvelopes(t *testing.T) {
 	if _, err := NewProposal("action-1\nforged", Publish, "email", "send", "person@example.com", "Send message", nil); err == nil {
 		t.Fatal("unsafe proposal identifier was accepted")
 	}
+	proposal, err := NewProposal("action-1", Publish, "email", "send", "person@example.com", "Send message", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, malformed := range []string{"short", strings.Repeat("G", 32), strings.Repeat("A", 32)} {
+		proposal.CorrelationID = malformed
+		if err := proposal.Validate(); err == nil {
+			t.Fatalf("unsafe correlation ID %q was accepted", malformed)
+		}
+	}
 }
 
 func TestBrokerDraftsWithoutApprovalOrExecution(t *testing.T) {

@@ -69,6 +69,7 @@ func TestWorkReviewEscapesActionPayloadForTerminal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	proposal.CorrelationID = strings.Repeat("a", 32)
 	manifest, err := artifact.Seal(work.Output, contract, artifact.SealOptions{
 		RunID: work.ID, Objective: "Draft release", Source: work.Source,
 		Actions:   []action.Record{{Proposal: proposal, Status: action.Pending}},
@@ -88,7 +89,7 @@ func TestWorkReviewEscapesActionPayloadForTerminal(t *testing.T) {
 	if err := reviewWorkBundle(&output, bundle, false, false); err != nil {
 		t.Fatal(err)
 	}
-	if strings.ContainsRune(output.String(), '\u202e') || !strings.Contains(output.String(), `\u202e`) || !strings.Contains(output.String(), "payload sha256:") {
+	if strings.ContainsRune(output.String(), '\u202e') || !strings.Contains(output.String(), `\u202e`) || !strings.Contains(output.String(), "payload sha256:") || !strings.Contains(output.String(), "reconciliation ID: "+proposal.CorrelationID) {
 		t.Fatalf("action review output = %q", output.String())
 	}
 }

@@ -151,6 +151,7 @@ type Proposal struct {
 	Target        string     `json:"target"`
 	Preview       string     `json:"preview"`
 	PayloadSHA256 string     `json:"payload_sha256"`
+	CorrelationID string     `json:"correlation_id,omitempty"`
 }
 
 // NewProposal creates a proposal bound to payload. The payload itself remains
@@ -196,6 +197,15 @@ func (p Proposal) Validate() error {
 	}
 	if _, err := hex.DecodeString(p.PayloadSHA256); err != nil {
 		return errors.New("proposal payload digest is invalid")
+	}
+	if p.CorrelationID != "" {
+		if len(p.CorrelationID) != 32 {
+			return errors.New("proposal correlation ID is invalid")
+		}
+		decoded, err := hex.DecodeString(p.CorrelationID)
+		if err != nil || hex.EncodeToString(decoded) != p.CorrelationID {
+			return errors.New("proposal correlation ID is invalid")
+		}
 	}
 	return nil
 }

@@ -81,8 +81,16 @@ payload. It creates a plain-text MIME message for one recipient, with no
 attachments, Cc, or Bcc. The `from` address must be a sender Gmail accepts for
 the connected account. Gator shows the exact fields and target for approval;
 an unattended goal check cannot use this operation. A successful send retains
-Gmail's message ID in the action record in the Work bundle. If the API outcome
-is uncertain, Gator records that uncertainty and does not retry automatically.
+Gmail's message ID in the action record in the Work bundle. Every prepared send
+also has a unique reconciliation ID, embedded in its MIME `Message-ID` header
+and retained with the action record. It distinguishes two separately approved
+sends with identical text. If the API outcome is uncertain, Gator records that
+uncertainty and does not retry automatically. The header enables a later
+read-scoped Sent-mail lookup; it does not establish delivery by itself.
+Google's [messages.list API](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/list)
+supports an `rfc822msgid:` query with a Gmail read scope. The `gmail.send`
+scope alone cannot perform that search, and a missing result must not be
+interpreted as proof that a timed-out send failed.
 
 Every mutation requires Work `act` mode and a fresh approval for the exact
 operation, target, and payload hash. A batch contains at most 25 typed

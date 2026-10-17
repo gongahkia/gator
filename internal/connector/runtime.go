@@ -103,6 +103,13 @@ func (r Runtime) PrepareAction(connectorID, operationID string, input json.RawMe
 	target := descriptor.Resource
 	requestPayload := append([]byte(nil), payload...)
 	ifMatch := ""
+	correlationID := ""
+	if descriptor.Kind == KindGoogle && operation.ID == "gmail_send" {
+		correlationID, err = newGmailCorrelationID()
+		if err != nil {
+			return PreparedAction{}, err
+		}
+	}
 	var googleSteps []googlePreparedStep
 	if descriptor.Kind == KindGoogle && operation.ID == "batch" {
 		googleSteps, payload, err = prepareGoogleBatch(descriptor, payload)
@@ -117,7 +124,7 @@ func (r Runtime) PrepareAction(connectorID, operationID string, input json.RawMe
 			if preconditionErr != nil {
 				return PreparedAction{}, preconditionErr
 			}
-			target, requestPayload, err = serviceAction(descriptor, operation.ID, preconditionPayload)
+			target, requestPayload, err = serviceAction(descriptor, operation.ID, preconditionPayload, correlationID)
 			if err != nil {
 				return PreparedAction{}, err
 			}
@@ -132,6 +139,10 @@ func (r Runtime) PrepareAction(connectorID, operationID string, input json.RawMe
 		descriptor.ID, operation.ID, target, string(payload), payload,
 	)
 	if err != nil {
+		return PreparedAction{}, err
+	}
+	proposal.CorrelationID = correlationID
+	if err := proposal.Validate(); err != nil {
 		return PreparedAction{}, err
 	}
 	return PreparedAction{
@@ -168,6 +179,14 @@ func (r Runtime) ExecutePreparedWithReceipt(ctx context.Context, mode action.Mod
 	actionDigest := sha256.Sum256(append([]byte(descriptor.ID+"\x00"+operation.ID+"\x00"+prepared.target+"\x00"), prepared.payload...))
 	if prepared.Proposal.ConnectorID != descriptor.ID || prepared.Proposal.Operation != operation.ID || prepared.Proposal.Capability != operation.Capability || prepared.Proposal.Target != prepared.target || prepared.Proposal.Preview != string(prepared.payload) || prepared.Proposal.ID != "action-"+hex.EncodeToString(actionDigest[:8]) || hex.EncodeToString(payloadDigest[:]) != prepared.Proposal.PayloadSHA256 {
 		return "", errors.New("prepared connector action payload does not match its proposal")
+	}
+	if descriptor.Kind == KindGoogle && operation.ID == "gmail_send" {
+		expected, err := prepareGmailMessage(prepared.payload, prepared.Proposal.CorrelationID)
+		if err != nil || !bytes.Equal(expected, prepared.requestPayload) {
+			return "", errors.New("prepared Gmail message does not match its reconciliation identity")
+		}
+	} else if prepared.Proposal.CorrelationID != "" {
+		return "", errors.New("prepared connector action has an unexpected reconciliation identity")
 	}
 	if prepared.descriptor.Kind == KindHTTPWebhook {
 		return "", r.publishHTTPJSON(ctx, descriptor, prepared.requestPayload)
@@ -434,7 +453,7 @@ func serviceRead(descriptor Descriptor, operation string, input serviceInput) (s
 	return endpoint, method, body, nil
 }
 
-func serviceAction(descriptor Descriptor, operation string, payload []byte) (string, []byte, error) {
+func serviceAction(descriptor Descriptor, operation string, payload []byte, correlationID string) (string, []byte, error) {
 	path := ""
 	switch descriptor.Kind + "/" + operation {
 	case KindSlack + "/post_message":
@@ -464,7 +483,7 @@ func serviceAction(descriptor Descriptor, operation string, payload []byte) (str
 		}
 		path, payload = "/v4/spreadsheets/"+url.PathEscape(id)+":batchUpdate", sanitized
 	case KindGoogle + "/gmail_send":
-		message, err := prepareGmailMessage(payload)
+		message, err := prepareGmailMessage(payload, correlationID)
 		if err != nil {
 			return "", nil, err
 		}
@@ -845,7 +864,7 @@ func prepareGoogleBatch(descriptor Descriptor, payload []byte) ([]googlePrepared
 		if err != nil {
 			return nil, nil, fmt.Errorf("Google batch %s: %w", operationID, err)
 		}
-		target, transportBody, err := serviceAction(descriptor, operationID, requestPayload)
+		target, transportBody, err := serviceAction(descriptor, operationID, requestPayload, "")
 		if err != nil {
 			return nil, nil, fmt.Errorf("Google batch %s: %w", operationID, err)
 		}

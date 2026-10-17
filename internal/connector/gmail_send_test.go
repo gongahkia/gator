@@ -16,6 +16,7 @@ import (
 
 func TestGmailSendPreparesPinnedPlainTextAndSendsOnce(t *testing.T) {
 	requests := 0
+	sentMessages := make(chan []byte, 1)
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		requests++
 		if request.Method != http.MethodPost || request.URL.Path != "/gmail/v1/users/me/messages/send" {
@@ -36,6 +37,7 @@ func TestGmailSendPreparesPinnedPlainTextAndSendsOnce(t *testing.T) {
 				t.Errorf("MIME message missing %q: %q", expected, message)
 			}
 		}
+		sentMessages <- message
 		writer.Header().Set("Content-Type", "application/json")
 		_, _ = writer.Write([]byte(`{"id":"sent-1"}`))
 	}))
@@ -54,9 +56,28 @@ func TestGmailSendPreparesPinnedPlainTextAndSendsOnce(t *testing.T) {
 	if prepared.Proposal.Target != server.URL+"/gmail/v1/users/me/messages/send" || !strings.Contains(prepared.Proposal.Preview, "venue@example.com") || prepared.Proposal.Capability != action.Publish {
 		t.Fatalf("proposal = %#v", prepared.Proposal)
 	}
+	messageID, err := gmailMessageID(prepared.Proposal.CorrelationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains([]byte(prepared.Proposal.Preview), []byte("Venue update")) {
+		t.Fatal("approved Gmail preview was lost")
+	}
+	second, err := runtime.PrepareAction(descriptor.ID, "gmail_send", input)
+	if err != nil || second.Proposal.CorrelationID == prepared.Proposal.CorrelationID {
+		t.Fatalf("two sends were given the same reconciliation identity: %v", err)
+	}
+	tampered := prepared
+	tampered.Proposal.CorrelationID = second.Proposal.CorrelationID
+	if _, err := runtime.ExecutePreparedWithReceipt(context.Background(), action.Act, tampered); err == nil || requests != 0 {
+		t.Fatalf("tampered reconciliation identity was accepted: %v, requests=%d", err, requests)
+	}
 	receipt, err := runtime.ExecutePreparedWithReceipt(context.Background(), action.Act, prepared)
 	if err != nil || requests != 1 || receipt != "sent-1" {
 		t.Fatalf("send = %v, receipt=%q, requests=%d", err, receipt, requests)
+	}
+	if sent := <-sentMessages; !bytes.Contains(sent, []byte("Message-ID: "+messageID+"\r\n")) {
+		t.Fatal("Gmail message did not carry its reconciliation identity")
 	}
 }
 
@@ -67,7 +88,7 @@ func TestGmailSendRejectsHeaderInjectionAndExtraRecipients(t *testing.T) {
 		`{"from":"me@example.com","to":"x@example.com","subject":"Hi","body":"Text","cc":"bad@example.com"}`,
 		`{"from":"me@example.com","to":"x@example.com, bad@example.com","subject":"Hi","body":"Text"}`,
 	} {
-		if _, err := prepareGmailMessage([]byte(input)); err == nil {
+		if _, err := prepareGmailMessage([]byte(input), strings.Repeat("0", 32)); err == nil {
 			t.Fatalf("unsafe Gmail send input accepted: %s", input)
 		}
 	}

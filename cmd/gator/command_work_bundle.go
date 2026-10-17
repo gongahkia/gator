@@ -244,6 +244,11 @@ func reviewWorkBundleWithDelivery(out io.Writer, bundle artifact.Bundle, store *
 			if _, err := fmt.Fprintf(out, "  %s %s/%s → %s\n    payload sha256:%s\n    exact JSON (escaped): %s\n", record.Status, record.Proposal.ConnectorID, record.Proposal.Operation, terminalSafe(record.Proposal.Target), record.Proposal.PayloadSHA256, strconv.QuoteToASCII(record.Proposal.Preview)); err != nil {
 				return err
 			}
+			if record.Proposal.CorrelationID != "" {
+				if _, err := fmt.Fprintf(out, "    reconciliation ID: %s\n", record.Proposal.CorrelationID); err != nil {
+					return err
+				}
+			}
 			if record.Error != "" {
 				if _, err := fmt.Fprintf(out, "    error: %s\n", terminalSafe(record.Error)); err != nil {
 					return err

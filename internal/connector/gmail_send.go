@@ -2,7 +2,9 @@ package connector
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,7 +25,11 @@ type gmailSendInput struct {
 
 // prepareGmailMessage accepts only a single-recipient, plain-text message.
 // The human approves the exact typed fields before the resulting MIME is sent.
-func prepareGmailMessage(payload []byte) ([]byte, error) {
+func prepareGmailMessage(payload []byte, correlationID string) ([]byte, error) {
+	messageID, err := gmailMessageID(correlationID)
+	if err != nil {
+		return nil, err
+	}
 	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.DisallowUnknownFields()
 	var input gmailSendInput
@@ -48,7 +54,7 @@ func prepareGmailMessage(payload []byte) ([]byte, error) {
 		return nil, errors.New("Gmail body is invalid or too long")
 	}
 	var message bytes.Buffer
-	fmt.Fprintf(&message, "From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n", from, to, mime.QEncoding.Encode("utf-8", input.Subject))
+	fmt.Fprintf(&message, "From: %s\r\nTo: %s\r\nSubject: %s\r\nMessage-ID: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n", from, to, mime.QEncoding.Encode("utf-8", input.Subject), messageID)
 	body := base64.StdEncoding.EncodeToString([]byte(input.Body))
 	for len(body) > 76 {
 		message.WriteString(body[:76])
@@ -60,6 +66,25 @@ func prepareGmailMessage(payload []byte) ([]byte, error) {
 	return json.Marshal(struct {
 		Raw string `json:"raw"`
 	}{Raw: base64.RawURLEncoding.EncodeToString(message.Bytes())})
+}
+
+func newGmailCorrelationID() (string, error) {
+	var value [16]byte
+	if _, err := rand.Read(value[:]); err != nil {
+		return "", fmt.Errorf("create Gmail reconciliation identity: %w", err)
+	}
+	return hex.EncodeToString(value[:]), nil
+}
+
+func gmailMessageID(correlationID string) (string, error) {
+	if len(correlationID) != 32 {
+		return "", errors.New("Gmail reconciliation identity is invalid")
+	}
+	value, err := hex.DecodeString(correlationID)
+	if err != nil || hex.EncodeToString(value) != correlationID {
+		return "", errors.New("Gmail reconciliation identity is invalid")
+	}
+	return "<gator-" + correlationID + "@gator.invalid>", nil
 }
 
 func singleGmailAddress(value string) (string, error) {
