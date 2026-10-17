@@ -39,6 +39,16 @@ type PreparedAction struct {
 	googleSteps    []googlePreparedStep
 }
 
+// ExecutionEvidence records what a provider returned after an action. A
+// resource ID names the affected document or sheet; it is not a unique
+// mutation receipt. The digest identifies the response Gator observed, not
+// proof that a later read will show the intended change.
+type ExecutionEvidence struct {
+	ReceiptID          string
+	ProviderResourceID string
+	ResponseSHA256     string
+}
+
 type googlePreparedStep struct {
 	operation string
 	target    string
@@ -162,7 +172,7 @@ func (r Runtime) PrepareAction(connectorID, operationID string, input json.RawMe
 // ExecutePrepared performs the first mutating operation for a prepared action.
 // It is intended to be called only inside action.Broker's approved closure.
 func (r Runtime) ExecutePrepared(ctx context.Context, mode action.Mode, prepared PreparedAction) error {
-	_, err := r.ExecutePreparedWithReceipt(ctx, mode, prepared)
+	_, err := r.ExecutePreparedWithEvidence(ctx, mode, prepared)
 	return err
 }
 
@@ -170,64 +180,129 @@ func (r Runtime) ExecutePrepared(ctx context.Context, mode action.Mode, prepared
 // exposes one. An absent Gmail send receipt after a successful HTTP response is
 // uncertain: the message might have been sent, so callers must not retry it.
 func (r Runtime) ExecutePreparedWithReceipt(ctx context.Context, mode action.Mode, prepared PreparedAction) (string, error) {
+	evidence, err := r.ExecutePreparedWithEvidence(ctx, mode, prepared)
+	return evidence.ReceiptID, err
+}
+
+// ExecutePreparedWithEvidence retains bounded provider response metadata for
+// approved actions. A missing or conflicting Google resource ID after a 2xx
+// response is an uncertain outcome and must not be retried automatically.
+func (r Runtime) ExecutePreparedWithEvidence(ctx context.Context, mode action.Mode, prepared PreparedAction) (ExecutionEvidence, error) {
 	if err := mode.Validate(); err != nil {
-		return "", err
+		return ExecutionEvidence{}, err
 	}
 	if !mode.Allows(prepared.operation.Capability) || !action.RequiresFreshApproval(prepared.operation.Capability) {
-		return "", fmt.Errorf("work mode %q does not allow capability %q", mode, prepared.operation.Capability)
+		return ExecutionEvidence{}, fmt.Errorf("work mode %q does not allow capability %q", mode, prepared.operation.Capability)
 	}
 	descriptor, operation, err := r.Registry.Operation(prepared.descriptor.ID, prepared.operation.ID)
 	if err != nil {
-		return "", err
+		return ExecutionEvidence{}, err
 	}
 	if descriptor != prepared.descriptor || operation.ID != prepared.operation.ID || operation.Capability != prepared.operation.Capability {
-		return "", errors.New("prepared connector action no longer matches the configured operation")
+		return ExecutionEvidence{}, errors.New("prepared connector action no longer matches the configured operation")
 	}
 	payloadDigest := sha256.Sum256(prepared.payload)
 	actionDigest := sha256.Sum256(append([]byte(descriptor.ID+"\x00"+operation.ID+"\x00"+prepared.target+"\x00"), prepared.payload...))
 	if prepared.Proposal.ConnectorID != descriptor.ID || prepared.Proposal.Operation != operation.ID || prepared.Proposal.Capability != operation.Capability || prepared.Proposal.Target != prepared.target || prepared.Proposal.Preview != string(prepared.payload) || prepared.Proposal.ID != "action-"+hex.EncodeToString(actionDigest[:8]) || hex.EncodeToString(payloadDigest[:]) != prepared.Proposal.PayloadSHA256 {
-		return "", errors.New("prepared connector action payload does not match its proposal")
+		return ExecutionEvidence{}, errors.New("prepared connector action payload does not match its proposal")
 	}
 	if descriptor.Kind == KindGoogle && operation.ID == "gmail_send" {
 		expected, err := prepareGmailMessage(prepared.payload, prepared.Proposal.CorrelationID)
 		if err != nil || !bytes.Equal(expected, prepared.requestPayload) {
-			return "", errors.New("prepared Gmail message does not match its reconciliation identity")
+			return ExecutionEvidence{}, errors.New("prepared Gmail message does not match its reconciliation identity")
 		}
 	} else if prepared.Proposal.CorrelationID != "" {
-		return "", errors.New("prepared connector action has an unexpected reconciliation identity")
+		return ExecutionEvidence{}, errors.New("prepared connector action has an unexpected reconciliation identity")
 	}
 	if prepared.descriptor.Kind == KindHTTPWebhook {
-		return "", r.publishHTTPJSON(ctx, descriptor, prepared.requestPayload)
+		return ExecutionEvidence{}, r.publishHTTPJSON(ctx, descriptor, prepared.requestPayload)
 	}
 	if prepared.descriptor.Kind == KindRemoteMCP {
 		token, tokenErr := r.bearerToken(ctx, descriptor)
 		if tokenErr != nil {
-			return "", tokenErr
+			return ExecutionEvidence{}, tokenErr
 		}
 		_, callErr := mcp.InvokeRemoteTool(ctx, descriptor.Resource, token, descriptor.ID, descriptor.ActionTool, prepared.requestPayload)
 		if callErr != nil {
-			return "", action.MarkUncertain(callErr)
+			return ExecutionEvidence{}, action.MarkUncertain(callErr)
 		}
-		return "", nil
+		return ExecutionEvidence{}, nil
 	}
 	if descriptor.Kind == KindGoogle && operation.ID == "batch" {
-		return "", r.executeGoogleBatch(ctx, descriptor, prepared.googleSteps)
+		return ExecutionEvidence{}, r.executeGoogleBatch(ctx, descriptor, prepared.googleSteps)
 	}
 	method := serviceActionMethod(descriptor, operation.ID)
 	result, err := r.requestJSONWithPrecondition(ctx, descriptor, operation.ID, method, prepared.target, prepared.requestPayload, prepared.ifMatch, true)
 	if err != nil {
-		return "", err
+		return ExecutionEvidence{}, err
 	}
+	evidence := ExecutionEvidence{ResponseSHA256: result.Provenance.SHA256}
 	if descriptor.Kind == KindGoogle && operation.ID == "gmail_send" {
 		var receipt struct {
 			ID string `json:"id"`
 		}
 		if err := json.Unmarshal(result.Data, &receipt); err != nil || !validGmailReceiptID(receipt.ID) {
-			return "", action.MarkUncertain(errors.New("Gmail accepted the send but returned no valid message ID; check Sent before trying again"))
+			return ExecutionEvidence{}, action.MarkUncertain(errors.New("Gmail accepted the send but returned no valid message ID; check Sent before trying again"))
 		}
-		return receipt.ID, nil
+		evidence.ReceiptID = receipt.ID
+		return evidence, nil
 	}
-	return "", nil
+	if descriptor.Kind == KindGoogle {
+		resourceID, err := googleActionResourceID(operation.ID, prepared.payload, result.Data)
+		if err != nil {
+			return ExecutionEvidence{}, action.MarkUncertain(err)
+		}
+		evidence.ProviderResourceID = resourceID
+	}
+	return evidence, nil
+}
+
+func googleActionResourceID(operation string, payload, response json.RawMessage) (string, error) {
+	field := ""
+	switch operation {
+	case "docs_create", "docs_update":
+		field = "documentId"
+	case "sheets_create", "sheets_values_update", "sheets_batch_update":
+		field = "spreadsheetId"
+	default:
+		return "", nil
+	}
+	var body map[string]json.RawMessage
+	if err := json.Unmarshal(response, &body); err != nil || body == nil {
+		return "", fmt.Errorf("Google %s returned no valid %s after action", operation, field)
+	}
+	var id string
+	if err := json.Unmarshal(body[field], &id); err != nil || !validGoogleResourceID(id) {
+		return "", fmt.Errorf("Google %s returned no valid %s after action", operation, field)
+	}
+	if operation == "docs_update" || operation == "sheets_batch_update" || operation == "sheets_values_update" {
+		expected, _, err := extractResourceID(payload)
+		if err != nil {
+			return "", err
+		}
+		if operation == "sheets_values_update" {
+			expected, _, err = splitGoogleID(expected, "sheet ID and range")
+			if err != nil {
+				return "", err
+			}
+		}
+		if id != expected {
+			return "", fmt.Errorf("Google %s returned a different %s after action", operation, field)
+		}
+	}
+	return id, nil
+}
+
+func validGoogleResourceID(id string) bool {
+	if id == "" || len(id) > 2048 || id != strings.TrimSpace(id) {
+		return false
+	}
+	for _, letter := range id {
+		if letter < 0x21 || letter > 0x7e || letter == '/' || letter == '?' || letter == '#' {
+			return false
+		}
+	}
+	return true
 }
 
 func (r Runtime) invokeRemoteMCP(ctx context.Context, descriptor Descriptor, operation Operation, raw json.RawMessage) (Result, error) {

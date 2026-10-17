@@ -7,6 +7,27 @@ import (
 	"testing"
 )
 
+func TestActionRecordAcceptsOnlyExecutedProviderEvidence(t *testing.T) {
+	proposal, err := NewProposal("action-1", ConnectedMutate, "google", "docs_update", "https://docs.example/doc-1", "Edit document", []byte(`{}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := Record{Proposal: proposal, Status: Executed, ProviderResourceID: "doc-1", ResponseSHA256: strings.Repeat("a", 64)}
+	if err := record.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	for _, changed := range []Record{
+		{Proposal: proposal, Status: Pending, ProviderResourceID: "doc-1"},
+		{Proposal: proposal, Status: Pending, ResponseSHA256: strings.Repeat("a", 64)},
+		{Proposal: proposal, Status: Executed, ProviderResourceID: "bad\nresource"},
+		{Proposal: proposal, Status: Executed, ResponseSHA256: strings.Repeat("A", 64)},
+	} {
+		if err := changed.Validate(); err == nil {
+			t.Fatalf("invalid action evidence accepted: %#v", changed)
+		}
+	}
+}
+
 func TestModeAuthorityIsMonotonic(t *testing.T) {
 	t.Parallel()
 

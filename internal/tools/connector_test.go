@@ -2,6 +2,8 @@ package tools
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +15,45 @@ import (
 	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/connector"
 )
+
+func TestGoogleDocumentActionRetainsProviderEvidenceAfterApproval(t *testing.T) {
+	response := `{"documentId":"doc-1","replies":[]}`
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		requests++
+		if request.Method != http.MethodPost || request.URL.Path != "/v1/documents/doc-1:batchUpdate" {
+			t.Errorf("request = %s %s", request.Method, request.URL.Path)
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(response))
+	}))
+	defer server.Close()
+	descriptor := connector.Descriptor{Version: connector.DescriptorVersion, ID: "google", Name: "Google", Kind: connector.KindGoogle, Resource: server.URL, Authentication: connector.AuthNone}
+	registry, err := connector.NewRegistry([]connector.Descriptor{descriptor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var records []action.Record
+	surface, err := ConnectorTools(connector.Runtime{Registry: registry, HTTPClient: server.Client()}, []string{descriptor.ID}, ConnectorPolicy{
+		Mode: action.Act, ExternalActions: action.Approve,
+		Approve:  func(context.Context, action.Proposal) (action.Decision, error) { return action.Allow, nil },
+		OnAction: func(record action.Record) { records = append(records, record) },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result string
+	for _, tool := range surface {
+		if tool.Definition().Name == "connector_google_docs_update" {
+			result = executeTool(t, tool, `{"payload":{"resource_id":"doc-1","requests":[]}}`)
+			break
+		}
+	}
+	digest := sha256.Sum256([]byte(response))
+	if requests != 1 || len(records) != 1 || records[0].Status != action.Executed || records[0].ProviderResourceID != "doc-1" || records[0].ResponseSHA256 != hex.EncodeToString(digest[:]) || records[0].ReceiptID != "" || records[0].Validate() != nil || !strings.Contains(result, `"provider_resource_id":"doc-1"`) {
+		t.Fatalf("requests=%d records=%#v result=%s", requests, records, result)
+	}
+}
 
 func TestConnectorToolsExposeOnlySelectedAttributedSource(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {

@@ -90,6 +90,13 @@ connector read permission policy. Mutations cover
 Docs create/batch update and Sheets create/range/batch update, plus an ordered
 batch of those typed mutations. Update payloads may include a Google `etag`;
 Gator binds it to the approved payload and sends it as `If-Match`.
+For an individual Docs or Sheets action, the Work action record retains the
+resource ID returned by Google and a SHA-256 digest of the response. An update
+whose returned resource ID is missing or differs from the approved target is
+recorded as uncertain, so it must be inspected before any retry. The resource
+ID identifies a document or spreadsheet, not a unique edit receipt; the digest
+does not prove the requested change is visible in a later read. Ordered batches
+still lack per-step receipts and are not transactional.
 
 `gmail_send` accepts exactly `from`, `to`, `subject`, and `body` in its action
 payload. It creates a plain-text MIME message for one recipient, with no

@@ -94,6 +94,46 @@ func TestWorkReviewEscapesActionPayloadForTerminal(t *testing.T) {
 	}
 }
 
+func TestWorkReviewShowsGoogleActionEvidence(t *testing.T) {
+	stateDir := t.TempDir()
+	work, err := workspace.CreateWork(t.TempDir(), stateDir, "review-google-action", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	contract := artifact.DefaultContract("report.md")
+	contract.ExternalActions = action.Approve
+	if err := artifact.WriteText(work.Output, contract, "report.md", "ready\n"); err != nil {
+		t.Fatal(err)
+	}
+	proposal, err := action.NewProposal("action-1", action.ConnectedMutate, "google", "docs_update", "https://docs.example/v1/documents/doc-1:batchUpdate", `{"resource_id":"doc-1","requests":[]}`, []byte(`{"resource_id":"doc-1","requests":[]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := strings.Repeat("a", 64)
+	manifest, err := artifact.Seal(work.Output, contract, artifact.SealOptions{
+		RunID: work.ID, Objective: "Update brief", Source: work.Source,
+		Actions:   []action.Record{{Proposal: proposal, Status: action.Executed, ProviderResourceID: "doc-1", ResponseSHA256: digest}},
+		StartedAt: work.CreatedAt, FinishedAt: work.CreatedAt,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := artifact.WriteManifest(work.ManifestPath, manifest); err != nil {
+		t.Fatal(err)
+	}
+	bundle, err := artifact.OpenBundle(work.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	if err := reviewWorkBundle(&output, bundle, false, false); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "provider resource ID: doc-1") || !strings.Contains(output.String(), "provider response sha256:"+digest) {
+		t.Fatalf("action evidence missing from review: %q", output.String())
+	}
+}
+
 func TestExportCommandWritesVerifiedArchiveWithoutOverwriting(t *testing.T) {
 	stateDir := t.TempDir()
 	t.Setenv("GATOR_STATE_DIR", stateDir)

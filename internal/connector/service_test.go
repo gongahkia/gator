@@ -3,7 +3,10 @@ package connector
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,6 +16,78 @@ import (
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/auth"
 )
+
+func TestGoogleActionEvidenceNamesAffectedResource(t *testing.T) {
+	for _, test := range []struct {
+		operation string
+		payload   string
+		path      string
+		method    string
+		response  string
+		resource  string
+	}{
+		{"docs_create", `{"title":"Brief"}`, "/v1/documents", http.MethodPost, `{"documentId":"doc-1"}`, "doc-1"},
+		{"docs_update", `{"resource_id":"doc-1","requests":[]}`, "/v1/documents/doc-1:batchUpdate", http.MethodPost, `{"documentId":"doc-1","replies":[]}`, "doc-1"},
+		{"sheets_create", `{"properties":{"title":"Tracker"}}`, "/v4/spreadsheets", http.MethodPost, `{"spreadsheetId":"sheet-1"}`, "sheet-1"},
+		{"sheets_values_update", `{"resource_id":"sheet-1/Sheet1!A1","values":[["done"]]}`, "/v4/spreadsheets/sheet-1/values/Sheet1!A1", http.MethodPut, `{"spreadsheetId":"sheet-1","updatedRange":"Sheet1!A1","updatedCells":1}`, "sheet-1"},
+		{"sheets_batch_update", `{"resource_id":"sheet-1","requests":[]}`, "/v4/spreadsheets/sheet-1:batchUpdate", http.MethodPost, `{"spreadsheetId":"sheet-1","replies":[]}`, "sheet-1"},
+	} {
+		t.Run(test.operation, func(t *testing.T) {
+			calls := 0
+			server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+				calls++
+				if request.URL.Path != test.path || request.Method != test.method {
+					t.Errorf("request = %s %s, want %s %s", request.Method, request.URL.Path, test.method, test.path)
+				}
+				writer.Header().Set("Content-Type", "application/json")
+				_, _ = writer.Write([]byte(test.response))
+			}))
+			defer server.Close()
+			descriptor := Descriptor{Version: DescriptorVersion, ID: "google", Name: "Google", Kind: KindGoogle, Resource: server.URL, Authentication: AuthNone}
+			registry, err := NewRegistry([]Descriptor{descriptor})
+			if err != nil {
+				t.Fatal(err)
+			}
+			runtime := Runtime{Registry: registry, HTTPClient: server.Client()}
+			prepared, err := runtime.PrepareAction(descriptor.ID, test.operation, actionInput([]byte(test.payload)))
+			if err != nil || calls != 0 {
+				t.Fatalf("prepare = %v, calls=%d", err, calls)
+			}
+			evidence, err := runtime.ExecutePreparedWithEvidence(context.Background(), action.Act, prepared)
+			wantDigest := sha256.Sum256([]byte(test.response))
+			if err != nil || calls != 1 || evidence.ProviderResourceID != test.resource || evidence.ResponseSHA256 != hex.EncodeToString(wantDigest[:]) || evidence.ReceiptID != "" {
+				t.Fatalf("evidence=%#v, err=%v, calls=%d", evidence, err, calls)
+			}
+		})
+	}
+}
+
+func TestGoogleActionMissingOrMismatchedResourceIsUncertain(t *testing.T) {
+	for _, response := range []string{`{}`, `{"documentId":"other"}`, `{"documentId":"bad/id"}`} {
+		t.Run(response, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+				writer.Header().Set("Content-Type", "application/json")
+				_, _ = writer.Write([]byte(response))
+			}))
+			defer server.Close()
+			descriptor := Descriptor{Version: DescriptorVersion, ID: "google", Name: "Google", Kind: KindGoogle, Resource: server.URL, Authentication: AuthNone}
+			registry, err := NewRegistry([]Descriptor{descriptor})
+			if err != nil {
+				t.Fatal(err)
+			}
+			runtime := Runtime{Registry: registry, HTTPClient: server.Client()}
+			prepared, err := runtime.PrepareAction(descriptor.ID, "docs_update", actionInput([]byte(`{"resource_id":"doc-1","requests":[]}`)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = runtime.ExecutePreparedWithEvidence(context.Background(), action.Act, prepared)
+			var uncertain interface{ OutcomeUncertain() bool }
+			if err == nil || !errors.As(err, &uncertain) || !uncertain.OutcomeUncertain() {
+				t.Fatalf("response %s yielded %v; want uncertain outcome", response, err)
+			}
+		})
+	}
+}
 
 func TestSlackAdapterUsesPinnedServiceEndpoint(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {

@@ -489,6 +489,11 @@ func writeWorkSummary(out io.Writer, outcome workrun.Outcome) error {
 		if _, err := fmt.Fprintf(out, "  → %s/%s: %s (%s, sha256:%s)\n", record.Proposal.ConnectorID, record.Proposal.Operation, record.Status, record.Proposal.Target, record.Proposal.PayloadSHA256[:12]); err != nil {
 			return err
 		}
+		if record.ProviderResourceID != "" {
+			if _, err := fmt.Fprintf(out, "    provider resource: %s\n", terminalSafe(record.ProviderResourceID)); err != nil {
+				return err
+			}
+		}
 	}
 	if outcome.Result.FinalText != "" {
 		_, err := fmt.Fprintf(out, "\n%s\n", outcome.Result.FinalText)

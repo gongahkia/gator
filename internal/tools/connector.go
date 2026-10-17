@@ -143,12 +143,12 @@ func (t connectorTool) executeAction(ctx context.Context, arguments json.RawMess
 	if t.policy.Permissions.Resolve(t.descriptor.ID, t.operation.ID, t.operation.Capability) == connector.PermissionDraft {
 		disposition = action.Propose
 	}
-	var receiptID string
+	var evidence connector.ExecutionEvidence
 	record, err := (action.Broker{Approve: t.policy.Approve}).Resolve(
 		ctx, t.policy.Mode, disposition, prepared.Proposal,
 		func(executionContext context.Context) error {
 			var executeErr error
-			receiptID, executeErr = t.runtime.ExecutePreparedWithReceipt(executionContext, t.policy.Mode, prepared)
+			evidence, executeErr = t.runtime.ExecutePreparedWithEvidence(executionContext, t.policy.Mode, prepared)
 			return executeErr
 		},
 	)
@@ -157,7 +157,9 @@ func (t connectorTool) executeAction(ctx context.Context, arguments json.RawMess
 		return agent.ToolResult{}, err
 	}
 	if record.Status == action.Executed {
-		record.ReceiptID = receiptID
+		record.ReceiptID = evidence.ReceiptID
+		record.ProviderResourceID = evidence.ProviderResourceID
+		record.ResponseSHA256 = evidence.ResponseSHA256
 	}
 	if t.policy.OnAction != nil {
 		t.policy.OnAction(record)

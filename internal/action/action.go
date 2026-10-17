@@ -224,10 +224,12 @@ const (
 // Record is safe to persist in a work manifest. It contains the bounded
 // proposal envelope and outcome, never the action payload or a credential.
 type Record struct {
-	Proposal  Proposal `json:"proposal"`
-	Status    Status   `json:"status"`
-	Error     string   `json:"error,omitempty"`
-	ReceiptID string   `json:"receipt_id,omitempty"`
+	Proposal           Proposal `json:"proposal"`
+	Status             Status   `json:"status"`
+	Error              string   `json:"error,omitempty"`
+	ReceiptID          string   `json:"receipt_id,omitempty"`
+	ProviderResourceID string   `json:"provider_resource_id,omitempty"`
+	ResponseSHA256     string   `json:"response_sha256,omitempty"`
 }
 
 // Decision is a one-shot human decision for one exact proposal. Decisions are
@@ -329,6 +331,15 @@ func (r Record) Validate() error {
 	}
 	if len(r.ReceiptID) > 2048 || strings.ContainsFunc(r.ReceiptID, unicode.IsControl) || r.ReceiptID != "" && r.Status != Executed {
 		return errors.New("action receipt ID is invalid")
+	}
+	if len(r.ProviderResourceID) > 2048 || strings.ContainsFunc(r.ProviderResourceID, unicode.IsControl) || r.ProviderResourceID != "" && r.Status != Executed {
+		return errors.New("action provider resource ID is invalid")
+	}
+	if r.ResponseSHA256 != "" {
+		decoded, err := hex.DecodeString(r.ResponseSHA256)
+		if err != nil || len(decoded) != sha256.Size || hex.EncodeToString(decoded) != r.ResponseSHA256 || r.Status != Executed {
+			return errors.New("action provider response digest is invalid")
+		}
 	}
 	return nil
 }
