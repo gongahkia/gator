@@ -17,6 +17,13 @@ use Gator's bounded native text extraction. Scanned pages are flagged as
 requiring OCR rather than silently treated as empty. No model-quality claim
 follows from being in the catalog.
 
+The saved selection also applies to goal-linked recurring jobs that use the
+default provider when they run. A live evaluation can select it explicitly with
+`--provider gator-local --model MODEL_TAG`; see the
+[continuity benchmark](PERSONAL_CONTINUITY_BENCHMARK.md#local-model-comparison).
+The managed local provider disables browser sessions, so tasks that need a
+browser require a different provider.
+
 ## Download, select, and delete
 
 1. Choose a model with ↑/↓. The screen shows installed state, source, approximate

@@ -51,3 +51,44 @@ The corpus does not yet test connected app reads, background trigger latency,
 or whether a user would accept an agent suggestion. Those require account
 fixtures or a supervised live trial; passing local scripted cases cannot prove
 them.
+
+## 2026-10-17 live smoke run
+
+`internal/eval/testdata/personal-continuity-v1/smoke-dataset.json` selects three
+development cases from the same corpus: a changed venue, a corrected brief
+preference, and a changed goal priority. The agent arm requested Gemini
+`gemini-3.5-flash` with an 80-request and 20-minute cap. It passed the venue
+case. The other two cases failed on HTTP 429; the provider error named
+`gemini-3.6-flash` and reported free-tier request limits. The local raw report
+is at `/tmp/gator-continuity-smoke-agent-20261017/experiment.json`. No baseline
+arm ran, so this result does not show an advantage over the same model without
+goal state, nor does it grade the two interrupted cases as agent failures.
+
+After quota is available, rerun both arms with the same explicit model,
+dataset, limits, and number of attempts, then compare the retained reports.
+The connected local/Gmail/Calendar brief path also has a scripted integration
+test, but no live relevance result yet.
+
+## Local-model comparison
+
+Gator's `/model` → **Local model** screen can install and select a reviewed
+Ollama model. After Ollama and that model are available, the same continuity
+evaluation can run without a cloud API quota. For a small smoke run, replace
+`qwen3:4b` below with the exact installed model tag if needed:
+
+```sh
+gator work eval run internal/eval/testdata/personal-continuity-v1/smoke-dataset.json \
+  --report-dir /tmp/gator-continuity-local-agent --id continuity-local-agent \
+  --split development --live --provider gator-local --model qwen3:4b \
+  --max-model-requests 80 --timeout-seconds 1200
+gator work eval run internal/eval/testdata/personal-continuity-v1/smoke-dataset.json \
+  --report-dir /tmp/gator-continuity-local-baseline --id continuity-local-baseline \
+  --split development --live --provider gator-local --model qwen3:4b \
+  --baseline-no-goal --max-model-requests 80 --timeout-seconds 1200
+gator work eval compare /tmp/gator-continuity-local-baseline/experiment.json \
+  /tmp/gator-continuity-local-agent/experiment.json
+```
+
+Compare local and cloud models as separate experiments; provider and model
+quality can change the result. On 2026-10-17 this machine has no Ollama
+executable or downloaded Ollama model, so these commands have not been run.
