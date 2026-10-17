@@ -190,11 +190,11 @@ func goalCommand(args []string, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		pins, err := captureConfiguredGoalOAuthPins(connectors)
+		pins, err := captureConfiguredGoalOAuthAccountPins(context.Background(), connectors)
 		if err != nil {
 			return err
 		}
-		definition, err := jobStore.Save(jobs.Definition{Name: goalJobName(record), GoalID: record.ID, Enabled: true, Schedule: *cron, Timezone: *timezone, Missed: *missed, SourcePath: record.SourcePath, RefreshSnapshot: true, ChangeOnly: *changeOnly, Objective: strings.TrimSpace(*task), Mode: mode, Contract: contract, ConnectorIDs: connectors, OAuthRefreshPins: pins, MaxSteps: 24})
+		definition, err := jobStore.Save(jobs.Definition{Name: goalJobName(record), GoalID: record.ID, Enabled: true, Schedule: *cron, Timezone: *timezone, Missed: *missed, SourcePath: record.SourcePath, RefreshSnapshot: true, ChangeOnly: *changeOnly, Objective: strings.TrimSpace(*task), Mode: mode, Contract: contract, ConnectorIDs: connectors, OAuthAccountPins: pins, MaxSteps: 24})
 		if err != nil {
 			return err
 		}
@@ -313,11 +313,11 @@ func goalCommand(args []string, out io.Writer) error {
 		if len(watchSources) > 0 {
 			schedule = "*/5 * * * *"
 		}
-		pins, err := captureConfiguredGoalOAuthPins(selected)
+		pins, err := captureConfiguredGoalOAuthAccountPins(context.Background(), selected)
 		if err != nil {
 			return err
 		}
-		definition, err := jobStore.Save(jobs.Definition{Name: goalJobName(record), GoalID: record.ID, GoalWatch: true, Enabled: true, Schedule: schedule, Timezone: "UTC", Missed: "run_once", SourcePath: record.SourcePath, RefreshSnapshot: true, ChangeOnly: true, Objective: strings.TrimSpace(*task), Mode: mode, Contract: contract, ConnectorIDs: selected, OAuthRefreshPins: pins, WatchSources: watchSources, MaxSteps: 24})
+		definition, err := jobStore.Save(jobs.Definition{Name: goalJobName(record), GoalID: record.ID, GoalWatch: true, Enabled: true, Schedule: schedule, Timezone: "UTC", Missed: "run_once", SourcePath: record.SourcePath, RefreshSnapshot: true, ChangeOnly: true, Objective: strings.TrimSpace(*task), Mode: mode, Contract: contract, ConnectorIDs: selected, OAuthAccountPins: pins, WatchSources: watchSources, MaxSteps: 24})
 		if err != nil {
 			return err
 		}

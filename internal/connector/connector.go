@@ -187,6 +187,13 @@ func OAuthGrantPin(descriptor Descriptor, refreshToken string) string {
 	return hex.EncodeToString(digest[:])
 }
 
+// GoogleAccountPin fingerprints Google's stable OIDC subject under the exact
+// configured connector identity. Reauthorization of that account keeps it valid.
+func GoogleAccountPin(descriptor Descriptor, subject string) string {
+	digest := sha256.Sum256([]byte("google-sub-v1\x00" + descriptor.CredentialRef() + "\x00" + strings.Join(strings.Fields(descriptor.OAuthScopes), " ") + "\x00" + subject))
+	return hex.EncodeToString(digest[:])
+}
+
 // Operations returns independent, Gator-owned operation metadata.
 func (d Descriptor) Operations() []Operation {
 	switch d.Kind {

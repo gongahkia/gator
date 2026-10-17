@@ -68,11 +68,13 @@ func goalConnectorReadiness(definition jobs.Definition) []string {
 			}
 		}
 		line := id + ": " + status
-		if pin := definition.OAuthRefreshPins[id]; pin != "" {
+		if definition.OAuthAccountPins[id] != "" {
+			line += "; account pinned; live identity checked when reading"
+		} else if pin := definition.OAuthRefreshPins[id]; pin != "" {
 			if pinErr := verifyGoalOAuthPin(id, pin, registry, credentials); pinErr != nil {
 				line += "; " + pinErr.Error()
 			}
-		} else if descriptor.Kind == connector.KindGoogle && descriptor.Authentication == connector.AuthOAuth && definition.OAuthRefreshPins[id] == "" {
+		} else if descriptor.Kind == connector.KindGoogle && descriptor.Authentication == connector.AuthOAuth {
 			line += "; account is not pinned for this older check; recreate it after confirming the account"
 		}
 		if len(blocked) > 0 {

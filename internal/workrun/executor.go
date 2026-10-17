@@ -392,6 +392,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	}
 	connectedRuntime := e.Connectors
 	connectedRuntime.OAuthRefreshPins = request.OAuthRefreshPins
+	connectedRuntime.OAuthAccountPins = request.OAuthAccountPins
 	connectorSurface, err := tools.ConnectorTools(connectedRuntime, request.ConnectorIDs, connectorPolicy)
 	if err != nil {
 		return outcome, err

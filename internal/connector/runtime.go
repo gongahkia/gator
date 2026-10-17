@@ -12,6 +12,7 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -57,6 +58,9 @@ type Runtime struct {
 	// recurring job was created. The check occurs on the credential used for
 	// each request, rather than only at job startup.
 	OAuthRefreshPins map[string]string
+	// OAuthAccountPins bind new Google recurring reads to the account's OIDC
+	// subject. The subject is checked against the token used for each request.
+	OAuthAccountPins map[string]string
 }
 
 // Invoke validates a connector operation and its exact input before any I/O.
@@ -921,6 +925,80 @@ func (r Runtime) executeGoogleBatch(ctx context.Context, descriptor Descriptor, 
 }
 
 func (r Runtime) bearerToken(ctx context.Context, descriptor Descriptor) (string, error) {
+	token, err := r.unverifiedBearerToken(ctx, descriptor)
+	if err != nil {
+		return "", err
+	}
+	if pin := r.OAuthAccountPins[descriptor.ID]; pin != "" {
+		if descriptor.Kind != KindGoogle || descriptor.Authentication != AuthOAuth {
+			return "", fmt.Errorf("connector %q authorization mode changed since this Work run was configured", descriptor.ID)
+		}
+		actual, err := r.googleAccountPinWithToken(ctx, descriptor, token)
+		if err != nil {
+			return "", err
+		}
+		if actual != pin {
+			return "", fmt.Errorf("Google connector %q account changed since this Work run was configured", descriptor.ID)
+		}
+	}
+	return token, nil
+}
+
+// GoogleAccountPin retrieves the current account identity without returning
+// the subject or any profile data to the caller or model.
+func (r Runtime) GoogleAccountPin(ctx context.Context, connectorID string) (string, error) {
+	descriptor, found := r.Registry.Get(connectorID)
+	if !found || descriptor.Kind != KindGoogle || descriptor.Authentication != AuthOAuth {
+		return "", fmt.Errorf("Google OAuth connector %q is required", connectorID)
+	}
+	if !slices.Contains(strings.Fields(descriptor.OAuthScopes), "openid") {
+		return "", fmt.Errorf("Google connector %q requires the openid scope to identify its account", connectorID)
+	}
+	token, err := r.unverifiedBearerToken(ctx, descriptor)
+	if err != nil {
+		return "", err
+	}
+	return r.googleAccountPinWithToken(ctx, descriptor, token)
+}
+
+func (r Runtime) googleAccountPinWithToken(ctx context.Context, descriptor Descriptor, token string) (string, error) {
+	endpoint := strings.TrimRight(descriptor.Resource, "/") + "/oauth2/v3/userinfo"
+	if descriptor.Resource == "https://www.googleapis.com" {
+		endpoint = "https://openidconnect.googleapis.com/v1/userinfo"
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return "", err
+	}
+	request.Header.Set("Authorization", "Bearer "+token)
+	request.Header.Set("Accept", "application/json")
+	response, err := r.httpClient().Do(request)
+	if err != nil {
+		return "", fmt.Errorf("verify Google account for connector %q: %w", descriptor.ID, err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("verify Google account for connector %q: HTTP %d", descriptor.ID, response.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(response.Body, 4097))
+	if err != nil || len(data) > 4096 {
+		return "", fmt.Errorf("verify Google account for connector %q: invalid response", descriptor.ID)
+	}
+	var profile struct {
+		Subject string `json:"sub"`
+	}
+	if err := json.Unmarshal(data, &profile); err != nil || len(profile.Subject) == 0 || len(profile.Subject) > 255 {
+		return "", fmt.Errorf("verify Google account for connector %q: missing subject", descriptor.ID)
+	}
+	for _, c := range profile.Subject {
+		if c < 0x21 || c > 0x7e {
+			return "", fmt.Errorf("verify Google account for connector %q: invalid subject", descriptor.ID)
+		}
+	}
+	return GoogleAccountPin(descriptor, profile.Subject), nil
+}
+
+func (r Runtime) unverifiedBearerToken(ctx context.Context, descriptor Descriptor) (string, error) {
 	if r.OAuthRefreshPins[descriptor.ID] != "" && descriptor.Authentication != AuthOAuth {
 		return "", fmt.Errorf("connector %q authorization mode changed since this Work run was configured", descriptor.ID)
 	}

@@ -105,6 +105,22 @@ func TestJobOAuthPinMustBelongToSelectedConnectorAndBeCanonical(t *testing.T) {
 			t.Fatalf("invalid OAuth grant pin accepted: %#v", pins)
 		}
 	}
+	definition.OAuthRefreshPins = nil
+	for _, pins := range []map[string]string{
+		{"other": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+		{"google": "not-a-digest"},
+		{"google": "ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789"},
+	} {
+		definition.OAuthAccountPins = pins
+		if err := definition.Validate(); err == nil {
+			t.Fatalf("invalid OAuth account pin accepted: %#v", pins)
+		}
+	}
+	definition.OAuthAccountPins = map[string]string{"google": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}
+	definition.OAuthRefreshPins = map[string]string{"google": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}
+	if err := definition.Validate(); err == nil {
+		t.Fatal("accepted conflicting account and grant pins")
+	}
 }
 
 func TestRunOnceCatchesScheduleMissedSinceCreation(t *testing.T) {

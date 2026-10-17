@@ -56,9 +56,10 @@ func probeGoalAccess(ctx context.Context, stateDir, goalID string, out io.Writer
 		if definition.GoalID != goalID || !definition.GoalWatch {
 			continue
 		}
-		pinErr := verifyGoalOAuthPins(definition, registry, credentials)
+		pinErr := verifyGoalOAuthPins(ctx, definition, registry, credentials)
 		boundRuntime := runtime
 		boundRuntime.OAuthRefreshPins = definition.OAuthRefreshPins
+		boundRuntime.OAuthAccountPins = definition.OAuthAccountPins
 		for _, source := range definition.WatchSources {
 			count++
 			if count > 8 {

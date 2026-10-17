@@ -1,19 +1,21 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/jobs"
 )
 
-// captureGoalOAuthPins binds new Google follow-ups to the currently authorized
-// refresh grant. A new login, even for the same account, requires an explicit
-// replacement of the check rather than silently changing its source identity.
-func captureGoalOAuthPins(selected []string, registry connector.Registry, credentials auth.Store) (map[string]string, error) {
+// captureGoalOAuthAccountPins binds new Google follow-ups to the live OIDC
+// subject. The digest survives token rotation without exposing the subject.
+func captureGoalOAuthAccountPins(ctx context.Context, selected []string, registry connector.Registry, credentials auth.Store) (map[string]string, error) {
 	var pins map[string]string
+	runtime := connector.Runtime{Registry: registry, Credentials: credentials}
 	for _, id := range selected {
 		descriptor, found := registry.Get(id)
 		if !found {
@@ -32,12 +34,18 @@ func captureGoalOAuthPins(selected []string, registry connector.Registry, creden
 		if pins == nil {
 			pins = make(map[string]string)
 		}
-		pins[id] = connector.OAuthGrantPin(descriptor, credential.Refresh)
+		probeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		pin, err := runtime.GoogleAccountPin(probeCtx, id)
+		cancel()
+		if err != nil {
+			return nil, fmt.Errorf("verify Google connector %q account before scheduling: %w", id, err)
+		}
+		pins[id] = pin
 	}
 	return pins, nil
 }
 
-func captureConfiguredGoalOAuthPins(selected []string) (map[string]string, error) {
+func captureConfiguredGoalOAuthAccountPins(ctx context.Context, selected []string) (map[string]string, error) {
 	if len(selected) == 0 {
 		return nil, nil
 	}
@@ -53,13 +61,27 @@ func captureConfiguredGoalOAuthPins(selected []string) (map[string]string, error
 	if err != nil {
 		return nil, err
 	}
-	return captureGoalOAuthPins(selected, registry, credentials)
+	return captureGoalOAuthAccountPins(ctx, selected, registry, credentials)
 }
 
-func verifyGoalOAuthPins(definition jobs.Definition, registry connector.Registry, credentials auth.Store) error {
+func verifyGoalOAuthPins(ctx context.Context, definition jobs.Definition, registry connector.Registry, credentials auth.Store) error {
 	for id, pinned := range definition.OAuthRefreshPins {
 		if err := verifyGoalOAuthPin(id, pinned, registry, credentials); err != nil {
 			return err
+		}
+	}
+	if len(definition.OAuthAccountPins) > 0 {
+		runtime := connector.Runtime{Registry: registry, Credentials: credentials}
+		for id, pinned := range definition.OAuthAccountPins {
+			probeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			actual, err := runtime.GoogleAccountPin(probeCtx, id)
+			cancel()
+			if err != nil {
+				return fmt.Errorf("Google connector %q account identity unavailable: %w", id, err)
+			}
+			if actual != pinned {
+				return fmt.Errorf("Google connector %q account changed; recreate this scheduled check after confirming the account", id)
+			}
 		}
 	}
 	return nil
@@ -80,8 +102,8 @@ func verifyGoalOAuthPin(id, pinned string, registry connector.Registry, credenti
 	return nil
 }
 
-func verifyConfiguredGoalOAuthPins(definition jobs.Definition) error {
-	if len(definition.OAuthRefreshPins) == 0 {
+func verifyConfiguredGoalOAuthPins(ctx context.Context, definition jobs.Definition) error {
+	if len(definition.OAuthRefreshPins) == 0 && len(definition.OAuthAccountPins) == 0 {
 		return nil
 	}
 	settings, err := loadSettings()
@@ -96,5 +118,5 @@ func verifyConfiguredGoalOAuthPins(definition jobs.Definition) error {
 	if err != nil {
 		return err
 	}
-	return verifyGoalOAuthPins(definition, registry, credentials)
+	return verifyGoalOAuthPins(ctx, definition, registry, credentials)
 }

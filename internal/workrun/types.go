@@ -98,6 +98,7 @@ type Request struct {
 	Steering             <-chan string
 	ConnectorIDs         []string
 	OAuthRefreshPins     map[string]string
+	OAuthAccountPins     map[string]string
 	ApproveAction        action.Approver
 	ApproveConnectorRead func(context.Context, string, string, json.RawMessage) (bool, error)
 	ConversationID       string

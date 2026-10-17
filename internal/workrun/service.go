@@ -75,6 +75,7 @@ func effectiveConfiguration(request Request) any {
 		Code                CodePolicy
 		Connectors          []string
 		OAuthRefreshPins    map[string]string
+		OAuthAccountPins    map[string]string
 		Permissions         any
 		WebOrigins          []string
 		IgnoredInstructions []string
@@ -94,7 +95,7 @@ func effectiveConfiguration(request Request) any {
 		BrowserSession      string
 		DisableBrowser      bool
 		DesktopSession      string
-	}{request.Contract, request.Mode, request.Code, request.ConnectorIDs, request.OAuthRefreshPins, request.ConnectorPermissions, request.WebOrigins, request.IgnoredInstructionPaths, request.Limits, request.MaxSteps, request.Provider, request.GoalContext, request.GoalPlanContext, request.GoalID, request.MemoryContext, request.RoleConfiguration, func() string {
+	}{request.Contract, request.Mode, request.Code, request.ConnectorIDs, request.OAuthRefreshPins, request.OAuthAccountPins, request.ConnectorPermissions, request.WebOrigins, request.IgnoredInstructionPaths, request.Limits, request.MaxSteps, request.Provider, request.GoalContext, request.GoalPlanContext, request.GoalID, request.MemoryContext, request.RoleConfiguration, func() string {
 		if request.Project != nil {
 			return request.Project.SHA256
 		}

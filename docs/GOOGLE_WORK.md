@@ -63,16 +63,20 @@ so publishing a broadly available OAuth app may require Google's verification
 process. Existing authorizations may retain previously granted scopes at
 Google until the user revokes them.
 
-New goal schedules and watches using a Google OAuth connector pin the selected
-refresh grant by a SHA-256 digest in the job definition. Gator checks that pin
-before polling or starting scheduled Work. If the authorization changes,
-including a refresh-token rotation or another login under the same connector
-ID, the check stops before reading connected data and `gator goal activity ID`
-shows the mismatch. Confirm the intended account, then use
-`gator goal unschedule GOAL_ID JOB_ID` and recreate the schedule or watch to
-bind the new grant. Older checks without a pin remain usable but appear as
-unbound in activity; recreate them to gain this protection. The digest does
-not establish the account's identity or replace a live access check.
+New goal schedules and watches using a Google OAuth connector make a live
+[OpenID UserInfo](https://developers.google.com/identity/openid-connect/reference)
+request and pin a SHA-256 digest of the account's stable `sub`
+identifier. Gator checks that identity before a scheduled run and against the
+token used for each connected request. Reauthorizing the same account keeps
+the check valid; switching accounts stops it before connected data is read.
+If identity cannot be checked, the read fails closed. `gator goal activity ID`
+shows that the account is pinned, while `gator goal access ID` makes a separate
+live probe. To intentionally change accounts, confirm the new account, then
+use `gator goal unschedule GOAL_ID JOB_ID` and recreate the check. Existing
+refresh-grant-pinned checks retain their stricter behavior and stop on any
+grant replacement; older unpinned checks still appear as unbound in activity.
+The job definition contains only a digest, not the subject or token. This
+identity check does not establish that a connected result is relevant or safe.
 
 ## Operations and approvals
 
