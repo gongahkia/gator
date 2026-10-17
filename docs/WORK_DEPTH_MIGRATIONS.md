@@ -39,6 +39,10 @@ selected parent revision. Interrupted/active retained outcomes cannot be retried
 through that shortcut.
 
 The execution model is bounded durable state, not instruction-level checkpoint
-replay or exactly-once external execution. Pending approval records preserve the
-request; restarting does not grant approval. macOS runtime verification and
+replay or exactly-once external execution. `gator work decisions` shows recorded
+pending approvals across runs; `gator work decisions RUN_ID --json` includes exact
+previews and the retained resolution for one run. A pending record may be stale
+after a crash, and only the original foreground run can answer it. Deliberate
+cancellation records the decision as cancelled. Restarting does not grant
+approval. macOS runtime verification and
 hosted service checks are listed separately in the verification record.

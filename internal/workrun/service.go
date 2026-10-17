@@ -107,6 +107,17 @@ type Interaction struct {
 	Kind    string `json:"kind"`
 	Preview any    `json:"preview"`
 }
+
+// InteractionRecord is the retained state of a foreground decision. A pending
+// record is only historical evidence of a request; it is not a remote approval
+// capability and may be stale if the original process exited unexpectedly.
+type InteractionRecord struct {
+	Version     int         `json:"version"`
+	Status      string      `json:"status"`
+	Interaction Interaction `json:"interaction"`
+	Approved    *bool       `json:"approved,omitempty"`
+	RunID       string      `json:"run_id,omitempty"`
+}
 type Completion struct {
 	Outcome Outcome
 	Err     error
@@ -188,31 +199,23 @@ func (s Service) Start(ctx context.Context, request Request) *Operation {
 		o.pending[id] = response
 		o.mu.Unlock()
 		defer func() { o.mu.Lock(); delete(o.pending, id); o.mu.Unlock() }()
-		if err := persistInteraction(struct {
-			Version     int
-			Status      string
-			Interaction Interaction
-		}{1, "pending", Interaction{id, kind, preview}}, id); err != nil {
+		interaction := Interaction{id, kind, preview}
+		if err := persistInteraction(InteractionRecord{Version: 1, Status: "pending", Interaction: interaction}, id); err != nil {
 			return false, err
 		}
 		select {
-		case interactions <- Interaction{id, kind, preview}:
+		case interactions <- interaction:
 		case <-ctx.Done():
-			return false, ctx.Err()
+			return false, errors.Join(ctx.Err(), persistInteraction(InteractionRecord{Version: 1, Status: "cancelled", Interaction: interaction}, id))
 		}
 		select {
 		case approved := <-response:
-			if err := persistInteraction(struct {
-				Version     int
-				Status      string
-				Interaction Interaction
-				Approved    bool
-			}{1, "resolved", Interaction{id, kind, preview}, approved}, id); err != nil {
+			if err := persistInteraction(InteractionRecord{Version: 1, Status: "resolved", Interaction: interaction, Approved: &approved}, id); err != nil {
 				return false, err
 			}
 			return approved, nil
 		case <-ctx.Done():
-			return false, ctx.Err()
+			return false, errors.Join(ctx.Err(), persistInteraction(InteractionRecord{Version: 1, Status: "cancelled", Interaction: interaction}, id))
 		}
 	}
 	request.OnSupervisor = func(supervisor *orchestrator.Supervisor) { o.mu.Lock(); o.tasks = supervisor; o.mu.Unlock() }

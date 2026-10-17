@@ -9,17 +9,19 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/workhistory"
+	"github.com/gongahkia/gator/internal/workrun"
 	"github.com/gongahkia/gator/internal/worksession"
 )
 
 func isWorkSessionCommand(value string) bool {
 	switch value {
-	case "list", "show", "history", "resume", "back", "forward", "tasks", "reconcile":
+	case "list", "show", "history", "resume", "back", "forward", "tasks", "decisions", "reconcile":
 		return true
 	default:
 		return false
@@ -36,6 +38,9 @@ func workSessionCommand(arguments []string, in io.Reader, out io.Writer, modelFa
 			return errors.New("usage: gator work reconcile WORK_ID CORRELATION_ID")
 		}
 		return reconcileGmailSend(context.Background(), stateDir, arguments[1], arguments[2], out)
+	}
+	if arguments[0] == "decisions" {
+		return workDecisionsCommand(stateDir, arguments[1:], out)
 	}
 	store, err := worksession.Open(stateDir)
 	if err != nil {
@@ -184,6 +189,56 @@ func workSessionCommand(arguments []string, in io.Reader, out io.Writer, modelFa
 		return runWorkTask(forwarded, in, out, modelFactory)
 	}
 	return errors.New("unknown Work conversation command")
+}
+
+func workDecisionsCommand(stateDir string, arguments []string, out io.Writer) error {
+	var runID string
+	var jsonOutput bool
+	for _, argument := range arguments {
+		if argument == "--json" && !jsonOutput {
+			jsonOutput = true
+		} else if !strings.HasPrefix(argument, "-") && runID == "" {
+			runID = argument
+		} else {
+			return errors.New("usage: gator work decisions [RUN_ID] [--json]")
+		}
+	}
+	records, err := workrun.ReadInteractionRecords(stateDir, runID)
+	if err != nil {
+		return err
+	}
+	if runID == "" {
+		records = slices.DeleteFunc(records, func(record workrun.InteractionRecord) bool {
+			return record.Status != "pending"
+		})
+	}
+	if jsonOutput {
+		return json.NewEncoder(out).Encode(struct {
+			LiveStatus string                      `json:"live_status"`
+			Decisions  []workrun.InteractionRecord `json:"decisions"`
+		}{LiveStatus: "not_checked", Decisions: records})
+	}
+	if _, err := fmt.Fprintln(out, "Recorded Work decisions (read-only; pending records may be stale and can only be answered in the original foreground run):"); err != nil {
+		return err
+	}
+	if len(records) == 0 {
+		_, err := fmt.Fprintln(out, "  none")
+		return err
+	}
+	for _, record := range records {
+		status := record.Status
+		if record.Status == "resolved" && record.Approved != nil {
+			if *record.Approved {
+				status = "approved"
+			} else {
+				status = "denied"
+			}
+		}
+		if _, err := fmt.Fprintf(out, "  %s #%d %s %s\n", record.RunID, record.Interaction.ID, status, terminalSafe(record.Interaction.Kind)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func firstLine(value string) string {

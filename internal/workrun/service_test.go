@@ -117,6 +117,31 @@ func TestServiceApprovalIsPendingUntilExplicitResponse(t *testing.T) {
 	}
 }
 
+func TestServiceCancellationClosesRetainedApproval(t *testing.T) {
+	state := t.TempDir()
+	model := &scriptedModel{turns: []agent.Turn{{ToolCalls: []agent.ToolCall{{ID: "child", Name: "delegate_agents", Arguments: json.RawMessage(`{"tasks":[{"agent":"code","task":"approval"}]}`)}}}}}
+	service := Service{Executor: Executor{Model: model, StateDir: state, Code: func(ctx context.Context, request CodeRequest) (CodeResult, error) {
+		_, err := request.Approve(ctx, []string{"reviewed-command"})
+		return CodeResult{}, err
+	}}}
+	operation := service.Start(context.Background(), Request{RunID: "cancelled-approval", SourcePath: t.TempDir(), Objective: "prepare", Contract: artifact.DefaultContract("report.md"), EnableCode: true})
+	interaction := <-operation.Interactions
+	operation.Cancel()
+	for range operation.Events {
+	}
+	<-operation.Done
+	records, err := ReadInteractionRecords(state, "cancelled-approval")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(records) != 1 || records[0].Status != "cancelled" || records[0].Interaction.ID != interaction.ID || records[0].Approved != nil {
+		t.Fatalf("cancelled approval = %#v", records)
+	}
+	if err := operation.Respond(interaction.ID, true); err == nil {
+		t.Fatal("cancelled approval remained answerable")
+	}
+}
+
 func TestEffectiveConfigurationRetainsWorkAuthority(t *testing.T) {
 	payload, err := json.Marshal(effectiveConfiguration(Request{IgnoredInstructionPaths: []string{"AGENTS.md"}, RequireCode: true}))
 	if err != nil {

@@ -43,6 +43,7 @@ Product areas:
 Common follow-up actions:
   gator work review WORK_ID
   gator work reconcile WORK_ID CORRELATION_ID
+  gator work decisions [RUN_ID] [--json]
   gator work apply WORK_ID [OPTIONS]
   gator work retry WORK_ID [OPTIONS]
   gator work feedback WORK_ID accept|reject|correct|remember|dont-learn|list

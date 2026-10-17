@@ -758,6 +758,9 @@ func (e Executor) normalizeAndValidate(request Request) (Request, error) {
 	if e.Model == nil {
 		return Request{}, errors.New("work agent model is required")
 	}
+	if request.RunID != "" && !validInteractionRunID(request.RunID) {
+		return Request{}, errors.New("invalid Work run ID")
+	}
 	request.Objective = strings.TrimSpace(request.Objective)
 	if request.Objective == "" || len(request.Objective) > 64*1024 || strings.ContainsRune(request.Objective, 0) {
 		return Request{}, errors.New("work objective is missing or invalid")
