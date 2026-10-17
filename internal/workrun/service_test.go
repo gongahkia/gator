@@ -98,6 +98,13 @@ func TestServiceApprovalIsPendingUntilExplicitResponse(t *testing.T) {
 	if err != nil || !strings.Contains(string(payload), "pending") {
 		t.Fatalf("pending state: %s %v", payload, err)
 	}
+	if operation.RunID != "approval-run" {
+		t.Fatalf("operation run ID = %q", operation.RunID)
+	}
+	records, err := ReadInteractionRecords(state, "approval-run")
+	if err != nil || len(records) != 1 || records[0].LiveStatus != "active" {
+		t.Fatalf("live pending decision = %#v, %v", records, err)
+	}
 	if err := operation.Respond(interaction.ID, true); err != nil {
 		t.Fatal(err)
 	}
@@ -114,6 +121,10 @@ func TestServiceApprovalIsPendingUntilExplicitResponse(t *testing.T) {
 	}
 	if err := operation.Respond(interaction.ID, true); err == nil {
 		t.Fatal("approval replay accepted")
+	}
+	records, err = ReadInteractionRecords(state, "approval-run")
+	if err != nil || len(records) != 1 || records[0].Status != "resolved" || records[0].LiveStatus != "stopped" {
+		t.Fatalf("finished decision = %#v, %v", records, err)
 	}
 }
 
@@ -134,7 +145,7 @@ func TestServiceCancellationClosesRetainedApproval(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(records) != 1 || records[0].Status != "cancelled" || records[0].Interaction.ID != interaction.ID || records[0].Approved != nil {
+	if len(records) != 1 || records[0].Status != "cancelled" || records[0].LiveStatus != "stopped" || records[0].Interaction.ID != interaction.ID || records[0].Approved != nil {
 		t.Fatalf("cancelled approval = %#v", records)
 	}
 	if err := operation.Respond(interaction.ID, true); err == nil {

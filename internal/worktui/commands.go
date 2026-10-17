@@ -937,6 +937,9 @@ func (m Model) workStatus() string {
 	status += "\n  current work: running (/cancel)"
 	if m.operation != nil {
 		status += "; steer with /steer MESSAGE"
+		if m.operation.RunID != "" {
+			status += "\n  work run: " + m.operation.RunID + " (inspect from another terminal: gator work decisions " + m.operation.RunID + ")"
+		}
 	}
 	activeTasks := make([]string, 0, len(m.tasks))
 	for id, taskStatus := range m.tasks {

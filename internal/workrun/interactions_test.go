@@ -41,7 +41,7 @@ func TestReadInteractionRecordsValidatesAndScopesRetainedDecisions(t *testing.T)
 		t.Fatalf("all records = %#v, %v", all, err)
 	}
 	one, err := ReadInteractionRecords(state, "run-one")
-	if err != nil || len(one) != 1 || one[0].Status != "pending" {
+	if err != nil || len(one) != 1 || one[0].Status != "pending" || one[0].LiveStatus != "unknown" {
 		t.Fatalf("scoped records = %#v, %v", one, err)
 	}
 	if _, err := ReadInteractionRecords(state, "../outside"); err == nil {
@@ -65,5 +65,31 @@ func TestWorkRejectsEscapingRunIDBeforeWritingState(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(state, "escape")); !os.IsNotExist(err) {
 		t.Fatalf("unexpected state outside Work directory: %v", err)
+	}
+}
+
+func TestInteractionRunLockReportsActiveThenStopped(t *testing.T) {
+	state := t.TempDir()
+	lock, err := acquireInteractionRunLock(state, "work-live")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second, err := acquireInteractionRunLock(state, "work-live"); err == nil {
+		second.Close()
+		t.Fatal("concurrent Work run acquired the same lock")
+	}
+	root, err := os.OpenRoot(filepath.Join(state, "gator", "interactions"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	if status, err := interactionRunLiveness(root, "work-live"); err != nil || status != "active" {
+		t.Fatalf("live lock = %q, %v", status, err)
+	}
+	if err := lock.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if status, err := interactionRunLiveness(root, "work-live"); err != nil || status != "stopped" {
+		t.Fatalf("released lock = %q, %v", status, err)
 	}
 }

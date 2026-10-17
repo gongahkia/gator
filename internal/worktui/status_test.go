@@ -27,7 +27,7 @@ func TestWorkStatusShowsSelectedModelAndAccess(t *testing.T) {
 func TestWorkStatusShowsCurrentSpecialistsAndApprovalControls(t *testing.T) {
 	m := New(Config{})
 	m.running = true
-	m.operation = &workrun.Operation{}
+	m.operation = &workrun.Operation{RunID: "work-live"}
 	m.tasks = map[string]string{
 		"subagent-001": "source_researcher: running",
 		"subagent-002": "claim_verifier: queued",
@@ -38,6 +38,7 @@ func TestWorkStatusShowsCurrentSpecialistsAndApprovalControls(t *testing.T) {
 	status := m.workStatus()
 	for _, expected := range []string{
 		"current work: running (/cancel); steer with /steer MESSAGE",
+		"work run: work-live (inspect from another terminal: gator work decisions work-live)",
 		"live specialists: 2 (/tasks, /cancel-task ID)",
 		"subagent-001 source_researcher: running",
 		"subagent-002 claim_verifier: queued",

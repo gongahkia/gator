@@ -41,8 +41,12 @@ through that shortcut.
 The execution model is bounded durable state, not instruction-level checkpoint
 replay or exactly-once external execution. `gator work decisions` shows recorded
 pending approvals across runs; `gator work decisions RUN_ID --json` includes exact
-previews and the retained resolution for one run. A pending record may be stale
-after a crash, and only the original foreground run can answer it. Deliberate
-cancellation records the decision as cancelled. Restarting does not grant
+previews and the retained resolution for one run. New foreground runs hold a
+local process lock while they can ask for approvals; the command labels a
+recorded pending decision as active, stale after the process exits, or
+unconfirmed for older records without a lock. `/status` shows the current Work
+run ID for inspection from another terminal. Only the original foreground run
+can answer an approval. Deliberate cancellation records the decision as
+cancelled. Restarting does not grant
 approval. macOS runtime verification and
 hosted service checks are listed separately in the verification record.

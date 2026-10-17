@@ -118,12 +118,14 @@ type InteractionRecord struct {
 	Interaction Interaction `json:"interaction"`
 	Approved    *bool       `json:"approved,omitempty"`
 	RunID       string      `json:"run_id,omitempty"`
+	LiveStatus  string      `json:"live_status,omitempty"`
 }
 type Completion struct {
 	Outcome Outcome
 	Err     error
 }
 type Operation struct {
+	RunID        string
 	tasks        *orchestrator.Supervisor
 	Events       <-chan agent.Event
 	Interactions <-chan Interaction
@@ -173,6 +175,9 @@ func (s Service) Start(ctx context.Context, request Request) *Operation {
 	if request.RunID == "" {
 		request.RunID, initializationErr = newID(time.Now())
 	}
+	if initializationErr == nil && !validInteractionRunID(request.RunID) {
+		initializationErr = errors.New("invalid Work run ID")
+	}
 	interactionDir := filepath.Join(request.StateDir, "gator", "interactions", request.RunID)
 	persistInteraction := func(value any, id int) error {
 		if err := os.MkdirAll(interactionDir, 0700); err != nil {
@@ -191,8 +196,18 @@ func (s Service) Start(ctx context.Context, request Request) *Operation {
 	events := make(chan agent.Event, 128)
 	interactions := make(chan Interaction, 8)
 	done := make(chan Completion, 1)
-	o := &Operation{Events: events, Interactions: interactions, Done: done, cancel: cancel, steering: make(chan string, 16), pending: map[int]chan bool{}, stopped: ctx.Done()}
+	o := &Operation{RunID: request.RunID, Events: events, Interactions: interactions, Done: done, cancel: cancel, steering: make(chan string, 16), pending: map[int]chan bool{}, stopped: ctx.Done()}
+	var lockOnce sync.Once
+	var liveLock *os.File
+	var lockErr error
+	ensureLiveLock := func() error {
+		lockOnce.Do(func() { liveLock, lockErr = acquireInteractionRunLock(request.StateDir, request.RunID) })
+		return lockErr
+	}
 	ask := func(ctx context.Context, kind string, preview any) (bool, error) {
+		if err := ensureLiveLock(); err != nil {
+			return false, err
+		}
 		o.mu.Lock()
 		o.next++
 		id := o.next
@@ -275,6 +290,9 @@ func (s Service) Start(ctx context.Context, request Request) *Operation {
 		err := initializationErr
 		if err == nil {
 			outcome, err = s.Execute(ctx, request)
+		}
+		if liveLock != nil {
+			err = errors.Join(err, liveLock.Close())
 		}
 		close(events)
 		close(interactions)

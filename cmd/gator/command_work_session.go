@@ -9,7 +9,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/gongahkia/gator/internal/orchestrator"
@@ -203,22 +202,23 @@ func workDecisionsCommand(stateDir string, arguments []string, out io.Writer) er
 			return errors.New("usage: gator work decisions [RUN_ID] [--json]")
 		}
 	}
-	records, err := workrun.ReadInteractionRecords(stateDir, runID)
+	var records []workrun.InteractionRecord
+	var err error
+	if runID == "" {
+		records, err = workrun.ReadPendingInteractionRecords(stateDir)
+	} else {
+		records, err = workrun.ReadInteractionRecords(stateDir, runID)
+	}
 	if err != nil {
 		return err
-	}
-	if runID == "" {
-		records = slices.DeleteFunc(records, func(record workrun.InteractionRecord) bool {
-			return record.Status != "pending"
-		})
 	}
 	if jsonOutput {
 		return json.NewEncoder(out).Encode(struct {
 			LiveStatus string                      `json:"live_status"`
 			Decisions  []workrun.InteractionRecord `json:"decisions"`
-		}{LiveStatus: "not_checked", Decisions: records})
+		}{LiveStatus: "per_run_lock", Decisions: records})
 	}
-	if _, err := fmt.Fprintln(out, "Recorded Work decisions (read-only; pending records may be stale and can only be answered in the original foreground run):"); err != nil {
+	if _, err := fmt.Fprintln(out, "Recorded Work decisions (read-only; answer approvals in the original foreground run):"); err != nil {
 		return err
 	}
 	if len(records) == 0 {
@@ -227,6 +227,16 @@ func workDecisionsCommand(stateDir string, arguments []string, out io.Writer) er
 	}
 	for _, record := range records {
 		status := record.Status
+		if record.Status == "pending" {
+			switch record.LiveStatus {
+			case "active":
+				status = "pending (run active)"
+			case "stopped":
+				status = "pending (stale)"
+			default:
+				status = "pending (run unconfirmed)"
+			}
+		}
 		if record.Status == "resolved" && record.Approved != nil {
 			if *record.Approved {
 				status = "approved"
