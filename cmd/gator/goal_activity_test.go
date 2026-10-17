@@ -2,6 +2,9 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +14,7 @@ import (
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
+	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/suggestion"
 )
 
@@ -41,6 +45,19 @@ func TestGoalActivityShowsDurableChecksAndPendingDecisions(t *testing.T) {
 		t.Fatal(err)
 	}
 	attempt.Status, attempt.Summary, attempt.FinishedAt = "completed", "Venue A cancelled", time.Now().UTC()
+	runID := attempt.ID + "-try-1"
+	attempt.Runs = []jobs.RunReference{{Try: 1, RunID: runID}}
+	taskDir := filepath.Join(stateDir, "gator", "tasks", runID)
+	if err := os.MkdirAll(taskDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	task, err := json.Marshal(orchestrator.Task{Version: orchestrator.TaskVersion, ID: "subagent-001", Role: "source_researcher", Status: "completed"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(taskDir, "subagent-001.json"), task, 0600); err != nil {
+		t.Fatal(err)
+	}
 	if err := jobStore.Record(attempt); err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +82,7 @@ func TestGoalActivityShowsDurableChecksAndPendingDecisions(t *testing.T) {
 	if err := goalCommand([]string{"activity", record.ID}, &output); err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{"Outcome: Choose a venue", "Step:", "next:", "last:", "Venue A cancelled", "Review venue cancellation", "Venue fallback", "gator goal pause " + record.ID} {
+	for _, expected := range []string{"Outcome: Choose a venue", "Step:", "next:", "last:", "Venue A cancelled", "specialist: subagent-001 source_researcher [completed]", "gator work tasks " + runID, "Review venue cancellation", "Venue fallback", "gator goal pause " + record.ID} {
 		if !strings.Contains(output.String(), expected) {
 			t.Fatalf("activity missing %q:\n%s", expected, output.String())
 		}

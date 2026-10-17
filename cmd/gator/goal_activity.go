@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 	"time"
 	"unicode"
@@ -11,6 +12,7 @@ import (
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
+	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/suggestion"
 )
 
@@ -138,6 +140,25 @@ func renderGoalActivity(stateDir, goalID string, out io.Writer) error {
 					break
 				}
 				fmt.Fprintf(&view, "    changed: %s %s %s\n", change.Kind, activityLine(change.Source, 60), activityLine(change.ID, 80))
+			}
+			if len(last.Runs) > 0 {
+				run := last.Runs[len(last.Runs)-1]
+				runID := run.RunID
+				if runID == fmt.Sprintf("%s-try-%d", last.ID, run.Try) && filepath.Base(runID) == runID && !strings.ContainsAny(runID, "\\/") {
+					tasks, err := orchestrator.ReadTasks(filepath.Join(stateDir, "gator", "tasks", runID))
+					if err != nil {
+						view.WriteString("    specialist checkpoints unavailable; inspect the Work run.\n")
+					} else if len(tasks) > 0 {
+						for index, task := range tasks {
+							if index == 3 {
+								fmt.Fprintf(&view, "    ... and %d more specialist tasks\n", len(tasks)-3)
+								break
+							}
+							fmt.Fprintf(&view, "    specialist: %s %s [%s]\n", activityLine(task.ID, 40), activityLine(task.Role, 60), activityLine(task.Status, 30))
+						}
+						fmt.Fprintf(&view, "    inspect: gator work tasks %s\n", runID)
+					}
+				}
 			}
 		}
 	}
