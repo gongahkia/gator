@@ -3,8 +3,10 @@
 Gator's Google Workspace connector provides Google Drive, Docs, Sheets,
 Calendar event reads, and Gmail message reads to Gator Work. This supports a
 daily brief that combines local notes, today's calendar, and selected inbox
-messages, then drafts a local document or email for review. Gator does not
-send email or change calendar events through this connector.
+messages, then drafts a local document or email for review. A separately
+enabled Gmail send operation can send one plain-text message to one recipient
+only in a foreground `act` run after exact approval. Gator does not change
+calendar events through this connector.
 
 An ongoing goal can select this connector in a timed, read-only follow-up with
 `gator goal schedule GOAL_ID --cron '0 9 * * *' --connector google-work --task 'Prepare the daily brief from selected mail and calendar events'`.
@@ -51,6 +53,11 @@ Drive metadata read, and Docs/Sheets read-write. `--daily-context` explicitly
 adds Calendar event read and Gmail read-only scopes. Without it, those operations
 are absent from the agent tool list. For an existing connection, add a separate
 Google connector with `--daily-context` and run `connector login` for it.
+To enable sending, add `--send-email` during setup and log in with that new
+scope. It requests only `gmail.send` for the send operation; `--daily-context`
+is still needed if Gator should read Gmail and Calendar. Existing credentials
+do not silently gain the send scope. Google classifies `gmail.send` as a
+sensitive scope, so a published OAuth app may need verification.
 Gmail read-only is a restricted Google scope,
 so publishing a broadly available OAuth app may require Google's verification
 process. Existing authorizations may retain previously granted scopes at
@@ -69,9 +76,20 @@ Docs create/batch update and Sheets create/range/batch update, plus an ordered
 batch of those typed mutations. Update payloads may include a Google `etag`;
 Gator binds it to the approved payload and sends it as `If-Match`.
 
+`gmail_send` accepts exactly `from`, `to`, `subject`, and `body` in its action
+payload. It creates a plain-text MIME message for one recipient, with no
+attachments, Cc, or Bcc. The `from` address must be a sender Gmail accepts for
+the connected account. Gator shows the exact fields and target for approval;
+an unattended goal check cannot use this operation. A successful send retains
+Gmail's message ID in the action record in the Work bundle. If the API outcome
+is uncertain, Gator records that uncertainty and does not retry automatically.
+
 Every mutation requires Work `act` mode and a fresh approval for the exact
 operation, target, and payload hash. A batch contains at most 25 typed
 operations and is never replayed automatically after an ambiguous outcome.
+Gmail sends follow the same no-automatic-retry rule. This operation follows
+Google's [MIME and base64url send guide](https://developers.google.com/workspace/gmail/api/guides/sending)
+and uses the separate [Gmail send scope](https://developers.google.com/workspace/gmail/api/auth/scopes).
 
 ## Boundaries
 

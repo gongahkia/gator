@@ -38,6 +38,7 @@ const (
 	GoogleOAuthRedirectURL  = "http://127.0.0.1:0/oauth/callback"
 	GoogleOAuthScopes       = "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/drive.metadata.readonly https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/spreadsheets"
 	GoogleDailyOAuthScopes  = "https://www.googleapis.com/auth/calendar.events.readonly https://www.googleapis.com/auth/gmail.readonly"
+	GoogleSendOAuthScope    = "https://www.googleapis.com/auth/gmail.send"
 )
 
 var idPattern = regexp.MustCompile(`\A[a-z][a-z0-9-]{0,63}\z`)
@@ -227,6 +228,9 @@ func (d Descriptor) Operations() []Operation {
 			if (operation.ID == "gmail_list" || operation.ID == "gmail_get") && !granted["https://www.googleapis.com/auth/gmail.readonly"] {
 				continue
 			}
+			if operation.ID == "gmail_send" && !granted[GoogleSendOAuthScope] {
+				continue
+			}
 			filtered = append(filtered, operation)
 		}
 		return filtered
@@ -286,6 +290,7 @@ func googleOperations() []Operation {
 		{"sheets_create", "Prepare Google Sheet creation for exact approval.", action.ConnectedMutate},
 		{"sheets_values_update", "Prepare a Google Sheet range update for exact approval.", action.ConnectedMutate},
 		{"sheets_batch_update", "Prepare Google Sheet batch updates for exact approval.", action.ConnectedMutate},
+		{"gmail_send", "Send one plain-text email to one recipient after exact foreground approval. Never retry an uncertain send automatically.", action.Publish},
 		{"batch", "Prepare an ordered batch of Google Docs and Sheets mutations for one exact approval. Gator never retries an ambiguous batch outcome.", action.ConnectedMutate},
 	})...)
 	for index := range operations {
@@ -303,6 +308,9 @@ func googleOperations() []Operation {
 		}
 		if operations[index].ID == "gmail_get" {
 			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["resource_id"],"properties":{"resource_id":{"type":"string","minLength":1,"maxLength":2048}},"additionalProperties":false}`)
+		}
+		if operations[index].ID == "gmail_send" {
+			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["payload"],"properties":{"payload":{"type":"object","required":["from","to","subject","body"],"properties":{"from":{"type":"string","minLength":3,"maxLength":254},"to":{"type":"string","minLength":3,"maxLength":254},"subject":{"type":"string","minLength":1,"maxLength":200},"body":{"type":"string","minLength":1,"maxLength":10000}},"additionalProperties":false}},"additionalProperties":false}`)
 		}
 		if operations[index].ID == "batch" {
 			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["payload"],"properties":{"payload":{"type":"object","required":["actions"],"properties":{"actions":{"type":"array","minItems":1,"maxItems":25,"items":{"type":"object","required":["operation","payload"],"properties":{"operation":{"type":"string"},"payload":{"type":"object"}},"additionalProperties":false}}},"additionalProperties":false}},"additionalProperties":false}`)

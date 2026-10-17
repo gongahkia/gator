@@ -150,6 +150,73 @@ func TestConnectorToolExecutesWebhookOnlyAfterFreshApproval(t *testing.T) {
 	}
 }
 
+func TestGmailSendStaysDraftOrDeniedUntilFreshApproval(t *testing.T) {
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		requests.Add(1)
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"id":"sent-1"}`))
+	}))
+	defer server.Close()
+	descriptor := connector.Descriptor{Version: connector.DescriptorVersion, ID: "google", Name: "Google", Kind: connector.KindGoogle, Resource: server.URL, Authentication: connector.AuthNone}
+	registry, err := connector.NewRegistry([]connector.Descriptor{descriptor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime := connector.Runtime{Registry: registry, HTTPClient: server.Client()}
+	arguments := `{"payload":{"from":"me@example.com","to":"venue@example.com","subject":"Venue update","body":"Can we use the new date?"}}`
+	for _, scenario := range []struct {
+		mode        action.Mode
+		disposition action.Disposition
+		decision    action.Decision
+		status      string
+		requests    int32
+	}{
+		{action.Draft, action.Propose, "", `"status":"pending"`, 0},
+		{action.Act, action.Approve, action.Deny, `"status":"denied"`, 0},
+		{action.Act, action.Approve, action.Allow, `"status":"executed"`, 1},
+	} {
+		surface, err := ConnectorTools(runtime, []string{descriptor.ID}, ConnectorPolicy{
+			Mode: scenario.mode, ExternalActions: scenario.disposition,
+			Approve: func(_ context.Context, proposal action.Proposal) (action.Decision, error) {
+				if proposal.Target != server.URL+"/gmail/v1/users/me/messages/send" || !strings.Contains(proposal.Preview, "venue@example.com") {
+					t.Fatalf("approval proposal = %#v", proposal)
+				}
+				return scenario.decision, nil
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		found := false
+		for _, tool := range surface {
+			if tool.Definition().Name != "connector_google_gmail_send" {
+				continue
+			}
+			found = true
+			result := executeTool(t, tool, arguments)
+			if !strings.Contains(result, scenario.status) || requests.Load() != scenario.requests {
+				t.Fatalf("Gmail send result=%s, requests=%d", result, requests.Load())
+			}
+			if scenario.decision == action.Allow && !strings.Contains(result, `"receipt_id":"sent-1"`) {
+				t.Fatalf("approved Gmail send lost provider receipt: %s", result)
+			}
+		}
+		if !found {
+			t.Fatal("Gmail send tool was not exposed")
+		}
+	}
+	forbidden, err := ConnectorTools(runtime, []string{descriptor.ID}, ConnectorPolicy{Mode: action.Inspect, ExternalActions: action.Forbid})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tool := range forbidden {
+		if tool.Definition().Name == "connector_google_gmail_send" {
+			t.Fatal("unattended inspect mode exposed Gmail send")
+		}
+	}
+}
+
 func TestConnectorToolsHideForbiddenActions(t *testing.T) {
 	t.Parallel()
 	descriptor := connector.Descriptor{Version: connector.DescriptorVersion, ID: "release", Name: "Release", Kind: connector.KindHTTPWebhook, Resource: "https://example.com/hook", Authentication: connector.AuthNone}

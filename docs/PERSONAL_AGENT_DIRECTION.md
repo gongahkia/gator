@@ -78,7 +78,7 @@ installed and the user session remains active).
 
 1. **Measure continuity quality.** Test multi-day goals with corrections, expiry, scope boundaries, and changing source facts. Compare live model behavior against a same-model baseline; passing storage tests alone does not prove agent usefulness.
 2. **Improve recall.** Measure lexical misses and false matches, then add source-linked retrieval over retained notes and documents. Preserve explicit correction and forgetting controls.
-3. **Broaden the goal loop.** Local files, due times, and bounded JSON/Gmail/Calendar polling are wired. Measure next-step and draft quality, missed changes, query caps, and read failures; then add provider cursors and a clear review flow for proposed actions. Keep exact approval before external changes.
+3. **Broaden the goal loop.** Local files, due times, and bounded JSON/Gmail/Calendar polling are wired. Measure next-step and draft quality, missed changes, query caps, and read failures; then add provider cursors and a clear review flow for proposed actions. A separately scoped Gmail send can complete a foreground approved action; unattended watches remain read and draft only. Capture provider receipts and reconcile uncertain sends before expanding action support.
 4. **Improve quiet follow-up.** The watch avoids unchanged model calls and honors an explicit attention decision. Measure false alerts and missed material changes before claiming semantic change detection.
 5. **Measure runtime cost.** Use the [runtime measurement tool](RUNTIME_BENCHMARK.md) to compare idle RAM, peak RAM, cold start, first response, and task cost against representative terminal agents on the same machine and model. Treat low RAM as a target until comparative runs exist.
 

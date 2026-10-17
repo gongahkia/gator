@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/connector"
 )
 
@@ -171,7 +172,7 @@ func TestConnectorCommandDefaultsGoogleToUserOwnedDesktopOAuthAndGranularOperati
 			t.Fatalf("Google operation %q is missing from %#v", required, operations)
 		}
 	}
-	for _, hidden := range []string{"calendar_events", "gmail_list", "gmail_get"} {
+	for _, hidden := range []string{"calendar_events", "gmail_list", "gmail_get", "gmail_send"} {
 		if operations[hidden] {
 			t.Fatalf("Google operation %q exposed without its scope", hidden)
 		}
@@ -184,6 +185,30 @@ func TestConnectorCommandDefaultsGoogleToUserOwnedDesktopOAuthAndGranularOperati
 		if operations[removed] {
 			t.Fatalf("removed Google operation %q remains in %#v", removed, operations)
 		}
+	}
+}
+
+func TestGoogleSendRequiresSeparateExplicitScope(t *testing.T) {
+	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
+	t.Setenv("GATOR_STATE_DIR", t.TempDir())
+	if err := connectorCommandWithIO([]string{"add", "mail-google", "--kind", "google", "--oauth-client-id", "desktop-client", "--daily-context", "--send-email"}, strings.NewReader(""), &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	settings, err := loadSettings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	descriptor := settings.Connectors[0]
+	if !strings.Contains(descriptor.OAuthScopes, connector.GoogleSendOAuthScope) {
+		t.Fatalf("send scope missing: %s", descriptor.OAuthScopes)
+	}
+	registry, err := connector.NewRegistry(settings.Connectors)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, operation, err := registry.Operation(descriptor.ID, "gmail_send")
+	if err != nil || operation.Capability != action.Publish {
+		t.Fatalf("Gmail send operation = %#v, %v", operation, err)
 	}
 }
 

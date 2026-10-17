@@ -113,6 +113,7 @@ func addConnector(id string, arguments []string, out io.Writer) error {
 	oauthRedirectURL := flags.String("oauth-redirect-url", "", "registered HTTP loopback callback URL (Google defaults to a private ephemeral callback)")
 	oauthScopes := flags.String("oauth-scopes", "", "space-separated OAuth scopes")
 	dailyContext := flags.Bool("daily-context", false, "request Google Calendar event and Gmail read scopes")
+	sendEmail := flags.Bool("send-email", false, "request the separate Gmail send scope for foreground approved messages")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
@@ -158,8 +159,8 @@ func addConnector(id string, arguments []string, out io.Writer) error {
 		}
 	}
 	if kind == connector.KindGoogle && strings.TrimSpace(*authentication) == connector.AuthOAuth {
-		if *dailyContext && strings.TrimSpace(*oauthScopes) != "" {
-			return errors.New("--daily-context cannot be combined with --oauth-scopes")
+		if (*dailyContext || *sendEmail) && strings.TrimSpace(*oauthScopes) != "" {
+			return errors.New("--daily-context and --send-email cannot be combined with --oauth-scopes")
 		}
 		if strings.TrimSpace(*oauthAuthorizeURL) == "" {
 			*oauthAuthorizeURL = connector.GoogleOAuthAuthorizeURL
@@ -175,9 +176,12 @@ func addConnector(id string, arguments []string, out io.Writer) error {
 			if *dailyContext {
 				*oauthScopes += " " + connector.GoogleDailyOAuthScopes
 			}
+			if *sendEmail {
+				*oauthScopes += " " + connector.GoogleSendOAuthScope
+			}
 		}
-	} else if *dailyContext {
-		return errors.New("--daily-context requires a Google OAuth connector")
+	} else if *dailyContext || *sendEmail {
+		return errors.New("--daily-context and --send-email require a Google OAuth connector")
 	}
 	descriptor := connector.Descriptor{
 		Version: connector.DescriptorVersion, ID: id, Name: strings.TrimSpace(*name),
