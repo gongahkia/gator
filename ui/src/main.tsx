@@ -158,49 +158,60 @@ function GreenPrompt({
   const palette = useGatorPalette();
   const [cursor, setCursor] = useState(value.length);
   const [historyIndex, setHistoryIndex] = useState(-1);
-  useEffect(() => { setCursor(value.length); }, [prefillVersion]);
+  const valueRef = useRef(value);
+  const cursorRef = useRef(cursor);
+  const historyIndexRef = useRef(historyIndex);
+  valueRef.current = value;
+  cursorRef.current = cursor;
+  const moveCursor = (position: number) => { cursorRef.current = position; setCursor(position); };
+  const moveHistory = (position: number) => { historyIndexRef.current = position; setHistoryIndex(position); };
+  useEffect(() => { valueRef.current = value; moveCursor(value.length); }, [prefillVersion]);
   const replace = (next: string, position: number) => {
+    valueRef.current = next;
     onChange(next);
-    setCursor(position);
-    setHistoryIndex(-1);
+    moveCursor(position);
+    moveHistory(-1);
   };
   useInput((input, key) => {
     if (disabled) return;
-    if ((key.return && key.shift) || (key.ctrl && input === "j")) { replace(value.slice(0, cursor) + "\n" + value.slice(cursor), cursor + 1); return; }
-    if (key.return) { if (value.trim()) onSubmit(value); setCursor(0); setHistoryIndex(-1); return; }
-    if (key.leftArrow) { setCursor((position) => previousGrapheme(value, position)); return; }
-    if (key.rightArrow) { setCursor((position) => nextGrapheme(value, position)); return; }
-    if (key.home || (key.ctrl && input === "a")) { setCursor(0); return; }
-    if (key.end || (key.ctrl && input === "e")) { setCursor(value.length); return; }
-    const beforeCursor = value.slice(0, cursor);
+    const current = valueRef.current;
+    const position = cursorRef.current;
+    const historyPosition = historyIndexRef.current;
+    if ((key.return && key.shift) || (key.ctrl && input === "j")) { replace(current.slice(0, position) + "\n" + current.slice(position), position + 1); return; }
+    if (key.return) { if (current.trim()) onSubmit(current); valueRef.current = ""; moveCursor(0); moveHistory(-1); return; }
+    if (key.leftArrow) { moveCursor(previousGrapheme(current, position)); return; }
+    if (key.rightArrow) { moveCursor(nextGrapheme(current, position)); return; }
+    if (key.home || (key.ctrl && input === "a")) { moveCursor(0); return; }
+    if (key.end || (key.ctrl && input === "e")) { moveCursor(current.length); return; }
+    const beforeCursor = current.slice(0, position);
     const currentLine = beforeCursor.split("\n").length - 1;
-    const lines = value.split("\n");
+    const lines = current.split("\n");
     const column = graphemeColumn(lines[currentLine], beforeCursor.length - beforeCursor.lastIndexOf("\n") - 1);
     if (key.upArrow && currentLine > 0) {
       const start = lines.slice(0, currentLine - 1).reduce((count, line) => count + line.length + 1, 0);
-      setCursor(start + cursorAtGraphemeColumn(lines[currentLine - 1], column)); return;
+      moveCursor(start + cursorAtGraphemeColumn(lines[currentLine - 1], column)); return;
     }
     if (key.downArrow && currentLine + 1 < lines.length) {
       const start = lines.slice(0, currentLine + 1).reduce((count, line) => count + line.length + 1, 0);
-      setCursor(start + cursorAtGraphemeColumn(lines[currentLine + 1], column)); return;
+      moveCursor(start + cursorAtGraphemeColumn(lines[currentLine + 1], column)); return;
     }
-    if (key.upArrow && historyIndex + 1 < history.length) {
-      const next = historyIndex + 1; setHistoryIndex(next); onChange(history[next]); setCursor(history[next].length); return;
+    if (key.upArrow && historyPosition + 1 < history.length) {
+      const next = historyPosition + 1; moveHistory(next); valueRef.current = history[next]; onChange(history[next]); moveCursor(history[next].length); return;
     }
-    if (key.downArrow && historyIndex >= 0) {
-      const next = historyIndex - 1; setHistoryIndex(next); onChange(next < 0 ? "" : history[next]); setCursor(next < 0 ? 0 : history[next].length); return;
+    if (key.downArrow && historyPosition >= 0) {
+      const next = historyPosition - 1; moveHistory(next); valueRef.current = next < 0 ? "" : history[next]; onChange(valueRef.current); moveCursor(valueRef.current.length); return;
     }
-    if (key.backspace) { if (cursor > 0) { const previous = previousGrapheme(value, cursor); replace(value.slice(0, previous) + value.slice(cursor), previous); } return; }
-    if (key.delete) { if (cursor < value.length) replace(value.slice(0, cursor) + value.slice(nextGrapheme(value, cursor)), cursor); return; }
-    if (key.ctrl && input === "u") { replace(value.slice(cursor), 0); return; }
+    if (key.backspace) { if (position > 0) { const previous = previousGrapheme(current, position); replace(current.slice(0, previous) + current.slice(position), previous); } return; }
+    if (key.delete) { if (position < current.length) replace(current.slice(0, position) + current.slice(nextGrapheme(current, position)), position); return; }
+    if (key.ctrl && input === "u") { replace(current.slice(position), 0); return; }
     if (key.ctrl && input === "w") {
-      const before = value.slice(0, cursor);
+      const before = current.slice(0, position);
       const keep = before.replace(/\s*\S+\s*$/, "");
-      replace(keep + value.slice(cursor), keep.length);
+      replace(keep + current.slice(position), keep.length);
       return;
     }
     if (key.ctrl || key.meta || key.tab || key.escape) return;
-    if (input) replace(value.slice(0, cursor) + input + value.slice(cursor), cursor + input.length);
+    if (input) replace(current.slice(0, position) + input + current.slice(position), position + input.length);
   }, { isActive: !disabled });
   return (
     <Box flexDirection="column">
@@ -219,12 +230,12 @@ function GreenPrompt({
 }
 
 function ChatKeys({
-  state, draft, matches, selected, setSelected, choose, dismiss, search, scroll, scrollToEnd, exit, clearDraft, bridge,
+  state, draftRef, selectedRef, dismissedRef, setSelected, choose, dismiss, search, scroll, scrollToEnd, exit, clearDraft, bridge,
 }: {
   state: BackendState;
-  draft: string;
-  matches: BackendCommand[];
-  selected: number;
+  draftRef: React.RefObject<string>;
+  selectedRef: React.RefObject<number>;
+  dismissedRef: React.RefObject<boolean>;
   setSelected: React.Dispatch<React.SetStateAction<number>>;
   choose: (command: BackendCommand) => void;
   dismiss: () => void;
@@ -236,6 +247,10 @@ function ChatKeys({
   bridge: GatorBridge;
 }): null {
   useInput((input, key, event) => {
+    const draft = draftRef.current;
+    const matches = !dismissedRef.current && draft.startsWith("/") && !draft.includes(" ")
+      ? state.commands.filter((command) => (draft === "/" ? !command.advanced : `/${command.name}`.startsWith(draft))).slice(0, 8)
+      : [];
     if (key.ctrl && input === "d") { event.stopImmediatePropagation(); exit(); return; }
     if (key.ctrl && input === "c" && !state.running) { event.stopImmediatePropagation(); clearDraft(); return; }
     if ((key.ctrl && input === "c") || (key.escape && state.running)) {
@@ -257,11 +272,13 @@ function ChatKeys({
     if (key.escape) { event.stopImmediatePropagation(); dismiss(); }
     else if (key.upArrow || key.downArrow) {
       event.stopImmediatePropagation();
-      setSelected((index) => (index + (key.upArrow ? -1 : 1) + matches.length) % matches.length);
+      const next = (selectedRef.current + (key.upArrow ? -1 : 1) + matches.length) % matches.length;
+      selectedRef.current = next;
+      setSelected(next);
     } else if (key.return || key.tab) {
       event.stopImmediatePropagation();
       const exact = matches.find((command) => `/${command.name}` === draft.trim());
-      choose(exact ?? matches[Math.min(selected, matches.length - 1)]);
+      choose(exact ?? matches[Math.min(selectedRef.current, matches.length - 1)]);
     }
   }, { captureCtrlC: true });
   return null;
@@ -363,23 +380,36 @@ function GreenSearch({ messages, close, navigate }: { messages: BackendMessage[]
   const [cursor, setCursor] = useState(0);
   const [matches, setMatches] = useState<ReturnType<typeof searchMessages>>([]);
   const [selected, setSelected] = useState(0);
+  const queryRef = useRef(query);
+  const cursorRef = useRef(cursor);
+  const matchesRef = useRef(matches);
+  const selectedRef = useRef(selected);
+  queryRef.current = query;
+  cursorRef.current = cursor;
+  matchesRef.current = matches;
+  selectedRef.current = selected;
   const change = (value: string, position: number) => {
     const found = searchMessages(messages, value);
+    queryRef.current = value; cursorRef.current = position; matchesRef.current = found; selectedRef.current = 0;
     setQuery(value); setCursor(position); setMatches(found); setSelected(0);
     if (found.length) navigate(found[0].index);
   };
   useInput((input, key, event) => {
     event.stopImmediatePropagation();
+    const current = queryRef.current;
+    const position = cursorRef.current;
+    const found = matchesRef.current;
+    const selectedMatch = selectedRef.current;
     if (key.escape) close();
-    else if (key.leftArrow) setCursor(previousGrapheme(query, cursor));
-    else if (key.rightArrow) setCursor(nextGrapheme(query, cursor));
-    else if (key.backspace && cursor > 0) { const previous = previousGrapheme(query, cursor); change(query.slice(0, previous) + query.slice(cursor), previous); }
-    else if (key.delete && cursor < query.length) change(query.slice(0, cursor) + query.slice(nextGrapheme(query, cursor)), cursor);
-    else if ((key.return || (key.ctrl && input === "n")) && matches.length) {
-      const next = (selected + 1) % matches.length; setSelected(next); navigate(matches[next].index);
-    } else if (key.ctrl && input === "p" && matches.length) {
-      const previous = (selected - 1 + matches.length) % matches.length; setSelected(previous); navigate(matches[previous].index);
-    } else if (!key.ctrl && !key.meta && input) change(query.slice(0, cursor) + input + query.slice(cursor), cursor + input.length);
+    else if (key.leftArrow) { cursorRef.current = previousGrapheme(current, position); setCursor(cursorRef.current); }
+    else if (key.rightArrow) { cursorRef.current = nextGrapheme(current, position); setCursor(cursorRef.current); }
+    else if (key.backspace && position > 0) { const previous = previousGrapheme(current, position); change(current.slice(0, previous) + current.slice(position), previous); }
+    else if (key.delete && position < current.length) change(current.slice(0, position) + current.slice(nextGrapheme(current, position)), position);
+    else if ((key.return || (key.ctrl && input === "n")) && found.length) {
+      const next = (selectedMatch + 1) % found.length; selectedRef.current = next; setSelected(next); navigate(found[next].index);
+    } else if (key.ctrl && input === "p" && found.length) {
+      const previous = (selectedMatch - 1 + found.length) % found.length; selectedRef.current = previous; setSelected(previous); navigate(found[previous].index);
+    } else if (!key.ctrl && !key.meta && input) change(current.slice(0, position) + input + current.slice(position), position + input.length);
   });
   return <Box paddingX={1}><Text color={palette.accent}>Search: </Text><Text>{query.slice(0, cursor)}<Text inverse>{graphemeAt(query, cursor) || " "}</Text>{query.slice(nextGrapheme(query, cursor))}</Text><Text dimColor>{`  ${matches.length ? `${selected + 1}/${matches.length} matches` : "no matches"}`}</Text></Box>;
 }
@@ -400,6 +430,9 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
   const palette = paletteForTheme(state?.theme);
   const list = useRef<VirtualListHandle>(null);
   const lastBackendInput = useRef("");
+  const inputRef = useRef(input);
+  const selectedRef = useRef(selected);
+  const dismissedRef = useRef(dismissed);
 
   useEffect(() => {
     const unsubscribe = bridge.subscribe(setState);
@@ -415,6 +448,7 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
 
   useEffect(() => {
     if (state?.mode === "chat" && state.input && state.input !== lastBackendInput.current) {
+      inputRef.current = state.input;
       setInput(state.input);
       setPrefillVersion((version) => version + 1);
     }
@@ -433,10 +467,12 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
     const text = value.trim();
     if (!text) return;
     bridge.send({ type: "submit", text });
+    inputRef.current = ""; dismissedRef.current = false;
     setInput(""); setDismissed(false); setHistory((current) => [text, ...current]);
   };
   const choose = (command: BackendCommand) => {
-    if (command.needs_input && input.trim() !== `/${command.name}`) {
+    if (command.needs_input && inputRef.current.trim() !== `/${command.name}`) {
+      inputRef.current = `/${command.name} `; dismissedRef.current = true;
       setInput(`/${command.name} `);
       setPrefillVersion((version) => version + 1);
       setDismissed(true);
@@ -478,10 +514,10 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
         {state.running && <Box marginTop={1}>{state.cancelling ? <Text color={palette.warning}>◌ Stopping… retaining evidence</Text> : <Spinner verb="Working" label={`${state.elapsed ?? ""} · Esc to interrupt`} color={palette.accent} showElapsed={false} />}</Box>}
       </Box>
       {state.status && <Text color={palette.secondary}>{state.status}</Text>}
-      {!searchOpen && <ChatKeys state={state} draft={input} matches={matches} selected={selected} setSelected={setSelected} choose={choose} dismiss={() => setDismissed(true)} search={() => setSearchOpen(true)} scroll={(rows) => list.current?.scrollBy(rows)} scrollToEnd={() => list.current?.scrollToEnd()} exit={close} clearDraft={() => { setInput(""); setPrefillVersion((version) => version + 1); }} bridge={bridge} />}
+      {!searchOpen && <ChatKeys state={state} draftRef={inputRef} selectedRef={selectedRef} dismissedRef={dismissedRef} setSelected={setSelected} choose={choose} dismiss={() => { dismissedRef.current = true; setDismissed(true); }} search={() => setSearchOpen(true)} scroll={(rows) => list.current?.scrollBy(rows)} scrollToEnd={() => list.current?.scrollToEnd()} exit={close} clearDraft={() => { inputRef.current = ""; setInput(""); setPrefillVersion((version) => version + 1); }} bridge={bridge} />}
       {searchOpen && <GreenSearch messages={state.messages} close={() => setSearchOpen(false)} navigate={(index) => list.current?.scrollTo(index)} />}
       <Divider color={palette.secondary} />
-      <GreenPrompt value={input} onChange={(value) => { setInput(value); setSelected(0); setDismissed(false); }} onSubmit={submit} disabled={searchOpen || !!failure} history={history} prefillVersion={prefillVersion} />
+      <GreenPrompt value={input} onChange={(value) => { inputRef.current = value; selectedRef.current = 0; dismissedRef.current = false; setInput(value); setSelected(0); setDismissed(false); }} onSubmit={submit} disabled={searchOpen || !!failure} history={history} prefillVersion={prefillVersion} />
       {matches.length > 0 && <Box marginLeft={2} flexDirection="column">{matches.map((command, index) => <Box key={command.name}><Text color={index === selected ? palette.accent : undefined} bold={index === selected}>{index === selected ? "❯" : " "} /{command.name}</Text><Text dimColor>  {command.description}</Text></Box>)}</Box>}
       {failure && <Text color={palette.error}>{failure}</Text>}
       <Divider color={palette.secondary} />

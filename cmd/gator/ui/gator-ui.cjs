@@ -46311,93 +46311,114 @@ function GreenPrompt({
   const palette = useGatorPalette();
   const [cursor, setCursor] = (0, import_react58.useState)(value.length);
   const [historyIndex, setHistoryIndex] = (0, import_react58.useState)(-1);
+  const valueRef = (0, import_react58.useRef)(value);
+  const cursorRef = (0, import_react58.useRef)(cursor);
+  const historyIndexRef = (0, import_react58.useRef)(historyIndex);
+  valueRef.current = value;
+  cursorRef.current = cursor;
+  const moveCursor = (position) => {
+    cursorRef.current = position;
+    setCursor(position);
+  };
+  const moveHistory = (position) => {
+    historyIndexRef.current = position;
+    setHistoryIndex(position);
+  };
   (0, import_react58.useEffect)(() => {
-    setCursor(value.length);
+    valueRef.current = value;
+    moveCursor(value.length);
   }, [prefillVersion]);
   const replace = (next, position) => {
+    valueRef.current = next;
     onChange(next);
-    setCursor(position);
-    setHistoryIndex(-1);
+    moveCursor(position);
+    moveHistory(-1);
   };
   use_input_default((input, key) => {
     if (disabled) return;
+    const current = valueRef.current;
+    const position = cursorRef.current;
+    const historyPosition = historyIndexRef.current;
     if (key.return && key.shift || key.ctrl && input === "j") {
-      replace(value.slice(0, cursor) + "\n" + value.slice(cursor), cursor + 1);
+      replace(current.slice(0, position) + "\n" + current.slice(position), position + 1);
       return;
     }
     if (key.return) {
-      if (value.trim()) onSubmit(value);
-      setCursor(0);
-      setHistoryIndex(-1);
+      if (current.trim()) onSubmit(current);
+      valueRef.current = "";
+      moveCursor(0);
+      moveHistory(-1);
       return;
     }
     if (key.leftArrow) {
-      setCursor((position) => previousGrapheme(value, position));
+      moveCursor(previousGrapheme(current, position));
       return;
     }
     if (key.rightArrow) {
-      setCursor((position) => nextGrapheme(value, position));
+      moveCursor(nextGrapheme(current, position));
       return;
     }
     if (key.home || key.ctrl && input === "a") {
-      setCursor(0);
+      moveCursor(0);
       return;
     }
     if (key.end || key.ctrl && input === "e") {
-      setCursor(value.length);
+      moveCursor(current.length);
       return;
     }
-    const beforeCursor = value.slice(0, cursor);
+    const beforeCursor = current.slice(0, position);
     const currentLine = beforeCursor.split("\n").length - 1;
-    const lines = value.split("\n");
+    const lines = current.split("\n");
     const column = graphemeColumn(lines[currentLine], beforeCursor.length - beforeCursor.lastIndexOf("\n") - 1);
     if (key.upArrow && currentLine > 0) {
       const start = lines.slice(0, currentLine - 1).reduce((count, line) => count + line.length + 1, 0);
-      setCursor(start + cursorAtGraphemeColumn(lines[currentLine - 1], column));
+      moveCursor(start + cursorAtGraphemeColumn(lines[currentLine - 1], column));
       return;
     }
     if (key.downArrow && currentLine + 1 < lines.length) {
       const start = lines.slice(0, currentLine + 1).reduce((count, line) => count + line.length + 1, 0);
-      setCursor(start + cursorAtGraphemeColumn(lines[currentLine + 1], column));
+      moveCursor(start + cursorAtGraphemeColumn(lines[currentLine + 1], column));
       return;
     }
-    if (key.upArrow && historyIndex + 1 < history.length) {
-      const next = historyIndex + 1;
-      setHistoryIndex(next);
+    if (key.upArrow && historyPosition + 1 < history.length) {
+      const next = historyPosition + 1;
+      moveHistory(next);
+      valueRef.current = history[next];
       onChange(history[next]);
-      setCursor(history[next].length);
+      moveCursor(history[next].length);
       return;
     }
-    if (key.downArrow && historyIndex >= 0) {
-      const next = historyIndex - 1;
-      setHistoryIndex(next);
-      onChange(next < 0 ? "" : history[next]);
-      setCursor(next < 0 ? 0 : history[next].length);
+    if (key.downArrow && historyPosition >= 0) {
+      const next = historyPosition - 1;
+      moveHistory(next);
+      valueRef.current = next < 0 ? "" : history[next];
+      onChange(valueRef.current);
+      moveCursor(valueRef.current.length);
       return;
     }
     if (key.backspace) {
-      if (cursor > 0) {
-        const previous = previousGrapheme(value, cursor);
-        replace(value.slice(0, previous) + value.slice(cursor), previous);
+      if (position > 0) {
+        const previous = previousGrapheme(current, position);
+        replace(current.slice(0, previous) + current.slice(position), previous);
       }
       return;
     }
     if (key.delete) {
-      if (cursor < value.length) replace(value.slice(0, cursor) + value.slice(nextGrapheme(value, cursor)), cursor);
+      if (position < current.length) replace(current.slice(0, position) + current.slice(nextGrapheme(current, position)), position);
       return;
     }
     if (key.ctrl && input === "u") {
-      replace(value.slice(cursor), 0);
+      replace(current.slice(position), 0);
       return;
     }
     if (key.ctrl && input === "w") {
-      const before = value.slice(0, cursor);
+      const before = current.slice(0, position);
       const keep = before.replace(/\s*\S+\s*$/, "");
-      replace(keep + value.slice(cursor), keep.length);
+      replace(keep + current.slice(position), keep.length);
       return;
     }
     if (key.ctrl || key.meta || key.tab || key.escape) return;
-    if (input) replace(value.slice(0, cursor) + input + value.slice(cursor), cursor + input.length);
+    if (input) replace(current.slice(0, position) + input + current.slice(position), position + input.length);
   }, { isActive: !disabled });
   return /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { flexDirection: "column", children: value ? value.split("\n").map((line, index, lines) => {
     const start = lines.slice(0, index).reduce((count, item) => count + item.length + 1, 0);
@@ -46420,9 +46441,9 @@ function GreenPrompt({
 }
 function ChatKeys({
   state,
-  draft,
-  matches,
-  selected,
+  draftRef,
+  selectedRef,
+  dismissedRef,
   setSelected,
   choose,
   dismiss,
@@ -46434,6 +46455,8 @@ function ChatKeys({
   bridge
 }) {
   use_input_default((input, key, event) => {
+    const draft = draftRef.current;
+    const matches = !dismissedRef.current && draft.startsWith("/") && !draft.includes(" ") ? state.commands.filter((command) => draft === "/" ? !command.advanced : `/${command.name}`.startsWith(draft)).slice(0, 8) : [];
     if (key.ctrl && input === "d") {
       event.stopImmediatePropagation();
       exit();
@@ -46482,11 +46505,13 @@ function ChatKeys({
       dismiss();
     } else if (key.upArrow || key.downArrow) {
       event.stopImmediatePropagation();
-      setSelected((index) => (index + (key.upArrow ? -1 : 1) + matches.length) % matches.length);
+      const next = (selectedRef.current + (key.upArrow ? -1 : 1) + matches.length) % matches.length;
+      selectedRef.current = next;
+      setSelected(next);
     } else if (key.return || key.tab) {
       event.stopImmediatePropagation();
       const exact = matches.find((command) => `/${command.name}` === draft.trim());
-      choose(exact ?? matches[Math.min(selected, matches.length - 1)]);
+      choose(exact ?? matches[Math.min(selectedRef.current, matches.length - 1)]);
     }
   }, { captureCtrlC: true });
   return null;
@@ -46611,8 +46636,20 @@ function GreenSearch({ messages, close, navigate }) {
   const [cursor, setCursor] = (0, import_react58.useState)(0);
   const [matches, setMatches] = (0, import_react58.useState)([]);
   const [selected, setSelected] = (0, import_react58.useState)(0);
+  const queryRef = (0, import_react58.useRef)(query);
+  const cursorRef = (0, import_react58.useRef)(cursor);
+  const matchesRef = (0, import_react58.useRef)(matches);
+  const selectedRef = (0, import_react58.useRef)(selected);
+  queryRef.current = query;
+  cursorRef.current = cursor;
+  matchesRef.current = matches;
+  selectedRef.current = selected;
   const change = (value, position) => {
     const found = searchMessages(messages, value);
+    queryRef.current = value;
+    cursorRef.current = position;
+    matchesRef.current = found;
+    selectedRef.current = 0;
     setQuery(value);
     setCursor(position);
     setMatches(found);
@@ -46621,22 +46658,32 @@ function GreenSearch({ messages, close, navigate }) {
   };
   use_input_default((input, key, event) => {
     event.stopImmediatePropagation();
+    const current = queryRef.current;
+    const position = cursorRef.current;
+    const found = matchesRef.current;
+    const selectedMatch = selectedRef.current;
     if (key.escape) close();
-    else if (key.leftArrow) setCursor(previousGrapheme(query, cursor));
-    else if (key.rightArrow) setCursor(nextGrapheme(query, cursor));
-    else if (key.backspace && cursor > 0) {
-      const previous = previousGrapheme(query, cursor);
-      change(query.slice(0, previous) + query.slice(cursor), previous);
-    } else if (key.delete && cursor < query.length) change(query.slice(0, cursor) + query.slice(nextGrapheme(query, cursor)), cursor);
-    else if ((key.return || key.ctrl && input === "n") && matches.length) {
-      const next = (selected + 1) % matches.length;
+    else if (key.leftArrow) {
+      cursorRef.current = previousGrapheme(current, position);
+      setCursor(cursorRef.current);
+    } else if (key.rightArrow) {
+      cursorRef.current = nextGrapheme(current, position);
+      setCursor(cursorRef.current);
+    } else if (key.backspace && position > 0) {
+      const previous = previousGrapheme(current, position);
+      change(current.slice(0, previous) + current.slice(position), previous);
+    } else if (key.delete && position < current.length) change(current.slice(0, position) + current.slice(nextGrapheme(current, position)), position);
+    else if ((key.return || key.ctrl && input === "n") && found.length) {
+      const next = (selectedMatch + 1) % found.length;
+      selectedRef.current = next;
       setSelected(next);
-      navigate(matches[next].index);
-    } else if (key.ctrl && input === "p" && matches.length) {
-      const previous = (selected - 1 + matches.length) % matches.length;
+      navigate(found[next].index);
+    } else if (key.ctrl && input === "p" && found.length) {
+      const previous = (selectedMatch - 1 + found.length) % found.length;
+      selectedRef.current = previous;
       setSelected(previous);
-      navigate(matches[previous].index);
-    } else if (!key.ctrl && !key.meta && input) change(query.slice(0, cursor) + input + query.slice(cursor), cursor + input.length);
+      navigate(found[previous].index);
+    } else if (!key.ctrl && !key.meta && input) change(current.slice(0, position) + input + current.slice(position), position + input.length);
   });
   return /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { paddingX: 1, children: [
     /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.accent, children: "Search: " }),
@@ -46664,6 +46711,9 @@ function App2({ bridge }) {
   const palette = paletteForTheme(state?.theme);
   const list = (0, import_react58.useRef)(null);
   const lastBackendInput = (0, import_react58.useRef)("");
+  const inputRef = (0, import_react58.useRef)(input);
+  const selectedRef = (0, import_react58.useRef)(selected);
+  const dismissedRef = (0, import_react58.useRef)(dismissed);
   (0, import_react58.useEffect)(() => {
     const unsubscribe = bridge.subscribe(setState);
     const unexit = bridge.onExit((code, detail) => {
@@ -46681,6 +46731,7 @@ function App2({ bridge }) {
   }, [bridge, exit]);
   (0, import_react58.useEffect)(() => {
     if (state?.mode === "chat" && state.input && state.input !== lastBackendInput.current) {
+      inputRef.current = state.input;
       setInput(state.input);
       setPrefillVersion((version) => version + 1);
     }
@@ -46699,12 +46750,16 @@ function App2({ bridge }) {
     const text = value.trim();
     if (!text) return;
     bridge.send({ type: "submit", text });
+    inputRef.current = "";
+    dismissedRef.current = false;
     setInput("");
     setDismissed(false);
     setHistory((current) => [text, ...current]);
   };
   const choose = (command) => {
-    if (command.needs_input && input.trim() !== `/${command.name}`) {
+    if (command.needs_input && inputRef.current.trim() !== `/${command.name}`) {
+      inputRef.current = `/${command.name} `;
+      dismissedRef.current = true;
       setInput(`/${command.name} `);
       setPrefillVersion((version) => version + 1);
       setDismissed(true);
@@ -46752,13 +46807,20 @@ function App2({ bridge }) {
       state.running && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginTop: 1, children: state.cancelling ? /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.warning, children: "\u25CC Stopping\u2026 retaining evidence" }) : /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Spinner, { verb: "Working", label: `${state.elapsed ?? ""} \xB7 Esc to interrupt`, color: palette.accent, showElapsed: false }) })
     ] }),
     state.status && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.secondary, children: state.status }),
-    !searchOpen && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(ChatKeys, { state, draft: input, matches, selected, setSelected, choose, dismiss: () => setDismissed(true), search: () => setSearchOpen(true), scroll: (rows) => list.current?.scrollBy(rows), scrollToEnd: () => list.current?.scrollToEnd(), exit: close, clearDraft: () => {
+    !searchOpen && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(ChatKeys, { state, draftRef: inputRef, selectedRef, dismissedRef, setSelected, choose, dismiss: () => {
+      dismissedRef.current = true;
+      setDismissed(true);
+    }, search: () => setSearchOpen(true), scroll: (rows) => list.current?.scrollBy(rows), scrollToEnd: () => list.current?.scrollToEnd(), exit: close, clearDraft: () => {
+      inputRef.current = "";
       setInput("");
       setPrefillVersion((version) => version + 1);
     }, bridge }),
     searchOpen && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(GreenSearch, { messages: state.messages, close: () => setSearchOpen(false), navigate: (index) => list.current?.scrollTo(index) }),
     /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Divider, { color: palette.secondary }),
     /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(GreenPrompt, { value: input, onChange: (value) => {
+      inputRef.current = value;
+      selectedRef.current = 0;
+      dismissedRef.current = false;
       setInput(value);
       setSelected(0);
       setDismissed(false);
