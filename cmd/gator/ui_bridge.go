@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strconv"
 	"strings"
 
@@ -55,6 +56,10 @@ func launchTerminalUI(conversationID, goalID string) (bool, error) {
 	}
 	command := exec.Command(node, bundle.Name(), binary, conversationID, goalID)
 	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
+	// The child may hand the terminal to an editor. Ctrl+C should interrupt that
+	// foreground job and leave the launcher waiting for the React UI to resume.
+	signal.Ignore(os.Interrupt)
+	defer signal.Reset(os.Interrupt)
 	return true, command.Run()
 }
 
@@ -158,11 +163,15 @@ func bridgeKey(name string) (tea.KeyMsg, bool) {
 }
 
 func runUIBridge(application worktui.Model) error {
+	// The renderer handles Ctrl+C in chat. During an external terminal handoff,
+	// the editor or login process receives SIGINT; keep the backend session alive.
+	signal.Ignore(os.Interrupt)
+	defer signal.Reset(os.Interrupt)
 	return runUIBridgeWithIO(application, os.Stdin, os.Stdout)
 }
 
 func runUIBridgeWithIO(application worktui.Model, in io.Reader, out io.Writer) error {
-	program := tea.NewProgram(&uiBridgeModel{model: application, out: json.NewEncoder(out)}, tea.WithoutRenderer(), tea.WithInput(nil))
+	program := tea.NewProgram(&uiBridgeModel{model: application, out: json.NewEncoder(out)}, tea.WithoutRenderer(), tea.WithInput(nil), tea.WithoutSignalHandler())
 	inputDone := make(chan error, 1)
 	go func() {
 		scanner := bufio.NewScanner(in)

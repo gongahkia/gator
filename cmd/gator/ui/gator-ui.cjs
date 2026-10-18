@@ -45603,6 +45603,9 @@ function App2({ bridge }) {
 }
 function runExternal(command) {
   return new Promise((resolve) => {
+    const onInterrupt = () => {
+    };
+    process.on("SIGINT", onInterrupt);
     const environment = command.env?.length ? Object.fromEntries(command.env.map((entry) => {
       const separator = entry.indexOf("=");
       return [entry.slice(0, separator), entry.slice(separator + 1)];
@@ -45616,6 +45619,7 @@ function runExternal(command) {
     const done = (error) => {
       if (finished) return;
       finished = true;
+      process.off("SIGINT", onInterrupt);
       resolve(error);
     };
     child.on("error", (error) => done(error.message));

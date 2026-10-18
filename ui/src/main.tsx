@@ -370,6 +370,10 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
 
 function runExternal(command: ExternalCommand): Promise<string> {
   return new Promise((resolve) => {
+    // The child shares the terminal process group. Let Ctrl+C interrupt that
+    // child without killing the renderer that will resume afterward.
+    const onInterrupt = () => {};
+    process.on("SIGINT", onInterrupt);
     const environment = command.env?.length
       ? Object.fromEntries(command.env.map((entry) => {
         const separator = entry.indexOf("=");
@@ -385,6 +389,7 @@ function runExternal(command: ExternalCommand): Promise<string> {
     const done = (error: string) => {
       if (finished) return;
       finished = true;
+      process.off("SIGINT", onInterrupt);
       resolve(error);
     };
     child.on("error", (error) => done(error.message));
