@@ -255,6 +255,14 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			return workTUIJobAction(arguments)
 		},
 		RefreshJobs: jobStore.List,
+		InboxAction: func(arguments []string) (string, error) {
+			var output bytes.Buffer
+			err := inboxCommand(arguments, &output)
+			return strings.TrimSpace(output.String()), err
+		},
+		RefreshInbox: func() ([]inbox.Entry, error) {
+			return inboxStore.List(false, 20)
+		},
 		Run: func(source, conversationID, prompt string, options worktui.RunOptions) worktui.RunResult {
 			if goalID != "" {
 				currentGoal, loadErr := goalStore.Load(goalID)

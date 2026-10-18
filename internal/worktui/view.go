@@ -3,6 +3,7 @@ package worktui
 import (
 	"fmt"
 	"strings"
+	"unicode"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gongahkia/gator/internal/learning"
@@ -251,13 +252,26 @@ func (m Model) renderSection(width, height int, accent, dim, selectedStyle lipgl
 	view.WriteString(accent.Render(gatorWordmark) + dim.Render("  "+title) + "\n\n")
 	messageStyle := lipgloss.NewStyle().Width(max(20, width-4))
 	if m.section == "inbox" {
+		if m.sectionNotice != "" {
+			view.WriteString(dim.Render(m.sectionNotice) + "\n\n")
+		}
 		if len(m.config.Inbox) == 0 {
 			view.WriteString(dim.Render("No recent results.") + "\n")
 		}
 		for _, item := range m.config.Inbox {
-			view.WriteString(messageStyle.Render(accent.Render(item.Status+":") + " " + item.Title + "\n" + item.Summary))
+			readState := "unread"
+			if !item.ReadAt.IsZero() {
+				readState = "read"
+			}
+			rating := item.Rating
+			if rating == "" {
+				rating = "unrated"
+			}
+			view.WriteString(messageStyle.Render(accent.Render(safeInboxText(item.Status)+":") + " " + safeInboxText(item.Title) + "\n" +
+				item.ID + " · " + readState + " · " + rating + "\n" + safeInboxText(item.Summary)))
 			view.WriteString("\n\n")
 		}
+		view.WriteString(dim.Render("esc, then /inbox rate ENTRY_ID useful|noise|wrong · /inbox read ENTRY_ID") + "\n")
 	} else {
 		if len(m.config.Jobs) == 0 {
 			view.WriteString(dim.Render("No scheduled jobs. Create one with `/jobs add …`.") + "\n")
@@ -274,6 +288,15 @@ func (m Model) renderSection(width, height int, accent, dim, selectedStyle lipgl
 	footer := wrapStatusLine([]string{"esc back", "ctrl+i workspace", "ctrl+p commands", "ctrl+x conversations", "ctrl+b inbox", "ctrl+j jobs"}, width)
 	view.WriteString("\n" + dim.Render(footer))
 	return view.String()
+}
+
+func safeInboxText(value string) string {
+	return strings.Map(func(character rune) rune {
+		if unicode.IsControl(character) {
+			return ' '
+		}
+		return character
+	}, value)
 }
 
 func (m Model) renderHistorySection(width, height int, accent, dim, selectedStyle lipgloss.Style) string {

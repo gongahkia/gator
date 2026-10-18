@@ -207,6 +207,12 @@ not create an inbox entry. These ratings describe only alerts that were shown;
 they cannot measure missed important changes or establish alert accuracy on
 their own.
 
+In interactive Gator, `ctrl+b` or `/inbox` opens a freshly loaded inbox panel.
+Each row shows its entry ID, read state, and rating. Press `esc` to return to
+chat, then use `/inbox show ENTRY_ID`, `/inbox read ENTRY_ID`, or
+`/inbox rate ENTRY_ID useful|noise|wrong|clear`. The panel refreshes when reopened
+and after an inbox action, including actions through `/jobs inbox ...`.
+
 `gator job quiet-audit JOB_ID` lists the newest 50 completed goal-watch checks
 where the model explicitly chose quiet, along with their attempt IDs, retained
 connected-item change counts, summaries, and Work IDs. It counts every retained

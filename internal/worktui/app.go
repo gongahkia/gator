@@ -170,6 +170,8 @@ type Config struct {
 	// as repeatable Work rather than creating a second TUI-only runtime.
 	JobAction      func(arguments []string) (string, error)
 	RefreshJobs    func() ([]jobs.Definition, error)
+	InboxAction    func(arguments []string) (string, error)
+	RefreshInbox   func() ([]inbox.Entry, error)
 	Run            func(source, conversationID, prompt string, options RunOptions) RunResult
 	MoveBack       func(conversationID string) (string, error)
 	MoveForward    func(conversationID string) (string, error)

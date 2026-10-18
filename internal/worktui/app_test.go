@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/gongahkia/gator/internal/goal"
+	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/worksession"
 )
@@ -129,6 +130,60 @@ func TestJobsUseTheConfiguredSharedServiceAndRefreshTheSection(t *testing.T) {
 	model = updated.(Model)
 	if model.section != "jobs" || !strings.Contains(model.View(), "Daily review") {
 		t.Fatalf("jobs section = %#v\n%s", model, model.View())
+	}
+}
+
+func TestInboxRefreshesOnOpenAndAfterRating(t *testing.T) {
+	entries := []inbox.Entry{{ID: "alert-one", Status: "completed", Title: "Venue update", Summary: "Deadline changed"}}
+	var received []string
+	model := New(Config{
+		CurrentFolder: "/work",
+		InboxAction: func(arguments []string) (string, error) {
+			received = append([]string(nil), arguments...)
+			entries[0].Rating = arguments[2]
+			return "Rating saved", nil
+		},
+		RefreshInbox: func() ([]inbox.Entry, error) {
+			return append([]inbox.Entry(nil), entries...), nil
+		},
+	})
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlB})
+	model = updated.(Model)
+	if model.section != "inbox" || !strings.Contains(model.View(), "alert-one") || !strings.Contains(model.View(), "unrated") {
+		t.Fatalf("fresh inbox panel = %s", model.View())
+	}
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model = updated.(Model)
+	model.input = "/inbox rate alert-one useful"
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if !reflect.DeepEqual(received, []string{"rate", "alert-one", "useful"}) || model.config.Inbox[0].Rating != "useful" || !strings.Contains(model.View(), "Rating saved") {
+		t.Fatalf("rating action = %#v inbox=%#v\n%s", received, model.config.Inbox, model.View())
+	}
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyCtrlB})
+	model = updated.(Model)
+	if !strings.Contains(model.View(), "alert-one · unread · useful") {
+		t.Fatalf("rated inbox panel = %s", model.View())
+	}
+	entries = append([]inbox.Entry{{ID: "alert-two", Status: "completed", Title: "New alert"}}, entries...)
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model = updated.(Model)
+	model.input = "/inbox"
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if model.section != "inbox" || !strings.Contains(model.View(), "alert-two") {
+		t.Fatalf("reopened inbox panel = %s", model.View())
+	}
+}
+
+func TestInboxPanelDoesNotInterpretStoredControlCharacters(t *testing.T) {
+	model := New(Config{CurrentFolder: "/work", Inbox: []inbox.Entry{{
+		ID: "alert-one", Status: "completed", Title: "Venue\x1b[2J update", Summary: "line one\rline two",
+	}}})
+	model.section = "inbox"
+	view := model.View()
+	if strings.Contains(view, "\x1b[2J") || strings.Contains(view, "\r") || !strings.Contains(view, "Venue [2J update") || !strings.Contains(view, "line one line two") {
+		t.Fatalf("unsafe or missing inbox content: %q", view)
 	}
 }
 
@@ -513,7 +568,7 @@ func TestCommandPaletteContainsCurrentCommands(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work"})
 	model.openCommandPalette()
 	expected := []string{
-		"/help", "/new", "/model", "/source", "/mode", "/settings", "/settings statusline", "/theme", "/history", "/jobs", "/goals", "/plan", "/activity", "/notifications", "/suggestions", "/memory", "/note", "/skill", "/learnings", "/feedback", "/review", "/save", "/apply", "/retry", "/copy", "exit",
+		"/help", "/new", "/model", "/source", "/mode", "/settings", "/settings statusline", "/theme", "/history", "/jobs", "/inbox", "/goals", "/plan", "/activity", "/notifications", "/suggestions", "/memory", "/note", "/skill", "/learnings", "/feedback", "/review", "/save", "/apply", "/retry", "/copy", "exit",
 	}
 	if len(model.entries) != len(expected) {
 		t.Fatalf("command palette has %d entries, want %d", len(model.entries), len(expected))

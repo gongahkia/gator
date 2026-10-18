@@ -164,6 +164,7 @@ func commandPaletteEntries() []entry {
 		{title: "/theme", subtitle: "Choose gator, contrast, or mono", kind: "command-input", command: "/theme"},
 		{title: "/history", subtitle: "Browse all retained Work", kind: "command", command: "/history"},
 		{title: "/jobs", subtitle: "Schedule, run, and review repeatable Work", kind: "command-input", command: "/jobs"},
+		{title: "/inbox", subtitle: "Review and rate follow-up results", kind: "command-input", command: "/inbox"},
 		{title: "/goals", subtitle: "Resume an ongoing goal", kind: "command", command: "/goals"},
 		{title: "/plan", subtitle: "Show or update the current goal plan", kind: "command-input", command: "/plan"},
 		{title: "/activity", subtitle: "Show current goal checks and running Work", kind: "command", command: "/activity"},
@@ -427,6 +428,30 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 			refreshed, err = m.config.RefreshJobs()
 			if err == nil {
 				m.config.Jobs = refreshed
+			}
+		}
+		if err == nil {
+			if refreshErr := m.refreshInbox(); refreshErr != nil {
+				result += "\nInbox refresh failed: " + refreshErr.Error()
+			}
+		}
+	case "/inbox":
+		if len(fields) == 1 {
+			if err = m.refreshInbox(); err == nil {
+				m.section = "inbox"
+				m.sectionNotice = ""
+				return m, nil
+			}
+			break
+		}
+		if m.config.InboxAction == nil {
+			err = errorsUnavailable("inbox")
+			break
+		}
+		result, err = m.config.InboxAction(fields[1:])
+		if err == nil {
+			if refreshErr := m.refreshInbox(); refreshErr != nil {
+				result += "\nInbox refresh failed: " + refreshErr.Error()
 			}
 		}
 	case "/goals":
@@ -1069,6 +1094,18 @@ func errorsUnavailable(name string) error {
 	return fmt.Errorf("%s is unavailable in this Gator build", strings.TrimPrefix(name, "/"))
 }
 
+func (m *Model) refreshInbox() error {
+	if m.config.RefreshInbox == nil {
+		return nil
+	}
+	entries, err := m.config.RefreshInbox()
+	if err != nil {
+		return err
+	}
+	m.config.Inbox = entries
+	return nil
+}
+
 func workHelp() string {
 	return `Gator
   Start Work by writing your request below. Gator retains its output and follows
@@ -1081,6 +1118,7 @@ func workHelp() string {
   /history [STATUS]              browse all retained Work
   /jobs [list|add|show|edit|enable|disable|run|history|remove]
                                  schedule and review repeatable Work
+  /inbox [show|read|rate|report] review and rate follow-up results
   /goals                         resume an ongoing goal
   /plan [outcome|add|step|review-at|reviewed|remove]
                                  inspect or update the current goal plan

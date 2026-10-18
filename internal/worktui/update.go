@@ -236,6 +236,10 @@ func (m Model) updateKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if value.Type == tea.KeyCtrlB && !m.running {
 		m.launcher = false
 		m.section = "inbox"
+		m.sectionNotice = ""
+		if err := m.refreshInbox(); err != nil {
+			m.sectionNotice = "Inbox refresh failed: " + err.Error()
+		}
 		return m, nil
 	}
 	if value.Type == tea.KeyCtrlJ && !m.running {
