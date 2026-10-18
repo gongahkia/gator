@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/gongahkia/gator/internal/uisnapshot"
 	"github.com/gongahkia/gator/internal/workhome"
 )
 
@@ -14,7 +15,7 @@ import (
 // The Go model remains the sole owner of commands, runs, approvals and history.
 type BridgeState struct {
 	Mode         string            `json:"mode"`
-	LegacyView   string            `json:"legacy_view,omitempty"`
+	Panel        *uisnapshot.Panel `json:"panel,omitempty"`
 	Messages     []BridgeMessage   `json:"messages"`
 	Commands     []BridgeCommand   `json:"commands"`
 	Actions      []workhome.Action `json:"actions"`
@@ -96,9 +97,9 @@ func (m Model) BridgeState() BridgeState {
 			Advanced: item.advanced, NeedsInput: item.kind == "command-input",
 		})
 	}
-	if m.models != nil || m.launcher || m.section != "" || m.pendingBundleAction != nil {
-		state.Mode = "legacy"
-		state.LegacyView = m.View()
+	if panel := m.bridgePanel(); panel != nil {
+		state.Mode = "panel"
+		state.Panel = panel
 	}
 	return state
 }

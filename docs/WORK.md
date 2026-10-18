@@ -25,9 +25,9 @@ not hidden model permissions.
 
 The default conversation screen uses a bundled React terminal renderer when
 Node.js 22 or newer is available. Its Go backend owns Work runs, retained
-conversation state, commands, approvals, and evidence. Model setup and other
-complex panels currently render through the native Go view inside the same
-terminal session. Without Node.js, or with `GATOR_NATIVE_TUI=1`, Gator uses
+conversation state, commands, approvals, and evidence. Pickers, model setup,
+inbox, history, learnings, and confirmations render as React panels from Go
+workflow state. Without Node.js, or with `GATOR_NATIVE_TUI=1`, Gator uses
 the native Go interface directly. The TypeScript source and build instructions
 are in `ui/`; the generated bundle is embedded in the Go binary.
 

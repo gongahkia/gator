@@ -45425,9 +45425,17 @@ function ChatKeys({
   }, { captureCtrlC: true });
   return null;
 }
-function LegacyKeys({ bridge }) {
+function PanelKeys({ bridge, scroll }) {
   use_input_default((input, key, event) => {
     event.stopImmediatePropagation();
+    if (key.pageUp || key.wheelUp) {
+      scroll(-8);
+      return;
+    }
+    if (key.pageDown || key.wheelDown) {
+      scroll(8);
+      return;
+    }
     let name = "";
     if (key.escape) name = "esc";
     else if (key.return) name = "enter";
@@ -45440,12 +45448,70 @@ function LegacyKeys({ bridge }) {
     else if (key.pageUp) name = "pgup";
     else if (key.pageDown) name = "pgdown";
     else if (key.tab) name = "tab";
+    else if (input === "f1") name = "f1";
     else if (key.ctrl) name = `ctrl+${input}`;
     else if (input === " ") name = "space";
     else if (!key.meta) name = input;
     if (name) bridge.send({ type: "key", key: name });
   }, { captureCtrlC: true });
   return null;
+}
+function PanelScreen({ panel, status, bridge }) {
+  const terminal = (0, import_react56.useContext)(TerminalSizeContext);
+  const [offset, setOffset] = (0, import_react56.useState)(0);
+  (0, import_react56.useEffect)(() => {
+    setOffset(0);
+  }, [panel.kind, panel.title, panel.subtitle]);
+  const rows = panel.rows ?? [];
+  const maxRows = Math.max(3, Math.floor(((terminal?.rows ?? 24) - 10) / 2));
+  const selected = Math.min(Math.max(0, panel.selected ?? 0), Math.max(0, rows.length - 1));
+  const rowStart = Math.max(0, Math.min(selected - Math.floor(maxRows / 2), rows.length - maxRows));
+  const blocks = (panel.blocks ?? []).flatMap((block) => [
+    ...block.title ? [{ text: block.title, heading: true }] : [],
+    ...block.lines.length ? block.lines.map((line) => ({ text: line, heading: false })) : [{ text: "None", heading: false }],
+    { text: "", heading: false }
+  ]);
+  const maxLines = Math.max(4, (terminal?.rows ?? 24) - 9);
+  const blockOffset = Math.min(offset, Math.max(0, blocks.length - maxLines));
+  return /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, paddingX: 2, paddingTop: 1, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(PanelKeys, { bridge, scroll: (amount) => setOffset((current) => Math.max(0, Math.min(blocks.length - maxLines, current + amount))) }),
+    /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { color: green, bold: true, children: [
+      "\u{1F40A} Gator  ",
+      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: mutedGreen, children: panel.title })
+    ] }),
+    panel.subtitle && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { children: panel.subtitle }) }),
+    panel.kind === "picker" && /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { marginTop: 1, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: mutedGreen, children: "Search  " }),
+      /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { children: [
+        panel.query || "type to filter",
+        /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { inverse: true, children: " " })
+      ] })
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Divider, {}) }),
+    /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, marginTop: 1, children: [
+      rows.slice(rowStart, rowStart + maxRows).map((row, index) => {
+        const active = panel.kind !== "inbox" && panel.kind !== "jobs" && rowStart + index === selected;
+        return /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", marginBottom: 1, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { color: active ? green : void 0, bold: active, children: [
+            active ? "\u276F " : "  ",
+            row.label,
+            row.state ? /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { color: mutedGreen, children: [
+              "  \xB7  ",
+              row.state
+            ] }) : null
+          ] }),
+          row.detail && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: !active, children: row.detail }) })
+        ] }, `${rowStart + index}-${row.label}`);
+      }),
+      blocks.slice(blockOffset, blockOffset + maxLines).map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginBottom: line.heading ? 0 : void 0, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: line.heading ? mutedGreen : void 0, bold: line.heading, children: line.text || " " }) }, `${blockOffset + index}-${line.text}`)),
+      blocks.length > maxLines && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: `  ${blockOffset + 1}\u2013${Math.min(blockOffset + maxLines, blocks.length)} of ${blocks.length} lines \xB7 PgUp/PgDn scroll` }),
+      rows.length === 0 && blocks.length === 0 && !panel.notice && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: "No items to show." }),
+      panel.notice && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: mutedGreen, children: panel.notice }) }),
+      status && status !== panel.notice && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: status }) })
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Divider, {}),
+    /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: panel.footer || "Esc back" })
+  ] });
 }
 function GreenSearch({ messages, close, navigate }) {
   const [query, setQuery] = (0, import_react56.useState)("");
@@ -45515,11 +45581,8 @@ function App2({ bridge }) {
     lastBackendInput.current = state?.input ?? "";
   }, [state?.mode, state?.input]);
   if (!state) return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { padding: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: green, children: failure || "Starting Gator\u2026" }) });
-  if (state.mode === "legacy") {
-    return /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(LegacyKeys, { bridge }),
-      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Ansi, { children: state.legacy_view ?? "" })
-    ] });
+  if (state.mode === "panel" && state.panel) {
+    return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(PanelScreen, { panel: state.panel, status: state.status, bridge });
   }
   const matches = !searchOpen && !dismissed && input.startsWith("/") && !input.includes(" ") ? state.commands.filter((command) => input === "/" ? !command.advanced : `/${command.name}`.startsWith(input)).slice(0, 8) : [];
   const submit = (value) => {
@@ -45531,7 +45594,7 @@ function App2({ bridge }) {
     setHistory((current) => [text, ...current]);
   };
   const choose = (command) => {
-    if (command.needs_input) {
+    if (command.needs_input && input.trim() !== `/${command.name}`) {
       setInput(`/${command.name} `);
       setPrefillVersion((version) => version + 1);
       setDismissed(true);

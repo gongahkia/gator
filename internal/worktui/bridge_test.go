@@ -27,7 +27,41 @@ func TestBridgeUsesLiveCommandAndMessageState(t *testing.T) {
 	}
 	model.openCommandPalette()
 	modal := model.BridgeState()
-	if modal.Mode != "legacy" || modal.LegacyView == "" {
+	if modal.Mode != "panel" || modal.Panel == nil || modal.Panel.Title != "Commands" {
 		t.Fatalf("modal bridge state = %#v", modal)
+	}
+}
+
+func TestBridgeProjectsCommandPanelsWithoutGoView(t *testing.T) {
+	for _, test := range []struct {
+		command string
+		title   string
+	}{
+		{command: "/inbox", title: "Inbox"},
+		{command: "/jobs", title: "Scheduled jobs"},
+		{command: "/history", title: "History"},
+		{command: "/learnings", title: "Learnings"},
+		{command: "/goals", title: "Ongoing goals"},
+	} {
+		t.Run(test.command, func(t *testing.T) {
+			model := New(Config{CurrentFolder: t.TempDir()})
+			next, _ := model.SubmitText(test.command)
+			state := next.(Model).BridgeState()
+			if state.Mode != "panel" || state.Panel == nil || state.Panel.Title != test.title {
+				t.Fatalf("%s panel = %#v", test.command, state.Panel)
+			}
+		})
+	}
+	model := New(Config{CurrentFolder: t.TempDir()})
+	model.pendingBundleAction = &pendingBundleAction{summary: "Save one draft"}
+	state := model.BridgeState()
+	if state.Mode != "panel" || state.Panel == nil || state.Panel.Title != "Review transfer" || len(state.Panel.Blocks) != 1 {
+		t.Fatalf("confirmation panel = %#v", state.Panel)
+	}
+	model.pendingBundleAction = nil
+	model.openStatusLineEditor()
+	state = model.BridgeState()
+	if state.Mode != "panel" || state.Panel == nil || state.Panel.Title != "Configure status line" || len(state.Panel.Rows) == 0 {
+		t.Fatalf("status line panel = %#v", state.Panel)
 	}
 }

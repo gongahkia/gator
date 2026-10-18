@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
-import { Ansi, Box, Text, render, useApp, useInput, TerminalSizeContext, type Instance } from "@claude-code-kit/ink-renderer";
+import { Box, Text, render, useApp, useInput, TerminalSizeContext, type Instance } from "@claude-code-kit/ink-renderer";
 import { Divider, MessageList, StatusLine, WelcomeScreen, type Message, type VirtualListHandle } from "@claude-code-kit/ui";
 import React, { useContext, useEffect, useRef, useState } from "react";
 
@@ -15,10 +15,21 @@ type BackendBundle = {
   Candidates: { ID: string; Status: string; ChangedPaths: string[] }[] | null;
 };
 type BackendMessage = { role: string; text: string; bundle?: BackendBundle };
+type BackendPanel = {
+  kind: string;
+  title: string;
+  subtitle?: string;
+  query?: string;
+  rows?: { label: string; detail?: string; state?: string }[];
+  blocks?: { title?: string; lines: string[] }[];
+  selected?: number;
+  notice?: string;
+  footer?: string;
+};
 type ExternalCommand = { kind: string; program: string; args: string[]; dir?: string; env?: string[] };
 type BackendState = {
-  mode: "chat" | "legacy";
-  legacy_view?: string;
+  mode: "chat" | "panel";
+  panel?: BackendPanel;
   messages: BackendMessage[];
   commands: BackendCommand[];
   actions: { Label: string; Command: string }[];
@@ -221,9 +232,11 @@ function ChatKeys({
   return null;
 }
 
-function LegacyKeys({ bridge }: { bridge: GatorBridge }): null {
+function PanelKeys({ bridge, scroll }: { bridge: GatorBridge; scroll: (amount: number) => void }): null {
   useInput((input, key, event) => {
     event.stopImmediatePropagation();
+    if (key.pageUp || key.wheelUp) { scroll(-8); return; }
+    if (key.pageDown || key.wheelDown) { scroll(8); return; }
     let name = "";
     if (key.escape) name = "esc";
     else if (key.return) name = "enter";
@@ -236,12 +249,57 @@ function LegacyKeys({ bridge }: { bridge: GatorBridge }): null {
     else if (key.pageUp) name = "pgup";
     else if (key.pageDown) name = "pgdown";
     else if (key.tab) name = "tab";
+    else if (input === "f1") name = "f1";
     else if (key.ctrl) name = `ctrl+${input}`;
     else if (input === " ") name = "space";
     else if (!key.meta) name = input;
     if (name) bridge.send({ type: "key", key: name });
   }, { captureCtrlC: true });
   return null;
+}
+
+function PanelScreen({ panel, status, bridge }: { panel: BackendPanel; status?: string; bridge: GatorBridge }): React.ReactNode {
+  const terminal = useContext(TerminalSizeContext);
+  const [offset, setOffset] = useState(0);
+  useEffect(() => { setOffset(0); }, [panel.kind, panel.title, panel.subtitle]);
+  const rows = panel.rows ?? [];
+  const maxRows = Math.max(3, Math.floor(((terminal?.rows ?? 24) - 10) / 2));
+  const selected = Math.min(Math.max(0, panel.selected ?? 0), Math.max(0, rows.length - 1));
+  const rowStart = Math.max(0, Math.min(selected - Math.floor(maxRows / 2), rows.length - maxRows));
+  const blocks = (panel.blocks ?? []).flatMap((block) => [
+    ...(block.title ? [{ text: block.title, heading: true }] : []),
+    ...(block.lines.length ? block.lines.map((line) => ({ text: line, heading: false })) : [{ text: "None", heading: false }]),
+    { text: "", heading: false },
+  ]);
+  const maxLines = Math.max(4, (terminal?.rows ?? 24) - 9);
+  const blockOffset = Math.min(offset, Math.max(0, blocks.length - maxLines));
+  return (
+    <Box flexDirection="column" flexGrow={1} paddingX={2} paddingTop={1}>
+      <PanelKeys bridge={bridge} scroll={(amount) => setOffset((current) => Math.max(0, Math.min(blocks.length - maxLines, current + amount)))} />
+      <Text color={green} bold>🐊 Gator  <Text color={mutedGreen}>{panel.title}</Text></Text>
+      {panel.subtitle && <Box marginTop={1}><Text>{panel.subtitle}</Text></Box>}
+      {panel.kind === "picker" && <Box marginTop={1}><Text color={mutedGreen}>Search  </Text><Text>{panel.query || "type to filter"}<Text inverse> </Text></Text></Box>}
+      <Box marginTop={1}><Divider /></Box>
+      <Box flexDirection="column" flexGrow={1} marginTop={1}>
+        {rows.slice(rowStart, rowStart + maxRows).map((row, index) => {
+          const active = panel.kind !== "inbox" && panel.kind !== "jobs" && rowStart + index === selected;
+          return <Box key={`${rowStart + index}-${row.label}`} flexDirection="column" marginBottom={1}>
+            <Text color={active ? green : undefined} bold={active}>{active ? "❯ " : "  "}{row.label}{row.state ? <Text color={mutedGreen}>  ·  {row.state}</Text> : null}</Text>
+            {row.detail && <Box marginLeft={2}><Text dimColor={!active}>{row.detail}</Text></Box>}
+          </Box>;
+        })}
+        {blocks.slice(blockOffset, blockOffset + maxLines).map((line, index) => <Box key={`${blockOffset + index}-${line.text}`} marginBottom={line.heading ? 0 : undefined}>
+          <Text color={line.heading ? mutedGreen : undefined} bold={line.heading}>{line.text || " "}</Text>
+        </Box>)}
+        {blocks.length > maxLines && <Text dimColor>{`  ${blockOffset + 1}–${Math.min(blockOffset + maxLines, blocks.length)} of ${blocks.length} lines · PgUp/PgDn scroll`}</Text>}
+        {rows.length === 0 && blocks.length === 0 && !panel.notice && <Text dimColor>No items to show.</Text>}
+        {panel.notice && <Box marginTop={1}><Text color={mutedGreen}>{panel.notice}</Text></Box>}
+        {status && status !== panel.notice && <Box marginTop={1}><Text dimColor>{status}</Text></Box>}
+      </Box>
+      <Divider />
+      <Text dimColor>{panel.footer || "Esc back"}</Text>
+    </Box>
+  );
 }
 
 function GreenSearch({ messages, close, navigate }: { messages: BackendMessage[]; close: () => void; navigate: (index: number) => void }): React.ReactNode {
@@ -301,8 +359,8 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
   }, [state?.mode, state?.input]);
 
   if (!state) return <Box padding={1}><Text color={green}>{failure || "Starting Gator…"}</Text></Box>;
-  if (state.mode === "legacy") {
-    return <Box flexDirection="column"><LegacyKeys bridge={bridge} /><Ansi>{state.legacy_view ?? ""}</Ansi></Box>;
+  if (state.mode === "panel" && state.panel) {
+    return <PanelScreen panel={state.panel} status={state.status} bridge={bridge} />;
   }
   const matches = !searchOpen && !dismissed && input.startsWith("/") && !input.includes(" ")
     ? state.commands.filter((command) => (input === "/" ? !command.advanced : `/${command.name}`.startsWith(input))).slice(0, 8)
@@ -314,7 +372,7 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
     setInput(""); setDismissed(false); setHistory((current) => [text, ...current]);
   };
   const choose = (command: BackendCommand) => {
-    if (command.needs_input) {
+    if (command.needs_input && input.trim() !== `/${command.name}`) {
       setInput(`/${command.name} `);
       setPrefillVersion((version) => version + 1);
       setDismissed(true);
