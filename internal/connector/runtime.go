@@ -782,9 +782,9 @@ func normalizeGoogleValuesUpdate(payload []byte) ([]byte, error) {
 				return nil, errors.New("Google Sheets values update cell is invalid")
 			}
 			switch value.(type) {
-			case nil, bool, float64, string:
+			case bool, float64, string:
 			default:
-				return nil, errors.New("Google Sheets values update cells must be scalars")
+				return nil, errors.New("Google Sheets values update cells must be booleans, numbers, or strings; use an empty string to clear a cell")
 			}
 		}
 	}

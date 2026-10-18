@@ -113,6 +113,11 @@ approval preview and sends it as the required URL query parameter. It defaults
 to `RAW` if omitted; a user may explicitly choose `USER_ENTERED`. The option
 is removed from the JSON `ValueRange` body. This follows Google's
 [`spreadsheets.values.update` request contract](https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets.values/update).
+
+Sheet value writes accept booleans, numbers, and strings. Gator rejects `null`
+cells because [Google skips them](https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets.values#ValueRange);
+use an empty string when the intent is to clear a cell.
+
 For an individual Docs or Sheets action, the Work action record retains the
 resource ID returned by Google and a SHA-256 digest of the response. An update
 whose returned resource ID is missing or differs from the approved target is

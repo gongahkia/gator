@@ -92,6 +92,7 @@ func TestGoogleSheetsValueOptionIsBoundToSingleAndBatchApproval(t *testing.T) {
 		`{"resource_id":"sheet-1/Sheet1!A1","values":[["done"]],"valueInputOption":"BAD"}`,
 		`{"resource_id":"sheet-1/Sheet1!A1","values":[]}`,
 		`{"resource_id":"sheet-1/Sheet1!A1","values":[[]]}`,
+		`{"resource_id":"sheet-1/Sheet1!A1","values":[[null]]}`,
 		`{"resource_id":"sheet-1/Sheet1!A1","values":[[{}]]}`,
 		`{"resource_id":"sheet-1/Sheet1!A1","values":[["done"]],"value_input_option":"RAW"}`,
 		`{"resource_id":"sheet-1/Sheet1!A1","range":"Sheet1!B2","values":[["done"]]}`,
@@ -101,6 +102,9 @@ func TestGoogleSheetsValueOptionIsBoundToSingleAndBatchApproval(t *testing.T) {
 		if _, err := runtime.PrepareAction(descriptor.ID, "sheets_values_update", actionInput([]byte(invalid))); err == nil {
 			t.Fatalf("invalid Sheet update prepared: %s", invalid)
 		}
+	}
+	if _, err := runtime.PrepareAction(descriptor.ID, "batch", actionInput([]byte(`{"actions":[{"operation":"sheets_values_update","payload":{"resource_id":"sheet-1/Sheet1!A1","values":[[null]]}}]}`))); err == nil {
+		t.Fatal("batch prepared a Sheet write whose only cell would be skipped")
 	}
 }
 
