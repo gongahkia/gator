@@ -10,11 +10,8 @@ import (
 
 func (m Model) bridgePanel() *uisnapshot.Panel {
 	if m.models != nil {
-		if provider, ok := m.models.(interface{ UISnapshot() uisnapshot.Panel }); ok {
-			panel := provider.UISnapshot()
-			return &panel
-		}
-		return &uisnapshot.Panel{Kind: "models", Title: "Models", Notice: "Model panel data is unavailable."}
+		panel := m.models.UISnapshot()
+		return &panel
 	}
 	if m.launcher {
 		panel := m.bridgeLauncherPanel()

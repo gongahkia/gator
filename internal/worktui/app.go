@@ -14,6 +14,7 @@ import (
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/learning"
+	"github.com/gongahkia/gator/internal/uisnapshot"
 	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workhome"
 	"github.com/gongahkia/gator/internal/workrun"
@@ -205,6 +206,7 @@ type Config struct {
 
 type ModelPanel interface {
 	tea.Model
+	UISnapshot() uisnapshot.Panel
 	Closed() bool
 	Close()
 }

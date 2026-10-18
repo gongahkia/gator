@@ -38,6 +38,8 @@ type BackendState = {
   provider?: string;
   model?: string;
   status?: string;
+  status_line: string[];
+  status_line_enabled: boolean;
   input?: string;
   running: boolean;
   cancelling: boolean;
@@ -248,6 +250,7 @@ function PanelKeys({ bridge, scroll }: { bridge: GatorBridge; scroll: (amount: n
     else if (key.delete) name = "delete";
     else if (key.pageUp) name = "pgup";
     else if (key.pageDown) name = "pgdown";
+    else if (key.tab && key.shift) name = "shift+tab";
     else if (key.tab) name = "tab";
     else if (input === "f1") name = "f1";
     else if (key.ctrl) name = `ctrl+${input}`;
@@ -401,12 +404,7 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
     content: item.text,
   }));
   const viewportHeight = Math.max(1, (terminal?.rows ?? 24) - 6 - matches.length - (state.running ? 2 : 0) - (searchOpen ? 1 : 0));
-  const statusSegments = [
-    ...(state.status ? [{ content: state.status, color: mutedGreen }] : []),
-    { content: state.provider && state.model ? `${state.provider}/${state.model}` : "Choose model: /model", color: green },
-    { content: state.source ? state.source.split("/").filter(Boolean).at(-1) || state.source : "Gator" },
-    ...(state.queued ? [{ content: `${state.queued} queued` }] : []),
-  ];
+  const statusSegments = (state.status_line ?? []).map((content) => ({ content, color: mutedGreen }));
   return (
     <Box flexDirection="column" flexGrow={1} paddingX={1} paddingTop={1}>
       <Box flexDirection="column" flexGrow={1}>
@@ -421,7 +419,7 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
       {matches.length > 0 && <Box marginLeft={2} flexDirection="column">{matches.map((command, index) => <Box key={command.name}><Text color={index === selected ? green : undefined} bold={index === selected}>{index === selected ? "❯" : " "} /{command.name}</Text><Text dimColor>  {command.description}</Text></Box>)}</Box>}
       {failure && <Text color="red">{failure}</Text>}
       <Divider />
-      <StatusLine segments={statusSegments} />
+      {state.status_line_enabled && statusSegments.length > 0 && <StatusLine segments={statusSegments} />}
     </Box>
   );
 }

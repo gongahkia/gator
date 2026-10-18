@@ -143,7 +143,7 @@ func (m *uiBridgeModel) sendState() {
 func bridgeKey(name string) (tea.KeyMsg, bool) {
 	special := map[string]tea.KeyType{
 		"enter": tea.KeyEnter, "esc": tea.KeyEsc, "up": tea.KeyUp, "down": tea.KeyDown,
-		"left": tea.KeyLeft, "right": tea.KeyRight, "tab": tea.KeyTab,
+		"left": tea.KeyLeft, "right": tea.KeyRight, "tab": tea.KeyTab, "shift+tab": tea.KeyShiftTab,
 		"backspace": tea.KeyBackspace, "delete": tea.KeyDelete,
 		"pgup": tea.KeyPgUp, "pgdown": tea.KeyPgDown,
 		"ctrl+c": tea.KeyCtrlC, "ctrl+p": tea.KeyCtrlP, "ctrl+x": tea.KeyCtrlX,

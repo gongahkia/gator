@@ -25,6 +25,8 @@ type BridgeState struct {
 	Provider     string            `json:"provider,omitempty"`
 	Model        string            `json:"model,omitempty"`
 	Status       string            `json:"status,omitempty"`
+	StatusLine   []string          `json:"status_line"`
+	StatusLineEnabled bool         `json:"status_line_enabled"`
 	Input        string            `json:"input,omitempty"`
 	Running      bool              `json:"running"`
 	Cancelling   bool              `json:"cancelling"`
@@ -78,6 +80,8 @@ func (m Model) BridgeState() BridgeState {
 		Provider:     m.modelStatus.Provider,
 		Model:        m.modelStatus.Model,
 		Status:       m.status,
+		StatusLine:   m.statusLineItems(),
+		StatusLineEnabled: m.statusLineEnabled,
 		Input:        m.input,
 		Running:      m.running,
 		Cancelling:   m.cancelling,

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/gongahkia/gator/internal/uisnapshot"
 )
 
 func TestModelManagementCannotOpenDuringWork(t *testing.T) {
@@ -55,6 +56,7 @@ type testModelPanel struct{ closed bool }
 
 func (m *testModelPanel) Init() tea.Cmd { return nil }
 func (m *testModelPanel) View() string  { return "model panel" }
+func (m *testModelPanel) UISnapshot() uisnapshot.Panel { return uisnapshot.Panel{Kind: "models", Title: "Models"} }
 func (m *testModelPanel) Close()        { m.closed = true }
 func (m *testModelPanel) Closed() bool  { return m.closed }
 func (m *testModelPanel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
