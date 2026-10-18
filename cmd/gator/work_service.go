@@ -5,19 +5,22 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"os"
+	"strings"
+	"unicode"
+
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/browser"
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/goal"
+	"github.com/gongahkia/gator/internal/knowledge"
 	"github.com/gongahkia/gator/internal/learning"
 	"github.com/gongahkia/gator/internal/memory"
 	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/snapshot"
 	"github.com/gongahkia/gator/internal/workrun"
-	"io"
-	"os"
-	"strings"
 )
 
 // configuredWorkService assembles trusted adapters; execution stays in workrun.Service.
@@ -60,6 +63,9 @@ func configuredWorkService(provider, modelName, stateDir string, request *workru
 		return workrun.Service{}, err
 	}
 	if err := applyMemoryContext(stateDir, request); err != nil {
+		return workrun.Service{}, err
+	}
+	if err := applyNoteContext(stateDir, request); err != nil {
 		return workrun.Service{}, err
 	}
 	if err := applyGoalPlanContext(stateDir, request); err != nil {
@@ -123,6 +129,52 @@ func applyMemoryContext(stateDir string, request *workrun.Request) error {
 	}
 	request.MemoryContext = memory.Render(records)
 	return nil
+}
+
+func applyNoteContext(stateDir string, request *workrun.Request) error {
+	store, err := knowledge.Open(stateDir)
+	if err != nil {
+		return err
+	}
+	notes, err := store.SearchNotes(request.Objective, request.GoalID, 4)
+	if err != nil {
+		return fmt.Errorf("resolve relevant notes: %w", err)
+	}
+	if len(notes) == 0 && strings.TrimSpace(request.GoalContext) != "" {
+		notes, err = store.SearchNotes(request.GoalContext, request.GoalID, 4)
+		if err != nil {
+			return fmt.Errorf("resolve goal-context notes: %w", err)
+		}
+	}
+	var lines []string
+	remaining := 2400
+	for _, note := range notes {
+		line := fmt.Sprintf("- [%s] %s (%s, lexical match: %s)", note.ID, safeNoteContext(note.Title), note.MatchScope, strings.Join(note.MatchedTerms, ", "))
+		if len(note.SourceRefs) > 0 {
+			refs := note.SourceRefs[:min(2, len(note.SourceRefs))]
+			line += " [source labels: " + safeNoteContext(strings.Join(refs, ", ")) + "]"
+		}
+		if note.Excerpt != "" {
+			line += ": " + safeNoteContext(note.Excerpt)
+		}
+		if len(line) > remaining {
+			break
+		}
+		lines = append(lines, line)
+		remaining -= len(line)
+	}
+	request.NoteContext = strings.Join(lines, "\n")
+	return nil
+}
+
+func safeNoteContext(value string) string {
+	clean := strings.Map(func(character rune) rune {
+		if unicode.IsControl(character) {
+			return ' '
+		}
+		return character
+	}, value)
+	return strings.Join(strings.Fields(clean), " ")
 }
 
 func applyGoalPlanContext(stateDir string, request *workrun.Request) error {

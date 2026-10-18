@@ -60,6 +60,16 @@ expiry and correction controls. `knowledge_search` and `knowledge_read` let the
 main agent retrieve both notes and active memories during Work. They accept IDs
 and query text, never arbitrary filesystem paths.
 
+At the start of Work, Gator also puts up to four matching note leads in the
+model context. Each lead has its note ID, goal/global scope, matched words, up
+to two source labels, and a short excerpt from a matching line. The full note
+stays in the private store and is available through `knowledge_read`. A lead
+is a retrieval hint, not a verified fact: source labels can be stale, and a
+lexical match can be irrelevant. Corrected or removed notes are reflected in
+the next Work run, and notes from another goal never enter the selection. The
+current request selects notes first; Gator consults ongoing goal context only
+when the request finds none.
+
 In the TUI, `/note add TITLE | BODY`, `/note list`, `/note search QUERY`, and
 `/note edit ID | BODY` use the current goal by default. The terminal CLI supports
 larger files and full metadata options.

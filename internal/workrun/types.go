@@ -96,7 +96,10 @@ type Request struct {
 	LearningContext string
 	// MemoryContext is a bounded selection of explicit user memories.
 	MemoryContext string
-	GoalID        string
+	// NoteContext names relevant saved notes with short excerpts. Full note text
+	// remains available through knowledge_read and is never tool authority.
+	NoteContext string
+	GoalID      string
 	// GoalContext is explicitly user-maintained ongoing context. It conveys
 	// neither tool authority nor an instruction that overrides the current task.
 	GoalContext          string

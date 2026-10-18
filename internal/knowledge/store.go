@@ -29,17 +29,20 @@ var noteIDPattern = regexp.MustCompile(`^note-[0-9a-f]{24}$`)
 var goalIDPattern = regexp.MustCompile(`^goal-[0-9a-f]{24}$`)
 
 type Document struct {
-	Version     int       `json:"version"`
-	ID          string    `json:"id"`
-	Kind        string    `json:"kind"`
-	Title       string    `json:"title"`
-	Description string    `json:"description,omitempty"`
-	SourceRefs  []string  `json:"source_refs,omitempty"`
-	GoalID      string    `json:"goal_id,omitempty"`
-	Enabled     bool      `json:"enabled,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	Body        string    `json:"-"`
+	Version      int       `json:"version"`
+	ID           string    `json:"id"`
+	Kind         string    `json:"kind"`
+	Title        string    `json:"title"`
+	Description  string    `json:"description,omitempty"`
+	SourceRefs   []string  `json:"source_refs,omitempty"`
+	GoalID       string    `json:"goal_id,omitempty"`
+	Enabled      bool      `json:"enabled,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	Body         string    `json:"-"`
+	MatchedTerms []string  `json:"-"`
+	MatchScope   string    `json:"-"`
+	Excerpt      string    `json:"-"`
 }
 
 type Store struct {
@@ -184,15 +187,22 @@ func (s Store) SearchNotes(query, goalID string, limit int) ([]Document, error) 
 		}
 		words := tokenize(d.Title + " " + d.Body + " " + strings.Join(d.SourceRefs, " "))
 		score := 0
+		var matched []string
 		for term := range terms {
 			if words[term] {
 				score++
+				matched = append(matched, term)
 			}
 		}
 		if score >= min(2, len(terms)) {
+			sort.Strings(matched)
+			d.MatchedTerms = matched
+			d.MatchScope = "global"
 			if goalID != "" && d.GoalID == goalID {
 				score += 2
+				d.MatchScope = "goal"
 			}
+			d.Excerpt = noteMatchExcerpt(d.Body, matched, 240)
 			d.Body = ""
 			matches = append(matches, scored{d, score})
 		}
@@ -214,6 +224,27 @@ func (s Store) SearchNotes(query, goalID string, limit int) ([]Document, error) 
 		result = append(result, m.d)
 	}
 	return result, nil
+}
+
+func noteMatchExcerpt(body string, terms []string, maxRunes int) string {
+	for _, line := range strings.Split(body, "\n") {
+		lower := strings.ToLower(line)
+		lineWords := tokenize(line)
+		for _, term := range terms {
+			if !lineWords[term] {
+				continue
+			}
+			index := strings.Index(lower, term)
+			if index < 0 {
+				continue
+			}
+			runes := []rune(line)
+			start := max(0, utf8.RuneCountInString(line[:min(index, len(line))])-80)
+			end := min(len(runes), start+maxRunes)
+			return strings.Join(strings.Fields(string(runes[start:end])), " ")
+		}
+	}
+	return ""
 }
 
 func (s Store) UpdateNote(id, title, body string) (Document, error) {

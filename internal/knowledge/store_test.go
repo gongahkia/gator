@@ -110,6 +110,33 @@ func TestSourceLinkedNoteCanBeFoundAndCorrected(t *testing.T) {
 	}
 }
 
+func TestNoteSearchExplainsMatchAndShowsBoundedRelevantExcerpt(t *testing.T) {
+	store, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	goalA := "goal-0123456789abcdef01234567"
+	goalB := "goal-aaaaaaaaaaaaaaaaaaaaaaaa"
+	body := strings.Repeat("Introduction. ", 35) + "\nThe venue capacity is 90 people and the booking deadline is Friday.\n"
+	selected, err := store.AddNoteWithRefs("Offsite planning", body, goalA, []string{"source/venue.md:4"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.AddNote("Other goal venue", "Capacity 20", goalB); err != nil {
+		t.Fatal(err)
+	}
+	results, err := store.SearchNotes("venue capacity", goalA, 4)
+	if err != nil || len(results) != 1 || results[0].ID != selected.ID || results[0].MatchScope != "goal" || strings.Join(results[0].MatchedTerms, ",") != "capacity,venue" || !strings.Contains(results[0].Excerpt, "capacity is 90") || results[0].Body != "" {
+		t.Fatalf("search result = %#v, %v", results, err)
+	}
+	if len([]rune(results[0].Excerpt)) > 240 {
+		t.Fatalf("unbounded note excerpt: %q", results[0].Excerpt)
+	}
+	if results, err = store.SearchNotes("venue capacity", goalB, 4); err != nil || len(results) != 1 || results[0].ID == selected.ID {
+		t.Fatalf("cross-goal note search = %#v, %v", results, err)
+	}
+}
+
 func TestKnowledgeRejectsTraversalSymlinksAndOversizedBodies(t *testing.T) {
 	store, err := Open(t.TempDir())
 	if err != nil {

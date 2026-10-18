@@ -48,6 +48,7 @@ func (s Service) Execute(ctx context.Context, request Request) (Outcome, error) 
 		request.OTLPEndpoint = s.Defaults.OTLPEndpoint
 		request.LearningContext = s.Defaults.LearningContext
 		request.MemoryContext = s.Defaults.MemoryContext
+		request.NoteContext = s.Defaults.NoteContext
 		request.GoalID = s.Defaults.GoalID
 		request.GoalPlanContext = s.Defaults.GoalPlanContext
 	}
@@ -86,6 +87,7 @@ func effectiveConfiguration(request Request) any {
 		GoalPlanContext     string
 		GoalID              string
 		MemoryContext       string
+		NoteContext         string
 		Roles               map[string]orchestrator.RoleConfiguration
 		ProjectSHA256       string
 		DisableDelegation   bool
@@ -95,7 +97,7 @@ func effectiveConfiguration(request Request) any {
 		BrowserSession      string
 		DisableBrowser      bool
 		DesktopSession      string
-	}{request.Contract, request.Mode, request.Code, request.ConnectorIDs, request.OAuthRefreshPins, request.OAuthAccountPins, request.ConnectorPermissions, request.WebOrigins, request.IgnoredInstructionPaths, request.Limits, request.MaxSteps, request.Provider, request.GoalContext, request.GoalPlanContext, request.GoalID, request.MemoryContext, request.RoleConfiguration, func() string {
+	}{request.Contract, request.Mode, request.Code, request.ConnectorIDs, request.OAuthRefreshPins, request.OAuthAccountPins, request.ConnectorPermissions, request.WebOrigins, request.IgnoredInstructionPaths, request.Limits, request.MaxSteps, request.Provider, request.GoalContext, request.GoalPlanContext, request.GoalID, request.MemoryContext, request.NoteContext, request.RoleConfiguration, func() string {
 		if request.Project != nil {
 			return request.Project.SHA256
 		}

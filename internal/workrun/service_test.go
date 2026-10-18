@@ -154,18 +154,19 @@ func TestServiceCancellationClosesRetainedApproval(t *testing.T) {
 }
 
 func TestEffectiveConfigurationRetainsWorkAuthority(t *testing.T) {
-	payload, err := json.Marshal(effectiveConfiguration(Request{IgnoredInstructionPaths: []string{"AGENTS.md"}, RequireCode: true}))
+	payload, err := json.Marshal(effectiveConfiguration(Request{IgnoredInstructionPaths: []string{"AGENTS.md"}, RequireCode: true, NoteContext: "[note-one] Venue capacity 90"}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	var configuration struct {
 		IgnoredInstructions []string
 		RequireCode         bool
+		NoteContext         string
 	}
 	if err := json.Unmarshal(payload, &configuration); err != nil {
 		t.Fatal(err)
 	}
-	if len(configuration.IgnoredInstructions) != 1 || configuration.IgnoredInstructions[0] != "AGENTS.md" || !configuration.RequireCode {
+	if len(configuration.IgnoredInstructions) != 1 || configuration.IgnoredInstructions[0] != "AGENTS.md" || !configuration.RequireCode || configuration.NoteContext != "[note-one] Venue capacity 90" {
 		t.Fatalf("ignored instructions = %#v", configuration.IgnoredInstructions)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gongahkia/gator/internal/knowledge"
 	"github.com/gongahkia/gator/internal/workrun"
 )
 
@@ -84,5 +85,62 @@ func TestMemoryCLIFileSourceRequiresReviewAfterChange(t *testing.T) {
 	}
 	if err := applyMemoryContext(state, &request); err != nil || !strings.Contains(request.MemoryContext, "8am") {
 		t.Fatalf("reviewed memory = %q, %v", request.MemoryContext, err)
+	}
+}
+
+func TestWorkStartsWithScopedRelevantNoteLeads(t *testing.T) {
+	state := t.TempDir()
+	store, err := knowledge.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	goalA := "goal-0123456789abcdef01234567"
+	goalB := "goal-aaaaaaaaaaaaaaaaaaaaaaaa"
+	note, err := store.AddNoteWithRefs("Offsite planning", "The venue capacity is 90 people.\nConfirm booking by Friday.", goalA, []string{"source/venue.md:4"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.AddNote("Other team's venue", "Venue capacity is 20.", goalB); err != nil {
+		t.Fatal(err)
+	}
+	budget, err := store.AddNote("Offsite budget", "The approved budget is 4000 dollars.", goalA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := workrun.Request{GoalID: goalA, Objective: "What is the venue capacity?"}
+	if err := applyNoteContext(state, &request); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(request.NoteContext, note.ID) || !strings.Contains(request.NoteContext, "capacity is 90") || !strings.Contains(request.NoteContext, "source/venue.md:4") || !strings.Contains(request.NoteContext, "goal, lexical match: capacity, venue") || strings.Contains(request.NoteContext, "capacity is 20") {
+		t.Fatalf("note projection = %q", request.NoteContext)
+	}
+	request.Objective = "What is the budget?"
+	request.GoalContext = "Plan the venue capacity for the offsite"
+	if err := applyNoteContext(state, &request); err != nil || !strings.Contains(request.NoteContext, budget.ID) || strings.Contains(request.NoteContext, note.ID) {
+		t.Fatalf("current request lost to broad goal context = %q, %v", request.NoteContext, err)
+	}
+	request.Objective = "Continue"
+	request.GoalContext = "Check venue capacity before booking"
+	if err := applyNoteContext(state, &request); err != nil || !strings.Contains(request.NoteContext, note.ID) {
+		t.Fatalf("goal-context fallback = %q, %v", request.NoteContext, err)
+	}
+	request.Objective = "What is the venue capacity?"
+	request.GoalContext = ""
+	request.GoalID = goalB
+	if err := applyNoteContext(state, &request); err != nil || strings.Contains(request.NoteContext, note.ID) || !strings.Contains(request.NoteContext, "capacity is 20") {
+		t.Fatalf("cross-goal note projection = %q, %v", request.NoteContext, err)
+	}
+	if _, err := store.UpdateNote(note.ID, "Offsite planning", "Venue capacity is 85 after correction."); err != nil {
+		t.Fatal(err)
+	}
+	request.GoalID = goalA
+	if err := applyNoteContext(state, &request); err != nil || strings.Contains(request.NoteContext, "capacity is 90") || !strings.Contains(request.NoteContext, "capacity is 85") {
+		t.Fatalf("corrected note projection = %q, %v", request.NoteContext, err)
+	}
+	if err := store.RemoveNote(note.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := applyNoteContext(state, &request); err != nil || request.NoteContext != "" {
+		t.Fatalf("removed note projection = %q, %v", request.NoteContext, err)
 	}
 }
