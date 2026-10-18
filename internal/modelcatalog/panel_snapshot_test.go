@@ -1,10 +1,12 @@
 package modelcatalog
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	modelprovider "github.com/gongahkia/gator/internal/model"
 )
 
 func TestModelPanelSnapshotFollowsChoiceSelection(t *testing.T) {
@@ -19,6 +21,22 @@ func TestModelPanelSnapshotFollowsChoiceSelection(t *testing.T) {
 	selected := panel.UISnapshot()
 	if selected.Selected != 1 || selected.Rows[1].Label != "Local model" {
 		t.Fatalf("selected model panel = %#v", selected)
+	}
+}
+
+func TestModelPanelSnapshotMasksCredentialWithoutGoView(t *testing.T) {
+	panel := NewModelCatalogPanel(Config{})
+	panel.model.screen = localModelsScreen
+	form := newCloudModelSetupForm(modelprovider.AzureOpenAI, "review", "", nil, 80)
+	form.credential.SetValue("super-secret-api-key")
+	panel.model.localModels.cloudSetup = &form
+	snapshot := panel.UISnapshot()
+	encoded, err := json.Marshal(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), "super-secret-api-key") || !strings.Contains(string(encoded), "••••••••") {
+		t.Fatalf("credential snapshot exposed a key or omitted its mask: %s", encoded)
 	}
 }
 

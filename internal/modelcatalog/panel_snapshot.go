@@ -3,14 +3,13 @@ package modelcatalog
 import (
 	"strings"
 
-	"github.com/charmbracelet/x/ansi"
 	"github.com/gongahkia/gator/internal/uisnapshot"
 )
 
 // UISnapshot exposes model-management state to the React terminal renderer.
 // Model selection, credential handling, and confirmations still run in Go.
 func (p *ModelCatalogPanel) UISnapshot() uisnapshot.Panel {
-	panel := uisnapshot.Panel{Kind: "models", Title: "Models", Notice: ansi.Strip(p.notice())}
+	panel := uisnapshot.Panel{Kind: "models", Title: "Models", Notice: p.noticeText()}
 	if p.help {
 		panel.Title = "Model help"
 		panel.Blocks = []uisnapshot.Block{
@@ -80,14 +79,19 @@ func (p *ModelCatalogPanel) focusedSnapshot(panel uisnapshot.Panel) uisnapshot.P
 	switch {
 	case state.confirmation != localModelNoConfirmation:
 		panel.Title = "Confirm model action"
-		panel.Blocks = []uisnapshot.Block{{Lines: cleanPanelLines(p.model.modelCatalogConfirmationView())}}
+		title, hint, detail := p.model.modelCatalogConfirmationContent()
+		panel.Blocks = []uisnapshot.Block{snapshotContent(title, hint, detail)}
 		panel.Footer = p.confirmationFooter(state.confirmation) + " · F1 help"
 	case state.cloudSetup != nil:
 		panel.Title = "Configure " + state.cloudSetup.provider
 		panel.Subtitle = state.cloudSetup.configurationHint()
 		for index, field := range state.cloudSetup.fields() {
 			label, _, input := state.cloudSetup.fieldPresentation(field)
-			panel.Rows = append(panel.Rows, uisnapshot.Row{Label: label, Detail: ansi.Strip(input.View())})
+			value := snapshotValue(input.Value(), input.Placeholder)
+			if field == cloudSetupCredentialField && input.Value() != "" {
+				value = "••••••••"
+			}
+			panel.Rows = append(panel.Rows, uisnapshot.Row{Label: label, Detail: value})
 			if field == state.cloudSetup.focus {
 				panel.Selected = index
 			}
@@ -97,8 +101,8 @@ func (p *ModelCatalogPanel) focusedSnapshot(panel uisnapshot.Panel) uisnapshot.P
 		panel.Title = "Custom provider"
 		panel.Subtitle = "Endpoint metadata only; secrets remain in environment variables."
 		for index, field := range state.customSetup.fields() {
-			label, _, input := state.customSetup.fieldPresentation(field)
-			panel.Rows = append(panel.Rows, uisnapshot.Row{Label: label, Detail: ansi.Strip(input)})
+			label, value := state.customSetup.snapshotField(field)
+			panel.Rows = append(panel.Rows, uisnapshot.Row{Label: label, Detail: value})
 			if field == state.customSetup.focus {
 				panel.Selected = index
 			}
@@ -111,16 +115,42 @@ func (p *ModelCatalogPanel) focusedSnapshot(panel uisnapshot.Panel) uisnapshot.P
 		panel.Footer = "Enter save · Esc cancel"
 	case state.dependencyHelp:
 		panel.Title = "Local model setup"
-		panel.Blocks = []uisnapshot.Block{{Lines: cleanPanelLines(p.model.localDependencyHelpView())}}
+		title, hint, detail := p.model.localDependencyHelpContent()
+		panel.Blocks = []uisnapshot.Block{snapshotContent(title, hint, detail)}
 		panel.Footer = "Enter review installation · I or Esc close help"
 	}
 	return panel
 }
 
-func cleanPanelLines(value string) []string {
-	value = strings.TrimSpace(ansi.Strip(value))
-	if value == "" {
-		return nil
+func snapshotContent(title, hint, detail string) uisnapshot.Block {
+	lines := []string{}
+	if hint != "" {
+		lines = append(lines, hint)
 	}
-	return strings.Split(value, "\n")
+	if detail != "" {
+		lines = append(lines, strings.Split(detail, "\n")...)
+	}
+	return uisnapshot.Block{Title: title, Lines: lines}
+}
+
+func snapshotValue(value, placeholder string) string {
+	if value == "" {
+		return placeholder
+	}
+	return value
+}
+
+func (form *customProviderSetupForm) snapshotField(field customProviderField) (string, string) {
+	switch field {
+	case customProviderIDField:
+		return "Provider ID", snapshotValue(form.id.Value(), form.id.Placeholder)
+	case customProviderURLField:
+		return "Chat Completions URL", snapshotValue(form.baseURL.Value(), form.baseURL.Placeholder)
+	case customProviderEnvField:
+		return "API key environment variable", snapshotValue(form.apiKeyEnv.Value(), form.apiKeyEnv.Placeholder)
+	case customProviderModelsField:
+		return "Model IDs", snapshotValue(form.models.Value(), form.models.Placeholder)
+	default:
+		return "Default model", snapshotValue(form.defaultModel.Value(), form.defaultModel.Placeholder)
+	}
 }

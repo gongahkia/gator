@@ -65,3 +65,18 @@ func TestBridgeProjectsCommandPanelsWithoutGoView(t *testing.T) {
 		t.Fatalf("status line panel = %#v", state.Panel)
 	}
 }
+
+func TestBridgeProjectsConfiguredStatusLineAndModelPanel(t *testing.T) {
+	model := New(Config{CurrentFolder: t.TempDir()})
+	model.statusLineEnabled = true
+	model.statusLine = []string{"send", "current-dir"}
+	state := model.BridgeState()
+	if !state.StatusLineEnabled || len(state.StatusLine) != 2 || state.StatusLine[0] != "enter send" {
+		t.Fatalf("configured status line = %#v", state.StatusLine)
+	}
+	model.models = &testModelPanel{}
+	state = model.BridgeState()
+	if state.Mode != "panel" || state.Panel == nil || state.Panel.Title != "Models" {
+		t.Fatalf("model panel snapshot = %#v", state.Panel)
+	}
+}

@@ -10,11 +10,12 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/gongahkia/gator/internal/modelcatalog"
 	"github.com/gongahkia/gator/internal/worktui"
 )
 
 func TestBridgeKeyMapsTerminalControls(t *testing.T) {
-	for name, want := range map[string]tea.KeyType{"esc": tea.KeyEsc, "enter": tea.KeyEnter, "ctrl+c": tea.KeyCtrlC, "up": tea.KeyUp} {
+	for name, want := range map[string]tea.KeyType{"esc": tea.KeyEsc, "enter": tea.KeyEnter, "ctrl+c": tea.KeyCtrlC, "up": tea.KeyUp, "shift+tab": tea.KeyShiftTab} {
 		key, ok := bridgeKey(name)
 		if !ok || key.Type != want {
 			t.Fatalf("bridgeKey(%q) = %#v, %v", name, key, ok)
@@ -34,7 +35,9 @@ func TestUIBridgeRoutesCommandAndPublishesState(t *testing.T) {
 	defer receive.Close()
 	finished := make(chan error, 1)
 	go func() {
-		finished <- runUIBridgeWithIO(worktui.New(worktui.Config{CurrentFolder: t.TempDir()}), input, receive)
+		finished <- runUIBridgeWithIO(worktui.New(worktui.Config{CurrentFolder: t.TempDir(), Models: func() (worktui.ModelPanel, error) {
+			return modelcatalog.NewModelCatalogPanel(modelcatalog.Config{}), nil
+		}}), input, receive)
 		receive.Close()
 	}()
 	frames := make(chan worktui.BridgeState, 4)
@@ -70,6 +73,12 @@ func TestUIBridgeRoutesCommandAndPublishesState(t *testing.T) {
 	}
 	if state := waitState(); len(state.Messages) != 1 || state.Messages[0].Role != "Gator" {
 		t.Fatalf("submitted UI state = %#v", state)
+	}
+	if _, err := send.Write([]byte("{\"version\":1,\"type\":\"submit\",\"text\":\"/model\"}\n")); err != nil {
+		t.Fatal(err)
+	}
+	if state := waitState(); state.Mode != "panel" || state.Panel == nil || state.Panel.Title != "Models" {
+		t.Fatalf("model UI state = %#v", state)
 	}
 	if _, err := send.Write([]byte("{\"version\":1,\"type\":\"exit\"}\n")); err != nil {
 		t.Fatal(err)

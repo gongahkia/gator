@@ -403,6 +403,21 @@ func (p *ModelCatalogPanel) catalogFooter() string {
 }
 
 func (p *ModelCatalogPanel) notice() string {
+	text := p.noticeText()
+	if text == "" {
+		return ""
+	}
+	switch p.model.notice.kind {
+	case noticeError:
+		return errorStyle.Render(text)
+	case noticeSuccess:
+		return okStyle.Render(text)
+	default:
+		return dimStyle.Render(text)
+	}
+}
+
+func (p *ModelCatalogPanel) noticeText() string {
 	text := strings.TrimSpace(p.model.notice.text)
 	if text == "" || strings.HasPrefix(text, "Choose a local model or a cloud API key") ||
 		text == "Local model catalog refreshed." ||
@@ -410,14 +425,7 @@ func (p *ModelCatalogPanel) notice() string {
 		strings.HasPrefix(text, "Local runtime is unavailable. Open the Local section") {
 		return ""
 	}
-	switch p.model.notice.kind {
-	case noticeError:
-		return errorStyle.Render(compact(text, p.panelWidth()))
-	case noticeSuccess:
-		return okStyle.Render(compact(text, p.panelWidth()))
-	default:
-		return dimStyle.Render(compact(text, p.panelWidth()))
-	}
+	return compact(text, p.panelWidth())
 }
 
 func (p *ModelCatalogPanel) selectedStyle() lipgloss.Style {

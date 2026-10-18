@@ -45447,6 +45447,7 @@ function PanelKeys({ bridge, scroll }) {
     else if (key.delete) name = "delete";
     else if (key.pageUp) name = "pgup";
     else if (key.pageDown) name = "pgdown";
+    else if (key.tab && key.shift) name = "shift+tab";
     else if (key.tab) name = "tab";
     else if (input === "f1") name = "f1";
     else if (key.ctrl) name = `ctrl+${input}`;
@@ -45628,12 +45629,7 @@ function App2({ bridge }) {
     content: item.text
   }));
   const viewportHeight = Math.max(1, (terminal?.rows ?? 24) - 6 - matches.length - (state.running ? 2 : 0) - (searchOpen ? 1 : 0));
-  const statusSegments = [
-    ...state.status ? [{ content: state.status, color: mutedGreen }] : [],
-    { content: state.provider && state.model ? `${state.provider}/${state.model}` : "Choose model: /model", color: green },
-    { content: state.source ? state.source.split("/").filter(Boolean).at(-1) || state.source : "Gator" },
-    ...state.queued ? [{ content: `${state.queued} queued` }] : []
-  ];
+  const statusSegments = (state.status_line ?? []).map((content) => ({ content, color: mutedGreen }));
   return /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, paddingX: 1, paddingTop: 1, children: [
     /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, children: [
       state.home && state.messages.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginBottom: 1, children: welcome }),
@@ -45661,7 +45657,7 @@ function App2({ bridge }) {
     ] }, command.name)) }),
     failure && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: "red", children: failure }),
     /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Divider, {}),
-    /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(StatusLine, { segments: statusSegments })
+    state.status_line_enabled && statusSegments.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(StatusLine, { segments: statusSegments })
   ] });
 }
 function runExternal(command) {

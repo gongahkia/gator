@@ -34,11 +34,19 @@ func (m Model) visibleRange(total, selected, limit int) (int, int) {
 }
 
 func (m Model) modelCatalogConfirmationView() string {
+	title, hint, detail := m.modelCatalogConfirmationContent()
+	if title == "" {
+		return ""
+	}
+	return m.fieldView(title, hint, detail)
+}
+
+func (m Model) modelCatalogConfirmationContent() (string, string, string) {
 	switch m.localModels.confirmation {
 	case localModelConfirmStart:
-		return m.fieldView("Start Ollama?", "Gator can start 'ollama serve' as a child of this TUI and stops it when Gator exits. You can instead start it yourself.", "Enter/y  Start with Gator (default)\nn/esc  I'll start it myself")
+		return "Start Ollama?", "Gator can start 'ollama serve' as a child of this TUI and stops it when Gator exits. You can instead start it yourself.", "Enter/y  Start with Gator (default)\nn/esc  I'll start it myself"
 	case localModelConfirmInstall:
-		return m.fieldView("Install Ollama?", "Ollama is not installed. Gator can show a reviewed official installation action before it runs anything.", "Enter/y  Review installation help (default)\nn/esc  I'll install it myself")
+		return "Install Ollama?", "Ollama is not installed. Gator can show a reviewed official installation action before it runs anything.", "Enter/y  Review installation help (default)\nn/esc  I'll install it myself"
 	case localModelConfirmRunInstallation:
 		if plan := m.localModels.installation; plan != nil {
 			detail := plan.Detail
@@ -49,44 +57,52 @@ func (m Model) modelCatalogConfirmationView() string {
 			if plan.RequiresElevation {
 				hint += " Gator will request your system password in this terminal, then stream progress here."
 			}
-			return m.fieldView(plan.Title, hint, wrapText(detail, m.inlineWidth()))
+			return plan.Title, hint, wrapText(detail, m.inlineWidth())
 		}
 	case localModelConfirmPull:
 		if selected, found := m.selectedLocalModel(); found {
-			return m.fieldView("Confirm download", "Model weights and upstream terms remain governed by the linked source.", selected.Name+" · approximately "+selected.Download+"\n"+selected.SourceURL)
+			return "Confirm download", "Model weights and upstream terms remain governed by the linked source.", selected.Name + " · approximately " + selected.Download + "\n" + selected.SourceURL
 		}
 	case localModelConfirmRemove:
 		if selected, found := m.selectedLocalModel(); found {
-			return m.fieldView("Confirm removal", "This deletes local model data from the selected Ollama runtime.", selected.Name+" · "+selected.OllamaModel)
+			return "Confirm removal", "This deletes local model data from the selected Ollama runtime.", selected.Name + " · " + selected.OllamaModel
 		}
 	case localModelConfirmRemoveCredential:
 		if cloud, found := m.selectedCloudModel(); found {
 			status := m.storedCredential(cloud.provider)
 			detail := cloud.provider + " · stored " + status.Kind + "\nOnly Gator's private credential file is changed. Environment variables and one-run keys are unchanged."
-			return m.fieldView("Remove stored Gator credential?", "This does not revoke the upstream key and does not log you out of vendor CLIs.", detail)
+			return "Remove stored Gator credential?", "This does not revoke the upstream key and does not log you out of vendor CLIs.", detail
 		}
 	case localModelConfirmRemoveCustom:
 		if cloud, found := m.selectedCloudModel(); found {
-			return m.fieldView("Remove custom provider?", "This deletes endpoint metadata from Gator config.json. The named API key environment variable is not changed or unset.", cloud.provider)
+			return "Remove custom provider?", "This deletes endpoint metadata from Gator config.json. The named API key environment variable is not changed or unset.", cloud.provider
 		}
 	case localModelConfirmSaveCustom:
 		if m.localModels.pendingCustom != nil {
-			return m.fieldView("Save custom provider?", "Review the destination before writing non-secret metadata. No API key is stored.", customProviderReviewText(*m.localModels.pendingCustom))
+			return "Save custom provider?", "Review the destination before writing non-secret metadata. No API key is stored.", customProviderReviewText(*m.localModels.pendingCustom)
 		}
 	case localModelConfirmApplyDiscovery:
 		if m.localModels.discovery != nil {
 			preview := *m.localModels.discovery
 			limit := min(12, len(preview.Models))
-			return m.fieldView("Replace configured models?", "These IDs came from an untrusted /models response. Confirming overwrites the configured catalog.", preview.ID+" default "+preview.DefaultModel+"\n"+strings.Join(preview.Models[:limit], "\n"))
+			return "Replace configured models?", "These IDs came from an untrusted /models response. Confirming overwrites the configured catalog.", preview.ID + " default " + preview.DefaultModel + "\n" + strings.Join(preview.Models[:limit], "\n")
 		}
 	}
-	return ""
+	return "", "", ""
 }
 
 func (m Model) localDependencyHelpView() string {
+	title, hint, detail := m.localDependencyHelpContent()
+	if title == "" {
+		return ""
+	}
+	return m.fieldView(title, hint, detail)
+}
+
+func (m Model) localDependencyHelpContent() (string, string, string) {
 	missing := m.localMissingDependencies()
 	if len(missing) == 0 {
-		return ""
+		return "", "", ""
 	}
 	lines := make([]string, 0, len(missing)*3)
 	for _, dependency := range missing {
@@ -107,9 +123,9 @@ func (m Model) localDependencyHelpView() string {
 		if plan.DisplayCommand != "" {
 			lines = append(lines, "  "+plan.DisplayCommand)
 		}
-		return m.fieldView("Installation help", "Gator found a platform-specific official action. Press Enter to review it before anything runs.", wrapText(strings.Join(lines, "\n"), m.inlineWidth()))
+		return "Installation help", "Gator found a platform-specific official action. Press Enter to review it before anything runs.", wrapText(strings.Join(lines, "\n"), m.inlineWidth())
 	}
-	return m.fieldView("Installation help", "Gator detected these prerequisites as missing. Use the official source shown here, install Ollama, then press r to refresh.", wrapText(strings.Join(lines, "\n"), m.inlineWidth()))
+	return "Installation help", "Gator detected these prerequisites as missing. Use the official source shown here, install Ollama, then press r to refresh.", wrapText(strings.Join(lines, "\n"), m.inlineWidth())
 }
 
 func (m Model) localInstallationPlan() (LocalInstallationPlan, error) {
