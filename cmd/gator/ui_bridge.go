@@ -72,6 +72,7 @@ type uiFrame struct {
 	Type    string `json:"type"`
 	Text    string `json:"text,omitempty"`
 	Key     string `json:"key,omitempty"`
+	Error   string `json:"error,omitempty"`
 	Width   int    `json:"width,omitempty"`
 	Height  int    `json:"height,omitempty"`
 }
@@ -96,11 +97,16 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 		case "submit":
 			next, command = m.model.SubmitText(frame.Text)
 		case "key":
+			if frame.Key == "ctrl+g" {
+				m.model = m.model.SetBridgeInput(frame.Text)
+			}
 			key, ok := bridgeKey(frame.Key)
 			if !ok {
 				return m, nil
 			}
 			next, command = m.model.Update(key)
+		case "external_done":
+			next, command = m.model.FinishBridgeExternal(frame.Error)
 		case "resize":
 			next, command = m.model.Update(tea.WindowSizeMsg{Width: max(20, frame.Width), Height: max(8, frame.Height)})
 		default:

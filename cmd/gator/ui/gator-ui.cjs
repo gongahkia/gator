@@ -45230,6 +45230,9 @@ var GatorBridge = class {
       this.listeners.delete(listener);
     };
   }
+  snapshot() {
+    return this.current;
+  }
   onExit(listener) {
     this.exits.add(listener);
     return () => {
@@ -45359,6 +45362,7 @@ function GreenPrompt({
 }
 function ChatKeys({
   state,
+  draft,
   matches,
   selected,
   setSelected,
@@ -45393,7 +45397,7 @@ function ChatKeys({
     const shortcuts = { p: "ctrl+p", x: "ctrl+x", b: "ctrl+b", j: "ctrl+j", i: "ctrl+i", g: "ctrl+g" };
     if (key.ctrl && shortcuts[input]) {
       event.stopImmediatePropagation();
-      bridge.send({ type: "key", key: shortcuts[input] });
+      bridge.send({ type: "key", key: shortcuts[input], text: input === "g" ? draft : void 0 });
       return;
     }
     if (key.pageUp || key.pageDown || key.wheelUp || key.wheelDown) {
@@ -45477,7 +45481,7 @@ function App2({ bridge }) {
   const { exit } = use_app_default();
   use_input_default(() => {
   });
-  const [state, setState] = (0, import_react56.useState)();
+  const [state, setState] = (0, import_react56.useState)(bridge.snapshot());
   const [failure, setFailure] = (0, import_react56.useState)("");
   const [input, setInput] = (0, import_react56.useState)("");
   const [prefillVersion, setPrefillVersion] = (0, import_react56.useState)(0);
@@ -45572,7 +45576,7 @@ function App2({ bridge }) {
       /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(MessageList, { ref: list, viewportHeight, messages, renderMessage: (item) => /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(MessageBody, { item: state.messages[Number(item.id.split("-", 1)[0])] }) }),
       state.running && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: green, children: state.cancelling ? "\u25CC Stopping\u2026 retaining evidence" : `${["\u280B", "\u2819", "\u2839", "\u2838", "\u283C", "\u2834", "\u2826", "\u2827", "\u2807", "\u280F"][state.loading_frame % 10]} Working\u2026 ${state.elapsed ?? ""} \xB7 Esc to interrupt` }) })
     ] }),
-    !searchOpen && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(ChatKeys, { state, matches, selected, setSelected, choose, dismiss: () => setDismissed(true), search: () => setSearchOpen(true), scroll: (rows) => list.current?.scrollBy(rows), exit: close, bridge }),
+    !searchOpen && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(ChatKeys, { state, draft: input, matches, selected, setSelected, choose, dismiss: () => setDismissed(true), search: () => setSearchOpen(true), scroll: (rows) => list.current?.scrollBy(rows), exit: close, bridge }),
     searchOpen && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(GreenSearch, { messages: state.messages, close: () => setSearchOpen(false), navigate: (index) => list.current?.scrollTo(index) }),
     /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Divider, {}),
     /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(GreenPrompt, { value: input, onChange: (value) => {
@@ -45596,14 +45600,58 @@ function App2({ bridge }) {
     /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(StatusLine, { segments: statusSegments })
   ] });
 }
+function runExternal(command) {
+  return new Promise((resolve) => {
+    const environment = command.env?.length ? Object.fromEntries(command.env.map((entry) => {
+      const separator = entry.indexOf("=");
+      return [entry.slice(0, separator), entry.slice(separator + 1)];
+    })) : process.env;
+    const child = (0, import_node_child_process.spawn)(command.program, command.args ?? [], {
+      cwd: command.dir || void 0,
+      env: environment,
+      stdio: "inherit"
+    });
+    let finished = false;
+    const done = (error) => {
+      if (finished) return;
+      finished = true;
+      resolve(error);
+    };
+    child.on("error", (error) => done(error.message));
+    child.on("exit", (code, signal) => done(code === 0 ? "" : signal ? `terminated by ${signal}` : `exited with status ${code}`));
+  });
+}
 async function main() {
   const [binary, conversationID = "", goalID = ""] = process.argv.slice(2);
   if (!binary) throw new Error("Gator UI requires its backend executable");
   const bridge = new GatorBridge(binary, conversationID, goalID);
+  let app;
+  let handoff;
+  let externalActive = false;
+  const unsubscribe = bridge.subscribe((state) => {
+    if (!state.external) {
+      externalActive = false;
+      return;
+    }
+    if (!externalActive) {
+      externalActive = true;
+      handoff = state.external;
+      app?.unmount();
+    }
+  });
   try {
-    const app = await root_default(/* @__PURE__ */ (0, import_jsx_runtime50.jsx)(App2, { bridge }));
-    await app.waitUntilExit();
+    while (true) {
+      app = await root_default(/* @__PURE__ */ (0, import_jsx_runtime50.jsx)(App2, { bridge }));
+      if (handoff) app.unmount();
+      await app.waitUntilExit();
+      app = void 0;
+      if (!handoff) break;
+      const command = handoff;
+      handoff = void 0;
+      bridge.send({ type: "external_done", error: await runExternal(command) });
+    }
   } finally {
+    unsubscribe();
     bridge.stop();
   }
 }

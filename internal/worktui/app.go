@@ -141,6 +141,7 @@ type Config struct {
 	SelectedModel           func() (provider, model string, err error)
 	ModelStatus             func() (ModelStatus, error)
 	Live                    bool
+	BridgeMode              bool
 	CurrentFolder           string
 	GoalID                  string
 	InitialTitle            string
@@ -278,6 +279,7 @@ type Model struct {
 	historyIndex           int
 	historyDraft           string
 	composerEditorPath     string
+	bridgeExternal         *BridgeExternal
 	messages               []message
 	running                bool
 	cancelling             bool

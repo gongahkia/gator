@@ -169,6 +169,7 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			return currentWorkModelStatus(settingsStore, stateDir)
 		},
 		Live:          true,
+		BridgeMode:    backend,
 		InitialTitle:  goalTitle,
 		GoalID:        goalID,
 		CurrentFolder: workingDirectory, Conversations: conversations, Jobs: definitions, SupervisorRunning: supervisorRunning, Inbox: inboxEntries, Goals: goals, Attention: attention,

@@ -895,6 +895,24 @@ func TestConnectorLoginUsesInteractiveCommandAndSelectsOnSuccess(t *testing.T) {
 	}
 }
 
+func TestBridgeConnectorLoginUsesTerminalHandoff(t *testing.T) {
+	model := New(Config{
+		CurrentFolder:    "/work",
+		BridgeMode:       true,
+		ConnectorCommand: func(values []string) *exec.Cmd { return exec.Command("true", values...) },
+	})
+	updated, command := model.SubmitText("/connector login google-work")
+	model = updated.(Model)
+	if command != nil || model.BridgeState().External == nil || model.BridgeState().External.Kind != "connector" {
+		t.Fatalf("connector handoff = %#v, command = %v", model.BridgeState().External, command)
+	}
+	updated, _ = model.FinishBridgeExternal("")
+	model = updated.(Model)
+	if model.BridgeState().External != nil || len(model.options.ConnectorIDs) != 1 || model.options.ConnectorIDs[0] != "google-work" {
+		t.Fatalf("completed connector state = %#v", model.BridgeState())
+	}
+}
+
 func TestCommandPaletteRowsShareOneLeftColumn(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work", RefreshJobs: func() ([]jobs.Definition, error) { return nil, nil }})
 	model.width, model.height = 100, 60

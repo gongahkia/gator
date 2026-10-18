@@ -1,6 +1,9 @@
 package worktui
 
 import (
+	"errors"
+	"fmt"
+	"os/exec"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -29,6 +32,24 @@ type BridgeState struct {
 	Queued       int               `json:"queued"`
 	Home         bool              `json:"home"`
 	FirstRun     bool              `json:"first_run"`
+	External     *BridgeExternal   `json:"external,omitempty"`
+}
+
+// BridgeExternal asks the frontend to give the terminal to a process. The
+// command is constructed by the same Go paths used by the native TUI.
+type BridgeExternal struct {
+	Kind    string   `json:"kind"`
+	Program string   `json:"program"`
+	Args    []string `json:"args"`
+	Dir     string   `json:"dir,omitempty"`
+	Env     []string `json:"env,omitempty"`
+	Action  string   `json:"-"`
+	ID      string   `json:"-"`
+}
+
+func bridgeExternal(kind, action, id string, command *exec.Cmd) *BridgeExternal {
+	return &BridgeExternal{Kind: kind, Program: command.Path, Args: append([]string(nil), command.Args[1:]...),
+		Dir: command.Dir, Env: append([]string(nil), command.Env...), Action: action, ID: id}
 }
 
 type BridgeMessage struct {
@@ -64,6 +85,7 @@ func (m Model) BridgeState() BridgeState {
 		Queued:       len(m.queue),
 		Home:         m.home,
 		FirstRun:     m.firstRun,
+		External:     m.bridgeExternal,
 	}
 	for _, item := range m.messages {
 		state.Messages = append(state.Messages, BridgeMessage{Role: item.role, Text: item.text, Bundle: cloneBundlePointer(item.bundle)})
@@ -79,6 +101,35 @@ func (m Model) BridgeState() BridgeState {
 		state.LegacyView = m.View()
 	}
 	return state
+}
+
+// SetBridgeInput synchronizes the React composer before an editor handoff.
+func (m Model) SetBridgeInput(text string) Model {
+	m.input = text
+	return m
+}
+
+// FinishBridgeExternal returns to the same model after the frontend restores
+// the terminal. The callback paths are shared with the native TUI.
+func (m Model) FinishBridgeExternal(failure string) (tea.Model, tea.Cmd) {
+	job := m.bridgeExternal
+	if job == nil {
+		return m, nil
+	}
+	m.bridgeExternal = nil
+	var err error
+	if failure != "" {
+		err = errors.New(failure)
+	}
+	switch job.Kind {
+	case "editor":
+		return m.updateComposerEditorDone(composerEditorDone{path: m.composerEditorPath, editor: composerEditor(), err: err})
+	case "connector":
+		return m.Update(connectorActionDone{action: job.Action, id: job.ID, err: err})
+	default:
+		m.status = fmt.Sprintf("Unknown external action %q", job.Kind)
+		return m, nil
+	}
 }
 
 // SubmitText routes a complete frontend request through the same Work TUI

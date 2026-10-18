@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
-import { Ansi, Box, Text, render, useApp, useInput, TerminalSizeContext } from "@claude-code-kit/ink-renderer";
+import { Ansi, Box, Text, render, useApp, useInput, TerminalSizeContext, type Instance } from "@claude-code-kit/ink-renderer";
 import { Divider, MessageList, StatusLine, WelcomeScreen, type Message, type VirtualListHandle } from "@claude-code-kit/ui";
 import React, { useContext, useEffect, useRef, useState } from "react";
 
@@ -15,6 +15,7 @@ type BackendBundle = {
   Candidates: { ID: string; Status: string; ChangedPaths: string[] }[] | null;
 };
 type BackendMessage = { role: string; text: string; bundle?: BackendBundle };
+type ExternalCommand = { kind: string; program: string; args: string[]; dir?: string; env?: string[] };
 type BackendState = {
   mode: "chat" | "legacy";
   legacy_view?: string;
@@ -34,8 +35,9 @@ type BackendState = {
   queued: number;
   home: boolean;
   first_run: boolean;
+  external?: ExternalCommand;
 };
-type Frame = { version: 1; type: "submit" | "key" | "resize" | "exit"; text?: string; key?: string; width?: number; height?: number };
+type Frame = { version: 1; type: "submit" | "key" | "resize" | "exit" | "external_done"; text?: string; key?: string; error?: string; width?: number; height?: number };
 
 class GatorBridge {
   private child: ChildProcessWithoutNullStreams;
@@ -77,6 +79,7 @@ class GatorBridge {
     if (this.current) listener(this.current);
     return () => { this.listeners.delete(listener); };
   }
+  snapshot(): BackendState | undefined { return this.current; }
   onExit(listener: (code: number | null, detail: string) => void): () => void {
     this.exits.add(listener);
     return () => { this.exits.delete(listener); };
@@ -175,9 +178,10 @@ function GreenPrompt({
 }
 
 function ChatKeys({
-  state, matches, selected, setSelected, choose, dismiss, search, scroll, exit, bridge,
+  state, draft, matches, selected, setSelected, choose, dismiss, search, scroll, exit, bridge,
 }: {
   state: BackendState;
+  draft: string;
   matches: BackendCommand[];
   selected: number;
   setSelected: React.Dispatch<React.SetStateAction<number>>;
@@ -197,7 +201,7 @@ function ChatKeys({
     if (key.ctrl && input === "f") { event.stopImmediatePropagation(); search(); return; }
     const shortcuts: Record<string, string> = { p: "ctrl+p", x: "ctrl+x", b: "ctrl+b", j: "ctrl+j", i: "ctrl+i", g: "ctrl+g" };
     if (key.ctrl && shortcuts[input]) {
-      event.stopImmediatePropagation(); bridge.send({ type: "key", key: shortcuts[input] }); return;
+      event.stopImmediatePropagation(); bridge.send({ type: "key", key: shortcuts[input], text: input === "g" ? draft : undefined }); return;
     }
     if (key.pageUp || key.pageDown || key.wheelUp || key.wheelDown) {
       event.stopImmediatePropagation(); scroll(key.pageUp ? -12 : key.pageDown ? 12 : key.wheelUp ? -3 : 3); return;
@@ -264,7 +268,7 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
   const { exit } = useApp();
   // Keep the terminal renderer active until the backend's first state arrives.
   useInput(() => {});
-  const [state, setState] = useState<BackendState>();
+  const [state, setState] = useState<BackendState | undefined>(bridge.snapshot());
   const [failure, setFailure] = useState("");
   const [input, setInput] = useState("");
   const [prefillVersion, setPrefillVersion] = useState(0);
@@ -340,6 +344,7 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
   }));
   const viewportHeight = Math.max(1, (terminal?.rows ?? 24) - 6 - matches.length - (state.running ? 2 : 0) - (searchOpen ? 1 : 0));
   const statusSegments = [
+    ...(state.status ? [{ content: state.status, color: mutedGreen }] : []),
     { content: state.provider && state.model ? `${state.provider}/${state.model}` : "Choose model: /model", color: green },
     { content: state.source ? state.source.split("/").filter(Boolean).at(-1) || state.source : "Gator" },
     ...(state.queued ? [{ content: `${state.queued} queued` }] : []),
@@ -351,7 +356,7 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
         <MessageList ref={list} viewportHeight={viewportHeight} messages={messages} renderMessage={(item) => <MessageBody item={state.messages[Number(item.id.split("-", 1)[0])]} />} />
         {state.running && <Box marginTop={1}><Text color={green}>{state.cancelling ? "◌ Stopping… retaining evidence" : `${["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"][state.loading_frame % 10]} Working… ${state.elapsed ?? ""} · Esc to interrupt`}</Text></Box>}
       </Box>
-      {!searchOpen && <ChatKeys state={state} matches={matches} selected={selected} setSelected={setSelected} choose={choose} dismiss={() => setDismissed(true)} search={() => setSearchOpen(true)} scroll={(rows) => list.current?.scrollBy(rows)} exit={close} bridge={bridge} />}
+      {!searchOpen && <ChatKeys state={state} draft={input} matches={matches} selected={selected} setSelected={setSelected} choose={choose} dismiss={() => setDismissed(true)} search={() => setSearchOpen(true)} scroll={(rows) => list.current?.scrollBy(rows)} exit={close} bridge={bridge} />}
       {searchOpen && <GreenSearch messages={state.messages} close={() => setSearchOpen(false)} navigate={(index) => list.current?.scrollTo(index)} />}
       <Divider />
       <GreenPrompt value={input} onChange={(value) => { setInput(value); setSelected(0); setDismissed(false); }} onSubmit={submit} disabled={searchOpen || !!failure} history={history} prefillVersion={prefillVersion} />
@@ -363,14 +368,58 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
   );
 }
 
+function runExternal(command: ExternalCommand): Promise<string> {
+  return new Promise((resolve) => {
+    const environment = command.env?.length
+      ? Object.fromEntries(command.env.map((entry) => {
+        const separator = entry.indexOf("=");
+        return [entry.slice(0, separator), entry.slice(separator + 1)];
+      }))
+      : process.env;
+    const child = spawn(command.program, command.args ?? [], {
+      cwd: command.dir || undefined,
+      env: environment,
+      stdio: "inherit",
+    });
+    let finished = false;
+    const done = (error: string) => {
+      if (finished) return;
+      finished = true;
+      resolve(error);
+    };
+    child.on("error", (error) => done(error.message));
+    child.on("exit", (code, signal) => done(code === 0 ? "" : signal ? `terminated by ${signal}` : `exited with status ${code}`));
+  });
+}
+
 async function main(): Promise<void> {
   const [binary, conversationID = "", goalID = ""] = process.argv.slice(2);
   if (!binary) throw new Error("Gator UI requires its backend executable");
   const bridge = new GatorBridge(binary, conversationID, goalID);
+  let app: Instance | undefined;
+  let handoff: ExternalCommand | undefined;
+  let externalActive = false;
+  const unsubscribe = bridge.subscribe((state) => {
+    if (!state.external) { externalActive = false; return; }
+    if (!externalActive) {
+      externalActive = true;
+      handoff = state.external;
+      app?.unmount();
+    }
+  });
   try {
-    const app = await render(<App bridge={bridge} />);
-    await app.waitUntilExit();
+    while (true) {
+      app = await render(<App bridge={bridge} />);
+      if (handoff) app.unmount();
+      await app.waitUntilExit();
+      app = undefined;
+      if (!handoff) break;
+      const command = handoff;
+      handoff = undefined;
+      bridge.send({ type: "external_done", error: await runExternal(command) });
+    }
   } finally {
+    unsubscribe();
     bridge.stop();
   }
 }

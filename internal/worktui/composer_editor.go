@@ -58,6 +58,10 @@ func (m Model) openComposerEditor() (tea.Model, tea.Cmd) {
 	command := composerEditorCommand(editor, path)
 	m.composerEditorPath = path
 	m.status = "Editing composer in " + singleLine(editor) + "… Save and exit to return."
+	if m.config.BridgeMode {
+		m.bridgeExternal = bridgeExternal("editor", "", "", command)
+		return m, nil
+	}
 	return m, tea.ExecProcess(command, func(err error) tea.Msg {
 		return composerEditorDone{path: path, editor: editor, err: err}
 	})

@@ -80,6 +80,31 @@ func TestCtrlGEditsAndRestoresComposerBuffer(t *testing.T) {
 	}
 }
 
+func TestBridgeEditorHandoffRestoresDraft(t *testing.T) {
+	t.Setenv("VISUAL", "true")
+	model := New(Config{CurrentFolder: "/work", BridgeMode: true}).SetBridgeInput("draft to edit")
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyCtrlG})
+	model = updated.(Model)
+	if command != nil || model.BridgeState().External == nil {
+		t.Fatalf("bridge editor handoff = %#v, command = %v", model.BridgeState().External, command)
+	}
+	path := model.composerEditorPath
+	if contents, err := os.ReadFile(path); err != nil || string(contents) != "draft to edit" {
+		t.Fatalf("editor input = %q, error = %v", contents, err)
+	}
+	if err := os.WriteFile(path, []byte("saved draft"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	updated, _ = model.FinishBridgeExternal("")
+	model = updated.(Model)
+	if model.BridgeState().External != nil || model.BridgeState().Input != "saved draft" {
+		t.Fatalf("restored bridge editor state = %#v", model.BridgeState())
+	}
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("editor draft remains: %v", err)
+	}
+}
+
 func TestComposerEditorKeepsSavedTextWhenEditorExitsWithError(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work"})
 	file, err := os.CreateTemp("", "gator-composer-test-*.md")

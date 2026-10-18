@@ -928,6 +928,10 @@ func (m *Model) startConnectorCommand(action, id string, arguments []string) err
 		return errorsUnavailable("connector login")
 	}
 	m.status = "Connector " + action + "…"
+	if m.config.BridgeMode {
+		m.bridgeExternal = bridgeExternal("connector", action, id, command)
+		return nil
+	}
 	m.pendingConnectorCmd = tea.ExecProcess(command, func(err error) tea.Msg {
 		return connectorActionDone{action: action, id: id, err: err}
 	})
