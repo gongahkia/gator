@@ -1,48 +1,55 @@
-//go:build !darwin
+//go:build !darwin || !cgo
 
 package desktop
 
 import (
 	"context"
 	"errors"
+	"runtime"
 )
 
 type unavailableRuntime struct{}
 
 func DefaultRuntime() Runtime { return unavailableRuntime{} }
+func unavailableDesktopError() error {
+	if runtime.GOOS == "darwin" {
+		return errors.New("desktop control requires a cgo-enabled macOS build")
+	}
+	return errors.New("desktop control is currently available only on macOS")
+}
 func (unavailableRuntime) AccessibilityTrusted() (bool, error) {
-	return false, errors.New("desktop control is currently available only on macOS")
+	return false, unavailableDesktopError()
 }
 func (unavailableRuntime) FrontWindow(context.Context) (Window, error) {
-	return Window{}, errors.New("desktop control is currently available only on macOS")
+	return Window{}, unavailableDesktopError()
 }
 func (unavailableRuntime) Screenshot(context.Context, Window) ([]byte, error) {
-	return nil, errors.New("desktop control is currently available only on macOS")
+	return nil, unavailableDesktopError()
 }
 func (unavailableRuntime) Activate(context.Context, string) error {
-	return errors.New("desktop control is currently available only on macOS")
+	return unavailableDesktopError()
 }
 func (unavailableRuntime) Click(context.Context, float64, float64) error {
-	return errors.New("desktop control is currently available only on macOS")
+	return unavailableDesktopError()
 }
 func (unavailableRuntime) DoubleClick(context.Context, float64, float64) error {
-	return errors.New("desktop control is currently available only on macOS")
+	return unavailableDesktopError()
 }
 func (unavailableRuntime) Drag(context.Context, []Point) error {
-	return errors.New("desktop control is currently available only on macOS")
+	return unavailableDesktopError()
 }
 func (unavailableRuntime) Move(context.Context, float64, float64) error {
-	return errors.New("desktop control is currently available only on macOS")
+	return unavailableDesktopError()
 }
 func (unavailableRuntime) Scroll(context.Context, float64, float64, int, int) error {
-	return errors.New("desktop control is currently available only on macOS")
+	return unavailableDesktopError()
 }
 func (unavailableRuntime) Type(context.Context, string) error {
-	return errors.New("desktop control is currently available only on macOS")
+	return unavailableDesktopError()
 }
 func (unavailableRuntime) Press(context.Context, string) error {
-	return errors.New("desktop control is currently available only on macOS")
+	return unavailableDesktopError()
 }
 func (unavailableRuntime) FocusedFieldSensitive(context.Context, int) (bool, error) {
-	return true, errors.New("desktop control is currently available only on macOS")
+	return true, unavailableDesktopError()
 }

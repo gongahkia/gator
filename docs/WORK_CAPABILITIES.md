@@ -44,4 +44,7 @@ gator work --provider openai --desktop-session DESKTOP_SESSION --artifact review
 
 The desktop command requires macOS Accessibility permission. Screenshot access
 may additionally require the operating system's Screen Recording permission.
-Gator fails closed if either required operation is unavailable.
+Gator fails closed if either required operation is unavailable. Desktop control
+also requires a cgo-enabled macOS build; the release workflow now builds
+macOS archives natively with cgo so this feature remains available. A custom
+`CGO_ENABLED=0` macOS build fails closed with a specific diagnostic.
