@@ -45397,18 +45397,12 @@ function ChatKeys({
   scroll,
   exit,
   clearDraft,
-  exitHint,
   bridge
 }) {
-  const lastExit = (0, import_react56.useRef)(0);
   use_input_default((input, key, event) => {
     if (key.ctrl && input === "d") {
       event.stopImmediatePropagation();
-      if (Date.now() - lastExit.current < 2e3) exit();
-      else {
-        lastExit.current = Date.now();
-        exitHint();
-      }
+      exit();
       return;
     }
     if (key.ctrl && input === "c" && !state.running) {
@@ -45452,14 +45446,19 @@ function ChatKeys({
       setSelected((index) => (index + (key.upArrow ? -1 : 1) + matches.length) % matches.length);
     } else if (key.return || key.tab) {
       event.stopImmediatePropagation();
-      choose(matches[Math.min(selected, matches.length - 1)]);
+      const exact = matches.find((command) => `/${command.name}` === draft.trim());
+      choose(exact ?? matches[Math.min(selected, matches.length - 1)]);
     }
   }, { captureCtrlC: true });
   return null;
 }
-function PanelKeys({ bridge, scroll }) {
+function PanelKeys({ bridge, scroll, exit }) {
   use_input_default((input, key, event) => {
     event.stopImmediatePropagation();
+    if (key.ctrl && input === "d") {
+      exit();
+      return;
+    }
     if (key.pageUp || key.wheelUp) {
       scroll(-8);
       return;
@@ -45489,7 +45488,7 @@ function PanelKeys({ bridge, scroll }) {
   }, { captureCtrlC: true });
   return null;
 }
-function PanelScreen({ panel, status, draft, statusLine, bridge }) {
+function PanelScreen({ panel, status, draft, statusLine, bridge, exit }) {
   const terminal = (0, import_react56.useContext)(TerminalSizeContext);
   const [offset, setOffset] = (0, import_react56.useState)(0);
   (0, import_react56.useEffect)(() => {
@@ -45501,17 +45500,18 @@ function PanelScreen({ panel, status, draft, statusLine, bridge }) {
     ...block.lines.length ? block.lines.map((line) => ({ text: line, heading: false })) : [{ text: "None", heading: false }],
     { text: "", heading: false }
   ]);
-  const available = Math.max(4, (terminal?.rows ?? 24) - 11);
+  const focused = panel.kind === "confirmation" || panel.kind === "model-form" || panel.kind === "learning-form";
+  const available = Math.max(4, (terminal?.rows ?? 24) - (focused ? 14 : 11));
   const rowHeight = rows.some((row) => row.detail) ? 3 : 2;
   const maxRows = Math.max(2, Math.floor((blocks.length > 0 ? available / 2 : available) / rowHeight));
   const selected = Math.min(Math.max(0, panel.selected ?? 0), Math.max(0, rows.length - 1));
   const rowStart = Math.max(0, Math.min(selected - Math.floor(maxRows / 2), rows.length - maxRows));
   const maxLines = Math.max(2, available - (rows.length > 0 ? Math.min(rows.length, maxRows) * rowHeight : 0));
   const blockOffset = Math.min(offset, Math.max(0, blocks.length - maxLines));
-  const focused = panel.kind === "confirmation" || panel.kind === "model-form";
   const panelWidth = Math.max(20, Math.min(78, (terminal?.columns ?? 80) - 4));
+  const contentWidth = focused ? panelWidth - 4 : Math.max(1, (terminal?.columns ?? 80) - 4);
   return /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, paddingX: 2, paddingTop: 1, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(PanelKeys, { bridge, scroll: (amount) => setOffset((current) => Math.max(0, Math.min(blocks.length - maxLines, current + amount))) }),
+    /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(PanelKeys, { bridge, exit, scroll: (amount) => setOffset((current) => Math.max(0, Math.min(blocks.length - maxLines, current + amount))) }),
     /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", flexGrow: focused ? 0 : 1, width: focused ? panelWidth : void 0, alignSelf: focused ? "center" : void 0, borderStyle: focused ? "round" : void 0, borderColor: focused ? green : void 0, paddingX: focused ? 1 : 0, marginTop: focused ? 1 : 0, children: [
       /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { color: green, bold: true, children: [
         "\u{1F40A} Gator  ",
@@ -45525,7 +45525,7 @@ function PanelScreen({ panel, status, draft, statusLine, bridge }) {
           /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { inverse: true, children: " " })
         ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Divider, {}) }),
+      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Divider, { width: contentWidth }) }),
       /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", flexGrow: focused ? 0 : 1, marginTop: 1, children: [
         rows.slice(rowStart, rowStart + maxRows).map((row, index) => {
           const active = panel.kind !== "inbox" && panel.kind !== "jobs" && rowStart + index === selected;
@@ -45538,7 +45538,10 @@ function PanelScreen({ panel, status, draft, statusLine, bridge }) {
                 row.state
               ] }) : null
             ] }),
-            row.detail && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: !active, children: row.detail }) })
+            row.detail && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { dimColor: !active, children: [
+              row.detail,
+              active && (panel.kind === "model-form" || panel.kind === "learning-form") && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { inverse: true, children: " " })
+            ] }) })
           ] }, `${rowStart + index}-${row.label}`);
         }),
         blocks.slice(blockOffset, blockOffset + maxLines).map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginBottom: line.heading ? 0 : void 0, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: line.heading ? mutedGreen : void 0, bold: line.heading, children: line.text || " " }) }, `${blockOffset + index}-${line.text}`)),
@@ -45547,11 +45550,11 @@ function PanelScreen({ panel, status, draft, statusLine, bridge }) {
         panel.notice && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: mutedGreen, children: panel.notice }) }),
         status && status !== panel.notice && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: status }) })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Divider, {}),
+      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Divider, { width: contentWidth }),
       /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: panel.footer || "Esc back" })
     ] }),
     focused && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { flexGrow: 1 }),
-    /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Divider, {}) }),
+    /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Divider, { width: Math.max(1, (terminal?.columns ?? 80) - 4) }) }),
     /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { dimColor: true, children: [
       "\u276F ",
       draft || "Ask Gator to work on something\u2026"
@@ -45595,7 +45598,6 @@ function App2({ bridge }) {
   });
   const [state, setState] = (0, import_react56.useState)(bridge.snapshot());
   const [failure, setFailure] = (0, import_react56.useState)("");
-  const [localNotice, setLocalNotice] = (0, import_react56.useState)("");
   const [input, setInput] = (0, import_react56.useState)("");
   const [prefillVersion, setPrefillVersion] = (0, import_react56.useState)(0);
   const [history, setHistory] = (0, import_react56.useState)([]);
@@ -45627,9 +45629,13 @@ function App2({ bridge }) {
     }
     lastBackendInput.current = state?.input ?? "";
   }, [state?.mode, state?.input]);
+  const close = () => {
+    bridge.stop();
+    exit();
+  };
   if (!state) return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { padding: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: green, children: failure || "Starting Gator\u2026" }) });
   if (state.mode === "panel" && state.panel) {
-    return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(PanelScreen, { panel: state.panel, status: state.status, draft: input, statusLine: state.status_line_enabled ? state.status_line : void 0, bridge });
+    return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(PanelScreen, { panel: state.panel, status: state.status, draft: input, statusLine: state.status_line_enabled ? state.status_line : void 0, bridge, exit: close });
   }
   const matches = !searchOpen && !dismissed && input.startsWith("/") && !input.includes(" ") ? state.commands.filter((command) => input === "/" ? !command.advanced : `/${command.name}`.startsWith(input)).slice(0, 8) : [];
   const submit = (value) => {
@@ -45637,7 +45643,6 @@ function App2({ bridge }) {
     if (!text) return;
     bridge.send({ type: "submit", text });
     setInput("");
-    setLocalNotice("");
     setDismissed(false);
     setHistory((current) => [text, ...current]);
   };
@@ -45649,10 +45654,6 @@ function App2({ bridge }) {
     } else {
       submit(`/${command.name}`);
     }
-  };
-  const close = () => {
-    bridge.stop();
-    exit();
   };
   const context = [state.title, state.provider ? `${state.provider}${state.model ? `/${state.model}` : ""}` : "Choose model: /model", state.source.split("/").filter(Boolean).at(-1) || state.source].filter(Boolean).join(" \xB7 ");
   const welcome = /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", children: [
@@ -45693,17 +45694,15 @@ function App2({ bridge }) {
       state.messages.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(MessageList, { ref: list, viewportHeight, messages, renderMessage: (item) => /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(MessageBody, { item: state.messages[Number(item.id.split("-", 1)[0])] }) }),
       state.running && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: green, children: state.cancelling ? "\u25CC Stopping\u2026 retaining evidence" : `${["\u280B", "\u2819", "\u2839", "\u2838", "\u283C", "\u2834", "\u2826", "\u2827", "\u2807", "\u280F"][state.loading_frame % 10]} Working\u2026 ${state.elapsed ?? ""} \xB7 Esc to interrupt` }) })
     ] }),
-    (localNotice || state.status) && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: mutedGreen, children: localNotice || state.status }),
+    state.status && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: mutedGreen, children: state.status }),
     !searchOpen && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(ChatKeys, { state, draft: input, matches, selected, setSelected, choose, dismiss: () => setDismissed(true), search: () => setSearchOpen(true), scroll: (rows) => list.current?.scrollBy(rows), exit: close, clearDraft: () => {
       setInput("");
       setPrefillVersion((version) => version + 1);
-      setLocalNotice("");
-    }, exitHint: () => setLocalNotice("Press Ctrl+D again to exit Gator"), bridge }),
+    }, bridge }),
     searchOpen && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(GreenSearch, { messages: state.messages, close: () => setSearchOpen(false), navigate: (index) => list.current?.scrollTo(index) }),
     /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Divider, {}),
     /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(GreenPrompt, { value: input, onChange: (value) => {
       setInput(value);
-      setLocalNotice("");
       setSelected(0);
       setDismissed(false);
     }, onSubmit: submit, disabled: searchOpen || !!failure, history, prefillVersion }),

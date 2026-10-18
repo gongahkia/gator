@@ -209,7 +209,7 @@ function GreenPrompt({
 }
 
 function ChatKeys({
-  state, draft, matches, selected, setSelected, choose, dismiss, search, scroll, exit, clearDraft, exitHint, bridge,
+  state, draft, matches, selected, setSelected, choose, dismiss, search, scroll, exit, clearDraft, bridge,
 }: {
   state: BackendState;
   draft: string;
@@ -222,17 +222,10 @@ function ChatKeys({
   scroll: (rows: number) => void;
   exit: () => void;
   clearDraft: () => void;
-  exitHint: () => void;
   bridge: GatorBridge;
 }): null {
-  const lastExit = useRef(0);
   useInput((input, key, event) => {
-    if (key.ctrl && input === "d") {
-      event.stopImmediatePropagation();
-      if (Date.now() - lastExit.current < 2000) exit();
-      else { lastExit.current = Date.now(); exitHint(); }
-      return;
-    }
+    if (key.ctrl && input === "d") { event.stopImmediatePropagation(); exit(); return; }
     if (key.ctrl && input === "c" && !state.running) { event.stopImmediatePropagation(); clearDraft(); return; }
     if ((key.ctrl && input === "c") || (key.escape && state.running)) {
       event.stopImmediatePropagation(); bridge.send({ type: "key", key: "esc" }); return;
@@ -254,15 +247,18 @@ function ChatKeys({
       event.stopImmediatePropagation();
       setSelected((index) => (index + (key.upArrow ? -1 : 1) + matches.length) % matches.length);
     } else if (key.return || key.tab) {
-      event.stopImmediatePropagation(); choose(matches[Math.min(selected, matches.length - 1)]);
+      event.stopImmediatePropagation();
+      const exact = matches.find((command) => `/${command.name}` === draft.trim());
+      choose(exact ?? matches[Math.min(selected, matches.length - 1)]);
     }
   }, { captureCtrlC: true });
   return null;
 }
 
-function PanelKeys({ bridge, scroll }: { bridge: GatorBridge; scroll: (amount: number) => void }): null {
+function PanelKeys({ bridge, scroll, exit }: { bridge: GatorBridge; scroll: (amount: number) => void; exit: () => void }): null {
   useInput((input, key, event) => {
     event.stopImmediatePropagation();
+    if (key.ctrl && input === "d") { exit(); return; }
     if (key.pageUp || key.wheelUp) { scroll(-8); return; }
     if (key.pageDown || key.wheelDown) { scroll(8); return; }
     let name = "";
@@ -287,7 +283,7 @@ function PanelKeys({ bridge, scroll }: { bridge: GatorBridge; scroll: (amount: n
   return null;
 }
 
-function PanelScreen({ panel, status, draft, statusLine, bridge }: { panel: BackendPanel; status?: string; draft?: string; statusLine?: string[]; bridge: GatorBridge }): React.ReactNode {
+function PanelScreen({ panel, status, draft, statusLine, bridge, exit }: { panel: BackendPanel; status?: string; draft?: string; statusLine?: string[]; bridge: GatorBridge; exit: () => void }): React.ReactNode {
   const terminal = useContext(TerminalSizeContext);
   const [offset, setOffset] = useState(0);
   useEffect(() => { setOffset(0); }, [panel.kind, panel.title, panel.subtitle]);
@@ -297,19 +293,19 @@ function PanelScreen({ panel, status, draft, statusLine, bridge }: { panel: Back
     ...(block.lines.length ? block.lines.map((line) => ({ text: line, heading: false })) : [{ text: "None", heading: false }]),
     { text: "", heading: false },
   ]);
-  const available = Math.max(4, (terminal?.rows ?? 24) - 11);
+  const focused = panel.kind === "confirmation" || panel.kind === "model-form" || panel.kind === "learning-form";
+  const available = Math.max(4, (terminal?.rows ?? 24) - (focused ? 14 : 11));
   const rowHeight = rows.some((row) => row.detail) ? 3 : 2;
   const maxRows = Math.max(2, Math.floor((blocks.length > 0 ? available / 2 : available) / rowHeight));
   const selected = Math.min(Math.max(0, panel.selected ?? 0), Math.max(0, rows.length - 1));
   const rowStart = Math.max(0, Math.min(selected - Math.floor(maxRows / 2), rows.length - maxRows));
   const maxLines = Math.max(2, available - (rows.length > 0 ? Math.min(rows.length, maxRows) * rowHeight : 0));
   const blockOffset = Math.min(offset, Math.max(0, blocks.length - maxLines));
-  const focused = panel.kind === "confirmation" || panel.kind === "model-form";
   const panelWidth = Math.max(20, Math.min(78, (terminal?.columns ?? 80) - 4));
   const contentWidth = focused ? panelWidth - 4 : Math.max(1, (terminal?.columns ?? 80) - 4);
   return (
     <Box flexDirection="column" flexGrow={1} paddingX={2} paddingTop={1}>
-      <PanelKeys bridge={bridge} scroll={(amount) => setOffset((current) => Math.max(0, Math.min(blocks.length - maxLines, current + amount)))} />
+      <PanelKeys bridge={bridge} exit={exit} scroll={(amount) => setOffset((current) => Math.max(0, Math.min(blocks.length - maxLines, current + amount)))} />
       <Box flexDirection="column" flexGrow={focused ? 0 : 1} width={focused ? panelWidth : undefined} alignSelf={focused ? "center" : undefined} borderStyle={focused ? "round" : undefined} borderColor={focused ? green : undefined} paddingX={focused ? 1 : 0} marginTop={focused ? 1 : 0}>
         <Text color={green} bold>🐊 Gator  <Text color={mutedGreen}>{panel.title}</Text></Text>
         {panel.subtitle && <Box marginTop={1}><Text>{panel.subtitle}</Text></Box>}
@@ -320,7 +316,7 @@ function PanelScreen({ panel, status, draft, statusLine, bridge }: { panel: Back
           const active = panel.kind !== "inbox" && panel.kind !== "jobs" && rowStart + index === selected;
           return <Box key={`${rowStart + index}-${row.label}`} flexDirection="column" marginBottom={1}>
             <Text color={active ? green : undefined} bold={active}>{active ? "❯ " : "  "}{row.label}{row.state ? <Text color={mutedGreen}>  ·  {row.state}</Text> : null}</Text>
-            {row.detail && <Box marginLeft={2}><Text dimColor={!active}>{row.detail}{active && panel.kind === "model-form" && <Text inverse> </Text>}</Text></Box>}
+            {row.detail && <Box marginLeft={2}><Text dimColor={!active}>{row.detail}{active && (panel.kind === "model-form" || panel.kind === "learning-form") && <Text inverse> </Text>}</Text></Box>}
           </Box>;
         })}
         {blocks.slice(blockOffset, blockOffset + maxLines).map((line, index) => <Box key={`${blockOffset + index}-${line.text}`} marginBottom={line.heading ? 0 : undefined}>
@@ -368,7 +364,6 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
   useInput(() => {});
   const [state, setState] = useState<BackendState | undefined>(bridge.snapshot());
   const [failure, setFailure] = useState("");
-  const [localNotice, setLocalNotice] = useState("");
   const [input, setInput] = useState("");
   const [prefillVersion, setPrefillVersion] = useState(0);
   const [history, setHistory] = useState<string[]>([]);
@@ -399,9 +394,10 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
     lastBackendInput.current = state?.input ?? "";
   }, [state?.mode, state?.input]);
 
+  const close = () => { bridge.stop(); exit(); };
   if (!state) return <Box padding={1}><Text color={green}>{failure || "Starting Gator…"}</Text></Box>;
   if (state.mode === "panel" && state.panel) {
-    return <PanelScreen panel={state.panel} status={state.status} draft={input} statusLine={state.status_line_enabled ? state.status_line : undefined} bridge={bridge} />;
+    return <PanelScreen panel={state.panel} status={state.status} draft={input} statusLine={state.status_line_enabled ? state.status_line : undefined} bridge={bridge} exit={close} />;
   }
   const matches = !searchOpen && !dismissed && input.startsWith("/") && !input.includes(" ")
     ? state.commands.filter((command) => (input === "/" ? !command.advanced : `/${command.name}`.startsWith(input))).slice(0, 8)
@@ -410,7 +406,7 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
     const text = value.trim();
     if (!text) return;
     bridge.send({ type: "submit", text });
-    setInput(""); setLocalNotice(""); setDismissed(false); setHistory((current) => [text, ...current]);
+    setInput(""); setDismissed(false); setHistory((current) => [text, ...current]);
   };
   const choose = (command: BackendCommand) => {
     if (command.needs_input && input.trim() !== `/${command.name}`) {
@@ -421,7 +417,6 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
       submit(`/${command.name}`);
     }
   };
-  const close = () => { bridge.stop(); exit(); };
   const context = [state.title, state.provider ? `${state.provider}${state.model ? `/${state.model}` : ""}` : "Choose model: /model", state.source.split("/").filter(Boolean).at(-1) || state.source].filter(Boolean).join(" · ");
   const welcome = (
     <Box flexDirection="column">
@@ -454,11 +449,11 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
         {state.messages.length > 0 && <MessageList ref={list} viewportHeight={viewportHeight} messages={messages} renderMessage={(item) => <MessageBody item={state.messages[Number(item.id.split("-", 1)[0])]} />} />}
         {state.running && <Box marginTop={1}><Text color={green}>{state.cancelling ? "◌ Stopping… retaining evidence" : `${["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"][state.loading_frame % 10]} Working… ${state.elapsed ?? ""} · Esc to interrupt`}</Text></Box>}
       </Box>
-      {(localNotice || state.status) && <Text color={mutedGreen}>{localNotice || state.status}</Text>}
-      {!searchOpen && <ChatKeys state={state} draft={input} matches={matches} selected={selected} setSelected={setSelected} choose={choose} dismiss={() => setDismissed(true)} search={() => setSearchOpen(true)} scroll={(rows) => list.current?.scrollBy(rows)} exit={close} clearDraft={() => { setInput(""); setPrefillVersion((version) => version + 1); setLocalNotice(""); }} exitHint={() => setLocalNotice("Press Ctrl+D again to exit Gator")} bridge={bridge} />}
+      {state.status && <Text color={mutedGreen}>{state.status}</Text>}
+      {!searchOpen && <ChatKeys state={state} draft={input} matches={matches} selected={selected} setSelected={setSelected} choose={choose} dismiss={() => setDismissed(true)} search={() => setSearchOpen(true)} scroll={(rows) => list.current?.scrollBy(rows)} exit={close} clearDraft={() => { setInput(""); setPrefillVersion((version) => version + 1); }} bridge={bridge} />}
       {searchOpen && <GreenSearch messages={state.messages} close={() => setSearchOpen(false)} navigate={(index) => list.current?.scrollTo(index)} />}
       <Divider />
-      <GreenPrompt value={input} onChange={(value) => { setInput(value); setLocalNotice(""); setSelected(0); setDismissed(false); }} onSubmit={submit} disabled={searchOpen || !!failure} history={history} prefillVersion={prefillVersion} />
+      <GreenPrompt value={input} onChange={(value) => { setInput(value); setSelected(0); setDismissed(false); }} onSubmit={submit} disabled={searchOpen || !!failure} history={history} prefillVersion={prefillVersion} />
       {matches.length > 0 && <Box marginLeft={2} flexDirection="column">{matches.map((command, index) => <Box key={command.name}><Text color={index === selected ? green : undefined} bold={index === selected}>{index === selected ? "❯" : " "} /{command.name}</Text><Text dimColor>  {command.description}</Text></Box>)}</Box>}
       {failure && <Text color="red">{failure}</Text>}
       <Divider />

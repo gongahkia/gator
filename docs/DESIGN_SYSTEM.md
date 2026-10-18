@@ -50,7 +50,7 @@ Gator requires Node.js 22 or newer; headless commands do not.
 
 - Enter submits a prompt; Shift+Enter or Ctrl+J inserts a new line.
 - Ctrl+C clears an idle draft or interrupts active work. Esc interrupts active
-  work or closes a panel. Ctrl+D twice within two seconds exits.
+  work or closes a panel. Ctrl+D exits.
 - Ctrl+G opens the editor. Ctrl+F searches the transcript. Ctrl+P opens the
   command picker. Ctrl+X opens conversations, Ctrl+B opens inbox, and Ctrl+I
   chooses a workspace. Scheduled jobs are available through `/jobs` and the
