@@ -89,12 +89,12 @@ func Catalog() []Requirement {
 			ID:         "node",
 			Name:       "Node.js",
 			Executable: "node",
-			Purpose:    "the interactive terminal interface",
+			Purpose:    "the interactive terminal interface and doctor",
 			Required:   false,
 			Applicable: allPlatforms,
 			HelpURL:    "https://nodejs.org/en/download",
 			Instructions: func(string) []string {
-				return []string{"Install Node.js 22 or newer to run interactive Gator. Headless commands and doctor remain available."}
+				return []string{"Install Node.js 22 or newer to run interactive Gator and doctor. Headless commands remain available."}
 			},
 		},
 	}

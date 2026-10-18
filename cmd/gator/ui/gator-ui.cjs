@@ -45206,6 +45206,22 @@ function heading(line) {
   if (line === "Reviewed local-model eligibility (Gator guardrail):") return "\u{1F9E0} Reviewed local models";
   return void 0;
 }
+function plainDoctorReport(raw) {
+  const lines = raw.trimEnd().split("\n").flatMap((line) => {
+    const title = heading(line);
+    if (title) return ["", title];
+    if (line.startsWith("Local model host:")) return ["", `\u{1F4BB} ${line}`];
+    if (line.startsWith("Suggested verification:")) return ["", `\u{1F9EA} ${line}`];
+    if (line.startsWith("  ") && !line.startsWith("    ")) {
+      const mark = /: (installed|enabled)/.test(line) ? "\u2713" : /: (missing|disabled|unsupported)/.test(line) ? "\u25CB" : " ";
+      return [`  ${mark} ${line.trimStart()}`];
+    }
+    return [line];
+  });
+  return `\u{1F40A} Gator doctor
+${lines.join("\n")}
+`;
+}
 function DoctorReport({ raw }) {
   return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { flexDirection: "column", children: raw.trimEnd().split("\n").map((line, index) => {
     const title = heading(line);
@@ -45219,14 +45235,14 @@ function DoctorReport({ raw }) {
     const status = lineColor(value);
     const mark = indented && /^(installed|enabled)/.test(value) ? "\u2713 " : indented && /^(missing|disabled|unsupported)/.test(value) ? "\u25CB " : "";
     const group = line.startsWith("Local model host:") || line.startsWith("Suggested verification:");
-    return /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { marginTop: group ? 1 : void 0, marginLeft: indented ? 2 : 0, children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: group ? 1 : void 0, marginLeft: indented ? 2 : 0, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { children: [
       /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { color: indented ? void 0 : mutedGreen, children: [
         mark,
         itemLabel,
         ": "
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: status, children: value })
-    ] }, index);
+    ] }) }, index);
   }) });
 }
 function DoctorScreen({ raw, frame }) {
@@ -45265,8 +45281,7 @@ function collectDoctor(binary, arguments_) {
 async function runDoctor(binary, arguments_) {
   if (!process.stdout.isTTY) {
     const report = await collectDoctor(binary, arguments_);
-    process.stdout.write(`\u{1F40A} Gator doctor
-${report}`);
+    process.stdout.write(plainDoctorReport(report));
     return;
   }
   let frame = 0;
@@ -45283,6 +45298,8 @@ ${report}`);
   } finally {
     if (timer) clearInterval(timer);
     app?.unmount();
+    app?.cleanup();
+    process.stdin.pause();
   }
 }
 

@@ -27,6 +27,7 @@ one-shot Node-rendered report; `/doctor` uses the same report component in chat.
 | Learnings list and detail | Provenance and explicit approval controls were projected consistently. The add/edit form was visually identical to a list. | Give the learning form the same bounded focus surface as model forms. |
 | Save/apply transfer confirmation | Confirmation data and keyboard actions were projected, but the screen looked like a list. | Use the green bordered focus surface with its evidence summary and explicit confirmation footer. |
 | External editor and connector handoff | React unmounts while an external terminal process runs, then resumes from Go state. | Retained; this is a handoff, not a Gator screen. |
+| Doctor diagnostics | The standalone command had a Go spinner and formatter while `/doctor` appeared as plain chat text. | Node renders both from the same report component; Go retains only the diagnostic checks. The standalone command exits after showing results. |
 
 ## Shared interaction checks
 

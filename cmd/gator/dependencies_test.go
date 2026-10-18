@@ -28,13 +28,13 @@ func TestWriteDependencyDoctorOffersOfficialGuidanceForMissingPrerequisite(t *te
 	}
 }
 
-func TestDoctorCallsNodeRequiredForInteractiveGator(t *testing.T) {
+func TestDoctorCallsNodeRequiredForInteractiveGatorAndDoctor(t *testing.T) {
 	var output bytes.Buffer
-	statuses := []dependency.Status{{Requirement: dependency.Requirement{ID: "node", Name: "Node.js", Purpose: "the interactive terminal interface"}}}
+	statuses := []dependency.Status{{Requirement: dependency.Requirement{ID: "node", Name: "Node.js", Purpose: "the interactive terminal interface and doctor"}}}
 	if err := writeDependencyDoctor(&output, statuses); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output.String(), "Node.js: missing (required for the interactive terminal interface)") {
+	if !strings.Contains(output.String(), "Node.js: missing (required for the interactive terminal interface and doctor)") {
 		t.Fatalf("Node requirement = %q", output.String())
 	}
 }

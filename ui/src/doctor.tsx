@@ -23,6 +23,21 @@ function heading(line: string): string | undefined {
   return undefined;
 }
 
+function plainDoctorReport(raw: string): string {
+  const lines = raw.trimEnd().split("\n").flatMap((line) => {
+    const title = heading(line);
+    if (title) return ["", title];
+    if (line.startsWith("Local model host:")) return ["", `💻 ${line}`];
+    if (line.startsWith("Suggested verification:")) return ["", `🧪 ${line}`];
+    if (line.startsWith("  ") && !line.startsWith("    ")) {
+      const mark = /: (installed|enabled)/.test(line) ? "✓" : /: (missing|disabled|unsupported)/.test(line) ? "○" : " ";
+      return [`  ${mark} ${line.trimStart()}`];
+    }
+    return [line];
+  });
+  return `🐊 Gator doctor\n${lines.join("\n")}\n`;
+}
+
 export function DoctorReport({ raw }: { raw: string }): React.ReactNode {
   return (
     <Box flexDirection="column">
@@ -39,7 +54,7 @@ export function DoctorReport({ raw }: { raw: string }): React.ReactNode {
         const mark = indented && /^(installed|enabled)/.test(value) ? "✓ " : indented && /^(missing|disabled|unsupported)/.test(value) ? "○ " : "";
         const group = line.startsWith("Local model host:") || line.startsWith("Suggested verification:");
         return <Box key={index} marginTop={group ? 1 : undefined} marginLeft={indented ? 2 : 0}>
-          <Text color={indented ? undefined : mutedGreen}>{mark}{itemLabel}: </Text><Text color={status}>{value}</Text>
+          <Text><Text color={indented ? undefined : mutedGreen}>{mark}{itemLabel}: </Text><Text color={status}>{value}</Text></Text>
         </Box>;
       })}
     </Box>
@@ -79,7 +94,7 @@ function collectDoctor(binary: string, arguments_: string[]): Promise<string> {
 export async function runDoctor(binary: string, arguments_: string[]): Promise<void> {
   if (!process.stdout.isTTY) {
     const report = await collectDoctor(binary, arguments_);
-    process.stdout.write(`🐊 Gator doctor\n${report}`);
+    process.stdout.write(plainDoctorReport(report));
     return;
   }
   let frame = 0;
@@ -96,5 +111,7 @@ export async function runDoctor(binary: string, arguments_: string[]): Promise<v
   } finally {
     if (timer) clearInterval(timer);
     app?.unmount();
+    app?.cleanup();
+    process.stdin.pause();
   }
 }
