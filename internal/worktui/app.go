@@ -210,7 +210,7 @@ type ModelPanel interface {
 
 type entry struct {
 	title, subtitle, kind, id, source, command string
-	advanced bool
+	advanced                                   bool
 }
 type message struct {
 	role   string

@@ -423,11 +423,11 @@ func (p *ModelCatalogPanel) notice() string {
 func (p *ModelCatalogPanel) selectedStyle() lipgloss.Style {
 	switch p.model.config.Theme {
 	case "contrast":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("0")).Background(lipgloss.Color("226"))
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("0")).Background(lipgloss.Color("120"))
 	case "mono":
 		return lipgloss.NewStyle().Reverse(true)
 	default:
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("255")).Background(lipgloss.Color("236"))
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("255")).Background(lipgloss.Color("22"))
 	}
 }
 

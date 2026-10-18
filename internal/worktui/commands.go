@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/instructions"
 	"github.com/gongahkia/gator/internal/jobs"
 )
@@ -144,11 +145,15 @@ func (m Model) copySelection(id string) (tea.Model, tea.Cmd) {
 
 func (m Model) filteredEntries() []entry {
 	query := strings.ToLower(strings.TrimSpace(m.paletteQuery))
-	if query == "" && m.launcherMode != "commands" && m.launcherMode != "slash" {
-		return m.entries
+	entries := m.entries
+	if m.launcherMode == "commands" || m.launcherMode == "slash" {
+		entries = m.availableCommandEntries()
 	}
-	result := make([]entry, 0, len(m.entries))
-	for _, item := range m.entries {
+	if query == "" && m.launcherMode != "commands" && m.launcherMode != "slash" {
+		return entries
+	}
+	result := make([]entry, 0, len(entries))
+	for _, item := range entries {
 		if query == "" && item.advanced {
 			continue
 		}
@@ -162,33 +167,187 @@ func (m Model) filteredEntries() []entry {
 
 func commandPaletteEntries() []entry {
 	return []entry{
-		{title: "/help", subtitle: "Show Gator commands", kind: "command", command: "/help"},
-		{title: "/new", subtitle: "Start a clean Gator conversation", kind: "command", command: "/new"},
-		{title: "/model", subtitle: "Choose Cloud API key or Local model · configure, download, select", kind: "command", command: "/model"},
-		{title: "/source", subtitle: "Choose the workspace for this conversation", kind: "command", command: "/source"},
+		{title: "/help", subtitle: "Show shortcuts and common commands", kind: "command", command: "/help"},
+		{title: "/new", subtitle: "Start a new conversation", kind: "command", command: "/new"},
+		{title: "/model", subtitle: "Choose a cloud or local model", kind: "command", command: "/model"},
+		{title: "/source", subtitle: "Change the workspace", kind: "command", command: "/source"},
 		{title: "/mode", subtitle: "Set auto, inspect, draft, or act", kind: "command-input", command: "/mode"},
-		{title: "/settings", subtitle: "Inspect current settings", kind: "command", command: "/settings"},
-		{title: "/settings statusline", subtitle: "Show or hide the optional status line", kind: "command", command: "/settings statusline"},
-		{title: "/theme", subtitle: "Choose gator, contrast, or mono", kind: "command-input", command: "/theme"},
-		{title: "/history", subtitle: "Browse all retained Work", kind: "command", command: "/history"},
-		{title: "/jobs", subtitle: "Schedule, run, and review repeatable Work", kind: "command-input", command: "/jobs"},
-		{title: "/inbox", subtitle: "Review and rate follow-up results", kind: "command-input", command: "/inbox"},
+		{title: "/attach", subtitle: "Attach a workspace file to the next request", kind: "command-input", command: "/attach"},
+		{title: "/detach", subtitle: "Remove a pending attachment", kind: "command-input", command: "/detach"},
+		{title: "/status", subtitle: "Show current model, workspace, and run", kind: "command", command: "/status"},
+		{title: "/settings", subtitle: "Inspect Gator settings", kind: "command", command: "/settings"},
+		{title: "/theme", subtitle: "Choose gator (green), contrast, or mono", kind: "command-input", command: "/theme"},
+		{title: "/doctor", subtitle: "Check setup and device readiness", kind: "command", command: "/doctor"},
+		{title: "/history", subtitle: "Browse retained work", kind: "command", command: "/history"},
+		{title: "/jobs", subtitle: "Schedule and review recurring work", kind: "command-input", command: "/jobs"},
+		{title: "/inbox", subtitle: "Review follow-up results", kind: "command-input", command: "/inbox"},
 		{title: "/goals", subtitle: "Resume an ongoing goal", kind: "command", command: "/goals"},
-		{title: "/plan", subtitle: "Show or update the current goal plan", kind: "command-input", command: "/plan"},
-		{title: "/activity", subtitle: "Show current goal checks and running Work", kind: "command", command: "/activity"},
-		{title: "/notifications", subtitle: "Set desktop urgency and quiet hours for the current goal", kind: "command-input", command: "/notifications"},
-		{title: "/suggestions", subtitle: "Review proposed notes, skills, and plan changes", kind: "command-input", command: "/suggestions"},
-		{title: "/memory", subtitle: "Search or manage saved knowledge", kind: "command-input", command: "/memory"},
-		{title: "/note", subtitle: "Save and search longer personal notes", kind: "command-input", command: "/note"},
-		{title: "/skill", subtitle: "Create and load reusable procedures", kind: "command-input", command: "/skill"},
-		{title: "/learnings", subtitle: "Browse and manage scoped guidance", kind: "command", command: "/learnings"},
-		{title: "/feedback", subtitle: "Accept, reject, correct, or remember this Work result", kind: "command-input", command: "/feedback"},
-		{title: "/review", subtitle: "Show latest staged output", kind: "command", command: "/review"},
-		{title: "/save", subtitle: "Save verified deliverables to a folder", kind: "command-input", command: "/save"},
-		{title: "/apply", subtitle: "Apply a verified Code candidate", kind: "command-input", command: "/apply"},
-		{title: "/retry", subtitle: "Retry failed or pending local changes", kind: "command-input", command: "/retry"},
-		{title: "/copy", subtitle: "Choose a response or deliverable summary to copy", kind: "command", command: "/copy"},
-		{title: "exit", subtitle: "Exit Gator", kind: "command", command: "exit"},
+		{title: "/plan", subtitle: "Show or update this goal's plan", kind: "command-input", command: "/plan"},
+		{title: "/activity", subtitle: "Show checks and work for this goal", kind: "command", command: "/activity"},
+		{title: "/notifications", subtitle: "Set alerts for this goal", kind: "command-input", command: "/notifications"},
+		{title: "/suggestions", subtitle: "Review proposed lasting changes", kind: "command-input", command: "/suggestions"},
+		{title: "/memory", subtitle: "Manage saved knowledge", kind: "command-input", command: "/memory"},
+		{title: "/note", subtitle: "Save or search personal notes", kind: "command-input", command: "/note"},
+		{title: "/skill", subtitle: "Create or manage reusable procedures", kind: "command-input", command: "/skill"},
+		{title: "/learnings", subtitle: "Review guidance from earlier work", kind: "command", command: "/learnings"},
+		{title: "/feedback", subtitle: "Rate or correct this result", kind: "command-input", command: "/feedback"},
+		{title: "/review", subtitle: "Preview the latest output", kind: "command", command: "/review"},
+		{title: "/save", subtitle: "Save deliverables to a folder", kind: "command-input", command: "/save"},
+		{title: "/apply", subtitle: "Apply a verified code change", kind: "command-input", command: "/apply", advanced: true},
+		{title: "/retry", subtitle: "Retry pending delivery", kind: "command-input", command: "/retry", advanced: true},
+		{title: "/copy", subtitle: "Copy a response or output summary", kind: "command", command: "/copy"},
+		{title: "/exit", subtitle: "Leave Gator", kind: "command", command: "/exit"},
+		{title: "/effort", subtitle: "Choose low, standard, or high effort", kind: "command-input", command: "/effort", advanced: true},
+		{title: "/artifact", subtitle: "Set expected output files", kind: "command-input", command: "/artifact", advanced: true},
+		{title: "/connector", subtitle: "Select or manage connected sources", kind: "command-input", command: "/connector", advanced: true},
+		{title: "/web-origin", subtitle: "Set allowed web origins", kind: "command-input", command: "/web-origin", advanced: true},
+		{title: "/source-refresh", subtitle: "Refresh workspace snapshot next turn", kind: "command", command: "/source-refresh", advanced: true},
+		{title: "/source ignore", subtitle: "Ignore a project instruction", kind: "command-input", command: "/source ignore", advanced: true},
+		{title: "/source unignore", subtitle: "Restore a project instruction", kind: "command-input", command: "/source unignore", advanced: true},
+		{title: "/source ignored", subtitle: "List ignored project instructions", kind: "command", command: "/source ignored", advanced: true},
+		{title: "/statusline", subtitle: "Configure the optional status line", kind: "command", command: "/statusline", advanced: true},
+		{title: "/permissions", subtitle: "Inspect current work authority", kind: "command", command: "/permissions", advanced: true},
+		{title: "/agents", subtitle: "Inspect internal specialists", kind: "command", command: "/agents", advanced: true},
+		{title: "/queue", subtitle: "Show queued prompts", kind: "command", command: "/queue"},
+		{title: "/dequeue", subtitle: "Remove the next queued prompt", kind: "command", command: "/dequeue", advanced: true},
+		{title: "/clear-queue", subtitle: "Remove all queued prompts", kind: "command", command: "/clear-queue", advanced: true},
+		{title: "/revision-back", subtitle: "Move to the previous conversation revision", kind: "command", command: "/revision-back", advanced: true},
+		{title: "/revision-forward", subtitle: "Move to the next conversation revision", kind: "command", command: "/revision-forward", advanced: true},
+		{title: "/tasks", subtitle: "Show active specialists", kind: "command", command: "/tasks", advanced: true},
+		{title: "/steer", subtitle: "Redirect the current run", kind: "command-input", command: "/steer", advanced: true},
+		{title: "/cancel", subtitle: "Stop the current run", kind: "command", command: "/cancel"},
+		{title: "/cancel-task", subtitle: "Stop a specialist task", kind: "command-input", command: "/cancel-task", advanced: true},
+		{title: "/steer-task", subtitle: "Redirect a specialist task", kind: "command-input", command: "/steer-task", advanced: true},
+		{title: "/approve", subtitle: "Approve the pending action", kind: "command", command: "/approve"},
+		{title: "/deny", subtitle: "Deny the pending action", kind: "command", command: "/deny"},
+	}
+}
+
+// The catalogue includes every TUI command. The open menu only contains
+// commands that can be used in the current session; direct command entry still
+// reaches the existing handlers and their detailed error messages.
+func (m Model) availableCommandEntries() []entry {
+	var available []entry
+	for _, item := range commandPaletteEntries() {
+		if m.commandAvailable(item.command) {
+			available = append(available, item)
+		}
+	}
+	return available
+}
+
+func (m Model) goalForConversation(conversationID string) string {
+	for _, record := range m.config.Goals {
+		if record.ConversationID == conversationID && record.Status == goal.Active {
+			return record.ID
+		}
+	}
+	return ""
+}
+
+func (m Model) commandAvailable(command string) bool {
+	if m.running {
+		switch command {
+		case "/help", "/status":
+			return true
+		case "/tasks":
+			return len(m.tasks) > 0
+		case "/queue", "/dequeue", "/clear-queue":
+			return len(m.queue) > 0
+		case "/cancel":
+			return m.cancel != nil
+		case "/steer":
+			return m.operation != nil
+		case "/cancel-task", "/steer-task":
+			return m.operation != nil && len(m.tasks) > 0
+		case "/approve", "/deny":
+			return m.operation != nil && m.interaction != nil
+		default:
+			return false
+		}
+	}
+	switch command {
+	case "/model":
+		return m.config.Models != nil
+	case "/source":
+		return m.config.ResolveSource != nil
+	case "/source-refresh", "/source ignore", "/attach":
+		return m.source != ""
+	case "/source unignore", "/source ignored":
+		return len(m.options.IgnoredInstructionPaths) > 0
+	case "/detach":
+		return len(m.options.Attachments) > 0
+	case "/settings", "/doctor", "/agents":
+		return m.config.Inspect != nil
+	case "/theme":
+		return m.config.SetTheme != nil
+	case "/statusline":
+		return m.config.SetStatusLine != nil
+	case "/connector":
+		return m.config.ConnectorAction != nil || m.config.ConnectorChoices != nil
+	case "/copy":
+		if m.config.Copy == nil {
+			return false
+		}
+		if m.lastBundle.Path != "" {
+			return true
+		}
+		for _, item := range m.messages {
+			if item.role == "Gator" && strings.TrimSpace(item.text) != "" {
+				return true
+			}
+		}
+		return false
+	case "/queue", "/dequeue", "/clear-queue":
+		return len(m.queue) > 0
+	case "/jobs":
+		return m.config.JobAction != nil || m.config.RefreshJobs != nil || len(m.config.Jobs) > 0
+	case "/inbox":
+		return m.config.InboxAction != nil || m.config.RefreshInbox != nil || len(m.config.Inbox) > 0
+	case "/goals":
+		return m.config.ListGoals != nil || len(m.config.Goals) > 0
+	case "/plan":
+		return m.goalID != "" && m.config.PlanAction != nil
+	case "/activity":
+		return m.goalID != "" && m.config.ActivityAction != nil
+	case "/notifications":
+		return m.goalID != "" && m.config.NotificationAction != nil
+	case "/suggestions":
+		return m.config.SuggestionAction != nil
+	case "/memory":
+		return m.config.MemoryAction != nil
+	case "/note":
+		return m.config.NoteAction != nil
+	case "/skill":
+		return m.config.SkillAction != nil
+	case "/history":
+		return m.config.HistoryStore != nil
+	case "/learnings":
+		return m.config.LearningStore != nil
+	case "/feedback":
+		return m.revision != "" && m.config.FeedbackAction != nil
+	case "/review":
+		return m.lastBundle.Path != ""
+	case "/save", "/retry":
+		return m.lastBundle.Path != "" && m.config.BundleAction != nil
+	case "/apply":
+		if m.lastBundle.Path == "" || m.config.BundleAction == nil {
+			return false
+		}
+		for _, candidate := range m.lastBundle.Candidates {
+			if candidate.Status == "verified" {
+				return true
+			}
+		}
+		return false
+	case "/revision-back":
+		return m.conversation != "" && m.config.MoveBack != nil
+	case "/revision-forward":
+		return m.conversation != "" && (m.config.MoveForward != nil || m.config.MoveToRevision != nil)
+	case "/tasks", "/steer", "/cancel", "/cancel-task", "/steer-task", "/approve", "/deny":
+		return false
+	default:
+		return true
 	}
 }
 
@@ -1166,9 +1325,10 @@ func workHelp() string {
                                  record feedback for this Work
   /review · /save · /apply · /retry
                                  review and deliver a completed result
-  /settings [statusline] · /theme · /new · /copy · exit
+  /status · /doctor · /settings [statusline] · /theme · /new · /copy · /exit
 
-Use /help advanced for workspace, integration, revision, queue, and diagnostic controls.
+Type / in an empty prompt to browse commands. Search also finds advanced controls.
+Use /help advanced for workspace, integration, revision, and queue details.
 
 Navigation
   ↑/↓       recall sent prompts in this conversation
@@ -1190,6 +1350,6 @@ func workAdvancedHelp() string {
   /queue · /dequeue · /clear-queue
   /tasks · /cancel-task ID · /steer-task ID MESSAGE · /steer MESSAGE
 
-These controls preserve the same Work semantics; they are intentionally kept
-out of the normal command palette. Use /help to return to the main workflow.`
+These controls preserve the same Work semantics. Type / and search for a name
+to find a command when it applies to the current conversation.`
 }

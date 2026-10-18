@@ -2,6 +2,7 @@ package worktui
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"unicode"
 
@@ -37,7 +38,7 @@ func (m Model) View() string {
 		return m.renderViewport(m.renderSection(width, height, accent, dim, selectedStyle), width, height)
 	}
 	if m.home {
-		return m.renderViewport(m.renderHome(width, height, accent), width, height)
+		return m.renderViewport(m.renderHome(width, height, accent, dim), width, height)
 	}
 	var view strings.Builder
 	view.WriteString(accent.Render(gatorWordmark))
@@ -64,7 +65,13 @@ func (m Model) View() string {
 				Render(accent.Render("Verified deliverables") + "\n" + contents)
 			transcript.WriteString(card)
 		} else {
-			transcript.WriteString(messageStyle.Render(accent.Render(item.role+":") + " " + item.text))
+			label := accent.Render("● " + item.role)
+			if item.role == "You" {
+				label = dim.Render("› You")
+			} else if item.role != "Gator" {
+				label = accent.Render("◆ " + item.role)
+			}
+			transcript.WriteString(messageStyle.Render(label + "\n" + item.text))
 		}
 		transcript.WriteString("\n\n")
 	}
@@ -75,7 +82,7 @@ func (m Model) View() string {
 			Width(max(16, width-8)).
 			Padding(0, 1).
 			Border(lipgloss.DoubleBorder()).
-			BorderForeground(lipgloss.Color("214")).
+			BorderForeground(lipgloss.Color("42")).
 			Render(confirmation))
 		transcript.WriteString("\n\n")
 	}
@@ -141,13 +148,31 @@ func (m Model) renderViewport(contents string, width, height int) string {
 	return lipgloss.NewStyle().Width(width).Height(height).Render(contents)
 }
 
-func (m Model) renderHome(width, height int, accent lipgloss.Style) string {
+func (m Model) renderHome(width, height int, accent, dim lipgloss.Style) string {
 	title := accent.Copy().Bold(true).Render(gatorWordmark)
 	composer := m.renderComposer(width, true)
 	composerRows := strings.Count(composer, "\n") + 1
 	composerTop := max(1, height-composerRows)
 	var view strings.Builder
-	view.WriteString(title + "\n")
+	view.WriteString(title + dim.Render("  Personal agent in your terminal") + "\n")
+	context := ""
+	if m.source != "" {
+		context = "  " + filepath.Base(m.source)
+	}
+	if m.modelStatus.Provider != "" {
+		if context != "" {
+			context += "  ·  "
+		} else {
+			context = "  "
+		}
+		context += m.modelStatus.Provider
+		if m.modelStatus.Model != "" {
+			context += "/" + m.modelStatus.Model
+		}
+	}
+	if context != "" {
+		view.WriteString(dim.Render(truncate(context, width)) + "\n")
+	}
 	if m.firstRun && strings.Count(view.String(), "\n")+5 < composerTop {
 		view.WriteString("\nGet started\n")
 		view.WriteString(truncate("  1  /model  Choose a cloud or local model", width) + "\n")
@@ -178,6 +203,9 @@ func (m Model) renderHome(width, height int, accent lipgloss.Style) string {
 			}
 		}
 	}
+	if strings.Count(view.String(), "\n")+2 < composerTop {
+		view.WriteString("\n" + dim.Render("  / commands  ·  ctrl+p search") + "\n")
+	}
 	if currentRow := strings.Count(view.String(), "\n"); currentRow < composerTop {
 		view.WriteString(strings.Repeat("\n", composerTop-currentRow))
 	}
@@ -192,6 +220,11 @@ func (m Model) renderPalette(width, height int, accent, dim, selectedStyle lipgl
 	visible := m.filteredEntries()
 	selected := min(m.selected, max(0, len(visible)-1))
 	maximum := max(1, height-9)
+	commandMenu := m.launcherMode == "commands" || m.launcherMode == "slash"
+	if commandMenu {
+		composerRows := strings.Count(m.renderComposer(width, false), "\n") + 1
+		maximum = max(1, height-composerRows-8)
+	}
 	start := 0
 	if selected >= maximum {
 		start = selected - maximum + 1
@@ -211,9 +244,13 @@ func (m Model) renderPalette(width, height int, accent, dim, selectedStyle lipgl
 	panel.WriteString(accent.Render(title) + "\n")
 	query := m.paletteQuery
 	if query == "" {
-		query = dim.Render("type to filter")
+		query = dim.Render("type to search")
 	}
-	panel.WriteString("Search  " + query + accent.Render("█") + "\n\n")
+	if m.launcherMode == "slash" {
+		panel.WriteString("/" + query + accent.Render("█") + "\n\n")
+	} else {
+		panel.WriteString("Search  " + query + accent.Render("█") + "\n\n")
+	}
 	if len(visible) == 0 {
 		empty := "No matching commands."
 		if m.launcherMode == "conversations" && m.paletteQuery == "" {
@@ -233,6 +270,14 @@ func (m Model) renderPalette(width, height int, accent, dim, selectedStyle lipgl
 			line = selectedStyle.Width(panelWidth).Render("› " + fmt.Sprintf("%-*s %s", titleWidth, title, subtitle))
 		}
 		panel.WriteString(line + "\n")
+	}
+	if commandMenu {
+		position := ""
+		if len(visible) > 0 {
+			position = fmt.Sprintf("%d–%d of %d  ·  ", start+1, end, len(visible))
+		}
+		panel.WriteString("\n" + dim.Render(position+"type to search all commands  ·  ↑/↓ choose  ·  enter run  ·  esc close"))
+		return lipgloss.Place(width, height, lipgloss.Left, lipgloss.Bottom, panel.String()+"\n"+m.renderComposer(width, false))
 	}
 	panel.WriteString("\n" + dim.Render("type filter  ·  ↑/↓ choose  ·  enter run  ·  esc close"))
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, panel.String())
@@ -564,7 +609,7 @@ func (m Model) renderComposer(width int, focused bool) string {
 	}
 	value := m.input
 	if value == "" {
-		placeholder := "Ask Gator to work on something…"
+		placeholder := "Ask Gator to work on something…  / for commands"
 		if m.firstRun {
 			placeholder = "Type /model to get started…"
 		}
@@ -592,13 +637,13 @@ func workStyles(theme string) (lipgloss.Style, lipgloss.Style, lipgloss.Style) {
 	case "contrast":
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("46")).Bold(true),
 			lipgloss.NewStyle().Foreground(lipgloss.Color("250")),
-			lipgloss.NewStyle().Foreground(lipgloss.Color("0")).Background(lipgloss.Color("226"))
+			lipgloss.NewStyle().Foreground(lipgloss.Color("0")).Background(lipgloss.Color("120"))
 	case "mono":
 		return lipgloss.NewStyle().Bold(true), lipgloss.NewStyle().Faint(true), lipgloss.NewStyle().Reverse(true)
 	default:
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true),
 			lipgloss.NewStyle().Foreground(lipgloss.Color("242")),
-			lipgloss.NewStyle().Foreground(lipgloss.Color("255")).Background(lipgloss.Color("236"))
+			lipgloss.NewStyle().Foreground(lipgloss.Color("255")).Background(lipgloss.Color("22"))
 	}
 }
 

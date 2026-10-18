@@ -238,6 +238,12 @@ func (m Model) updateKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, tea.Quit
 	}
+	if value.String() == "esc" && m.launcher {
+		return m.updateLauncher(value)
+	}
+	if value.String() == "esc" && m.section != "" {
+		return m.updateSectionKey(value)
+	}
 	if value.String() == "esc" && m.running && m.cancel != nil {
 		m.interruptRun()
 		return m, nil
@@ -405,6 +411,10 @@ func (m Model) updateLearningsSectionKey(value tea.KeyMsg) (tea.Model, tea.Cmd) 
 }
 
 func (m Model) updateRunningKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if value.String() == "/" && m.input == "" {
+		m.openSlashPalette()
+		return m, nil
+	}
 	switch value.String() {
 	case "up":
 		m.recallPreviousPrompt()
@@ -433,7 +443,7 @@ func (m Model) submitRunningInput() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.input = ""
-	if prompt == "exit" || prompt == "/quit" {
+	if prompt == "exit" || prompt == "/exit" || prompt == "/quit" {
 		if m.cancel != nil {
 			m.quitting = true
 			m.cancel()
@@ -527,6 +537,10 @@ func (m *Model) interruptRun() {
 }
 
 func (m Model) updateComposerKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if value.String() == "/" && m.input == "" {
+		m.openSlashPalette()
+		return m, nil
+	}
 	switch value.String() {
 	case "up":
 		m.recallPreviousPrompt()
@@ -589,6 +603,10 @@ func (m Model) updateHome(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.running {
 		return m, nil
 	}
+	if key.String() == "/" && m.input == "" {
+		m.openSlashPalette()
+		return m, nil
+	}
 	switch key.String() {
 	case "up":
 		m.recallPreviousPrompt()
@@ -641,6 +659,18 @@ func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+u":
 		m.paletteQuery = ""
 		m.selected = 0
+	case " ":
+		if m.launcherMode == "slash" && len(visible) > 0 {
+			selected := visible[min(m.selected, len(visible)-1)]
+			if strings.EqualFold(strings.TrimPrefix(selected.title, "/"), strings.TrimSpace(m.paletteQuery)) {
+				m.launcher = false
+				m.paletteQuery = ""
+				m.input = selected.command + " "
+				return m, nil
+			}
+		}
+		m.paletteQuery += " "
+		m.selected = 0
 	case "enter":
 		if len(visible) == 0 {
 			return m, nil
@@ -650,6 +680,10 @@ func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "command":
 			m.launcher = false
 			m.paletteQuery = ""
+			if m.running {
+				m.input = selected.command
+				return m.submitRunningInput()
+			}
 			return m.runLocalCommand(selected.command)
 		case "command-input":
 			m.launcher = false
@@ -672,6 +706,7 @@ func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.home = false
 			m.source = selected.source
 			m.conversation = selected.id
+			m.goalID = m.goalForConversation(selected.id)
 			m.title = selected.title
 			m.restoreConversation(selected.id, "")
 			m.scroll = 0
@@ -694,6 +729,7 @@ func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.section = ""
 			m.home = false
 			m.source = state.SourcePath
+			m.goalID = selected.id
 			m.conversation = state.ConversationID
 			m.title = state.Title
 			m.messages = nil

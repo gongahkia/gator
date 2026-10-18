@@ -15,6 +15,7 @@ import (
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/workhome"
+	"github.com/gongahkia/gator/internal/workrun"
 	"github.com/gongahkia/gator/internal/worksession"
 )
 
@@ -498,11 +499,11 @@ func TestInitialViewIsADeclutteredBottomComposer(t *testing.T) {
 	}
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlP})
 	view = updated.(Model).View()
-	if !strings.Contains(view, "Commands") || !strings.Contains(view, "/jobs") || !strings.Contains(view, "/learnings") {
-		t.Fatalf("palette did not reveal the product commands: %q", view)
+	if !strings.Contains(view, "Commands") || !strings.Contains(view, "/mode") || !strings.Contains(view, "/status") || !strings.Contains(view, "/exit") {
+		t.Fatalf("palette did not reveal available commands: %q", view)
 	}
-	if strings.Contains(view, "/attach") || strings.Contains(view, "/status") {
-		t.Fatalf("palette retained advanced command bloat: %q", view)
+	if strings.Contains(view, "/jobs") || strings.Contains(view, "/learnings") || strings.Contains(view, "/apply") {
+		t.Fatalf("palette showed commands without their backing service or result: %q", view)
 	}
 	if strings.Contains(view, "Work in reports") || strings.Contains(view, "Inbox") || strings.Contains(view, "Scheduled jobs") {
 		t.Fatalf("command palette still mixes destinations with actions: %q", view)
@@ -580,7 +581,7 @@ func TestEscapeStopsRunningWorkAndPausesQueuedPrompts(t *testing.T) {
 }
 
 func TestCommandPaletteFiltersAndFillsCommandsThatNeedArguments(t *testing.T) {
-	model := New(Config{CurrentFolder: "/work"})
+	model := New(Config{CurrentFolder: "/work", RefreshJobs: func() ([]jobs.Definition, error) { return nil, nil }})
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlP})
 	model = updated.(Model)
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("jobs")})
@@ -597,21 +598,112 @@ func TestCommandPaletteFiltersAndFillsCommandsThatNeedArguments(t *testing.T) {
 }
 
 func TestCommandPaletteContainsCurrentCommands(t *testing.T) {
-	model := New(Config{CurrentFolder: "/work"})
-	model.openCommandPalette()
-	expected := []string{
-		"/help", "/new", "/model", "/source", "/mode", "/settings", "/settings statusline", "/theme", "/history", "/jobs", "/inbox", "/goals", "/plan", "/activity", "/notifications", "/suggestions", "/memory", "/note", "/skill", "/learnings", "/feedback", "/review", "/save", "/apply", "/retry", "/copy", "exit",
-	}
-	if len(model.entries) != len(expected) {
-		t.Fatalf("command palette has %d entries, want %d", len(model.entries), len(expected))
-	}
-	for index, item := range model.entries {
+	catalog := commandPaletteEntries()
+	seen := map[string]bool{}
+	for _, item := range catalog {
 		if item.kind != "command" && item.kind != "command-input" {
-			t.Fatalf("non-command entry in palette: %#v", item)
+			t.Fatalf("non-command entry in catalogue: %#v", item)
 		}
-		if item.title != expected[index] {
-			t.Fatalf("command %d = %q, want %q", index, item.title, expected[index])
+		if seen[item.command] {
+			t.Fatalf("duplicate command %q", item.command)
 		}
+		seen[item.command] = true
+	}
+	for _, command := range []string{"/help", "/model", "/doctor", "/attach", "/artifact", "/connector", "/memory", "/note", "/skill", "/feedback", "/review", "/save", "/apply", "/retry", "/revision-back", "/tasks", "/steer", "/cancel", "/approve", "/exit"} {
+		if !seen[command] {
+			t.Errorf("catalogue omits TUI command %s", command)
+		}
+	}
+	if seen["/code"] || seen["/login"] {
+		t.Fatal("catalogue exposes retired or unrelated commands")
+	}
+}
+
+func TestSlashOpensSearchableCommandsAndCompletesArguments(t *testing.T) {
+	model := New(Config{CurrentFolder: "/work", RefreshJobs: func() ([]jobs.Definition, error) { return nil, nil }})
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+	model = updated.(Model)
+	if !model.launcher || model.launcherMode != "slash" || model.input != "" || !strings.Contains(model.View(), "Commands") {
+		t.Fatalf("slash did not open command search: %#v", model)
+	}
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("jobs")})
+	model = updated.(Model)
+	if !strings.Contains(model.View(), "/jobs") || strings.Contains(model.View(), "/help") {
+		t.Fatalf("slash search did not filter commands: %s", model.View())
+	}
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeySpace})
+	model = updated.(Model)
+	if model.launcher || model.input != "/jobs " {
+		t.Fatalf("slash command did not hand arguments to composer: %#v", model)
+	}
+}
+
+func TestEscapeClosesCommandMenuBeforeInterruptingRun(t *testing.T) {
+	cancelled := false
+	model := New(Config{CurrentFolder: "/work"})
+	model.home = false
+	model.running = true
+	model.cancel = func() { cancelled = true }
+	model.openSlashPalette()
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model = updated.(Model)
+	if model.launcher || cancelled || model.cancelling {
+		t.Fatalf("escape did not close the command menu first: %#v", model)
+	}
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model = updated.(Model)
+	if !cancelled || !model.cancelling {
+		t.Fatalf("escape did not interrupt the exposed run: %#v", model)
+	}
+}
+
+func TestCommandMenuOnlyShowsActionsAvailableNow(t *testing.T) {
+	model := New(Config{
+		CurrentFolder: "/work", GoalID: "goal-one",
+		PlanAction:         func(string) (string, error) { return "", nil },
+		ActivityAction:     func() (string, error) { return "", nil },
+		NotificationAction: func([]string) (string, error) { return "", nil },
+		FeedbackAction:     func(string, []string) (string, error) { return "", nil },
+		BundleAction:       func(BundleActionRequest) (string, error) { return "", nil },
+	})
+	for _, command := range []string{"/plan", "/activity", "/notifications"} {
+		if !model.commandAvailable(command) {
+			t.Fatalf("active goal command %s was hidden", command)
+		}
+	}
+	for _, command := range []string{"/feedback", "/review", "/save", "/apply", "/retry", "/copy"} {
+		if model.commandAvailable(command) {
+			t.Fatalf("premature action %s was shown", command)
+		}
+	}
+	model.revision = "revision-one"
+	model.lastBundle = BundleSummary{Path: "/bundle", Candidates: []CandidateSummary{{ID: "candidate-one", Status: "verified"}}}
+	for _, command := range []string{"/feedback", "/review", "/save", "/apply", "/retry"} {
+		if !model.commandAvailable(command) {
+			t.Fatalf("result action %s was hidden", command)
+		}
+	}
+	model.running = true
+	model.cancel = func() {}
+	model.operation = &workrun.Operation{}
+	model.tasks = map[string]string{"specialist-one": "research: running"}
+	model.interaction = &workrun.Interaction{}
+	model.openCommandPalette()
+	for _, command := range []string{"/cancel", "/approve", "/deny", "/steer", "/tasks"} {
+		if !model.commandAvailable(command) {
+			t.Fatalf("live action %s was hidden", command)
+		}
+	}
+	for _, command := range []string{"/save", "/feedback", "/model"} {
+		if model.commandAvailable(command) {
+			t.Fatalf("non-live action %s appeared during a run", command)
+		}
+	}
+	model.paletteQuery = "tasks"
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if command != nil || model.launcher || len(model.messages) == 0 || model.messages[len(model.messages)-1].role != "Specialists" {
+		t.Fatalf("running palette did not route /tasks: %#v", model)
 	}
 }
 
@@ -804,12 +896,12 @@ func TestConnectorLoginUsesInteractiveCommandAndSelectsOnSuccess(t *testing.T) {
 }
 
 func TestCommandPaletteRowsShareOneLeftColumn(t *testing.T) {
-	model := New(Config{CurrentFolder: "/work"})
+	model := New(Config{CurrentFolder: "/work", RefreshJobs: func() ([]jobs.Definition, error) { return nil, nil }})
 	model.width, model.height = 100, 60
 	model.openCommandPalette()
 	lines := strings.Split(ansi.Strip(model.View()), "\n")
 	position := -1
-	for _, command := range []string{"/help", "/new", "/jobs", "/retry", "exit"} {
+	for _, command := range []string{"/help", "/new", "/jobs", "/exit"} {
 		found := false
 		for _, line := range lines {
 			if index := strings.Index(line, command); index >= 0 {

@@ -29,3 +29,15 @@ func TestInitRequestsAStartupScreenClear(t *testing.T) {
 		t.Fatal("Work TUI did not request a startup redraw")
 	}
 }
+
+func TestConversationKeepsUserAndGatorTurnsDistinct(t *testing.T) {
+	model := New(Config{CurrentFolder: "/work"})
+	model.home = false
+	model.messages = []message{{role: "You", text: "Draft a brief"}, {role: "Gator", text: "Here is the brief."}}
+	view := ansi.Strip(model.View())
+	for _, expected := range []string{"› You\nDraft a brief", "● Gator\nHere is the brief."} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("conversation turn %q missing from view:\n%s", expected, view)
+		}
+	}
+}
