@@ -164,12 +164,18 @@ type Config struct {
 	SelectGoal              func(id string) (GoalState, error)
 	ClearGoal               func()
 	MemoryAction            func(arguments []string) (string, error)
+	MemoryResult            func(arguments []string) (*uisnapshot.Result, error)
 	PlanAction              func(command string) (string, error)
+	PlanResult              func(command string) (*uisnapshot.Result, error)
 	ActivityAction          func() (string, error)
+	ActivityResult          func() (*uisnapshot.Result, error)
 	NotificationAction      func(arguments []string) (string, error)
 	SuggestionAction        func(arguments []string) (string, error)
 	NoteAction              func(command string) (string, error)
+	NoteResult              func(command string) (*uisnapshot.Result, error)
 	SkillAction             func(command string) (string, error)
+	SkillResult             func(command string) (*uisnapshot.Result, error)
+	ReviewBundle            func(bundlePath string) (*uisnapshot.Result, error)
 	// JobAction uses the same local Job service as the CLI. It keeps scheduling
 	// as repeatable Work rather than creating a second TUI-only runtime.
 	JobAction      func(arguments []string) (string, error)
@@ -217,6 +223,7 @@ type message struct {
 	role   string
 	text   string
 	bundle *BundleSummary
+	result *uisnapshot.Result
 }
 type runDone RunResult
 type bundleActionDone struct {

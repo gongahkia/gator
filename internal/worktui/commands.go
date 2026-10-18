@@ -197,7 +197,7 @@ func commandPaletteEntries() []entry {
 		{title: "/retry", subtitle: "Retry pending delivery", kind: "command-input", command: "/retry", advanced: true},
 		{title: "/copy", subtitle: "Copy a response or output summary", kind: "command", command: "/copy"},
 		{title: "/exit", subtitle: "Leave Gator", kind: "command", command: "/exit"},
-		{title: "/effort", subtitle: "Choose low, standard, or high effort", kind: "command-input", command: "/effort", advanced: true},
+		{title: "/effort", subtitle: "Choose low, standard, or high effort", kind: "command", command: "/effort", advanced: true},
 		{title: "/artifact", subtitle: "Set expected output files", kind: "command-input", command: "/artifact", advanced: true},
 		{title: "/connector", subtitle: "Select or manage connected sources", kind: "command-input", command: "/connector", advanced: true},
 		{title: "/web-origin", subtitle: "Set allowed web origins", kind: "command-input", command: "/web-origin", advanced: true},
@@ -395,8 +395,13 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		}
 		return m.openModels()
 	case "/effort":
+		if len(fields) == 1 {
+			m.section = "effort"
+			m.selected = effortIndex(m.options.MaxSteps)
+			return m, nil
+		}
 		if len(fields) != 2 {
-			result = "Usage: /effort low|standard|high\nCurrent: " + effortName(m.options.MaxSteps)
+			err = fmt.Errorf("usage: /effort low|standard|high")
 			break
 		}
 		switch strings.ToLower(fields[1]) {
@@ -764,7 +769,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 	if fields[0] == "/doctor" && err == nil {
 		role = "Doctor"
 	}
-	m.messages = append(m.messages, message{role: role, text: result})
+	m.messages = append(m.messages, message{role: role, text: result, result: m.commandResult(command, fields, result, err)})
 	m.scroll = 0
 	if fields[0] == "/inbox" || fields[0] == "/suggestions" {
 		m.refreshAttention()

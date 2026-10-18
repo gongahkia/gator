@@ -1,9 +1,10 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
 import { Box, Text, render, useApp, useInput, TerminalSizeContext, type Instance } from "@claude-code-kit/ink-renderer";
-import { Divider, MessageList, StatusLine, WelcomeScreen, type Message, type VirtualListHandle } from "@claude-code-kit/ui";
+import { Divider, Markdown, MessageList, StatusLine, WelcomeScreen, type Message, type VirtualListHandle } from "@claude-code-kit/ui";
 import React, { useContext, useEffect, useRef, useState } from "react";
 import { DoctorReport, runDoctor } from "./doctor.js";
+import { ResultBody, type BackendResult } from "./result.js";
 
 const green = "#4BAA72";
 const mutedGreen = "#86BE9A";
@@ -15,13 +16,13 @@ type BackendBundle = {
   Artifacts: { Path: string; MediaType: string; Valid: boolean }[] | null;
   Candidates: { ID: string; Status: string; ChangedPaths: string[] }[] | null;
 };
-type BackendMessage = { role: string; text: string; bundle?: BackendBundle };
+type BackendMessage = { role: string; text: string; bundle?: BackendBundle; result?: BackendResult };
 type BackendPanel = {
   kind: string;
   title: string;
   subtitle?: string;
   query?: string;
-  rows?: { label: string; detail?: string; state?: string }[];
+  rows?: { label: string; detail?: string; state?: string; tone?: "success" | "warning" | "error" | "muted" }[];
   blocks?: { title?: string; lines: string[] }[];
   selected?: number;
   notice?: string;
@@ -114,12 +115,16 @@ class GatorBridge {
   }
 }
 
-function formatBundle(bundle: BackendBundle): string {
-  const lines = [`Verified deliverables · ${bundle.Status}`];
-  for (const item of bundle.Artifacts ?? []) lines.push(`${item.Valid ? "✓" : "!"} ${item.Path} · ${item.MediaType}`);
-  for (const item of bundle.Candidates ?? []) lines.push(`${item.Status} change ${item.ID}: ${item.ChangedPaths.join(", ")}`);
-  if (lines.length === 1) lines.push(bundle.Path);
-  return lines.join("\n");
+function bundleResult(bundle: BackendBundle): BackendResult {
+  return {
+    kind: "list", title: "Verified deliverables", tone: bundle.Status === "verified" ? "success" : "warning",
+    summary: bundle.Status,
+    items: [
+      ...(bundle.Artifacts ?? []).map((item) => ({ label: item.Path, detail: item.MediaType, state: item.Valid ? "verified" : "needs review", tone: item.Valid ? "success" as const : "warning" as const })),
+      ...(bundle.Candidates ?? []).map((item) => ({ label: `Change ${item.ID}`, detail: item.ChangedPaths.join(", "), state: item.Status })),
+    ],
+    footer: bundle.Path,
+  };
 }
 
 function MessageBody({ item }: { item: BackendMessage }): React.ReactNode {
@@ -130,13 +135,12 @@ function MessageBody({ item }: { item: BackendMessage }): React.ReactNode {
   const isUser = item.role === "You";
   const isGator = item.role === "Gator";
   const label = isUser ? "› You" : isGator ? "🐊 Gator" : item.role === "Deliverables" ? "◈ Deliverables" : `◌ ${item.role}`;
-  const content = item.bundle ? formatBundle(item.bundle) : item.text;
   return (
     <Box flexDirection="column">
       <Text color={isGator ? green : isUser ? undefined : mutedGreen} bold={!isUser} dimColor={isUser}>{label}</Text>
-      {content.split("\n").map((line, index) => (
-        <Box marginLeft={2} key={index}><Text dimColor={!isGator && !isUser}>{line || " "}</Text></Box>
-      ))}
+      <Box marginLeft={2} flexDirection="column">
+        {item.result ? <ResultBody result={item.result} /> : item.bundle ? <ResultBody result={bundleResult(item.bundle)} /> : isGator ? <Markdown>{item.text}</Markdown> : item.text.split("\n").map((line, index) => <Text key={index} dimColor={!isUser}>{line || " "}</Text>)}
+      </Box>
     </Box>
   );
 }
@@ -320,7 +324,7 @@ function PanelScreen({ panel, status, draft, statusLine, bridge, exit }: { panel
         {rows.slice(rowStart, rowStart + maxRows).map((row, index) => {
           const active = panel.kind !== "inbox" && panel.kind !== "jobs" && rowStart + index === selected;
           return <Box key={`${rowStart + index}-${row.label}`} flexDirection="column" marginBottom={1}>
-            <Text color={active ? green : undefined} bold={active}>{active ? "❯ " : "  "}{row.label}{row.state ? <Text color={mutedGreen}>  ·  {row.state}</Text> : null}</Text>
+            <Text color={active ? green : undefined} bold={active}>{active ? "❯ " : "  "}{row.label}{row.state ? <Text color={row.tone === "warning" ? "#D6AD69" : row.tone === "error" ? "#DF7777" : row.tone === "success" ? green : mutedGreen}>  ·  {row.state}</Text> : null}</Text>
             {row.detail && <Box marginLeft={2}><Text dimColor={!active}>{row.detail}{active && (panel.kind === "model-form" || panel.kind === "learning-form") && <Text inverse> </Text>}</Text></Box>}
           </Box>;
         })}

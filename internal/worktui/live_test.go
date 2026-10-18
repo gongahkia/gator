@@ -82,7 +82,7 @@ func TestRunningTUIQueuesApprovalsWithoutLosingControl(t *testing.T) {
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
 	if model.interaction != nil {
-		t.Fatal("approval remained pending")
+		t.Fatalf("approval remained pending: %s", model.status)
 	}
 	for range operation.Events {
 	}

@@ -74,6 +74,17 @@ func (m Model) bridgeLauncherPanel() uisnapshot.Panel {
 func (m Model) bridgeSectionPanel() uisnapshot.Panel {
 	panel := uisnapshot.Panel{Kind: m.section, Selected: m.selected, Notice: m.sectionNotice, Footer: "Esc back"}
 	switch m.section {
+	case "effort":
+		panel.Title = "Choose effort"
+		panel.Subtitle = "How much time Gator may spend on a request."
+		panel.Footer = "↑/↓ choose · Enter set effort · Esc back"
+		for index, name := range []string{"Low", "Standard", "High"} {
+			state := ""
+			if index == effortIndex(m.options.MaxSteps) {
+				state = "current"
+			}
+			panel.Rows = append(panel.Rows, uisnapshot.Row{Label: name, Detail: []string{"Quick requests · up to 12 steps", "Everyday work · up to 24 steps", "Complex work · up to 48 steps"}[index], State: state})
+		}
 	case "inbox":
 		panel.Title = "Inbox"
 		panel.Footer = "Esc back · /inbox rate ID useful|noise|wrong · /inbox read ID"
@@ -88,8 +99,14 @@ func (m Model) bridgeSectionPanel() uisnapshot.Panel {
 			if item.Rating != "" {
 				state += " · " + item.Rating
 			}
+			tone := "muted"
+			if item.Urgent {
+				tone = "warning"
+			} else if item.ReadAt.IsZero() {
+				tone = "success"
+			}
 			panel.Rows = append(panel.Rows, uisnapshot.Row{Label: safeInboxText(item.Title),
-				Detail: safeInboxText(item.Summary), State: safeInboxText(item.Status) + " · " + item.ID + " · " + state})
+				Detail: safeInboxText(item.Summary), State: safeInboxText(item.Status) + " · " + item.ID + " · " + state, Tone: tone})
 		}
 		if len(panel.Rows) == 0 {
 			panel.Notice = "No recent results."
@@ -102,7 +119,11 @@ func (m Model) bridgeSectionPanel() uisnapshot.Panel {
 			if job.Enabled {
 				state = "enabled"
 			}
-			panel.Rows = append(panel.Rows, uisnapshot.Row{Label: job.Name, Detail: job.Schedule + " · " + job.Timezone, State: state})
+			tone := "muted"
+			if job.Enabled {
+				tone = "success"
+			}
+			panel.Rows = append(panel.Rows, uisnapshot.Row{Label: job.Name, Detail: job.Schedule + " · " + job.Timezone, State: state, Tone: tone})
 		}
 		if len(panel.Rows) == 0 {
 			panel.Notice = "No scheduled jobs. Create one with /jobs add."

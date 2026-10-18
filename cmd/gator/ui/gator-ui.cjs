@@ -1734,18 +1734,18 @@ var require_react_jsx_runtime_development = __commonJS({
       function isValidElement2(object) {
         return "object" === typeof object && null !== object && object.$$typeof === REACT_ELEMENT_TYPE;
       }
-      var React7 = require_react(), REACT_ELEMENT_TYPE = /* @__PURE__ */ Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = /* @__PURE__ */ Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = /* @__PURE__ */ Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = /* @__PURE__ */ Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = /* @__PURE__ */ Symbol.for("react.profiler"), REACT_CONSUMER_TYPE = /* @__PURE__ */ Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = /* @__PURE__ */ Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = /* @__PURE__ */ Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = /* @__PURE__ */ Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = /* @__PURE__ */ Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = /* @__PURE__ */ Symbol.for("react.memo"), REACT_LAZY_TYPE = /* @__PURE__ */ Symbol.for("react.lazy"), REACT_ACTIVITY_TYPE = /* @__PURE__ */ Symbol.for("react.activity"), REACT_CLIENT_REFERENCE = /* @__PURE__ */ Symbol.for("react.client.reference"), ReactSharedInternals = React7.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, hasOwnProperty = Object.prototype.hasOwnProperty, isArrayImpl = Array.isArray, createTask = console.createTask ? console.createTask : function() {
+      var React8 = require_react(), REACT_ELEMENT_TYPE = /* @__PURE__ */ Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = /* @__PURE__ */ Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = /* @__PURE__ */ Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = /* @__PURE__ */ Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = /* @__PURE__ */ Symbol.for("react.profiler"), REACT_CONSUMER_TYPE = /* @__PURE__ */ Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = /* @__PURE__ */ Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = /* @__PURE__ */ Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = /* @__PURE__ */ Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = /* @__PURE__ */ Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = /* @__PURE__ */ Symbol.for("react.memo"), REACT_LAZY_TYPE = /* @__PURE__ */ Symbol.for("react.lazy"), REACT_ACTIVITY_TYPE = /* @__PURE__ */ Symbol.for("react.activity"), REACT_CLIENT_REFERENCE = /* @__PURE__ */ Symbol.for("react.client.reference"), ReactSharedInternals = React8.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, hasOwnProperty = Object.prototype.hasOwnProperty, isArrayImpl = Array.isArray, createTask = console.createTask ? console.createTask : function() {
         return null;
       };
-      React7 = {
+      React8 = {
         react_stack_bottom_frame: function(callStackForError) {
           return callStackForError();
         }
       };
       var specialPropKeyWarningShown;
       var didWarnAboutElementRef = {};
-      var unknownOwnerDebugStack = React7.react_stack_bottom_frame.bind(
-        React7,
+      var unknownOwnerDebugStack = React8.react_stack_bottom_frame.bind(
+        React8,
         UnknownOwner
       )();
       var unknownOwnerDebugTask = createTask(getTaskName(UnknownOwner));
@@ -11931,14 +11931,14 @@ var require_react_reconciler_production = __commonJS({
       }
       var exports3 = {};
       "use strict";
-      var React7 = require_react(), Scheduler = require_scheduler(), assign = Object.assign, REACT_LEGACY_ELEMENT_TYPE = /* @__PURE__ */ Symbol.for("react.element"), REACT_ELEMENT_TYPE = /* @__PURE__ */ Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = /* @__PURE__ */ Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = /* @__PURE__ */ Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = /* @__PURE__ */ Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = /* @__PURE__ */ Symbol.for("react.profiler"), REACT_CONSUMER_TYPE = /* @__PURE__ */ Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = /* @__PURE__ */ Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = /* @__PURE__ */ Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = /* @__PURE__ */ Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = /* @__PURE__ */ Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = /* @__PURE__ */ Symbol.for("react.memo"), REACT_LAZY_TYPE = /* @__PURE__ */ Symbol.for("react.lazy");
+      var React8 = require_react(), Scheduler = require_scheduler(), assign = Object.assign, REACT_LEGACY_ELEMENT_TYPE = /* @__PURE__ */ Symbol.for("react.element"), REACT_ELEMENT_TYPE = /* @__PURE__ */ Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = /* @__PURE__ */ Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = /* @__PURE__ */ Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = /* @__PURE__ */ Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = /* @__PURE__ */ Symbol.for("react.profiler"), REACT_CONSUMER_TYPE = /* @__PURE__ */ Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = /* @__PURE__ */ Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = /* @__PURE__ */ Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = /* @__PURE__ */ Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = /* @__PURE__ */ Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = /* @__PURE__ */ Symbol.for("react.memo"), REACT_LAZY_TYPE = /* @__PURE__ */ Symbol.for("react.lazy");
       /* @__PURE__ */ Symbol.for("react.scope");
       var REACT_ACTIVITY_TYPE = /* @__PURE__ */ Symbol.for("react.activity");
       /* @__PURE__ */ Symbol.for("react.legacy_hidden");
       /* @__PURE__ */ Symbol.for("react.tracing_marker");
       var REACT_MEMO_CACHE_SENTINEL = /* @__PURE__ */ Symbol.for("react.memo_cache_sentinel");
       /* @__PURE__ */ Symbol.for("react.view_transition");
-      var MAYBE_ITERATOR_SYMBOL = Symbol.iterator, REACT_CLIENT_REFERENCE = /* @__PURE__ */ Symbol.for("react.client.reference"), isArrayImpl = Array.isArray, ReactSharedInternals = React7.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, rendererVersion = $$$config.rendererVersion, rendererPackageName = $$$config.rendererPackageName, extraDevToolsConfig = $$$config.extraDevToolsConfig, getPublicInstance = $$$config.getPublicInstance, getRootHostContext = $$$config.getRootHostContext, getChildHostContext = $$$config.getChildHostContext, prepareForCommit = $$$config.prepareForCommit, resetAfterCommit = $$$config.resetAfterCommit, createInstance = $$$config.createInstance;
+      var MAYBE_ITERATOR_SYMBOL = Symbol.iterator, REACT_CLIENT_REFERENCE = /* @__PURE__ */ Symbol.for("react.client.reference"), isArrayImpl = Array.isArray, ReactSharedInternals = React8.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, rendererVersion = $$$config.rendererVersion, rendererPackageName = $$$config.rendererPackageName, extraDevToolsConfig = $$$config.extraDevToolsConfig, getPublicInstance = $$$config.getPublicInstance, getRootHostContext = $$$config.getRootHostContext, getChildHostContext = $$$config.getChildHostContext, prepareForCommit = $$$config.prepareForCommit, resetAfterCommit = $$$config.resetAfterCommit, createInstance = $$$config.createInstance;
       $$$config.cloneMutableInstance;
       var appendInitialChild = $$$config.appendInitialChild, finalizeInitialChildren = $$$config.finalizeInitialChildren, shouldSetTextContent = $$$config.shouldSetTextContent, createTextInstance = $$$config.createTextInstance;
       $$$config.cloneMutableTextInstance;
@@ -13704,7 +13704,7 @@ var require_react_reconciler_development = __commonJS({
       }
       function logRenderPhase(startTime, endTime, lanes, debugTask) {
         if (supportsUserTiming && !(endTime <= startTime)) {
-          var color = (lanes & 738197653) === lanes ? "tertiary-dark" : "primary-dark";
+          var color2 = (lanes & 738197653) === lanes ? "tertiary-dark" : "primary-dark";
           lanes = (lanes & 536870912) === lanes ? "Prepared" : (lanes & 201326741) === lanes ? "Hydrated" : "Render";
           debugTask ? debugTask.run(
             console.timeStamp.bind(
@@ -13714,7 +13714,7 @@ var require_react_reconciler_development = __commonJS({
               endTime,
               currentTrack,
               "Scheduler \u269B",
-              color
+              color2
             )
           ) : console.timeStamp(
             lanes,
@@ -13722,7 +13722,7 @@ var require_react_reconciler_development = __commonJS({
             endTime,
             currentTrack,
             "Scheduler \u269B",
-            color
+            color2
           );
         }
       }
@@ -22951,7 +22951,7 @@ var require_react_reconciler_development = __commonJS({
           else {
             var endTime = renderStartTime, debugTask = workInProgressUpdateTask;
             if (supportsUserTiming && !(endTime <= previousRenderStartTime)) {
-              var color = (lanes & 738197653) === lanes ? "tertiary-dark" : "primary-dark", label = (lanes & 536870912) === lanes ? "Prewarm" : (lanes & 201326741) === lanes ? "Interrupted Hydration" : "Interrupted Render";
+              var color2 = (lanes & 738197653) === lanes ? "tertiary-dark" : "primary-dark", label = (lanes & 536870912) === lanes ? "Prewarm" : (lanes & 201326741) === lanes ? "Interrupted Hydration" : "Interrupted Render";
               debugTask ? debugTask.run(
                 console.timeStamp.bind(
                   console,
@@ -22960,7 +22960,7 @@ var require_react_reconciler_development = __commonJS({
                   endTime,
                   currentTrack,
                   "Scheduler \u269B",
-                  color
+                  color2
                 )
               ) : console.timeStamp(
                 label,
@@ -22968,7 +22968,7 @@ var require_react_reconciler_development = __commonJS({
                 endTime,
                 currentTrack,
                 "Scheduler \u269B",
-                color
+                color2
               );
             }
           }
@@ -22980,10 +22980,10 @@ var require_react_reconciler_development = __commonJS({
           workInProgressUpdateTask = blockingUpdateTask;
           debugTask = 0 <= blockingUpdateTime && blockingUpdateTime < blockingClampTime ? blockingClampTime : blockingUpdateTime;
           endTime = 0 <= blockingEventTime && blockingEventTime < blockingClampTime ? blockingClampTime : blockingEventTime;
-          color = 0 <= endTime ? endTime : 0 <= debugTask ? debugTask : renderStartTime;
+          color2 = 0 <= endTime ? endTime : 0 <= debugTask ? debugTask : renderStartTime;
           0 <= blockingSuspendedTime && (setCurrentTrackFromLanes(2), logSuspendedWithDelayPhase(
             blockingSuspendedTime,
-            color,
+            color2,
             lanes,
             previousRenderStartTime
           ));
@@ -22991,7 +22991,7 @@ var require_react_reconciler_development = __commonJS({
           var eventTime = endTime, eventType = blockingEventType, eventIsRepeat = 0 < blockingEventRepeatTime, isSpawnedUpdate = 1 === blockingUpdateType, isPingedUpdate = 2 === blockingUpdateType;
           debugTask = renderStartTime;
           endTime = blockingUpdateTask;
-          color = blockingUpdateMethodName;
+          color2 = blockingUpdateMethodName;
           label = blockingUpdateComponentName;
           if (supportsUserTiming) {
             currentTrack = "Blocking";
@@ -23018,7 +23018,7 @@ var require_react_reconciler_development = __commonJS({
                 color$jscomp$0
               );
             }
-            debugTask > previousRenderStartTime && (eventTime = isSpawnedUpdate ? "error" : (lanes & 738197653) === lanes ? "tertiary-light" : "primary-light", isSpawnedUpdate = isPingedUpdate ? "Promise Resolved" : isSpawnedUpdate ? "Cascading Update" : 5 < debugTask - previousRenderStartTime ? "Update Blocked" : "Update", isPingedUpdate = [], null != label && isPingedUpdate.push(["Component name", label]), null != color && isPingedUpdate.push(["Method name", color]), previousRenderStartTime = {
+            debugTask > previousRenderStartTime && (eventTime = isSpawnedUpdate ? "error" : (lanes & 738197653) === lanes ? "tertiary-light" : "primary-light", isSpawnedUpdate = isPingedUpdate ? "Promise Resolved" : isSpawnedUpdate ? "Cascading Update" : 5 < debugTask - previousRenderStartTime ? "Update Blocked" : "Update", isPingedUpdate = [], null != label && isPingedUpdate.push(["Component name", label]), null != color2 && isPingedUpdate.push(["Method name", color2]), previousRenderStartTime = {
               start: previousRenderStartTime,
               end: debugTask,
               detail: {
@@ -23045,12 +23045,12 @@ var require_react_reconciler_development = __commonJS({
           blockingEventTime = -1.1;
           blockingClampTime = now();
         }
-        0 !== (lanes & 4194048) && (workInProgressUpdateTask = transitionUpdateTask, debugTask = 0 <= transitionStartTime && transitionStartTime < transitionClampTime ? transitionClampTime : transitionStartTime, previousRenderStartTime = 0 <= transitionUpdateTime && transitionUpdateTime < transitionClampTime ? transitionClampTime : transitionUpdateTime, endTime = 0 <= transitionEventTime && transitionEventTime < transitionClampTime ? transitionClampTime : transitionEventTime, color = 0 <= endTime ? endTime : 0 <= previousRenderStartTime ? previousRenderStartTime : renderStartTime, 0 <= transitionSuspendedTime && (setCurrentTrackFromLanes(256), logSuspendedWithDelayPhase(
+        0 !== (lanes & 4194048) && (workInProgressUpdateTask = transitionUpdateTask, debugTask = 0 <= transitionStartTime && transitionStartTime < transitionClampTime ? transitionClampTime : transitionStartTime, previousRenderStartTime = 0 <= transitionUpdateTime && transitionUpdateTime < transitionClampTime ? transitionClampTime : transitionUpdateTime, endTime = 0 <= transitionEventTime && transitionEventTime < transitionClampTime ? transitionClampTime : transitionEventTime, color2 = 0 <= endTime ? endTime : 0 <= previousRenderStartTime ? previousRenderStartTime : renderStartTime, 0 <= transitionSuspendedTime && (setCurrentTrackFromLanes(256), logSuspendedWithDelayPhase(
           transitionSuspendedTime,
-          color,
+          color2,
           lanes,
           workInProgressUpdateTask
-        )), isPingedUpdate = endTime, eventTime = transitionEventType, eventType = 0 < transitionEventRepeatTime, eventIsRepeat = 2 === transitionUpdateType, color = renderStartTime, endTime = transitionUpdateTask, label = transitionUpdateMethodName, isSpawnedUpdate = transitionUpdateComponentName, supportsUserTiming && (currentTrack = "Transition", 0 < previousRenderStartTime ? previousRenderStartTime > color && (previousRenderStartTime = color) : previousRenderStartTime = color, 0 < debugTask ? debugTask > previousRenderStartTime && (debugTask = previousRenderStartTime) : debugTask = previousRenderStartTime, 0 < isPingedUpdate ? isPingedUpdate > debugTask && (isPingedUpdate = debugTask) : isPingedUpdate = debugTask, debugTask > isPingedUpdate && null !== eventTime && (color$jscomp$0 = eventType ? "secondary-light" : "warning", endTime ? endTime.run(
+        )), isPingedUpdate = endTime, eventTime = transitionEventType, eventType = 0 < transitionEventRepeatTime, eventIsRepeat = 2 === transitionUpdateType, color2 = renderStartTime, endTime = transitionUpdateTask, label = transitionUpdateMethodName, isSpawnedUpdate = transitionUpdateComponentName, supportsUserTiming && (currentTrack = "Transition", 0 < previousRenderStartTime ? previousRenderStartTime > color2 && (previousRenderStartTime = color2) : previousRenderStartTime = color2, 0 < debugTask ? debugTask > previousRenderStartTime && (debugTask = previousRenderStartTime) : debugTask = previousRenderStartTime, 0 < isPingedUpdate ? isPingedUpdate > debugTask && (isPingedUpdate = debugTask) : isPingedUpdate = debugTask, debugTask > isPingedUpdate && null !== eventTime && (color$jscomp$0 = eventType ? "secondary-light" : "warning", endTime ? endTime.run(
           console.timeStamp.bind(
             console,
             eventType ? "Consecutive" : "Event: " + eventTime,
@@ -23084,9 +23084,9 @@ var require_react_reconciler_development = __commonJS({
           currentTrack,
           "Scheduler \u269B",
           "primary-dark"
-        )), color > previousRenderStartTime && (debugTask = eventIsRepeat ? "Promise Resolved" : 5 < color - previousRenderStartTime ? "Update Blocked" : "Update", isPingedUpdate = [], null != isSpawnedUpdate && isPingedUpdate.push(["Component name", isSpawnedUpdate]), null != label && isPingedUpdate.push(["Method name", label]), previousRenderStartTime = {
+        )), color2 > previousRenderStartTime && (debugTask = eventIsRepeat ? "Promise Resolved" : 5 < color2 - previousRenderStartTime ? "Update Blocked" : "Update", isPingedUpdate = [], null != isSpawnedUpdate && isPingedUpdate.push(["Component name", isSpawnedUpdate]), null != label && isPingedUpdate.push(["Method name", label]), previousRenderStartTime = {
           start: previousRenderStartTime,
-          end: color,
+          end: color2,
           detail: {
             devtools: {
               properties: isPingedUpdate,
@@ -23127,7 +23127,7 @@ var require_react_reconciler_development = __commonJS({
         endTime = root.entangledLanes;
         if (0 !== endTime)
           for (root = root.entanglements, endTime &= lanes; 0 < endTime; )
-            debugTask = 31 - clz32(endTime), color = 1 << debugTask, lanes |= root[debugTask], endTime &= ~color;
+            debugTask = 31 - clz32(endTime), color2 = 1 << debugTask, lanes |= root[debugTask], endTime &= ~color2;
         entangledRenderLanes = lanes;
         finishQueueingConcurrentUpdates();
         root = getCurrentTime();
@@ -24531,14 +24531,14 @@ var require_react_reconciler_development = __commonJS({
       }
       var exports3 = {};
       "use strict";
-      var React7 = require_react(), Scheduler = require_scheduler(), assign = Object.assign, REACT_LEGACY_ELEMENT_TYPE = /* @__PURE__ */ Symbol.for("react.element"), REACT_ELEMENT_TYPE = /* @__PURE__ */ Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = /* @__PURE__ */ Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = /* @__PURE__ */ Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = /* @__PURE__ */ Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = /* @__PURE__ */ Symbol.for("react.profiler"), REACT_CONSUMER_TYPE = /* @__PURE__ */ Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = /* @__PURE__ */ Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = /* @__PURE__ */ Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = /* @__PURE__ */ Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = /* @__PURE__ */ Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = /* @__PURE__ */ Symbol.for("react.memo"), REACT_LAZY_TYPE = /* @__PURE__ */ Symbol.for("react.lazy");
+      var React8 = require_react(), Scheduler = require_scheduler(), assign = Object.assign, REACT_LEGACY_ELEMENT_TYPE = /* @__PURE__ */ Symbol.for("react.element"), REACT_ELEMENT_TYPE = /* @__PURE__ */ Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = /* @__PURE__ */ Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = /* @__PURE__ */ Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = /* @__PURE__ */ Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = /* @__PURE__ */ Symbol.for("react.profiler"), REACT_CONSUMER_TYPE = /* @__PURE__ */ Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = /* @__PURE__ */ Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = /* @__PURE__ */ Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = /* @__PURE__ */ Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = /* @__PURE__ */ Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = /* @__PURE__ */ Symbol.for("react.memo"), REACT_LAZY_TYPE = /* @__PURE__ */ Symbol.for("react.lazy");
       /* @__PURE__ */ Symbol.for("react.scope");
       var REACT_ACTIVITY_TYPE = /* @__PURE__ */ Symbol.for("react.activity");
       /* @__PURE__ */ Symbol.for("react.legacy_hidden");
       /* @__PURE__ */ Symbol.for("react.tracing_marker");
       var REACT_MEMO_CACHE_SENTINEL = /* @__PURE__ */ Symbol.for("react.memo_cache_sentinel");
       /* @__PURE__ */ Symbol.for("react.view_transition");
-      var MAYBE_ITERATOR_SYMBOL = Symbol.iterator, REACT_CLIENT_REFERENCE = /* @__PURE__ */ Symbol.for("react.client.reference"), isArrayImpl = Array.isArray, ReactSharedInternals = React7.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, rendererVersion = $$$config.rendererVersion, rendererPackageName = $$$config.rendererPackageName, extraDevToolsConfig = $$$config.extraDevToolsConfig, getPublicInstance = $$$config.getPublicInstance, getRootHostContext = $$$config.getRootHostContext, getChildHostContext = $$$config.getChildHostContext, prepareForCommit = $$$config.prepareForCommit, resetAfterCommit = $$$config.resetAfterCommit, createInstance = $$$config.createInstance;
+      var MAYBE_ITERATOR_SYMBOL = Symbol.iterator, REACT_CLIENT_REFERENCE = /* @__PURE__ */ Symbol.for("react.client.reference"), isArrayImpl = Array.isArray, ReactSharedInternals = React8.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, rendererVersion = $$$config.rendererVersion, rendererPackageName = $$$config.rendererPackageName, extraDevToolsConfig = $$$config.extraDevToolsConfig, getPublicInstance = $$$config.getPublicInstance, getRootHostContext = $$$config.getRootHostContext, getChildHostContext = $$$config.getChildHostContext, prepareForCommit = $$$config.prepareForCommit, resetAfterCommit = $$$config.resetAfterCommit, createInstance = $$$config.createInstance;
       $$$config.cloneMutableInstance;
       var appendInitialChild = $$$config.appendInitialChild, finalizeInitialChildren = $$$config.finalizeInitialChildren, shouldSetTextContent = $$$config.shouldSetTextContent, createTextInstance = $$$config.createTextInstance;
       $$$config.cloneMutableTextInstance;
@@ -27550,7 +27550,7 @@ function satisfies(version, range) {
 var ANSI_BACKGROUND_OFFSET = 10;
 var wrapAnsi16 = (offset = 0) => (code) => `\x1B[${code + offset}m`;
 var wrapAnsi256 = (offset = 0) => (code) => `\x1B[${38 + offset};5;${code}m`;
-var wrapAnsi16m = (offset = 0) => (red2, green3, blue) => `\x1B[${38 + offset};2;${red2};${green3};${blue}m`;
+var wrapAnsi16m = (offset = 0) => (red2, green4, blue) => `\x1B[${38 + offset};2;${red2};${green4};${blue}m`;
 var styles = {
   modifier: {
     reset: [0, 0],
@@ -27645,8 +27645,8 @@ function assembleStyles() {
   styles.bgColor.ansi16m = wrapAnsi16m(ANSI_BACKGROUND_OFFSET);
   Object.defineProperties(styles, {
     rgbToAnsi256: {
-      value(red2, green3, blue) {
-        if (red2 === green3 && green3 === blue) {
+      value(red2, green4, blue) {
+        if (red2 === green4 && green4 === blue) {
           if (red2 < 8) {
             return 16;
           }
@@ -27655,7 +27655,7 @@ function assembleStyles() {
           }
           return Math.round((red2 - 8) / 247 * 24) + 232;
         }
-        return 16 + 36 * Math.round(red2 / 255 * 5) + 6 * Math.round(green3 / 255 * 5) + Math.round(blue / 255 * 5);
+        return 16 + 36 * Math.round(red2 / 255 * 5) + 6 * Math.round(green4 / 255 * 5) + Math.round(blue / 255 * 5);
       },
       enumerable: false
     },
@@ -27693,24 +27693,24 @@ function assembleStyles() {
           return 90 + (code - 8);
         }
         let red2;
-        let green3;
+        let green4;
         let blue;
         if (code >= 232) {
           red2 = ((code - 232) * 10 + 8) / 255;
-          green3 = red2;
+          green4 = red2;
           blue = red2;
         } else {
           code -= 16;
           const remainder = code % 36;
           red2 = Math.floor(code / 36) / 5;
-          green3 = Math.floor(remainder / 6) / 5;
+          green4 = Math.floor(remainder / 6) / 5;
           blue = remainder % 6 / 5;
         }
-        const value = Math.max(red2, green3, blue) * 2;
+        const value = Math.max(red2, green4, blue) * 2;
         if (value === 0) {
           return 30;
         }
-        let result = 30 + (Math.round(blue) << 2 | Math.round(green3) << 1 | Math.round(red2));
+        let result = 30 + (Math.round(blue) << 2 | Math.round(green4) << 1 | Math.round(red2));
         if (value === 2) {
           result += 60;
         }
@@ -27719,7 +27719,7 @@ function assembleStyles() {
       enumerable: false
     },
     rgbToAnsi: {
-      value: (red2, green3, blue) => styles.ansi256ToAnsi(styles.rgbToAnsi256(red2, green3, blue)),
+      value: (red2, green4, blue) => styles.ansi256ToAnsi(styles.rgbToAnsi256(red2, green4, blue)),
       enumerable: false
     },
     hexToAnsi: {
@@ -30579,7 +30579,7 @@ var memoizedStylesForWrap = {
 function Text(t0) {
   const $2 = (0, import_compiler_runtime3.c)(29);
   const {
-    color,
+    color: color2,
     backgroundColor,
     bold,
     dim: dimProp,
@@ -30601,11 +30601,11 @@ function Text(t0) {
     return null;
   }
   let t6;
-  if ($2[0] !== color) {
-    t6 = color && {
-      color
+  if ($2[0] !== color2) {
+    t6 = color2 && {
+      color: color2
     };
-    $2[0] = color;
+    $2[0] = color2;
     $2[1] = t6;
   } else {
     t6 = $2[1];
@@ -32178,14 +32178,14 @@ var NAMED_COLOR_MAP = {
   brightCyan: "ansi:cyanBright",
   brightWhite: "ansi:whiteBright"
 };
-function colorToString(color) {
-  switch (color.type) {
+function colorToString(color2) {
+  switch (color2.type) {
     case "named":
-      return NAMED_COLOR_MAP[color.name];
+      return NAMED_COLOR_MAP[color2.name];
     case "indexed":
-      return `ansi256(${color.index})`;
+      return `ansi256(${color2.index})`;
     case "rgb":
-      return `rgb(${color.r},${color.g},${color.b})`;
+      return `rgb(${color2.r},${color2.g},${color2.b})`;
     case "default":
       return void 0;
   }
@@ -32256,7 +32256,7 @@ function StyledText(t0) {
 var ANSI_BACKGROUND_OFFSET2 = 10;
 var wrapAnsi162 = (offset = 0) => (code) => `\x1B[${code + offset}m`;
 var wrapAnsi2562 = (offset = 0) => (code) => `\x1B[${38 + offset};5;${code}m`;
-var wrapAnsi16m2 = (offset = 0) => (red2, green3, blue) => `\x1B[${38 + offset};2;${red2};${green3};${blue}m`;
+var wrapAnsi16m2 = (offset = 0) => (red2, green4, blue) => `\x1B[${38 + offset};2;${red2};${green4};${blue}m`;
 var styles2 = {
   modifier: {
     reset: [0, 0],
@@ -32351,8 +32351,8 @@ function assembleStyles2() {
   styles2.bgColor.ansi16m = wrapAnsi16m2(ANSI_BACKGROUND_OFFSET2);
   Object.defineProperties(styles2, {
     rgbToAnsi256: {
-      value(red2, green3, blue) {
-        if (red2 === green3 && green3 === blue) {
+      value(red2, green4, blue) {
+        if (red2 === green4 && green4 === blue) {
           if (red2 < 8) {
             return 16;
           }
@@ -32361,7 +32361,7 @@ function assembleStyles2() {
           }
           return Math.round((red2 - 8) / 247 * 24) + 232;
         }
-        return 16 + 36 * Math.round(red2 / 255 * 5) + 6 * Math.round(green3 / 255 * 5) + Math.round(blue / 255 * 5);
+        return 16 + 36 * Math.round(red2 / 255 * 5) + 6 * Math.round(green4 / 255 * 5) + Math.round(blue / 255 * 5);
       },
       enumerable: false
     },
@@ -32399,24 +32399,24 @@ function assembleStyles2() {
           return 90 + (code - 8);
         }
         let red2;
-        let green3;
+        let green4;
         let blue;
         if (code >= 232) {
           red2 = ((code - 232) * 10 + 8) / 255;
-          green3 = red2;
+          green4 = red2;
           blue = red2;
         } else {
           code -= 16;
           const remainder = code % 36;
           red2 = Math.floor(code / 36) / 5;
-          green3 = Math.floor(remainder / 6) / 5;
+          green4 = Math.floor(remainder / 6) / 5;
           blue = remainder % 6 / 5;
         }
-        const value = Math.max(red2, green3, blue) * 2;
+        const value = Math.max(red2, green4, blue) * 2;
         if (value === 0) {
           return 30;
         }
-        let result = 30 + (Math.round(blue) << 2 | Math.round(green3) << 1 | Math.round(red2));
+        let result = 30 + (Math.round(blue) << 2 | Math.round(green4) << 1 | Math.round(red2));
         if (value === 2) {
           result += 60;
         }
@@ -32425,7 +32425,7 @@ function assembleStyles2() {
       enumerable: false
     },
     rgbToAnsi: {
-      value: (red2, green3, blue) => styles2.ansi256ToAnsi(styles2.rgbToAnsi256(red2, green3, blue)),
+      value: (red2, green4, blue) => styles2.ansi256ToAnsi(styles2.rgbToAnsi256(red2, green4, blue)),
       enumerable: false
     },
     hexToAnsi: {
@@ -32756,12 +32756,12 @@ var CHALK_BOOSTED_FOR_XTERMJS = boostChalkLevelForXtermJs();
 var CHALK_CLAMPED_FOR_TMUX = clampChalkLevelForTmux();
 var RGB_REGEX = /^rgb\(\s?(\d+),\s?(\d+),\s?(\d+)\s?\)$/;
 var ANSI_REGEX = /^ansi256\(\s?(\d+)\s?\)$/;
-var colorize = (str, color, type) => {
-  if (!color) {
+var colorize = (str, color2, type) => {
+  if (!color2) {
     return str;
   }
-  if (color.startsWith("ansi:")) {
-    const value = color.substring("ansi:".length);
+  if (color2.startsWith("ansi:")) {
+    const value = color2.substring("ansi:".length);
     switch (value) {
       case "black":
         return type === "foreground" ? source_default.black(str) : source_default.bgBlack(str);
@@ -32797,19 +32797,19 @@ var colorize = (str, color, type) => {
         return type === "foreground" ? source_default.whiteBright(str) : source_default.bgWhiteBright(str);
     }
   }
-  if (color.startsWith("#")) {
-    return type === "foreground" ? source_default.hex(color)(str) : source_default.bgHex(color)(str);
+  if (color2.startsWith("#")) {
+    return type === "foreground" ? source_default.hex(color2)(str) : source_default.bgHex(color2)(str);
   }
-  if (color.startsWith("ansi256")) {
-    const matches = ANSI_REGEX.exec(color);
+  if (color2.startsWith("ansi256")) {
+    const matches = ANSI_REGEX.exec(color2);
     if (!matches) {
       return str;
     }
     const value = Number(matches[1]);
     return type === "foreground" ? source_default.ansi256(value)(str) : source_default.bgAnsi256(value)(str);
   }
-  if (color.startsWith("rgb")) {
-    const matches = RGB_REGEX.exec(color);
+  if (color2.startsWith("rgb")) {
+    const matches = RGB_REGEX.exec(color2);
     if (!matches) {
       return str;
     }
@@ -32830,7 +32830,7 @@ var colorize = (str, color, type) => {
     gray: type === "foreground" ? source_default.gray : source_default.bgBlackBright,
     grey: type === "foreground" ? source_default.gray : source_default.bgBlackBright
   };
-  const fn = PLAIN_ANSI[color];
+  const fn = PLAIN_ANSI[color2];
   if (fn) {
     return fn(str);
   }
@@ -32864,11 +32864,11 @@ function applyTextStyles(text, styles52) {
   }
   return result;
 }
-function applyColor(text, color) {
-  if (!color) {
+function applyColor(text, color2) {
+  if (!color2) {
     return text;
   }
-  return colorize(text, color, "foreground");
+  return colorize(text, color2, "foreground");
 }
 var instances = /* @__PURE__ */ new Map();
 var instances_default = instances;
@@ -34015,7 +34015,7 @@ function stringWidth2(input, options = {}) {
 var ANSI_BACKGROUND_OFFSET22 = 10;
 var wrapAnsi1622 = (offset = 0) => (code) => `\x1B[${code + offset}m`;
 var wrapAnsi25622 = (offset = 0) => (code) => `\x1B[${38 + offset};5;${code}m`;
-var wrapAnsi16m22 = (offset = 0) => (red2, green3, blue) => `\x1B[${38 + offset};2;${red2};${green3};${blue}m`;
+var wrapAnsi16m22 = (offset = 0) => (red2, green4, blue) => `\x1B[${38 + offset};2;${red2};${green4};${blue}m`;
 var styles3 = {
   modifier: {
     reset: [0, 0],
@@ -34110,8 +34110,8 @@ function assembleStyles22() {
   styles3.bgColor.ansi16m = wrapAnsi16m22(ANSI_BACKGROUND_OFFSET22);
   Object.defineProperties(styles3, {
     rgbToAnsi256: {
-      value(red2, green3, blue) {
-        if (red2 === green3 && green3 === blue) {
+      value(red2, green4, blue) {
+        if (red2 === green4 && green4 === blue) {
           if (red2 < 8) {
             return 16;
           }
@@ -34120,7 +34120,7 @@ function assembleStyles22() {
           }
           return Math.round((red2 - 8) / 247 * 24) + 232;
         }
-        return 16 + 36 * Math.round(red2 / 255 * 5) + 6 * Math.round(green3 / 255 * 5) + Math.round(blue / 255 * 5);
+        return 16 + 36 * Math.round(red2 / 255 * 5) + 6 * Math.round(green4 / 255 * 5) + Math.round(blue / 255 * 5);
       },
       enumerable: false
     },
@@ -34158,24 +34158,24 @@ function assembleStyles22() {
           return 90 + (code - 8);
         }
         let red2;
-        let green3;
+        let green4;
         let blue;
         if (code >= 232) {
           red2 = ((code - 232) * 10 + 8) / 255;
-          green3 = red2;
+          green4 = red2;
           blue = red2;
         } else {
           code -= 16;
           const remainder = code % 36;
           red2 = Math.floor(code / 36) / 5;
-          green3 = Math.floor(remainder / 6) / 5;
+          green4 = Math.floor(remainder / 6) / 5;
           blue = remainder % 6 / 5;
         }
-        const value = Math.max(red2, green3, blue) * 2;
+        const value = Math.max(red2, green4, blue) * 2;
         if (value === 0) {
           return 30;
         }
-        let result = 30 + (Math.round(blue) << 2 | Math.round(green3) << 1 | Math.round(red2));
+        let result = 30 + (Math.round(blue) << 2 | Math.round(green4) << 1 | Math.round(red2));
         if (value === 2) {
           result += 60;
         }
@@ -34184,7 +34184,7 @@ function assembleStyles22() {
       enumerable: false
     },
     rgbToAnsi: {
-      value: (red2, green3, blue) => styles3.ansi256ToAnsi(styles3.rgbToAnsi256(red2, green3, blue)),
+      value: (red2, green4, blue) => styles3.ansi256ToAnsi(styles3.rgbToAnsi256(red2, green4, blue)),
       enumerable: false
     },
     hexToAnsi: {
@@ -34244,10 +34244,10 @@ var getSgrTokens = (sgrParameters) => {
         continue;
       }
       const red2 = codes[index + 2];
-      const green3 = codes[index + 3];
+      const green4 = codes[index + 3];
       const blue = codes[index + 4];
-      if (mode === ANSI_SGR_COLOR_MODE_RGB && Number.isFinite(red2) && Number.isFinite(green3) && Number.isFinite(blue)) {
-        sgrTokens.push([code, mode, red2, green3, blue]);
+      if (mode === ANSI_SGR_COLOR_MODE_RGB && Number.isFinite(red2) && Number.isFinite(green4) && Number.isFinite(blue)) {
+        sgrTokens.push([code, mode, red2, green4, blue]);
         index += 4;
         continue;
       }
@@ -39963,8 +39963,8 @@ function embedTextInBorder(borderLine, text, align, offset = 0, borderChar) {
   const after = borderChar.repeat(borderLength - position - textLength - 1) + borderLine.substring(borderLength - 1);
   return [before, text, after];
 }
-function styleBorderLine(line, color, dim) {
-  let styled = applyColor(line, color);
+function styleBorderLine(line, color2, dim) {
+  let styled = applyColor(line, color2);
   if (dim) {
     styled = source_default.dim(styled);
   }
@@ -41749,8 +41749,8 @@ var Ink = class {
    * frame; the effect fires before any mouse input so the fallback is
    * unobservable in practice.
    */
-  setSelectionBgColor(color) {
-    const wrapped = colorize("\0", color, "background");
+  setSelectionBgColor(color2) {
+    const wrapped = colorize("\0", color2, "background");
     const nul = wrapped.indexOf("\0");
     if (nul <= 0 || nul === wrapped.length - 1) {
       this.stylePool.setSelectionBg(null);
@@ -42846,6 +42846,151 @@ function StatusLine({
     /* @__PURE__ */ (0, import_jsx_runtime26.jsx)(Box_default, { flexGrow: seg.flex ? 1 : 0, children: hasAnsi(seg.content) ? /* @__PURE__ */ (0, import_jsx_runtime26.jsx)(Ansi, { children: seg.content }) : /* @__PURE__ */ (0, import_jsx_runtime26.jsx)(Text, { dimColor: true, color: seg.color, children: seg.content }) })
   ] }, segmentKeys[i])) });
 }
+var themes = {
+  dark: {
+    text: "#E0E0E0",
+    dimText: "#666666",
+    border: "#444444",
+    accent: "#5B9BD5",
+    success: "#6BC76B",
+    warning: "#E5C07B",
+    error: "#E06C75",
+    assistant: "#DA7756",
+    inactive: "#666666",
+    inverseText: "#1E1E1E",
+    permission: "#5B9BD5",
+    diffAdded: "#1a3a1a",
+    diffRemoved: "#3a1a1a",
+    diffAddedWord: "#2d5a2d",
+    diffRemovedWord: "#5a2d2d",
+    diffHeader: "#1e2d3d",
+    userMessage: "#2B4A6F",
+    assistantMessage: "#3D2614",
+    systemMessage: "#2D2D2D",
+    toolUseMessage: "#1E3A2D",
+    permissionAllow: "#1B4332",
+    permissionDeny: "#3B1014",
+    permissionAlways: "#1B2F4D",
+    focus: "#5B9BD5",
+    selection: "#264F78",
+    placeholder: "#555555",
+    link: "#79B8FF",
+    code: "#F8BFB0",
+    codeBackground: "#2D2D2D",
+    blockquote: "#444444",
+    info: "#5B9BD5",
+    spinnerColor: "#DA7756",
+    shimmer: "#3A3A3A"
+  },
+  light: {
+    text: "#1E1E1E",
+    dimText: "#999999",
+    border: "#CCCCCC",
+    accent: "#0066CC",
+    success: "#2E7D32",
+    warning: "#F57C00",
+    error: "#C62828",
+    assistant: "#DA7756",
+    inactive: "#999999",
+    inverseText: "#FFFFFF",
+    permission: "#0066CC",
+    diffAdded: "#E6FFEC",
+    diffRemoved: "#FFEBE9",
+    diffAddedWord: "#CCFFD8",
+    diffRemovedWord: "#FFD7D5",
+    diffHeader: "#DDF4FF",
+    userMessage: "#E8F0FE",
+    assistantMessage: "#FDF2EE",
+    systemMessage: "#F5F5F5",
+    toolUseMessage: "#EAF5EE",
+    permissionAllow: "#E6F4EA",
+    permissionDeny: "#FCE8E6",
+    permissionAlways: "#E8F0FE",
+    focus: "#0066CC",
+    selection: "#B3D4FF",
+    placeholder: "#AAAAAA",
+    link: "#0066CC",
+    code: "#C7522A",
+    codeBackground: "#F5F5F5",
+    blockquote: "#EEEEEE",
+    info: "#0066CC",
+    spinnerColor: "#DA7756",
+    shimmer: "#E8E8E8"
+  },
+  "light-high-contrast": {
+    text: "#000000",
+    dimText: "#595959",
+    border: "#767676",
+    accent: "#0000EE",
+    success: "#006400",
+    warning: "#7A4000",
+    error: "#AE1818",
+    assistant: "#B55530",
+    inactive: "#767676",
+    inverseText: "#FFFFFF",
+    permission: "#0000EE",
+    diffAdded: "#CCF0D0",
+    diffRemoved: "#F5C6C6",
+    diffAddedWord: "#99E0A0",
+    diffRemovedWord: "#EBA0A0",
+    diffHeader: "#B8DEFF",
+    userMessage: "#C8DCFF",
+    assistantMessage: "#FCDAC8",
+    systemMessage: "#E0E0E0",
+    toolUseMessage: "#C4EED0",
+    permissionAllow: "#C4EED0",
+    permissionDeny: "#F5C6C6",
+    permissionAlways: "#C8DCFF",
+    focus: "#0000EE",
+    selection: "#80BFFF",
+    placeholder: "#767676",
+    link: "#0000EE",
+    code: "#8B0000",
+    codeBackground: "#E8E8E8",
+    blockquote: "#D0D0D0",
+    info: "#0000EE",
+    spinnerColor: "#B55530",
+    shimmer: "#D0D0D0"
+  },
+  "dark-dimmed": {
+    text: "#ADBAC7",
+    dimText: "#545D68",
+    border: "#373E47",
+    accent: "#539BF5",
+    success: "#57AB5A",
+    warning: "#C69026",
+    error: "#E5534B",
+    assistant: "#DA7756",
+    inactive: "#545D68",
+    inverseText: "#22272E",
+    permission: "#539BF5",
+    diffAdded: "#1B2F23",
+    diffRemoved: "#2F1B1E",
+    diffAddedWord: "#264D30",
+    diffRemovedWord: "#4D2628",
+    diffHeader: "#1C2B3A",
+    userMessage: "#1C2B3A",
+    assistantMessage: "#2F211A",
+    systemMessage: "#2D333B",
+    toolUseMessage: "#1B2B23",
+    permissionAllow: "#1B2B23",
+    permissionDeny: "#2F1B1E",
+    permissionAlways: "#1C2B3A",
+    focus: "#539BF5",
+    selection: "#1C4066",
+    placeholder: "#545D68",
+    link: "#6CB6FF",
+    code: "#F0A070",
+    codeBackground: "#2D333B",
+    blockquote: "#373E47",
+    info: "#539BF5",
+    spinnerColor: "#DA7756",
+    shimmer: "#373E47"
+  }
+};
+function getTheme(name) {
+  return themes[name] ?? themes.dark;
+}
 var DEFAULT_THEME = "dark";
 var ThemeContext = (0, import_react42.createContext)({
   themeSetting: DEFAULT_THEME,
@@ -42859,6 +43004,21 @@ var ThemeContext = (0, import_react42.createContext)({
   },
   currentTheme: DEFAULT_THEME
 });
+function useTheme() {
+  const { currentTheme, setThemeSetting } = (0, import_react42.useContext)(ThemeContext);
+  return [currentTheme, setThemeSetting];
+}
+function color(c, theme, type = "foreground") {
+  return (text) => {
+    if (!c) {
+      return text;
+    }
+    if (c.startsWith("rgb(") || c.startsWith("#") || c.startsWith("ansi256(") || c.startsWith("ansi:")) {
+      return colorize(text, c, type);
+    }
+    return colorize(text, getTheme(theme)[c], type);
+  };
+}
 function isUnicodeSupported() {
   const { env: env22 } = import_process5.default;
   const { TERM, TERM_PROGRAM } = env22;
@@ -44654,10 +44814,19 @@ function ansiRegex2({ onlyFirst = false } = {}) {
   return new RegExp(pattern, onlyFirst ? void 0 : "g");
 }
 var regex2 = ansiRegex2();
+function stripAnsi2(string) {
+  if (typeof string !== "string") {
+    throw new TypeError(`Expected a \`string\`, got \`${typeof string}\``);
+  }
+  if (!string.includes("\x1B") && !string.includes("\x9B")) {
+    return string;
+  }
+  return string.replace(regex2, "");
+}
 var ANSI_BACKGROUND_OFFSET3 = 10;
 var wrapAnsi163 = (offset = 0) => (code) => `\x1B[${code + offset}m`;
 var wrapAnsi2563 = (offset = 0) => (code) => `\x1B[${38 + offset};5;${code}m`;
-var wrapAnsi16m3 = (offset = 0) => (red2, green3, blue) => `\x1B[${38 + offset};2;${red2};${green3};${blue}m`;
+var wrapAnsi16m3 = (offset = 0) => (red2, green4, blue) => `\x1B[${38 + offset};2;${red2};${green4};${blue}m`;
 var styles5 = {
   modifier: {
     reset: [0, 0],
@@ -44752,8 +44921,8 @@ function assembleStyles3() {
   styles5.bgColor.ansi16m = wrapAnsi16m3(ANSI_BACKGROUND_OFFSET3);
   Object.defineProperties(styles5, {
     rgbToAnsi256: {
-      value(red2, green3, blue) {
-        if (red2 === green3 && green3 === blue) {
+      value(red2, green4, blue) {
+        if (red2 === green4 && green4 === blue) {
           if (red2 < 8) {
             return 16;
           }
@@ -44762,7 +44931,7 @@ function assembleStyles3() {
           }
           return Math.round((red2 - 8) / 247 * 24) + 232;
         }
-        return 16 + 36 * Math.round(red2 / 255 * 5) + 6 * Math.round(green3 / 255 * 5) + Math.round(blue / 255 * 5);
+        return 16 + 36 * Math.round(red2 / 255 * 5) + 6 * Math.round(green4 / 255 * 5) + Math.round(blue / 255 * 5);
       },
       enumerable: false
     },
@@ -44800,24 +44969,24 @@ function assembleStyles3() {
           return 90 + (code - 8);
         }
         let red2;
-        let green3;
+        let green4;
         let blue;
         if (code >= 232) {
           red2 = ((code - 232) * 10 + 8) / 255;
-          green3 = red2;
+          green4 = red2;
           blue = red2;
         } else {
           code -= 16;
           const remainder = code % 36;
           red2 = Math.floor(code / 36) / 5;
-          green3 = Math.floor(remainder / 6) / 5;
+          green4 = Math.floor(remainder / 6) / 5;
           blue = remainder % 6 / 5;
         }
-        const value = Math.max(red2, green3, blue) * 2;
+        const value = Math.max(red2, green4, blue) * 2;
         if (value === 0) {
           return 30;
         }
-        let result = 30 + (Math.round(blue) << 2 | Math.round(green3) << 1 | Math.round(red2));
+        let result = 30 + (Math.round(blue) << 2 | Math.round(green4) << 1 | Math.round(red2));
         if (value === 2) {
           result += 60;
         }
@@ -44826,7 +44995,7 @@ function assembleStyles3() {
       enumerable: false
     },
     rgbToAnsi: {
-      value: (red2, green3, blue) => styles5.ansi256ToAnsi(styles5.rgbToAnsi256(red2, green3, blue)),
+      value: (red2, green4, blue) => styles5.ansi256ToAnsi(styles5.rgbToAnsi256(red2, green4, blue)),
       enumerable: false
     },
     hexToAnsi: {
@@ -45137,6 +45306,560 @@ var applyStyle2 = (self2, string) => {
 Object.defineProperties(createChalk2.prototype, styles23);
 var chalk2 = createChalk2();
 var chalkStderr2 = createChalk2({ level: stderrColor2 ? stderrColor2.level : 0 });
+var source_default2 = chalk2;
+function logForDebugging3(...args) {
+  if (process.env.DEBUG) {
+    console.debug(...args);
+  }
+}
+var EOL = "\n";
+var BLOCKQUOTE_BAR = "\u258E";
+var OSC8_START = "\x1B]8;;";
+var OSC8_END = "\x07";
+function supportsHyperlinks3() {
+  const termProgram = process.env.TERM_PROGRAM;
+  const lcTerminal = process.env.LC_TERMINAL;
+  const term = process.env.TERM;
+  const supported = ["ghostty", "Hyper", "kitty", "alacritty", "iTerm.app", "iTerm2"];
+  return !!(termProgram && supported.includes(termProgram)) || !!(lcTerminal && supported.includes(lcTerminal)) || !!term?.includes("kitty");
+}
+function createHyperlink(url, content) {
+  if (!supportsHyperlinks3()) {
+    return url;
+  }
+  const displayText = content ?? url;
+  const coloredText = source_default2.blue(displayText);
+  return `${OSC8_START}${url}${OSC8_END}${coloredText}${OSC8_START}${OSC8_END}`;
+}
+var markedConfigured = false;
+function configureMarked() {
+  if (markedConfigured) return;
+  markedConfigured = true;
+  g.use({
+    tokenizer: {
+      del() {
+        return void 0;
+      }
+    }
+  });
+}
+function formatToken(token, theme, listDepth = 0, orderedListNumber = null, parent = null, highlight = null) {
+  switch (token.type) {
+    case "blockquote": {
+      const inner = (token.tokens ?? []).map((_2) => formatToken(_2, theme, 0, null, null, highlight)).join("");
+      const bar = source_default2.dim(BLOCKQUOTE_BAR);
+      return inner.split(EOL).map((line) => stripAnsi2(line).trim() ? `${bar} ${source_default2.italic(line)}` : line).join(EOL);
+    }
+    case "code": {
+      if (!highlight) {
+        return token.text + EOL;
+      }
+      let language = "plaintext";
+      if (token.lang) {
+        if (highlight.supportsLanguage(token.lang)) {
+          language = token.lang;
+        } else {
+          logForDebugging3(
+            `Language not supported while highlighting code, falling back to plaintext: ${token.lang}`
+          );
+        }
+      }
+      return highlight.highlight(token.text, { language }) + EOL;
+    }
+    case "codespan": {
+      return color("permission", theme)(token.text);
+    }
+    case "em":
+      return source_default2.italic(
+        (token.tokens ?? []).map((_2) => formatToken(_2, theme, 0, null, parent, highlight)).join("")
+      );
+    case "strong":
+      return source_default2.bold(
+        (token.tokens ?? []).map((_2) => formatToken(_2, theme, 0, null, parent, highlight)).join("")
+      );
+    case "heading":
+      switch (token.depth) {
+        case 1:
+          return source_default2.bold.italic.underline(
+            (token.tokens ?? []).map((_2) => formatToken(_2, theme, 0, null, null, highlight)).join("")
+          ) + EOL + EOL;
+        case 2:
+          return source_default2.bold(
+            (token.tokens ?? []).map((_2) => formatToken(_2, theme, 0, null, null, highlight)).join("")
+          ) + EOL + EOL;
+        default:
+          return source_default2.bold(
+            (token.tokens ?? []).map((_2) => formatToken(_2, theme, 0, null, null, highlight)).join("")
+          ) + EOL + EOL;
+      }
+    case "hr":
+      return "---";
+    case "image":
+      return token.href;
+    case "link": {
+      if (token.href.startsWith("mailto:")) {
+        const email = token.href.replace(/^mailto:/, "");
+        return email;
+      }
+      const linkText = (token.tokens ?? []).map((_2) => formatToken(_2, theme, 0, null, token, highlight)).join("");
+      const plainLinkText = stripAnsi2(linkText);
+      if (plainLinkText && plainLinkText !== token.href) {
+        return createHyperlink(token.href, linkText);
+      }
+      return createHyperlink(token.href);
+    }
+    case "list": {
+      return token.items.map(
+        (_2, index) => formatToken(
+          _2,
+          theme,
+          listDepth,
+          token.ordered ? token.start + index : null,
+          token,
+          highlight
+        )
+      ).join("");
+    }
+    case "list_item":
+      return (token.tokens ?? []).map(
+        (_2) => `${"  ".repeat(listDepth)}${formatToken(_2, theme, listDepth + 1, orderedListNumber, token, highlight)}`
+      ).join("");
+    case "paragraph":
+      return (token.tokens ?? []).map((_2) => formatToken(_2, theme, 0, null, null, highlight)).join("") + EOL;
+    case "space":
+      return EOL;
+    case "br":
+      return EOL;
+    case "text":
+      if (parent?.type === "link") {
+        return token.text;
+      }
+      if (parent?.type === "list_item") {
+        return `${orderedListNumber === null ? "-" : `${getListNumber(listDepth, orderedListNumber)}.`} ${token.tokens ? token.tokens.map((_2) => formatToken(_2, theme, listDepth, orderedListNumber, token, highlight)).join("") : linkifyIssueReferences(token.text)}${EOL}`;
+      }
+      return linkifyIssueReferences(token.text);
+    case "table": {
+      let getDisplayText2 = function(tokens) {
+        return stripAnsi2(
+          tokens?.map((_2) => formatToken(_2, theme, 0, null, null, highlight)).join("") ?? ""
+        );
+      };
+      var getDisplayText = getDisplayText2;
+      const tableToken = token;
+      const columnWidths = tableToken.header.map((header, index) => {
+        let maxWidth = stringWidth(getDisplayText2(header.tokens));
+        for (const row of tableToken.rows) {
+          const cellLength = stringWidth(getDisplayText2(row[index]?.tokens));
+          maxWidth = Math.max(maxWidth, cellLength);
+        }
+        return Math.max(maxWidth, 3);
+      });
+      let tableOutput = "| ";
+      tableToken.header.forEach((header, index) => {
+        const content = header.tokens?.map((_2) => formatToken(_2, theme, 0, null, null, highlight)).join("") ?? "";
+        const displayText = getDisplayText2(header.tokens);
+        const width = columnWidths[index];
+        const align = tableToken.align?.[index];
+        tableOutput += `${padAligned(content, stringWidth(displayText), width, align)} | `;
+      });
+      tableOutput = tableOutput.trimEnd() + EOL;
+      tableOutput += "|";
+      columnWidths.forEach((width) => {
+        const separator = "-".repeat(width + 2);
+        tableOutput += `${separator}|`;
+      });
+      tableOutput += EOL;
+      tableToken.rows.forEach((row) => {
+        tableOutput += "| ";
+        row.forEach((cell, index) => {
+          const content = cell.tokens?.map((_2) => formatToken(_2, theme, 0, null, null, highlight)).join("") ?? "";
+          const displayText = getDisplayText2(cell.tokens);
+          const width = columnWidths[index];
+          const align = tableToken.align?.[index];
+          tableOutput += `${padAligned(content, stringWidth(displayText), width, align)} | `;
+        });
+        tableOutput = tableOutput.trimEnd() + EOL;
+      });
+      return tableOutput + EOL;
+    }
+    case "escape":
+      return token.text;
+    case "def":
+    case "del":
+    case "html":
+      return "";
+  }
+  return "";
+}
+var ISSUE_REF_PATTERN = /(^|[^\w./-])([A-Za-z0-9][\w-]*\/[A-Za-z0-9][\w.-]*)#(\d+)\b/g;
+function linkifyIssueReferences(text) {
+  if (!supportsHyperlinks3()) {
+    return text;
+  }
+  return text.replace(
+    ISSUE_REF_PATTERN,
+    (_match, prefix, repo, num) => prefix + createHyperlink(`https://github.com/${repo}/issues/${num}`, `${repo}#${num}`)
+  );
+}
+function numberToLetter(n) {
+  let result = "";
+  while (n > 0) {
+    n--;
+    result = String.fromCharCode(97 + n % 26) + result;
+    n = Math.floor(n / 26);
+  }
+  return result;
+}
+var ROMAN_VALUES = [
+  [1e3, "m"],
+  [900, "cm"],
+  [500, "d"],
+  [400, "cd"],
+  [100, "c"],
+  [90, "xc"],
+  [50, "l"],
+  [40, "xl"],
+  [10, "x"],
+  [9, "ix"],
+  [5, "v"],
+  [4, "iv"],
+  [1, "i"]
+];
+function numberToRoman(n) {
+  let result = "";
+  for (const [value, numeral] of ROMAN_VALUES) {
+    while (n >= value) {
+      result += numeral;
+      n -= value;
+    }
+  }
+  return result;
+}
+function getListNumber(listDepth, orderedListNumber) {
+  switch (listDepth) {
+    case 0:
+    case 1:
+      return orderedListNumber.toString();
+    case 2:
+      return numberToLetter(orderedListNumber);
+    case 3:
+      return numberToRoman(orderedListNumber);
+    default:
+      return orderedListNumber.toString();
+  }
+}
+function padAligned(content, displayWidth, targetWidth, align) {
+  const padding = Math.max(0, targetWidth - displayWidth);
+  if (align === "center") {
+    const leftPad = Math.floor(padding / 2);
+    return " ".repeat(leftPad) + content + " ".repeat(padding - leftPad);
+  }
+  if (align === "right") {
+    return " ".repeat(padding) + content;
+  }
+  return content + " ".repeat(padding);
+}
+var SAFETY_MARGIN = 4;
+var MIN_COLUMN_WIDTH = 3;
+var MAX_ROW_LINES = 4;
+var ANSI_BOLD_START = "\x1B[1m";
+var ANSI_BOLD_END = "\x1B[22m";
+function wrapText2(text, width, options) {
+  if (width <= 0) return [text];
+  const trimmedText = text.trimEnd();
+  const wrapped = wrapAnsi2(trimmedText, width, {
+    hard: options?.hard ?? false,
+    trim: false,
+    wordWrap: true
+  });
+  const lines = wrapped.split("\n").filter((line) => line.length > 0);
+  return lines.length > 0 ? lines : [""];
+}
+function MarkdownTable({ token, highlight, forceWidth }) {
+  const [theme] = useTheme();
+  const terminalSize = (0, import_react54.useContext)(TerminalSizeContext);
+  const actualTerminalWidth = terminalSize?.columns ?? 80;
+  const terminalWidth = forceWidth ?? actualTerminalWidth;
+  function formatCell(tokens) {
+    return tokens?.map((_2) => formatToken(_2, theme, 0, null, null, highlight)).join("") ?? "";
+  }
+  function getPlainText(tokens_0) {
+    return stripAnsi2(formatCell(tokens_0));
+  }
+  function getMinWidth(tokens_1) {
+    const text = getPlainText(tokens_1);
+    const words = text.split(/\s+/).filter((w2) => w2.length > 0);
+    if (words.length === 0) return MIN_COLUMN_WIDTH;
+    return Math.max(...words.map((w_0) => stringWidth(w_0)), MIN_COLUMN_WIDTH);
+  }
+  function getIdealWidth(tokens_2) {
+    return Math.max(stringWidth(getPlainText(tokens_2)), MIN_COLUMN_WIDTH);
+  }
+  const minWidths = token.header.map((header, colIndex) => {
+    let maxMinWidth = getMinWidth(header.tokens);
+    for (const row of token.rows) {
+      maxMinWidth = Math.max(maxMinWidth, getMinWidth(row[colIndex]?.tokens));
+    }
+    return maxMinWidth;
+  });
+  const idealWidths = token.header.map((header_0, colIndex_0) => {
+    let maxIdeal = getIdealWidth(header_0.tokens);
+    for (const row_0 of token.rows) {
+      maxIdeal = Math.max(maxIdeal, getIdealWidth(row_0[colIndex_0]?.tokens));
+    }
+    return maxIdeal;
+  });
+  const numCols = token.header.length;
+  const borderOverhead = 1 + numCols * 3;
+  const availableWidth = Math.max(
+    terminalWidth - borderOverhead - SAFETY_MARGIN,
+    numCols * MIN_COLUMN_WIDTH
+  );
+  const totalMin = minWidths.reduce((sum, w_1) => sum + w_1, 0);
+  const totalIdeal = idealWidths.reduce((sum_0, w_2) => sum_0 + w_2, 0);
+  let needsHardWrap = false;
+  let columnWidths;
+  if (totalIdeal <= availableWidth) {
+    columnWidths = idealWidths;
+  } else if (totalMin <= availableWidth) {
+    const extraSpace = availableWidth - totalMin;
+    const overflows = idealWidths.map((ideal, i) => ideal - minWidths[i]);
+    const totalOverflow = overflows.reduce((sum_1, o) => sum_1 + o, 0);
+    columnWidths = minWidths.map((min, i_0) => {
+      if (totalOverflow === 0) return min;
+      const extra = Math.floor(overflows[i_0] / totalOverflow * extraSpace);
+      return min + extra;
+    });
+  } else {
+    needsHardWrap = true;
+    const scaleFactor = availableWidth / totalMin;
+    columnWidths = minWidths.map(
+      (w_3) => Math.max(Math.floor(w_3 * scaleFactor), MIN_COLUMN_WIDTH)
+    );
+  }
+  function calculateMaxRowLines() {
+    let maxLines = 1;
+    for (let i_1 = 0; i_1 < token.header.length; i_1++) {
+      const content = formatCell(token.header[i_1].tokens);
+      const wrapped = wrapText2(content, columnWidths[i_1], {
+        hard: needsHardWrap
+      });
+      maxLines = Math.max(maxLines, wrapped.length);
+    }
+    for (const row_1 of token.rows) {
+      for (let i_2 = 0; i_2 < row_1.length; i_2++) {
+        const content_0 = formatCell(row_1[i_2]?.tokens);
+        const wrapped_0 = wrapText2(content_0, columnWidths[i_2], {
+          hard: needsHardWrap
+        });
+        maxLines = Math.max(maxLines, wrapped_0.length);
+      }
+    }
+    return maxLines;
+  }
+  const maxRowLines = calculateMaxRowLines();
+  const useVerticalFormat = maxRowLines > MAX_ROW_LINES;
+  function renderRowLines(cells, isHeader) {
+    const cellLines = cells.map((cell, colIndex_1) => {
+      const formattedText = formatCell(cell.tokens);
+      const width = columnWidths[colIndex_1];
+      return wrapText2(formattedText, width, {
+        hard: needsHardWrap
+      });
+    });
+    const maxLines_0 = Math.max(...cellLines.map((lines) => lines.length), 1);
+    const verticalOffsets = cellLines.map(
+      (lines_0) => Math.floor((maxLines_0 - lines_0.length) / 2)
+    );
+    const result = [];
+    for (let lineIdx = 0; lineIdx < maxLines_0; lineIdx++) {
+      let line = "\u2502";
+      for (let colIndex_2 = 0; colIndex_2 < cells.length; colIndex_2++) {
+        const lines_1 = cellLines[colIndex_2];
+        const offset = verticalOffsets[colIndex_2];
+        const contentLineIdx = lineIdx - offset;
+        const lineText = contentLineIdx >= 0 && contentLineIdx < lines_1.length ? lines_1[contentLineIdx] : "";
+        const width_0 = columnWidths[colIndex_2];
+        const align = isHeader ? "center" : token.align?.[colIndex_2] ?? "left";
+        line += ` ${padAligned(lineText, stringWidth(lineText), width_0, align)} \u2502`;
+      }
+      result.push(line);
+    }
+    return result;
+  }
+  function renderBorderLine(type) {
+    const [left, mid, cross, right] = {
+      top: ["\u250C", "\u2500", "\u252C", "\u2510"],
+      middle: ["\u251C", "\u2500", "\u253C", "\u2524"],
+      bottom: ["\u2514", "\u2500", "\u2534", "\u2518"]
+    }[type];
+    let line_0 = left;
+    columnWidths.forEach((width_1, colIndex_3) => {
+      line_0 += mid.repeat(width_1 + 2);
+      line_0 += colIndex_3 < columnWidths.length - 1 ? cross : right;
+    });
+    return line_0;
+  }
+  function renderVerticalFormat() {
+    const lines_2 = [];
+    const headers = token.header.map((h) => getPlainText(h.tokens));
+    const separatorWidth = Math.min(terminalWidth - 1, 40);
+    const separator = "\u2500".repeat(separatorWidth);
+    const wrapIndent = "  ";
+    token.rows.forEach((row_2, rowIndex) => {
+      if (rowIndex > 0) {
+        lines_2.push(separator);
+      }
+      row_2.forEach((cell_0, colIndex_4) => {
+        const label = headers[colIndex_4] || `Column ${colIndex_4 + 1}`;
+        const rawValue = formatCell(cell_0.tokens).trimEnd();
+        const value = rawValue.replace(/\n+/g, " ").replace(/\s+/g, " ").trim();
+        const firstLineWidth = terminalWidth - stringWidth(label) - 3;
+        const subsequentLineWidth = terminalWidth - wrapIndent.length - 1;
+        const firstPassLines = wrapText2(value, Math.max(firstLineWidth, 10));
+        const firstLine = firstPassLines[0] || "";
+        let wrappedValue;
+        if (firstPassLines.length <= 1 || subsequentLineWidth <= firstLineWidth) {
+          wrappedValue = firstPassLines;
+        } else {
+          const remainingText = firstPassLines.slice(1).map((l) => l.trim()).join(" ");
+          const rewrapped = wrapText2(remainingText, subsequentLineWidth);
+          wrappedValue = [firstLine, ...rewrapped];
+        }
+        lines_2.push(`${ANSI_BOLD_START}${label}:${ANSI_BOLD_END} ${wrappedValue[0] || ""}`);
+        for (let i_3 = 1; i_3 < wrappedValue.length; i_3++) {
+          const line_1 = wrappedValue[i_3];
+          if (!line_1.trim()) continue;
+          lines_2.push(`${wrapIndent}${line_1}`);
+        }
+      });
+    });
+    return lines_2.join("\n");
+  }
+  if (useVerticalFormat) {
+    return /* @__PURE__ */ (0, import_jsx_runtime44.jsx)(Ansi, { children: renderVerticalFormat() });
+  }
+  const tableLines = [];
+  tableLines.push(renderBorderLine("top"));
+  tableLines.push(...renderRowLines(token.header, true));
+  tableLines.push(renderBorderLine("middle"));
+  token.rows.forEach((row_3, rowIndex_0) => {
+    tableLines.push(...renderRowLines(row_3, false));
+    if (rowIndex_0 < token.rows.length - 1) {
+      tableLines.push(renderBorderLine("middle"));
+    }
+  });
+  tableLines.push(renderBorderLine("bottom"));
+  const maxLineWidth = Math.max(...tableLines.map((line_2) => stringWidth(stripAnsi2(line_2))));
+  if (maxLineWidth > terminalWidth - SAFETY_MARGIN) {
+    return /* @__PURE__ */ (0, import_jsx_runtime44.jsx)(Ansi, { children: renderVerticalFormat() });
+  }
+  return /* @__PURE__ */ (0, import_jsx_runtime44.jsx)(Ansi, { children: tableLines.join("\n") });
+}
+var cliHighlightPromise;
+async function loadCliHighlight() {
+  try {
+    const mod = await import("cli-highlight");
+    const cliHighlight = mod;
+    return {
+      highlight: cliHighlight.highlight,
+      supportsLanguage: cliHighlight.supportsLanguage
+    };
+  } catch {
+    return null;
+  }
+}
+function getCliHighlightPromise() {
+  cliHighlightPromise ?? (cliHighlightPromise = loadCliHighlight());
+  return cliHighlightPromise;
+}
+var TOKEN_CACHE_MAX = 500;
+var tokenCache = /* @__PURE__ */ new Map();
+var MD_SYNTAX_RE = /[#*`|[>\-_~]|\n\n|^\d+\. |\n\d+\. /;
+function hasMarkdownSyntax(s) {
+  return MD_SYNTAX_RE.test(s.length > 500 ? s.slice(0, 500) : s);
+}
+function stripPromptXMLTags(content) {
+  return content.replace(/<(commit_analysis|context|function_analysis|pr_analysis)>.*?<\/\1>\n?/gs, "").trim();
+}
+function cachedLexer(content) {
+  if (!hasMarkdownSyntax(content)) {
+    return [
+      {
+        type: "paragraph",
+        raw: content,
+        text: content,
+        tokens: [{ type: "text", raw: content, text: content }]
+      }
+    ];
+  }
+  const key = hashContent(content);
+  const hit = tokenCache.get(key);
+  if (hit) {
+    tokenCache.delete(key);
+    tokenCache.set(key, hit);
+    return hit;
+  }
+  const tokens = g.lexer(content);
+  if (tokenCache.size >= TOKEN_CACHE_MAX) {
+    const first = tokenCache.keys().next().value;
+    if (first !== void 0) tokenCache.delete(first);
+  }
+  tokenCache.set(key, tokens);
+  return tokens;
+}
+function Markdown(props) {
+  const settings = {};
+  if (settings.syntaxHighlightingDisabled) {
+    return /* @__PURE__ */ (0, import_jsx_runtime45.jsx)(MarkdownBody, { ...props, highlight: null });
+  }
+  return /* @__PURE__ */ (0, import_jsx_runtime45.jsx)(import_react53.Suspense, { fallback: /* @__PURE__ */ (0, import_jsx_runtime45.jsx)(MarkdownBody, { ...props, highlight: null }), children: /* @__PURE__ */ (0, import_jsx_runtime45.jsx)(MarkdownWithHighlight, { ...props }) });
+}
+function MarkdownWithHighlight(props) {
+  const highlight = (0, import_react53.use)(getCliHighlightPromise());
+  return /* @__PURE__ */ (0, import_jsx_runtime45.jsx)(MarkdownBody, { ...props, highlight });
+}
+function MarkdownBody({
+  children,
+  dimColor,
+  highlight
+}) {
+  const [theme] = useTheme();
+  configureMarked();
+  const elements = (0, import_react53.useMemo)(() => {
+    const tokens = cachedLexer(stripPromptXMLTags(children));
+    const elements2 = [];
+    let nonTableContent = "";
+    function flushNonTableContent() {
+      if (nonTableContent) {
+        elements2.push(
+          /* @__PURE__ */ (0, import_jsx_runtime45.jsx)(Ansi, { dimColor, children: nonTableContent.trim() }, elements2.length)
+        );
+        nonTableContent = "";
+      }
+    }
+    for (const token of tokens) {
+      if (token.type === "table") {
+        flushNonTableContent();
+        elements2.push(
+          /* @__PURE__ */ (0, import_jsx_runtime45.jsx)(
+            MarkdownTable,
+            {
+              token,
+              highlight
+            },
+            elements2.length
+          )
+        );
+      } else {
+        nonTableContent += formatToken(token, theme, 0, null, null, highlight);
+      }
+    }
+    flushNonTableContent();
+    return elements2;
+  }, [children, dimColor, highlight, theme]);
+  return /* @__PURE__ */ (0, import_jsx_runtime45.jsx)(Box_default, { flexDirection: "column", gap: 1, children: elements });
+}
 var STATUS_CONFIG = {
   success: { icon: figures_default.tick, color: "green" },
   error: { icon: figures_default.cross, color: "red" },
@@ -45184,7 +45907,7 @@ function WelcomeScreen({
 }
 
 // src/main.tsx
-var import_react56 = __toESM(require_react(), 1);
+var import_react57 = __toESM(require_react(), 1);
 
 // src/doctor.tsx
 var import_node_child_process = require("node:child_process");
@@ -45310,9 +46033,87 @@ async function runDoctor(binary, arguments_) {
   }
 }
 
-// src/main.tsx
+// src/result.tsx
+var import_react56 = __toESM(require_react(), 1);
 var import_jsx_runtime51 = __toESM(require_jsx_runtime(), 1);
+var colors = {
+  success: "#4BAA72",
+  warning: "#D6AD69",
+  error: "#DF7777",
+  muted: "#86BE9A"
+};
 var green2 = "#4BAA72";
+var muted = "#86BE9A";
+function toneColor(tone) {
+  return tone ? colors[tone] : void 0;
+}
+function JsonPreview({ value, depth = 0 }) {
+  if (value === null || typeof value !== "object") {
+    return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: typeof value === "string" ? void 0 : muted, children: JSON.stringify(value) ?? String(value) });
+  }
+  if (depth >= 12) return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: "\u2026" });
+  const entries = Array.isArray(value) ? value.map((item, index) => [String(index + 1), item]) : Object.entries(value);
+  if (entries.length === 0) return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: Array.isArray(value) ? "[]" : "{}" });
+  return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { flexDirection: "column", children: entries.map(([key, item]) => /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", marginLeft: depth ? 2 : 0, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: muted, children: key }),
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: ": " }),
+      item === null || typeof item !== "object" ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(JsonPreview, { value: item, depth: depth + 1 }) : null
+    ] }),
+    item !== null && typeof item === "object" ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(JsonPreview, { value: item, depth: depth + 1 }) }) : null
+  ] }, key)) });
+}
+function ResultContent({ fields, items, lines, markdown }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", children: [
+    fields?.map((field, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", marginBottom: index + 1 === fields.length ? 0 : 0, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: muted, children: field.label }),
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: toneColor(field.tone), children: field.value }) })
+    ] }, `${index}-${field.label}`)),
+    items?.map((item, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", marginTop: index ? 1 : 0, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: toneColor(item.tone) ?? green2, children: "\u2022 " }),
+        /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { bold: true, children: item.label }),
+        item.state ? /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { color: toneColor(item.tone) ?? muted, children: [
+          "  \xB7  ",
+          item.state
+        ] }) : null
+      ] }),
+      item.detail ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: item.detail }) }) : null
+    ] }, `${index}-${item.label}`)),
+    lines?.map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { children: line || " " }, index)),
+    markdown ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Markdown, { children: markdown }) : null
+  ] });
+}
+function ResultBody({ result }) {
+  const terminal = (0, import_react56.useContext)(TerminalSizeContext);
+  const width = Math.max(16, Math.min(76, (terminal?.columns ?? 80) - 7));
+  const marker = result.kind === "approval" ? "\u25C7" : result.tone === "error" ? "!" : result.tone === "success" ? "\u2713" : "\u25CC";
+  return /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", width, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { color: toneColor(result.tone) ?? green2, children: [
+        marker,
+        " "
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: toneColor(result.tone) ?? green2, bold: true, children: result.title })
+    ] }),
+    result.summary ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { children: result.summary }) }) : null,
+    result.fields?.length || result.items?.length || result.lines?.length || result.markdown ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, marginTop: 1, flexDirection: "column", children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(ResultContent, { fields: result.fields, items: result.items, lines: result.lines, markdown: result.markdown }) }) : null,
+    result.sections?.map((section, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { marginLeft: 2, marginTop: 1, flexDirection: "column", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: muted, bold: true, children: section.title }),
+      section.summary ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: section.summary }) : null,
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, flexDirection: "column", children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(ResultContent, { fields: section.fields, items: section.items, lines: section.lines, markdown: section.markdown }) })
+    ] }, `${index}-${section.title}`)),
+    result.kind === "approval" && result.preview !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { marginLeft: 2, marginTop: 1, flexDirection: "column", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: muted, bold: true, children: "What Gator will do" }),
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(JsonPreview, { value: result.preview }) })
+    ] }) : null,
+    result.footer ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: result.kind === "approval" && result.tone === "warning" ? colors.warning : muted, children: result.footer }) }) : null
+  ] });
+}
+
+// src/main.tsx
+var import_jsx_runtime52 = __toESM(require_jsx_runtime(), 1);
+var green3 = "#4BAA72";
 var mutedGreen2 = "#86BE9A";
 var GatorBridge = class {
   child;
@@ -45380,25 +46181,30 @@ var GatorBridge = class {
     timeout.unref();
   }
 };
-function formatBundle(bundle) {
-  const lines = [`Verified deliverables \xB7 ${bundle.Status}`];
-  for (const item of bundle.Artifacts ?? []) lines.push(`${item.Valid ? "\u2713" : "!"} ${item.Path} \xB7 ${item.MediaType}`);
-  for (const item of bundle.Candidates ?? []) lines.push(`${item.Status} change ${item.ID}: ${item.ChangedPaths.join(", ")}`);
-  if (lines.length === 1) lines.push(bundle.Path);
-  return lines.join("\n");
+function bundleResult(bundle) {
+  return {
+    kind: "list",
+    title: "Verified deliverables",
+    tone: bundle.Status === "verified" ? "success" : "warning",
+    summary: bundle.Status,
+    items: [
+      ...(bundle.Artifacts ?? []).map((item) => ({ label: item.Path, detail: item.MediaType, state: item.Valid ? "verified" : "needs review", tone: item.Valid ? "success" : "warning" })),
+      ...(bundle.Candidates ?? []).map((item) => ({ label: `Change ${item.ID}`, detail: item.ChangedPaths.join(", "), state: item.Status }))
+    ],
+    footer: bundle.Path
+  };
 }
 function MessageBody({ item }) {
-  if (item.role === "Doctor") return /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: green2, bold: true, children: "\u{1F40A} Gator doctor" }),
-    /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(DoctorReport, { raw: item.text }) })
+  if (item.role === "Doctor") return /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { flexDirection: "column", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: green3, bold: true, children: "\u{1F40A} Gator doctor" }),
+    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(DoctorReport, { raw: item.text }) })
   ] });
   const isUser = item.role === "You";
   const isGator = item.role === "Gator";
   const label = isUser ? "\u203A You" : isGator ? "\u{1F40A} Gator" : item.role === "Deliverables" ? "\u25C8 Deliverables" : `\u25CC ${item.role}`;
-  const content = item.bundle ? formatBundle(item.bundle) : item.text;
-  return /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: isGator ? green2 : isUser ? void 0 : mutedGreen2, bold: !isUser, dimColor: isUser, children: label }),
-    content.split("\n").map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: !isGator && !isUser, children: line || " " }) }, index))
+  return /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { flexDirection: "column", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: isGator ? green3 : isUser ? void 0 : mutedGreen2, bold: !isUser, dimColor: isUser, children: label }),
+    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginLeft: 2, flexDirection: "column", children: item.result ? /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(ResultBody, { result: item.result }) : item.bundle ? /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(ResultBody, { result: bundleResult(item.bundle) }) : isGator ? /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Markdown, { children: item.text }) : item.text.split("\n").map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { dimColor: !isUser, children: line || " " }, index)) })
   ] });
 }
 function GreenPrompt({
@@ -45409,9 +46215,9 @@ function GreenPrompt({
   disabled,
   prefillVersion
 }) {
-  const [cursor, setCursor] = (0, import_react56.useState)(value.length);
-  const [historyIndex, setHistoryIndex] = (0, import_react56.useState)(-1);
-  (0, import_react56.useEffect)(() => {
+  const [cursor, setCursor] = (0, import_react57.useState)(value.length);
+  const [historyIndex, setHistoryIndex] = (0, import_react57.useState)(-1);
+  (0, import_react57.useEffect)(() => {
     setCursor(value.length);
   }, [prefillVersion]);
   const replace = (next, position) => {
@@ -45496,22 +46302,22 @@ function GreenPrompt({
     if (key.ctrl || key.meta || key.tab || key.escape) return;
     if (input) replace(value.slice(0, cursor) + input + value.slice(cursor), cursor + input.length);
   }, { isActive: !disabled });
-  return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { flexDirection: "column", children: value ? value.split("\n").map((line, index, lines) => {
+  return /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { flexDirection: "column", children: value ? value.split("\n").map((line, index, lines) => {
     const start = lines.slice(0, index).reduce((count, item) => count + item.length + 1, 0);
     const localCursor = cursor - start;
-    return /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: green2, children: index === 0 ? "\u276F " : "\xB7 " }),
-      localCursor >= 0 && localCursor <= line.length ? /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: green3, children: index === 0 ? "\u276F " : "\xB7 " }),
+      localCursor >= 0 && localCursor <= line.length ? /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { children: [
         line.slice(0, localCursor),
-        /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { inverse: true, children: line[localCursor] ?? " " }),
+        /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { inverse: true, children: line[localCursor] ?? " " }),
         line.slice(localCursor + 1)
-      ] }) : /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { children: line || " " })
+      ] }) : /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { children: line || " " })
     ] }, index);
-  }) : /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { children: [
-    /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: green2, children: "\u276F " }),
-    /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { inverse: true, children: " " }),
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: "Ask Gator to work on something\u2026" })
+  }) : /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: green3, children: "\u276F " }),
+    /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { inverse: true, children: " " }),
+      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { dimColor: true, children: "Ask Gator to work on something\u2026" })
     ] })
   ] }) });
 }
@@ -45619,9 +46425,9 @@ function PanelKeys({ bridge, scroll, exit }) {
   return null;
 }
 function PanelScreen({ panel, status, draft, statusLine, bridge, exit }) {
-  const terminal = (0, import_react56.useContext)(TerminalSizeContext);
-  const [offset, setOffset] = (0, import_react56.useState)(0);
-  (0, import_react56.useEffect)(() => {
+  const terminal = (0, import_react57.useContext)(TerminalSizeContext);
+  const [offset, setOffset] = (0, import_react57.useState)(0);
+  (0, import_react57.useEffect)(() => {
     setOffset(0);
   }, [panel.kind, panel.title, panel.subtitle]);
   const rows = panel.rows ?? [];
@@ -45640,62 +46446,62 @@ function PanelScreen({ panel, status, draft, statusLine, bridge, exit }) {
   const blockOffset = Math.min(offset, Math.max(0, blocks.length - maxLines));
   const panelWidth = Math.max(20, Math.min(78, (terminal?.columns ?? 80) - 4));
   const contentWidth = focused ? panelWidth - 4 : Math.max(1, (terminal?.columns ?? 80) - 4);
-  return /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, paddingX: 2, paddingTop: 1, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(PanelKeys, { bridge, exit, scroll: (amount) => setOffset((current) => Math.max(0, Math.min(blocks.length - maxLines, current + amount))) }),
-    /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", flexGrow: focused ? 0 : 1, width: focused ? panelWidth : void 0, alignSelf: focused ? "center" : void 0, borderStyle: focused ? "round" : void 0, borderColor: focused ? green2 : void 0, paddingX: focused ? 1 : 0, marginTop: focused ? 1 : 0, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { color: green2, bold: true, children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, paddingX: 2, paddingTop: 1, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(PanelKeys, { bridge, exit, scroll: (amount) => setOffset((current) => Math.max(0, Math.min(blocks.length - maxLines, current + amount))) }),
+    /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { flexDirection: "column", flexGrow: focused ? 0 : 1, width: focused ? panelWidth : void 0, alignSelf: focused ? "center" : void 0, borderStyle: focused ? "round" : void 0, borderColor: focused ? green3 : void 0, paddingX: focused ? 1 : 0, marginTop: focused ? 1 : 0, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { color: green3, bold: true, children: [
         "\u{1F40A} Gator  ",
-        /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: mutedGreen2, children: panel.title })
+        /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: mutedGreen2, children: panel.title })
       ] }),
-      panel.subtitle && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { children: panel.subtitle }) }),
-      panel.kind === "picker" && /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { marginTop: 1, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: mutedGreen2, children: "Search  " }),
-        /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { children: [
+      panel.subtitle && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { children: panel.subtitle }) }),
+      panel.kind === "picker" && /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { marginTop: 1, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: mutedGreen2, children: "Search  " }),
+        /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { children: [
           panel.query || "type to filter",
-          /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { inverse: true, children: " " })
+          /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { inverse: true, children: " " })
         ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Divider, { width: contentWidth }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", flexGrow: focused ? 0 : 1, marginTop: 1, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Divider, { width: contentWidth }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { flexDirection: "column", flexGrow: focused ? 0 : 1, marginTop: 1, children: [
         rows.slice(rowStart, rowStart + maxRows).map((row, index) => {
           const active = panel.kind !== "inbox" && panel.kind !== "jobs" && rowStart + index === selected;
-          return /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", marginBottom: 1, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { color: active ? green2 : void 0, bold: active, children: [
+          return /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { flexDirection: "column", marginBottom: 1, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { color: active ? green3 : void 0, bold: active, children: [
               active ? "\u276F " : "  ",
               row.label,
-              row.state ? /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { color: mutedGreen2, children: [
+              row.state ? /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { color: mutedGreen2, children: [
                 "  \xB7  ",
                 row.state
               ] }) : null
             ] }),
-            row.detail && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { dimColor: !active, children: [
+            row.detail && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { dimColor: !active, children: [
               row.detail,
-              active && (panel.kind === "model-form" || panel.kind === "learning-form") && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { inverse: true, children: " " })
+              active && (panel.kind === "model-form" || panel.kind === "learning-form") && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { inverse: true, children: " " })
             ] }) })
           ] }, `${rowStart + index}-${row.label}`);
         }),
-        blocks.slice(blockOffset, blockOffset + maxLines).map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginBottom: line.heading ? 0 : void 0, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: line.heading ? mutedGreen2 : void 0, bold: line.heading, children: line.text || " " }) }, `${blockOffset + index}-${line.text}`)),
-        blocks.length > maxLines && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: `  ${blockOffset + 1}\u2013${Math.min(blockOffset + maxLines, blocks.length)} of ${blocks.length} lines \xB7 PgUp/PgDn scroll` }),
-        rows.length === 0 && blocks.length === 0 && !panel.notice && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: "No items to show." }),
-        panel.notice && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: mutedGreen2, children: panel.notice }) }),
-        status && status !== panel.notice && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: status }) })
+        blocks.slice(blockOffset, blockOffset + maxLines).map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginBottom: line.heading ? 0 : void 0, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: line.heading ? mutedGreen2 : void 0, bold: line.heading, children: line.text || " " }) }, `${blockOffset + index}-${line.text}`)),
+        blocks.length > maxLines && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { dimColor: true, children: `  ${blockOffset + 1}\u2013${Math.min(blockOffset + maxLines, blocks.length)} of ${blocks.length} lines \xB7 PgUp/PgDn scroll` }),
+        rows.length === 0 && blocks.length === 0 && !panel.notice && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { dimColor: true, children: "No items to show." }),
+        panel.notice && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: mutedGreen2, children: panel.notice }) }),
+        status && status !== panel.notice && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { dimColor: true, children: status }) })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Divider, { width: contentWidth }),
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: panel.footer || "Esc back" })
+      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Divider, { width: contentWidth }),
+      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { dimColor: true, children: panel.footer || "Esc back" })
     ] }),
-    focused && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { flexGrow: 1 }),
-    /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Divider, { width: Math.max(1, (terminal?.columns ?? 80) - 4) }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { dimColor: true, children: [
+    focused && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { flexGrow: 1 }),
+    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Divider, { width: Math.max(1, (terminal?.columns ?? 80) - 4) }) }),
+    /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { dimColor: true, children: [
       "\u276F ",
       draft || "Ask Gator to work on something\u2026"
     ] }),
-    statusLine && statusLine.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(StatusLine, { segments: statusLine.map((content) => ({ content, color: mutedGreen2 })) })
+    statusLine && statusLine.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(StatusLine, { segments: statusLine.map((content) => ({ content, color: mutedGreen2 })) })
   ] });
 }
 function GreenSearch({ messages, close, navigate }) {
-  const [query, setQuery] = (0, import_react56.useState)("");
-  const [matches, setMatches] = (0, import_react56.useState)([]);
-  const [selected, setSelected] = (0, import_react56.useState)(0);
+  const [query, setQuery] = (0, import_react57.useState)("");
+  const [matches, setMatches] = (0, import_react57.useState)([]);
+  const [selected, setSelected] = (0, import_react57.useState)(0);
   const change = (value) => {
     const found = messages.flatMap((item, index) => item.text.toLowerCase().includes(value.toLowerCase()) && value ? [index] : []);
     setQuery(value);
@@ -45713,31 +46519,31 @@ function GreenSearch({ messages, close, navigate }) {
       navigate(matches[next]);
     } else if (!key.ctrl && !key.meta && input) change(query + input);
   });
-  return /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { paddingX: 1, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: green2, children: "Search: " }),
-    /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { paddingX: 1, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: green3, children: "Search: " }),
+    /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { children: [
       query,
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { inverse: true, children: " " })
+      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { inverse: true, children: " " })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: `  ${matches.length ? `${selected + 1}/${matches.length} matches` : "no matches"}` })
+    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { dimColor: true, children: `  ${matches.length ? `${selected + 1}/${matches.length} matches` : "no matches"}` })
   ] });
 }
 function App2({ bridge }) {
   const { exit } = use_app_default();
   use_input_default(() => {
   });
-  const [state, setState] = (0, import_react56.useState)(bridge.snapshot());
-  const [failure, setFailure] = (0, import_react56.useState)("");
-  const [input, setInput] = (0, import_react56.useState)("");
-  const [prefillVersion, setPrefillVersion] = (0, import_react56.useState)(0);
-  const [history, setHistory] = (0, import_react56.useState)([]);
-  const [selected, setSelected] = (0, import_react56.useState)(0);
-  const [dismissed, setDismissed] = (0, import_react56.useState)(false);
-  const [searchOpen, setSearchOpen] = (0, import_react56.useState)(false);
-  const terminal = (0, import_react56.useContext)(TerminalSizeContext);
-  const list = (0, import_react56.useRef)(null);
-  const lastBackendInput = (0, import_react56.useRef)("");
-  (0, import_react56.useEffect)(() => {
+  const [state, setState] = (0, import_react57.useState)(bridge.snapshot());
+  const [failure, setFailure] = (0, import_react57.useState)("");
+  const [input, setInput] = (0, import_react57.useState)("");
+  const [prefillVersion, setPrefillVersion] = (0, import_react57.useState)(0);
+  const [history, setHistory] = (0, import_react57.useState)([]);
+  const [selected, setSelected] = (0, import_react57.useState)(0);
+  const [dismissed, setDismissed] = (0, import_react57.useState)(false);
+  const [searchOpen, setSearchOpen] = (0, import_react57.useState)(false);
+  const terminal = (0, import_react57.useContext)(TerminalSizeContext);
+  const list = (0, import_react57.useRef)(null);
+  const lastBackendInput = (0, import_react57.useRef)("");
+  (0, import_react57.useEffect)(() => {
     const unsubscribe = bridge.subscribe(setState);
     const unexit = bridge.onExit((code, detail) => {
       if (code === 0) exit();
@@ -45752,7 +46558,7 @@ function App2({ bridge }) {
       process.stdout.off("resize", resize);
     };
   }, [bridge, exit]);
-  (0, import_react56.useEffect)(() => {
+  (0, import_react57.useEffect)(() => {
     if (state?.mode === "chat" && state.input && state.input !== lastBackendInput.current) {
       setInput(state.input);
       setPrefillVersion((version) => version + 1);
@@ -45763,9 +46569,9 @@ function App2({ bridge }) {
     bridge.stop();
     exit();
   };
-  if (!state) return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { padding: 1, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: green2, children: failure || "Starting Gator\u2026" }) });
+  if (!state) return /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { padding: 1, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: green3, children: failure || "Starting Gator\u2026" }) });
   if (state.mode === "panel" && state.panel) {
-    return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(PanelScreen, { panel: state.panel, status: state.status, draft: input, statusLine: state.status_line_enabled ? state.status_line : void 0, bridge, exit: close });
+    return /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(PanelScreen, { panel: state.panel, status: state.status, draft: input, statusLine: state.status_line_enabled ? state.status_line : void 0, bridge, exit: close });
   }
   const matches = !searchOpen && !dismissed && input.startsWith("/") && !input.includes(" ") ? state.commands.filter((command) => input === "/" ? !command.advanced : `/${command.name}`.startsWith(input)).slice(0, 8) : [];
   const submit = (value) => {
@@ -45786,22 +46592,22 @@ function App2({ bridge }) {
     }
   };
   const context = [state.title, state.provider ? `${state.provider}${state.model ? `/${state.model}` : ""}` : "Choose model: /model", state.source.split("/").filter(Boolean).at(-1) || state.source].filter(Boolean).join(" \xB7 ");
-  const welcome = /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(WelcomeScreen, { appName: "Gator", subtitle: "Your ongoing work, ready when you are", color: green2, logo: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: green2, children: "\u{1F40A}" }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: context }),
-    /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { marginTop: 1, marginLeft: 1, flexDirection: "column", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: mutedGreen2, bold: true, children: state.first_run ? "Get started" : "Next up" }),
-      state.first_run ? /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(import_jsx_runtime51.Fragment, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { children: "  1  /model  Choose a cloud or local model" }),
-        /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { children: "  2  Ask: Summarize this folder into a daily brief with next actions." })
-      ] }) : state.actions.slice(0, 4).map((action, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { children: [
+  const welcome = /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { flexDirection: "column", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(WelcomeScreen, { appName: "Gator", subtitle: "Your ongoing work, ready when you are", color: green3, logo: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: green3, children: "\u{1F40A}" }) }),
+    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { dimColor: true, children: context }),
+    /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { marginTop: 1, marginLeft: 1, flexDirection: "column", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: mutedGreen2, bold: true, children: state.first_run ? "Get started" : "Next up" }),
+      state.first_run ? /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(import_jsx_runtime52.Fragment, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { children: "  1  /model  Choose a cloud or local model" }),
+        /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { children: "  2  Ask: Summarize this folder into a daily brief with next actions." })
+      ] }) : state.actions.slice(0, 4).map((action, index) => /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { children: [
         "  ",
         action.Label,
         " \xB7 ",
         action.Command
       ] }, index)),
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: "  Type / for Gator commands." }),
-      state.supervisor_needs_start && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: mutedGreen2, children: "  Recurring checks need a running supervisor \xB7 gator job supervisor" })
+      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { dimColor: true, children: "  Type / for Gator commands." }),
+      state.supervisor_needs_start && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: mutedGreen2, children: "  Recurring checks need a running supervisor \xB7 gator job supervisor" })
     ] })
   ] });
   const messages = state.messages.map((item, index) => ({
@@ -45811,45 +46617,45 @@ function App2({ bridge }) {
   }));
   const viewportHeight = Math.max(1, (terminal?.rows ?? 24) - 6 - matches.length - (state.running ? 2 : 0) - (searchOpen ? 1 : 0) - input.split("\n").length + 1);
   const statusSegments = (state.status_line ?? []).map((content) => ({ content, color: mutedGreen2 }));
-  return /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, paddingX: 1, paddingTop: 1, children: [
-    !state.home && /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { marginBottom: 1, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: green2, bold: true, children: "\u{1F40A} Gator" }),
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { color: mutedGreen2, children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, paddingX: 1, paddingTop: 1, children: [
+    !state.home && /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { marginBottom: 1, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: green3, bold: true, children: "\u{1F40A} Gator" }),
+      /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { color: mutedGreen2, children: [
         "  ",
         context
       ] })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, children: [
-      state.home && state.messages.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginBottom: 1, children: welcome }),
-      state.messages.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(MessageList, { ref: list, viewportHeight, messages, renderMessage: (item) => /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(MessageBody, { item: state.messages[Number(item.id.split("-", 1)[0])] }) }),
-      state.running && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: green2, children: state.cancelling ? "\u25CC Stopping\u2026 retaining evidence" : `${["\u280B", "\u2819", "\u2839", "\u2838", "\u283C", "\u2834", "\u2826", "\u2827", "\u2807", "\u280F"][state.loading_frame % 10]} Working\u2026 ${state.elapsed ?? ""} \xB7 Esc to interrupt` }) })
+    /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, children: [
+      state.home && state.messages.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginBottom: 1, children: welcome }),
+      state.messages.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(MessageList, { ref: list, viewportHeight, messages, renderMessage: (item) => /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(MessageBody, { item: state.messages[Number(item.id.split("-", 1)[0])] }) }),
+      state.running && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: green3, children: state.cancelling ? "\u25CC Stopping\u2026 retaining evidence" : `${["\u280B", "\u2819", "\u2839", "\u2838", "\u283C", "\u2834", "\u2826", "\u2827", "\u2807", "\u280F"][state.loading_frame % 10]} Working\u2026 ${state.elapsed ?? ""} \xB7 Esc to interrupt` }) })
     ] }),
-    state.status && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: mutedGreen2, children: state.status }),
-    !searchOpen && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(ChatKeys, { state, draft: input, matches, selected, setSelected, choose, dismiss: () => setDismissed(true), search: () => setSearchOpen(true), scroll: (rows) => list.current?.scrollBy(rows), exit: close, clearDraft: () => {
+    state.status && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: mutedGreen2, children: state.status }),
+    !searchOpen && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(ChatKeys, { state, draft: input, matches, selected, setSelected, choose, dismiss: () => setDismissed(true), search: () => setSearchOpen(true), scroll: (rows) => list.current?.scrollBy(rows), exit: close, clearDraft: () => {
       setInput("");
       setPrefillVersion((version) => version + 1);
     }, bridge }),
-    searchOpen && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(GreenSearch, { messages: state.messages, close: () => setSearchOpen(false), navigate: (index) => list.current?.scrollTo(index) }),
-    /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Divider, {}),
-    /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(GreenPrompt, { value: input, onChange: (value) => {
+    searchOpen && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(GreenSearch, { messages: state.messages, close: () => setSearchOpen(false), navigate: (index) => list.current?.scrollTo(index) }),
+    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Divider, {}),
+    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(GreenPrompt, { value: input, onChange: (value) => {
       setInput(value);
       setSelected(0);
       setDismissed(false);
     }, onSubmit: submit, disabled: searchOpen || !!failure, history, prefillVersion }),
-    matches.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, flexDirection: "column", children: matches.map((command, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { color: index === selected ? green2 : void 0, bold: index === selected, children: [
+    matches.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginLeft: 2, flexDirection: "column", children: matches.map((command, index) => /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { color: index === selected ? green3 : void 0, bold: index === selected, children: [
         index === selected ? "\u276F" : " ",
         " /",
         command.name
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { dimColor: true, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { dimColor: true, children: [
         "  ",
         command.description
       ] })
     ] }, command.name)) }),
-    failure && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: "red", children: failure }),
-    /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Divider, {}),
-    state.status_line_enabled && statusSegments.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(StatusLine, { segments: statusSegments })
+    failure && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: "red", children: failure }),
+    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Divider, {}),
+    state.status_line_enabled && statusSegments.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(StatusLine, { segments: statusSegments })
   ] });
 }
 function runExternal(command) {
@@ -45900,7 +46706,7 @@ async function main() {
   });
   try {
     while (true) {
-      app = await root_default(/* @__PURE__ */ (0, import_jsx_runtime51.jsx)(App2, { bridge }));
+      app = await root_default(/* @__PURE__ */ (0, import_jsx_runtime52.jsx)(App2, { bridge }));
       if (handoff) app.unmount();
       await app.waitUntilExit();
       app = void 0;

@@ -57,9 +57,10 @@ func bridgeExternal(kind, action, id string, command *exec.Cmd) *BridgeExternal 
 }
 
 type BridgeMessage struct {
-	Role   string         `json:"role"`
-	Text   string         `json:"text"`
-	Bundle *BundleSummary `json:"bundle,omitempty"`
+	Role   string             `json:"role"`
+	Text   string             `json:"text"`
+	Bundle *BundleSummary     `json:"bundle,omitempty"`
+	Result *uisnapshot.Result `json:"result,omitempty"`
 }
 
 type BridgeCommand struct {
@@ -102,7 +103,7 @@ func (m Model) BridgeState() BridgeState {
 		}
 	}
 	for _, item := range m.messages {
-		state.Messages = append(state.Messages, BridgeMessage{Role: item.role, Text: item.text, Bundle: cloneBundlePointer(item.bundle)})
+		state.Messages = append(state.Messages, BridgeMessage{Role: item.role, Text: item.text, Bundle: cloneBundlePointer(item.bundle), Result: item.result})
 	}
 	for _, item := range m.availableCommandEntries() {
 		state.Commands = append(state.Commands, BridgeCommand{

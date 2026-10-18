@@ -18,6 +18,7 @@ type Row struct {
 	Label  string `json:"label"`
 	Detail string `json:"detail,omitempty"`
 	State  string `json:"state,omitempty"`
+	Tone   string `json:"tone,omitempty"`
 }
 
 type Block struct {

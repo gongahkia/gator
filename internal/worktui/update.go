@@ -11,6 +11,7 @@ import (
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/learning"
 	"github.com/gongahkia/gator/internal/rattles"
+	"github.com/gongahkia/gator/internal/uisnapshot"
 	"github.com/gongahkia/gator/internal/workrun"
 )
 
@@ -119,8 +120,7 @@ func (m Model) updateInteraction(value workrun.Interaction) (tea.Model, tea.Cmd)
 		return m, waitWorkEvent(m.live)
 	}
 	m.interaction = &value
-	preview, _ := json.Marshal(value.Preview)
-	m.messages = append(m.messages, message{role: "Approval", text: string(preview) + "\nUse /approve or /deny."})
+	m.messages = append(m.messages, approvalMessage(value))
 	return m, waitWorkEvent(m.live)
 }
 
@@ -300,6 +300,25 @@ func (m Model) updateKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) updateSectionKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch m.section {
+	case "effort":
+		switch value.String() {
+		case "esc":
+			m.section = ""
+		case "up":
+			if m.selected > 0 {
+				m.selected--
+			}
+		case "down":
+			if m.selected < 2 {
+				m.selected++
+			}
+		case "enter":
+			levels := [][2]int{{12, 8}, {24, 16}, {48, 32}}
+			m.options.MaxSteps, m.options.Code.MaxSteps = levels[m.selected][0], levels[m.selected][1]
+			m.section = ""
+			m.messages = append(m.messages, message{role: "Gator", text: "Effort set to " + effortName(m.options.MaxSteps) + ".", result: &uisnapshot.Result{Kind: "notice", Title: "Effort", Tone: "success", Summary: "Set to " + effortName(m.options.MaxSteps)}})
+		}
+		return m, nil
 	case "history":
 		return m.updateHistorySectionKey(value)
 	case "learnings":
@@ -492,14 +511,29 @@ func (m Model) submitRunningInput() (tea.Model, tea.Cmd) {
 		err := m.operation.Respond(m.interaction.ID, prompt == "/approve")
 		if err != nil {
 			m.status = err.Error()
+			if err.Error() != "interaction is no longer pending" {
+				return m, nil
+			}
+		}
+		for index := len(m.messages) - 1; index >= 0; index-- {
+			item := &m.messages[index]
+			if item.result != nil && item.result.Kind == "approval" && len(item.result.Fields) > 0 && item.result.Fields[0].Value == fmt.Sprint(m.interaction.ID) {
+				if err != nil {
+					item.result.Tone, item.result.Footer = "muted", "No longer pending"
+				} else if prompt == "/approve" {
+					item.result.Tone, item.result.Footer = "success", "Approved"
+				} else {
+					item.result.Tone, item.result.Footer = "muted", "Denied"
+				}
+				break
+			}
 		}
 		m.interaction = nil
 		if len(m.pendingInteractions) > 0 {
 			next := m.pendingInteractions[0]
 			m.pendingInteractions = m.pendingInteractions[1:]
 			m.interaction = &next
-			preview, _ := json.Marshal(next.Preview)
-			m.messages = append(m.messages, message{role: "Approval", text: string(preview) + "\nUse /approve or /deny."})
+			m.messages = append(m.messages, approvalMessage(next))
 		}
 		return m, nil
 	}

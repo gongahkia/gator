@@ -24,6 +24,7 @@ import (
 	"github.com/gongahkia/gator/internal/learning"
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/state"
+	"github.com/gongahkia/gator/internal/uisnapshot"
 	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workhome"
 	"github.com/gongahkia/gator/internal/workrun"
@@ -200,11 +201,13 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			}
 			return workTUIPlanAction(goalStore, goalID, command)
 		},
+		PlanResult: func(command string) (*uisnapshot.Result, error) { return workPlanResult(goalStore, goalID, command) },
 		ActivityAction: func() (string, error) {
 			var output bytes.Buffer
 			err := renderWorkTUIActivity(stateDir, goalID, &output)
 			return strings.TrimSpace(output.String()), err
 		},
+		ActivityResult: func() (*uisnapshot.Result, error) { return workActivityResult(stateDir, goalID) },
 		NotificationAction: func(arguments []string) (string, error) {
 			if goalID == "" {
 				return "", errors.New("select an active goal with /goals before using /notifications")
@@ -235,8 +238,13 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			err := memoryCommand(arguments, &output)
 			return strings.TrimSpace(output.String()), err
 		},
+		MemoryResult: func(arguments []string) (*uisnapshot.Result, error) {
+			return workMemoryResult(stateDir, goalID, arguments)
+		},
 		NoteAction:  func(command string) (string, error) { return workTUINoteAction(command, goalID) },
+		NoteResult:  func(command string) (*uisnapshot.Result, error) { return workNoteResult(goalID, command) },
 		SkillAction: workTUISkillAction,
+		SkillResult: workSkillResult,
 		ResolveSource: func(path string) (string, error) {
 			if !filepath.IsAbs(path) {
 				path = filepath.Join(workingDirectory, path)
@@ -261,6 +269,7 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		ConnectorAction:  workTUIConnectorAction,
 		ConnectorCommand: workTUIConnectorCommand,
 		BundleAction:     workTUIBundleAction(stateDir),
+		ReviewBundle:     func(path string) (*uisnapshot.Result, error) { return workReviewResult(stateDir, path) },
 		ListConversations: func() ([]worksession.Conversation, error) {
 			return sessions.List(50)
 		},
