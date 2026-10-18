@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/workhome"
 )
 
@@ -78,5 +79,16 @@ func TestBridgeProjectsConfiguredStatusLineAndModelPanel(t *testing.T) {
 	state = model.BridgeState()
 	if state.Mode != "panel" || state.Panel == nil || state.Panel.Title != "Models" {
 		t.Fatalf("model panel snapshot = %#v", state.Panel)
+	}
+}
+
+func TestBridgeFlagsStoppedSupervisorForEnabledJobs(t *testing.T) {
+	model := New(Config{CurrentFolder: t.TempDir(), Jobs: []jobs.Definition{{Enabled: true}}})
+	if !model.BridgeState().SupervisorNeedsStart {
+		t.Fatal("bridge hid stopped supervisor warning")
+	}
+	model.config.SupervisorRunning = true
+	if model.BridgeState().SupervisorNeedsStart {
+		t.Fatal("bridge showed stopped supervisor warning while running")
 	}
 }

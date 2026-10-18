@@ -45607,8 +45607,10 @@ function App2({ bridge }) {
     bridge.stop();
     exit();
   };
+  const context = [state.title, state.provider ? `${state.provider}${state.model ? `/${state.model}` : ""}` : "Choose model: /model", state.source.split("/").filter(Boolean).at(-1) || state.source].filter(Boolean).join(" \xB7 ");
   const welcome = /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", children: [
     /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(WelcomeScreen, { appName: "Gator", subtitle: "Your ongoing work, ready when you are", color: green, logo: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: green, children: "\u{1F40A}" }) }),
+    /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: context }),
     /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { marginTop: 1, marginLeft: 1, flexDirection: "column", children: [
       /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: mutedGreen, bold: true, children: state.first_run ? "Get started" : "Next up" }),
       state.first_run ? /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(import_jsx_runtime50.Fragment, { children: [
@@ -45620,7 +45622,8 @@ function App2({ bridge }) {
         " \xB7 ",
         action.Command
       ] }, index)),
-      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: "  Type / for Gator commands." })
+      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: "  Type / for Gator commands." }),
+      state.supervisor_needs_start && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: mutedGreen, children: "  Recurring checks need a running supervisor \xB7 gator job supervisor" })
     ] })
   ] });
   const messages = state.messages.map((item, index) => ({
@@ -45631,11 +45634,19 @@ function App2({ bridge }) {
   const viewportHeight = Math.max(1, (terminal?.rows ?? 24) - 6 - matches.length - (state.running ? 2 : 0) - (searchOpen ? 1 : 0));
   const statusSegments = (state.status_line ?? []).map((content) => ({ content, color: mutedGreen }));
   return /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, paddingX: 1, paddingTop: 1, children: [
+    !state.home && /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { marginBottom: 1, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: green, bold: true, children: "\u{1F40A} Gator" }),
+      /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { color: mutedGreen, children: [
+        "  ",
+        context
+      ] })
+    ] }),
     /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, children: [
       state.home && state.messages.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginBottom: 1, children: welcome }),
       /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(MessageList, { ref: list, viewportHeight, messages, renderMessage: (item) => /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(MessageBody, { item: state.messages[Number(item.id.split("-", 1)[0])] }) }),
       state.running && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: green, children: state.cancelling ? "\u25CC Stopping\u2026 retaining evidence" : `${["\u280B", "\u2819", "\u2839", "\u2838", "\u283C", "\u2834", "\u2826", "\u2827", "\u2807", "\u280F"][state.loading_frame % 10]} Working\u2026 ${state.elapsed ?? ""} \xB7 Esc to interrupt` }) })
     ] }),
+    state.status && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: mutedGreen, children: state.status }),
     !searchOpen && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(ChatKeys, { state, draft: input, matches, selected, setSelected, choose, dismiss: () => setDismissed(true), search: () => setSearchOpen(true), scroll: (rows) => list.current?.scrollBy(rows), exit: close, bridge }),
     searchOpen && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(GreenSearch, { messages: state.messages, close: () => setSearchOpen(false), navigate: (index) => list.current?.scrollTo(index) }),
     /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Divider, {}),

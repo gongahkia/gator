@@ -48,6 +48,7 @@ type BackendState = {
   queued: number;
   home: boolean;
   first_run: boolean;
+  supervisor_needs_start: boolean;
   external?: ExternalCommand;
 };
 type Frame = { version: 1; type: "submit" | "key" | "resize" | "exit" | "external_done"; text?: string; key?: string; error?: string; width?: number; height?: number };
@@ -384,9 +385,11 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
     }
   };
   const close = () => { bridge.stop(); exit(); };
+  const context = [state.title, state.provider ? `${state.provider}${state.model ? `/${state.model}` : ""}` : "Choose model: /model", state.source.split("/").filter(Boolean).at(-1) || state.source].filter(Boolean).join(" · ");
   const welcome = (
     <Box flexDirection="column">
       <WelcomeScreen appName="Gator" subtitle="Your ongoing work, ready when you are" color={green} logo={<Text color={green}>🐊</Text>} />
+      <Text dimColor>{context}</Text>
       <Box marginTop={1} marginLeft={1} flexDirection="column">
         <Text color={mutedGreen} bold>{state.first_run ? "Get started" : "Next up"}</Text>
         {state.first_run ? (
@@ -395,6 +398,7 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
           <Text key={index}>  {action.Label} · {action.Command}</Text>
         ))}
         <Text dimColor>  Type / for Gator commands.</Text>
+        {state.supervisor_needs_start && <Text color={mutedGreen}>  Recurring checks need a running supervisor · gator job supervisor</Text>}
       </Box>
     </Box>
   );
@@ -407,11 +411,13 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
   const statusSegments = (state.status_line ?? []).map((content) => ({ content, color: mutedGreen }));
   return (
     <Box flexDirection="column" flexGrow={1} paddingX={1} paddingTop={1}>
+      {!state.home && <Box marginBottom={1}><Text color={green} bold>🐊 Gator</Text><Text color={mutedGreen}>  {context}</Text></Box>}
       <Box flexDirection="column" flexGrow={1}>
         {state.home && state.messages.length === 0 && <Box marginBottom={1}>{welcome}</Box>}
         <MessageList ref={list} viewportHeight={viewportHeight} messages={messages} renderMessage={(item) => <MessageBody item={state.messages[Number(item.id.split("-", 1)[0])]} />} />
         {state.running && <Box marginTop={1}><Text color={green}>{state.cancelling ? "◌ Stopping… retaining evidence" : `${["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"][state.loading_frame % 10]} Working… ${state.elapsed ?? ""} · Esc to interrupt`}</Text></Box>}
       </Box>
+      {state.status && <Text color={mutedGreen}>{state.status}</Text>}
       {!searchOpen && <ChatKeys state={state} draft={input} matches={matches} selected={selected} setSelected={setSelected} choose={choose} dismiss={() => setDismissed(true)} search={() => setSearchOpen(true)} scroll={(rows) => list.current?.scrollBy(rows)} exit={close} bridge={bridge} />}
       {searchOpen && <GreenSearch messages={state.messages} close={() => setSearchOpen(false)} navigate={(index) => list.current?.scrollTo(index)} />}
       <Divider />
