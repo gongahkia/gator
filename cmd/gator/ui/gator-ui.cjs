@@ -46339,6 +46339,14 @@ function GreenPrompt({
     const current = valueRef.current;
     const position = cursorRef.current;
     const historyPosition = historyIndexRef.current;
+    if (!key.ctrl && !key.meta && !key.return && input.endsWith("\r")) {
+      const submitted = current.slice(0, position) + input.slice(0, -1) + current.slice(position);
+      if (submitted.trim()) onSubmit(submitted);
+      valueRef.current = "";
+      moveCursor(0);
+      moveHistory(-1);
+      return;
+    }
     if (key.return && key.shift || key.ctrl && input === "j") {
       replace(current.slice(0, position) + "\n" + current.slice(position), position + 1);
       return;

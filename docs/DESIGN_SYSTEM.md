@@ -26,7 +26,9 @@ documents; user text, command output, and approval previews stay literal.
 
 - `🐊 Gator` labels the home and conversation. Green marks Gator, the prompt,
   focused rows, and active work; neutral text carries content and muted green
-  carries secondary context.
+  carries secondary context. `/theme` applies the saved `gator`, `contrast`, or
+  `mono` palette to the React interface immediately, including panels, result
+  cards, status, and doctor diagnostics.
 - Yellow marks pending review; red marks errors. Colors follow typed state from
   Go, never words inferred from arbitrary output text. Approvals show the exact
   structured preview and keep `/approve` and `/deny` visible until resolved.
@@ -36,6 +38,9 @@ documents; user text, command output, and approval previews stay literal.
   anchor at the bottom so its location stays predictable; Esc returns to chat.
 - `/` suggestions appear immediately above the composer. Long lists keep the
   selected row in view. Detail content scrolls with PageUp and PageDown.
+- Transcript search covers the content rendered in result cards, approvals,
+  deliverables, and agent turns. Repeated matches are counted and Ctrl+N/Ctrl+P
+  move among them.
 - Forms and confirmations use a constrained green bordered surface. Lists and
   detail pages remain open surfaces with one visible selection and a footer.
 - The optional kit `StatusLine` sits below the composer. Its content is chosen
@@ -71,9 +76,18 @@ documents; user text, command output, and approval previews stay literal.
   command picker.
 - Up and Down navigate picker rows or recall prompts when the composer has no
   adjacent line. PageUp and PageDown scroll long content.
+- Left, Right, Backspace, and Delete in the composer and search treat an emoji
+  or combining sequence as one character. Small terminals compress panel
+  chrome and wrap long detail lines; the picker fits at 20×12.
 
 The kit hardcodes cyan in its `Select` and `ListItem` focus states, so Gator
 renders those rows with green rather than inheriting a mismatched color. The
 shared kit components used directly are `WelcomeScreen`, `MessageList`,
-`Markdown`, `Divider`, and `StatusLine`. Keep keyboard ownership in the React layer for
-editing and in Go for workflow actions so the same key cannot trigger both.
+`Markdown`, `Divider`, `StatusLine`, `Spinner`, `Byline`, and
+`KeyboardShortcutHint`. Gator's prompt, search, row picker, and focused form
+surfaces are adapters that follow the kit's placement, focus, and key
+conventions while using the saved palette and Go workflow state. The kit's
+`PromptInput` uses JavaScript character offsets, which split some emoji, and
+its `Dialog` owns Esc locally; Gator needs Go to own Esc for approval and model
+forms. Keep keyboard ownership in React for text editing and in Go for workflow
+actions so one key cannot trigger both.

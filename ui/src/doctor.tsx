@@ -45,7 +45,7 @@ export async function runDoctor(binary: string, arguments_: string[]): Promise<v
   let app: Instance | undefined;
   let finalFrame: (() => void) | undefined;
   try {
-    app = await render(<GatorPaletteProvider><DoctorScreen /></GatorPaletteProvider>, { onFrame: () => { finalFrame?.(); finalFrame = undefined; } });
+    app = await render(<GatorPaletteProvider theme={process.env.GATOR_UI_THEME}><DoctorScreen /></GatorPaletteProvider>, { onFrame: () => { finalFrame?.(); finalFrame = undefined; } });
     const payload = JSON.parse(await collectDoctor(binary, arguments_, true)) as DoctorPayload;
     const painted = new Promise<void>((resolve) => { finalFrame = resolve; });
     app.rerender(<GatorPaletteProvider theme={payload.theme}><DoctorScreen result={payload.result} /></GatorPaletteProvider>);

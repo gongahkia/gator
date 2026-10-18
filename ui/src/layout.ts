@@ -9,7 +9,7 @@ export function panelGeometry(columns: number, rows: number, focused: boolean, p
   const compact = rows < 16;
   const showSubtitle = hasSubtitle && !compact;
   const showComposerAnchor = !compact;
-  const chrome = 1 + (showSubtitle ? 2 : 0) + (picker ? compact ? 1 : 4 : 0) + 2 + 2 + (showComposerAnchor ? 3 : 0) + (compact ? 0 : 1);
+  const chrome = 1 + (showSubtitle ? 2 : 0) + (picker ? (compact ? 1 : 4) : 0) + 2 + 2 + (showComposerAnchor ? 3 : 0) + (compact ? 0 : 1);
   return { paddingX, panelWidth, contentWidth, compact, showSubtitle, showComposerAnchor, bodyRows: Math.max(1, rows - chrome) };
 }
 

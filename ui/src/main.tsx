@@ -177,6 +177,14 @@ function GreenPrompt({
     const current = valueRef.current;
     const position = cursorRef.current;
     const historyPosition = historyIndexRef.current;
+    // Some terminals deliver a fast text burst and its Return in one input
+    // event. The kit exposes that burst as text instead of key.return.
+    if (!key.ctrl && !key.meta && !key.return && input.endsWith("\r")) {
+      const submitted = current.slice(0, position) + input.slice(0, -1) + current.slice(position);
+      if (submitted.trim()) onSubmit(submitted);
+      valueRef.current = ""; moveCursor(0); moveHistory(-1);
+      return;
+    }
     if ((key.return && key.shift) || (key.ctrl && input === "j")) { replace(current.slice(0, position) + "\n" + current.slice(position), position + 1); return; }
     if (key.return) { if (current.trim()) onSubmit(current); valueRef.current = ""; moveCursor(0); moveHistory(-1); return; }
     if (key.leftArrow) { moveCursor(previousGrapheme(current, position)); return; }
@@ -307,7 +315,11 @@ function PanelKeys({ bridge, scroll, exit }: { bridge: GatorBridge; scroll: (amo
     else if (key.ctrl) name = `ctrl+${input}`;
     else if (input === " ") name = "space";
     else if (!key.meta) name = input;
-    if (name) bridge.send({ type: "key", key: name });
+    if (name.endsWith("\r") && name.length > 1) {
+      const preceding = name.slice(0, -1);
+      if (preceding) bridge.send({ type: "key", key: preceding });
+      bridge.send({ type: "key", key: "enter" });
+    } else if (name) bridge.send({ type: "key", key: name });
   }, { captureCtrlC: true });
   return null;
 }

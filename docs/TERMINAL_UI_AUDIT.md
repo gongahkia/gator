@@ -88,3 +88,21 @@ and typed Markdown documents use the kit's Markdown renderer. The `/effort`
 command opens a picker. The standalone script commands keep their existing
 plain output. Approval cards retain the complete JSON preview and display
 their resolution; a stale request is marked as no longer pending.
+
+## Palette, search, diagnostics, and control follow-up
+
+| Surface | Kit reference | Gator implementation and reason |
+| --- | --- | --- |
+| Home and conversation | `WelcomeScreen`, `MessageList`, `Markdown`, `Spinner`, `Divider`, `StatusLine` | Uses these components directly. All accents now read the saved palette from bridge state. |
+| Prompt and slash suggestions | `PromptInput` and its suggestions | Keeps the bottom prompt, history, multiline keys, and suggestions above it. A Gator adapter uses grapheme-aware cursor editing and palette-aware focus; the kit prompt uses JavaScript character offsets. Fast text plus Return is handled as one submission. |
+| Transcript search | Kit search overlay near the prompt | Gator searches visible typed cards and deliverables as well as prose; Ctrl+N/Ctrl+P navigate matches. The Go result schema remains the source of truth. |
+| Pickers, models, history, inbox, jobs, and learnings | `Select`, `ListItem`, `Byline`, `KeyboardShortcutHint` | Gator renders rows in the kit's single-focus style and uses the kit hint components. Go retains selection and action state. The kit's `Select` and `ListItem` hardcode cyan, so their row implementations are not used. |
+| Forms and transfer confirmations | Kit `Dialog` | Gator keeps a centered, bordered focus surface with kit-style hints. Go retains Esc and Enter ownership for model, approval, and transfer state; the kit dialog's local Esc handler would duplicate those actions. |
+| Doctor and command results | Kit transcript and Markdown primitives | Go emits semantic fields, items, sections, and tones. React renders one result body for `/doctor` and standalone `gator doctor`; no text-regex color inference remains. The standalone spinner starts in the saved theme. |
+
+The screen inventory above was rechecked against each `Panel.Kind` and model
+submode. Compact panels drop the subtitle and composer anchor to preserve the
+active choice and Esc guidance at 20×12. Long detail lines wrap by terminal
+cells. User text and untrusted previews stay literal; Markdown is limited to
+agent prose and explicitly typed Markdown results. This remains a Claude Code
+inspired interface built from an independent kit, not Anthropic's frontend.

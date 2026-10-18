@@ -11,6 +11,7 @@ The Go executable embeds `cmd/gator/ui/gator-ui.cjs`. To change this frontend:
 cd ui
 npm ci
 npm run check
+npm run test
 npm run build
 cd ..
 go build -o bin/gator ./cmd/gator
@@ -22,3 +23,8 @@ is missing or too old, those commands exit with an installation message.
 Headless commands continue to work. The generated bundle is checked against the TypeScript source in
 CI and included in native releases. `ui/licenses/` contains notices for the
 bundled terminal UI dependencies.
+
+The renderer reads the saved theme from Go. Its result cards and doctor report
+use typed status fields and tones; transcript search indexes the content shown
+on screen. `docs/DESIGN_SYSTEM.md` records the kit components and the Gator
+adapters used for the composer, search, pickers, and workflow forms.
