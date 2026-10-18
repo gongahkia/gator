@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -39,6 +40,12 @@ func TestGoogleActionEvidenceNamesAffectedResource(t *testing.T) {
 				if request.URL.Path != test.path || request.Method != test.method {
 					t.Errorf("request = %s %s, want %s %s", request.Method, request.URL.Path, test.method, test.path)
 				}
+				if test.operation == "sheets_values_update" {
+					body, _ := io.ReadAll(request.Body)
+					if request.URL.Query().Get("valueInputOption") != "RAW" || strings.Contains(string(body), "valueInputOption") {
+						t.Errorf("Sheet update omitted required query option or sent it in the body: %s %s", request.URL, body)
+					}
+				}
 				writer.Header().Set("Content-Type", "application/json")
 				_, _ = writer.Write([]byte(test.response))
 			}))
@@ -53,12 +60,47 @@ func TestGoogleActionEvidenceNamesAffectedResource(t *testing.T) {
 			if err != nil || calls != 0 {
 				t.Fatalf("prepare = %v, calls=%d", err, calls)
 			}
+			if test.operation == "sheets_values_update" && !strings.Contains(prepared.Proposal.Preview, `"valueInputOption":"RAW"`) {
+				t.Fatalf("approval omitted value interpretation: %s", prepared.Proposal.Preview)
+			}
 			evidence, err := runtime.ExecutePreparedWithEvidence(context.Background(), action.Act, prepared)
 			wantDigest := sha256.Sum256([]byte(test.response))
 			if err != nil || calls != 1 || evidence.ProviderResourceID != test.resource || evidence.ResponseSHA256 != hex.EncodeToString(wantDigest[:]) || evidence.ReceiptID != "" {
 				t.Fatalf("evidence=%#v, err=%v, calls=%d", evidence, err, calls)
 			}
 		})
+	}
+}
+
+func TestGoogleSheetsValueOptionIsBoundToSingleAndBatchApproval(t *testing.T) {
+	descriptor := Descriptor{Version: DescriptorVersion, ID: "google", Name: "Google", Kind: KindGoogle, Resource: "https://www.googleapis.com", Authentication: AuthNone}
+	registry, err := NewRegistry([]Descriptor{descriptor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime := Runtime{Registry: registry}
+	payload := []byte(`{"resource_id":"sheet-1/Sheet1!A1","values":[["=2+2"]],"valueInputOption":"USER_ENTERED"}`)
+	prepared, err := runtime.PrepareAction(descriptor.ID, "sheets_values_update", actionInput(payload))
+	if err != nil || !strings.Contains(prepared.Proposal.Target, "valueInputOption=USER_ENTERED") || !strings.Contains(prepared.Proposal.Preview, `"valueInputOption":"USER_ENTERED"`) || strings.Contains(string(prepared.requestPayload), "valueInputOption") {
+		t.Fatalf("single update option = %#v, %v", prepared, err)
+	}
+	batch, err := runtime.PrepareAction(descriptor.ID, "batch", actionInput([]byte(`{"actions":[{"operation":"sheets_values_update","payload":{"resource_id":"sheet-1/Sheet1!A1","values":[["done"]]}}]}`)))
+	if err != nil || len(batch.googleSteps) != 1 || !strings.Contains(batch.googleSteps[0].target, "valueInputOption=RAW") || !strings.Contains(batch.Proposal.Preview, `"valueInputOption":"RAW"`) || strings.Contains(string(batch.googleSteps[0].payload), "valueInputOption") {
+		t.Fatalf("batch update option = %#v, %v", batch, err)
+	}
+	for _, invalid := range []string{
+		`{"resource_id":"sheet-1/Sheet1!A1","values":[["done"]],"valueInputOption":"BAD"}`,
+		`{"resource_id":"sheet-1/Sheet1!A1","values":[]}`,
+		`{"resource_id":"sheet-1/Sheet1!A1","values":[[]]}`,
+		`{"resource_id":"sheet-1/Sheet1!A1","values":[[{}]]}`,
+		`{"resource_id":"sheet-1/Sheet1!A1","values":[["done"]],"value_input_option":"RAW"}`,
+		`{"resource_id":"sheet-1/Sheet1!A1","range":"Sheet1!B2","values":[["done"]]}`,
+		`{"resource_id":"sheet-1/Sheet1!A1","majorDimension":"BAD","values":[["done"]]}`,
+		`{"resource_id":"sheet-1/Sheet1!A1"}`,
+	} {
+		if _, err := runtime.PrepareAction(descriptor.ID, "sheets_values_update", actionInput([]byte(invalid))); err == nil {
+			t.Fatalf("invalid Sheet update prepared: %s", invalid)
+		}
 	}
 }
 

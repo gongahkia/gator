@@ -108,6 +108,11 @@ connector read permission policy. Mutations cover
 Docs create/batch update and Sheets create/range/batch update, plus an ordered
 batch of those typed mutations. Update payloads may include a Google `etag`;
 Gator binds it to the approved payload and sends it as `If-Match`.
+For `sheets_values_update`, Gator includes `valueInputOption` in the exact
+approval preview and sends it as the required URL query parameter. It defaults
+to `RAW` if omitted; a user may explicitly choose `USER_ENTERED`. The option
+is removed from the JSON `ValueRange` body. This follows Google's
+[`spreadsheets.values.update` request contract](https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets.values/update).
 For an individual Docs or Sheets action, the Work action record retains the
 resource ID returned by Google and a SHA-256 digest of the response. An update
 whose returned resource ID is missing or differs from the approved target is

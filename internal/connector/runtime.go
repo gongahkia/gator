@@ -168,6 +168,12 @@ func (r Runtime) PrepareAction(connectorID, operationID string, input json.RawMe
 	if err != nil {
 		return PreparedAction{}, err
 	}
+	if descriptor.Kind == KindGoogle && operation.ID == "sheets_values_update" {
+		payload, err = normalizeGoogleValuesUpdate(payload)
+		if err != nil {
+			return PreparedAction{}, err
+		}
+	}
 	target := descriptor.Resource
 	requestPayload := append([]byte(nil), payload...)
 	ifMatch := ""
@@ -616,7 +622,20 @@ func serviceAction(descriptor Descriptor, operation string, payload []byte, corr
 		if err != nil {
 			return "", nil, err
 		}
-		path, payload = "/v4/spreadsheets/"+url.PathEscape(id)+"/values/"+url.PathEscape(cellRange), sanitized
+		var body map[string]json.RawMessage
+		if err := json.Unmarshal(sanitized, &body); err != nil {
+			return "", nil, errors.New("Google Sheets values update payload is invalid")
+		}
+		var option string
+		if err := json.Unmarshal(body["valueInputOption"], &option); err != nil || option != "RAW" && option != "USER_ENTERED" {
+			return "", nil, errors.New("Google Sheets values update requires RAW or USER_ENTERED valueInputOption")
+		}
+		delete(body, "valueInputOption")
+		payload, err = json.Marshal(body)
+		if err != nil {
+			return "", nil, err
+		}
+		path = "/v4/spreadsheets/" + url.PathEscape(id) + "/values/" + url.PathEscape(cellRange) + "?valueInputOption=" + option
 	case KindGoogle + "/sheets_batch_update":
 		id, sanitized, err := extractResourceID(payload)
 		if err != nil {
@@ -716,6 +735,79 @@ func extractGoogleCompositeID(payload []byte, label string) (string, string, []b
 		return "", "", nil, err
 	}
 	return first, second, sanitized, nil
+}
+
+// normalizeGoogleValuesUpdate makes the interpretation of values visible in
+// the exact approval preview. RAW is the conservative default; the option is
+// sent as a required query parameter, never as a ValueRange body field.
+func normalizeGoogleValuesUpdate(payload []byte) ([]byte, error) {
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &object); err != nil || object == nil {
+		return nil, errors.New("Google Sheets values update requires one JSON object")
+	}
+	_, cellRange, err := splitGoogleIDFromPayload(payload)
+	if err != nil {
+		return nil, err
+	}
+	for key := range object {
+		switch key {
+		case "resource_id", "values", "valueInputOption", "majorDimension", "range", "etag":
+		default:
+			return nil, fmt.Errorf("Google Sheets values update field %q is not supported", key)
+		}
+	}
+	if raw, found := object["range"]; found {
+		var specified string
+		if json.Unmarshal(raw, &specified) != nil || specified != cellRange {
+			return nil, errors.New("Google Sheets values update body range must match resource_id")
+		}
+	}
+	if raw, found := object["majorDimension"]; found {
+		var dimension string
+		if json.Unmarshal(raw, &dimension) != nil || dimension != "ROWS" && dimension != "COLUMNS" {
+			return nil, errors.New("Google Sheets values update majorDimension must be ROWS or COLUMNS")
+		}
+	}
+	var values [][]json.RawMessage
+	if err := json.Unmarshal(object["values"], &values); err != nil || len(values) == 0 {
+		return nil, errors.New("Google Sheets values update requires a nonempty values array")
+	}
+	for _, row := range values {
+		if len(row) == 0 {
+			return nil, errors.New("Google Sheets values update requires at least one cell in each row or column")
+		}
+		for _, cell := range row {
+			var value any
+			if json.Unmarshal(cell, &value) != nil {
+				return nil, errors.New("Google Sheets values update cell is invalid")
+			}
+			switch value.(type) {
+			case nil, bool, float64, string:
+			default:
+				return nil, errors.New("Google Sheets values update cells must be scalars")
+			}
+		}
+	}
+	option := "RAW"
+	if raw, found := object["valueInputOption"]; found {
+		if err := json.Unmarshal(raw, &option); err != nil || option != "RAW" && option != "USER_ENTERED" {
+			return nil, errors.New("Google Sheets values update valueInputOption must be RAW or USER_ENTERED")
+		}
+	}
+	object["valueInputOption"], _ = json.Marshal(option)
+	result, err := json.Marshal(object)
+	if err != nil || len(result) > maxHTTPActionBytes {
+		return nil, errors.New("Google Sheets values update payload is too large")
+	}
+	return result, nil
+}
+
+func splitGoogleIDFromPayload(payload []byte) (string, string, error) {
+	id, _, err := extractResourceID(payload)
+	if err != nil {
+		return "", "", err
+	}
+	return splitGoogleID(id, "sheet ID and range")
 }
 
 func splitGoogleID(value, label string) (string, string, error) {
@@ -1009,6 +1101,12 @@ func prepareGoogleBatch(descriptor Descriptor, payload []byte) ([]googlePrepared
 		canonical, err := canonicalJSONObject(item.Payload)
 		if err != nil {
 			return nil, nil, fmt.Errorf("Google batch %s payload: %w", operationID, err)
+		}
+		if operationID == "sheets_values_update" {
+			canonical, err = normalizeGoogleValuesUpdate(canonical)
+			if err != nil {
+				return nil, nil, fmt.Errorf("Google batch %s payload: %w", operationID, err)
+			}
 		}
 		expectedResourceID, err := expectedGoogleActionResourceID(operationID, canonical)
 		if err != nil {
