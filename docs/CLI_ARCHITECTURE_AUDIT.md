@@ -44,16 +44,23 @@ boundaries. They are not language-wide benchmarks.
 
 ## Performance evidence and limits
 
-On a local `darwin/amd64` machine, a stripped `CGO_ENABLED=0` Gator binary
-at this audit revision was 22 MiB. Three direct process runs of `gator --help`
-had a median peak RSS of about 13.4 MiB and median first output of 40 ms;
-the first run took 1,870 ms to first output. Three runs of an empty-state
-`gator job supervisor --notify=false`, stopped after five seconds, had a
-median peak RSS of about 14.6 MiB and median first output of 152 ms. The
-measurement command and its limits are in [the runtime benchmark](RUNTIME_BENCHMARK.md).
+On a local `darwin/amd64` machine, each of two stripped builds was measured
+three times per command. The first row is the original no-cgo audit build; the
+second uses the release workflow's pinned Go toolchain and cgo setting.
+
+| Build | Size | Median `--help` peak RSS / first output | Median idle supervisor peak RSS / first output |
+| --- | ---: | ---: | ---: |
+| Go 1.27, cgo off | 22 MiB | 13.4 MiB / 40 ms | 14.6 MiB / 152 ms |
+| Go 1.25.13, cgo on | 20 MiB | 13.0 MiB / 22 ms | 14.0 MiB / 117 ms |
+
+The first invocation after each build took 1,870 ms and 649 ms respectively
+to first output; these runs were not a controlled cold-start comparison. The
+supervisor used an empty state directory and was stopped after five seconds.
+The measurement command and its limits are in [the runtime benchmark](RUNTIME_BENCHMARK.md).
 These figures exclude model work, browser workers, and the full process tree.
-They do not compare Go with Rust, Python, Muse, dots, or Hermes. They therefore
-do not justify a language migration or a low-RAM marketing claim.
+The builds use different Go versions, so their numbers do not establish a cgo
+effect. They do not compare Go with Rust, Python, Muse, dots, or Hermes, and
+cannot justify a language migration or a low-RAM marketing claim.
 
 ## Findings and next architecture work
 
@@ -66,8 +73,9 @@ do not justify a language migration or a low-RAM marketing claim.
    with cgo enabled so published macOS binaries retain the desktop feature.
    The native Intel and arm64 release jobs still need their first CI run. Local
    Intel builds with and without cgo, and both Linux cross-builds, succeeded
-   locally with Go 1.27. The release jobs use Go 1.25.13 and remain unverified
-   until CI runs them.
+   locally with Go 1.27. The Intel cgo build, Linux arm64 cross-build, and
+   connector/desktop package tests also passed locally with the release jobs'
+   Go 1.25.13. Native arm64 and the full release CI remain unverified.
 2. **The Work RPC documentation overstated its v1 surface.** It previously
    listed a `code` request field that the implementation rejects. The protocol
    document now reflects that boundary. The protocol also lacks
@@ -90,3 +98,16 @@ do not justify a language migration or a low-RAM marketing claim.
 The next productive work is tightening the Go application boundary and
 measuring real interactive tasks. No frontend code was ported because the
 audit did not find a defensible advantage from doing so now.
+
+## Connector scope checkpoint
+
+The current Google connector supports bounded reads, selected approved writes,
+Gmail send reconciliation, goal watches, account pins, and batch evidence. The
+[feature map](MUSE_DOTS_FEATURE_MAP.md) still reports no matched live-model
+comparison for cross-source usefulness and no real-account validation of Sheet
+writes. This is enough infrastructure to test the intended daily briefs,
+decks, and email drafts. Further connector families, generalized mutation
+recovery, and standing action grants should wait for those task results. Fix
+API-contract and data-loss bugs in supported paths, then spend the next
+iteration on real account runs and user task outcomes. This is a scope choice,
+not a claim that the existing connector work is wasted.
