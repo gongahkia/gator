@@ -65,6 +65,8 @@ func jobCommand(arguments []string, out io.Writer) error {
 	switch arguments[0] {
 	case "inbox":
 		return inboxCommand(arguments[1:], out)
+	case "quiet-audit":
+		return quietAuditCommand(arguments[1:], out)
 	case "add":
 		return addJob(arguments[1:], out)
 	case "show", "enable", "disable", "run", "history", "remove", "edit":
@@ -969,6 +971,70 @@ func inboxCommand(arguments []string, out io.Writer) error {
 		fmt.Fprintln(out)
 	}
 	return nil
+}
+
+func quietAuditCommand(arguments []string, out io.Writer) error {
+	if len(arguments) != 1 && len(arguments) != 3 && len(arguments) != 5 {
+		return errors.New("usage: gator job quiet-audit JOB_ID [ATTEMPT_ID missed|correct|clear [--note TEXT]]")
+	}
+	store, _, err := jobStore()
+	if err != nil {
+		return err
+	}
+	jobID := arguments[0]
+	if len(arguments) > 1 {
+		note := ""
+		if len(arguments) == 5 {
+			if arguments[3] != "--note" {
+				return errors.New("quiet-audit note must use --note TEXT")
+			}
+			note = arguments[4]
+		}
+		review, err := store.ReviewQuietWatch(jobID, arguments[1], arguments[2], note, time.Now())
+		if err != nil {
+			return err
+		}
+		verdict := review.Verdict
+		if verdict == "" {
+			verdict = "cleared"
+		}
+		_, err = fmt.Fprintf(out, "Quiet watch attempt %s: %s.\n", arguments[1], verdict)
+		return err
+	}
+	audit, err := store.QuietWatchAudit(jobID, 50)
+	if err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(out, "Quiet watch decisions for %s: %d total, %d missed, %d correct, %d unreviewed (user judgments only).\n", jobID, audit.Total, audit.Missed, audit.Correct, audit.Unreviewed); err != nil {
+		return err
+	}
+	for _, item := range audit.Entries {
+		verdict := item.Review.Verdict
+		if verdict == "" {
+			verdict = "unreviewed"
+		}
+		runID := ""
+		for _, run := range item.Attempt.Runs {
+			if run.RunID != "" {
+				runID = run.RunID
+			}
+		}
+		if _, err := fmt.Fprintf(out, "%s\t%s\t%s\titems_changed=%d\twork=%s\t%s", item.Attempt.ID, item.Attempt.StartedAt.Format(time.RFC3339), verdict, len(item.Attempt.WatchChanges), runID, strconv.QuoteToASCII(item.Attempt.Summary)); err != nil {
+			return err
+		}
+		if item.Review.Note != "" {
+			if _, err := fmt.Fprintf(out, "\tnote=%s", strconv.QuoteToASCII(item.Review.Note)); err != nil {
+				return err
+			}
+		}
+		if _, err := fmt.Fprintln(out); err != nil {
+			return err
+		}
+	}
+	if audit.Total > len(audit.Entries) {
+		_, err = fmt.Fprintf(out, "Showing the newest %d of %d quiet decisions.\n", len(audit.Entries), audit.Total)
+	}
+	return err
 }
 
 func jobSupervisorRequest(actionName string, out io.Writer) error {

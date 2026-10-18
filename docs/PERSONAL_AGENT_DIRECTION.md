@@ -69,10 +69,17 @@ gator goal plan GOAL_ID review-at 2026-10-21T09:00:00+08:00
 Inside a goal chat, `/plan` shows that plan. `/plan outcome TEXT`, `/plan add TITLE | RFC3339_DUE | EVIDENCE`, `/plan step STEP_ID done | EVIDENCE`, and `/plan review-at RFC3339` make common edits in place; `/plan help` shows the syntax. `/activity` (or `gator goal activity ID`) brings together open steps, the last and next scheduled checks, supervisor status, unread follow-ups, pending goal suggestions, and commands to pause or resume. `gator goal access ID` makes bounded live reads of up to eight selected watch sources and reports whether each read succeeds, needs login, or lacks permission; it does not retain response bodies or update watch fingerprints. A successful probe confirms access at that moment, not future reachability or relevance. `gator goal notifications ID --quiet 22:00-08:00 --timezone Asia/Singapore` (or `/notifications` inside its chat) suppresses desktop interruptions for that goal during quiet hours; `--desktop off` mutes its desktop interruptions entirely. These settings narrow an enabled global desktop notification setting. The inbox always retains results and failures. `gator job inbox rate ENTRY_ID useful|noise|wrong|clear` records explicit feedback on shown job alerts, and goal activity counts those ratings; quiet checks and missed changes are outside that count. The activity view reads retained state and makes no claim that a scheduled check will run while the host is off.
 When the local job supervisor is running, a due `review-at` creates one inbox
 reminder without a model call unless an enabled watch owns that goal's review.
+
 `/plan reviewed` records that the user reviewed
 the goal and clears a due review time. The reminder will appear after the CLI
 closes only while the local supervisor is running (or its per-user service is
 installed and the user session remains active).
+
+For an explicit quiet watch decision, `gator job quiet-audit JOB_ID` shows the
+retained check and lets the user label a missed important change or a correct
+quiet result after inspecting its sources. Unchanged-input skips and alerted
+checks are excluded. This complements inbox ratings for shown alerts, but no
+real review sample or missed-change rate has been established.
 
 `gator work list`, `gator work show WORK_ID`, and the TUI History view report
 whether a running Work record has an active process-held lease, a stopped lease
@@ -102,7 +109,7 @@ once. One-shot CLI Work still asks in its own foreground terminal.
 1. **Measure continuity quality.** Test multi-day goals with corrections, expiry, scope boundaries, and changing source facts. Compare live model behavior against a same-model baseline; passing storage tests alone does not prove agent usefulness.
 2. **Improve recall.** Measure lexical misses and false matches, then add source-linked retrieval over retained notes and documents. Preserve explicit correction and forgetting controls.
 3. **Broaden the goal loop.** Local files, due times, bounded JSON/Gmail/Calendar polling, and a Gmail history cursor are wired. Measure next-step and draft quality, missed changes, query caps, and read failures; then add a Calendar cursor and a clear review flow for proposed actions. A separately scoped Gmail send can complete a foreground approved action; unattended watches remain read and draft only. Validate receipts and uncertain-send recovery with a real account before expanding action support.
-4. **Improve quiet follow-up.** The watch avoids unchanged model calls and honors an explicit attention decision. Users can rate shown job alerts, but no real ratings or missed-change measurements have been collected. Measure false alerts and missed material changes before claiming semantic change detection.
+4. **Improve quiet follow-up.** The watch avoids unchanged model calls and honors an explicit attention decision. Users can rate shown job alerts and review explicit quiet decisions, but no real ratings or complete missed-change review have been collected. Measure false alerts and missed material changes before claiming semantic change detection.
 5. **Measure runtime cost.** Use the [runtime measurement tool](RUNTIME_BENCHMARK.md) to compare idle RAM, peak RAM, cold start, first response, and task cost against representative terminal agents on the same machine and model. Treat low RAM as a target until comparative runs exist.
 
 ## Evaluation reset

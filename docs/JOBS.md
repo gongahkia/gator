@@ -207,6 +207,19 @@ not create an inbox entry. These ratings describe only alerts that were shown;
 they cannot measure missed important changes or establish alert accuracy on
 their own.
 
+`gator job quiet-audit JOB_ID` lists the newest 50 completed goal-watch checks
+where the model explicitly chose quiet, along with their attempt IDs, retained
+connected-item change counts, summaries, and Work IDs. It counts every retained
+quiet decision, even when only 50 rows are displayed. After inspecting the
+underlying source and Work run, use
+`gator job quiet-audit JOB_ID ATTEMPT_ID missed --note 'reason'`
+to record a missed important change, or `... correct` to confirm that staying
+quiet was appropriate. `... clear` removes a previous judgment. The audit
+excludes unchanged-input skips, because no new model decision was made, and
+excludes alerted and failed attempts. Unreviewed checks are not assumed correct
+or missed. These user labels can support a supervised recall study only when
+the relevant quiet checks are actually reviewed; counts alone are not recall.
+
 - Cron is evaluated in an explicit IANA timezone and claimed in UTC.
 - `missed` is either `skip` or `run_once`; replaying every missed interval
   is intentionally unsupported in the first version.
@@ -242,6 +255,10 @@ gator job inbox show ENTRY_ID
 gator job inbox read ENTRY_ID
 gator job inbox rate ENTRY_ID useful|noise|wrong|clear
 gator job inbox report GOAL_ID
+gator job quiet-audit JOB_ID
+gator job quiet-audit JOB_ID ATTEMPT_ID missed --note 'The deadline changed'
+gator job quiet-audit JOB_ID ATTEMPT_ID correct
+gator job quiet-audit JOB_ID ATTEMPT_ID clear
 gator job remove ID --yes        # keeps immutable history by default
 gator job launchagent install    # macOS, opt-in per-user supervisor
 gator job launchagent status

@@ -40,6 +40,7 @@ Product areas:
               gator learnings add|edit|approve|reject|enable|disable ...
   Jobs        gator job add|list|show|edit|enable|disable|run|history|remove
               gator job inbox show|read|rate|report
+              gator job quiet-audit JOB_ID [ATTEMPT_ID missed|correct|clear [--note TEXT]]
   Settings    gator config [show] · gator config set default-provider|default-model|sandbox|network VALUE
 
 Common follow-up actions:
