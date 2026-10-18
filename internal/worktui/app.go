@@ -142,6 +142,7 @@ type Config struct {
 	ModelStatus             func() (ModelStatus, error)
 	Live                    bool
 	CurrentFolder           string
+	GoalID                  string
 	InitialTitle            string
 	ResolveSource           func(path string) (string, error)
 	ConnectorChoices        func() []string
@@ -209,6 +210,7 @@ type ModelPanel interface {
 
 type entry struct {
 	title, subtitle, kind, id, source, command string
+	advanced bool
 }
 type message struct {
 	role   string
@@ -266,6 +268,7 @@ type Model struct {
 	selected               int
 	entries                []entry
 	source                 string
+	goalID                 string
 	conversation           string
 	revision               string
 	snapshot               string
@@ -331,13 +334,14 @@ func New(config Config) Model {
 		home:     true,
 		firstRun: config.FirstRun,
 		source:   config.CurrentFolder,
+		goalID:   config.GoalID,
 		title:    "Work in " + filepath.Base(config.CurrentFolder),
 		theme:    normalizeTheme(config.Theme),
 		options: RunOptions{MaxSteps: 24, Mode: "auto", Code: CodeOptions{
 			MaxSteps: 16, Sandbox: "strict", Network: "deny",
 		}},
 	}
-	model.entries = commandPaletteEntries()
+	model.entries = model.availableCommandEntries()
 	model.statusLine, model.statusLineConfigured = resolveStatusLine(config.StatusLine)
 	model.statusLineEnabled = config.StatusLineEnabled
 	model.refreshModelStatus()

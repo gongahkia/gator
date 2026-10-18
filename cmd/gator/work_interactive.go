@@ -164,6 +164,7 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		},
 		Live:          true,
 		InitialTitle:  goalTitle,
+		GoalID:        goalID,
 		CurrentFolder: workingDirectory, Conversations: conversations, Jobs: definitions, SupervisorRunning: supervisorRunning, Inbox: inboxEntries, Goals: goals, Attention: attention,
 		RefreshAttention: func() (workhome.Attention, error) {
 			freshGoals, err := goalStore.List()

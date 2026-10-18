@@ -15,9 +15,14 @@ import (
 func (m *Model) openCommandPalette() {
 	m.launcher = true
 	m.launcherMode = "commands"
-	m.entries = commandPaletteEntries()
+	m.entries = m.availableCommandEntries()
 	m.paletteQuery = ""
 	m.selected = 0
+}
+
+func (m *Model) openSlashPalette() {
+	m.openCommandPalette()
+	m.launcherMode = "slash"
 }
 
 func (m *Model) openConversationPicker() {
@@ -139,12 +144,15 @@ func (m Model) copySelection(id string) (tea.Model, tea.Cmd) {
 
 func (m Model) filteredEntries() []entry {
 	query := strings.ToLower(strings.TrimSpace(m.paletteQuery))
-	if query == "" {
+	if query == "" && m.launcherMode != "commands" && m.launcherMode != "slash" {
 		return m.entries
 	}
 	result := make([]entry, 0, len(m.entries))
 	for _, item := range m.entries {
-		searchable := strings.ToLower(item.title + " " + item.subtitle)
+		if query == "" && item.advanced {
+			continue
+		}
+		searchable := strings.ToLower(item.title + " " + item.subtitle + " " + item.command)
 		if strings.Contains(searchable, query) {
 			result = append(result, item)
 		}
@@ -206,7 +214,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		if m.config.ClearGoal != nil {
 			m.config.ClearGoal()
 		}
-		m.home, m.conversation = true, ""
+		m.home, m.conversation, m.goalID = true, "", ""
 		m.section, m.paletteQuery, m.launcherMode = "", "", ""
 		m.source = m.config.CurrentFolder
 		m.title = "Work in " + filepath.Base(m.source)
@@ -317,6 +325,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 			if m.config.ClearGoal != nil {
 				m.config.ClearGoal()
 			}
+			m.goalID = ""
 			if m.source != resolved {
 				m.conversation = ""
 				m.revision = ""
@@ -584,7 +593,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 			m.scroll = 0
 			return m, nil
 		}
-	case "exit":
+	case "exit", "/exit":
 		return m, tea.Quit
 	default:
 		err = fmt.Errorf("unknown command %s; use /help", fields[0])
