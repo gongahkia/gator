@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -55,6 +56,49 @@ func TestDueGoalReviewCreatesOneReminderUntilMarkedReviewed(t *testing.T) {
 	entries, err = mailbox.List(false, 10)
 	if err != nil || len(entries) != 1 {
 		t.Fatalf("reviewed goal reminded again: %#v, %v", entries, err)
+	}
+}
+
+func TestDueGoalReviewHonorsDesktopPolicyWithoutLosingInbox(t *testing.T) {
+	state := t.TempDir()
+	goals, err := goal.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now, _ := time.Parse(time.RFC3339, "2026-10-18T00:00:00Z") // 08:00 Singapore
+	var delivered []string
+	visit := func(title, summary string) { delivered = append(delivered, title+": "+summary) }
+	setDue := func(name string, policy goal.NotificationPolicy) {
+		t.Helper()
+		record, err := goals.Add(name, "", t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := goals.SetNotificationPolicy(record.ID, policy); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := goals.ApplyPlanChange(record.ID, goal.PlanChange{Kind: "set_next_review", ExpectedRevision: 0, NextReviewAt: now.Add(-time.Minute)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	setDue("Muted review", goal.NotificationPolicy{DesktopMuted: true})
+	setDue("Quiet review", goal.NotificationPolicy{QuietStart: "07:00", QuietEnd: "09:00", Timezone: "Asia/Singapore"})
+	setDue("Visible review", goal.NotificationPolicy{})
+	runDueGoalReviewsWith(state, true, now, visit)
+	if len(delivered) != 1 || !strings.Contains(delivered[0], "Visible review") {
+		t.Fatalf("desktop reminders = %#v", delivered)
+	}
+	mailbox, err := inbox.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries, err := mailbox.List(false, 10)
+	if err != nil || len(entries) != 3 {
+		t.Fatalf("retained reminders = %#v, %v", entries, err)
+	}
+	runDueGoalReviewsWith(state, true, now.Add(2*time.Hour), visit)
+	if len(delivered) != 1 {
+		t.Fatalf("quiet reminder was replayed after quiet hours: %#v", delivered)
 	}
 }
 

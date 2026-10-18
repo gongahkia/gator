@@ -13,6 +13,10 @@ import (
 // runDueGoalReviews sends one local reminder for each user-selected plan
 // review time. It never calls a model or changes the plan on its own.
 func runDueGoalReviews(stateDir string, notify bool, now time.Time) {
+	runDueGoalReviewsWith(stateDir, notify, now, desktopNotification)
+}
+
+func runDueGoalReviewsWith(stateDir string, notify bool, now time.Time, deliver func(string, string)) {
 	goals, err := goal.Open(stateDir)
 	if err != nil {
 		return
@@ -62,8 +66,8 @@ func runDueGoalReviews(stateDir string, notify bool, now time.Time) {
 			summary = string([]rune(summary)[:min(len([]rune(summary)), 500)])
 		}
 		entry, err := mailbox.Add(inbox.Entry{ID: id, Kind: "goal_review", Title: record.Title, Summary: summary, GoalID: record.ID, ConversationID: record.ConversationID, Status: "review_due"})
-		if err == nil && notify {
-			desktopNotification(entry.Title, entry.Summary)
+		if err == nil && notify && record.Notifications.AllowsDesktop(now) {
+			deliver(entry.Title, entry.Summary)
 		}
 	}
 }

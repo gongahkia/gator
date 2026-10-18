@@ -21,6 +21,8 @@ Of the 28 capabilities below, **5 are present with stated limits, 18 are partial
 
 Alert feedback now covers two distinct samples: `gator job inbox rate` or interactive `/inbox rate` records judgments on **shown** job alerts, and `gator job quiet-audit` lets a user inspect and label **model-evaluated quiet** watch attempts. The interactive inbox reloads on opening and displays IDs, read state, and ratings so those judgments can be made without leaving terminal chat. Unchanged-input skips have no new model decision. Neither partial status changes: no real review sample or full ground-truth set exists, so alert precision and missed-change recall remain unmeasured.
 
+Goal desktop mute and quiet hours now apply to both job alerts and due plan-review reminders. Both still create durable inbox entries; suppressed desktop reminders are not replayed after quiet hours.
+
 ## 1. Own work over time
 
 | User-visible capability | Muse | dots | Gator today | Gator priority and acceptance bar |

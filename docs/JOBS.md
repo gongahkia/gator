@@ -163,7 +163,9 @@ not create a second inbox entry.
 22:00-08:00 --timezone Asia/Singapore` suppresses them during local quiet
 hours. These settings only narrow desktop alerts when the supervisor's global
 notification option is enabled. Completed results and failures still go to
-the terminal inbox; quiet hours do not defer or drop them.
+the terminal inbox; quiet hours do not defer or drop them. The same policy
+applies to due plan-review reminders. A reminder retained during quiet hours
+is not replayed as a desktop notification when quiet hours end.
 
 A connected watch can select up to four read surfaces with `--connector ID`.
 An HTTP JSON connector polls its configured resource. A Google connector needs
