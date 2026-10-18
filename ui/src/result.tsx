@@ -50,7 +50,7 @@ function ResultContent({ fields, items, lines, markdown }: Pick<BackendResult, "
       {item.detail ? <Box marginLeft={2}><Text dimColor>{item.detail}</Text></Box> : null}
     </Box>)}
     {lines?.map((line, index) => <Box key={index} marginTop={index === 0 && (hasFields || hasItems) ? 1 : 0}><Text>{line || " "}</Text></Box>)}
-    {markdown ? <Box marginTop={hasFields || hasItems ? 1 : 0}><Markdown>{markdown}</Markdown></Box> : null}
+    {markdown ? <Box marginTop={hasFields || hasItems ? 1 : 0}><Markdown key={palette.accent}>{markdown}</Markdown></Box> : null}
   </Box>;
 }
 

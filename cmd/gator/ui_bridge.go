@@ -61,10 +61,8 @@ func launchBundledUI(arguments []string, out io.Writer, surface string) error {
 	}
 	command := exec.Command(node, append([]string{bundle.Name(), binary}, arguments...)...)
 	command.Stdin, command.Stdout, command.Stderr = os.Stdin, out, os.Stderr
-	if surface == "gator doctor" {
-		if settings, err := loadSettings(); err == nil {
-			command.Env = append(os.Environ(), "GATOR_UI_THEME="+settings.Theme)
-		}
+	if settings, err := loadSettings(); err == nil {
+		command.Env = append(os.Environ(), "GATOR_UI_THEME="+settings.Theme)
 	}
 	// The child may hand the terminal to an editor. Ctrl+C should interrupt that
 	// foreground job and leave the launcher waiting for the React UI to resume.

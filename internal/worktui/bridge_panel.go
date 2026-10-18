@@ -92,6 +92,7 @@ func (m Model) bridgeSectionPanel() uisnapshot.Panel {
 	case "inbox":
 		panel.Title = "Inbox"
 		panel.Footer = "Esc back · /inbox rate ID useful|noise|wrong · /inbox read ID"
+		panel.Hints = []uisnapshot.Hint{{Shortcut: "Esc", Action: "back"}, {Shortcut: "/inbox read ID", Action: "open"}, {Shortcut: "/inbox rate", Action: "rate"}}
 		for _, item := range m.config.Inbox {
 			state := "unread"
 			if !item.ReadAt.IsZero() {
@@ -118,6 +119,7 @@ func (m Model) bridgeSectionPanel() uisnapshot.Panel {
 	case "jobs":
 		panel.Title = "Scheduled jobs"
 		panel.Footer = "Esc back · /jobs add to create a recurring check"
+		panel.Hints = []uisnapshot.Hint{{Shortcut: "Esc", Action: "back"}, {Shortcut: "/jobs add", Action: "create"}}
 		for _, job := range m.config.Jobs {
 			state := "disabled"
 			if job.Enabled {

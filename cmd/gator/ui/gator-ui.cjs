@@ -45958,12 +45958,28 @@ var palettes = {
 function paletteForTheme(name) {
   return palettes[name ?? "gator"] ?? palettes.gator;
 }
+function synchronizeKitTheme(palette) {
+  const kit = getTheme("dark");
+  kit.accent = palette.accent;
+  kit.assistant = palette.accent;
+  kit.permission = palette.accent;
+  kit.focus = palette.accent;
+  kit.link = palette.accent;
+  kit.code = palette.accent;
+  kit.info = palette.secondary;
+  kit.spinnerColor = palette.accent;
+  kit.success = palette.accent;
+  kit.warning = palette.warning;
+  kit.error = palette.error;
+}
 var GatorPaletteContext = (0, import_react56.createContext)(palettes.gator);
 function useGatorPalette() {
   return (0, import_react56.useContext)(GatorPaletteContext);
 }
 function GatorPaletteProvider({ theme, children }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(GatorPaletteContext.Provider, { value: paletteForTheme(theme), children });
+  const palette = paletteForTheme(theme);
+  synchronizeKitTheme(palette);
+  return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(GatorPaletteContext.Provider, { value: palette, children });
 }
 
 // src/result.tsx
@@ -46012,7 +46028,7 @@ function ResultContent({ fields, items, lines, markdown }) {
       item.detail ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: item.detail }) }) : null
     ] }, `${index}-${item.label}`)),
     lines?.map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginTop: index === 0 && (hasFields || hasItems) ? 1 : 0, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { children: line || " " }) }, index)),
-    markdown ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginTop: hasFields || hasItems ? 1 : 0, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Markdown, { children: markdown }) }) : null
+    markdown ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginTop: hasFields || hasItems ? 1 : 0, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Markdown, { children: markdown }, palette.accent) }) : null
   ] });
 }
 function ResultBody({ result }) {
@@ -46086,7 +46102,7 @@ ${report}`);
   let app;
   let finalFrame;
   try {
-    app = await root_default(/* @__PURE__ */ (0, import_jsx_runtime52.jsx)(GatorPaletteProvider, { children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(DoctorScreen, {}) }), { onFrame: () => {
+    app = await root_default(/* @__PURE__ */ (0, import_jsx_runtime52.jsx)(GatorPaletteProvider, { theme: process.env.GATOR_UI_THEME, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(DoctorScreen, {}) }), { onFrame: () => {
       finalFrame?.();
       finalFrame = void 0;
     } });
@@ -46101,6 +46117,21 @@ ${report}`);
     app?.cleanup();
     process.stdin.pause();
   }
+}
+
+// src/bundle.ts
+function bundleResult(bundle) {
+  return {
+    kind: "list",
+    title: "Verified deliverables",
+    tone: bundle.Status === "verified" ? "success" : "warning",
+    summary: bundle.Status,
+    items: [
+      ...(bundle.Artifacts ?? []).map((item) => ({ label: item.Path, detail: item.MediaType, state: item.Valid ? "verified" : "needs review", tone: item.Valid ? "success" : "warning" })),
+      ...(bundle.Candidates ?? []).map((item) => ({ label: `Change ${item.ID}`, detail: item.ChangedPaths.join(", "), state: item.Status }))
+    ],
+    footer: bundle.Path
+  };
 }
 
 // src/search.ts
@@ -46127,12 +46158,7 @@ function resultText(result) {
 function searchableMessage(message) {
   const bundle = message.bundle;
   if (message.result) return resultText(message.result).join("\n");
-  if (bundle) return [
-    bundle.Path,
-    bundle.Status,
-    ...(bundle.Artifacts ?? []).flatMap((item) => [item.Path, item.MediaType]),
-    ...(bundle.Candidates ?? []).flatMap((item) => [item.ID, item.Status, ...item.ChangedPaths])
-  ].join("\n");
+  if (bundle) return resultText(bundleResult(bundle)).join("\n");
   return message.text;
 }
 function searchMessages(messages, query) {
@@ -46277,19 +46303,6 @@ var GatorBridge = class {
     timeout.unref();
   }
 };
-function bundleResult(bundle) {
-  return {
-    kind: "list",
-    title: "Verified deliverables",
-    tone: bundle.Status === "verified" ? "success" : "warning",
-    summary: bundle.Status,
-    items: [
-      ...(bundle.Artifacts ?? []).map((item) => ({ label: item.Path, detail: item.MediaType, state: item.Valid ? "verified" : "needs review", tone: item.Valid ? "success" : "warning" })),
-      ...(bundle.Candidates ?? []).map((item) => ({ label: `Change ${item.ID}`, detail: item.ChangedPaths.join(", "), state: item.Status }))
-    ],
-    footer: bundle.Path
-  };
-}
 function MessageBody({ item }) {
   const palette = useGatorPalette();
   const isUser = item.role === "You";
@@ -46297,7 +46310,7 @@ function MessageBody({ item }) {
   const label = isUser ? "\u203A You" : isGator ? "\u{1F40A} Gator" : item.role === "Deliverables" ? "\u25C8 Deliverables" : `\u25CC ${item.role}`;
   return /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", children: [
     /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: isGator ? palette.accent : isUser ? void 0 : palette.secondary, bold: !isUser, dimColor: isUser, children: label }),
-    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginLeft: 2, flexDirection: "column", children: item.result ? /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(ResultBody, { result: item.result }) : item.bundle ? /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(ResultBody, { result: bundleResult(item.bundle) }) : isGator ? /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Markdown, { children: item.text }) : item.text.split("\n").map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: !isUser, children: line || " " }, index)) })
+    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginLeft: 2, flexDirection: "column", children: item.result ? /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(ResultBody, { result: item.result }) : item.bundle ? /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(ResultBody, { result: bundleResult(item.bundle) }) : isGator ? /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Markdown, { children: item.text }, palette.accent) : item.text.split("\n").map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: !isUser, children: line || " " }, index)) })
   ] });
 }
 function GreenPrompt({
@@ -46556,7 +46569,11 @@ function PanelKeys({ bridge, scroll, exit }) {
     else if (key.ctrl) name = `ctrl+${input}`;
     else if (input === " ") name = "space";
     else if (!key.meta) name = input;
-    if (name) bridge.send({ type: "key", key: name });
+    if (name.endsWith("\r") && name.length > 1) {
+      const preceding = name.slice(0, -1);
+      if (preceding) bridge.send({ type: "key", key: preceding });
+      bridge.send({ type: "key", key: "enter" });
+    } else if (name) bridge.send({ type: "key", key: name });
   }, { captureCtrlC: true });
   return null;
 }
@@ -46583,6 +46600,7 @@ function PanelScreen({ panel, status, draft, statusLine, bridge, exit }) {
   const rowStart = Math.max(0, Math.min(selected - Math.floor(maxRows / 2), rows.length - maxRows));
   const maxLines = Math.max(1, bodyRows - (rows.length > 0 ? Math.min(rows.length, maxRows) * rowHeight : 0));
   const blockOffset = Math.min(offset, Math.max(0, blocks.length - maxLines));
+  const compactShortcuts = panel.hints?.length ? [...new Set([...panel.hints.slice(0, 2), panel.hints[panel.hints.length - 1]].map((hint) => hint.shortcut))].join(" \xB7 ") : "Esc back";
   return /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, paddingX: geometry.paddingX, paddingTop: geometry.compact ? 0 : 1, children: [
     /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(PanelKeys, { bridge, exit, scroll: (amount) => setOffset((current) => Math.max(0, Math.min(blocks.length - maxLines, current + amount))) }),
     /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", flexGrow: focused ? 0 : 1, width: geometry.panelWidth, alignSelf: focused ? "center" : void 0, borderStyle: focused && !geometry.compact ? "round" : void 0, borderColor: focused && !geometry.compact ? palette.accent : void 0, paddingX: focused && !geometry.compact ? 1 : 0, marginTop: focused && !geometry.compact ? 1 : 0, children: [
@@ -46625,7 +46643,7 @@ function PanelScreen({ panel, status, draft, statusLine, bridge, exit }) {
         status && status !== panel.notice && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginTop: geometry.compact ? 0 : 1, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { wrap: "truncate-end", dimColor: true, children: status }) })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Divider, { width: geometry.contentWidth, color: palette.accent }),
-      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { wrap: "truncate-end", dimColor: true, children: geometry.compact ? "Esc back" : panel.hints?.length ? /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Byline, { children: panel.hints.map((hint) => /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(KeyboardShortcutHint, { shortcut: hint.shortcut, action: hint.action }, `${hint.shortcut}-${hint.action}`)) }) : panel.footer || "Esc back" })
+      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { wrap: "truncate-end", dimColor: true, children: geometry.compact ? compactShortcuts : panel.hints?.length ? /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Byline, { children: panel.hints.map((hint) => /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(KeyboardShortcutHint, { shortcut: hint.shortcut, action: hint.action }, `${hint.shortcut}-${hint.action}`)) }) : panel.footer || "Esc back" })
     ] }),
     focused && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { flexGrow: 1 }),
     geometry.showComposerAnchor && /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(import_jsx_runtime53.Fragment, { children: [
@@ -46670,28 +46688,48 @@ function GreenSearch({ messages, close, navigate }) {
     const position = cursorRef.current;
     const found = matchesRef.current;
     const selectedMatch = selectedRef.current;
-    if (key.escape) close();
-    else if (key.leftArrow) {
+    if (key.escape) {
+      close();
+      return;
+    }
+    if (key.leftArrow) {
       cursorRef.current = previousGrapheme(current, position);
       setCursor(cursorRef.current);
-    } else if (key.rightArrow) {
+      return;
+    }
+    if (key.rightArrow) {
       cursorRef.current = nextGrapheme(current, position);
       setCursor(cursorRef.current);
-    } else if (key.backspace && position > 0) {
-      const previous = previousGrapheme(current, position);
-      change(current.slice(0, previous) + current.slice(position), previous);
-    } else if (key.delete && position < current.length) change(current.slice(0, position) + current.slice(nextGrapheme(current, position)), position);
-    else if ((key.return || key.ctrl && input === "n") && found.length) {
+      return;
+    }
+    if (key.backspace) {
+      if (position > 0) {
+        const previous = previousGrapheme(current, position);
+        change(current.slice(0, previous) + current.slice(position), previous);
+      }
+      return;
+    }
+    if (key.delete) {
+      if (position < current.length) change(current.slice(0, position) + current.slice(nextGrapheme(current, position)), position);
+      return;
+    }
+    if ((key.return || key.ctrl && input === "n") && found.length) {
       const next = (selectedMatch + 1) % found.length;
       selectedRef.current = next;
       setSelected(next);
       navigate(found[next].index);
-    } else if (key.ctrl && input === "p" && found.length) {
+      return;
+    }
+    if (key.ctrl && input === "p" && found.length) {
       const previous = (selectedMatch - 1 + found.length) % found.length;
       selectedRef.current = previous;
       setSelected(previous);
       navigate(found[previous].index);
-    } else if (!key.ctrl && !key.meta && input) change(current.slice(0, position) + input + current.slice(position), position + input.length);
+      return;
+    }
+    if (key.ctrl || key.meta || key.tab || key.return) return;
+    if (input.endsWith("\r")) input = input.slice(0, -1);
+    if (input) change(current.slice(0, position) + input + current.slice(position), position + input.length);
   });
   return /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { paddingX: 1, children: [
     /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.accent, children: "Search: " }),
@@ -46716,7 +46754,8 @@ function App2({ bridge }) {
   const [dismissed, setDismissed] = (0, import_react58.useState)(false);
   const [searchOpen, setSearchOpen] = (0, import_react58.useState)(false);
   const terminal = (0, import_react58.useContext)(TerminalSizeContext);
-  const palette = paletteForTheme(state?.theme);
+  const palette = paletteForTheme(state?.theme ?? process.env.GATOR_UI_THEME);
+  synchronizeKitTheme(palette);
   const list = (0, import_react58.useRef)(null);
   const lastBackendInput = (0, import_react58.useRef)("");
   const inputRef = (0, import_react58.useRef)(input);

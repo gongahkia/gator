@@ -100,6 +100,11 @@ their resolution; a stale request is marked as no longer pending.
 | Forms and transfer confirmations | Kit `Dialog` | Gator keeps a centered, bordered focus surface with kit-style hints. Go retains Esc and Enter ownership for model, approval, and transfer state; the kit dialog's local Esc handler would duplicate those actions. |
 | Doctor and command results | Kit transcript and Markdown primitives | Go emits semantic fields, items, sections, and tones. React renders one result body for `/doctor` and standalone `gator doctor`; no text-regex color inference remains. The standalone spinner starts in the saved theme. |
 
+The kit's Markdown renderer reads its own dark theme for inline code and links.
+Gator synchronizes that public theme object with its saved palette and remounts
+Markdown when the theme changes. This adapter is tested against the pinned
+kit version.
+
 The screen inventory above was rechecked against each `Panel.Kind` and model
 submode. Compact panels drop the subtitle and composer anchor to preserve the
 active choice and Esc guidance at 20×12. Long detail lines wrap by terminal

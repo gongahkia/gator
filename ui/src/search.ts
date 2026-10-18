@@ -1,10 +1,7 @@
 import type { BackendResult } from "./result.js";
+import { bundleResult, type BackendBundle } from "./bundle.js";
 
-export type SearchMessage = { text: string; result?: BackendResult; bundle?: {
-  Path: string; Status: string;
-  Artifacts: { Path: string; MediaType: string; Valid: boolean }[] | null;
-  Candidates: { ID: string; Status: string; ChangedPaths: string[] }[] | null;
-} };
+export type SearchMessage = { text: string; result?: BackendResult; bundle?: BackendBundle };
 
 function resultText(result: BackendResult): string[] {
   return [
@@ -24,10 +21,7 @@ function resultText(result: BackendResult): string[] {
 export function searchableMessage(message: SearchMessage): string {
   const bundle = message.bundle;
   if (message.result) return resultText(message.result).join("\n");
-  if (bundle) return [bundle.Path, bundle.Status,
-      ...(bundle.Artifacts ?? []).flatMap((item) => [item.Path, item.MediaType]),
-      ...(bundle.Candidates ?? []).flatMap((item) => [item.ID, item.Status, ...item.ChangedPaths])
-    ].join("\n");
+  if (bundle) return resultText(bundleResult(bundle)).join("\n");
   return message.text;
 }
 

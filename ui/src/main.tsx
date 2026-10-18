@@ -4,19 +4,14 @@ import { Box, Text, render, useApp, useInput, TerminalSizeContext, type Instance
 import { Byline, Divider, KeyboardShortcutHint, Markdown, MessageList, Spinner, StatusLine, WelcomeScreen, type Message, type VirtualListHandle } from "@claude-code-kit/ui";
 import React, { useContext, useEffect, useRef, useState } from "react";
 import { runDoctor } from "./doctor.js";
+import { bundleResult, type BackendBundle } from "./bundle.js";
 import { ResultBody, type BackendResult } from "./result.js";
 import { searchMessages } from "./search.js";
 import { panelGeometry, wrapTerminalText } from "./layout.js";
 import { cursorAtGraphemeColumn, graphemeAt, graphemeColumn, nextGrapheme, previousGrapheme } from "./text.js";
-import { GatorPaletteContext, paletteForTheme, useGatorPalette } from "./theme.js";
+import { GatorPaletteContext, paletteForTheme, synchronizeKitTheme, useGatorPalette } from "./theme.js";
 
 type BackendCommand = { name: string; description: string; advanced: boolean; needs_input: boolean };
-type BackendBundle = {
-  Path: string;
-  Status: string;
-  Artifacts: { Path: string; MediaType: string; Valid: boolean }[] | null;
-  Candidates: { ID: string; Status: string; ChangedPaths: string[] }[] | null;
-};
 type BackendMessage = { role: string; text: string; bundle?: BackendBundle; result?: BackendResult };
 type BackendPanel = {
   kind: string;
@@ -118,18 +113,6 @@ class GatorBridge {
   }
 }
 
-function bundleResult(bundle: BackendBundle): BackendResult {
-  return {
-    kind: "list", title: "Verified deliverables", tone: bundle.Status === "verified" ? "success" : "warning",
-    summary: bundle.Status,
-    items: [
-      ...(bundle.Artifacts ?? []).map((item) => ({ label: item.Path, detail: item.MediaType, state: item.Valid ? "verified" : "needs review", tone: item.Valid ? "success" as const : "warning" as const })),
-      ...(bundle.Candidates ?? []).map((item) => ({ label: `Change ${item.ID}`, detail: item.ChangedPaths.join(", "), state: item.Status })),
-    ],
-    footer: bundle.Path,
-  };
-}
-
 function MessageBody({ item }: { item: BackendMessage }): React.ReactNode {
   const palette = useGatorPalette();
   const isUser = item.role === "You";
@@ -139,7 +122,7 @@ function MessageBody({ item }: { item: BackendMessage }): React.ReactNode {
     <Box flexDirection="column">
       <Text color={isGator ? palette.accent : isUser ? undefined : palette.secondary} bold={!isUser} dimColor={isUser}>{label}</Text>
       <Box marginLeft={2} flexDirection="column">
-        {item.result ? <ResultBody result={item.result} /> : item.bundle ? <ResultBody result={bundleResult(item.bundle)} /> : isGator ? <Markdown>{item.text}</Markdown> : item.text.split("\n").map((line, index) => <Text key={index} dimColor={!isUser}>{line || " "}</Text>)}
+        {item.result ? <ResultBody result={item.result} /> : item.bundle ? <ResultBody result={bundleResult(item.bundle)} /> : isGator ? <Markdown key={palette.accent}>{item.text}</Markdown> : item.text.split("\n").map((line, index) => <Text key={index} dimColor={!isUser}>{line || " "}</Text>)}
       </Box>
     </Box>
   );
@@ -345,6 +328,9 @@ function PanelScreen({ panel, status, draft, statusLine, bridge, exit }: { panel
   const rowStart = Math.max(0, Math.min(selected - Math.floor(maxRows / 2), rows.length - maxRows));
   const maxLines = Math.max(1, bodyRows - (rows.length > 0 ? Math.min(rows.length, maxRows) * rowHeight : 0));
   const blockOffset = Math.min(offset, Math.max(0, blocks.length - maxLines));
+  const compactShortcuts = panel.hints?.length
+    ? [...new Set([...panel.hints.slice(0, 2), panel.hints[panel.hints.length - 1]].map((hint) => hint.shortcut))].join(" · ")
+    : "Esc back";
   return (
     <Box flexDirection="column" flexGrow={1} paddingX={geometry.paddingX} paddingTop={geometry.compact ? 0 : 1}>
       <PanelKeys bridge={bridge} exit={exit} scroll={(amount) => setOffset((current) => Math.max(0, Math.min(blocks.length - maxLines, current + amount)))} />
@@ -374,7 +360,7 @@ function PanelScreen({ panel, status, draft, statusLine, bridge, exit }: { panel
         {status && status !== panel.notice && <Box marginTop={geometry.compact ? 0 : 1}><Text wrap="truncate-end" dimColor>{status}</Text></Box>}
         </Box>
         <Divider width={geometry.contentWidth} color={palette.accent} />
-        <Text wrap="truncate-end" dimColor>{geometry.compact ? "Esc back" : panel.hints?.length
+        <Text wrap="truncate-end" dimColor>{geometry.compact ? compactShortcuts : panel.hints?.length
           ? <Byline>{panel.hints.map((hint) => <KeyboardShortcutHint key={`${hint.shortcut}-${hint.action}`} shortcut={hint.shortcut} action={hint.action} />)}</Byline>
           : panel.footer || "Esc back"}</Text>
       </Box>
@@ -412,16 +398,28 @@ function GreenSearch({ messages, close, navigate }: { messages: BackendMessage[]
     const position = cursorRef.current;
     const found = matchesRef.current;
     const selectedMatch = selectedRef.current;
-    if (key.escape) close();
-    else if (key.leftArrow) { cursorRef.current = previousGrapheme(current, position); setCursor(cursorRef.current); }
-    else if (key.rightArrow) { cursorRef.current = nextGrapheme(current, position); setCursor(cursorRef.current); }
-    else if (key.backspace && position > 0) { const previous = previousGrapheme(current, position); change(current.slice(0, previous) + current.slice(position), previous); }
-    else if (key.delete && position < current.length) change(current.slice(0, position) + current.slice(nextGrapheme(current, position)), position);
-    else if ((key.return || (key.ctrl && input === "n")) && found.length) {
+    if (key.escape) { close(); return; }
+    if (key.leftArrow) { cursorRef.current = previousGrapheme(current, position); setCursor(cursorRef.current); return; }
+    if (key.rightArrow) { cursorRef.current = nextGrapheme(current, position); setCursor(cursorRef.current); return; }
+    if (key.backspace) {
+      if (position > 0) { const previous = previousGrapheme(current, position); change(current.slice(0, previous) + current.slice(position), previous); }
+      return;
+    }
+    if (key.delete) {
+      if (position < current.length) change(current.slice(0, position) + current.slice(nextGrapheme(current, position)), position);
+      return;
+    }
+    if ((key.return || (key.ctrl && input === "n")) && found.length) {
       const next = (selectedMatch + 1) % found.length; selectedRef.current = next; setSelected(next); navigate(found[next].index);
-    } else if (key.ctrl && input === "p" && found.length) {
+      return;
+    }
+    if (key.ctrl && input === "p" && found.length) {
       const previous = (selectedMatch - 1 + found.length) % found.length; selectedRef.current = previous; setSelected(previous); navigate(found[previous].index);
-    } else if (!key.ctrl && !key.meta && input) change(current.slice(0, position) + input + current.slice(position), position + input.length);
+      return;
+    }
+    if (key.ctrl || key.meta || key.tab || key.return) return;
+    if (input.endsWith("\r")) input = input.slice(0, -1);
+    if (input) change(current.slice(0, position) + input + current.slice(position), position + input.length);
   });
   return <Box paddingX={1}><Text color={palette.accent}>Search: </Text><Text>{query.slice(0, cursor)}<Text inverse>{graphemeAt(query, cursor) || " "}</Text>{query.slice(nextGrapheme(query, cursor))}</Text><Text dimColor>{`  ${matches.length ? `${selected + 1}/${matches.length} matches` : "no matches"}`}</Text></Box>;
 }
@@ -439,7 +437,8 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
   const [dismissed, setDismissed] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const terminal = useContext(TerminalSizeContext);
-  const palette = paletteForTheme(state?.theme);
+  const palette = paletteForTheme(state?.theme ?? process.env.GATOR_UI_THEME);
+  synchronizeKitTheme(palette);
   const list = useRef<VirtualListHandle>(null);
   const lastBackendInput = useRef("");
   const inputRef = useRef(input);

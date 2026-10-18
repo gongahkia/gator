@@ -91,3 +91,8 @@ conventions while using the saved palette and Go workflow state. The kit's
 its `Dialog` owns Esc locally; Gator needs Go to own Esc for approval and model
 forms. Keep keyboard ownership in React for text editing and in Go for workflow
 actions so one key cannot trigger both.
+
+The kit's Markdown component reads its own theme for inline code and links.
+Gator synchronizes those public theme colors with the active palette before
+rendering Markdown; the adapter is covered by a UI test because it depends on
+the pinned kit version.
