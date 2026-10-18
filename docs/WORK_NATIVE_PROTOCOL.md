@@ -12,7 +12,6 @@ The first frame is `{"version":1,"type":"start","request":{...}}`. Request field
 | `conversation_id`, `parent_revision_id` | Continuation and optional branch |
 | `snapshot_id`, `refresh_source` | Explicit capture or live source refresh |
 | `mode`, `contract` | Full Work mode and contract v1 |
-| `code` | Complete `workrun.CodePolicy` object; existing Go field names are preserved |
 | `max_steps`, `limits` | Manager steps and aggregate `model_requests`, `tokens`, `wall_seconds` |
 | `connectors`, `web_origins` | Explicit source grants |
 | `images`, `attachments` | Validated normalized attachments; `data` is base64 JSON bytes |
@@ -46,3 +45,7 @@ Clients should continuously consume output; event delivery applies bounded
 backpressure. EOF ends control input, not the running task. Use a cancel frame
 for deliberate cancellation. Pending interactions without a response end only
 when cancelled or timed out. A failed output writer cancels and joins Work.
+
+This v1 surface does not accept a `code` policy or `steer_task` control frame.
+Persistent-agent management such as goals, memory, jobs, and provider setup
+remains available through the Go CLI rather than this Work-only protocol.
