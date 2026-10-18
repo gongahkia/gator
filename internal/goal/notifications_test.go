@@ -45,6 +45,11 @@ func TestGoalNotificationPolicyPersistsAndHandlesOvernightQuietHours(t *testing.
 	if policy.AllowsDesktop(time.Date(2026, 10, 18, 4, 0, 0, 0, time.UTC)) {
 		t.Fatal("muted goal allowed a desktop notification")
 	}
+	policy.DesktopMuted = false
+	policy.UrgentOnly = true
+	if policy.AllowsDesktop(time.Date(2026, 10, 18, 4, 0, 0, 0, time.UTC)) || !policy.AllowsDesktopUrgency(time.Date(2026, 10, 18, 4, 0, 0, 0, time.UTC), true) || policy.AllowsDesktopUrgency(time.Date(2026, 10, 17, 16, 0, 0, 0, time.UTC), true) {
+		t.Fatal("urgent-only policy ignored urgency or quiet hours")
+	}
 	for _, invalid := range []NotificationPolicy{
 		{QuietStart: "9:00", QuietEnd: "10:00", Timezone: "UTC"},
 		{QuietStart: "08:00", QuietEnd: "08:00", Timezone: "UTC"},

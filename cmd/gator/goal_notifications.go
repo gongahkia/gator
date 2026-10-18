@@ -11,7 +11,7 @@ import (
 	"github.com/gongahkia/gator/internal/goal"
 )
 
-const goalNotificationsUsage = "usage: gator goal notifications ID [--desktop on|off] [--quiet HH:MM-HH:MM --timezone AREA/CITY | --clear-quiet]"
+const goalNotificationsUsage = "usage: gator goal notifications ID [--desktop on|off] [--urgent-only on|off] [--quiet HH:MM-HH:MM --timezone AREA/CITY | --clear-quiet]"
 
 func goalNotificationsCommand(store goal.Store, args []string, out io.Writer) error {
 	if len(args) == 0 {
@@ -28,13 +28,14 @@ func goalNotificationsCommand(store goal.Store, args []string, out io.Writer) er
 	flags := flag.NewFlagSet("goal notifications", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	desktop := flags.String("desktop", "", "on or off when desktop notifications are globally enabled")
+	urgentOnly := flags.String("urgent-only", "", "desktop only for urgent alerts and failures")
 	quiet := flags.String("quiet", "", "local quiet interval HH:MM-HH:MM")
 	timezone := flags.String("timezone", "", "IANA timezone for quiet hours")
 	clearQuiet := flags.Bool("clear-quiet", false, "remove quiet hours")
 	if err := flags.Parse(args[1:]); err != nil {
 		return err
 	}
-	if len(flags.Args()) != 0 || *desktop == "" && *quiet == "" && !*clearQuiet || *quiet != "" && *clearQuiet {
+	if len(flags.Args()) != 0 || *desktop == "" && *urgentOnly == "" && *quiet == "" && !*clearQuiet || *quiet != "" && *clearQuiet {
 		return errors.New(goalNotificationsUsage)
 	}
 	policy := record.Notifications
@@ -46,6 +47,15 @@ func goalNotificationsCommand(store goal.Store, args []string, out io.Writer) er
 		policy.DesktopMuted = true
 	default:
 		return errors.New("--desktop must be on or off")
+	}
+	switch *urgentOnly {
+	case "":
+	case "on":
+		policy.UrgentOnly = true
+	case "off":
+		policy.UrgentOnly = false
+	default:
+		return errors.New("--urgent-only must be on or off")
 	}
 	if *clearQuiet {
 		if *timezone != "" {
@@ -73,6 +83,9 @@ func goalDesktopStatus(policy goal.NotificationPolicy) string {
 	if policy.DesktopMuted {
 		return "off"
 	}
+	if policy.UrgentOnly {
+		return "on (urgent only)"
+	}
 	return "on"
 }
 
@@ -83,7 +96,7 @@ func goalQuietStatus(policy goal.NotificationPolicy) string {
 	return policy.QuietStart + "-" + policy.QuietEnd + " " + policy.Timezone
 }
 
-func goalAllowsDesktopNotification(stateDir, goalID string, now time.Time) bool {
+func goalAllowsDesktopNotification(stateDir, goalID string, now time.Time, urgent bool) bool {
 	if goalID == "" {
 		return true
 	}
@@ -92,5 +105,5 @@ func goalAllowsDesktopNotification(stateDir, goalID string, now time.Time) bool 
 		return false
 	}
 	record, err := store.Load(goalID)
-	return err == nil && record.Notifications.AllowsDesktop(now)
+	return err == nil && record.Notifications.AllowsDesktopUrgency(now, urgent)
 }

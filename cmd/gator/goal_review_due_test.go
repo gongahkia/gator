@@ -83,6 +83,7 @@ func TestDueGoalReviewHonorsDesktopPolicyWithoutLosingInbox(t *testing.T) {
 	}
 	setDue("Muted review", goal.NotificationPolicy{DesktopMuted: true})
 	setDue("Quiet review", goal.NotificationPolicy{QuietStart: "07:00", QuietEnd: "09:00", Timezone: "Asia/Singapore"})
+	setDue("Urgent-only review", goal.NotificationPolicy{UrgentOnly: true})
 	setDue("Visible review", goal.NotificationPolicy{})
 	runDueGoalReviewsWith(state, true, now, visit)
 	if len(delivered) != 1 || !strings.Contains(delivered[0], "Visible review") {
@@ -93,7 +94,7 @@ func TestDueGoalReviewHonorsDesktopPolicyWithoutLosingInbox(t *testing.T) {
 		t.Fatal(err)
 	}
 	entries, err := mailbox.List(false, 10)
-	if err != nil || len(entries) != 3 {
+	if err != nil || len(entries) != 4 {
 		t.Fatalf("retained reminders = %#v, %v", entries, err)
 	}
 	runDueGoalReviewsWith(state, true, now.Add(2*time.Hour), visit)

@@ -134,7 +134,7 @@ func TestJobsUseTheConfiguredSharedServiceAndRefreshTheSection(t *testing.T) {
 }
 
 func TestInboxRefreshesOnOpenAndAfterRating(t *testing.T) {
-	entries := []inbox.Entry{{ID: "alert-one", Status: "completed", Title: "Venue update", Summary: "Deadline changed"}}
+	entries := []inbox.Entry{{ID: "alert-one", Status: "completed", Title: "Venue update", Summary: "Deadline changed", Urgent: true}}
 	var received []string
 	model := New(Config{
 		CurrentFolder: "/work",
@@ -149,7 +149,7 @@ func TestInboxRefreshesOnOpenAndAfterRating(t *testing.T) {
 	})
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlB})
 	model = updated.(Model)
-	if model.section != "inbox" || !strings.Contains(model.View(), "alert-one") || !strings.Contains(model.View(), "unrated") {
+	if model.section != "inbox" || !strings.Contains(model.View(), "alert-one") || !strings.Contains(model.View(), "unrated · urgent") {
 		t.Fatalf("fresh inbox panel = %s", model.View())
 	}
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})

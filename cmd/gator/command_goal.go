@@ -25,7 +25,7 @@ const goalUsage = `Gator goals — ongoing responsibilities
   gator goal show ID
   gator goal activity ID
   gator goal access ID
-  gator goal notifications ID [--desktop on|off] [--quiet HH:MM-HH:MM --timezone AREA/CITY | --clear-quiet]
+  gator goal notifications ID [--desktop on|off] [--urgent-only on|off] [--quiet HH:MM-HH:MM --timezone AREA/CITY | --clear-quiet]
   gator goal plan ID [outcome|add|step|remove|review-at|reviewed ...]
   gator goal context ID TEXT
   gator goal pause|resume|complete ID

@@ -82,11 +82,11 @@ func TestGoalWatchChangedSourceIsQuietAcrossRestart(t *testing.T) {
 	}
 	execute = func(_ context.Context, _ jobs.Definition, _ string, _ ...string) (jobResult, error) {
 		calls++
-		return jobResult{Status: "completed", Summary: "Venue A cancelled; review Venue B and a reply draft", ResultSHA256: "changed", WatchAttention: true}, nil
+		return jobResult{Status: "completed", Summary: "Venue A cancelled; review Venue B and a reply draft", ResultSHA256: "changed", WatchAttention: true, Urgent: true}, nil
 	}
 	runDueJobsContextWith(context.Background(), store, state, false, now.Add(2*time.Minute), execute)
 	entries, err = mailbox.List(false, 0)
-	if err != nil || len(entries) != 1 || entries[0].GoalID != record.ID || calls != 2 {
+	if err != nil || len(entries) != 1 || entries[0].GoalID != record.ID || !entries[0].Urgent || calls != 2 {
 		t.Fatalf("changed watch inbox = %#v; calls=%d; err=%v", entries, calls, err)
 	}
 	runDueJobsContextWith(context.Background(), store, state, false, now.Add(3*time.Minute), execute)
@@ -95,7 +95,7 @@ func TestGoalWatchChangedSourceIsQuietAcrossRestart(t *testing.T) {
 		t.Fatalf("duplicate after unchanged minute: entries=%#v calls=%d err=%v", entries, calls, err)
 	}
 	history, err := store.History(definitions[0].ID, 0)
-	if err != nil || len(history) != 4 || history[0].Status != "unchanged" {
+	if err != nil || len(history) != 4 || history[0].Status != "unchanged" || !history[1].Urgent {
 		t.Fatalf("watch attempts = %#v, %v", history, err)
 	}
 }
@@ -150,6 +150,25 @@ func TestGoalWatchAttentionCannotHideArtifactsOrSuggestions(t *testing.T) {
 	}
 	if attention, _ := classifyGoalWatchResult("I found a changed date.", nil, nil, watchReferenceSet{}); !attention {
 		t.Fatal("unstructured response was hidden")
+	}
+}
+
+func TestGoalWatchUrgencyRequiresValidAttentiveDecision(t *testing.T) {
+	for _, candidate := range []struct {
+		output string
+		urgent bool
+	}{
+		{`{"attention":true,"urgent":true,"summary":"Venue cancelled; book replacement today."}`, true},
+		{"```json\n{\"attention\":true,\"urgent\":true,\"summary\":\"Deadline changed.\"}\n```", true},
+		{`{"attention":true,"urgent":false,"summary":"Routine update."}`, false},
+		{`{"attention":false,"urgent":true,"summary":"Nothing changed."}`, false},
+		{`{"attention":true,"summary":"Old-format response."}`, false},
+		{`{"attention":true,"urgent":true}`, false},
+		{"malformed", false},
+	} {
+		if got := goalWatchUrgent(candidate.output); got != candidate.urgent {
+			t.Fatalf("urgency for %q = %t", candidate.output, got)
+		}
 	}
 }
 

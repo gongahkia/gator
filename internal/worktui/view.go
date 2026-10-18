@@ -267,8 +267,12 @@ func (m Model) renderSection(width, height int, accent, dim, selectedStyle lipgl
 			if rating == "" {
 				rating = "unrated"
 			}
+			urgency := ""
+			if item.Urgent {
+				urgency = " · urgent"
+			}
 			view.WriteString(messageStyle.Render(accent.Render(safeInboxText(item.Status)+":") + " " + safeInboxText(item.Title) + "\n" +
-				item.ID + " · " + readState + " · " + rating + "\n" + safeInboxText(item.Summary)))
+				item.ID + " · " + readState + " · " + rating + urgency + "\n" + safeInboxText(item.Summary)))
 			view.WriteString("\n\n")
 		}
 		view.WriteString(dim.Render("esc, then /inbox rate ENTRY_ID useful|noise|wrong · /inbox read ENTRY_ID") + "\n")

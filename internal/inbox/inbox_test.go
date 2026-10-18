@@ -13,12 +13,12 @@ func TestAddListAndMarkRead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	entry, err := store.Add(Entry{Kind: "job", Title: "Weekly brief", Summary: "Completed", Status: "completed"})
+	entry, err := store.Add(Entry{Kind: "job", Title: "Weekly brief", Summary: "Completed", Status: "completed", Urgent: true})
 	if err != nil {
 		t.Fatal(err)
 	}
 	entries, err := store.List(true, 10)
-	if err != nil || len(entries) != 1 || entries[0].ID != entry.ID {
+	if err != nil || len(entries) != 1 || entries[0].ID != entry.ID || !entries[0].Urgent {
 		t.Fatalf("List = %#v, %v", entries, err)
 	}
 	if err := store.MarkRead(entry.ID, time.Now()); err != nil {

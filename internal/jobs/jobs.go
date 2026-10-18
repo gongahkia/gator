@@ -112,6 +112,7 @@ type Attempt struct {
 	ResultSHA256             string         `json:"result_sha256,omitempty"`
 	InputSHA256              string         `json:"input_sha256,omitempty"`
 	WatchAttention           bool           `json:"watch_attention,omitempty"`
+	Urgent                   bool           `json:"urgent,omitempty"`
 	WatchItems               []WatchItem    `json:"watch_items,omitempty"`
 	WatchChanges             []WatchChange  `json:"watch_changes,omitempty"`
 	WatchCursors             []WatchCursor  `json:"watch_cursors,omitempty"`

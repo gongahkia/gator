@@ -69,6 +69,11 @@ gator goal plan GOAL_ID review-at 2026-10-21T09:00:00+08:00
 Inside a goal chat, `/plan` shows that plan. `/plan outcome TEXT`, `/plan add TITLE | RFC3339_DUE | EVIDENCE`, `/plan step STEP_ID done | EVIDENCE`, and `/plan review-at RFC3339` make common edits in place; `/plan help` shows the syntax. `/activity` (or `gator goal activity ID`) brings together open steps, the last and next scheduled checks, supervisor status, unread follow-ups, pending goal suggestions, and commands to pause or resume. `gator goal access ID` makes bounded live reads of up to eight selected watch sources and reports whether each read succeeds, needs login, or lacks permission; it does not retain response bodies or update watch fingerprints. A successful probe confirms access at that moment, not future reachability or relevance. `gator goal notifications ID --quiet 22:00-08:00 --timezone Asia/Singapore` (or `/notifications` inside its chat) suppresses desktop interruptions for that goal during quiet hours; `--desktop off` mutes its desktop interruptions entirely. These settings narrow an enabled global desktop notification setting. The inbox always retains results and failures. `gator job inbox rate ENTRY_ID useful|noise|wrong|clear` records explicit feedback on shown job alerts, and goal activity counts those ratings; quiet checks and missed changes are outside that count. The activity view reads retained state and makes no claim that a scheduled check will run while the host is off.
 When the local job supervisor is running, a due `review-at` creates one inbox
 reminder without a model call unless an enabled watch owns that goal's review.
+The goal's desktop mute and quiet hours apply to this reminder too. Optional
+`gator goal notifications ID --urgent-only on` limits desktop alerts to failed
+jobs and watch results the model marks urgent; routine results and due reviews
+remain in the inbox. The urgent label is visible but unverified, so this
+setting needs real-world missed-alert evaluation before being a default.
 
 `/plan reviewed` records that the user reviewed
 the goal and clears a due review time. The reminder will appear after the CLI

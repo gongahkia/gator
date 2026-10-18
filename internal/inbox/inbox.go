@@ -31,6 +31,7 @@ type Entry struct {
 	ConversationID string    `json:"conversation_id,omitempty"`
 	RevisionID     string    `json:"revision_id,omitempty"`
 	Status         string    `json:"status"`
+	Urgent         bool      `json:"urgent,omitempty"`
 	CreatedAt      time.Time `json:"created_at"`
 	ReadAt         time.Time `json:"read_at,omitempty"`
 	Rating         string    `json:"rating,omitempty"`

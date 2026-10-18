@@ -9,6 +9,7 @@ import (
 // are retained regardless of this policy.
 type NotificationPolicy struct {
 	DesktopMuted bool   `json:"desktop_muted,omitempty"`
+	UrgentOnly   bool   `json:"urgent_only,omitempty"`
 	QuietStart   string `json:"quiet_start,omitempty"`
 	QuietEnd     string `json:"quiet_end,omitempty"`
 	Timezone     string `json:"timezone,omitempty"`
@@ -28,7 +29,14 @@ func (p NotificationPolicy) Validate() error {
 }
 
 func (p NotificationPolicy) AllowsDesktop(now time.Time) bool {
+	return p.AllowsDesktopUrgency(now, false)
+}
+
+func (p NotificationPolicy) AllowsDesktopUrgency(now time.Time, urgent bool) bool {
 	if p.DesktopMuted {
+		return false
+	}
+	if p.UrgentOnly && !urgent {
 		return false
 	}
 	if p.QuietStart == "" {

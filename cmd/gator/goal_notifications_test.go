@@ -27,7 +27,7 @@ func TestGoalQuietHoursSuppressDesktopButKeepInbox(t *testing.T) {
 		t.Fatalf("notification settings = %q, %v", output.String(), err)
 	}
 	quiet, _ := time.Parse(time.RFC3339, "2026-10-17T16:00:00Z")
-	if goalAllowsDesktopNotification(stateDir, record.ID, quiet) {
+	if goalAllowsDesktopNotification(stateDir, record.ID, quiet, false) {
 		t.Fatal("quiet goal allowed desktop interruption")
 	}
 	definition := jobs.Definition{ID: "job-goal-quiet", Name: "Offsite", GoalID: record.ID}
@@ -50,5 +50,51 @@ func TestGoalQuietHoursSuppressDesktopButKeepInbox(t *testing.T) {
 	loaded, err := goals.Load(record.ID)
 	if err != nil || !loaded.Notifications.DesktopMuted || loaded.Notifications.QuietStart != "" {
 		t.Fatalf("updated notification policy = %#v, %v", loaded.Notifications, err)
+	}
+}
+
+func TestGoalUrgentOnlyDesktopSettingKeepsRoutineResultsInInbox(t *testing.T) {
+	stateDir := t.TempDir()
+	t.Setenv("GATOR_STATE_DIR", stateDir)
+	goals, err := goal.Open(stateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := goals.Add("Track offsite", "", t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	if err := goalCommand([]string{"notifications", record.ID, "--urgent-only", "on"}, &output); err != nil || !strings.Contains(output.String(), "on (urgent only)") {
+		t.Fatalf("urgent-only setting = %q, %v", output.String(), err)
+	}
+	now := time.Date(2026, 10, 18, 12, 0, 0, 0, time.UTC)
+	if goalAllowsDesktopNotification(stateDir, record.ID, now, false) || !goalAllowsDesktopNotification(stateDir, record.ID, now, true) {
+		t.Fatal("urgent-only policy did not distinguish routine from urgent")
+	}
+	definition := jobs.Definition{ID: "job-offsite", Name: "Offsite", GoalID: record.ID}
+	entry, err := recordJobInbox(stateDir, definition, jobs.Attempt{Status: "completed", Summary: "Routine update", ResultSHA256: "routine"})
+	if err != nil || entry.ID == "" || entry.Urgent {
+		t.Fatalf("routine result = %#v, %v", entry, err)
+	}
+	failure, err := recordJobInbox(stateDir, definition, jobs.Attempt{Status: "failed", Error: "provider unavailable"})
+	if err != nil || failure.ID == "" || !failure.Urgent {
+		t.Fatalf("failed result = %#v, %v", failure, err)
+	}
+	mailbox, err := inbox.Open(stateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries, err := mailbox.List(false, 10)
+	if err != nil || len(entries) != 2 {
+		t.Fatalf("urgent-only inbox = %#v, %v", entries, err)
+	}
+	output.Reset()
+	if err := inboxCommand([]string{"show", failure.ID}, &output); err != nil || !strings.Contains(output.String(), "urgent: true") {
+		t.Fatalf("urgency was not visible in inbox details = %q, %v", output.String(), err)
+	}
+	output.Reset()
+	if err := goalCommand([]string{"notifications", record.ID, "--urgent-only", "off"}, &output); err != nil || goalAllowsDesktopNotification(stateDir, record.ID, now, false) == false {
+		t.Fatalf("urgent-only reset = %q, %v", output.String(), err)
 	}
 }

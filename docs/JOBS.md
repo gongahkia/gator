@@ -161,7 +161,12 @@ not create a second inbox entry.
 `gator goal notifications ID` shows that goal's desktop delivery policy.
 `--desktop off` mutes desktop alerts for that goal, while `--quiet
 22:00-08:00 --timezone Asia/Singapore` suppresses them during local quiet
-hours. These settings only narrow desktop alerts when the supervisor's global
+hours. `--urgent-only on` sends desktop alerts only for failed jobs and goal
+watch results explicitly marked urgent; ordinary completed jobs and due plan
+reviews stay in the inbox. Use `--urgent-only off` to restore all eligible
+desktop alerts. A watch's urgent label is a model judgment, not a verified
+severity assessment; older watch responses without the field count as routine.
+These settings only narrow desktop alerts when the supervisor's global
 notification option is enabled. Completed results and failures still go to
 the terminal inbox; quiet hours do not defer or drop them. The same policy
 applies to due plan-review reminders. A reminder retained during quiet hours
@@ -214,6 +219,8 @@ Each row shows its entry ID, read state, and rating. Press `esc` to return to
 chat, then use `/inbox show ENTRY_ID`, `/inbox read ENTRY_ID`, or
 `/inbox rate ENTRY_ID useful|noise|wrong|clear`. The panel refreshes when reopened
 and after an inbox action, including actions through `/jobs inbox ...`.
+Urgent job alerts show an explicit marker in the CLI and terminal inbox; a
+user rating is independent of that model-assigned label.
 
 `gator job quiet-audit JOB_ID` lists the newest 50 completed goal-watch checks
 where the model explicitly chose quiet, along with their attempt IDs, retained

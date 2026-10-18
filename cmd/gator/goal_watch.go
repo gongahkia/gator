@@ -16,6 +16,28 @@ import (
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
+type goalWatchDecision struct {
+	Attention *bool    `json:"attention"`
+	Urgent    bool     `json:"urgent"`
+	Summary   string   `json:"summary"`
+	Evidence  []string `json:"evidence"`
+}
+
+func parseGoalWatchDecision(finalText string) (goalWatchDecision, bool) {
+	value := strings.TrimSpace(finalText)
+	if strings.HasPrefix(value, "```json\n") && strings.HasSuffix(value, "\n```") {
+		value = strings.TrimSuffix(strings.TrimPrefix(value, "```json\n"), "\n```")
+	}
+	var decision goalWatchDecision
+	err := json.Unmarshal([]byte(value), &decision)
+	return decision, err == nil && decision.Attention != nil && strings.TrimSpace(decision.Summary) != ""
+}
+
+func goalWatchUrgent(finalText string) bool {
+	decision, valid := parseGoalWatchDecision(finalText)
+	return valid && *decision.Attention && decision.Urgent
+}
+
 // A quiet watch is an explicit model decision with no durable side effect.
 // If the final answer is malformed, surface it for review rather than hide it.
 func classifyGoalWatchResult(finalText string, messages []agent.Message, artifacts []artifact.File, references watchReferenceSet) (bool, string) {
@@ -33,16 +55,8 @@ func classifyGoalWatchResult(finalText string, messages []agent.Message, artifac
 			failedSuggestion = true
 		}
 	}
-	var decision struct {
-		Attention *bool    `json:"attention"`
-		Summary   string   `json:"summary"`
-		Evidence  []string `json:"evidence"`
-	}
-	value := strings.TrimSpace(finalText)
-	if strings.HasPrefix(value, "```json\n") && strings.HasSuffix(value, "\n```") {
-		value = strings.TrimSuffix(strings.TrimPrefix(value, "```json\n"), "\n```")
-	}
-	if json.Unmarshal([]byte(value), &decision) == nil && decision.Attention != nil && strings.TrimSpace(decision.Summary) != "" {
+	decision, valid := parseGoalWatchDecision(finalText)
+	if valid {
 		if failedSuggestion {
 			return true, "Goal watch could not queue its proposed change; review the Work run."
 		}
