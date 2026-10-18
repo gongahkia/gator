@@ -4,41 +4,20 @@ import (
 	"strings"
 )
 
+func normalizeCatalogTheme(name string) string {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "contrast", "mono":
+		return strings.ToLower(strings.TrimSpace(name))
+	default:
+		return "gator"
+	}
+}
+
 func (m Model) inlineWidth() int {
 	if m.width <= 0 {
 		return 68
 	}
 	return min(72, max(16, m.width-4))
-}
-
-func (m Model) fieldView(label, hint, value string) string {
-	sections := []string{labelStyle.Render(label)}
-	if hint != "" {
-		sections = append(sections, dimStyle.Render(compact(hint, m.inlineWidth())))
-	}
-	if value != "" {
-		sections = append(sections, value)
-	}
-	return strings.Join(sections, "\n")
-}
-
-func (m Model) visibleRange(total, selected, limit int) (int, int) {
-	if total == 0 || limit <= 0 {
-		return 0, 0
-	}
-	limit = min(limit, total)
-	selected = min(max(0, selected), total-1)
-	start := selected - limit/2
-	start = max(0, min(start, total-limit))
-	return start, start + limit
-}
-
-func (m Model) modelCatalogConfirmationView() string {
-	title, hint, detail := m.modelCatalogConfirmationContent()
-	if title == "" {
-		return ""
-	}
-	return m.fieldView(title, hint, detail)
 }
 
 func (m Model) modelCatalogConfirmationContent() (string, string, string) {
@@ -89,14 +68,6 @@ func (m Model) modelCatalogConfirmationContent() (string, string, string) {
 		}
 	}
 	return "", "", ""
-}
-
-func (m Model) localDependencyHelpView() string {
-	title, hint, detail := m.localDependencyHelpContent()
-	if title == "" {
-		return ""
-	}
-	return m.fieldView(title, hint, detail)
 }
 
 func (m Model) localDependencyHelpContent() (string, string, string) {

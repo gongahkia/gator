@@ -21,8 +21,6 @@ import (
 	"github.com/gongahkia/gator/internal/worksession"
 )
 
-const gatorWordmark = "🐊 Gator"
-
 type RunResult struct {
 	ConversationID string
 	RevisionID     string

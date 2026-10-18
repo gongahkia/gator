@@ -21,38 +21,35 @@ import (
 //go:embed ui/gator-ui.cjs
 var terminalUIBundle []byte
 
-// launchTerminalUI starts the bundled React renderer. A missing Node runtime
-// leaves the native Go interface available, including in single-file releases.
-func launchTerminalUI(conversationID, goalID string) (bool, error) {
-	if os.Getenv("GATOR_NATIVE_TUI") == "1" {
-		return false, nil
-	}
+// launchTerminalUI starts the bundled React renderer. Interactive Work requires
+// Node 22 or newer; headless commands do not depend on this runtime.
+func launchTerminalUI(conversationID, goalID string) error {
 	node, err := exec.LookPath("node")
 	if err != nil {
-		return false, nil
+		return errors.New("interactive Gator requires Node.js 22 or newer; install Node.js and retry")
 	}
 	if !supportedNodeUI(node) {
-		return false, nil
+		return errors.New("interactive Gator requires Node.js 22 or newer; upgrade Node.js and retry")
 	}
 	binary, err := os.Executable()
 	if err != nil {
-		return false, err
+		return err
 	}
 	bundle, err := os.CreateTemp("", "gator-ui-*.cjs")
 	if err != nil {
-		return false, err
+		return err
 	}
 	defer os.Remove(bundle.Name())
 	if err := bundle.Chmod(0o600); err != nil {
 		bundle.Close()
-		return false, err
+		return err
 	}
 	if _, err := bundle.Write(terminalUIBundle); err != nil {
 		bundle.Close()
-		return false, err
+		return err
 	}
 	if err := bundle.Close(); err != nil {
-		return false, err
+		return err
 	}
 	command := exec.Command(node, bundle.Name(), binary, conversationID, goalID)
 	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
@@ -60,7 +57,7 @@ func launchTerminalUI(conversationID, goalID string) (bool, error) {
 	// foreground job and leave the launcher waiting for the React UI to resume.
 	signal.Ignore(os.Interrupt)
 	defer signal.Reset(os.Interrupt)
-	return true, command.Run()
+	return command.Run()
 }
 
 func supportedNodeUI(node string) bool {

@@ -53,7 +53,7 @@ func TestCloudModelSetupClearsCredentialAndUpdatesSelection(t *testing.T) {
 	form.focus = cloudSetupAPIVersionField
 	panel.model.localModels.cloudSetup = &form
 
-	if strings.Contains(panel.View(), "secret-api-key") {
+	if strings.Contains(panelSnapshotText(panel.UISnapshot()), "secret-api-key") {
 		t.Fatal("cloud setup view exposed the typed credential")
 	}
 	_, command := panel.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -67,7 +67,7 @@ func TestCloudModelSetupClearsCredentialAndUpdatesSelection(t *testing.T) {
 	if panel.model.localModels.cloudSetup != nil || panel.model.provider.Value() != "azure-openai" || panel.model.model.Value() != "review" {
 		t.Fatalf("selection = form:%#v provider:%q model:%q", panel.model.localModels.cloudSetup, panel.model.provider.Value(), panel.model.model.Value())
 	}
-	if strings.Contains(panel.View(), "secret-api-key") {
+	if strings.Contains(panelSnapshotText(panel.UISnapshot()), "secret-api-key") {
 		t.Fatal("saved panel view exposed the typed credential")
 	}
 }
@@ -197,7 +197,8 @@ func TestInstallationHelpReviewsTheOfficialActionBeforeRunningIt(t *testing.T) {
 	if m.localModels.confirmation != localModelConfirmRunInstallation || m.localModels.installation == nil {
 		t.Fatalf("installation action was not held for confirmation: %#v", m.localModels)
 	}
-	view := m.modelCatalogConfirmationView()
+	title, hint, detail := m.modelCatalogConfirmationContent()
+	view := title + "\n" + hint + "\n" + detail
 	for _, expected := range []string{"Run Ollama installer?", "curl -fsSL https://ollama.com/install.sh | sh", "Review the exact official action"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("installation review omitted %q:\n%s", expected, view)

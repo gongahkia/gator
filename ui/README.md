@@ -17,8 +17,8 @@ go build -o bin/gator ./cmd/gator
 ./bin/gator
 ```
 
-Node.js 22 or newer is required for the React display. When it is absent,
-Gator starts the native Go TUI. Set `GATOR_NATIVE_TUI=1` to use that interface
-on purpose. The generated bundle is checked against the TypeScript source in
+Node.js 22 or newer is required for interactive Gator. If it is missing or too
+old, interactive startup exits with an installation message. Headless commands
+and `gator doctor` continue to work. The generated bundle is checked against the TypeScript source in
 CI and included in native releases. `ui/licenses/` contains notices for the
 bundled terminal UI dependencies.

@@ -1,56 +1,19 @@
 package modelcatalog
 
 import (
-	"encoding/json"
 	"strings"
-	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
-	modelprovider "github.com/gongahkia/gator/internal/model"
+	"github.com/gongahkia/gator/internal/uisnapshot"
 )
 
-func TestModelPanelSnapshotFollowsChoiceSelection(t *testing.T) {
-	panel := NewModelCatalogPanel(Config{})
-	initial := panel.UISnapshot()
-	if initial.Title != "Models" || len(initial.Rows) != 2 || initial.Selected != 0 {
-		t.Fatalf("initial model panel = %#v", initial)
+func panelSnapshotText(panel uisnapshot.Panel) string {
+	parts := []string{panel.Kind, panel.Title, panel.Subtitle, panel.Query, panel.Notice, panel.Footer}
+	for _, row := range panel.Rows {
+		parts = append(parts, row.Label, row.Detail, row.State)
 	}
-	if _, command := panel.Update(tea.KeyMsg{Type: tea.KeyDown}); command != nil {
-		t.Fatalf("unexpected command while moving model choice")
+	for _, block := range panel.Blocks {
+		parts = append(parts, block.Title)
+		parts = append(parts, block.Lines...)
 	}
-	selected := panel.UISnapshot()
-	if selected.Selected != 1 || selected.Rows[1].Label != "Local model" {
-		t.Fatalf("selected model panel = %#v", selected)
-	}
-}
-
-func TestModelPanelSnapshotMasksCredentialWithoutGoView(t *testing.T) {
-	panel := NewModelCatalogPanel(Config{})
-	panel.model.screen = localModelsScreen
-	form := newCloudModelSetupForm(modelprovider.AzureOpenAI, "review", "", nil, 80)
-	form.credential.SetValue("super-secret-api-key")
-	panel.model.localModels.cloudSetup = &form
-	snapshot := panel.UISnapshot()
-	encoded, err := json.Marshal(snapshot)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(string(encoded), "super-secret-api-key") || !strings.Contains(string(encoded), "••••••••") {
-		t.Fatalf("credential snapshot exposed a key or omitted its mask: %s", encoded)
-	}
-}
-
-func TestModelPanelSnapshotKeepsDownloadConfirmation(t *testing.T) {
-	panel := NewModelCatalogPanel(Config{LocalModels: &fakeLocalManager{}})
-	defer panel.Close()
-	panel.model.screen = localModelsScreen
-	panel.model.localModels.section = localModelSection
-	panel.model.localModels.catalog = LocalCatalog{Models: []LocalModel{{
-		Name: "Reviewed model", Download: "398 MB", SourceURL: "https://ollama.com/library/example",
-	}}}
-	panel.model.localModels.confirmation = localModelConfirmPull
-	snapshot := panel.UISnapshot()
-	if snapshot.Kind != "model-form" || len(snapshot.Blocks) != 1 || !strings.Contains(strings.Join(snapshot.Blocks[0].Lines, " "), "398 MB") || !strings.Contains(snapshot.Footer, "download") {
-		t.Fatalf("download confirmation snapshot = %#v", snapshot)
-	}
+	return strings.Join(parts, "\n")
 }

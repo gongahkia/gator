@@ -265,11 +265,6 @@ func (m Model) updateKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	if value.Type == tea.KeyCtrlJ && !m.running {
-		m.launcher = false
-		m.section = "jobs"
-		return m, nil
-	}
 	if value.String() == "ctrl+p" {
 		m.openCommandPalette()
 		return m, nil

@@ -107,7 +107,7 @@ func TestWorkCLIAndTUIHistoryReadTheSameGlobalWorkRecords(t *testing.T) {
 	if command != nil {
 		t.Fatal("global History unexpectedly scheduled external work")
 	}
-	view := updated.(worktui.Model).View()
+	view := bridgeStateText(updated.(worktui.Model).BridgeState())
 	for _, objective := range []string{"Inspect retained history", "Prepare global history"} {
 		if !strings.Contains(cli.String(), objective) || !strings.Contains(view, objective) {
 			t.Fatalf("CLI/TUI history differs for %q:\nCLI=%s\nTUI=%s", objective, cli.String(), view)

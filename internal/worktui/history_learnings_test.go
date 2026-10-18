@@ -59,12 +59,12 @@ func TestGlobalHistoryUsesCanonicalStoreForAllWorkDetailAndReview(t *testing.T) 
 	})
 	model.width, model.height = 120, 60
 	model = submitTUICommand(t, model, "/history")
-	if model.section != "history" || len(model.historyItems) != 3 || model.historyItems[0].Record.ID != "work-running" || !strings.Contains(model.View(), "Prepare the project report") || !strings.Contains(model.View(), "Repair the failed import") {
-		t.Fatalf("global history = %#v\n%s", model.historyItems, model.View())
+	if model.section != "history" || len(model.historyItems) != 3 || model.historyItems[0].Record.ID != "work-running" || !strings.Contains(model.snapshotText(), "Prepare the project report") || !strings.Contains(model.snapshotText(), "Repair the failed import") {
+		t.Fatalf("global history = %#v\n%s", model.historyItems, model.snapshotText())
 	}
 	for _, want := range []string{"running (unconfirmed) · inspect", "failed · draft", "completed · draft", "verification failed", "delivery not delivered"} {
-		if !strings.Contains(model.View(), want) {
-			t.Fatalf("history list omitted truthful state %q:\n%s", want, model.View())
+		if !strings.Contains(model.snapshotText(), want) {
+			t.Fatalf("history list omitted truthful state %q:\n%s", want, model.snapshotText())
 		}
 	}
 	for index, item := range model.historyItems {
@@ -77,7 +77,7 @@ func TestGlobalHistoryUsesCanonicalStoreForAllWorkDetailAndReview(t *testing.T) 
 	if model.historyDetail == nil || model.historyDetail.Record.ID != "work-completed" || model.historyDetail.Project != project {
 		t.Fatalf("history detail = %#v", model.historyDetail)
 	}
-	view := model.View()
+	view := model.snapshotText()
 	for _, want := range []string{"Snapshot: snap-history", "not delivered", "user_corrected", "Use concise sections.", "Artifact bundle unavailable"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("history detail omitted %q:\n%s", want, view)
@@ -85,8 +85,8 @@ func TestGlobalHistoryUsesCanonicalStoreForAllWorkDetailAndReview(t *testing.T) 
 	}
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
 	model = updated.(Model)
-	if reviewPath != filepath.Join(state, "bundles", "work-completed") || !strings.Contains(model.View(), "Reviewed retained artifact.") {
-		t.Fatalf("history review did not use shared bundle action: path=%q\n%s", reviewPath, model.View())
+	if reviewPath != filepath.Join(state, "bundles", "work-completed") || !strings.Contains(model.snapshotText(), "Reviewed retained artifact.") {
+		t.Fatalf("history review did not use shared bundle action: path=%q\n%s", reviewPath, model.snapshotText())
 	}
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	model = updated.(Model)
@@ -149,8 +149,8 @@ func TestHistoryRetryUsesTheExistingConfirmedDeliveryAction(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(Model)
-	if len(requests) != 2 || requests[0].Execute || !requests[1].Execute || !strings.Contains(model.View(), "retry complete") {
-		t.Fatalf("history retry delivery requests = %#v\n%s", requests, model.View())
+	if len(requests) != 2 || requests[0].Execute || !requests[1].Execute || !strings.Contains(model.snapshotText(), "retry complete") {
+		t.Fatalf("history retry delivery requests = %#v\n%s", requests, model.snapshotText())
 	}
 }
 
@@ -170,14 +170,14 @@ func TestHistoryAndLearningsHaveUsefulEmptyStates(t *testing.T) {
 	}
 	model := New(Config{CurrentFolder: t.TempDir(), HistoryStore: &history, DeliveryStore: &deliveries, LearningStore: &learnings})
 	model = submitTUICommand(t, model, "/history")
-	if !strings.Contains(model.View(), "No retained Work matches this view yet.") {
-		t.Fatalf("empty history state = %s", model.View())
+	if !strings.Contains(model.snapshotText(), "No retained Work matches this view yet.") {
+		t.Fatalf("empty history state = %s", model.snapshotText())
 	}
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	model = updated.(Model)
 	model = submitTUICommand(t, model, "/learnings")
-	if !strings.Contains(model.View(), "No learnings match this view.") {
-		t.Fatalf("empty learning state = %s", model.View())
+	if !strings.Contains(model.snapshotText(), "No learnings match this view.") {
+		t.Fatalf("empty learning state = %s", model.snapshotText())
 	}
 }
 
@@ -213,18 +213,18 @@ func TestLearningsUseCanonicalStoreForStatusProvenanceApprovalReversalAndEdit(t 
 	model.width, model.height = 120, 60
 	model = submitTUICommand(t, model, "/learnings")
 	if model.section != "learnings" || len(model.learningItems) != 4 {
-		t.Fatalf("learning list = %#v\n%s", model.learningItems, model.View())
+		t.Fatalf("learning list = %#v\n%s", model.learningItems, model.snapshotText())
 	}
 	for _, status := range []string{"active", "candidate", "disabled", "rejected"} {
-		if !strings.Contains(model.View(), status) {
-			t.Fatalf("learning list omitted %s:\n%s", status, model.View())
+		if !strings.Contains(model.snapshotText(), status) {
+			t.Fatalf("learning list omitted %s:\n%s", status, model.snapshotText())
 		}
 	}
 	selectLearningID(t, &model, candidate.ID)
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
-	if model.learningDetail == nil || !strings.Contains(model.View(), "work-correction") || !strings.Contains(model.View(), "observation-correction") || !strings.Contains(model.View(), "Confidence: 91") {
-		t.Fatalf("candidate provenance detail = %#v\n%s", model.learningDetail, model.View())
+	if model.learningDetail == nil || !strings.Contains(model.snapshotText(), "work-correction") || !strings.Contains(model.snapshotText(), "observation-correction") || !strings.Contains(model.snapshotText(), "91") {
+		t.Fatalf("candidate provenance detail = %#v\n%s", model.learningDetail, model.snapshotText())
 	}
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
 	model = updated.(Model)

@@ -334,21 +334,6 @@ func (m Model) saveReviewedCustomProvider() (tea.Model, tea.Cmd) {
 	}
 }
 
-func (form *customProviderSetupForm) fieldPresentation(field customProviderField) (string, string, string) {
-	switch field {
-	case customProviderIDField:
-		return "Provider ID", "Lowercase letters, digits, and hyphens. Cannot match a built-in provider or gator-local.", form.id.View()
-	case customProviderURLField:
-		return "Chat Completions URL", "Absolute http(s) URL. Discovery requires a path ending in /chat/completions.", form.baseURL.View()
-	case customProviderEnvField:
-		return "API key environment variable", "Optional. Leave empty for a keyless local endpoint. Do not paste a key.", form.apiKeyEnv.View()
-	case customProviderModelsField:
-		return "Model IDs", "One provider model ID per line. These are sent unchanged to the endpoint.", form.models.View()
-	default:
-		return "Default model", "Must be one of the listed model IDs.", form.defaultModel.View()
-	}
-}
-
 func customProviderReviewText(setup CustomProviderSetup) string {
 	host := setup.BaseURL
 	if endpoint, err := url.Parse(setup.BaseURL); err == nil {

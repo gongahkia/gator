@@ -45291,6 +45291,10 @@ function GreenPrompt({
   };
   use_input_default((input, key) => {
     if (disabled) return;
+    if (key.return && key.shift || key.ctrl && input === "j") {
+      replace(value.slice(0, cursor) + "\n" + value.slice(cursor), cursor + 1);
+      return;
+    }
     if (key.return) {
       if (value.trim()) onSubmit(value);
       setCursor(0);
@@ -45311,6 +45315,20 @@ function GreenPrompt({
     }
     if (key.end || key.ctrl && input === "e") {
       setCursor(value.length);
+      return;
+    }
+    const beforeCursor = value.slice(0, cursor);
+    const currentLine = beforeCursor.split("\n").length - 1;
+    const lines = value.split("\n");
+    const column = beforeCursor.length - beforeCursor.lastIndexOf("\n") - 1;
+    if (key.upArrow && currentLine > 0) {
+      const start = lines.slice(0, currentLine - 1).reduce((count, line) => count + line.length + 1, 0);
+      setCursor(start + Math.min(column, lines[currentLine - 1].length));
+      return;
+    }
+    if (key.downArrow && currentLine + 1 < lines.length) {
+      const start = lines.slice(0, currentLine + 1).reduce((count, line) => count + line.length + 1, 0);
+      setCursor(start + Math.min(column, lines[currentLine + 1].length));
       return;
     }
     if (key.upArrow && historyIndex + 1 < history.length) {
@@ -45348,17 +45366,24 @@ function GreenPrompt({
     if (key.ctrl || key.meta || key.tab || key.escape) return;
     if (input) replace(value.slice(0, cursor) + input + value.slice(cursor), cursor + input.length);
   }, { isActive: !disabled });
-  return /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { flexDirection: "column", children: value ? value.split("\n").map((line, index, lines) => {
+    const start = lines.slice(0, index).reduce((count, item) => count + item.length + 1, 0);
+    const localCursor = cursor - start;
+    return /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: green, children: index === 0 ? "\u276F " : "\xB7 " }),
+      localCursor >= 0 && localCursor <= line.length ? /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { children: [
+        line.slice(0, localCursor),
+        /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { inverse: true, children: line[localCursor] ?? " " }),
+        line.slice(localCursor + 1)
+      ] }) : /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { children: line || " " })
+    ] }, index);
+  }) : /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { children: [
     /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: green, children: "\u276F " }),
-    value ? /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { children: [
-      value.slice(0, cursor),
-      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { inverse: true, children: value[cursor] ?? " " }),
-      value.slice(cursor + 1)
-    ] }) : /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { children: [
       /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { inverse: true, children: " " }),
       /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: "Ask Gator to work on something\u2026" })
     ] })
-  ] });
+  ] }) });
 }
 function ChatKeys({
   state,
@@ -45371,17 +45396,24 @@ function ChatKeys({
   search,
   scroll,
   exit,
+  clearDraft,
+  exitHint,
   bridge
 }) {
+  const lastExit = (0, import_react56.useRef)(0);
   use_input_default((input, key, event) => {
     if (key.ctrl && input === "d") {
       event.stopImmediatePropagation();
-      exit();
+      if (Date.now() - lastExit.current < 2e3) exit();
+      else {
+        lastExit.current = Date.now();
+        exitHint();
+      }
       return;
     }
     if (key.ctrl && input === "c" && !state.running) {
       event.stopImmediatePropagation();
-      exit();
+      clearDraft();
       return;
     }
     if (key.ctrl && input === "c" || key.escape && state.running) {
@@ -45394,7 +45426,7 @@ function ChatKeys({
       search();
       return;
     }
-    const shortcuts = { p: "ctrl+p", x: "ctrl+x", b: "ctrl+b", j: "ctrl+j", i: "ctrl+i", g: "ctrl+g" };
+    const shortcuts = { p: "ctrl+p", x: "ctrl+x", b: "ctrl+b", i: "ctrl+i", g: "ctrl+g" };
     if (key.ctrl && shortcuts[input]) {
       event.stopImmediatePropagation();
       bridge.send({ type: "key", key: shortcuts[input], text: input === "g" ? draft : void 0 });
@@ -45457,61 +45489,74 @@ function PanelKeys({ bridge, scroll }) {
   }, { captureCtrlC: true });
   return null;
 }
-function PanelScreen({ panel, status, bridge }) {
+function PanelScreen({ panel, status, draft, statusLine, bridge }) {
   const terminal = (0, import_react56.useContext)(TerminalSizeContext);
   const [offset, setOffset] = (0, import_react56.useState)(0);
   (0, import_react56.useEffect)(() => {
     setOffset(0);
   }, [panel.kind, panel.title, panel.subtitle]);
   const rows = panel.rows ?? [];
-  const maxRows = Math.max(3, Math.floor(((terminal?.rows ?? 24) - 10) / 2));
-  const selected = Math.min(Math.max(0, panel.selected ?? 0), Math.max(0, rows.length - 1));
-  const rowStart = Math.max(0, Math.min(selected - Math.floor(maxRows / 2), rows.length - maxRows));
   const blocks = (panel.blocks ?? []).flatMap((block) => [
     ...block.title ? [{ text: block.title, heading: true }] : [],
     ...block.lines.length ? block.lines.map((line) => ({ text: line, heading: false })) : [{ text: "None", heading: false }],
     { text: "", heading: false }
   ]);
-  const maxLines = Math.max(4, (terminal?.rows ?? 24) - 9);
+  const available = Math.max(4, (terminal?.rows ?? 24) - 11);
+  const rowHeight = rows.some((row) => row.detail) ? 3 : 2;
+  const maxRows = Math.max(2, Math.floor((blocks.length > 0 ? available / 2 : available) / rowHeight));
+  const selected = Math.min(Math.max(0, panel.selected ?? 0), Math.max(0, rows.length - 1));
+  const rowStart = Math.max(0, Math.min(selected - Math.floor(maxRows / 2), rows.length - maxRows));
+  const maxLines = Math.max(2, available - (rows.length > 0 ? Math.min(rows.length, maxRows) * rowHeight : 0));
   const blockOffset = Math.min(offset, Math.max(0, blocks.length - maxLines));
+  const focused = panel.kind === "confirmation" || panel.kind === "model-form";
+  const panelWidth = Math.max(20, Math.min(78, (terminal?.columns ?? 80) - 4));
   return /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, paddingX: 2, paddingTop: 1, children: [
     /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(PanelKeys, { bridge, scroll: (amount) => setOffset((current) => Math.max(0, Math.min(blocks.length - maxLines, current + amount))) }),
-    /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { color: green, bold: true, children: [
-      "\u{1F40A} Gator  ",
-      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: mutedGreen, children: panel.title })
+    /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", flexGrow: focused ? 0 : 1, width: focused ? panelWidth : void 0, alignSelf: focused ? "center" : void 0, borderStyle: focused ? "round" : void 0, borderColor: focused ? green : void 0, paddingX: focused ? 1 : 0, marginTop: focused ? 1 : 0, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { color: green, bold: true, children: [
+        "\u{1F40A} Gator  ",
+        /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: mutedGreen, children: panel.title })
+      ] }),
+      panel.subtitle && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { children: panel.subtitle }) }),
+      panel.kind === "picker" && /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { marginTop: 1, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: mutedGreen, children: "Search  " }),
+        /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { children: [
+          panel.query || "type to filter",
+          /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { inverse: true, children: " " })
+        ] })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Divider, {}) }),
+      /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", flexGrow: focused ? 0 : 1, marginTop: 1, children: [
+        rows.slice(rowStart, rowStart + maxRows).map((row, index) => {
+          const active = panel.kind !== "inbox" && panel.kind !== "jobs" && rowStart + index === selected;
+          return /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", marginBottom: 1, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { color: active ? green : void 0, bold: active, children: [
+              active ? "\u276F " : "  ",
+              row.label,
+              row.state ? /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { color: mutedGreen, children: [
+                "  \xB7  ",
+                row.state
+              ] }) : null
+            ] }),
+            row.detail && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: !active, children: row.detail }) })
+          ] }, `${rowStart + index}-${row.label}`);
+        }),
+        blocks.slice(blockOffset, blockOffset + maxLines).map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginBottom: line.heading ? 0 : void 0, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: line.heading ? mutedGreen : void 0, bold: line.heading, children: line.text || " " }) }, `${blockOffset + index}-${line.text}`)),
+        blocks.length > maxLines && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: `  ${blockOffset + 1}\u2013${Math.min(blockOffset + maxLines, blocks.length)} of ${blocks.length} lines \xB7 PgUp/PgDn scroll` }),
+        rows.length === 0 && blocks.length === 0 && !panel.notice && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: "No items to show." }),
+        panel.notice && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: mutedGreen, children: panel.notice }) }),
+        status && status !== panel.notice && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: status }) })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Divider, {}),
+      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: panel.footer || "Esc back" })
     ] }),
-    panel.subtitle && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { children: panel.subtitle }) }),
-    panel.kind === "picker" && /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { marginTop: 1, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: mutedGreen, children: "Search  " }),
-      /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { children: [
-        panel.query || "type to filter",
-        /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { inverse: true, children: " " })
-      ] })
-    ] }),
+    focused && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { flexGrow: 1 }),
     /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Divider, {}) }),
-    /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, marginTop: 1, children: [
-      rows.slice(rowStart, rowStart + maxRows).map((row, index) => {
-        const active = panel.kind !== "inbox" && panel.kind !== "jobs" && rowStart + index === selected;
-        return /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", marginBottom: 1, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { color: active ? green : void 0, bold: active, children: [
-            active ? "\u276F " : "  ",
-            row.label,
-            row.state ? /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { color: mutedGreen, children: [
-              "  \xB7  ",
-              row.state
-            ] }) : null
-          ] }),
-          row.detail && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: !active, children: row.detail }) })
-        ] }, `${rowStart + index}-${row.label}`);
-      }),
-      blocks.slice(blockOffset, blockOffset + maxLines).map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginBottom: line.heading ? 0 : void 0, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: line.heading ? mutedGreen : void 0, bold: line.heading, children: line.text || " " }) }, `${blockOffset + index}-${line.text}`)),
-      blocks.length > maxLines && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: `  ${blockOffset + 1}\u2013${Math.min(blockOffset + maxLines, blocks.length)} of ${blocks.length} lines \xB7 PgUp/PgDn scroll` }),
-      rows.length === 0 && blocks.length === 0 && !panel.notice && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: "No items to show." }),
-      panel.notice && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: mutedGreen, children: panel.notice }) }),
-      status && status !== panel.notice && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: status }) })
+    /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { dimColor: true, children: [
+      "\u276F ",
+      draft || "Ask Gator to work on something\u2026"
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Divider, {}),
-    /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: panel.footer || "Esc back" })
+    statusLine && statusLine.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(StatusLine, { segments: statusLine.map((content) => ({ content, color: mutedGreen })) })
   ] });
 }
 function GreenSearch({ messages, close, navigate }) {
@@ -45550,6 +45595,7 @@ function App2({ bridge }) {
   });
   const [state, setState] = (0, import_react56.useState)(bridge.snapshot());
   const [failure, setFailure] = (0, import_react56.useState)("");
+  const [localNotice, setLocalNotice] = (0, import_react56.useState)("");
   const [input, setInput] = (0, import_react56.useState)("");
   const [prefillVersion, setPrefillVersion] = (0, import_react56.useState)(0);
   const [history, setHistory] = (0, import_react56.useState)([]);
@@ -45583,7 +45629,7 @@ function App2({ bridge }) {
   }, [state?.mode, state?.input]);
   if (!state) return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { padding: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: green, children: failure || "Starting Gator\u2026" }) });
   if (state.mode === "panel" && state.panel) {
-    return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(PanelScreen, { panel: state.panel, status: state.status, bridge });
+    return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(PanelScreen, { panel: state.panel, status: state.status, draft: input, statusLine: state.status_line_enabled ? state.status_line : void 0, bridge });
   }
   const matches = !searchOpen && !dismissed && input.startsWith("/") && !input.includes(" ") ? state.commands.filter((command) => input === "/" ? !command.advanced : `/${command.name}`.startsWith(input)).slice(0, 8) : [];
   const submit = (value) => {
@@ -45591,6 +45637,7 @@ function App2({ bridge }) {
     if (!text) return;
     bridge.send({ type: "submit", text });
     setInput("");
+    setLocalNotice("");
     setDismissed(false);
     setHistory((current) => [text, ...current]);
   };
@@ -45631,7 +45678,7 @@ function App2({ bridge }) {
     role: item.role === "You" ? "user" : item.role === "Gator" ? "assistant" : "system",
     content: item.text
   }));
-  const viewportHeight = Math.max(1, (terminal?.rows ?? 24) - 6 - matches.length - (state.running ? 2 : 0) - (searchOpen ? 1 : 0));
+  const viewportHeight = Math.max(1, (terminal?.rows ?? 24) - 6 - matches.length - (state.running ? 2 : 0) - (searchOpen ? 1 : 0) - input.split("\n").length + 1);
   const statusSegments = (state.status_line ?? []).map((content) => ({ content, color: mutedGreen }));
   return /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, paddingX: 1, paddingTop: 1, children: [
     !state.home && /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { marginBottom: 1, children: [
@@ -45643,15 +45690,20 @@ function App2({ bridge }) {
     ] }),
     /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, children: [
       state.home && state.messages.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginBottom: 1, children: welcome }),
-      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(MessageList, { ref: list, viewportHeight, messages, renderMessage: (item) => /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(MessageBody, { item: state.messages[Number(item.id.split("-", 1)[0])] }) }),
+      state.messages.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(MessageList, { ref: list, viewportHeight, messages, renderMessage: (item) => /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(MessageBody, { item: state.messages[Number(item.id.split("-", 1)[0])] }) }),
       state.running && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: green, children: state.cancelling ? "\u25CC Stopping\u2026 retaining evidence" : `${["\u280B", "\u2819", "\u2839", "\u2838", "\u283C", "\u2834", "\u2826", "\u2827", "\u2807", "\u280F"][state.loading_frame % 10]} Working\u2026 ${state.elapsed ?? ""} \xB7 Esc to interrupt` }) })
     ] }),
-    state.status && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: mutedGreen, children: state.status }),
-    !searchOpen && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(ChatKeys, { state, draft: input, matches, selected, setSelected, choose, dismiss: () => setDismissed(true), search: () => setSearchOpen(true), scroll: (rows) => list.current?.scrollBy(rows), exit: close, bridge }),
+    (localNotice || state.status) && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: mutedGreen, children: localNotice || state.status }),
+    !searchOpen && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(ChatKeys, { state, draft: input, matches, selected, setSelected, choose, dismiss: () => setDismissed(true), search: () => setSearchOpen(true), scroll: (rows) => list.current?.scrollBy(rows), exit: close, clearDraft: () => {
+      setInput("");
+      setPrefillVersion((version) => version + 1);
+      setLocalNotice("");
+    }, exitHint: () => setLocalNotice("Press Ctrl+D again to exit Gator"), bridge }),
     searchOpen && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(GreenSearch, { messages: state.messages, close: () => setSearchOpen(false), navigate: (index) => list.current?.scrollTo(index) }),
     /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Divider, {}),
     /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(GreenPrompt, { value: input, onChange: (value) => {
       setInput(value);
+      setLocalNotice("");
       setSelected(0);
       setDismissed(false);
     }, onSubmit: submit, disabled: searchOpen || !!failure, history, prefillVersion }),

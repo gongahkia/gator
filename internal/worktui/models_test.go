@@ -36,7 +36,7 @@ func TestModelManagementReturnsToSameConversationAndCancelsOnTerminalClose(t *te
 	m.input = "unfinished draft"
 	next, _ := m.openModels()
 	m = next.(Model)
-	if m.View() != "model panel" {
+	if panel := m.BridgeState().Panel; panel == nil || panel.Title != "Models" {
 		t.Fatal("model panel was not rendered")
 	}
 	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})

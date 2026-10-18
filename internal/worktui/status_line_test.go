@@ -9,40 +9,11 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-func TestStatusLineWrapsAtItemBoundariesWithinViewport(t *testing.T) {
-	wrapped := wrapStatusLine([]string{
-		"enter send", "ctrl+p commands", "ctrl+x conversations", "ctrl+b inbox", "ctrl+j jobs",
-	}, 34)
-	if !strings.Contains(wrapped, "\n") {
-		t.Fatalf("status line did not wrap: %q", wrapped)
-	}
-	for _, line := range strings.Split(wrapped, "\n") {
-		if width := ansi.StringWidth(line); width > 34 {
-			t.Fatalf("line width = %d, want <= 34: %q", width, line)
-		}
-	}
-	if strings.ReplaceAll(wrapped, "\n", statusLineSeparator) != "enter send"+statusLineSeparator+"ctrl+p commands"+statusLineSeparator+"ctrl+x conversations"+statusLineSeparator+"ctrl+b inbox"+statusLineSeparator+"ctrl+j jobs" {
-		t.Fatalf("wrapped status line lost or reordered items: %q", wrapped)
-	}
-}
-
-func TestStatusLineSplitsAnOversizedUnicodeItem(t *testing.T) {
-	wrapped := wrapStatusLine([]string{"access " + strings.Repeat("🐊", 8)}, 9)
-	for _, line := range strings.Split(wrapped, "\n") {
-		if width := ansi.StringWidth(line); width > 9 {
-			t.Fatalf("line width = %d, want <= 9: %q", width, line)
-		}
-	}
-	if strings.Count(wrapped, "🐊") != 8 || !strings.HasPrefix(wrapped, "access\n") {
-		t.Fatalf("oversized item lost content while wrapping: %q", wrapped)
-	}
-}
-
 func TestConfiguredEmptyStatusLineHidesComposerFooter(t *testing.T) {
 	empty := []string{}
 	model := New(Config{CurrentFolder: "/work", StatusLine: &empty, StatusLineEnabled: true})
 	model.width, model.height = 30, 20
-	view := ansi.Strip(model.View())
+	view := ansi.Strip(model.snapshotText())
 	if strings.Contains(view, "ctrl+p commands") || strings.Contains(view, "enter send") {
 		t.Fatalf("explicit empty status line was rendered: %q", view)
 	}
@@ -60,7 +31,7 @@ func TestConfiguredStatusLineShowsSelectedLocalModel(t *testing.T) {
 	})
 	model.home = false
 	model.width, model.height = 100, 24
-	view := ansi.Strip(model.View())
+	view := ansi.Strip(model.snapshotText())
 	if !strings.Contains(view, "model gator-local/qwen3:8b") {
 		t.Fatalf("configured status line omitted selected local model: %q", view)
 	}
@@ -71,7 +42,7 @@ func TestConfiguredStatusLineAdvertisesEditorShortcut(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work", StatusLine: &items, StatusLineEnabled: true})
 	model.home = false
 	model.width, model.height = 100, 24
-	if view := ansi.Strip(model.View()); !strings.Contains(view, "ctrl+g editor") {
+	if view := ansi.Strip(model.snapshotText()); !strings.Contains(view, "ctrl+g editor") {
 		t.Fatalf("configured status line omitted composer editor shortcut: %q", view)
 	}
 }
@@ -81,26 +52,17 @@ func TestConfiguredStatusLineAdvertisesWorkspaceShortcut(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work", StatusLine: &items, StatusLineEnabled: true})
 	model.home = false
 	model.width, model.height = 100, 24
-	if view := ansi.Strip(model.View()); !strings.Contains(view, "ctrl+i workspace") {
+	if view := ansi.Strip(model.snapshotText()); !strings.Contains(view, "ctrl+i workspace") {
 		t.Fatalf("configured status line omitted workspace shortcut: %q", view)
 	}
 }
 
-func TestComposerFooterWrapsWithoutLosingNavigationAtNarrowWidth(t *testing.T) {
+func TestStatusLineBridgePreservesConfiguredItems(t *testing.T) {
 	items := append([]string(nil), defaultStatusLine...)
 	model := New(Config{CurrentFolder: "/work", StatusLine: &items, StatusLineEnabled: true})
-	model.home = false
-	model.width, model.height = 32, 24
-	view := ansi.Strip(model.View())
-	for _, item := range []string{"enter send", "ctrl+g editor", "ctrl+i workspace", "ctrl+p commands", "ctrl+x conversations", "ctrl+b inbox", "ctrl+j jobs"} {
-		if !strings.Contains(view, item) {
-			t.Fatalf("narrow view lost %q: %q", item, view)
-		}
-	}
-	for _, line := range strings.Split(view, "\n") {
-		if width := ansi.StringWidth(line); width > 32 {
-			t.Fatalf("view line width = %d, want <= 32: %q", width, line)
-		}
+	state := model.BridgeState()
+	if !state.StatusLineEnabled || len(state.StatusLine) < 7 {
+		t.Fatalf("configured status line = %#v", state.StatusLine)
 	}
 }
 
@@ -122,8 +84,8 @@ func TestStatusLineEditorTogglesReordersAndPersists(t *testing.T) {
 		},
 	})
 	model.openStatusLineEditor()
-	if view := ansi.Strip(model.View()); !strings.Contains(view, "Configure status line") || !strings.Contains(view, "[x]") {
-		t.Fatalf("status line editor = %q", view)
+	if panel := model.BridgeState().Panel; panel == nil || panel.Title != "Configure status line" || len(panel.Rows) == 0 {
+		t.Fatalf("status line editor = %#v", panel)
 	}
 
 	model.selected = statusLineOptionIndex("send")
@@ -171,7 +133,7 @@ func TestStatusLineRequiresExplicitEnable(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work", StatusLine: &items})
 	model.home = false
 	model.width, model.height = 100, 24
-	if view := ansi.Strip(model.View()); strings.Contains(view, "model ") || strings.Contains(view, "mode auto") {
+	if view := ansi.Strip(model.snapshotText()); strings.Contains(view, "model ") || strings.Contains(view, "mode auto") {
 		t.Fatalf("status line was shown without explicit enable: %q", view)
 	}
 	model.openStatusLineEditor()
@@ -179,8 +141,8 @@ func TestStatusLineRequiresExplicitEnable(t *testing.T) {
 	model = updated.(Model)
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
-	if !model.statusLineEnabled || !strings.Contains(ansi.Strip(model.View()), "mode auto") {
-		t.Fatalf("status line did not become visible after explicit enable: %#v\n%s", model, model.View())
+	if !model.statusLineEnabled || !strings.Contains(ansi.Strip(model.snapshotText()), "mode auto") {
+		t.Fatalf("status line did not become visible after explicit enable: %#v\n%s", model, model.snapshotText())
 	}
 }
 

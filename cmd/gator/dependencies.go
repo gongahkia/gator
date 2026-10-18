@@ -26,7 +26,7 @@ func writeDependencyDoctor(out io.Writer, statuses []dependency.Status) error {
 			state = "missing"
 		}
 		role := "optional"
-		if status.Required {
+		if status.Required || status.ID == "node" {
 			role = "required"
 		}
 		if _, err := fmt.Fprintf(out, "  %s: %s (%s for %s)\n", status.Name, state, role, status.Purpose); err != nil {

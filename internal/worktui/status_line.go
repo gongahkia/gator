@@ -6,11 +6,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/ansi"
 )
-
-const statusLineSeparator = "  ·  "
 
 type statusLineOption struct {
 	id          string
@@ -26,7 +22,7 @@ var statusLineOptions = []statusLineOption{
 	{id: "commands", label: "Command palette", description: "ctrl+p commands"},
 	{id: "conversations", label: "Conversations", description: "ctrl+x conversations"},
 	{id: "inbox", label: "Inbox", description: "ctrl+b inbox"},
-	{id: "jobs", label: "Scheduled jobs", description: "ctrl+j jobs"},
+	{id: "jobs", label: "Scheduled jobs", description: "/jobs"},
 	{id: "model", label: "Model", description: "Selected provider and model"},
 	{id: "model-access", label: "Model access", description: "Login, credential, or local-model readiness"},
 	{id: "current-dir", label: "Current directory", description: "Selected source directory"},
@@ -91,7 +87,7 @@ func (m Model) statusLineValue(id string) string {
 	case "inbox":
 		return "ctrl+b inbox"
 	case "jobs":
-		return "ctrl+j jobs"
+		return "/jobs scheduled jobs"
 	case "model":
 		provider, modelName := singleLine(m.modelStatus.Provider), singleLine(m.modelStatus.Model)
 		if provider == "" {
@@ -134,49 +130,6 @@ func (m Model) statusLineValue(id string) string {
 	default:
 		return ""
 	}
-}
-
-// wrapStatusLine packs complete items onto each row when possible, then wraps
-// an individual oversized item without relying on terminal-side clipping.
-func wrapStatusLine(items []string, width int) string {
-	if width <= 0 || len(items) == 0 {
-		return ""
-	}
-	var rows []string
-	current := ""
-	flush := func() {
-		if current != "" {
-			rows = append(rows, current)
-			current = ""
-		}
-	}
-	for _, item := range items {
-		item = strings.TrimSpace(item)
-		if item == "" {
-			continue
-		}
-		if current != "" && ansi.StringWidth(current+statusLineSeparator+item) <= width {
-			current += statusLineSeparator + item
-			continue
-		}
-		flush()
-		chunks := splitDisplayWidth(item, width)
-		for _, chunk := range chunks[:max(0, len(chunks)-1)] {
-			rows = append(rows, chunk)
-		}
-		if len(chunks) > 0 {
-			current = chunks[len(chunks)-1]
-		}
-	}
-	flush()
-	return strings.Join(rows, "\n")
-}
-
-func splitDisplayWidth(value string, width int) []string {
-	if width <= 0 || value == "" {
-		return nil
-	}
-	return strings.Split(ansi.Wrap(value, width, " "), "\n")
 }
 
 func statusLineOptionIndex(id string) int {
@@ -276,50 +229,6 @@ func (m Model) updateStatusLineEditor(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
-}
-
-func (m Model) renderStatusLineEditor(width, height int, accent, dim, selectedStyle lipgloss.Style) string {
-	panelWidth := min(76, max(16, width-4))
-	maximum := max(1, height-13)
-	selected := min(m.selected, len(statusLineOptions)-1)
-	start := max(0, selected-maximum+1)
-	end := min(len(statusLineOptions), start+maximum)
-	var panel strings.Builder
-	panel.WriteString(accent.Render(ansi.Wrap("Configure status line", panelWidth, " ")) + "\n")
-	visibility := "hidden"
-	if m.statusLineDraftEnabled {
-		visibility = "shown"
-	}
-	panel.WriteString(dim.Render(ansi.Wrap("Status line is "+visibility+". Choose its items; selected order is preserved.", panelWidth, " ")) + "\n\n")
-	for index := start; index < end; index++ {
-		option := statusLineOptions[index]
-		order := selectedStatusLineIndex(m.statusLineDraft, option.id)
-		marker := "[ ]"
-		position := "  "
-		if order >= 0 {
-			marker = "[x]"
-			position = fmt.Sprintf("%2d", order+1)
-		}
-		prefix := fmt.Sprintf("%s %s ", marker, position)
-		labelWidth := min(19, max(8, panelWidth-len(prefix)-4))
-		descriptionWidth := max(0, panelWidth-len(prefix)-labelWidth-1)
-		line := prefix + fmt.Sprintf("%-*s %s", labelWidth, truncate(option.label, labelWidth), truncate(option.description, descriptionWidth))
-		if index == selected {
-			line = selectedStyle.Width(panelWidth).Render("› " + truncate(line, max(1, panelWidth-2)))
-		} else {
-			line = "  " + truncate(line, max(1, panelWidth-2))
-		}
-		panel.WriteString(line + "\n")
-	}
-	preview := m.statusLineDraftValues()
-	if !m.statusLineDraftEnabled || len(preview) == 0 {
-		panel.WriteString("\n" + dim.Render("Preview: hidden"))
-	} else {
-		panel.WriteString("\n" + dim.Render("Preview\n"+wrapStatusLine(preview, panelWidth)))
-	}
-	controls := wrapStatusLine([]string{"v show/hide", "space toggle", "←/→ reorder", "r defaults", "enter save", "esc cancel"}, panelWidth)
-	panel.WriteString("\n\n" + dim.Render(controls))
-	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, panel.String())
 }
 
 func (m Model) statusLineDraftValues() []string {

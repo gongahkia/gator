@@ -89,12 +89,12 @@ func Catalog() []Requirement {
 			ID:         "node",
 			Name:       "Node.js",
 			Executable: "node",
-			Purpose:    "the React terminal interface (the native Go interface remains available)",
+			Purpose:    "the interactive terminal interface",
 			Required:   false,
 			Applicable: allPlatforms,
 			HelpURL:    "https://nodejs.org/en/download",
 			Instructions: func(string) []string {
-				return []string{"Install Node.js 22 or newer to use the new terminal interface; Gator uses its native Go interface when Node.js is unavailable."}
+				return []string{"Install Node.js 22 or newer to run interactive Gator. Headless commands and doctor remain available."}
 			},
 		},
 	}

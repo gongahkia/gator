@@ -22,7 +22,7 @@ type probedWorkModel struct{ tea.Model }
 
 func (m probedWorkModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	if probe, ok := message.(modelViewProbe); ok {
-		probe <- m.View()
+		probe <- bridgeStateText(m.Model.(worktui.Model).BridgeState())
 		return m, nil
 	}
 	next, command := m.Model.Update(message)
@@ -173,7 +173,7 @@ func TestWorkTUIManagesLocalModelsAndUsesSelectionThroughService(t *testing.T) {
 	waitView("Cloud API key")
 	key("down")
 	key("enter")
-	waitView("Recommended for general Work")
+	waitView("General Work")
 	for range 5 {
 		key("down")
 	}
@@ -201,13 +201,13 @@ func TestWorkTUIManagesLocalModelsAndUsesSelectionThroughService(t *testing.T) {
 	waitView("write a short report")
 	key("enter")
 	waitView("Local Work complete")
-	waitView("Artifacts:")
+	waitView("report.md")
 	if calls.Load() != 2 {
 		t.Fatalf("Work model calls = %d", calls.Load())
 	}
 	key("/status")
 	key("enter")
-	waitView("model access: local model configured")
+	waitView("local model configured")
 	key("/model")
 	waitView("/model")
 	key("enter")

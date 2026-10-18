@@ -1,122 +1,65 @@
-# Gator terminal design system
+# Gator terminal interface
 
-## Product posture
+## Reference and ownership
 
-Gator should feel like a quiet work surface, not an operations dashboard. The
-first screen asks for an outcome and postpones history, jobs, inbox, and
-specialist controls until the user asks for them. Commands and destinations are
-separate concepts: `Ctrl+P` searches actions, while direct control-key bindings
-open conversations, inbox, or jobs.
+The interactive UI is the React renderer in `ui/src/main.tsx`, built with
+`@claude-code-kit/ink-renderer` and `@claude-code-kit/ui` 0.4.0. The imported
+kit is an independent project inspired by Claude Code; it is not Anthropic's
+frontend. Gator uses its conversational layout and keyboard conventions while
+keeping its own green identity, work commands, and review flows.
 
-The interaction model is informed by the official [OpenCode TUI
-documentation](https://opencode.ai/docs/tui/) and
-[keybinding model](https://opencode.ai/docs/keybinds): a centered first prompt,
-a bottom-docked session prompt, a searchable `Ctrl+P` command list,
-keyboard-first navigation, and resumable sessions. Gator does not copy OpenCode's branding or
-screen treatment; it adopts the underlying progressive-disclosure pattern.
+Go owns workflow state, actions, and approvals. It publishes display data
+through `BridgeState` and `UISnapshot`. Go `View()` methods are empty Bubble Tea
+interface adapters. There is no Go screen renderer or fallback. Interactive
+Gator requires Node.js 22 or newer; headless commands do not.
 
-## Screen states
+## Shared layout
 
-| State | Primary content | Composer | Secondary navigation |
-| --- | --- | --- | --- |
-| Home | Centered `🐊 Gator` wordmark and one outcome question | Centered, at most 72 columns | Direct `Ctrl+X`, `Ctrl+B`, and `Ctrl+J` hints |
-| Drafting | Centered `🐊 Gator` wordmark and outcome question | Centered and growing with wrapped input | Available through direct shortcuts |
-| Conversation | Top-left `🐊 Gator` wordmark, transcript, and current run status | Docked below the transcript | Available through direct shortcuts |
-| Command palette | Searchable Work commands | Hidden | `Ctrl+P`; type to filter, arrows to choose |
-| Status-line editor | Ordered composer-footer items with a live preview | Hidden | `Space` toggles; left/right reorders; `Enter` saves |
-| Models | Centered, constrained cloud/local catalog with one-line readiness states | Hidden | `Tab` changes section; contextual controls stay in a two-line footer |
-| Conversations | Retained Work conversations only | Hidden | `Ctrl+X` |
-| Inbox | Recent scheduled-work results in a read-only view | Hidden | `Ctrl+B` |
-| Jobs | Configured schedules in a read-only view | Hidden | `Ctrl+J` |
+- `🐊 Gator` labels the home and conversation. Green marks Gator, the prompt,
+  focused rows, and active work; neutral text carries content and muted green
+  carries secondary context.
+- The transcript uses the kit's `MessageList`. The empty home uses its
+  `WelcomeScreen`; no empty transcript viewport is reserved on home.
+- The composer stays at the bottom of chat. A panel leaves a muted composer
+  anchor at the bottom so its location stays predictable; Esc returns to chat.
+- `/` suggestions appear immediately above the composer. Long lists keep the
+  selected row in view. Detail content scrolls with PageUp and PageDown.
+- Forms and confirmations use a constrained green bordered surface. Lists and
+  detail pages remain open surfaces with one visible selection and a footer.
+- The optional kit `StatusLine` sits below the composer. Its content is chosen
+  through `/settings statusline` and can be hidden.
 
-Typing keeps the growing composer centered. Submitting the first prompt docks
-the composer and starts a conversation. Merely opening Gator must not show
-cards, counters, setup prose, or a navigation rail. First-run setup begins only
-after the first submitted prompt, or explicitly through `/model`.
+## Screen inventory
 
-Provider lifecycle is contained in `/model`. Its Cloud section offers
-configuration, provider-owned sign-in, and stored-credential removal without
-placing secret values in the composer or command palette. First-run task setup
-opens this panel and retains the draft until a configured model is selected.
-Vendor-CLI credentials are not imported as native Work-provider credentials.
+| Surface | Content | Input and exit |
+| --- | --- | --- |
+| Home | Welcome, model setup or next actions | Bottom composer; `/` commands |
+| Conversation | User and Gator turns, deliverables, run status | Bottom composer; Esc interrupts active work |
+| Slash suggestions | Available commands filtered by typed prefix | Above composer; arrows, Tab or Enter select; Esc dismisses |
+| Search | Transcript match count and result navigation | Ctrl+F opens; Esc closes |
+| Pickers | Commands, conversations, goals, workspace, copy target | Search above rows; arrows and Enter; Esc closes |
+| Model choice and catalogs | Cloud or local options, readiness, model details | Arrows and Enter; contextual footer; F1 help |
+| Model forms and confirmations | Credential, provider, rename, install, download, removal | Green bordered focus surface; Tab or arrows; Enter confirms; Esc cancels |
+| Status line settings | Ordered items and preview | Space toggles, arrows reorder, Enter saves, Esc cancels |
+| Inbox and jobs | Results and configured schedules | Read-only rows with action guidance; Esc returns |
+| History | Retained runs, artifact and feedback details | Selection, detail, review and retry controls; Esc returns |
+| Learnings | Memory list, provenance details, edit form | Selection and explicit approval controls; Esc returns |
+| Transfer confirmation | Verified save or apply summary | Green bordered focus surface; Enter confirms, Esc cancels |
 
-## Visual language
+## Keyboard conventions
 
-- Use one green accent (`ANSI 42`) for identity, focus, and active work.
-- Use the `🐊 Gator` wordmark consistently. Center it only on the empty
-  home state; keep it at the top-left everywhere after composition begins.
-- Use neutral foreground (`ANSI 255`), muted metadata (`ANSI 242`), and a dark
-  selection surface (`ANSI 236`).
-- Use rounded one-cell borders only around an input or a selected surface.
-- Keep the bordered composer at no more than 72 columns and leave at least two
-  columns of margin on each side.
-- Prefer whitespace over dividers. Do not repeat the product name, tagline, and
-  folder name on every screen.
-- Status belongs next to the conversation title. Composer controls and optional
-  context belong in a muted footer that packs complete items onto rows and
-  wraps oversized values to the terminal width.
-- Work-owned overlays must use the Work palette and constrained centered
-  layout even when their behavior is backed by retained Code-era components.
-  Legacy headers, pink accents, control rails, and explanatory paragraphs must
-  not leak into the Work surface.
+- Enter submits a prompt; Shift+Enter or Ctrl+J inserts a new line.
+- Ctrl+C clears an idle draft or interrupts active work. Esc interrupts active
+  work or closes a panel. Ctrl+D twice within two seconds exits.
+- Ctrl+G opens the editor. Ctrl+F searches the transcript. Ctrl+P opens the
+  command picker. Ctrl+X opens conversations, Ctrl+B opens inbox, and Ctrl+I
+  chooses a workspace. Scheduled jobs are available through `/jobs` and the
+  command picker.
+- Up and Down navigate picker rows or recall prompts when the composer has no
+  adjacent line. PageUp and PageDown scroll long content.
 
-## Interaction rules
-
-1. Typing is always directed to the visible composer.
-2. `Enter` submits; an empty submission does nothing.
-3. `Ctrl+P` opens the searchable command palette from every state; it never
-   mixes folders, conversations, inbox entries, or jobs into the action list.
-4. `Ctrl+X` opens conversations, `Ctrl+B` opens inbox, and `Ctrl+J` opens jobs.
-   `Esc` returns from a destination or closes a picker. `Ctrl+I`/Tab remains
-   available for future focus navigation instead of doubling as Inbox.
-5. Opening a retained conversation goes directly to its session state. `/new`
-   returns to the clean home state for the current folder.
-6. Long-running work replaces input focus with a single active status; internal
-   tool and specialist detail belongs in events and evidence, not permanent
-   chrome.
-7. Revision commands remain available, but are discoverable through help and
-   the palette instead of occupying the default footer.
-8. `/statusline` opens an ordered-item editor. `Space` toggles an item,
-   left/right changes its selected order, `r` restores defaults, and an empty
-   selection hides the footer. The choice is persisted in `config.json` as an
-   ordered `tui.status_line` array; omitting it uses Gator's defaults.
-
-The default footer starts with the selected model. Available status-line
-identifiers are `queue`, `send`, `commands`, `conversations`, `inbox`, `jobs`,
-`model`, `model-access`, `current-dir`, `mode`, `artifacts`, `connectors`,
-`conversation`, `effort`, `sandbox`, and `status`. Configuration excerpt:
-
-```json
-{
-  "tui": {
-    "status_line": ["model", "model-access", "current-dir", "commands"]
-  }
-}
-```
-
-This ordered-list shape and the empty-list-to-hide behavior follow the official
-[Codex configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference)
-and [sample configuration](https://learn.chatgpt.com/codex/config-file/config-sample),
-adapted to Gator's JSON settings and footer items.
-
-## Accessibility and terminal behavior
-
-Color is never the only indication of selection or activity: the palette uses
-`›`, and active work uses a one-cell Braille spinner plus text. Its frames and
-80 ms cadence come from the MIT-licensed Rattles `BrailleDots` preset, ported
-into Gator's Go renderer; it is not required to understand run state. Layouts
-retain usable fallbacks when no terminal size has arrived. Labels remain plain
-text so screen readers and copied terminal output keep their meaning. Motion is
-limited to active work and model operations, and never changes the surrounding
-layout.
-
-## Reference boundary
-
-OpenCode is the primary interaction reference because its official docs cover
-prompting, sessions, command navigation, and customization as one terminal
-system. Claude Code's [command discovery](https://code.claude.com/docs/en/commands)
-and [contextual keybindings](https://code.claude.com/docs/en/keybindings) are
-secondary references for separating searchable actions from navigation and
-focused views. Any future redesign should preserve Gator's own identity:
-proof-carrying artifacts, local snapshots, explicit authority, and restrained
-green accents.
+The kit hardcodes cyan in its `Select` and `ListItem` focus states, so Gator
+renders those rows with green rather than inheriting a mismatched color. The
+shared kit components used directly are `WelcomeScreen`, `MessageList`,
+`Divider`, and `StatusLine`. Keep keyboard ownership in the React layer for
+editing and in Go for workflow actions so the same key cannot trigger both.

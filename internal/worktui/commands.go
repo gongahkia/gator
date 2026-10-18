@@ -1340,7 +1340,8 @@ Navigation
   ctrl+i    choose a workspace directory
   ctrl+x    retained conversations
   ctrl+b    inbox
-  ctrl+j    scheduled jobs
+  ctrl+j    insert a new line in the composer
+  /jobs     scheduled jobs
   ctrl+p    searchable command palette`
 }
 

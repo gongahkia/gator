@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -165,5 +166,22 @@ func TestNodeRuntimeGuard(t *testing.T) {
 	}
 	if !supportedNodeUI(path) {
 		t.Fatal("Node 22 did not pass the UI guard")
+	}
+}
+
+func TestInteractiveLaunchRejectsMissingOrOldNode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Gator does not support Windows")
+	}
+	t.Setenv("PATH", t.TempDir())
+	if err := launchTerminalUI("", ""); err == nil || !strings.Contains(err.Error(), "Node.js 22") {
+		t.Fatalf("missing Node should stop interactive startup: %v", err)
+	}
+	path := filepath.Join(os.Getenv("PATH"), "node")
+	if err := os.WriteFile(path, []byte("#!/bin/sh\nprintf 'v21.9.0\\n'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := launchTerminalUI("", ""); err == nil || !strings.Contains(err.Error(), "upgrade Node.js") {
+		t.Fatalf("old Node should stop interactive startup: %v", err)
 	}
 }

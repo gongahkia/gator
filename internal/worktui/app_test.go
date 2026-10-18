@@ -35,8 +35,8 @@ func TestHomeComposerStartsConversationAndRetainsResult(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(Model)
-	if model.conversation != "work-one" || model.running || !strings.Contains(model.View(), "Done") {
-		t.Fatalf("model = %#v\n%s", model, model.View())
+	if model.conversation != "work-one" || model.running || !strings.Contains(model.snapshotText(), "Done") {
+		t.Fatalf("model = %#v\n%s", model, model.snapshotText())
 	}
 }
 
@@ -87,8 +87,8 @@ func TestDirectCodeCommandIsNotExposed(t *testing.T) {
 	model.input = "/code on"
 	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
-	if command != nil || !strings.Contains(model.View(), "unknown command /code") || strings.Contains(model.View(), "/code on|off") {
-		t.Fatalf("unexpected direct Code route: %s", model.View())
+	if command != nil || !strings.Contains(model.snapshotText(), "unknown command /code") || strings.Contains(model.snapshotText(), "/code on|off") {
+		t.Fatalf("unexpected direct Code route: %s", model.snapshotText())
 	}
 }
 
@@ -99,8 +99,8 @@ func TestSourceIgnoreCommandsManageProjectInstructionPaths(t *testing.T) {
 		updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 		model = updated.(Model)
 	}
-	if len(model.options.IgnoredInstructionPaths) != 1 || model.options.IgnoredInstructionPaths[0] != "AGENTS.md" || !strings.Contains(model.View(), "Ignored project instruction files") {
-		t.Fatalf("ignored instructions = %#v\n%s", model.options.IgnoredInstructionPaths, model.View())
+	if len(model.options.IgnoredInstructionPaths) != 1 || model.options.IgnoredInstructionPaths[0] != "AGENTS.md" || !strings.Contains(model.snapshotText(), "Ignored project instruction files") {
+		t.Fatalf("ignored instructions = %#v\n%s", model.options.IgnoredInstructionPaths, model.snapshotText())
 	}
 	model.input = "/source unignore AGENTS.md"
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -125,14 +125,14 @@ func TestJobsUseTheConfiguredSharedServiceAndRefreshTheSection(t *testing.T) {
 	model.input = "/jobs add daily --schedule 0 9 * * * -- review changes"
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
-	if !reflect.DeepEqual(received, []string{"add", "daily", "--schedule", "0", "9", "*", "*", "*", "--", "review", "changes"}) || len(model.config.Jobs) != 1 || !strings.Contains(model.View(), "Job added.") {
-		t.Fatalf("job action = %#v jobs=%#v\n%s", received, model.config.Jobs, model.View())
+	if !reflect.DeepEqual(received, []string{"add", "daily", "--schedule", "0", "9", "*", "*", "*", "--", "review", "changes"}) || len(model.config.Jobs) != 1 || !strings.Contains(model.snapshotText(), "Job added.") {
+		t.Fatalf("job action = %#v jobs=%#v\n%s", received, model.config.Jobs, model.snapshotText())
 	}
 	model.input = "/jobs"
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
-	if model.section != "jobs" || !strings.Contains(model.View(), "Daily review") {
-		t.Fatalf("jobs section = %#v\n%s", model, model.View())
+	if model.section != "jobs" || !strings.Contains(model.snapshotText(), "Daily review") {
+		t.Fatalf("jobs section = %#v\n%s", model, model.snapshotText())
 	}
 }
 
@@ -152,21 +152,21 @@ func TestInboxRefreshesOnOpenAndAfterRating(t *testing.T) {
 	})
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlB})
 	model = updated.(Model)
-	if model.section != "inbox" || !strings.Contains(model.View(), "alert-one") || !strings.Contains(model.View(), "unrated · urgent") {
-		t.Fatalf("fresh inbox panel = %s", model.View())
+	if model.section != "inbox" || !strings.Contains(model.snapshotText(), "alert-one") || !strings.Contains(model.snapshotText(), "unread · urgent") {
+		t.Fatalf("fresh inbox panel = %s", model.snapshotText())
 	}
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	model = updated.(Model)
 	model.input = "/inbox rate alert-one useful"
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
-	if !reflect.DeepEqual(received, []string{"rate", "alert-one", "useful"}) || model.config.Inbox[0].Rating != "useful" || !strings.Contains(model.View(), "Rating saved") {
-		t.Fatalf("rating action = %#v inbox=%#v\n%s", received, model.config.Inbox, model.View())
+	if !reflect.DeepEqual(received, []string{"rate", "alert-one", "useful"}) || model.config.Inbox[0].Rating != "useful" || !strings.Contains(model.snapshotText(), "Rating saved") {
+		t.Fatalf("rating action = %#v inbox=%#v\n%s", received, model.config.Inbox, model.snapshotText())
 	}
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyCtrlB})
 	model = updated.(Model)
-	if !strings.Contains(model.View(), "alert-one · unread · useful") {
-		t.Fatalf("rated inbox panel = %s", model.View())
+	if !strings.Contains(model.snapshotText(), "alert-one · unread · urgent · useful") {
+		t.Fatalf("rated inbox panel = %s", model.snapshotText())
 	}
 	entries = append([]inbox.Entry{{ID: "alert-two", Status: "completed", Title: "New alert"}}, entries...)
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
@@ -174,8 +174,8 @@ func TestInboxRefreshesOnOpenAndAfterRating(t *testing.T) {
 	model.input = "/inbox"
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
-	if model.section != "inbox" || !strings.Contains(model.View(), "alert-two") {
-		t.Fatalf("reopened inbox panel = %s", model.View())
+	if model.section != "inbox" || !strings.Contains(model.snapshotText(), "alert-two") {
+		t.Fatalf("reopened inbox panel = %s", model.snapshotText())
 	}
 }
 
@@ -184,7 +184,7 @@ func TestInboxPanelDoesNotInterpretStoredControlCharacters(t *testing.T) {
 		ID: "alert-one", Status: "completed", Title: "Venue\x1b[2J update", Summary: "line one\rline two",
 	}}})
 	model.section = "inbox"
-	view := model.View()
+	view := model.snapshotText()
 	if strings.Contains(view, "\x1b[2J") || strings.Contains(view, "\r") || !strings.Contains(view, "Venue [2J update") || !strings.Contains(view, "line one line two") {
 		t.Fatalf("unsafe or missing inbox content: %q", view)
 	}
@@ -202,8 +202,8 @@ func TestFeedbackUsesTheConfiguredSharedServiceForCurrentRevision(t *testing.T) 
 	model.input = "/feedback accept"
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
-	if workID != "work-feedback" || !reflect.DeepEqual(received, []string{"accept"}) || !strings.Contains(model.View(), "feedback recorded") {
-		t.Fatalf("feedback action work=%q args=%#v\n%s", workID, received, model.View())
+	if workID != "work-feedback" || !reflect.DeepEqual(received, []string{"accept"}) || !strings.Contains(model.snapshotText(), "feedback recorded") {
+		t.Fatalf("feedback action work=%q args=%#v\n%s", workID, received, model.snapshotText())
 	}
 	for _, item := range commandPaletteEntries() {
 		if item.command == "/feedback" {
@@ -236,13 +236,13 @@ func TestVerifiedDeliverablesRenderAndSaveWithOneConfirmation(t *testing.T) {
 		},
 	}))
 	model = updated.(Model)
-	if view := ansi.Strip(model.View()); !strings.Contains(view, "Verified deliverables") || !strings.Contains(view, "brief.md") {
+	if view := ansi.Strip(model.snapshotText()); !strings.Contains(view, "Artifacts:") || !strings.Contains(view, "brief.md") {
 		t.Fatalf("bundle card = %q", view)
 	}
 	model.input = "/save /destination"
 	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
-	if command != nil || model.pendingBundleAction == nil || !strings.Contains(ansi.Strip(model.View()), "Review transfer") {
+	if command != nil || model.pendingBundleAction == nil || !strings.Contains(ansi.Strip(model.snapshotText()), "Review transfer") {
 		t.Fatal("save did not stop for one explicit confirmation")
 	}
 	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -252,7 +252,7 @@ func TestVerifiedDeliverablesRenderAndSaveWithOneConfirmation(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(Model)
-	if len(requests) != 2 || requests[0].Execute || !requests[1].Execute || !strings.Contains(model.View(), "saved") {
+	if len(requests) != 2 || requests[0].Execute || !requests[1].Execute || !strings.Contains(model.snapshotText(), "saved") {
 		t.Fatalf("requests = %#v", requests)
 	}
 }
@@ -284,7 +284,7 @@ func TestRetryUsesTheSameConfirmedBundleActionPath(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(Model)
-	if len(requests) != 2 || requests[0].Action != "retry" || requests[0].Execute || requests[1].Action != "retry" || !requests[1].Execute || !strings.Contains(model.View(), "retry finished") {
+	if len(requests) != 2 || requests[0].Action != "retry" || requests[0].Execute || requests[1].Action != "retry" || !requests[1].Execute || !strings.Contains(model.snapshotText(), "retry finished") {
 		t.Fatalf("retry requests = %#v", requests)
 	}
 }
@@ -298,8 +298,8 @@ func TestRevisionCommandsStayInConversation(t *testing.T) {
 	model.input = "/revision-back"
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
-	if !strings.Contains(model.View(), "moved work-one") {
-		t.Fatalf("view = %s", model.View())
+	if !strings.Contains(model.snapshotText(), "moved work-one") {
+		t.Fatalf("view = %s", model.snapshotText())
 	}
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyCtrlP})
 	if !updated.(Model).launcher {
@@ -323,8 +323,8 @@ func TestStartsRequestedConversationAndSelectsForwardBranch(t *testing.T) {
 	}
 	model.input = "/revision-forward revision-two"
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	if called != "work-one/revision-two" || !strings.Contains(updated.(Model).View(), "moved") {
-		t.Fatalf("called = %q, view = %s", called, updated.(Model).View())
+	if called != "work-one/revision-two" || !strings.Contains(updated.(Model).snapshotText(), "moved") {
+		t.Fatalf("called = %q, view = %s", called, updated.(Model).snapshotText())
 	}
 }
 
@@ -358,7 +358,7 @@ func TestRequestedConversationRestoresTranscriptCardsAndSelectedRevision(t *test
 		},
 	})
 	model.width, model.height = 120, 80
-	view := ansi.Strip(model.View())
+	view := ansi.Strip(model.snapshotText())
 	for _, want := range []string{
 		"Draft the report", "The first draft is ready.", "Revise the executive summary", "The revised report is ready.",
 		"report.md", "report.docx", "Revision rev-two", "snapshot snap-two",
@@ -411,7 +411,7 @@ func TestRevisionNavigationReloadsSelectedThreadAndBundle(t *testing.T) {
 	model.input = "/revision-back"
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
-	view := ansi.Strip(model.View())
+	view := ansi.Strip(model.snapshotText())
 	if strings.Contains(view, "Answer rev-two") || strings.Contains(view, "rev-two.md") ||
 		!strings.Contains(view, "Answer rev-one") || !strings.Contains(view, "rev-one.md") ||
 		!strings.Contains(view, "Moved back to rev-one.") || model.lastBundle.Path != "/retained/rev-one" {
@@ -420,7 +420,7 @@ func TestRevisionNavigationReloadsSelectedThreadAndBundle(t *testing.T) {
 	model.input = "/revision-forward"
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
-	view = ansi.Strip(model.View())
+	view = ansi.Strip(model.snapshotText())
 	if strings.Contains(view, "Answer rev-one") || strings.Contains(view, "rev-one.md") ||
 		!strings.Contains(view, "Answer rev-two") || !strings.Contains(view, "rev-two.md") ||
 		!strings.Contains(view, "Moved forward to rev-two.") || model.lastBundle.Path != "/retained/rev-two" {
@@ -440,114 +440,61 @@ func TestConversationPickerRefreshesRetainedConversationList(t *testing.T) {
 	})
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlX})
 	model = updated.(Model)
-	if !strings.Contains(model.View(), "Newly retained") {
-		t.Fatalf("picker did not refresh conversations: %s", model.View())
+	if !strings.Contains(model.snapshotText(), "Newly retained") {
+		t.Fatalf("picker did not refresh conversations: %s", model.snapshotText())
 	}
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
-	if model.conversation != "work-new" || !strings.Contains(model.View(), "work-new") {
-		t.Fatalf("picker did not restore selected conversation: %#v\n%s", model, model.View())
+	if model.conversation != "work-new" || !strings.Contains(model.snapshotText(), "work-new") {
+		t.Fatalf("picker did not restore selected conversation: %#v\n%s", model, model.snapshotText())
 	}
 }
 
-func TestInitialViewIsADeclutteredBottomComposer(t *testing.T) {
+func TestInitialBridgeStateKeepsWorkspaceAndCommandsAvailable(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work/reports"})
-	model.width = 100
-	model.height = 30
-	view := model.View()
-	if !model.home || model.launcher || !strings.Contains(view, gatorWordmark) || strings.Contains(view, "What do you want to accomplish?") || !strings.Contains(view, "Ask Gator to work on something") {
-		t.Fatalf("initial view = %q", view)
+	state := model.BridgeState()
+	if !state.Home || state.Mode != "chat" || state.Source != "/work/reports" {
+		t.Fatalf("initial bridge state = %#v", state)
 	}
-	initialLines := strings.Split(ansi.Strip(view), "\n")
-	if !strings.HasPrefix(initialLines[0], gatorWordmark) {
-		t.Fatalf("initial logo is not top-left: %q", initialLines[0])
+	model.openCommandPalette()
+	panel := model.BridgeState().Panel
+	if panel == nil || panel.Title != "Commands" {
+		t.Fatalf("command picker = %#v", panel)
 	}
-	for _, line := range initialLines {
-		if strings.Contains(line, "Ask Gator to work on something") && !strings.HasPrefix(line, "│") {
-			t.Fatalf("initial composer is not left-aligned: %q", line)
+	for _, name := range []string{"/mode", "/status", "/exit"} {
+		if !strings.Contains(model.snapshotText(), name) {
+			t.Fatalf("command picker omitted %s", name)
 		}
-	}
-	if strings.Contains(view, "Inbox") || strings.Contains(view, "Scheduled jobs") || strings.Contains(view, "local-first work") {
-		t.Fatalf("initial view exposes launcher clutter: %q", view)
-	}
-	for _, shortcut := range []string{"ctrl+g editor", "ctrl+i workspace", "ctrl+p commands", "ctrl+x conversations", "ctrl+b inbox", "ctrl+j jobs", "model ", "mode auto"} {
-		if strings.Contains(view, shortcut) {
-			t.Fatalf("initial view exposes status-line clutter %q: %q", shortcut, view)
-		}
-	}
-	typing, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
-	typingModel := typing.(Model)
-	typingView := typingModel.View()
-	if !typingModel.home || strings.Contains(typingView, "What do you want to accomplish?") || !strings.Contains(typingView, gatorWordmark) || strings.Contains(typingView, "Work in reports") {
-		t.Fatalf("composer did not stay bottom-anchored while drafting: %q", typingView)
-	}
-	submitted, _ := typingModel.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	submittedModel := submitted.(Model)
-	submittedView := ansi.Strip(submittedModel.View())
-	if submittedModel.home || strings.Contains(submittedView, "What do you want to accomplish?") || !strings.Contains(submittedView, "Work in reports") {
-		t.Fatalf("composer did not enter the Work view after submission: %q", submittedView)
-	}
-	composerRow := -1
-	for row, line := range strings.Split(submittedView, "\n") {
-		if strings.Contains(line, "Ask Gator to work on something") {
-			composerRow = row
-			break
-		}
-	}
-	if composerRow < submittedModel.height-3 {
-		t.Fatalf("composer row = %d, want the bottom of %d rows:\n%s", composerRow, submittedModel.height, submittedView)
-	}
-	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlP})
-	view = updated.(Model).View()
-	if !strings.Contains(view, "Commands") || !strings.Contains(view, "/mode") || !strings.Contains(view, "/status") || !strings.Contains(view, "/exit") {
-		t.Fatalf("palette did not reveal available commands: %q", view)
-	}
-	if strings.Contains(view, "/jobs") || strings.Contains(view, "/learnings") || strings.Contains(view, "/apply") {
-		t.Fatalf("palette showed commands without their backing service or result: %q", view)
-	}
-	if strings.Contains(view, "Work in reports") || strings.Contains(view, "Inbox") || strings.Contains(view, "Scheduled jobs") {
-		t.Fatalf("command palette still mixes destinations with actions: %q", view)
-	}
-	if strings.Contains(view, "Open the isolated coding workflow") {
-		t.Fatalf("palette still exposes the retired Code frontend: %q", view)
 	}
 }
 
-func TestBottomHomeComposerGrowsForWrappedDrafts(t *testing.T) {
+func TestBridgePreservesLongDraft(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work/reports"})
-	model.width, model.height = 60, 30
 	model.input = strings.Repeat("draft ", 30)
-	view := ansi.Strip(model.View())
-	if strings.Contains(view, "What do you want to accomplish?") || strings.Count(view, "│") <= 2 {
-		t.Fatalf("bottom composer did not grow across wrapped rows: %q", view)
+	if model.BridgeState().Input != model.input {
+		t.Fatal("bridge truncated the composer draft")
 	}
 }
 
-func TestRunningWorkUsesRattlesLoadingFrames(t *testing.T) {
+func TestRunningWorkPublishesLoadingFramesAndElapsedTime(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work"})
 	model.home = false
 	model.running = true
 	model.cancel = func() {}
 	model.loadingRun = 7
 	model.runStarted = time.Now().Add(-20 * time.Second)
-
-	if view := ansi.Strip(model.View()); !strings.Contains(view, "⠋ Working…") {
-		t.Fatalf("initial loading view = %q", view)
-	}
-	if view := ansi.Strip(model.View()); !strings.Contains(view, "20s · esc to interrupt") {
-		t.Fatalf("initial loading view omitted elapsed work time: %q", view)
+	initial := model.BridgeState()
+	if !initial.Running || initial.LoadingFrame != 0 || initial.Elapsed == "" {
+		t.Fatalf("running state = %#v", initial)
 	}
 	updated, command := model.Update(loadingTickMsg{run: 7})
 	model = updated.(Model)
-	if command == nil || model.loadingFrame != 1 {
-		t.Fatalf("loading tick was not scheduled: frame=%d command=%v", model.loadingFrame, command != nil)
-	}
-	if view := ansi.Strip(model.View()); !strings.Contains(view, "⠙ Working…") {
-		t.Fatalf("updated loading view = %q", view)
+	if command == nil || model.BridgeState().LoadingFrame != 1 {
+		t.Fatalf("loading tick = %#v", model.BridgeState())
 	}
 	updated, command = model.Update(loadingTickMsg{run: 6})
 	if command != nil || updated.(Model).loadingFrame != 1 {
-		t.Fatal("a stale run tick must not animate a later run")
+		t.Fatal("stale loading tick changed the run")
 	}
 }
 
@@ -565,7 +512,7 @@ func TestEscapeStopsRunningWorkAndPausesQueuedPrompts(t *testing.T) {
 
 	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	model = updated.(Model)
-	if command != nil || ctx.Err() != context.Canceled || !model.cancelling || !strings.Contains(ansi.Strip(model.View()), "Stopping… retaining evidence") {
+	if command != nil || ctx.Err() != context.Canceled || !model.cancelling || !model.BridgeState().Cancelling {
 		t.Fatalf("escape did not stop the run: %#v", model)
 	}
 	updated, _ = model.Update(agent.Event{Kind: agent.EventTextDelta, Text: "late progress"})
@@ -586,7 +533,7 @@ func TestCommandPaletteFiltersAndFillsCommandsThatNeedArguments(t *testing.T) {
 	model = updated.(Model)
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("jobs")})
 	model = updated.(Model)
-	view := model.View()
+	view := model.snapshotText()
 	if !strings.Contains(view, "/jobs") || strings.Contains(view, "/help") {
 		t.Fatalf("filtered palette = %q", view)
 	}
@@ -623,13 +570,13 @@ func TestSlashOpensSearchableCommandsAndCompletesArguments(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work", RefreshJobs: func() ([]jobs.Definition, error) { return nil, nil }})
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
 	model = updated.(Model)
-	if !model.launcher || model.launcherMode != "slash" || model.input != "" || !strings.Contains(model.View(), "Commands") {
+	if !model.launcher || model.launcherMode != "slash" || model.input != "" || !strings.Contains(model.snapshotText(), "Commands") {
 		t.Fatalf("slash did not open command search: %#v", model)
 	}
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("jobs")})
 	model = updated.(Model)
-	if !strings.Contains(model.View(), "/jobs") || strings.Contains(model.View(), "/help") {
-		t.Fatalf("slash search did not filter commands: %s", model.View())
+	if !strings.Contains(model.snapshotText(), "/jobs") || strings.Contains(model.snapshotText(), "/help") {
+		t.Fatalf("slash search did not filter commands: %s", model.snapshotText())
 	}
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeySpace})
 	model = updated.(Model)
@@ -738,8 +685,8 @@ func TestGoalPickerResumesSelectedGoal(t *testing.T) {
 		selected = value
 		return GoalState{Title: "Daily brief", SourcePath: "/briefs"}, nil
 	}})
-	if !strings.Contains(model.View(), "Daily brief") {
-		t.Fatalf("home does not show goal: %s", model.View())
+	if len(model.BridgeState().Actions) == 0 {
+		t.Fatal("home did not suggest continuing an ongoing goal")
 	}
 	updated, _ := model.runLocalCommand("/goals")
 	model = updated.(Model)
@@ -758,8 +705,8 @@ func TestSourceMenuIncludesWorkspaceSelectionAndRefresh(t *testing.T) {
 	model.input = "/source"
 	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
-	if command != nil || !model.launcher || model.launcherMode != "source" || !strings.Contains(model.View(), "Current: /work") {
-		t.Fatalf("source menu state = %#v\n%s", model, model.View())
+	if command != nil || !model.launcher || model.launcherMode != "source" || !strings.Contains(model.snapshotText(), "Current: /work") {
+		t.Fatalf("source menu state = %#v\n%s", model, model.snapshotText())
 	}
 	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
@@ -788,8 +735,8 @@ func TestCopyPromptsForTheResponseOrDeliverableSummary(t *testing.T) {
 	model.input = "/copy"
 	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
-	if command != nil || !model.launcher || model.launcherMode != "copy" || len(model.entries) != 3 || !strings.Contains(model.View(), "Verified deliverables") {
-		t.Fatalf("copy picker state = %#v\n%s", model, model.View())
+	if command != nil || !model.launcher || model.launcherMode != "copy" || len(model.entries) != 3 || !strings.Contains(model.snapshotText(), "Verified deliverables") {
+		t.Fatalf("copy picker state = %#v\n%s", model, model.snapshotText())
 	}
 	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
@@ -815,7 +762,7 @@ func TestRemovedTUIAliasesAreUnknown(t *testing.T) {
 		model := New(Config{CurrentFolder: "/work"})
 		model.input = input
 		updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
-		if command != nil || !strings.Contains(updated.(Model).View(), "unknown command") {
+		if command != nil || !strings.Contains(updated.(Model).snapshotText(), "unknown command") {
 			t.Fatalf("%s still routes: %#v", input, updated.(Model))
 		}
 	}
@@ -827,8 +774,8 @@ func TestProviderSlashCommandsAreNotDispatched(t *testing.T) {
 		model.input = command
 		updated, run := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 		model = updated.(Model)
-		if run != nil || !strings.Contains(model.View(), "unknown command") {
-			t.Fatalf("%s was still dispatched: %#v\n%s", command, model, model.View())
+		if run != nil || !strings.Contains(model.snapshotText(), "unknown command") {
+			t.Fatalf("%s was still dispatched: %#v\n%s", command, model, model.snapshotText())
 		}
 	}
 }
@@ -861,7 +808,7 @@ func TestConnectorSetupAndManagementRunInsideTUI(t *testing.T) {
 	if len(calls) != 1 || strings.Join(calls[0], " ") != "add google-work --kind google --oauth-client-id desktop-client-id" {
 		t.Fatalf("connector setup arguments = %#v", calls)
 	}
-	if view := model.View(); !strings.Contains(view, "Added connector google-work") || !strings.Contains(view, "/connector login google-work prompt") {
+	if view := model.snapshotText(); !strings.Contains(view, "Added connector google-work") || !strings.Contains(view, "/connector login google-work prompt") {
 		t.Fatalf("connector setup result = %s", view)
 	}
 	model.input = "/connector google-work"
@@ -890,8 +837,8 @@ func TestConnectorLoginUsesInteractiveCommandAndSelectsOnSuccess(t *testing.T) {
 	updated, _ = model.Update(connectorActionDone{action: "login", id: "google-work"})
 	model = updated.(Model)
 	if len(model.options.ConnectorIDs) != 1 || model.options.ConnectorIDs[0] != "google-work" ||
-		!strings.Contains(model.View(), "authenticated and selected") {
-		t.Fatalf("connector login result = %#v\n%s", model.options.ConnectorIDs, model.View())
+		!strings.Contains(model.snapshotText(), "authenticated and selected") {
+		t.Fatalf("connector login result = %#v\n%s", model.options.ConnectorIDs, model.snapshotText())
 	}
 }
 
@@ -913,28 +860,23 @@ func TestBridgeConnectorLoginUsesTerminalHandoff(t *testing.T) {
 	}
 }
 
-func TestCommandPaletteRowsShareOneLeftColumn(t *testing.T) {
+func TestCommandPalettePublishesOrderedRows(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work", RefreshJobs: func() ([]jobs.Definition, error) { return nil, nil }})
-	model.width, model.height = 100, 60
 	model.openCommandPalette()
-	lines := strings.Split(ansi.Strip(model.View()), "\n")
-	position := -1
+	panel := model.BridgeState().Panel
+	if panel == nil || panel.Kind != "picker" {
+		t.Fatalf("command picker = %#v", panel)
+	}
 	for _, command := range []string{"/help", "/new", "/jobs", "/exit"} {
 		found := false
-		for _, line := range lines {
-			if index := strings.Index(line, command); index >= 0 {
-				column := ansi.StringWidth(line[:index])
-				if position < 0 {
-					position = column
-				} else if column != position {
-					t.Fatalf("%s starts at column %d, want %d\n%s", command, column, position, ansi.Strip(model.View()))
-				}
+		for _, row := range panel.Rows {
+			if row.Label == command {
 				found = true
 				break
 			}
 		}
 		if !found {
-			t.Fatalf("palette omitted %s", command)
+			t.Fatalf("picker omitted %s", command)
 		}
 	}
 }
@@ -949,7 +891,7 @@ func TestDirectShortcutsOpenConversationsInboxAndJobs(t *testing.T) {
 		model = updated.(Model)
 	}
 	press(tea.KeyMsg{Type: tea.KeyCtrlI})
-	if !model.launcher || model.launcherMode != "source" || !strings.Contains(model.View(), "Change workspace") {
+	if !model.launcher || model.launcherMode != "source" || !strings.Contains(model.snapshotText(), "Change workspace") {
 		t.Fatalf("workspace shortcut state = %#v", model)
 	}
 	press(tea.KeyMsg{Type: tea.KeyEnter})
@@ -957,16 +899,17 @@ func TestDirectShortcutsOpenConversationsInboxAndJobs(t *testing.T) {
 		t.Fatalf("workspace selection input state = %#v", model)
 	}
 	press(tea.KeyMsg{Type: tea.KeyCtrlB})
-	if model.section != "inbox" || !strings.Contains(model.View(), "Inbox") || model.launcher {
+	if model.section != "inbox" || !strings.Contains(model.snapshotText(), "Inbox") || model.launcher {
 		t.Fatalf("inbox shortcut state = %#v", model)
 	}
 	press(tea.KeyMsg{Type: tea.KeyEsc})
-	press(tea.KeyMsg{Type: tea.KeyCtrlJ})
-	if model.section != "jobs" || !strings.Contains(model.View(), "Scheduled jobs") {
+	updated, _ := model.runLocalCommand("/jobs")
+	model = updated.(Model)
+	if model.section != "jobs" || !strings.Contains(model.snapshotText(), "Scheduled jobs") {
 		t.Fatalf("jobs shortcut state = %#v", model)
 	}
 	press(tea.KeyMsg{Type: tea.KeyCtrlX})
-	if !model.launcher || model.launcherMode != "conversations" || !strings.Contains(model.View(), "Quarterly plan") {
+	if !model.launcher || model.launcherMode != "conversations" || !strings.Contains(model.snapshotText(), "Quarterly plan") {
 		t.Fatalf("conversation shortcut state = %#v", model)
 	}
 	press(tea.KeyMsg{Type: tea.KeyEnter})
@@ -1086,27 +1029,32 @@ func TestFirstRunRetainsInitialTaskInModelManagement(t *testing.T) {
 	}
 }
 
-func TestFirstRunShowsSetupBeforeARequest(t *testing.T) {
+func TestFirstRunPublishesSetupStateBeforeARequest(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work", FirstRun: true, Models: func() (ModelPanel, error) { return &testModelPanel{}, nil }})
-	view := ansi.Strip(model.View())
-	for _, text := range []string{"Get started", "/model", "cloud or local model", "daily brief", "keep it through setup"} {
-		if !strings.Contains(view, text) {
-			t.Fatalf("home does not explain %q:\n%s", text, view)
-		}
+	state := model.BridgeState()
+	if !state.Home || !state.FirstRun || state.Mode != "chat" {
+		t.Fatalf("first run = %#v", state)
 	}
 	model.input = "/model"
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if updated.(Model).models == nil {
-		t.Fatal("visible setup route did not open the model panel")
+		t.Fatal("setup route did not open model panel")
 	}
 }
 
-func TestHomeShowsNextActionsInOnePlace(t *testing.T) {
+func TestHomePublishesNextActions(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work", Attention: workhome.Attention{PendingSuggestions: 1, UnreadResults: 1, ActiveGoals: 1, RecentWork: true}})
-	view := ansi.Strip(model.View())
-	for _, text := range []string{"Next up", "/suggestions", "/inbox", "/goals", "/history"} {
-		if !strings.Contains(view, text) {
-			t.Fatalf("home does not show %q:\n%s", text, view)
+	state := model.BridgeState()
+	for _, command := range []string{"/suggestions", "/inbox", "/goals", "/history"} {
+		found := false
+		for _, action := range state.Actions {
+			if action.Command == command {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("home omitted action %s", command)
 		}
 	}
 }

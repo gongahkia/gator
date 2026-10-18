@@ -76,7 +76,7 @@ func TestPanelConfirmationRemainsVisibleInShortTerminal(t *testing.T) {
 		ID: "fixture", Name: "Reviewed model", Download: "398 MB", SourceURL: "https://ollama.com/library/qwen2.5-coder",
 	}}}
 	panel.model.localModels.confirmation = localModelConfirmPull
-	view := panel.View()
+	view := panelSnapshotText(panel.UISnapshot())
 	for _, required := range []string{"Confirm download", "398 MB", "https://ollama.com/library/qwen2.5-coder", "enter/y download", "esc/n cancel"} {
 		if !strings.Contains(view, required) {
 			t.Fatalf("confirmation hid %q:\n%s", required, view)
@@ -93,14 +93,14 @@ func TestPanelUsesWorkVisualLanguage(t *testing.T) {
 	panel.model.screen = localModelsScreen
 	panel.model.notice = notice{}
 
-	view := panel.View()
+	view := panelSnapshotText(panel.UISnapshot())
 	plain := ansi.Strip(view)
-	for _, required := range []string{"Cloud API key", "gemini", "↑/↓ choose", "esc setup choice", "f1 help"} {
+	for _, required := range []string{"Cloud models", "gemini", "↑/↓ choose", "Esc back", "F1 help"} {
 		if !strings.Contains(plain, required) {
 			t.Fatalf("work-native model panel omitted %q:\n%s", required, plain)
 		}
 	}
-	for _, legacy := range []string{"🐊 Gator  models · gator", "Tab: Cloud / Local", "Readiness is credential/configuration state only", "Cloud models", "sign in"} {
+	for _, legacy := range []string{"🐊 Gator  models · gator", "Tab: Cloud / Local", "Readiness is credential/configuration state only", "sign in"} {
 		if strings.Contains(plain, legacy) {
 			t.Fatalf("model panel retained legacy chrome %q:\n%s", legacy, plain)
 		}
@@ -113,16 +113,16 @@ func TestPanelStartsWithLocalOrCloudAPIKeyChoice(t *testing.T) {
 	panel.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	panel.Init()
 	panel.model.localModels.catalog = LocalCatalog{RuntimeVersion: "fixture", Models: []LocalModel{{Name: "General Work Model", Category: "General Work"}}}
-	plain := ansi.Strip(panel.View())
-	for _, required := range []string{"Cloud API key", "Local model", "enter continue"} {
+	plain := ansi.Strip(panelSnapshotText(panel.UISnapshot()))
+	for _, required := range []string{"Cloud API key", "Local model", "Enter continue"} {
 		if !strings.Contains(plain, required) {
 			t.Fatalf("choice omitted %q:\n%s", required, plain)
 		}
 	}
 	panel.Update(tea.KeyMsg{Type: tea.KeyDown})
 	panel.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	plain = ansi.Strip(panel.View())
-	if !strings.Contains(plain, "Recommended for general Work") {
+	plain = ansi.Strip(panelSnapshotText(panel.UISnapshot()))
+	if !strings.Contains(plain, "General Work") {
 		t.Fatalf("local selection did not open local catalog:\n%s", plain)
 	}
 }
@@ -138,8 +138,8 @@ func TestPanelPlacesGeneralWorkModelsBeforeCodingModels(t *testing.T) {
 		{ID: "work", Category: "General Work", Name: "General Work Model", Download: "5.2 GB"},
 		{ID: "code", Category: "Coding", Name: "Coding Model", Download: "4.7 GB"},
 	}}
-	plain := ansi.Strip(panel.View())
-	for _, required := range []string{"Recommended for general Work", "Coding · implementation and verification", "General Work Model", "Coding Model", "x remove"} {
+	plain := ansi.Strip(panelSnapshotText(panel.UISnapshot()))
+	for _, required := range []string{"General Work", "Coding", "General Work Model", "Coding Model", "X remove"} {
 		if !strings.Contains(plain, required) {
 			t.Fatalf("model panel omitted %q:\n%s", required, plain)
 		}

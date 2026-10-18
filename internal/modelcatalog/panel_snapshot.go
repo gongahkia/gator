@@ -66,6 +66,12 @@ func (p *ModelCatalogPanel) UISnapshot() uisnapshot.Panel {
 	}
 	if p.model.localModels.action != localModelIdle {
 		panel.Notice = p.model.localModelActionLabel()
+		if p.model.localModels.action == localModelPulling || p.model.localModels.action == localModelInstalling {
+			panel.Notice = p.model.localModelProgressLabel()
+		}
+		if p.model.localModels.action == localModelInstalling && len(p.model.localModels.installerLogs) > 0 {
+			panel.Blocks = append(panel.Blocks, uisnapshot.Block{Title: "Installer output", Lines: append([]string(nil), p.model.localModels.installerLogs...)})
+		}
 	}
 	if len(panel.Rows) == 0 && panel.Notice == "" {
 		panel.Notice = "No models available yet."

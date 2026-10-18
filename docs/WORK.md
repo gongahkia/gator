@@ -23,13 +23,14 @@ Use `/mode` and `/artifact` when the automatic choice is not the intended
 contract. `/source`, `/connector`, and `/web-origin` are visible session controls,
 not hidden model permissions.
 
-The default conversation screen uses a bundled React terminal renderer when
-Node.js 22 or newer is available. Its Go backend owns Work runs, retained
+The interactive conversation screen requires Node.js 22 or newer and uses a
+bundled React terminal renderer. Its Go backend owns Work runs, retained
 conversation state, commands, approvals, and evidence. Pickers, model setup,
 inbox, history, learnings, and confirmations render as React panels from Go
-workflow state. Without Node.js, or with `GATOR_NATIVE_TUI=1`, Gator uses
-the native Go interface directly. The TypeScript source and build instructions
-are in `ui/`; the generated bundle is embedded in the Go binary.
+workflow state. If Node.js is missing or too old, interactive startup exits
+with an installation message; headless commands still work. The TypeScript
+source and build instructions are in `ui/`; the generated bundle is embedded
+in the Go binary.
 
 Completed files appear in the conversation as a verified deliverable card.
 `/review` previews them without leaving the TUI. `/save [DIRECTORY]` preflights

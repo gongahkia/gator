@@ -62,7 +62,7 @@ type Model struct {
 }
 
 func newModel(config Config) Model {
-	config.Theme = applyWorkSurfaceTheme(config.Theme)
+	config.Theme = normalizeCatalogTheme(config.Theme)
 	if strings.TrimSpace(config.Provider) == "" {
 		config.Provider = "openai"
 	}
@@ -73,7 +73,7 @@ func newModel(config Config) Model {
 	localSpinner := spinner.New(spinner.WithSpinner(spinner.Spinner{
 		Frames: rattles.BrailleDots.Frames,
 		FPS:    rattles.BrailleDots.Interval,
-	}), spinner.WithStyle(keyStyle))
+	}))
 	return Model{
 		config:      config,
 		screen:      chooseModelScreen,

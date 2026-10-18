@@ -156,11 +156,24 @@ function GreenPrompt({
   };
   useInput((input, key) => {
     if (disabled) return;
+    if ((key.return && key.shift) || (key.ctrl && input === "j")) { replace(value.slice(0, cursor) + "\n" + value.slice(cursor), cursor + 1); return; }
     if (key.return) { if (value.trim()) onSubmit(value); setCursor(0); setHistoryIndex(-1); return; }
     if (key.leftArrow) { setCursor((position) => Math.max(0, position - 1)); return; }
     if (key.rightArrow) { setCursor((position) => Math.min(value.length, position + 1)); return; }
     if (key.home || (key.ctrl && input === "a")) { setCursor(0); return; }
     if (key.end || (key.ctrl && input === "e")) { setCursor(value.length); return; }
+    const beforeCursor = value.slice(0, cursor);
+    const currentLine = beforeCursor.split("\n").length - 1;
+    const lines = value.split("\n");
+    const column = beforeCursor.length - beforeCursor.lastIndexOf("\n") - 1;
+    if (key.upArrow && currentLine > 0) {
+      const start = lines.slice(0, currentLine - 1).reduce((count, line) => count + line.length + 1, 0);
+      setCursor(start + Math.min(column, lines[currentLine - 1].length)); return;
+    }
+    if (key.downArrow && currentLine + 1 < lines.length) {
+      const start = lines.slice(0, currentLine + 1).reduce((count, line) => count + line.length + 1, 0);
+      setCursor(start + Math.min(column, lines[currentLine + 1].length)); return;
+    }
     if (key.upArrow && historyIndex + 1 < history.length) {
       const next = historyIndex + 1; setHistoryIndex(next); onChange(history[next]); setCursor(history[next].length); return;
     }
@@ -180,19 +193,23 @@ function GreenPrompt({
     if (input) replace(value.slice(0, cursor) + input + value.slice(cursor), cursor + input.length);
   }, { isActive: !disabled });
   return (
-    <Box>
-      <Text color={green}>❯ </Text>
-      {value ? (
-        <Text>{value.slice(0, cursor)}<Text inverse>{value[cursor] ?? " "}</Text>{value.slice(cursor + 1)}</Text>
-      ) : (
-        <Text><Text inverse> </Text><Text dimColor>Ask Gator to work on something…</Text></Text>
-      )}
+    <Box flexDirection="column">
+      {value ? value.split("\n").map((line, index, lines) => {
+        const start = lines.slice(0, index).reduce((count, item) => count + item.length + 1, 0);
+        const localCursor = cursor - start;
+        return <Box key={index}>
+          <Text color={green}>{index === 0 ? "❯ " : "· "}</Text>
+          {localCursor >= 0 && localCursor <= line.length
+            ? <Text>{line.slice(0, localCursor)}<Text inverse>{line[localCursor] ?? " "}</Text>{line.slice(localCursor + 1)}</Text>
+            : <Text>{line || " "}</Text>}
+        </Box>;
+      }) : <Box><Text color={green}>❯ </Text><Text><Text inverse> </Text><Text dimColor>Ask Gator to work on something…</Text></Text></Box>}
     </Box>
   );
 }
 
 function ChatKeys({
-  state, draft, matches, selected, setSelected, choose, dismiss, search, scroll, exit, bridge,
+  state, draft, matches, selected, setSelected, choose, dismiss, search, scroll, exit, clearDraft, exitHint, bridge,
 }: {
   state: BackendState;
   draft: string;
@@ -204,16 +221,24 @@ function ChatKeys({
   search: () => void;
   scroll: (rows: number) => void;
   exit: () => void;
+  clearDraft: () => void;
+  exitHint: () => void;
   bridge: GatorBridge;
 }): null {
+  const lastExit = useRef(0);
   useInput((input, key, event) => {
-    if (key.ctrl && input === "d") { event.stopImmediatePropagation(); exit(); return; }
-    if (key.ctrl && input === "c" && !state.running) { event.stopImmediatePropagation(); exit(); return; }
+    if (key.ctrl && input === "d") {
+      event.stopImmediatePropagation();
+      if (Date.now() - lastExit.current < 2000) exit();
+      else { lastExit.current = Date.now(); exitHint(); }
+      return;
+    }
+    if (key.ctrl && input === "c" && !state.running) { event.stopImmediatePropagation(); clearDraft(); return; }
     if ((key.ctrl && input === "c") || (key.escape && state.running)) {
       event.stopImmediatePropagation(); bridge.send({ type: "key", key: "esc" }); return;
     }
     if (key.ctrl && input === "f") { event.stopImmediatePropagation(); search(); return; }
-    const shortcuts: Record<string, string> = { p: "ctrl+p", x: "ctrl+x", b: "ctrl+b", j: "ctrl+j", i: "ctrl+i", g: "ctrl+g" };
+    const shortcuts: Record<string, string> = { p: "ctrl+p", x: "ctrl+x", b: "ctrl+b", i: "ctrl+i", g: "ctrl+g" };
     if (key.ctrl && shortcuts[input]) {
       event.stopImmediatePropagation(); bridge.send({ type: "key", key: shortcuts[input], text: input === "g" ? draft : undefined }); return;
     }
@@ -262,34 +287,40 @@ function PanelKeys({ bridge, scroll }: { bridge: GatorBridge; scroll: (amount: n
   return null;
 }
 
-function PanelScreen({ panel, status, bridge }: { panel: BackendPanel; status?: string; bridge: GatorBridge }): React.ReactNode {
+function PanelScreen({ panel, status, draft, statusLine, bridge }: { panel: BackendPanel; status?: string; draft?: string; statusLine?: string[]; bridge: GatorBridge }): React.ReactNode {
   const terminal = useContext(TerminalSizeContext);
   const [offset, setOffset] = useState(0);
   useEffect(() => { setOffset(0); }, [panel.kind, panel.title, panel.subtitle]);
   const rows = panel.rows ?? [];
-  const maxRows = Math.max(3, Math.floor(((terminal?.rows ?? 24) - 10) / 2));
-  const selected = Math.min(Math.max(0, panel.selected ?? 0), Math.max(0, rows.length - 1));
-  const rowStart = Math.max(0, Math.min(selected - Math.floor(maxRows / 2), rows.length - maxRows));
   const blocks = (panel.blocks ?? []).flatMap((block) => [
     ...(block.title ? [{ text: block.title, heading: true }] : []),
     ...(block.lines.length ? block.lines.map((line) => ({ text: line, heading: false })) : [{ text: "None", heading: false }]),
     { text: "", heading: false },
   ]);
-  const maxLines = Math.max(4, (terminal?.rows ?? 24) - 9);
+  const available = Math.max(4, (terminal?.rows ?? 24) - 11);
+  const rowHeight = rows.some((row) => row.detail) ? 3 : 2;
+  const maxRows = Math.max(2, Math.floor((blocks.length > 0 ? available / 2 : available) / rowHeight));
+  const selected = Math.min(Math.max(0, panel.selected ?? 0), Math.max(0, rows.length - 1));
+  const rowStart = Math.max(0, Math.min(selected - Math.floor(maxRows / 2), rows.length - maxRows));
+  const maxLines = Math.max(2, available - (rows.length > 0 ? Math.min(rows.length, maxRows) * rowHeight : 0));
   const blockOffset = Math.min(offset, Math.max(0, blocks.length - maxLines));
+  const focused = panel.kind === "confirmation" || panel.kind === "model-form";
+  const panelWidth = Math.max(20, Math.min(78, (terminal?.columns ?? 80) - 4));
+  const contentWidth = focused ? panelWidth - 4 : Math.max(1, (terminal?.columns ?? 80) - 4);
   return (
     <Box flexDirection="column" flexGrow={1} paddingX={2} paddingTop={1}>
       <PanelKeys bridge={bridge} scroll={(amount) => setOffset((current) => Math.max(0, Math.min(blocks.length - maxLines, current + amount)))} />
-      <Text color={green} bold>🐊 Gator  <Text color={mutedGreen}>{panel.title}</Text></Text>
-      {panel.subtitle && <Box marginTop={1}><Text>{panel.subtitle}</Text></Box>}
-      {panel.kind === "picker" && <Box marginTop={1}><Text color={mutedGreen}>Search  </Text><Text>{panel.query || "type to filter"}<Text inverse> </Text></Text></Box>}
-      <Box marginTop={1}><Divider /></Box>
-      <Box flexDirection="column" flexGrow={1} marginTop={1}>
+      <Box flexDirection="column" flexGrow={focused ? 0 : 1} width={focused ? panelWidth : undefined} alignSelf={focused ? "center" : undefined} borderStyle={focused ? "round" : undefined} borderColor={focused ? green : undefined} paddingX={focused ? 1 : 0} marginTop={focused ? 1 : 0}>
+        <Text color={green} bold>🐊 Gator  <Text color={mutedGreen}>{panel.title}</Text></Text>
+        {panel.subtitle && <Box marginTop={1}><Text>{panel.subtitle}</Text></Box>}
+        {panel.kind === "picker" && <Box marginTop={1}><Text color={mutedGreen}>Search  </Text><Text>{panel.query || "type to filter"}<Text inverse> </Text></Text></Box>}
+        <Box marginTop={1}><Divider width={contentWidth} /></Box>
+        <Box flexDirection="column" flexGrow={focused ? 0 : 1} marginTop={1}>
         {rows.slice(rowStart, rowStart + maxRows).map((row, index) => {
           const active = panel.kind !== "inbox" && panel.kind !== "jobs" && rowStart + index === selected;
           return <Box key={`${rowStart + index}-${row.label}`} flexDirection="column" marginBottom={1}>
             <Text color={active ? green : undefined} bold={active}>{active ? "❯ " : "  "}{row.label}{row.state ? <Text color={mutedGreen}>  ·  {row.state}</Text> : null}</Text>
-            {row.detail && <Box marginLeft={2}><Text dimColor={!active}>{row.detail}</Text></Box>}
+            {row.detail && <Box marginLeft={2}><Text dimColor={!active}>{row.detail}{active && panel.kind === "model-form" && <Text inverse> </Text>}</Text></Box>}
           </Box>;
         })}
         {blocks.slice(blockOffset, blockOffset + maxLines).map((line, index) => <Box key={`${blockOffset + index}-${line.text}`} marginBottom={line.heading ? 0 : undefined}>
@@ -299,9 +330,14 @@ function PanelScreen({ panel, status, bridge }: { panel: BackendPanel; status?: 
         {rows.length === 0 && blocks.length === 0 && !panel.notice && <Text dimColor>No items to show.</Text>}
         {panel.notice && <Box marginTop={1}><Text color={mutedGreen}>{panel.notice}</Text></Box>}
         {status && status !== panel.notice && <Box marginTop={1}><Text dimColor>{status}</Text></Box>}
+        </Box>
+        <Divider width={contentWidth} />
+        <Text dimColor>{panel.footer || "Esc back"}</Text>
       </Box>
-      <Divider />
-      <Text dimColor>{panel.footer || "Esc back"}</Text>
+      {focused && <Box flexGrow={1} />}
+      <Box marginTop={1}><Divider width={Math.max(1, (terminal?.columns ?? 80) - 4)} /></Box>
+      <Text dimColor>❯ {draft || "Ask Gator to work on something…"}</Text>
+      {statusLine && statusLine.length > 0 && <StatusLine segments={statusLine.map((content) => ({ content, color: mutedGreen }))} />}
     </Box>
   );
 }
@@ -332,6 +368,7 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
   useInput(() => {});
   const [state, setState] = useState<BackendState | undefined>(bridge.snapshot());
   const [failure, setFailure] = useState("");
+  const [localNotice, setLocalNotice] = useState("");
   const [input, setInput] = useState("");
   const [prefillVersion, setPrefillVersion] = useState(0);
   const [history, setHistory] = useState<string[]>([]);
@@ -364,7 +401,7 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
 
   if (!state) return <Box padding={1}><Text color={green}>{failure || "Starting Gator…"}</Text></Box>;
   if (state.mode === "panel" && state.panel) {
-    return <PanelScreen panel={state.panel} status={state.status} bridge={bridge} />;
+    return <PanelScreen panel={state.panel} status={state.status} draft={input} statusLine={state.status_line_enabled ? state.status_line : undefined} bridge={bridge} />;
   }
   const matches = !searchOpen && !dismissed && input.startsWith("/") && !input.includes(" ")
     ? state.commands.filter((command) => (input === "/" ? !command.advanced : `/${command.name}`.startsWith(input))).slice(0, 8)
@@ -373,7 +410,7 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
     const text = value.trim();
     if (!text) return;
     bridge.send({ type: "submit", text });
-    setInput(""); setDismissed(false); setHistory((current) => [text, ...current]);
+    setInput(""); setLocalNotice(""); setDismissed(false); setHistory((current) => [text, ...current]);
   };
   const choose = (command: BackendCommand) => {
     if (command.needs_input && input.trim() !== `/${command.name}`) {
@@ -407,21 +444,21 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
     role: item.role === "You" ? "user" : item.role === "Gator" ? "assistant" : "system",
     content: item.text,
   }));
-  const viewportHeight = Math.max(1, (terminal?.rows ?? 24) - 6 - matches.length - (state.running ? 2 : 0) - (searchOpen ? 1 : 0));
+  const viewportHeight = Math.max(1, (terminal?.rows ?? 24) - 6 - matches.length - (state.running ? 2 : 0) - (searchOpen ? 1 : 0) - input.split("\n").length + 1);
   const statusSegments = (state.status_line ?? []).map((content) => ({ content, color: mutedGreen }));
   return (
     <Box flexDirection="column" flexGrow={1} paddingX={1} paddingTop={1}>
       {!state.home && <Box marginBottom={1}><Text color={green} bold>🐊 Gator</Text><Text color={mutedGreen}>  {context}</Text></Box>}
       <Box flexDirection="column" flexGrow={1}>
         {state.home && state.messages.length === 0 && <Box marginBottom={1}>{welcome}</Box>}
-        <MessageList ref={list} viewportHeight={viewportHeight} messages={messages} renderMessage={(item) => <MessageBody item={state.messages[Number(item.id.split("-", 1)[0])]} />} />
+        {state.messages.length > 0 && <MessageList ref={list} viewportHeight={viewportHeight} messages={messages} renderMessage={(item) => <MessageBody item={state.messages[Number(item.id.split("-", 1)[0])]} />} />}
         {state.running && <Box marginTop={1}><Text color={green}>{state.cancelling ? "◌ Stopping… retaining evidence" : `${["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"][state.loading_frame % 10]} Working… ${state.elapsed ?? ""} · Esc to interrupt`}</Text></Box>}
       </Box>
-      {state.status && <Text color={mutedGreen}>{state.status}</Text>}
-      {!searchOpen && <ChatKeys state={state} draft={input} matches={matches} selected={selected} setSelected={setSelected} choose={choose} dismiss={() => setDismissed(true)} search={() => setSearchOpen(true)} scroll={(rows) => list.current?.scrollBy(rows)} exit={close} bridge={bridge} />}
+      {(localNotice || state.status) && <Text color={mutedGreen}>{localNotice || state.status}</Text>}
+      {!searchOpen && <ChatKeys state={state} draft={input} matches={matches} selected={selected} setSelected={setSelected} choose={choose} dismiss={() => setDismissed(true)} search={() => setSearchOpen(true)} scroll={(rows) => list.current?.scrollBy(rows)} exit={close} clearDraft={() => { setInput(""); setPrefillVersion((version) => version + 1); setLocalNotice(""); }} exitHint={() => setLocalNotice("Press Ctrl+D again to exit Gator")} bridge={bridge} />}
       {searchOpen && <GreenSearch messages={state.messages} close={() => setSearchOpen(false)} navigate={(index) => list.current?.scrollTo(index)} />}
       <Divider />
-      <GreenPrompt value={input} onChange={(value) => { setInput(value); setSelected(0); setDismissed(false); }} onSubmit={submit} disabled={searchOpen || !!failure} history={history} prefillVersion={prefillVersion} />
+      <GreenPrompt value={input} onChange={(value) => { setInput(value); setLocalNotice(""); setSelected(0); setDismissed(false); }} onSubmit={submit} disabled={searchOpen || !!failure} history={history} prefillVersion={prefillVersion} />
       {matches.length > 0 && <Box marginLeft={2} flexDirection="column">{matches.map((command, index) => <Box key={command.name}><Text color={index === selected ? green : undefined} bold={index === selected}>{index === selected ? "❯" : " "} /{command.name}</Text><Text dimColor>  {command.description}</Text></Box>)}</Box>}
       {failure && <Text color="red">{failure}</Text>}
       <Divider />

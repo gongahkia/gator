@@ -13,7 +13,6 @@ import (
 	"strings"
 
 	"github.com/atotto/clipboard"
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/attachment"
@@ -60,9 +59,7 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		if err != nil || output.Mode()&os.ModeCharDevice == 0 {
 			return errors.New("interactive Work requires a terminal; use 'gator work' for scripts")
 		}
-		if launched, err := launchTerminalUI(startConversationID, goalID); launched || err != nil {
-			return err
-		}
+		return launchTerminalUI(startConversationID, goalID)
 	}
 	stateDir, err := state.ResolveDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {
@@ -387,15 +384,7 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		StatusLineEnabled: settings.TUI.StatusLineEnabled,
 		SetStatusLine:     saveWorkStatusLine(settingsStore),
 	})
-	if backend {
-		return runUIBridge(application)
-	}
-	program := tea.NewProgram(application, tea.WithAltScreen())
-	final, err := program.Run()
-	if application, ok := final.(worktui.Model); ok {
-		application.Close()
-	}
-	return err
+	return runUIBridge(application)
 }
 
 func workTUIConnectorAction(arguments []string) (string, error) {
