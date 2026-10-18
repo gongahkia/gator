@@ -43,11 +43,14 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version: "1.25.13"
-      - name: Install strict process sandbox
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y bubblewrap
-      - name: Test release source
+      - name: Test release source on macOS
+        if: runner.os == 'macOS'
         run: go test ./...
+      # GitHub-hosted Linux runners cannot create Bubblewrap's network namespace.
+      # Compile every test there, then build the Linux release binary below.
+      - name: Compile release tests on Linux
+        if: runner.os == 'Linux'
+        run: go test ./... -run '^$'
       - name: Build archive
         shell: bash
         env:
