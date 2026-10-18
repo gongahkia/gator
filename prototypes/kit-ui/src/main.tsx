@@ -181,7 +181,7 @@ function GatorPreviewREPL({
   const [searchOpen, setSearchOpen] = useState(false);
   const historyRef = useRef<VirtualListHandle>(null);
   const terminal = useContext(TerminalSizeContext);
-  const matches = !pickerDismissed && inputValue.startsWith("/") && !inputValue.includes(" ")
+  const matches = !searchOpen && !pickerDismissed && inputValue.startsWith("/") && !inputValue.includes(" ")
     ? commands.filter((command) => `/${command.name}`.startsWith(inputValue))
     : [];
   const viewportHeight = Math.max(1, (terminal?.rows ?? 24) - 6 - matches.length - (searchOpen ? 1 : 0));
