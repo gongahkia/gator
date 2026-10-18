@@ -444,7 +444,7 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
     </Box>
   );
   const messages: Message[] = state.messages.map((item, index) => ({
-    id: `${index}-${item.role}-${item.text.length}`,
+    id: `${index}-${item.role}-${item.text.length}-${item.result?.tone ?? ""}-${item.result?.footer ?? ""}`,
     role: item.role === "You" ? "user" : item.role === "Gator" ? "assistant" : "system",
     content: item.text,
   }));

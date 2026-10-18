@@ -46051,7 +46051,7 @@ function JsonPreview({ value, depth = 0 }) {
   if (value === null || typeof value !== "object") {
     return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: typeof value === "string" ? void 0 : muted, children: JSON.stringify(value) ?? String(value) });
   }
-  if (depth >= 12) return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: "\u2026" });
+  if (depth >= 12) return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { children: JSON.stringify(value, null, 2) });
   const entries = Array.isArray(value) ? value.map((item, index) => [String(index + 1), item]) : Object.entries(value);
   if (entries.length === 0) return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: Array.isArray(value) ? "[]" : "{}" });
   return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { flexDirection: "column", children: entries.map(([key, item]) => /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", marginLeft: depth ? 2 : 0, children: [
@@ -46064,12 +46064,17 @@ function JsonPreview({ value, depth = 0 }) {
   ] }, key)) });
 }
 function ResultContent({ fields, items, lines, markdown }) {
+  const hasFields = (fields?.length ?? 0) > 0;
+  const hasItems = (items?.length ?? 0) > 0;
   return /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", children: [
-    fields?.map((field, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", marginBottom: index + 1 === fields.length ? 0 : 0, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: muted, children: field.label }),
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: toneColor(field.tone), children: field.value }) })
+    fields?.map((field, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { color: muted, children: [
+        field.label,
+        ": "
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: toneColor(field.tone), children: field.value })
     ] }, `${index}-${field.label}`)),
-    items?.map((item, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", marginTop: index ? 1 : 0, children: [
+    items?.map((item, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", marginTop: index || hasFields ? 1 : 0, children: [
       /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { children: [
         /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: toneColor(item.tone) ?? green2, children: "\u2022 " }),
         /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { bold: true, children: item.label }),
@@ -46080,8 +46085,8 @@ function ResultContent({ fields, items, lines, markdown }) {
       ] }),
       item.detail ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: item.detail }) }) : null
     ] }, `${index}-${item.label}`)),
-    lines?.map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { children: line || " " }, index)),
-    markdown ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Markdown, { children: markdown }) : null
+    lines?.map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginTop: index === 0 && (hasFields || hasItems) ? 1 : 0, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { children: line || " " }) }, index)),
+    markdown ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginTop: hasFields || hasItems ? 1 : 0, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Markdown, { children: markdown }) }) : null
   ] });
 }
 function ResultBody({ result }) {
@@ -46469,7 +46474,7 @@ function PanelScreen({ panel, status, draft, statusLine, bridge, exit }) {
             /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { color: active ? green3 : void 0, bold: active, children: [
               active ? "\u276F " : "  ",
               row.label,
-              row.state ? /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { color: mutedGreen2, children: [
+              row.state ? /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { color: row.tone === "warning" ? "#D6AD69" : row.tone === "error" ? "#DF7777" : row.tone === "success" ? green3 : mutedGreen2, children: [
                 "  \xB7  ",
                 row.state
               ] }) : null
@@ -46611,7 +46616,7 @@ function App2({ bridge }) {
     ] })
   ] });
   const messages = state.messages.map((item, index) => ({
-    id: `${index}-${item.role}-${item.text.length}`,
+    id: `${index}-${item.role}-${item.text.length}-${item.result?.tone ?? ""}-${item.result?.footer ?? ""}`,
     role: item.role === "You" ? "user" : item.role === "Gator" ? "assistant" : "system",
     content: item.text
   }));

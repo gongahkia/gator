@@ -131,14 +131,14 @@ func (m Model) copySelection(id string) (tea.Model, tea.Cmd) {
 		}
 	}
 	if strings.TrimSpace(text) == "" {
-		m.messages = append(m.messages, message{role: "Gator", text: "That item is no longer available to copy."})
+		m.messages = append(m.messages, noticeMessage("Copy", "That item is no longer available to copy.", "warning"))
 		return m, nil
 	}
 	if err := m.config.Copy(text); err != nil {
-		m.messages = append(m.messages, message{role: "Gator", text: err.Error()})
+		m.messages = append(m.messages, noticeMessage("Copy failed", err.Error(), "error"))
 		return m, nil
 	}
-	m.messages = append(m.messages, message{role: "Gator", text: "Copied " + label + "."})
+	m.messages = append(m.messages, noticeMessage("Copied", "Copied "+label+".", "success"))
 	m.scroll = 0
 	return m, nil
 }
@@ -975,11 +975,11 @@ func (m *Model) configureWebOrigins(fields []string) (string, error) {
 
 func (m Model) prepareSave(raw string) (tea.Model, tea.Cmd) {
 	if m.lastBundle.Path == "" {
-		m.messages = append(m.messages, message{role: "Gator", text: "No verified deliverables are available yet."})
+		m.messages = append(m.messages, noticeMessage("Save", "No verified deliverables are available yet.", "warning"))
 		return m, nil
 	}
 	if m.config.BundleAction == nil {
-		m.messages = append(m.messages, message{role: "Gator", text: errorsUnavailable("save").Error()})
+		m.messages = append(m.messages, noticeMessage("Save unavailable", errorsUnavailable("save").Error(), "error"))
 		return m, nil
 	}
 	replace := false
@@ -995,7 +995,7 @@ func (m Model) prepareSave(raw string) (tea.Model, tea.Cmd) {
 	request := BundleActionRequest{Action: "save", BundlePath: m.lastBundle.Path, Target: target, Replace: replace}
 	summary, err := m.config.BundleAction(request)
 	if err != nil {
-		m.messages = append(m.messages, message{role: "Gator", text: err.Error()})
+		m.messages = append(m.messages, noticeMessage("Save failed", err.Error(), "error"))
 		return m, nil
 	}
 	m.pendingBundleAction = &pendingBundleAction{request: request, summary: summary}
@@ -1005,7 +1005,7 @@ func (m Model) prepareSave(raw string) (tea.Model, tea.Cmd) {
 
 func (m Model) prepareCodeApply(raw string) (tea.Model, tea.Cmd) {
 	if m.lastBundle.Path == "" || len(m.lastBundle.Candidates) == 0 {
-		m.messages = append(m.messages, message{role: "Gator", text: "No verified Code candidate is available yet."})
+		m.messages = append(m.messages, noticeMessage("Apply", "No verified Code candidate is available yet.", "warning"))
 		return m, nil
 	}
 	candidate := CandidateSummary{}
@@ -1026,7 +1026,7 @@ func (m Model) prepareCodeApply(raw string) (tea.Model, tea.Cmd) {
 		}
 	}
 	if candidate.ID == "" {
-		m.messages = append(m.messages, message{role: "Gator", text: "No verified Code candidate is available yet."})
+		m.messages = append(m.messages, noticeMessage("Apply", "No verified Code candidate is available yet.", "warning"))
 		return m, nil
 	}
 	if target == "" {
@@ -1035,7 +1035,7 @@ func (m Model) prepareCodeApply(raw string) (tea.Model, tea.Cmd) {
 	request := BundleActionRequest{Action: "apply-code", BundlePath: m.lastBundle.Path, Target: target, CandidateID: candidate.ID}
 	summary, err := m.config.BundleAction(request)
 	if err != nil {
-		m.messages = append(m.messages, message{role: "Gator", text: err.Error()})
+		m.messages = append(m.messages, noticeMessage("Apply failed", err.Error(), "error"))
 		return m, nil
 	}
 	m.pendingBundleAction = &pendingBundleAction{request: request, summary: summary}
@@ -1045,18 +1045,18 @@ func (m Model) prepareCodeApply(raw string) (tea.Model, tea.Cmd) {
 
 func (m Model) prepareRetry(raw string) (tea.Model, tea.Cmd) {
 	if m.lastBundle.Path == "" {
-		m.messages = append(m.messages, message{role: "Gator", text: "No completed Work output is available yet."})
+		m.messages = append(m.messages, noticeMessage("Retry", "No completed Work output is available yet.", "warning"))
 		return m, nil
 	}
 	if m.config.BundleAction == nil {
-		m.messages = append(m.messages, message{role: "Gator", text: errorsUnavailable("retry").Error()})
+		m.messages = append(m.messages, noticeMessage("Retry unavailable", errorsUnavailable("retry").Error(), "error"))
 		return m, nil
 	}
 	deliveryID := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(raw), "/retry"))
 	request := BundleActionRequest{Action: "retry", BundlePath: m.lastBundle.Path, DeliveryID: deliveryID}
 	summary, err := m.config.BundleAction(request)
 	if err != nil {
-		m.messages = append(m.messages, message{role: "Gator", text: err.Error()})
+		m.messages = append(m.messages, noticeMessage("Retry failed", err.Error(), "error"))
 		return m, nil
 	}
 	m.pendingBundleAction = &pendingBundleAction{request: request, summary: summary}

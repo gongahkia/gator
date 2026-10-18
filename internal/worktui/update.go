@@ -96,7 +96,7 @@ func (m Model) updateAgentEvent(value agent.Event) (tea.Model, tea.Cmd) {
 			m.tasks[task.ID] = task.Role + ": " + task.Status
 			m.status = task.ID + " " + m.tasks[task.ID]
 			if task.Error != "" {
-				m.messages = append(m.messages, message{role: "Specialist", text: task.ID + ": " + task.Error})
+				m.messages = append(m.messages, noticeMessage("Specialist failed", task.ID+": "+task.Error, "error"))
 			}
 			return m, waitWorkEvent(m.live)
 		}
@@ -150,9 +150,9 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 		m.snapshot = value.SnapshotID
 	}
 	if wasCancelling && value.Error != "" && strings.Contains(strings.ToLower(value.Error), "cancel") {
-		m.messages = append(m.messages, message{role: "Gator", text: "Run interrupted. Review any retained work in /history."})
+		m.messages = append(m.messages, noticeMessage("Work interrupted", "Review any retained work in /history.", "warning"))
 	} else if value.Error != "" {
-		m.messages = append(m.messages, message{role: "Gator", text: explainRunFailure(value.Error, m.modelStatus)})
+		m.messages = append(m.messages, noticeMessage("Work failed", explainRunFailure(value.Error, m.modelStatus), "error"))
 	} else {
 		text := value.FinalText
 		if text == "" {
@@ -191,9 +191,9 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 
 func (m Model) updateBundleActionDone(value bundleActionDone) (tea.Model, tea.Cmd) {
 	if value.err != nil {
-		m.messages = append(m.messages, message{role: "Gator", text: value.err.Error()})
+		m.messages = append(m.messages, noticeMessage("Delivery failed", value.err.Error(), "error"))
 	} else {
-		m.messages = append(m.messages, message{role: "Gator", text: value.text})
+		m.messages = append(m.messages, reportMessage("Delivery", value.text, "success"))
 	}
 	m.status = ""
 	m.scroll = 0
@@ -203,7 +203,7 @@ func (m Model) updateBundleActionDone(value bundleActionDone) (tea.Model, tea.Cm
 func (m Model) updateConnectorActionDone(value connectorActionDone) (tea.Model, tea.Cmd) {
 	m.status = ""
 	if value.err != nil {
-		m.messages = append(m.messages, message{role: "Gator", text: "Connector " + value.action + " did not finish: " + value.err.Error()})
+		m.messages = append(m.messages, noticeMessage("Connector", "Connector "+value.action+" did not finish: "+value.err.Error(), "error"))
 		m.scroll = 0
 		return m, nil
 	}
@@ -222,7 +222,7 @@ func (m Model) updateConnectorActionDone(value connectorActionDone) (tea.Model, 
 	if text == "" {
 		text = "Connector " + value.action + " finished for " + value.id + "."
 	}
-	m.messages = append(m.messages, message{role: "Gator", text: text})
+	m.messages = append(m.messages, reportMessage("Connector", text, "success"))
 	m.scroll = 0
 	return m, nil
 }
@@ -472,7 +472,15 @@ func (m Model) submitRunningInput() (tea.Model, tea.Cmd) {
 			lines = append(lines, id+" "+status)
 		}
 		sort.Strings(lines)
-		m.messages = append(m.messages, message{role: "Specialists", text: strings.Join(lines, "\n")})
+		items := make([]uisnapshot.ResultItem, 0, len(lines))
+		for _, line := range lines {
+			items = append(items, uisnapshot.ResultItem{Label: line})
+		}
+		summary := fmt.Sprintf("%d specialists", len(items))
+		if len(items) == 0 {
+			summary = "No specialists are active."
+		}
+		m.messages = append(m.messages, message{role: "Specialists", text: strings.Join(lines, "\n"), result: &uisnapshot.Result{Kind: "list", Title: "Internal specialists", Summary: summary, Items: items}})
 		return m, nil
 	}
 	if strings.HasPrefix(prompt, "/cancel-task ") && m.operation != nil {
@@ -545,7 +553,7 @@ func (m Model) submitRunningInput() (tea.Model, tea.Cmd) {
 		return m.runLocalCommand(prompt)
 	}
 	if len(m.queue) >= 16 {
-		m.messages = append(m.messages, message{role: "Gator", text: "The local queue is full (16 prompts)."})
+		m.messages = append(m.messages, noticeMessage("Queue full", "The local queue is full (16 prompts).", "warning"))
 		return m, nil
 	}
 	m.queue = append(m.queue, queuedRun{prompt: prompt, options: cloneRunOptions(m.options)})
@@ -617,7 +625,7 @@ func (m Model) submitComposerInput() (tea.Model, tea.Cmd) {
 	m.status = "Working from an immutable snapshot…"
 	if m.config.Run == nil {
 		m.running = false
-		m.messages = append(m.messages, message{role: "Gator", text: "Work execution is unavailable in this build."})
+		m.messages = append(m.messages, noticeMessage("Work unavailable", "Work execution is unavailable in this build.", "error"))
 		return m, nil
 	}
 	source, conversation := m.source, m.conversation

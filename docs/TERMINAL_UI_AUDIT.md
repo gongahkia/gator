@@ -77,3 +77,14 @@ shared prompt, panel, focus, and green color conventions in
 `docs/DESIGN_SYSTEM.md`. The audit checks Gator's own UI against the imported
 kit's patterns. It does not establish pixel parity with the proprietary Claude
 Code CLI.
+
+## Result presentation follow-up
+
+The command transcript now accepts `uisnapshot.Result` alongside its plain text.
+React renders typed notices, fields, lists, previews, and approval requests with
+one component. Memory, notes, skills, plans, activity, status, permissions, the
+prompt queue, and verified deliverables have structured presenters. Agent prose
+and typed Markdown documents use the kit's Markdown renderer. The `/effort`
+command opens a picker. The standalone script commands keep their existing
+plain output. Approval cards retain the complete JSON preview and display
+their resolution; a stale request is marked as no longer pending.

@@ -2,6 +2,7 @@ package worktui
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/gongahkia/gator/internal/uisnapshot"
@@ -144,12 +145,23 @@ func (m Model) statusResult() *uisnapshot.Result {
 			pending++
 		}
 		result.Fields = append(result.Fields, uisnapshot.Field{Label: "Pending approvals", Value: fmt.Sprint(pending)})
+		if m.interaction != nil {
+			result.Fields = append(result.Fields, uisnapshot.Field{Label: "Current approval", Value: fmt.Sprintf("%s #%d", m.interaction.Kind, m.interaction.ID), Tone: "warning"})
+		}
 		for id, status := range m.tasks {
 			if strings.HasSuffix(status, ": queued") || strings.HasSuffix(status, ": running") {
 				result.Items = append(result.Items, uisnapshot.ResultItem{Label: id, Detail: status})
 			}
 		}
+		sort.Slice(result.Items, func(i, j int) bool { return result.Items[i].Label < result.Items[j].Label })
+		result.Fields = append(result.Fields, uisnapshot.Field{Label: "Live specialists", Value: fmt.Sprint(len(result.Items))})
 		result.Footer = "/cancel to stop · /tasks to inspect specialists"
+		if m.operation != nil {
+			result.Footer += " · /steer MESSAGE to redirect"
+		}
+		if m.interaction != nil {
+			result.Footer += " · /approve or /deny to decide"
+		}
 	}
 	return result
 }
@@ -161,5 +173,5 @@ func (m Model) permissionsResult() *uisnapshot.Result {
 		{Label: "Mode", Value: m.options.Mode},
 		{Label: "Connectors", Value: valueOrNone(strings.Join(m.options.ConnectorIDs, ", "))},
 		{Label: "Web origins", Value: valueOrNone(strings.Join(m.options.WebOrigins, ", "))},
-	}}
+	}, Footer: "Internal specialists are managed by Gator."}
 }

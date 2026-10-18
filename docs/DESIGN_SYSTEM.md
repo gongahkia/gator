@@ -11,15 +11,25 @@ keeping its own green identity, work commands, and review flows.
 Go owns workflow state, actions, and approvals. It publishes display data
 through `BridgeState` and `UISnapshot`. Go `View()` methods are empty Bubble Tea
 interface adapters. There is no Go screen renderer or fallback. Interactive
-Interactive Gator and `gator doctor` require Node.js 22 or newer; headless
+Gator and `gator doctor` require Node.js 22 or newer; headless
 commands do not. The Go doctor checks feed a React report in either the
 standalone command or `/doctor` conversation result.
+
+Command results travel as typed `uisnapshot.Result` values through
+`BridgeMessage.result`. React owns their presentation: notices, status fields,
+lists, previews, and approvals use one result component with explicit semantic
+tones. Go retains readable text for transcript search and headless commands.
+The renderer applies Markdown only to agent prose and explicitly typed Markdown
+documents; user text, command output, and approval previews stay literal.
 
 ## Shared layout
 
 - `🐊 Gator` labels the home and conversation. Green marks Gator, the prompt,
   focused rows, and active work; neutral text carries content and muted green
   carries secondary context.
+- Yellow marks pending review; red marks errors. Colors follow typed state from
+  Go, never words inferred from arbitrary output text. Approvals show the exact
+  structured preview and keep `/approve` and `/deny` visible until resolved.
 - The transcript uses the kit's `MessageList`. The empty home uses its
   `WelcomeScreen`; no empty transcript viewport is reserved on home.
 - The composer stays at the bottom of chat. A panel leaves a muted composer
@@ -47,6 +57,8 @@ standalone command or `/doctor` conversation result.
 | History | Retained runs, artifact and feedback details | Selection, detail, review and retry controls; Esc returns |
 | Learnings | Memory list, provenance details, edit form | Selection and explicit approval controls; Esc returns |
 | Transfer confirmation | Verified save or apply summary | Green bordered focus surface; Enter confirms, Esc cancels |
+| Command results | Typed status, notices, lists, and verified previews | Read in chat; next action appears in the footer |
+| Approval request | Structured action preview and request ID | `/approve` or `/deny` while work is running |
 
 ## Keyboard conventions
 
@@ -63,5 +75,5 @@ standalone command or `/doctor` conversation result.
 The kit hardcodes cyan in its `Select` and `ListItem` focus states, so Gator
 renders those rows with green rather than inheriting a mismatched color. The
 shared kit components used directly are `WelcomeScreen`, `MessageList`,
-`Divider`, and `StatusLine`. Keep keyboard ownership in the React layer for
+`Markdown`, `Divider`, and `StatusLine`. Keep keyboard ownership in the React layer for
 editing and in Go for workflow actions so the same key cannot trigger both.

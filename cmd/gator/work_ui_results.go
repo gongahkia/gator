@@ -41,11 +41,21 @@ func workMemoryResult(stateDir, activeGoal string, arguments []string) (*uisnaps
 			result.Summary = "No matching memories."
 		}
 		for _, record := range records {
-			state := record.Kind
-			if record.SourceStatus != "" {
-				state += " · " + record.SourceStatus
+			state := record.Kind + " · global"
+			if record.GoalID != "" {
+				state = record.Kind + " · " + record.GoalID
 			}
-			result.Items = append(result.Items, uisnapshot.ResultItem{Label: record.Text, Detail: record.ID, State: state})
+			detail := record.ID
+			if len(record.MatchedTerms) > 0 {
+				detail += " · matched " + strings.Join(record.MatchedTerms, ", ") + " in " + record.MatchScope
+			}
+			tone := ""
+			if record.SourceStatus == "changed" || record.SourceStatus == "unavailable" {
+				state += " · source " + record.SourceStatus
+				detail += " · excluded from automatic recall"
+				tone = "warning"
+			}
+			result.Items = append(result.Items, uisnapshot.ResultItem{Label: record.Text, Detail: detail, State: state, Tone: tone})
 		}
 		return result, nil
 	case "show":
@@ -59,7 +69,7 @@ func workMemoryResult(stateDir, activeGoal string, arguments []string) (*uisnaps
 		return &uisnapshot.Result{Kind: "details", Title: "Memory", Summary: record.Text, Fields: []uisnapshot.Field{
 			{Label: "ID", Value: record.ID}, {Label: "Kind", Value: record.Kind}, {Label: "Goal", Value: uiEmpty(record.GoalID)},
 			{Label: "Source", Value: uiEmpty(record.Source)}, {Label: "Source status", Value: uiEmpty(record.SourceStatus)},
-			{Label: "Expires", Value: formatMemoryExpiry(record.ExpiresAt)}, {Label: "Updated", Value: record.UpdatedAt.Local().Format("2006-01-02 15:04")},
+			{Label: "Expires", Value: formatMemoryExpiry(record.ExpiresAt)}, {Label: "Created", Value: record.CreatedAt.Local().Format("2006-01-02 15:04")}, {Label: "Updated", Value: record.UpdatedAt.Local().Format("2006-01-02 15:04")},
 		}}, nil
 	}
 	return nil, nil
@@ -235,9 +245,11 @@ func workReviewResult(stateDir, path string) (*uisnapshot.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	result := &uisnapshot.Result{Kind: "preview", Title: "Deliverable preview", Summary: fmt.Sprintf("%d files", len(previews)), Footer: "Use /save to copy deliverables after review."}
+	result := &uisnapshot.Result{Kind: "preview", Title: "Deliverable preview", Summary: fmt.Sprintf("%d files", len(previews))}
 	if len(previews) == 0 {
 		result.Summary = "This turn has no deliverable files."
+	} else {
+		result.Footer = "Use /save to copy deliverables after review."
 	}
 	for _, preview := range previews {
 		section := uisnapshot.ResultSection{Title: preview.Path, Summary: preview.Summary, Fields: []uisnapshot.Field{{Label: "Type", Value: preview.Kind}}}
@@ -256,8 +268,20 @@ func workReviewResult(stateDir, path string) (*uisnapshot.Result, error) {
 	for _, candidate := range bundle.Manifest.Candidates {
 		result.Sections = append(result.Sections, uisnapshot.ResultSection{Title: "Proposed change " + candidate.ID, Summary: candidate.Status, Items: []uisnapshot.ResultItem{{Label: "Changed files", Detail: strings.Join(candidate.ChangedPaths, ", ")}}})
 	}
-	store, err := delivery.Open(stateDir); if err != nil { return nil, err }
-	records, err := store.ListWork(bundle.Manifest.RunID); if err != nil { return nil, err }
+	if len(bundle.Manifest.Candidates) > 0 {
+		if result.Footer != "" {
+			result.Footer += " "
+		}
+		result.Footer += "Use /apply to review a proposed change."
+	}
+	store, err := delivery.Open(stateDir)
+	if err != nil {
+		return nil, err
+	}
+	records, err := store.ListWork(bundle.Manifest.RunID)
+	if err != nil {
+		return nil, err
+	}
 	for _, record := range records {
 		section := uisnapshot.ResultSection{Title: "Delivery " + record.ID, Fields: []uisnapshot.Field{{Label: "Target", Value: record.TargetPath}}}
 		for _, effect := range record.Effects {

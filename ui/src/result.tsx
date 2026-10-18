@@ -32,7 +32,7 @@ function JsonPreview({ value, depth = 0 }: { value: unknown; depth?: number }): 
   if (value === null || typeof value !== "object") {
     return <Text color={typeof value === "string" ? undefined : muted}>{JSON.stringify(value) ?? String(value)}</Text>;
   }
-  if (depth >= 12) return <Text dimColor>…</Text>;
+  if (depth >= 12) return <Text>{JSON.stringify(value, null, 2)}</Text>;
   const entries = Array.isArray(value) ? value.map((item, index) => [String(index + 1), item] as const) : Object.entries(value);
   if (entries.length === 0) return <Text dimColor>{Array.isArray(value) ? "[]" : "{}"}</Text>;
   return <Box flexDirection="column">{entries.map(([key, item]) => <Box key={key} flexDirection="column" marginLeft={depth ? 2 : 0}>
@@ -42,17 +42,16 @@ function JsonPreview({ value, depth = 0 }: { value: unknown; depth?: number }): 
 }
 
 function ResultContent({ fields, items, lines, markdown }: Pick<BackendResult, "fields" | "items" | "lines" | "markdown">): React.ReactNode {
+  const hasFields = (fields?.length ?? 0) > 0;
+  const hasItems = (items?.length ?? 0) > 0;
   return <Box flexDirection="column">
-    {fields?.map((field, index) => <Box key={`${index}-${field.label}`} flexDirection="column" marginBottom={index + 1 === fields.length ? 0 : 0}>
-      <Text color={muted}>{field.label}</Text>
-      <Box marginLeft={2}><Text color={toneColor(field.tone)}>{field.value}</Text></Box>
-    </Box>)}
-    {items?.map((item, index) => <Box key={`${index}-${item.label}`} flexDirection="column" marginTop={index ? 1 : 0}>
+    {fields?.map((field, index) => <Text key={`${index}-${field.label}`}><Text color={muted}>{field.label}: </Text><Text color={toneColor(field.tone)}>{field.value}</Text></Text>)}
+    {items?.map((item, index) => <Box key={`${index}-${item.label}`} flexDirection="column" marginTop={index || hasFields ? 1 : 0}>
       <Box><Text color={toneColor(item.tone) ?? green}>• </Text><Text bold>{item.label}</Text>{item.state ? <Text color={toneColor(item.tone) ?? muted}>  ·  {item.state}</Text> : null}</Box>
       {item.detail ? <Box marginLeft={2}><Text dimColor>{item.detail}</Text></Box> : null}
     </Box>)}
-    {lines?.map((line, index) => <Text key={index}>{line || " "}</Text>)}
-    {markdown ? <Markdown>{markdown}</Markdown> : null}
+    {lines?.map((line, index) => <Box key={index} marginTop={index === 0 && (hasFields || hasItems) ? 1 : 0}><Text>{line || " "}</Text></Box>)}
+    {markdown ? <Box marginTop={hasFields || hasItems ? 1 : 0}><Markdown>{markdown}</Markdown></Box> : null}
   </Box>;
 }
 
