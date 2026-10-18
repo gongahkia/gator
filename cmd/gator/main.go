@@ -97,7 +97,7 @@ func run(args []string, out io.Writer) error {
 	case "update", "-u":
 		return update(args[1:], out)
 	case "doctor", "-d":
-		return doctor(args[1:], out)
+		return presentDoctor(args[1:], out)
 	case "extension", "-e":
 		return extensionCommand(args[1:], out)
 	case "lsp", "-l":
