@@ -83,6 +83,9 @@ func (m Model) updateLoading(value loadingTickMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateAgentEvent(value agent.Event) (tea.Model, tea.Cmd) {
+	if m.cancelling {
+		return m, waitWorkEvent(m.live)
+	}
 	if value.Kind == agent.EventSubagent && value.TaskID != "" {
 		var task struct{ ID, Role, Status, Error string }
 		if json.Unmarshal([]byte(value.Text), &task) == nil {
@@ -108,6 +111,9 @@ func (m Model) updateAgentEvent(value agent.Event) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateInteraction(value workrun.Interaction) (tea.Model, tea.Cmd) {
+	if m.cancelling {
+		return m, waitWorkEvent(m.live)
+	}
 	if m.interaction != nil {
 		m.pendingInteractions = append(m.pendingInteractions, value)
 		return m, waitWorkEvent(m.live)
@@ -119,9 +125,12 @@ func (m Model) updateInteraction(value workrun.Interaction) (tea.Model, tea.Cmd)
 }
 
 func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
+	wasCancelling := m.cancelling
 	if m.cancel != nil {
 		m.cancel()
 	}
+	m.cancel = nil
+	m.cancelling = false
 	m.operation = nil
 	m.interaction = nil
 	m.pendingInteractions = nil
@@ -140,7 +149,9 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 	if value.SnapshotID != "" {
 		m.snapshot = value.SnapshotID
 	}
-	if value.Error != "" {
+	if wasCancelling && value.Error != "" && strings.Contains(strings.ToLower(value.Error), "cancel") {
+		m.messages = append(m.messages, message{role: "Gator", text: "Run interrupted. Review any retained work in /history."})
+	} else if value.Error != "" {
 		m.messages = append(m.messages, message{role: "Gator", text: explainRunFailure(value.Error, m.modelStatus)})
 	} else {
 		text := value.FinalText
@@ -158,8 +169,11 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 	if m.revisionStatus() != "" {
 		m.status = m.revisionStatus()
 	}
+	if wasCancelling {
+		m.status = "Run stopped"
+	}
 	m.scroll = 0
-	if value.Error == "" && len(m.queue) > 0 && m.config.Run != nil {
+	if value.Error == "" && !wasCancelling && len(m.queue) > 0 && m.config.Run != nil {
 		next := m.queue[0]
 		m.queue = m.queue[1:]
 		m.messages = append(m.messages, message{role: "You", text: next.prompt})
@@ -169,7 +183,7 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 		source, conversation := m.source, m.conversation
 		return m.startWork(source, conversation, next.prompt, next.options)
 	}
-	if value.Error != "" && len(m.queue) > 0 {
+	if len(m.queue) > 0 && (value.Error != "" || wasCancelling) {
 		m.status = fmt.Sprintf("Run stopped · %d queued prompt(s) paused", len(m.queue))
 	}
 	return m, nil
@@ -219,11 +233,14 @@ func (m Model) updateKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	if value.String() == "ctrl+c" {
 		if m.running && m.cancel != nil {
-			m.cancel()
-			m.status = "Cancelling; retaining evidence…"
+			m.interruptRun()
 			return m, nil
 		}
 		return m, tea.Quit
+	}
+	if value.String() == "esc" && m.running && m.cancel != nil {
+		m.interruptRun()
+		return m, nil
 	}
 	if value.Type == tea.KeyCtrlX && !m.running {
 		m.openConversationPicker()
@@ -482,8 +499,7 @@ func (m Model) submitRunningInput() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if prompt == "/cancel" && m.cancel != nil {
-		m.cancel()
-		m.status = "Cancelling…"
+		m.interruptRun()
 		return m, nil
 	}
 	if strings.HasPrefix(prompt, "/") {
@@ -499,6 +515,15 @@ func (m Model) submitRunningInput() (tea.Model, tea.Cmd) {
 	m.options.RefreshSource = false
 	m.status = fmt.Sprintf("Working from an immutable snapshot… · %d queued", len(m.queue))
 	return m, nil
+}
+
+func (m *Model) interruptRun() {
+	if m.cancel == nil || m.cancelling {
+		return
+	}
+	m.cancelling = true
+	m.cancel()
+	m.status = "Stopping the current run; retaining evidence…"
 }
 
 func (m Model) updateComposerKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {

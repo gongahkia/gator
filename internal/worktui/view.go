@@ -114,8 +114,13 @@ func (m Model) View() string {
 	}
 	if m.running {
 		working := rattles.BrailleDots.Frame(m.loadingFrame) + " Working…"
-		if elapsed := m.workElapsed(); elapsed != "" {
-			working += " " + elapsed + " · esc to interrupt"
+		if m.cancelling {
+			working = "Stopping… retaining evidence"
+		} else if elapsed := m.workElapsed(); elapsed != "" {
+			working += " " + elapsed
+			if m.cancel != nil {
+				working += " · esc to interrupt"
+			}
 		}
 		view.WriteString(accent.Render(working) + "\n\n")
 	}

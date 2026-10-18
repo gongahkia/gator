@@ -10,6 +10,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
@@ -525,6 +526,7 @@ func TestRunningWorkUsesRattlesLoadingFrames(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work"})
 	model.home = false
 	model.running = true
+	model.cancel = func() {}
 	model.loadingRun = 7
 	model.runStarted = time.Now().Add(-20 * time.Second)
 
@@ -545,6 +547,35 @@ func TestRunningWorkUsesRattlesLoadingFrames(t *testing.T) {
 	updated, command = model.Update(loadingTickMsg{run: 6})
 	if command != nil || updated.(Model).loadingFrame != 1 {
 		t.Fatal("a stale run tick must not animate a later run")
+	}
+}
+
+func TestEscapeStopsRunningWorkAndPausesQueuedPrompts(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	model := New(Config{CurrentFolder: "/work", Run: func(_, _, _ string, _ RunOptions) RunResult {
+		t.Fatal("queued work started after interruption")
+		return RunResult{}
+	}})
+	model.home = false
+	model.running = true
+	model.cancel = cancel
+	model.runStarted = time.Now().Add(-time.Second)
+	model.queue = []queuedRun{{prompt: "next task"}}
+
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model = updated.(Model)
+	if command != nil || ctx.Err() != context.Canceled || !model.cancelling || !strings.Contains(ansi.Strip(model.View()), "Stopping… retaining evidence") {
+		t.Fatalf("escape did not stop the run: %#v", model)
+	}
+	updated, _ = model.Update(agent.Event{Kind: agent.EventTextDelta, Text: "late progress"})
+	model = updated.(Model)
+	if !strings.Contains(model.status, "Stopping the current run") {
+		t.Fatalf("late event replaced stop status: %q", model.status)
+	}
+	updated, command = model.Update(runDone{FinalText: "finished just before cancellation"})
+	model = updated.(Model)
+	if command != nil || model.running || model.cancelling || model.cancel != nil || len(model.queue) != 1 || !strings.Contains(model.status, "paused") {
+		t.Fatalf("interrupted run restarted queued work: %#v", model)
 	}
 }
 

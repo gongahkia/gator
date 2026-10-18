@@ -277,6 +277,7 @@ type Model struct {
 	composerEditorPath     string
 	messages               []message
 	running                bool
+	cancelling             bool
 	status                 string
 	firstRun               bool
 	pendingPrompt          string

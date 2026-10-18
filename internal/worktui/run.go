@@ -38,6 +38,7 @@ func (m Model) workElapsed() string {
 
 func (m Model) startWork(source, conversation, prompt string, options RunOptions) (tea.Model, tea.Cmd) {
 	m.runStarted = time.Now()
+	m.cancelling = false
 	if !m.config.Live {
 		return m, func() tea.Msg { return runDone(m.config.Run(source, conversation, prompt, options)) }
 	}
