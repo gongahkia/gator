@@ -45287,14 +45287,21 @@ async function runDoctor(binary, arguments_) {
   let frame = 0;
   let app;
   let timer;
+  let finalFrame;
   try {
-    app = await root_default(/* @__PURE__ */ (0, import_jsx_runtime50.jsx)(DoctorScreen, { frame }));
+    app = await root_default(/* @__PURE__ */ (0, import_jsx_runtime50.jsx)(DoctorScreen, { frame }), { onFrame: () => {
+      finalFrame?.();
+      finalFrame = void 0;
+    } });
     timer = setInterval(() => app?.rerender(/* @__PURE__ */ (0, import_jsx_runtime50.jsx)(DoctorScreen, { frame: ++frame })), 80);
     const report = await collectDoctor(binary, arguments_);
     clearInterval(timer);
     timer = void 0;
+    const painted = new Promise((resolve) => {
+      finalFrame = resolve;
+    });
     app.rerender(/* @__PURE__ */ (0, import_jsx_runtime50.jsx)(DoctorScreen, { frame, raw: report }));
-    await new Promise((resolve) => setTimeout(resolve, 80));
+    await Promise.race([painted, new Promise((resolve) => setTimeout(resolve, 1e3))]);
   } finally {
     if (timer) clearInterval(timer);
     app?.unmount();

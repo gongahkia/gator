@@ -100,14 +100,16 @@ export async function runDoctor(binary: string, arguments_: string[]): Promise<v
   let frame = 0;
   let app: Instance | undefined;
   let timer: ReturnType<typeof setInterval> | undefined;
+  let finalFrame: (() => void) | undefined;
   try {
-    app = await render(<DoctorScreen frame={frame} />);
+    app = await render(<DoctorScreen frame={frame} />, { onFrame: () => { finalFrame?.(); finalFrame = undefined; } });
     timer = setInterval(() => app?.rerender(<DoctorScreen frame={++frame} />), 80);
     const report = await collectDoctor(binary, arguments_);
     clearInterval(timer);
     timer = undefined;
+    const painted = new Promise<void>((resolve) => { finalFrame = resolve; });
     app.rerender(<DoctorScreen frame={frame} raw={report} />);
-    await new Promise((resolve) => setTimeout(resolve, 80));
+    await Promise.race([painted, new Promise((resolve) => setTimeout(resolve, 1000))]);
   } finally {
     if (timer) clearInterval(timer);
     app?.unmount();
