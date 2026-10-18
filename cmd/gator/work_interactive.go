@@ -386,6 +386,7 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			return workFeedbackTUIAction(stateDir, workID, arguments)
 		},
 		Inspect:           inspectWorkTUITopic,
+		DoctorResult:      func() (*uisnapshot.Result, error) { return doctorResult(nil) },
 		Copy:              clipboard.WriteAll,
 		Theme:             settings.Theme,
 		SetTheme:          saveTheme,

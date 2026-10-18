@@ -33,6 +33,17 @@ func TestBridgeUsesLiveCommandAndMessageState(t *testing.T) {
 	}
 }
 
+func TestBridgeProjectsThemeChangesToReact(t *testing.T) {
+	model := New(Config{CurrentFolder: t.TempDir(), Theme: "mono", SetTheme: func(string) error { return nil }})
+	if got := model.BridgeState().Theme; got != "mono" {
+		t.Fatalf("initial theme = %q", got)
+	}
+	next, _ := model.SubmitText("/theme contrast")
+	if got := next.(Model).BridgeState().Theme; got != "contrast" {
+		t.Fatalf("changed theme = %q", got)
+	}
+}
+
 func TestDoctorResultIsMarkedForReactReport(t *testing.T) {
 	model := New(Config{CurrentFolder: t.TempDir(), Inspect: func(topic string) (string, error) {
 		if topic != "doctor" {

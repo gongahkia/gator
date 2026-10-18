@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -136,6 +137,20 @@ func run(args []string, out io.Writer) error {
 	case "ui-doctor-backend":
 		if os.Getenv("GATOR_UI_DOCTOR_BACKEND") != "1" {
 			return errors.New("ui-doctor-backend is an internal Gator transport")
+		}
+		if len(args) > 1 && args[1] == "--json" {
+			result, err := doctorResult(args[2:])
+			if err != nil {
+				return err
+			}
+			settings, err := loadSettings()
+			if err != nil {
+				return err
+			}
+			return json.NewEncoder(out).Encode(struct {
+				Theme  string `json:"theme"`
+				Result any    `json:"result"`
+			}{Theme: settings.Theme, Result: result})
 		}
 		return doctor(args[1:], out)
 	case "work", "-w":

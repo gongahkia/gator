@@ -24,6 +24,7 @@ type BridgeState struct {
 	GoalID               string            `json:"goal_id,omitempty"`
 	Provider             string            `json:"provider,omitempty"`
 	Model                string            `json:"model,omitempty"`
+	Theme                string            `json:"theme"`
 	Status               string            `json:"status,omitempty"`
 	StatusLine           []string          `json:"status_line"`
 	StatusLineEnabled    bool              `json:"status_line_enabled"`
@@ -81,6 +82,7 @@ func (m Model) BridgeState() BridgeState {
 		GoalID:            m.goalID,
 		Provider:          m.modelStatus.Provider,
 		Model:             m.modelStatus.Model,
+		Theme:             m.theme,
 		Status:            m.status,
 		StatusLine:        m.statusLineItems(),
 		StatusLineEnabled: m.statusLineEnabled,

@@ -1734,18 +1734,18 @@ var require_react_jsx_runtime_development = __commonJS({
       function isValidElement2(object) {
         return "object" === typeof object && null !== object && object.$$typeof === REACT_ELEMENT_TYPE;
       }
-      var React8 = require_react(), REACT_ELEMENT_TYPE = /* @__PURE__ */ Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = /* @__PURE__ */ Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = /* @__PURE__ */ Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = /* @__PURE__ */ Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = /* @__PURE__ */ Symbol.for("react.profiler"), REACT_CONSUMER_TYPE = /* @__PURE__ */ Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = /* @__PURE__ */ Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = /* @__PURE__ */ Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = /* @__PURE__ */ Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = /* @__PURE__ */ Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = /* @__PURE__ */ Symbol.for("react.memo"), REACT_LAZY_TYPE = /* @__PURE__ */ Symbol.for("react.lazy"), REACT_ACTIVITY_TYPE = /* @__PURE__ */ Symbol.for("react.activity"), REACT_CLIENT_REFERENCE = /* @__PURE__ */ Symbol.for("react.client.reference"), ReactSharedInternals = React8.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, hasOwnProperty = Object.prototype.hasOwnProperty, isArrayImpl = Array.isArray, createTask = console.createTask ? console.createTask : function() {
+      var React9 = require_react(), REACT_ELEMENT_TYPE = /* @__PURE__ */ Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = /* @__PURE__ */ Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = /* @__PURE__ */ Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = /* @__PURE__ */ Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = /* @__PURE__ */ Symbol.for("react.profiler"), REACT_CONSUMER_TYPE = /* @__PURE__ */ Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = /* @__PURE__ */ Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = /* @__PURE__ */ Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = /* @__PURE__ */ Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = /* @__PURE__ */ Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = /* @__PURE__ */ Symbol.for("react.memo"), REACT_LAZY_TYPE = /* @__PURE__ */ Symbol.for("react.lazy"), REACT_ACTIVITY_TYPE = /* @__PURE__ */ Symbol.for("react.activity"), REACT_CLIENT_REFERENCE = /* @__PURE__ */ Symbol.for("react.client.reference"), ReactSharedInternals = React9.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, hasOwnProperty = Object.prototype.hasOwnProperty, isArrayImpl = Array.isArray, createTask = console.createTask ? console.createTask : function() {
         return null;
       };
-      React8 = {
+      React9 = {
         react_stack_bottom_frame: function(callStackForError) {
           return callStackForError();
         }
       };
       var specialPropKeyWarningShown;
       var didWarnAboutElementRef = {};
-      var unknownOwnerDebugStack = React8.react_stack_bottom_frame.bind(
-        React8,
+      var unknownOwnerDebugStack = React9.react_stack_bottom_frame.bind(
+        React9,
         UnknownOwner
       )();
       var unknownOwnerDebugTask = createTask(getTaskName(UnknownOwner));
@@ -11931,14 +11931,14 @@ var require_react_reconciler_production = __commonJS({
       }
       var exports3 = {};
       "use strict";
-      var React8 = require_react(), Scheduler = require_scheduler(), assign = Object.assign, REACT_LEGACY_ELEMENT_TYPE = /* @__PURE__ */ Symbol.for("react.element"), REACT_ELEMENT_TYPE = /* @__PURE__ */ Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = /* @__PURE__ */ Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = /* @__PURE__ */ Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = /* @__PURE__ */ Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = /* @__PURE__ */ Symbol.for("react.profiler"), REACT_CONSUMER_TYPE = /* @__PURE__ */ Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = /* @__PURE__ */ Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = /* @__PURE__ */ Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = /* @__PURE__ */ Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = /* @__PURE__ */ Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = /* @__PURE__ */ Symbol.for("react.memo"), REACT_LAZY_TYPE = /* @__PURE__ */ Symbol.for("react.lazy");
+      var React9 = require_react(), Scheduler = require_scheduler(), assign = Object.assign, REACT_LEGACY_ELEMENT_TYPE = /* @__PURE__ */ Symbol.for("react.element"), REACT_ELEMENT_TYPE = /* @__PURE__ */ Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = /* @__PURE__ */ Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = /* @__PURE__ */ Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = /* @__PURE__ */ Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = /* @__PURE__ */ Symbol.for("react.profiler"), REACT_CONSUMER_TYPE = /* @__PURE__ */ Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = /* @__PURE__ */ Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = /* @__PURE__ */ Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = /* @__PURE__ */ Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = /* @__PURE__ */ Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = /* @__PURE__ */ Symbol.for("react.memo"), REACT_LAZY_TYPE = /* @__PURE__ */ Symbol.for("react.lazy");
       /* @__PURE__ */ Symbol.for("react.scope");
       var REACT_ACTIVITY_TYPE = /* @__PURE__ */ Symbol.for("react.activity");
       /* @__PURE__ */ Symbol.for("react.legacy_hidden");
       /* @__PURE__ */ Symbol.for("react.tracing_marker");
       var REACT_MEMO_CACHE_SENTINEL = /* @__PURE__ */ Symbol.for("react.memo_cache_sentinel");
       /* @__PURE__ */ Symbol.for("react.view_transition");
-      var MAYBE_ITERATOR_SYMBOL = Symbol.iterator, REACT_CLIENT_REFERENCE = /* @__PURE__ */ Symbol.for("react.client.reference"), isArrayImpl = Array.isArray, ReactSharedInternals = React8.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, rendererVersion = $$$config.rendererVersion, rendererPackageName = $$$config.rendererPackageName, extraDevToolsConfig = $$$config.extraDevToolsConfig, getPublicInstance = $$$config.getPublicInstance, getRootHostContext = $$$config.getRootHostContext, getChildHostContext = $$$config.getChildHostContext, prepareForCommit = $$$config.prepareForCommit, resetAfterCommit = $$$config.resetAfterCommit, createInstance = $$$config.createInstance;
+      var MAYBE_ITERATOR_SYMBOL = Symbol.iterator, REACT_CLIENT_REFERENCE = /* @__PURE__ */ Symbol.for("react.client.reference"), isArrayImpl = Array.isArray, ReactSharedInternals = React9.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, rendererVersion = $$$config.rendererVersion, rendererPackageName = $$$config.rendererPackageName, extraDevToolsConfig = $$$config.extraDevToolsConfig, getPublicInstance = $$$config.getPublicInstance, getRootHostContext = $$$config.getRootHostContext, getChildHostContext = $$$config.getChildHostContext, prepareForCommit = $$$config.prepareForCommit, resetAfterCommit = $$$config.resetAfterCommit, createInstance = $$$config.createInstance;
       $$$config.cloneMutableInstance;
       var appendInitialChild = $$$config.appendInitialChild, finalizeInitialChildren = $$$config.finalizeInitialChildren, shouldSetTextContent = $$$config.shouldSetTextContent, createTextInstance = $$$config.createTextInstance;
       $$$config.cloneMutableTextInstance;
@@ -24531,14 +24531,14 @@ var require_react_reconciler_development = __commonJS({
       }
       var exports3 = {};
       "use strict";
-      var React8 = require_react(), Scheduler = require_scheduler(), assign = Object.assign, REACT_LEGACY_ELEMENT_TYPE = /* @__PURE__ */ Symbol.for("react.element"), REACT_ELEMENT_TYPE = /* @__PURE__ */ Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = /* @__PURE__ */ Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = /* @__PURE__ */ Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = /* @__PURE__ */ Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = /* @__PURE__ */ Symbol.for("react.profiler"), REACT_CONSUMER_TYPE = /* @__PURE__ */ Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = /* @__PURE__ */ Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = /* @__PURE__ */ Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = /* @__PURE__ */ Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = /* @__PURE__ */ Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = /* @__PURE__ */ Symbol.for("react.memo"), REACT_LAZY_TYPE = /* @__PURE__ */ Symbol.for("react.lazy");
+      var React9 = require_react(), Scheduler = require_scheduler(), assign = Object.assign, REACT_LEGACY_ELEMENT_TYPE = /* @__PURE__ */ Symbol.for("react.element"), REACT_ELEMENT_TYPE = /* @__PURE__ */ Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = /* @__PURE__ */ Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = /* @__PURE__ */ Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = /* @__PURE__ */ Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = /* @__PURE__ */ Symbol.for("react.profiler"), REACT_CONSUMER_TYPE = /* @__PURE__ */ Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = /* @__PURE__ */ Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = /* @__PURE__ */ Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = /* @__PURE__ */ Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = /* @__PURE__ */ Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = /* @__PURE__ */ Symbol.for("react.memo"), REACT_LAZY_TYPE = /* @__PURE__ */ Symbol.for("react.lazy");
       /* @__PURE__ */ Symbol.for("react.scope");
       var REACT_ACTIVITY_TYPE = /* @__PURE__ */ Symbol.for("react.activity");
       /* @__PURE__ */ Symbol.for("react.legacy_hidden");
       /* @__PURE__ */ Symbol.for("react.tracing_marker");
       var REACT_MEMO_CACHE_SENTINEL = /* @__PURE__ */ Symbol.for("react.memo_cache_sentinel");
       /* @__PURE__ */ Symbol.for("react.view_transition");
-      var MAYBE_ITERATOR_SYMBOL = Symbol.iterator, REACT_CLIENT_REFERENCE = /* @__PURE__ */ Symbol.for("react.client.reference"), isArrayImpl = Array.isArray, ReactSharedInternals = React8.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, rendererVersion = $$$config.rendererVersion, rendererPackageName = $$$config.rendererPackageName, extraDevToolsConfig = $$$config.extraDevToolsConfig, getPublicInstance = $$$config.getPublicInstance, getRootHostContext = $$$config.getRootHostContext, getChildHostContext = $$$config.getChildHostContext, prepareForCommit = $$$config.prepareForCommit, resetAfterCommit = $$$config.resetAfterCommit, createInstance = $$$config.createInstance;
+      var MAYBE_ITERATOR_SYMBOL = Symbol.iterator, REACT_CLIENT_REFERENCE = /* @__PURE__ */ Symbol.for("react.client.reference"), isArrayImpl = Array.isArray, ReactSharedInternals = React9.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, rendererVersion = $$$config.rendererVersion, rendererPackageName = $$$config.rendererPackageName, extraDevToolsConfig = $$$config.extraDevToolsConfig, getPublicInstance = $$$config.getPublicInstance, getRootHostContext = $$$config.getRootHostContext, getChildHostContext = $$$config.getChildHostContext, prepareForCommit = $$$config.prepareForCommit, resetAfterCommit = $$$config.resetAfterCommit, createInstance = $$$config.createInstance;
       $$$config.cloneMutableInstance;
       var appendInitialChild = $$$config.appendInitialChild, finalizeInitialChildren = $$$config.finalizeInitialChildren, shouldSetTextContent = $$$config.shouldSetTextContent, createTextInstance = $$$config.createTextInstance;
       $$$config.cloneMutableTextInstance;
@@ -27550,7 +27550,7 @@ function satisfies(version, range) {
 var ANSI_BACKGROUND_OFFSET = 10;
 var wrapAnsi16 = (offset = 0) => (code) => `\x1B[${code + offset}m`;
 var wrapAnsi256 = (offset = 0) => (code) => `\x1B[${38 + offset};5;${code}m`;
-var wrapAnsi16m = (offset = 0) => (red2, green4, blue) => `\x1B[${38 + offset};2;${red2};${green4};${blue}m`;
+var wrapAnsi16m = (offset = 0) => (red, green, blue) => `\x1B[${38 + offset};2;${red};${green};${blue}m`;
 var styles = {
   modifier: {
     reset: [0, 0],
@@ -27645,17 +27645,17 @@ function assembleStyles() {
   styles.bgColor.ansi16m = wrapAnsi16m(ANSI_BACKGROUND_OFFSET);
   Object.defineProperties(styles, {
     rgbToAnsi256: {
-      value(red2, green4, blue) {
-        if (red2 === green4 && green4 === blue) {
-          if (red2 < 8) {
+      value(red, green, blue) {
+        if (red === green && green === blue) {
+          if (red < 8) {
             return 16;
           }
-          if (red2 > 248) {
+          if (red > 248) {
             return 231;
           }
-          return Math.round((red2 - 8) / 247 * 24) + 232;
+          return Math.round((red - 8) / 247 * 24) + 232;
         }
-        return 16 + 36 * Math.round(red2 / 255 * 5) + 6 * Math.round(green4 / 255 * 5) + Math.round(blue / 255 * 5);
+        return 16 + 36 * Math.round(red / 255 * 5) + 6 * Math.round(green / 255 * 5) + Math.round(blue / 255 * 5);
       },
       enumerable: false
     },
@@ -27692,25 +27692,25 @@ function assembleStyles() {
         if (code < 16) {
           return 90 + (code - 8);
         }
-        let red2;
-        let green4;
+        let red;
+        let green;
         let blue;
         if (code >= 232) {
-          red2 = ((code - 232) * 10 + 8) / 255;
-          green4 = red2;
-          blue = red2;
+          red = ((code - 232) * 10 + 8) / 255;
+          green = red;
+          blue = red;
         } else {
           code -= 16;
           const remainder = code % 36;
-          red2 = Math.floor(code / 36) / 5;
-          green4 = Math.floor(remainder / 6) / 5;
+          red = Math.floor(code / 36) / 5;
+          green = Math.floor(remainder / 6) / 5;
           blue = remainder % 6 / 5;
         }
-        const value = Math.max(red2, green4, blue) * 2;
+        const value = Math.max(red, green, blue) * 2;
         if (value === 0) {
           return 30;
         }
-        let result = 30 + (Math.round(blue) << 2 | Math.round(green4) << 1 | Math.round(red2));
+        let result = 30 + (Math.round(blue) << 2 | Math.round(green) << 1 | Math.round(red));
         if (value === 2) {
           result += 60;
         }
@@ -27719,7 +27719,7 @@ function assembleStyles() {
       enumerable: false
     },
     rgbToAnsi: {
-      value: (red2, green4, blue) => styles.ansi256ToAnsi(styles.rgbToAnsi256(red2, green4, blue)),
+      value: (red, green, blue) => styles.ansi256ToAnsi(styles.rgbToAnsi256(red, green, blue)),
       enumerable: false
     },
     hexToAnsi: {
@@ -31945,9 +31945,9 @@ var Parser = class {
     for (const char of text) {
       if (char.charCodeAt(0) === C0.BEL) {
         if (current) {
-          const graphemes = [...segmentGraphemes(current)];
-          if (graphemes.length > 0) {
-            actions.push({ type: "text", graphemes, style: { ...this.style } });
+          const graphemes2 = [...segmentGraphemes(current)];
+          if (graphemes2.length > 0) {
+            actions.push({ type: "text", graphemes: graphemes2, style: { ...this.style } });
           }
           current = "";
         }
@@ -31957,9 +31957,9 @@ var Parser = class {
       }
     }
     if (current) {
-      const graphemes = [...segmentGraphemes(current)];
-      if (graphemes.length > 0) {
-        actions.push({ type: "text", graphemes, style: { ...this.style } });
+      const graphemes2 = [...segmentGraphemes(current)];
+      if (graphemes2.length > 0) {
+        actions.push({ type: "text", graphemes: graphemes2, style: { ...this.style } });
       }
     }
     return actions;
@@ -32256,7 +32256,7 @@ function StyledText(t0) {
 var ANSI_BACKGROUND_OFFSET2 = 10;
 var wrapAnsi162 = (offset = 0) => (code) => `\x1B[${code + offset}m`;
 var wrapAnsi2562 = (offset = 0) => (code) => `\x1B[${38 + offset};5;${code}m`;
-var wrapAnsi16m2 = (offset = 0) => (red2, green4, blue) => `\x1B[${38 + offset};2;${red2};${green4};${blue}m`;
+var wrapAnsi16m2 = (offset = 0) => (red, green, blue) => `\x1B[${38 + offset};2;${red};${green};${blue}m`;
 var styles2 = {
   modifier: {
     reset: [0, 0],
@@ -32351,17 +32351,17 @@ function assembleStyles2() {
   styles2.bgColor.ansi16m = wrapAnsi16m2(ANSI_BACKGROUND_OFFSET2);
   Object.defineProperties(styles2, {
     rgbToAnsi256: {
-      value(red2, green4, blue) {
-        if (red2 === green4 && green4 === blue) {
-          if (red2 < 8) {
+      value(red, green, blue) {
+        if (red === green && green === blue) {
+          if (red < 8) {
             return 16;
           }
-          if (red2 > 248) {
+          if (red > 248) {
             return 231;
           }
-          return Math.round((red2 - 8) / 247 * 24) + 232;
+          return Math.round((red - 8) / 247 * 24) + 232;
         }
-        return 16 + 36 * Math.round(red2 / 255 * 5) + 6 * Math.round(green4 / 255 * 5) + Math.round(blue / 255 * 5);
+        return 16 + 36 * Math.round(red / 255 * 5) + 6 * Math.round(green / 255 * 5) + Math.round(blue / 255 * 5);
       },
       enumerable: false
     },
@@ -32398,25 +32398,25 @@ function assembleStyles2() {
         if (code < 16) {
           return 90 + (code - 8);
         }
-        let red2;
-        let green4;
+        let red;
+        let green;
         let blue;
         if (code >= 232) {
-          red2 = ((code - 232) * 10 + 8) / 255;
-          green4 = red2;
-          blue = red2;
+          red = ((code - 232) * 10 + 8) / 255;
+          green = red;
+          blue = red;
         } else {
           code -= 16;
           const remainder = code % 36;
-          red2 = Math.floor(code / 36) / 5;
-          green4 = Math.floor(remainder / 6) / 5;
+          red = Math.floor(code / 36) / 5;
+          green = Math.floor(remainder / 6) / 5;
           blue = remainder % 6 / 5;
         }
-        const value = Math.max(red2, green4, blue) * 2;
+        const value = Math.max(red, green, blue) * 2;
         if (value === 0) {
           return 30;
         }
-        let result = 30 + (Math.round(blue) << 2 | Math.round(green4) << 1 | Math.round(red2));
+        let result = 30 + (Math.round(blue) << 2 | Math.round(green) << 1 | Math.round(red));
         if (value === 2) {
           result += 60;
         }
@@ -32425,7 +32425,7 @@ function assembleStyles2() {
       enumerable: false
     },
     rgbToAnsi: {
-      value: (red2, green4, blue) => styles2.ansi256ToAnsi(styles2.rgbToAnsi256(red2, green4, blue)),
+      value: (red, green, blue) => styles2.ansi256ToAnsi(styles2.rgbToAnsi256(red, green, blue)),
       enumerable: false
     },
     hexToAnsi: {
@@ -34015,7 +34015,7 @@ function stringWidth2(input, options = {}) {
 var ANSI_BACKGROUND_OFFSET22 = 10;
 var wrapAnsi1622 = (offset = 0) => (code) => `\x1B[${code + offset}m`;
 var wrapAnsi25622 = (offset = 0) => (code) => `\x1B[${38 + offset};5;${code}m`;
-var wrapAnsi16m22 = (offset = 0) => (red2, green4, blue) => `\x1B[${38 + offset};2;${red2};${green4};${blue}m`;
+var wrapAnsi16m22 = (offset = 0) => (red, green, blue) => `\x1B[${38 + offset};2;${red};${green};${blue}m`;
 var styles3 = {
   modifier: {
     reset: [0, 0],
@@ -34110,17 +34110,17 @@ function assembleStyles22() {
   styles3.bgColor.ansi16m = wrapAnsi16m22(ANSI_BACKGROUND_OFFSET22);
   Object.defineProperties(styles3, {
     rgbToAnsi256: {
-      value(red2, green4, blue) {
-        if (red2 === green4 && green4 === blue) {
-          if (red2 < 8) {
+      value(red, green, blue) {
+        if (red === green && green === blue) {
+          if (red < 8) {
             return 16;
           }
-          if (red2 > 248) {
+          if (red > 248) {
             return 231;
           }
-          return Math.round((red2 - 8) / 247 * 24) + 232;
+          return Math.round((red - 8) / 247 * 24) + 232;
         }
-        return 16 + 36 * Math.round(red2 / 255 * 5) + 6 * Math.round(green4 / 255 * 5) + Math.round(blue / 255 * 5);
+        return 16 + 36 * Math.round(red / 255 * 5) + 6 * Math.round(green / 255 * 5) + Math.round(blue / 255 * 5);
       },
       enumerable: false
     },
@@ -34157,25 +34157,25 @@ function assembleStyles22() {
         if (code < 16) {
           return 90 + (code - 8);
         }
-        let red2;
-        let green4;
+        let red;
+        let green;
         let blue;
         if (code >= 232) {
-          red2 = ((code - 232) * 10 + 8) / 255;
-          green4 = red2;
-          blue = red2;
+          red = ((code - 232) * 10 + 8) / 255;
+          green = red;
+          blue = red;
         } else {
           code -= 16;
           const remainder = code % 36;
-          red2 = Math.floor(code / 36) / 5;
-          green4 = Math.floor(remainder / 6) / 5;
+          red = Math.floor(code / 36) / 5;
+          green = Math.floor(remainder / 6) / 5;
           blue = remainder % 6 / 5;
         }
-        const value = Math.max(red2, green4, blue) * 2;
+        const value = Math.max(red, green, blue) * 2;
         if (value === 0) {
           return 30;
         }
-        let result = 30 + (Math.round(blue) << 2 | Math.round(green4) << 1 | Math.round(red2));
+        let result = 30 + (Math.round(blue) << 2 | Math.round(green) << 1 | Math.round(red));
         if (value === 2) {
           result += 60;
         }
@@ -34184,7 +34184,7 @@ function assembleStyles22() {
       enumerable: false
     },
     rgbToAnsi: {
-      value: (red2, green4, blue) => styles3.ansi256ToAnsi(styles3.rgbToAnsi256(red2, green4, blue)),
+      value: (red, green, blue) => styles3.ansi256ToAnsi(styles3.rgbToAnsi256(red, green, blue)),
       enumerable: false
     },
     hexToAnsi: {
@@ -34243,11 +34243,11 @@ var getSgrTokens = (sgrParameters) => {
         index += 2;
         continue;
       }
-      const red2 = codes[index + 2];
-      const green4 = codes[index + 3];
+      const red = codes[index + 2];
+      const green = codes[index + 3];
       const blue = codes[index + 4];
-      if (mode === ANSI_SGR_COLOR_MODE_RGB && Number.isFinite(red2) && Number.isFinite(green4) && Number.isFinite(blue)) {
-        sgrTokens.push([code, mode, red2, green4, blue]);
+      if (mode === ANSI_SGR_COLOR_MODE_RGB && Number.isFinite(red) && Number.isFinite(green) && Number.isFinite(blue)) {
+        sgrTokens.push([code, mode, red, green, blue]);
         index += 4;
         continue;
       }
@@ -42846,6 +42846,16 @@ function StatusLine({
     /* @__PURE__ */ (0, import_jsx_runtime26.jsx)(Box_default, { flexGrow: seg.flex ? 1 : 0, children: hasAnsi(seg.content) ? /* @__PURE__ */ (0, import_jsx_runtime26.jsx)(Ansi, { children: seg.content }) : /* @__PURE__ */ (0, import_jsx_runtime26.jsx)(Text, { dimColor: true, color: seg.color, children: seg.content }) })
   ] }, segmentKeys[i])) });
 }
+function Byline({ children }) {
+  const validChildren = import_react41.Children.toArray(children);
+  if (validChildren.length === 0) {
+    return null;
+  }
+  return /* @__PURE__ */ (0, import_jsx_runtime30.jsx)(import_jsx_runtime30.Fragment, { children: validChildren.map((child, index) => /* @__PURE__ */ (0, import_jsx_runtime30.jsxs)(import_react41.default.Fragment, { children: [
+    index > 0 && /* @__PURE__ */ (0, import_jsx_runtime30.jsx)(Text, { dimColor: true, children: " \xB7 " }),
+    child
+  ] }, (0, import_react41.isValidElement)(child) ? child.key ?? index : index)) });
+}
 var themes = {
   dark: {
     text: "#E0E0E0",
@@ -43018,6 +43028,28 @@ function color(c, theme, type = "foreground") {
     }
     return colorize(text, getTheme(theme)[c], type);
   };
+}
+function KeyboardShortcutHint({
+  shortcut,
+  action,
+  parens = false,
+  bold = false
+}) {
+  const shortcutText = bold ? /* @__PURE__ */ (0, import_jsx_runtime32.jsx)(Text, { bold: true, children: shortcut }) : shortcut;
+  if (parens) {
+    return /* @__PURE__ */ (0, import_jsx_runtime32.jsxs)(Text, { children: [
+      "(",
+      shortcutText,
+      " to ",
+      action,
+      ")"
+    ] });
+  }
+  return /* @__PURE__ */ (0, import_jsx_runtime32.jsxs)(Text, { children: [
+    shortcutText,
+    " to ",
+    action
+  ] });
 }
 function isUnicodeSupported() {
   const { env: env22 } = import_process5.default;
@@ -44826,7 +44858,7 @@ function stripAnsi2(string) {
 var ANSI_BACKGROUND_OFFSET3 = 10;
 var wrapAnsi163 = (offset = 0) => (code) => `\x1B[${code + offset}m`;
 var wrapAnsi2563 = (offset = 0) => (code) => `\x1B[${38 + offset};5;${code}m`;
-var wrapAnsi16m3 = (offset = 0) => (red2, green4, blue) => `\x1B[${38 + offset};2;${red2};${green4};${blue}m`;
+var wrapAnsi16m3 = (offset = 0) => (red, green, blue) => `\x1B[${38 + offset};2;${red};${green};${blue}m`;
 var styles5 = {
   modifier: {
     reset: [0, 0],
@@ -44921,17 +44953,17 @@ function assembleStyles3() {
   styles5.bgColor.ansi16m = wrapAnsi16m3(ANSI_BACKGROUND_OFFSET3);
   Object.defineProperties(styles5, {
     rgbToAnsi256: {
-      value(red2, green4, blue) {
-        if (red2 === green4 && green4 === blue) {
-          if (red2 < 8) {
+      value(red, green, blue) {
+        if (red === green && green === blue) {
+          if (red < 8) {
             return 16;
           }
-          if (red2 > 248) {
+          if (red > 248) {
             return 231;
           }
-          return Math.round((red2 - 8) / 247 * 24) + 232;
+          return Math.round((red - 8) / 247 * 24) + 232;
         }
-        return 16 + 36 * Math.round(red2 / 255 * 5) + 6 * Math.round(green4 / 255 * 5) + Math.round(blue / 255 * 5);
+        return 16 + 36 * Math.round(red / 255 * 5) + 6 * Math.round(green / 255 * 5) + Math.round(blue / 255 * 5);
       },
       enumerable: false
     },
@@ -44968,25 +45000,25 @@ function assembleStyles3() {
         if (code < 16) {
           return 90 + (code - 8);
         }
-        let red2;
-        let green4;
+        let red;
+        let green;
         let blue;
         if (code >= 232) {
-          red2 = ((code - 232) * 10 + 8) / 255;
-          green4 = red2;
-          blue = red2;
+          red = ((code - 232) * 10 + 8) / 255;
+          green = red;
+          blue = red;
         } else {
           code -= 16;
           const remainder = code % 36;
-          red2 = Math.floor(code / 36) / 5;
-          green4 = Math.floor(remainder / 6) / 5;
+          red = Math.floor(code / 36) / 5;
+          green = Math.floor(remainder / 6) / 5;
           blue = remainder % 6 / 5;
         }
-        const value = Math.max(red2, green4, blue) * 2;
+        const value = Math.max(red, green, blue) * 2;
         if (value === 0) {
           return 30;
         }
-        let result = 30 + (Math.round(blue) << 2 | Math.round(green4) << 1 | Math.round(red2));
+        let result = 30 + (Math.round(blue) << 2 | Math.round(green) << 1 | Math.round(red));
         if (value === 2) {
           result += 60;
         }
@@ -44995,7 +45027,7 @@ function assembleStyles3() {
       enumerable: false
     },
     rgbToAnsi: {
-      value: (red2, green4, blue) => styles5.ansi256ToAnsi(styles5.rgbToAnsi256(red2, green4, blue)),
+      value: (red, green, blue) => styles5.ansi256ToAnsi(styles5.rgbToAnsi256(red, green, blue)),
       enumerable: false
     },
     hexToAnsi: {
@@ -45907,80 +45939,123 @@ function WelcomeScreen({
 }
 
 // src/main.tsx
-var import_react57 = __toESM(require_react(), 1);
+var import_react58 = __toESM(require_react(), 1);
 
 // src/doctor.tsx
 var import_node_child_process = require("node:child_process");
+
+// src/result.tsx
+var import_react57 = __toESM(require_react(), 1);
+
+// src/theme.tsx
+var import_react56 = __toESM(require_react(), 1);
 var import_jsx_runtime50 = __toESM(require_jsx_runtime(), 1);
-var green = "#4BAA72";
-var mutedGreen = "#86BE9A";
-var amber = "#D9AD6C";
-var red = "#E08484";
-var spinner = ["\u280B", "\u2819", "\u2839", "\u2838", "\u283C", "\u2834", "\u2826", "\u2827", "\u2807", "\u280F"];
-function lineColor(value) {
-  const text = value.toLowerCase();
-  if (/missing \(required|not detected|expired|unsupported/.test(text)) return red;
-  if (/missing|not configured|disabled|unavailable/.test(text)) return amber;
-  if (/detected|installed|stored|enabled|configured|not required|set in environment|seatbelt|bubblewrap/.test(text)) return green;
-  return void 0;
+var palettes = {
+  gator: { accent: "#4BAA72", secondary: "#86BE9A", warning: "#D6AD69", error: "#DF7777" },
+  contrast: { accent: "#78E6A3", secondary: "#C4F1D3", warning: "#FFD879", error: "#FF9292" },
+  mono: { accent: "#E6E6E6", secondary: "#B8B8B8", warning: "#E6E6E6", error: "#FFFFFF" }
+};
+function paletteForTheme(name) {
+  return palettes[name ?? "gator"] ?? palettes.gator;
 }
-function heading(line) {
-  if (line === "Dependencies:") return "\u{1F527} Dependencies";
-  if (line === "Reviewed local-model eligibility (Gator guardrail):") return "\u{1F9E0} Reviewed local models";
-  return void 0;
+var GatorPaletteContext = (0, import_react56.createContext)(palettes.gator);
+function useGatorPalette() {
+  return (0, import_react56.useContext)(GatorPaletteContext);
 }
-function plainDoctorReport(raw) {
-  const lines = raw.trimEnd().split("\n").flatMap((line) => {
-    const title = heading(line);
-    if (title) return ["", title];
-    if (line.startsWith("Local model host:")) return ["", `\u{1F4BB} ${line}`];
-    if (line.startsWith("Suggested verification:")) return ["", `\u{1F9EA} ${line}`];
-    if (line.startsWith("  ") && !line.startsWith("    ")) {
-      const mark = /: (installed|enabled)/.test(line) ? "\u2713" : /: (missing|disabled|unsupported)/.test(line) ? "\u25CB" : " ";
-      return [`  ${mark} ${line.trimStart()}`];
-    }
-    return [line];
-  });
-  return `\u{1F40A} Gator doctor
-${lines.join("\n")}
-`;
+function GatorPaletteProvider({ theme, children }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(GatorPaletteContext.Provider, { value: paletteForTheme(theme), children });
 }
-function DoctorReport({ raw }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { flexDirection: "column", children: raw.trimEnd().split("\n").map((line, index) => {
-    const title = heading(line);
-    if (title) return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: mutedGreen, bold: true, children: title }) }, index);
-    if (line.startsWith("    ")) return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: line.trim() }) }, index);
-    if (line.startsWith("Local-model advice:")) return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: line }) }, index);
-    const [label, value] = line.split(/: (.*)/s, 2);
-    if (value === void 0) return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { children: line }, index);
-    const indented = label.startsWith("  ");
-    const itemLabel = label.trimStart();
-    const status = lineColor(value);
-    const mark = indented && /^(installed|enabled)/.test(value) ? "\u2713 " : indented && /^(missing|disabled|unsupported)/.test(value) ? "\u25CB " : "";
-    const group = line.startsWith("Local model host:") || line.startsWith("Suggested verification:");
-    return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: group ? 1 : void 0, marginLeft: indented ? 2 : 0, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { color: indented ? void 0 : mutedGreen, children: [
-        mark,
-        itemLabel,
+
+// src/result.tsx
+var import_jsx_runtime51 = __toESM(require_jsx_runtime(), 1);
+function toneColor(tone, palette) {
+  return tone === "success" ? palette.accent : tone === "warning" ? palette.warning : tone === "error" ? palette.error : tone === "muted" ? palette.secondary : void 0;
+}
+function JsonPreview({ value, depth = 0 }) {
+  const palette = useGatorPalette();
+  if (value === null || typeof value !== "object") {
+    return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: typeof value === "string" ? void 0 : palette.secondary, children: JSON.stringify(value) ?? String(value) });
+  }
+  if (depth >= 12) return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { children: JSON.stringify(value, null, 2) });
+  const entries = Array.isArray(value) ? value.map((item, index) => [String(index + 1), item]) : Object.entries(value);
+  if (entries.length === 0) return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: Array.isArray(value) ? "[]" : "{}" });
+  return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { flexDirection: "column", children: entries.map(([key, item]) => /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", marginLeft: depth ? 2 : 0, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: palette.secondary, children: key }),
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: ": " }),
+      item === null || typeof item !== "object" ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(JsonPreview, { value: item, depth: depth + 1 }) : null
+    ] }),
+    item !== null && typeof item === "object" ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(JsonPreview, { value: item, depth: depth + 1 }) }) : null
+  ] }, key)) });
+}
+function ResultContent({ fields, items, lines, markdown }) {
+  const palette = useGatorPalette();
+  const hasFields = (fields?.length ?? 0) > 0;
+  const hasItems = (items?.length ?? 0) > 0;
+  return /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", children: [
+    fields?.map((field, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { color: palette.secondary, children: [
+        field.label,
         ": "
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: status, children: value })
-    ] }) }, index);
-  }) });
-}
-function DoctorScreen({ raw, frame }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", paddingX: 1, paddingTop: 1, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: green, bold: true, children: "\u{1F40A} Gator doctor" }),
-    /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Divider, {}) }),
-    raw === void 0 ? /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { color: green, children: [
-      spinner[frame % spinner.length],
-      " Checking Gator, models, and device\u2026"
-    ] }) }) : /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(DoctorReport, { raw }) })
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: toneColor(field.tone, palette), children: field.value })
+    ] }, `${index}-${field.label}`)),
+    items?.map((item, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", marginTop: index || hasFields ? 1 : 0, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: toneColor(item.tone, palette) ?? palette.accent, children: "\u2022 " }),
+        /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { bold: true, children: item.label }),
+        item.state ? /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { color: toneColor(item.tone, palette) ?? palette.secondary, children: [
+          "  \xB7  ",
+          item.state
+        ] }) : null
+      ] }),
+      item.detail ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: item.detail }) }) : null
+    ] }, `${index}-${item.label}`)),
+    lines?.map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginTop: index === 0 && (hasFields || hasItems) ? 1 : 0, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { children: line || " " }) }, index)),
+    markdown ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginTop: hasFields || hasItems ? 1 : 0, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Markdown, { children: markdown }) }) : null
   ] });
 }
-function collectDoctor(binary, arguments_) {
+function ResultBody({ result }) {
+  const terminal = (0, import_react57.useContext)(TerminalSizeContext);
+  const palette = useGatorPalette();
+  const width = Math.max(1, Math.min(76, (terminal?.columns ?? 80) - 5));
+  const marker = result.kind === "approval" ? "\u25C7" : result.tone === "error" ? "!" : result.tone === "success" ? "\u2713" : "\u25CC";
+  return /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", width, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { color: toneColor(result.tone, palette) ?? palette.accent, children: [
+        marker,
+        " "
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: toneColor(result.tone, palette) ?? palette.accent, bold: true, children: result.title })
+    ] }),
+    result.summary ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { children: result.summary }) }) : null,
+    result.fields?.length || result.items?.length || result.lines?.length || result.markdown ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, marginTop: 1, flexDirection: "column", children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(ResultContent, { fields: result.fields, items: result.items, lines: result.lines, markdown: result.markdown }) }) : null,
+    result.sections?.map((section, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { marginLeft: 2, marginTop: 1, flexDirection: "column", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: palette.secondary, bold: true, children: section.title }),
+      section.summary ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: section.summary }) : null,
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, flexDirection: "column", children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(ResultContent, { fields: section.fields, items: section.items, lines: section.lines, markdown: section.markdown }) })
+    ] }, `${index}-${section.title}`)),
+    result.kind === "approval" && result.preview !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { marginLeft: 2, marginTop: 1, flexDirection: "column", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: palette.secondary, bold: true, children: "What Gator will do" }),
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(JsonPreview, { value: result.preview }) })
+    ] }) : null,
+    result.footer ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: result.kind === "approval" && result.tone === "warning" ? palette.warning : palette.secondary, children: result.footer }) }) : null
+  ] });
+}
+
+// src/doctor.tsx
+var import_jsx_runtime52 = __toESM(require_jsx_runtime(), 1);
+function DoctorScreen({ result }) {
+  const palette = useGatorPalette();
+  return /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { flexDirection: "column", paddingX: 1, paddingTop: 1, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: palette.accent, bold: true, children: "\u{1F40A} Gator doctor" }),
+    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Divider, { color: palette.accent }) }),
+    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginTop: 1, children: result ? /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(ResultBody, { result }) : /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Spinner, { verb: "Checking Gator, models, and device", color: palette.accent }) })
+  ] });
+}
+function collectDoctor(binary, arguments_, structured) {
   return new Promise((resolve, reject) => {
-    const child = (0, import_node_child_process.spawn)(binary, ["ui-doctor-backend", ...arguments_], {
+    const child = (0, import_node_child_process.spawn)(binary, ["ui-doctor-backend", ...structured ? ["--json"] : [], ...arguments_], {
       env: { ...process.env, GATOR_UI_DOCTOR_BACKEND: "1" },
       stdio: ["ignore", "pipe", "pipe"]
     });
@@ -46003,123 +46078,139 @@ function collectDoctor(binary, arguments_) {
 }
 async function runDoctor(binary, arguments_) {
   if (!process.stdout.isTTY) {
-    const report = await collectDoctor(binary, arguments_);
-    process.stdout.write(plainDoctorReport(report));
+    const report = await collectDoctor(binary, arguments_, false);
+    process.stdout.write(`\u{1F40A} Gator doctor
+${report}`);
     return;
   }
-  let frame = 0;
   let app;
-  let timer;
   let finalFrame;
   try {
-    app = await root_default(/* @__PURE__ */ (0, import_jsx_runtime50.jsx)(DoctorScreen, { frame }), { onFrame: () => {
+    app = await root_default(/* @__PURE__ */ (0, import_jsx_runtime52.jsx)(GatorPaletteProvider, { children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(DoctorScreen, {}) }), { onFrame: () => {
       finalFrame?.();
       finalFrame = void 0;
     } });
-    timer = setInterval(() => app?.rerender(/* @__PURE__ */ (0, import_jsx_runtime50.jsx)(DoctorScreen, { frame: ++frame })), 80);
-    const report = await collectDoctor(binary, arguments_);
-    clearInterval(timer);
-    timer = void 0;
+    const payload = JSON.parse(await collectDoctor(binary, arguments_, true));
     const painted = new Promise((resolve) => {
       finalFrame = resolve;
     });
-    app.rerender(/* @__PURE__ */ (0, import_jsx_runtime50.jsx)(DoctorScreen, { frame, raw: report }));
+    app.rerender(/* @__PURE__ */ (0, import_jsx_runtime52.jsx)(GatorPaletteProvider, { theme: payload.theme, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(DoctorScreen, { result: payload.result }) }));
     await Promise.race([painted, new Promise((resolve) => setTimeout(resolve, 1e3))]);
   } finally {
-    if (timer) clearInterval(timer);
     app?.unmount();
     app?.cleanup();
     process.stdin.pause();
   }
 }
 
-// src/result.tsx
-var import_react56 = __toESM(require_react(), 1);
-var import_jsx_runtime51 = __toESM(require_jsx_runtime(), 1);
-var colors = {
-  success: "#4BAA72",
-  warning: "#D6AD69",
-  error: "#DF7777",
-  muted: "#86BE9A"
-};
-var green2 = "#4BAA72";
-var muted = "#86BE9A";
-function toneColor(tone) {
-  return tone ? colors[tone] : void 0;
+// src/search.ts
+function resultText(result) {
+  return [
+    result.title,
+    result.summary,
+    result.markdown,
+    result.footer,
+    ...(result.fields ?? []).flatMap((field) => [field.label, field.value]),
+    ...(result.items ?? []).flatMap((item) => [item.label, item.detail, item.state]),
+    ...result.lines ?? [],
+    ...(result.sections ?? []).flatMap((section) => [
+      section.title,
+      section.summary,
+      section.markdown,
+      ...(section.fields ?? []).flatMap((field) => [field.label, field.value]),
+      ...(section.items ?? []).flatMap((item) => [item.label, item.detail, item.state]),
+      ...section.lines ?? []
+    ]),
+    result.preview === void 0 ? "" : JSON.stringify(result.preview)
+  ].filter((value) => !!value);
 }
-function JsonPreview({ value, depth = 0 }) {
-  if (value === null || typeof value !== "object") {
-    return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: typeof value === "string" ? void 0 : muted, children: JSON.stringify(value) ?? String(value) });
+function searchableMessage(message) {
+  const bundle = message.bundle;
+  if (message.result) return resultText(message.result).join("\n");
+  if (bundle) return [
+    bundle.Path,
+    bundle.Status,
+    ...(bundle.Artifacts ?? []).flatMap((item) => [item.Path, item.MediaType]),
+    ...(bundle.Candidates ?? []).flatMap((item) => [item.ID, item.Status, ...item.ChangedPaths])
+  ].join("\n");
+  return message.text;
+}
+function searchMessages(messages, query) {
+  const needle = query.trim().toLocaleLowerCase();
+  if (!needle) return [];
+  return messages.flatMap((message, index) => {
+    const content = searchableMessage(message).toLocaleLowerCase();
+    const matches = [];
+    let offset = content.indexOf(needle);
+    while (offset >= 0) {
+      matches.push({ index, offset, length: needle.length });
+      offset = content.indexOf(needle, offset + Math.max(1, needle.length));
+    }
+    return matches;
+  });
+}
+
+// src/layout.ts
+var graphemes = new Intl.Segmenter(void 0, { granularity: "grapheme" });
+var wide = /[\p{Extended_Pictographic}\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE10-\uFE6F\uFF01-\uFF60\uFFE0-\uFFE6]/u;
+function panelGeometry(columns, rows, focused, picker, hasSubtitle) {
+  const paddingX = columns < 32 ? 0 : columns < 48 ? 1 : 2;
+  const availableWidth = Math.max(1, columns - 2 * paddingX);
+  const panelWidth = focused ? Math.min(78, availableWidth) : availableWidth;
+  const contentWidth = Math.max(1, panelWidth - (focused ? 4 : 0));
+  const compact = rows < 16;
+  const showSubtitle = hasSubtitle && !compact;
+  const showComposerAnchor = !compact;
+  const chrome = 1 + (showSubtitle ? 2 : 0) + (picker ? compact ? 1 : 4 : 0) + 2 + 2 + (showComposerAnchor ? 3 : 0) + (compact ? 0 : 1);
+  return { paddingX, panelWidth, contentWidth, compact, showSubtitle, showComposerAnchor, bodyRows: Math.max(1, rows - chrome) };
+}
+function wrapTerminalText(value, width) {
+  const limit = Math.max(1, width);
+  const lines = [];
+  for (const sourceLine of value.split("\n")) {
+    let line = "";
+    let cells = 0;
+    for (const part of graphemes.segment(sourceLine)) {
+      const glyph = part.segment;
+      const size = wide.test(glyph) ? 2 : 1;
+      if (line && cells + size > limit) {
+        lines.push(line);
+        line = "";
+        cells = 0;
+      }
+      line += glyph;
+      cells += size;
+    }
+    lines.push(line);
   }
-  if (depth >= 12) return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { children: JSON.stringify(value, null, 2) });
-  const entries = Array.isArray(value) ? value.map((item, index) => [String(index + 1), item]) : Object.entries(value);
-  if (entries.length === 0) return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: Array.isArray(value) ? "[]" : "{}" });
-  return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { flexDirection: "column", children: entries.map(([key, item]) => /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", marginLeft: depth ? 2 : 0, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: muted, children: key }),
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: ": " }),
-      item === null || typeof item !== "object" ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(JsonPreview, { value: item, depth: depth + 1 }) : null
-    ] }),
-    item !== null && typeof item === "object" ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(JsonPreview, { value: item, depth: depth + 1 }) }) : null
-  ] }, key)) });
+  return lines;
 }
-function ResultContent({ fields, items, lines, markdown }) {
-  const hasFields = (fields?.length ?? 0) > 0;
-  const hasItems = (items?.length ?? 0) > 0;
-  return /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", children: [
-    fields?.map((field, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { color: muted, children: [
-        field.label,
-        ": "
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: toneColor(field.tone), children: field.value })
-    ] }, `${index}-${field.label}`)),
-    items?.map((item, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", marginTop: index || hasFields ? 1 : 0, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: toneColor(item.tone) ?? green2, children: "\u2022 " }),
-        /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { bold: true, children: item.label }),
-        item.state ? /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { color: toneColor(item.tone) ?? muted, children: [
-          "  \xB7  ",
-          item.state
-        ] }) : null
-      ] }),
-      item.detail ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: item.detail }) }) : null
-    ] }, `${index}-${item.label}`)),
-    lines?.map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginTop: index === 0 && (hasFields || hasItems) ? 1 : 0, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { children: line || " " }) }, index)),
-    markdown ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginTop: hasFields || hasItems ? 1 : 0, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Markdown, { children: markdown }) }) : null
-  ] });
+
+// src/text.ts
+var segmenter4 = new Intl.Segmenter(void 0, { granularity: "grapheme" });
+function graphemeBoundaries(value) {
+  const positions = Array.from(segmenter4.segment(value), (part) => part.index);
+  return [...positions, value.length].filter((position, index, all) => index === 0 || position !== all[index - 1]);
 }
-function ResultBody({ result }) {
-  const terminal = (0, import_react56.useContext)(TerminalSizeContext);
-  const width = Math.max(16, Math.min(76, (terminal?.columns ?? 80) - 7));
-  const marker = result.kind === "approval" ? "\u25C7" : result.tone === "error" ? "!" : result.tone === "success" ? "\u2713" : "\u25CC";
-  return /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", width, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { color: toneColor(result.tone) ?? green2, children: [
-        marker,
-        " "
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: toneColor(result.tone) ?? green2, bold: true, children: result.title })
-    ] }),
-    result.summary ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { children: result.summary }) }) : null,
-    result.fields?.length || result.items?.length || result.lines?.length || result.markdown ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, marginTop: 1, flexDirection: "column", children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(ResultContent, { fields: result.fields, items: result.items, lines: result.lines, markdown: result.markdown }) }) : null,
-    result.sections?.map((section, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { marginLeft: 2, marginTop: 1, flexDirection: "column", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: muted, bold: true, children: section.title }),
-      section.summary ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: section.summary }) : null,
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, flexDirection: "column", children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(ResultContent, { fields: section.fields, items: section.items, lines: section.lines, markdown: section.markdown }) })
-    ] }, `${index}-${section.title}`)),
-    result.kind === "approval" && result.preview !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { marginLeft: 2, marginTop: 1, flexDirection: "column", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: muted, bold: true, children: "What Gator will do" }),
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(JsonPreview, { value: result.preview }) })
-    ] }) : null,
-    result.footer ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: result.kind === "approval" && result.tone === "warning" ? colors.warning : muted, children: result.footer }) }) : null
-  ] });
+function previousGrapheme(value, cursor) {
+  return [...graphemeBoundaries(value)].reverse().find((position) => position < cursor) ?? 0;
+}
+function nextGrapheme(value, cursor) {
+  return graphemeBoundaries(value).find((position) => position > cursor) ?? value.length;
+}
+function graphemeAt(value, cursor) {
+  return value.slice(cursor, nextGrapheme(value, cursor));
+}
+function graphemeColumn(value, cursor) {
+  return graphemeBoundaries(value).filter((position) => position < cursor).length;
+}
+function cursorAtGraphemeColumn(value, column) {
+  const positions = graphemeBoundaries(value);
+  return positions[Math.min(Math.max(0, column), positions.length - 1)] ?? 0;
 }
 
 // src/main.tsx
-var import_jsx_runtime52 = __toESM(require_jsx_runtime(), 1);
-var green3 = "#4BAA72";
-var mutedGreen2 = "#86BE9A";
+var import_jsx_runtime53 = __toESM(require_jsx_runtime(), 1);
 var GatorBridge = class {
   child;
   current;
@@ -46200,16 +46291,13 @@ function bundleResult(bundle) {
   };
 }
 function MessageBody({ item }) {
-  if (item.role === "Doctor") return /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { flexDirection: "column", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: green3, bold: true, children: "\u{1F40A} Gator doctor" }),
-    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(DoctorReport, { raw: item.text }) })
-  ] });
+  const palette = useGatorPalette();
   const isUser = item.role === "You";
-  const isGator = item.role === "Gator";
+  const isGator = item.role === "Gator" || item.role === "Doctor";
   const label = isUser ? "\u203A You" : isGator ? "\u{1F40A} Gator" : item.role === "Deliverables" ? "\u25C8 Deliverables" : `\u25CC ${item.role}`;
-  return /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { flexDirection: "column", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: isGator ? green3 : isUser ? void 0 : mutedGreen2, bold: !isUser, dimColor: isUser, children: label }),
-    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginLeft: 2, flexDirection: "column", children: item.result ? /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(ResultBody, { result: item.result }) : item.bundle ? /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(ResultBody, { result: bundleResult(item.bundle) }) : isGator ? /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Markdown, { children: item.text }) : item.text.split("\n").map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { dimColor: !isUser, children: line || " " }, index)) })
+  return /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: isGator ? palette.accent : isUser ? void 0 : palette.secondary, bold: !isUser, dimColor: isUser, children: label }),
+    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginLeft: 2, flexDirection: "column", children: item.result ? /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(ResultBody, { result: item.result }) : item.bundle ? /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(ResultBody, { result: bundleResult(item.bundle) }) : isGator ? /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Markdown, { children: item.text }) : item.text.split("\n").map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: !isUser, children: line || " " }, index)) })
   ] });
 }
 function GreenPrompt({
@@ -46220,9 +46308,10 @@ function GreenPrompt({
   disabled,
   prefillVersion
 }) {
-  const [cursor, setCursor] = (0, import_react57.useState)(value.length);
-  const [historyIndex, setHistoryIndex] = (0, import_react57.useState)(-1);
-  (0, import_react57.useEffect)(() => {
+  const palette = useGatorPalette();
+  const [cursor, setCursor] = (0, import_react58.useState)(value.length);
+  const [historyIndex, setHistoryIndex] = (0, import_react58.useState)(-1);
+  (0, import_react58.useEffect)(() => {
     setCursor(value.length);
   }, [prefillVersion]);
   const replace = (next, position) => {
@@ -46243,11 +46332,11 @@ function GreenPrompt({
       return;
     }
     if (key.leftArrow) {
-      setCursor((position) => Math.max(0, position - 1));
+      setCursor((position) => previousGrapheme(value, position));
       return;
     }
     if (key.rightArrow) {
-      setCursor((position) => Math.min(value.length, position + 1));
+      setCursor((position) => nextGrapheme(value, position));
       return;
     }
     if (key.home || key.ctrl && input === "a") {
@@ -46261,15 +46350,15 @@ function GreenPrompt({
     const beforeCursor = value.slice(0, cursor);
     const currentLine = beforeCursor.split("\n").length - 1;
     const lines = value.split("\n");
-    const column = beforeCursor.length - beforeCursor.lastIndexOf("\n") - 1;
+    const column = graphemeColumn(lines[currentLine], beforeCursor.length - beforeCursor.lastIndexOf("\n") - 1);
     if (key.upArrow && currentLine > 0) {
       const start = lines.slice(0, currentLine - 1).reduce((count, line) => count + line.length + 1, 0);
-      setCursor(start + Math.min(column, lines[currentLine - 1].length));
+      setCursor(start + cursorAtGraphemeColumn(lines[currentLine - 1], column));
       return;
     }
     if (key.downArrow && currentLine + 1 < lines.length) {
       const start = lines.slice(0, currentLine + 1).reduce((count, line) => count + line.length + 1, 0);
-      setCursor(start + Math.min(column, lines[currentLine + 1].length));
+      setCursor(start + cursorAtGraphemeColumn(lines[currentLine + 1], column));
       return;
     }
     if (key.upArrow && historyIndex + 1 < history.length) {
@@ -46287,11 +46376,14 @@ function GreenPrompt({
       return;
     }
     if (key.backspace) {
-      if (cursor > 0) replace(value.slice(0, cursor - 1) + value.slice(cursor), cursor - 1);
+      if (cursor > 0) {
+        const previous = previousGrapheme(value, cursor);
+        replace(value.slice(0, previous) + value.slice(cursor), previous);
+      }
       return;
     }
     if (key.delete) {
-      if (cursor < value.length) replace(value.slice(0, cursor) + value.slice(cursor + 1), cursor);
+      if (cursor < value.length) replace(value.slice(0, cursor) + value.slice(nextGrapheme(value, cursor)), cursor);
       return;
     }
     if (key.ctrl && input === "u") {
@@ -46307,22 +46399,22 @@ function GreenPrompt({
     if (key.ctrl || key.meta || key.tab || key.escape) return;
     if (input) replace(value.slice(0, cursor) + input + value.slice(cursor), cursor + input.length);
   }, { isActive: !disabled });
-  return /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { flexDirection: "column", children: value ? value.split("\n").map((line, index, lines) => {
+  return /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { flexDirection: "column", children: value ? value.split("\n").map((line, index, lines) => {
     const start = lines.slice(0, index).reduce((count, item) => count + item.length + 1, 0);
     const localCursor = cursor - start;
-    return /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: green3, children: index === 0 ? "\u276F " : "\xB7 " }),
-      localCursor >= 0 && localCursor <= line.length ? /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.accent, children: index === 0 ? "\u276F " : "\xB7 " }),
+      localCursor >= 0 && localCursor <= line.length ? /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { children: [
         line.slice(0, localCursor),
-        /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { inverse: true, children: line[localCursor] ?? " " }),
-        line.slice(localCursor + 1)
-      ] }) : /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { children: line || " " })
+        /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { inverse: true, children: graphemeAt(line, localCursor) || " " }),
+        line.slice(nextGrapheme(line, localCursor))
+      ] }) : /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { children: line || " " })
     ] }, index);
-  }) : /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { children: [
-    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: green3, children: "\u276F " }),
-    /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { inverse: true, children: " " }),
-      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { dimColor: true, children: "Ask Gator to work on something\u2026" })
+  }) : /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.accent, children: "\u276F " }),
+    /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { inverse: true, children: " " }),
+      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: true, children: "Ask Gator to work on something\u2026" })
     ] })
   ] }) });
 }
@@ -46336,6 +46428,7 @@ function ChatKeys({
   dismiss,
   search,
   scroll,
+  scrollToEnd,
   exit,
   clearDraft,
   bridge
@@ -46359,6 +46452,11 @@ function ChatKeys({
     if (key.ctrl && input === "f") {
       event.stopImmediatePropagation();
       search();
+      return;
+    }
+    if (key.ctrl && key.end) {
+      event.stopImmediatePropagation();
+      scrollToEnd();
       return;
     }
     const shortcuts = { p: "ctrl+p", x: "ctrl+x", b: "ctrl+b", i: "ctrl+i", g: "ctrl+g" };
@@ -46430,125 +46528,143 @@ function PanelKeys({ bridge, scroll, exit }) {
   return null;
 }
 function PanelScreen({ panel, status, draft, statusLine, bridge, exit }) {
-  const terminal = (0, import_react57.useContext)(TerminalSizeContext);
-  const [offset, setOffset] = (0, import_react57.useState)(0);
-  (0, import_react57.useEffect)(() => {
+  const terminal = (0, import_react58.useContext)(TerminalSizeContext);
+  const palette = useGatorPalette();
+  const [offset, setOffset] = (0, import_react58.useState)(0);
+  (0, import_react58.useEffect)(() => {
     setOffset(0);
   }, [panel.kind, panel.title, panel.subtitle]);
   const rows = panel.rows ?? [];
+  const focused = panel.kind === "confirmation" || panel.kind === "model-form" || panel.kind === "learning-form";
+  const geometry = panelGeometry(terminal?.columns ?? 80, terminal?.rows ?? 24, focused, panel.kind === "picker", !!panel.subtitle);
   const blocks = (panel.blocks ?? []).flatMap((block) => [
     ...block.title ? [{ text: block.title, heading: true }] : [],
-    ...block.lines.length ? block.lines.map((line) => ({ text: line, heading: false })) : [{ text: "None", heading: false }],
+    ...block.lines.length ? block.lines.flatMap((line) => wrapTerminalText(line, geometry.contentWidth).map((text) => ({ text, heading: false }))) : [{ text: "None", heading: false }],
     { text: "", heading: false }
   ]);
-  const focused = panel.kind === "confirmation" || panel.kind === "model-form" || panel.kind === "learning-form";
-  const available = Math.max(4, (terminal?.rows ?? 24) - (focused ? 14 : 11));
   const rowHeight = rows.some((row) => row.detail) ? 3 : 2;
-  const maxRows = Math.max(2, Math.floor((blocks.length > 0 ? available / 2 : available) / rowHeight));
+  const noticeRows = panel.notice || status ? 1 : 0;
+  const bodyRows = Math.max(1, geometry.bodyRows - noticeRows);
+  const maxRows = Math.max(1, Math.floor((blocks.length > 0 ? Math.ceil(bodyRows / 2) : bodyRows) / rowHeight));
   const selected = Math.min(Math.max(0, panel.selected ?? 0), Math.max(0, rows.length - 1));
   const rowStart = Math.max(0, Math.min(selected - Math.floor(maxRows / 2), rows.length - maxRows));
-  const maxLines = Math.max(2, available - (rows.length > 0 ? Math.min(rows.length, maxRows) * rowHeight : 0));
+  const maxLines = Math.max(1, bodyRows - (rows.length > 0 ? Math.min(rows.length, maxRows) * rowHeight : 0));
   const blockOffset = Math.min(offset, Math.max(0, blocks.length - maxLines));
-  const panelWidth = Math.max(20, Math.min(78, (terminal?.columns ?? 80) - 4));
-  const contentWidth = focused ? panelWidth - 4 : Math.max(1, (terminal?.columns ?? 80) - 4);
-  return /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, paddingX: 2, paddingTop: 1, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(PanelKeys, { bridge, exit, scroll: (amount) => setOffset((current) => Math.max(0, Math.min(blocks.length - maxLines, current + amount))) }),
-    /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { flexDirection: "column", flexGrow: focused ? 0 : 1, width: focused ? panelWidth : void 0, alignSelf: focused ? "center" : void 0, borderStyle: focused ? "round" : void 0, borderColor: focused ? green3 : void 0, paddingX: focused ? 1 : 0, marginTop: focused ? 1 : 0, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { color: green3, bold: true, children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, paddingX: geometry.paddingX, paddingTop: geometry.compact ? 0 : 1, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(PanelKeys, { bridge, exit, scroll: (amount) => setOffset((current) => Math.max(0, Math.min(blocks.length - maxLines, current + amount))) }),
+    /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", flexGrow: focused ? 0 : 1, width: geometry.panelWidth, alignSelf: focused ? "center" : void 0, borderStyle: focused && !geometry.compact ? "round" : void 0, borderColor: focused && !geometry.compact ? palette.accent : void 0, paddingX: focused && !geometry.compact ? 1 : 0, marginTop: focused && !geometry.compact ? 1 : 0, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { color: palette.accent, bold: true, wrap: "truncate-end", children: [
         "\u{1F40A} Gator  ",
-        /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: mutedGreen2, children: panel.title })
+        /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.secondary, children: panel.title })
       ] }),
-      panel.subtitle && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { children: panel.subtitle }) }),
-      panel.kind === "picker" && /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { marginTop: 1, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: mutedGreen2, children: "Search  " }),
-        /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { children: [
-          panel.query || "type to filter",
-          /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { inverse: true, children: " " })
-        ] })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Divider, { width: contentWidth }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { flexDirection: "column", flexGrow: focused ? 0 : 1, marginTop: 1, children: [
+      geometry.showSubtitle && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { wrap: "truncate-end", children: panel.subtitle }) }),
+      panel.kind === "picker" && (geometry.compact ? /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { wrap: "truncate-end", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.secondary, children: "Search " }),
+        panel.query || "type to filter",
+        /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { inverse: true, children: " " })
+      ] }) : /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginTop: 1, width: geometry.contentWidth, borderStyle: "round", borderColor: palette.secondary, paddingX: 1, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { wrap: "truncate-end", children: [
+        panel.query || "Type to filter",
+        /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { inverse: true, children: " " })
+      ] }) })),
+      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginTop: geometry.compact ? 0 : 1, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Divider, { width: geometry.contentWidth, color: palette.accent }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", flexGrow: focused ? 0 : 1, marginTop: 1, children: [
         rows.slice(rowStart, rowStart + maxRows).map((row, index) => {
           const active = panel.kind !== "inbox" && panel.kind !== "jobs" && rowStart + index === selected;
-          return /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { flexDirection: "column", marginBottom: 1, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { color: active ? green3 : void 0, bold: active, children: [
+          return /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", marginBottom: geometry.compact ? 0 : 1, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { wrap: "truncate-end", color: active ? palette.accent : void 0, bold: active, children: [
               active ? "\u276F " : "  ",
               row.label,
-              row.state ? /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { color: row.tone === "warning" ? "#D6AD69" : row.tone === "error" ? "#DF7777" : row.tone === "success" ? green3 : mutedGreen2, children: [
+              row.state ? /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { color: row.tone === "warning" ? palette.warning : row.tone === "error" ? palette.error : row.tone === "success" ? palette.accent : palette.secondary, children: [
                 "  \xB7  ",
                 row.state
               ] }) : null
             ] }),
-            row.detail && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { dimColor: !active, children: [
+            row.detail && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { wrap: "truncate-end", dimColor: !active, children: [
               row.detail,
-              active && (panel.kind === "model-form" || panel.kind === "learning-form") && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { inverse: true, children: " " })
+              active && (panel.kind === "model-form" || panel.kind === "learning-form") && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { inverse: true, children: " " })
             ] }) })
           ] }, `${rowStart + index}-${row.label}`);
         }),
-        blocks.slice(blockOffset, blockOffset + maxLines).map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginBottom: line.heading ? 0 : void 0, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: line.heading ? mutedGreen2 : void 0, bold: line.heading, children: line.text || " " }) }, `${blockOffset + index}-${line.text}`)),
-        blocks.length > maxLines && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { dimColor: true, children: `  ${blockOffset + 1}\u2013${Math.min(blockOffset + maxLines, blocks.length)} of ${blocks.length} lines \xB7 PgUp/PgDn scroll` }),
-        rows.length === 0 && blocks.length === 0 && !panel.notice && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { dimColor: true, children: "No items to show." }),
-        panel.notice && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: mutedGreen2, children: panel.notice }) }),
-        status && status !== panel.notice && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { dimColor: true, children: status }) })
+        blocks.slice(blockOffset, blockOffset + maxLines).map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginBottom: line.heading ? 0 : void 0, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { wrap: "truncate-end", color: line.heading ? palette.secondary : void 0, bold: line.heading, children: line.text || " " }) }, `${blockOffset + index}-${line.text}`)),
+        blocks.length > maxLines && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: true, wrap: "truncate-end", children: `${blockOffset + 1}\u2013${Math.min(blockOffset + maxLines, blocks.length)} of ${blocks.length} \xB7 PgUp/PgDn` }),
+        rows.length === 0 && blocks.length === 0 && !panel.notice && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: true, children: "No items to show." }),
+        panel.notice && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginTop: geometry.compact ? 0 : 1, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { wrap: "truncate-end", color: palette.secondary, children: panel.notice }) }),
+        status && status !== panel.notice && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginTop: geometry.compact ? 0 : 1, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { wrap: "truncate-end", dimColor: true, children: status }) })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Divider, { width: contentWidth }),
-      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { dimColor: true, children: panel.footer || "Esc back" })
+      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Divider, { width: geometry.contentWidth, color: palette.accent }),
+      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { wrap: "truncate-end", dimColor: true, children: geometry.compact ? "Esc back" : panel.hints?.length ? /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Byline, { children: panel.hints.map((hint) => /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(KeyboardShortcutHint, { shortcut: hint.shortcut, action: hint.action }, `${hint.shortcut}-${hint.action}`)) }) : panel.footer || "Esc back" })
     ] }),
-    focused && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { flexGrow: 1 }),
-    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Divider, { width: Math.max(1, (terminal?.columns ?? 80) - 4) }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { dimColor: true, children: [
-      "\u276F ",
-      draft || "Ask Gator to work on something\u2026"
+    focused && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { flexGrow: 1 }),
+    geometry.showComposerAnchor && /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(import_jsx_runtime53.Fragment, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Divider, { width: geometry.panelWidth, color: palette.accent }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { wrap: "truncate-end", dimColor: true, children: [
+        "\u276F ",
+        draft || "Ask Gator to work on something\u2026"
+      ] })
     ] }),
-    statusLine && statusLine.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(StatusLine, { segments: statusLine.map((content) => ({ content, color: mutedGreen2 })) })
+    !geometry.compact && statusLine && statusLine.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(StatusLine, { segments: statusLine.map((content) => ({ content, color: palette.secondary })) })
   ] });
 }
 function GreenSearch({ messages, close, navigate }) {
-  const [query, setQuery] = (0, import_react57.useState)("");
-  const [matches, setMatches] = (0, import_react57.useState)([]);
-  const [selected, setSelected] = (0, import_react57.useState)(0);
-  const change = (value) => {
-    const found = messages.flatMap((item, index) => item.text.toLowerCase().includes(value.toLowerCase()) && value ? [index] : []);
+  const palette = useGatorPalette();
+  const [query, setQuery] = (0, import_react58.useState)("");
+  const [cursor, setCursor] = (0, import_react58.useState)(0);
+  const [matches, setMatches] = (0, import_react58.useState)([]);
+  const [selected, setSelected] = (0, import_react58.useState)(0);
+  const change = (value, position) => {
+    const found = searchMessages(messages, value);
     setQuery(value);
+    setCursor(position);
     setMatches(found);
     setSelected(0);
-    if (found.length) navigate(found[0]);
+    if (found.length) navigate(found[0].index);
   };
   use_input_default((input, key, event) => {
     event.stopImmediatePropagation();
     if (key.escape) close();
-    else if (key.backspace) change(query.slice(0, -1));
+    else if (key.leftArrow) setCursor(previousGrapheme(query, cursor));
+    else if (key.rightArrow) setCursor(nextGrapheme(query, cursor));
+    else if (key.backspace && cursor > 0) {
+      const previous = previousGrapheme(query, cursor);
+      change(query.slice(0, previous) + query.slice(cursor), previous);
+    } else if (key.delete && cursor < query.length) change(query.slice(0, cursor) + query.slice(nextGrapheme(query, cursor)), cursor);
     else if ((key.return || key.ctrl && input === "n") && matches.length) {
       const next = (selected + 1) % matches.length;
       setSelected(next);
-      navigate(matches[next]);
-    } else if (!key.ctrl && !key.meta && input) change(query + input);
+      navigate(matches[next].index);
+    } else if (key.ctrl && input === "p" && matches.length) {
+      const previous = (selected - 1 + matches.length) % matches.length;
+      setSelected(previous);
+      navigate(matches[previous].index);
+    } else if (!key.ctrl && !key.meta && input) change(query.slice(0, cursor) + input + query.slice(cursor), cursor + input.length);
   });
-  return /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { paddingX: 1, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: green3, children: "Search: " }),
-    /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { children: [
-      query,
-      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { inverse: true, children: " " })
+  return /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { paddingX: 1, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.accent, children: "Search: " }),
+    /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { children: [
+      query.slice(0, cursor),
+      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { inverse: true, children: graphemeAt(query, cursor) || " " }),
+      query.slice(nextGrapheme(query, cursor))
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { dimColor: true, children: `  ${matches.length ? `${selected + 1}/${matches.length} matches` : "no matches"}` })
+    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: true, children: `  ${matches.length ? `${selected + 1}/${matches.length} matches` : "no matches"}` })
   ] });
 }
 function App2({ bridge }) {
   const { exit } = use_app_default();
   use_input_default(() => {
   });
-  const [state, setState] = (0, import_react57.useState)(bridge.snapshot());
-  const [failure, setFailure] = (0, import_react57.useState)("");
-  const [input, setInput] = (0, import_react57.useState)("");
-  const [prefillVersion, setPrefillVersion] = (0, import_react57.useState)(0);
-  const [history, setHistory] = (0, import_react57.useState)([]);
-  const [selected, setSelected] = (0, import_react57.useState)(0);
-  const [dismissed, setDismissed] = (0, import_react57.useState)(false);
-  const [searchOpen, setSearchOpen] = (0, import_react57.useState)(false);
-  const terminal = (0, import_react57.useContext)(TerminalSizeContext);
-  const list = (0, import_react57.useRef)(null);
-  const lastBackendInput = (0, import_react57.useRef)("");
-  (0, import_react57.useEffect)(() => {
+  const [state, setState] = (0, import_react58.useState)(bridge.snapshot());
+  const [failure, setFailure] = (0, import_react58.useState)("");
+  const [input, setInput] = (0, import_react58.useState)("");
+  const [prefillVersion, setPrefillVersion] = (0, import_react58.useState)(0);
+  const [history, setHistory] = (0, import_react58.useState)([]);
+  const [selected, setSelected] = (0, import_react58.useState)(0);
+  const [dismissed, setDismissed] = (0, import_react58.useState)(false);
+  const [searchOpen, setSearchOpen] = (0, import_react58.useState)(false);
+  const terminal = (0, import_react58.useContext)(TerminalSizeContext);
+  const palette = paletteForTheme(state?.theme);
+  const list = (0, import_react58.useRef)(null);
+  const lastBackendInput = (0, import_react58.useRef)("");
+  (0, import_react58.useEffect)(() => {
     const unsubscribe = bridge.subscribe(setState);
     const unexit = bridge.onExit((code, detail) => {
       if (code === 0) exit();
@@ -46563,7 +46679,7 @@ function App2({ bridge }) {
       process.stdout.off("resize", resize);
     };
   }, [bridge, exit]);
-  (0, import_react57.useEffect)(() => {
+  (0, import_react58.useEffect)(() => {
     if (state?.mode === "chat" && state.input && state.input !== lastBackendInput.current) {
       setInput(state.input);
       setPrefillVersion((version) => version + 1);
@@ -46574,9 +46690,9 @@ function App2({ bridge }) {
     bridge.stop();
     exit();
   };
-  if (!state) return /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { padding: 1, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: green3, children: failure || "Starting Gator\u2026" }) });
+  if (!state) return /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { padding: 1, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Spinner, { verb: failure || "Starting Gator", color: palette.accent }) });
   if (state.mode === "panel" && state.panel) {
-    return /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(PanelScreen, { panel: state.panel, status: state.status, draft: input, statusLine: state.status_line_enabled ? state.status_line : void 0, bridge, exit: close });
+    return /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(GatorPaletteContext.Provider, { value: palette, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(PanelScreen, { panel: state.panel, status: state.status, draft: input, statusLine: state.status_line_enabled ? state.status_line : void 0, bridge, exit: close }) });
   }
   const matches = !searchOpen && !dismissed && input.startsWith("/") && !input.includes(" ") ? state.commands.filter((command) => input === "/" ? !command.advanced : `/${command.name}`.startsWith(input)).slice(0, 8) : [];
   const submit = (value) => {
@@ -46597,22 +46713,22 @@ function App2({ bridge }) {
     }
   };
   const context = [state.title, state.provider ? `${state.provider}${state.model ? `/${state.model}` : ""}` : "Choose model: /model", state.source.split("/").filter(Boolean).at(-1) || state.source].filter(Boolean).join(" \xB7 ");
-  const welcome = /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { flexDirection: "column", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(WelcomeScreen, { appName: "Gator", subtitle: "Your ongoing work, ready when you are", color: green3, logo: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: green3, children: "\u{1F40A}" }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { dimColor: true, children: context }),
-    /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { marginTop: 1, marginLeft: 1, flexDirection: "column", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: mutedGreen2, bold: true, children: state.first_run ? "Get started" : "Next up" }),
-      state.first_run ? /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(import_jsx_runtime52.Fragment, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { children: "  1  /model  Choose a cloud or local model" }),
-        /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { children: "  2  Ask: Summarize this folder into a daily brief with next actions." })
-      ] }) : state.actions.slice(0, 4).map((action, index) => /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { children: [
+  const welcome = /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(WelcomeScreen, { appName: "Gator", subtitle: "Your ongoing work, ready when you are", color: palette.accent, logo: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.accent, children: "\u{1F40A}" }) }),
+    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: true, children: context }),
+    /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { marginTop: 1, marginLeft: 1, flexDirection: "column", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.secondary, bold: true, children: state.first_run ? "Get started" : "Next up" }),
+      state.first_run ? /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(import_jsx_runtime53.Fragment, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { children: "  1  /model  Choose a cloud or local model" }),
+        /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { children: "  2  Ask: Summarize this folder into a daily brief with next actions." })
+      ] }) : state.actions.slice(0, 4).map((action, index) => /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { children: [
         "  ",
         action.Label,
         " \xB7 ",
         action.Command
       ] }, index)),
-      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { dimColor: true, children: "  Type / for Gator commands." }),
-      state.supervisor_needs_start && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: mutedGreen2, children: "  Recurring checks need a running supervisor \xB7 gator job supervisor" })
+      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: true, children: "  Type / for Gator commands." }),
+      state.supervisor_needs_start && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.secondary, children: "  Recurring checks need a running supervisor \xB7 gator job supervisor" })
     ] })
   ] });
   const messages = state.messages.map((item, index) => ({
@@ -46621,47 +46737,47 @@ function App2({ bridge }) {
     content: item.text
   }));
   const viewportHeight = Math.max(1, (terminal?.rows ?? 24) - 6 - matches.length - (state.running ? 2 : 0) - (searchOpen ? 1 : 0) - input.split("\n").length + 1);
-  const statusSegments = (state.status_line ?? []).map((content) => ({ content, color: mutedGreen2 }));
-  return /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, paddingX: 1, paddingTop: 1, children: [
-    !state.home && /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { marginBottom: 1, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: green3, bold: true, children: "\u{1F40A} Gator" }),
-      /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { color: mutedGreen2, children: [
+  const statusSegments = (state.status_line ?? []).map((content) => ({ content, color: palette.secondary }));
+  return /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(GatorPaletteContext.Provider, { value: palette, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, paddingX: 1, paddingTop: 1, children: [
+    !state.home && /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { marginBottom: 1, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.accent, bold: true, children: "\u{1F40A} Gator" }),
+      /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { color: palette.secondary, children: [
         "  ",
         context
       ] })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, children: [
-      state.home && state.messages.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginBottom: 1, children: welcome }),
-      state.messages.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(MessageList, { ref: list, viewportHeight, messages, renderMessage: (item) => /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(MessageBody, { item: state.messages[Number(item.id.split("-", 1)[0])] }) }),
-      state.running && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: green3, children: state.cancelling ? "\u25CC Stopping\u2026 retaining evidence" : `${["\u280B", "\u2819", "\u2839", "\u2838", "\u283C", "\u2834", "\u2826", "\u2827", "\u2807", "\u280F"][state.loading_frame % 10]} Working\u2026 ${state.elapsed ?? ""} \xB7 Esc to interrupt` }) })
+    /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, children: [
+      state.home && state.messages.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginBottom: 1, children: welcome }),
+      state.messages.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(MessageList, { ref: list, viewportHeight, messages, renderMessage: (item) => /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(MessageBody, { item: state.messages[Number(item.id.split("-", 1)[0])] }) }),
+      state.running && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginTop: 1, children: state.cancelling ? /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.warning, children: "\u25CC Stopping\u2026 retaining evidence" }) : /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Spinner, { verb: "Working", label: `${state.elapsed ?? ""} \xB7 Esc to interrupt`, color: palette.accent, showElapsed: false }) })
     ] }),
-    state.status && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: mutedGreen2, children: state.status }),
-    !searchOpen && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(ChatKeys, { state, draft: input, matches, selected, setSelected, choose, dismiss: () => setDismissed(true), search: () => setSearchOpen(true), scroll: (rows) => list.current?.scrollBy(rows), exit: close, clearDraft: () => {
+    state.status && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.secondary, children: state.status }),
+    !searchOpen && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(ChatKeys, { state, draft: input, matches, selected, setSelected, choose, dismiss: () => setDismissed(true), search: () => setSearchOpen(true), scroll: (rows) => list.current?.scrollBy(rows), scrollToEnd: () => list.current?.scrollToEnd(), exit: close, clearDraft: () => {
       setInput("");
       setPrefillVersion((version) => version + 1);
     }, bridge }),
-    searchOpen && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(GreenSearch, { messages: state.messages, close: () => setSearchOpen(false), navigate: (index) => list.current?.scrollTo(index) }),
-    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Divider, {}),
-    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(GreenPrompt, { value: input, onChange: (value) => {
+    searchOpen && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(GreenSearch, { messages: state.messages, close: () => setSearchOpen(false), navigate: (index) => list.current?.scrollTo(index) }),
+    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Divider, { color: palette.secondary }),
+    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(GreenPrompt, { value: input, onChange: (value) => {
       setInput(value);
       setSelected(0);
       setDismissed(false);
     }, onSubmit: submit, disabled: searchOpen || !!failure, history, prefillVersion }),
-    matches.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginLeft: 2, flexDirection: "column", children: matches.map((command, index) => /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { color: index === selected ? green3 : void 0, bold: index === selected, children: [
+    matches.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginLeft: 2, flexDirection: "column", children: matches.map((command, index) => /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { color: index === selected ? palette.accent : void 0, bold: index === selected, children: [
         index === selected ? "\u276F" : " ",
         " /",
         command.name
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { dimColor: true, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { dimColor: true, children: [
         "  ",
         command.description
       ] })
     ] }, command.name)) }),
-    failure && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: "red", children: failure }),
-    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Divider, {}),
-    state.status_line_enabled && statusSegments.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(StatusLine, { segments: statusSegments })
-  ] });
+    failure && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.error, children: failure }),
+    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Divider, { color: palette.secondary }),
+    state.status_line_enabled && statusSegments.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(StatusLine, { segments: statusSegments })
+  ] }) });
 }
 function runExternal(command) {
   return new Promise((resolve) => {
@@ -46711,7 +46827,7 @@ async function main() {
   });
   try {
     while (true) {
-      app = await root_default(/* @__PURE__ */ (0, import_jsx_runtime52.jsx)(App2, { bridge }));
+      app = await root_default(/* @__PURE__ */ (0, import_jsx_runtime53.jsx)(App2, { bridge }));
       if (handoff) app.unmount();
       await app.waitUntilExit();
       app = void 0;

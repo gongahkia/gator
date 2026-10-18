@@ -198,6 +198,7 @@ type Config struct {
 	FeedbackAction func(workID string, arguments []string) (string, error)
 	FirstRun       bool
 	Inspect        func(topic string) (string, error)
+	DoctorResult   func() (*uisnapshot.Result, error)
 	Copy           func(text string) error
 	Theme          string
 	SetTheme       func(name string) error

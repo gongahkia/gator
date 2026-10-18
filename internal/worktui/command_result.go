@@ -42,8 +42,10 @@ func effortIndex(steps int) int {
 
 func (m Model) commandResult(command string, fields []string, text string, runErr error) *uisnapshot.Result {
 	name := fields[0]
-	if name == "/doctor" && runErr == nil {
-		return nil // The diagnostic report has its own React presentation.
+	if name == "/doctor" && runErr == nil && m.config.DoctorResult != nil {
+		if presented, err := m.config.DoctorResult(); err == nil && presented != nil {
+			return presented
+		}
 	}
 	title := commandResultTitle(name)
 	if runErr != nil {

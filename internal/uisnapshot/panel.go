@@ -12,6 +12,14 @@ type Panel struct {
 	Selected int     `json:"selected,omitempty"`
 	Notice   string  `json:"notice,omitempty"`
 	Footer   string  `json:"footer,omitempty"`
+	Hints    []Hint  `json:"hints,omitempty"`
+}
+
+// Hint is a keyboard action the frontend can present with the kit's shared
+// shortcut styling. Footer remains available for longer workflow guidance.
+type Hint struct {
+	Shortcut string `json:"shortcut"`
+	Action   string `json:"action"`
 }
 
 type Row struct {

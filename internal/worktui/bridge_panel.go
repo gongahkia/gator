@@ -26,6 +26,7 @@ func (m Model) bridgePanel() *uisnapshot.Panel {
 			Kind: "confirmation", Title: "Review transfer", Subtitle: "Confirm this change before Gator writes to your files.",
 			Blocks: []uisnapshot.Block{{Lines: strings.Split(m.pendingBundleAction.summary, "\n")}},
 			Footer: "Enter or Y confirm · Esc or N cancel",
+			Hints:  []uisnapshot.Hint{{Shortcut: "Enter", Action: "confirm"}, {Shortcut: "Esc", Action: "cancel"}},
 		}
 	}
 	return nil
@@ -35,6 +36,7 @@ func (m Model) bridgeLauncherPanel() uisnapshot.Panel {
 	if m.launcherMode == "status-line" {
 		panel := uisnapshot.Panel{Kind: "status-line", Title: "Configure status line", Selected: m.selected,
 			Footer: "V show or hide · Space toggle · ←/→ reorder · R defaults · Enter save · Esc cancel"}
+		panel.Hints = []uisnapshot.Hint{{Shortcut: "V", Action: "show/hide"}, {Shortcut: "Space", Action: "toggle"}, {Shortcut: "←/→", Action: "reorder"}, {Shortcut: "R", Action: "defaults"}, {Shortcut: "Enter", Action: "save"}, {Shortcut: "Esc", Action: "cancel"}}
 		if m.statusLineDraftEnabled {
 			panel.Subtitle = "Status line shown. Choose items; selected order is preserved."
 		} else {
@@ -55,6 +57,7 @@ func (m Model) bridgeLauncherPanel() uisnapshot.Panel {
 	}
 	panel := uisnapshot.Panel{Kind: "picker", Title: "Commands", Selected: m.selected,
 		Query: m.paletteQuery, Footer: "Type to filter · ↑/↓ choose · Enter select · Esc close"}
+	panel.Hints = []uisnapshot.Hint{{Shortcut: "↑/↓", Action: "choose"}, {Shortcut: "Enter", Action: "select"}, {Shortcut: "Esc", Action: "close"}}
 	switch m.launcherMode {
 	case "conversations":
 		panel.Title = "Conversations"
@@ -78,6 +81,7 @@ func (m Model) bridgeSectionPanel() uisnapshot.Panel {
 		panel.Title = "Choose effort"
 		panel.Subtitle = "How much time Gator may spend on a request."
 		panel.Footer = "↑/↓ choose · Enter set effort · Esc back"
+		panel.Hints = []uisnapshot.Hint{{Shortcut: "↑/↓", Action: "choose"}, {Shortcut: "Enter", Action: "set"}, {Shortcut: "Esc", Action: "back"}}
 		for index, name := range []string{"Low", "Standard", "High"} {
 			state := ""
 			if index == effortIndex(m.options.MaxSteps) {
@@ -139,6 +143,7 @@ func (m Model) bridgeSectionPanel() uisnapshot.Panel {
 func (m Model) bridgeHistoryPanel() uisnapshot.Panel {
 	panel := uisnapshot.Panel{Kind: "history", Title: "History", Subtitle: historyFilterName(m.historyFilter),
 		Selected: m.selected, Notice: m.sectionNotice, Footer: "↑/↓ select · Enter details · F filter · R refresh · Esc back"}
+	panel.Hints = []uisnapshot.Hint{{Shortcut: "↑/↓", Action: "select"}, {Shortcut: "Enter", Action: "details"}, {Shortcut: "F", Action: "filter"}, {Shortcut: "Esc", Action: "back"}}
 	if detail := m.historyDetail; detail != nil {
 		panel.Title = "History detail"
 		panel.Subtitle = detail.Record.ObjectiveSummary
@@ -161,6 +166,13 @@ func (m Model) bridgeHistoryPanel() uisnapshot.Panel {
 			controls = append(controls, "C open conversation")
 		}
 		panel.Footer = strings.Join(controls, " · ")
+		panel.Hints = []uisnapshot.Hint{{Shortcut: "Esc", Action: "back"}, {Shortcut: "R", Action: "review"}}
+		if m.historyRetryAvailable() {
+			panel.Hints = append(panel.Hints, uisnapshot.Hint{Shortcut: "T", Action: "retry"})
+		}
+		if detail.Record.ConversationID != "" {
+			panel.Hints = append(panel.Hints, uisnapshot.Hint{Shortcut: "C", Action: "conversation"})
+		}
 		return panel
 	}
 	for _, item := range m.historyItems {
@@ -176,6 +188,7 @@ func (m Model) bridgeHistoryPanel() uisnapshot.Panel {
 func (m Model) bridgeLearningsPanel() uisnapshot.Panel {
 	panel := uisnapshot.Panel{Kind: "learnings", Title: "Learnings", Subtitle: learningFilterName(m.learningFilter),
 		Selected: m.selected, Notice: m.sectionNotice, Footer: "↑/↓ select · Enter details · N add · F filter · R refresh · Esc back"}
+	panel.Hints = []uisnapshot.Hint{{Shortcut: "↑/↓", Action: "select"}, {Shortcut: "Enter", Action: "details"}, {Shortcut: "N", Action: "add"}, {Shortcut: "Esc", Action: "back"}}
 	if form := m.learningForm; form != nil {
 		panel.Kind = "learning-form"
 		panel.Title = "Add explicit learning"
@@ -190,6 +203,7 @@ func (m Model) bridgeLearningsPanel() uisnapshot.Panel {
 		}
 		panel.Selected = form.Field
 		panel.Footer = "Tab next field · Enter continue or save · Esc cancel"
+		panel.Hints = []uisnapshot.Hint{{Shortcut: "Tab", Action: "next field"}, {Shortcut: "Enter", Action: "save"}, {Shortcut: "Esc", Action: "cancel"}}
 		return panel
 	}
 	if record := m.learningDetail; record != nil {
@@ -222,6 +236,18 @@ func (m Model) bridgeLearningsPanel() uisnapshot.Panel {
 			controls = append(controls, "E edit")
 		}
 		panel.Footer = strings.Join(controls, " · ")
+		panel.Hints = []uisnapshot.Hint{{Shortcut: "Esc", Action: "back"}, {Shortcut: "N", Action: "add"}}
+		switch record.Status {
+		case learning.Candidate:
+			panel.Hints = append(panel.Hints, uisnapshot.Hint{Shortcut: "A", Action: "approve"}, uisnapshot.Hint{Shortcut: "R", Action: "reject"})
+		case learning.Active:
+			panel.Hints = append(panel.Hints, uisnapshot.Hint{Shortcut: "D", Action: "disable"})
+		case learning.Disabled:
+			panel.Hints = append(panel.Hints, uisnapshot.Hint{Shortcut: "A", Action: "enable"})
+		}
+		if record.Origin == learning.UserAuthored {
+			panel.Hints = append(panel.Hints, uisnapshot.Hint{Shortcut: "E", Action: "edit"})
+		}
 		return panel
 	}
 	for _, item := range m.learningItems {

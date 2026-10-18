@@ -45,3 +45,29 @@ func TestDoctorReportsConfiguredWebSearchWithoutToken(t *testing.T) {
 		t.Fatalf("doctor web search output = %q", text)
 	}
 }
+
+func TestDoctorStructuredResultCarriesDiagnosticState(t *testing.T) {
+	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
+	previous := inspectLocalModelHost
+	inspectLocalModelHost = func() localmodel.Host {
+		return localmodel.Host{OS: "linux", Architecture: "amd64", TotalMemoryBytes: 8 << 30,
+			ModelDirectory: "/models", AvailableDiskBytes: 32 << 30}
+	}
+	t.Cleanup(func() { inspectLocalModelHost = previous })
+	result, err := doctorResult(nil)
+	if err != nil {
+		t.Fatalf("doctor result: %v", err)
+	}
+	if result.Title != "Gator doctor" || len(result.Sections) < 4 || result.Sections[3].Title != "Reviewed local models" {
+		t.Fatalf("doctor result = %#v", result)
+	}
+	var disabled bool
+	for _, item := range result.Sections[3].Items {
+		if item.Label == "qwen3-30b" && item.Tone == "warning" && strings.HasPrefix(item.State, "disabled:") {
+			disabled = true
+		}
+	}
+	if !disabled {
+		t.Fatalf("expected typed disabled model in %#v", result.Sections[3].Items)
+	}
+}
