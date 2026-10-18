@@ -128,6 +128,11 @@ func run(args []string, out io.Writer) error {
 		return suggestionCommand(args[1:], out)
 	case "work-rpc":
 		return workHeadless(context.Background(), os.Stdin, out)
+	case "ui-backend":
+		if os.Getenv("GATOR_UI_BACKEND") != "1" || len(args) != 3 {
+			return errors.New("ui-backend is an internal Gator transport")
+		}
+		return workInteractiveConversationForGoal(args[1], args[2])
 	case "work", "-w":
 		return workCommand(args[1:], out)
 	case "acp":

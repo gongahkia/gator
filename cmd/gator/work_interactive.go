@@ -50,13 +50,19 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 	if err != nil {
 		return err
 	}
-	input, err := os.Stdin.Stat()
-	if err != nil || input.Mode()&os.ModeCharDevice == 0 {
-		return errors.New("interactive Work requires a terminal; use 'gator work' for scripts")
-	}
-	output, err := os.Stdout.Stat()
-	if err != nil || output.Mode()&os.ModeCharDevice == 0 {
-		return errors.New("interactive Work requires a terminal; use 'gator work' for scripts")
+	backend := os.Getenv("GATOR_UI_BACKEND") == "1"
+	if !backend {
+		input, err := os.Stdin.Stat()
+		if err != nil || input.Mode()&os.ModeCharDevice == 0 {
+			return errors.New("interactive Work requires a terminal; use 'gator work' for scripts")
+		}
+		output, err := os.Stdout.Stat()
+		if err != nil || output.Mode()&os.ModeCharDevice == 0 {
+			return errors.New("interactive Work requires a terminal; use 'gator work' for scripts")
+		}
+		if launched, err := launchTerminalUI(startConversationID, goalID); launched || err != nil {
+			return err
+		}
 	}
 	stateDir, err := state.ResolveDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {
@@ -380,6 +386,9 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		StatusLineEnabled: settings.TUI.StatusLineEnabled,
 		SetStatusLine:     saveWorkStatusLine(settingsStore),
 	})
+	if backend {
+		return runUIBridge(application)
+	}
 	program := tea.NewProgram(application, tea.WithAltScreen())
 	final, err := program.Run()
 	if application, ok := final.(worktui.Model); ok {
