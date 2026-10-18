@@ -36,11 +36,11 @@ func TestConversationKeepsUserAndGatorTurnsDistinct(t *testing.T) {
 	model.messages = []message{{role: "You", text: "Draft a brief"}, {role: "Gator", text: "Here is the brief."}}
 	view := ansi.Strip(model.View())
 	previous := -1
-	for _, expected := range []string{"› You", "Draft a brief", "● Gator", "Here is the brief."} {
-		index := strings.Index(view, expected)
-		if index <= previous {
+	for _, expected := range []string{"› You", "Draft a brief", "🐊 Gator", "Here is the brief."} {
+		index := strings.Index(view[previous+1:], expected)
+		if index < 0 {
 			t.Fatalf("conversation turn %q missing or out of order:\n%s", expected, view)
 		}
-		previous = index
+		previous += index + 1
 	}
 }

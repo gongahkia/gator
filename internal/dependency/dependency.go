@@ -85,6 +85,18 @@ func Catalog() []Requirement {
 				return []string{"Install Ollama from its official download page, then return to Gator and refresh the Local model section."}
 			},
 		},
+		{
+			ID:         "node",
+			Name:       "Node.js",
+			Executable: "node",
+			Purpose:    "the React terminal interface (the native Go interface remains available)",
+			Required:   false,
+			Applicable: allPlatforms,
+			HelpURL:    "https://nodejs.org/en/download",
+			Instructions: func(string) []string {
+				return []string{"Install Node.js 22 or newer to use the new terminal interface; Gator uses its native Go interface when Node.js is unavailable."}
+			},
+		},
 	}
 }
 

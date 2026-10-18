@@ -4,3 +4,4 @@ bin/
 /gator.exe
 coverage.out
 AGENTS.md
+node_modules

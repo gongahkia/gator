@@ -17,6 +17,11 @@ func writeDependencyDoctor(out io.Writer, statuses []dependency.Status) error {
 	}
 	for _, status := range statuses {
 		state := "installed"
+		usable := status.Installed
+		if status.ID == "node" && usable && !supportedNodeUI(status.Path) {
+			usable = false
+			state = "unsupported version"
+		}
 		if !status.Installed {
 			state = "missing"
 		}
@@ -27,7 +32,7 @@ func writeDependencyDoctor(out io.Writer, statuses []dependency.Status) error {
 		if _, err := fmt.Fprintf(out, "  %s: %s (%s for %s)\n", status.Name, state, role, status.Purpose); err != nil {
 			return err
 		}
-		if status.Installed {
+		if usable {
 			continue
 		}
 		if status.HelpURL != "" {

@@ -12,10 +12,10 @@ func TestDetectWithLookupReportsApplicableMissingAndInstalledRequirements(t *tes
 		}
 		return "", errors.New("not found")
 	})
-	if len(statuses) != 3 {
+	if len(statuses) != 4 {
 		t.Fatalf("dependency statuses = %#v", statuses)
 	}
-	if !statuses[0].Installed || statuses[0].ID != "git" || statuses[1].Installed || statuses[1].ID != "bubblewrap" || statuses[2].Installed || statuses[2].HelpURL == "" {
+	if !statuses[0].Installed || statuses[0].ID != "git" || statuses[1].Installed || statuses[1].ID != "bubblewrap" || statuses[2].Installed || statuses[2].HelpURL == "" || statuses[3].ID != "node" {
 		t.Fatalf("dependency statuses = %#v", statuses)
 	}
 }

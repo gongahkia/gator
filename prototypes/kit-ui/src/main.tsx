@@ -37,7 +37,7 @@ function briefScene(): Message[] {
 
 function PreviewMessage({ item }: { item: Message }): React.ReactNode {
   const isUser = item.role === "user";
-  const label = isUser ? "› You" : item.role === "assistant" ? "● Gator" : "◌ Preview";
+  const label = isUser ? "› You" : item.role === "assistant" ? "🐊 Gator" : "◌ Preview";
   const color = isUser ? undefined : item.role === "assistant" ? green : mutedGreen;
   const content = typeof item.content === "string" ? item.content : "";
 

@@ -65,7 +65,7 @@ func (m Model) View() string {
 				Render(accent.Render("Verified deliverables") + "\n" + contents)
 			transcript.WriteString(card)
 		} else {
-			label := accent.Render("● " + item.role)
+			label := accent.Render("🐊 " + item.role)
 			if item.role == "You" {
 				label = dim.Render("› You")
 			} else if item.role != "Gator" {

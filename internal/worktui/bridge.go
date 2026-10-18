@@ -10,23 +10,25 @@ import (
 // BridgeState is a display-only projection for the React terminal frontend.
 // The Go model remains the sole owner of commands, runs, approvals and history.
 type BridgeState struct {
-	Mode         string             `json:"mode"`
-	LegacyView   string             `json:"legacy_view,omitempty"`
-	Messages     []BridgeMessage    `json:"messages"`
-	Commands     []BridgeCommand    `json:"commands"`
-	Actions      []workhome.Action  `json:"actions"`
-	Title        string             `json:"title"`
-	Source       string             `json:"source"`
-	GoalID       string             `json:"goal_id,omitempty"`
-	Provider     string             `json:"provider,omitempty"`
-	Model        string             `json:"model,omitempty"`
-	Status       string             `json:"status,omitempty"`
-	Running      bool               `json:"running"`
-	Cancelling   bool               `json:"cancelling"`
-	Elapsed      string             `json:"elapsed,omitempty"`
-	Queued       int                `json:"queued"`
-	Home         bool               `json:"home"`
-	FirstRun     bool               `json:"first_run"`
+	Mode         string            `json:"mode"`
+	LegacyView   string            `json:"legacy_view,omitempty"`
+	Messages     []BridgeMessage   `json:"messages"`
+	Commands     []BridgeCommand   `json:"commands"`
+	Actions      []workhome.Action `json:"actions"`
+	Title        string            `json:"title"`
+	Source       string            `json:"source"`
+	GoalID       string            `json:"goal_id,omitempty"`
+	Provider     string            `json:"provider,omitempty"`
+	Model        string            `json:"model,omitempty"`
+	Status       string            `json:"status,omitempty"`
+	Input        string            `json:"input,omitempty"`
+	Running      bool              `json:"running"`
+	Cancelling   bool              `json:"cancelling"`
+	Elapsed      string            `json:"elapsed,omitempty"`
+	LoadingFrame int               `json:"loading_frame"`
+	Queued       int               `json:"queued"`
+	Home         bool              `json:"home"`
+	FirstRun     bool              `json:"first_run"`
 }
 
 type BridgeMessage struct {
@@ -44,22 +46,24 @@ type BridgeCommand struct {
 
 func (m Model) BridgeState() BridgeState {
 	state := BridgeState{
-		Mode:       "chat",
-		Messages:   make([]BridgeMessage, 0, len(m.messages)),
-		Commands:   make([]BridgeCommand, 0),
-		Actions:    m.config.Attention.Next(),
-		Title:      m.title,
-		Source:     m.source,
-		GoalID:     m.goalID,
-		Provider:   m.modelStatus.Provider,
-		Model:      m.modelStatus.Model,
-		Status:     m.status,
-		Running:    m.running,
-		Cancelling: m.cancelling,
-		Elapsed:    m.workElapsed(),
-		Queued:     len(m.queue),
-		Home:       m.home,
-		FirstRun:   m.firstRun,
+		Mode:         "chat",
+		Messages:     make([]BridgeMessage, 0, len(m.messages)),
+		Commands:     make([]BridgeCommand, 0),
+		Actions:      m.config.Attention.Next(),
+		Title:        m.title,
+		Source:       m.source,
+		GoalID:       m.goalID,
+		Provider:     m.modelStatus.Provider,
+		Model:        m.modelStatus.Model,
+		Status:       m.status,
+		Input:        m.input,
+		Running:      m.running,
+		Cancelling:   m.cancelling,
+		Elapsed:      m.workElapsed(),
+		LoadingFrame: m.loadingFrame,
+		Queued:       len(m.queue),
+		Home:         m.home,
+		FirstRun:     m.firstRun,
 	}
 	for _, item := range m.messages {
 		state.Messages = append(state.Messages, BridgeMessage{Role: item.role, Text: item.text, Bundle: cloneBundlePointer(item.bundle)})

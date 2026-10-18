@@ -43,6 +43,18 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version: "1.25.13"
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Check bundled terminal UI
+        shell: bash
+        run: |
+          npm ci --prefix ui
+          npm run check --prefix ui
+          npm run build --prefix ui
+          git diff --exit-code -- cmd/gator/ui/gator-ui.cjs
       - name: Test release source on macOS
         if: runner.os == 'macOS'
         run: go test ./...
@@ -64,6 +76,7 @@ jobs:
           name="gator_${VERSION}_${GOOS}_${GOARCH}"
           mkdir -p "dist/$name"
           go build -trimpath -ldflags "-s -w -X main.version=$VERSION -X main.commit=$COMMIT -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o "dist/$name/gator" ./cmd/gator
+          cp -R ui/licenses "dist/$name/terminal-ui-licenses"
           tar -C dist -czf "dist/gator_${GOOS}_${GOARCH}.tar.gz" "$name"
           rm -rf "dist/$name"
       - uses: actions/upload-artifact@v4

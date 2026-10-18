@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -26,6 +28,9 @@ func launchTerminalUI(conversationID, goalID string) (bool, error) {
 	}
 	node, err := exec.LookPath("node")
 	if err != nil {
+		return false, nil
+	}
+	if !supportedNodeUI(node) {
 		return false, nil
 	}
 	binary, err := os.Executable()
@@ -53,6 +58,15 @@ func launchTerminalUI(conversationID, goalID string) (bool, error) {
 	return true, command.Run()
 }
 
+func supportedNodeUI(node string) bool {
+	version, err := exec.Command(node, "--version").Output()
+	if err != nil {
+		return false
+	}
+	major, err := strconv.Atoi(strings.SplitN(strings.TrimPrefix(strings.TrimSpace(string(version)), "v"), ".", 2)[0])
+	return err == nil && major >= 22
+}
+
 type uiFrame struct {
 	Version int    `json:"version"`
 	Type    string `json:"type"`
@@ -68,12 +82,12 @@ type uiBridgeModel struct {
 	last  []byte
 }
 
-func (m uiBridgeModel) Init() tea.Cmd {
+func (m *uiBridgeModel) Init() tea.Cmd {
 	m.sendState()
 	return m.model.Init()
 }
 
-func (m uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
+func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 	var next tea.Model
 	var command tea.Cmd
 	switch frame := value.(type) {
@@ -100,7 +114,7 @@ func (m uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 	return m, command
 }
 
-func (m uiBridgeModel) View() string { return "" }
+func (m *uiBridgeModel) View() string { return "" }
 
 func (m *uiBridgeModel) sendState() {
 	state, err := json.Marshal(m.model.BridgeState())
@@ -138,10 +152,14 @@ func bridgeKey(name string) (tea.KeyMsg, bool) {
 }
 
 func runUIBridge(application worktui.Model) error {
-	program := tea.NewProgram(uiBridgeModel{model: application, out: json.NewEncoder(os.Stdout)}, tea.WithoutRenderer(), tea.WithInput(nil))
+	return runUIBridgeWithIO(application, os.Stdin, os.Stdout)
+}
+
+func runUIBridgeWithIO(application worktui.Model, in io.Reader, out io.Writer) error {
+	program := tea.NewProgram(&uiBridgeModel{model: application, out: json.NewEncoder(out)}, tea.WithoutRenderer(), tea.WithInput(nil))
 	inputDone := make(chan error, 1)
 	go func() {
-		scanner := bufio.NewScanner(os.Stdin)
+		scanner := bufio.NewScanner(in)
 		scanner.Buffer(make([]byte, 4096), 4*1024*1024)
 		for scanner.Scan() {
 			var frame uiFrame
@@ -163,7 +181,7 @@ func runUIBridge(application worktui.Model) error {
 		program.Quit()
 	}()
 	final, err := program.Run()
-	if model, ok := final.(uiBridgeModel); ok {
+	if model, ok := final.(*uiBridgeModel); ok {
 		model.model.Close()
 	} else {
 		application.Close()
