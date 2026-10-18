@@ -69,6 +69,21 @@ dataset, limits, and number of attempts, then compare the retained reports.
 The connected local/Gmail/Calendar brief path also has a scripted integration
 test, but no live relevance result yet.
 
+## 2026-10-18 matched smoke attempt
+
+The three-case smoke dataset was rerun with `gemini-3.5-flash` in both arms,
+one attempt per case and an 80-request cap per arm. Gator's goal-context arm
+passed the brief-preference and goal-priority cases; venue-change failed on
+Gemini HTTP 503. The no-goal baseline received Gemini HTTP 429 on all three
+cases. The provider reported a 20-request daily free-tier limit for its
+underlying `gemini-3.6-flash` model and a roughly 23-hour reset. This is **not
+a valid outcome comparison**: zero cases completed without provider failure
+in both arms. `gator work eval compare` now reports that coverage explicitly
+and excludes provider-failed cases from success deltas. Raw local reports and
+traces are in `/tmp/gator-continuity-smoke-agent-20261018` and
+`/tmp/gator-continuity-smoke-baseline-20261018`; those temporary paths are not
+portable benchmark artifacts.
+
 ## Local-model comparison
 
 Gator's `/model` → **Local model** screen can install and select a reviewed

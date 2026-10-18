@@ -31,6 +31,42 @@ func TestWorkExperimentRejectsInvalidAblationsBeforeExecution(t *testing.T) {
 	}
 }
 
+func TestCompareWorkExcludesProviderFailuresFromOutcomeDeltas(t *testing.T) {
+	base := WorkExperiment{ID: "baseline", DatasetSHA256: "same", Split: WorkSplitDevelopment, Attempts: 1, Total: 2, Provider: "gemini", Model: "same-model"}
+	base.Trials = []WorkTrial{
+		{CaseID: "blocked", Status: "failed", Category: "provider"},
+		{CaseID: "comparable", Status: "failed", Category: "task"},
+	}
+	agent := base
+	agent.ID = "agent"
+	agent.Trials = []WorkTrial{
+		{CaseID: "blocked", Status: "passed", Category: "success"},
+		{CaseID: "comparable", Status: "passed", Category: "success"},
+	}
+	comparison, err := CompareWork(base, agent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{
+		"Comparison coverage: 1/2 cases",
+		"blocked: excluded (provider failure in baseline)",
+		"comparable: 0 -> 1 of 1 trials",
+		"Among comparable cases, at least one success: 0 -> 1",
+	} {
+		if !strings.Contains(comparison, expected) {
+			t.Fatalf("comparison omitted %q: %s", expected, comparison)
+		}
+	}
+	if strings.Contains(comparison, "blocked: 0 -> 1") {
+		t.Fatalf("provider failure was scored as an agent advantage: %s", comparison)
+	}
+	base.Trials[1].Category = "provider"
+	comparison, err = CompareWork(base, agent)
+	if err != nil || !strings.Contains(comparison, "No matched outcome comparison is available") {
+		t.Fatalf("zero-coverage comparison = %q, %v", comparison, err)
+	}
+}
+
 func TestWorkExperimentDefaultsToDevelopmentAndRequiresExplicitHeldOutSelection(t *testing.T) {
 	root := t.TempDir()
 	if err := os.Mkdir(filepath.Join(root, "source"), 0o700); err != nil {

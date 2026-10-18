@@ -743,19 +743,28 @@ func CompareWork(a, b WorkExperiment) (string, error) {
 	if a.DatasetSHA256 != b.DatasetSHA256 || a.Split != b.Split || a.Attempts != b.Attempts || a.Total != b.Total || a.Scripted != b.Scripted || a.Provider != b.Provider || a.Model != b.Model {
 		return "", errors.New("comparison requires identical dataset, model, and trial counts")
 	}
-	scores := map[string][2]int{}
+	type caseScores struct {
+		passed          [2]int
+		trials          [2]int
+		providerFailure [2]bool
+	}
+	scores := map[string]caseScores{}
 	for _, trial := range a.Trials {
 		value := scores[trial.CaseID]
+		value.trials[0]++
 		if trial.Status == "passed" {
-			value[0]++
+			value.passed[0]++
 		}
+		value.providerFailure[0] = value.providerFailure[0] || trial.Category == "provider" || trial.ExecutionCategory == "provider"
 		scores[trial.CaseID] = value
 	}
 	for _, trial := range b.Trials {
 		value := scores[trial.CaseID]
+		value.trials[1]++
 		if trial.Status == "passed" {
-			value[1]++
+			value.passed[1]++
 		}
+		value.providerFailure[1] = value.providerFailure[1] || trial.Category == "provider" || trial.ExecutionCategory == "provider"
 		scores[trial.CaseID] = value
 	}
 	keys := []string{}
@@ -764,12 +773,53 @@ func CompareWork(a, b WorkExperiment) (string, error) {
 	}
 	sort.Strings(keys)
 	var output strings.Builder
-	output.WriteString(WorkSummary(a))
-	output.WriteString(WorkSummary(b))
+	comparable := 0
 	for _, key := range keys {
 		score := scores[key]
-		fmt.Fprintf(&output, "%s: %d -> %d of %d trials\n", key, score[0], score[1], a.Attempts)
+		if score.trials[0] != a.Attempts || score.trials[1] != b.Attempts {
+			return "", fmt.Errorf("comparison has mismatched trials for case %s", key)
+		}
+		if !score.providerFailure[0] && !score.providerFailure[1] {
+			comparable++
+		}
 	}
-	fmt.Fprintf(&output, "At least one success: %d -> %d cases; all trials succeed: %d -> %d cases.\n", a.CasesAtLeastOne, b.CasesAtLeastOne, a.CasesAll, b.CasesAll)
+	fmt.Fprintf(&output, "Comparison coverage: %d/%d cases have no provider failures in either arm.\n", comparable, len(keys))
+	if comparable < len(keys) {
+		output.WriteString("Provider-failed cases are excluded from outcome deltas; raw arm summaries below still include every attempt. Do not infer a product advantage from excluded cases.\n")
+	}
+	if comparable == 0 {
+		output.WriteString("No matched outcome comparison is available.\n")
+	}
+	output.WriteString(WorkSummary(a))
+	output.WriteString(WorkSummary(b))
+	var aAtLeast, bAtLeast, aAll, bAll int
+	for _, key := range keys {
+		score := scores[key]
+		if score.providerFailure[0] || score.providerFailure[1] {
+			var failed []string
+			if score.providerFailure[0] {
+				failed = append(failed, a.ID)
+			}
+			if score.providerFailure[1] {
+				failed = append(failed, b.ID)
+			}
+			fmt.Fprintf(&output, "%s: excluded (provider failure in %s)\n", key, strings.Join(failed, ", "))
+			continue
+		}
+		fmt.Fprintf(&output, "%s: %d -> %d of %d trials\n", key, score.passed[0], score.passed[1], a.Attempts)
+		if score.passed[0] > 0 {
+			aAtLeast++
+		}
+		if score.passed[1] > 0 {
+			bAtLeast++
+		}
+		if score.passed[0] == a.Attempts {
+			aAll++
+		}
+		if score.passed[1] == b.Attempts {
+			bAll++
+		}
+	}
+	fmt.Fprintf(&output, "Among comparable cases, at least one success: %d -> %d; all trials succeed: %d -> %d.\n", aAtLeast, bAtLeast, aAll, bAll)
 	return output.String(), nil
 }
