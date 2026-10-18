@@ -15,5 +15,5 @@ When comparing, look at the home screen's density, the `/` command picker, how a
 
 The `/` menu contains Gator commands. Try `/goals`, `/inbox`, `/memory`, `/model`, `/new`, and `/exit`. Normal text receives a preview-only response. All goal, inbox, and brief content is synthetic.
 
-The REPL component currently renders command suggestions with its built-in cyan selection color. A full green theme would require a theme option upstream or a small fork. This preview deliberately leaves that component unchanged so its actual appearance is visible.
+The kit's REPL hardcodes cyan in its prompt and command suggestions. This preview composes the kit's message list, input, dividers, and status line with a Gator-green command picker and search prompt. Type `/`, use ↑/↓, and press Enter or Tab to run a preview command. No dependency fork is needed for this prototype.
 
