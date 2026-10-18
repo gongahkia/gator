@@ -7,8 +7,8 @@ This audit covers every interactive screen projected by `worktui.BridgeState`,
 the imported [`@claude-code-kit` 0.4.0 package](https://github.com/Minnzen/claude-code-kit) and its conversational layout,
 keyboard behavior, picker rows, and prompt placement. That package is an
 independent Claude Code inspired kit, not Anthropic's frontend. Gator retains
-its green color and its work product commands. `gator doctor` is one-shot CLI
-output, outside this interactive screen inventory.
+its green color and its work product commands. `gator doctor` now uses a
+one-shot Node-rendered report; `/doctor` uses the same report component in chat.
 
 ## Screen inventory and findings
 
@@ -66,9 +66,8 @@ output, outside this interactive screen inventory.
 - PTY smoke check of the first-run home, model choice, cloud catalog, and
   credential form. The form displayed a green border and the composer anchor;
   Ctrl+D exited cleanly from both chat and a panel.
-- With Node removed from `PATH`, `gator doctor` still completed and reported
-  Node as required for the interactive interface; interactive startup exited
-  with the Node 22+ installation message.
+- With Node removed from `PATH`, both interactive startup and `gator doctor`
+  exit with the Node 22+ installation message. Headless commands still work.
 - Static inspection of every `Panel.Kind`, launcher mode, model submode,
   history and learning detail, transfer confirmation, and React rendering path.
 

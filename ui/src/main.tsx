@@ -3,6 +3,7 @@ import { createInterface } from "node:readline";
 import { Box, Text, render, useApp, useInput, TerminalSizeContext, type Instance } from "@claude-code-kit/ink-renderer";
 import { Divider, MessageList, StatusLine, WelcomeScreen, type Message, type VirtualListHandle } from "@claude-code-kit/ui";
 import React, { useContext, useEffect, useRef, useState } from "react";
+import { DoctorReport, runDoctor } from "./doctor.js";
 
 const green = "#4BAA72";
 const mutedGreen = "#86BE9A";
@@ -122,6 +123,10 @@ function formatBundle(bundle: BackendBundle): string {
 }
 
 function MessageBody({ item }: { item: BackendMessage }): React.ReactNode {
+  if (item.role === "Doctor") return <Box flexDirection="column">
+    <Text color={green} bold>🐊 Gator doctor</Text>
+    <Box marginLeft={2}><DoctorReport raw={item.text} /></Box>
+  </Box>;
   const isUser = item.role === "You";
   const isGator = item.role === "Gator";
   const label = isUser ? "› You" : isGator ? "🐊 Gator" : item.role === "Deliverables" ? "◈ Deliverables" : `◌ ${item.role}`;
@@ -492,8 +497,11 @@ function runExternal(command: ExternalCommand): Promise<string> {
 }
 
 async function main(): Promise<void> {
-  const [binary, conversationID = "", goalID = ""] = process.argv.slice(2);
+  const [binary, mode, ...arguments_] = process.argv.slice(2);
   if (!binary) throw new Error("Gator UI requires its backend executable");
+  if (mode === "doctor") return runDoctor(binary, arguments_);
+  if (mode !== "work") throw new Error("unknown Gator UI mode");
+  const [conversationID = "", goalID = ""] = arguments_;
   const bridge = new GatorBridge(binary, conversationID, goalID);
   let app: Instance | undefined;
   let handoff: ExternalCommand | undefined;

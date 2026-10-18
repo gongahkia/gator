@@ -11,7 +11,9 @@ keeping its own green identity, work commands, and review flows.
 Go owns workflow state, actions, and approvals. It publishes display data
 through `BridgeState` and `UISnapshot`. Go `View()` methods are empty Bubble Tea
 interface adapters. There is no Go screen renderer or fallback. Interactive
-Gator requires Node.js 22 or newer; headless commands do not.
+Interactive Gator and `gator doctor` require Node.js 22 or newer; headless
+commands do not. The Go doctor checks feed a React report in either the
+standalone command or `/doctor` conversation result.
 
 ## Shared layout
 

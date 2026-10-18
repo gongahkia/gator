@@ -121,9 +121,12 @@ func TestShortCLIFormsRouteToTheirCommandFamilies(t *testing.T) {
 	if err := run([]string{"-u", "unexpected"}, io.Discard); err == nil || !strings.Contains(err.Error(), "usage: gator update") {
 		t.Fatalf("-u error = %v", err)
 	}
-	if err := run([]string{"-d", "--provider", "not-a-provider"}, io.Discard); err == nil || !strings.Contains(err.Error(), "unknown provider") {
+	path := os.Getenv("PATH")
+	t.Setenv("PATH", t.TempDir())
+	if err := run([]string{"-d"}, io.Discard); err == nil || !strings.Contains(err.Error(), "gator doctor requires Node.js 22") {
 		t.Fatalf("-d error = %v", err)
 	}
+	t.Setenv("PATH", path)
 	output.Reset()
 	if err := run([]string{"-a", "--help"}, &output); err != nil || !strings.Contains(output.String(), "gator agent list") || strings.Contains(output.String(), "gator agent acp") {
 		t.Fatalf("-a output = %q, err = %v", output.String(), err)

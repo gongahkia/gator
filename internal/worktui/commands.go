@@ -760,7 +760,11 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 	if err != nil {
 		result = err.Error()
 	}
-	m.messages = append(m.messages, message{role: "Gator", text: result})
+	role := "Gator"
+	if fields[0] == "/doctor" && err == nil {
+		role = "Doctor"
+	}
+	m.messages = append(m.messages, message{role: role, text: result})
 	m.scroll = 0
 	if fields[0] == "/inbox" || fields[0] == "/suggestions" {
 		m.refreshAttention()

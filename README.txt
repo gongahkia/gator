@@ -29,7 +29,8 @@ Gator currently pins Go 1.25.13.
 Build with `make build`, then run `./bin/gator` for the interactive terminal.
 The green React terminal interface requires Node.js 22 or newer. If Node.js is
 missing or too old, interactive startup exits with installation guidance.
-Headless commands and `gator doctor` still run without Node.js. The Go Work
+Headless commands still run without Node.js. `gator doctor` also uses the Node
+terminal interface and requires Node.js 22 or newer. The Go Work
 engine owns conversations, commands, and approvals behind the React interface.
 
 = = = = = = = =

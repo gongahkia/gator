@@ -24,12 +24,20 @@ var terminalUIBundle []byte
 // launchTerminalUI starts the bundled React renderer. Interactive Work requires
 // Node 22 or newer; headless commands do not depend on this runtime.
 func launchTerminalUI(conversationID, goalID string) error {
+	return launchBundledUI([]string{"work", conversationID, goalID}, os.Stdout, "interactive Gator")
+}
+
+func launchDoctorUI(arguments []string, out io.Writer) error {
+	return launchBundledUI(append([]string{"doctor"}, arguments...), out, "gator doctor")
+}
+
+func launchBundledUI(arguments []string, out io.Writer, surface string) error {
 	node, err := exec.LookPath("node")
 	if err != nil {
-		return errors.New("interactive Gator requires Node.js 22 or newer; install Node.js and retry")
+		return fmt.Errorf("%s requires Node.js 22 or newer; install Node.js and retry", surface)
 	}
 	if !supportedNodeUI(node) {
-		return errors.New("interactive Gator requires Node.js 22 or newer; upgrade Node.js and retry")
+		return fmt.Errorf("%s requires Node.js 22 or newer; upgrade Node.js and retry", surface)
 	}
 	binary, err := os.Executable()
 	if err != nil {
@@ -51,8 +59,8 @@ func launchTerminalUI(conversationID, goalID string) error {
 	if err := bundle.Close(); err != nil {
 		return err
 	}
-	command := exec.Command(node, bundle.Name(), binary, conversationID, goalID)
-	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
+	command := exec.Command(node, append([]string{bundle.Name(), binary}, arguments...)...)
+	command.Stdin, command.Stdout, command.Stderr = os.Stdin, out, os.Stderr
 	// The child may hand the terminal to an editor. Ctrl+C should interrupt that
 	// foreground job and leave the launcher waiting for the React UI to resume.
 	signal.Ignore(os.Interrupt)

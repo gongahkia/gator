@@ -33,6 +33,20 @@ func TestBridgeUsesLiveCommandAndMessageState(t *testing.T) {
 	}
 }
 
+func TestDoctorResultIsMarkedForReactReport(t *testing.T) {
+	model := New(Config{CurrentFolder: t.TempDir(), Inspect: func(topic string) (string, error) {
+		if topic != "doctor" {
+			t.Fatalf("unexpected inspection topic %q", topic)
+		}
+		return "Repository: detected", nil
+	}})
+	next, _ := model.SubmitText("/doctor")
+	messages := next.(Model).BridgeState().Messages
+	if len(messages) != 1 || messages[0].Role != "Doctor" || messages[0].Text != "Repository: detected" {
+		t.Fatalf("doctor bridge message = %#v", messages)
+	}
+}
+
 func TestBridgeProjectsCommandPanelsWithoutGoView(t *testing.T) {
 	for _, test := range []struct {
 		command string

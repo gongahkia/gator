@@ -27447,7 +27447,7 @@ var require_bidi = __commonJS({
 });
 
 // src/main.tsx
-var import_node_child_process = require("node:child_process");
+var import_node_child_process2 = require("node:child_process");
 var import_node_readline = require("node:readline");
 
 // node_modules/@claude-code-kit/ink-renderer/dist/index.mjs
@@ -27550,7 +27550,7 @@ function satisfies(version, range) {
 var ANSI_BACKGROUND_OFFSET = 10;
 var wrapAnsi16 = (offset = 0) => (code) => `\x1B[${code + offset}m`;
 var wrapAnsi256 = (offset = 0) => (code) => `\x1B[${38 + offset};5;${code}m`;
-var wrapAnsi16m = (offset = 0) => (red, green2, blue) => `\x1B[${38 + offset};2;${red};${green2};${blue}m`;
+var wrapAnsi16m = (offset = 0) => (red2, green3, blue) => `\x1B[${38 + offset};2;${red2};${green3};${blue}m`;
 var styles = {
   modifier: {
     reset: [0, 0],
@@ -27645,17 +27645,17 @@ function assembleStyles() {
   styles.bgColor.ansi16m = wrapAnsi16m(ANSI_BACKGROUND_OFFSET);
   Object.defineProperties(styles, {
     rgbToAnsi256: {
-      value(red, green2, blue) {
-        if (red === green2 && green2 === blue) {
-          if (red < 8) {
+      value(red2, green3, blue) {
+        if (red2 === green3 && green3 === blue) {
+          if (red2 < 8) {
             return 16;
           }
-          if (red > 248) {
+          if (red2 > 248) {
             return 231;
           }
-          return Math.round((red - 8) / 247 * 24) + 232;
+          return Math.round((red2 - 8) / 247 * 24) + 232;
         }
-        return 16 + 36 * Math.round(red / 255 * 5) + 6 * Math.round(green2 / 255 * 5) + Math.round(blue / 255 * 5);
+        return 16 + 36 * Math.round(red2 / 255 * 5) + 6 * Math.round(green3 / 255 * 5) + Math.round(blue / 255 * 5);
       },
       enumerable: false
     },
@@ -27692,25 +27692,25 @@ function assembleStyles() {
         if (code < 16) {
           return 90 + (code - 8);
         }
-        let red;
-        let green2;
+        let red2;
+        let green3;
         let blue;
         if (code >= 232) {
-          red = ((code - 232) * 10 + 8) / 255;
-          green2 = red;
-          blue = red;
+          red2 = ((code - 232) * 10 + 8) / 255;
+          green3 = red2;
+          blue = red2;
         } else {
           code -= 16;
           const remainder = code % 36;
-          red = Math.floor(code / 36) / 5;
-          green2 = Math.floor(remainder / 6) / 5;
+          red2 = Math.floor(code / 36) / 5;
+          green3 = Math.floor(remainder / 6) / 5;
           blue = remainder % 6 / 5;
         }
-        const value = Math.max(red, green2, blue) * 2;
+        const value = Math.max(red2, green3, blue) * 2;
         if (value === 0) {
           return 30;
         }
-        let result = 30 + (Math.round(blue) << 2 | Math.round(green2) << 1 | Math.round(red));
+        let result = 30 + (Math.round(blue) << 2 | Math.round(green3) << 1 | Math.round(red2));
         if (value === 2) {
           result += 60;
         }
@@ -27719,7 +27719,7 @@ function assembleStyles() {
       enumerable: false
     },
     rgbToAnsi: {
-      value: (red, green2, blue) => styles.ansi256ToAnsi(styles.rgbToAnsi256(red, green2, blue)),
+      value: (red2, green3, blue) => styles.ansi256ToAnsi(styles.rgbToAnsi256(red2, green3, blue)),
       enumerable: false
     },
     hexToAnsi: {
@@ -32256,7 +32256,7 @@ function StyledText(t0) {
 var ANSI_BACKGROUND_OFFSET2 = 10;
 var wrapAnsi162 = (offset = 0) => (code) => `\x1B[${code + offset}m`;
 var wrapAnsi2562 = (offset = 0) => (code) => `\x1B[${38 + offset};5;${code}m`;
-var wrapAnsi16m2 = (offset = 0) => (red, green2, blue) => `\x1B[${38 + offset};2;${red};${green2};${blue}m`;
+var wrapAnsi16m2 = (offset = 0) => (red2, green3, blue) => `\x1B[${38 + offset};2;${red2};${green3};${blue}m`;
 var styles2 = {
   modifier: {
     reset: [0, 0],
@@ -32351,17 +32351,17 @@ function assembleStyles2() {
   styles2.bgColor.ansi16m = wrapAnsi16m2(ANSI_BACKGROUND_OFFSET2);
   Object.defineProperties(styles2, {
     rgbToAnsi256: {
-      value(red, green2, blue) {
-        if (red === green2 && green2 === blue) {
-          if (red < 8) {
+      value(red2, green3, blue) {
+        if (red2 === green3 && green3 === blue) {
+          if (red2 < 8) {
             return 16;
           }
-          if (red > 248) {
+          if (red2 > 248) {
             return 231;
           }
-          return Math.round((red - 8) / 247 * 24) + 232;
+          return Math.round((red2 - 8) / 247 * 24) + 232;
         }
-        return 16 + 36 * Math.round(red / 255 * 5) + 6 * Math.round(green2 / 255 * 5) + Math.round(blue / 255 * 5);
+        return 16 + 36 * Math.round(red2 / 255 * 5) + 6 * Math.round(green3 / 255 * 5) + Math.round(blue / 255 * 5);
       },
       enumerable: false
     },
@@ -32398,25 +32398,25 @@ function assembleStyles2() {
         if (code < 16) {
           return 90 + (code - 8);
         }
-        let red;
-        let green2;
+        let red2;
+        let green3;
         let blue;
         if (code >= 232) {
-          red = ((code - 232) * 10 + 8) / 255;
-          green2 = red;
-          blue = red;
+          red2 = ((code - 232) * 10 + 8) / 255;
+          green3 = red2;
+          blue = red2;
         } else {
           code -= 16;
           const remainder = code % 36;
-          red = Math.floor(code / 36) / 5;
-          green2 = Math.floor(remainder / 6) / 5;
+          red2 = Math.floor(code / 36) / 5;
+          green3 = Math.floor(remainder / 6) / 5;
           blue = remainder % 6 / 5;
         }
-        const value = Math.max(red, green2, blue) * 2;
+        const value = Math.max(red2, green3, blue) * 2;
         if (value === 0) {
           return 30;
         }
-        let result = 30 + (Math.round(blue) << 2 | Math.round(green2) << 1 | Math.round(red));
+        let result = 30 + (Math.round(blue) << 2 | Math.round(green3) << 1 | Math.round(red2));
         if (value === 2) {
           result += 60;
         }
@@ -32425,7 +32425,7 @@ function assembleStyles2() {
       enumerable: false
     },
     rgbToAnsi: {
-      value: (red, green2, blue) => styles2.ansi256ToAnsi(styles2.rgbToAnsi256(red, green2, blue)),
+      value: (red2, green3, blue) => styles2.ansi256ToAnsi(styles2.rgbToAnsi256(red2, green3, blue)),
       enumerable: false
     },
     hexToAnsi: {
@@ -34015,7 +34015,7 @@ function stringWidth2(input, options = {}) {
 var ANSI_BACKGROUND_OFFSET22 = 10;
 var wrapAnsi1622 = (offset = 0) => (code) => `\x1B[${code + offset}m`;
 var wrapAnsi25622 = (offset = 0) => (code) => `\x1B[${38 + offset};5;${code}m`;
-var wrapAnsi16m22 = (offset = 0) => (red, green2, blue) => `\x1B[${38 + offset};2;${red};${green2};${blue}m`;
+var wrapAnsi16m22 = (offset = 0) => (red2, green3, blue) => `\x1B[${38 + offset};2;${red2};${green3};${blue}m`;
 var styles3 = {
   modifier: {
     reset: [0, 0],
@@ -34110,17 +34110,17 @@ function assembleStyles22() {
   styles3.bgColor.ansi16m = wrapAnsi16m22(ANSI_BACKGROUND_OFFSET22);
   Object.defineProperties(styles3, {
     rgbToAnsi256: {
-      value(red, green2, blue) {
-        if (red === green2 && green2 === blue) {
-          if (red < 8) {
+      value(red2, green3, blue) {
+        if (red2 === green3 && green3 === blue) {
+          if (red2 < 8) {
             return 16;
           }
-          if (red > 248) {
+          if (red2 > 248) {
             return 231;
           }
-          return Math.round((red - 8) / 247 * 24) + 232;
+          return Math.round((red2 - 8) / 247 * 24) + 232;
         }
-        return 16 + 36 * Math.round(red / 255 * 5) + 6 * Math.round(green2 / 255 * 5) + Math.round(blue / 255 * 5);
+        return 16 + 36 * Math.round(red2 / 255 * 5) + 6 * Math.round(green3 / 255 * 5) + Math.round(blue / 255 * 5);
       },
       enumerable: false
     },
@@ -34157,25 +34157,25 @@ function assembleStyles22() {
         if (code < 16) {
           return 90 + (code - 8);
         }
-        let red;
-        let green2;
+        let red2;
+        let green3;
         let blue;
         if (code >= 232) {
-          red = ((code - 232) * 10 + 8) / 255;
-          green2 = red;
-          blue = red;
+          red2 = ((code - 232) * 10 + 8) / 255;
+          green3 = red2;
+          blue = red2;
         } else {
           code -= 16;
           const remainder = code % 36;
-          red = Math.floor(code / 36) / 5;
-          green2 = Math.floor(remainder / 6) / 5;
+          red2 = Math.floor(code / 36) / 5;
+          green3 = Math.floor(remainder / 6) / 5;
           blue = remainder % 6 / 5;
         }
-        const value = Math.max(red, green2, blue) * 2;
+        const value = Math.max(red2, green3, blue) * 2;
         if (value === 0) {
           return 30;
         }
-        let result = 30 + (Math.round(blue) << 2 | Math.round(green2) << 1 | Math.round(red));
+        let result = 30 + (Math.round(blue) << 2 | Math.round(green3) << 1 | Math.round(red2));
         if (value === 2) {
           result += 60;
         }
@@ -34184,7 +34184,7 @@ function assembleStyles22() {
       enumerable: false
     },
     rgbToAnsi: {
-      value: (red, green2, blue) => styles3.ansi256ToAnsi(styles3.rgbToAnsi256(red, green2, blue)),
+      value: (red2, green3, blue) => styles3.ansi256ToAnsi(styles3.rgbToAnsi256(red2, green3, blue)),
       enumerable: false
     },
     hexToAnsi: {
@@ -34243,11 +34243,11 @@ var getSgrTokens = (sgrParameters) => {
         index += 2;
         continue;
       }
-      const red = codes[index + 2];
-      const green2 = codes[index + 3];
+      const red2 = codes[index + 2];
+      const green3 = codes[index + 3];
       const blue = codes[index + 4];
-      if (mode === ANSI_SGR_COLOR_MODE_RGB && Number.isFinite(red) && Number.isFinite(green2) && Number.isFinite(blue)) {
-        sgrTokens.push([code, mode, red, green2, blue]);
+      if (mode === ANSI_SGR_COLOR_MODE_RGB && Number.isFinite(red2) && Number.isFinite(green3) && Number.isFinite(blue)) {
+        sgrTokens.push([code, mode, red2, green3, blue]);
         index += 4;
         continue;
       }
@@ -44657,7 +44657,7 @@ var regex2 = ansiRegex2();
 var ANSI_BACKGROUND_OFFSET3 = 10;
 var wrapAnsi163 = (offset = 0) => (code) => `\x1B[${code + offset}m`;
 var wrapAnsi2563 = (offset = 0) => (code) => `\x1B[${38 + offset};5;${code}m`;
-var wrapAnsi16m3 = (offset = 0) => (red, green2, blue) => `\x1B[${38 + offset};2;${red};${green2};${blue}m`;
+var wrapAnsi16m3 = (offset = 0) => (red2, green3, blue) => `\x1B[${38 + offset};2;${red2};${green3};${blue}m`;
 var styles5 = {
   modifier: {
     reset: [0, 0],
@@ -44752,17 +44752,17 @@ function assembleStyles3() {
   styles5.bgColor.ansi16m = wrapAnsi16m3(ANSI_BACKGROUND_OFFSET3);
   Object.defineProperties(styles5, {
     rgbToAnsi256: {
-      value(red, green2, blue) {
-        if (red === green2 && green2 === blue) {
-          if (red < 8) {
+      value(red2, green3, blue) {
+        if (red2 === green3 && green3 === blue) {
+          if (red2 < 8) {
             return 16;
           }
-          if (red > 248) {
+          if (red2 > 248) {
             return 231;
           }
-          return Math.round((red - 8) / 247 * 24) + 232;
+          return Math.round((red2 - 8) / 247 * 24) + 232;
         }
-        return 16 + 36 * Math.round(red / 255 * 5) + 6 * Math.round(green2 / 255 * 5) + Math.round(blue / 255 * 5);
+        return 16 + 36 * Math.round(red2 / 255 * 5) + 6 * Math.round(green3 / 255 * 5) + Math.round(blue / 255 * 5);
       },
       enumerable: false
     },
@@ -44799,25 +44799,25 @@ function assembleStyles3() {
         if (code < 16) {
           return 90 + (code - 8);
         }
-        let red;
-        let green2;
+        let red2;
+        let green3;
         let blue;
         if (code >= 232) {
-          red = ((code - 232) * 10 + 8) / 255;
-          green2 = red;
-          blue = red;
+          red2 = ((code - 232) * 10 + 8) / 255;
+          green3 = red2;
+          blue = red2;
         } else {
           code -= 16;
           const remainder = code % 36;
-          red = Math.floor(code / 36) / 5;
-          green2 = Math.floor(remainder / 6) / 5;
+          red2 = Math.floor(code / 36) / 5;
+          green3 = Math.floor(remainder / 6) / 5;
           blue = remainder % 6 / 5;
         }
-        const value = Math.max(red, green2, blue) * 2;
+        const value = Math.max(red2, green3, blue) * 2;
         if (value === 0) {
           return 30;
         }
-        let result = 30 + (Math.round(blue) << 2 | Math.round(green2) << 1 | Math.round(red));
+        let result = 30 + (Math.round(blue) << 2 | Math.round(green3) << 1 | Math.round(red2));
         if (value === 2) {
           result += 60;
         }
@@ -44826,7 +44826,7 @@ function assembleStyles3() {
       enumerable: false
     },
     rgbToAnsi: {
-      value: (red, green2, blue) => styles5.ansi256ToAnsi(styles5.rgbToAnsi256(red, green2, blue)),
+      value: (red2, green3, blue) => styles5.ansi256ToAnsi(styles5.rgbToAnsi256(red2, green3, blue)),
       enumerable: false
     },
     hexToAnsi: {
@@ -45185,9 +45185,111 @@ function WelcomeScreen({
 
 // src/main.tsx
 var import_react56 = __toESM(require_react(), 1);
+
+// src/doctor.tsx
+var import_node_child_process = require("node:child_process");
 var import_jsx_runtime50 = __toESM(require_jsx_runtime(), 1);
 var green = "#4BAA72";
 var mutedGreen = "#86BE9A";
+var amber = "#D9AD6C";
+var red = "#E08484";
+var spinner = ["\u280B", "\u2819", "\u2839", "\u2838", "\u283C", "\u2834", "\u2826", "\u2827", "\u2807", "\u280F"];
+function lineColor(value) {
+  const text = value.toLowerCase();
+  if (/missing \(required|not detected|expired|unsupported/.test(text)) return red;
+  if (/missing|not configured|disabled|unavailable/.test(text)) return amber;
+  if (/detected|installed|stored|enabled|configured|not required|set in environment|seatbelt|bubblewrap/.test(text)) return green;
+  return void 0;
+}
+function heading(line) {
+  if (line === "Dependencies:") return "\u{1F527} Dependencies";
+  if (line === "Reviewed local-model eligibility (Gator guardrail):") return "\u{1F9E0} Reviewed local models";
+  return void 0;
+}
+function DoctorReport({ raw }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { flexDirection: "column", children: raw.trimEnd().split("\n").map((line, index) => {
+    const title = heading(line);
+    if (title) return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: mutedGreen, bold: true, children: title }) }, index);
+    if (line.startsWith("    ")) return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: line.trim() }) }, index);
+    if (line.startsWith("Local-model advice:")) return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: line }) }, index);
+    const [label, value] = line.split(/: (.*)/s, 2);
+    if (value === void 0) return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { children: line }, index);
+    const indented = label.startsWith("  ");
+    const itemLabel = label.trimStart();
+    const status = lineColor(value);
+    const mark = indented && /^(installed|enabled)/.test(value) ? "\u2713 " : indented && /^(missing|disabled|unsupported)/.test(value) ? "\u25CB " : "";
+    const group = line.startsWith("Local model host:") || line.startsWith("Suggested verification:");
+    return /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { marginTop: group ? 1 : void 0, marginLeft: indented ? 2 : 0, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { color: indented ? void 0 : mutedGreen, children: [
+        mark,
+        itemLabel,
+        ": "
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: status, children: value })
+    ] }, index);
+  }) });
+}
+function DoctorScreen({ raw, frame }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", paddingX: 1, paddingTop: 1, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: green, bold: true, children: "\u{1F40A} Gator doctor" }),
+    /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Divider, {}) }),
+    raw === void 0 ? /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { color: green, children: [
+      spinner[frame % spinner.length],
+      " Checking Gator, models, and device\u2026"
+    ] }) }) : /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(DoctorReport, { raw }) })
+  ] });
+}
+function collectDoctor(binary, arguments_) {
+  return new Promise((resolve, reject) => {
+    const child = (0, import_node_child_process.spawn)(binary, ["ui-doctor-backend", ...arguments_], {
+      env: { ...process.env, GATOR_UI_DOCTOR_BACKEND: "1" },
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    let report = "";
+    let errors = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+      report += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      errors += chunk;
+    });
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code === 0) resolve(report);
+      else reject(new Error(errors.trim() || `doctor checks exited with status ${code ?? "unknown"}`));
+    });
+  });
+}
+async function runDoctor(binary, arguments_) {
+  if (!process.stdout.isTTY) {
+    const report = await collectDoctor(binary, arguments_);
+    process.stdout.write(`\u{1F40A} Gator doctor
+${report}`);
+    return;
+  }
+  let frame = 0;
+  let app;
+  let timer;
+  try {
+    app = await root_default(/* @__PURE__ */ (0, import_jsx_runtime50.jsx)(DoctorScreen, { frame }));
+    timer = setInterval(() => app?.rerender(/* @__PURE__ */ (0, import_jsx_runtime50.jsx)(DoctorScreen, { frame: ++frame })), 80);
+    const report = await collectDoctor(binary, arguments_);
+    clearInterval(timer);
+    timer = void 0;
+    app.rerender(/* @__PURE__ */ (0, import_jsx_runtime50.jsx)(DoctorScreen, { frame, raw: report }));
+    await new Promise((resolve) => setTimeout(resolve, 80));
+  } finally {
+    if (timer) clearInterval(timer);
+    app?.unmount();
+  }
+}
+
+// src/main.tsx
+var import_jsx_runtime51 = __toESM(require_jsx_runtime(), 1);
+var green2 = "#4BAA72";
+var mutedGreen2 = "#86BE9A";
 var GatorBridge = class {
   child;
   current;
@@ -45196,7 +45298,7 @@ var GatorBridge = class {
   errorText = "";
   closed = false;
   constructor(binary, conversationID, goalID) {
-    this.child = (0, import_node_child_process.spawn)(binary, ["ui-backend", conversationID, goalID], {
+    this.child = (0, import_node_child_process2.spawn)(binary, ["ui-backend", conversationID, goalID], {
       env: { ...process.env, GATOR_UI_BACKEND: "1" },
       stdio: ["pipe", "pipe", "pipe"]
     });
@@ -45262,13 +45364,17 @@ function formatBundle(bundle) {
   return lines.join("\n");
 }
 function MessageBody({ item }) {
+  if (item.role === "Doctor") return /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: green2, bold: true, children: "\u{1F40A} Gator doctor" }),
+    /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(DoctorReport, { raw: item.text }) })
+  ] });
   const isUser = item.role === "You";
   const isGator = item.role === "Gator";
   const label = isUser ? "\u203A You" : isGator ? "\u{1F40A} Gator" : item.role === "Deliverables" ? "\u25C8 Deliverables" : `\u25CC ${item.role}`;
   const content = item.bundle ? formatBundle(item.bundle) : item.text;
-  return /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: isGator ? green : isUser ? void 0 : mutedGreen, bold: !isUser, dimColor: isUser, children: label }),
-    content.split("\n").map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: !isGator && !isUser, children: line || " " }) }, index))
+  return /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: isGator ? green2 : isUser ? void 0 : mutedGreen2, bold: !isUser, dimColor: isUser, children: label }),
+    content.split("\n").map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: !isGator && !isUser, children: line || " " }) }, index))
   ] });
 }
 function GreenPrompt({
@@ -45366,22 +45472,22 @@ function GreenPrompt({
     if (key.ctrl || key.meta || key.tab || key.escape) return;
     if (input) replace(value.slice(0, cursor) + input + value.slice(cursor), cursor + input.length);
   }, { isActive: !disabled });
-  return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { flexDirection: "column", children: value ? value.split("\n").map((line, index, lines) => {
+  return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { flexDirection: "column", children: value ? value.split("\n").map((line, index, lines) => {
     const start = lines.slice(0, index).reduce((count, item) => count + item.length + 1, 0);
     const localCursor = cursor - start;
-    return /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: green, children: index === 0 ? "\u276F " : "\xB7 " }),
-      localCursor >= 0 && localCursor <= line.length ? /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: green2, children: index === 0 ? "\u276F " : "\xB7 " }),
+      localCursor >= 0 && localCursor <= line.length ? /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { children: [
         line.slice(0, localCursor),
-        /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { inverse: true, children: line[localCursor] ?? " " }),
+        /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { inverse: true, children: line[localCursor] ?? " " }),
         line.slice(localCursor + 1)
-      ] }) : /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { children: line || " " })
+      ] }) : /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { children: line || " " })
     ] }, index);
-  }) : /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { children: [
-    /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: green, children: "\u276F " }),
-    /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { inverse: true, children: " " }),
-      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: "Ask Gator to work on something\u2026" })
+  }) : /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: green2, children: "\u276F " }),
+    /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { inverse: true, children: " " }),
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: "Ask Gator to work on something\u2026" })
     ] })
   ] }) });
 }
@@ -45510,56 +45616,56 @@ function PanelScreen({ panel, status, draft, statusLine, bridge, exit }) {
   const blockOffset = Math.min(offset, Math.max(0, blocks.length - maxLines));
   const panelWidth = Math.max(20, Math.min(78, (terminal?.columns ?? 80) - 4));
   const contentWidth = focused ? panelWidth - 4 : Math.max(1, (terminal?.columns ?? 80) - 4);
-  return /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, paddingX: 2, paddingTop: 1, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(PanelKeys, { bridge, exit, scroll: (amount) => setOffset((current) => Math.max(0, Math.min(blocks.length - maxLines, current + amount))) }),
-    /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", flexGrow: focused ? 0 : 1, width: focused ? panelWidth : void 0, alignSelf: focused ? "center" : void 0, borderStyle: focused ? "round" : void 0, borderColor: focused ? green : void 0, paddingX: focused ? 1 : 0, marginTop: focused ? 1 : 0, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { color: green, bold: true, children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, paddingX: 2, paddingTop: 1, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(PanelKeys, { bridge, exit, scroll: (amount) => setOffset((current) => Math.max(0, Math.min(blocks.length - maxLines, current + amount))) }),
+    /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", flexGrow: focused ? 0 : 1, width: focused ? panelWidth : void 0, alignSelf: focused ? "center" : void 0, borderStyle: focused ? "round" : void 0, borderColor: focused ? green2 : void 0, paddingX: focused ? 1 : 0, marginTop: focused ? 1 : 0, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { color: green2, bold: true, children: [
         "\u{1F40A} Gator  ",
-        /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: mutedGreen, children: panel.title })
+        /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: mutedGreen2, children: panel.title })
       ] }),
-      panel.subtitle && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { children: panel.subtitle }) }),
-      panel.kind === "picker" && /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { marginTop: 1, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: mutedGreen, children: "Search  " }),
-        /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { children: [
+      panel.subtitle && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { children: panel.subtitle }) }),
+      panel.kind === "picker" && /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { marginTop: 1, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: mutedGreen2, children: "Search  " }),
+        /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { children: [
           panel.query || "type to filter",
-          /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { inverse: true, children: " " })
+          /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { inverse: true, children: " " })
         ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Divider, { width: contentWidth }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", flexGrow: focused ? 0 : 1, marginTop: 1, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Divider, { width: contentWidth }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", flexGrow: focused ? 0 : 1, marginTop: 1, children: [
         rows.slice(rowStart, rowStart + maxRows).map((row, index) => {
           const active = panel.kind !== "inbox" && panel.kind !== "jobs" && rowStart + index === selected;
-          return /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", marginBottom: 1, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { color: active ? green : void 0, bold: active, children: [
+          return /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", marginBottom: 1, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { color: active ? green2 : void 0, bold: active, children: [
               active ? "\u276F " : "  ",
               row.label,
-              row.state ? /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { color: mutedGreen, children: [
+              row.state ? /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { color: mutedGreen2, children: [
                 "  \xB7  ",
                 row.state
               ] }) : null
             ] }),
-            row.detail && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { dimColor: !active, children: [
+            row.detail && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { dimColor: !active, children: [
               row.detail,
-              active && (panel.kind === "model-form" || panel.kind === "learning-form") && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { inverse: true, children: " " })
+              active && (panel.kind === "model-form" || panel.kind === "learning-form") && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { inverse: true, children: " " })
             ] }) })
           ] }, `${rowStart + index}-${row.label}`);
         }),
-        blocks.slice(blockOffset, blockOffset + maxLines).map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginBottom: line.heading ? 0 : void 0, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: line.heading ? mutedGreen : void 0, bold: line.heading, children: line.text || " " }) }, `${blockOffset + index}-${line.text}`)),
-        blocks.length > maxLines && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: `  ${blockOffset + 1}\u2013${Math.min(blockOffset + maxLines, blocks.length)} of ${blocks.length} lines \xB7 PgUp/PgDn scroll` }),
-        rows.length === 0 && blocks.length === 0 && !panel.notice && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: "No items to show." }),
-        panel.notice && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: mutedGreen, children: panel.notice }) }),
-        status && status !== panel.notice && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: status }) })
+        blocks.slice(blockOffset, blockOffset + maxLines).map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginBottom: line.heading ? 0 : void 0, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: line.heading ? mutedGreen2 : void 0, bold: line.heading, children: line.text || " " }) }, `${blockOffset + index}-${line.text}`)),
+        blocks.length > maxLines && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: `  ${blockOffset + 1}\u2013${Math.min(blockOffset + maxLines, blocks.length)} of ${blocks.length} lines \xB7 PgUp/PgDn scroll` }),
+        rows.length === 0 && blocks.length === 0 && !panel.notice && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: "No items to show." }),
+        panel.notice && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: mutedGreen2, children: panel.notice }) }),
+        status && status !== panel.notice && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: status }) })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Divider, { width: contentWidth }),
-      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: panel.footer || "Esc back" })
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Divider, { width: contentWidth }),
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: panel.footer || "Esc back" })
     ] }),
-    focused && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { flexGrow: 1 }),
-    /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Divider, { width: Math.max(1, (terminal?.columns ?? 80) - 4) }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { dimColor: true, children: [
+    focused && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { flexGrow: 1 }),
+    /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Divider, { width: Math.max(1, (terminal?.columns ?? 80) - 4) }) }),
+    /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { dimColor: true, children: [
       "\u276F ",
       draft || "Ask Gator to work on something\u2026"
     ] }),
-    statusLine && statusLine.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(StatusLine, { segments: statusLine.map((content) => ({ content, color: mutedGreen })) })
+    statusLine && statusLine.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(StatusLine, { segments: statusLine.map((content) => ({ content, color: mutedGreen2 })) })
   ] });
 }
 function GreenSearch({ messages, close, navigate }) {
@@ -45583,13 +45689,13 @@ function GreenSearch({ messages, close, navigate }) {
       navigate(matches[next]);
     } else if (!key.ctrl && !key.meta && input) change(query + input);
   });
-  return /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { paddingX: 1, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: green, children: "Search: " }),
-    /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { paddingX: 1, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: green2, children: "Search: " }),
+    /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { children: [
       query,
-      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { inverse: true, children: " " })
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { inverse: true, children: " " })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: `  ${matches.length ? `${selected + 1}/${matches.length} matches` : "no matches"}` })
+    /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: `  ${matches.length ? `${selected + 1}/${matches.length} matches` : "no matches"}` })
   ] });
 }
 function App2({ bridge }) {
@@ -45633,9 +45739,9 @@ function App2({ bridge }) {
     bridge.stop();
     exit();
   };
-  if (!state) return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { padding: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: green, children: failure || "Starting Gator\u2026" }) });
+  if (!state) return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { padding: 1, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: green2, children: failure || "Starting Gator\u2026" }) });
   if (state.mode === "panel" && state.panel) {
-    return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(PanelScreen, { panel: state.panel, status: state.status, draft: input, statusLine: state.status_line_enabled ? state.status_line : void 0, bridge, exit: close });
+    return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(PanelScreen, { panel: state.panel, status: state.status, draft: input, statusLine: state.status_line_enabled ? state.status_line : void 0, bridge, exit: close });
   }
   const matches = !searchOpen && !dismissed && input.startsWith("/") && !input.includes(" ") ? state.commands.filter((command) => input === "/" ? !command.advanced : `/${command.name}`.startsWith(input)).slice(0, 8) : [];
   const submit = (value) => {
@@ -45656,22 +45762,22 @@ function App2({ bridge }) {
     }
   };
   const context = [state.title, state.provider ? `${state.provider}${state.model ? `/${state.model}` : ""}` : "Choose model: /model", state.source.split("/").filter(Boolean).at(-1) || state.source].filter(Boolean).join(" \xB7 ");
-  const welcome = /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(WelcomeScreen, { appName: "Gator", subtitle: "Your ongoing work, ready when you are", color: green, logo: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: green, children: "\u{1F40A}" }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: context }),
-    /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { marginTop: 1, marginLeft: 1, flexDirection: "column", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: mutedGreen, bold: true, children: state.first_run ? "Get started" : "Next up" }),
-      state.first_run ? /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(import_jsx_runtime50.Fragment, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { children: "  1  /model  Choose a cloud or local model" }),
-        /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { children: "  2  Ask: Summarize this folder into a daily brief with next actions." })
-      ] }) : state.actions.slice(0, 4).map((action, index) => /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { children: [
+  const welcome = /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(WelcomeScreen, { appName: "Gator", subtitle: "Your ongoing work, ready when you are", color: green2, logo: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: green2, children: "\u{1F40A}" }) }),
+    /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: context }),
+    /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { marginTop: 1, marginLeft: 1, flexDirection: "column", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: mutedGreen2, bold: true, children: state.first_run ? "Get started" : "Next up" }),
+      state.first_run ? /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(import_jsx_runtime51.Fragment, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { children: "  1  /model  Choose a cloud or local model" }),
+        /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { children: "  2  Ask: Summarize this folder into a daily brief with next actions." })
+      ] }) : state.actions.slice(0, 4).map((action, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { children: [
         "  ",
         action.Label,
         " \xB7 ",
         action.Command
       ] }, index)),
-      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { dimColor: true, children: "  Type / for Gator commands." }),
-      state.supervisor_needs_start && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: mutedGreen, children: "  Recurring checks need a running supervisor \xB7 gator job supervisor" })
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: "  Type / for Gator commands." }),
+      state.supervisor_needs_start && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: mutedGreen2, children: "  Recurring checks need a running supervisor \xB7 gator job supervisor" })
     ] })
   ] });
   const messages = state.messages.map((item, index) => ({
@@ -45680,46 +45786,46 @@ function App2({ bridge }) {
     content: item.text
   }));
   const viewportHeight = Math.max(1, (terminal?.rows ?? 24) - 6 - matches.length - (state.running ? 2 : 0) - (searchOpen ? 1 : 0) - input.split("\n").length + 1);
-  const statusSegments = (state.status_line ?? []).map((content) => ({ content, color: mutedGreen }));
-  return /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, paddingX: 1, paddingTop: 1, children: [
-    !state.home && /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { marginBottom: 1, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: green, bold: true, children: "\u{1F40A} Gator" }),
-      /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { color: mutedGreen, children: [
+  const statusSegments = (state.status_line ?? []).map((content) => ({ content, color: mutedGreen2 }));
+  return /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, paddingX: 1, paddingTop: 1, children: [
+    !state.home && /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { marginBottom: 1, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: green2, bold: true, children: "\u{1F40A} Gator" }),
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { color: mutedGreen2, children: [
         "  ",
         context
       ] })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, children: [
-      state.home && state.messages.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginBottom: 1, children: welcome }),
-      state.messages.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(MessageList, { ref: list, viewportHeight, messages, renderMessage: (item) => /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(MessageBody, { item: state.messages[Number(item.id.split("-", 1)[0])] }) }),
-      state.running && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: green, children: state.cancelling ? "\u25CC Stopping\u2026 retaining evidence" : `${["\u280B", "\u2819", "\u2839", "\u2838", "\u283C", "\u2834", "\u2826", "\u2827", "\u2807", "\u280F"][state.loading_frame % 10]} Working\u2026 ${state.elapsed ?? ""} \xB7 Esc to interrupt` }) })
+    /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, children: [
+      state.home && state.messages.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginBottom: 1, children: welcome }),
+      state.messages.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(MessageList, { ref: list, viewportHeight, messages, renderMessage: (item) => /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(MessageBody, { item: state.messages[Number(item.id.split("-", 1)[0])] }) }),
+      state.running && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: green2, children: state.cancelling ? "\u25CC Stopping\u2026 retaining evidence" : `${["\u280B", "\u2819", "\u2839", "\u2838", "\u283C", "\u2834", "\u2826", "\u2827", "\u2807", "\u280F"][state.loading_frame % 10]} Working\u2026 ${state.elapsed ?? ""} \xB7 Esc to interrupt` }) })
     ] }),
-    state.status && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: mutedGreen, children: state.status }),
-    !searchOpen && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(ChatKeys, { state, draft: input, matches, selected, setSelected, choose, dismiss: () => setDismissed(true), search: () => setSearchOpen(true), scroll: (rows) => list.current?.scrollBy(rows), exit: close, clearDraft: () => {
+    state.status && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: mutedGreen2, children: state.status }),
+    !searchOpen && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(ChatKeys, { state, draft: input, matches, selected, setSelected, choose, dismiss: () => setDismissed(true), search: () => setSearchOpen(true), scroll: (rows) => list.current?.scrollBy(rows), exit: close, clearDraft: () => {
       setInput("");
       setPrefillVersion((version) => version + 1);
     }, bridge }),
-    searchOpen && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(GreenSearch, { messages: state.messages, close: () => setSearchOpen(false), navigate: (index) => list.current?.scrollTo(index) }),
-    /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Divider, {}),
-    /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(GreenPrompt, { value: input, onChange: (value) => {
+    searchOpen && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(GreenSearch, { messages: state.messages, close: () => setSearchOpen(false), navigate: (index) => list.current?.scrollTo(index) }),
+    /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Divider, {}),
+    /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(GreenPrompt, { value: input, onChange: (value) => {
       setInput(value);
       setSelected(0);
       setDismissed(false);
     }, onSubmit: submit, disabled: searchOpen || !!failure, history, prefillVersion }),
-    matches.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Box_default, { marginLeft: 2, flexDirection: "column", children: matches.map((command, index) => /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Box_default, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { color: index === selected ? green : void 0, bold: index === selected, children: [
+    matches.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, flexDirection: "column", children: matches.map((command, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { color: index === selected ? green2 : void 0, bold: index === selected, children: [
         index === selected ? "\u276F" : " ",
         " /",
         command.name
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(Text, { dimColor: true, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { dimColor: true, children: [
         "  ",
         command.description
       ] })
     ] }, command.name)) }),
-    failure && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Text, { color: "red", children: failure }),
-    /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(Divider, {}),
-    state.status_line_enabled && statusSegments.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(StatusLine, { segments: statusSegments })
+    failure && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: "red", children: failure }),
+    /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Divider, {}),
+    state.status_line_enabled && statusSegments.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(StatusLine, { segments: statusSegments })
   ] });
 }
 function runExternal(command) {
@@ -45731,7 +45837,7 @@ function runExternal(command) {
       const separator = entry.indexOf("=");
       return [entry.slice(0, separator), entry.slice(separator + 1)];
     })) : process.env;
-    const child = (0, import_node_child_process.spawn)(command.program, command.args ?? [], {
+    const child = (0, import_node_child_process2.spawn)(command.program, command.args ?? [], {
       cwd: command.dir || void 0,
       env: environment,
       stdio: "inherit"
@@ -45748,8 +45854,11 @@ function runExternal(command) {
   });
 }
 async function main() {
-  const [binary, conversationID = "", goalID = ""] = process.argv.slice(2);
+  const [binary, mode, ...arguments_] = process.argv.slice(2);
   if (!binary) throw new Error("Gator UI requires its backend executable");
+  if (mode === "doctor") return runDoctor(binary, arguments_);
+  if (mode !== "work") throw new Error("unknown Gator UI mode");
+  const [conversationID = "", goalID = ""] = arguments_;
   const bridge = new GatorBridge(binary, conversationID, goalID);
   let app;
   let handoff;
@@ -45767,7 +45876,7 @@ async function main() {
   });
   try {
     while (true) {
-      app = await root_default(/* @__PURE__ */ (0, import_jsx_runtime50.jsx)(App2, { bridge }));
+      app = await root_default(/* @__PURE__ */ (0, import_jsx_runtime51.jsx)(App2, { bridge }));
       if (handoff) app.unmount();
       await app.waitUntilExit();
       app = void 0;

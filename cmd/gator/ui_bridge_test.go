@@ -185,3 +185,20 @@ func TestInteractiveLaunchRejectsMissingOrOldNode(t *testing.T) {
 		t.Fatalf("old Node should stop interactive startup: %v", err)
 	}
 }
+
+func TestDoctorLaunchRejectsMissingOrOldNode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Gator does not support Windows")
+	}
+	t.Setenv("PATH", t.TempDir())
+	if err := launchDoctorUI(nil, io.Discard); err == nil || !strings.Contains(err.Error(), "gator doctor requires Node.js 22") {
+		t.Fatalf("missing Node should stop doctor: %v", err)
+	}
+	path := filepath.Join(os.Getenv("PATH"), "node")
+	if err := os.WriteFile(path, []byte("#!/bin/sh\nprintf 'v21.9.0\\n'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := launchDoctorUI(nil, io.Discard); err == nil || !strings.Contains(err.Error(), "upgrade Node.js") {
+		t.Fatalf("old Node should stop doctor: %v", err)
+	}
+}

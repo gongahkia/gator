@@ -28,7 +28,8 @@ bundled React terminal renderer. Its Go backend owns Work runs, retained
 conversation state, commands, approvals, and evidence. Pickers, model setup,
 inbox, history, learnings, and confirmations render as React panels from Go
 workflow state. If Node.js is missing or too old, interactive startup exits
-with an installation message; headless commands still work. The TypeScript
+with an installation message; headless commands still work. `gator doctor`
+uses the same Node frontend and also requires Node.js 22 or newer. The TypeScript
 source and build instructions are in `ui/`; the generated bundle is embedded
 in the Go binary.
 

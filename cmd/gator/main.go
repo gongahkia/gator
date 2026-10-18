@@ -97,7 +97,7 @@ func run(args []string, out io.Writer) error {
 	case "update", "-u":
 		return update(args[1:], out)
 	case "doctor", "-d":
-		return presentDoctor(args[1:], out)
+		return launchDoctorUI(args[1:], out)
 	case "extension", "-e":
 		return extensionCommand(args[1:], out)
 	case "lsp", "-l":
@@ -133,6 +133,11 @@ func run(args []string, out io.Writer) error {
 			return errors.New("ui-backend is an internal Gator transport")
 		}
 		return workInteractiveConversationForGoal(args[1], args[2])
+	case "ui-doctor-backend":
+		if os.Getenv("GATOR_UI_DOCTOR_BACKEND") != "1" {
+			return errors.New("ui-doctor-backend is an internal Gator transport")
+		}
+		return doctor(args[1:], out)
 	case "work", "-w":
 		return workCommand(args[1:], out)
 	case "acp":
