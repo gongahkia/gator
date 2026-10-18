@@ -45566,6 +45566,7 @@ function App2({ bridge }) {
   }));
   const viewportHeight = Math.max(1, (terminal?.rows ?? 24) - 6 - matches.length - (state.running ? 2 : 0) - (searchOpen ? 1 : 0));
   const statusSegments = [
+    ...state.status ? [{ content: state.status, color: mutedGreen }] : [],
     { content: state.provider && state.model ? `${state.provider}/${state.model}` : "Choose model: /model", color: green },
     { content: state.source ? state.source.split("/").filter(Boolean).at(-1) || state.source : "Gator" },
     ...state.queued ? [{ content: `${state.queued} queued` }] : []
