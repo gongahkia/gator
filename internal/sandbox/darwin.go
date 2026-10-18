@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 )
@@ -112,6 +113,7 @@ func sandboxRoots(root, scratch string, policy Policy) ([]string, []string, erro
 	readRoots := []string{
 		root,
 		scratch,
+		runtime.GOROOT(),
 		"/System",
 		"/usr",
 		"/bin",

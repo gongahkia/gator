@@ -284,6 +284,7 @@ func processEnvironment(policy Policy) ([]string, string, func(), error) {
 	cleanup := func() { _ = os.RemoveAll(scratch) }
 	values := map[string]string{
 		"PATH":    safeEnvironment("PATH"),
+		"GOROOT":  runtime.GOROOT(),
 		"TMPDIR":  scratch,
 		"TMP":     scratch,
 		"TEMP":    scratch,
