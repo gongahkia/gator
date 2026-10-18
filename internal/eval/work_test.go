@@ -109,6 +109,13 @@ func TestWorkExperimentDefaultsToDevelopmentAndRequiresExplicitHeldOutSelection(
 	if all.Split != WorkSplitAll || all.Total != 2 {
 		t.Fatalf("all split = %#v", all)
 	}
+	selected, err := RunWorkExperiment(context.Background(), filepath.Join(root, "dataset.json"), dataset, WorkEvalOptions{ID: "selected", Attempts: 1, ReportDir: filepath.Join(root, "selected"), Split: WorkSplitAll, CaseIDs: []string{"held-out-case"}}, factory)
+	if err != nil || selected.Total != 1 || selected.Trials[0].CaseID != "held-out-case" {
+		t.Fatalf("selected cases = %#v; %v", selected, err)
+	}
+	if _, err := RunWorkExperiment(context.Background(), filepath.Join(root, "dataset.json"), dataset, WorkEvalOptions{ID: "unknown", Attempts: 1, ReportDir: filepath.Join(root, "unknown"), CaseIDs: []string{"held-out-case"}}, factory); err == nil {
+		t.Fatal("case outside selected split accepted")
+	}
 	if _, _, err := selectWorkCases(dataset, "unexpected"); err == nil {
 		t.Fatal("unknown split accepted")
 	}

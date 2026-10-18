@@ -146,6 +146,7 @@ type WorkExperiment struct {
 }
 type WorkEvalOptions struct {
 	DisabledRoles                           []string
+	CaseIDs                                 []string
 	MaxRequests                             int
 	ID, Harness, Provider, Model, ReportDir string
 	Split                                   string
@@ -294,6 +295,25 @@ func RunWorkExperiment(ctx context.Context, datasetPath string, dataset WorkData
 	split, cases, err := selectWorkCases(dataset, options.Split)
 	if err != nil {
 		return WorkExperiment{}, err
+	}
+	if len(options.CaseIDs) > 0 {
+		selected := make(map[string]bool, len(options.CaseIDs))
+		for _, id := range options.CaseIDs {
+			selected[id] = false
+		}
+		var filtered []WorkCase
+		for _, item := range cases {
+			if _, ok := selected[item.ID]; ok {
+				filtered = append(filtered, item)
+				selected[item.ID] = true
+			}
+		}
+		for id, found := range selected {
+			if !found {
+				return WorkExperiment{}, fmt.Errorf("case %q not found in %s split", id, split)
+			}
+		}
+		cases = filtered
 	}
 	selectedDataset := dataset
 	selectedDataset.Cases = append([]WorkCase(nil), cases...)

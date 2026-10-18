@@ -24,7 +24,7 @@ func workEvalCommand(args []string, out io.Writer) error {
 		return workLearningEvalCommand(args[1:], out)
 	}
 	if len(args) < 2 {
-		return errors.New("usage: gator work eval validate|run|show|compare DATASET_OR_REPORT [options]\n       gator work eval learning validate|run|show DATASET_OR_REPORT [options]")
+		return errors.New("usage: gator work eval validate|run|baseline|show|compare DATASET_OR_REPORT [options]\n       gator work eval learning validate|run|show DATASET_OR_REPORT [options]")
 	}
 	action, path := args[0], args[1]
 	if action == "judge-rubric" || action == "calibrate-rubric" {
@@ -72,6 +72,9 @@ func workEvalCommand(args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
+	if action == "baseline" {
+		return workEvalDirectBaseline(path, dataset, args[2:], out)
+	}
 	if action == "validate" {
 		_, err = fmt.Fprintf(out, "%s: %d valid %s cases\n", dataset.ID, len(dataset.Cases), dataset.Target)
 		return err
@@ -87,6 +90,8 @@ func workEvalCommand(args []string, out io.Writer) error {
 	delegation := flags.Bool("delegation", true, "enable specialists")
 	var disabledRoles stringFlags
 	flags.Var(&disabledRoles, "disable-role", "omit one specialist role for a matched ablation")
+	var caseIDs stringFlags
+	flags.Var(&caseIDs, "case", "run one case ID (repeat to select more)")
 	live := flags.Bool("live", false, "use real provider models")
 	baselineNoGoal := flags.Bool("baseline-no-goal", false, "same-model ablation without saved goal plan or memory context")
 	provider := flags.String("provider", "", "live provider")
@@ -113,7 +118,7 @@ func workEvalCommand(args []string, out io.Writer) error {
 		ctx, cancel = context.WithTimeout(ctx, time.Duration(*seconds)*time.Second)
 		defer cancel()
 	}
-	options := eval.WorkEvalOptions{DisabledRoles: disabledRoles, ID: *id, Harness: commit, Provider: *provider, Model: *model, ReportDir: absolute, Attempts: *attempts, Delegation: *delegation, Live: *live, BaselineNoGoal: *baselineNoGoal, MaxRequests: *requests, Split: *split}
+	options := eval.WorkEvalOptions{DisabledRoles: disabledRoles, CaseIDs: caseIDs, ID: *id, Harness: commit, Provider: *provider, Model: *model, ReportDir: absolute, Attempts: *attempts, Delegation: *delegation, Live: *live, BaselineNoGoal: *baselineNoGoal, MaxRequests: *requests, Split: *split}
 	report, err := eval.RunWorkExperiment(ctx, path, dataset, options, func(c eval.WorkCase, state string) (workrun.Service, error) {
 		if *live {
 			request := workrun.Request{}
