@@ -570,38 +570,7 @@ func (m Model) updateHome(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "down":
 		m.recallNextPrompt()
 	case "enter":
-		prompt := strings.TrimSpace(m.input)
-		if prompt == "" {
-			return m, nil
-		}
-		m.input = ""
-		if prompt == "exit" {
-			return m.runLocalCommand("exit")
-		}
-		if strings.HasPrefix(prompt, "/") {
-			return m.runLocalCommand(prompt)
-		}
-		if m.firstRun {
-			m.pendingPrompt = prompt
-			return m.openModels()
-		}
-		m.home = false
-		m.messages = append(m.messages, message{role: "You", text: prompt})
-		m.recordPrompt(prompt)
-		m.running = true
-		m.status = "Working from an immutable snapshot…"
-		run := m.config.Run
-		if run == nil {
-			m.running = false
-			m.messages = append(m.messages, message{role: "Gator", text: "Work execution is unavailable in this build."})
-			return m, nil
-		}
-		source, conversation := m.source, m.conversation
-		options := cloneRunOptions(m.options)
-		options.PreviousArtifacts = m.previousArtifactPaths()
-		m.options.Attachments = nil
-		m.options.RefreshSource = false
-		return m.startWork(source, conversation, prompt, options)
+		return m.submitComposerInput()
 	case "backspace":
 		m.resetPromptHistoryNavigation()
 		runes := []rune(m.input)

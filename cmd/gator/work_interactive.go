@@ -26,6 +26,7 @@ import (
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/workhistory"
+	"github.com/gongahkia/gator/internal/workhome"
 	"github.com/gongahkia/gator/internal/workrun"
 	"github.com/gongahkia/gator/internal/worksession"
 	"github.com/gongahkia/gator/internal/workspace"
@@ -138,6 +139,10 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 	if err != nil {
 		return err
 	}
+	attention, err := workhome.Read(stateDir, goals, inboxEntries)
+	if err != nil {
+		return err
+	}
 	settings, err := loadSettings()
 	if err != nil {
 		return err
@@ -159,7 +164,18 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		},
 		Live:          true,
 		InitialTitle:  goalTitle,
-		CurrentFolder: workingDirectory, Conversations: conversations, Jobs: definitions, SupervisorRunning: supervisorRunning, Inbox: inboxEntries, Goals: goals,
+		CurrentFolder: workingDirectory, Conversations: conversations, Jobs: definitions, SupervisorRunning: supervisorRunning, Inbox: inboxEntries, Goals: goals, Attention: attention,
+		RefreshAttention: func() (workhome.Attention, error) {
+			freshGoals, err := goalStore.List()
+			if err != nil {
+				return workhome.Attention{}, err
+			}
+			freshInbox, err := inboxStore.List(false, 20)
+			if err != nil {
+				return workhome.Attention{}, err
+			}
+			return workhome.Read(stateDir, freshGoals, freshInbox)
+		},
 		ListGoals: goalStore.List,
 		SelectGoal: func(id string) (worktui.GoalState, error) {
 			record, err := goalStore.Load(id)

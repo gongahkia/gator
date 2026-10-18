@@ -15,6 +15,7 @@ import (
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/learning"
 	"github.com/gongahkia/gator/internal/workhistory"
+	"github.com/gongahkia/gator/internal/workhome"
 	"github.com/gongahkia/gator/internal/workrun"
 	"github.com/gongahkia/gator/internal/worksession"
 )
@@ -156,6 +157,8 @@ type Config struct {
 	SupervisorRunning       bool
 	Inbox                   []inbox.Entry
 	Goals                   []goal.Record
+	Attention               workhome.Attention
+	RefreshAttention        func() (workhome.Attention, error)
 	ListGoals               func() ([]goal.Record, error)
 	SelectGoal              func(id string) (GoalState, error)
 	ClearGoal               func()
@@ -306,6 +309,22 @@ type Model struct {
 }
 
 func New(config Config) Model {
+	// Keep the home useful for embedders that supply records directly without
+	// the CLI's read-only attention projection.
+	if config.Attention.ActiveGoals == 0 {
+		for _, record := range config.Goals {
+			if record.Status == goal.Active {
+				config.Attention.ActiveGoals++
+			}
+		}
+	}
+	if config.Attention.UnreadResults == 0 {
+		for _, item := range config.Inbox {
+			if item.ReadAt.IsZero() {
+				config.Attention.UnreadResults++
+			}
+		}
+	}
 	model := Model{
 		config:   config,
 		home:     true,

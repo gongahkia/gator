@@ -13,6 +13,7 @@ import (
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
+	"github.com/gongahkia/gator/internal/workhome"
 	"github.com/gongahkia/gator/internal/worksession"
 )
 
@@ -941,6 +942,31 @@ func TestFirstRunRetainsInitialTaskInModelManagement(t *testing.T) {
 	model = updated.(Model)
 	if model.models != nil || model.firstRun || model.input != "prepare the brief" || !strings.Contains(model.status, "Selected model: openai / gpt-5") {
 		t.Fatalf("post-model state = %#v", model)
+	}
+}
+
+func TestFirstRunShowsSetupBeforeARequest(t *testing.T) {
+	model := New(Config{CurrentFolder: "/work", FirstRun: true, Models: func() (ModelPanel, error) { return &testModelPanel{}, nil }})
+	view := ansi.Strip(model.View())
+	for _, text := range []string{"Get started", "/model", "cloud or local model", "daily brief", "keep it through setup"} {
+		if !strings.Contains(view, text) {
+			t.Fatalf("home does not explain %q:\n%s", text, view)
+		}
+	}
+	model.input = "/model"
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if updated.(Model).models == nil {
+		t.Fatal("visible setup route did not open the model panel")
+	}
+}
+
+func TestHomeShowsNextActionsInOnePlace(t *testing.T) {
+	model := New(Config{CurrentFolder: "/work", Attention: workhome.Attention{PendingSuggestions: 1, UnreadResults: 1, ActiveGoals: 1, RecentWork: true}})
+	view := ansi.Strip(model.View())
+	for _, text := range []string{"Next up", "/suggestions", "/inbox", "/goals", "/history"} {
+		if !strings.Contains(view, text) {
+			t.Fatalf("home does not show %q:\n%s", text, view)
+		}
 	}
 }
 

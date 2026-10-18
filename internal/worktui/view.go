@@ -143,30 +143,26 @@ func (m Model) renderHome(width, height int, accent lipgloss.Style) string {
 	composerTop := max(1, height-composerRows)
 	var view strings.Builder
 	view.WriteString(title + "\n")
-	available := max(0, composerTop-strings.Count(view.String(), "\n")-2)
-	if len(m.config.Goals) > 0 && available > 2 {
-		view.WriteString("\nOngoing goals  ·  /goals to resume\n")
-		shown := 0
-		for _, goal := range m.config.Goals {
-			if goal.Status != "active" {
-				continue
-			}
-			view.WriteString("  " + truncate(goal.Title, max(20, width-10)) + "\n")
-			shown++
-			if shown == min(5, available-2) {
+	if m.firstRun && strings.Count(view.String(), "\n")+5 < composerTop {
+		view.WriteString("\nGet started\n")
+		view.WriteString(truncate("  1  /model  Choose a cloud or local model", width) + "\n")
+		view.WriteString(truncate("  2  Ask: Summarize this folder into a daily brief with next actions.", width) + "\n")
+		view.WriteString(truncate("     You can type the task now; Gator will keep it through setup.", width) + "\n")
+	} else if !m.firstRun && strings.Count(view.String(), "\n")+3 < composerTop {
+		view.WriteString("\nNext up\n")
+		for _, action := range m.config.Attention.Next() {
+			if strings.Count(view.String(), "\n")+2 >= composerTop {
 				break
 			}
+			view.WriteString("  " + truncate(action.Label+"  ·  "+action.Command, max(20, width-4)) + "\n")
 		}
-	}
-	if len(m.config.Inbox) > 0 && strings.Count(view.String(), "\n")+2 < composerTop {
-		unread := 0
-		for _, entry := range m.config.Inbox {
-			if entry.ReadAt.IsZero() {
-				unread++
+		if m.config.Attention.ActiveGoals > 0 && strings.Count(view.String(), "\n")+2 < composerTop {
+			for _, record := range m.config.Goals {
+				if record.Status == "active" {
+					view.WriteString("    " + truncate(record.Title, max(16, width-8)) + "\n")
+					break
+				}
 			}
-		}
-		if unread > 0 {
-			view.WriteString(fmt.Sprintf("\n%d unread follow-up result(s)  ·  ctrl+b to review\n", unread))
 		}
 	}
 	if !m.config.SupervisorRunning && strings.Count(view.String(), "\n")+2 < composerTop {
@@ -563,7 +559,11 @@ func (m Model) renderComposer(width int, focused bool) string {
 	}
 	value := m.input
 	if value == "" {
-		value = lipgloss.NewStyle().Foreground(lipgloss.Color("242")).Render("Ask Gator to work on something…")
+		placeholder := "Ask Gator to work on something…"
+		if m.firstRun {
+			placeholder = "Type /model to get started…"
+		}
+		value = lipgloss.NewStyle().Foreground(lipgloss.Color("242")).Render(placeholder)
 	}
 	if focused {
 		value += lipgloss.NewStyle().Foreground(cursor).Render("█")

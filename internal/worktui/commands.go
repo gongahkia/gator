@@ -215,6 +215,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		m.messages, m.status, m.queue = nil, "", nil
 		m.lastOutput, m.lastBundle = "", BundleSummary{}
 		m.options = RunOptions{MaxSteps: 24, Mode: "auto", Code: CodeOptions{MaxSteps: 16, Sandbox: "strict", Network: "deny"}}
+		m.refreshAttention()
 		return m, nil
 	case "/model", "/models":
 		if len(fields) != 1 {
@@ -593,7 +594,22 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 	}
 	m.messages = append(m.messages, message{role: "Gator", text: result})
 	m.scroll = 0
+	if fields[0] == "/inbox" || fields[0] == "/suggestions" {
+		m.refreshAttention()
+	}
 	return m, nil
+}
+
+func (m *Model) refreshAttention() {
+	if m.config.RefreshAttention == nil {
+		return
+	}
+	attention, err := m.config.RefreshAttention()
+	if err != nil {
+		m.status = "Home summary: " + err.Error()
+		return
+	}
+	m.config.Attention = attention
 }
 
 func (m *Model) configureArtifacts(fields []string, raw string) (string, error) {
