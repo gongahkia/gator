@@ -66,6 +66,7 @@ func configuredWorkService(provider, modelName, stateDir string, request *workru
 	if err := applyLearningContext(stateDir, request); err != nil {
 		return workrun.Service{}, err
 	}
+	request.ContextRefs, request.ContextItems, request.RecallStatus = nil, nil, ""
 	if err := applyMemoryContext(stateDir, request); err != nil {
 		return workrun.Service{}, err
 	}
@@ -122,6 +123,7 @@ func applyLearningContext(stateDir string, request *workrun.Request) error {
 }
 
 func applyMemoryContext(stateDir string, request *workrun.Request) error {
+	recallState := "basic matching (enhanced recall unavailable)"
 	store, err := memory.Open(stateDir)
 	if err != nil {
 		return err
@@ -155,7 +157,7 @@ func applyMemoryContext(stateDir string, request *workrun.Request) error {
 			available[record.ID] = record
 			documents = append(documents, retrieval.Document{ID: record.ID, Text: record.Text})
 		}
-		ctx, cancel := retrieval.Timeout(context.Background())
+		ctx, cancel := retrieval.Timeout(preparationContext(request))
 		hits, searchErr := retrieval.Search(ctx, stateDir, "memory/"+request.GoalID, query, documents, embedder, 8)
 		cancel()
 		if searchErr == nil {
@@ -177,13 +179,16 @@ func applyMemoryContext(stateDir string, request *workrun.Request) error {
 				}
 				records = append(records, record)
 			}
-			request.RecallStatus = "semantic + lexical"
-		} else {
-			request.RecallStatus = "lexical fallback (semantic unavailable)"
+			recallState = "enhanced + basic matching"
+			if len(documents) == 0 {
+				recallState = "no eligible saved memories"
+			}
 		}
-	} else {
-		request.RecallStatus = "lexical fallback (semantic unavailable)"
 	}
+	if len(all) == 0 {
+		recallState = "no saved memories in scope"
+	}
+	appendRecallStatus(request, "Memories", recallState)
 	var selected []memory.Record
 	request.MemoryContext, selected = memory.RenderSelection(records)
 	for _, record := range selected {
@@ -194,6 +199,7 @@ func applyMemoryContext(stateDir string, request *workrun.Request) error {
 }
 
 func applyNoteContext(stateDir string, request *workrun.Request) error {
+	recallState := "basic matching (enhanced recall unavailable)"
 	store, err := knowledge.Open(stateDir)
 	if err != nil {
 		return err
@@ -237,7 +243,7 @@ func applyNoteContext(stateDir string, request *workrun.Request) error {
 			available[note.ID] = full
 			documents = append(documents, retrieval.Document{ID: note.ID, Text: full.Title + "\n" + full.Body})
 		}
-		ctx, cancel := retrieval.Timeout(context.Background())
+		ctx, cancel := retrieval.Timeout(preparationContext(request))
 		hits, searchErr := retrieval.Search(ctx, stateDir, "notes/"+request.GoalID, request.Objective+" "+request.GoalContext, documents, embedder, 4)
 		cancel()
 		if searchErr == nil {
@@ -265,10 +271,16 @@ func applyNoteContext(stateDir string, request *workrun.Request) error {
 				selected = append(selected, full)
 			}
 			notes = selected
-		} else {
-			request.RecallStatus = "lexical fallback (semantic unavailable)"
+			recallState = "enhanced + basic matching"
+			if len(documents) == 0 {
+				recallState = "no eligible saved notes"
+			}
 		}
 	}
+	if len(all) == 0 {
+		recallState = "no saved notes in scope"
+	}
+	appendRecallStatus(request, "Notes", recallState)
 	var lines []string
 	remaining := 2400
 	for _, note := range notes {
@@ -289,7 +301,7 @@ func applyNoteContext(stateDir string, request *workrun.Request) error {
 		}
 		lines = append(lines, line)
 		request.ContextRefs = append(request.ContextRefs, note.ID)
-		request.ContextItems = append(request.ContextItems, workhistory.ContextItem{ID: note.ID, Kind: "note", Title: note.Title, Excerpt: boundedContextExcerpt(note.Excerpt), Scope: contextScope(note.GoalID), Source: strings.Join(note.SourceRefs, ", "), UpdatedAt: note.UpdatedAt})
+		request.ContextItems = append(request.ContextItems, workhistory.ContextItem{ID: note.ID, Kind: "note", Title: note.Title, Excerpt: boundedContextExcerpt(note.Excerpt), Scope: contextScope(note.GoalID), Source: strings.Join(note.SourceRefs[:min(2, len(note.SourceRefs))], ", "), UpdatedAt: note.UpdatedAt})
 		remaining -= len(line)
 	}
 	request.NoteContext = strings.Join(lines, "\n")
@@ -456,11 +468,25 @@ func applyGoalPlanContext(stateDir string, request *workrun.Request) error {
 }
 
 func executeConfiguredWork(ctx context.Context, provider, modelName, stateDir string, request workrun.Request) (workrun.Outcome, error) {
+	request.PreparationContext = ctx
 	service, err := configuredWorkService(provider, modelName, stateDir, &request)
 	if err != nil {
 		return workrun.Outcome{}, err
 	}
 	return service.Execute(ctx, request)
+}
+
+func preparationContext(request *workrun.Request) context.Context {
+	if request.PreparationContext != nil {
+		return request.PreparationContext
+	}
+	return context.Background()
+}
+func appendRecallStatus(request *workrun.Request, scope, status string) {
+	if request.RecallStatus != "" {
+		request.RecallStatus += "; "
+	}
+	request.RecallStatus += scope + ": " + status
 }
 
 func configureWorkRoles(executor *workrun.Executor, settings config.Settings, state string) error {

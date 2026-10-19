@@ -13,9 +13,19 @@ import (
 // Model inference may explain a route, but the validated Request remains the
 // only source of authority and selected connected services.
 func resolveDecision(request Request) (*workhistory.Decision, error) {
-	if len(request.ContextRefs)>32||len(request.ContextItems)>32||len(request.ExcludedKnowledgeIDs)>128{return nil,errors.New("too many saved context references")}
-	for _,item:=range request.ContextItems{if len(item.ID)>128||len(item.Excerpt)>2048||len(item.Source)>2048||len(item.Title)>512{return nil,errors.New("saved context excerpt exceeds its bounds")}}
-	for _,id:=range request.ExcludedKnowledgeIDs{if len(id)>128||(!strings.HasPrefix(id,"mem-")&&!strings.HasPrefix(id,"note-")){return nil,errors.New("invalid excluded knowledge ID")}}
+	if len(request.ContextRefs) > 32 || len(request.ContextItems) > 32 || len(request.ExcludedKnowledgeIDs) > 128 {
+		return nil, errors.New("too many saved context references")
+	}
+	for _, item := range request.ContextItems {
+		if len(item.ID) > 128 || len(item.Excerpt) > 2048 || len(item.Source) > 2048 || len(item.Title) > 512 {
+			return nil, errors.New("saved context excerpt exceeds its bounds")
+		}
+	}
+	for _, id := range request.ExcludedKnowledgeIDs {
+		if len(id) > 128 || (!strings.HasPrefix(id, "mem-") && !strings.HasPrefix(id, "note-")) {
+			return nil, errors.New("invalid excluded knowledge ID")
+		}
+	}
 	origin := strings.TrimSpace(request.DecisionOrigin)
 	if origin == "" {
 		origin = "explicit"

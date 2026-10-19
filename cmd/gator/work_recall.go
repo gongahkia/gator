@@ -20,7 +20,7 @@ func workRecallStatus(ctx context.Context, stateDir string) (worktui.RecallStatu
 	if provider == "" {
 		provider = "ollama"
 	}
-	status := worktui.RecallStatus{Provider: provider, State: "Basic recall available", Storage: "Saved memories, notes, transcripts, and Work records stay in the private Gator state directory on this computer. Forgetting removes an item from future recall; prior transcripts and retained Work evidence may still contain it."}
+	status := worktui.RecallStatus{Provider: provider, State: "Basic recall available", Storage: "Saved memories, notes, transcripts, and Work records stay in the private local Gator state directory on this computer. Forgetting removes an item from future recall; prior transcripts and retained Work evidence may still contain it."}
 	status.Retrieval = "Basic word matching works without a download. Enhanced recall uses " + provider + "; unavailable embeddings fall back to basic matching."
 	status.Chat = "Selected saved context and task sources are supplied to the chat model chosen in /model."
 	if settings.Defaults.Provider == localmodel.ProviderID {
@@ -33,7 +33,7 @@ func workRecallStatus(ctx context.Context, stateDir string) (worktui.RecallStatu
 	if provider != "ollama" {
 		status.Retrieval += " Your cloud retrieval opt-in uploads eligible saved text and search queries to " + provider + " for embedding."
 		if _, err := configuredEmbedder(stateDir); err != nil {
-			status.Detail = "Cloud retrieval unavailable; check the upload setting and API key. Basic matching remains available."
+			status.Detail = "Cloud retrieval unavailable; check the upload setting and API key. Use /model → Cloud to configure that provider's key without selecting it as the chat model. Basic matching remains available."
 		} else {
 			status.State, status.Detail, status.Ready = "Enhanced recall configured", "API key configured; network access and embedding responses are checked on each Work run.", true
 		}

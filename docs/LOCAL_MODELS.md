@@ -74,6 +74,12 @@ deletion and runtime startup require no separate Gator CLI commands.
 
 ## Cloud and custom models
 
+The initial model picker explains storage, retrieval, and chat processing
+separately. Choosing a local embedding model does not change a cloud Work model's
+processing destination. `/memory` exposes the independent retrieval setting,
+readiness, and upload choice, and offers the local embedding download with
+progress and Esc cancellation.
+
 Choose **Cloud API key** from the first screen to configure a provider/model
 with masked API-key entry and provider-specific endpoint fields, then press
 `u`/Enter to select a model. The selection is persisted for Work. The screen

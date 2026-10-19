@@ -7,6 +7,7 @@ type RecallStatus struct {
 }
 
 type KnowledgeItem struct {
+	SourceReviewNeeded                                         bool
 	ID, Kind, Title, Text, Scope, Source, Updated, CurrentText string
 	Available                                                  bool
 }

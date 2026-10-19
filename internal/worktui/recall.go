@@ -98,7 +98,9 @@ func (m Model) startRecallInstall() (tea.Model, tea.Cmd) {
 	install := m.config.InstallRecall
 	go func() {
 		err := install(ctx, func(status string) {
-			if len(events)>=cap(events)-1{return}
+			if len(events) >= cap(events)-1 {
+				return
+			}
 			select {
 			case events <- recallProgress(status):
 			default:

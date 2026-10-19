@@ -157,6 +157,9 @@ func (t goalReviewSnapshot) Execute(_ context.Context, raw json.RawMessage) (age
 		return agent.ToolResult{}, err
 	}
 	for _, m := range memories {
+		if m.SourceStatus == "changed" || m.SourceStatus == "unavailable" {
+			continue
+		}
 		if slices.Contains(t.ExcludedIDs, m.ID) {
 			continue
 		}

@@ -131,6 +131,9 @@ func (m Model) updateModelPanel(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 	if m.pendingPrompt != "" {
 		m.input, m.pendingPrompt = m.pendingPrompt, ""
 	}
+	if m.section == "memory" {
+		return m, tea.Batch(tea.ClearScreen, m.recallStatusCommand())
+	}
 	return m, tea.ClearScreen
 }
 

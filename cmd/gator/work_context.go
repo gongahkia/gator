@@ -28,6 +28,7 @@ func readWorkContext(stateDir, workID, goalID string) (worktui.ContextState, err
 		if strings.HasPrefix(id, "mem-") {
 			if r, err := memories.Load(id); err == nil && (r.GoalID == "" || r.GoalID == result.GoalID) {
 				item.Kind, item.Title, item.Text, item.CurrentText, item.Scope, item.Source, item.Available = "memory", r.Kind, r.Text, r.Text, contextScope(r.GoalID), r.Source, true
+				item.SourceReviewNeeded = r.SourceStatus == "changed" || r.SourceStatus == "unavailable"
 				item.Updated = r.UpdatedAt.Local().Format("Jan 2 15:04")
 			}
 		} else if strings.HasPrefix(id, "note-") {

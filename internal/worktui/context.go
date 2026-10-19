@@ -53,7 +53,19 @@ func (m Model) updateContextKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.contextEditing = false
 			m.contextDetail.CurrentText = m.contextEdit
+			if m.contextWorkID == "" {
+				m.contextDetail.Text = m.contextEdit
+				for i := range m.contextState.Items {
+					if m.contextState.Items[i].ID == m.contextDetail.ID {
+						m.contextState.Items[i].Text = m.contextEdit
+						m.contextState.Items[i].CurrentText = m.contextEdit
+					}
+				}
+			}
 			m.sectionNotice = "Correction saved for future recall. The retained excerpt describes the earlier run."
+			if m.contextDetail.SourceReviewNeeded {
+				m.sectionNotice = "Text corrected. Review and relink the changed source file with /memory correct --source-file before this memory can enter automatic recall."
+			}
 		default:
 			editFormText(&m.contextEdit, key, 4096)
 		}
@@ -74,6 +86,18 @@ func (m Model) updateContextKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.contextConfirm = false
 			m.contextDetail.Available = false
 			m.sectionNotice = "Forgotten from future recall. Prior transcripts and retained Work evidence remain."
+			if m.contextWorkID == "" {
+				id := m.contextDetail.ID
+				items := m.contextState.Items[:0]
+				for _, item := range m.contextState.Items {
+					if item.ID != id {
+						items = append(items, item)
+					}
+				}
+				m.contextState.Items = items
+				m.contextDetail = nil
+				m.selected = min(m.selected, max(0, len(items)-1))
+			}
 		}
 		return m, nil
 	}
@@ -130,7 +154,13 @@ func (m Model) contextPanel() uisnapshot.Panel {
 	p := uisnapshot.Panel{Kind: "context", Title: "Context and sources", Subtitle: m.contextState.Outcome, Selected: m.selected, Notice: m.sectionNotice}
 	if item := m.contextDetail; item != nil {
 		p.Title = item.Title
-		p.Blocks = []uisnapshot.Block{{Title: "Supplied excerpt", Lines: []string{item.Text}}, {Title: "Scope and provenance", Lines: []string{"Scope: " + item.Scope, "Source labels: " + valueOrNone(item.Source), item.Updated, "This is supplied context, not proof of hidden reasoning or that a source supports a claim."}}}
+		p.Blocks = []uisnapshot.Block{{Title: "Supplied excerpt", Lines: []string{item.Text}}, {Title: "Scope and provenance", Lines: []string{"Scope: " + knowledgeScope(item.Scope, m.contextState.GoalID), "Source labels: " + valueOrNone(item.Source), item.Updated, "This is supplied context, not proof of hidden reasoning or that a source supports a claim."}}}
+		if item.SourceReviewNeeded {
+			p.Blocks = append(p.Blocks, uisnapshot.Block{Title: "Source needs review", Lines: []string{"The linked file changed or is unavailable. Automatic recall skips this memory until you review the file and relink it.", "/memory correct " + item.ID + " --source-file PATH TEXT"}})
+		}
+		if !item.Available {
+			p.Blocks = append(p.Blocks, uisnapshot.Block{Title: "Saved state", Lines: []string{"This item is no longer saved. The excerpt remains part of this earlier Work record."}})
+		}
 		if m.contextEditing {
 			p.Kind, p.Title = "knowledge-form", "Correct saved knowledge"
 			p.Rows = []uisnapshot.Row{{Label: "Current saved text", Detail: m.contextEdit}}
@@ -141,11 +171,14 @@ func (m Model) contextPanel() uisnapshot.Panel {
 			p.Hints = []uisnapshot.Hint{{Shortcut: "Enter", Action: "forget"}, {Shortcut: "Esc", Action: "cancel"}}
 		} else {
 			p.Hints = []uisnapshot.Hint{{Shortcut: "E", Action: "correct"}, {Shortcut: "F", Action: "forget"}, {Shortcut: "O", Action: "omit/include next run"}, {Shortcut: "Esc", Action: "back"}}
+			if !item.Available {
+				p.Hints = []uisnapshot.Hint{{Shortcut: "Esc", Action: "back"}}
+			}
 		}
 		return p
 	}
 	for _, item := range m.contextState.Items {
-		state := item.Scope
+		state := knowledgeScope(item.Scope, m.contextState.GoalID)
 		if sliceContains(m.options.ExcludedKnowledgeIDs, item.ID) {
 			state += " · omitted next run"
 		}
@@ -162,4 +195,14 @@ func (m Model) contextPanel() uisnapshot.Panel {
 
 func contextLink(workID string) *uisnapshot.Result {
 	return &uisnapshot.Result{Kind: "notice", Title: "Context and sources", Summary: "Inspect supplied saved context, source references, and usage.", Footer: "/context " + strings.TrimSpace(workID) + " · /followup to keep tracking this work"}
+}
+
+func knowledgeScope(scope, goalID string) string {
+	if scope == "global" {
+		return "Global · available across goals"
+	}
+	if scope == goalID && goalID != "" {
+		return "This goal"
+	}
+	return scope
 }

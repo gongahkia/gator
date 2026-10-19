@@ -463,7 +463,8 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 		}
 	}
 	request := workrun.Request{
-		SourcePath: source, ConversationID: conversationID, Objective: prompt,
+		PreparationContext: ctx,
+		SourcePath:         source, ConversationID: conversationID, Objective: prompt,
 		MaxSteps: options.MaxSteps, Mode: mode, Contract: contract,
 		DecisionOrigin: decisionOrigin, DecisionReason: decisionReason,
 		ExcludedKnowledgeIDs:    append([]string(nil), options.ExcludedKnowledgeIDs...),

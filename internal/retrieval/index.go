@@ -126,6 +126,9 @@ func Search(ctx context.Context, stateDir, scope, query string, documents []Docu
 			return nil, err
 		}
 	}
+	if len(index.Entries) == 0 {
+		return nil, nil
+	}
 	vectors, err := embedder.Embed(ctx, []string{query})
 	if err != nil {
 		return nil, err

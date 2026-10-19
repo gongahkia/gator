@@ -3,6 +3,10 @@ package worktui
 import tea "github.com/charmbracelet/bubbletea"
 
 func (m Model) openModels() (tea.Model, tea.Cmd) {
+	if m.recallBusy {
+		m.sectionNotice = "Finish or cancel the recall model download before managing models."
+		return m, nil
+	}
 	if m.running {
 		m.status = "Finish or cancel the current work before managing models."
 		return m, nil
@@ -25,7 +29,9 @@ func (m Model) openModels() (tea.Model, tea.Cmd) {
 
 // Close releases a model operation if the terminal closes while its panel is open.
 func (m Model) Close() {
-	if m.recallCancel!=nil{m.recallCancel()}
+	if m.recallCancel != nil {
+		m.recallCancel()
+	}
 	if m.models != nil {
 		m.models.Close()
 	}

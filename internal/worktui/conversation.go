@@ -12,7 +12,7 @@ func (m *Model) restoreConversation(conversationID, announcement string) {
 	m.queue = nil
 	m.pendingBundleAction = nil
 	m.lastOutput = ""
-	m.lastWorkID=""
+	m.lastWorkID = ""
 	m.lastBundle = BundleSummary{}
 	m.messages = nil
 	m.revision = ""

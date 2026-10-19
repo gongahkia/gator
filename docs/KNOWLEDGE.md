@@ -49,6 +49,26 @@ records. Saved source text and instructions never grant tool authority.
 
 ## Notes
 
+In terminal chat, `/memory` opens the readiness and setup panel. It explains
+three separate stages: private local storage, retrieval through basic matching
+or the selected embedding provider, and chat processing through `/model`.
+Local retrieval does not prevent selected memories from being sent to a cloud
+chat model. Local-model installation runs with progress and cancellation; cloud
+retrieval requires a separate review of the saved-text upload.
+
+`/context` opens context and sources for the latest Work result; `/context ID`
+opens a retained run. Expand a saved item with Enter to inspect its excerpt,
+scope, source labels, and revision. `E` corrects the canonical saved text, `F`
+reviews forgetting, and `O` toggles omission from automatic recall and knowledge
+tools for the next run. Historical excerpts describe what was supplied at run
+start; they are not rewritten by a later correction or forgetting action.
+Existing conversation text is not erased by omission. A changed file-linked
+source still needs review and relinking before automatic recall can use it.
+
+These excerpts and source references describe inputs, not hidden model
+reasoning or proof that a source supports an answer's claim. Feedback ratings
+are retained for review and do not automatically retrain the selected model.
+
 ```sh
 gator note add --title 'Venue decision' --goal GOAL_ID --source-ref 'source/venue-email.md:12' --body 'Venue B is preferred; verify capacity by Friday.'
 gator note add --title 'Meeting notes' --file ./meeting.md

@@ -80,8 +80,8 @@ type Record struct {
 	FinishedAt         time.Time          `json:"finished_at,omitempty"`
 }
 
-// Decision is the effective, host-validated route for a Work run. It contains
-// identifiers and capability names, never source text or credentials.
+// Decision is the effective, host-validated route for a Work run. Bounded saved
+// context excerpts are retained for review; credentials are never included.
 type Decision struct {
 	Version      int           `json:"version"`
 	Origin       string        `json:"origin"`
