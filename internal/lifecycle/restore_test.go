@@ -33,13 +33,23 @@ type restoreModel struct{}
 func (restoreModel) Complete(context.Context, agent.TurnRequest) (agent.Turn, error) {
 	return agent.Turn{Text: "The decision is due Friday. Original paths in this transcript are historical."}, nil
 }
+
+type restoreDraftModel struct{ calls int }
+
+func (m *restoreDraftModel) Complete(context.Context, agent.TurnRequest) (agent.Turn, error) {
+	m.calls++
+	if m.calls == 1 {
+		return agent.Turn{ToolCalls: []agent.ToolCall{{ID: "write-draft", Name: "write_artifact", Arguments: json.RawMessage(`{"path":"decision.md","content":"# Decision\nChoose by Friday.\n"}`)}}}, nil
+	}
+	return agent.Turn{Text: "Prepared the decision draft for review."}, nil
+}
 func restoreFixture(t *testing.T) (Store, string, string, workrun.Outcome, string) {
 	t.Helper()
 	root, source := t.TempDir(), t.TempDir()
 	if err := os.WriteFile(filepath.Join(source, "notes.md"), []byte("Choose by Friday."), 0600); err != nil {
 		t.Fatal(err)
 	}
-	outcome, err := (workrun.Executor{StateDir: root, Model: restoreModel{}}).Execute(context.Background(), workrun.Request{RunID: "restore-completed", SourcePath: source, Objective: "Inspect the deadline", Mode: action.Inspect, Contract: artifact.InspectionContract()})
+	outcome, err := (workrun.Executor{StateDir: root, Model: &restoreDraftModel{}}).Execute(context.Background(), workrun.Request{RunID: "restore-completed", SourcePath: source, Objective: "Draft the decision summary", Mode: action.Draft, Contract: artifact.DefaultContract("decision.md")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,6 +137,10 @@ func TestRestoreMigratesUsableHistoryAndKnowledgeIntoFreshProfile(t *testing.T) 
 	if string(oldManifest) != string(newManifest) {
 		t.Fatal("migration changed sealed artifact evidence")
 	}
+	data, err := bundle.Output.ReadRegularFile("decision.md", 1024)
+	if err != nil || !strings.Contains(string(data), "Choose by Friday.") {
+		t.Fatal("draft artifact content was lost", err)
+	}
 	if revision.Replay != nil && len(revision.Replay.Configuration) > 0 {
 		t.Fatal("restored replay reactivated old execution configuration")
 	}
@@ -168,6 +182,21 @@ func TestRestoreMigratesUsableHistoryAndKnowledgeIntoFreshProfile(t *testing.T) 
 	latest, _ := sessions.Load(g.ConversationID)
 	if latest.SourceRefreshRequired {
 		t.Fatal("fresh capture did not clear migration refresh requirement")
+	}
+	restoredStore, err := Open(destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nextArchive := filepath.Join(t.TempDir(), "next-generation.tar.gz")
+	if _, err = restoredStore.Export(context.Background(), nextArchive); err != nil {
+		t.Fatal("re-export restored profile", err)
+	}
+	nextPlan, err := restoredStore.PreviewRestore(context.Background(), nextArchive, filepath.Join(t.TempDir(), "second-profile"), nil)
+	if err != nil {
+		t.Fatal("preview second migration", err)
+	}
+	if _, err = restoredStore.Restore(context.Background(), nextPlan.ID); err != nil {
+		t.Fatal("second migration", err)
 	}
 	if _, err = s.Restore(context.Background(), plan.ID); err == nil {
 		t.Fatal("restore overwrote an existing profile")
@@ -265,5 +294,52 @@ func TestRestoreRejectsTraversalLinksAndRuntimeCapabilities(t *testing.T) {
 				t.Fatal("unsafe restore created a profile")
 			}
 		})
+	}
+}
+
+func TestEmptyBackupCanBecomeAFreshProfile(t *testing.T) {
+	s, _ := Open(t.TempDir())
+	archive := filepath.Join(t.TempDir(), "empty.tar.gz")
+	if _, err := s.Export(context.Background(), archive); err != nil {
+		t.Fatal(err)
+	}
+	p, err := s.PreviewRestore(context.Background(), archive, filepath.Join(t.TempDir(), "fresh-empty"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	receipt, err := s.Restore(context.Background(), p.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Files != 0 {
+		t.Fatal("fixture is not an empty backup")
+	}
+	if _, err = os.Stat(filepath.Join(receipt.Plan.Target, "gator", "usage", "policy.json")); err != nil {
+		t.Fatal("empty profile was not initialized")
+	}
+}
+
+func TestProfilePublicationCannotReplaceAnExistingEmptyDirectory(t *testing.T) {
+	parentPath := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(parentPath, "staged", "profile"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(parentPath, "staged", "profile", "content"), []byte("retained"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(parentPath, "destination"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	parent, err := os.OpenRoot(parentPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer parent.Close()
+	if err = publishProfile(parent, "staged/profile", "destination"); err == nil {
+		t.Fatal("publication replaced an existing directory after preflight")
+	}
+	entries, err := os.ReadDir(filepath.Join(parentPath, "destination"))
+	if err != nil || len(entries) != 0 {
+		t.Fatal("publication changed the existing destination", err)
 	}
 }

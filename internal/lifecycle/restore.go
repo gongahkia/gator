@@ -292,6 +292,9 @@ func stageBackup(ctx context.Context, archive, parent string) (stage string, man
 		return
 	}
 	defer root.Close()
+	if err = root.MkdirAll("gator", 0700); err != nil {
+		return
+	}
 	manifest, err = readBackup(ctx, copyPath, func(header *tar.Header, reader io.Reader) error {
 		name := filepath.FromSlash(header.Name)
 		if err := root.MkdirAll(filepath.Dir(name), 0700); err != nil {

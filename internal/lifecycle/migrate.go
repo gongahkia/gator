@@ -358,6 +358,31 @@ func validateRestoredProfile(ctx context.Context, profile, final string) error {
 			}
 		}
 	}
+	err = filepath.WalkDir(filepath.Join(profile, "gator", "conversations"), func(path string, entry fs.DirEntry, err error) error {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		rel, _ := filepath.Rel(filepath.Join(profile, "gator", "conversations"), path)
+		parts := strings.Split(filepath.ToSlash(rel), "/")
+		if len(parts) == 2 && parts[1] == "conversation.json" {
+			_, err = sessions.Load(parts[0])
+			return err
+		}
+		if len(parts) == 3 && parts[1] == "revisions" && strings.HasSuffix(parts[2], ".json") {
+			_, err = sessions.LoadRevision(parts[0], strings.TrimSuffix(parts[2], ".json"))
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
 	history, err := workhistory.Open(profile)
 	if err != nil {
 		return err

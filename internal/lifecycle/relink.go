@@ -143,8 +143,8 @@ func (s Store) PreviewRelink(ctx context.Context, from, to string) (RelinkPlan, 
 	if err != nil {
 		return p, err
 	}
-	if len(data) > 32<<20 {
-		return p, errors.New("source relink exceeds its 32 MiB metadata review bound")
+	if len(data) > 31<<20 {
+		return p, errors.New("source relink exceeds its 31 MiB metadata review bound")
 	}
 	return p, privateJSON(filepath.Join(s.control, "plans", "relink-"+p.ID+".json"), p)
 }
@@ -197,6 +197,9 @@ func (s Store) Relink(ctx context.Context, id string) (int, error) {
 	}
 	defer root.Close()
 	for _, edit := range p.Edits {
+		if !filepath.IsLocal(edit.Path) || !migrationMetadata(edit.Path) {
+			return 0, errors.New("unsafe source relink review path")
+		}
 		current, err := root.ReadFile(edit.Path)
 		if err != nil {
 			return 0, err
