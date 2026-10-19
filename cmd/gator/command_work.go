@@ -169,6 +169,11 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	if err != nil {
 		return err
 	}
+	release, guardErr := state.Guard(stateDir, false)
+	if guardErr != nil {
+		return guardErr
+	}
+	defer release()
 	var selectedGoal goal.Record
 	var goalStore goal.Store
 	if strings.TrimSpace(*goalID) != "" {

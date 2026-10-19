@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/gongahkia/gator/internal/agent"
 	"time"
+
+	"github.com/gongahkia/gator/internal/agent"
 )
 
 type categoryKey struct{}

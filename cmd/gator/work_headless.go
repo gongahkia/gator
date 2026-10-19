@@ -7,15 +7,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"os"
+	"os/signal"
+	"syscall"
+
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/workrun"
-	"io"
-	"os"
-	"os/signal"
-	"syscall"
 )
 
 type workFrame struct {
@@ -69,6 +70,12 @@ func workHeadless(ctx context.Context, in io.Reader, out io.Writer) (resultErr e
 		return errors.New("expected Work v1 start frame")
 	}
 	input := first.Request
+	release, guardErr := state.Guard(stateDir, false)
+	if guardErr != nil {
+		return guardErr
+	}
+	defer release()
+
 	request := workrun.Request{Limits: input.Limits, WebOrigins: input.WebOrigins, Images: input.Images, Attachments: input.Attachments, SourcePath: input.Source, Objective: input.Objective, ConversationID: input.ConversationID, ParentRevisionID: input.ParentRevisionID, SnapshotID: input.SnapshotID, RefreshSource: input.Refresh, Mode: input.Mode, Contract: input.Contract, MaxSteps: input.MaxSteps, ConnectorIDs: input.Connectors}
 	service, err := configuredWorkService(input.Provider, input.Model, stateDir, &request)
 	if err != nil {

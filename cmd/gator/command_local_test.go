@@ -21,6 +21,7 @@ import (
 
 func TestLocalUseConfiguresNativeProviderForInstalledCuratedModel(t *testing.T) {
 	useGenerousLocalModelHost(t)
+	t.Setenv("GATOR_STATE_DIR", t.TempDir())
 	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
 	server := newLocalModelServer(t)
 	defer server.Close()
@@ -43,8 +44,8 @@ func TestLocalUseConfiguresNativeProviderForInstalledCuratedModel(t *testing.T) 
 	if err != nil || executor.Model == nil {
 		t.Fatalf("local executor = %#v, err = %v", executor, err)
 	}
-	if _, ok := executor.Model.(localmodel.TextOnlyModel); !ok {
-		t.Fatalf("local executor model = %T, want text-only local wrapper", executor.Model)
+	if capabilities, ok := executor.Model.(agent.VisualInputModel); !ok || capabilities.SupportsVisualInput() {
+		t.Fatalf("local executor model = %T, want text-only capabilities through metering", executor.Model)
 	}
 	if _, err := newCodeExecutor(localmodel.ProviderID, "", "http://models.example.com/v1/chat/completions"); err == nil || !strings.Contains(err.Error(), "loopback") {
 		t.Fatalf("managed local remote override error = %v", err)

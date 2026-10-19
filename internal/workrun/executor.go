@@ -41,7 +41,6 @@ import (
 // failure. The retained output can therefore be reviewed after an interrupted
 // or unsuccessful attempt.
 func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Outcome, finalErr error) {
-	ctx = usage.WithState(ctx, request.StateDir)
 	now := e.Now
 	if now == nil {
 		now = time.Now
@@ -50,6 +49,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	if err != nil {
 		return Outcome{}, err
 	}
+	ctx = usage.WithState(ctx, request.StateDir)
 	release, guardErr := state.Guard(request.StateDir, false)
 	if guardErr != nil {
 		return Outcome{}, guardErr
