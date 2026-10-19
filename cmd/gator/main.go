@@ -28,6 +28,11 @@ Start:
   gator "research X and produce a report"
   gator work [OPTIONS] TASK
 
+Inside Gator:
+  /followup new                 review a project check before saving
+  /memory                       set up recall and inspect data destinations
+  /context                      review sources and saved context
+
 Product areas:
   Work        gator work [TASK] · gator work resume CONVERSATION TASK
   History     gator work list · gator work history CONVERSATION · gator work show ID
@@ -58,7 +63,7 @@ Common follow-up actions:
 
 Advanced and integration families remain available when needed:
   provider, config hook, agent, browser, desktop, doctor, extension, lsp,
-  mcp, theme, update, work eval, and work snapshot.
+  mcp, pilot guide|record|report, theme, update, work eval, and work snapshot.
   Run an advanced family with --help or consult its command-specific output.
 
 For a free-form Work task that begins with a nested command name, use

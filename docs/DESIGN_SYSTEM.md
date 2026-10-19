@@ -24,6 +24,19 @@ documents; user text, command output, and approval previews stay literal.
 
 ## Shared layout
 
+Product controls use existing pickers, review panels, expandable details, and
+keyboard hints. `/followup` puts the desired outcome, selected sources,
+notification conditions, timing, permissions, health, and next action before
+runtime details. Timing and permitted actions remain separate; there is no
+numbered autonomy slider. Specialist identities and task mechanics belong in
+`/tasks`, `/agents`, and advanced diagnostics. Normal progress describes the
+work, evidence review, or blocker in user terms.
+
+`/memory` and initial model setup distinguish local storage, retrieval, and chat
+processing. `/context` expands supplied excerpts and source references with
+scope and correction controls. Input provenance does not establish model
+causality or source support for a claim.
+
 - `🐊 Gator` labels the home and conversation. Green marks Gator, the prompt,
   focused rows, and active work; neutral text carries content and muted green
   carries secondary context. `/theme` applies the saved `gator`, `contrast`, or

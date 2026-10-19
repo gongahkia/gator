@@ -7,7 +7,7 @@ import { runDoctor } from "./doctor.js";
 import { bundleResult, type BackendBundle } from "./bundle.js";
 import { ResultBody, type BackendResult } from "./result.js";
 import { searchMessages } from "./search.js";
-import { panelGeometry, wrapTerminalText } from "./layout.js";
+import { panelGeometry, wrapTerminalText, fitPanelHints, formFieldTail } from "./layout.js";
 import { cursorAtGraphemeColumn, graphemeAt, graphemeColumn, nextGrapheme, previousGrapheme } from "./text.js";
 import { GatorPaletteContext, paletteForTheme, synchronizeKitTheme, useGatorPalette } from "./theme.js";
 
@@ -141,6 +141,7 @@ function GreenPrompt({
   prefillVersion: number;
 }): React.ReactNode {
   const palette = useGatorPalette();
+  const terminal = useContext(TerminalSizeContext);
   const [cursor, setCursor] = useState(value.length);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const valueRef = useRef(value);
@@ -217,7 +218,7 @@ function GreenPrompt({
             ? <Text>{line.slice(0, localCursor)}<Text inverse>{graphemeAt(line, localCursor) || " "}</Text>{line.slice(nextGrapheme(line, localCursor))}</Text>
             : <Text>{line || " "}</Text>}
         </Box>;
-      }) : <Box><Text color={palette.accent}>❯ </Text><Text><Text inverse> </Text><Text dimColor>Ask Gator to work on something…</Text></Text></Box>}
+      }) : <Box><Text color={palette.accent}>❯ </Text><Text><Text inverse> </Text><Text dimColor>{(terminal?.columns ?? 80) < 40 ? "Ask Gator…" : "Ask Gator to work on something…"}</Text></Text></Box>}
     </Box>
   );
 }
@@ -296,7 +297,7 @@ function PanelKeys({ bridge, scroll, exit }: { bridge: GatorBridge; scroll: (amo
     else if (key.pageDown) name = "pgdown";
     else if (key.tab && key.shift) name = "shift+tab";
     else if (key.tab) name = "tab";
-    else if (input === "f1") name = "f1";
+    else if (event.keypress.name === "f1") name = "f1";
     else if (key.ctrl) name = `ctrl+${input}`;
     else if (input === " ") name = "space";
     else if (!key.meta) name = input;
@@ -322,17 +323,19 @@ function PanelScreen({ panel, status, draft, statusLine, bridge, exit }: { panel
     ...(block.lines.length ? block.lines.flatMap((line) => wrapTerminalText(line, geometry.contentWidth).map((text) => ({ text, heading: false }))) : [{ text: "None", heading: false }]),
     { text: "", heading: false },
   ]);
-  const rowHeight = rows.some((row) => row.detail) ? 3 : 2;
-  const noticeRows = panel.notice || status ? 1 : 0;
+  const rowHeight = rows.some((row) => row.detail) ? (geometry.compact ? 2 : 3) : (geometry.compact ? 1 : 2);
+  const noticeRows = (panel.notice ? (geometry.compact ? 1 : 2) : 0) + (status && status !== panel.notice ? (geometry.compact ? 1 : 2) : 0);
   const bodyRows = Math.max(1, geometry.bodyRows - noticeRows);
   const maxRows = Math.max(1, Math.floor((blocks.length > 0 ? Math.ceil(bodyRows / 2) : bodyRows) / rowHeight));
   const selected = Math.min(Math.max(0, panel.selected ?? 0), Math.max(0, rows.length - 1));
   const rowStart = Math.max(0, Math.min(selected - Math.floor(maxRows / 2), rows.length - maxRows));
-  const maxLines = Math.max(1, bodyRows - (rows.length > 0 ? Math.min(rows.length, maxRows) * rowHeight : 0));
+  const remainingLines = Math.max(1, bodyRows - (rows.length > 0 ? Math.min(rows.length, maxRows) * rowHeight : 0));
+  const maxLines = Math.max(1, remainingLines - (blocks.length > remainingLines ? 1 : 0));
   const blockOffset = Math.min(offset, Math.max(0, blocks.length - maxLines));
   const compactShortcuts = panel.hints?.length
-    ? [...new Set([...panel.hints.slice(0, 2), panel.hints[panel.hints.length - 1]].map((hint) => hint.shortcut))].join(" · ")
+    ? fitPanelHints(panel.hints, geometry.contentWidth, true).map((hint) => hint.shortcut).join(" · ")
     : "Esc back";
+  const visibleHints = fitPanelHints(panel.hints ?? [], geometry.contentWidth);
   return (
     <Box flexDirection="column" flexGrow={1} paddingX={geometry.paddingX} paddingTop={geometry.compact ? 0 : 1}>
       <PanelKeys bridge={bridge} exit={exit} scroll={(amount) => setOffset((current) => Math.max(0, Math.min(blocks.length - maxLines, current + amount)))} />
@@ -350,7 +353,7 @@ function PanelScreen({ panel, status, draft, statusLine, bridge, exit }: { panel
           const active = panel.kind !== "inbox" && panel.kind !== "jobs" && rowStart + index === selected;
           return <Box key={`${rowStart + index}-${row.label}`} flexDirection="column" marginBottom={geometry.compact ? 0 : 1}>
             <Text wrap="truncate-end" color={active ? palette.accent : undefined} bold={active}>{active ? "❯ " : "  "}{row.label}{row.state ? <Text color={row.tone === "warning" ? palette.warning : row.tone === "error" ? palette.error : row.tone === "success" ? palette.accent : palette.secondary}>  ·  {row.state}</Text> : null}</Text>
-            {row.detail && <Box marginLeft={2}><Text wrap="truncate-end" dimColor={!active}>{row.detail}{active && panel.kind.endsWith("-form") && <Text inverse> </Text>}</Text></Box>}
+            {row.detail && <Box marginLeft={2}><Text wrap="truncate-end" dimColor={!active}>{active && panel.kind.endsWith("-form") ? formFieldTail(row.detail, geometry.contentWidth - 3) : row.detail}{active && panel.kind.endsWith("-form") && <Text inverse> </Text>}</Text></Box>}
           </Box>;
         })}
         {blocks.slice(blockOffset, blockOffset + maxLines).map((line, index) => <Box key={`${blockOffset + index}-${line.text}`} marginBottom={line.heading ? 0 : undefined}>
@@ -363,7 +366,7 @@ function PanelScreen({ panel, status, draft, statusLine, bridge, exit }: { panel
         </Box>
         <Divider width={geometry.contentWidth} color={palette.accent} />
         <Text wrap="truncate-end" dimColor>{geometry.compact ? compactShortcuts : panel.hints?.length
-          ? <Byline>{panel.hints.map((hint) => <KeyboardShortcutHint key={`${hint.shortcut}-${hint.action}`} shortcut={hint.shortcut} action={hint.action} />)}</Byline>
+          ? <Byline>{visibleHints.map((hint) => <KeyboardShortcutHint key={`${hint.shortcut}-${hint.action}`} shortcut={hint.shortcut} action={hint.action} />)}</Byline>
           : panel.footer || "Esc back"}</Text>
       </Box>
       {focused && <Box flexGrow={1} />}
@@ -494,14 +497,25 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
     }
   };
   const context = [state.title, state.provider ? `${state.provider}${state.model ? `/${state.model}` : ""}` : "Choose model: /model", state.source.split("/").filter(Boolean).at(-1) || state.source].filter(Boolean).join(" · ");
-  const welcome = (
+  const compactHome = (terminal?.rows ?? 24) < 20 || (terminal?.columns ?? 80) < 60;
+  const welcome = compactHome ? (
+    <Box flexDirection="column">
+      <Text color={palette.accent} bold>🐊 Gator</Text>
+      <Text dimColor wrap="truncate-end">{context}</Text>
+      {state.first_run && <Text wrap="truncate-end">/model · Choose a chat model</Text>}
+      <Text wrap="truncate-end">/followup new · Track project changes</Text>
+      <Text dimColor wrap="truncate-end">/memory · Recall and data destinations</Text>
+      {(state.checks ?? []).slice(0, 1).map((check, index) => <Text key={index} color={check.state === "offline" || check.state === "couldn't check" ? palette.warning : palette.secondary} wrap="truncate-end">{check.title} · {check.state} · /followup</Text>)}
+      <Text dimColor wrap="truncate-end">Type / for commands.</Text>
+    </Box>
+  ) : (
     <Box flexDirection="column">
       <WelcomeScreen appName="Gator" subtitle="Your ongoing work, ready when you are" color={palette.accent} logo={<Text color={palette.accent}>🐊</Text>} />
       <Text dimColor>{context}</Text>
       <Box marginTop={1} marginLeft={1} flexDirection="column">
         <Text color={palette.secondary} bold>{state.first_run ? "Get started" : "Next up"}</Text>
         {state.first_run ? (
-          <><Text>  1  /model  Choose a cloud or local model</Text><Text>  2  Ask: Summarize this folder into a daily brief with next actions.</Text></>
+          <><Text>  1  /model  Choose a cloud or local model</Text><Text>  2  Ask: Review this project’s notes and draft the next useful response.</Text></>
         ) : state.actions.slice(0, 4).map((action, index) => (
           <Text key={index}>  {action.Label} · {action.Command}</Text>
         ))}

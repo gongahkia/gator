@@ -163,13 +163,7 @@ func (m Model) updateAgentEvent(value agent.Event) (tea.Model, tea.Cmd) {
 			return m, waitWorkEvent(m.live)
 		}
 	}
-	if value.Kind == agent.EventTextDelta {
-		m.status = "Working: " + value.Text
-	} else if value.Text != "" {
-		m.status = value.Text
-	} else {
-		m.status = string(value.Kind)
-	}
+	m.status = workProgress(value)
 	return m, waitWorkEvent(m.live)
 }
 
@@ -302,6 +296,18 @@ func (m Model) updateKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if value.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
+		return m, nil
+	}
+	if m.productHelp {
+		if value.String() == "esc" || value.String() == "f1" {
+			m.productHelp = false
+		} else if value.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+		return m, nil
+	}
+	if value.String() == "f1" && (m.section != "" || m.launcher) {
+		m.productHelp = true
 		return m, nil
 	}
 	if m.pendingBundleAction != nil {

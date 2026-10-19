@@ -332,6 +332,7 @@ type Model struct {
 	learningFilter         learning.Status
 	learningForm           *learningForm
 	sectionNotice          string
+	productHelp            bool
 	followupForm           *followupForm
 	followupSaving         bool
 	checks                 []workhome.Check

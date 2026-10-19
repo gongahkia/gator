@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { panelGeometry, wrapTerminalText } from "../src/layout.js";
+import { panelGeometry, wrapTerminalText, fitPanelHints, formFieldTail, terminalCells } from "../src/layout.js";
 import { searchMessages } from "../src/search.js";
 import { graphemeAt, nextGrapheme, previousGrapheme } from "../src/text.js";
 import { paletteForTheme } from "../src/theme.js";
@@ -49,4 +49,23 @@ test("saved themes produce distinct UI accents", () => {
   assert.equal(getTheme("dark").permission, paletteForTheme("mono").accent);
   assert.equal(getTheme("dark").link, paletteForTheme("mono").accent);
   synchronizeKitTheme(paletteForTheme("gator"));
+});
+
+test("focused forms reserve borders and preserve cancel and help in narrow footers", () => {
+  const geometry = panelGeometry(80, 24, true, false, true);
+  assert.equal(geometry.bodyRows, 9);
+  const hints = [{ shortcut: "Tab", action: "next field" }, { shortcut: "Ctrl+R", action: "review" }, { shortcut: "Ctrl+U", action: "clear field" }, { shortcut: "Esc", action: "cancel" }];
+  for (const [width, compact] of [[72, false], [20, true]] as const) {
+    const shown = fitPanelHints(hints, width, compact);
+    assert.equal(shown.at(-1)?.shortcut, "Esc");
+    assert.ok(shown.some((hint) => hint.shortcut === "F1"));
+    assert.ok(terminalCells(shown.map((hint) => compact ? hint.shortcut : `${hint.shortcut} to ${hint.action}`).join(" · ")) <= width);
+  }
+  const tail = formFieldTail("A long outcome ends with 🐊e\u0301", 12);
+  assert.ok(tail.startsWith("…"));
+  assert.ok(tail.endsWith("🐊e\u0301"));
+  assert.ok(terminalCells(tail) <= 12);
+  const modelHints = fitPanelHints([...hints, { shortcut: "F1", action: "help" }], 20, true);
+  assert.equal(modelHints.at(-1)?.shortcut, "Esc");
+  assert.equal(modelHints.filter((hint) => hint.shortcut === "F1").length, 1);
 });

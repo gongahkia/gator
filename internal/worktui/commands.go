@@ -64,7 +64,14 @@ func (m *Model) openGoalPicker() {
 		if goal.Status != "active" {
 			continue
 		}
-		m.entries = append(m.entries, entry{title: goal.Title, subtitle: goal.Context, kind: "goal", id: goal.ID})
+		health := "No scheduled check · /followup new"
+		for _, check := range m.checks {
+			if check.GoalID == goal.ID {
+				health = check.HealthLine()
+				break
+			}
+		}
+		m.entries = append(m.entries, entry{title: goal.Title, subtitle: health, kind: "goal", id: goal.ID})
 	}
 	m.paletteQuery = ""
 	m.selected = 0
@@ -189,7 +196,7 @@ func commandPaletteEntries() []entry {
 		{title: "/activity", subtitle: "Show checks and work for this goal", kind: "command", command: "/activity"},
 		{title: "/notifications", subtitle: "Set alerts for this goal", kind: "command-input", command: "/notifications"},
 		{title: "/suggestions", subtitle: "Review proposed lasting changes", kind: "command-input", command: "/suggestions"},
-		{title: "/memory", subtitle: "Manage saved knowledge", kind: "command-input", command: "/memory"},
+		{title: "/memory", subtitle: "Set up recall and manage saved context", kind: "command", command: "/memory"},
 		{title: "/note", subtitle: "Save or search personal notes", kind: "command-input", command: "/note"},
 		{title: "/skill", subtitle: "Create or manage reusable procedures", kind: "command-input", command: "/skill"},
 		{title: "/learnings", subtitle: "Review guidance from earlier work", kind: "command", command: "/learnings"},
@@ -318,7 +325,13 @@ func (m Model) commandAvailable(command string) bool {
 	case "/suggestions":
 		return m.config.SuggestionAction != nil
 	case "/memory":
-		return m.config.MemoryAction != nil
+		return m.config.MemoryAction != nil || m.config.RecallStatus != nil
+	case "/followup":
+		return m.config.SaveFollowup != nil
+	case "/context":
+		return m.config.ReadContext != nil
+	case "/pilot":
+		return m.config.PilotAction != nil
 	case "/note":
 		return m.config.NoteAction != nil
 	case "/skill":
@@ -635,6 +648,10 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		result = "Cleared the prompt queue."
 	case "/jobs":
 		if len(fields) == 1 {
+			if m.config.ReadChecks != nil {
+				cmd := m.openFollowup()
+				return m, cmd
+			}
 			m.section = "jobs"
 			return m, nil
 		}
@@ -713,6 +730,16 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		if len(fields) == 1 && m.config.RecallStatus != nil {
 			cmd := m.openRecall()
 			return m, cmd
+		}
+		if len(fields) >= 3 && fields[1] == "embeddings" && fields[2] == "install" && m.config.InstallRecall != nil {
+			m.section, m.home = "memory", false
+			if len(fields) == 4 && fields[3] == "--yes" {
+				return m.startRecallInstall()
+			}
+			if len(fields) == 3 {
+				m.recallConfirm = "install"
+				return m, nil
+			}
 		}
 		if m.config.MemoryAction == nil {
 			err = errorsUnavailable("memory")
@@ -1397,6 +1424,7 @@ func workHelp() string {
   /mode auto|inspect|draft|act   choose Work authority
   /artifact [add|remove] PATH    set expected deliverables
   /history [STATUS]              browse all retained Work
+  /followup [new]                set up and manage project follow-ups
   /jobs [list|add|show|edit|enable|disable|run|history|remove]
                                  schedule and review repeatable Work
   /inbox [show|read|rate|report] review and rate follow-up results
@@ -1408,6 +1436,8 @@ func workHelp() string {
                                  set desktop alerts for the current goal
   /suggestions [list|show|accept|reject]
                                  review proposed durable changes
+  /memory                        set up recall; inspect data destinations
+  /context [WORK_ID]              review sources and saved context; correct or omit
   /memory add|list|search|show|correct|forget ...
                                  manage explicit saved knowledge
   /note add TITLE | BODY          save a Markdown note in the current goal
@@ -1434,7 +1464,7 @@ Navigation
   ctrl+x    retained conversations
   ctrl+b    inbox
   ctrl+j    insert a new line in the composer
-  /jobs     scheduled jobs
+  /followup scheduled checks and recovery
   ctrl+p    searchable command palette`
 }
 
@@ -1444,6 +1474,7 @@ func workAdvancedHelp() string {
   /source ignore|unignore|ignored PATH · /source-refresh
   /connector ... · /web-origin ...
   /status · /permissions · /statusline · /doctor · /agents
+  /pilot guide|record|report      review observed project follow-up outcomes
   /revision-back · /revision-forward [REVISION]
   /queue · /dequeue · /clear-queue
   /tasks · /cancel-task ID · /steer-task ID MESSAGE · /steer MESSAGE

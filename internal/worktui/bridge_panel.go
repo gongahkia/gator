@@ -14,11 +14,12 @@ func (m Model) bridgePanel() *uisnapshot.Panel {
 		return &panel
 	}
 	if m.launcher {
-		panel := m.bridgeLauncherPanel()
+		panel := m.withPanelHelp(m.bridgeLauncherPanel())
 		return &panel
 	}
 	if m.section != "" {
 		panel := m.bridgeSectionPanel()
+		panel = m.withPanelHelp(panel)
 		return &panel
 	}
 	if m.pendingBundleAction != nil {
@@ -282,4 +283,15 @@ func (m Model) bridgeLearningsPanel() uisnapshot.Panel {
 		panel.Notice = "No learnings match this view. Press N to add a preference."
 	}
 	return panel
+}
+
+func (m Model) withPanelHelp(panel uisnapshot.Panel) uisnapshot.Panel {
+	if !m.productHelp {
+		return panel
+	}
+	lines := []string{}
+	for _, hint := range panel.Hints {
+		lines = append(lines, hint.Shortcut+" · "+hint.Action)
+	}
+	return uisnapshot.Panel{Kind: "help", Title: panel.Title + " · shortcuts", Blocks: []uisnapshot.Block{{Lines: lines}}, Hints: []uisnapshot.Hint{{Shortcut: "F1/Esc", Action: "back"}}}
 }

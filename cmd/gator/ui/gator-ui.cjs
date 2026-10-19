@@ -46187,8 +46187,42 @@ function panelGeometry(columns, rows, focused, picker, hasSubtitle) {
   const compact = rows < 16;
   const showSubtitle = hasSubtitle && !compact;
   const showComposerAnchor = !compact;
-  const chrome = 1 + (showSubtitle ? 2 : 0) + (picker ? compact ? 1 : 4 : 0) + 2 + 2 + (showComposerAnchor ? 3 : 0) + (compact ? 0 : 1);
+  const chrome = (compact ? 0 : 1) + (focused && !compact ? 3 : 0) + 1 + (showSubtitle ? 2 : 0) + (picker ? compact ? 1 : 4 : 0) + (compact ? 1 : 2) + 1 + 2 + (showComposerAnchor ? 3 : 0);
   return { paddingX, panelWidth, contentWidth, compact, showSubtitle, showComposerAnchor, bodyRows: Math.max(1, rows - chrome) };
+}
+function terminalCells(value) {
+  return [...graphemes.segment(value)].reduce((cells, part) => cells + (wide.test(part.segment) ? 2 : 1), 0);
+}
+function formFieldTail(value, width) {
+  const text = value.replace(/\s+/g, " ");
+  if (terminalCells(text) <= width) return text;
+  const parts = [...graphemes.segment(text)].map((part) => part.segment);
+  let tail = "", cells = 1;
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const size = terminalCells(parts[i]);
+    if (cells + size > Math.max(1, width)) break;
+    tail = parts[i] + tail;
+    cells += size;
+  }
+  return "\u2026" + tail;
+}
+function fitPanelHints(hints, width, compact = false) {
+  if (!hints.length) return [];
+  const last = hints.find((hint) => hint.shortcut.includes("Esc")) ?? hints[hints.length - 1];
+  const cost = (hint) => terminalCells(compact ? hint.shortcut : `${hint.shortcut} to ${hint.action}`);
+  if (hints.reduce((sum, hint) => sum + cost(hint), 0) + (hints.length - 1) * 3 <= width) return hints;
+  const help = hints.find((hint) => hint.shortcut === "F1") ?? { shortcut: "F1", action: "shortcuts" };
+  const selected = [];
+  const includeHelp = !last.shortcut.includes("F1") && cost(last) + cost(help) + 3 <= width;
+  let used = cost(last) + (includeHelp ? cost(help) + 3 : 0);
+  for (const hint of hints.filter((hint2) => hint2 !== last && hint2.shortcut !== "F1")) {
+    const addition = cost(hint) + 3;
+    if (used + addition > width) break;
+    selected.push(hint);
+    used += addition;
+  }
+  if (includeHelp) selected.push(help);
+  return [...selected, last];
 }
 function wrapTerminalText(value, width) {
   const limit = Math.max(1, width);
@@ -46322,6 +46356,7 @@ function GreenPrompt({
   prefillVersion
 }) {
   const palette = useGatorPalette();
+  const terminal = (0, import_react58.useContext)(TerminalSizeContext);
   const [cursor, setCursor] = (0, import_react58.useState)(value.length);
   const [historyIndex, setHistoryIndex] = (0, import_react58.useState)(-1);
   const valueRef = (0, import_react58.useRef)(value);
@@ -46456,7 +46491,7 @@ function GreenPrompt({
     /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.accent, children: "\u276F " }),
     /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { children: [
       /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { inverse: true, children: " " }),
-      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: true, children: "Ask Gator to work on something\u2026" })
+      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: true, children: (terminal?.columns ?? 80) < 40 ? "Ask Gator\u2026" : "Ask Gator to work on something\u2026" })
     ] })
   ] }) });
 }
@@ -46565,7 +46600,7 @@ function PanelKeys({ bridge, scroll, exit }) {
     else if (key.pageDown) name = "pgdown";
     else if (key.tab && key.shift) name = "shift+tab";
     else if (key.tab) name = "tab";
-    else if (input === "f1") name = "f1";
+    else if (event.keypress.name === "f1") name = "f1";
     else if (key.ctrl) name = `ctrl+${input}`;
     else if (input === " ") name = "space";
     else if (!key.meta) name = input;
@@ -46585,22 +46620,24 @@ function PanelScreen({ panel, status, draft, statusLine, bridge, exit }) {
     setOffset(0);
   }, [panel.kind, panel.title, panel.subtitle]);
   const rows = panel.rows ?? [];
-  const focused = panel.kind === "confirmation" || panel.kind === "model-form" || panel.kind === "learning-form";
+  const focused = panel.kind === "confirmation" || panel.kind.endsWith("-form");
   const geometry = panelGeometry(terminal?.columns ?? 80, terminal?.rows ?? 24, focused, panel.kind === "picker", !!panel.subtitle);
   const blocks = (panel.blocks ?? []).flatMap((block) => [
     ...block.title ? [{ text: block.title, heading: true }] : [],
     ...block.lines.length ? block.lines.flatMap((line) => wrapTerminalText(line, geometry.contentWidth).map((text) => ({ text, heading: false }))) : [{ text: "None", heading: false }],
     { text: "", heading: false }
   ]);
-  const rowHeight = rows.some((row) => row.detail) ? 3 : 2;
-  const noticeRows = panel.notice || status ? 1 : 0;
+  const rowHeight = rows.some((row) => row.detail) ? geometry.compact ? 2 : 3 : geometry.compact ? 1 : 2;
+  const noticeRows = (panel.notice ? geometry.compact ? 1 : 2 : 0) + (status && status !== panel.notice ? geometry.compact ? 1 : 2 : 0);
   const bodyRows = Math.max(1, geometry.bodyRows - noticeRows);
   const maxRows = Math.max(1, Math.floor((blocks.length > 0 ? Math.ceil(bodyRows / 2) : bodyRows) / rowHeight));
   const selected = Math.min(Math.max(0, panel.selected ?? 0), Math.max(0, rows.length - 1));
   const rowStart = Math.max(0, Math.min(selected - Math.floor(maxRows / 2), rows.length - maxRows));
-  const maxLines = Math.max(1, bodyRows - (rows.length > 0 ? Math.min(rows.length, maxRows) * rowHeight : 0));
+  const remainingLines = Math.max(1, bodyRows - (rows.length > 0 ? Math.min(rows.length, maxRows) * rowHeight : 0));
+  const maxLines = Math.max(1, remainingLines - (blocks.length > remainingLines ? 1 : 0));
   const blockOffset = Math.min(offset, Math.max(0, blocks.length - maxLines));
-  const compactShortcuts = panel.hints?.length ? [...new Set([...panel.hints.slice(0, 2), panel.hints[panel.hints.length - 1]].map((hint) => hint.shortcut))].join(" \xB7 ") : "Esc back";
+  const compactShortcuts = panel.hints?.length ? fitPanelHints(panel.hints, geometry.contentWidth, true).map((hint) => hint.shortcut).join(" \xB7 ") : "Esc back";
+  const visibleHints = fitPanelHints(panel.hints ?? [], geometry.contentWidth);
   return /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, paddingX: geometry.paddingX, paddingTop: geometry.compact ? 0 : 1, children: [
     /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(PanelKeys, { bridge, exit, scroll: (amount) => setOffset((current) => Math.max(0, Math.min(blocks.length - maxLines, current + amount))) }),
     /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", flexGrow: focused ? 0 : 1, width: geometry.panelWidth, alignSelf: focused ? "center" : void 0, borderStyle: focused && !geometry.compact ? "round" : void 0, borderColor: focused && !geometry.compact ? palette.accent : void 0, paddingX: focused && !geometry.compact ? 1 : 0, marginTop: focused && !geometry.compact ? 1 : 0, children: [
@@ -46631,8 +46668,8 @@ function PanelScreen({ panel, status, draft, statusLine, bridge, exit }) {
               ] }) : null
             ] }),
             row.detail && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { wrap: "truncate-end", dimColor: !active, children: [
-              row.detail,
-              active && (panel.kind === "model-form" || panel.kind === "learning-form") && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { inverse: true, children: " " })
+              active && panel.kind.endsWith("-form") ? formFieldTail(row.detail, geometry.contentWidth - 3) : row.detail,
+              active && panel.kind.endsWith("-form") && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { inverse: true, children: " " })
             ] }) })
           ] }, `${rowStart + index}-${row.label}`);
         }),
@@ -46643,7 +46680,7 @@ function PanelScreen({ panel, status, draft, statusLine, bridge, exit }) {
         status && status !== panel.notice && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginTop: geometry.compact ? 0 : 1, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { wrap: "truncate-end", dimColor: true, children: status }) })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Divider, { width: geometry.contentWidth, color: palette.accent }),
-      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { wrap: "truncate-end", dimColor: true, children: geometry.compact ? compactShortcuts : panel.hints?.length ? /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Byline, { children: panel.hints.map((hint) => /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(KeyboardShortcutHint, { shortcut: hint.shortcut, action: hint.action }, `${hint.shortcut}-${hint.action}`)) }) : panel.footer || "Esc back" })
+      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { wrap: "truncate-end", dimColor: true, children: geometry.compact ? compactShortcuts : panel.hints?.length ? /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Byline, { children: visibleHints.map((hint) => /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(KeyboardShortcutHint, { shortcut: hint.shortcut, action: hint.action }, `${hint.shortcut}-${hint.action}`)) }) : panel.footer || "Esc back" })
     ] }),
     focused && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { flexGrow: 1 }),
     geometry.showComposerAnchor && /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(import_jsx_runtime53.Fragment, { children: [
@@ -46815,14 +46852,28 @@ function App2({ bridge }) {
     }
   };
   const context = [state.title, state.provider ? `${state.provider}${state.model ? `/${state.model}` : ""}` : "Choose model: /model", state.source.split("/").filter(Boolean).at(-1) || state.source].filter(Boolean).join(" \xB7 ");
-  const welcome = /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", children: [
+  const compactHome = (terminal?.rows ?? 24) < 20 || (terminal?.columns ?? 80) < 60;
+  const welcome = compactHome ? /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.accent, bold: true, children: "\u{1F40A} Gator" }),
+    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: true, wrap: "truncate-end", children: context }),
+    state.first_run && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { wrap: "truncate-end", children: "/model \xB7 Choose a chat model" }),
+    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { wrap: "truncate-end", children: "/followup new \xB7 Track project changes" }),
+    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: true, wrap: "truncate-end", children: "/memory \xB7 Recall and data destinations" }),
+    (state.checks ?? []).slice(0, 1).map((check, index) => /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { color: check.state === "offline" || check.state === "couldn't check" ? palette.warning : palette.secondary, wrap: "truncate-end", children: [
+      check.title,
+      " \xB7 ",
+      check.state,
+      " \xB7 /followup"
+    ] }, index)),
+    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: true, wrap: "truncate-end", children: "Type / for commands." })
+  ] }) : /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", children: [
     /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(WelcomeScreen, { appName: "Gator", subtitle: "Your ongoing work, ready when you are", color: palette.accent, logo: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.accent, children: "\u{1F40A}" }) }),
     /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: true, children: context }),
     /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { marginTop: 1, marginLeft: 1, flexDirection: "column", children: [
       /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.secondary, bold: true, children: state.first_run ? "Get started" : "Next up" }),
       state.first_run ? /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(import_jsx_runtime53.Fragment, { children: [
         /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { children: "  1  /model  Choose a cloud or local model" }),
-        /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { children: "  2  Ask: Summarize this folder into a daily brief with next actions." })
+        /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { children: "  2  Ask: Review this project\u2019s notes and draft the next useful response." })
       ] }) : state.actions.slice(0, 4).map((action, index) => /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { children: [
         "  ",
         action.Label,
@@ -46830,6 +46881,20 @@ function App2({ bridge }) {
         action.Command
       ] }, index)),
       /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: true, children: "  Type / for Gator commands." }),
+      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { children: "  Track project changes and draft the next step \xB7 /followup new" }),
+      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: true, children: "  Memory setup and processing destinations \xB7 /memory" }),
+      (state.checks ?? []).slice(0, 2).map((check, index) => /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { color: check.state === "offline" || check.state === "couldn't check" ? palette.warning : palette.secondary, children: [
+          "  ",
+          check.title,
+          " \xB7 ",
+          check.state
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { dimColor: true, children: [
+          "  ",
+          check.health
+        ] })
+      ] }, index)),
       state.supervisor_needs_start && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.secondary, children: "  Recurring checks need a running supervisor \xB7 gator job supervisor" })
     ] })
   ] });
@@ -46845,6 +46910,7 @@ function App2({ bridge }) {
       /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.accent, bold: true, children: "\u{1F40A} Gator" }),
       /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { color: palette.secondary, children: [
         "  ",
+        state.goal_id ? "Goal: " : "",
         context
       ] })
     ] }),

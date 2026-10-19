@@ -39,6 +39,15 @@ The [Muse and dots feature map](MUSE_DOTS_FEATURE_MAP.md) compares first-party p
 
 ## Product promise
 
+The first guided product workflow is project follow-up: watch selected changes,
+identify the next useful step, and draft a response for review. `/followup`
+reviews the outcome, sources, notification conditions, frequency, permissions,
+and limits before saving; `/memory` explains storage, retrieval, and chat
+processing separately. Context and sources beside a result support correction,
+forgetting, and one-run omission. Background health comes from durable attempts
+and a fresh supervisor probe. The [project follow-up pilot](PROJECT_FOLLOWUP_PILOT.md)
+defines the human review procedure and evidence required before success claims.
+
 **Gator is a terminal-native personal agent that remembers your ongoing goals, works across local files and selected tools, and checks with you before consequential actions.**
 
 The job is to help a person make progress over days and weeks. A goal may produce a brief, edit a document, answer a question, or prepare an external action; no one output format defines the product. The terminal is the primary conversation and control surface. Local state and provider choice matter, but neither by itself proves usefulness or lower resource use.
@@ -54,7 +63,7 @@ Meta describes Muse as a personal agent that develops plans for goals, works acr
 | Need | Existing asset | Gap to close |
 | --- | --- | --- |
 | Continue a conversation | Durable Work conversations, replay, branching, goal records, TUI picker, structured goal plans, and reviewed plan suggestions | Live tests must show that suggestions actually help users complete goals |
-| Remember preferences and decisions | Scoped learnings, searchable memories, source-linked Markdown notes, bounded alternate-query search, explicit skills, and reviewed model suggestions | Retrieval still depends on good terms; suggestion quality and source-link accuracy need live evaluation |
+| Remember preferences and decisions | Scoped learnings, memories and source-linked notes with optional semantic recall, lexical fallback, explicit skills, and reviewed model suggestions | Retrieval relevance, suggestion quality, and source-link accuracy need live evaluation |
 | Act through tools | Local files, browser, connectors, approval broker, internal specialists, reviewed goal-plan suggestions | Bounded connected polls can propose a next step; autonomous approved action and proven judgment are still absent |
 | Work over time | Goal-linked jobs and watches, due review checks, attempts, inbox, exact duplicate-result suppression, local/connected content gates, a bounded Gmail history cursor, opt-in macOS and Linux per-user services | Watches poll while the host is online; no push event trigger, Calendar cursor, or proven semantic change detection |
 | Extend behavior | Extensions, user-created text skills, MCP, role routing, read-only goal reviewer | Skills are explicit text procedures; model-authored suggestions and measured workflow selection need evaluation |
@@ -77,7 +86,7 @@ gator work --goal GOAL_ID 'What changed, and what should I do next?'
 gator work --goal GOAL_ID --artifact decision-brief.md 'Draft the decision brief'
 ```
 
-The terminal home lists active goals and unread follow-up results. `/goals` opens a goal picker; `/memory` manages explicit facts, preferences, decisions, and notes. `gator memory search` finds saved knowledge, while `correct`, `forget`, and `--expires` let the user maintain it. Global memories may be retrieved for any Work turn; goal memories stay within their goal. Retrieval is bounded and lexical, so it may miss a relevant paraphrase. Stored memories are reference data, never tool authority.
+The terminal home lists active goals and unread follow-up results. `/goals` opens a goal picker; `/memory` explains recall readiness and data destinations; `/context` reviews saved inputs and supports corrections, forgetting, and one-run omission. `gator memory search` finds saved knowledge, while `correct`, `forget`, and `--expires` let the user maintain it. Global memories may be retrieved for any Work turn; goal memories stay within their goal. Work combines bounded semantic and lexical retrieval when embeddings are available, with lexical fallback when they are not. Relevant items can still be missed. Stored memories are reference data, never tool authority.
 
 In an ordinary Work conversation, a request to take on an ongoing responsibility can now queue a **goal proposal** with a title, context, outcome, and up to eight initial steps. The proposal can attach the run's selected local source and, if the user requested recurring follow-up, include a five-field cron schedule, timezone, and inspect-only task. No goal, source attachment, or job becomes active until the user inspects and accepts the proposal with `/suggestions` or `gator suggestion show/accept`. The accepted result prints `gator goal chat GOAL_ID` so the work can continue in a goal-bound conversation. A proposed schedule runs only while the local supervisor is available; it cannot send or publish. This is a conversational creation path, not a claim that a live model reliably recognizes every ongoing responsibility.
 
@@ -145,7 +154,7 @@ once. One-shot CLI Work still asks in its own foreground terminal.
 ## Next engineering sequence
 
 1. **Measure continuity quality.** Test multi-day goals with corrections, expiry, scope boundaries, and changing source facts. Compare live model behavior against a same-model baseline; passing storage tests alone does not prove agent usefulness.
-2. **Improve recall.** Measure lexical misses and false matches, then add source-linked retrieval over retained notes and documents. Preserve explicit correction and forgetting controls.
+2. **Measure recall.** Compare optional semantic recall and lexical fallback for relevant matches, omissions, and source accuracy. Preserve explicit correction and forgetting controls; expand indexing only from measured needs.
 3. **Broaden the goal loop.** Local files, due times, bounded JSON/Gmail/Calendar polling, and a Gmail history cursor are wired. Measure next-step and draft quality, missed changes, query caps, and read failures; then add a Calendar cursor and a clear review flow for proposed actions. A separately scoped Gmail send can complete a foreground approved action; unattended watches remain read and draft only. Validate receipts and uncertain-send recovery with a real account before expanding action support.
 4. **Improve quiet follow-up.** The watch avoids unchanged model calls and honors an explicit attention decision. Users can rate shown job alerts and review explicit quiet decisions, but no real ratings or complete missed-change review have been collected. Measure false alerts and missed material changes before claiming semantic change detection.
 5. **Measure runtime cost.** Use the [runtime measurement tool](RUNTIME_BENCHMARK.md) to compare idle RAM, peak RAM, cold start, first response, and task cost against representative terminal agents on the same machine and model. Treat low RAM as a target until comparative runs exist.

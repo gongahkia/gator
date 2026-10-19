@@ -133,7 +133,7 @@ func (m Model) statusResult() *uisnapshot.Result {
 		{Label: "Revision", Value: valueOrNone(m.revision)},
 		{Label: "Mode", Value: m.options.Mode},
 		{Label: "Deliverables", Value: valueOrNone(strings.Join(m.options.Artifacts, ", "))},
-		{Label: "Effort", Value: fmt.Sprintf("%s · %d manager steps", effortName(m.options.MaxSteps), m.options.MaxSteps)},
+		{Label: "Effort", Value: effortName(m.options.MaxSteps)},
 		{Label: "Connectors", Value: valueOrNone(strings.Join(m.options.ConnectorIDs, ", "))},
 		{Label: "Web origins", Value: valueOrNone(strings.Join(m.options.WebOrigins, ", "))},
 		{Label: "Attachments", Value: valueOrNone(strings.Join(m.options.Attachments, ", "))},
@@ -172,5 +172,5 @@ func (m Model) permissionsResult() *uisnapshot.Result {
 		{Label: "Mode", Value: m.options.Mode},
 		{Label: "Connectors", Value: valueOrNone(strings.Join(m.options.ConnectorIDs, ", "))},
 		{Label: "Web origins", Value: valueOrNone(strings.Join(m.options.WebOrigins, ", "))},
-	}, Footer: "Internal specialists are managed by Gator."}
+	}, Footer: "Consequential connected actions require a fresh foreground approval."}
 }

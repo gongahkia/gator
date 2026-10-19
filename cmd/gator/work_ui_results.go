@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"strings"
 
@@ -211,22 +210,46 @@ func workActivityResult(stateDir, activeGoal string) (*uisnapshot.Result, error)
 	}
 	result := &uisnapshot.Result{Kind: "report", Title: "Activity", Summary: fmt.Sprintf("%d running work sessions", len(activity.Runs))}
 	if activeGoal != "" {
-		var output bytes.Buffer
-		if err := renderGoalActivity(stateDir, activeGoal, &output); err != nil {
+		goals, err := goal.Open(stateDir)
+		if err != nil {
 			return nil, err
 		}
-		result.Sections = append(result.Sections, uisnapshot.ResultSection{Title: "Goal activity", Lines: strings.Split(strings.TrimSpace(output.String()), "\n")})
+		record, err := goals.Load(activeGoal)
+		if err != nil {
+			return nil, err
+		}
+		plan, err := goals.LoadPlan(activeGoal)
+		if err != nil {
+			return nil, err
+		}
+		section := uisnapshot.ResultSection{Title: record.Title, Fields: []uisnapshot.Field{{Label: "Outcome", Value: uiEmpty(plan.Outcome)}, {Label: "Sources", Value: record.SourcePath}, {Label: "Status", Value: string(record.Status)}}}
+		for _, step := range plan.Steps {
+			if step.Status != goal.StepDone {
+				section.Items = append(section.Items, uisnapshot.ResultItem{Label: step.Title, State: string(step.Status)})
+				if len(section.Items) == 3 {
+					break
+				}
+			}
+		}
+		result.Sections = append(result.Sections, section)
+		checks, _, err := readFollowupChecks(stateDir)
+		if err != nil {
+			return nil, err
+		}
+		for _, check := range checks {
+			if check.GoalID == activeGoal {
+				result.Sections = append(result.Sections, uisnapshot.ResultSection{Title: check.Title, Summary: check.HealthLine(), Fields: []uisnapshot.Field{{Label: "Permitted actions", Value: string(check.Definition.Mode)}, {Label: "Notification conditions", Value: uiEmpty(check.Definition.AlertWhen)}, {Label: "Next action", Value: check.NextAction}, {Label: "Problem", Value: uiEmpty(check.Issue)}}})
+			}
+		}
 	}
 	for _, run := range activity.Runs {
 		section := uisnapshot.ResultSection{Title: run.Objective, Fields: []uisnapshot.Field{{Label: "Run", Value: run.ID}, {Label: "Status", Value: run.LiveStatus}}}
-		for _, task := range run.Tasks {
-			section.Items = append(section.Items, uisnapshot.ResultItem{Label: task.Role, Detail: task.ID + " · " + task.Summary, State: task.Status})
-		}
 		for _, decision := range run.PendingDecisions {
 			section.Items = append(section.Items, uisnapshot.ResultItem{Label: decision.Kind, Detail: fmt.Sprintf("Decision #%d", decision.ID), State: decision.LiveStatus, Tone: "warning"})
 		}
 		result.Sections = append(result.Sections, section)
 	}
+	result.Footer = "/followup manage checks · /goals switch goal · /context inspect sources · /tasks advanced diagnostics"
 	if len(result.Sections) == 0 {
 		result.Summary = "No running work."
 	}
