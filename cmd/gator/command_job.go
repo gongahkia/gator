@@ -10,7 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/gongahkia/gator/internal/agent"
-	"github.com/gongahkia/gator/internal/usage"
+	sharedusage "github.com/gongahkia/gator/internal/usage"
 	"github.com/gongahkia/gator/internal/workrun"
 	"io"
 	"net"
@@ -31,6 +31,7 @@ import (
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
+	"github.com/gongahkia/gator/internal/lifecycle"
 	"github.com/gongahkia/gator/internal/state"
 )
 
@@ -131,7 +132,7 @@ func jobLaunchAgent(arguments []string, out io.Writer) error {
 			return err
 		}
 		logPath := filepath.Join(stateDir, "gator", "jobs", "launchagent.log")
-		plist := launchAgentPlist(label, executable, stateDir, logPath)
+		plist := launchAgentPlist(label, executable, stateDir, logPath, os.Getenv("GATOR_CONFIG_DIR"))
 		if err := writePrivateFile(path, []byte(plist)); err != nil {
 			return err
 		}
@@ -168,13 +169,17 @@ func jobLaunchAgent(arguments []string, out io.Writer) error {
 	}
 }
 
-func launchAgentPlist(label, executable, stateDir, logPath string) string {
+func launchAgentPlist(label, executable, stateDir, logPath string, configDirs ...string) string {
 	escape := func(value string) string {
 		return strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", "\"", "&quot;", "'", "&apos;").Replace(value)
 	}
+	configEnv := ""
+	if len(configDirs) > 0 && configDirs[0] != "" {
+		configEnv = "<key>GATOR_CONFIG_DIR</key><string>" + escape(configDirs[0]) + "</string>"
+	}
 	return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict><key>Label</key><string>` + escape(label) + `</string><key>ProgramArguments</key><array><string>` + escape(executable) + `</string><string>job</string><string>supervisor</string></array><key>EnvironmentVariables</key><dict><key>GATOR_STATE_DIR</key><string>` + escape(stateDir) + `</string></dict><key>RunAtLoad</key><true/><key>KeepAlive</key><true/><key>ProcessType</key><string>Background</string><key>StandardOutPath</key><string>` + escape(logPath) + `</string><key>StandardErrorPath</key><string>` + escape(logPath) + `</string></dict></plist>`
+<plist version="1.0"><dict><key>Label</key><string>` + escape(label) + `</string><key>ProgramArguments</key><array><string>` + escape(executable) + `</string><string>job</string><string>supervisor</string></array><key>EnvironmentVariables</key><dict><key>GATOR_STATE_DIR</key><string>` + escape(stateDir) + `</string>` + configEnv + `</dict><key>RunAtLoad</key><true/><key>KeepAlive</key><true/><key>ProcessType</key><string>Background</string><key>StandardOutPath</key><string>` + escape(logPath) + `</string><key>StandardErrorPath</key><string>` + escape(logPath) + `</string></dict></plist>`
 }
 
 func writePrivateFile(path string, contents []byte) error {
@@ -479,6 +484,20 @@ func executeJobContextWith(ctx context.Context, definition jobs.Definition, atte
 			}
 		}
 	}
+	if runErr == nil {
+		shared, err := sharedusage.Open(stateDir)
+		if err != nil {
+			runErr = err
+		} else if err = shared.Admission(time.Now()); errors.Is(err, sharedusage.ErrLimit) {
+			attempt.Status = "limited"
+			attempt.LimitReason = "shared"
+			attempt.Summary = err.Error()
+			attempt.FinishedAt = time.Now().UTC()
+			return attempt
+		} else if err != nil {
+			runErr = err
+		}
+	}
 	if runErr == nil && definition.MaxChecksPerDay > 0 {
 		now := time.Now().UTC()
 		reserved, reserveErr := store.ReserveCheck(definition, attempt, now)
@@ -538,6 +557,14 @@ func executeJobContextWith(ctx context.Context, definition jobs.Definition, atte
 		attempt.BundlePath = filepath.Dir(result.ManifestPath)
 	}
 	if runErr != nil {
+		if errors.Is(runErr, sharedusage.ErrLimit) {
+			attempt.Status = "limited"
+			attempt.LimitReason = "shared"
+			attempt.Summary = runErr.Error()
+			attempt.Error = ""
+			attempt.Urgent = false
+			return attempt
+		}
 		attempt.Status = "failed"
 		attempt.Urgent = true
 		attempt.Error = boundedJobError(runErr.Error())
@@ -638,7 +665,7 @@ func runJobProcessContext(ctx context.Context, definition jobs.Definition, state
 // runJobProcessWith keeps the job adapter small and makes clear that each job
 // attempt invokes the same Work service boundary as foreground Work.
 func runJobProcessWith(ctx context.Context, definition jobs.Definition, stateDir string, execute func(context.Context, string, string, string, workrun.Request) (workrun.Outcome, error), runIDs ...string) (jobResult, error) {
-	ctx = usage.WithState(usage.WithCategory(ctx, "background"), stateDir)
+	ctx = sharedusage.WithState(sharedusage.WithCategory(ctx, "background"), stateDir)
 	if err := verifyConfiguredGoalOAuthPins(ctx, definition); err != nil {
 		return jobResult{}, err
 	}
@@ -722,6 +749,24 @@ func runJobSupervisor(arguments []string, out io.Writer) error {
 	defer listener.Close()
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
+	if err := store.Observe(time.Now(), false); err != nil {
+		return err
+	}
+	heartbeatDone := make(chan struct{})
+	defer func() { cancel(); <-heartbeatDone; _ = store.Observe(time.Now(), true) }()
+	go func() {
+		defer close(heartbeatDone)
+		ticker := time.NewTicker(15 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case now := <-ticker.C:
+				_ = store.Observe(now, false)
+			}
+		}
+	}()
 	mux := http.NewServeMux()
 	authorized := func(handler http.HandlerFunc) http.HandlerFunc {
 		return func(writer http.ResponseWriter, request *http.Request) {
@@ -758,6 +803,7 @@ func runJobSupervisor(arguments []string, out io.Writer) error {
 	defer os.Remove(filepath.Join(store.Root(), "supervisor.token"))
 	fmt.Fprintf(out, "Gator job supervisor running at %s (PID %d). Keep this terminal open.\n", state.URL, state.PID)
 	runDueJobsContext(ctx, store, stateDir, *notify, time.Now())
+	_, _ = lifecycle.Maintain(ctx, stateDir, time.Now())
 	runDueGoalReviews(stateDir, *notify, time.Now())
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
@@ -769,6 +815,7 @@ func runJobSupervisor(arguments []string, out io.Writer) error {
 			_ = server.Shutdown(shutdown)
 			return nil
 		case now := <-ticker.C:
+			_, _ = lifecycle.Maintain(ctx, stateDir, now)
 			runDueJobsContext(ctx, store, stateDir, *notify, now)
 			runDueGoalReviews(stateDir, *notify, now)
 		}
@@ -807,6 +854,11 @@ func runDueJobsContext(ctx context.Context, store jobs.Store, stateDir string, n
 }
 
 func runDueJobsContextWith(ctx context.Context, store jobs.Store, stateDir string, notify bool, now time.Time, execute func(context.Context, jobs.Definition, string, ...string) (jobResult, error)) {
+	release, guardErr := state.Guard(stateDir, false)
+	if guardErr != nil {
+		return
+	}
+	defer release()
 	definitions, err := store.List()
 	if err != nil {
 		return
@@ -1063,7 +1115,14 @@ func quietAuditCommand(arguments []string, out io.Writer) error {
 }
 
 func jobSupervisorRequest(actionName string, out io.Writer) error {
-	store, _, err := jobStore()
+	_, root, err := jobStore()
+	if err != nil {
+		return err
+	}
+	return jobSupervisorRequestAt(root, actionName, out)
+}
+func jobSupervisorRequestAt(stateDir, actionName string, out io.Writer) error {
+	store, err := jobs.Open(stateDir)
 	if err != nil {
 		return err
 	}

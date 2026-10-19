@@ -78,6 +78,8 @@ func (m Model) bridgeLauncherPanel() uisnapshot.Panel {
 func (m Model) bridgeSectionPanel() uisnapshot.Panel {
 	panel := uisnapshot.Panel{Kind: m.section, Selected: m.selected, Notice: m.sectionNotice, Footer: "Esc back"}
 	switch m.section {
+	case "controls":
+		return m.controlsPanel()
 	case "followup":
 		return m.followupPanel()
 	case "memory":

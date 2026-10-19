@@ -176,6 +176,8 @@ type Config struct {
 	SaveFollowup            func(followup.Draft) (goal.Record, jobs.Definition, error)
 	ReadChecks              func() ([]workhome.Check, bool, error)
 	StartSupervisor         func() error
+	Controls                func(context.Context, string, string, []string) (ControlScreen, error)
+	BeforeLocalCommand      func() (func(), error)
 	PilotAction             func(workID string, arguments []string) (*uisnapshot.Result, error)
 	PlanAction              func(command string) (string, error)
 	PlanResult              func(command string) (*uisnapshot.Result, error)
@@ -333,6 +335,15 @@ type Model struct {
 	learningForm           *learningForm
 	sectionNotice          string
 	productHelp            bool
+	controlFamily          string
+	controlRootArgs        []string
+	controlScreen          ControlScreen
+	controlForm            *ControlAction
+	controlField           int
+	controlReview          bool
+	controlBusy            bool
+	controlCancel          context.CancelFunc
+	controlGeneration      uint64
 	followupForm           *followupForm
 	followupSaving         bool
 	checks                 []workhome.Check

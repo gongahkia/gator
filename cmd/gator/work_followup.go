@@ -16,11 +16,17 @@ import (
 	"github.com/gongahkia/gator/internal/followup"
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/jobs"
+	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/workhome"
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
 func saveFollowup(stateDir string, draft followup.Draft) (goal.Record, jobs.Definition, error) {
+	release, guardErr := state.Guard(stateDir, false)
+	if guardErr != nil {
+		return goal.Record{}, jobs.Definition{}, guardErr
+	}
+	defer release()
 	if err := draft.Validate(); err != nil {
 		return goal.Record{}, jobs.Definition{}, err
 	}
@@ -170,13 +176,13 @@ func saveFollowup(stateDir string, draft followup.Draft) (goal.Record, jobs.Defi
 }
 
 func readFollowupChecks(stateDir string) ([]workhome.Check, bool, error) {
-	running := jobSupervisorRequest("health", io.Discard) == nil
+	running := jobSupervisorRequestAt(stateDir, "health", io.Discard) == nil
 	checks, err := workhome.ReadChecks(stateDir, running, time.Now())
 	return checks, running, err
 }
 
 func startLocalSupervisor(stateDir string) error {
-	if jobSupervisorRequest("health", io.Discard) == nil {
+	if jobSupervisorRequestAt(stateDir, "health", io.Discard) == nil {
 		return nil
 	}
 	binary, err := os.Executable()
@@ -204,7 +210,7 @@ func startLocalSupervisor(stateDir string) error {
 	}
 	go func() { _ = command.Wait() }()
 	for attempt := 0; attempt < 20; attempt++ {
-		if jobSupervisorRequest("health", io.Discard) == nil {
+		if jobSupervisorRequestAt(stateDir, "health", io.Discard) == nil {
 			return nil
 		}
 		time.Sleep(100 * time.Millisecond)

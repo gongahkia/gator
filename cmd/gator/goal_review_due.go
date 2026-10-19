@@ -8,6 +8,7 @@ import (
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
+	"github.com/gongahkia/gator/internal/state"
 )
 
 // runDueGoalReviews sends one local reminder for each user-selected plan
@@ -17,6 +18,11 @@ func runDueGoalReviews(stateDir string, notify bool, now time.Time) {
 }
 
 func runDueGoalReviewsWith(stateDir string, notify bool, now time.Time, deliver func(string, string)) {
+	release, guardErr := state.Guard(stateDir, false)
+	if guardErr != nil {
+		return
+	}
+	defer release()
 	goals, err := goal.Open(stateDir)
 	if err != nil {
 		return

@@ -17,6 +17,43 @@ import (
 
 func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 	switch value := messageValue.(type) {
+	case controlDone:
+		if value.Generation != m.controlGeneration {
+			return m, nil
+		}
+		m.controlBusy = false
+		if m.controlCancel != nil {
+			m.controlCancel()
+			m.controlCancel = nil
+		}
+		if value.Err != nil {
+			m.sectionNotice = value.Err.Error()
+		} else {
+			m.controlScreen = value.Screen
+			if value.Screen.ResetConversation {
+				m.messages = nil
+				m.conversation = ""
+				m.revision = ""
+				m.snapshot = ""
+				m.lastWorkID = ""
+				m.lastOutput = ""
+				m.lastBundle = BundleSummary{}
+				m.goalID = ""
+				m.queue = nil
+				m.options.ExcludedKnowledgeIDs = nil
+				m.config.Conversations = nil
+				m.config.Goals = nil
+				m.config.Jobs = nil
+				m.checks = nil
+				m.checkDetail = nil
+				if m.config.ClearGoal != nil {
+					m.config.ClearGoal()
+				}
+			}
+			m.selected = 0
+			m.sectionNotice = ""
+		}
+		return m, nil
 	case followupSaved:
 		return m.finishFollowup(value)
 	case recallStatusDone:
@@ -288,6 +325,9 @@ func (m Model) updateConnectorActionDone(value connectorActionDone) (tea.Model, 
 	}
 	m.messages = append(m.messages, reportMessage("Connector", text, "success"))
 	m.scroll = 0
+	if m.section == "controls" && m.controlFamily == "recovery" {
+		return m, m.controlCommand("status", m.controlRootArgs)
+	}
 	return m, nil
 }
 
@@ -382,6 +422,8 @@ func (m Model) updateKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) updateSectionKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch m.section {
+	case "controls":
+		return m.updateControls(value)
 	case "followup":
 		return m.updateFollowupKey(value)
 	case "memory":

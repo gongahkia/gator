@@ -9,6 +9,7 @@ import (
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/knowledge"
 	"github.com/gongahkia/gator/internal/memory"
+	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/worktui"
 )
@@ -106,6 +107,11 @@ func readWorkContext(stateDir, workID, goalID string) (worktui.ContextState, err
 }
 
 func changeWorkKnowledge(stateDir, id, action, text, goalID string) error {
+	release, guardErr := state.Guard(stateDir, false)
+	if guardErr != nil {
+		return guardErr
+	}
+	defer release()
 	if strings.HasPrefix(id, "mem-") {
 		store, err := memory.Open(stateDir)
 		if err != nil {

@@ -61,6 +61,10 @@ func ReadChecks(stateDir string, supervisor bool, now time.Time) ([]Check, error
 				}
 				if attempt.Status == "limited" {
 					check.State, check.Issue, check.NextAction = "daily limit", attempt.Summary, "Model checks resume on the next UTC day; edit limits or pause this check"
+					if attempt.LimitReason == "shared" {
+						check.State = "shared limit"
+						check.NextAction = "Open /usage to review or resume shared requests; concurrency limits clear when other requests finish"
+					}
 				}
 				if attempt.NotificationPolicySHA256 != "" && attempt.NotificationPolicySHA256 != policy {
 					check.State = "settings changed; waiting for check"

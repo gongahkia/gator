@@ -190,6 +190,9 @@ func commandPaletteEntries() []entry {
 		{title: "/inbox", subtitle: "Review follow-up results", kind: "command-input", command: "/inbox"},
 		{title: "/goals", subtitle: "Resume an ongoing goal", kind: "command", command: "/goals"},
 		{title: "/followup", subtitle: "Watch project changes and review the next step", kind: "command", command: "/followup"},
+		{title: "/recovery", subtitle: "Reconnect sources and review offline checks", kind: "command", command: "/recovery"},
+		{title: "/usage", subtitle: "Shared usage and limits across all work", kind: "command", command: "/usage"},
+		{title: "/data", subtitle: "Retention, private backups, and deletion", kind: "command", command: "/data"},
 		{title: "/context", subtitle: "Inspect sources and saved context supplied to this work", kind: "command", command: "/context"},
 		{title: "/pilot", subtitle: "Review a project follow-up pilot and record outcomes", kind: "command-input", command: "/pilot", advanced: true},
 		{title: "/plan", subtitle: "Show or update this goal's plan", kind: "command-input", command: "/plan"},
@@ -372,11 +375,26 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 	if len(fields) == 0 {
 		return m, nil
 	}
+	if m.config.BeforeLocalCommand != nil && fields[0] != "/data" && fields[0] != "/usage" && fields[0] != "/recovery" {
+		release, err := m.config.BeforeLocalCommand()
+		if err != nil {
+			m.messages = append(m.messages, noticeMessage("Private data", err.Error(), "error"))
+			return m, nil
+		}
+		defer release()
+	}
 	m.home = false
 	m.section = ""
 	var result string
 	var err error
 	switch fields[0] {
+	case "/usage", "/data", "/recovery":
+		if m.config.Controls == nil {
+			err = errorsUnavailable("product controls")
+			break
+		}
+		cmd := m.openControls(strings.TrimPrefix(fields[0], "/"), fields[1:])
+		return m, cmd
 	case "/followup":
 		if m.config.SaveFollowup == nil {
 			err = errorsUnavailable("follow-up setup")

@@ -24,7 +24,8 @@ import (
 	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/retrieval"
 	"github.com/gongahkia/gator/internal/snapshot"
-	"github.com/gongahkia/gator/internal/usage"
+	"github.com/gongahkia/gator/internal/state"
+	sharedusage "github.com/gongahkia/gator/internal/usage"
 	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workrun"
 )
@@ -481,7 +482,12 @@ func applyGoalPlanContext(stateDir string, request *workrun.Request) error {
 }
 
 func executeConfiguredWork(ctx context.Context, provider, modelName, stateDir string, request workrun.Request) (workrun.Outcome, error) {
-	ctx = usage.WithState(ctx, stateDir)
+	release, guardErr := state.Guard(stateDir, false)
+	if guardErr != nil {
+		return workrun.Outcome{}, guardErr
+	}
+	defer release()
+	ctx = sharedusage.WithState(ctx, stateDir)
 	request.PreparationContext = ctx
 	service, err := configuredWorkService(provider, modelName, stateDir, &request)
 	if err != nil {

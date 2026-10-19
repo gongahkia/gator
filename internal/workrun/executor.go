@@ -26,6 +26,7 @@ import (
 	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/projectcapture"
 	"github.com/gongahkia/gator/internal/snapshot"
+	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/suggestion"
 	"github.com/gongahkia/gator/internal/telemetry"
 	"github.com/gongahkia/gator/internal/tools"
@@ -49,6 +50,11 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	if err != nil {
 		return Outcome{}, err
 	}
+	release, guardErr := state.Guard(request.StateDir, false)
+	if guardErr != nil {
+		return Outcome{}, guardErr
+	}
+	defer release()
 	request.Decision, err = resolveDecision(request)
 	if err != nil {
 		return Outcome{}, err

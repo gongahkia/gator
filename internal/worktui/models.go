@@ -29,6 +29,9 @@ func (m Model) openModels() (tea.Model, tea.Cmd) {
 
 // Close releases a model operation if the terminal closes while its panel is open.
 func (m Model) Close() {
+	if m.controlCancel != nil {
+		m.controlCancel()
+	}
 	if m.recallCancel != nil {
 		m.recallCancel()
 	}

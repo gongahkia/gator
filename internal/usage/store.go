@@ -13,11 +13,14 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/gongahkia/gator/internal/state"
 )
 
 var ErrLimit = errors.New("shared usage limit reached; open /usage to review limits")
 
 type Policy struct {
+	Paused             bool  `json:"paused"`
 	DailyRequests      int   `json:"daily_requests"`
 	DailyTokens        int64 `json:"daily_tokens"`
 	ConcurrentRequests int   `json:"concurrent_requests"`
@@ -55,9 +58,10 @@ type Snapshot struct {
 }
 type Store struct{ root string }
 type Reservation struct {
-	store   Store
-	day, id string
-	lease   *os.File
+	store       Store
+	day, id     string
+	lease       *os.File
+	releaseData func()
 }
 
 func Open(stateDir string) (Store, error) {
@@ -143,6 +147,24 @@ func (s Store) SavePolicy(p Policy) error {
 		return err
 	}
 	defer unlock()
+	return write(filepath.Join(s.root, "policy.json"), p)
+}
+func (s Store) SaveReviewedPolicy(p, expected Policy) error {
+	if err := p.Validate(); err != nil {
+		return err
+	}
+	unlock, err := s.lock()
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	prior, err := s.Policy()
+	if err != nil {
+		return err
+	}
+	if prior != expected {
+		return errors.New("shared limits changed while you reviewed them; refresh and review again")
+	}
 	return write(filepath.Join(s.root, "policy.json"), p)
 }
 func (s Store) day(date string) (Day, error) {
@@ -231,7 +253,31 @@ func (s Store) Snapshot(now time.Time) (Snapshot, error) {
 	result.ActiveRequests, err = s.active()
 	return result, err
 }
+
+// Admission checks known exhausted limits before preparing a scheduled Work.
+// Actual provider calls still make their own atomic reservation.
+func (s Store) Admission(now time.Time) error {
+	v, err := s.Snapshot(now)
+	if err != nil {
+		return err
+	}
+	p := v.Policy
+	if p.Paused || (p.DailyRequests > 0 && v.Requests >= p.DailyRequests) || (p.DailyTokens > 0 && v.Tokens >= p.DailyTokens) || (p.ConcurrentRequests > 0 && v.ActiveRequests >= p.ConcurrentRequests) {
+		return ErrLimit
+	}
+	return nil
+}
 func (s Store) Reserve(now time.Time, category, provider string, tokens int64) (*Reservation, error) {
+	release, guardErr := state.Guard(filepath.Dir(filepath.Dir(s.root)), false)
+	if guardErr != nil {
+		return nil, guardErr
+	}
+	accepted := false
+	defer func() {
+		if !accepted {
+			release()
+		}
+	}()
 	if tokens < 0 || len(provider) > 256 || strings.ContainsAny(provider, "\x00\r\n") {
 		return nil, errors.New("invalid usage reservation")
 	}
@@ -258,7 +304,7 @@ func (s Store) Reserve(now time.Time, category, provider string, tokens int64) (
 	if err != nil {
 		return nil, err
 	}
-	if (p.DailyRequests > 0 && t.Requests >= p.DailyRequests) || (p.DailyTokens > 0 && (tokens > p.DailyTokens-t.Tokens)) || (p.ConcurrentRequests > 0 && active >= p.ConcurrentRequests) {
+	if p.Paused || (p.DailyRequests > 0 && t.Requests >= p.DailyRequests) || (p.DailyTokens > 0 && (tokens > p.DailyTokens-t.Tokens)) || (p.ConcurrentRequests > 0 && active >= p.ConcurrentRequests) {
 		return nil, ErrLimit
 	}
 	var b [16]byte
@@ -281,7 +327,8 @@ func (s Store) Reserve(now time.Time, category, provider string, tokens int64) (
 		os.Remove(lease.Name())
 		return nil, err
 	}
-	return &Reservation{s, d.Date, id, lease}, nil
+	accepted = true
+	return &Reservation{store: s, day: d.Date, id: id, lease: lease, releaseData: release}, nil
 }
 
 // Finish preserves a conservative charge if the provider omits token usage or

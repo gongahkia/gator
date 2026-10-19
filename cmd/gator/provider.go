@@ -19,7 +19,7 @@ import (
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/tools"
-	"github.com/gongahkia/gator/internal/usage"
+	sharedusage "github.com/gongahkia/gator/internal/usage"
 )
 
 func providerFromEnvironment() (model.Provider, error) {
@@ -180,7 +180,7 @@ func executorConfigurationWithExtensions(backend agent.Model, settings config.Se
 	if len(labels) > 0 {
 		label = labels[0]
 	}
-	backend = usage.Model(backend, stateDir, label)
+	backend = sharedusage.Model(backend, stateDir, label)
 	return nativeExecutorConfiguration{
 		Model:          backend,
 		Extensions:     extensions,

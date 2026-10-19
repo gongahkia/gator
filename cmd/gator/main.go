@@ -9,6 +9,10 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"time"
+
+	"github.com/gongahkia/gator/internal/lifecycle"
+	"github.com/gongahkia/gator/internal/state"
 )
 
 // These values are set for release builds with -ldflags. Development builds
@@ -70,6 +74,13 @@ For a free-form Work task that begins with a nested command name, use
 gator work -- TASK to keep it a task rather than dispatching that command.`
 
 func main() {
+	if len(os.Args) == 1 || (os.Args[1] != "--help" && os.Args[1] != "-h" && os.Args[1] != "--version" && os.Args[1] != "-v") {
+		if root, err := state.ResolveDir(""); err == nil {
+			if _, err := lifecycle.Maintain(context.Background(), root, time.Now()); err != nil {
+				fmt.Fprintln(os.Stderr, "gator: retention cleanup deferred:", err)
+			}
+		}
+	}
 	if err := run(os.Args[1:], os.Stdout); err != nil {
 		fmt.Fprintln(os.Stderr, "gator:", err)
 		os.Exit(1)
@@ -95,7 +106,22 @@ func run(args []string, out io.Writer) error {
 		return err
 	}
 
+	if commandUsesPrivateData(args) {
+		root, err := state.ResolveDir("")
+		if err != nil {
+			return err
+		}
+		release, err := state.Guard(root, false)
+		if err != nil {
+			return err
+		}
+		defer release()
+	}
 	switch args[0] {
+	case "data":
+		return dataCommand(args[1:], out)
+	case "usage":
+		return usageCommand(args[1:], out)
 	case "config", "-c":
 		return configCommand(args[1:], out)
 	case "agent", "-a":
@@ -172,6 +198,29 @@ func run(args []string, out io.Writer) error {
 		}
 		return fmt.Errorf("unknown command %q; run 'gator --help'", args[0])
 	}
+}
+
+func commandUsesPrivateData(args []string) bool {
+	if len(args) == 0 {
+		return false
+	}
+	switch args[0] {
+	case "memory", "note", "notes", "skill", "skills", "learnings", "suggestion", "suggestions":
+		return true
+	case "goal", "goals":
+		return len(args) < 2 || args[1] != "chat"
+	case "job", "-j":
+		return len(args) < 2 || args[1] != "supervisor"
+	case "work":
+		if len(args) < 2 {
+			return false
+		}
+		switch args[1] {
+		case "feedback", "snapshot", "apply", "reconcile", "review", "answer", "steer", "stop", "cancel-task", "steer-task":
+			return true
+		}
+	}
+	return false
 }
 
 // isQuotedWorkRequest preserves useful unknown-command errors while making

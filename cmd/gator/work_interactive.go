@@ -28,7 +28,7 @@ import (
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/uisnapshot"
-	"github.com/gongahkia/gator/internal/usage"
+	sharedusage "github.com/gongahkia/gator/internal/usage"
 	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workhome"
 	"github.com/gongahkia/gator/internal/workrun"
@@ -254,14 +254,16 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		ChangeKnowledge: func(id, action, text, activeGoal string) error {
 			return changeWorkKnowledge(stateDir, id, action, text, activeGoal)
 		},
-		SaveFollowup:    func(draft followup.Draft) (goal.Record, jobs.Definition, error) { return saveFollowup(stateDir, draft) },
-		ReadChecks:      func() ([]workhome.Check, bool, error) { return readFollowupChecks(stateDir) },
-		StartSupervisor: func() error { return startLocalSupervisor(stateDir) },
-		PilotAction:     workPilotResult,
-		NoteAction:      func(command string) (string, error) { return workTUINoteAction(command, goalID) },
-		NoteResult:      func(command string) (*uisnapshot.Result, error) { return workNoteResult(goalID, command) },
-		SkillAction:     workTUISkillAction,
-		SkillResult:     workSkillResult,
+		SaveFollowup:       func(draft followup.Draft) (goal.Record, jobs.Definition, error) { return saveFollowup(stateDir, draft) },
+		ReadChecks:         func() ([]workhome.Check, bool, error) { return readFollowupChecks(stateDir) },
+		StartSupervisor:    func() error { return startLocalSupervisor(stateDir) },
+		PilotAction:        workPilotResult,
+		Controls:           workControls(stateDir),
+		BeforeLocalCommand: func() (func(), error) { return state.Guard(stateDir, false) },
+		NoteAction:         func(command string) (string, error) { return workTUINoteAction(command, goalID) },
+		NoteResult:         func(command string) (*uisnapshot.Result, error) { return workNoteResult(goalID, command) },
+		SkillAction:        workTUISkillAction,
+		SkillResult:        workSkillResult,
 		ResolveSource: func(path string) (string, error) {
 			if !filepath.IsAbs(path) {
 				path = filepath.Join(workingDirectory, path)
@@ -299,6 +301,11 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		StartConversationID: startConversationID,
 		FirstRun:            settings.Defaults.Provider == "" && len(conversations) == 0,
 		JobAction: func(arguments []string) (string, error) {
+			release, err := state.Guard(stateDir, false)
+			if err != nil {
+				return "", err
+			}
+			defer release()
 			return workTUIJobAction(arguments)
 		},
 		RefreshJobs: jobStore.List,
@@ -439,12 +446,17 @@ func runInteractiveWork(source, conversationID, prompt, stateDir string, options
 }
 
 func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, options worktui.RunOptions, currentGoal goal.Record) worktui.RunResult {
+	release, guardErr := state.Guard(stateDir, false)
+	if guardErr != nil {
+		return worktui.RunResult{Error: guardErr.Error()}
+	}
+	defer release()
 	requestedAt := time.Now()
 	ctx := options.Context
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	ctx = usage.WithState(usage.WithCategory(ctx, "chat"), stateDir)
+	ctx = sharedusage.WithState(sharedusage.WithCategory(ctx, "chat"), stateDir)
 	mode, paths, decisionOrigin, decisionReason, err := resolveInteractiveWork(ctx, prompt, options)
 	if err != nil {
 		return worktui.RunResult{Error: err.Error()}
@@ -573,7 +585,7 @@ func resolveInteractiveWork(ctx context.Context, prompt string, options worktui.
 	}
 	routeCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
 	defer cancel()
-	turn, err := backend.Complete(usage.WithCategory(routeCtx, "routing"), agent.TurnRequest{
+	turn, err := backend.Complete(sharedusage.WithCategory(routeCtx, "routing"), agent.TurnRequest{
 		System:   `Classify the user's immediate request for a terminal work agent. Return one JSON object only: {"mode":"inspect"|"draft","artifact":"optional basename.ext"}. Inspect answers questions. Draft creates a file. Never choose act, a connector, a goal, or a schedule. If uncertain, choose inspect.`,
 		Messages: []agent.Message{{Role: agent.RoleUser, Content: prompt}},
 	})

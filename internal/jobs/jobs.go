@@ -111,6 +111,7 @@ type WatchCursor struct {
 }
 
 type Attempt struct {
+	LimitReason              string         `json:"limit_reason,omitempty"`
 	Runs                     []RunReference `json:"runs,omitempty"`
 	Version                  int            `json:"version"`
 	ID                       string         `json:"id"`

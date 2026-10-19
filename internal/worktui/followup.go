@@ -138,6 +138,13 @@ func (m Model) updateFollowupKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if key.String() == "r" {
 		return m, m.refreshChecksCommand()
 	}
+	if key.String() == "h" && m.config.Controls != nil {
+		args := []string{}
+		if m.checkDetail != nil {
+			args = append(args, m.checkDetail.ID)
+		}
+		return m, m.openControls("recovery", args)
+	}
 	if m.checkDetail != nil {
 		switch key.String() {
 		case "e":
@@ -391,6 +398,7 @@ func (m Model) followupPanel() uisnapshot.Panel {
 			{Title: "Usage and limits", Lines: checkLimitLines(*c)},
 		}
 		p.Hints = []uisnapshot.Hint{{Shortcut: "P", Action: "pause/resume"}, {Shortcut: "E", Action: "edit agreement"}, {Shortcut: "X", Action: "check now"}, {Shortcut: "S", Action: "start supervisor"}, {Shortcut: "R", Action: "refresh"}, {Shortcut: "Esc", Action: "back"}}
+		p.Hints = append([]uisnapshot.Hint{{Shortcut: "H", Action: "recovery and offline history"}}, p.Hints...)
 		return p
 	}
 	for _, c := range m.checks {
