@@ -17,6 +17,7 @@ import (
 )
 
 type Draft struct {
+	Enabled                                  bool
 	ID, GoalID, JobID, ExpectedDigest        string
 	Title, Outcome, SourcePath, AlertWhen    string
 	ConnectorIDs                             []string
@@ -34,9 +35,9 @@ func New(source, goalID string) (Draft, error) {
 		return Draft{}, err
 	}
 	return Draft{ID: hex.EncodeToString(id[:]), GoalID: goalID, Title: "Project follow-up", SourcePath: source,
-		Outcome:         "Watch project changes, identify the next useful step, and draft a response when useful.",
-		AlertWhen:       "A deadline, commitment, decision, or blocker changes; stay quiet for unrelated updates.",
-		IntervalMinutes: 15, Mode: action.Draft, MaxRequests: 32, MaxSeconds: 300, MaxTokens: 100000, MaxChecksPerDay: 24}, nil
+		Outcome:   "Watch project changes, identify the next useful step, and draft a response when useful.",
+		AlertWhen: "A deadline, commitment, decision, or blocker changes; stay quiet for unrelated updates.",
+		Enabled:   true, IntervalMinutes: 15, Mode: action.Draft, MaxRequests: 32, MaxSeconds: 300, MaxTokens: 100000, MaxChecksPerDay: 24}, nil
 }
 
 func (d Draft) Validate() error {
@@ -75,14 +76,18 @@ func (d Draft) Definition(goalID string, sources []jobs.WatchSource) (jobs.Defin
 		return jobs.Definition{}, err
 	}
 	schedule, _ := jobs.WatchSchedule(d.IntervalMinutes)
+	contract := artifact.InspectionContract()
+	if d.Mode == action.Draft {
+		contract = artifact.OptionalDraftContract()
+	}
 	id := d.JobID
 	if id == "" {
 		id = "job-" + d.ID
 	}
-	return jobs.Definition{ID: id, Name: d.Title, GoalID: goalID, Enabled: true, GoalWatch: true, ChangeOnly: true,
+	return jobs.Definition{ID: id, Name: d.Title, GoalID: goalID, Enabled: d.Enabled, GoalWatch: true, ChangeOnly: true,
 		RefreshSnapshot: true, SourcePath: d.SourcePath, Objective: d.Outcome, AlertWhen: d.AlertWhen,
 		Schedule: schedule, PollMinutes: d.IntervalMinutes, Timezone: "UTC", Missed: "run_once", Mode: d.Mode,
-		Contract: artifact.InspectionContract(), ConnectorIDs: append([]string(nil), d.ConnectorIDs...), WatchSources: sources,
+		Contract: contract, ConnectorIDs: append([]string(nil), d.ConnectorIDs...), WatchSources: sources,
 		MaxSteps: 24, MaxChecksPerDay: d.MaxChecksPerDay, Limits: agent.Limits{ModelRequests: d.MaxRequests, WallSeconds: d.MaxSeconds, Tokens: d.MaxTokens}}, nil
 }
 
@@ -95,12 +100,15 @@ func (d Draft) ReviewLines() []string {
 	if d.Mode == action.Draft {
 		permission = "Read and prepare drafts for review"
 	}
-	lines := []string{"Outcome: " + d.Outcome, "Sources: " + sources, fmt.Sprintf("When: every %d minutes while this computer and the supervisor are running", d.IntervalMinutes), "Notify when: " + d.AlertWhen, "Permitted actions: " + permission, "Sending and publishing require a separate foreground approval.", fmt.Sprintf("Limits: %d model checks/day; per try %d requests, %d tokens, %ds", d.MaxChecksPerDay, d.MaxRequests, d.MaxTokens, d.MaxSeconds), "Transient failures may retry up to 3 times per check. Cost estimate unavailable; usage is recorded."}
+	lines := []string{"Outcome: " + d.Outcome, "Sources: " + sources, fmt.Sprintf("When: every %d minutes while this computer and the supervisor are running", d.IntervalMinutes), "Notify when: " + d.AlertWhen, "Permitted actions: " + permission, "Sending and publishing require a separate foreground approval.", fmt.Sprintf("Limits: %d Work checks/day; per try %d requests, %d tokens, %ds", d.MaxChecksPerDay, d.MaxRequests, d.MaxTokens, d.MaxSeconds), "Transient failures may retry up to 3 times per check. Cost estimate unavailable; usage is recorded."}
 	if d.GmailQuery != "" {
 		lines = append(lines, "Mail selection: "+d.GmailQuery)
 	}
 	if d.CalendarDays > 0 {
 		lines = append(lines, fmt.Sprintf("Calendar selection: next %d days", d.CalendarDays))
+	}
+	if !d.Enabled {
+		lines = append(lines, "This check remains paused after saving. Resume it explicitly when ready.")
 	}
 	return lines
 }

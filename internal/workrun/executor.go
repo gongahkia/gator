@@ -805,13 +805,13 @@ func (e Executor) normalizeAndValidate(request Request) (Request, error) {
 		return Request{}, fmt.Errorf("validate outcome contract: %w", err)
 	}
 	if request.Mode == action.Inspect {
-		if len(request.Contract.Artifacts) != 0 || request.Contract.ExternalActions != action.Forbid {
+		if len(request.Contract.Artifacts) != 0 || request.Contract.AllowOptionalArtifacts || request.Contract.ExternalActions != action.Forbid {
 			return Request{}, errors.New("inspect mode requires an inspection-only contract")
 		}
 		if request.RequireCode {
 			return Request{}, errors.New("a required Code implementation is unavailable in inspect mode")
 		}
-	} else if len(request.Contract.Artifacts) == 0 {
+	} else if len(request.Contract.Artifacts) == 0 && !(request.Mode == action.Draft && request.Contract.AllowOptionalArtifacts) {
 		return Request{}, errors.New("draft and act modes require at least one artifact")
 	}
 	if request.Mode == action.Draft && request.Contract.ExternalActions == action.Approve {

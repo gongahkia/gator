@@ -333,6 +333,7 @@ type Model struct {
 	learningForm           *learningForm
 	sectionNotice          string
 	followupForm           *followupForm
+	followupSaving         bool
 	checks                 []workhome.Check
 	checkDetail            *workhome.Check
 	recall                 RecallStatus

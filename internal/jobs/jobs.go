@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 	"unicode/utf8"
 
@@ -195,6 +196,50 @@ func Open(stateDir string) (Store, error) {
 func (s Store) Root() string { return s.root }
 
 func (s Store) Save(definition Definition) (Definition, error) {
+	unlock, err := s.lockDefinitions()
+	if err != nil {
+		return Definition{}, err
+	}
+	defer unlock()
+	return s.save(definition)
+}
+
+// SaveReviewed rejects a concurrent policy edit while preserving scheduler
+// bookkeeping that may have advanced while the user reviewed the agreement.
+func (s Store) SaveReviewed(definition Definition, expected string) (Definition, error) {
+	unlock, err := s.lockDefinitions()
+	if err != nil {
+		return Definition{}, err
+	}
+	defer unlock()
+	prior, err := s.Load(definition.ID)
+	if err != nil {
+		return Definition{}, err
+	}
+	digest, err := prior.PolicyDigest()
+	if err != nil {
+		return Definition{}, err
+	}
+	if expected == "" || digest != expected {
+		return Definition{}, errors.New("this check changed while you edited it; refresh and review it again")
+	}
+	definition.CreatedAt, definition.LastScheduledAt = prior.CreatedAt, prior.LastScheduledAt
+	return s.save(definition)
+}
+
+func (s Store) lockDefinitions() (func(), error) {
+	file, err := os.OpenFile(filepath.Join(s.root, ".definitions.lock"), os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		return nil, err
+	}
+	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
+		file.Close()
+		return nil, err
+	}
+	return func() { _ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN); _ = file.Close() }, nil
+}
+
+func (s Store) save(definition Definition) (Definition, error) {
 	now := time.Now().UTC()
 	if definition.Version == 0 {
 		definition.Version = Version
@@ -256,6 +301,9 @@ func (d Definition) Validate() error {
 	}
 	if d.Mode != action.Inspect && d.Mode != action.Draft {
 		return errors.New("scheduled jobs may only inspect or draft")
+	}
+	if d.Contract.AllowOptionalArtifacts && (!d.GoalWatch || d.Mode != action.Draft) {
+		return errors.New("optional scheduled drafts require a draft goal watch")
 	}
 	if d.Contract.Normalize().ExternalActions == action.Approve {
 		return errors.New("scheduled jobs cannot approve external actions")
@@ -393,11 +441,14 @@ func (d Definition) Digest() (string, error) {
 
 // PolicyDigest excludes scheduler bookkeeping so a running poll does not make
 // an otherwise unchanged review stale. Source, authority, and budget edits do.
-func (d Definition) PolicyDigest() (string,error) {
-	d.UpdatedAt,d.LastScheduledAt=time.Time{},time.Time{}
-	payload,err:=json.Marshal(d);if err!=nil{return "",err}
-	digest:=sha256.Sum256(payload)
-	return hex.EncodeToString(digest[:]),nil
+func (d Definition) PolicyDigest() (string, error) {
+	d.UpdatedAt, d.LastScheduledAt = time.Time{}, time.Time{}
+	payload, err := json.Marshal(d)
+	if err != nil {
+		return "", err
+	}
+	digest := sha256.Sum256(payload)
+	return hex.EncodeToString(digest[:]), nil
 }
 
 func (s Store) Load(id string) (Definition, error) {
@@ -435,15 +486,25 @@ func (s Store) List() ([]Definition, error) {
 }
 
 func (s Store) SetEnabled(id string, enabled bool) (Definition, error) {
+	unlock, err := s.lockDefinitions()
+	if err != nil {
+		return Definition{}, err
+	}
+	defer unlock()
 	definition, err := s.Load(id)
 	if err != nil {
 		return Definition{}, err
 	}
 	definition.Enabled = enabled
-	return s.Save(definition)
+	return s.save(definition)
 }
 
 func (s Store) Claim(id string, scheduled time.Time) (Definition, bool, error) {
+	unlock, err := s.lockDefinitions()
+	if err != nil {
+		return Definition{}, false, err
+	}
+	defer unlock()
 	definition, err := s.Load(id)
 	if err != nil {
 		return Definition{}, false, err
@@ -453,7 +514,7 @@ func (s Store) Claim(id string, scheduled time.Time) (Definition, bool, error) {
 		return definition, false, nil
 	}
 	definition.LastScheduledAt = scheduled
-	definition, err = s.Save(definition)
+	definition, err = s.save(definition)
 	return definition, err == nil, err
 }
 
@@ -770,6 +831,11 @@ func syncDirectory(path string) error {
 // ClaimBegin retains intent before moving the schedule watermark. The foreground
 // supervisor holds the store's single-owner lock. A recovered intent claims its slot.
 func (s Store) ClaimBegin(id string, scheduled time.Time) (Definition, Attempt, bool, error) {
+	unlock, err := s.lockDefinitions()
+	if err != nil {
+		return Definition{}, Attempt{}, false, err
+	}
+	defer unlock()
 	definition, err := s.Load(id)
 	if err != nil {
 		return Definition{}, Attempt{}, false, err
@@ -785,7 +851,7 @@ func (s Store) ClaimBegin(id string, scheduled time.Time) (Definition, Attempt, 
 	for _, attempt := range history {
 		if attempt.ScheduledAt.Equal(scheduled) {
 			definition.LastScheduledAt = scheduled
-			_, err = s.Save(definition)
+			_, err = s.save(definition)
 			return definition, attempt, false, err
 		}
 	}
@@ -794,7 +860,7 @@ func (s Store) ClaimBegin(id string, scheduled time.Time) (Definition, Attempt, 
 		return definition, attempt, false, err
 	}
 	definition.LastScheduledAt = scheduled
-	definition, err = s.Save(definition)
+	definition, err = s.save(definition)
 	return definition, attempt, err == nil, err
 }
 

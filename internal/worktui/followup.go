@@ -9,6 +9,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/followup"
+	"github.com/gongahkia/gator/internal/goal"
+	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/uisnapshot"
 	"github.com/gongahkia/gator/internal/workhome"
 )
@@ -24,6 +26,11 @@ type checksRefreshed struct {
 	Err     error
 }
 type checksTick struct{}
+type followupSaved struct {
+	Goal goal.Record
+	Job  jobs.Definition
+	Err  error
+}
 type checkActionDone struct {
 	Text string
 	Err  error
@@ -62,11 +69,16 @@ func (m *Model) editFollowup() {
 		return
 	}
 	definition := m.checkDetail.Definition
+	if !definition.GoalWatch {
+		m.sectionNotice = "This schedule uses advanced settings. Edit it with /jobs edit " + definition.ID + " or create a reviewed project check with N."
+		return
+	}
 	draft, err := followup.New(definition.SourcePath, definition.GoalID)
 	if err != nil {
 		m.sectionNotice = err.Error()
 		return
 	}
+	draft.Enabled = definition.Enabled
 	draft.JobID, draft.Title, draft.Outcome = definition.ID, definition.Name, definition.Objective
 	draft.ExpectedDigest, _ = definition.PolicyDigest()
 	draft.ConnectorIDs, draft.AlertWhen, draft.Mode = append([]string(nil), definition.ConnectorIDs...), definition.AlertWhen, definition.Mode
@@ -131,6 +143,10 @@ func (m Model) updateFollowupKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "e":
 			m.editFollowup()
 		case "p":
+			if m.checkDetail.State == "goal paused" {
+				m.sectionNotice = m.checkDetail.NextAction
+				return m, nil
+			}
 			if m.config.JobAction == nil {
 				return m, nil
 			}
@@ -183,27 +199,9 @@ func (m Model) updateFollowupForm(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.sectionNotice = "Follow-up setup unavailable."
 				return m, nil
 			}
-			record, definition, err := m.config.SaveFollowup(f.Draft)
-			if err != nil {
-				m.sectionNotice = err.Error()
-				return m, nil
-			}
-			if m.goalID != record.ID {
-				m.messages, m.revision, m.snapshot, m.lastWorkID = nil, "", "", ""
-			}
-			if m.config.SelectGoal != nil {
-				state, selectErr := m.config.SelectGoal(record.ID)
-				if selectErr != nil {
-					m.sectionNotice = "Saved check; could not select its goal: " + selectErr.Error()
-					return m, m.refreshChecksCommand()
-				}
-				m.conversation, m.source, m.title = state.ConversationID, state.SourcePath, state.Title
-			}
-			m.goalID = record.ID
-			m.followupForm, m.checkDetail = nil, nil
-			m.sectionNotice = "Saved " + definition.Name + ". Review background health below; a stopped supervisor cannot run checks."
-			m.refreshAttention()
-			return m, m.refreshChecksCommand()
+			save, draft := m.config.SaveFollowup, f.Draft
+			m.followupSaving, m.sectionNotice = true, "Saving your reviewed agreement…"
+			return m, func() tea.Msg { record, definition, err := save(draft); return followupSaved{record, definition, err} }
 		}
 		return m, nil
 	}
@@ -309,6 +307,33 @@ func (m Model) updateFollowupForm(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) finishFollowup(value followupSaved) (tea.Model, tea.Cmd) {
+	m.followupSaving = false
+	if value.Err != nil {
+		m.sectionNotice = value.Err.Error()
+		return m, nil
+	}
+	record, definition := value.Goal, value.Job
+	if m.goalID != record.ID {
+		m.messages, m.revision, m.snapshot, m.lastWorkID = nil, "", "", ""
+	}
+	if m.config.SelectGoal != nil {
+		state, err := m.config.SelectGoal(record.ID)
+		if err != nil {
+			m.sectionNotice = "Saved check; could not select its goal: " + err.Error()
+			return m, m.refreshChecksCommand()
+		}
+		m.conversation, m.source, m.title = state.ConversationID, state.SourcePath, state.Title
+	} else {
+		m.source, m.title, m.conversation = record.SourcePath, record.Title, record.ConversationID
+	}
+	m.goalID = record.ID
+	m.followupForm, m.checkDetail = nil, nil
+	m.sectionNotice = "Saved " + definition.Name + ". Review background health below; a stopped supervisor cannot run checks."
+	m.refreshAttention()
+	return m, m.refreshChecksCommand()
+}
+
 func cycleInt(current int, choices []int) int {
 	for i, v := range choices {
 		if v == current {
@@ -352,13 +377,19 @@ func (m Model) followupPanel() uisnapshot.Panel {
 				selectedSource = choices[m.selected%len(choices)] + " · selected: " + valueOrNone(strings.Join(d.ConnectorIDs, ", "))
 			}
 		}
-		p.Rows = []uisnapshot.Row{{Label: "Title", Detail: d.Title}, {Label: "Desired outcome", Detail: d.Outcome}, {Label: "Local workspace", Detail: d.SourcePath}, {Label: "Connected sources · ←/→ choose, Space toggle", Detail: selectedSource}, {Label: "Mail selection · exact Gmail query", Detail: valueOrNone(d.GmailQuery)}, {Label: "Calendar window · ←/→ change", Detail: strconv.Itoa(d.CalendarDays) + " days (0 disables)"}, {Label: "When Gator works · ←/→ change", Detail: fmt.Sprintf("Every %d minutes", d.IntervalMinutes)}, {Label: "Notify me when", Detail: d.AlertWhen}, {Label: "What Gator may do · ←/→ change", Detail: string(d.Mode) + "; sending requires foreground approval"}, {Label: "Per-try budget · ←/→ change", Detail: fmt.Sprintf("%d requests · %d tokens · %ds", d.MaxRequests, d.MaxTokens, d.MaxSeconds)}, {Label: "Daily model checks · ←/→ change", Detail: fmt.Sprintf("Up to %d per UTC day; then review with Enter", d.MaxChecksPerDay)}}
-		p.Hints = []uisnapshot.Hint{{Shortcut: "Tab", Action: "next field"}, {Shortcut: "Ctrl+U", Action: "clear field"}, {Shortcut: "Ctrl+R", Action: "review"}, {Shortcut: "Esc", Action: "cancel"}}
+		p.Rows = []uisnapshot.Row{{Label: "Title", Detail: d.Title}, {Label: "Desired outcome", Detail: d.Outcome}, {Label: "Local workspace", Detail: d.SourcePath}, {Label: "Connected sources · ←/→ choose, Space toggle", Detail: selectedSource}, {Label: "Mail selection · exact Gmail query", Detail: valueOrNone(d.GmailQuery)}, {Label: "Calendar window · ←/→ change", Detail: strconv.Itoa(d.CalendarDays) + " days (0 disables)"}, {Label: "When Gator works · ←/→ change", Detail: fmt.Sprintf("Every %d minutes", d.IntervalMinutes)}, {Label: "Notify me when", Detail: d.AlertWhen}, {Label: "What Gator may do · ←/→ change", Detail: string(d.Mode) + "; sending requires foreground approval"}, {Label: "Per-try budget · ←/→ change", Detail: fmt.Sprintf("%d requests · %d tokens · %ds", d.MaxRequests, d.MaxTokens, d.MaxSeconds)}, {Label: "Daily Work checks · ←/→ change", Detail: fmt.Sprintf("Up to %d per UTC day; then review with Enter", d.MaxChecksPerDay)}}
+		p.Hints = []uisnapshot.Hint{{Shortcut: "Tab", Action: "next field"}, {Shortcut: "Ctrl+R", Action: "review"}, {Shortcut: "Ctrl+U", Action: "clear field"}, {Shortcut: "Esc", Action: "cancel"}}
 		return p
 	}
 	if c := m.checkDetail; c != nil {
 		p.Title, p.Subtitle = "Follow-up details", c.Title
-		p.Blocks = []uisnapshot.Block{{Title: "Outcome", Lines: []string{c.Outcome}}, {Title: "Background health", Lines: []string{c.HealthLine(), c.Issue, "Next action: " + c.NextAction}}, {Title: "Sources and permissions", Lines: []string{c.Definition.SourcePath, "Connected: " + valueOrNone(strings.Join(c.Definition.ConnectorIDs, ", ")), "Notify when: " + valueOrNone(c.Definition.AlertWhen), "May " + string(c.Definition.Mode) + "; external actions forbidden unattended"}}, {Title: "Usage and limits", Lines: []string{fmt.Sprintf("Today: %d model checks · %d reported requests · %d reported tokens", c.ChecksToday, c.ModelRequests, c.Tokens), fmt.Sprintf("Per try: %d requests · %d tokens · %ds; up to 3 transient tries per check", c.Definition.Limits.ModelRequests, c.Definition.Limits.Tokens, c.Definition.Limits.WallSeconds), fmt.Sprintf("Daily cap: %d model checks (UTC)", c.Definition.MaxChecksPerDay), "Cost estimate unavailable. Reported usage may be incomplete when a provider omits it."}}}
+		p.Blocks = []uisnapshot.Block{
+			{Title: "Outcome", Lines: []string{c.Outcome}},
+			{Title: "Background health", Lines: []string{c.HealthLine(), c.Issue, "Next action: " + c.NextAction}},
+			{Title: "Timing and control", Lines: []string{checkFrequency(*c), "P pauses or resumes future polls; a current check may finish.", "Agreement edits apply to future checks."}},
+			{Title: "Sources and permissions", Lines: checkSourceLines(*c)},
+			{Title: "Usage and limits", Lines: checkLimitLines(*c)},
+		}
 		p.Hints = []uisnapshot.Hint{{Shortcut: "P", Action: "pause/resume"}, {Shortcut: "E", Action: "edit agreement"}, {Shortcut: "X", Action: "check now"}, {Shortcut: "S", Action: "start supervisor"}, {Shortcut: "R", Action: "refresh"}, {Shortcut: "Esc", Action: "back"}}
 		return p
 	}
@@ -382,4 +413,43 @@ func checkTone(state string) string {
 }
 func nextChecksTick() tea.Cmd {
 	return tea.Tick(15*time.Second, func(time.Time) tea.Msg { return checksTick{} })
+}
+
+func checkFrequency(c workhome.Check) string {
+	if c.Definition.PollMinutes > 0 {
+		return fmt.Sprintf("Every %d minutes while the host and supervisor run", c.Definition.PollMinutes)
+	}
+	return c.Definition.Schedule + " · " + c.Definition.Timezone
+}
+func checkSourceLines(c workhome.Check) []string {
+	lines := []string{c.Definition.SourcePath, "Notify when: " + valueOrNone(c.Definition.AlertWhen), "May " + string(c.Definition.Mode) + "; external actions forbidden unattended"}
+	for _, source := range c.Definition.WatchSources {
+		line := source.ConnectorID + " / " + source.Operation
+		if source.Query != "" {
+			line += " · query: " + source.Query
+		}
+		if source.Days > 0 {
+			line += fmt.Sprintf(" · next %d days", source.Days)
+		}
+		lines = append(lines, line)
+	}
+	return lines
+}
+func checkLimitLines(c workhome.Check) []string {
+	requests, seconds := c.Definition.Limits.ModelRequests, c.Definition.Limits.WallSeconds
+	if requests == 0 {
+		requests = 256
+	}
+	if seconds == 0 {
+		seconds = 1800
+	}
+	tokens := "not capped"
+	if c.Definition.Limits.Tokens > 0 {
+		tokens = fmt.Sprint(c.Definition.Limits.Tokens)
+	}
+	daily := "No daily Work-check cap"
+	if c.Definition.MaxChecksPerDay > 0 {
+		daily = fmt.Sprintf("Daily cap: %d Work checks (UTC), including failed starts", c.Definition.MaxChecksPerDay)
+	}
+	return []string{fmt.Sprintf("Today (UTC): %d Work checks · %d reported execution requests · %d reported tokens", c.ChecksToday, c.ModelRequests, c.Tokens), fmt.Sprintf("Per try: %d requests · tokens %s · %ds; up to 3 transient tries per check", requests, tokens, seconds), daily, "Cost estimate unavailable. Provider reporting may be incomplete; retrieval and preliminary routing can add separate charges."}
 }

@@ -17,12 +17,18 @@ import (
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/workhome"
+	"github.com/gongahkia/gator/internal/workspace"
 )
 
 func saveFollowup(stateDir string, draft followup.Draft) (goal.Record, jobs.Definition, error) {
 	if err := draft.Validate(); err != nil {
 		return goal.Record{}, jobs.Definition{}, err
 	}
+	root, err := workspace.Open(draft.SourcePath)
+	if err != nil {
+		return goal.Record{}, jobs.Definition{}, err
+	}
+	draft.SourcePath = root.Path()
 	settings, err := loadSettings()
 	if err != nil {
 		return goal.Record{}, jobs.Definition{}, err
@@ -32,7 +38,7 @@ func saveFollowup(stateDir string, draft followup.Draft) (goal.Record, jobs.Defi
 		return goal.Record{}, jobs.Definition{}, err
 	}
 	var sources []jobs.WatchSource
-	hasGoogle:=false
+	hasGoogle := false
 	seen := map[string]bool{}
 	for _, id := range draft.ConnectorIDs {
 		if seen[id] {
@@ -47,7 +53,7 @@ func saveFollowup(stateDir string, draft followup.Draft) (goal.Record, jobs.Defi
 		case connector.KindHTTPJSON:
 			sources = append(sources, jobs.WatchSource{ConnectorID: id, Operation: "fetch"})
 		case connector.KindGoogle:
-			hasGoogle=true
+			hasGoogle = true
 			if draft.GmailQuery == "" && draft.CalendarDays == 0 {
 				return goal.Record{}, jobs.Definition{}, errors.New("select a mail query or calendar window for Google")
 			}
@@ -61,7 +67,9 @@ func saveFollowup(stateDir string, draft followup.Draft) (goal.Record, jobs.Defi
 			return goal.Record{}, jobs.Definition{}, fmt.Errorf("%s has no bounded follow-up reader", id)
 		}
 	}
-	if !hasGoogle&&(draft.GmailQuery!=""||draft.CalendarDays!=0){return goal.Record{},jobs.Definition{},errors.New("mail and calendar selections require a Google connector")}
+	if !hasGoogle && (draft.GmailQuery != "" || draft.CalendarDays != 0) {
+		return goal.Record{}, jobs.Definition{}, errors.New("mail and calendar selections require a Google connector")
+	}
 	if len(sources) > 4 {
 		return goal.Record{}, jobs.Definition{}, errors.New("select at most four connected read surfaces")
 	}
@@ -134,7 +142,24 @@ func saveFollowup(stateDir string, draft followup.Draft) (goal.Record, jobs.Defi
 		definition.CreatedAt, definition.LastScheduledAt = prior.CreatedAt, prior.LastScheduledAt
 	}
 	definition.OAuthAccountPins = pins
-	definition, err = store.Save(definition)
+	if draft.JobID != "" {
+		definition, err = store.SaveReviewed(definition, draft.ExpectedDigest)
+	} else {
+		prior, loadErr := store.Load(definition.ID)
+		if loadErr == nil {
+			definition.Version, definition.CreatedAt = prior.Version, prior.CreatedAt
+			wanted, _ := definition.PolicyDigest()
+			actual, _ := prior.PolicyDigest()
+			if wanted != actual {
+				return record, definition, errors.New("this saved check has changed; refresh and edit it from the follow-up list")
+			}
+			definition = prior
+		} else if errors.Is(loadErr, os.ErrNotExist) {
+			definition, err = store.Save(definition)
+		} else {
+			err = loadErr
+		}
+	}
 	if err != nil {
 		return record, definition, err
 	}
@@ -167,6 +192,9 @@ func startLocalSupervisor(stateDir string) error {
 		return err
 	}
 	defer log.Close()
+	if err := log.Chmod(0600); err != nil {
+		return err
+	}
 	command := exec.Command(binary, "job", "supervisor")
 	command.Env = append(os.Environ(), "GATOR_STATE_DIR="+stateDir)
 	command.Stdout, command.Stderr = log, log

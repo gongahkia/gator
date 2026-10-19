@@ -31,11 +31,12 @@ const (
 // may report success. It is developer-owned input and must not be weakened by
 // model output or repository content.
 type Contract struct {
-	Version          int                `json:"version"`
-	Artifacts        []Requirement      `json:"artifacts"`
-	MaxArtifactBytes int64              `json:"max_artifact_bytes,omitempty"`
-	MaxTotalBytes    int64              `json:"max_total_bytes,omitempty"`
-	ExternalActions  action.Disposition `json:"external_actions"`
+	AllowOptionalArtifacts bool               `json:"allow_optional_artifacts,omitempty"`
+	Version                int                `json:"version"`
+	Artifacts              []Requirement      `json:"artifacts"`
+	MaxArtifactBytes       int64              `json:"max_artifact_bytes,omitempty"`
+	MaxTotalBytes          int64              `json:"max_total_bytes,omitempty"`
+	ExternalActions        action.Disposition `json:"external_actions"`
 }
 
 // Requirement defines one required output-relative artifact and the
@@ -109,6 +110,14 @@ func InspectionContract() Contract {
 	}
 }
 
+// OptionalDraftContract permits bounded drafts when useful without requiring a
+// user-facing file on every check. External actions remain forbidden.
+func OptionalDraftContract() Contract {
+	contract := InspectionContract()
+	contract.AllowOptionalArtifacts = true
+	return contract
+}
+
 // Normalize fills optional limits and policy with conservative defaults and
 // returns independent slices safe for a caller to modify.
 func (c Contract) Normalize() Contract {
@@ -143,6 +152,9 @@ func (c Contract) Validate() error {
 	}
 	if err := c.ExternalActions.Validate(); err != nil {
 		return err
+	}
+	if c.AllowOptionalArtifacts && c.ExternalActions != action.Forbid {
+		return errors.New("optional drafts cannot authorize external actions")
 	}
 
 	seenPaths := make(map[string]struct{}, len(c.Artifacts))

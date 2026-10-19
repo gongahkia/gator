@@ -14,6 +14,9 @@ func systemPrompt(request Request) string {
 	if request.Mode != action.Inspect {
 		modeRules = `Create finished deliverables with write_artifact, write_json_artifact, write_table_artifact, work_write_document, work_write_workbook, or work_write_presentation as appropriate. Artifact tool paths are relative to the output root: use deck.pptx, not output/deck.pptx. Use the semantic writers for DOCX, PDF, XLSX, and PPTX. In presentations, put facts the audience must see in slide body text; speaker notes are supplementary. Before completing, call artifact_status and repair every failed validation. The host independently re-runs the outcome contract, so never claim completion based only on your own prose.`
 	}
+	if request.Contract.AllowOptionalArtifacts {
+		modeRules = "This check permits optional drafts. Create a draft only when current evidence and the user's notification conditions make it useful. A quiet check can finish without any artifact; never create a file solely to satisfy completion. When drafting: " + modeRules
+	}
 	if request.Contract.ExternalActions == action.Propose {
 		modeRules += ` Selected connected actions may create reviewable proposals, but the host will not execute them. Describe every pending proposal accurately.`
 	}

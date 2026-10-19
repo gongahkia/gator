@@ -37,7 +37,7 @@ func ReadChecks(stateDir string, supervisor bool, now time.Time) ([]Check, error
 	}
 	checks := make([]Check, 0, len(definitions))
 	for _, definition := range definitions {
-		policy,_:=definition.PolicyDigest()
+		policy, _ := definition.PolicyDigest()
 		check := Check{ID: definition.ID, GoalID: definition.GoalID, Title: definition.Name, Outcome: definition.Objective, Enabled: definition.Enabled, Definition: definition, State: "waiting for first check", NextAction: "Review results in /inbox"}
 		active := true
 		if definition.GoalID != "" {
@@ -59,10 +59,14 @@ func ReadChecks(stateDir string, supervisor bool, now time.Time) ([]Check, error
 				if attempt.Status == "failed" || attempt.Status == "interrupted" {
 					check.State, check.Issue, check.NextAction = "couldn't check", attempt.Error, "Review access and model setup, then retry the check"
 				}
-				if attempt.Status=="limited" {check.State,check.Issue,check.NextAction="daily limit",attempt.Summary,"Model checks resume on the next UTC day; edit limits or pause this check"}
-				if attempt.NotificationPolicySHA256!=""&&attempt.NotificationPolicySHA256!=policy {check.State="settings changed; waiting for check"}
+				if attempt.Status == "limited" {
+					check.State, check.Issue, check.NextAction = "daily limit", attempt.Summary, "Model checks resume on the next UTC day; edit limits or pause this check"
+				}
+				if attempt.NotificationPolicySHA256 != "" && attempt.NotificationPolicySHA256 != policy {
+					check.State = "settings changed; waiting for check"
+				}
 			}
-			if check.LastSuccess.IsZero() && attempt.NotificationPolicySHA256==policy && (attempt.Status == "completed" || attempt.Status == "unchanged") {
+			if check.LastSuccess.IsZero() && attempt.NotificationPolicySHA256 == policy && (attempt.Status == "completed" || attempt.Status == "unchanged") {
 				check.LastSuccess = attempt.FinishedAt
 			}
 			if sameDay(attempt.StartedAt, now.UTC()) {
@@ -80,11 +84,20 @@ func ReadChecks(stateDir string, supervisor bool, now time.Time) ([]Check, error
 					check.ModelRequests += bundle.Manifest.Usage.ModelRequests
 					check.Tokens += bundle.Manifest.Usage.InputTokens + bundle.Manifest.Usage.OutputTokens
 				}
-				check.DurationSeconds += attempt.FinishedAt.Sub(attempt.StartedAt).Seconds()
+				if attempt.FinishedAt.After(attempt.StartedAt) {
+					check.DurationSeconds += attempt.FinishedAt.Sub(attempt.StartedAt).Seconds()
+				}
 			}
+		}
+		check.ChecksToday, err = store.DailyChecks(definition.ID, now)
+		if err != nil {
+			return nil, err
 		}
 		if !definition.Enabled || !active {
 			check.State, check.NextAction = "paused", "Resume this check when ready"
+			if !active {
+				check.State, check.NextAction = "goal paused", "Resume the goal with gator goal resume "+definition.GoalID
+			}
 		} else if !supervisor {
 			check.State, check.NextAction = "offline", "Start the local supervisor"
 		} else {

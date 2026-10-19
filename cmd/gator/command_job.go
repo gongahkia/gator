@@ -479,22 +479,13 @@ func executeJobContextWith(ctx context.Context, definition jobs.Definition, atte
 		}
 	}
 	if runErr == nil && definition.MaxChecksPerDay > 0 {
-		history, historyErr := store.History(definition.ID, 0)
-		if historyErr != nil {
-			runErr = historyErr
-		} else {
-			checks := 0
-			now := time.Now().UTC()
-			for _, prior := range history {
-				at := prior.StartedAt.UTC()
-				if prior.ID != attempt.ID && at.Year() == now.Year() && at.YearDay() == now.YearDay() && len(prior.Runs) > 0 {
-					checks++
-				}
-			}
-			if checks >= definition.MaxChecksPerDay {
-				attempt.Status, attempt.Summary, attempt.FinishedAt = "limited", "Daily model-check limit reached; checks resume on the next UTC day.", now
-				return attempt
-			}
+		now := time.Now().UTC()
+		reserved, reserveErr := store.ReserveCheck(definition, attempt, now)
+		if reserveErr != nil {
+			runErr = reserveErr
+		} else if !reserved {
+			attempt.Status, attempt.Summary, attempt.FinishedAt = "limited", "Daily Work-check limit reached; checks resume on the next UTC day.", now
+			return attempt
 		}
 	}
 	for try := 1; runErr == nil && try <= 3; try++ {
@@ -921,7 +912,7 @@ func digestJobResult(finalText string, artifacts []artifact.File) string {
 }
 
 func jobNotificationPolicyHash(definition jobs.Definition) string {
-	digest,_:=definition.PolicyDigest()
+	digest, _ := definition.PolicyDigest()
 	return digest
 }
 

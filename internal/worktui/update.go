@@ -17,6 +17,8 @@ import (
 
 func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 	switch value := messageValue.(type) {
+	case followupSaved:
+		return m.finishFollowup(value)
 	case recallStatusDone:
 		if value.Err != nil {
 			m.sectionNotice = "Recall status unavailable: " + value.Err.Error()
@@ -293,6 +295,12 @@ func (m Model) updateConnectorActionDone(value connectorActionDone) (tea.Model, 
 }
 
 func (m Model) updateKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.followupSaving {
+		if value.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+		return m, nil
+	}
 	if m.pendingBundleAction != nil {
 		return m.updateBundleConfirmation(value)
 	}
