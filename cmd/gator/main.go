@@ -36,6 +36,9 @@ Inside Gator:
   /followup new                 review a project check before saving
   /memory                       set up recall and inspect data destinations
   /context                      review sources and saved context
+  /recovery                     reconnect, retry, and review offline coverage
+  /usage                        review shared usage and limits
+  /data                         manage retention, backups, and deletion
 
 Product areas:
   Work        gator work [TASK] · gator work resume CONVERSATION TASK
@@ -52,6 +55,8 @@ Product areas:
               gator job inbox show|read|rate|report
               gator job quiet-audit JOB_ID [ATTEMPT_ID missed|correct|clear [--note TEXT]]
   Settings    gator config [show] · gator config set default-provider|default-model|sandbox|network VALUE
+  Usage       gator usage status|limits|pause|resume
+  Data        gator data status|retention|cleanup|preview|apply|export|verify
 
 Common follow-up actions:
   gator work review WORK_ID
@@ -76,7 +81,7 @@ gator work -- TASK to keep it a task rather than dispatching that command.`
 func main() {
 	if len(os.Args) == 1 || (os.Args[1] != "--help" && os.Args[1] != "-h" && os.Args[1] != "--version" && os.Args[1] != "-v") {
 		if root, err := state.ResolveDir(""); err == nil {
-			if _, err := lifecycle.Maintain(context.Background(), root, time.Now()); err != nil {
+			if _, err := lifecycle.Maintain(context.Background(), root, time.Now()); err != nil && !errors.Is(err, state.ErrBusy) {
 				fmt.Fprintln(os.Stderr, "gator: retention cleanup deferred:", err)
 			}
 		}

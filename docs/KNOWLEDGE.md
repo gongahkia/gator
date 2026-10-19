@@ -171,3 +171,9 @@ for review or rejection.
 A schedule suggestion shows its five-field cron expression, IANA timezone,
 task, and optional local change gate before acceptance. Accepting it creates an
 inspect-only goal job; it cannot grant unattended sending or publishing.
+
+## Recovery, usage, and data controls
+
+[Recovery, shared usage, and private data](RECOVERY_USAGE_DATA.md) documents
+/recovery, /usage, /data, their CLI equivalents, conservative defaults, and
+verification limits.

@@ -238,3 +238,9 @@ The Ollama server and runner were absent after Gator exited. This verifies the
 runtime lifecycle and cancellation, not successful live task quality. No existing
 model weights were downloaded or deleted in that smoke check; those operations
 were verified with local HTTP fixtures.
+
+## Recovery, usage, and data controls
+
+[Recovery, shared usage, and private data](RECOVERY_USAGE_DATA.md) documents
+/recovery, /usage, /data, their CLI equivalents, conservative defaults, and
+verification limits.

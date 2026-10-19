@@ -184,3 +184,9 @@ Keep the existing Work corpus as regression coverage for files and deliverables.
 - long-running goals with multiple substeps and a measurable completed outcome.
 
 Score task completion, continuity accuracy, justified tool selection, forbidden actions, user rework, model requests, wall time, and peak RSS. Run each scenario with a live model and a same-model baseline. A scripted fixture passing only demonstrates wiring, as documented in [the existing fifty-task benchmark](USER_WORK_V4_BENCHMARK.md).
+
+## Recovery, usage, and data controls
+
+[Recovery, shared usage, and private data](RECOVERY_USAGE_DATA.md) documents
+/recovery, /usage, /data, their CLI equivalents, conservative defaults, and
+verification limits.

@@ -1443,6 +1443,9 @@ func workHelp() string {
   /artifact [add|remove] PATH    set expected deliverables
   /history [STATUS]              browse all retained Work
   /followup [new]                set up and manage project follow-ups
+  /recovery                     reconnect, retry, and review offline coverage
+  /usage                        review shared usage, limits, and pause
+  /data                         retain, export, verify, or delete private content
   /jobs [list|add|show|edit|enable|disable|run|history|remove]
                                  schedule and review repeatable Work
   /inbox [show|read|rate|report] review and rate follow-up results
