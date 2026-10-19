@@ -438,6 +438,7 @@ func runInteractiveWork(source, conversationID, prompt, stateDir string, options
 }
 
 func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, options worktui.RunOptions, currentGoal goal.Record) worktui.RunResult {
+	requestedAt := time.Now()
 	ctx := options.Context
 	if ctx == nil {
 		ctx = context.Background()
@@ -463,6 +464,7 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 		}
 	}
 	request := workrun.Request{
+		RequestedAt:        requestedAt,
 		PreparationContext: ctx,
 		SourcePath:         source, ConversationID: conversationID, Objective: prompt,
 		MaxSteps: options.MaxSteps, Mode: mode, Contract: contract,

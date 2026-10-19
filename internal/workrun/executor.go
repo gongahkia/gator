@@ -102,7 +102,8 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	if _, err := history.Start(workhistory.Start{
 		ID: request.RunID, Objective: request.Objective, Mode: request.Mode, Decision: request.Decision, ExternalActions: request.Contract.ExternalActions,
 		PolicySHA256: policySHA256, ConversationID: request.ConversationID, ParentRevisionID: request.ParentRevisionID,
-		StartedAt: startedAt,
+		StartedAt:   startedAt,
+		RequestedAt: request.RequestedAt,
 		Evidence: workhistory.EvidenceReferences{
 			TracePath:        filepath.Join(request.StateDir, "gator", "traces", request.RunID, "trace.json"),
 			InteractionsPath: filepath.Join(request.StateDir, "gator", "interactions", request.RunID),

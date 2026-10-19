@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/gongahkia/gator/internal/inbox"
@@ -26,6 +27,9 @@ Record first route chosen, time to action, wrong turns, and success without help
 
 gator pilot record --work WORK_ID --draft usable|light-edits|rewrite|failed --corrections N [--followup useful|unhelpful] [--recovery succeeded|failed] [--reviewer PSEUDONYM] [--note TEXT]
 gator pilot report [--goal GOAL_ID] [--json]
+
+Optional observed usability: --setup-seconds N --resume-seconds N --repair-seconds N --unassisted true|false.
+Omitting these flags leaves those observations unmeasured.
 
 Rate shown alerts with gator job inbox rate ENTRY_ID useful|noise|wrong.
 Review quiet checks with gator job quiet-audit JOB_ID ATTEMPT_ID missed|correct.
@@ -63,13 +67,31 @@ func pilotCommand(args []string, out io.Writer) error {
 		recovery := flags.String("recovery", "unreviewed", "recovery judgment")
 		reviewer := flags.String("reviewer", "self", "reviewer pseudonym")
 		note := flags.String("note", "", "source-supported reviewer notes")
+		setupSeconds := flags.Int("setup-seconds", -1, "observed setup time, or omit when unmeasured")
+		resumeSeconds := flags.Int("resume-seconds", -1, "observed resume time, or omit when unmeasured")
+		repairSeconds := flags.Int("repair-seconds", -1, "observed manual repair time, or omit when unmeasured")
+		unassisted := flags.String("unassisted", "unreviewed", "true or false when observed")
 		if err := flags.Parse(args[1:]); err != nil {
 			return err
 		}
 		if len(flags.Args()) != 0 {
 			return errors.New("unexpected pilot review arguments")
 		}
-		review, err := store.Save(pilot.Review{WorkID: *work, Reviewer: *reviewer, Draft: *draft, Corrections: *corrections, Followup: *followup, Recovery: *recovery, Notes: *note})
+		var alone *bool
+		if *unassisted != "unreviewed" {
+			value, parseErr := strconv.ParseBool(*unassisted)
+			if parseErr != nil {
+				return errors.New("--unassisted must be true, false, or unreviewed")
+			}
+			alone = &value
+		}
+		optionalSeconds := func(value int) *int {
+			if value < 0 {
+				return nil
+			}
+			return &value
+		}
+		review, err := store.Save(pilot.Review{WorkID: *work, Reviewer: *reviewer, Draft: *draft, Corrections: *corrections, Followup: *followup, Recovery: *recovery, Notes: *note, SetupSeconds: optionalSeconds(*setupSeconds), ResumeSeconds: optionalSeconds(*resumeSeconds), RepairSeconds: optionalSeconds(*repairSeconds), Unassisted: alone})
 		if err != nil {
 			return err
 		}
@@ -98,7 +120,11 @@ func pilotCommand(args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
+	if _, err = fmt.Fprintf(out, "Observed usability: setup %ds across %d observations; resume %ds across %d; repair %ds across %d\nCompleted without help: %d; needed help: %d (others unreviewed)\n", report.SetupSeconds, report.SetupObservations, report.ResumeSeconds, report.ResumeObservations, report.RepairSeconds, report.RepairObservations, report.UnassistedSuccesses, report.NeededHelp); err != nil {
+		return err
+	}
 	if report.KnownCostUSD != nil {
+		// Report only retained provider cost, never an invented estimate.
 		_, err = fmt.Fprintf(out, "Reported cost: $%.4f\n", *report.KnownCostUSD)
 	} else {
 		_, err = fmt.Fprintln(out, "Cost unavailable; missing provider usage or pricing is not treated as zero.")

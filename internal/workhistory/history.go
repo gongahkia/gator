@@ -77,6 +77,7 @@ type Record struct {
 	Status             Status             `json:"status"`
 	LiveStatus         string             `json:"-"` // transient process-held lease state
 	StartedAt          time.Time          `json:"started_at"`
+	RequestedAt        time.Time          `json:"requested_at,omitempty"`
 	FinishedAt         time.Time          `json:"finished_at,omitempty"`
 }
 
@@ -139,6 +140,7 @@ type Start struct {
 	ConversationID   string
 	ParentRevisionID string
 	StartedAt        time.Time
+	RequestedAt      time.Time
 	Evidence         EvidenceReferences
 }
 
@@ -281,6 +283,7 @@ func (s Store) Start(start Start) (Record, error) {
 		ParentRevisionID: start.ParentRevisionID,
 		Evidence:         start.Evidence,
 		Status:           Running,
+		RequestedAt:      start.RequestedAt,
 		StartedAt:        start.StartedAt.UTC(),
 	}
 	if err := validateRecord(record); err != nil {
@@ -418,6 +421,9 @@ func (s Store) list(conversationID string, limit int, oldestFirst bool) ([]Recor
 func (s Store) path(id string) string { return filepath.Join(s.root, id+".json") }
 
 func validateRecord(record Record) error {
+	if !record.RequestedAt.IsZero() && record.RequestedAt.After(record.StartedAt) {
+		return errors.New("Work request time cannot follow execution start")
+	}
 	if record.Version != Version || validateID(record.ID) != nil || record.ObjectiveSummary == "" || len(record.ObjectiveSummary) > 160 || !validDigest(record.ObjectiveSHA256) {
 		return errors.New("Work history identity is invalid")
 	}

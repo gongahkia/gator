@@ -18,16 +18,20 @@ import (
 )
 
 type Review struct {
-	Version     int       `json:"version"`
-	WorkID      string    `json:"work_id"`
-	GoalID      string    `json:"goal_id,omitempty"`
-	Reviewer    string    `json:"reviewer"`
-	Draft       string    `json:"draft"`
-	Corrections int       `json:"corrections"`
-	Followup    string    `json:"followup"`
-	Recovery    string    `json:"recovery"`
-	Notes       string    `json:"notes,omitempty"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	Version       int       `json:"version"`
+	WorkID        string    `json:"work_id"`
+	GoalID        string    `json:"goal_id,omitempty"`
+	Reviewer      string    `json:"reviewer"`
+	Draft         string    `json:"draft"`
+	Corrections   int       `json:"corrections"`
+	Followup      string    `json:"followup"`
+	Recovery      string    `json:"recovery"`
+	Notes         string    `json:"notes,omitempty"`
+	SetupSeconds  *int      `json:"setup_seconds,omitempty"`
+	ResumeSeconds *int      `json:"resume_seconds,omitempty"`
+	RepairSeconds *int      `json:"repair_seconds,omitempty"`
+	Unassisted    *bool     `json:"unassisted,omitempty"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 type Store struct{ stateDir, root string }
 type Report struct {
@@ -40,6 +44,8 @@ type Report struct {
 	ElapsedSeconds                                                           float64
 	KnownCostUSD                                                             *float64
 	UsageIncomplete                                                          bool
+	SetupSeconds, SetupObservations, ResumeSeconds, ResumeObservations       int
+	RepairSeconds, RepairObservations, UnassistedSuccesses, NeededHelp       int
 }
 
 func Open(stateDir string) (Store, error) {
@@ -64,6 +70,11 @@ func validChoice(value string, choices ...string) bool {
 	return false
 }
 func validate(r Review) error {
+	for _, seconds := range []*int{r.SetupSeconds, r.ResumeSeconds, r.RepairSeconds} {
+		if seconds != nil && (*seconds < 0 || *seconds > 86400) {
+			return errors.New("observed usability time must be 0–86400 seconds")
+		}
+	}
 	if r.WorkID == "" || len(r.WorkID) > 128 || filepath.Base(r.WorkID) != r.WorkID || r.Reviewer == "" || len(r.Reviewer) > 100 || strings.ContainsAny(r.WorkID+r.Reviewer, "\x00\r\n") || len(r.Notes) > 4096 || r.Corrections < 0 || r.Corrections > 1000 {
 		return errors.New("invalid pilot review identity or correction count")
 	}
@@ -95,6 +106,8 @@ func (s Store) Save(r Review) (Review, error) {
 	}
 	if work.Decision != nil {
 		r.GoalID = work.Decision.GoalID
+	} else {
+		r.GoalID = ""
 	}
 	r.Version, r.UpdatedAt = 1, time.Now().UTC()
 	data, err := json.MarshalIndent(r, "", "  ")
@@ -170,6 +183,25 @@ func (s Store) Report(goalID string) (Report, error) {
 			result.Failed++
 		}
 		result.Corrections += review.Corrections
+		if review.SetupSeconds != nil {
+			result.SetupSeconds += *review.SetupSeconds
+			result.SetupObservations++
+		}
+		if review.ResumeSeconds != nil {
+			result.ResumeSeconds += *review.ResumeSeconds
+			result.ResumeObservations++
+		}
+		if review.RepairSeconds != nil {
+			result.RepairSeconds += *review.RepairSeconds
+			result.RepairObservations++
+		}
+		if review.Unassisted != nil {
+			if *review.Unassisted {
+				result.UnassistedSuccesses++
+			} else {
+				result.NeededHelp++
+			}
+		}
 		if review.Followup == "useful" {
 			result.UsefulFollowups++
 		}
@@ -191,7 +223,11 @@ func (s Store) Report(goalID string) (Report, error) {
 		if err != nil {
 			return result, err
 		}
-		result.ElapsedSeconds += work.FinishedAt.Sub(work.StartedAt).Seconds()
+		started := work.StartedAt
+		if !work.RequestedAt.IsZero() && work.RequestedAt.Before(started) {
+			started = work.RequestedAt
+		}
+		result.ElapsedSeconds += work.FinishedAt.Sub(started).Seconds()
 		if work.Evidence.ArtifactManifestPath == "" {
 			result.UsageIncomplete = true
 			continue

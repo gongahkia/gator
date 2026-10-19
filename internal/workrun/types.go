@@ -80,6 +80,7 @@ type Request struct {
 	IgnoredInstructionPaths []string
 	Objective               string
 	RunID                   string
+	RequestedAt             time.Time
 	PreparationContext      context.Context
 	// EnableControl exposes stop and steering for this foreground run through a
 	// private loopback endpoint. It never grants action approval authority.

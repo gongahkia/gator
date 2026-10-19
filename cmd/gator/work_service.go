@@ -9,6 +9,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/gongahkia/gator/internal/agent"
@@ -29,6 +30,9 @@ import (
 
 // configuredWorkService assembles trusted adapters; execution stays in workrun.Service.
 func configuredWorkService(provider, modelName, stateDir string, request *workrun.Request) (workrun.Service, error) {
+	if request.RequestedAt.IsZero() {
+		request.RequestedAt = time.Now()
+	}
 	defaults, err := configuredDefaults()
 	if err != nil {
 		return workrun.Service{}, err

@@ -393,7 +393,14 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 			err = errorsUnavailable("pilot review")
 			break
 		}
-		presented, pilotErr := m.config.PilotAction(m.lastWorkID, fields[1:])
+		pilotArgs := fields[1:]
+		for i, arg := range pilotArgs {
+			if arg == "|" {
+				pilotArgs = append(append([]string(nil), pilotArgs[:i]...), "--note", strings.Join(pilotArgs[i+1:], " "))
+				break
+			}
+		}
+		presented, pilotErr := m.config.PilotAction(m.lastWorkID, pilotArgs)
 		if pilotErr != nil {
 			err = pilotErr
 			break
