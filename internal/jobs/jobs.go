@@ -85,6 +85,18 @@ type WatchChange struct {
 	Kind   string `json:"kind"`
 }
 
+// WatchDecision is the retained, host-checked reason for surfacing or quieting
+// a goal watch. Status is quiet, attention, or review.
+type WatchDecision struct {
+	Status    string   `json:"status"`
+	Summary   string   `json:"summary"`
+	NextStep  string   `json:"next_step,omitempty"`
+	Rationale string   `json:"rationale,omitempty"`
+	Evidence  []string `json:"evidence,omitempty"`
+	ChangeIDs []string `json:"change_ids,omitempty"`
+	Urgent    bool     `json:"urgent,omitempty"`
+}
+
 // WatchCursor is a bounded provider checkpoint for one selected source. It
 // contains no message content and is valid only with the attempt's definition.
 type WatchCursor struct {
@@ -112,6 +124,7 @@ type Attempt struct {
 	ResultSHA256             string         `json:"result_sha256,omitempty"`
 	InputSHA256              string         `json:"input_sha256,omitempty"`
 	WatchAttention           bool           `json:"watch_attention,omitempty"`
+	WatchDecision            *WatchDecision `json:"watch_decision,omitempty"`
 	Urgent                   bool           `json:"urgent,omitempty"`
 	WatchItems               []WatchItem    `json:"watch_items,omitempty"`
 	WatchChanges             []WatchChange  `json:"watch_changes,omitempty"`

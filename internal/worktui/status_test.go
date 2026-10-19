@@ -14,6 +14,8 @@ func TestWorkStatusShowsSelectedModelAndAccess(t *testing.T) {
 	}})
 	status := m.workStatus()
 	for _, expected := range []string{
+		"when Gator works: on request; no enabled scheduled checks (/jobs)",
+		"what Gator may do: auto: inspect or draft; external actions require foreground approval (/mode)",
 		"model: codex / gpt-5.6",
 		"model access: logged in (Gator OAuth credential)",
 		"internal specialists: managed by Gator",

@@ -134,6 +134,12 @@ func renderGoalActivity(stateDir, goalID string, out io.Writer) error {
 				fmt.Fprintf(&view, " — %s", activityLine(last.Summary, 140))
 			}
 			view.WriteByte('\n')
+			if last.WatchDecision != nil {
+				fmt.Fprintf(&view, "    decision: %s — %s\n", last.WatchDecision.Status, activityLine(last.WatchDecision.Rationale, 180))
+				if last.WatchDecision.NextStep != "" {
+					fmt.Fprintf(&view, "    next step: %s\n", activityLine(last.WatchDecision.NextStep, 180))
+				}
+			}
 			changes := last.WatchChanges
 			if len(changes) == 0 {
 				for _, prior := range history[1:] {

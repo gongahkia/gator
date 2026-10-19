@@ -1,5 +1,38 @@
 # Gator as a terminal personal agent
 
+## Architecture decision — 2026-10-19
+
+Gator remains a local, user-controlled agent runtime: one user-facing manager,
+bounded internal specialists, persistent goals, reviewable Work, and a host-owned
+authority boundary. Improve the decisions around the existing Go runner rather
+than replace its provider-neutral tool loop. A specialist assignment is not a
+grant of autonomous decision authority. Unattended work may inspect, recommend,
+and prepare drafts; consequential connected actions require a fresh, exact
+foreground approval.
+
+The next foundation connects request interpretation, goal and memory context,
+tool selection, watch decisions, and visible authority in one retained Work
+decision. Explicit user controls always override inferred intent. The product
+shows what Gator is working on, what it remembered, when it will check again,
+and what it may do. Internal prompts, model routing, and specialist mechanics
+remain advanced diagnostics. Present timing and authority as separate controls,
+not a single numbered autonomy slider.
+
+Semantic retrieval defaults to an explicitly installed local Ollama embedding
+model, with separately opted-in OpenAI or Gemini embedding credentials. Missing
+or failed embeddings degrade to source-aware lexical search. Neither selecting
+a chat model nor merely storing a cloud API key authorizes uploading saved
+knowledge for indexing. Improve goal selection and alert relevance against
+matched live evaluations before claiming the agent is smarter.
+
+The first implementation pass retains a validated Work decision, uses a bounded
+model route only for ambiguous terminal prompts, indexes eligible memories and
+notes privately with lexical fallback, and retains checked goal-watch reasons.
+The existing Claude Code Kit TUI shows the decision in History and presents
+timing (`/jobs`) separately from authority (`/mode`) in Status. These are
+inspectable controls and diagnostics; model quality, missed alerts, and
+retrieval relevance still require matched live evaluation.
+
 Decision recorded 2026-10-16. The intended references are [Meta Muse](https://about.fb.com/news/2026/09/introducing-muse-personal-ai-agent/), [OpenAI dots](https://learn.chatgpt.com/docs/dots), and [Hermes Agent](https://github.com/NousResearch/hermes-agent). The GitHub project named [`plyght/dot`](https://github.com/plyght/dot) is a separate terminal coding agent.
 
 The [Muse and dots feature map](MUSE_DOTS_FEATURE_MAP.md) compares first-party product claims with Gator's implemented boundaries and sets an evidence-based order for closing the most valuable gaps.

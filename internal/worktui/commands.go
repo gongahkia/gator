@@ -171,7 +171,7 @@ func commandPaletteEntries() []entry {
 		{title: "/new", subtitle: "Start a new conversation", kind: "command", command: "/new"},
 		{title: "/model", subtitle: "Choose a cloud or local model", kind: "command", command: "/model"},
 		{title: "/source", subtitle: "Change the workspace", kind: "command", command: "/source"},
-		{title: "/mode", subtitle: "Set auto, inspect, draft, or act", kind: "command-input", command: "/mode"},
+		{title: "/mode", subtitle: "Choose what Gator may do: auto, inspect, draft, or act", kind: "command-input", command: "/mode"},
 		{title: "/attach", subtitle: "Attach a workspace file to the next request", kind: "command-input", command: "/attach"},
 		{title: "/detach", subtitle: "Remove a pending attachment", kind: "command-input", command: "/detach"},
 		{title: "/status", subtitle: "Show current model, workspace, and run", kind: "command", command: "/status"},
@@ -179,7 +179,7 @@ func commandPaletteEntries() []entry {
 		{title: "/theme", subtitle: "Choose gator (green), contrast, or mono", kind: "command-input", command: "/theme"},
 		{title: "/doctor", subtitle: "Check setup and device readiness", kind: "command", command: "/doctor"},
 		{title: "/history", subtitle: "Browse retained work", kind: "command", command: "/history"},
-		{title: "/jobs", subtitle: "Schedule and review recurring work", kind: "command-input", command: "/jobs"},
+		{title: "/jobs", subtitle: "Choose when Gator works: schedule and review checks", kind: "command-input", command: "/jobs"},
 		{title: "/inbox", subtitle: "Review follow-up results", kind: "command-input", command: "/inbox"},
 		{title: "/goals", subtitle: "Resume an ongoing goal", kind: "command", command: "/goals"},
 		{title: "/plan", subtitle: "Show or update this goal's plan", kind: "command-input", command: "/plan"},
@@ -1143,9 +1143,41 @@ func singleLine(value string) string {
 	return strings.Join(strings.Fields(value), " ")
 }
 
+func (m Model) workTiming() string {
+	enabled := 0
+	for _, job := range m.config.Jobs {
+		if job.Enabled {
+			enabled++
+		}
+	}
+	if enabled == 0 {
+		return "on request; no enabled scheduled checks (/jobs)"
+	}
+	if m.config.SupervisorRunning {
+		return fmt.Sprintf("on request; %d enabled scheduled checks (/jobs)", enabled)
+	}
+	return fmt.Sprintf("on request; %d enabled scheduled checks, supervisor stopped (/jobs)", enabled)
+}
+
+func (m Model) workAuthority() string {
+	switch m.options.Mode {
+	case "", "auto":
+		return "auto: inspect or draft; external actions require foreground approval"
+	case "inspect":
+		return "inspect only"
+	case "draft":
+		return "draft for review"
+	case "act":
+		return "act with foreground approval"
+	default:
+		return valueOrNone(m.options.Mode)
+	}
+}
+
 func (m Model) workStatus() string {
 	modelSelection, modelAccess := m.configuredModelStatus()
-	status := fmt.Sprintf("Gator orchestration\n  model: %s\n  model access: %s\n  workspace: %s%s\n  ignored project instructions: %s\n  conversation: %s\n  selected revision: %s\n  mode: %s\n  deliverables: %s\n  connectors: %s\n  web origins: %s\n  effort: %s (%d manager steps)\n  pending attachments: %s\n  queued prompts: %d\n  internal specialists: managed by Gator",
+	status := fmt.Sprintf("Gator orchestration\n  when Gator works: %s\n  what Gator may do: %s (/mode)\n  model: %s\n  model access: %s\n  workspace: %s%s\n  ignored project instructions: %s\n  conversation: %s\n  selected revision: %s\n  mode: %s\n  deliverables: %s\n  connectors: %s\n  web origins: %s\n  effort: %s (%d manager steps)\n  pending attachments: %s\n  queued prompts: %d\n  internal specialists: managed by Gator",
+		m.workTiming(), m.workAuthority(),
 		modelSelection, modelAccess,
 		valueOrNone(m.source), map[bool]string{true: " (refresh next turn)", false: " (frozen per turn)"}[m.options.RefreshSource],
 		valueOrNone(strings.Join(m.options.IgnoredInstructionPaths, ", ")),
@@ -1193,7 +1225,8 @@ func (m Model) workStatus() string {
 }
 
 func (m Model) workPermissions() string {
-	return fmt.Sprintf("Gator Work authority\n  workspace: read-only immutable snapshots from %s\n  ignored project instructions: %s\n  mode: %s\n  connectors: %s\n  web origins: %s\n  internal specialists: managed by Gator",
+	return fmt.Sprintf("Gator Work authority\n  when Gator works: %s\n  what Gator may do: %s (/mode)\n  workspace: read-only immutable snapshots from %s\n  ignored project instructions: %s\n  mode: %s\n  connectors: %s\n  web origins: %s\n  internal specialists: managed by Gator",
+		m.workTiming(), m.workAuthority(),
 		valueOrNone(m.source), valueOrNone(strings.Join(m.options.IgnoredInstructionPaths, ", ")), valueOrNone(m.options.Mode), valueOrNone(strings.Join(m.options.ConnectorIDs, ", ")),
 		valueOrNone(strings.Join(m.options.WebOrigins, ", ")))
 }

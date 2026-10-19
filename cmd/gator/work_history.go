@@ -59,6 +59,12 @@ func formatWorkHistoryRecord(record workhistory.Record, deliveries []delivery.Re
 	lines := []string{record.ObjectiveSummary, fmt.Sprintf("  Status: %s · verification %s · %s", record.DisplayStatus(), valueOrDash(string(record.VerificationStatus)), valueOrDash(record.ArtifactStatus))}
 	lines = append(lines, "  Delivery: "+historyDeliveryState(deliveries))
 	lines = append(lines, "  Artifacts: "+historyArtifacts(record))
+	if decision := record.Decision; decision != nil {
+		lines = append(lines, fmt.Sprintf("  Decision: %s %s (%s); recall %s", decision.Intent, decision.Mode, decision.Origin, valueOrDash(decision.RecallStatus)))
+		if decision.Reason != "" {
+			lines = append(lines, "  Why: "+decision.Reason)
+		}
+	}
 	lines = append(lines, "  Feedback: "+historyFeedback(observations))
 	if derived := historyLearnings(record.ID, learnings); derived != "" {
 		lines = append(lines, "  Learnings: "+derived)

@@ -157,6 +157,19 @@ func (m Model) bridgeHistoryPanel() uisnapshot.Panel {
 			{Title: "Feedback", Lines: historyFeedbackLines(detail.Observations)},
 			{Title: "Derived learnings", Lines: historyLearningLines(detail.Learnings)},
 		}
+		if decision := detail.Record.Decision; decision != nil {
+			lines := []string{"Purpose: " + decision.Intent + " · " + string(decision.Mode), "Chosen by: " + decision.Origin, "Connected sources: " + valueOrNone(strings.Join(decision.Connectors, ", ")), "Recall: " + valueOrNone(decision.RecallStatus)}
+			if decision.GoalID != "" {
+				lines = append(lines, "Goal: "+decision.GoalID)
+			}
+			if len(decision.ContextRefs) > 0 {
+				lines = append(lines, "Used knowledge: "+strings.Join(decision.ContextRefs, ", "))
+			}
+			if decision.Reason != "" {
+				lines = append(lines, decision.Reason)
+			}
+			panel.Blocks = append(panel.Blocks, uisnapshot.Block{Title: "Gator's decision", Lines: lines})
+		}
 		if detail.Review != "" {
 			panel.Blocks = append(panel.Blocks, uisnapshot.Block{Title: "Review", Lines: []string{detail.Review}})
 		}

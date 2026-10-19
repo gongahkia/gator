@@ -20,7 +20,10 @@ type goalWatchDecision struct {
 	Attention *bool    `json:"attention"`
 	Urgent    bool     `json:"urgent"`
 	Summary   string   `json:"summary"`
+	NextStep  string   `json:"next_step"`
+	Rationale string   `json:"rationale"`
 	Evidence  []string `json:"evidence"`
+	ChangeIDs []string `json:"change_ids"`
 }
 
 func parseGoalWatchDecision(finalText string) (goalWatchDecision, bool) {
@@ -41,6 +44,11 @@ func goalWatchUrgent(finalText string) bool {
 // A quiet watch is an explicit model decision with no durable side effect.
 // If the final answer is malformed, surface it for review rather than hide it.
 func classifyGoalWatchResult(finalText string, messages []agent.Message, artifacts []artifact.File, references watchReferenceSet) (bool, string) {
+	decision := evaluateGoalWatchResult(finalText, messages, artifacts, references, nil)
+	return decision.Status != "quiet", decision.Summary
+}
+
+func evaluateGoalWatchResult(finalText string, messages []agent.Message, artifacts []artifact.File, references watchReferenceSet, changes []jobs.WatchChange) jobs.WatchDecision {
 	forcedAttention := len(artifacts) > 0
 	failedSuggestion := false
 	for _, message := range messages {
@@ -58,27 +66,79 @@ func classifyGoalWatchResult(finalText string, messages []agent.Message, artifac
 	decision, valid := parseGoalWatchDecision(finalText)
 	if valid {
 		if failedSuggestion {
-			return true, "Goal watch could not queue its proposed change; review the Work run."
+			return jobs.WatchDecision{Status: "review", Summary: "Goal watch could not queue its proposed change; review the Work run.", NextStep: "Review the Work run and proposed change.", Rationale: "A suggested plan change failed host validation."}
 		}
-		summary := strings.TrimSpace(decision.Summary)
-		if len([]rune(summary)) > 360 {
-			summary = string([]rune(summary)[:360])
-		}
+		summary := boundedWatchText(decision.Summary, 360)
 		attention := *decision.Attention || forcedAttention
+		status := "quiet"
+		if attention {
+			status = "attention"
+		}
+		result := jobs.WatchDecision{Status: status, Summary: summary, NextStep: boundedWatchText(decision.NextStep, 240), Rationale: boundedWatchText(decision.Rationale, 360), Urgent: attention && decision.Urgent}
+		if result.Rationale == "" {
+			result.Rationale = summary
+		}
+		if attention && result.NextStep == "" {
+			result.Status = "review"
+			result.NextStep = "Review the Work run."
+		}
+		allowedChanges := map[string]bool{}
+		for _, change := range changes {
+			allowedChanges[change.Source+" "+change.ID] = true
+		}
+		for _, id := range decision.ChangeIDs {
+			id = boundedWatchText(id, 180)
+			if !allowedChanges[id] {
+				result.Status = "review"
+				result.Summary += " [change ID unverified; review Work run]"
+				continue
+			}
+			if len(result.ChangeIDs) < 8 {
+				result.ChangeIDs = append(result.ChangeIDs, id)
+			}
+		}
 		if attention {
 			evidence, unverified := boundedWatchEvidence(decision.Evidence, references)
 			if evidence != "" {
-				summary += " [evidence: " + evidence + "]"
+				result.Summary += " [evidence: " + evidence + "]"
+				result.Evidence = strings.Split(evidence, "; ")
 			} else {
-				summary += " [evidence missing or unverified; review Work run]"
+				result.Status = "review"
+				result.Summary += " [evidence missing or unverified; review Work run]"
 			}
 			if evidence != "" && unverified {
-				summary += " [other references unverified; review Work run]"
+				result.Status = "review"
+				result.Summary += " [other references unverified; review Work run]"
 			}
 		}
-		return attention, summary
+		if forcedAttention && !*decision.Attention {
+			result.Status = "review"
+			result.Rationale = "The Work run created an artifact or suggested a change despite a quiet model decision."
+		}
+		if !attention && len(decision.Evidence) > 0 {
+			_, unverified := boundedWatchEvidence(decision.Evidence, references)
+			if unverified {
+				result.Status = "review"
+				result.Summary += " [quiet rationale references unverified; review Work run]"
+			}
+		}
+		return result
 	}
-	return true, summarizeJobResult(finalText, artifacts)
+	return jobs.WatchDecision{Status: "review", Summary: summarizeJobResult(finalText, artifacts), NextStep: "Review the Work run.", Rationale: "The watch returned an invalid decision."}
+}
+
+func boundedWatchText(value string, limit int) string {
+	value = strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return ' '
+		}
+		return r
+	}, value)
+	value = strings.Join(strings.Fields(value), " ")
+	if len([]rune(value)) > limit {
+		value = string([]rune(value)[:limit])
+	}
+	return value
 }
 
 // watchReferenceSet checks reference integrity against material retained by
