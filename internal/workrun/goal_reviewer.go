@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -23,6 +24,7 @@ type goalReviewSnapshot struct {
 	StateDir       string
 	GoalID         string
 	ConversationID string
+	ExcludedIDs    []string
 }
 
 func (goalReviewSnapshot) Definition() agent.ToolDefinition {
@@ -155,6 +157,9 @@ func (t goalReviewSnapshot) Execute(_ context.Context, raw json.RawMessage) (age
 		return agent.ToolResult{}, err
 	}
 	for _, m := range memories {
+		if slices.Contains(t.ExcludedIDs, m.ID) {
+			continue
+		}
 		result.Knowledge = append(result.Knowledge, reference{m.ID, m.Kind, boundedReview(m.Text, 120), m.UpdatedAt})
 		if len(result.Knowledge) == 24 {
 			break
@@ -170,6 +175,9 @@ func (t goalReviewSnapshot) Execute(_ context.Context, raw json.RawMessage) (age
 			return agent.ToolResult{}, err
 		}
 		for _, n := range notes {
+			if slices.Contains(t.ExcludedIDs, n.ID) {
+				continue
+			}
 			result.Knowledge = append(result.Knowledge, reference{n.ID, "note", n.Title, n.UpdatedAt})
 			if len(result.Knowledge) == 24 {
 				break

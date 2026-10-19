@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -17,9 +18,10 @@ import (
 // PersonalKnowledge is a read-only view of the local knowledge base. The
 // current goal narrows every lookup; model-supplied paths are never accepted.
 type PersonalKnowledge struct {
-	Notes    knowledge.Store
-	Memories memory.Store
-	GoalID   string
+	Notes       knowledge.Store
+	Memories    memory.Store
+	GoalID      string
+	ExcludedIDs []string
 }
 
 func (p PersonalKnowledge) Tools() []agent.Tool {
@@ -65,13 +67,13 @@ func (t knowledgeSearch) Execute(_ context.Context, raw json.RawMessage) (agent.
 			return agent.ToolResult{}, err
 		}
 		for _, n := range notes {
-			if !seen[n.ID] && len(result) < 16 {
+			if !seen[n.ID] && !slices.Contains(t.ExcludedIDs, n.ID) && len(result) < 16 {
 				result = append(result, item{n.ID, "note", n.Title, n.UpdatedAt.Format("2006-01-02"), query})
 				seen[n.ID] = true
 			}
 		}
 		for _, m := range memories {
-			if !seen[m.ID] && len(result) < 16 {
+			if !seen[m.ID] && !slices.Contains(t.ExcludedIDs, m.ID) && len(result) < 16 {
 				result = append(result, item{m.ID, m.Kind, boundedKnowledgePreview(m.Text, 160), m.UpdatedAt.Format("2006-01-02"), query})
 				seen[m.ID] = true
 			}
@@ -103,6 +105,9 @@ func (t knowledgeRead) Execute(_ context.Context, raw json.RawMessage) (agent.To
 	}
 	if err := decodeArguments(raw, &args); err != nil {
 		return agent.ToolResult{}, err
+	}
+	if slices.Contains(t.ExcludedIDs, args.ID) {
+		return agent.ToolResult{}, errors.New("this saved item was excluded by the user for this run")
 	}
 	if strings.HasPrefix(args.ID, "note-") {
 		d, err := t.Notes.LoadNote(args.ID)

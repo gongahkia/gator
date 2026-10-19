@@ -27,6 +27,11 @@ func (p *ModelCatalogPanel) UISnapshot() uisnapshot.Panel {
 			{Label: "Cloud API key", Detail: "Choose a cloud model and configure its API key."},
 			{Label: "Local model", Detail: "Browse reviewed Ollama models on this machine."},
 		}
+		panel.Blocks = []uisnapshot.Block{
+			{Title: "Storage", Lines: []string{"Memories, notes, and Work records are saved in private local Gator storage."}},
+			{Title: "Retrieval", Lines: []string{"Saved context is selected using basic matching or a separately configured embedding provider. /memory shows readiness and upload settings."}},
+			{Title: "Chat processing", Lines: []string{"A cloud chat model receives selected task sources and saved context. Local storage or local retrieval does not keep a cloud chat request on this computer.", "A local Ollama chat model processes its requests here; connected tools contact their selected services."}},
+		}
 		if p.model.localModels.section == localModelSection {
 			panel.Selected = 1
 		}

@@ -77,6 +77,12 @@ func (m Model) bridgeLauncherPanel() uisnapshot.Panel {
 func (m Model) bridgeSectionPanel() uisnapshot.Panel {
 	panel := uisnapshot.Panel{Kind: m.section, Selected: m.selected, Notice: m.sectionNotice, Footer: "Esc back"}
 	switch m.section {
+	case "followup":
+		return m.followupPanel()
+	case "memory":
+		return m.recallPanel()
+	case "context":
+		return m.contextPanel()
 	case "effort":
 		panel.Title = "Choose effort"
 		panel.Subtitle = "How much time Gator may spend on a request."
@@ -163,12 +169,12 @@ func (m Model) bridgeHistoryPanel() uisnapshot.Panel {
 				lines = append(lines, "Goal: "+decision.GoalID)
 			}
 			if len(decision.ContextRefs) > 0 {
-				lines = append(lines, "Used knowledge: "+strings.Join(decision.ContextRefs, ", "))
+				lines = append(lines, "Saved context supplied: "+strings.Join(decision.ContextRefs, ", "))
 			}
 			if decision.Reason != "" {
 				lines = append(lines, decision.Reason)
 			}
-			panel.Blocks = append(panel.Blocks, uisnapshot.Block{Title: "Gator's decision", Lines: lines})
+			panel.Blocks = append(panel.Blocks, uisnapshot.Block{Title: "Work context · /context " + detail.Record.ID, Lines: lines})
 		}
 		if detail.Review != "" {
 			panel.Blocks = append(panel.Blocks, uisnapshot.Block{Title: "Review", Lines: []string{detail.Review}})

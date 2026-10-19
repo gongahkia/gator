@@ -83,17 +83,30 @@ type Record struct {
 // Decision is the effective, host-validated route for a Work run. It contains
 // identifiers and capability names, never source text or credentials.
 type Decision struct {
-	Version      int         `json:"version"`
-	Origin       string      `json:"origin"`
-	Intent       string      `json:"intent"`
-	GoalID       string      `json:"goal_id,omitempty"`
-	Mode         action.Mode `json:"mode"`
-	Artifacts    []string    `json:"artifacts,omitempty"`
-	Connectors   []string    `json:"connectors,omitempty"`
-	ToolGroups   []string    `json:"tool_groups,omitempty"`
-	ContextRefs  []string    `json:"context_refs,omitempty"`
-	RecallStatus string      `json:"recall_status,omitempty"`
-	Reason       string      `json:"reason,omitempty"`
+	Version      int           `json:"version"`
+	Origin       string        `json:"origin"`
+	Intent       string        `json:"intent"`
+	GoalID       string        `json:"goal_id,omitempty"`
+	Mode         action.Mode   `json:"mode"`
+	Artifacts    []string      `json:"artifacts,omitempty"`
+	Connectors   []string      `json:"connectors,omitempty"`
+	ToolGroups   []string      `json:"tool_groups,omitempty"`
+	ContextRefs  []string      `json:"context_refs,omitempty"`
+	ContextItems []ContextItem `json:"context_items,omitempty"`
+	RecallStatus string        `json:"recall_status,omitempty"`
+	Reason       string        `json:"reason,omitempty"`
+}
+
+// ContextItem retains a bounded excerpt of the saved context actually supplied
+// at the start of this run. It describes input, not the model's hidden reasoning.
+type ContextItem struct {
+	ID        string    `json:"id"`
+	Kind      string    `json:"kind"`
+	Title     string    `json:"title"`
+	Excerpt   string    `json:"excerpt"`
+	Scope     string    `json:"scope"`
+	Source    string    `json:"source,omitempty"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // DisplayStatus keeps the durable lifecycle distinct from the transient run

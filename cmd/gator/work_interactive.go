@@ -20,6 +20,7 @@ import (
 	"github.com/gongahkia/gator/internal/attachment"
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/delivery"
+	"github.com/gongahkia/gator/internal/followup"
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
@@ -243,10 +244,23 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		MemoryResult: func(arguments []string) (*uisnapshot.Result, error) {
 			return workMemoryResult(stateDir, goalID, arguments)
 		},
-		NoteAction:  func(command string) (string, error) { return workTUINoteAction(command, goalID) },
-		NoteResult:  func(command string) (*uisnapshot.Result, error) { return workNoteResult(goalID, command) },
-		SkillAction: workTUISkillAction,
-		SkillResult: workSkillResult,
+		RecallStatus:    func(ctx context.Context) (worktui.RecallStatus, error) { return workRecallStatus(ctx, stateDir) },
+		ConfigureRecall: configureWorkRecall,
+		InstallRecall:   installWorkRecall,
+		ReadContext: func(workID, activeGoal string) (worktui.ContextState, error) {
+			return readWorkContext(stateDir, workID, activeGoal)
+		},
+		ChangeKnowledge: func(id, action, text, activeGoal string) error {
+			return changeWorkKnowledge(stateDir, id, action, text, activeGoal)
+		},
+		SaveFollowup:    func(draft followup.Draft) (goal.Record, jobs.Definition, error) { return saveFollowup(stateDir, draft) },
+		ReadChecks:      func() ([]workhome.Check, bool, error) { return readFollowupChecks(stateDir) },
+		StartSupervisor: func() error { return startLocalSupervisor(stateDir) },
+		PilotAction:     workPilotResult,
+		NoteAction:      func(command string) (string, error) { return workTUINoteAction(command, goalID) },
+		NoteResult:      func(command string) (*uisnapshot.Result, error) { return workNoteResult(goalID, command) },
+		SkillAction:     workTUISkillAction,
+		SkillResult:     workSkillResult,
 		ResolveSource: func(path string) (string, error) {
 			if !filepath.IsAbs(path) {
 				path = filepath.Join(workingDirectory, path)
@@ -452,6 +466,7 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 		SourcePath: source, ConversationID: conversationID, Objective: prompt,
 		MaxSteps: options.MaxSteps, Mode: mode, Contract: contract,
 		DecisionOrigin: decisionOrigin, DecisionReason: decisionReason,
+		ExcludedKnowledgeIDs:    append([]string(nil), options.ExcludedKnowledgeIDs...),
 		GoalContext:             goalContext(currentGoal),
 		GoalID:                  currentGoal.ID,
 		ConnectorIDs:            append([]string(nil), options.ConnectorIDs...),
@@ -509,7 +524,7 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 	} else {
 		outcome, err = service.Execute(ctx, request)
 	}
-	result := worktui.RunResult{ConversationID: outcome.ConversationID, RevisionID: outcome.RevisionID, SnapshotID: outcome.SnapshotID, FinalText: outcome.Result.FinalText}
+	result := worktui.RunResult{WorkID: outcome.Manifest.RunID, ConversationID: outcome.ConversationID, RevisionID: outcome.RevisionID, SnapshotID: outcome.SnapshotID, FinalText: outcome.Result.FinalText}
 	if outcome.Work.Path != "" {
 		result.OutputPath = outcome.Work.Output.Path()
 		if summary, summaryErr := summarizeWorkBundle(outcome.Work.Path); summaryErr == nil {

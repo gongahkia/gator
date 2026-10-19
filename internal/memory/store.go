@@ -270,7 +270,15 @@ func (s Store) Forget(id string) error {
 }
 
 func Render(records []Record) string {
+	text, _ := RenderSelection(records)
+	return text
+}
+
+// RenderSelection returns the exact bounded records supplied to the model so
+// the context UI never claims an omitted item was provided.
+func RenderSelection(records []Record) (string, []Record) {
 	var lines []string
+	var selected []Record
 	remaining := 4000
 	for _, record := range records {
 		line := fmt.Sprintf("- [%s] %s (%s, updated: %s", record.ID, record.Text, record.Kind, record.UpdatedAt.Format("2006-01-02"))
@@ -293,9 +301,10 @@ func Render(records []Record) string {
 			break
 		}
 		lines = append(lines, line)
+		selected = append(selected, record)
 		remaining -= len(line)
 	}
-	return strings.Join(lines, "\n")
+	return strings.Join(lines, "\n"), selected
 }
 
 func tokenize(value string) map[string]bool {

@@ -341,7 +341,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		return outcome, fmt.Errorf("list saved memories: %w", err)
 	}
 	if len(notes)+len(skills)+len(memories) > 0 {
-		surface = append(surface, (tools.PersonalKnowledge{Notes: knowledgeStore, Memories: memoryStore, GoalID: request.GoalID}).Tools()...)
+		surface = append(surface, (tools.PersonalKnowledge{Notes: knowledgeStore, Memories: memoryStore, GoalID: request.GoalID, ExcludedIDs: request.ExcludedKnowledgeIDs}).Tools()...)
 	}
 	suggestions, err := suggestion.Open(request.StateDir)
 	if err != nil {

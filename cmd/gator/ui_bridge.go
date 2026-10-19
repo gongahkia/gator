@@ -156,7 +156,7 @@ func bridgeKey(name string) (tea.KeyMsg, bool) {
 		"pgup": tea.KeyPgUp, "pgdown": tea.KeyPgDown,
 		"ctrl+c": tea.KeyCtrlC, "ctrl+p": tea.KeyCtrlP, "ctrl+x": tea.KeyCtrlX,
 		"ctrl+i": tea.KeyCtrlI, "ctrl+b": tea.KeyCtrlB, "ctrl+j": tea.KeyCtrlJ,
-		"ctrl+g": tea.KeyCtrlG, "ctrl+u": tea.KeyCtrlU,
+		"ctrl+g": tea.KeyCtrlG, "ctrl+u": tea.KeyCtrlU, "ctrl+r":tea.KeyCtrlR,
 		"ctrl+q": tea.KeyCtrlQ, "f1": tea.KeyF1,
 	}
 	if kind, ok := special[name]; ok {

@@ -34,6 +34,8 @@ type BackendState = {
   actions: { Label: string; Command: string }[];
   title: string;
   source: string;
+  goal_id?: string;
+  checks?: { title: string; health: string; state: string }[];
   provider?: string;
   model?: string;
   theme: string;
@@ -313,7 +315,7 @@ function PanelScreen({ panel, status, draft, statusLine, bridge, exit }: { panel
   const [offset, setOffset] = useState(0);
   useEffect(() => { setOffset(0); }, [panel.kind, panel.title, panel.subtitle]);
   const rows = panel.rows ?? [];
-  const focused = panel.kind === "confirmation" || panel.kind === "model-form" || panel.kind === "learning-form";
+  const focused = panel.kind === "confirmation" || panel.kind.endsWith("-form");
   const geometry = panelGeometry(terminal?.columns ?? 80, terminal?.rows ?? 24, focused, panel.kind === "picker", !!panel.subtitle);
   const blocks = (panel.blocks ?? []).flatMap((block) => [
     ...(block.title ? [{ text: block.title, heading: true }] : []),
@@ -348,7 +350,7 @@ function PanelScreen({ panel, status, draft, statusLine, bridge, exit }: { panel
           const active = panel.kind !== "inbox" && panel.kind !== "jobs" && rowStart + index === selected;
           return <Box key={`${rowStart + index}-${row.label}`} flexDirection="column" marginBottom={geometry.compact ? 0 : 1}>
             <Text wrap="truncate-end" color={active ? palette.accent : undefined} bold={active}>{active ? "❯ " : "  "}{row.label}{row.state ? <Text color={row.tone === "warning" ? palette.warning : row.tone === "error" ? palette.error : row.tone === "success" ? palette.accent : palette.secondary}>  ·  {row.state}</Text> : null}</Text>
-            {row.detail && <Box marginLeft={2}><Text wrap="truncate-end" dimColor={!active}>{row.detail}{active && (panel.kind === "model-form" || panel.kind === "learning-form") && <Text inverse> </Text>}</Text></Box>}
+            {row.detail && <Box marginLeft={2}><Text wrap="truncate-end" dimColor={!active}>{row.detail}{active && panel.kind.endsWith("-form") && <Text inverse> </Text>}</Text></Box>}
           </Box>;
         })}
         {blocks.slice(blockOffset, blockOffset + maxLines).map((line, index) => <Box key={`${blockOffset + index}-${line.text}`} marginBottom={line.heading ? 0 : undefined}>
@@ -504,6 +506,9 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
           <Text key={index}>  {action.Label} · {action.Command}</Text>
         ))}
         <Text dimColor>  Type / for Gator commands.</Text>
+        <Text>  Track project changes and draft the next step · /followup new</Text>
+        <Text dimColor>  Memory setup and processing destinations · /memory</Text>
+        {(state.checks ?? []).slice(0, 2).map((check, index) => <Box key={index} flexDirection="column"><Text color={check.state === "offline" || check.state === "couldn't check" ? palette.warning : palette.secondary}>  {check.title} · {check.state}</Text><Text dimColor>  {check.health}</Text></Box>)}
         {state.supervisor_needs_start && <Text color={palette.secondary}>  Recurring checks need a running supervisor · gator job supervisor</Text>}
       </Box>
     </Box>
@@ -518,7 +523,7 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
   return (
     <GatorPaletteContext.Provider value={palette}>
     <Box flexDirection="column" flexGrow={1} paddingX={1} paddingTop={1}>
-      {!state.home && <Box marginBottom={1}><Text color={palette.accent} bold>🐊 Gator</Text><Text color={palette.secondary}>  {context}</Text></Box>}
+      {!state.home && <Box marginBottom={1}><Text color={palette.accent} bold>🐊 Gator</Text><Text color={palette.secondary}>  {state.goal_id ? "Goal: " : ""}{context}</Text></Box>}
       <Box flexDirection="column" flexGrow={1}>
         {state.home && state.messages.length === 0 && <Box marginBottom={1}>{welcome}</Box>}
         {state.messages.length > 0 && <MessageList ref={list} viewportHeight={viewportHeight} messages={messages} renderMessage={(item) => <MessageBody item={state.messages[Number(item.id.split("-", 1)[0])]} />} />}

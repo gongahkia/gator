@@ -121,6 +121,8 @@ func run(args []string, out io.Writer) error {
 		return goalCommand(args[1:], out)
 	case "memory":
 		return memoryCommand(args[1:], out)
+	case "pilot":
+		return pilotCommand(args[1:], out)
 	case "note", "notes":
 		return noteCommand(args[1:], out)
 	case "skill", "skills":

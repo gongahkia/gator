@@ -45,6 +45,9 @@ type Definition struct {
 	RefreshSnapshot     bool                   `json:"refresh_snapshot"`
 	ChangeOnly          bool                   `json:"change_only,omitempty"`
 	GoalWatch           bool                   `json:"goal_watch,omitempty"`
+	PollMinutes         int                    `json:"poll_minutes,omitempty"`
+	AlertWhen           string                 `json:"alert_when,omitempty"`
+	MaxChecksPerDay     int                    `json:"max_checks_per_day,omitempty"`
 	WatchSources        []WatchSource          `json:"watch_sources,omitempty"`
 	RuntimeWatchChanges []WatchChange          `json:"-"`
 	RuntimeWatchItems   []WatchItem            `json:"-"`
@@ -269,7 +272,21 @@ func (d Definition) Validate() error {
 	if d.ChangeOnly && (!d.RefreshSnapshot || len(d.WebOrigins) > 0 || len(d.ConnectorIDs) > 0 && len(d.WatchSources) == 0) {
 		return errors.New("change-only jobs require refreshed local source and only bounded watch connector reads")
 	}
-	if d.GoalWatch && (d.GoalID == "" || !d.ChangeOnly || d.Missed != "run_once" || d.EnableCode || len(d.WebOrigins) != 0 || len(d.WatchSources) == 0 && d.Schedule != "* * * * *" || len(d.WatchSources) > 0 && d.Schedule != "*/5 * * * *") {
+	expectedWatchSchedule := "* * * * *"
+	if len(d.WatchSources) > 0 {
+		expectedWatchSchedule = "*/5 * * * *"
+	}
+	if d.PollMinutes != 0 {
+		var err error
+		expectedWatchSchedule, err = WatchSchedule(d.PollMinutes)
+		if err != nil {
+			return err
+		}
+	}
+	if d.MaxChecksPerDay < 0 || d.MaxChecksPerDay > 1440 || len(d.AlertWhen) > 2048 || strings.ContainsRune(d.AlertWhen, 0) {
+		return errors.New("invalid watch notification conditions or daily limit")
+	}
+	if d.GoalWatch && (d.GoalID == "" || !d.ChangeOnly || d.Missed != "run_once" || d.EnableCode || len(d.WebOrigins) != 0 || d.Schedule != expectedWatchSchedule) {
 		return errors.New("goal watches require a local goal, bounded polling, run_once catch-up, and no code delegation")
 	}
 	if len(d.WatchSources) > 4 || len(d.WatchSources) > 0 && !d.GoalWatch {
@@ -348,6 +365,18 @@ func (d Definition) Validate() error {
 	return nil
 }
 
+// WatchSchedule keeps reviewed polling intervals separate from action authority.
+func WatchSchedule(minutes int) (string, error) {
+	switch minutes {
+	case 5, 15, 30:
+		return fmt.Sprintf("*/%d * * * *", minutes), nil
+	case 60:
+		return "0 * * * *", nil
+	default:
+		return "", errors.New("check frequency must be 5, 15, 30, or 60 minutes")
+	}
+}
+
 // Digest binds an execution to the exact normalized definition loaded by the
 // supervisor. Definitions contain identities and policy, but never secrets.
 func (d Definition) Digest() (string, error) {
@@ -360,6 +389,15 @@ func (d Definition) Digest() (string, error) {
 	}
 	digest := sha256.Sum256(payload)
 	return hex.EncodeToString(digest[:]), nil
+}
+
+// PolicyDigest excludes scheduler bookkeeping so a running poll does not make
+// an otherwise unchanged review stale. Source, authority, and budget edits do.
+func (d Definition) PolicyDigest() (string,error) {
+	d.UpdatedAt,d.LastScheduledAt=time.Time{},time.Time{}
+	payload,err:=json.Marshal(d);if err!=nil{return "",err}
+	digest:=sha256.Sum256(payload)
+	return hex.EncodeToString(digest[:]),nil
 }
 
 func (s Store) Load(id string) (Definition, error) {

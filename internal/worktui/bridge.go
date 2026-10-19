@@ -37,6 +37,7 @@ type BridgeState struct {
 	Home                 bool              `json:"home"`
 	FirstRun             bool              `json:"first_run"`
 	SupervisorNeedsStart bool              `json:"supervisor_needs_start"`
+	Checks               []BridgeCheck     `json:"checks,omitempty"`
 	External             *BridgeExternal   `json:"external,omitempty"`
 }
 
@@ -70,6 +71,11 @@ type BridgeCommand struct {
 	Advanced    bool   `json:"advanced"`
 	NeedsInput  bool   `json:"needs_input"`
 }
+type BridgeCheck struct {
+	Title  string `json:"title"`
+	Health string `json:"health"`
+	State  string `json:"state"`
+}
 
 func (m Model) BridgeState() BridgeState {
 	state := BridgeState{
@@ -95,6 +101,9 @@ func (m Model) BridgeState() BridgeState {
 		Home:              m.home,
 		FirstRun:          m.firstRun,
 		External:          m.bridgeExternal,
+	}
+	for _, check := range m.checks {
+		state.Checks = append(state.Checks, BridgeCheck{Title: singleLine(check.Title), Health: check.HealthLine(), State: check.State})
 	}
 	if !m.config.SupervisorRunning {
 		for _, job := range m.config.Jobs {

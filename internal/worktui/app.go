@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/delivery"
+	"github.com/gongahkia/gator/internal/followup"
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
@@ -22,6 +23,7 @@ import (
 )
 
 type RunResult struct {
+	WorkID         string
 	ConversationID string
 	RevisionID     string
 	SnapshotID     string
@@ -106,6 +108,7 @@ type RunOptions struct {
 	ConnectorIDs            []string
 	WebOrigins              []string
 	IgnoredInstructionPaths []string
+	ExcludedKnowledgeIDs    []string
 	RefreshSource           bool
 	Code                    CodeOptions
 }
@@ -165,6 +168,15 @@ type Config struct {
 	ClearGoal               func()
 	MemoryAction            func(arguments []string) (string, error)
 	MemoryResult            func(arguments []string) (*uisnapshot.Result, error)
+	RecallStatus            func(context.Context) (RecallStatus, error)
+	ConfigureRecall         func(provider string, allowUpload bool) error
+	InstallRecall           func(context.Context, func(string)) error
+	ReadContext             func(workID, goalID string) (ContextState, error)
+	ChangeKnowledge         func(id, action, text, goalID string) error
+	SaveFollowup            func(followup.Draft) (goal.Record, jobs.Definition, error)
+	ReadChecks              func() ([]workhome.Check, bool, error)
+	StartSupervisor         func() error
+	PilotAction             func(workID string, arguments []string) (*uisnapshot.Result, error)
 	PlanAction              func(command string) (string, error)
 	PlanResult              func(command string) (*uisnapshot.Result, error)
 	ActivityAction          func() (string, error)
@@ -320,6 +332,21 @@ type Model struct {
 	learningFilter         learning.Status
 	learningForm           *learningForm
 	sectionNotice          string
+	followupForm           *followupForm
+	checks                 []workhome.Check
+	checkDetail            *workhome.Check
+	recall                 RecallStatus
+	recallBusy             bool
+	recallCancel           context.CancelFunc
+	recallEvents           <-chan tea.Msg
+	recallConfirm          string
+	contextState           ContextState
+	contextDetail          *KnowledgeItem
+	contextEdit            string
+	contextEditing         bool
+	contextConfirm         bool
+	contextWorkID          string
+	lastWorkID             string
 }
 
 func New(config Config) Model {
@@ -387,4 +414,9 @@ func New(config Config) Model {
 // Init forces one redraw after the alternate screen has been entered. Some
 // terminal emulators otherwise retain cells from the previous buffer until
 // their first viewport-sized repaint.
-func (m Model) Init() tea.Cmd { return tea.ClearScreen }
+func (m Model) Init() tea.Cmd {
+	if m.config.ReadChecks != nil {
+		return tea.Batch(tea.ClearScreen, m.refreshChecksCommand(), nextChecksTick())
+	}
+	return tea.ClearScreen
+}

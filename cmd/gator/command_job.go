@@ -478,6 +478,25 @@ func executeJobContextWith(ctx context.Context, definition jobs.Definition, atte
 			}
 		}
 	}
+	if runErr == nil && definition.MaxChecksPerDay > 0 {
+		history, historyErr := store.History(definition.ID, 0)
+		if historyErr != nil {
+			runErr = historyErr
+		} else {
+			checks := 0
+			now := time.Now().UTC()
+			for _, prior := range history {
+				at := prior.StartedAt.UTC()
+				if prior.ID != attempt.ID && at.Year() == now.Year() && at.YearDay() == now.YearDay() && len(prior.Runs) > 0 {
+					checks++
+				}
+			}
+			if checks >= definition.MaxChecksPerDay {
+				attempt.Status, attempt.Summary, attempt.FinishedAt = "limited", "Daily model-check limit reached; checks resume on the next UTC day.", now
+				return attempt
+			}
+		}
+	}
 	for try := 1; runErr == nil && try <= 3; try++ {
 		attempt.Try = try
 		reference := jobs.RunReference{Try: try, RunID: attempt.ID + "-try-" + strconv.Itoa(try)}
@@ -574,6 +593,7 @@ func jobWorkRequest(definition jobs.Definition) workrun.Request {
 		}
 		request.System += ` Use exact evidence references: a retained evidence ID; source/path:line from a file you read; connectorID/gmail_list messageID after reading that message; connectorID/calendar_events eventID after reading the event list; goal plan step STEP_ID; or goal plan review. Gator checks reference integrity before displaying references in an alert. A reference alone does not prove the claim it accompanies.`
 	}
+	request.System += followupObjective(definition)
 	if definition.RefreshSnapshot {
 		request.SnapshotID = ""
 	}
@@ -832,7 +852,7 @@ func runDueJobsContextWith(ctx context.Context, store jobs.Store, stateDir strin
 }
 
 func recordJobInbox(stateDir string, definition jobs.Definition, attempt jobs.Attempt) (inbox.Entry, error) {
-	if attempt.Status == "unchanged" {
+	if attempt.Status == "unchanged" || attempt.Status == "limited" {
 		return inbox.Entry{}, nil
 	}
 	if definition.GoalWatch && attempt.Status == "completed" && !attempt.WatchAttention {
@@ -901,14 +921,8 @@ func digestJobResult(finalText string, artifacts []artifact.File) string {
 }
 
 func jobNotificationPolicyHash(definition jobs.Definition) string {
-	definition.UpdatedAt = time.Time{}
-	definition.LastScheduledAt = time.Time{}
-	data, err := json.Marshal(definition)
-	if err != nil {
-		return ""
-	}
-	digest := sha256.Sum256(data)
-	return hex.EncodeToString(digest[:])
+	digest,_:=definition.PolicyDigest()
+	return digest
 }
 
 func inboxCommand(arguments []string, out io.Writer) error {

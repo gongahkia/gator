@@ -104,10 +104,12 @@ type Request struct {
 	MemoryContext string
 	// NoteContext names relevant saved notes with short excerpts. Full note text
 	// remains available through knowledge_read and is never tool authority.
-	NoteContext  string
-	ContextRefs  []string
-	RecallStatus string
-	GoalID       string
+	NoteContext          string
+	ContextRefs          []string
+	ContextItems         []workhistory.ContextItem
+	ExcludedKnowledgeIDs []string
+	RecallStatus         string
+	GoalID               string
 	// GoalContext is explicitly user-maintained ongoing context. It conveys
 	// neither tool authority nor an instruction that overrides the current task.
 	GoalContext          string

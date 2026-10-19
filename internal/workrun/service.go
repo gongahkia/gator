@@ -18,6 +18,7 @@ import (
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/tools"
+	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
@@ -50,6 +51,7 @@ func (s Service) Execute(ctx context.Context, request Request) (Outcome, error) 
 		request.MemoryContext = s.Defaults.MemoryContext
 		request.NoteContext = s.Defaults.NoteContext
 		request.ContextRefs = append([]string(nil), s.Defaults.ContextRefs...)
+		request.ContextItems = append([]workhistory.ContextItem(nil), s.Defaults.ContextItems...)
 		request.RecallStatus = s.Defaults.RecallStatus
 		request.GoalID = s.Defaults.GoalID
 		request.GoalPlanContext = s.Defaults.GoalPlanContext
@@ -73,38 +75,39 @@ func PolicyDigest(request Request) (string, error) {
 
 func effectiveConfiguration(request Request) any {
 	return struct {
-		Contract            artifact.Contract
-		Mode                action.Mode
-		Code                CodePolicy
-		Connectors          []string
-		OAuthRefreshPins    map[string]string
-		OAuthAccountPins    map[string]string
-		Permissions         any
-		WebOrigins          []string
-		IgnoredInstructions []string
-		Limits              agent.Limits
-		MaxSteps            int
-		Provider            string
-		GoalContext         string
-		GoalPlanContext     string
-		GoalID              string
-		MemoryContext       string
-		NoteContext         string
-		Roles               map[string]orchestrator.RoleConfiguration
-		ProjectSHA256       string
-		DisableDelegation   bool
-		DisabledRoles       []string
-		EnableCode          bool
-		RequireCode         bool
-		BrowserSession      string
-		DisableBrowser      bool
-		DesktopSession      string
+		Contract             artifact.Contract
+		Mode                 action.Mode
+		Code                 CodePolicy
+		Connectors           []string
+		OAuthRefreshPins     map[string]string
+		OAuthAccountPins     map[string]string
+		Permissions          any
+		WebOrigins           []string
+		IgnoredInstructions  []string
+		Limits               agent.Limits
+		MaxSteps             int
+		Provider             string
+		GoalContext          string
+		GoalPlanContext      string
+		GoalID               string
+		MemoryContext        string
+		NoteContext          string
+		Roles                map[string]orchestrator.RoleConfiguration
+		ProjectSHA256        string
+		DisableDelegation    bool
+		DisabledRoles        []string
+		EnableCode           bool
+		RequireCode          bool
+		BrowserSession       string
+		DisableBrowser       bool
+		ExcludedKnowledgeIDs []string
+		DesktopSession       string
 	}{request.Contract, request.Mode, request.Code, request.ConnectorIDs, request.OAuthRefreshPins, request.OAuthAccountPins, request.ConnectorPermissions, request.WebOrigins, request.IgnoredInstructionPaths, request.Limits, request.MaxSteps, request.Provider, request.GoalContext, request.GoalPlanContext, request.GoalID, request.MemoryContext, request.NoteContext, request.RoleConfiguration, func() string {
 		if request.Project != nil {
 			return request.Project.SHA256
 		}
 		return ""
-	}(), request.DisableDelegation, request.DisabledRoles, request.EnableCode, request.RequireCode, request.BrowserSession, request.DisableBrowser, request.DesktopSession}
+	}(), request.DisableDelegation, request.DisabledRoles, request.EnableCode, request.RequireCode, request.BrowserSession, request.DisableBrowser, request.ExcludedKnowledgeIDs, request.DesktopSession}
 }
 
 type Interaction struct {

@@ -2,7 +2,6 @@ package worktui
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/gongahkia/gator/internal/uisnapshot"
@@ -123,6 +122,9 @@ func (m Model) statusResult() *uisnapshot.Result {
 		work = "Running"
 	}
 	result := &uisnapshot.Result{Kind: "details", Title: "Current session", Fields: []uisnapshot.Field{
+		{Label: "When Gator works", Value: m.workTiming()},
+		{Label: "What Gator may do", Value: m.workAuthority()},
+		{Label: "Current goal", Value: valueOrNone(m.title)},
 		{Label: "Model", Value: selection}, {Label: "Access", Value: access},
 		{Label: "Workspace", Value: valueOrNone(m.source)},
 		{Label: "Workspace refresh", Value: map[bool]string{true: "Next turn", false: "Frozen per turn"}[m.options.RefreshSource]},
@@ -150,14 +152,7 @@ func (m Model) statusResult() *uisnapshot.Result {
 		if m.interaction != nil {
 			result.Fields = append(result.Fields, uisnapshot.Field{Label: "Current approval", Value: fmt.Sprintf("%s #%d", m.interaction.Kind, m.interaction.ID), Tone: "warning"})
 		}
-		for id, status := range m.tasks {
-			if strings.HasSuffix(status, ": queued") || strings.HasSuffix(status, ": running") {
-				result.Items = append(result.Items, uisnapshot.ResultItem{Label: id, Detail: status})
-			}
-		}
-		sort.Slice(result.Items, func(i, j int) bool { return result.Items[i].Label < result.Items[j].Label })
-		result.Fields = append(result.Fields, uisnapshot.Field{Label: "Live specialists", Value: fmt.Sprint(len(result.Items))})
-		result.Footer = "/cancel to stop · /tasks to inspect specialists"
+		result.Footer = "/cancel to stop · /activity for progress · /tasks for advanced diagnostics"
 		if m.operation != nil {
 			result.Footer += " · /steer MESSAGE to redirect"
 		}
@@ -170,6 +165,8 @@ func (m Model) statusResult() *uisnapshot.Result {
 
 func (m Model) permissionsResult() *uisnapshot.Result {
 	return &uisnapshot.Result{Kind: "details", Title: "Work authority", Summary: "Workspace snapshots are read-only.", Fields: []uisnapshot.Field{
+		{Label: "When Gator works", Value: m.workTiming()},
+		{Label: "What Gator may do", Value: m.workAuthority()},
 		{Label: "Workspace", Value: valueOrNone(m.source)},
 		{Label: "Ignored instructions", Value: valueOrNone(strings.Join(m.options.IgnoredInstructionPaths, ", "))},
 		{Label: "Mode", Value: m.options.Mode},

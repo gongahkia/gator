@@ -16,6 +16,63 @@ import (
 )
 
 func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
+	switch value := messageValue.(type) {
+	case recallStatusDone:
+		if value.Err != nil {
+			m.sectionNotice = "Recall status unavailable: " + value.Err.Error()
+		} else {
+			m.recall = value.Status
+			m.sectionNotice = ""
+		}
+		return m, nil
+	case recallProgress:
+		m.sectionNotice = string(value)
+		return m, waitWorkEvent(m.recallEvents)
+	case recallInstallDone:
+		m.recallBusy = false
+		if m.recallCancel != nil {
+			m.recallCancel()
+		}
+		m.recallCancel = nil
+		m.recallEvents = nil
+		if value.Err != nil {
+			m.sectionNotice = "Download stopped: " + value.Err.Error()
+			return m, nil
+		}
+		m.sectionNotice = "Local recall model installed."
+		return m, m.recallStatusCommand()
+	case checksRefreshed:
+		if value.Err == nil {
+			m.checks, m.config.SupervisorRunning = value.Checks, value.Running
+			m.config.Jobs = nil
+			for _, check := range value.Checks {
+				m.config.Jobs = append(m.config.Jobs, check.Definition)
+			}
+			if m.checkDetail != nil {
+				for _, check := range value.Checks {
+					if check.ID == m.checkDetail.ID {
+						copy := check
+						m.checkDetail = &copy
+						break
+					}
+				}
+			}
+		} else if m.section == "followup" {
+			m.sectionNotice = "Health unavailable: " + value.Err.Error()
+		}
+		return m, nil
+	case checksTick:
+		if m.config.ReadChecks == nil {
+			return m, nil
+		}
+		return m, tea.Batch(m.refreshChecksCommand(), nextChecksTick())
+	case checkActionDone:
+		m.sectionNotice = value.Text
+		if value.Err != nil {
+			m.sectionNotice = value.Err.Error()
+		}
+		return m, m.refreshChecksCommand()
+	}
 	if m.models != nil {
 		return m.updateModelPanel(messageValue)
 	}
@@ -94,9 +151,9 @@ func (m Model) updateAgentEvent(value agent.Event) (tea.Model, tea.Cmd) {
 				m.tasks = map[string]string{}
 			}
 			m.tasks[task.ID] = task.Role + ": " + task.Status
-			m.status = task.ID + " " + m.tasks[task.ID]
+			m.status = specialistProgress(task.Role, task.Status)
 			if task.Error != "" {
-				m.messages = append(m.messages, noticeMessage("Specialist failed", task.ID+": "+task.Error, "error"))
+				m.messages = append(m.messages, noticeMessage("Part of this work needs review", "Gator retained progress. Inspect /activity for the outcome or /tasks for diagnostics.", "warning"))
 			}
 			return m, waitWorkEvent(m.live)
 		}
@@ -125,6 +182,11 @@ func (m Model) updateInteraction(value workrun.Interaction) (tea.Model, tea.Cmd)
 }
 
 func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
+	if value.WorkID != "" {
+		m.lastWorkID = value.WorkID
+	} else if m.operation != nil {
+		m.lastWorkID = m.operation.RunID
+	}
 	wasCancelling := m.cancelling
 	if m.cancel != nil {
 		m.cancel()
@@ -166,6 +228,9 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 	}
 	m.lastOutput = value.OutputPath
 	m.lastBundle = value.Bundle
+	if m.lastWorkID != "" {
+		m.messages = append(m.messages, message{role: "Context", result: contextLink(m.lastWorkID)})
+	}
 	if m.revisionStatus() != "" {
 		m.status = m.revisionStatus()
 	}
@@ -300,6 +365,12 @@ func (m Model) updateKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) updateSectionKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch m.section {
+	case "followup":
+		return m.updateFollowupKey(value)
+	case "memory":
+		return m.updateRecallKey(value)
+	case "context":
+		return m.updateContextKey(value)
 	case "effort":
 		switch value.String() {
 		case "esc":
@@ -559,6 +630,7 @@ func (m Model) submitRunningInput() (tea.Model, tea.Cmd) {
 	m.queue = append(m.queue, queuedRun{prompt: prompt, options: cloneRunOptions(m.options)})
 	m.recordPrompt(prompt)
 	m.options.Attachments = nil
+	m.options.ExcludedKnowledgeIDs = nil
 	m.options.RefreshSource = false
 	m.status = fmt.Sprintf("Working from an immutable snapshot… · %d queued", len(m.queue))
 	return m, nil
@@ -632,6 +704,7 @@ func (m Model) submitComposerInput() (tea.Model, tea.Cmd) {
 	options := cloneRunOptions(m.options)
 	options.PreviousArtifacts = m.previousArtifactPaths()
 	m.options.Attachments = nil
+	m.options.ExcludedKnowledgeIDs = nil
 	m.options.RefreshSource = false
 	return m.startWork(source, conversation, prompt, options)
 }

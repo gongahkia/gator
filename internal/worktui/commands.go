@@ -182,6 +182,9 @@ func commandPaletteEntries() []entry {
 		{title: "/jobs", subtitle: "Choose when Gator works: schedule and review checks", kind: "command-input", command: "/jobs"},
 		{title: "/inbox", subtitle: "Review follow-up results", kind: "command-input", command: "/inbox"},
 		{title: "/goals", subtitle: "Resume an ongoing goal", kind: "command", command: "/goals"},
+		{title: "/followup", subtitle: "Watch project changes and review the next step", kind: "command", command: "/followup"},
+		{title: "/context", subtitle: "Inspect sources and saved context supplied to this work", kind: "command", command: "/context"},
+		{title: "/pilot", subtitle: "Review a project follow-up pilot and record outcomes", kind: "command-input", command: "/pilot", advanced: true},
 		{title: "/plan", subtitle: "Show or update this goal's plan", kind: "command-input", command: "/plan"},
 		{title: "/activity", subtitle: "Show checks and work for this goal", kind: "command", command: "/activity"},
 		{title: "/notifications", subtitle: "Set alerts for this goal", kind: "command-input", command: "/notifications"},
@@ -361,6 +364,42 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 	var result string
 	var err error
 	switch fields[0] {
+	case "/followup":
+		if m.config.SaveFollowup == nil {
+			err = errorsUnavailable("follow-up setup")
+			break
+		}
+		cmd := m.openFollowup()
+		if len(fields) == 2 && fields[1] == "new" {
+			m.newFollowup()
+		} else if len(fields) != 1 {
+			err = fmt.Errorf("usage: /followup [new]")
+			m.section = ""
+			break
+		}
+		return m, cmd
+	case "/context":
+		if len(fields) > 2 {
+			err = fmt.Errorf("usage: /context [WORK_ID]")
+			break
+		}
+		id := ""
+		if len(fields) == 2 {
+			id = fields[1]
+		}
+		return m.openContext(id, false)
+	case "/pilot":
+		if m.config.PilotAction == nil {
+			err = errorsUnavailable("pilot review")
+			break
+		}
+		presented, pilotErr := m.config.PilotAction(m.lastWorkID, fields[1:])
+		if pilotErr != nil {
+			err = pilotErr
+			break
+		}
+		m.messages = append(m.messages, message{role: "Pilot", result: presented})
+		return m, nil
 	case "/help", "/?":
 		if len(fields) == 1 {
 			result = workHelp()
@@ -664,6 +703,10 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		}
 		result, err = m.config.SuggestionAction(fields[1:])
 	case "/memory":
+		if len(fields) == 1 && m.config.RecallStatus != nil {
+			cmd := m.openRecall()
+			return m, cmd
+		}
 		if m.config.MemoryAction == nil {
 			err = errorsUnavailable("memory")
 			break
@@ -1251,6 +1294,7 @@ func cloneRunOptions(options RunOptions) RunOptions {
 	result.ConnectorIDs = append([]string(nil), options.ConnectorIDs...)
 	result.WebOrigins = append([]string(nil), options.WebOrigins...)
 	result.IgnoredInstructionPaths = append([]string(nil), options.IgnoredInstructionPaths...)
+	result.ExcludedKnowledgeIDs = append([]string(nil), options.ExcludedKnowledgeIDs...)
 	result.Code.Verification = append([]string(nil), options.Code.Verification...)
 	result.Code.Scopes = append([]string(nil), options.Code.Scopes...)
 	result.Code.Setup = append([]string(nil), options.Code.Setup...)

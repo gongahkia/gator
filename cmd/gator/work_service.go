@@ -23,6 +23,7 @@ import (
 	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/retrieval"
 	"github.com/gongahkia/gator/internal/snapshot"
+	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workrun"
 )
 
@@ -131,6 +132,8 @@ func applyMemoryContext(stateDir string, request *workrun.Request) error {
 		return fmt.Errorf("resolve relevant memories: %w", err)
 	}
 	records := lexical
+	lexical = filterMemoryExclusions(lexical, request.ExcludedKnowledgeIDs)
+	records = lexical
 	lexicalByID := map[string]memory.Record{}
 	for _, record := range lexical {
 		lexicalByID[record.ID] = record
@@ -143,6 +146,9 @@ func applyMemoryContext(stateDir string, request *workrun.Request) error {
 		documents := make([]retrieval.Document, 0, len(all))
 		available := map[string]memory.Record{}
 		for _, record := range all {
+			if sliceHas(request.ExcludedKnowledgeIDs, record.ID) {
+				continue
+			}
 			if record.SourceStatus == "changed" || record.SourceStatus == "unavailable" {
 				continue
 			}
@@ -178,9 +184,11 @@ func applyMemoryContext(stateDir string, request *workrun.Request) error {
 	} else {
 		request.RecallStatus = "lexical fallback (semantic unavailable)"
 	}
-	request.MemoryContext = memory.Render(records)
-	for _, record := range records {
+	var selected []memory.Record
+	request.MemoryContext, selected = memory.RenderSelection(records)
+	for _, record := range selected {
 		request.ContextRefs = append(request.ContextRefs, record.ID)
+		request.ContextItems = append(request.ContextItems, workhistory.ContextItem{ID: record.ID, Kind: "memory", Title: record.Kind, Excerpt: boundedContextExcerpt(record.Text), Scope: contextScope(record.GoalID), Source: record.Source, UpdatedAt: record.UpdatedAt})
 	}
 	return nil
 }
@@ -208,10 +216,20 @@ func applyNoteContext(stateDir string, request *workrun.Request) error {
 	if err != nil {
 		return err
 	}
+	filtered := notes[:0]
+	for _, note := range notes {
+		if !sliceHas(request.ExcludedKnowledgeIDs, note.ID) {
+			filtered = append(filtered, note)
+		}
+	}
+	notes = filtered
 	if embedder, embedErr := configuredEmbedder(stateDir); embedErr == nil && len(all) > 0 {
 		documents := make([]retrieval.Document, 0, len(all))
 		available := map[string]knowledge.Document{}
 		for _, note := range all {
+			if sliceHas(request.ExcludedKnowledgeIDs, note.ID) {
+				continue
+			}
 			full, err := store.LoadNote(note.ID)
 			if err != nil {
 				return err
@@ -271,10 +289,43 @@ func applyNoteContext(stateDir string, request *workrun.Request) error {
 		}
 		lines = append(lines, line)
 		request.ContextRefs = append(request.ContextRefs, note.ID)
+		request.ContextItems = append(request.ContextItems, workhistory.ContextItem{ID: note.ID, Kind: "note", Title: note.Title, Excerpt: boundedContextExcerpt(note.Excerpt), Scope: contextScope(note.GoalID), Source: strings.Join(note.SourceRefs, ", "), UpdatedAt: note.UpdatedAt})
 		remaining -= len(line)
 	}
 	request.NoteContext = strings.Join(lines, "\n")
 	return nil
+}
+
+func sliceHas(ids []string, id string) bool {
+	for _, v := range ids {
+		if v == id {
+			return true
+		}
+	}
+	return false
+}
+func filterMemoryExclusions(records []memory.Record, ids []string) []memory.Record {
+	result := make([]memory.Record, 0, len(records))
+	for _, r := range records {
+		if !sliceHas(ids, r.ID) {
+			result = append(result, r)
+		}
+	}
+	return result
+}
+func boundedContextExcerpt(text string) string {
+	text = safeNoteContext(text)
+	r := []rune(text)
+	if len(r) > 240 {
+		return string(r[:240]) + "…"
+	}
+	return text
+}
+func contextScope(id string) string {
+	if id == "" {
+		return "global"
+	}
+	return id
 }
 
 func configuredEmbedder(stateDir string) (retrieval.Embedder, error) {
