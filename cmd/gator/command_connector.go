@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -248,12 +251,16 @@ func loginConnector(id string, arguments []string, in io.Reader, out io.Writer) 
 	oauthClientSecret := flags.String("oauth-client-secret", "", "optional private OAuth client secret")
 	oauthClientSecretFromEnvironment := flags.String("oauth-client-secret-from-env", "", "read optional private OAuth client secret from an environment variable")
 	promptClientSecret := flags.Bool("prompt-client-secret", false, "read an optional OAuth client secret from a hidden terminal prompt")
+	reviewDigest := flags.String("review-digest", "", "require the connector configuration reviewed by recovery")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
 	descriptor, credentials, err := configuredConnector(id)
 	if err != nil {
 		return err
+	}
+	if *reviewDigest != "" && *reviewDigest != connectorLoginReview(descriptor) {
+		return errors.New("connector configuration changed during review; reconnect from a fresh recovery screen")
 	}
 	credentialSources := 0
 	if *fromEnvironment != "" {
@@ -342,6 +349,12 @@ func loginConnector(id string, arguments []string, in io.Reader, out io.Writer) 
 	}
 	_, err = fmt.Fprintf(out, "Stored a resource-bound bearer credential for connector %s.\n", id)
 	return err
+}
+
+func connectorLoginReview(descriptor connector.Descriptor) string {
+	data, _ := json.Marshal(descriptor)
+	digest := sha256.Sum256(data)
+	return hex.EncodeToString(digest[:])
 }
 
 func loginConnectorOAuth(descriptor connector.Descriptor, credentials auth.Store, clientSecret string, out io.Writer) error {

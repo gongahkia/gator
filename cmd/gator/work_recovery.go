@@ -2,8 +2,12 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/xml"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -41,6 +45,18 @@ func managedJobCommand(ctx context.Context, stateDir string, args ...string) (st
 	return string(output), nil
 }
 func recoveryControl(ctx context.Context, stateDir, action string, args []string) (worktui.ControlScreen, error) {
+	return recoveryControlWith(ctx, stateDir, action, args, managedJobCommand)
+}
+
+func recoveryControlWith(ctx context.Context, stateDir, action string, args []string, command func(context.Context, string, ...string) (string, error)) (worktui.ControlScreen, error) {
+	servicePath, err := recoveryServicePath()
+	if err != nil {
+		return worktui.ControlScreen{}, err
+	}
+	installed, ownsService, serviceDigest, err := recoveryServiceReview(servicePath, stateDir, runtime.GOOS)
+	if err != nil {
+		return worktui.ControlScreen{}, err
+	}
 	jobID := ""
 	if len(args) > 0 {
 		jobID = args[0]
@@ -53,18 +69,24 @@ func recoveryControl(ctx context.Context, stateDir, action string, args []string
 		}
 		notice = "Supervisor started. It runs while this computer is on."
 	case "install", "remove":
+		if len(args) != 2 || args[1] != serviceDigest {
+			return worktui.ControlScreen{}, errors.New("background service changed during review; refresh recovery before changing it")
+		}
+		if installed && !ownsService {
+			return worktui.ControlScreen{}, errors.New("the installed Gator service belongs to another state directory; manage it from that profile before enabling this one")
+		}
 		service := "systemd"
 		if runtime.GOOS == "darwin" {
 			service = "launchagent"
 		}
 		if action == "install" {
-			_, _ = managedJobCommand(ctx, stateDir, "stop")
+			_, _ = command(ctx, stateDir, "stop")
 		}
 		serviceArgs := []string{service, action}
 		if action == "remove" {
 			serviceArgs = append(serviceArgs, "--yes")
 		}
-		output, err := managedJobCommand(ctx, stateDir, serviceArgs...)
+		output, err := command(ctx, stateDir, serviceArgs...)
 		if err != nil {
 			return worktui.ControlScreen{}, err
 		}
@@ -73,16 +95,23 @@ func recoveryControl(ctx context.Context, stateDir, action string, args []string
 		if jobID == "" {
 			return worktui.ControlScreen{}, errors.New("choose a check to retry")
 		}
-		output, err := managedJobCommand(ctx, stateDir, "run", jobID)
+		output, err := command(ctx, stateDir, "run", jobID)
 		if err != nil {
 			return worktui.ControlScreen{}, err
 		}
 		notice = strings.TrimSpace(output)
 	case "token":
-		if len(args) != 3 {
+		if len(args) != 4 {
 			return worktui.ControlScreen{}, errors.New("choose the check, connector, and new credential")
 		}
-		descriptor, credentials, err := configuredConnector(args[1])
+		descriptor, _, err := configuredConnector(args[1])
+		if err != nil {
+			return worktui.ControlScreen{}, err
+		}
+		if descriptor.CredentialRef() != args[2] {
+			return worktui.ControlScreen{}, errors.New("connector resource changed during review; reconnect from a fresh recovery screen")
+		}
+		credentials, err := auth.New(stateDir)
 		if err != nil {
 			return worktui.ControlScreen{}, err
 		}
@@ -103,7 +132,7 @@ func recoveryControl(ctx context.Context, stateDir, action string, args []string
 		if !selected || descriptor.Authentication != connector.AuthBearer {
 			return worktui.ControlScreen{}, errors.New("this check does not select that bearer connector")
 		}
-		credential, err := auth.NewBearerToken(args[2], time.Time{})
+		credential, err := auth.NewBearerToken(args[3], time.Time{})
 		if err != nil {
 			return worktui.ControlScreen{}, err
 		}
@@ -121,15 +150,12 @@ func recoveryControl(ctx context.Context, stateDir, action string, args []string
 		return worktui.ControlScreen{}, err
 	}
 	screen := worktui.ControlScreen{Panel: uisnapshot.Panel{Kind: "recovery", Title: "Recovery and background checks", Notice: notice}}
-	servicePath, err := recoveryServicePath()
-	if err != nil {
-		return screen, err
-	}
-	_, serviceErr := os.Stat(servicePath)
-	installed := serviceErr == nil
 	serviceState := "Not configured"
 	if installed {
 		serviceState = "Configuration installed; supervisor health is checked separately"
+		if !ownsService {
+			serviceState = "Installed for another state directory; manage that profile before enabling this one"
+		}
 	}
 	active := "Offline"
 	if running {
@@ -185,7 +211,12 @@ func recoveryControl(ctx context.Context, stateDir, action string, args []string
 			if index >= 8 {
 				break
 			}
-			descriptor, credentials, err := configuredConnector(id)
+			descriptor, _, err := configuredConnector(id)
+			if err != nil {
+				screen.Panel.Blocks = append(screen.Panel.Blocks, uisnapshot.Block{Title: id, Lines: []string{"Connector configuration is unavailable: " + err.Error(), "Review /connector and edit the selected sources through /followup before retrying."}})
+				continue
+			}
+			credentials, err := auth.New(stateDir)
 			if err != nil {
 				return screen, err
 			}
@@ -194,9 +225,10 @@ func recoveryControl(ctx context.Context, stateDir, action string, args []string
 				return screen, err
 			}
 			screen.Panel.Blocks = append(screen.Panel.Blocks, uisnapshot.Block{Title: descriptor.Name, Lines: []string{status, "Resource: " + descriptor.Resource, "Existing OAuth scopes: " + descriptor.OAuthScopes, "Reconnect preserves this connector configuration and the check's permissions. An account change needs a reviewed agreement edit through /followup."}})
-			control := worktui.ControlAction{Key: strconv.Itoa(index + 1), Label: "Reconnect " + descriptor.Name, Action: "token", Args: []string{jobID, id}, Description: "Replace credentials only for " + descriptor.ID + " at " + descriptor.Resource + ". Existing OAuth scopes: " + descriptor.OAuthScopes + ". Reconnecting does not authorize new operations.", Review: true}
+			control := worktui.ControlAction{Key: strconv.Itoa(index + 1), Label: "Reconnect " + descriptor.Name, Action: "token", Args: []string{jobID, id, descriptor.CredentialRef()}, Description: "Replace credentials only for " + descriptor.ID + " at " + descriptor.Resource + ". Existing OAuth scopes: " + descriptor.OAuthScopes + ". Reconnecting does not authorize new operations.", Review: true}
 			if descriptor.Authentication == connector.AuthOAuth {
 				control.ConnectorID = id
+				control.ConnectorReview = connectorLoginReview(descriptor)
 			} else if descriptor.Authentication == connector.AuthBearer {
 				control.Fields = []worktui.ControlField{{Label: "New bearer token", Secret: true}}
 			} else {
@@ -206,15 +238,91 @@ func recoveryControl(ctx context.Context, stateDir, action string, args []string
 		}
 	}
 	screen.Actions = append(screen.Actions, worktui.ControlAction{Key: "S", Label: "Start supervisor now", Action: "start", Args: []string{jobID}})
-	autostart := worktui.ControlAction{Key: "A", Label: "Enable start at login", Action: "install", Args: []string{jobID}, Review: true, Description: "Install Gator's per-user background service at " + servicePath + ". It uses this state directory and the current Gator executable. This may replace an existing Gator service configuration. Checks run only while this host and user session are active."}
+	autostart := worktui.ControlAction{Key: "A", Label: "Enable start at login", Action: "install", Args: []string{jobID, serviceDigest}, Review: true, Description: "Install Gator's per-user background service at " + servicePath + ". It uses this state directory and the current Gator executable. This may replace an existing Gator service configuration. Checks run only while this host and user session are active."}
 	if installed {
 		autostart.Label = "Disable start at login"
 		autostart.Action = "remove"
 		autostart.Description = "Remove Gator's per-user service at " + servicePath + " and stop its supervisor. Saved checks remain and can be started manually."
 	}
-	screen.Actions = append(screen.Actions, autostart, worktui.ControlAction{Key: "R", Label: "Refresh", Action: "status", Args: []string{jobID}})
+	if !installed || ownsService {
+		screen.Actions = append(screen.Actions, autostart)
+	}
+	screen.Actions = append(screen.Actions, worktui.ControlAction{Key: "R", Label: "Refresh", Action: "status", Args: []string{jobID}})
 	if notice != "" {
 		screen.Panel.Blocks = append([]uisnapshot.Block{{Title: "Action result", Lines: strings.Split(notice, "\n")}}, screen.Panel.Blocks...)
 	}
 	return screen, nil
+}
+
+// recoveryServiceReview recognizes Gator's generated service configuration.
+// Unknown or ambiguous configurations are never offered for removal.
+func recoveryServiceReview(filename, stateDir, platform string) (installed, owns bool, digest string, err error) {
+	data, err := os.ReadFile(filename)
+	if errors.Is(err, os.ErrNotExist) {
+		return false, false, "absent", nil
+	}
+	if err != nil {
+		return false, false, "", err
+	}
+	sum := sha256.Sum256(data)
+	digest = hex.EncodeToString(sum[:])
+	selected := ""
+	count := 0
+	if platform == "darwin" {
+		decoder := xml.NewDecoder(strings.NewReader(string(data)))
+		wantValue := false
+		for {
+			token, readErr := decoder.Token()
+			if errors.Is(readErr, io.EOF) {
+				break
+			}
+			if readErr != nil {
+				return true, false, digest, nil
+			}
+			start, ok := token.(xml.StartElement)
+			if !ok {
+				continue
+			}
+			if start.Name.Local == "key" || start.Name.Local == "string" {
+				var value string
+				if err := decoder.DecodeElement(&value, &start); err != nil {
+					return true, false, digest, nil
+				}
+				if start.Name.Local == "key" {
+					wantValue = value == "GATOR_STATE_DIR"
+				} else if wantValue {
+					selected = value
+					count++
+					wantValue = false
+				}
+			}
+		}
+	} else {
+		for _, line := range strings.Split(string(data), "\n") {
+			value, ok := strings.CutPrefix(strings.TrimSpace(line), "Environment=")
+			if !ok {
+				continue
+			}
+			value, unquoteErr := strconv.Unquote(value)
+			if unquoteErr != nil {
+				continue
+			}
+			value = strings.ReplaceAll(value, "%%", "%")
+			if root, ok := strings.CutPrefix(value, "GATOR_STATE_DIR="); ok {
+				selected = root
+				count++
+			}
+		}
+	}
+	canonical := func(value string) string {
+		absolute, err := filepath.Abs(value)
+		if err != nil {
+			return ""
+		}
+		if resolved, err := filepath.EvalSymlinks(absolute); err == nil {
+			return resolved
+		}
+		return filepath.Clean(absolute)
+	}
+	return true, count == 1 && selected != "" && canonical(selected) == canonical(stateDir), digest, nil
 }
