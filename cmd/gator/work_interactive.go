@@ -28,6 +28,7 @@ import (
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/uisnapshot"
+	"github.com/gongahkia/gator/internal/usage"
 	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workhome"
 	"github.com/gongahkia/gator/internal/workrun"
@@ -443,6 +444,7 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	ctx = usage.WithState(usage.WithCategory(ctx, "chat"), stateDir)
 	mode, paths, decisionOrigin, decisionReason, err := resolveInteractiveWork(ctx, prompt, options)
 	if err != nil {
 		return worktui.RunResult{Error: err.Error()}
@@ -571,7 +573,7 @@ func resolveInteractiveWork(ctx context.Context, prompt string, options worktui.
 	}
 	routeCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
 	defer cancel()
-	turn, err := backend.Complete(routeCtx, agent.TurnRequest{
+	turn, err := backend.Complete(usage.WithCategory(routeCtx, "routing"), agent.TurnRequest{
 		System:   `Classify the user's immediate request for a terminal work agent. Return one JSON object only: {"mode":"inspect"|"draft","artifact":"optional basename.ext"}. Inspect answers questions. Draft creates a file. Never choose act, a connector, a goal, or a schedule. If uncertain, choose inspect.`,
 		Messages: []agent.Message{{Role: agent.RoleUser, Content: prompt}},
 	})

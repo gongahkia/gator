@@ -24,6 +24,7 @@ import (
 	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/retrieval"
 	"github.com/gongahkia/gator/internal/snapshot"
+	"github.com/gongahkia/gator/internal/usage"
 	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workrun"
 )
@@ -351,7 +352,11 @@ func configuredEmbedder(stateDir string) (retrieval.Embedder, error) {
 	}
 	provider := settings.Embeddings.Provider
 	if provider == "" || provider == "ollama" {
-		return retrieval.NewEmbedder("ollama", "")
+		e, err := retrieval.NewEmbedder("ollama", "")
+		if err != nil {
+			return nil, err
+		}
+		return retrieval.Meter(e, stateDir), nil
 	}
 	if !settings.Embeddings.CloudUploadApproved {
 		return nil, errors.New("cloud retrieval upload is not approved")
@@ -375,7 +380,11 @@ func configuredEmbedder(stateDir string) (retrieval.Embedder, error) {
 			key = os.Getenv("GEMINI_API_KEY")
 		}
 	}
-	return retrieval.NewEmbedder(provider, key)
+	e, err := retrieval.NewEmbedder(provider, key)
+	if err != nil {
+		return nil, err
+	}
+	return retrieval.Meter(e, stateDir), nil
 }
 
 func memoryIDs(records []memory.Record) []string {
@@ -472,6 +481,7 @@ func applyGoalPlanContext(stateDir string, request *workrun.Request) error {
 }
 
 func executeConfiguredWork(ctx context.Context, provider, modelName, stateDir string, request workrun.Request) (workrun.Outcome, error) {
+	ctx = usage.WithState(ctx, stateDir)
 	request.PreparationContext = ctx
 	service, err := configuredWorkService(provider, modelName, stateDir, &request)
 	if err != nil {

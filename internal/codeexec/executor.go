@@ -24,6 +24,7 @@ import (
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/terminal"
 	"github.com/gongahkia/gator/internal/tools"
+	"github.com/gongahkia/gator/internal/usage"
 	"github.com/gongahkia/gator/internal/workspace"
 	"github.com/gongahkia/gator/internal/worktree"
 )
@@ -83,6 +84,7 @@ type Executor struct {
 // Work creates the frozen source repository first, so this never mutates the
 // user's selected source checkout.
 func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error) {
+	ctx = usage.WithCategory(ctx, "code")
 	if err := e.validate(request); err != nil {
 		return Outcome{}, err
 	}

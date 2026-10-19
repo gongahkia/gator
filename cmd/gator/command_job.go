@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/usage"
 	"github.com/gongahkia/gator/internal/workrun"
 	"io"
 	"net"
@@ -637,6 +638,7 @@ func runJobProcessContext(ctx context.Context, definition jobs.Definition, state
 // runJobProcessWith keeps the job adapter small and makes clear that each job
 // attempt invokes the same Work service boundary as foreground Work.
 func runJobProcessWith(ctx context.Context, definition jobs.Definition, stateDir string, execute func(context.Context, string, string, string, workrun.Request) (workrun.Outcome, error), runIDs ...string) (jobResult, error) {
+	ctx = usage.WithState(usage.WithCategory(ctx, "background"), stateDir)
 	if err := verifyConfiguredGoalOAuthPins(ctx, definition); err != nil {
 		return jobResult{}, err
 	}

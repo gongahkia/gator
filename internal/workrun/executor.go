@@ -29,6 +29,7 @@ import (
 	"github.com/gongahkia/gator/internal/suggestion"
 	"github.com/gongahkia/gator/internal/telemetry"
 	"github.com/gongahkia/gator/internal/tools"
+	"github.com/gongahkia/gator/internal/usage"
 	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/worksession"
 	"github.com/gongahkia/gator/internal/workspace"
@@ -39,6 +40,7 @@ import (
 // failure. The retained output can therefore be reviewed after an interrupted
 // or unsuccessful attempt.
 func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Outcome, finalErr error) {
+	ctx = usage.WithState(ctx, request.StateDir)
 	now := e.Now
 	if now == nil {
 		now = time.Now

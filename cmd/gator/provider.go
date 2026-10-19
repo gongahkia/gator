@@ -19,6 +19,7 @@ import (
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/tools"
+	"github.com/gongahkia/gator/internal/usage"
 )
 
 func providerFromEnvironment() (model.Provider, error) {
@@ -119,7 +120,7 @@ func newNativeExecutorConfiguration(providerName, modelName, baseURL string) (na
 	if err != nil {
 		return nativeExecutorConfiguration{}, err
 	}
-	return executorConfigurationWithExtensions(backend.Model, settings)
+	return executorConfigurationWithExtensions(backend.Model, settings, providerName+"/"+modelName)
 }
 
 func newCustomExecutorConfiguration(settings config.Settings, provider config.CustomProvider, modelName, baseURL string) (nativeExecutorConfiguration, error) {
@@ -157,12 +158,12 @@ func newCustomExecutorConfiguration(settings config.Settings, provider config.Cu
 		ProviderName:     "custom provider " + provider.ID,
 	}}
 	if provider.ID == localmodel.ProviderID {
-		return executorConfigurationWithExtensions(localmodel.TextOnlyModel{Backend: backend}, settings)
+		return executorConfigurationWithExtensions(localmodel.TextOnlyModel{Backend: backend}, settings, provider.ID+"/"+modelName)
 	}
-	return executorConfigurationWithExtensions(backend, settings)
+	return executorConfigurationWithExtensions(backend, settings, provider.ID+"/"+modelName)
 }
 
-func executorConfigurationWithExtensions(backend agent.Model, settings config.Settings) (nativeExecutorConfiguration, error) {
+func executorConfigurationWithExtensions(backend agent.Model, settings config.Settings, labels ...string) (nativeExecutorConfiguration, error) {
 	extensions, err := extension.DefaultResolver(settings)
 	if err != nil {
 		return nativeExecutorConfiguration{}, err
@@ -171,6 +172,15 @@ func executorConfigurationWithExtensions(backend agent.Model, settings config.Se
 	if err != nil {
 		return nativeExecutorConfiguration{}, err
 	}
+	stateDir, err := state.ResolveDir("")
+	if err != nil {
+		return nativeExecutorConfiguration{}, err
+	}
+	label := "configured model"
+	if len(labels) > 0 {
+		label = labels[0]
+	}
+	backend = usage.Model(backend, stateDir, label)
 	return nativeExecutorConfiguration{
 		Model:          backend,
 		Extensions:     extensions,
