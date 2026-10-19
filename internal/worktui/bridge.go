@@ -56,8 +56,14 @@ type BridgeExternal struct {
 }
 
 func bridgeExternal(kind, action, id string, command *exec.Cmd) *BridgeExternal {
+	var environment []string
+	for _, value := range command.Env {
+		if strings.HasPrefix(value, "GATOR_STATE_DIR=") || strings.HasPrefix(value, "GATOR_CONFIG_DIR=") {
+			environment = append(environment, value)
+		}
+	}
 	return &BridgeExternal{Kind: kind, Program: command.Path, Args: append([]string(nil), command.Args[1:]...),
-		Dir: command.Dir, Env: append([]string(nil), command.Env...), Action: action, ID: id}
+		Dir: command.Dir, Env: environment, Action: action, ID: id}
 }
 
 type BridgeMessage struct {

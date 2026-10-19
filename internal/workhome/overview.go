@@ -104,7 +104,9 @@ func ReadOverview(ctx context.Context, stateDir string, supervisor bool, now tim
 		if g.Status != goal.Active {
 			continue
 		}
-		if info, err := os.Stat(g.SourcePath); err != nil || !info.IsDir() {
+		sourceInfo, sourceErr := os.Stat(g.SourcePath)
+		sourceAvailable := sourceErr == nil && sourceInfo.IsDir()
+		if !sourceAvailable {
 			add(3, OverviewItem{ID: "source-" + g.ID, Kind: "source", SourcePath: g.SourcePath, Target: g.ID, GoalID: g.ID, Title: g.Title + ": source unavailable", Detail: "Review the source folder before continuing this goal."})
 		}
 		plan, err := gs.LoadPlan(g.ID)
@@ -136,6 +138,9 @@ func ReadOverview(ctx context.Context, stateDir string, supervisor bool, now tim
 			if section == 2 {
 				nextAdded = true
 			}
+		}
+		if sourceAvailable && !nextAdded && plan.NextReviewAt.IsZero() {
+			add(2, OverviewItem{ID: "continue-" + g.ID, Kind: "goal", Target: g.ID, GoalID: g.ID, Title: "Continue " + g.Title, Detail: "Active goal · choose or review its next step"})
 		}
 	}
 	is, err := inbox.Open(stateDir)
@@ -193,6 +198,10 @@ func ReadOverview(ctx context.Context, stateDir string, supervisor bool, now tim
 			add(2, OverviewItem{ID: "running-" + run.ID, Kind: "work", Target: run.ID, Title: run.Objective, Detail: "Work is running", At: run.StartedAt})
 		}
 		for _, decision := range run.PendingDecisions {
+			if decision.LiveStatus != "active" {
+				add(3, OverviewItem{ID: fmt.Sprintf("stale-decision-%s-%d", run.ID, decision.ID), Kind: "work", Target: run.ID, Title: run.Objective, Detail: "A retained decision has no confirmed live review. Inspect the Work record.", At: run.StartedAt})
+				continue
+			}
 			add(1, OverviewItem{ID: fmt.Sprintf("decision-%s-%d", run.ID, decision.ID), Kind: "decision", Target: run.ID, DecisionID: decision.ID, Title: run.Objective, Detail: "Waiting for your " + decision.Kind + " response; open the exact review", At: run.StartedAt})
 		}
 	}
@@ -202,7 +211,7 @@ func ReadOverview(ctx context.Context, stateDir string, supervisor bool, now tim
 	}
 	enabled := 0
 	for _, check := range checks {
-		if check.Enabled {
+		if check.Enabled && check.State != "goal paused" {
 			enabled++
 		}
 		item := OverviewItem{ID: "check-" + check.ID, Kind: "check", Target: check.ID, GoalID: check.GoalID, Title: check.Title, Detail: check.HealthLine(), At: check.NextDue}

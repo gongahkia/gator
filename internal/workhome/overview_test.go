@@ -2,9 +2,11 @@ package workhome
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -16,6 +18,7 @@ import (
 	"github.com/gongahkia/gator/internal/suggestion"
 	"github.com/gongahkia/gator/internal/usage"
 	"github.com/gongahkia/gator/internal/workhistory"
+	"github.com/gongahkia/gator/internal/workrun"
 )
 
 func findSection(t *testing.T, view Overview, id string) OverviewSection {
@@ -178,5 +181,69 @@ func TestOverviewKeepsDeterministicBoundedListsAndCancellation(t *testing.T) {
 	cancel()
 	if _, err = ReadOverview(ctx, root, true, now); err != context.Canceled {
 		t.Fatal("cancellation was ignored", err)
+	}
+}
+
+func TestOverviewSeparatesLiveReviewsFromStaleDecisionRecords(t *testing.T) {
+	root := t.TempDir()
+	now := time.Now()
+	history, _ := workhistory.Open(root)
+	lease, err := history.AcquireRun("awaiting-review")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lease.Close()
+	if _, err = history.Start(workhistory.Start{ID: "awaiting-review", Objective: "Review this exact action", Mode: action.Inspect, ExternalActions: action.Forbid, StartedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(root, "gator", "interactions", "awaiting-review")
+	if err = os.MkdirAll(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	lock, err := os.OpenFile(filepath.Join(dir, "active.lock"), os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lock.Close()
+	if err = syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
+		t.Fatal(err)
+	}
+	record := workrun.InteractionRecord{Version: 1, Status: "pending", Interaction: workrun.Interaction{ID: 1, Kind: "approval", Preview: map[string]string{"action": "review only"}}}
+	data, _ := json.Marshal(record)
+	if err = os.WriteFile(filepath.Join(dir, "1.json"), data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	view, err := ReadOverview(context.Background(), root, true, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasOverviewItem(findSection(t, view, "needs"), "decision", "awaiting-review") {
+		t.Fatal("live review was not actionable")
+	}
+	if err = syscall.Flock(int(lock.Fd()), syscall.LOCK_UN); err != nil {
+		t.Fatal(err)
+	}
+	view, err = ReadOverview(context.Background(), root, true, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hasOverviewItem(findSection(t, view, "needs"), "decision", "awaiting-review") {
+		t.Fatal("stale record appeared answerable")
+	}
+	if !hasOverviewItem(findSection(t, view, "blocked"), "work", "awaiting-review") {
+		t.Fatal("stale decision was hidden")
+	}
+}
+
+func TestOverviewKeepsAnActiveGoalReachableWithoutAPlan(t *testing.T) {
+	root := t.TempDir()
+	goals, _ := goal.Open(root)
+	g, err := goals.Add("Choose a venue", "", t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	view, err := ReadOverview(context.Background(), root, false, time.Now())
+	if err != nil || !hasOverviewItem(findSection(t, view, "next"), "goal", g.ID) {
+		t.Fatal("an active goal without scheduled steps became unreachable", err)
 	}
 }

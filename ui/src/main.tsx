@@ -326,9 +326,11 @@ function PanelScreen({ panel, status, draft, statusLine, bridge, exit }: { panel
     ...(block.lines.length ? block.lines.flatMap((line) => wrapTerminalText(line, geometry.contentWidth).map((text) => ({ text, heading: false }))) : [{ text: "None", heading: false }]),
     { text: "", heading: false },
   ]);
-  const rowHeight = rows.some((row) => row.detail && !(panel.kind === "overview" && geometry.compact)) ? (geometry.compact ? 2 : 3) : (geometry.compact ? 1 : 2);
+  const overviewRows = panel.kind === "overview";
+  const rowHeight = overviewRows ? (geometry.compact || !rows.some((row) => row.detail) ? 1 : 2) : rows.some((row) => row.detail) ? (geometry.compact ? 2 : 3) : (geometry.compact ? 1 : 2);
+  const additionalFooter = !!panel.footer && !!panel.hints?.length;
   const noticeRows = (panel.notice ? (geometry.compact ? 1 : 2) : 0) + (status && status !== panel.notice ? (geometry.compact ? 1 : 2) : 0);
-  const bodyRows = Math.max(1, geometry.bodyRows - noticeRows);
+  const bodyRows = Math.max(1, geometry.bodyRows - noticeRows - (additionalFooter ? 1 : 0));
   const maxRows = Math.max(1, Math.floor((blocks.length > 0 ? Math.ceil(bodyRows / 2) : bodyRows) / rowHeight));
   const selected = Math.min(Math.max(0, panel.selected ?? 0), Math.max(0, rows.length - 1));
   const rowStart = Math.max(0, Math.min(selected - Math.floor(maxRows / 2), rows.length - maxRows));
@@ -354,7 +356,7 @@ function PanelScreen({ panel, status, draft, statusLine, bridge, exit }: { panel
         <Box flexDirection="column" flexGrow={focused ? 0 : 1} marginTop={1}>
         {rows.slice(rowStart, rowStart + maxRows).map((row, index) => {
           const active = panel.kind !== "inbox" && panel.kind !== "jobs" && rowStart + index === selected;
-          return <Box key={`${rowStart + index}-${row.label}`} flexDirection="column" marginBottom={geometry.compact ? 0 : 1}>
+          return <Box key={`${rowStart + index}-${row.label}`} flexDirection="column" marginBottom={geometry.compact || overviewRows ? 0 : 1}>
             <Text wrap="truncate-end" color={active ? palette.accent : undefined} bold={active}>{active ? "❯ " : "  "}{row.label}{panel.kind === "overview" && geometry.compact && row.detail ? <Text dimColor> · {row.detail}</Text> : null}{row.state ? <Text color={row.tone === "warning" ? palette.warning : row.tone === "error" ? palette.error : row.tone === "success" ? palette.accent : palette.secondary}>  ·  {row.state}</Text> : null}</Text>
             {row.detail && !(panel.kind === "overview" && geometry.compact) && <Box marginLeft={2}><Text wrap="truncate-end" dimColor={!active}>{active && panel.kind.endsWith("-form") ? formFieldTail(row.detail, geometry.contentWidth - 3) : row.detail}{active && panel.kind.endsWith("-form") && <Text inverse> </Text>}</Text></Box>}
           </Box>;
@@ -367,6 +369,7 @@ function PanelScreen({ panel, status, draft, statusLine, bridge, exit }: { panel
         {panel.notice && <Box marginTop={geometry.compact ? 0 : 1}><Text wrap="truncate-end" color={palette.secondary}>{panel.notice}</Text></Box>}
         {status && status !== panel.notice && <Box marginTop={geometry.compact ? 0 : 1}><Text wrap="truncate-end" dimColor>{status}</Text></Box>}
         </Box>
+        {additionalFooter && <Text wrap="truncate-end" dimColor>{panel.footer}</Text>}
         <Divider width={geometry.contentWidth} color={palette.accent} />
         <Text wrap="truncate-end" dimColor>{geometry.compact ? compactShortcuts : panel.hints?.length
           ? <Byline>{visibleHints.map((hint) => <KeyboardShortcutHint key={`${hint.shortcut}-${hint.action}`} shortcut={hint.shortcut} action={hint.action} />)}</Byline>
@@ -506,7 +509,7 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
       {compactHome ? <Text color={palette.accent} bold>🐊 Gator</Text> : <WelcomeScreen appName="Gator" subtitle="Your ongoing work" color={palette.accent} logo={<Text color={palette.accent}>🐊</Text>} />}
       <Text dimColor wrap="truncate-end">{context}</Text>
       <Box marginTop={compactHome ? 0 : 1}><EverydayOverview view={state.overview} issue={state.overview_issue} compact={compactHome} /></Box>
-      {state.first_run && <Text wrap="truncate-end">/model · Choose a model · /followup new</Text>}
+      {state.first_run && (!compactHome || (terminal?.rows ?? 24) >= 14) && <Text wrap="truncate-end">/model · Choose a model · /followup new</Text>}
     </Box>
   );
   const messages: Message[] = state.messages.map((item, index) => ({
@@ -546,10 +549,10 @@ function runExternal(command: ExternalCommand): Promise<string> {
     const onInterrupt = () => {};
     process.on("SIGINT", onInterrupt);
     const environment = command.env?.length
-      ? Object.fromEntries(command.env.map((entry) => {
+      ? { ...process.env, ...Object.fromEntries(command.env.map((entry) => {
         const separator = entry.indexOf("=");
         return [entry.slice(0, separator), entry.slice(separator + 1)];
-      }))
+      })) }
       : process.env;
     const child = spawn(command.program, command.args ?? [], {
       cwd: command.dir || undefined,

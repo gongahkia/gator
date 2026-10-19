@@ -74,8 +74,12 @@ func overviewControl(ctx context.Context, root, action string, args []string) (w
 	if err != nil {
 		return worktui.ControlScreen{}, err
 	}
-	screen := worktui.ControlScreen{Panel: uisnapshot.Panel{Kind: "overview", Title: "Everyday overview", Subtitle: "Retained facts · refreshed " + view.At.Local().Format("15:04:05")}}
+	screen := worktui.ControlScreen{Location: strings.Join(args, "\x00"), Panel: uisnapshot.Panel{Kind: "overview", Title: "Everyday overview", Subtitle: "Retained facts · choose an item to act"}}
 	if len(args) == 0 {
+		screen.Panel.Subtitle = "Changes from the last 24 hours · no model call"
+		if view.Reviewed {
+			screen.Panel.Subtitle = "Changes since " + view.Since.Local().Format("Jan 2 15:04") + " · no model call"
+		}
 		for index, section := range view.Sections {
 			screen.Actions = append(screen.Actions, worktui.ControlAction{Key: strconv.Itoa(index + 1), Label: section.Title, Detail: section.Summary, Action: "section", Args: []string{section.ID}})
 		}
@@ -180,6 +184,11 @@ func overviewControl(ctx context.Context, root, action string, args []string) (w
 		}
 		screen.Actions = append(screen.Actions, worktui.ControlAction{Key: "B", Label: "All four sections", Action: "status"})
 	}
+	refreshed := "Refreshed " + view.At.Local().Format("15:04:05")
+	if screen.Panel.Footer != "" {
+		refreshed += " · " + screen.Panel.Footer
+	}
+	screen.Panel.Footer = refreshed
 	screen.Actions = append(screen.Actions, worktui.ControlAction{Key: "R", Label: "Refresh", Action: "status", Args: append([]string(nil), args...)})
 	return screen, nil
 }

@@ -291,6 +291,7 @@ type Model struct {
 	overviewGeneration     uint64
 	overviewBusy           bool
 	overviewIssue          string
+	controlReturnHome      bool
 	launcher               bool
 	launcherMode           string
 	paletteQuery           string
@@ -349,6 +350,8 @@ type Model struct {
 	controlField           int
 	controlReview          bool
 	controlBusy            bool
+	controlBackground      bool
+	controlResultNotice    string
 	controlCancel          context.CancelFunc
 	controlGeneration      uint64
 	followupForm           *followupForm

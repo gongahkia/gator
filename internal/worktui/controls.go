@@ -30,6 +30,7 @@ type ControlAction struct {
 type SourceMove struct{ From, To string }
 
 type ControlScreen struct {
+	Location             string
 	SourceMoves          []SourceMove
 	ResetConversation    bool
 	ClearGoal            bool
@@ -44,12 +45,14 @@ type controlDone struct {
 }
 
 func (m *Model) openControls(family string, args []string) tea.Cmd {
+	m.controlReturnHome = m.home && len(m.messages) == 0
 	m.section, m.home, m.launcher = "controls", false, false
 	m.controlFamily = family
 	m.controlRootArgs = append([]string(nil), args...)
 	m.controlScreen = ControlScreen{}
 	m.controlForm = nil
 	m.controlReview = false
+	m.controlResultNotice = ""
 	m.sectionNotice = ""
 	return m.controlCommand("status", args)
 }
@@ -65,11 +68,43 @@ func (m *Model) controlCommand(action string, args []string) tea.Cmd {
 	ctx, cancel := context.WithCancel(context.Background())
 	m.controlCancel = cancel
 	m.controlBusy = true
+	m.controlBackground = false
 	call, family := m.config.Controls, m.controlFamily
 	return func() tea.Msg {
 		screen, err := call(ctx, family, action, args)
 		return controlDone{generation, screen, err}
 	}
+}
+
+func (m *Model) refreshControlBackground() tea.Cmd {
+	cmd := m.controlCommand("status", m.controlRootArgs)
+	m.controlBusy, m.controlBackground = false, true
+	return cmd
+}
+
+func (m *Model) cancelControlBackground() {
+	if !m.controlBackground {
+		return
+	}
+	if m.controlCancel != nil {
+		m.controlCancel()
+		m.controlCancel = nil
+	}
+	m.controlGeneration++
+	m.controlBackground = false
+}
+
+func preservedControlSelection(old, next ControlScreen, selected int) int {
+	if old.Location != next.Location || selected < 0 || selected >= len(old.Actions) {
+		return 0
+	}
+	a := old.Actions[selected]
+	for i, b := range next.Actions {
+		if a.Action == b.Action && strings.Join(a.Args, "\x00") == strings.Join(b.Args, "\x00") && (len(a.Args) > 0 || a.Key == b.Key) {
+			return i
+		}
+	}
+	return min(selected, max(0, len(next.Actions)-1))
 }
 func (m Model) updateControls(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.running && m.controlFamily == "data" && key.String() != "esc" {
@@ -135,10 +170,19 @@ func (m Model) updateControls(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if key.String() == "esc" {
+		if m.controlFamily == "overview" && len(m.controlRootArgs) > 0 {
+			m.controlRootArgs = m.controlRootArgs[:len(m.controlRootArgs)-1]
+			cmd := m.controlCommand("status", m.controlRootArgs)
+			return m, cmd
+		}
 		if m.controlScreen.Panel.Kind == "confirmation" {
 			return m, m.controlCommand("status", m.controlRootArgs)
 		}
 		m.section = ""
+		m.cancelControlBackground()
+		if m.controlReturnHome && len(m.messages) == 0 {
+			m.home = true
+		}
 		return m, nil
 	}
 	if key.String() == "up" {
@@ -153,6 +197,8 @@ func (m Model) updateControls(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if key.String() != strings.ToLower(a.Key) && !(key.String() == "enter" && i == m.selected) {
 			continue
 		}
+		m.cancelControlBackground()
+		m.controlResultNotice = ""
 		if len(a.Fields) > 0 || a.Review || a.ConnectorID != "" {
 			copy := a
 			copy.Fields = append([]ControlField(nil), a.Fields...)
@@ -187,6 +233,9 @@ func (m Model) controlsPanel() uisnapshot.Panel {
 	p := m.controlScreen.Panel
 	p.Selected = m.selected
 	p.Notice = m.sectionNotice
+	if p.Notice == "" {
+		p.Notice = m.controlResultNotice
+	}
 	if p.Title == "" {
 		p.Title = "Loading " + m.controlFamily
 		p.Kind = "controls"

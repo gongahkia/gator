@@ -45938,15 +45938,6 @@ function WelcomeScreen({
   ] });
 }
 
-// src/main.tsx
-var import_react58 = __toESM(require_react(), 1);
-
-// src/doctor.tsx
-var import_node_child_process = require("node:child_process");
-
-// src/result.tsx
-var import_react57 = __toESM(require_react(), 1);
-
 // src/theme.tsx
 var import_react56 = __toESM(require_react(), 1);
 var import_jsx_runtime50 = __toESM(require_jsx_runtime(), 1);
@@ -45982,53 +45973,81 @@ function GatorPaletteProvider({ theme, children }) {
   return /* @__PURE__ */ (0, import_jsx_runtime50.jsx)(GatorPaletteContext.Provider, { value: palette, children });
 }
 
-// src/result.tsx
+// src/overview.tsx
 var import_jsx_runtime51 = __toESM(require_jsx_runtime(), 1);
+var overviewLabels = {
+  changed: "Changed",
+  needs: "Needs you",
+  next: "Next",
+  blocked: "Blocked"
+};
+function EverydayOverview({ view, issue, compact }) {
+  const palette = useGatorPalette();
+  return /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", children: [
+    !compact && /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: palette.secondary, bold: true, children: "Everyday overview \xB7 /overview" }),
+    issue ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: palette.warning, wrap: "truncate-end", children: "Overview unavailable \xB7 /overview to retry" }) : !view ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, wrap: "truncate-end", children: "Reading your overview\u2026" }) : view.sections.map((section) => /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { flexDirection: "column", children: /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { wrap: "truncate-end", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { bold: true, color: section.id === "blocked" && section.total > 0 ? palette.warning : section.id === "needs" && section.total > 0 ? palette.accent : palette.secondary, children: compact ? overviewLabels[section.id] ?? section.title : section.title }),
+      " \xB7 ",
+      section.summary
+    ] }) }, section.id)),
+    /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, wrap: "truncate-end", children: compact ? "/overview \xB7 Ctrl+O" : "Ctrl+O open actions \xB7 refreshes every 15s \xB7 retained facts, no model call" })
+  ] });
+}
+
+// src/main.tsx
+var import_react58 = __toESM(require_react(), 1);
+
+// src/doctor.tsx
+var import_node_child_process = require("node:child_process");
+
+// src/result.tsx
+var import_react57 = __toESM(require_react(), 1);
+var import_jsx_runtime52 = __toESM(require_jsx_runtime(), 1);
 function toneColor(tone, palette) {
   return tone === "success" ? palette.accent : tone === "warning" ? palette.warning : tone === "error" ? palette.error : tone === "muted" ? palette.secondary : void 0;
 }
 function JsonPreview({ value, depth = 0 }) {
   const palette = useGatorPalette();
   if (value === null || typeof value !== "object") {
-    return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: typeof value === "string" ? void 0 : palette.secondary, children: JSON.stringify(value) ?? String(value) });
+    return /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: typeof value === "string" ? void 0 : palette.secondary, children: JSON.stringify(value) ?? String(value) });
   }
-  if (depth >= 12) return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { children: JSON.stringify(value, null, 2) });
+  if (depth >= 12) return /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { children: JSON.stringify(value, null, 2) });
   const entries = Array.isArray(value) ? value.map((item, index) => [String(index + 1), item]) : Object.entries(value);
-  if (entries.length === 0) return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: Array.isArray(value) ? "[]" : "{}" });
-  return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { flexDirection: "column", children: entries.map(([key, item]) => /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", marginLeft: depth ? 2 : 0, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: palette.secondary, children: key }),
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: ": " }),
-      item === null || typeof item !== "object" ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(JsonPreview, { value: item, depth: depth + 1 }) : null
+  if (entries.length === 0) return /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { dimColor: true, children: Array.isArray(value) ? "[]" : "{}" });
+  return /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { flexDirection: "column", children: entries.map(([key, item]) => /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { flexDirection: "column", marginLeft: depth ? 2 : 0, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: palette.secondary, children: key }),
+      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { dimColor: true, children: ": " }),
+      item === null || typeof item !== "object" ? /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(JsonPreview, { value: item, depth: depth + 1 }) : null
     ] }),
-    item !== null && typeof item === "object" ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(JsonPreview, { value: item, depth: depth + 1 }) }) : null
+    item !== null && typeof item === "object" ? /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(JsonPreview, { value: item, depth: depth + 1 }) }) : null
   ] }, key)) });
 }
 function ResultContent({ fields, items, lines, markdown }) {
   const palette = useGatorPalette();
   const hasFields = (fields?.length ?? 0) > 0;
   const hasItems = (items?.length ?? 0) > 0;
-  return /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", children: [
-    fields?.map((field, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { color: palette.secondary, children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { flexDirection: "column", children: [
+    fields?.map((field, index) => /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { color: palette.secondary, children: [
         field.label,
         ": "
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: toneColor(field.tone, palette), children: field.value })
+      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: toneColor(field.tone, palette), children: field.value })
     ] }, `${index}-${field.label}`)),
-    items?.map((item, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", marginTop: index || hasFields ? 1 : 0, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: toneColor(item.tone, palette) ?? palette.accent, children: "\u2022 " }),
-        /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { bold: true, children: item.label }),
-        item.state ? /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { color: toneColor(item.tone, palette) ?? palette.secondary, children: [
+    items?.map((item, index) => /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { flexDirection: "column", marginTop: index || hasFields ? 1 : 0, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: toneColor(item.tone, palette) ?? palette.accent, children: "\u2022 " }),
+        /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { bold: true, children: item.label }),
+        item.state ? /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { color: toneColor(item.tone, palette) ?? palette.secondary, children: [
           "  \xB7  ",
           item.state
         ] }) : null
       ] }),
-      item.detail ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: item.detail }) }) : null
+      item.detail ? /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { dimColor: true, children: item.detail }) }) : null
     ] }, `${index}-${item.label}`)),
-    lines?.map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginTop: index === 0 && (hasFields || hasItems) ? 1 : 0, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { children: line || " " }) }, index)),
-    markdown ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginTop: hasFields || hasItems ? 1 : 0, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Markdown, { children: markdown }, palette.accent) }) : null
+    lines?.map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginTop: index === 0 && (hasFields || hasItems) ? 1 : 0, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { children: line || " " }) }, index)),
+    markdown ? /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginTop: hasFields || hasItems ? 1 : 0, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Markdown, { children: markdown }, palette.accent) }) : null
   ] });
 }
 function ResultBody({ result }) {
@@ -46036,37 +46055,37 @@ function ResultBody({ result }) {
   const palette = useGatorPalette();
   const width = Math.max(1, Math.min(76, (terminal?.columns ?? 80) - 5));
   const marker = result.kind === "approval" ? "\u25C7" : result.tone === "error" ? "!" : result.tone === "success" ? "\u2713" : "\u25CC";
-  return /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { flexDirection: "column", width, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Text, { color: toneColor(result.tone, palette) ?? palette.accent, children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { flexDirection: "column", width, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { color: toneColor(result.tone, palette) ?? palette.accent, children: [
         marker,
         " "
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: toneColor(result.tone, palette) ?? palette.accent, bold: true, children: result.title })
+      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: toneColor(result.tone, palette) ?? palette.accent, bold: true, children: result.title })
     ] }),
-    result.summary ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { children: result.summary }) }) : null,
-    result.fields?.length || result.items?.length || result.lines?.length || result.markdown ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, marginTop: 1, flexDirection: "column", children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(ResultContent, { fields: result.fields, items: result.items, lines: result.lines, markdown: result.markdown }) }) : null,
-    result.sections?.map((section, index) => /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { marginLeft: 2, marginTop: 1, flexDirection: "column", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: palette.secondary, bold: true, children: section.title }),
-      section.summary ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { dimColor: true, children: section.summary }) : null,
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, flexDirection: "column", children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(ResultContent, { fields: section.fields, items: section.items, lines: section.lines, markdown: section.markdown }) })
+    result.summary ? /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { children: result.summary }) }) : null,
+    result.fields?.length || result.items?.length || result.lines?.length || result.markdown ? /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginLeft: 2, marginTop: 1, flexDirection: "column", children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(ResultContent, { fields: result.fields, items: result.items, lines: result.lines, markdown: result.markdown }) }) : null,
+    result.sections?.map((section, index) => /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { marginLeft: 2, marginTop: 1, flexDirection: "column", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: palette.secondary, bold: true, children: section.title }),
+      section.summary ? /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { dimColor: true, children: section.summary }) : null,
+      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginLeft: 2, flexDirection: "column", children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(ResultContent, { fields: section.fields, items: section.items, lines: section.lines, markdown: section.markdown }) })
     ] }, `${index}-${section.title}`)),
-    result.kind === "approval" && result.preview !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime51.jsxs)(Box_default, { marginLeft: 2, marginTop: 1, flexDirection: "column", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: palette.secondary, bold: true, children: "What Gator will do" }),
-      /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(JsonPreview, { value: result.preview }) })
+    result.kind === "approval" && result.preview !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { marginLeft: 2, marginTop: 1, flexDirection: "column", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: palette.secondary, bold: true, children: "What Gator will do" }),
+      /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(JsonPreview, { value: result.preview }) })
     ] }) : null,
-    result.footer ? /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Box_default, { marginLeft: 2, marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(Text, { color: result.kind === "approval" && result.tone === "warning" ? palette.warning : palette.secondary, children: result.footer }) }) : null
+    result.footer ? /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginLeft: 2, marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: result.kind === "approval" && result.tone === "warning" ? palette.warning : palette.secondary, children: result.footer }) }) : null
   ] });
 }
 
 // src/doctor.tsx
-var import_jsx_runtime52 = __toESM(require_jsx_runtime(), 1);
+var import_jsx_runtime53 = __toESM(require_jsx_runtime(), 1);
 function DoctorScreen({ result }) {
   const palette = useGatorPalette();
-  return /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { flexDirection: "column", paddingX: 1, paddingTop: 1, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: palette.accent, bold: true, children: "\u{1F40A} Gator doctor" }),
-    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Divider, { color: palette.accent }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { marginTop: 1, children: result ? /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(ResultBody, { result }) : /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Spinner, { verb: "Checking Gator, models, and device", color: palette.accent }) })
+  return /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", paddingX: 1, paddingTop: 1, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.accent, bold: true, children: "\u{1F40A} Gator doctor" }),
+    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Divider, { color: palette.accent }) }),
+    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginTop: 1, children: result ? /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(ResultBody, { result }) : /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Spinner, { verb: "Checking Gator, models, and device", color: palette.accent }) })
   ] });
 }
 function collectDoctor(binary, arguments_, structured) {
@@ -46102,7 +46121,7 @@ ${report}`);
   let app;
   let finalFrame;
   try {
-    app = await root_default(/* @__PURE__ */ (0, import_jsx_runtime52.jsx)(GatorPaletteProvider, { theme: process.env.GATOR_UI_THEME, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(DoctorScreen, {}) }), { onFrame: () => {
+    app = await root_default(/* @__PURE__ */ (0, import_jsx_runtime53.jsx)(GatorPaletteProvider, { theme: process.env.GATOR_UI_THEME, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(DoctorScreen, {}) }), { onFrame: () => {
       finalFrame?.();
       finalFrame = void 0;
     } });
@@ -46110,7 +46129,7 @@ ${report}`);
     const painted = new Promise((resolve) => {
       finalFrame = resolve;
     });
-    app.rerender(/* @__PURE__ */ (0, import_jsx_runtime52.jsx)(GatorPaletteProvider, { theme: payload.theme, children: /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(DoctorScreen, { result: payload.result }) }));
+    app.rerender(/* @__PURE__ */ (0, import_jsx_runtime53.jsx)(GatorPaletteProvider, { theme: payload.theme, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(DoctorScreen, { result: payload.result }) }));
     await Promise.race([painted, new Promise((resolve) => setTimeout(resolve, 1e3))]);
   } finally {
     app?.unmount();
@@ -46270,7 +46289,7 @@ function cursorAtGraphemeColumn(value, column) {
 }
 
 // src/main.tsx
-var import_jsx_runtime53 = __toESM(require_jsx_runtime(), 1);
+var import_jsx_runtime54 = __toESM(require_jsx_runtime(), 1);
 var GatorBridge = class {
   child;
   current;
@@ -46342,9 +46361,9 @@ function MessageBody({ item }) {
   const isUser = item.role === "You";
   const isGator = item.role === "Gator" || item.role === "Doctor";
   const label = isUser ? "\u203A You" : isGator ? "\u{1F40A} Gator" : item.role === "Deliverables" ? "\u25C8 Deliverables" : `\u25CC ${item.role}`;
-  return /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: isGator ? palette.accent : isUser ? void 0 : palette.secondary, bold: !isUser, dimColor: isUser, children: label }),
-    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginLeft: 2, flexDirection: "column", children: item.result ? /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(ResultBody, { result: item.result }) : item.bundle ? /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(ResultBody, { result: bundleResult(item.bundle) }) : isGator ? /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Markdown, { children: item.text }, palette.accent) : item.text.split("\n").map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: !isUser, children: line || " " }, index)) })
+  return /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Box_default, { flexDirection: "column", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { color: isGator ? palette.accent : isUser ? void 0 : palette.secondary, bold: !isUser, dimColor: isUser, children: label }),
+    /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Box_default, { marginLeft: 2, flexDirection: "column", children: item.result ? /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(ResultBody, { result: item.result }) : item.bundle ? /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(ResultBody, { result: bundleResult(item.bundle) }) : isGator ? /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Markdown, { children: item.text }, palette.accent) : item.text.split("\n").map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { dimColor: !isUser, children: line || " " }, index)) })
   ] });
 }
 function GreenPrompt({
@@ -46476,22 +46495,22 @@ function GreenPrompt({
     if (key.ctrl || key.meta || key.tab || key.escape) return;
     if (input) replace(current.slice(0, position) + input + current.slice(position), position + input.length);
   }, { isActive: !disabled });
-  return /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { flexDirection: "column", children: value ? value.split("\n").map((line, index, lines) => {
+  return /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Box_default, { flexDirection: "column", children: value ? value.split("\n").map((line, index, lines) => {
     const start = lines.slice(0, index).reduce((count, item) => count + item.length + 1, 0);
     const localCursor = cursor - start;
-    return /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.accent, children: index === 0 ? "\u276F " : "\xB7 " }),
-      localCursor >= 0 && localCursor <= line.length ? /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Box_default, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { color: palette.accent, children: index === 0 ? "\u276F " : "\xB7 " }),
+      localCursor >= 0 && localCursor <= line.length ? /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Text, { children: [
         line.slice(0, localCursor),
-        /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { inverse: true, children: graphemeAt(line, localCursor) || " " }),
+        /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { inverse: true, children: graphemeAt(line, localCursor) || " " }),
         line.slice(nextGrapheme(line, localCursor))
-      ] }) : /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { children: line || " " })
+      ] }) : /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { children: line || " " })
     ] }, index);
-  }) : /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { children: [
-    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.accent, children: "\u276F " }),
-    /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { inverse: true, children: " " }),
-      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: true, children: (terminal?.columns ?? 80) < 40 ? "Ask Gator\u2026" : "Ask Gator to work on something\u2026" })
+  }) : /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Box_default, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { color: palette.accent, children: "\u276F " }),
+    /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Text, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { inverse: true, children: " " }),
+      /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { dimColor: true, children: (terminal?.columns ?? 80) < 40 ? "Ask Gator\u2026" : "Ask Gator to work on something\u2026" })
     ] })
   ] }) });
 }
@@ -46538,10 +46557,10 @@ function ChatKeys({
       scrollToEnd();
       return;
     }
-    const shortcuts = { p: "ctrl+p", x: "ctrl+x", b: "ctrl+b", i: "ctrl+i", g: "ctrl+g" };
+    const shortcuts = { p: "ctrl+p", x: "ctrl+x", b: "ctrl+b", i: "ctrl+i", g: "ctrl+g", o: "ctrl+o" };
     if (key.ctrl && shortcuts[input]) {
       event.stopImmediatePropagation();
-      bridge.send({ type: "key", key: shortcuts[input], text: input === "g" ? draft : void 0 });
+      bridge.send({ type: "key", key: shortcuts[input], text: input === "g" || input === "o" ? draft : void 0 });
       return;
     }
     if (key.pageUp || key.pageDown || key.wheelUp || key.wheelDown) {
@@ -46627,9 +46646,11 @@ function PanelScreen({ panel, status, draft, statusLine, bridge, exit }) {
     ...block.lines.length ? block.lines.flatMap((line) => wrapTerminalText(line, geometry.contentWidth).map((text) => ({ text, heading: false }))) : [{ text: "None", heading: false }],
     { text: "", heading: false }
   ]);
-  const rowHeight = rows.some((row) => row.detail) ? geometry.compact ? 2 : 3 : geometry.compact ? 1 : 2;
+  const overviewRows = panel.kind === "overview";
+  const rowHeight = overviewRows ? geometry.compact || !rows.some((row) => row.detail) ? 1 : 2 : rows.some((row) => row.detail) ? geometry.compact ? 2 : 3 : geometry.compact ? 1 : 2;
+  const additionalFooter = !!panel.footer && !!panel.hints?.length;
   const noticeRows = (panel.notice ? geometry.compact ? 1 : 2 : 0) + (status && status !== panel.notice ? geometry.compact ? 1 : 2 : 0);
-  const bodyRows = Math.max(1, geometry.bodyRows - noticeRows);
+  const bodyRows = Math.max(1, geometry.bodyRows - noticeRows - (additionalFooter ? 1 : 0));
   const maxRows = Math.max(1, Math.floor((blocks.length > 0 ? Math.ceil(bodyRows / 2) : bodyRows) / rowHeight));
   const selected = Math.min(Math.max(0, panel.selected ?? 0), Math.max(0, rows.length - 1));
   const rowStart = Math.max(0, Math.min(selected - Math.floor(maxRows / 2), rows.length - maxRows));
@@ -46638,59 +46659,64 @@ function PanelScreen({ panel, status, draft, statusLine, bridge, exit }) {
   const blockOffset = Math.min(offset, Math.max(0, blocks.length - maxLines));
   const compactShortcuts = panel.hints?.length ? fitPanelHints(panel.hints, geometry.contentWidth, true).map((hint) => hint.shortcut).join(" \xB7 ") : "Esc back";
   const visibleHints = fitPanelHints(panel.hints ?? [], geometry.contentWidth);
-  return /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, paddingX: geometry.paddingX, paddingTop: geometry.compact ? 0 : 1, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(PanelKeys, { bridge, exit, scroll: (amount) => setOffset((current) => Math.max(0, Math.min(blocks.length - maxLines, current + amount))) }),
-    /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", flexGrow: focused ? 0 : 1, width: geometry.panelWidth, alignSelf: focused ? "center" : void 0, borderStyle: focused && !geometry.compact ? "round" : void 0, borderColor: focused && !geometry.compact ? palette.accent : void 0, paddingX: focused && !geometry.compact ? 1 : 0, marginTop: focused && !geometry.compact ? 1 : 0, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { color: palette.accent, bold: true, wrap: "truncate-end", children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, paddingX: geometry.paddingX, paddingTop: geometry.compact ? 0 : 1, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(PanelKeys, { bridge, exit, scroll: (amount) => setOffset((current) => Math.max(0, Math.min(blocks.length - maxLines, current + amount))) }),
+    /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Box_default, { flexDirection: "column", flexGrow: focused ? 0 : 1, width: geometry.panelWidth, alignSelf: focused ? "center" : void 0, borderStyle: focused && !geometry.compact ? "round" : void 0, borderColor: focused && !geometry.compact ? palette.accent : void 0, paddingX: focused && !geometry.compact ? 1 : 0, marginTop: focused && !geometry.compact ? 1 : 0, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Text, { color: palette.accent, bold: true, wrap: "truncate-end", children: [
         "\u{1F40A} Gator  ",
-        /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.secondary, children: panel.title })
+        /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { color: palette.secondary, children: panel.title })
       ] }),
-      geometry.showSubtitle && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { wrap: "truncate-end", children: panel.subtitle }) }),
-      panel.kind === "picker" && (geometry.compact ? /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { wrap: "truncate-end", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.secondary, children: "Search " }),
+      geometry.showSubtitle && /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { wrap: "truncate-end", children: panel.subtitle }) }),
+      panel.kind === "picker" && (geometry.compact ? /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Text, { wrap: "truncate-end", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { color: palette.secondary, children: "Search " }),
         panel.query || "type to filter",
-        /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { inverse: true, children: " " })
-      ] }) : /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginTop: 1, width: geometry.contentWidth, borderStyle: "round", borderColor: palette.secondary, paddingX: 1, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { wrap: "truncate-end", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { inverse: true, children: " " })
+      ] }) : /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Box_default, { marginTop: 1, width: geometry.contentWidth, borderStyle: "round", borderColor: palette.secondary, paddingX: 1, children: /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Text, { wrap: "truncate-end", children: [
         panel.query || "Type to filter",
-        /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { inverse: true, children: " " })
+        /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { inverse: true, children: " " })
       ] }) })),
-      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginTop: geometry.compact ? 0 : 1, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Divider, { width: geometry.contentWidth, color: palette.accent }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", flexGrow: focused ? 0 : 1, marginTop: 1, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Box_default, { marginTop: geometry.compact ? 0 : 1, children: /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Divider, { width: geometry.contentWidth, color: palette.accent }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Box_default, { flexDirection: "column", flexGrow: focused ? 0 : 1, marginTop: 1, children: [
         rows.slice(rowStart, rowStart + maxRows).map((row, index) => {
           const active = panel.kind !== "inbox" && panel.kind !== "jobs" && rowStart + index === selected;
-          return /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", marginBottom: geometry.compact ? 0 : 1, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { wrap: "truncate-end", color: active ? palette.accent : void 0, bold: active, children: [
+          return /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Box_default, { flexDirection: "column", marginBottom: geometry.compact || overviewRows ? 0 : 1, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Text, { wrap: "truncate-end", color: active ? palette.accent : void 0, bold: active, children: [
               active ? "\u276F " : "  ",
               row.label,
-              row.state ? /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { color: row.tone === "warning" ? palette.warning : row.tone === "error" ? palette.error : row.tone === "success" ? palette.accent : palette.secondary, children: [
+              panel.kind === "overview" && geometry.compact && row.detail ? /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Text, { dimColor: true, children: [
+                " \xB7 ",
+                row.detail
+              ] }) : null,
+              row.state ? /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Text, { color: row.tone === "warning" ? palette.warning : row.tone === "error" ? palette.error : row.tone === "success" ? palette.accent : palette.secondary, children: [
                 "  \xB7  ",
                 row.state
               ] }) : null
             ] }),
-            row.detail && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { wrap: "truncate-end", dimColor: !active, children: [
+            row.detail && !(panel.kind === "overview" && geometry.compact) && /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Text, { wrap: "truncate-end", dimColor: !active, children: [
               active && panel.kind.endsWith("-form") ? formFieldTail(row.detail, geometry.contentWidth - 3) : row.detail,
-              active && panel.kind.endsWith("-form") && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { inverse: true, children: " " })
+              active && panel.kind.endsWith("-form") && /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { inverse: true, children: " " })
             ] }) })
           ] }, `${rowStart + index}-${row.label}`);
         }),
-        blocks.slice(blockOffset, blockOffset + maxLines).map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginBottom: line.heading ? 0 : void 0, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { wrap: "truncate-end", color: line.heading ? palette.secondary : void 0, bold: line.heading, children: line.text || " " }) }, `${blockOffset + index}-${line.text}`)),
-        blocks.length > maxLines && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: true, wrap: "truncate-end", children: `${blockOffset + 1}\u2013${Math.min(blockOffset + maxLines, blocks.length)} of ${blocks.length} \xB7 PgUp/PgDn` }),
-        rows.length === 0 && blocks.length === 0 && !panel.notice && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: true, children: "No items to show." }),
-        panel.notice && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginTop: geometry.compact ? 0 : 1, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { wrap: "truncate-end", color: palette.secondary, children: panel.notice }) }),
-        status && status !== panel.notice && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginTop: geometry.compact ? 0 : 1, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { wrap: "truncate-end", dimColor: true, children: status }) })
+        blocks.slice(blockOffset, blockOffset + maxLines).map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Box_default, { marginBottom: line.heading ? 0 : void 0, children: /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { wrap: "truncate-end", color: line.heading ? palette.secondary : void 0, bold: line.heading, children: line.text || " " }) }, `${blockOffset + index}-${line.text}`)),
+        blocks.length > maxLines && /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { dimColor: true, wrap: "truncate-end", children: `${blockOffset + 1}\u2013${Math.min(blockOffset + maxLines, blocks.length)} of ${blocks.length} \xB7 PgUp/PgDn` }),
+        rows.length === 0 && blocks.length === 0 && !panel.notice && /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { dimColor: true, children: "No items to show." }),
+        panel.notice && /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Box_default, { marginTop: geometry.compact ? 0 : 1, children: /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { wrap: "truncate-end", color: palette.secondary, children: panel.notice }) }),
+        status && status !== panel.notice && /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Box_default, { marginTop: geometry.compact ? 0 : 1, children: /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { wrap: "truncate-end", dimColor: true, children: status }) })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Divider, { width: geometry.contentWidth, color: palette.accent }),
-      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { wrap: "truncate-end", dimColor: true, children: geometry.compact ? compactShortcuts : panel.hints?.length ? /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Byline, { children: visibleHints.map((hint) => /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(KeyboardShortcutHint, { shortcut: hint.shortcut, action: hint.action }, `${hint.shortcut}-${hint.action}`)) }) : panel.footer || "Esc back" })
+      additionalFooter && /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { wrap: "truncate-end", dimColor: true, children: panel.footer }),
+      /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Divider, { width: geometry.contentWidth, color: palette.accent }),
+      /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { wrap: "truncate-end", dimColor: true, children: geometry.compact ? compactShortcuts : panel.hints?.length ? /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Byline, { children: visibleHints.map((hint) => /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(KeyboardShortcutHint, { shortcut: hint.shortcut, action: hint.action }, `${hint.shortcut}-${hint.action}`)) }) : panel.footer || "Esc back" })
     ] }),
-    focused && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { flexGrow: 1 }),
-    geometry.showComposerAnchor && /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(import_jsx_runtime53.Fragment, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Divider, { width: geometry.panelWidth, color: palette.accent }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { wrap: "truncate-end", dimColor: true, children: [
+    focused && /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Box_default, { flexGrow: 1 }),
+    geometry.showComposerAnchor && /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(import_jsx_runtime54.Fragment, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Divider, { width: geometry.panelWidth, color: palette.accent }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Text, { wrap: "truncate-end", dimColor: true, children: [
         "\u276F ",
         draft || "Ask Gator to work on something\u2026"
       ] })
     ] }),
-    !geometry.compact && statusLine && statusLine.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(StatusLine, { segments: statusLine.map((content) => ({ content, color: palette.secondary })) })
+    !geometry.compact && statusLine && statusLine.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(StatusLine, { segments: statusLine.map((content) => ({ content, color: palette.secondary })) })
   ] });
 }
 function GreenSearch({ messages, close, navigate }) {
@@ -46768,14 +46794,14 @@ function GreenSearch({ messages, close, navigate }) {
     if (input.endsWith("\r")) input = input.slice(0, -1);
     if (input) change(current.slice(0, position) + input + current.slice(position), position + input.length);
   });
-  return /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { paddingX: 1, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.accent, children: "Search: " }),
-    /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Box_default, { paddingX: 1, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { color: palette.accent, children: "Search: " }),
+    /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Text, { children: [
       query.slice(0, cursor),
-      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { inverse: true, children: graphemeAt(query, cursor) || " " }),
+      /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { inverse: true, children: graphemeAt(query, cursor) || " " }),
       query.slice(nextGrapheme(query, cursor))
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: true, children: `  ${matches.length ? `${selected + 1}/${matches.length} matches` : "no matches"}` })
+    /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { dimColor: true, children: `  ${matches.length ? `${selected + 1}/${matches.length} matches` : "no matches"}` })
   ] });
 }
 function App2({ bridge }) {
@@ -46825,9 +46851,9 @@ function App2({ bridge }) {
     bridge.stop();
     exit();
   };
-  if (!state) return /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { padding: 1, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Spinner, { verb: failure || "Starting Gator", color: palette.accent }) });
+  if (!state) return /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Box_default, { padding: 1, children: /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Spinner, { verb: failure || "Starting Gator", color: palette.accent }) });
   if (state.mode === "panel" && state.panel) {
-    return /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(GatorPaletteContext.Provider, { value: palette, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(PanelScreen, { panel: state.panel, status: state.status, draft: input, statusLine: state.status_line_enabled ? state.status_line : void 0, bridge, exit: close }) });
+    return /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(GatorPaletteContext.Provider, { value: palette, children: /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(PanelScreen, { panel: state.panel, status: state.status, draft: input, statusLine: state.status_line_enabled ? state.status_line : void 0, bridge, exit: close }) });
   }
   const matches = !searchOpen && !dismissed && input.startsWith("/") && !input.includes(" ") ? state.commands.filter((command) => input === "/" ? !command.advanced : `/${command.name}`.startsWith(input)).slice(0, 8) : [];
   const submit = (value) => {
@@ -46853,50 +46879,11 @@ function App2({ bridge }) {
   };
   const context = [state.title, state.provider ? `${state.provider}${state.model ? `/${state.model}` : ""}` : "Choose model: /model", state.source.split("/").filter(Boolean).at(-1) || state.source].filter(Boolean).join(" \xB7 ");
   const compactHome = (terminal?.rows ?? 24) < 20 || (terminal?.columns ?? 80) < 60;
-  const welcome = compactHome ? /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.accent, bold: true, children: "\u{1F40A} Gator" }),
-    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: true, wrap: "truncate-end", children: context }),
-    state.first_run && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { wrap: "truncate-end", children: "/model \xB7 Choose a chat model" }),
-    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { wrap: "truncate-end", children: "/followup new \xB7 Track project changes" }),
-    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: true, wrap: "truncate-end", children: "/memory \xB7 Recall and data destinations" }),
-    (state.checks ?? []).slice(0, 1).map((check, index) => /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { color: check.state === "offline" || check.state === "couldn't check" ? palette.warning : palette.secondary, wrap: "truncate-end", children: [
-      check.title,
-      " \xB7 ",
-      check.state,
-      " \xB7 /followup"
-    ] }, index)),
-    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: true, wrap: "truncate-end", children: "Type / for commands." })
-  ] }) : /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(WelcomeScreen, { appName: "Gator", subtitle: "Your ongoing work, ready when you are", color: palette.accent, logo: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.accent, children: "\u{1F40A}" }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: true, children: context }),
-    /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { marginTop: 1, marginLeft: 1, flexDirection: "column", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.secondary, bold: true, children: state.first_run ? "Get started" : "Next up" }),
-      state.first_run ? /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(import_jsx_runtime53.Fragment, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { children: "  1  /model  Choose a cloud or local model" }),
-        /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { children: "  2  Ask: Review this project\u2019s notes and draft the next useful response." })
-      ] }) : state.actions.slice(0, 4).map((action, index) => /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { children: [
-        "  ",
-        action.Label,
-        " \xB7 ",
-        action.Command
-      ] }, index)),
-      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: true, children: "  Type / for Gator commands." }),
-      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { children: "  Track project changes and draft the next step \xB7 /followup new" }),
-      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { dimColor: true, children: "  Memory setup and processing destinations \xB7 /memory" }),
-      (state.checks ?? []).slice(0, 2).map((check, index) => /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { color: check.state === "offline" || check.state === "couldn't check" ? palette.warning : palette.secondary, children: [
-          "  ",
-          check.title,
-          " \xB7 ",
-          check.state
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { dimColor: true, children: [
-          "  ",
-          check.health
-        ] })
-      ] }, index)),
-      state.supervisor_needs_start && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.secondary, children: "  Recurring checks need a running supervisor \xB7 gator job supervisor" })
-    ] })
+  const welcome = /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Box_default, { flexDirection: "column", children: [
+    compactHome ? /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { color: palette.accent, bold: true, children: "\u{1F40A} Gator" }) : /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(WelcomeScreen, { appName: "Gator", subtitle: "Your ongoing work", color: palette.accent, logo: /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { color: palette.accent, children: "\u{1F40A}" }) }),
+    /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { dimColor: true, wrap: "truncate-end", children: context }),
+    /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Box_default, { marginTop: compactHome ? 0 : 1, children: /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(EverydayOverview, { view: state.overview, issue: state.overview_issue, compact: compactHome }) }),
+    state.first_run && (!compactHome || (terminal?.rows ?? 24) >= 14) && /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { wrap: "truncate-end", children: "/model \xB7 Choose a model \xB7 /followup new" })
   ] });
   const messages = state.messages.map((item, index) => ({
     id: `${index}-${item.role}-${item.text.length}-${item.result?.tone ?? ""}-${item.result?.footer ?? ""}`,
@@ -46905,22 +46892,22 @@ function App2({ bridge }) {
   }));
   const viewportHeight = Math.max(1, (terminal?.rows ?? 24) - 6 - matches.length - (state.running ? 2 : 0) - (searchOpen ? 1 : 0) - input.split("\n").length + 1);
   const statusSegments = (state.status_line ?? []).map((content) => ({ content, color: palette.secondary }));
-  return /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(GatorPaletteContext.Provider, { value: palette, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, paddingX: 1, paddingTop: 1, children: [
-    !state.home && /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { marginBottom: 1, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.accent, bold: true, children: "\u{1F40A} Gator" }),
-      /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { color: palette.secondary, children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(GatorPaletteContext.Provider, { value: palette, children: /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, paddingX: 1, paddingTop: 1, children: [
+    !state.home && /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Box_default, { marginBottom: 1, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { color: palette.accent, bold: true, children: "\u{1F40A} Gator" }),
+      /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Text, { color: palette.secondary, children: [
         "  ",
         state.goal_id ? "Goal: " : "",
         context
       ] })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, children: [
-      state.home && state.messages.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginBottom: 1, children: welcome }),
-      state.messages.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(MessageList, { ref: list, viewportHeight, messages, renderMessage: (item) => /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(MessageBody, { item: state.messages[Number(item.id.split("-", 1)[0])] }) }),
-      state.running && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginTop: 1, children: state.cancelling ? /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.warning, children: "\u25CC Stopping\u2026 retaining evidence" }) : /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Spinner, { verb: "Working", label: `${state.elapsed ?? ""} \xB7 Esc to interrupt`, color: palette.accent, showElapsed: false }) })
+    /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Box_default, { flexDirection: "column", flexGrow: 1, children: [
+      state.home && state.messages.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Box_default, { marginBottom: 1, children: welcome }),
+      state.messages.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(MessageList, { ref: list, viewportHeight, messages, renderMessage: (item) => /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(MessageBody, { item: state.messages[Number(item.id.split("-", 1)[0])] }) }),
+      state.running && /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Box_default, { marginTop: 1, children: state.cancelling ? /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { color: palette.warning, children: "\u25CC Stopping\u2026 retaining evidence" }) : /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Spinner, { verb: "Working", label: `${state.elapsed ?? ""} \xB7 Esc to interrupt`, color: palette.accent, showElapsed: false }) })
     ] }),
-    state.status && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.secondary, children: state.status }),
-    !searchOpen && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(ChatKeys, { state, draftRef: inputRef, selectedRef, dismissedRef, setSelected, choose, dismiss: () => {
+    state.status && /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { color: palette.secondary, children: state.status }),
+    !searchOpen && /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(ChatKeys, { state, draftRef: inputRef, selectedRef, dismissedRef, setSelected, choose, dismiss: () => {
       dismissedRef.current = true;
       setDismissed(true);
     }, search: () => setSearchOpen(true), scroll: (rows) => list.current?.scrollBy(rows), scrollToEnd: () => list.current?.scrollToEnd(), exit: close, clearDraft: () => {
@@ -46928,9 +46915,9 @@ function App2({ bridge }) {
       setInput("");
       setPrefillVersion((version) => version + 1);
     }, bridge }),
-    searchOpen && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(GreenSearch, { messages: state.messages, close: () => setSearchOpen(false), navigate: (index) => list.current?.scrollTo(index) }),
-    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Divider, { color: palette.secondary }),
-    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(GreenPrompt, { value: input, onChange: (value) => {
+    searchOpen && /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(GreenSearch, { messages: state.messages, close: () => setSearchOpen(false), navigate: (index) => list.current?.scrollTo(index) }),
+    /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Divider, { color: palette.secondary }),
+    /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(GreenPrompt, { value: input, onChange: (value) => {
       inputRef.current = value;
       selectedRef.current = 0;
       dismissedRef.current = false;
@@ -46938,20 +46925,20 @@ function App2({ bridge }) {
       setSelected(0);
       setDismissed(false);
     }, onSubmit: submit, disabled: searchOpen || !!failure, history, prefillVersion }),
-    matches.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { marginLeft: 2, flexDirection: "column", children: matches.map((command, index) => /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Box_default, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { color: index === selected ? palette.accent : void 0, bold: index === selected, children: [
+    matches.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Box_default, { marginLeft: 2, flexDirection: "column", children: matches.map((command, index) => /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Box_default, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Text, { color: index === selected ? palette.accent : void 0, bold: index === selected, children: [
         index === selected ? "\u276F" : " ",
         " /",
         command.name
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { dimColor: true, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Text, { dimColor: true, children: [
         "  ",
         command.description
       ] })
     ] }, command.name)) }),
-    failure && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: palette.error, children: failure }),
-    /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Divider, { color: palette.secondary }),
-    state.status_line_enabled && statusSegments.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(StatusLine, { segments: statusSegments })
+    failure && /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Text, { color: palette.error, children: failure }),
+    /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Divider, { color: palette.secondary }),
+    state.status_line_enabled && statusSegments.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(StatusLine, { segments: statusSegments })
   ] }) });
 }
 function runExternal(command) {
@@ -46959,10 +46946,10 @@ function runExternal(command) {
     const onInterrupt = () => {
     };
     process.on("SIGINT", onInterrupt);
-    const environment = command.env?.length ? Object.fromEntries(command.env.map((entry) => {
+    const environment = command.env?.length ? { ...process.env, ...Object.fromEntries(command.env.map((entry) => {
       const separator = entry.indexOf("=");
       return [entry.slice(0, separator), entry.slice(separator + 1)];
-    })) : process.env;
+    })) } : process.env;
     const child = (0, import_node_child_process2.spawn)(command.program, command.args ?? [], {
       cwd: command.dir || void 0,
       env: environment,
@@ -47002,7 +46989,7 @@ async function main() {
   });
   try {
     while (true) {
-      app = await root_default(/* @__PURE__ */ (0, import_jsx_runtime53.jsx)(App2, { bridge }));
+      app = await root_default(/* @__PURE__ */ (0, import_jsx_runtime54.jsx)(App2, { bridge }));
       if (handoff) app.unmount();
       await app.waitUntilExit();
       app = void 0;

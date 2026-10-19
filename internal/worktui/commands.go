@@ -384,6 +384,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		}
 		defer release()
 	}
+	wasHome := m.home
 	m.home = false
 	m.section = ""
 	var result string
@@ -394,6 +395,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 			err = errorsUnavailable("product controls")
 			break
 		}
+		m.home = wasHome
 		cmd := m.openControls(strings.TrimPrefix(fields[0], "/"), fields[1:])
 		return m, cmd
 	case "/followup":
@@ -1447,7 +1449,7 @@ func workHelp() string {
   /followup [new]                set up and manage project follow-ups
   /recovery                     reconnect, retry, and review offline coverage
   /usage                        review shared usage, limits, and pause
-  /data                         retain, export, verify, or delete private content
+  /data                         retain, export, restore, relink, or delete private content
   /jobs [list|add|show|edit|enable|disable|run|history|remove]
                                  schedule and review repeatable Work
   /inbox [show|read|rate|report] review and rate follow-up results
@@ -1488,6 +1490,7 @@ Navigation
   ctrl+b    inbox
   ctrl+j    insert a new line in the composer
   /followup scheduled checks and recovery
+  ctrl+o    everyday overview and direct actions
   ctrl+p    searchable command palette`
 }
 

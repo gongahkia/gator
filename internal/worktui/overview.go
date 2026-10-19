@@ -85,19 +85,21 @@ func (m Model) openOverviewWork(id string) (tea.Model, tea.Cmd) {
 
 func moveSourcePath(value, from, to string) string {
 	original := value
-	probe := value
-	for {
-		if resolved, err := filepath.EvalSymlinks(probe); err == nil {
-			suffix, _ := filepath.Rel(probe, value)
-			value = filepath.Join(resolved, suffix)
-			break
+	canonical := func(value string) string {
+		probe := value
+		for {
+			if resolved, err := filepath.EvalSymlinks(probe); err == nil {
+				suffix, _ := filepath.Rel(probe, value)
+				return filepath.Join(resolved, suffix)
+			}
+			parent := filepath.Dir(probe)
+			if parent == probe {
+				return value
+			}
+			probe = parent
 		}
-		parent := filepath.Dir(probe)
-		if parent == probe {
-			break
-		}
-		probe = parent
 	}
+	value, from = canonical(value), canonical(from)
 	relative, err := filepath.Rel(from, value)
 	if err == nil && (relative == "." || relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))) {
 		return filepath.Join(to, relative)

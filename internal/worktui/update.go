@@ -30,10 +30,11 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case controlExternalDone:
+		m.controlRootArgs = nil
 		if value.Err != nil {
-			m.sectionNotice = value.Err.Error()
+			m.controlResultNotice = value.Err.Error()
 		} else {
-			m.sectionNotice = "Review finished. The overview will reflect the retained result."
+			m.controlResultNotice = "Review finished. The overview will reflect the retained result."
 		}
 		return m, tea.Batch(m.controlCommand("status", nil), m.refreshOverviewCommand())
 
@@ -42,6 +43,7 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.controlBusy = false
+		m.controlBackground = false
 		if m.controlCancel != nil {
 			m.controlCancel()
 			m.controlCancel = nil
@@ -49,8 +51,12 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		if value.Err != nil {
 			m.sectionNotice = value.Err.Error()
 		} else {
+			selection := 0
+			if m.controlFamily == "overview" {
+				selection = preservedControlSelection(m.controlScreen, value.Screen, m.selected)
+			}
 			m.controlScreen = value.Screen
-			m.selected = 0
+			m.selected = selection
 			m.sectionNotice = ""
 			m.clearRemovedData(value.Screen)
 		}
@@ -106,8 +112,8 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		commands := []tea.Cmd{m.refreshChecksCommand(), m.refreshOverviewCommand(), nextChecksTick()}
-		if m.section == "controls" && m.controlFamily == "overview" && !m.controlBusy && m.controlForm == nil {
-			commands = append(commands, m.controlCommand("status", m.controlRootArgs))
+		if m.section == "controls" && m.controlFamily == "overview" && !m.controlBusy && !m.controlBackground && m.controlForm == nil {
+			commands = append(commands, m.refreshControlBackground())
 		}
 		return m, tea.Batch(commands...)
 	case checkActionDone:
@@ -388,7 +394,9 @@ func (m Model) updateKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.openConversationPicker()
 		return m, nil
 	}
-	if value.Type == tea.KeyCtrlI && !m.running {
+	// Tab and Ctrl+I share a terminal key code. Forms own Tab; the workspace
+	// shortcut is available only from the chat composer.
+	if value.Type == tea.KeyCtrlI && !m.running && m.section == "" && !m.launcher {
 		m.openSourceMenu()
 		return m, nil
 	}
