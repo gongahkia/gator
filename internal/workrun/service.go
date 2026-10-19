@@ -49,6 +49,8 @@ func (s Service) Execute(ctx context.Context, request Request) (Outcome, error) 
 		request.LearningContext = s.Defaults.LearningContext
 		request.MemoryContext = s.Defaults.MemoryContext
 		request.NoteContext = s.Defaults.NoteContext
+		request.ContextRefs = append([]string(nil), s.Defaults.ContextRefs...)
+		request.RecallStatus = s.Defaults.RecallStatus
 		request.GoalID = s.Defaults.GoalID
 		request.GoalPlanContext = s.Defaults.GoalPlanContext
 	}

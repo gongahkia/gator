@@ -28,10 +28,24 @@ fact and its fingerprint. The fingerprint detects file changes; it does not
 prove that the file supports the memory's claim. Plain `--source REF` remains
 an unverified label.
 
-`gator memory search QUERY` and the memory context selected for Work show the
-lexical terms that matched and whether the memory was global or scoped to the
-current goal. These are retrieval reasons, not evidence that the remembered
+`gator memory search QUERY` shows lexical terms that matched. At the start of
+Work, Gator combines lexical and semantic recall over eligible memories and
+notes. The default semantic provider is local Ollama `embeddinggemma:latest`.
+Install it explicitly with `gator memory embeddings install --yes` (about
+622 MB), and check readiness with `gator memory embeddings status`. If Ollama
+or the model is unavailable, Work continues with lexical recall. Goal scope,
+expiry, and changed source fingerprints are checked before memory indexing.
+Retrieval reasons are retained with each Work decision, but they do not prove a
 fact is true. Current sources still take precedence when they disagree.
+
+Cloud embeddings are optional and separate from the chat model selection:
+`gator memory embeddings set openai --allow-upload` or `gator memory embeddings
+set gemini --allow-upload`. These settings permit Gator to upload eligible
+saved memory and note text and the current query to that provider for
+embedding. Use `gator memory embeddings set ollama` to return to local recall.
+The private vector index contains embeddings and content hashes rather than
+plain text. It updates changed records incrementally and removes forgotten
+records. Saved source text and instructions never grant tool authority.
 
 ## Notes
 
@@ -48,9 +62,10 @@ gator note remove NOTE_ID --yes
 ```
 
 A note is either global or attached to one goal. Goal-scoped notes are never
-returned to another goal's Work tools. Search is lexical and bounded. It indexes
+returned to another goal's Work tools. The explicit search command is lexical
+and bounded. It indexes
 source reference terms so a note can be found by a document name, but it does
-not claim semantic recall. Source references are user-maintained provenance
+not claim a semantic match. Source references are user-maintained provenance
 labels, not proof that the source still says the same thing; check the current
 source before relying on them. The agent may try up to three alternate terms
 when its first knowledge search misses, and each result shows which query
@@ -61,14 +76,13 @@ main agent retrieve both notes and active memories during Work. They accept IDs
 and query text, never arbitrary filesystem paths.
 
 At the start of Work, Gator also puts up to four matching note leads in the
-model context. Each lead has its note ID, goal/global scope, matched words, up
-to two source labels, and a short excerpt from a matching line. The full note
+model context. Each lead has its note ID, goal/global scope, retrieval reason,
+up to two source labels, and a short excerpt. The full note
 stays in the private store and is available through `knowledge_read`. A lead
 is a retrieval hint, not a verified fact: source labels can be stale, and a
-lexical match can be irrelevant. Corrected or removed notes are reflected in
-the next Work run, and notes from another goal never enter the selection. The
-current request selects notes first; Gator consults ongoing goal context only
-when the request finds none.
+match can be irrelevant. Corrected or removed notes are reflected in the next
+Work run, and notes from another goal never enter the selection. Work uses the
+current request and ongoing goal context to rank eligible notes.
 
 In the TUI, `/note add TITLE | BODY`, `/note list`, `/note search QUERY`, and
 `/note edit ID | BODY` use the current goal by default. The terminal CLI supports

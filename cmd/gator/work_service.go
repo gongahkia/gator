@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
 	"unicode"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/browser"
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/connector"
@@ -19,6 +21,7 @@ import (
 	"github.com/gongahkia/gator/internal/learning"
 	"github.com/gongahkia/gator/internal/memory"
 	"github.com/gongahkia/gator/internal/orchestrator"
+	"github.com/gongahkia/gator/internal/retrieval"
 	"github.com/gongahkia/gator/internal/snapshot"
 	"github.com/gongahkia/gator/internal/workrun"
 )
@@ -123,11 +126,62 @@ func applyMemoryContext(stateDir string, request *workrun.Request) error {
 		return err
 	}
 	query := request.Objective + " " + request.GoalContext
-	records, err := store.Search(query, request.GoalID, 8)
+	lexical, err := store.Search(query, request.GoalID, 8)
 	if err != nil {
 		return fmt.Errorf("resolve relevant memories: %w", err)
 	}
+	records := lexical
+	lexicalByID := map[string]memory.Record{}
+	for _, record := range lexical {
+		lexicalByID[record.ID] = record
+	}
+	all, err := store.List(request.GoalID, false)
+	if err != nil {
+		return err
+	}
+	if embedder, embedErr := configuredEmbedder(stateDir); embedErr == nil && len(all) > 0 {
+		documents := make([]retrieval.Document, 0, len(all))
+		available := map[string]memory.Record{}
+		for _, record := range all {
+			if record.SourceStatus == "changed" || record.SourceStatus == "unavailable" {
+				continue
+			}
+			available[record.ID] = record
+			documents = append(documents, retrieval.Document{ID: record.ID, Text: record.Text})
+		}
+		ctx, cancel := retrieval.Timeout(context.Background())
+		hits, searchErr := retrieval.Search(ctx, stateDir, "memory/"+request.GoalID, query, documents, embedder, 8)
+		cancel()
+		if searchErr == nil {
+			ids := fuseRecallIDs(memoryIDs(lexical), hitIDs(hits), 8)
+			records = make([]memory.Record, 0, len(ids))
+			for _, id := range ids {
+				record := available[id]
+				if record.ID == "" {
+					continue
+				}
+				if lexicalRecord, ok := lexicalByID[id]; ok {
+					record = lexicalRecord
+				} else {
+					record.MatchScope = "global"
+					if record.GoalID != "" {
+						record.MatchScope = "goal"
+					}
+					record.MatchMethod = "semantic"
+				}
+				records = append(records, record)
+			}
+			request.RecallStatus = "semantic + lexical"
+		} else {
+			request.RecallStatus = "lexical fallback (semantic unavailable)"
+		}
+	} else {
+		request.RecallStatus = "lexical fallback (semantic unavailable)"
+	}
 	request.MemoryContext = memory.Render(records)
+	for _, record := range records {
+		request.ContextRefs = append(request.ContextRefs, record.ID)
+	}
 	return nil
 }
 
@@ -146,10 +200,65 @@ func applyNoteContext(stateDir string, request *workrun.Request) error {
 			return fmt.Errorf("resolve goal-context notes: %w", err)
 		}
 	}
+	lexicalByID := map[string]knowledge.Document{}
+	for _, note := range notes {
+		lexicalByID[note.ID] = note
+	}
+	all, err := store.ListNotes(request.GoalID)
+	if err != nil {
+		return err
+	}
+	if embedder, embedErr := configuredEmbedder(stateDir); embedErr == nil && len(all) > 0 {
+		documents := make([]retrieval.Document, 0, len(all))
+		available := map[string]knowledge.Document{}
+		for _, note := range all {
+			full, err := store.LoadNote(note.ID)
+			if err != nil {
+				return err
+			}
+			available[note.ID] = full
+			documents = append(documents, retrieval.Document{ID: note.ID, Text: full.Title + "\n" + full.Body})
+		}
+		ctx, cancel := retrieval.Timeout(context.Background())
+		hits, searchErr := retrieval.Search(ctx, stateDir, "notes/"+request.GoalID, request.Objective+" "+request.GoalContext, documents, embedder, 4)
+		cancel()
+		if searchErr == nil {
+			ids := fuseRecallIDs(noteIDs(notes), hitIDs(hits), 4)
+			selected := make([]knowledge.Document, 0, len(ids))
+			for _, id := range ids {
+				full := available[id]
+				if full.ID == "" {
+					continue
+				}
+				if lexicalNote, ok := lexicalByID[id]; ok {
+					full = lexicalNote
+				} else {
+					if full.GoalID != "" {
+						full.MatchScope = "goal"
+					} else {
+						full.MatchScope = "global"
+					}
+					full.MatchMethod = "semantic"
+					full.Excerpt = strings.Join(strings.Fields(full.Body), " ")
+					if len([]rune(full.Excerpt)) > 240 {
+						full.Excerpt = string([]rune(full.Excerpt)[:240])
+					}
+				}
+				selected = append(selected, full)
+			}
+			notes = selected
+		} else {
+			request.RecallStatus = "lexical fallback (semantic unavailable)"
+		}
+	}
 	var lines []string
 	remaining := 2400
 	for _, note := range notes {
-		line := fmt.Sprintf("- [%s] %s (%s, lexical match: %s)", note.ID, safeNoteContext(note.Title), note.MatchScope, strings.Join(note.MatchedTerms, ", "))
+		match := "lexical match: " + strings.Join(note.MatchedTerms, ", ")
+		if note.MatchMethod != "" {
+			match = note.MatchMethod
+		}
+		line := fmt.Sprintf("- [%s] %s (%s, %s)", note.ID, safeNoteContext(note.Title), note.MatchScope, match)
 		if len(note.SourceRefs) > 0 {
 			refs := note.SourceRefs[:min(2, len(note.SourceRefs))]
 			line += " [source labels: " + safeNoteContext(strings.Join(refs, ", ")) + "]"
@@ -161,10 +270,90 @@ func applyNoteContext(stateDir string, request *workrun.Request) error {
 			break
 		}
 		lines = append(lines, line)
+		request.ContextRefs = append(request.ContextRefs, note.ID)
 		remaining -= len(line)
 	}
 	request.NoteContext = strings.Join(lines, "\n")
 	return nil
+}
+
+func configuredEmbedder(stateDir string) (retrieval.Embedder, error) {
+	settings, err := loadSettings()
+	if err != nil {
+		return nil, err
+	}
+	provider := settings.Embeddings.Provider
+	if provider == "" || provider == "ollama" {
+		return retrieval.NewEmbedder("ollama", "")
+	}
+	if !settings.Embeddings.CloudUploadApproved {
+		return nil, errors.New("cloud retrieval upload is not approved")
+	}
+	credentials, err := auth.New(stateDir)
+	if err != nil {
+		return nil, err
+	}
+	credential, found, err := credentials.Read(provider)
+	if err != nil {
+		return nil, err
+	}
+	key := ""
+	if found && credential.IsAPIKey() {
+		key = credential.Key
+	}
+	if key == "" {
+		if provider == "openai" {
+			key = os.Getenv("OPENAI_API_KEY")
+		} else {
+			key = os.Getenv("GEMINI_API_KEY")
+		}
+	}
+	return retrieval.NewEmbedder(provider, key)
+}
+
+func memoryIDs(records []memory.Record) []string {
+	ids := make([]string, 0, len(records))
+	for _, record := range records {
+		ids = append(ids, record.ID)
+	}
+	return ids
+}
+func noteIDs(records []knowledge.Document) []string {
+	ids := make([]string, 0, len(records))
+	for _, record := range records {
+		ids = append(ids, record.ID)
+	}
+	return ids
+}
+func hitIDs(hits []retrieval.Hit) []string {
+	ids := make([]string, 0, len(hits))
+	for _, hit := range hits {
+		ids = append(ids, hit.ID)
+	}
+	return ids
+}
+func fuseRecallIDs(lexical, semantic []string, limit int) []string {
+	scores := map[string]float64{}
+	for i, id := range lexical {
+		scores[id] += 1 / float64(60+i+1)
+	}
+	for i, id := range semantic {
+		scores[id] += 1 / float64(60+i+1)
+	}
+	ids := make([]string, 0, len(scores))
+	for id := range scores {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool {
+		if scores[ids[i]] == scores[ids[j]] {
+			return ids[i] < ids[j]
+		}
+		return scores[ids[i]] > scores[ids[j]]
+	})
+	if len(ids) > limit {
+		ids = ids[:limit]
+	}
+	return ids
 }
 
 func safeNoteContext(value string) string {

@@ -11,9 +11,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/atotto/clipboard"
 	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/attachment"
 	"github.com/gongahkia/gator/internal/config"
@@ -426,7 +428,7 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	mode, paths, err := inferInteractiveWork(prompt, options)
+	mode, paths, decisionOrigin, decisionReason, err := resolveInteractiveWork(ctx, prompt, options)
 	if err != nil {
 		return worktui.RunResult{Error: err.Error()}
 	}
@@ -449,6 +451,7 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 	request := workrun.Request{
 		SourcePath: source, ConversationID: conversationID, Objective: prompt,
 		MaxSteps: options.MaxSteps, Mode: mode, Contract: contract,
+		DecisionOrigin: decisionOrigin, DecisionReason: decisionReason,
 		GoalContext:             goalContext(currentGoal),
 		GoalID:                  currentGoal.ID,
 		ConnectorIDs:            append([]string(nil), options.ConnectorIDs...),
@@ -519,6 +522,73 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 		result.Error = err.Error()
 	}
 	return result
+}
+
+// resolveInteractiveWork spends one model request only when explicit controls
+// and clear language leave the desired output uncertain. A failed classifier
+// degrades to inspection; it cannot select act or connected capabilities.
+func resolveInteractiveWork(ctx context.Context, prompt string, options worktui.RunOptions) (action.Mode, []string, string, string, error) {
+	mode, paths, err := inferInteractiveWork(prompt, options)
+	if err != nil {
+		return "", nil, "", "", err
+	}
+	if !ambiguousInteractivePrompt(prompt, options) {
+		origin := "auto"
+		if options.Mode != "" && options.Mode != "auto" || len(options.Artifacts) > 0 {
+			origin = "explicit"
+		}
+		return mode, paths, origin, "Selected from explicit controls or clear request wording.", nil
+	}
+	defaults, err := configuredDefaults()
+	if err != nil {
+		return action.Inspect, nil, "auto", "Classification unavailable; using inspect mode.", nil
+	}
+	provider, modelName, err := resolveConfiguredProvider(defaults.Provider, defaults.Model)
+	if err != nil {
+		return action.Inspect, nil, "auto", "Classification unavailable; using inspect mode.", nil
+	}
+	backend, err := nativeWorkModel(provider, modelName, "")
+	if err != nil {
+		return action.Inspect, nil, "auto", "Classification unavailable; using inspect mode.", nil
+	}
+	routeCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
+	defer cancel()
+	turn, err := backend.Complete(routeCtx, agent.TurnRequest{
+		System:   `Classify the user's immediate request for a terminal work agent. Return one JSON object only: {"mode":"inspect"|"draft","artifact":"optional basename.ext"}. Inspect answers questions. Draft creates a file. Never choose act, a connector, a goal, or a schedule. If uncertain, choose inspect.`,
+		Messages: []agent.Message{{Role: agent.RoleUser, Content: prompt}},
+	})
+	if err != nil || len(turn.ToolCalls) > 0 || len(turn.Text) > 2048 {
+		return action.Inspect, nil, "auto", "Classification unavailable; using inspect mode.", nil
+	}
+	var route struct {
+		Mode     string `json:"mode"`
+		Artifact string `json:"artifact"`
+	}
+	if json.Unmarshal([]byte(strings.TrimSpace(turn.Text)), &route) != nil {
+		return action.Inspect, nil, "auto", "Classification unavailable; using inspect mode.", nil
+	}
+	if route.Mode != "draft" {
+		return action.Inspect, nil, "model", "Ambiguous request classified as a question.", nil
+	}
+	path := strings.TrimSpace(route.Artifact)
+	if path == "" || filepath.Base(path) != path || artifact.ValidateOutputPath(path) != nil {
+		path = inferArtifactPaths(strings.ToLower(prompt))[0]
+	}
+	return action.Draft, []string{path}, "model", "Ambiguous request classified as a deliverable.", nil
+}
+
+func ambiguousInteractivePrompt(prompt string, options worktui.RunOptions) bool {
+	if options.Mode != "" && options.Mode != "auto" || len(options.Artifacts) > 0 {
+		return false
+	}
+	lower := strings.ToLower(strings.TrimSpace(prompt))
+	if strings.HasSuffix(lower, "?") || containsAny(lower, "write ", "create ", "draft ", "produce ", "generate ", "prepare ", "build ", "reconcile ", "implement ", "fix ", "refactor ", "design ", ".md", ".json", ".csv", ".docx", ".xlsx", ".pdf", ".pptx", ".svg", ".html") {
+		return false
+	}
+	if len(options.PreviousArtifacts) > 0 && containsAny(lower, "revise", "rewrite", "update it", "edit it", "tighten", "improve it") {
+		return false
+	}
+	return !containsAny(lower, "what ", "why ", "how ", "when ", "where ", "who ", "explain ", "summarize ")
 }
 
 func inferInteractiveWork(prompt string, options worktui.RunOptions) (action.Mode, []string, error) {

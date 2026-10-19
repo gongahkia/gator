@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -9,8 +10,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/goal"
+	"github.com/gongahkia/gator/internal/localmodel"
 	"github.com/gongahkia/gator/internal/memory"
+	"github.com/gongahkia/gator/internal/retrieval"
 	"github.com/gongahkia/gator/internal/state"
 )
 
@@ -22,6 +26,9 @@ const memoryUsage = `Gator memory — explicit, inspectable personal knowledge
   gator memory show ID
   gator memory correct ID [--source-file PATH] TEXT
   gator memory forget ID
+  gator memory embeddings status
+  gator memory embeddings set ollama|openai|gemini [--allow-upload]
+  gator memory embeddings install --yes
 
 Goal memories are visible only in that goal; global memories are shared.
 The agent uses bounded, relevant active memories as context, never as authority.`
@@ -40,6 +47,8 @@ func memoryCommand(args []string, out io.Writer) error {
 		return err
 	}
 	switch args[0] {
+	case "embeddings":
+		return memoryEmbeddingsCommand(args[1:], out)
 	case "add":
 		flags := flag.NewFlagSet("memory add", flag.ContinueOnError)
 		flags.SetOutput(io.Discard)
@@ -163,6 +172,88 @@ func memoryCommand(args []string, out io.Writer) error {
 	default:
 		return fmt.Errorf("unknown memory command %q", args[0])
 	}
+}
+
+func memoryEmbeddingsCommand(args []string, out io.Writer) error {
+	if len(args) > 0 && args[0] == "install" {
+		if len(args) != 2 || args[1] != "--yes" {
+			return errors.New("embeddinggemma:latest is a 622 MB Ollama download from https://ollama.com/library/embeddinggemma; repeat with install --yes")
+		}
+		client, err := localmodel.NewClient("")
+		if err != nil {
+			return err
+		}
+		model := localmodel.Model{OllamaModel: retrieval.LocalModel, SourceURL: "https://ollama.com/library/embeddinggemma", Download: "622 MB", DownloadBytes: 622_000_000}
+		if err := client.Pull(context.Background(), model, func(progress localmodel.Progress) {
+			if progress.Status != "" {
+				_, _ = fmt.Fprintln(out, progress.Status)
+			}
+		}); err != nil {
+			return err
+		}
+		_, err = fmt.Fprintln(out, "Local semantic recall is ready.")
+		return err
+	}
+	settingsStore, err := config.DefaultStore()
+	if err != nil {
+		return err
+	}
+	settings, err := settingsStore.Load()
+	if err != nil {
+		return err
+	}
+	if len(args) == 0 || args[0] == "status" && len(args) == 1 {
+		provider := settings.Embeddings.Provider
+		if provider == "" {
+			provider = "ollama"
+		}
+		status := "configured"
+		if provider == "ollama" {
+			status = "unavailable; using lexical search"
+			if client, clientErr := localmodel.NewClient(""); clientErr == nil {
+				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+				models, modelErr := client.Models(ctx)
+				cancel()
+				if modelErr == nil {
+					status = "model missing; using lexical search (gator memory embeddings install --yes)"
+					for _, model := range models {
+						if model.Name == retrieval.LocalModel {
+							status = "ready"
+							break
+						}
+					}
+				}
+			}
+		} else if !settings.Embeddings.CloudUploadApproved {
+			status = "upload disabled; using lexical search"
+		}
+		_, err := fmt.Fprintf(out, "Memory search: %s embeddings (%s); lexical fallback on failure.\n", provider, status)
+		return err
+	}
+	if args[0] != "set" || len(args) < 2 || len(args) > 3 {
+		return errors.New("usage: gator memory embeddings set ollama|openai|gemini [--allow-upload]")
+	}
+	provider := args[1]
+	if provider != "ollama" && provider != "openai" && provider != "gemini" {
+		return errors.New("embeddings provider must be ollama, openai, or gemini")
+	}
+	approved := len(args) == 3 && args[2] == "--allow-upload"
+	if len(args) == 3 && !approved {
+		return errors.New("unknown embeddings option")
+	}
+	if provider != "ollama" && !approved {
+		return errors.New("cloud embeddings upload saved memory and note text; repeat with --allow-upload to opt in")
+	}
+	settings.Embeddings = config.EmbeddingSettings{Provider: provider, CloudUploadApproved: approved && provider != "ollama"}
+	if err := settingsStore.Save(settings); err != nil {
+		return err
+	}
+	if provider == "ollama" {
+		_, err = fmt.Fprintln(out, "Memory search uses local Ollama embeddinggemma:latest when installed, otherwise lexical fallback. Run gator memory embeddings install --yes to install it.")
+	} else {
+		_, err = fmt.Fprintf(out, "Memory search uses %s embeddings and may upload saved memory and note text. Configure its API key via /model Cloud or gator provider login %s.\n", provider, provider)
+	}
+	return err
 }
 
 func printMemories(out io.Writer, records []memory.Record) error {

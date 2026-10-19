@@ -19,6 +19,7 @@ import (
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/snapshot"
 	"github.com/gongahkia/gator/internal/tools"
+	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
@@ -88,9 +89,14 @@ type Request struct {
 	controlSteerTask  func(string, string) error
 	MaxSteps          int
 	Mode              action.Mode
-	Contract          artifact.Contract
-	StateDir          string
-	System            string
+	// DecisionOrigin identifies how the host chose this run's route. It is
+	// observational metadata and cannot widen Mode or any tool grant.
+	DecisionOrigin string
+	DecisionReason string
+	Decision       *workhistory.Decision
+	Contract       artifact.Contract
+	StateDir       string
+	System         string
 	// LearningContext is a bounded projection of applicable active learnings.
 	// It is supplied by the application boundary; candidates never appear here.
 	LearningContext string
@@ -98,8 +104,10 @@ type Request struct {
 	MemoryContext string
 	// NoteContext names relevant saved notes with short excerpts. Full note text
 	// remains available through knowledge_read and is never tool authority.
-	NoteContext string
-	GoalID      string
+	NoteContext  string
+	ContextRefs  []string
+	RecallStatus string
+	GoalID       string
 	// GoalContext is explicitly user-maintained ongoing context. It conveys
 	// neither tool authority nor an instruction that overrides the current task.
 	GoalContext          string

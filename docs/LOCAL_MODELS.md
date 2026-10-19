@@ -17,6 +17,13 @@ use Gator's bounded native text extraction. Scanned pages are flagged as
 requiring OCR rather than silently treated as empty. No model-quality claim
 follows from being in the catalog.
 
+Memory recall uses a separate Ollama embedding model. Check it with `gator
+memory embeddings status` and explicitly download `embeddinggemma:latest`
+(about 622 MB) with `gator memory embeddings install --yes`. This model does
+not replace the selected Work chat model. See [Personal knowledge and
+skills](KNOWLEDGE.md) for the separate cloud embedding opt-in and lexical
+fallback.
+
 The saved selection also applies to goal-linked recurring jobs that use the
 default provider when they run. A live evaluation can select it explicitly with
 `--provider gator-local --model MODEL_TAG`; see the

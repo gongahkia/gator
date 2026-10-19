@@ -64,6 +64,7 @@ type Record struct {
 	ObjectiveSummary   string             `json:"objective_summary"`
 	ObjectiveSHA256    string             `json:"objective_sha256"`
 	Mode               action.Mode        `json:"mode"`
+	Decision           *Decision          `json:"decision,omitempty"`
 	ExternalActions    action.Disposition `json:"external_actions"`
 	PolicySHA256       string             `json:"policy_sha256,omitempty"`
 	ConversationID     string             `json:"conversation_id,omitempty"`
@@ -77,6 +78,22 @@ type Record struct {
 	LiveStatus         string             `json:"-"` // transient process-held lease state
 	StartedAt          time.Time          `json:"started_at"`
 	FinishedAt         time.Time          `json:"finished_at,omitempty"`
+}
+
+// Decision is the effective, host-validated route for a Work run. It contains
+// identifiers and capability names, never source text or credentials.
+type Decision struct {
+	Version      int         `json:"version"`
+	Origin       string      `json:"origin"`
+	Intent       string      `json:"intent"`
+	GoalID       string      `json:"goal_id,omitempty"`
+	Mode         action.Mode `json:"mode"`
+	Artifacts    []string    `json:"artifacts,omitempty"`
+	Connectors   []string    `json:"connectors,omitempty"`
+	ToolGroups   []string    `json:"tool_groups,omitempty"`
+	ContextRefs  []string    `json:"context_refs,omitempty"`
+	RecallStatus string      `json:"recall_status,omitempty"`
+	Reason       string      `json:"reason,omitempty"`
 }
 
 // DisplayStatus keeps the durable lifecycle distinct from the transient run
@@ -103,6 +120,7 @@ type Start struct {
 	ID               string
 	Objective        string
 	Mode             action.Mode
+	Decision         *Decision
 	ExternalActions  action.Disposition
 	PolicySHA256     string
 	ConversationID   string
@@ -243,6 +261,7 @@ func (s Store) Start(start Start) (Record, error) {
 		ObjectiveSummary: summary(objective),
 		ObjectiveSHA256:  digest(objective),
 		Mode:             start.Mode,
+		Decision:         start.Decision,
 		ExternalActions:  start.ExternalActions,
 		PolicySHA256:     start.PolicySHA256,
 		ConversationID:   start.ConversationID,

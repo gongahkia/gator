@@ -47,6 +47,10 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	if err != nil {
 		return Outcome{}, err
 	}
+	request.Decision, err = resolveDecision(request)
+	if err != nil {
+		return Outcome{}, err
+	}
 	if request.RunID == "" {
 		request.RunID, err = newID(now())
 		if err != nil {
@@ -96,7 +100,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		}
 	}()
 	if _, err := history.Start(workhistory.Start{
-		ID: request.RunID, Objective: request.Objective, Mode: request.Mode, ExternalActions: request.Contract.ExternalActions,
+		ID: request.RunID, Objective: request.Objective, Mode: request.Mode, Decision: request.Decision, ExternalActions: request.Contract.ExternalActions,
 		PolicySHA256: policySHA256, ConversationID: request.ConversationID, ParentRevisionID: request.ParentRevisionID,
 		StartedAt: startedAt,
 		Evidence: workhistory.EvidenceReferences{

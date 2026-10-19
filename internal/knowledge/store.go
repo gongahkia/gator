@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gongahkia/gator/internal/retrieval"
 	"io"
 	"os"
 	"path/filepath"
@@ -42,6 +43,7 @@ type Document struct {
 	Body         string    `json:"-"`
 	MatchedTerms []string  `json:"-"`
 	MatchScope   string    `json:"-"`
+	MatchMethod  string    `json:"-"`
 	Excerpt      string    `json:"-"`
 }
 
@@ -291,7 +293,12 @@ func (s Store) SetSkillEnabled(id string, enabled bool) (Document, error) {
 	return d, nil
 }
 
-func (s Store) RemoveNote(id string) error  { return s.remove("note", id) }
+func (s Store) RemoveNote(id string) error {
+	if err := s.remove("note", id); err != nil {
+		return err
+	}
+	return retrieval.DropID(filepath.Dir(filepath.Dir(s.root)), id)
+}
 func (s Store) RemoveSkill(id string) error { return s.remove("skill", id) }
 func (s Store) NotePath(id string) (string, error) {
 	if _, err := s.LoadNote(id); err != nil {

@@ -101,6 +101,46 @@ func (c Client) ChatCompletionsURL() string {
 	return c.endpoint("/v1/chat/completions")
 }
 
+// Embed uses Ollama's native embedding endpoint on the same loopback-only
+// runtime. Explicitly disable truncation so indexing never silently drops the
+// end of a saved note.
+func (c Client) Embed(ctx context.Context, model string, input []string) ([][]float32, error) {
+	if strings.TrimSpace(model) == "" || len(input) == 0 || len(input) > 32 {
+		return nil, errors.New("invalid local embedding request")
+	}
+	payload, err := json.Marshal(struct {
+		Model    string   `json:"model"`
+		Input    []string `json:"input"`
+		Truncate bool     `json:"truncate"`
+	}{model, input, false})
+	if err != nil {
+		return nil, err
+	}
+	request, err := c.request(ctx, http.MethodPost, "/api/embed", bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	request.Header.Set("Content-Type", "application/json")
+	response, err := c.httpClient().Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("connect to local Ollama embeddings: %w", err)
+	}
+	defer response.Body.Close()
+	if err := requireSuccess(response, "generate local embeddings"); err != nil {
+		return nil, err
+	}
+	var result struct {
+		Embeddings [][]float32 `json:"embeddings"`
+	}
+	if err := decodeBounded(response.Body, &result); err != nil {
+		return nil, err
+	}
+	if len(result.Embeddings) != len(input) {
+		return nil, errors.New("local embedding count mismatch")
+	}
+	return result.Embeddings, nil
+}
+
 // Version verifies that the selected local runtime is reachable.
 func (c Client) Version(ctx context.Context) (string, error) {
 	request, err := c.request(ctx, http.MethodGet, "/api/version", nil)

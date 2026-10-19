@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gongahkia/gator/internal/retrieval"
 	"io"
 	"os"
 	"path/filepath"
@@ -32,6 +33,7 @@ type Record struct {
 	SourceStatus string    `json:"-"`
 	MatchedTerms []string  `json:"-"`
 	MatchScope   string    `json:"-"`
+	MatchMethod  string    `json:"-"`
 	ExpiresAt    time.Time `json:"expires_at,omitempty"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
@@ -261,7 +263,10 @@ func (s Store) Forget(id string) error {
 	if _, err := s.Load(id); err != nil {
 		return err
 	}
-	return os.Remove(s.path(id))
+	if err := os.Remove(s.path(id)); err != nil {
+		return err
+	}
+	return retrieval.DropID(filepath.Dir(filepath.Dir(s.root)), id)
 }
 
 func Render(records []Record) string {
@@ -277,6 +282,8 @@ func Render(records []Record) string {
 		}
 		if len(record.MatchedTerms) > 0 {
 			line += ", selected by lexical match: " + strings.Join(record.MatchedTerms, ", ") + " (" + record.MatchScope + ")"
+		} else if record.MatchMethod != "" {
+			line += ", selected by " + record.MatchMethod + " match (" + record.MatchScope + ")"
 		}
 		if !record.ExpiresAt.IsZero() {
 			line += ", expires: " + record.ExpiresAt.Format("2006-01-02")

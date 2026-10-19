@@ -32,11 +32,12 @@ type WorkRole struct {
 }
 
 type Settings struct {
-	WorkRoles []WorkRole  `json:"work_roles,omitempty"`
-	Version   int         `json:"version"`
-	Defaults  Defaults    `json:"defaults"`
-	Theme     string      `json:"theme,omitempty"`
-	TUI       TUISettings `json:"tui,omitzero"`
+	WorkRoles  []WorkRole        `json:"work_roles,omitempty"`
+	Version    int               `json:"version"`
+	Defaults   Defaults          `json:"defaults"`
+	Embeddings EmbeddingSettings `json:"embeddings"`
+	Theme      string            `json:"theme,omitempty"`
+	TUI        TUISettings       `json:"tui,omitzero"`
 	// ProviderEndpoints stores explicit non-secret endpoint overrides by
 	// provider ID. Credentials remain exclusively in Gator's auth store.
 	ProviderEndpoints map[string]string `json:"provider_endpoints,omitempty"`
@@ -59,6 +60,14 @@ type Settings struct {
 	Snapshots            SnapshotSettings           `json:"snapshots"`
 	Notifications        NotificationSettings       `json:"notifications"`
 	JobDefaults          JobDefaults                `json:"job_defaults"`
+}
+
+// EmbeddingSettings selects a knowledge-retrieval backend independently of the
+// conversational model. CloudUploadApproved is set only after an explicit
+// acknowledgement that saved memory and note text leaves the device.
+type EmbeddingSettings struct {
+	Provider            string `json:"provider"`
+	CloudUploadApproved bool   `json:"cloud_upload_approved,omitempty"`
 }
 
 // TUISettings contains display-only terminal preferences. Status lines are
@@ -137,7 +146,7 @@ type Store struct {
 // Default returns usable settings without requiring a file on disk.
 func Default() Settings {
 	limits := snapshot.DefaultLimits()
-	return Settings{Version: version, Execution: sandbox.DefaultPolicy(), Snapshots: SnapshotSettings{MaxFiles: limits.MaxFiles, MaxTotalBytes: limits.MaxTotal, MaxFileBytes: limits.MaxFileBytes}, Notifications: NotificationSettings{Desktop: true}, JobDefaults: JobDefaults{Timezone: "Local", Missed: "skip"}}
+	return Settings{Version: version, Embeddings: EmbeddingSettings{Provider: "ollama"}, Execution: sandbox.DefaultPolicy(), Snapshots: SnapshotSettings{MaxFiles: limits.MaxFiles, MaxTotalBytes: limits.MaxTotal, MaxFileBytes: limits.MaxFileBytes}, Notifications: NotificationSettings{Desktop: true}, JobDefaults: JobDefaults{Timezone: "Local", Missed: "skip"}}
 }
 
 // ProviderEndpoint returns a persisted non-secret endpoint override for one
@@ -302,6 +311,12 @@ func validate(settings Settings) error {
 	}
 	if settings.Version != version {
 		return fmt.Errorf("unsupported configuration version %d", settings.Version)
+	}
+	if settings.Embeddings.Provider != "" && settings.Embeddings.Provider != "ollama" && settings.Embeddings.Provider != "openai" && settings.Embeddings.Provider != "gemini" {
+		return fmt.Errorf("unknown embeddings provider %q", settings.Embeddings.Provider)
+	}
+	if settings.Embeddings.Provider != "" && settings.Embeddings.Provider != "ollama" && !settings.Embeddings.CloudUploadApproved {
+		return errors.New("cloud embeddings require explicit upload approval")
 	}
 	if len(settings.Defaults.Provider) > 128 || len(settings.Defaults.Model) > 512 {
 		return errors.New("configuration default exceeds its size limit")
