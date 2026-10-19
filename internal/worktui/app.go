@@ -163,6 +163,8 @@ type Config struct {
 	Goals                   []goal.Record
 	Attention               workhome.Attention
 	RefreshAttention        func() (workhome.Attention, error)
+	ReadOverview            func(context.Context) (workhome.Overview, error)
+	ControlCommand          func([]string) *exec.Cmd
 	ListGoals               func() ([]goal.Record, error)
 	SelectGoal              func(id string) (GoalState, error)
 	ClearGoal               func()
@@ -285,6 +287,10 @@ type Model struct {
 	width                  int
 	height                 int
 	home                   bool
+	overview               workhome.Overview
+	overviewGeneration     uint64
+	overviewBusy           bool
+	overviewIssue          string
 	launcher               bool
 	launcherMode           string
 	paletteQuery           string
@@ -430,7 +436,7 @@ func New(config Config) Model {
 // their first viewport-sized repaint.
 func (m Model) Init() tea.Cmd {
 	if m.config.ReadChecks != nil {
-		return tea.Batch(tea.ClearScreen, m.refreshChecksCommand(), nextChecksTick())
+		return tea.Batch(tea.ClearScreen, m.refreshChecksCommand(), m.readOverviewCommand(), nextChecksTick())
 	}
-	return tea.ClearScreen
+	return tea.Batch(tea.ClearScreen, m.readOverviewCommand())
 }

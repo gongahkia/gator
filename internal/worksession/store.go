@@ -19,14 +19,15 @@ import (
 const Version = 2
 
 type Conversation struct {
-	Version      int       `json:"version"`
-	ID           string    `json:"id"`
-	Title        string    `json:"title"`
-	SourcePath   string    `json:"source_path"`
-	SnapshotID   string    `json:"snapshot_id"`
-	HeadRevision string    `json:"head_revision_id,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	SourceRefreshRequired bool      `json:"source_refresh_required,omitempty"`
+	Version               int       `json:"version"`
+	ID                    string    `json:"id"`
+	Title                 string    `json:"title"`
+	SourcePath            string    `json:"source_path"`
+	SnapshotID            string    `json:"snapshot_id"`
+	HeadRevision          string    `json:"head_revision_id,omitempty"`
+	CreatedAt             time.Time `json:"created_at"`
+	UpdatedAt             time.Time `json:"updated_at"`
 }
 
 type ReplayState struct {
@@ -163,6 +164,7 @@ func (s Store) AddRevision(conversationID string, revision Revision) (Conversati
 	if err := writeJSON(path, revision); err != nil {
 		return Conversation{}, err
 	}
+	conversation.SourceRefreshRequired = false
 	conversation.HeadRevision = revision.ID
 	conversation.SnapshotID = revision.SnapshotID
 	conversation.UpdatedAt = revision.CreatedAt

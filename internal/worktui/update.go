@@ -17,6 +17,26 @@ import (
 
 func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 	switch value := messageValue.(type) {
+	case overviewRefreshed:
+		if value.Generation != m.overviewGeneration {
+			return m, nil
+		}
+		m.overviewBusy = false
+		if value.Err != nil {
+			m.overviewIssue = value.Err.Error()
+		} else {
+			m.overview = value.View
+			m.overviewIssue = ""
+		}
+		return m, nil
+	case controlExternalDone:
+		if value.Err != nil {
+			m.sectionNotice = value.Err.Error()
+		} else {
+			m.sectionNotice = "Review finished. The overview will reflect the retained result."
+		}
+		return m, tea.Batch(m.controlCommand("status", nil), m.refreshOverviewCommand())
+
 	case controlDone:
 		if value.Generation != m.controlGeneration {
 			return m, nil
@@ -85,7 +105,11 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		if m.config.ReadChecks == nil {
 			return m, nil
 		}
-		return m, tea.Batch(m.refreshChecksCommand(), nextChecksTick())
+		commands := []tea.Cmd{m.refreshChecksCommand(), m.refreshOverviewCommand(), nextChecksTick()}
+		if m.section == "controls" && m.controlFamily == "overview" && !m.controlBusy && m.controlForm == nil {
+			commands = append(commands, m.controlCommand("status", m.controlRootArgs))
+		}
+		return m, tea.Batch(commands...)
 	case checkActionDone:
 		m.sectionNotice = value.Text
 		if value.Err != nil {
@@ -376,6 +400,10 @@ func (m Model) updateKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.sectionNotice = "Inbox refresh failed: " + err.Error()
 		}
 		return m, nil
+	}
+	if value.String() == "ctrl+o" && m.config.Controls != nil && !m.running {
+		cmd := m.openControls("overview", nil)
+		return m, cmd
 	}
 	if value.String() == "ctrl+p" {
 		m.openCommandPalette()

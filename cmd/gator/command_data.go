@@ -49,6 +49,74 @@ func dataCommand(args []string, out io.Writer) error {
 		return nil
 	}
 	switch args[0] {
+	case "relink":
+		if len(args) != 3 {
+			return errors.New("usage: gator data relink OLD_SOURCE NEW_SOURCE")
+		}
+		plan, err := s.PreviewRelink(ctx, args[1], args[2])
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(out, "Relink %s → %s in %d metadata files. Affected checks will be paused.\nNothing changed. Apply this review: gator data relink-apply %s --yes\n", plan.From, plan.To, len(plan.Edits), plan.ID)
+		return err
+	case "relink-apply":
+		if len(args) != 3 || args[2] != "--yes" {
+			return errors.New("usage: gator data relink-apply REVIEW_ID --yes")
+		}
+		count, err := s.Relink(ctx, args[1])
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(out, "Relinked %d metadata references. Review paused checks before enabling them.\n", count)
+		return err
+
+	case "restore":
+		if len(args) < 2 {
+			return errors.New("usage: gator data restore ARCHIVE --to NEW_PROFILE [--map-source OLD=NEW] [--json]")
+		}
+		flags := flag.NewFlagSet("data restore", flag.ContinueOnError)
+		flags.SetOutput(io.Discard)
+		destination := flags.String("to", "", "new profile directory; must not already exist")
+		asJSON := flags.Bool("json", false, "print exact restore review")
+		var pairs connectorFlags
+		flags.Var(&pairs, "map-source", "map an old absolute source directory to an existing new directory")
+		if err = flags.Parse(args[2:]); err != nil {
+			return err
+		}
+		if len(flags.Args()) != 0 || *destination == "" {
+			return errors.New("restore requires --to NEW_PROFILE and no extra arguments")
+		}
+		mappings, err := lifecycle.SourceMappings(strings.Join(pairs, "\n"))
+		if err != nil {
+			return err
+		}
+		plan, err := s.PreviewRestore(ctx, args[1], *destination, mappings)
+		if err != nil {
+			return err
+		}
+		if *asJSON {
+			return json.NewEncoder(out).Encode(plan)
+		}
+		screen := restorePlanScreen(plan)
+		for _, block := range screen.Panel.Blocks {
+			for _, line := range block.Lines {
+				if _, err = fmt.Fprintln(out, line); err != nil {
+					return err
+				}
+			}
+		}
+		_, err = fmt.Fprintf(out, "Nothing restored. Apply this review: gator data restore-apply %s --yes\n", plan.ID)
+		return err
+	case "restore-apply":
+		if len(args) != 3 || args[2] != "--yes" {
+			return errors.New("usage: gator data restore-apply REVIEW_ID --yes")
+		}
+		receipt, err := s.Restore(ctx, args[1])
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(out, "Restored a fresh profile at %s. Checks and model requests are paused.\nOpen it with %s; review /data, set up /model and connectors, then review /followup and /usage before resuming.\n", receipt.Plan.Target, profileLaunch(receipt.Plan.Target))
+		return err
 	case "preview":
 		if len(args) < 2 || len(args) > 3 || (len(args) == 3 && args[2] != "--json") {
 			return errors.New("usage: gator data preview knowledge|history|snapshots|all [--json]")
@@ -133,7 +201,7 @@ func dataCommand(args []string, out io.Writer) error {
 		_, err = fmt.Fprintf(out, "Verified %d files, created %s for %s.\n", len(manifest.Files), manifest.CreatedAt.Format(time.RFC3339), manifest.StateDir)
 		return err
 	default:
-		return errors.New("usage: gator data status|preview|apply|cleanup|retention|export|verify")
+		return errors.New("usage: gator data status|preview|apply|cleanup|retention|export|verify|restore|restore-apply")
 	}
 }
 func printDataPlan(out io.Writer, p lifecycle.Plan, asJSON bool) error {

@@ -110,7 +110,7 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 		case "submit":
 			next, command = m.model.SubmitText(frame.Text)
 		case "key":
-			if frame.Key == "ctrl+g" {
+			if frame.Key == "ctrl+g" || frame.Key == "ctrl+o" {
 				m.model = m.model.SetBridgeInput(frame.Text)
 			}
 			key, ok := bridgeKey(frame.Key)
@@ -156,7 +156,7 @@ func bridgeKey(name string) (tea.KeyMsg, bool) {
 		"pgup": tea.KeyPgUp, "pgdown": tea.KeyPgDown,
 		"ctrl+c": tea.KeyCtrlC, "ctrl+p": tea.KeyCtrlP, "ctrl+x": tea.KeyCtrlX,
 		"ctrl+i": tea.KeyCtrlI, "ctrl+b": tea.KeyCtrlB, "ctrl+j": tea.KeyCtrlJ,
-		"ctrl+g": tea.KeyCtrlG, "ctrl+u": tea.KeyCtrlU, "ctrl+r": tea.KeyCtrlR,
+		"ctrl+g": tea.KeyCtrlG, "ctrl+o": tea.KeyCtrlO, "ctrl+u": tea.KeyCtrlU, "ctrl+r": tea.KeyCtrlR,
 		"ctrl+q": tea.KeyCtrlQ, "f1": tea.KeyF1,
 	}
 	if kind, ok := special[name]; ok {

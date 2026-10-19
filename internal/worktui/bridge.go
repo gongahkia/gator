@@ -14,31 +14,33 @@ import (
 // BridgeState is a display-only projection for the React terminal frontend.
 // The Go model remains the sole owner of commands, runs, approvals and history.
 type BridgeState struct {
-	Mode                 string            `json:"mode"`
-	Panel                *uisnapshot.Panel `json:"panel,omitempty"`
-	Messages             []BridgeMessage   `json:"messages"`
-	Commands             []BridgeCommand   `json:"commands"`
-	Actions              []workhome.Action `json:"actions"`
-	Title                string            `json:"title"`
-	Source               string            `json:"source"`
-	GoalID               string            `json:"goal_id,omitempty"`
-	Provider             string            `json:"provider,omitempty"`
-	Model                string            `json:"model,omitempty"`
-	Theme                string            `json:"theme"`
-	Status               string            `json:"status,omitempty"`
-	StatusLine           []string          `json:"status_line"`
-	StatusLineEnabled    bool              `json:"status_line_enabled"`
-	Input                string            `json:"input,omitempty"`
-	Running              bool              `json:"running"`
-	Cancelling           bool              `json:"cancelling"`
-	Elapsed              string            `json:"elapsed,omitempty"`
-	LoadingFrame         int               `json:"loading_frame"`
-	Queued               int               `json:"queued"`
-	Home                 bool              `json:"home"`
-	FirstRun             bool              `json:"first_run"`
-	SupervisorNeedsStart bool              `json:"supervisor_needs_start"`
-	Checks               []BridgeCheck     `json:"checks,omitempty"`
-	External             *BridgeExternal   `json:"external,omitempty"`
+	Mode                 string             `json:"mode"`
+	Panel                *uisnapshot.Panel  `json:"panel,omitempty"`
+	Messages             []BridgeMessage    `json:"messages"`
+	Commands             []BridgeCommand    `json:"commands"`
+	Actions              []workhome.Action  `json:"actions"`
+	Title                string             `json:"title"`
+	Source               string             `json:"source"`
+	GoalID               string             `json:"goal_id,omitempty"`
+	Provider             string             `json:"provider,omitempty"`
+	Model                string             `json:"model,omitempty"`
+	Theme                string             `json:"theme"`
+	Status               string             `json:"status,omitempty"`
+	StatusLine           []string           `json:"status_line"`
+	StatusLineEnabled    bool               `json:"status_line_enabled"`
+	Input                string             `json:"input,omitempty"`
+	Running              bool               `json:"running"`
+	Cancelling           bool               `json:"cancelling"`
+	Elapsed              string             `json:"elapsed,omitempty"`
+	LoadingFrame         int                `json:"loading_frame"`
+	Queued               int                `json:"queued"`
+	Home                 bool               `json:"home"`
+	FirstRun             bool               `json:"first_run"`
+	SupervisorNeedsStart bool               `json:"supervisor_needs_start"`
+	Checks               []BridgeCheck      `json:"checks,omitempty"`
+	Overview             *workhome.Overview `json:"overview,omitempty"`
+	OverviewIssue        string             `json:"overview_issue,omitempty"`
+	External             *BridgeExternal    `json:"external,omitempty"`
 }
 
 // BridgeExternal asks the frontend to give the terminal to a process. The
@@ -102,6 +104,11 @@ func (m Model) BridgeState() BridgeState {
 		FirstRun:          m.firstRun,
 		External:          m.bridgeExternal,
 	}
+	if !m.overview.At.IsZero() {
+		copy := m.overview
+		state.Overview = &copy
+	}
+	state.OverviewIssue = m.overviewIssue
 	for _, check := range m.checks {
 		state.Checks = append(state.Checks, BridgeCheck{Title: singleLine(check.Title), Health: check.HealthLine(), State: check.State})
 	}
@@ -152,6 +159,8 @@ func (m Model) FinishBridgeExternal(failure string) (tea.Model, tea.Cmd) {
 		return m.updateComposerEditorDone(composerEditorDone{path: m.composerEditorPath, editor: composerEditor(), err: err})
 	case "connector":
 		return m.Update(connectorActionDone{action: job.Action, id: job.ID, err: err})
+	case "control":
+		return m.Update(controlExternalDone{Err: err})
 	default:
 		m.status = fmt.Sprintf("Unknown external action %q", job.Kind)
 		return m, nil

@@ -82,6 +82,10 @@ func main() {
 	if len(os.Args) == 1 || (os.Args[1] != "--help" && os.Args[1] != "-h" && os.Args[1] != "--version" && os.Args[1] != "-v") {
 		if root, err := state.ResolveDir(""); err == nil {
 			if _, err := lifecycle.Maintain(context.Background(), root, time.Now()); err != nil && !errors.Is(err, state.ErrBusy) {
+				if errors.Is(err, lifecycle.ErrRecovery) {
+					fmt.Fprintln(os.Stderr, "gator:", err)
+					os.Exit(1)
+				}
 				fmt.Fprintln(os.Stderr, "gator: retention cleanup deferred:", err)
 			}
 		}
@@ -123,6 +127,8 @@ func run(args []string, out io.Writer) error {
 		defer release()
 	}
 	switch args[0] {
+	case "overview":
+		return overviewCommand(args[1:], out)
 	case "data":
 		return dataCommand(args[1:], out)
 	case "usage":

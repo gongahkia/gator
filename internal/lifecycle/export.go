@@ -163,6 +163,12 @@ func (s Store) Export(ctx context.Context, destination string) (BackupManifest, 
 }
 
 func VerifyBackup(ctx context.Context, filename string) (BackupManifest, error) {
+	return readBackup(ctx, filename, nil)
+}
+
+// readBackup has one parser for verification and extraction; the sink sees only
+// regular allowlisted files and must consume each entry completely.
+func readBackup(ctx context.Context, filename string, sink func(*tar.Header, io.Reader) error) (BackupManifest, error) {
 	var manifest BackupManifest
 	f, err := os.Open(filename)
 	if err != nil {
@@ -189,7 +195,7 @@ func VerifyBackup(ctx context.Context, filename string) (BackupManifest, error) 
 		if nextErr != nil {
 			return manifest, nextErr
 		}
-		if header.Typeflag != tar.TypeReg || header.Size < 0 || header.Size > 1<<30 || path.Clean(header.Name) != header.Name || strings.ContainsAny(header.Name, "\\\x00\r\n") {
+		if header.Typeflag != tar.TypeReg || header.Size < 0 || header.Size > 1<<30 || path.Clean(header.Name) != header.Name || !filepath.IsLocal(header.Name) || strings.Count(header.Name, "/") > 32 || strings.ContainsAny(header.Name, "\\\x00\r\n") {
 			return manifest, errors.New("backup contains an unsafe entry")
 		}
 		total += header.Size
@@ -217,10 +223,19 @@ func VerifyBackup(ctx context.Context, filename string) (BackupManifest, error) 
 			return manifest, errors.New("duplicate backup entry")
 		}
 		digest := sha256.New()
-		if _, err = io.Copy(digest, cancelReader{ctx, tr}); err != nil {
+		reader := io.TeeReader(cancelReader{ctx, tr}, digest)
+		if sink == nil {
+			_, err = io.Copy(io.Discard, reader)
+		} else {
+			err = sink(header, reader)
+		}
+		if err != nil {
 			return manifest, err
 		}
 		actual[header.Name] = hex.EncodeToString(digest.Sum(nil))
+		if len(actual) > 500000 {
+			return manifest, errors.New("backup contains too many files")
+		}
 	}
 	remaining := int64(10<<30) - total + 1
 	drained, drainErr := io.Copy(io.Discard, io.LimitReader(cancelReader{ctx, gz}, remaining))

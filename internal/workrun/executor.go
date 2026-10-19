@@ -204,6 +204,9 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		if err != nil {
 			return Outcome{}, fmt.Errorf("load Work conversation: %w", err)
 		}
+		if conversation.SourceRefreshRequired && request.SnapshotID == "" {
+			request.RefreshSource = true
+		}
 		if request.ParentRevisionID == "" {
 			request.ParentRevisionID = conversation.HeadRevision
 		}

@@ -24,7 +24,7 @@ import (
 // of saved knowledge. Removing the latter alone cannot erase earlier inputs.
 var content = map[string][]string{
 	"knowledge": {"memory", "knowledge", "learnings", "observations", "retrieval"},
-	"history":   {"conversations", "work-history", "workspaces", "work-control", "traces", "interactions", "tasks", "candidates", "delivery", "suggestions", "inbox", "pilot", "jobs/history", "observations"},
+	"history":   {"conversations", "work-history", "workspaces", "work-control", "traces", "interactions", "tasks", "candidates", "delivery", "suggestions", "inbox", "pilot", "jobs/history", "observations", "migrations"},
 	"snapshots": {"snapshots"},
 	"goals":     {"goals", "jobs/definitions", "empty-workspace"},
 }
@@ -112,7 +112,14 @@ func Open(stateDir string) (Store, error) {
 	}
 	control := filepath.Join(root, "data-control")
 	abs = filepath.Dir(root)
-	return Store{abs, root, control}, nil
+	store := Store{abs, root, control}
+	if err = store.recoverRelink(); err != nil {
+		if errors.Is(err, state.ErrBusy) {
+			return Store{}, err
+		}
+		return Store{}, errors.Join(ErrRecovery, err)
+	}
+	return store, nil
 }
 func (s Store) Policy() (Policy, error) {
 	var p Policy

@@ -18,13 +18,19 @@ type ControlField struct {
 }
 type ControlAction struct {
 	Key, Label, Action, Description string
+	Detail, Command, GoalID, WorkID string
+	Family                          string
+	External                        []string
 	Args                            []string
 	Fields                          []ControlField
 	Review                          bool
 	ConnectorID                     string
 	ConnectorReview                 string
 }
+type SourceMove struct{ From, To string }
+
 type ControlScreen struct {
+	SourceMoves          []SourceMove
 	ResetConversation    bool
 	ClearGoal            bool
 	RemovedConversations []string
@@ -108,6 +114,10 @@ func (m Model) updateControls(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.controlForm = nil
 			m.controlReview = false
+			if len(f.External) > 0 {
+				cmd := m.startControlExternal(f.External)
+				return m, cmd
+			}
 			return m, m.controlCommand(f.Action, args)
 		}
 		switch key.String() {
@@ -151,7 +161,22 @@ func (m Model) updateControls(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.controlReview = len(a.Fields) == 0
 			return m, nil
 		}
-		if a.Action == "select" && m.controlFamily == "recovery" {
+		if a.Family != "" {
+			m.controlFamily = a.Family
+			m.controlRootArgs = nil
+			cmd := m.controlCommand(a.Action, a.Args)
+			return m, cmd
+		}
+		if a.GoalID != "" {
+			return m.openOverviewGoal(a.GoalID, a.Command)
+		}
+		if a.WorkID != "" {
+			return m.openOverviewWork(a.WorkID)
+		}
+		if a.Command != "" {
+			return m.runLocalCommand(a.Command)
+		}
+		if (a.Action == "select" && m.controlFamily == "recovery") || ((a.Action == "section" || a.Action == "item" || a.Action == "status") && m.controlFamily == "overview") {
 			m.controlRootArgs = append([]string(nil), a.Args...)
 		}
 		return m, m.controlCommand(a.Action, a.Args)
@@ -196,7 +221,7 @@ func (m Model) controlsPanel() uisnapshot.Panel {
 		return p
 	}
 	for _, a := range m.controlScreen.Actions {
-		p.Rows = append(p.Rows, uisnapshot.Row{Label: a.Label})
+		p.Rows = append(p.Rows, uisnapshot.Row{Label: a.Label, Detail: a.Detail})
 		p.Hints = append(p.Hints, uisnapshot.Hint{Shortcut: a.Key, Action: a.Label})
 	}
 	p.Hints = append(p.Hints, uisnapshot.Hint{Shortcut: "Esc", Action: "back"})
@@ -207,6 +232,14 @@ func (m Model) controlsPanel() uisnapshot.Panel {
 }
 
 func (m *Model) clearRemovedData(screen ControlScreen) {
+	for _, move := range screen.SourceMoves {
+		m.source = moveSourcePath(m.source, move.From, move.To)
+		m.options.RefreshSource = true
+		m.snapshot = ""
+		m.contextState = ContextState{}
+		m.config.Goals = nil
+	}
+
 	reset := screen.ResetConversation
 	for _, id := range screen.RemovedConversations {
 		if id == m.conversation {
@@ -216,6 +249,9 @@ func (m *Model) clearRemovedData(screen ControlScreen) {
 	if !reset {
 		return
 	}
+	m.overviewGeneration++
+	m.overview = workhome.Overview{}
+	m.overviewBusy = false
 	m.messages = nil
 	m.conversation = ""
 	m.revision = ""

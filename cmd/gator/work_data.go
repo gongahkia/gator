@@ -25,7 +25,67 @@ func dataControl(ctx context.Context, stateDir, action string, args []string) (w
 	reset := false
 	clearGoal := false
 	var removedConversations []string
+	var sourceMoves []worktui.SourceMove
 	switch action {
+	case "finish-restore-review":
+		path := filepath.Join(stateDir, "gator", "data-control", "restore-reviewed.json")
+		if err = os.WriteFile(path, []byte(time.Now().UTC().Format(time.RFC3339)), 0600); err != nil {
+			return worktui.ControlScreen{}, err
+		}
+		notice = "Restore setup review marked complete. No checks or provider requests were enabled."
+	case "relink-source":
+		if len(args) != 1 {
+			return worktui.ControlScreen{}, errors.New("choose a source folder to relink")
+		}
+		return worktui.ControlScreen{Panel: uisnapshot.Panel{Kind: "data", Title: "Relink a moved source folder", Blocks: []uisnapshot.Block{{Lines: []string{"Missing source: " + args[0], "Choose the corresponding existing project folder. The next screen reviews every metadata change; source files are never changed."}}}}, Actions: []worktui.ControlAction{{Key: "Enter", Label: "Choose the replacement folder", Action: "relink-plan", Fields: []worktui.ControlField{{Label: "Old source folder", Value: args[0]}, {Label: "Existing new source folder"}}, Review: true}}}, nil
+
+	case "relink-plan":
+		if len(args) != 2 {
+			return worktui.ControlScreen{}, errors.New("choose the old and new source directories")
+		}
+		plan, err := s.PreviewRelink(ctx, args[0], args[1])
+		if err != nil {
+			return worktui.ControlScreen{}, err
+		}
+		return relinkPlanScreen(plan), nil
+	case "relink-apply":
+		if len(args) != 1 {
+			return worktui.ControlScreen{}, errors.New("review source mapping before applying it")
+		}
+		plan, err := s.LoadRelinkPlan(args[0])
+		if err != nil {
+			return worktui.ControlScreen{}, err
+		}
+		count, err := s.Relink(ctx, args[0])
+		if err != nil {
+			return worktui.ControlScreen{}, err
+		}
+		sourceMoves = []worktui.SourceMove{{From: plan.From, To: plan.To}}
+		notice = fmt.Sprintf("Relinked %d metadata references. Affected checks are paused. Existing transcript and artifact bytes retain their original evidence.", count)
+
+	case "restore-plan":
+		if len(args) != 3 {
+			return worktui.ControlScreen{}, errors.New("choose the archive, a new profile directory, and optional source mappings")
+		}
+		mappings, err := lifecycle.SourceMappings(strings.ReplaceAll(args[2], ";", "\n"))
+		if err != nil {
+			return worktui.ControlScreen{}, err
+		}
+		plan, err := s.PreviewRestore(ctx, args[0], args[1], mappings)
+		if err != nil {
+			return worktui.ControlScreen{}, err
+		}
+		return restorePlanScreen(plan), nil
+	case "restore-apply":
+		if len(args) != 1 {
+			return worktui.ControlScreen{}, errors.New("preview the restore before applying it")
+		}
+		receipt, err := s.Restore(ctx, args[0])
+		if err != nil {
+			return worktui.ControlScreen{}, err
+		}
+		notice = "Restored a separate profile at " + receipt.Plan.Target + ". This session still uses " + stateDir + ". Start Gator with " + profileLaunch(receipt.Plan.Target) + ". Review provider setup, source folders, shared pause, and paused checks in that profile."
+
 	case "backup", "verify":
 		if len(args) != 1 {
 			return worktui.ControlScreen{}, errors.New("choose one backup file path")
@@ -113,13 +173,31 @@ func dataControl(ctx context.Context, stateDir, action string, args []string) (w
 	for _, group := range view.Groups {
 		lines = append(lines, fmt.Sprintf("%s: %d files · %s", group.Name, group.Files, byteLabel(group.Bytes)))
 	}
+	var restored lifecycle.RestoreReceipt
+	if data, readErr := os.ReadFile(filepath.Join(view.StateDir, "gator", "data-control", "restored.json")); readErr == nil {
+		if err = json.Unmarshal(data, &restored); err != nil {
+			return worktui.ControlScreen{}, err
+		}
+		lines = append(lines, "Restored profile: "+restored.Plan.Target, "Original archive: "+restored.Plan.Archive, "Open this profile with "+profileLaunch(view.StateDir), "Use L to relink a moved source folder. Set up /model and connectors, then review /usage and paused /followup checks.")
+		sources, sourceErr := s.SourceFolders(ctx)
+		if sourceErr != nil {
+			return worktui.ControlScreen{}, sourceErr
+		}
+		for _, source := range sources {
+			status := "available"
+			if info, err := os.Stat(source.Destination); err != nil || !info.IsDir() {
+				status = "missing — relink this source with L"
+			}
+			lines = append(lines, source.Destination+" · "+status)
+		}
+	}
 	p := view.Policy
 	expected, _ := json.Marshal(p)
 	retention := []string{"Zero days means keep until explicitly deleted.", fmt.Sprintf("Completed history: %s · saved facts/notes: %s · unused snapshots: %s", daysLabel(p.HistoryDays), daysLabel(p.KnowledgeDays), daysLabel(p.SnapshotDays)), "Ongoing goals, their conversations, pending suggestions, the latest successful check per job, and referenced snapshots are protected.", "Automatic expiry of saved knowledge applies to facts and notes; skills and learnings remain until explicitly removed.", "Automatic cleanup runs on Gator startup and daily while the supervisor is active. It waits when Work is using the data."}
 	if !view.LastSweep.At.IsZero() {
 		retention = append(retention, fmt.Sprintf("Last automatic cleanup: %s · %d files removed", view.LastSweep.At.Local().Format(time.RFC1123), view.LastSweep.Removed))
 	}
-	screen := worktui.ControlScreen{ResetConversation: reset, ClearGoal: clearGoal, RemovedConversations: removedConversations, Panel: uisnapshot.Panel{Kind: "data", Title: "Private data and retention", Blocks: []uisnapshot.Block{{Title: "Storage and copies", Lines: lines}, {Title: "Retention", Lines: retention}}}}
+	screen := worktui.ControlScreen{SourceMoves: sourceMoves, ResetConversation: reset, ClearGoal: clearGoal, RemovedConversations: removedConversations, Panel: uisnapshot.Panel{Kind: "data", Title: "Private data and retention", Blocks: []uisnapshot.Block{{Title: "Storage and copies", Lines: lines}, {Title: "Retention", Lines: retention}}}}
 	if notice != "" {
 		screen.Panel.Blocks = append([]uisnapshot.Block{{Title: "Action result", Lines: []string{notice}}}, screen.Panel.Blocks...)
 	}
@@ -129,12 +207,17 @@ func dataControl(ctx context.Context, stateDir, action string, args []string) (w
 	}
 	destination := filepath.Join(home, "gator-private-backup-"+time.Now().Format("20060102-150405")+".tar.gz")
 	screen.Actions = []worktui.ControlAction{
+		{Key: "L", Label: "Relink a moved source folder", Action: "relink-plan", Description: "Preview changes to source references in goals, conversations, checks, frozen source metadata, and historical workspace navigation. Original source files and sealed artifact bytes are untouched. Affected checks will be paused.", Fields: []worktui.ControlField{{Label: "Old source folder"}, {Label: "Existing new source folder"}}, Review: true},
+		{Key: "I", Label: "Restore into a new profile", Action: "restore-plan", Description: "Verify a backup and preview migration into a new profile directory. The current profile stays active. Review the exact destination and source mappings before final confirmation.", Fields: []worktui.ControlField{{Label: "Existing backup archive"}, {Label: "New profile directory", Value: filepath.Join(home, "gator-restored-"+time.Now().Format("20060102-150405"))}, {Label: "Source mappings OLD=NEW; OLD=NEW (optional)"}}, Review: true},
 		{Key: "B", Label: "Export private backup", Action: "backup", Description: "Write an unencrypted private archive containing retained Work, source snapshots, saved knowledge, and transcripts. Credentials and provider settings are excluded. Choose a path outside Gator's private data directory and keep the archive private.", Fields: []worktui.ControlField{{Label: "New backup file", Value: destination}}, Review: true},
 		{Key: "V", Label: "Verify a backup", Action: "verify", Fields: []worktui.ControlField{{Label: "Existing backup file"}}, Description: "Read the archive and validate its file list and checksums. This does not restore or overwrite any data.", Review: true},
 		{Key: "E", Label: "Edit retention", Action: "retention", Args: []string{string(expected)}, Description: "Review automatic deletion of eligible local files. Zero keeps data until explicitly deleted. Ongoing goals, pending suggestions, current job baselines and referenced snapshots are protected. Original projects and external backups remain.", Fields: []worktui.ControlField{{Label: "Completed history days (0 keep)", Value: strconv.Itoa(p.HistoryDays)}, {Label: "Saved facts/notes days (0 keep)", Value: strconv.Itoa(p.KnowledgeDays)}, {Label: "Unused snapshot days (0 keep)", Value: strconv.Itoa(p.SnapshotDays)}}, Review: true},
 		{Key: "C", Label: "Preview retention cleanup", Action: "cleanup"},
 		{Key: "D", Label: "Choose content to delete", Action: "delete-options"},
 		{Key: "R", Label: "Refresh", Action: "status"},
+	}
+	if restored.Plan.Target != "" {
+		screen.Actions = append(screen.Actions, worktui.ControlAction{Key: "F", Label: "Finish restore setup review", Action: "finish-restore-review", Review: true, Description: "Mark the restore checklist reviewed. This does not enable jobs, unpause usage, or grant any permissions. Source, model, and background issues remain visible in /overview."})
 	}
 	return screen, nil
 }
@@ -175,4 +258,43 @@ func byteLabel(bytes int64) string {
 		return fmt.Sprintf("%.1f KiB", float64(bytes)/1024)
 	}
 	return fmt.Sprintf("%.1f MiB", float64(bytes)/(1<<20))
+}
+
+func restorePlanScreen(p lifecycle.RestorePlan) worktui.ControlScreen {
+	lines := []string{
+		"Review ID: " + p.ID,
+		"Archive: " + p.Archive,
+		"Archive SHA256: " + p.ArchiveSHA256,
+		"Original profile: " + p.Origin,
+		"New profile: " + p.Target,
+		fmt.Sprintf("Verified archive: %d files · %s", p.Files, byteLabel(p.Bytes)),
+		fmt.Sprintf("%d enabled checks will be paused; %d interrupted runs become failed history.", p.PausedChecks, p.InterruptedRuns),
+		"The review expires after one hour. Changed archive bytes, paths, source availability, or mappings require a new preview.",
+	}
+	lines = append(lines, p.Notes...)
+	var sources []string
+	for _, source := range p.Sources {
+		status := "available"
+		if !source.Available {
+			status = "missing — choose an existing source mapping to resume this project"
+		}
+		sources = append(sources, source.Original+" → "+source.Destination+" · "+status)
+	}
+	if len(sources) == 0 {
+		sources = []string{"No source folders are referenced."}
+	}
+	return worktui.ControlScreen{Panel: uisnapshot.Panel{Kind: "confirmation", Title: "Review restore into a fresh profile", Blocks: []uisnapshot.Block{{Title: "Restore agreement", Lines: lines}, {Title: "Source folders and mappings", Lines: sources}}}, Actions: []worktui.ControlAction{{Key: "Enter", Label: "Restore this reviewed profile", Action: "restore-apply", Args: []string{p.ID}}}}
+}
+
+func profileLaunch(root string) string {
+	quote := func(value string) string { return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'" }
+	return "GATOR_STATE_DIR=" + quote(root) + " GATOR_CONFIG_DIR=" + quote(filepath.Join(root, "config")) + " gator"
+}
+func relinkPlanScreen(p lifecycle.RelinkPlan) worktui.ControlScreen {
+	lines := []string{"From: " + p.From, "To: " + p.To, fmt.Sprintf("Update %d navigation metadata files. Affected checks will be paused.", len(p.Edits)), "Original projects, artifact bytes, transcript text, and evidence hashes remain unchanged.", "The review expires after one hour; changed references require a fresh preview.", "An interrupted update is rolled back from a private recovery journal before this profile is used again."}
+	var paths []string
+	for _, edit := range p.Edits {
+		paths = append(paths, edit.Path)
+	}
+	return worktui.ControlScreen{Panel: uisnapshot.Panel{Kind: "confirmation", Title: "Review source folder relink", Blocks: []uisnapshot.Block{{Title: "Source mapping", Lines: lines}, {Title: "Affected metadata", Lines: paths}}}, Actions: []worktui.ControlAction{{Key: "Enter", Label: "Relink these reviewed source references", Action: "relink-apply", Args: []string{p.ID}}}}
 }

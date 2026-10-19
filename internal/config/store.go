@@ -17,6 +17,7 @@ import (
 	"github.com/gongahkia/gator/internal/mcp"
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/snapshot"
+	"github.com/gongahkia/gator/internal/state"
 )
 
 const version = 4
@@ -177,6 +178,13 @@ func ResolveDir(override string) (string, error) {
 	}
 	if configured := os.Getenv("GATOR_CONFIG_DIR"); strings.TrimSpace(configured) != "" {
 		return absoluteDirectory(configured)
+	}
+
+	if root, err := state.ResolveDir(""); err == nil {
+		marker := filepath.Join(root, "gator", "data-control", "restored.json")
+		if info, err := os.Lstat(marker); err == nil && info.Mode().IsRegular() {
+			return filepath.Join(root, "config"), nil
+		}
 	}
 	if configured := os.Getenv("XDG_CONFIG_HOME"); strings.TrimSpace(configured) != "" {
 		return absoluteDirectory(configured)

@@ -190,6 +190,7 @@ func commandPaletteEntries() []entry {
 		{title: "/inbox", subtitle: "Review follow-up results", kind: "command-input", command: "/inbox"},
 		{title: "/goals", subtitle: "Resume an ongoing goal", kind: "command", command: "/goals"},
 		{title: "/followup", subtitle: "Watch project changes and review the next step", kind: "command", command: "/followup"},
+		{title: "/overview", subtitle: "Changes, decisions, next actions, and blockers", kind: "command", command: "/overview"},
 		{title: "/recovery", subtitle: "Reconnect sources and review offline checks", kind: "command", command: "/recovery"},
 		{title: "/usage", subtitle: "Shared usage and limits across all work", kind: "command", command: "/usage"},
 		{title: "/data", subtitle: "Retention, private backups, and deletion", kind: "command", command: "/data"},
@@ -375,7 +376,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 	if len(fields) == 0 {
 		return m, nil
 	}
-	if m.config.BeforeLocalCommand != nil && fields[0] != "/data" && fields[0] != "/usage" && fields[0] != "/recovery" {
+	if m.config.BeforeLocalCommand != nil && fields[0] != "/data" && fields[0] != "/usage" && fields[0] != "/recovery" && fields[0] != "/overview" {
 		release, err := m.config.BeforeLocalCommand()
 		if err != nil {
 			m.messages = append(m.messages, noticeMessage("Private data", err.Error(), "error"))
@@ -388,7 +389,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 	var result string
 	var err error
 	switch fields[0] {
-	case "/usage", "/data", "/recovery":
+	case "/usage", "/data", "/recovery", "/overview":
 		if m.config.Controls == nil {
 			err = errorsUnavailable("product controls")
 			break
@@ -1442,6 +1443,7 @@ func workHelp() string {
   /mode auto|inspect|draft|act   choose Work authority
   /artifact [add|remove] PATH    set expected deliverables
   /history [STATUS]              browse all retained Work
+  /overview                     changes, decisions, next actions, and blockers
   /followup [new]                set up and manage project follow-ups
   /recovery                     reconnect, retry, and review offline coverage
   /usage                        review shared usage, limits, and pause

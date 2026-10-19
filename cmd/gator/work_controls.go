@@ -22,6 +22,8 @@ func workControls(stateDir string) func(context.Context, string, string, []strin
 			return worktui.ControlScreen{}, err
 		}
 		switch family {
+		case "overview":
+			return overviewControl(ctx, stateDir, action, args)
 		case "recovery":
 			return recoveryControl(ctx, stateDir, action, args)
 		case "data":

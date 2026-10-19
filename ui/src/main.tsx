@@ -2,6 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
 import { Box, Text, render, useApp, useInput, TerminalSizeContext, type Instance } from "@claude-code-kit/ink-renderer";
 import { Byline, Divider, KeyboardShortcutHint, Markdown, MessageList, Spinner, StatusLine, WelcomeScreen, type Message, type VirtualListHandle } from "@claude-code-kit/ui";
+import { EverydayOverview, type Overview } from "./overview.js";
 import React, { useContext, useEffect, useRef, useState } from "react";
 import { runDoctor } from "./doctor.js";
 import { bundleResult, type BackendBundle } from "./bundle.js";
@@ -51,6 +52,8 @@ type BackendState = {
   home: boolean;
   first_run: boolean;
   supervisor_needs_start: boolean;
+  overview?: Overview;
+  overview_issue?: string;
   external?: ExternalCommand;
 };
 type Frame = { version: 1; type: "submit" | "key" | "resize" | "exit" | "external_done"; text?: string; key?: string; error?: string; width?: number; height?: number };
@@ -252,9 +255,9 @@ function ChatKeys({
     }
     if (key.ctrl && input === "f") { event.stopImmediatePropagation(); search(); return; }
     if (key.ctrl && key.end) { event.stopImmediatePropagation(); scrollToEnd(); return; }
-    const shortcuts: Record<string, string> = { p: "ctrl+p", x: "ctrl+x", b: "ctrl+b", i: "ctrl+i", g: "ctrl+g" };
+    const shortcuts: Record<string, string> = { p: "ctrl+p", x: "ctrl+x", b: "ctrl+b", i: "ctrl+i", g: "ctrl+g", o: "ctrl+o" };
     if (key.ctrl && shortcuts[input]) {
-      event.stopImmediatePropagation(); bridge.send({ type: "key", key: shortcuts[input], text: input === "g" ? draft : undefined }); return;
+      event.stopImmediatePropagation(); bridge.send({ type: "key", key: shortcuts[input], text: input === "g" || input === "o" ? draft : undefined }); return;
     }
     if (key.pageUp || key.pageDown || key.wheelUp || key.wheelDown) {
       event.stopImmediatePropagation(); scroll(key.pageUp ? -12 : key.pageDown ? 12 : key.wheelUp ? -3 : 3); return;
@@ -323,7 +326,7 @@ function PanelScreen({ panel, status, draft, statusLine, bridge, exit }: { panel
     ...(block.lines.length ? block.lines.flatMap((line) => wrapTerminalText(line, geometry.contentWidth).map((text) => ({ text, heading: false }))) : [{ text: "None", heading: false }]),
     { text: "", heading: false },
   ]);
-  const rowHeight = rows.some((row) => row.detail) ? (geometry.compact ? 2 : 3) : (geometry.compact ? 1 : 2);
+  const rowHeight = rows.some((row) => row.detail && !(panel.kind === "overview" && geometry.compact)) ? (geometry.compact ? 2 : 3) : (geometry.compact ? 1 : 2);
   const noticeRows = (panel.notice ? (geometry.compact ? 1 : 2) : 0) + (status && status !== panel.notice ? (geometry.compact ? 1 : 2) : 0);
   const bodyRows = Math.max(1, geometry.bodyRows - noticeRows);
   const maxRows = Math.max(1, Math.floor((blocks.length > 0 ? Math.ceil(bodyRows / 2) : bodyRows) / rowHeight));
@@ -352,8 +355,8 @@ function PanelScreen({ panel, status, draft, statusLine, bridge, exit }: { panel
         {rows.slice(rowStart, rowStart + maxRows).map((row, index) => {
           const active = panel.kind !== "inbox" && panel.kind !== "jobs" && rowStart + index === selected;
           return <Box key={`${rowStart + index}-${row.label}`} flexDirection="column" marginBottom={geometry.compact ? 0 : 1}>
-            <Text wrap="truncate-end" color={active ? palette.accent : undefined} bold={active}>{active ? "❯ " : "  "}{row.label}{row.state ? <Text color={row.tone === "warning" ? palette.warning : row.tone === "error" ? palette.error : row.tone === "success" ? palette.accent : palette.secondary}>  ·  {row.state}</Text> : null}</Text>
-            {row.detail && <Box marginLeft={2}><Text wrap="truncate-end" dimColor={!active}>{active && panel.kind.endsWith("-form") ? formFieldTail(row.detail, geometry.contentWidth - 3) : row.detail}{active && panel.kind.endsWith("-form") && <Text inverse> </Text>}</Text></Box>}
+            <Text wrap="truncate-end" color={active ? palette.accent : undefined} bold={active}>{active ? "❯ " : "  "}{row.label}{panel.kind === "overview" && geometry.compact && row.detail ? <Text dimColor> · {row.detail}</Text> : null}{row.state ? <Text color={row.tone === "warning" ? palette.warning : row.tone === "error" ? palette.error : row.tone === "success" ? palette.accent : palette.secondary}>  ·  {row.state}</Text> : null}</Text>
+            {row.detail && !(panel.kind === "overview" && geometry.compact) && <Box marginLeft={2}><Text wrap="truncate-end" dimColor={!active}>{active && panel.kind.endsWith("-form") ? formFieldTail(row.detail, geometry.contentWidth - 3) : row.detail}{active && panel.kind.endsWith("-form") && <Text inverse> </Text>}</Text></Box>}
           </Box>;
         })}
         {blocks.slice(blockOffset, blockOffset + maxLines).map((line, index) => <Box key={`${blockOffset + index}-${line.text}`} marginBottom={line.heading ? 0 : undefined}>
@@ -498,33 +501,12 @@ function App({ bridge }: { bridge: GatorBridge }): React.ReactNode {
   };
   const context = [state.title, state.provider ? `${state.provider}${state.model ? `/${state.model}` : ""}` : "Choose model: /model", state.source.split("/").filter(Boolean).at(-1) || state.source].filter(Boolean).join(" · ");
   const compactHome = (terminal?.rows ?? 24) < 20 || (terminal?.columns ?? 80) < 60;
-  const welcome = compactHome ? (
+  const welcome = (
     <Box flexDirection="column">
-      <Text color={palette.accent} bold>🐊 Gator</Text>
+      {compactHome ? <Text color={palette.accent} bold>🐊 Gator</Text> : <WelcomeScreen appName="Gator" subtitle="Your ongoing work" color={palette.accent} logo={<Text color={palette.accent}>🐊</Text>} />}
       <Text dimColor wrap="truncate-end">{context}</Text>
-      {state.first_run && <Text wrap="truncate-end">/model · Choose a chat model</Text>}
-      <Text wrap="truncate-end">/followup new · Track project changes</Text>
-      <Text dimColor wrap="truncate-end">/memory · Recall and data destinations</Text>
-      {(state.checks ?? []).slice(0, 1).map((check, index) => <Text key={index} color={check.state === "offline" || check.state === "couldn't check" ? palette.warning : palette.secondary} wrap="truncate-end">{check.title} · {check.state} · /followup</Text>)}
-      <Text dimColor wrap="truncate-end">Type / for commands.</Text>
-    </Box>
-  ) : (
-    <Box flexDirection="column">
-      <WelcomeScreen appName="Gator" subtitle="Your ongoing work, ready when you are" color={palette.accent} logo={<Text color={palette.accent}>🐊</Text>} />
-      <Text dimColor>{context}</Text>
-      <Box marginTop={1} marginLeft={1} flexDirection="column">
-        <Text color={palette.secondary} bold>{state.first_run ? "Get started" : "Next up"}</Text>
-        {state.first_run ? (
-          <><Text>  1  /model  Choose a cloud or local model</Text><Text>  2  Ask: Review this project’s notes and draft the next useful response.</Text></>
-        ) : state.actions.slice(0, 4).map((action, index) => (
-          <Text key={index}>  {action.Label} · {action.Command}</Text>
-        ))}
-        <Text dimColor>  Type / for Gator commands.</Text>
-        <Text>  Track project changes and draft the next step · /followup new</Text>
-        <Text dimColor>  Memory setup and processing destinations · /memory</Text>
-        {(state.checks ?? []).slice(0, 2).map((check, index) => <Box key={index} flexDirection="column"><Text color={check.state === "offline" || check.state === "couldn't check" ? palette.warning : palette.secondary}>  {check.title} · {check.state}</Text><Text dimColor>  {check.health}</Text></Box>)}
-        {state.supervisor_needs_start && <Text color={palette.secondary}>  Recurring checks need a running supervisor · gator job supervisor</Text>}
-      </Box>
+      <Box marginTop={compactHome ? 0 : 1}><EverydayOverview view={state.overview} issue={state.overview_issue} compact={compactHome} /></Box>
+      {state.first_run && <Text wrap="truncate-end">/model · Choose a model · /followup new</Text>}
     </Box>
   );
   const messages: Message[] = state.messages.map((item, index) => ({

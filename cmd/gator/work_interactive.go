@@ -271,6 +271,8 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		StartSupervisor:    func() error { return startLocalSupervisor(stateDir) },
 		PilotAction:        workPilotResult,
 		Controls:           workControls(stateDir),
+		ReadOverview:       func(ctx context.Context) (workhome.Overview, error) { return readEverydayOverview(ctx, stateDir) },
+		ControlCommand:     func(args []string) *exec.Cmd { return overviewTerminalCommand(stateDir, args) },
 		BeforeLocalCommand: func() (func(), error) { return state.Guard(stateDir, false) },
 		NoteAction:         func(command string) (string, error) { return workTUINoteAction(command, goalID) },
 		NoteResult:         func(command string) (*uisnapshot.Result, error) { return workNoteResult(goalID, command) },
