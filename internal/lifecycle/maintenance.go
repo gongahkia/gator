@@ -37,6 +37,13 @@ func Maintain(ctx context.Context, stateDir string, now time.Time) (Sweep, error
 		return Sweep{}, err
 	}
 	defer release()
+	p, err = s.Policy()
+	if err != nil {
+		return Sweep{}, err
+	}
+	if p.HistoryDays == 0 && p.KnowledgeDays == 0 && p.SnapshotDays == 0 {
+		return Sweep{}, nil
+	}
 	data, _ := json.Marshal(p)
 	digest := sha256.Sum256(data)
 	policyDigest := hex.EncodeToString(digest[:])

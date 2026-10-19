@@ -30,28 +30,9 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 			m.sectionNotice = value.Err.Error()
 		} else {
 			m.controlScreen = value.Screen
-			if value.Screen.ResetConversation {
-				m.messages = nil
-				m.conversation = ""
-				m.revision = ""
-				m.snapshot = ""
-				m.lastWorkID = ""
-				m.lastOutput = ""
-				m.lastBundle = BundleSummary{}
-				m.goalID = ""
-				m.queue = nil
-				m.options.ExcludedKnowledgeIDs = nil
-				m.config.Conversations = nil
-				m.config.Goals = nil
-				m.config.Jobs = nil
-				m.checks = nil
-				m.checkDetail = nil
-				if m.config.ClearGoal != nil {
-					m.config.ClearGoal()
-				}
-			}
 			m.selected = 0
 			m.sectionNotice = ""
+			m.clearRemovedData(value.Screen)
 		}
 		return m, nil
 	case followupSaved:
@@ -332,6 +313,15 @@ func (m Model) updateConnectorActionDone(value connectorActionDone) (tea.Model, 
 }
 
 func (m Model) updateKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.controlBusy {
+		if value.String() == "ctrl+c" {
+			if m.controlCancel != nil {
+				m.controlCancel()
+			}
+			return m, tea.Quit
+		}
+		return m.updateControls(value)
+	}
 	if m.followupSaving {
 		if value.String() == "ctrl+c" {
 			return m, tea.Quit

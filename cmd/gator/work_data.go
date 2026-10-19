@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gongahkia/gator/internal/lifecycle"
@@ -21,6 +23,8 @@ func dataControl(ctx context.Context, stateDir, action string, args []string) (w
 	}
 	notice := ""
 	reset := false
+	clearGoal := false
+	var removedConversations []string
 	switch action {
 	case "backup", "verify":
 		if len(args) != 1 {
@@ -40,18 +44,22 @@ func dataControl(ctx context.Context, stateDir, action string, args []string) (w
 			notice = fmt.Sprintf("Verified %d files and their checksums. Backup created %s for state directory %s.", len(m.Files), m.CreatedAt.Format(time.RFC1123), m.StateDir)
 		}
 	case "retention":
-		if len(args) != 3 {
+		if len(args) != 4 {
 			return worktui.ControlScreen{}, errors.New("provide history, saved knowledge, and snapshot retention days")
 		}
 		var days [3]int
-		for i, arg := range args {
+		for i, arg := range args[1:] {
 			days[i], err = strconv.Atoi(arg)
 			if err != nil {
 				return worktui.ControlScreen{}, err
 			}
 		}
 		p := lifecycle.Policy{HistoryDays: days[0], KnowledgeDays: days[1], SnapshotDays: days[2]}
-		if err = s.SavePolicy(p); err != nil {
+		var expected lifecycle.Policy
+		if err = json.Unmarshal([]byte(args[0]), &expected); err != nil {
+			return worktui.ControlScreen{}, err
+		}
+		if err = s.SaveReviewedPolicy(p, expected); err != nil {
 			return worktui.ControlScreen{}, err
 		}
 		notice = "Retention saved. Automatic cleanup runs at startup and daily while the local supervisor is active. Preview cleanup to review the current eligible files."
@@ -82,7 +90,18 @@ func dataControl(ctx context.Context, stateDir, action string, args []string) (w
 			return worktui.ControlScreen{}, fmt.Errorf("removed %d files before stopping: %w; refresh and preview remaining data", count, err)
 		}
 		notice = fmt.Sprintf("Removed %d selected private files. Original projects and external copies were preserved.", count)
-		reset = p.Scope == "all" || p.Scope == "history" || p.Scope == "retention"
+		reset = p.Scope == "all" || p.Scope == "history"
+		clearGoal = p.Scope == "all"
+		if p.Scope == "retention" {
+			seen := map[string]bool{}
+			for _, item := range p.Items {
+				parts := strings.Split(filepath.ToSlash(item.Path), "/")
+				if len(parts) > 1 && parts[0] == "conversations" && !seen[parts[1]] {
+					removedConversations = append(removedConversations, parts[1])
+					seen[parts[1]] = true
+				}
+			}
+		}
 	case "delete-options":
 		return worktui.ControlScreen{Panel: uisnapshot.Panel{Kind: "data", Title: "Choose private content to delete", Blocks: []uisnapshot.Block{{Lines: []string{"Each choice opens a file-count and scope review. Nothing is removed until you confirm that review.", "Deleting a saved fact alone does not erase it from prior transcripts. All retained Work and knowledge includes those local historical copies.", "Original external project files, exports, credentials, provider settings, browser profiles, and shared usage counters remain."}}}}, Actions: []worktui.ControlAction{{Key: "K", Label: "Saved knowledge and retrieval cache", Action: "plan", Args: []string{"knowledge"}}, {Key: "H", Label: "Work history, transcripts, and excerpts", Action: "plan", Args: []string{"history"}}, {Key: "S", Label: "Unused source snapshots", Action: "plan", Args: []string{"snapshots"}}, {Key: "A", Label: "All retained Work and knowledge", Action: "plan", Args: []string{"all"}}}}, nil
 	}
@@ -95,8 +114,12 @@ func dataControl(ctx context.Context, stateDir, action string, args []string) (w
 		lines = append(lines, fmt.Sprintf("%s: %d files · %s", group.Name, group.Files, byteLabel(group.Bytes)))
 	}
 	p := view.Policy
+	expected, _ := json.Marshal(p)
 	retention := []string{"Zero days means keep until explicitly deleted.", fmt.Sprintf("Completed history: %s · saved facts/notes: %s · unused snapshots: %s", daysLabel(p.HistoryDays), daysLabel(p.KnowledgeDays), daysLabel(p.SnapshotDays)), "Ongoing goals, their conversations, pending suggestions, the latest successful check per job, and referenced snapshots are protected.", "Automatic expiry of saved knowledge applies to facts and notes; skills and learnings remain until explicitly removed.", "Automatic cleanup runs on Gator startup and daily while the supervisor is active. It waits when Work is using the data."}
-	screen := worktui.ControlScreen{ResetConversation: reset, Panel: uisnapshot.Panel{Kind: "data", Title: "Private data and retention", Blocks: []uisnapshot.Block{{Title: "Storage and copies", Lines: lines}, {Title: "Retention", Lines: retention}}}}
+	if !view.LastSweep.At.IsZero() {
+		retention = append(retention, fmt.Sprintf("Last automatic cleanup: %s · %d files removed", view.LastSweep.At.Local().Format(time.RFC1123), view.LastSweep.Removed))
+	}
+	screen := worktui.ControlScreen{ResetConversation: reset, ClearGoal: clearGoal, RemovedConversations: removedConversations, Panel: uisnapshot.Panel{Kind: "data", Title: "Private data and retention", Blocks: []uisnapshot.Block{{Title: "Storage and copies", Lines: lines}, {Title: "Retention", Lines: retention}}}}
 	if notice != "" {
 		screen.Panel.Blocks = append([]uisnapshot.Block{{Title: "Action result", Lines: []string{notice}}}, screen.Panel.Blocks...)
 	}
@@ -108,7 +131,7 @@ func dataControl(ctx context.Context, stateDir, action string, args []string) (w
 	screen.Actions = []worktui.ControlAction{
 		{Key: "B", Label: "Export private backup", Action: "backup", Description: "Write an unencrypted private archive containing retained Work, source snapshots, saved knowledge, and transcripts. Credentials and provider settings are excluded. Choose a path outside Gator's private data directory and keep the archive private.", Fields: []worktui.ControlField{{Label: "New backup file", Value: destination}}, Review: true},
 		{Key: "V", Label: "Verify a backup", Action: "verify", Fields: []worktui.ControlField{{Label: "Existing backup file"}}, Description: "Read the archive and validate its file list and checksums. This does not restore or overwrite any data.", Review: true},
-		{Key: "E", Label: "Edit retention", Action: "retention", Description: "Review automatic deletion of eligible local files. Zero keeps data until explicitly deleted. Ongoing goals, pending suggestions, current job baselines and referenced snapshots are protected. Original projects and external backups remain.", Fields: []worktui.ControlField{{Label: "Completed history days (0 keep)", Value: strconv.Itoa(p.HistoryDays)}, {Label: "Saved facts/notes days (0 keep)", Value: strconv.Itoa(p.KnowledgeDays)}, {Label: "Unused snapshot days (0 keep)", Value: strconv.Itoa(p.SnapshotDays)}}, Review: true},
+		{Key: "E", Label: "Edit retention", Action: "retention", Args: []string{string(expected)}, Description: "Review automatic deletion of eligible local files. Zero keeps data until explicitly deleted. Ongoing goals, pending suggestions, current job baselines and referenced snapshots are protected. Original projects and external backups remain.", Fields: []worktui.ControlField{{Label: "Completed history days (0 keep)", Value: strconv.Itoa(p.HistoryDays)}, {Label: "Saved facts/notes days (0 keep)", Value: strconv.Itoa(p.KnowledgeDays)}, {Label: "Unused snapshot days (0 keep)", Value: strconv.Itoa(p.SnapshotDays)}}, Review: true},
 		{Key: "C", Label: "Preview retention cleanup", Action: "cleanup"},
 		{Key: "D", Label: "Choose content to delete", Action: "delete-options"},
 		{Key: "R", Label: "Refresh", Action: "status"},
@@ -116,7 +139,7 @@ func dataControl(ctx context.Context, stateDir, action string, args []string) (w
 	return screen, nil
 }
 func dataPlanScreen(p lifecycle.Plan) worktui.ControlScreen {
-	lines := []string{"Scope: " + p.Scope, fmt.Sprintf("Selected: %d files · %s", p.Files, byteLabel(p.Bytes)), "Review ID: " + p.ID, "This review expires after one hour and is rejected if selected data changes."}
+	lines := []string{"Scope: " + p.Scope, fmt.Sprintf("Selected: %d files · %d folders · %s", p.Files, p.Folders, byteLabel(p.Bytes)), "Review ID: " + p.ID, "This review expires after one hour and is rejected if selected data changes."}
 	lines = append(lines, p.Notes...)
 	var paths []string
 	for _, item := range p.Items {
@@ -133,8 +156,8 @@ func dataPlanScreen(p lifecycle.Plan) worktui.ControlScreen {
 		paths = append(paths, fmt.Sprintf("… %d more files; the saved review contains the complete list", p.Files-len(paths)))
 	}
 	screen := worktui.ControlScreen{Panel: uisnapshot.Panel{Kind: "confirmation", Title: "Review private data removal", Blocks: []uisnapshot.Block{{Title: "Removal agreement", Lines: lines}, {Title: "Selected file examples", Lines: paths}}}}
-	if p.Files > 0 {
-		screen.Actions = []worktui.ControlAction{{Key: "Enter", Label: fmt.Sprintf("Delete %d reviewed files", p.Files), Action: "apply", Args: []string{p.ID}}}
+	if len(p.Items) > 0 {
+		screen.Actions = []worktui.ControlAction{{Key: "Enter", Label: fmt.Sprintf("Delete %d files and %d folders", p.Files, p.Folders), Action: "apply", Args: []string{p.ID}}}
 	}
 	return screen
 }
@@ -153,4 +176,3 @@ func byteLabel(bytes int64) string {
 	}
 	return fmt.Sprintf("%.1f MiB", float64(bytes)/(1<<20))
 }
-

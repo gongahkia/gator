@@ -25,6 +25,9 @@ func dataCommand(args []string, out io.Writer) error {
 	}
 	ctx := context.Background()
 	if len(args) == 0 || args[0] == "status" {
+		if len(args) > 1 && (len(args) != 2 || args[1] != "--json") {
+			return errors.New("usage: gator data status [--json]")
+		}
 		if len(args) == 2 && args[1] == "--json" {
 			view, err := s.Inventory(ctx)
 			if err != nil {
@@ -47,7 +50,7 @@ func dataCommand(args []string, out io.Writer) error {
 	}
 	switch args[0] {
 	case "preview":
-		if len(args) < 2 || len(args) > 3 {
+		if len(args) < 2 || len(args) > 3 || (len(args) == 3 && args[2] != "--json") {
 			return errors.New("usage: gator data preview knowledge|history|snapshots|all [--json]")
 		}
 		p, err := s.PreviewDelete(ctx, args[1])
@@ -110,7 +113,7 @@ func dataCommand(args []string, out io.Writer) error {
 			_, err = fmt.Fprintln(out, "Review these settings, then repeat with --yes to enable automatic cleanup at startup and daily while the supervisor is active.")
 			return err
 		}
-		return s.SavePolicy(p)
+		return s.SaveReviewedPolicy(p, prior)
 	case "export", "verify":
 		if len(args) != 2 {
 			return errors.New("usage: gator data export NEW_ARCHIVE.tar.gz | verify ARCHIVE.tar.gz")

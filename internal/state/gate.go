@@ -7,6 +7,8 @@ import (
 	"syscall"
 )
 
+var ErrBusy = errors.New("work is using private data; finish or stop it before exporting or deleting data")
+
 // Guard prevents data export or removal from racing a writer. Exclusive
 // maintenance never interrupts existing work; callers can retry when it ends.
 func Guard(stateDir string, exclusive bool) (func(), error) {
@@ -25,7 +27,7 @@ func Guard(stateDir string, exclusive bool) (func(), error) {
 	if err = syscall.Flock(int(f.Fd()), mode); err != nil {
 		f.Close()
 		if exclusive && (errors.Is(err, syscall.EWOULDBLOCK) || errors.Is(err, syscall.EAGAIN)) {
-			return nil, errors.New("work is using private data; finish or stop it before exporting or deleting data")
+			return nil, ErrBusy
 		}
 		return nil, err
 	}

@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/uisnapshot"
+	"github.com/gongahkia/gator/internal/workhome"
 )
 
 // Control screens reuse the terminal's existing picker, form and review panel.
@@ -21,11 +22,14 @@ type ControlAction struct {
 	Fields                          []ControlField
 	Review                          bool
 	ConnectorID                     string
+	ConnectorReview                 string
 }
 type ControlScreen struct {
-	ResetConversation bool
-	Panel             uisnapshot.Panel
-	Actions           []ControlAction
+	ResetConversation    bool
+	ClearGoal            bool
+	RemovedConversations []string
+	Panel                uisnapshot.Panel
+	Actions              []ControlAction
 }
 type controlDone struct {
 	Generation uint64
@@ -47,6 +51,9 @@ func (m *Model) controlCommand(action string, args []string) tea.Cmd {
 	if m.config.Controls == nil {
 		return nil
 	}
+	if m.controlCancel != nil {
+		m.controlCancel()
+	}
 	m.controlGeneration++
 	generation := m.controlGeneration
 	ctx, cancel := context.WithCancel(context.Background())
@@ -59,6 +66,10 @@ func (m *Model) controlCommand(action string, args []string) tea.Cmd {
 	}
 }
 func (m Model) updateControls(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.running && m.controlFamily == "data" && key.String() != "esc" {
+		m.sectionNotice = "Finish or stop the current Work before changing private data."
+		return m, nil
+	}
 	if m.controlBusy {
 		if key.String() == "esc" && m.controlCancel != nil {
 			m.controlCancel()
@@ -86,7 +97,11 @@ func (m Model) updateControls(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if f.ConnectorID != "" {
 				m.controlForm = nil
 				m.controlReview = false
-				if err := m.startConnectorCommand("reconnect", f.ConnectorID, []string{"login", f.ConnectorID}); err != nil {
+				arguments := []string{"login", f.ConnectorID}
+				if f.ConnectorReview != "" {
+					arguments = append(arguments, "--review-digest", f.ConnectorReview)
+				}
+				if err := m.startConnectorCommand("reconnect", f.ConnectorID, arguments); err != nil {
 					m.sectionNotice = err.Error()
 				}
 				return m, nil
@@ -135,6 +150,9 @@ func (m Model) updateControls(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.controlField = 0
 			m.controlReview = len(a.Fields) == 0
 			return m, nil
+		}
+		if a.Action == "select" && m.controlFamily == "recovery" {
+			m.controlRootArgs = append([]string(nil), a.Args...)
 		}
 		return m, m.controlCommand(a.Action, a.Args)
 	}
@@ -186,4 +204,56 @@ func (m Model) controlsPanel() uisnapshot.Panel {
 		p.Notice = "Working… Esc stops the operation"
 	}
 	return p
+}
+
+func (m *Model) clearRemovedData(screen ControlScreen) {
+	reset := screen.ResetConversation
+	for _, id := range screen.RemovedConversations {
+		if id == m.conversation {
+			reset = true
+		}
+	}
+	if !reset {
+		return
+	}
+	m.messages = nil
+	m.conversation = ""
+	m.revision = ""
+	m.snapshot = ""
+	m.lastWorkID = ""
+	m.lastOutput = ""
+	m.lastBundle = BundleSummary{}
+	m.queue = nil
+	m.options.ExcludedKnowledgeIDs = nil
+	m.options.PreviousArtifacts = nil
+	m.config.Conversations = nil
+	m.config.Goals = nil
+	m.config.Jobs = nil
+	m.config.Inbox = nil
+	m.config.Attention = workhome.Attention{}
+	m.checks = nil
+	m.checkDetail = nil
+	m.followupForm = nil
+	m.entries = nil
+	m.tasks = map[string]string{}
+	m.contextState = ContextState{}
+	m.contextDetail = nil
+	m.contextEdit = ""
+	m.contextWorkID = ""
+	m.contextEditing = false
+	m.contextConfirm = false
+	if screen.ClearGoal {
+		m.goalID = ""
+		if m.config.ClearGoal != nil {
+			m.config.ClearGoal()
+		}
+		if m.config.ResetPrivateState != nil {
+			fresh, err := m.config.ResetPrivateState()
+			if err != nil {
+				m.sectionNotice = "Data removed; choose a workspace with /source: " + err.Error()
+			} else {
+				m.source, m.title = fresh.SourcePath, fresh.Title
+			}
+		}
+	}
 }

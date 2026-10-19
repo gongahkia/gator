@@ -18,11 +18,6 @@ import (
 	"github.com/gongahkia/gator/internal/worksession"
 )
 
-type metadata struct {
-	ID, GoalID, ConversationID, WorkID, Status string
-	UpdatedAt, CreatedAt                       time.Time
-}
-
 func (s Store) objects(base string) (map[string]map[string]json.RawMessage, error) {
 	root, err := os.OpenRoot(s.root)
 	if err != nil {
@@ -147,7 +142,13 @@ func (s Store) selectRetention(ctx context.Context, now time.Time, p Policy) (Pl
 		return plan, err
 	}
 	for _, run := range history {
-		if protectedWork[run.ID] && run.ConversationID != "" {
+		// A retained run must not lose its conversation, including an interrupted
+		// run whose last conversation update predates the retention cutoff.
+		keep := protectedWork[run.ID] || run.Status == workhistory.Running || run.FinishedAt.IsZero()
+		if p.HistoryDays > 0 && !run.FinishedAt.Before(now.Add(-time.Duration(p.HistoryDays)*24*time.Hour)) {
+			keep = true
+		}
+		if keep && run.ConversationID != "" {
 			protectedConversation[run.ConversationID] = true
 		}
 	}

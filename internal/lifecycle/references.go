@@ -3,12 +3,34 @@ package lifecycle
 import (
 	"encoding/json"
 	"errors"
-	"github.com/gongahkia/gator/internal/snapshot"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/gongahkia/gator/internal/snapshot"
+	"github.com/gongahkia/gator/internal/workhistory"
 )
+
+func (s Store) ensureIdle() error {
+	if _, err := os.Stat(filepath.Join(s.root, "work-history")); errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	history, err := workhistory.Open(s.stateDir)
+	if err != nil {
+		return err
+	}
+	records, err := history.List(0)
+	if err != nil {
+		return err
+	}
+	for _, record := range records {
+		if record.Status == workhistory.Running && record.LiveStatus == "active" {
+			return errors.New("a retained Work lease is active; finish or stop it before data maintenance")
+		}
+	}
+	return nil
+}
 
 func (s Store) validateReferences(p Plan) error {
 	if p.Scope == "all" {

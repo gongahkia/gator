@@ -178,6 +178,7 @@ type Config struct {
 	StartSupervisor         func() error
 	Controls                func(context.Context, string, string, []string) (ControlScreen, error)
 	BeforeLocalCommand      func() (func(), error)
+	ResetPrivateState       func() (GoalState, error)
 	PilotAction             func(workID string, arguments []string) (*uisnapshot.Result, error)
 	PlanAction              func(command string) (string, error)
 	PlanResult              func(command string) (*uisnapshot.Result, error)

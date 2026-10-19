@@ -54,6 +54,7 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 	if err != nil {
 		return err
 	}
+	originalWorkingDirectory := workingDirectory
 	backend := os.Getenv("GATOR_UI_BACKEND") == "1"
 	if !backend {
 		input, err := os.Stdin.Stat()
@@ -199,6 +200,17 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			return worktui.GoalState{Title: record.Title, SourcePath: record.SourcePath, ConversationID: record.ConversationID}, nil
 		},
 		ClearGoal: func() { goalID = "" },
+		ResetPrivateState: func() (worktui.GoalState, error) {
+			goalID = ""
+			source := originalWorkingDirectory
+			if info, err := os.Stat(source); err != nil || !info.IsDir() {
+				source = filepath.Join(stateDir, "gator", "empty-workspace")
+				if err = os.MkdirAll(source, 0700); err != nil {
+					return worktui.GoalState{}, err
+				}
+			}
+			return worktui.GoalState{SourcePath: source, Title: "Work in " + filepath.Base(source)}, nil
+		},
 		PlanAction: func(command string) (string, error) {
 			if goalID == "" {
 				return "", errors.New("select an active goal with /goals before using /plan")
@@ -285,10 +297,16 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			}
 			return ids
 		},
-		ConnectorAction:  workTUIConnectorAction,
-		ConnectorCommand: workTUIConnectorCommand,
-		BundleAction:     workTUIBundleAction(stateDir),
-		ReviewBundle:     func(path string) (*uisnapshot.Result, error) { return workReviewResult(stateDir, path) },
+		ConnectorAction: workTUIConnectorAction,
+		ConnectorCommand: func(args []string) *exec.Cmd {
+			command := workTUIConnectorCommand(args)
+			if command != nil {
+				command.Env = append(os.Environ(), "GATOR_STATE_DIR="+stateDir)
+			}
+			return command
+		},
+		BundleAction: workTUIBundleAction(stateDir),
+		ReviewBundle: func(path string) (*uisnapshot.Result, error) { return workReviewResult(stateDir, path) },
 		ListConversations: func() ([]worksession.Conversation, error) {
 			return sessions.List(50)
 		},
@@ -318,6 +336,11 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			return inboxStore.List(false, 20)
 		},
 		Run: func(source, conversationID, prompt string, options worktui.RunOptions) worktui.RunResult {
+			release, err := state.Guard(stateDir, false)
+			if err != nil {
+				return worktui.RunResult{Error: err.Error()}
+			}
+			defer release()
 			if goalID != "" {
 				currentGoal, loadErr := goalStore.Load(goalID)
 				if loadErr != nil {

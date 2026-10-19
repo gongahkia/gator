@@ -10,6 +10,7 @@ import (
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/snapshot"
 	"github.com/gongahkia/gator/internal/state"
+	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/worksession"
 )
 
@@ -74,6 +75,19 @@ func snapshotCommand(arguments []string, out io.Writer) error {
 		for _, definition := range definitions {
 			if definition.SnapshotID != "" {
 				referenced[definition.SnapshotID] = struct{}{}
+			}
+		}
+		history, err := workhistory.Open(stateDir)
+		if err != nil {
+			return err
+		}
+		runs, err := history.List(0)
+		if err != nil {
+			return err
+		}
+		for _, run := range runs {
+			if run.SnapshotID != "" {
+				referenced[run.SnapshotID] = struct{}{}
 			}
 		}
 		snapshots, blobs, err := snapshot.GC(stateDir, referenced)

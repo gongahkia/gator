@@ -42,7 +42,7 @@ func (r cancelReader) Read(p []byte) (int, error) {
 // capabilities, credentials, provider configuration and browser profiles are
 // excluded. Source snapshots and transcripts can still contain private data.
 func (s Store) Export(ctx context.Context, destination string) (BackupManifest, error) {
-	manifest := BackupManifest{Version: 1, CreatedAt: time.Now().UTC(), StateDir: s.stateDir, Files: map[string]string{}, Excluded: []string{"credentials and provider configuration", "browser/desktop profiles", "runtime access tokens and leases", "shared usage counters", "original external project directories"}}
+	manifest := BackupManifest{Version: 1, CreatedAt: time.Now().UTC(), StateDir: s.stateDir, Files: map[string]string{}, Excluded: []string{"credentials and provider configuration", "browser/desktop profiles", "runtime access tokens and leases", "rebuildable retrieval indexes", "shared usage counters", "original external project directories"}}
 	absolute, err := filepath.Abs(destination)
 	if err != nil {
 		return manifest, err
@@ -70,6 +70,9 @@ func (s Store) Export(ctx context.Context, destination string) (BackupManifest, 
 		return manifest, err
 	}
 	defer release()
+	if err = s.ensureIdle(); err != nil {
+		return manifest, err
+	}
 	paths, _ := roots("all")
 	items, err := s.walk(ctx, paths, false)
 	if err != nil {
@@ -91,12 +94,20 @@ func (s Store) Export(ctx context.Context, destination string) (BackupManifest, 
 	}
 	gz := gzip.NewWriter(f)
 	tw := tar.NewWriter(gz)
+	var total int64
 	for _, item := range items {
 		if err = ctx.Err(); err != nil {
 			return manifest, err
 		}
 		if item.Directory || !backupContent("gator/"+filepath.ToSlash(item.Path)) {
 			continue
+		}
+		if item.Bytes > 1<<30 {
+			return manifest, errors.New("backup file exceeds the 1 GiB verification bound")
+		}
+		total += item.Bytes
+		if total > 10<<30 {
+			return manifest, errors.New("backup exceeds the 10 GiB verification bound")
 		}
 		file, openErr := root.Open(item.Path)
 		if openErr != nil {
@@ -122,6 +133,9 @@ func (s Store) Export(ctx context.Context, destination string) (BackupManifest, 
 	data, err := json.Marshal(manifest)
 	if err != nil {
 		return manifest, err
+	}
+	if len(data) > 32<<20 || total+int64(len(data)) > 10<<30 {
+		return manifest, errors.New("backup manifest exceeds its verification bound")
 	}
 	if err = tw.WriteHeader(&tar.Header{Name: "gator-backup.json", Mode: 0600, Size: int64(len(data)), Typeflag: tar.TypeReg}); err != nil {
 		return manifest, err

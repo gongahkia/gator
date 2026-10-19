@@ -26,7 +26,7 @@ var content = map[string][]string{
 	"knowledge": {"memory", "knowledge", "learnings", "observations", "retrieval"},
 	"history":   {"conversations", "work-history", "workspaces", "work-control", "traces", "interactions", "tasks", "candidates", "delivery", "suggestions", "inbox", "pilot", "jobs/history", "observations"},
 	"snapshots": {"snapshots"},
-	"goals":     {"goals", "jobs/definitions"},
+	"goals":     {"goals", "jobs/definitions", "empty-workspace"},
 }
 
 type Policy struct{ HistoryDays, KnowledgeDays, SnapshotDays int }
@@ -46,9 +46,10 @@ type Group struct {
 	Bytes int64
 }
 type Inventory struct {
-	Groups   []Group
-	Policy   Policy
-	StateDir string
+	Groups    []Group
+	Policy    Policy
+	StateDir  string
+	LastSweep Sweep
 }
 type Item struct {
 	Path      string
@@ -63,6 +64,7 @@ type Plan struct {
 	CreatedAt time.Time
 	Items     []Item
 	Files     int
+	Folders   int
 	Bytes     int64
 	Notes     []string
 }
@@ -77,10 +79,39 @@ func Open(stateDir string) (Store, error) {
 		return Store{}, err
 	}
 	root := filepath.Join(abs, "gator")
-	control := filepath.Join(root, "data-control")
-	if err = os.MkdirAll(filepath.Join(control, "plans"), 0700); err != nil {
+	if info, err := os.Lstat(root); err == nil {
+		if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+			return Store{}, errors.New("private Gator root must be a regular directory")
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
 		return Store{}, err
 	}
+	if err = os.MkdirAll(root, 0700); err != nil {
+		return Store{}, err
+	}
+	root, err = filepath.EvalSymlinks(root)
+	if err != nil {
+		return Store{}, err
+	}
+	anchored, err := os.OpenRoot(root)
+	if err != nil {
+		return Store{}, err
+	}
+	defer anchored.Close()
+	for _, rel := range []string{"data-control", "data-control/plans"} {
+		info, err := anchored.Lstat(rel)
+		if errors.Is(err, os.ErrNotExist) {
+			if err = anchored.Mkdir(rel, 0700); err != nil {
+				return Store{}, err
+			}
+		} else if err != nil {
+			return Store{}, err
+		} else if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+			return Store{}, errors.New("data controls must use ordinary private directories")
+		}
+	}
+	control := filepath.Join(root, "data-control")
+	abs = filepath.Dir(root)
 	return Store{abs, root, control}, nil
 }
 func (s Store) Policy() (Policy, error) {
@@ -123,6 +154,15 @@ func privateJSON(path string, value any) error {
 	return os.Rename(f.Name(), path)
 }
 func (s Store) SavePolicy(p Policy) error {
+	return s.savePolicy(p, nil)
+}
+
+// SaveReviewedPolicy refuses an edit made from an outdated retention screen.
+func (s Store) SaveReviewedPolicy(p, expected Policy) error {
+	return s.savePolicy(p, &expected)
+}
+
+func (s Store) savePolicy(p Policy, expected *Policy) error {
 	if err := p.Validate(); err != nil {
 		return err
 	}
@@ -131,6 +171,15 @@ func (s Store) SavePolicy(p Policy) error {
 		return err
 	}
 	defer release()
+	if expected != nil {
+		current, err := s.Policy()
+		if err != nil {
+			return err
+		}
+		if current != *expected {
+			return errors.New("retention changed during review; refresh before editing it")
+		}
+	}
 	return privateJSON(filepath.Join(s.control, "retention.json"), p)
 }
 func roots(scope string) ([]string, error) {
@@ -213,6 +262,13 @@ func (s Store) walk(ctx context.Context, paths []string, hash bool) ([]Item, err
 func (s Store) Inventory(ctx context.Context) (Inventory, error) {
 	out := Inventory{StateDir: s.stateDir}
 	var err error
+	if data, readErr := os.ReadFile(filepath.Join(s.control, "last-sweep.json")); readErr == nil {
+		if err = json.Unmarshal(data, &out.LastSweep); err != nil {
+			return out, err
+		}
+	} else if !errors.Is(readErr, os.ErrNotExist) {
+		return out, readErr
+	}
 	out.Policy, err = s.Policy()
 	if err != nil {
 		return out, err
@@ -244,6 +300,8 @@ func (s Store) savePlan(p Plan) (Plan, error) {
 		if !item.Directory {
 			p.Files++
 			p.Bytes += item.Bytes
+		} else {
+			p.Folders++
 		}
 	}
 	p.ID = planID(p)
@@ -314,6 +372,9 @@ func (s Store) Apply(ctx context.Context, id string) (int, error) {
 	return s.applyLocked(ctx, id)
 }
 func (s Store) applyLocked(ctx context.Context, id string) (int, error) {
+	if err := s.ensureIdle(); err != nil {
+		return 0, err
+	}
 	p, err := s.LoadPlan(id)
 	if err != nil {
 		return 0, err
@@ -384,7 +445,30 @@ func (s Store) applyLocked(ctx context.Context, id string) (int, error) {
 	} else {
 		_ = os.Remove(filepath.Join(s.control, "plans", id+".json"))
 	}
-	return removed, nil
+	return removed, s.recreateRoots(p)
+}
+
+func (s Store) recreateRoots(p Plan) error {
+	if !p.Complete {
+		return nil
+	}
+	paths, _ := roots(p.Scope)
+	root, err := os.OpenRoot(s.root)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	if p.Scope == "all" {
+		if err = root.MkdirAll("data-control/plans", 0700); err != nil {
+			return err
+		}
+	}
+	for _, path := range paths {
+		if err = root.MkdirAll(path, 0700); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 func sameItems(a, b []Item) bool {
 	if len(a) != len(b) {

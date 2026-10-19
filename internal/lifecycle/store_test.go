@@ -28,6 +28,54 @@ func writeFixture(t *testing.T, root, path, text string) {
 		t.Fatal(err)
 	}
 }
+
+func TestRetentionReviewRejectsConcurrentPolicyChanges(t *testing.T) {
+	s, _ := Open(t.TempDir())
+	if err := s.SavePolicy(Policy{HistoryDays: 30}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SaveReviewedPolicy(Policy{HistoryDays: 7}, Policy{}); err == nil {
+		t.Fatal("stale retention policy overwrote a newer edit")
+	}
+	p, err := s.Policy()
+	if err != nil || p.HistoryDays != 30 {
+		t.Fatal("policy changed after rejection", err)
+	}
+}
+
+func TestBackupRejectsOversizedFilesAndCorruptArchive(t *testing.T) {
+	root := t.TempDir()
+	s, _ := Open(root)
+	writeFixture(t, root, "memory/large.json", "")
+	f, err := os.OpenFile(filepath.Join(root, "gator/memory/large.json"), os.O_WRONLY, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = f.Truncate((1 << 30) + 1); err != nil {
+		f.Close()
+		t.Fatal(err)
+	}
+	f.Close()
+	destination := filepath.Join(t.TempDir(), "backup.tar.gz")
+	if _, err = s.Export(context.Background(), destination); err == nil {
+		t.Fatal("created an unverifiable oversized backup")
+	}
+	writeFixture(t, root, "memory/large.json", `{"text":"saved"}`)
+	if _, err = s.Export(context.Background(), destination); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data[len(data)-8] ^= 1 // Corrupt gzip's CRC without changing the tar contents.
+	if err = os.WriteFile(destination, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = VerifyBackup(context.Background(), destination); err == nil {
+		t.Fatal("corrupt backup verified")
+	}
+}
 func TestReviewRejectsChangedContentAndPreservesOriginals(t *testing.T) {
 	root := t.TempDir()
 	s, _ := Open(root)
@@ -80,6 +128,19 @@ func TestMaintenanceRefusesActiveWorkAndDoesNotFollowLinks(t *testing.T) {
 		t.Fatal("maintenance accepted a source symlink")
 	}
 }
+
+func TestDataRootSymlinkCannotCreateControlFilesOutsideState(t *testing.T) {
+	root, outside := t.TempDir(), t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(root, "gator")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Open(root); err == nil {
+		t.Fatal("accepted a symbolic private root")
+	}
+	if _, err := os.Stat(filepath.Join(outside, "data-control")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("created control data outside the private root")
+	}
+}
 func TestPrivateBackupVerifiesAndExcludesCredentials(t *testing.T) {
 	root := t.TempDir()
 	s, _ := Open(root)
@@ -117,6 +178,9 @@ func TestPrivateBackupVerifiesAndExcludesCredentials(t *testing.T) {
 	}
 	if _, err = VerifyBackup(context.Background(), output); err != nil {
 		t.Fatal("content deletion removed the external backup")
+	}
+	if _, err = s.PreviewDelete(context.Background(), "knowledge"); err != nil {
+		t.Fatal("deletion left the open data store unusable", err)
 	}
 }
 func TestSnapshotCleanupPreservesReferencedSharedContent(t *testing.T) {
