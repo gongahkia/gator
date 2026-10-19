@@ -36,6 +36,7 @@ Inside Gator:
   /followup new                 review a project check before saving
   /memory                       set up recall and inspect data destinations
   /context                      review sources and saved context
+  /overview                     changes, decisions, next actions, and blockers
   /recovery                     reconnect, retry, and review offline coverage
   /usage                        review shared usage and limits
   /data                         manage retention, backups, and deletion
@@ -55,8 +56,10 @@ Product areas:
               gator job inbox show|read|rate|report
               gator job quiet-audit JOB_ID [ATTEMPT_ID missed|correct|clear [--note TEXT]]
   Settings    gator config [show] · gator config set default-provider|default-model|sandbox|network VALUE
+  Overview    gator overview [--json|seen]
   Usage       gator usage status|limits|pause|resume
   Data        gator data status|retention|cleanup|preview|apply|export|verify
+              gator data restore|restore-apply|relink|relink-apply
 
 Common follow-up actions:
   gator work review WORK_ID

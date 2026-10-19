@@ -177,3 +177,7 @@ inspect-only goal job; it cannot grant unattended sending or publishing.
 [Recovery, shared usage, and private data](RECOVERY_USAGE_DATA.md) documents
 /recovery, /usage, /data, their CLI equivalents, conservative defaults, and
 verification limits.
+
+[Everyday overview, restore, and migration](OVERVIEW_RESTORE.md) describes the
+four-question home view, exact actions, fresh-profile recovery, and reviewed
+source-folder relinking.

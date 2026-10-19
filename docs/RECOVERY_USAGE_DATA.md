@@ -106,10 +106,11 @@ are excluded. Choose a new destination outside Gator's private data directory;
 an existing archive is never overwritten. Export and verification enforce
 1 GiB per file and 10 GiB total limits, including a bounded manifest.
 
-Verification checks file scope, checksums, and archive integrity. It does not
-restore data. There is no supported automatic restore/migration flow yet;
-archives retain the original state-root context and should not be described as
-a portable installation backup.
+Verification checks file scope, checksums, and archive integrity. Reviewed
+restore and source relinking are now supported through /data and the CLI.
+[Everyday overview, restore, and migration](OVERVIEW_RESTORE.md) documents fresh
+profiles, source mappings, paused checks, fresh configuration, and recovery.
+The archive retains content rather than credentials or installation settings.
 
 CLI equivalents:
 
