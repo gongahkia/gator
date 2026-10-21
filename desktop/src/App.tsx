@@ -83,8 +83,14 @@ function WorkspacePanel({ state, open, presenceRef, tab, setTab, navigate }: { s
   const bundles = state.messages.filter((message) => message.bundle).map((message) => message.bundle!);
   const latest = bundles.at(-1);
   return <aside ref={presenceRef} className="workspace-panel" aria-label="Work details" data-open={open} inert={!open} aria-hidden={!open}>
-    <div className="detail-tabs" role="tablist" aria-label="Work details">{["Deliverables", "Checks"].map((label) => <button key={label} role="tab" aria-selected={tab === label} onClick={() => setTab(label)}>{label}</button>)}</div>
-    <div className="workspace-content" ref={content} role="tabpanel" aria-label={tab}>
+    <div className="detail-tabs" role="tablist" aria-label="Work details">{["Deliverables", "Checks"].map((label, index) => <button key={label} id={`work-details-tab-${label}`} role="tab" aria-controls="work-details-content" aria-selected={tab === label} tabIndex={tab === label ? 0 : -1} onClick={() => setTab(label)} onKeyDown={(event) => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      const next = event.key === "Home" ? 0 : event.key === "End" ? 1 : (index + (event.key === "ArrowRight" ? 1 : -1) + 2) % 2;
+      setTab(["Deliverables", "Checks"][next]);
+      event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
+    }}>{label}</button>)}</div>
+    <div className="workspace-content" id="work-details-content" ref={content} role="tabpanel" aria-labelledby={`work-details-tab-${tab}`} tabIndex={0}>
       {tab === "Deliverables" ? latest ? <Result result={bundleResult(latest)} /> : <Empty icon={<Folder size={24} />} title="Your work lands here" text="Documents, verified outputs, and proposed changes appear after a task produces them." /> : <>
         <div className="flex items-center justify-between mb-5"><span className="eyebrow">Recurring checks</span><button className="small-button" disabled={state.running} onClick={() => navigate("/followup")}>Manage<ChevronRight size={13} /></button></div>
         {state.checks?.length ? state.checks.map((check, i) => <div className="check-item" key={i}><div className="flex items-center gap-2"><span className="status-dot" data-tone={check.tone} /><strong>{check.title}</strong></div><span className="badge" data-tone={check.tone}>{check.state}</span><p>{check.health}</p></div>) : <Empty icon={<ListChecks size={24} />} title="Keep an eye on things" text="Set up a recurring check for an ongoing goal. Results arrive in your inbox." />}

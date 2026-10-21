@@ -339,6 +339,11 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     await expect(page.getByRole("complementary", { name: "Work details" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Context", exact: true })).toHaveCount(0);
     await expect(page.getByRole("tab", { name: "Deliverables" })).toHaveAttribute("aria-selected", "true");
+    await page.getByRole("tab", { name: "Deliverables" }).press("ArrowRight");
+    await expect(page.getByRole("tab", { name: "Checks", exact: true })).toBeFocused();
+    await expect(page.getByRole("tabpanel", { name: "Checks", exact: true })).toBeVisible();
+    await page.getByRole("tab", { name: "Checks", exact: true }).press("Home");
+    await expect(page.getByRole("tab", { name: "Deliverables", exact: true })).toBeFocused();
     await page.getByRole("tab", { name: "Deliverables" }).click();
     await expect(page.getByText("Your work lands here")).toBeVisible();
     await page.getByRole("button", { name: "Hide work details" }).click();

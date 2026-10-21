@@ -44,6 +44,7 @@ Gator retains its alligator identity and personal-agent destinations.
 | P7 | Diagnostic text and shortcuts | Metadata, key legends, and command-like instructions compete with primary page content | Disclose supporting diagnostics/shortcuts; keep forms, review details, warnings, and all underlying text accessible | Implemented: disclosure commit |
 | P8 | Approvals and details | Most Gator results have identical document-card treatment | Clear semantic status icons, deliberate review hierarchy, and exact action details visible before approval | Implemented: result/review commit |
 | P9 | Page header | Gator repeats the conversation title on unrelated settings/list pages | Show the active page and workspace/settings context; keep conversation tools on conversation surfaces | Implemented: page header commit |
+| P10 | Detail tabs | Gator tab roles lacked linked panels and arrow navigation | Roving focus, Arrow/Home/End keys, and labelled tab/panel relationships | Implemented: detail tabs commit |
 | K1 | Queue | Gator already has visible editable/reorderable queued cards | Retain Go acknowledgement, captured options, pause/resume, and draft protection; do not change scheduling | Retained |
 | K2 | Motion | Gator already has interruptible transitions and reduced-motion support | Keep existing motion rules; no entrance replay during typing or provider updates | Retained |
 | K3 | Usage | Gator accounts for local provider admission; Codex screenshots can show account/subscription quotas | Keep real local daily counters, uncapped states, UTC reset, and the separate review/confirm flow | Intentional difference |
@@ -77,6 +78,8 @@ Gator retains its alligator identity and personal-agent destinations.
 | MEDIUM | `desktop/src/Result.tsx:24` | One document-card hierarchy for most results | P8: semantic status/review treatment | Distinguish action reviews, warnings and ordinary output |
 
 | MEDIUM | `desktop/src/App.tsx` main header | Unrelated conversation title and disabled workspace tools on settings | P9: active page title and contextual tools | Page identity should match the visible content |
+
+| MEDIUM | `desktop/src/App.tsx` work detail tabs | Tab roles without their full keyboard contract | P10: linked panels and standard focus/navigation behavior | Desktop tab controls must work with the keyboard |
 
 ## Considered but rejected
 
