@@ -145,9 +145,10 @@ test("recent work groups real saved conversations by workspace and isolates thei
     await expect(recent.getByRole("button", { name: "area-b/shared", exact: true })).toBeVisible();
     await recent.getByRole("button", { name: "Show 1 more", exact: true }).click();
     await expect(recent.getByRole("button", { name: "Open conversation: Plan 4", exact: true })).toBeVisible();
+    await recent.getByRole("button", { name: "Show fewer", exact: true }).click();
+    await expect(recent.getByRole("button", { name: "Open conversation: Plan 4", exact: true })).toHaveCount(0);
     await recent.getByRole("button", { name: "area-a/shared", exact: true }).press("Enter");
     await expect(recent.getByRole("button", { name: "Open conversation: Plan 0", exact: true })).toBeHidden();
-    await recent.getByRole("button", { name: "area-a/shared", exact: true }).press("Enter");
     const filter = recent.getByRole("searchbox", { name: "Filter recent conversations" });
     await filter.fill("Plan 4");
     await expect(recent.getByRole("button", { name: "Open conversation: Plan 4", exact: true })).toBeVisible();
@@ -156,7 +157,10 @@ test("recent work groups real saved conversations by workspace and isolates thei
     await expect(recent.getByText("No matching recent conversations", { exact: true })).toBeVisible();
     await filter.press("Escape");
     await expect(filter).toHaveValue("");
+    await expect(recent.getByRole("button", { name: "Open conversation: Plan 0", exact: true })).toBeHidden();
+    await recent.getByRole("button", { name: "area-a/shared", exact: true }).press("Enter");
     await expect(recent.getByRole("button", { name: "Open conversation: Plan 0", exact: true })).toBeVisible();
+    await expect(recent.getByRole("button", { name: "Open conversation: Plan 4", exact: true })).toHaveCount(0);
     const composer = page.getByRole("textbox", { name: "Message Gator", exact: true });
     const open = async (index: number) => { await recent.getByRole("button", { name: `Open conversation: Plan ${index}`, exact: true }).click(); await expect.poll(() => page.evaluate(async () => (await window.gator!.snapshot()).state?.conversation_id)).toBe(`work-test-${index}`); };
     await open(0); await composer.fill("Draft for the first project");

@@ -5,10 +5,12 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/connector"
+	"github.com/gongahkia/gator/internal/workspace"
 	"github.com/gongahkia/gator/internal/worktui"
 )
 
@@ -44,5 +46,50 @@ func TestWorkBundleDetailsBoundsAndDeduplicatesProvenance(t *testing.T) {
 	preview, truncated := boundedDetailPreview(text, 4096)
 	if !truncated || !utf8.ValidString(preview) || len(preview) > 4096 || len(preview) < 4093 {
 		t.Fatalf("UTF-8 preview bounds = %d, %t", len(preview), truncated)
+	}
+}
+
+func TestWorkBundleDetailsBoundsPreviewReadsAndMatchesSelectedPaths(t *testing.T) {
+	work, err := workspace.CreateWork(t.TempDir(), t.TempDir(), "work-bounded-previews", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	paths := []string{"large.txt", "one.md", "two.md", "three.md", "four.md", "five.md", "six.md", "seven.md", "eight.md", "nine.md"}
+	contract := artifact.DefaultContract(paths...)
+	for _, path := range paths {
+		content := strings.Repeat("界", 2000)
+		if path == "large.txt" {
+			content = strings.Repeat("x", 1024*1024+1)
+		}
+		if err := artifact.WriteText(work.Output, contract, path, content); err != nil {
+			t.Fatal(err)
+		}
+	}
+	manifest, err := artifact.Seal(work.Output, contract, artifact.SealOptions{RunID: "work-bounded-previews", Objective: "Review retained outputs", Source: work.Source, StartedAt: work.CreatedAt, FinishedAt: work.CreatedAt})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := artifact.WriteManifest(work.ManifestPath, manifest); err != nil {
+		t.Fatal(err)
+	}
+	summary, err := summarizeWorkBundle(work.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	total, previews := 0, 0
+	for _, file := range summary.Artifacts {
+		if file.Path == "large.txt" && (file.Preview != "" || file.Bytes != 1024*1024+1 || !file.Valid) {
+			t.Fatal("large file metadata or preview read budget was lost")
+		}
+		if file.Preview != "" {
+			previews++
+			if !file.Truncated || !utf8.ValidString(file.Preview) || file.Preview != strings.Repeat("界", 1365) {
+				t.Fatalf("selected preview was assigned to the wrong path or truncated incorrectly: %#v", file)
+			}
+		}
+		total += len(file.Preview)
+	}
+	if len(summary.Artifacts) != 10 || previews != 8 || total > 32*1024 {
+		t.Fatalf("preview envelope: artifacts=%d previews=%d bytes=%d", len(summary.Artifacts), previews, total)
 	}
 }
