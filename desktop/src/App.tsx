@@ -55,8 +55,7 @@ function Message({ message, pending, onApproval }: { message: BackendMessage; pe
   const user = message.role === "You";
   const result = message.result ?? (message.bundle ? bundleResult(message.bundle) : undefined);
   const approval = result?.kind === "approval" && result.fields?.some((field) => field.label === "Request" && field.value === String(pending)) ? pending : undefined;
-  return <article className={`message ${user ? "user-message" : ""}`}>
-    <div className="message-avatar">{user ? <span>Y</span> : <Logo small />}</div>
+  return <article className={`message ${user ? "user-message" : message.role === "Gator" ? "assistant-message" : "result-message"}`} aria-label={user ? "Your message" : `${message.role} message`}>
     <div className="message-content"><div className="message-byline">{user ? "You" : message.role === "Gator" ? "Gator" : message.role}</div>
       {result ? <Result result={result} approval={approval} onApproval={onApproval} /> : message.role === "Gator" ? <Markdown text={message.text} /> : <div className="literal prose-text">{message.text}</div>}
     </div>

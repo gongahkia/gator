@@ -355,6 +355,13 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     await page.getByRole("textbox", { name: "Message Gator" }).fill("What should I decide next?");
     await page.getByRole("button", { name: "Send message" }).click();
     await expect(page.locator(".message-byline", { hasText: "Gator" })).toHaveCount(2);
+    await expect(page.locator(".message-avatar")).toHaveCount(0);
+    await expect(page.getByRole("article", { name: "Your message", exact: true })).toHaveCount(2);
+    const conversationLayout = await page.evaluate(() => ({
+      user: document.querySelector(".user-message .message-content")!.getBoundingClientRect().left,
+      assistant: document.querySelector(".assistant-message .message-content")!.getBoundingClientRect().left,
+    }));
+    expect(conversationLayout.user).toBeGreaterThan(conversationLayout.assistant);
     const saved = JSON.parse(cli(["overview", "--json"]));
     expect(saved).toBeTruthy();
     await expect(page.getByRole("button", { name: "Settings", exact: true })).toBeEnabled();
