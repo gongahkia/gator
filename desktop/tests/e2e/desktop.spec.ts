@@ -164,6 +164,11 @@ test("recent work groups real saved conversations by workspace and isolates thei
     await open(0); await expect(composer).toHaveValue("Draft for the first project");
     await page.reload(); await expect(composer).toHaveValue("Draft for the first project");
     await expect(recent.getByRole("button", { name: "Open conversation: Plan 0", exact: true })).toHaveAttribute("aria-current", "page");
+    const current = await page.evaluate(() => window.gator!.snapshot());
+    await application.evaluate(({ BrowserWindow }, snapshot) => BrowserWindow.getAllWindows()[0].webContents.send("gator:update", { ...snapshot, state: { ...snapshot.state!, running: true, pending_approval: { id: 99 } } }), current);
+    await expect(recent.getByText("Needs review", { exact: true })).toBeVisible();
+    await expect(recent.getByRole("button", { name: "Open conversation: Plan 0", exact: true })).toBeDisabled();
+    await application.evaluate(({ BrowserWindow }, snapshot) => BrowserWindow.getAllWindows()[0].webContents.send("gator:update", snapshot), current);
     await page.getByRole("button", { name: "Follow-up checks", exact: true }).click();
     await page.getByRole("button", { name: /new check/i }).click();
     await page.getByRole("textbox", { name: "Title", exact: true }).fill("Keep my form edit");

@@ -29,6 +29,8 @@ test("compact work details preserve conversation state and distinguish selection
     await expect(rail).toBeVisible();
     const outputs = rail.getByRole("region", { name: "Outputs", exact: true });
     await expect(outputs.locator(".work-output")).toHaveCount(5);
+    await page.evaluate(async () => { await Promise.allSettled(document.getAnimations().filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity).map((animation) => animation.finished)); });
+    await page.screenshot({ path: "test-results/desktop-work-details-compact.png" });
     await expect(rail.getByRole("region", { name: "Follow-up checks", exact: true })).toHaveCount(0);
     await rail.getByRole("button", { name: /^Context/ }).click();
     await expect(rail.getByText("budget.md", { exact: true })).toBeVisible();
@@ -38,11 +40,15 @@ test("compact work details preserve conversation state and distinguish selection
     await rail.getByRole("button", { name: /^Connections/ }).click();
     await expect(rail.getByText("next-calendar", { exact: true })).toBeVisible();
     await expect(rail.getByText("used-drive", { exact: true })).toBeVisible();
+    await expect(rail.getByText("Records can include sources carried over from earlier turns.")).toBeVisible();
     await rail.getByRole("button", { name: /^Workspace/ }).click();
     await expect(rail.getByText("Automatic · chosen per request", { exact: true })).toBeVisible();
+    await page.evaluate(async () => { await Promise.allSettled(document.getAnimations().filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity).map((animation) => animation.finished)); });
+    expect(await page.evaluate(() => scrollY)).toBe(0);
     await page.screenshot({ path: "test-results/desktop-work-details-expanded.png" });
     await outputs.getByRole("button", { name: /report.md Checks passed/ }).click();
     await expect(rail.getByRole("heading", { name: "Earlier report", exact: true })).toBeVisible();
+    await page.screenshot({ path: "test-results/desktop-work-details-preview.png" });
     await expect(composer).toHaveValue("Keep my unsent follow-up");
     expect(await scroll.evaluate((element) => element.scrollTop)).toBe(0);
     await rail.getByRole("button", { name: "All outputs", exact: true }).click();
@@ -85,6 +91,7 @@ test("compact work details preserve conversation state and distinguish selection
     await expect(drawer.getByRole("button", { name: /^Workspace/ })).toBeFocused();
     await page.keyboard.press("Tab"); await expect(close).toBeFocused();
     await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.evaluate(async () => { await Promise.allSettled(document.getAnimations().filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity).map((animation) => animation.finished)); });
     await page.screenshot({ path: "test-results/desktop-work-details-drawer.png" });
     await page.keyboard.press("Escape");
     await expect(drawer).toHaveCount(0);

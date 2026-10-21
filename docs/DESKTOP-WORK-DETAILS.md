@@ -18,9 +18,10 @@ read-only projection of existing Go-owned state, not a new agent runtime.
 - **Connection selection** means a connector ID selected for a new request.
   Queued requests retain their own selections. It does not establish sign-in,
   account identity, current OAuth scope, consent to a read, or approval of a
-  write. **Recorded use** comes only from a verified retained manifest's
-  connector provenance, scoped to that run. An absent record is not a claim
-  that the connector was never used anywhere in the conversation. No new
+  write. **Retained connection sources** come only from a verified retained manifest's
+  connector provenance. These records can be inherited from earlier turns and
+  do not establish fresh use in the latest request. An absent record does not
+  rule out actions or other use outside this provenance. No new
   connection toggles, login probes, or permission grants are introduced.
 - **Outputs** are files and change candidates projected from verified retained
   bundles, identified by bundle plus file/candidate identity. Include earlier
