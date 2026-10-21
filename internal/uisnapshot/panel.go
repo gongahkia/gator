@@ -17,6 +17,7 @@ type Panel struct {
 	Usage    *Usage  `json:"usage,omitempty"`
 	Filter   *Filter `json:"filter,omitempty"`
 	Toggle   *Toggle `json:"toggle,omitempty"`
+	Summary  []Field `json:"summary,omitempty"`
 }
 
 type Toggle struct {
@@ -37,14 +38,17 @@ type Hint struct {
 }
 
 type Row struct {
-	Label    string `json:"label"`
-	Group    string `json:"group,omitempty"`
-	Checked  bool   `json:"checked,omitempty"`
-	Position int    `json:"position,omitempty"`
-	Detail   string `json:"detail,omitempty"`
-	State    string `json:"state,omitempty"`
-	Tone     string `json:"tone,omitempty"`
-	Input    *Input `json:"input,omitempty"`
+	Label     string  `json:"label"`
+	Group     string  `json:"group,omitempty"`
+	Checked   bool    `json:"checked,omitempty"`
+	Position  int     `json:"position,omitempty"`
+	Source    string  `json:"source,omitempty"`
+	UpdatedAt string  `json:"updated_at,omitempty"`
+	Metadata  []Field `json:"metadata,omitempty"`
+	Detail    string  `json:"detail,omitempty"`
+	State     string  `json:"state,omitempty"`
+	Tone      string  `json:"tone,omitempty"`
+	Input     *Input  `json:"input,omitempty"`
 }
 
 // Input describes an editable field without exposing secrets. Value is empty
@@ -79,4 +83,6 @@ type Block struct {
 	Title       string   `json:"title,omitempty"`
 	Lines       []string `json:"lines"`
 	Collapsible bool     `json:"collapsible,omitempty"`
+	Role        string   `json:"role,omitempty"`
+	Fields      []Field  `json:"fields,omitempty"`
 }

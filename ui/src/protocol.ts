@@ -45,11 +45,13 @@ export type BackendPanel = {
   query?: string;
   rows?: {
     label: string; group?: string; detail?: string; state?: string; tone?: ResultTone; checked?: boolean; position?: number;
+    source?: string; updated_at?: string; metadata?: ResultField[];
     input?: { value?: string; placeholder?: string; secret?: boolean; multiline?: boolean; limit: number;
       kind?: string; help?: string; options?: { value: string; label: string }[];
       parts?: { label: string; min: number; max: number }[]; min?: number; max?: number; read_only?: boolean };
   }[];
-  blocks?: { title?: string; lines: string[] | null; collapsible?: boolean }[];
+  blocks?: { title?: string; lines: string[] | null; collapsible?: boolean; role?: string; fields?: ResultField[] }[];
+  summary?: ResultField[];
   usage?: Usage;
   filter?: { value: string; options: { value: string; label: string }[] };
   toggle?: { label: string; checked: boolean };
