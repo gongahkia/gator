@@ -35,6 +35,7 @@ type Filter struct {
 type Hint struct {
 	Shortcut string `json:"shortcut"`
 	Action   string `json:"action"`
+	Group    string `json:"group,omitempty"`
 }
 
 type Row struct {

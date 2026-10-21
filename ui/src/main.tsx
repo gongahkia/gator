@@ -276,11 +276,12 @@ function PanelScreen({ panel, status, draft, statusLine, bridge, exit }: { panel
   const rows = panel.rows ?? [];
   const focused = panel.kind === "confirmation" || panel.kind.endsWith("-form");
   const geometry = panelGeometry(terminal?.columns ?? 80, terminal?.rows ?? 24, focused, panel.kind === "picker", !!panel.subtitle);
-  const blocks = (panel.blocks ?? []).flatMap((block) => [
+  const blocks = [...(panel.summary ?? []).flatMap((field) => wrapTerminalText(`${field.label}: ${field.value}`, geometry.contentWidth).map((text) => ({ text, heading: false }))), ...(panel.blocks ?? []).flatMap((block) => [
     ...(block.title ? [{ text: block.title, heading: true }] : []),
-    ...(block.lines?.length ? block.lines.flatMap((line) => wrapTerminalText(line, geometry.contentWidth).map((text) => ({ text, heading: false }))) : [{ text: "None", heading: false }]),
+    ...(block.fields ?? []).flatMap((field) => wrapTerminalText(`${field.label}: ${field.value}`, geometry.contentWidth).map((text) => ({ text, heading: false }))),
+    ...(block.lines?.length ? block.lines.flatMap((line) => wrapTerminalText(line, geometry.contentWidth).map((text) => ({ text, heading: false }))) : block.fields?.length ? [] : [{ text: "None", heading: false }]),
     { text: "", heading: false },
-  ]);
+  ])];
   const overviewRows = panel.kind === "overview";
   const rowHeight = overviewRows ? (geometry.compact || !rows.some((row) => row.detail) ? 1 : 2) : rows.some((row) => row.detail) ? (geometry.compact ? 2 : 3) : (geometry.compact ? 1 : 2);
   const additionalFooter = !!panel.footer && !!panel.hints?.length;

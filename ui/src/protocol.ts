@@ -58,7 +58,7 @@ export type BackendPanel = {
   selected?: number;
   notice?: string;
   footer?: string;
-  hints?: { shortcut: string; action: string }[];
+  hints?: { shortcut: string; action: string; group?: string }[];
 };
 export type Usage = {
   day: string;

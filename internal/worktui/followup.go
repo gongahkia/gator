@@ -442,19 +442,45 @@ func (m Model) followupPanel() uisnapshot.Panel {
 	}
 	if c := m.checkDetail; c != nil {
 		p.Title, p.Subtitle = "Follow-up details", c.Title
-		p.Blocks = []uisnapshot.Block{
-			{Title: "Outcome", Lines: []string{c.Outcome}},
-			{Title: "Background health", Lines: []string{c.HealthLine(), c.Issue, "Next action: " + c.NextAction}},
-			{Title: "Timing and control", Lines: []string{checkFrequency(*c), "P pauses or resumes future polls; a current check may finish.", "Agreement edits apply to future checks."}},
-			{Title: "Sources and permissions", Lines: checkSourceLines(*c)},
-			{Title: "Usage and limits", Lines: checkLimitLines(*c)},
+		last, next := "Not checked yet", "Not scheduled"
+		if !c.LastSuccess.IsZero() {
+			last = c.LastSuccess.Local().Format("2 Jan, 15:04")
 		}
-		p.Hints = []uisnapshot.Hint{{Shortcut: "P", Action: "pause/resume"}, {Shortcut: "E", Action: "edit agreement"}, {Shortcut: "X", Action: "check now"}, {Shortcut: "S", Action: "start supervisor"}, {Shortcut: "R", Action: "refresh"}, {Shortcut: "Esc", Action: "back"}}
-		p.Hints = append([]uisnapshot.Hint{{Shortcut: "H", Action: "recovery and offline history"}}, p.Hints...)
+		if !c.NextDue.IsZero() {
+			next = c.NextDue.Local().Format("2 Jan, 15:04")
+		}
+		p.Summary = []uisnapshot.Field{{Label: "Status", Value: c.State, Tone: checkTone(c.State)}, {Label: "Last successful check", Value: last}, {Label: "Next scheduled check", Value: next}}
+		permission := "Read and recommend"
+		if c.Definition.Mode == action.Draft {
+			permission = "Read and prepare drafts"
+		}
+		p.Blocks = []uisnapshot.Block{
+			{Title: "Outcome", Role: "content", Lines: []string{c.Outcome}},
+			{Title: "Next step", Lines: []string{c.NextAction, c.Issue}},
+			{Title: "Permissions", Fields: []uisnapshot.Field{{Label: "Allowed actions", Value: permission}, {Label: "Sending or publishing", Value: "Separate foreground approval required"}}},
+			{Title: "Timing and control", Collapsible: true, Lines: []string{checkFrequency(*c), "Checks depend on this computer and the supervisor running.", "Pausing stops future checks; a current check may finish.", "Agreement edits apply to future checks."}},
+			{Title: "Sources and permissions", Collapsible: true, Lines: checkSourceLines(*c)},
+			{Title: "Usage and limits", Collapsible: true, Lines: checkLimitLines(*c)},
+		}
+		pause := "resume check"
+		if c.Enabled {
+			pause = "pause check"
+		}
+		p.Hints = []uisnapshot.Hint{{Shortcut: "P", Action: pause}, {Shortcut: "X", Action: "check now", Group: "more"}, {Shortcut: "H", Action: "recovery and offline history", Group: "more"}, {Shortcut: "R", Action: "refresh"}, {Shortcut: "Esc", Action: "back"}}
+		if c.Definition.GoalWatch {
+			p.Hints = append(p.Hints, uisnapshot.Hint{Shortcut: "E", Action: "edit agreement"})
+		}
+		if !m.config.SupervisorRunning {
+			p.Hints = append(p.Hints, uisnapshot.Hint{Shortcut: "S", Action: "start supervisor", Group: "more"})
+		}
 		return p
 	}
 	for _, c := range m.checks {
-		p.Rows = append(p.Rows, uisnapshot.Row{Label: c.Title, Detail: c.HealthLine(), State: c.State, Tone: checkTone(c.State)})
+		at := ""
+		if !c.LastAttempt.IsZero() {
+			at = c.LastAttempt.Format(time.RFC3339)
+		}
+		p.Rows = append(p.Rows, uisnapshot.Row{Label: c.Title, Detail: c.HealthLine(), State: c.State, Tone: checkTone(c.State), Source: c.Definition.SourcePath, UpdatedAt: at})
 	}
 	if len(p.Rows) == 0 {
 		p.Blocks = []uisnapshot.Block{{Title: "Start with one useful loop", Lines: []string{"Watch project changes, identify the next step, and prepare a response for review.", "Press N to choose sources and review the agreement."}}}
