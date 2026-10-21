@@ -318,6 +318,7 @@ func (m Model) bridgeLearningsPanel() uisnapshot.Panel {
 	if form := m.learningForm; form != nil {
 		panel.Kind = "learning-form"
 		panel.Title = "Add saved guidance"
+		panel.Subtitle = "Preferences, facts, and procedures for future work."
 		if form.EditingID != "" {
 			panel.Title = "Edit saved guidance"
 		}
