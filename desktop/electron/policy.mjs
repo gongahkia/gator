@@ -51,10 +51,10 @@ export function validateFrame(frame) {
     const panel = frame.panel;
     if (!panel || typeof panel !== "object" || Array.isArray(panel) || !/^[a-f0-9]{64}$/.test(panel.id)) throw new Error("Invalid view");
     if (Object.keys(panel).some((key) => !["id", "action", "row", "fields", "text"].includes(key))) throw new Error("Invalid view action");
-    if (!["select", "activate", "key", "query"].includes(panel.action)) throw new Error("Invalid view action");
+    if (!["select", "activate", "key", "query", "filter"].includes(panel.action)) throw new Error("Invalid view action");
     if (panel.row !== undefined && (!Number.isSafeInteger(panel.row) || panel.row < 0 || panel.row > 10000)) throw new Error("Invalid row");
     if (panel.action === "key" && (typeof frame.key !== "string" || !/^(enter|esc|up|down|left|right|tab|shift\+tab|space|ctrl\+[ru]|f1|[a-z0-9])$/.test(frame.key))) throw new Error("Invalid view key");
-    if (panel.action === "query" && (typeof panel.text !== "string" || panel.text.length > 4096)) throw new Error("Invalid search");
+    if (["query", "filter"].includes(panel.action) && (typeof panel.text !== "string" || panel.text.length > 4096)) throw new Error("Invalid search");
     if (panel.fields !== undefined && (!panel.fields || Array.isArray(panel.fields) || typeof panel.fields !== "object" || Object.entries(panel.fields).some(([key, value]) => !/^\d{1,5}$/.test(key) || typeof value !== "string" || value.length > 64 * 1024))) throw new Error("Invalid form");
   }
   return { ...frame, version: 1 };

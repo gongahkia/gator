@@ -10,6 +10,8 @@ test("renderer cannot launch processes, acknowledge handoffs, or inject transpor
 test("panel actions require a view identity and bounded typed values", () => {
   const frame = { type: "panel", key: "ctrl+r", panel: { id: "a".repeat(64), action: "key", fields: { 0: "review me" } } };
   assert.equal(validateFrame(frame).version, 1);
+  assert.equal(validateFrame({ type: "panel", panel: { id: frame.panel.id, action: "filter", text: "completed" } }).version, 1);
+  for (const text of [undefined, false, "x".repeat(4097)]) assert.throws(() => validateFrame({ type: "panel", panel: { id: frame.panel.id, action: "filter", text } }));
   for (const change of [{ id: "" }, { row: -1 }, { action: "execute" }, { fields: { "-1": "bad" } }, { fields: { 0: false } }, { program: "sh" }]) assert.throws(() => validateFrame({ ...frame, panel: { ...frame.panel, ...change } }));
   assert.throws(() => validateFrame({ type: "approval", interaction_id: 0, approved: true }));
   assert.throws(() => validateFrame({ type: "approval", interaction_id: 1, approved: "true" }));
