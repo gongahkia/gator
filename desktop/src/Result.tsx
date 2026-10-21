@@ -1,10 +1,20 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { Children, isValidElement, type ReactNode } from "react";
 import { Check, FileText, ShieldCheck } from "lucide-react";
 import type { BackendBundle, BackendResult, ResultSection } from "../../ui/src/protocol";
+import { CopyButton } from "./CopyButton";
+
+function CodeBlock({ children }: { children?: ReactNode }) {
+  const child = Children.toArray(children)[0];
+  const code = isValidElement<{ className?: string; children?: string }>(child) ? child.props : undefined;
+  const language = code?.className?.replace(/^language-/, "") || "text";
+  return <div className="code-block"><div className="code-block-heading"><span>{language}</span>{typeof code?.children === "string" && <CopyButton label="Copy code" text={code.children} />}</div><pre>{children}</pre></div>;
+}
 
 export function Markdown({ text }: { text: string }) {
   return <div className="markdown"><ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml components={{
+    pre: CodeBlock,
     a: ({ href, children }) => <a href={href} onClick={(event) => { event.preventDefault(); if (href) void window.gator?.openLink(href).catch(() => {}); }}>{children}</a>,
     // Remote images would contact a service just by reading a conversation.
     img: ({ alt }) => <span className="muted">[Image{alt ? `: ${alt}` : ""}]</span>,

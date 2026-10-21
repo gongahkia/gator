@@ -11,6 +11,7 @@ import { ConversationsPanel } from "./ConversationsPanel";
 import { IconSwap, Presence, useViewMotion, type PresenceRef } from "./motion";
 import { MessageQueue, useQueueAction } from "./MessageQueue";
 import { SettingsNavigation, settingsRoutes } from "./SettingsNavigation";
+import { CopyButton } from "./CopyButton";
 
 const destinations = [
   { command: "/overview", label: "Overview", icon: LayoutDashboard, group: "work" },
@@ -58,6 +59,7 @@ function Message({ message, pending, onApproval }: { message: BackendMessage; pe
   return <article className={`message ${user ? "user-message" : message.role === "Gator" ? "assistant-message" : "result-message"}`} aria-label={user ? "Your message" : `${message.role} message`}>
     <div className="message-content"><div className="message-byline">{user ? "You" : message.role === "Gator" ? "Gator" : message.role}</div>
       {result ? <Result result={result} approval={approval} onApproval={onApproval} /> : message.role === "Gator" ? <Markdown text={message.text} /> : <div className="literal prose-text">{message.text}</div>}
+      {!result && message.role === "Gator" && message.text && <div className="message-actions"><CopyButton text={message.text} label="Copy response" compact /></div>}
     </div>
   </article>;
 }

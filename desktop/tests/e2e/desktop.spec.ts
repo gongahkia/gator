@@ -273,12 +273,13 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
   await mkdir(workspace);
   await writeFile(join(workspace, "project.md"), "A personal project with one open decision.\n");
   let requests = 0;
+  const answer = "The desktop is connected to Gator’s Go runtime. Your project has one open decision.\n\n```js\nconsole.log('gator');\n```";
   const server = createServer((req, res) => {
     req.resume();
     req.on("end", () => {
       requests++;
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ id: "local-desktop-test", choices: [{ message: { role: "assistant", content: "The desktop is connected to Gator’s Go runtime. Your project has one open decision." }, finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 10, total_tokens: 20 } }));
+      res.end(JSON.stringify({ id: "local-desktop-test", choices: [{ message: { role: "assistant", content: answer }, finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 10, total_tokens: 20 } }));
     });
   });
   await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
@@ -362,6 +363,24 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
       assistant: document.querySelector(".assistant-message .message-content")!.getBoundingClientRect().left,
     }));
     expect(conversationLayout.user).toBeGreaterThan(conversationLayout.assistant);
+    // Keep the system clipboard untouched while exercising exact output and
+    // permission-denied feedback through the real rendered response controls.
+    await page.evaluate(() => {
+      const capture = { value: "" };
+      Object.defineProperty(window, "__copyCapture", { value: capture, configurable: true });
+      Object.defineProperty(navigator.clipboard, "writeText", { configurable: true, value: async (text: string) => { capture.value = text; } });
+    });
+    await page.getByRole("button", { name: "Copy code", exact: true }).first().click();
+    await expect(page.locator(".code-block-heading").first()).toContainText("Copied");
+    expect(await page.evaluate(() => (window as unknown as { __copyCapture: { value: string } }).__copyCapture.value)).toBe("console.log('gator');\n");
+    await page.getByRole("button", { name: "Copy response", exact: true }).first().click();
+    expect(await page.evaluate(() => (window as unknown as { __copyCapture: { value: string } }).__copyCapture.value)).toBe(answer);
+    await page.evaluate(() => {
+      Object.defineProperty(navigator.clipboard, "writeText", { configurable: true, value: async () => { throw new Error("Clipboard denied by test"); } });
+      document.execCommand = () => false;
+    });
+    await page.getByRole("button", { name: "Copy response", exact: true }).last().click();
+    await expect(page.getByRole("alert").filter({ hasText: "Couldn’t copy. Select the text to copy it." })).toBeVisible();
     const saved = JSON.parse(cli(["overview", "--json"]));
     expect(saved).toBeTruthy();
     await expect(page.getByRole("button", { name: "Settings", exact: true })).toBeEnabled();
