@@ -3,82 +3,17 @@ package main
 import (
 	"bufio"
 	"bytes"
-	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"os/signal"
-	"strconv"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/worktui"
 )
-
-//go:embed ui/gator-ui.cjs
-var terminalUIBundle []byte
-
-// launchTerminalUI starts the bundled React renderer. Interactive Work requires
-// Node 22 or newer; headless commands do not depend on this runtime.
-func launchTerminalUI(conversationID, goalID string) error {
-	return launchBundledUI([]string{"work", conversationID, goalID}, os.Stdout, "interactive Gator")
-}
-
-func launchDoctorUI(arguments []string, out io.Writer) error {
-	return launchBundledUI(append([]string{"doctor"}, arguments...), out, "gator doctor")
-}
-
-func launchBundledUI(arguments []string, out io.Writer, surface string) error {
-	node, err := exec.LookPath("node")
-	if err != nil {
-		return fmt.Errorf("%s requires Node.js 22 or newer; install Node.js and retry", surface)
-	}
-	if !supportedNodeUI(node) {
-		return fmt.Errorf("%s requires Node.js 22 or newer; upgrade Node.js and retry", surface)
-	}
-	binary, err := os.Executable()
-	if err != nil {
-		return err
-	}
-	bundle, err := os.CreateTemp("", "gator-ui-*.cjs")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(bundle.Name())
-	if err := bundle.Chmod(0o600); err != nil {
-		bundle.Close()
-		return err
-	}
-	if _, err := bundle.Write(terminalUIBundle); err != nil {
-		bundle.Close()
-		return err
-	}
-	if err := bundle.Close(); err != nil {
-		return err
-	}
-	command := exec.Command(node, append([]string{bundle.Name(), binary}, arguments...)...)
-	command.Stdin, command.Stdout, command.Stderr = os.Stdin, out, os.Stderr
-	if settings, err := loadSettings(); err == nil {
-		command.Env = append(os.Environ(), "GATOR_UI_THEME="+settings.Theme)
-	}
-	// The child may hand the terminal to an editor. Ctrl+C should interrupt that
-	// foreground job and leave the launcher waiting for the React UI to resume.
-	signal.Ignore(os.Interrupt)
-	defer signal.Reset(os.Interrupt)
-	return command.Run()
-}
-
-func supportedNodeUI(node string) bool {
-	version, err := exec.Command(node, "--version").Output()
-	if err != nil {
-		return false
-	}
-	major, err := strconv.Atoi(strings.SplitN(strings.TrimPrefix(strings.TrimSpace(string(version)), "v"), ".", 2)[0])
-	return err == nil && major >= 22
-}
 
 type uiFrame struct {
 	Version       int                               `json:"version"`

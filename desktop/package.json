@@ -2,7 +2,7 @@
   "name": "gator-desktop",
   "productName": "Gator",
   "version": "0.1.0",
-  "description": "Gator personal agent desktop companion",
+  "description": "Gator personal agent desktop application",
   "author": "Gabriel Ong",
   "private": true,
   "type": "module",
@@ -41,9 +41,10 @@
   "build": {
     "appId": "com.gongahkia.gator",
     "asar": true,
+    "artifactName": "Gator-${version}-${os}-${arch}.${ext}",
     "directories": { "output": "release" },
     "files": ["dist/**/*", "electron/**/*", "assets/**/*", "licenses/**/*", "package.json", "!**/*.test.mjs"],
-    "extraResources": [{ "from": "runtime/gator", "to": "runtime/gator" }],
+    "extraResources": [{ "from": "runtime/gator-runtime", "to": "runtime/gator-runtime" }],
     "mac": { "icon": "assets/icon.icns", "category": "public.app-category.productivity", "identity": null, "target": ["dmg", "zip"] },
     "linux": { "icon": "assets/icon.png", "category": "Utility", "target": ["AppImage", "deb"] }
   }

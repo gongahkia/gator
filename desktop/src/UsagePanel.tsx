@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ArrowLeft, ChevronDown, Pause, Play, RefreshCw, SlidersHorizontal } from "lucide-react";
-import type { BackendPanel, Usage } from "../../ui/src/protocol";
+import type { BackendPanel, Usage } from "./protocol";
 import type { DesktopFrame } from "./bridge";
 
 const number = new Intl.NumberFormat();

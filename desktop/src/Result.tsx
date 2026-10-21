@@ -2,7 +2,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Children, isValidElement, type ReactNode } from "react";
 import { Check, ChevronDown, FileText, Info, ShieldCheck, TriangleAlert } from "lucide-react";
-import type { BackendBundle, BackendResult, ResultSection } from "../../ui/src/protocol";
+import type { BackendBundle, BackendResult, ResultSection } from "./protocol";
 import { CopyButton } from "./CopyButton";
 
 function CodeBlock({ children }: { children?: ReactNode }) {

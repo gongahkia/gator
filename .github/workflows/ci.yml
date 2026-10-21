@@ -25,14 +25,12 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: ui/package-lock.json
-      - name: Check terminal UI bundle
-        shell: bash
+          cache-dependency-path: desktop/package-lock.json
+      - name: Check desktop frontend and host
         run: |
-          npm ci --prefix ui
-          npm run check --prefix ui
-          npm run build --prefix ui
-          git diff --exit-code -- cmd/gator/ui/gator-ui.cjs
+          npm ci --prefix desktop
+          npm run check --prefix desktop
+          npm test --prefix desktop
       - name: Check formatting
         shell: bash
         run: |
@@ -49,7 +47,13 @@ jobs:
       - name: Vet
         run: go vet ./...
       - name: Build
-        run: go build ./cmd/gator
+        run: make build
+
+      - name: Check packaged desktop workflows
+        if: runner.os == 'macOS'
+        run: |
+          npm run pack --prefix desktop
+          GATOR_DESKTOP_TEST_EXECUTABLE="$PWD/desktop/release/mac/Gator.app/Contents/MacOS/Gator" npm run test:e2e --prefix desktop
 
   browser:
     name: browser-${{ matrix.os }}

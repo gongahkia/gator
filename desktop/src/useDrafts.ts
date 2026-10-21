@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { BackendState } from "../../ui/src/protocol";
+import type { BackendState } from "./protocol";
 import type { DraftRequest, DraftSnapshot, SavedDraft } from "./bridge";
 
 export function useDrafts(state?: BackendState) {

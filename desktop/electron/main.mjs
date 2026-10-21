@@ -40,7 +40,7 @@ async function startBackend() {
   if (starting) return starting;
   starting = (async () => {
     if (backend && !backend.closed) await backend.stop();
-    const binary = process.env.GATOR_DESKTOP_BINARY || (app.isPackaged ? join(process.resourcesPath, "runtime/gator") : join(here, "../runtime/gator"));
+    const binary = process.env.GATOR_DESKTOP_BINARY || (app.isPackaged ? join(process.resourcesPath, "runtime/gator-runtime") : join(here, "../runtime/gator-runtime"));
     await access(binary, constants.X_OK);
     // A desktop launch never implicitly captures the user's home directory.
     const workspace = process.env.GATOR_DESKTOP_WORKSPACE || join(app.getPath("userData"), "workspace");

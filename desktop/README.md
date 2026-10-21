@@ -1,59 +1,65 @@
 # Gator desktop
 
-An Electron companion to the terminal, adapted from the sibling Referene
-(OpenHands Agent Canvas) frontend. React DOM and Tailwind render the desktop;
-Gator's existing Go application owns conversations, tools, model configuration,
-approvals, goals, usage, and data controls.
+Gator's primary and currently supported user interface is this Electron app.
+React DOM and Tailwind render the frontend; the private Go runtime owns
+conversations, tools, model configuration, approvals, goals, usage, and data.
+The standalone CLI and React terminal renderer are retired.
 
 ## Run
 
-From the repository root, with Go and Node.js 22.12+ installed:
+From the repository root, with Go 1.25.13 and Node.js 22.12+ installed:
 
 ```sh
 npm ci --prefix desktop
 make desktop
 ```
 
-This builds the Go runtime and frontend, then opens the desktop app. The
-terminal still starts with `make build` and `./bin/gator`.
+This builds the private runtime and frontend, then opens Gator. Installed apps
+bundle Electron's Node runtime; users do not need Node or a Gator CLI on PATH.
 
-Both use your normal Gator profile. A desktop launch starts in a private empty
-workspace; choose a folder from the top-right folder control, or resume a saved
-goal or conversation. You can choose a starting folder explicitly:
+The app uses the existing local Gator profile. A launch starts in a private
+empty workspace; choose a folder from the top-right control, or resume a saved
+goal or conversation. To choose a starting folder during development:
 
 ```sh
 GATOR_DESKTOP_WORKSPACE=/absolute/path/to/notes make desktop
 ```
 
-`GATOR_STATE_DIR` and `GATOR_CONFIG_DIR` work exactly as in the CLI. Use them
-to try the desktop with a separate profile. `GATOR_DESKTOP_USER_DATA` selects
-Electron's separate window/preferences directory for isolated development.
-`GATOR_DESKTOP_BINARY` can select a separately built Gator binary for development.
+`GATOR_STATE_DIR` and `GATOR_CONFIG_DIR` select the local profile.
+`GATOR_DESKTOP_USER_DATA` selects Electron's separate preferences/drafts directory.
+`GATOR_DESKTOP_BINARY` can select a separately built private runtime during
+development. These overrides are useful for isolated testing.
 
 ## Check and package
 
 ```sh
 npm run check --prefix desktop
 npm test --prefix desktop
-npm run build --prefix desktop
-npm run test:e2e --prefix desktop
-npm run pack --prefix desktop
+make build
+make package
 ```
 
-`pack` creates an unpacked native application under `desktop/release/`.
-On macOS, it is `desktop/release/mac/Gator.app`. To exercise that application
-with the same isolated integration tests:
+`make build` builds the frontend and private `desktop/runtime/gator-runtime`.
+`make package` creates an unpacked native app under `desktop/release/`.
+On macOS, it is `desktop/release/mac/Gator.app`. To exercise that package:
 
 ```sh
 GATOR_DESKTOP_TEST_EXECUTABLE="$PWD/desktop/release/mac/Gator.app/Contents/MacOS/Gator" \
   npm run test:e2e --prefix desktop
 ```
 
-`npm run dist --prefix desktop` builds platform installers. Build on the target
-OS and architecture; the Go runtime is compiled for the build host. macOS
-artifacts are unsigned development builds; signing and notarization are a
-separate release step. Electron bundles Node; an installed application does
-not require a separate Node install.
+`make dist` builds desktop installers. The release workflow produces macOS
+DMG/ZIP and Linux AppImage/DEB artifacts with matching runtime architectures.
+macOS builds are unsigned development builds until signing and notarization
+are configured. No standalone CLI archives are built or installed.
 
-See [desktop architecture and rollout](../docs/DESKTOP.md) for controls,
-boundaries, verification, and the decision to keep both interfaces.
+The executable under `runtime/` is an internal app component. Bare invocation
+and former user CLI commands direct users to the desktop app. App-owned
+background services and reviewed system authentication/installation handoffs
+retain their existing paths. Such a handoff may open Terminal temporarily;
+it does not launch an interactive Gator terminal interface.
+
+For developer-only fixtures and maintenance, `GATOR_INTERNAL_COMMANDS=1`
+explicitly enables the existing runtime command handlers. This is not a
+supported user interface or a security boundary. Never substitute it for
+an action review. See [the retirement decision](../docs/DESKTOP-PRIMARY.md).

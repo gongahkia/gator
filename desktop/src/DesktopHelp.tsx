@@ -1,5 +1,5 @@
 import { ArrowUpRight, ChevronDown, Keyboard } from "lucide-react";
-import type { BackendCommand } from "../../ui/src/protocol";
+import type { BackendCommand } from "./protocol";
 import { CopyButton } from "./CopyButton";
 
 const pages = [

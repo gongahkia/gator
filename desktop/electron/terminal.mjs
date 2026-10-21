@@ -6,7 +6,8 @@ import { shellQuote } from "./policy.mjs";
 
 export function terminalScript(job, result) {
   const environment = (job.env ?? []).filter((value) => /^(GATOR_STATE_DIR|GATOR_CONFIG_DIR)=/.test(value));
-  const command = ["env", ...environment.map(shellQuote), shellQuote(job.program), ...(job.args ?? []).map(shellQuote)].join(" ");
+  // App-owned handoffs can use private runtime handlers; this never starts a Gator terminal UI.
+  const command = ["env", "GATOR_INTERNAL_COMMANDS=1", ...environment.map(shellQuote), shellQuote(job.program), ...(job.args ?? []).map(shellQuote)].join(" ");
   const onExit = `gator_exit=$?; printf '%s' "$gator_exit" > ${shellQuote(result)}`;
   return `#!/bin/sh\numask 077\ntrap ${shellQuote(onExit)} EXIT\ntrap 'exit 130' INT TERM HUP\ncd ${shellQuote(job.dir || process.cwd())} || exit 1\n${command}\ngator_exit=$?\nprintf '\\nGator action finished. You can close this window.\\n'\nexit "$gator_exit"\n`;
 }

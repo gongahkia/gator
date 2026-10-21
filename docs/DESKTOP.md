@@ -1,10 +1,11 @@
-# Desktop companion
+# Gator desktop
 
 ## Decision
 
-Add desktop alongside the terminal first. Compare their usefulness in real
-work before deciding whether to retire the terminal. A desktop release does
-not change the CLI or the current React terminal renderer.
+As of 22 October 2026, the desktop application is the primary and currently
+supported user interface. The standalone CLI and React terminal renderer are
+retired. This supersedes the earlier decision to ship both interfaces; see
+[Desktop as the primary interface](DESKTOP-PRIMARY.md).
 
 The sibling `Referene` directory contains OpenHands Agent Canvas 1.29.0, a
 React DOM / Tailwind web app with an Electron desktop shell. Gator adapts its
@@ -15,21 +16,18 @@ goals, inbox, reviewed follow-ups, saved knowledge, and deliverables.
 ## Ownership
 
 ```text
-React terminal (Claude Code Kit) ─┐
-                                ├─ Go UI bridge ─ Go Work application
-React desktop ─ Electron host ───┘                ├─ conversations and goals
-                                                 ├─ tools and approvals
-                                                 ├─ checks and inbox
-                                                 └─ shared usage and data
+React desktop → Electron host → private Go runtime
+                                ├─ conversations and goals
+                                ├─ tools and approvals
+                                ├─ checks and inbox
+                                └─ shared usage and data
 ```
 
-The desktop host launches the same `gator ui-backend` transport used by the
-terminal. It consumes JSON-line display snapshots and sends typed actions.
-`ui/src/protocol.ts` is the shared frontend contract. The desktop has no
-agent loop, provider credentials, second copy of goal state, or HTTP listener.
-Normal state/config overrides still select the profile. The two interfaces
-can use the same saved profile, but each window/process owns its own live
-foreground run; opening the desktop does not attach to a terminal's live run.
+The host launches the bundled `gator-runtime ui-backend` transport and exchanges
+JSON-line display snapshots and typed actions. `desktop/src/protocol.ts` owns
+the frontend contract. The desktop has no separate agent loop, provider
+credentials, goal store, or HTTP listener. Existing state/config overrides and
+saved profiles continue to work. Each app window owns its foreground session.
 Shared usage and storage locks remain owned by Go.
 
 Desktop view navigation and form edits are small adapters on the existing Go
@@ -55,7 +53,7 @@ current live interaction ID; retained cards have no approval authority.
 | Commands | Cmd/Ctrl+K, searchable commands, arrow navigation, input-prefilling commands |
 | Transcript search | Cmd/Ctrl+F, literal in-place highlights over rendered prose/results, previous/next matches, Enter/Shift+Enter, and surrounding context preserved |
 | Drafts | Local recovery per profile/conversation (or selected workspace before a conversation exists); saved-draft manager with clear/disable controls; unsaved forms and paused queues prompt before leaving |
-| Terminal handoff | Reviewed connector sign-in and other interactive CLI steps open the system terminal and return their status |
+| Terminal handoff | Reviewed system sign-in, installation, and action steps open the system terminal and return their status |
 
 Enter sends and Shift+Enter inserts a line. Cmd/Ctrl+N starts a conversation
 in the selected workspace. During work, Enter queues a follow-up and
@@ -196,20 +194,14 @@ the desktop closes. Closing other active foreground work asks to stop it,
 then shuts down its Go child. Scheduled checks retain their existing service
 lifecycle; the desktop does not silently enable an OS service.
 
-## Rollout
+## Distribution
 
-Keep both interfaces while checking:
-
-- Whether a user can resume a goal, understand changes, review an action, and
-  find the result without knowing slash commands.
-- Whether model setup, source recovery, shared limits, and restore reviews
-  remain understandable in the desktop.
-- Whether startup, idle memory, packaging size, and everyday responsiveness
-  justify the extra Electron runtime.
-- Whether real terminal usage still provides a useful workflow.
-
-Remove a frontend only after there is evidence to do so. The Go runtime and
-headless CLI remain reusable regardless of that later product decision.
+Desktop bundles and installers are the release artifacts. `make build` builds
+the app; `make package` creates an unpacked local app; `make dist` produces
+installers. `make runtime` is a developer-only build of the private Go process.
+The old CLI installer now explains the migration without downloading anything.
+Historical verification notes below describe earlier implementation stages;
+they do not reinstate the retired frontend or distribution paths.
 
 ## Development verification
 
@@ -227,7 +219,7 @@ resource policy, process communication, and child shutdown.
 Native packaging is available through `desktop/package.json`. Signed and
 notarized release distribution, automatic updates, and Linux desktop runtime
 verification remain release work; they are not prerequisites for trying the
-desktop alongside the terminal locally.
+the desktop app locally.
 
 Referene attribution is in `desktop/licenses/OPENHANDS.txt`.
 

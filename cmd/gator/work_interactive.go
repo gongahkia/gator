@@ -57,15 +57,7 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 	originalWorkingDirectory := workingDirectory
 	backend := os.Getenv("GATOR_UI_BACKEND") == "1"
 	if !backend {
-		input, err := os.Stdin.Stat()
-		if err != nil || input.Mode()&os.ModeCharDevice == 0 {
-			return errors.New("interactive Work requires a terminal; use 'gator work' for scripts")
-		}
-		output, err := os.Stdout.Stat()
-		if err != nil || output.Mode()&os.ModeCharDevice == 0 {
-			return errors.New("interactive Work requires a terminal; use 'gator work' for scripts")
-		}
-		return launchTerminalUI(startConversationID, goalID)
+		return errors.New(desktopOnlyMessage)
 	}
 	stateDir, err := state.ResolveDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {

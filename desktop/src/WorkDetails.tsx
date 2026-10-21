@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, ChartNoAxesCombined, ChevronDown, ChevronRight, FileCode2, Files, FileText, Folder, ListChecks, Plug, X } from "lucide-react";
-import type { BackendBundle, BackendState } from "../../ui/src/protocol";
+import type { BackendBundle, BackendState } from "./protocol";
 import type { PresenceRef } from "./motion";
 import { Markdown } from "./Result";
 import { CopyButton } from "./CopyButton";

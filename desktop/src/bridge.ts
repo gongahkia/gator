@@ -1,4 +1,4 @@
-import type { BackendState, Frame } from "../../ui/src/protocol";
+import type { BackendState, Frame } from "./protocol";
 
 export type DesktopSnapshot = { state?: BackendState; error?: string; connection?: "starting" | "connected" | "disconnected"; sessionID?: string; terminalBusy?: boolean; fullScreen?: boolean };
 export type DesktopFrame = Omit<Frame, "version">;

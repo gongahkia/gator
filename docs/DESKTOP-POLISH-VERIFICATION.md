@@ -1,5 +1,11 @@
 # Desktop polish: implementation and verification
 
+**22 October 2026 follow-up:** the terminal frontend and its status-line
+settings were subsequently retired when desktop became the primary interface.
+This report records the preceding polish pass; see
+[the current interface decision](DESKTOP-PRIMARY.md).
+
+
 21 October 2026. Follow-up to the [baseline screen audit](DESKTOP-SCREEN-AUDIT.md).
 Full review using `make-interfaces-feel-better`.
 

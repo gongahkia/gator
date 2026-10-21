@@ -9,7 +9,7 @@ import { createServer } from "node:http";
 const launchDesktop = (env: Record<string, string | undefined>) => {
   const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
   const definedEnv = Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
-  return electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env: definedEnv });
+  return electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env: { ...definedEnv, GATOR_INTERNAL_COMMANDS: "" } });
 };
 
 const openSettingsCategory = async (page: Page, name: string) => {
@@ -29,7 +29,7 @@ const settlePresentation = async (page: Page) => {
 test("unsent drafts survive reload and reconnect without submission, and retention can be cleared", async () => {
   test.setTimeout(90_000); // Reconnect plus two isolated app launches and native teardown.
   const directory = await mkdtemp(join(tmpdir(), "gator-desktop-drafts-e2e-"));
-  const env = { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") };
+  const env = { ...process.env, GATOR_INTERNAL_COMMANDS: "1", GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") };
   let application = await launchDesktop(env);
   try {
     const page = await application.firstWindow();
@@ -75,7 +75,7 @@ test("unsent drafts survive reload and reconnect without submission, and retenti
 
 test("long conversations retain context while searching and signal activity without moving the reader", async () => {
   const directory = await mkdtemp(join(tmpdir(), "gator-desktop-transcript-e2e-"));
-  const env = { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") };
+  const env = { ...process.env, GATOR_INTERNAL_COMMANDS: "1", GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") };
   const application = await launchDesktop(env);
   try {
     const page = await application.firstWindow();
@@ -136,7 +136,7 @@ test("recent work groups real saved conversations by workspace and isolates thei
     await mkdir(root, { recursive: true });
     await writeFile(join(root, "conversation.json"), JSON.stringify({ version: 2, id, title: `Plan ${index}`, source_path: index < 5 ? first : second, snapshot_id: "snap-test", created_at: new Date(0).toISOString(), updated_at: new Date(1000000 - index).toISOString() }), { mode: 0o600 });
   }
-  const env = { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop"), GATOR_DESKTOP_WORKSPACE: first };
+  const env = { ...process.env, GATOR_INTERNAL_COMMANDS: "1", GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop"), GATOR_DESKTOP_WORKSPACE: first };
   const application = await launchDesktop(env);
   try {
     const page = await application.firstWindow();
@@ -200,7 +200,7 @@ test("recent work groups real saved conversations by workspace and isolates thei
 test("motion is interruptible, releases dismissed controls, and honors reduced motion", async () => {
   test.setTimeout(120_000); // Includes inspection at 10% playback and native startup.
   const directory = await mkdtemp(join(tmpdir(), "gator-desktop-motion-e2e-"));
-  const env = { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") };
+  const env = { ...process.env, GATOR_INTERNAL_COMMANDS: "1", GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") };
   const application = await launchDesktop(env);
   try {
     const page = await application.firstWindow();
@@ -343,8 +343,8 @@ test("queued messages can be edited, reordered, removed, and resumed without los
   });
   await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
   const address = server.address() as { port: number };
-  const env = { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop"), GATOR_DESKTOP_WORKSPACE: workspace };
-  const cli = (args: string[]) => execFileSync(resolve("runtime/gator"), args, { env, encoding: "utf8" });
+  const env = { ...process.env, GATOR_INTERNAL_COMMANDS: "1", GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop"), GATOR_DESKTOP_WORKSPACE: workspace };
+  const cli = (args: string[]) => execFileSync(resolve("runtime/gator-runtime"), args, { env, encoding: "utf8" });
   cli(["provider", "add", "queue-fixture", "--base-url", `http://127.0.0.1:${address.port}/v1/chat/completions`, "--model", "fixture-model"]);
   cli(["config", "set", "default-provider", "queue-fixture"]);
   const application = await launchDesktop(env);
@@ -470,8 +470,8 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
   });
   await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
   const address = server.address() as { port: number };
-  const env = { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop"), GATOR_DESKTOP_WORKSPACE: workspace };
-  const binary = resolve("runtime/gator");
+  const env = { ...process.env, GATOR_INTERNAL_COMMANDS: "1", GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop"), GATOR_DESKTOP_WORKSPACE: workspace };
+  const binary = resolve("runtime/gator-runtime");
   const cli = (args: string[]) => execFileSync(binary, args, { env, encoding: "utf8" });
   cli(["provider", "add", "desktop-fixture", "--base-url", `http://127.0.0.1:${address.port}/v1/chat/completions`, "--model", "fixture-model"]);
   cli(["config", "set", "default-provider", "desktop-fixture"]);
@@ -661,8 +661,8 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
 
 test("dashboard scroll respects interaction and reduced motion; usage controls keep the Go review flow", async () => {
   const directory = await mkdtemp(join(tmpdir(), "gator-desktop-dashboard-e2e-"));
-  const env = { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") };
-  const binary = resolve("runtime/gator");
+  const env = { ...process.env, GATOR_INTERNAL_COMMANDS: "1", GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") };
+  const binary = resolve("runtime/gator-runtime");
   const cli = (args: string[]) => execFileSync(binary, args, { env, encoding: "utf8" });
   const application = await launchDesktop(env);
   try {
@@ -747,7 +747,7 @@ test("dashboard scroll respects interaction and reduced motion; usage controls k
 
 test("review presentation preserves exact previews and only the live approval action", async () => {
   const directory = await mkdtemp(join(tmpdir(), "gator-desktop-review-ui-"));
-  const env = { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") };
+  const env = { ...process.env, GATOR_INTERNAL_COMMANDS: "1", GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") };
   const application = await launchDesktop(env);
   try {
     const page = await application.firstWindow();
@@ -784,7 +784,7 @@ test("review presentation preserves exact previews and only the live approval ac
 
 test("first-run model setup uses native fields and keeps credentials out of display state", async () => {
   const directory = await mkdtemp(join(tmpdir(), "gator-desktop-setup-e2e-"));
-  const env = { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") };
+  const env = { ...process.env, GATOR_INTERNAL_COMMANDS: "1", GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") };
   const application = await launchDesktop(env);
   try {
     const page = await application.firstWindow();

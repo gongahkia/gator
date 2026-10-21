@@ -10,13 +10,13 @@ async function profile() {
   const workspace = join(directory, "workspace");
   await mkdir(workspace, { recursive: true });
   await writeFile(join(workspace, "project.md"), "# Offsite\nReview the venue shortlist and budget.\n");
-  const env = Object.fromEntries(Object.entries({ ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop"), GATOR_DESKTOP_WORKSPACE: workspace }).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
-  const cli = (...args: string[]) => execFileSync(resolve("runtime/gator"), args, { env, encoding: "utf8" }).trim();
+  const env = Object.fromEntries(Object.entries({ ...process.env, GATOR_INTERNAL_COMMANDS: "1", GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop"), GATOR_DESKTOP_WORKSPACE: workspace }).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+  const cli = (...args: string[]) => execFileSync(resolve("runtime/gator-runtime"), args, { env, encoding: "utf8" }).trim();
   return { directory, workspace, env, cli };
 }
 async function launch(env: Record<string, string>) {
   const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
-  const app = await electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env });
+  const app = await electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env: { ...env, GATOR_INTERNAL_COMMANDS: "" } });
   const page = await app.firstWindow();
   await expect(page.getByRole("textbox", { name: "Message Gator", exact: true })).toBeVisible();
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 960));
@@ -168,7 +168,7 @@ test("native follow-up fields review exact values and path selection never switc
   } finally { await closeDesktop(app); await rm(p.directory, { recursive: true, force: true }); }
 });
 
-test("saved guidance and terminal status line controls persist explicit native choices", async () => {
+test("saved guidance persists native choices and retired terminal settings are absent", async () => {
   const p = await profile();
   const { app, page } = await launch(p.env);
   try {
@@ -193,22 +193,26 @@ test("saved guidance and terminal status line controls persist explicit native c
     await capture(page, "guidance-filter-empty");
     await page.getByRole("combobox", { name: "Filter saved guidance", exact: true }).selectOption("active");
     await expect(page.locator(".panel-row")).toHaveCount(1);
-    await navigate(page, "/statusline");
-    // These controls wait for the authoritative Go projection after IPC.
-    await page.getByRole("switch", { name: "Show in Terminal", exact: true }).click();
-    await expect(page.getByRole("switch", { name: "Show in Terminal", exact: true })).toBeChecked();
-    await page.getByRole("checkbox", { name: "Effort", exact: true }).click();
-    await expect(page.getByRole("checkbox", { name: "Effort", exact: true })).toBeChecked();
-    const position = (await snapshot(page)).panel!.rows!.find((row) => row.label === "Effort")!.position!;
-    await page.getByRole("button", { name: "Move Effort earlier", exact: true }).click();
-    await expect.poll(async () => (await snapshot(page)).panel!.rows!.find((row) => row.label === "Effort")!.position).toBe(position - 1);
-    await capture(page, "statusline-native-options");
-    const selected = (await snapshot(page)).panel!.rows!.filter((row) => row.checked).sort((a, b) => a.position! - b.position!).map((row) => row.label);
-    await page.getByRole("button", { name: "Save changes", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Terminal status line", exact: true })).toHaveCount(0);
-    await navigate(page, "/statusline");
-    await expect(page.getByRole("switch", { name: "Show in Terminal", exact: true })).toBeChecked();
-    await expect(page.getByRole("checkbox", { name: "Effort", exact: true })).toBeChecked();
-    expect((await snapshot(page)).panel!.rows!.filter((row) => row.checked).sort((a, b) => a.position! - b.position!).map((row) => row.label)).toEqual(selected);
+    expect((await snapshot(page)).commands?.some((command) => command.name === "statusline")).toBe(false);
+    await page.getByRole("button", { name: "Search commands", exact: true }).click();
+    await page.getByRole("textbox", { name: "Find a command", exact: true }).fill("statusline");
+    await expect(page.locator(".command-list button")).toHaveCount(0);
+    await expect(page.getByText("No commands match “statusline”.", { exact: true })).toBeVisible();
+    await capture(page, "retired-terminal-settings");
+    await page.keyboard.press("Escape");
+
+  } finally { await closeDesktop(app); await rm(p.directory, { recursive: true, force: true }); }
+});
+
+test("the desktop starts without a standalone Node or Gator CLI on PATH", async () => {
+  const p = await profile();
+  const emptyPath = join(p.directory, "empty-path");
+  await mkdir(emptyPath);
+  const { app, page } = await launch({ ...p.env, PATH: emptyPath });
+  try {
+    await expect(page.getByRole("heading", { name: "What’s on your mind?", exact: true })).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Message Gator", exact: true })).toBeVisible();
+    expect((await snapshot(page)).commands?.some((command) => command.name === "statusline")).toBe(false);
+    await capture(page, "desktop-without-cli-or-node");
   } finally { await closeDesktop(app); await rm(p.directory, { recursive: true, force: true }); }
 });

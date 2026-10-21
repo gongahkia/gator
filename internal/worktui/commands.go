@@ -221,7 +221,6 @@ func commandPaletteEntries() []entry {
 		{title: "/source ignore", subtitle: "Ignore a project instruction", kind: "command-input", command: "/source ignore", advanced: true},
 		{title: "/source unignore", subtitle: "Restore a project instruction", kind: "command-input", command: "/source unignore", advanced: true},
 		{title: "/source ignored", subtitle: "List ignored project instructions", kind: "command", command: "/source ignored", advanced: true},
-		{title: "/statusline", subtitle: "Configure the optional status line", kind: "command", command: "/statusline", advanced: true},
 		{title: "/permissions", subtitle: "Inspect current work authority", kind: "command", command: "/permissions", advanced: true},
 		{title: "/agents", subtitle: "Inspect internal specialists", kind: "command", command: "/agents", advanced: true},
 		{title: "/queue", subtitle: "Show queued prompts", kind: "command", command: "/queue"},
@@ -609,21 +608,16 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 	case "/status":
 		result = m.workStatus()
 	case "/statusline":
-		if len(fields) != 1 {
-			err = fmt.Errorf("usage: /statusline")
-			break
-		}
-		m.openStatusLineEditor()
-		return m, nil
+		err = fmt.Errorf("the terminal interface is retired; use Settings in Gator desktop")
 	case "/permissions":
 		result = m.workPermissions()
 	case "/settings":
 		if len(fields) == 2 && fields[1] == "statusline" {
-			m.openStatusLineEditor()
-			return m, nil
+			err = fmt.Errorf("the terminal interface is retired; use Settings in Gator desktop")
+			break
 		}
 		if len(fields) != 1 {
-			err = fmt.Errorf("usage: /settings [statusline]")
+			err = fmt.Errorf("usage: /settings")
 			break
 		}
 		fallthrough
@@ -1481,7 +1475,7 @@ func workHelp() string {
                                  record feedback for this Work
   /review · /save · /apply · /retry
                                  review and deliver a completed result
-  /status · /doctor · /settings [statusline] · /theme · /new · /copy · /exit
+  /status · /doctor · /settings · /theme · /new · /copy · /exit
 
 Type / in an empty prompt to browse commands. Search also finds advanced controls.
 Use /help advanced for workspace, integration, revision, and queue details.
@@ -1503,7 +1497,7 @@ func workAdvancedHelp() string {
   /effort low|standard|high · /attach PATH · /detach PATH|all
   /source ignore|unignore|ignored PATH · /source-refresh
   /connector ... · /web-origin ...
-  /status · /permissions · /statusline · /doctor · /agents
+  /status · /permissions · /doctor · /agents
   /pilot guide|record|report      review observed project follow-up outcomes
   /revision-back · /revision-forward [REVISION]
   /queue · /dequeue · /clear-queue

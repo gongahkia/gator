@@ -1,4 +1,4 @@
-import type { BackendPanel } from "../../ui/src/protocol";
+import type { BackendPanel } from "./protocol";
 import type { DesktopFrame } from "./bridge";
 import { Panel } from "./Panel";
 

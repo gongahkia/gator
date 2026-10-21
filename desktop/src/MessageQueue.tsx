@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, CornerDownLeft, ListOrdered, Pencil, X } from "lucide-react";
-import type { BackendState, QueueAction, QueuedMessage } from "../../ui/src/protocol";
+import type { BackendState, QueueAction, QueuedMessage } from "./protocol";
 import type { DesktopFrame } from "./bridge";
 
 export type QueueChange = Omit<QueueAction, "request_id">;

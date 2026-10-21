@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronRight, Folder, Search, X } from "lucide-react";
 import { useId, useMemo, useState } from "react";
-import type { BackendState } from "../../ui/src/protocol";
+import type { BackendState } from "./protocol";
 
 export function RecentConversations({ state, disabled, open, browse }: { state: BackendState; disabled: boolean; open(id: string): void; browse(): void }) {
   const [closed, setClosed] = useState(new Set<string>());

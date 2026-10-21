@@ -4,9 +4,6 @@ import (
 	"encoding/json"
 	"io"
 	"os"
-	"path/filepath"
-	"runtime"
-	"strings"
 	"testing"
 	"time"
 
@@ -147,58 +144,5 @@ func TestUIBridgeHandsEditorToFrontendAndRestoresDraft(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("UI bridge did not exit")
-	}
-}
-
-func TestNodeRuntimeGuard(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("Gator does not support Windows")
-	}
-	path := filepath.Join(t.TempDir(), "node")
-	if err := os.WriteFile(path, []byte("#!/bin/sh\nprintf 'v21.9.0\\n'\n"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if supportedNodeUI(path) {
-		t.Fatal("Node 21 unexpectedly passed the UI guard")
-	}
-	if err := os.WriteFile(path, []byte("#!/bin/sh\nprintf 'v22.0.0\\n'\n"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if !supportedNodeUI(path) {
-		t.Fatal("Node 22 did not pass the UI guard")
-	}
-}
-
-func TestInteractiveLaunchRejectsMissingOrOldNode(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("Gator does not support Windows")
-	}
-	t.Setenv("PATH", t.TempDir())
-	if err := launchTerminalUI("", ""); err == nil || !strings.Contains(err.Error(), "Node.js 22") {
-		t.Fatalf("missing Node should stop interactive startup: %v", err)
-	}
-	path := filepath.Join(os.Getenv("PATH"), "node")
-	if err := os.WriteFile(path, []byte("#!/bin/sh\nprintf 'v21.9.0\\n'\n"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := launchTerminalUI("", ""); err == nil || !strings.Contains(err.Error(), "upgrade Node.js") {
-		t.Fatalf("old Node should stop interactive startup: %v", err)
-	}
-}
-
-func TestDoctorLaunchRejectsMissingOrOldNode(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("Gator does not support Windows")
-	}
-	t.Setenv("PATH", t.TempDir())
-	if err := launchDoctorUI(nil, io.Discard); err == nil || !strings.Contains(err.Error(), "gator doctor requires Node.js 22") {
-		t.Fatalf("missing Node should stop doctor: %v", err)
-	}
-	path := filepath.Join(os.Getenv("PATH"), "node")
-	if err := os.WriteFile(path, []byte("#!/bin/sh\nprintf 'v21.9.0\\n'\n"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := launchDoctorUI(nil, io.Discard); err == nil || !strings.Contains(err.Error(), "upgrade Node.js") {
-		t.Fatalf("old Node should stop doctor: %v", err)
 	}
 }

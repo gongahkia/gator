@@ -3,7 +3,10 @@ package main
 import (
 	"fmt"
 	"io"
+	"os/exec"
 	"runtime"
+	"strconv"
+	"strings"
 
 	"github.com/gongahkia/gator/internal/dependency"
 )
@@ -18,7 +21,7 @@ func writeDependencyDoctor(out io.Writer, statuses []dependency.Status) error {
 	for _, status := range statuses {
 		state := "installed"
 		usable := status.Installed
-		if status.ID == "node" && usable && !supportedNodeUI(status.Path) {
+		if status.ID == "node" && usable && !supportedNodeTools(status.Path) {
 			usable = false
 			state = "unsupported version"
 		}
@@ -26,7 +29,7 @@ func writeDependencyDoctor(out io.Writer, statuses []dependency.Status) error {
 			state = "missing"
 		}
 		role := "optional"
-		if status.Required || status.ID == "node" {
+		if status.Required {
 			role = "required"
 		}
 		if _, err := fmt.Fprintf(out, "  %s: %s (%s for %s)\n", status.Name, state, role, status.Purpose); err != nil {
@@ -50,4 +53,14 @@ func writeDependencyDoctor(out io.Writer, statuses []dependency.Status) error {
 		}
 	}
 	return nil
+}
+
+// External Node is optional tooling; Electron supplies its own application runtime.
+func supportedNodeTools(node string) bool {
+	version, err := exec.Command(node, "--version").Output()
+	if err != nil {
+		return false
+	}
+	major, err := strconv.Atoi(strings.SplitN(strings.TrimPrefix(strings.TrimSpace(string(version)), "v"), ".", 2)[0])
+	return err == nil && major >= 22
 }

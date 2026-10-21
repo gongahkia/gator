@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import type { BackendPanel } from "../../ui/src/protocol";
+import type { BackendPanel } from "./protocol";
 
 type Row = NonNullable<BackendPanel["rows"]>[number];
 

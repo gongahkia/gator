@@ -1,4 +1,11 @@
-# Gator as a terminal personal agent
+# Gator as a desktop personal agent
+
+**Interface decision, 22 October 2026:** desktop is the primary supported
+interface; the standalone CLI and React terminal renderer are retired. See
+[Desktop as the primary interface](DESKTOP-PRIMARY.md). Command-line examples
+below are historical implementation/maintenance references, not current user
+onboarding instructions. In-app slash commands remain available where offered.
+
 
 ## Architecture decision — 2026-10-19
 
@@ -48,9 +55,9 @@ forgetting, and one-run omission. Background health comes from durable attempts
 and a fresh supervisor probe. The [project follow-up pilot](PROJECT_FOLLOWUP_PILOT.md)
 defines the human review procedure and evidence required before success claims.
 
-**Gator is a terminal-native personal agent that remembers your ongoing goals, works across local files and selected tools, and checks with you before consequential actions.**
+**Gator is a desktop personal agent that remembers your ongoing goals, works across local files and selected tools, and checks with you before consequential actions.**
 
-The job is to help a person make progress over days and weeks. A goal may produce a brief, edit a document, answer a question, or prepare an external action; no one output format defines the product. The terminal is the primary conversation and control surface. Local state and provider choice matter, but neither by itself proves usefulness or lower resource use.
+The job is to help a person make progress over days and weeks. A goal may produce a brief, edit a document, answer a question, or prepare an external action; no one output format defines the product. The desktop app is the primary conversation and control surface. Local state and provider choice matter, but neither by itself proves usefulness or lower resource use.
 
 ## Competitive reality
 

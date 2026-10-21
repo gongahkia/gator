@@ -14,20 +14,10 @@ func TestRunHelp(t *testing.T) {
 	for _, command := range []string{"--help", "-h"} {
 		var output bytes.Buffer
 		if err := run([]string{command}, &output); err != nil {
-			t.Fatalf("run %s: %v", command, err)
+			t.Fatal(err)
 		}
-		if !strings.Contains(output.String(), "Start:") {
-			t.Fatalf("help output = %q, want a terminal-agent entry point", output.String())
-		}
-		for _, value := range []string{"gator goal add", "gator work --goal GOAL_ID", "gator \"research X and produce a report\"", "Work", "History", "Goals", "Learnings", "Jobs", "Settings", "gator work review", "gator work -- TASK"} {
-			if !strings.Contains(output.String(), value) {
-				t.Fatalf("help output is missing %q", value)
-			}
-		}
-		for _, hidden := range []string{"gator agent acp", "--kind json|webhook", "snapshot-max-files", "--actions forbid|draft|approve"} {
-			if strings.Contains(output.String(), hidden) {
-				t.Fatalf("normal help exposes advanced plumbing %q: %q", hidden, output.String())
-			}
+		if !strings.Contains(output.String(), "Open the Gator desktop application") || strings.Contains(output.String(), "gator work") {
+			t.Fatalf("help = %q", output.String())
 		}
 	}
 }
@@ -108,7 +98,8 @@ func TestACPCodeEntryPointsAreRetired(t *testing.T) {
 	}
 }
 
-func TestShortCLIFormsRouteToTheirCommandFamilies(t *testing.T) {
+func TestInternalCommandAliasesRouteToTheirServices(t *testing.T) {
+	t.Setenv("GATOR_STATE_DIR", t.TempDir())
 	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
 	var output bytes.Buffer
 	if err := run([]string{"-c"}, &output); err != nil || !strings.Contains(output.String(), "Settings\n") {
@@ -118,12 +109,12 @@ func TestShortCLIFormsRouteToTheirCommandFamilies(t *testing.T) {
 	if err := run([]string{"-p", "list"}, &output); err != nil || !strings.Contains(output.String(), "No custom providers configured") {
 		t.Fatalf("-p list output = %q, err = %v", output.String(), err)
 	}
-	if err := run([]string{"-u", "unexpected"}, io.Discard); err == nil || !strings.Contains(err.Error(), "usage: gator update") {
+	if err := run([]string{"-u", "unexpected"}, io.Discard); err == nil || !strings.Contains(err.Error(), "CLI updater is retired") {
 		t.Fatalf("-u error = %v", err)
 	}
 	path := os.Getenv("PATH")
 	t.Setenv("PATH", t.TempDir())
-	if err := run([]string{"-d"}, io.Discard); err == nil || !strings.Contains(err.Error(), "gator doctor requires Node.js 22") {
+	if err := run([]string{"-d"}, io.Discard); err != nil {
 		t.Fatalf("-d error = %v", err)
 	}
 	t.Setenv("PATH", path)

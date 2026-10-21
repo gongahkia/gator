@@ -3,41 +3,37 @@ maybe someone can learn something from looking at mine.
 
 = = = = = = = =
 
-Gator is a terminal-native personal agent for ongoing goals.
+Gator is a desktop personal agent for ongoing work.
 
-Gator lets you keep an ongoing goal and continue its conversation across
-terminal sessions. The terminal home shows active goals and unread follow-up
-results; /goals resumes one. You can save facts, preferences, decisions, and
-notes with gator memory (or /memory), then search, correct, expire, or forget
-them. Relevant active memories are retrieved for each Work turn alongside the
-selected goal's current context. Gator can answer questions, research selected
+Open the Gator app to start a conversation, continue an ongoing goal, review
+follow-up results, and manage saved knowledge. Gator can research selected
 sources, analyze data, create documents, and prepare actions through selected
-tools. A goal can have a recurring check with gator goal schedule. The local
-job supervisor runs scheduled checks and sends results to Gator's inbox; on
-macOS and Linux, opt-in per-user services can keep it running after the CLI
-closes. External changes still require explicit approval. See docs/PERSONAL_AGENT_DIRECTION.md
-for the product scope and current limits.
+tools. External changes still require explicit approval.
 
-Longer notes and reusable text skills can be saved with `gator note` and
-`gator skill` (or `/note` and `/skill` in the terminal UI). They live in a
-private, inspectable knowledge directory and are loaded only through bounded
-read tools. An active goal can use a read-only goal reviewer to compare recent
-work and follow-ups before recommending a next step. See docs/KNOWLEDGE.md.
+The Electron frontend is the primary and currently supported user interface.
+The standalone CLI and React terminal renderer are retired. Existing saved
+conversations, goals, knowledge, credentials, and settings remain in the same
+local Gator profile. The app bundles the Go runtime; users do not need a CLI
+or a separate Node.js installation.
 
-Gator currently pins Go 1.25.13.
+For local development, install Go 1.25.13 and Node.js 22.12 or newer, then run:
 
-Build with `make build`, then run `./bin/gator` for the interactive terminal.
-The green React terminal interface requires Node.js 22 or newer. If Node.js is
-missing or too old, interactive startup exits with installation guidance.
-Headless commands still run without Node.js. `gator doctor` also uses the Node
-terminal interface and requires Node.js 22 or newer. The Go Work
-engine owns conversations, commands, and approvals behind the React interface.
+  npm ci --prefix desktop
+  make desktop
 
-An optional Electron desktop companion is available alongside the terminal.
-Run `npm ci --prefix desktop` once, then `make desktop`. It adapts the sibling
-Referene frontend to the same Go runtime and saved Gator profile. Choose a
-workspace using its folder control or resume an existing goal/conversation.
-See desktop/README.md and docs/DESKTOP.md. The terminal remains available.
+Choose a workspace from the app's folder control. A first launch starts in a
+private empty workspace rather than implicitly reading your home directory.
+Use Settings for models, usage limits, backups, and recovery.
+
+Build with `make build`; create a local application bundle with `make package`.
+`make dist` creates platform installers under desktop/release/. macOS builds
+are unsigned development builds until release signing is configured.
+See desktop/README.md and docs/DESKTOP.md for setup and current boundaries.
+See docs/DESKTOP-PRIMARY.md for the CLI retirement decision.
+
+The Go process under desktop/runtime/ is a private app component, not an
+installable command-line product. Reviewed system sign-in or installation
+steps may still open the operating system's Terminal and return to the app.
 
 = = = = = = = =
 

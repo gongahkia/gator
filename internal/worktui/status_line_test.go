@@ -157,11 +157,13 @@ func TestStatusLineRequiresExplicitEnable(t *testing.T) {
 	}
 }
 
-func TestSettingsStatusLineOpensTheVisibilityControl(t *testing.T) {
-	model := New(Config{CurrentFolder: "/work"})
-	next, command := model.runLocalCommand("/settings statusline")
-	model = next.(Model)
-	if command != nil || !model.launcher || model.launcherMode != "status-line" {
-		t.Fatalf("settings status line did not open visibility control: %#v", model)
+func TestTerminalSettingsRouteIsRetired(t *testing.T) {
+	for _, text := range []string{"/settings statusline", "/statusline"} {
+		model := New(Config{CurrentFolder: t.TempDir()})
+		next, command := model.runLocalCommand(text)
+		model = next.(Model)
+		if command != nil || model.launcher || !strings.Contains(model.snapshotText(), "terminal interface is retired") {
+			t.Fatalf("retired route %q: %s", text, model.snapshotText())
+		}
 	}
 }

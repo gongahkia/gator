@@ -1,5 +1,5 @@
 import { ChevronDown } from "lucide-react";
-import type { BackendPanel, ResultField } from "../../ui/src/protocol";
+import type { BackendPanel, ResultField } from "./protocol";
 import { ShortcutReference } from "./DesktopHelp";
 
 export function PanelFacts({ fields, summary = false }: { fields: ResultField[]; summary?: boolean }) {

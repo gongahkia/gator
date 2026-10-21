@@ -33,7 +33,7 @@ jobs:
       - name: Install strict process sandbox
         run: sudo apt-get update && sudo apt-get install -y bubblewrap
       - name: Build
-        run: make build
+        run: make runtime
       - name: Run bounded live Work corpus
         env:
           GATOR_PROVIDER: ${{ inputs.provider }}
@@ -47,7 +47,7 @@ jobs:
           [[ "$WORK_MODEL_REQUESTS" =~ ^[0-9]+$ && "$WORK_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]]
           (( WORK_MODEL_REQUESTS >= 1 && WORK_MODEL_REQUESTS <= 512 ))
           (( WORK_TIMEOUT_SECONDS >= 1 && WORK_TIMEOUT_SECONDS <= 1800 ))
-          ./bin/gator eval work run internal/eval/testdata/work-v1/dataset.json \
+          GATOR_INTERNAL_COMMANDS=1 ./desktop/runtime/gator-runtime work eval run internal/eval/testdata/work-v1/dataset.json \
             --id "live-${GITHUB_RUN_ID}" --live --provider "$GATOR_PROVIDER" --model "$GATOR_MODEL" \
             --max-model-requests "$WORK_MODEL_REQUESTS" --timeout-seconds "$WORK_TIMEOUT_SECONDS" \
             --report-dir "$RUNNER_TEMP/work-eval"

@@ -113,7 +113,7 @@ func doctor(arguments []string, out io.Writer) error {
 		return err
 	}
 	if facts.CustomLocal {
-		if _, err := fmt.Fprintln(out, "Local runtime: open /model → Local in the TUI to inspect the Ollama server and model inventory."); err != nil {
+		if _, err := fmt.Fprintln(out, "Local runtime: open Settings → Models → Local model in Gator to inspect the Ollama server and model inventory."); err != nil {
 			return err
 		}
 	}
@@ -144,7 +144,7 @@ func doctorResult(arguments []string) (*uisnapshot.Result, error) {
 		},
 	}, {Title: "Dependencies"}, {Title: "Local model host"}, {Title: "Reviewed local models"}}}
 	for _, status := range facts.Dependencies {
-		usable := status.Installed && (status.ID != "node" || supportedNodeUI(status.Path))
+		usable := status.Installed && (status.ID != "node" || supportedNodeTools(status.Path))
 		state := "installed"
 		if !status.Installed {
 			state = "missing"
@@ -152,7 +152,7 @@ func doctorResult(arguments []string) (*uisnapshot.Result, error) {
 			state = "unsupported version"
 		}
 		role := "optional"
-		if status.Required || status.ID == "node" {
+		if status.Required {
 			role = "required"
 		}
 		detail := role + " for " + status.Purpose

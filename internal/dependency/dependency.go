@@ -89,12 +89,12 @@ func Catalog() []Requirement {
 			ID:         "node",
 			Name:       "Node.js",
 			Executable: "node",
-			Purpose:    "the interactive terminal interface and doctor",
+			Purpose:    "optional browser and MCP tools",
 			Required:   false,
 			Applicable: allPlatforms,
 			HelpURL:    "https://nodejs.org/en/download",
 			Instructions: func(string) []string {
-				return []string{"Install Node.js 22 or newer to run interactive Gator and doctor. Headless commands remain available."}
+				return []string{"Install Node.js 22 or newer if a browser or MCP tool needs it. Gator desktop includes its own application runtime."}
 			},
 		},
 	}

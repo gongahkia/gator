@@ -2,16 +2,13 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"runtime"
 	"strings"
-	"time"
 
-	"github.com/gongahkia/gator/internal/lifecycle"
 	"github.com/gongahkia/gator/internal/state"
 )
 
@@ -23,78 +20,15 @@ var (
 	date    = "unknown"
 )
 
-const usage = `Gator — terminal-native personal agent
+const usage = `Gator desktop runtime
 
-Start:
-  gator
-  gator goal add "Plan the offsite"
-  gator work --goal GOAL_ID "What should I do next?"
-  gator "research X and produce a report"
-  gator work [OPTIONS] TASK
-
-Inside Gator:
-  /followup new                 review a project check before saving
-  /memory                       set up recall and inspect data destinations
-  /context                      review sources and saved context
-  /overview                     changes, decisions, next actions, and blockers
-  /recovery                     reconnect, retry, and review offline coverage
-  /usage                        review shared usage and limits
-  /data                         manage retention, backups, and deletion
-
-Product areas:
-  Work        gator work [TASK] · gator work resume CONVERSATION TASK
-  History     gator work list · gator work history CONVERSATION · gator work show ID
-  Activity    gator work activity [--json]
-  Goals       gator goal add|chat|list|show|context|pause|resume|complete
-              gator goal schedule|watch|schedules|unschedule
-  Memory      gator memory add|list|search|show|correct|forget
-  Notes       gator note add|list|search|show|edit|remove
-  Skills      gator skill create|list|show|edit|enable|disable|remove
-  Learnings   gator learnings list [--status STATUS] [--scope SCOPE]
-              gator learnings add|edit|approve|reject|enable|disable ...
-  Jobs        gator job add|list|show|edit|enable|disable|run|history|remove
-              gator job inbox show|read|rate|report
-              gator job quiet-audit JOB_ID [ATTEMPT_ID missed|correct|clear [--note TEXT]]
-  Settings    gator config [show] · gator config set default-provider|default-model|sandbox|network VALUE
-  Overview    gator overview [--json|seen]
-  Usage       gator usage status|limits|pause|resume
-  Data        gator data status|retention|cleanup|preview|apply|export|verify
-              gator data restore|restore-apply|relink|relink-apply
-
-Common follow-up actions:
-  gator work review WORK_ID
-  gator work reconcile WORK_ID CORRELATION_ID
-  gator work decisions [RUN_ID] [--json]
-  gator work answer RUN_ID DECISION_ID
-  gator work steer RUN_ID TEXT · gator work stop RUN_ID
-  gator work cancel-task RUN_ID TASK_ID
-  gator work steer-task RUN_ID TASK_ID TEXT
-  gator work apply WORK_ID [OPTIONS]
-  gator work retry WORK_ID [OPTIONS]
-  gator work feedback WORK_ID accept|reject|correct|remember|dont-learn|list
-
-Advanced and integration families remain available when needed:
-  provider, config hook, agent, browser, desktop, doctor, extension, lsp,
-  mcp, pilot guide|record|report, theme, update, work eval, and work snapshot.
-  Run an advanced family with --help or consult its command-specific output.
-
-For a free-form Work task that begins with a nested command name, use
-gator work -- TASK to keep it a task rather than dispatching that command.`
+Open the Gator desktop application to use Gator.
+This bundled process is an internal app component, not a standalone CLI.
+Development setup: npm ci --prefix desktop && make desktop`
 
 func main() {
-	if len(os.Args) == 1 || (os.Args[1] != "--help" && os.Args[1] != "-h" && os.Args[1] != "--version" && os.Args[1] != "-v") {
-		if root, err := state.ResolveDir(""); err == nil {
-			if _, err := lifecycle.Maintain(context.Background(), root, time.Now()); err != nil && !errors.Is(err, state.ErrBusy) {
-				if errors.Is(err, lifecycle.ErrRecovery) {
-					fmt.Fprintln(os.Stderr, "gator:", err)
-					os.Exit(1)
-				}
-				fmt.Fprintln(os.Stderr, "gator: retention cleanup deferred:", err)
-			}
-		}
-	}
-	if err := run(os.Args[1:], os.Stdout); err != nil {
-		fmt.Fprintln(os.Stderr, "gator:", err)
+	if err := runDesktopRuntime(os.Args[1:], os.Stdout); err != nil {
+		fmt.Fprintln(os.Stderr, "Gator:", err)
 		os.Exit(1)
 	}
 }
@@ -104,7 +38,7 @@ func run(args []string, out io.Writer) error {
 		return fmt.Errorf("Gator supports only Linux and macOS; %s is not supported", runtime.GOOS)
 	}
 	if len(args) == 0 {
-		return workInteractive()
+		return errors.New(desktopOnlyMessage)
 	}
 	if args[0] == "--help" || args[0] == "-h" {
 		_, err := fmt.Fprintln(out, usage)
@@ -141,9 +75,9 @@ func run(args []string, out io.Writer) error {
 	case "agent", "-a":
 		return agentFamilyCommand(args[1:], out)
 	case "update", "-u":
-		return update(args[1:], out)
+		return errors.New("Gator desktop updates are installed through the desktop application distribution; the CLI updater is retired")
 	case "doctor", "-d":
-		return launchDoctorUI(args[1:], out)
+		return doctor(args[1:], out)
 	case "extension", "-e":
 		return extensionCommand(args[1:], out)
 	case "lsp", "-l":
@@ -181,25 +115,6 @@ func run(args []string, out io.Writer) error {
 			return errors.New("ui-backend is an internal Gator transport")
 		}
 		return workInteractiveConversationForGoal(args[1], args[2])
-	case "ui-doctor-backend":
-		if os.Getenv("GATOR_UI_DOCTOR_BACKEND") != "1" {
-			return errors.New("ui-doctor-backend is an internal Gator transport")
-		}
-		if len(args) > 1 && args[1] == "--json" {
-			result, err := doctorResult(args[2:])
-			if err != nil {
-				return err
-			}
-			settings, err := loadSettings()
-			if err != nil {
-				return err
-			}
-			return json.NewEncoder(out).Encode(struct {
-				Theme  string `json:"theme"`
-				Result any    `json:"result"`
-			}{Theme: settings.Theme, Result: result})
-		}
-		return doctor(args[1:], out)
 	case "work", "-w":
 		return workCommand(args[1:], out)
 	case "acp":
