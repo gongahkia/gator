@@ -64,7 +64,7 @@ export function Panel({ panel, send, title = panel.title, subtitle = panel.subti
   const creates = (hint: typeof hints[number]) => hint.key === "n" && /^(new|add)\b/i.test(hint.label);
   const keyboardFooter = !hasInputs && panel.kind !== "confirmation" && /^(Esc\b|↑|↓|Type to filter|Tab\b)/i.test(panel.footer ?? "");
   const supportingBlock = (block: NonNullable<BackendPanel["blocks"]>[number]) => !hasInputs && panel.kind !== "confirmation" && (
-    ["Storage", "Retrieval", "Chat processing", "How to read this"].includes(block.title ?? "") ||
+    block.collapsible || ["Storage", "Retrieval", "Chat processing", "How to read this"].includes(block.title ?? "") ||
     panel.title === "Saved knowledge" && ["Work context", "Observed source references"].includes(block.title ?? "")
   );
   const rowKeys = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {

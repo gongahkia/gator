@@ -129,15 +129,15 @@ func (m Model) recallPanel() uisnapshot.Panel {
 	}
 	p.Blocks = []uisnapshot.Block{
 		{Title: "Recall readiness", Lines: []string{valueOrNone(m.recall.State), m.recall.Detail}},
-		{Title: "1 · Storage", Lines: []string{valueOrDefault(m.recall.Storage, "Memories, notes, transcripts, and Work records are stored in your private Gator state directory on this computer.")}},
-		{Title: "2 · Retrieval", Lines: []string{valueOrDefault(m.recall.Retrieval, "Basic word matching works without a model download. Enhanced recall uses local embeddings or your separately selected cloud provider.")}},
-		{Title: "3 · Chat processing", Lines: []string{valueOrDefault(m.recall.Chat, "Selected saved context and task sources are supplied to the model chosen in /model. A cloud chat model processes that context remotely even when storage and retrieval are local.")}},
-		{Title: "Your controls", Lines: []string{"K browse saved knowledge; correct, forget, or omit it from the next run.", "Feedback ratings are retained for review. They do not automatically retrain your model.", "Local recall can fall back to basic word matching; each result's Context and sources shows the observed route."}},
+		{Title: "Storage", Collapsible: true, Lines: []string{valueOrDefault(m.recall.Storage, "Memories, notes, transcripts, and Work records are stored in your private Gator state directory on this computer.")}},
+		{Title: "Retrieval", Collapsible: true, Lines: []string{valueOrDefault(m.recall.Retrieval, "Basic word matching works without a model download. Enhanced recall uses local embeddings or your separately selected cloud provider.")}},
+		{Title: "Chat processing", Collapsible: true, Lines: []string{valueOrDefault(m.recall.Chat, "Selected saved context and task sources are supplied to the model chosen in /model. A cloud chat model processes that context remotely even when storage and retrieval are local.")}},
+		{Title: "Your controls", Collapsible: true, Lines: []string{"Browse saved knowledge to correct, forget, or omit it from the next run.", "Feedback ratings are retained for review. They do not automatically retrain your model.", "Local recall can fall back to basic word matching; each result's Context and sources shows the observed route."}},
 	}
 	if m.recallBusy {
 		p.Hints = []uisnapshot.Hint{{Shortcut: "Esc", Action: "cancel download"}}
 	} else {
-		p.Hints = []uisnapshot.Hint{{Shortcut: "I", Action: "install local recall"}, {Shortcut: "L", Action: "use local"}, {Shortcut: "O/G", Action: "OpenAI/Gemini"}, {Shortcut: "K", Action: "saved knowledge"}, {Shortcut: "C", Action: "chat model"}, {Shortcut: "R", Action: "refresh"}, {Shortcut: "Esc", Action: "back"}}
+		p.Hints = []uisnapshot.Hint{{Shortcut: "I", Action: "install local recall"}, {Shortcut: "L", Action: "use local"}, {Shortcut: "O", Action: "use OpenAI"}, {Shortcut: "G", Action: "use Gemini"}, {Shortcut: "K", Action: "saved knowledge"}, {Shortcut: "C", Action: "chat model"}, {Shortcut: "R", Action: "refresh"}, {Shortcut: "Esc", Action: "back"}}
 	}
 	return p
 }

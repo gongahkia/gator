@@ -43,6 +43,7 @@ type Input struct {
 }
 
 type Block struct {
-	Title string   `json:"title,omitempty"`
-	Lines []string `json:"lines"`
+	Title       string   `json:"title,omitempty"`
+	Lines       []string `json:"lines"`
+	Collapsible bool     `json:"collapsible,omitempty"`
 }

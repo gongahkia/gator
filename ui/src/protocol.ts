@@ -47,7 +47,7 @@ export type BackendPanel = {
     label: string; detail?: string; state?: string; tone?: ResultTone;
     input?: { value?: string; placeholder?: string; secret?: boolean; multiline?: boolean; limit: number };
   }[];
-  blocks?: { title?: string; lines: string[] | null }[];
+  blocks?: { title?: string; lines: string[] | null; collapsible?: boolean }[];
   usage?: Usage;
   selected?: number;
   notice?: string;
