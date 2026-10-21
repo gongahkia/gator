@@ -35,7 +35,7 @@ Gator retains its alligator identity and personal-agent destinations.
 
 | ID | Surface | Codex reference / Gator difference | Presentation adaptation | Status |
 | --- | --- | --- | --- | --- |
-| P1 | Typography and surfaces | Codex uses readable system typography; many Gator labels and controls are 10–12px | Shared text/spacing/radius tokens, larger text, restrained borders and consistent focus/hover | Planned |
+| P1 | Typography and surfaces | Codex uses readable system typography; many Gator labels and controls are 10–12px | Shared text/radius tokens, larger text, restrained borders and consistent focus/hover | Implemented: typography commit |
 | P2 | New conversation | Codex places the prompt beside the starting question; Gator pins it far below a dashboard | Center the starting composer; put the existing live overview and requested scrolling dashboard below it | Planned |
 | P3 | Navigation and settings | Codex has one Settings entry and a category rail; Gator spreads four settings links down the workspace sidebar | One Settings entry, categorized views for existing models, usage, data, and recovery; preserve all Go navigation/actions | Planned |
 | P4 | Conversation | Gator repeats avatars, names, and a left gutter on every message | Right-aligned user bubbles and an unboxed assistant reading column; preserve meaningful result roles | Planned |
