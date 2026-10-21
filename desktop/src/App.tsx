@@ -195,6 +195,7 @@ export function App() {
   const messages = state.messages.filter((message) => !search || `${message.text} ${JSON.stringify(message.result ?? message.bundle ?? "")}`.toLowerCase().includes(search.toLowerCase()));
   const slash = draft.startsWith("/") && !draft.includes(" ") ? state.commands.filter((command) => command.name.startsWith(draft.slice(1))).slice(0, 7) : [];
   const sourceName = state.source.split("/").at(-1) || "Workspace";
+  const headerTitle = home ? "New conversation" : panel ? conversationBrowser ? "Conversations" : panel.title : state.title;
 
   return <div className={`app-shell ${collapsed ? "sidebar-collapsed" : ""} ${details ? "details-open" : ""}`} data-theme={state.theme} data-platform={window.gator?.platform} data-fullscreen={fullScreen}>
     <div className="titlebar" aria-hidden="true"><span>Gator</span></div>
@@ -209,7 +210,7 @@ export function App() {
       </>}
     </aside>
     <main className="main-area">
-      <header className="main-header"><div className="breadcrumbs"><span>{home ? "Your workspace" : settingsPage ? "Settings" : conversationBrowser ? "Conversations" : panel ? panel.title : "Conversation"}</span><ChevronRight size={13} /><strong>{home ? "Home" : state.title}</strong></div><div className="header-actions"><button className="header-workspace" aria-label="Choose workspace folder" onClick={() => void window.gator?.chooseFolder().catch(() => {})} disabled={state.running || !!panel} title={state.source}><Folder size={15} /><span>{sourceName}</span><ChevronDown size={13} /></button><button className="icon-button" aria-label={details ? "Hide work details" : "Show work details"} aria-expanded={details} onClick={() => setDetails(!details)}><IconSwap active={details} on={<PanelRightClose size={18} />} off={<PanelRightOpen size={18} />} /></button></div></header>
+      <header className="main-header"><div className="breadcrumbs"><span>{settingsPage ? "Settings" : sourceName}</span><ChevronRight size={13} /><strong title={headerTitle}>{headerTitle}</strong></div><div className="header-actions">{!settingsPage && <><button className="header-workspace" aria-label="Choose workspace folder" onClick={() => void window.gator?.chooseFolder().catch(() => {})} disabled={state.running || !!panel} title={state.source}><Folder size={15} /><span>{sourceName}</span><ChevronDown size={13} /></button><button className="icon-button" aria-label={details ? "Hide work details" : "Show work details"} aria-expanded={details} onClick={() => setDetails(!details)}><IconSwap active={details} on={<PanelRightClose size={18} />} off={<PanelRightOpen size={18} />} /></button></>}</div></header>
       {error && <div className="connection-error" role="alert"><span>{error}</span><button className="small-button" onClick={() => void window.gator?.restart().catch(() => {})}>Reconnect</button></div>}
       {state.notice && <div className="view-status" role="status">{state.notice}</div>}
       {panel && state.pending_approval && <div className="approval-reminder panel-approval"><ShieldCheck size={16} /><span>A current action needs your review.</span><button className="small-button" onClick={() => navigate("/chat")}>Review action<ChevronRight size={13} /></button></div>}

@@ -43,6 +43,7 @@ Gator retains its alligator identity and personal-agent destinations.
 | P6 | Lists and forms | Gator stretches terminal-style rows across the whole window and duplicates row actions in its footer | Bounded content width, native page toolbars, single row actions, direct keyboard list navigation, and better empty states | Implemented: native panels commit |
 | P7 | Diagnostic text and shortcuts | Metadata, key legends, and command-like instructions compete with primary page content | Disclose supporting diagnostics/shortcuts; keep forms, review details, warnings, and all underlying text accessible | Implemented: disclosure commit |
 | P8 | Approvals and details | Most Gator results have identical document-card treatment | Clear semantic status icons, deliberate review hierarchy, and exact action details visible before approval | Implemented: result/review commit |
+| P9 | Page header | Gator repeats the conversation title on unrelated settings/list pages | Show the active page and workspace/settings context; keep conversation tools on conversation surfaces | Implemented: page header commit |
 | K1 | Queue | Gator already has visible editable/reorderable queued cards | Retain Go acknowledgement, captured options, pause/resume, and draft protection; do not change scheduling | Retained |
 | K2 | Motion | Gator already has interruptible transitions and reduced-motion support | Keep existing motion rules; no entrance replay during typing or provider updates | Retained |
 | K3 | Usage | Gator accounts for local provider admission; Codex screenshots can show account/subscription quotas | Keep real local daily counters, uncapped states, UTC reset, and the separate review/confirm flow | Intentional difference |
@@ -74,6 +75,8 @@ Gator retains its alligator identity and personal-agent destinations.
 | MEDIUM | `desktop/src/Panel.tsx:35` | Duplicate footer actions, flat full-width rows and generic emptiness | P6: desktop toolbars, bounded forms/lists and keyboard rows | Match desktop interaction conventions while keeping exact panel actions |
 | MEDIUM | `desktop/src/Panel.tsx:56` | Diagnostic prose/key legends dominate several pages | P7: supporting disclosures, preserved warnings and reviews | Use progressive disclosure without hiding decision-critical content |
 | MEDIUM | `desktop/src/Result.tsx:24` | One document-card hierarchy for most results | P8: semantic status/review treatment | Distinguish action reviews, warnings and ordinary output |
+
+| MEDIUM | `desktop/src/App.tsx` main header | Unrelated conversation title and disabled workspace tools on settings | P9: active page title and contextual tools | Page identity should match the visible content |
 
 ## Considered but rejected
 
