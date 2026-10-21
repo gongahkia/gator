@@ -543,6 +543,43 @@ test("dashboard scroll respects interaction and reduced motion; usage controls k
   } finally { await application.close(); await rm(directory, { recursive: true, force: true }); }
 });
 
+test("review presentation preserves exact previews and only the live approval action", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "gator-desktop-review-ui-"));
+  const env = { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") };
+  const application = await launchDesktop(env);
+  try {
+    const page = await application.firstWindow();
+    await expect(page.getByRole("heading", { name: "What’s on your mind?" })).toBeVisible();
+    const base = await page.evaluate(async () => (await window.gator!.snapshot()).state!);
+    const preview = { action: "write_file", path: "plan.txt", content: "A change you must review first." };
+    await application.evaluate(({ BrowserWindow, ipcMain }, state) => {
+      const frames: unknown[] = [];
+      Object.defineProperty(globalThis, "__reviewFrames", { value: frames, configurable: true });
+      // Observe presentation actions without writing to the real Go runtime.
+      ipcMain.removeHandler("gator:send");
+      ipcMain.handle("gator:send", (_event, frame) => { frames.push(frame); });
+      BrowserWindow.getAllWindows()[0].webContents.send("gator:update", { state });
+    }, { ...base, first_run: false, home: false, running: true, pending_approval: { id: 17 }, messages: [
+      { role: "Gator", text: "", result: { kind: "approval", title: "Previous file write", tone: "success", fields: [{ label: "Request", value: "16" }], footer: "Approved" } },
+      { role: "Gator", text: "", result: { kind: "approval", title: "Review proposed file write", tone: "warning", summary: "Write the proposed plan.", fields: [{ label: "Request", value: "17" }], preview } },
+    ] } as typeof base);
+    const current = page.getByRole("region", { name: "Review proposed file write", exact: true });
+    const previous = page.getByRole("region", { name: "Previous file write", exact: true });
+    await expect(current.getByText("Needs review", { exact: true })).toBeVisible();
+    await expect(current.locator(".result-action-details")).toHaveAttribute("open", "");
+    await expect(current.locator(".preview")).toBeVisible();
+    expect(JSON.parse((await current.locator(".preview").textContent())!)).toEqual(preview);
+    await expect(previous.getByRole("button", { name: "Approve this action" })).toHaveCount(0);
+    await page.screenshot({ path: "test-results/desktop-approval-review.png" });
+    await current.getByRole("button", { name: "Approve this action", exact: true }).click();
+    expect(await application.evaluate(() => (globalThis as unknown as { __reviewFrames: unknown[] }).__reviewFrames)).toEqual([{ type: "approval", interaction_id: 17, approved: true }]);
+  } finally {
+    await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close()).catch(() => {});
+    await application.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("first-run model setup uses native fields and keeps credentials out of display state", async () => {
   const directory = await mkdtemp(join(tmpdir(), "gator-desktop-setup-e2e-"));
   const env = { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") };
