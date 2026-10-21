@@ -1,7 +1,10 @@
 import type { BackendState, Frame } from "../../ui/src/protocol";
 
-export type DesktopSnapshot = { state?: BackendState; error?: string; terminalBusy?: boolean; fullScreen?: boolean };
+export type DesktopSnapshot = { state?: BackendState; error?: string; connection?: "starting" | "connected" | "disconnected"; sessionID?: string; terminalBusy?: boolean; fullScreen?: boolean };
 export type DesktopFrame = Omit<Frame, "version">;
+export type SavedDraft = { context: string; text: string; title: string; source: string; updated: number };
+export type DraftSnapshot = { enabled: boolean; drafts: SavedDraft[] };
+export type DraftRequest = { action: "list" | "clear" } | { action: "remove"; context: string } | { action: "configure"; enabled: boolean } | { action: "save"; draft: Omit<SavedDraft, "updated"> };
 
 declare global {
   interface Window {
@@ -14,6 +17,7 @@ declare global {
       openLink(url: string): Promise<void>;
       continueInTerminal(): Promise<void>;
       restart(): Promise<void>;
+      drafts(request: DraftRequest): Promise<DraftSnapshot>;
     };
   }
 }

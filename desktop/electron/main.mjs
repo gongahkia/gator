@@ -3,9 +3,12 @@ import { mkdir, access } from "node:fs/promises";
 import { constants } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { homedir } from "node:os";
+import { createHash, randomUUID } from "node:crypto";
 import { Backend } from "./backend.mjs";
 import { APP_URL, assetPath, externalURL } from "./policy.mjs";
 import { terminalHandoff } from "./terminal.mjs";
+import { DraftStore } from "./drafts.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const assets = resolve(here, "../dist");
@@ -13,6 +16,8 @@ const appIcon = resolve(here, "../assets/icon.png");
 app.setName("Gator");
 // Allows isolated development/test profiles without changing Gator's state.
 if (process.env.GATOR_DESKTOP_USER_DATA) app.setPath("userData", resolve(process.env.GATOR_DESKTOP_USER_DATA));
+const stateRoot = resolve(process.env.GATOR_STATE_DIR?.trim() || process.env.XDG_STATE_HOME?.trim() || join(homedir(), ".local/state"));
+const drafts = new DraftStore(join(app.getPath("userData"), "drafts", `${createHash("sha256").update(stateRoot).digest("hex")}.json`));
 protocol.registerSchemesAsPrivileged([{ scheme: "gator", privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 
 let window;
@@ -20,12 +25,13 @@ let backend;
 let terminalBusy = false;
 let closing = false;
 let starting;
+let sessionID;
 
 function update() {
   if (window && !window.isDestroyed()) window.webContents.send("gator:update", snapshot());
 }
 function snapshot() {
-  return { state: backend?.state, error: backend?.closed ? backend.failure : undefined, terminalBusy, fullScreen: window?.isFullScreen() ?? false };
+  return { state: backend?.state, error: backend?.closed ? backend.failure : undefined, connection: backend?.closed ? "disconnected" : backend?.state ? "connected" : "starting", sessionID, terminalBusy, fullScreen: window?.isFullScreen() ?? false };
 }
 function trusted(event) {
   if (!window || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || event.senderFrame.url !== APP_URL) throw new Error("Untrusted desktop request");
@@ -40,6 +46,7 @@ async function startBackend() {
     const workspace = process.env.GATOR_DESKTOP_WORKSPACE || join(app.getPath("userData"), "workspace");
     if (!process.env.GATOR_DESKTOP_WORKSPACE) await mkdir(workspace, { recursive: true, mode: 0o700 });
     backend = new Backend(binary, workspace);
+    sessionID = randomUUID();
     backend.on("state", update);
     backend.on("closed", update);
   })();
@@ -72,6 +79,7 @@ function createWindow() {
       if (answer.response !== 1) return;
     }
     closing = true;
+    await drafts.flush();
     await backend?.stop();
     window.destroy();
     app.quit();
@@ -97,6 +105,7 @@ else {
       { label: "Window", submenu: [{ role: "minimize" }, { role: "close" }] },
     ]));
     ipcMain.handle("gator:snapshot", (event) => { trusted(event); return snapshot(); });
+    ipcMain.handle("gator:drafts", (event, request) => { trusted(event); return drafts.request(request); });
     ipcMain.handle("gator:send", (event, frame) => { trusted(event); if (backend?.state?.external) throw new Error("Finish the current step in Terminal first"); backend.send(frame); });
     ipcMain.handle("gator:folder", async (event) => {
       trusted(event);
