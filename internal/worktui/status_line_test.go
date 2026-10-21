@@ -84,7 +84,7 @@ func TestStatusLineEditorTogglesReordersAndPersists(t *testing.T) {
 		},
 	})
 	model.openStatusLineEditor()
-	if panel := model.BridgeState().Panel; panel == nil || panel.Title != "Configure status line" || len(panel.Rows) == 0 {
+	if panel := model.BridgeState().Panel; panel == nil || panel.Title != "Terminal status line" || len(panel.Rows) == 0 {
 		t.Fatalf("status line editor = %#v", panel)
 	}
 

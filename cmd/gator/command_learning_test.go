@@ -113,7 +113,7 @@ func TestLearningTUIAndCLIImmediatelyShareCanonicalState(t *testing.T) {
 	model = updated.(worktui.Model)
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
 	model = updated.(worktui.Model)
-	if !strings.Contains(bridgeStateText(model.BridgeState()), "active ·") {
+	if !strings.Contains(bridgeStateText(model.BridgeState()), "Status\nactive") {
 		t.Fatalf("TUI approval did not update learning detail:\n%s", bridgeStateText(model.BridgeState()))
 	}
 	var output bytes.Buffer
@@ -129,7 +129,7 @@ func TestLearningTUIAndCLIImmediatelyShareCanonicalState(t *testing.T) {
 	model = updated.(worktui.Model)
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(worktui.Model)
-	if !strings.Contains(bridgeStateText(model.BridgeState()), "disabled ·") {
+	if !strings.Contains(bridgeStateText(model.BridgeState()), "Status\ndisabled") {
 		t.Fatalf("TUI did not observe CLI mutation:\n%s", bridgeStateText(model.BridgeState()))
 	}
 }

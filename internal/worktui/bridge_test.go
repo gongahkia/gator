@@ -70,7 +70,7 @@ func TestBridgeProjectsCommandPanelsWithoutGoView(t *testing.T) {
 		{command: "/inbox", title: "Inbox"},
 		{command: "/jobs", title: "Scheduled jobs"},
 		{command: "/history", title: "History"},
-		{command: "/learnings", title: "Learnings"},
+		{command: "/learnings", title: "Saved guidance"},
 		{command: "/goals", title: "Ongoing goals"},
 	} {
 		t.Run(test.command, func(t *testing.T) {
@@ -91,7 +91,7 @@ func TestBridgeProjectsCommandPanelsWithoutGoView(t *testing.T) {
 	model.pendingBundleAction = nil
 	model.openStatusLineEditor()
 	state = model.BridgeState()
-	if state.Mode != "panel" || state.Panel == nil || state.Panel.Title != "Configure status line" || len(state.Panel.Rows) == 0 {
+	if state.Mode != "panel" || state.Panel == nil || state.Panel.Title != "Terminal status line" || len(state.Panel.Rows) == 0 {
 		t.Fatalf("status line panel = %#v", state.Panel)
 	}
 }
