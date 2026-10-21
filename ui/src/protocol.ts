@@ -44,8 +44,10 @@ export type BackendPanel = {
   subtitle?: string;
   query?: string;
   rows?: {
-    label: string; detail?: string; state?: string; tone?: ResultTone;
-    input?: { value?: string; placeholder?: string; secret?: boolean; multiline?: boolean; limit: number };
+    label: string; group?: string; detail?: string; state?: string; tone?: ResultTone;
+    input?: { value?: string; placeholder?: string; secret?: boolean; multiline?: boolean; limit: number;
+      kind?: string; help?: string; options?: { value: string; label: string }[];
+      parts?: { label: string; min: number; max: number }[]; min?: number; max?: number; read_only?: boolean };
   }[];
   blocks?: { title?: string; lines: string[] | null; collapsible?: boolean }[];
   usage?: Usage;

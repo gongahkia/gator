@@ -26,6 +26,7 @@ type Hint struct {
 
 type Row struct {
 	Label  string `json:"label"`
+	Group  string `json:"group,omitempty"`
 	Detail string `json:"detail,omitempty"`
 	State  string `json:"state,omitempty"`
 	Tone   string `json:"tone,omitempty"`
@@ -35,11 +36,29 @@ type Row struct {
 // Input describes an editable field without exposing secrets. Value is empty
 // for secret fields; the desktop keeps a replacement only until submission.
 type Input struct {
-	Value       string `json:"value,omitempty"`
-	Placeholder string `json:"placeholder,omitempty"`
-	Secret      bool   `json:"secret,omitempty"`
-	Multiline   bool   `json:"multiline,omitempty"`
-	Limit       int    `json:"limit"`
+	Kind        string       `json:"kind,omitempty"`
+	Help        string       `json:"help,omitempty"`
+	Options     []Option     `json:"options,omitempty"`
+	Parts       []NumberPart `json:"parts,omitempty"`
+	Min         int64        `json:"min,omitempty"`
+	Max         int64        `json:"max,omitempty"`
+	ReadOnly    bool         `json:"read_only,omitempty"`
+	Value       string       `json:"value,omitempty"`
+	Placeholder string       `json:"placeholder,omitempty"`
+	Secret      bool         `json:"secret,omitempty"`
+	Multiline   bool         `json:"multiline,omitempty"`
+	Limit       int          `json:"limit"`
+}
+
+type Option struct {
+	Value string `json:"value"`
+	Label string `json:"label"`
+}
+
+type NumberPart struct {
+	Label string `json:"label"`
+	Min   int64  `json:"min"`
+	Max   int64  `json:"max"`
 }
 
 type Block struct {

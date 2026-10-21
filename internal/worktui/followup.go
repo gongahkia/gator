@@ -1,6 +1,7 @@
 package worktui
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -389,6 +390,53 @@ func (m Model) followupPanel() uisnapshot.Panel {
 		p.Hints = []uisnapshot.Hint{{Shortcut: "Tab", Action: "next field"}, {Shortcut: "Ctrl+R", Action: "review"}, {Shortcut: "Ctrl+U", Action: "clear field"}, {Shortcut: "Esc", Action: "cancel"}}
 		for index, value := range map[int]string{0: d.Title, 1: d.Outcome, 2: d.SourcePath, 4: d.GmailQuery, 7: d.AlertWhen} {
 			p.Rows[index].Input = bridgeInput(value, 4096, index == 1 || index == 7)
+		}
+		p.Rows[0].Input.Limit = 100
+		p.Rows[2].Input.Kind = "directory"
+		p.Rows[4].Input.Limit = 1024
+		p.Rows[7].Input.Limit = 2048
+		p.Rows[3].Label = "Connected sources"
+		selected, _ := json.Marshal(d.ConnectorIDs)
+		p.Rows[3].Input = &uisnapshot.Input{Kind: "multi", Value: string(selected), Limit: 4096, Max: 4,
+			Help: "Local files remain included. Choose up to four configured sources; this does not grant new permissions."}
+		var connectors []string
+		if m.config.ConnectorChoices != nil {
+			connectors = m.config.ConnectorChoices()
+		}
+		for _, id := range connectors {
+			p.Rows[3].Input.Options = append(p.Rows[3].Input.Options, uisnapshot.Option{Value: id, Label: id})
+		}
+		for _, id := range d.ConnectorIDs {
+			if !sliceContains(connectors, id) {
+				p.Rows[3].Input.Options = append(p.Rows[3].Input.Options, uisnapshot.Option{Value: id, Label: id + " (unavailable)"})
+			}
+		}
+		p.Rows[5].Label, p.Rows[5].Input = "Calendar window (days)", bridgeNumberInput(int64(d.CalendarDays), 0, 30)
+		p.Rows[5].Input.Help = "Zero excludes calendar events. Mail and calendar filters require a connected source."
+		p.Rows[6].Label, p.Rows[6].Input = "Check frequency", bridgeSelect(strconv.Itoa(d.IntervalMinutes),
+			uisnapshot.Option{Value: "5", Label: "Every 5 minutes"}, uisnapshot.Option{Value: "15", Label: "Every 15 minutes"},
+			uisnapshot.Option{Value: "30", Label: "Every 30 minutes"}, uisnapshot.Option{Value: "60", Label: "Every hour"})
+		p.Rows[8].Label, p.Rows[8].Input = "What Gator may do", bridgeSelect(string(d.Mode),
+			uisnapshot.Option{Value: "inspect", Label: "Read and recommend"}, uisnapshot.Option{Value: "draft", Label: "Read and prepare drafts for review"})
+		p.Rows[8].Input.Help = "Sending and publishing always require separate foreground approval."
+		p.Rows[9].Label = "Limits for each attempt"
+		p.Rows[9].Input = &uisnapshot.Input{Kind: "budget", Limit: 128, Value: fmt.Sprintf("%d,%d,%d", d.MaxRequests, d.MaxTokens, d.MaxSeconds),
+			Parts: []uisnapshot.NumberPart{{Label: "Provider requests", Min: 1, Max: 256}, {Label: "Tokens", Min: 1000, Max: 1000000}, {Label: "Time (seconds)", Min: 30, Max: 1800}},
+			Help:  "Up to three transient attempts per check. Usage and shared limits also apply."}
+		p.Rows[10].Label, p.Rows[10].Input = "Checks per UTC day", bridgeNumberInput(int64(d.MaxChecksPerDay), 1, 288)
+		for index := range p.Rows {
+			switch {
+			case index < 2:
+				p.Rows[index].Group = "Outcome"
+			case index < 6:
+				p.Rows[index].Group = "Sources"
+			case index < 8:
+				p.Rows[index].Group = "Timing and notifications"
+			case index == 8:
+				p.Rows[index].Group = "Permissions"
+			default:
+				p.Rows[index].Group = "Usage limits"
+			}
 		}
 		return p
 	}

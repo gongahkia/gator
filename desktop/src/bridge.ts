@@ -14,6 +14,7 @@ declare global {
       subscribe(callback: (snapshot: DesktopSnapshot) => void): () => void;
       send(frame: DesktopFrame): Promise<void>;
       chooseFolder(): Promise<string | null>;
+      choosePath(request: { panel_id: string; kind: string }): Promise<string | null>;
       openLink(url: string): Promise<void>;
       continueInTerminal(): Promise<void>;
       restart(): Promise<void>;

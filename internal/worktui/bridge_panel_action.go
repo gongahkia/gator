@@ -1,10 +1,13 @@
 package worktui
 
 import (
+	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/uisnapshot"
 )
 
@@ -50,7 +53,7 @@ func (m Model) ApplyBridgePanel(event BridgePanelAction, key tea.KeyMsg) (tea.Mo
 			return m, nil
 		}
 		field := panel.Rows[index].Input
-		if len(value) > field.Limit || (!field.Multiline && strings.ContainsAny(value, "\r\n")) || strings.ContainsRune(value, 0) {
+		if !validBridgeInput(field, value) {
 			m.status = fmt.Sprintf("Check the value for %s.", panel.Rows[index].Label)
 			m.bridgeNotice = m.status
 			return m, nil
@@ -121,10 +124,25 @@ func (m *Model) setBridgeField(index int, value string) {
 			d.Outcome = value
 		case 2:
 			d.SourcePath = value
+		case 3:
+			_ = json.Unmarshal([]byte(value), &d.ConnectorIDs)
 		case 4:
 			d.GmailQuery = value
+		case 5:
+			d.CalendarDays, _ = strconv.Atoi(value)
+		case 6:
+			d.IntervalMinutes, _ = strconv.Atoi(value)
 		case 7:
 			d.AlertWhen = value
+		case 8:
+			d.Mode = action.Mode(value)
+		case 9:
+			parts := strings.Split(value, ",")
+			d.MaxRequests, _ = strconv.Atoi(parts[0])
+			d.MaxTokens, _ = strconv.ParseInt(parts[1], 10, 64)
+			d.MaxSeconds, _ = strconv.Atoi(parts[2])
+		case 10:
+			d.MaxChecksPerDay, _ = strconv.Atoi(value)
 		}
 	case m.learningForm != nil:
 		if index == 2 {

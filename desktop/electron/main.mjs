@@ -115,6 +115,19 @@ else {
       backend.send({ type: "submit", text: `/source ${result.filePaths[0]}` });
       return result.filePaths[0];
     });
+    ipcMain.handle("gator:pick-path", async (event, request) => {
+      trusted(event);
+      const owner = backend;
+      const panel = owner?.state?.panel;
+      if (!request || !["directory", "file", "save"].includes(request.kind) || !panel?.id || request.panel_id !== panel.id || owner.state.running || owner.state.external || !panel.rows?.some((row) => row.input?.kind === request.kind)) return null;
+      const result = request.kind === "save"
+        ? await dialog.showSaveDialog(window, { title: "Choose a destination" })
+        : await dialog.showOpenDialog(window, { title: request.kind === "directory" ? "Choose a folder" : "Choose a file", properties: [request.kind === "directory" ? "openDirectory" : "openFile"] });
+      if (result.canceled || backend !== owner || owner.state.running || owner.state.external || owner.state.panel?.id !== panel.id) return null;
+      // Selection only fills the reviewed form. No source command, file write,
+      // restore, export, or other agent action is sent by this picker.
+      return request.kind === "save" ? result.filePath || null : result.filePaths[0] || null;
+    });
     ipcMain.handle("gator:link", async (event, value) => { trusted(event); const url = externalURL(value); if (!url) throw new Error("Only web links can be opened"); await shell.openExternal(url); });
     ipcMain.handle("gator:restart", async (event) => { trusted(event); if (terminalBusy || (backend?.state?.running && !backend.closed)) throw new Error("Finish the current operation first"); await startBackend(); update(); });
     ipcMain.handle("gator:terminal", async (event) => {

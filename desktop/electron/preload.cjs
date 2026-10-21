@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld("gator", {
   snapshot: () => ipcRenderer.invoke("gator:snapshot"),
   send: (frame) => ipcRenderer.invoke("gator:send", frame),
   chooseFolder: () => ipcRenderer.invoke("gator:folder"),
+  choosePath: (request) => ipcRenderer.invoke("gator:pick-path", request),
   openLink: (url) => ipcRenderer.invoke("gator:link", url),
   continueInTerminal: () => ipcRenderer.invoke("gator:terminal"),
   restart: () => ipcRenderer.invoke("gator:restart"),
