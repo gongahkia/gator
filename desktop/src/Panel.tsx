@@ -1,10 +1,20 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { ArrowLeft, BookOpen, ChevronLeft, ChevronRight, Inbox, MessageSquare, Plus, RefreshCw, Search, Target } from "lucide-react";
 import type { BackendPanel, PanelAction } from "../../ui/src/protocol";
 import type { DesktopFrame } from "./bridge";
 
 function shortcutKeys(shortcut: string) {
   return shortcut.toLowerCase().replaceAll(" ", "").split("/").map((key) => ({ "←": "left", "→": "right", "↑": "up", "↓": "down", "f1/esc": "f1" })[key] ?? key).filter((key) => /^(enter|esc|up|down|left|right|tab|shift\+tab|space|ctrl\+[ru]|f1|[a-z0-9])$/.test(key));
+}
+
+function emptyState(panel: BackendPanel) {
+  if (panel.rows?.length) return;
+  if (panel.query?.trim()) return { icon: Search, title: "No results", detail: "Try a different search." };
+  if (panel.title === "Saved knowledge") return { icon: BookOpen, title: "No saved knowledge yet.", detail: "Notes and useful context you save will appear here." };
+  if (panel.kind === "picker" && panel.title === "Conversations") return { icon: MessageSquare, title: "No conversations yet", detail: "Start a conversation to see it here." };
+  if (panel.kind === "picker" && panel.title === "Ongoing goals") return { icon: Target, title: "No ongoing goals", detail: "Your ongoing goals will appear here when you create one." };
+  if (panel.kind === "inbox" && (!panel.notice || panel.notice === "No recent results.")) return { icon: Inbox, title: "You’re all caught up", detail: panel.notice || "Results from your follow-up checks will appear here." };
+  if (panel.kind === "history" && !panel.blocks?.length) return { icon: MessageSquare, title: "No task runs in this view", detail: "Try another filter or start a conversation." };
 }
 
 export function Panel({ panel, send, title = panel.title, subtitle = panel.subtitle, navigation }: { panel: BackendPanel; send(frame: DesktopFrame): Promise<void>; title?: string; subtitle?: string; navigation?: ReactNode }) {
@@ -33,22 +43,48 @@ export function Panel({ panel, send, title = panel.title, subtitle = panel.subti
   };
   const hints = (panel.hints ?? []).flatMap((hint) => shortcutKeys(hint.shortcut).map((key, i, keys) => ({ key, label: keys.length > 1 ? `${hint.action} (${key})` : hint.action, shortcut: hint.shortcut, id: `${hint.shortcut}-${i}` }))).filter((hint) => !["up", "down", "tab", "shift+tab", "ctrl+u"].includes(hint.key));
 
-  return <section className="workflow" aria-label={title}>
-    <div className="workflow-heading"><button className="icon-button" aria-label="Back to conversation" onClick={() => keyAction("esc")}><ArrowLeft size={18} /></button><div><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div>{panel.kind === "confirmation" && <span className="badge" data-tone="warning">Review</span>}</div>
+  const empty = emptyState(panel);
+  const EmptyIcon = empty?.icon;
+  const rowActivation = new Set(["select", "continue", "expand", "details", "choose", "open", "set effort"]);
+  const visibleHints = hints.filter((hint) => {
+    if (hint.key === "esc") return hasInputs || panel.kind === "confirmation";
+    if (["enter", "ctrl+r"].includes(hint.key) && (hasInputs || panel.kind === "confirmation")) return true;
+    if (hint.key === "enter" && !hasInputs && panel.kind !== "confirmation" && rowActivation.has(hint.label.toLowerCase()) && (panel.rows?.length || empty)) return false;
+    // The row already activates this exact Go action. Keep refresh in the
+    // toolbar and omit its duplicate row instead.
+    return hint.key === "r" || !panel.rows?.some((row) => !row.input && row.label.toLowerCase() === hint.label.toLowerCase());
+  });
+  const primary = visibleHints.filter((hint) => ["enter", "ctrl+r", "esc"].includes(hint.key));
+  const toolbar = visibleHints.filter((hint) => !primary.includes(hint));
+  const refresh = toolbar.find((hint) => hint.key === "r" && hint.label.toLowerCase() === "refresh");
+  const rowKeys = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
+    if (busy) { event.preventDefault(); return; }
+    const buttons = [...event.currentTarget.closest(".panel-rows, .form-fields")!.querySelectorAll<HTMLButtonElement>(".panel-row")];
+    const current = buttons.indexOf(event.currentTarget);
+    const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : Math.max(0, Math.min(buttons.length - 1, current + (event.key === "ArrowDown" ? 1 : -1)));
+    event.preventDefault();
+    const target = buttons[next];
+    if (target) { target.focus(); void action({ action: "select", row: Number(target.dataset.row ?? index), fields }); }
+  };
+
+  return <section className="workflow" data-kind={panel.kind} aria-label={title}>
+    <div className="workflow-heading"><button className="icon-button" aria-label="Back to conversation" disabled={busy} onClick={() => keyAction("esc")}><ArrowLeft size={18} /></button><div><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div>{panel.kind === "confirmation" && <span className="badge" data-tone="warning">Review</span>}</div>
     {navigation}
-    {panel.kind === "picker" && <form className="panel-search" onSubmit={(event) => { event.preventDefault(); void action({ action: "query", text: query }); }}><Search size={16} /><input aria-label={`Search ${panel.title.toLowerCase()}`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter…" autoFocus /><button className="small-button" type="submit">Search</button>{query && <button className="small-button" type="button" onClick={() => { setQuery(""); void action({ action: "query", text: "" }); }}>Clear</button>}</form>}
-    {panel.notice && <p className="panel-notice" role="status">{panel.notice}</p>}
+    {!!toolbar.length && <div className="panel-toolbar" role="toolbar" aria-label={`${title} actions`}>{toolbar.map((hint) => hint === refresh ? <button className="icon-button" aria-label={hint.label} title={`${hint.label} (${hint.shortcut})`} key={hint.id} disabled={busy} onClick={() => keyAction(hint.key)}><RefreshCw size={17} /></button> : <button className={`button ${hint.key === "n" ? "primary" : ""}`} key={hint.id} disabled={busy} onClick={() => keyAction(hint.key)}>{hint.key === "n" && <Plus size={16} />}{hint.label}<kbd>{hint.shortcut}</kbd></button>)}</div>}
+    {panel.kind === "picker" && <form className="panel-search" onSubmit={(event) => { event.preventDefault(); void action({ action: "query", text: query }); }}><Search size={16} /><input aria-label={`Search ${panel.title.toLowerCase()}`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search…" autoFocus /><button className="small-button" type="submit">Search</button>{query && <button className="small-button" type="button" onClick={() => { setQuery(""); void action({ action: "query", text: "" }); }}>Clear</button>}</form>}
+    {panel.notice && empty?.detail !== panel.notice && <p className="panel-notice" role="status">{panel.notice}</p>}
     <div className="workflow-content">
       {!!panel.rows?.length && <div className={hasInputs ? "form-fields" : "panel-rows"}>
-        {panel.rows.map((row, index) => row.input ? <label className="field" key={`${index}-${row.label}`}><span>{row.label}</span>{row.input.multiline ? <textarea aria-label={row.label} value={fields[index] ?? row.input.value ?? ""} maxLength={row.input.limit} placeholder={row.input.placeholder} onChange={(event) => setFields({ ...fields, [index]: event.target.value })} rows={3} /> : <input aria-label={row.label} type={row.input.secret ? "password" : "text"} autoComplete="off" value={fields[index] ?? row.input.value ?? ""} maxLength={row.input.limit} placeholder={row.input.placeholder} onChange={(event) => setFields({ ...fields, [index]: event.target.value })} />}{row.input.secret && <small>Leave empty to keep the stored credential.</small>}</label> : <div className="panel-row-wrap" key={`${index}-${row.label}`}>
-          <button ref={index === selected ? selectedRow : undefined} className="panel-row" aria-current={index === selected ? "true" : undefined} onClick={() => panel.kind === "status-line" ? keyAction("space", index) : void action({ action: hasInputs ? "select" : "activate", row: index, fields })}><div><strong>{row.label.split(" · ←")[0]}</strong>{row.state && <span className="badge" data-tone={row.tone}>{row.state}</span>}</div>{row.detail && <p>{row.detail}</p>}</button>
+        {panel.rows.map((row, index) => refresh && !row.input && row.label.toLowerCase() === "refresh" ? null : row.input ? <label className="field" key={`${index}-${row.label}`}><span>{row.label}</span>{row.input.multiline ? <textarea aria-label={row.label} value={fields[index] ?? row.input.value ?? ""} maxLength={row.input.limit} placeholder={row.input.placeholder} onChange={(event) => setFields({ ...fields, [index]: event.target.value })} rows={3} /> : <input aria-label={row.label} type={row.input.secret ? "password" : "text"} autoComplete="off" value={fields[index] ?? row.input.value ?? ""} maxLength={row.input.limit} placeholder={row.input.placeholder} onChange={(event) => setFields({ ...fields, [index]: event.target.value })} />}{row.input.secret && <small>Leave empty to keep the stored credential.</small>}</label> : <div className="panel-row-wrap" key={`${index}-${row.label}`}>
+          <button ref={index === selected ? selectedRow : undefined} className="panel-row" data-row={index} aria-current={index === selected ? "true" : undefined} onKeyDown={(event) => rowKeys(event, index)} onClick={() => panel.kind === "status-line" ? keyAction("space", index) : void action({ action: hasInputs ? "select" : "activate", row: index, fields })}><div><strong>{row.label.split(" · ←")[0]}</strong>{row.state && <span className="badge" data-tone={row.tone}>{row.state}</span>}</div>{row.detail && <p>{row.detail}</p>}{!hasInputs && <ChevronRight className="panel-row-chevron" size={16} />}</button>
           {hasInputs && <div className="row-adjust"><button className="icon-button" aria-label={`Previous ${row.label}`} onClick={() => keyAction("left", index)}><ChevronLeft size={16} /></button><button className="small-button" onClick={() => keyAction("space", index)}>Change</button><button className="icon-button" aria-label={`Next ${row.label}`} onClick={() => keyAction("right", index)}><ChevronRight size={16} /></button></div>}
         </div>)}
       </div>}
-      {panel.kind === "context" && panel.title === "Saved knowledge" && !panel.rows?.length && <p className="empty-hint">No saved knowledge yet.</p>}
+      {empty && EmptyIcon && <div className="panel-empty"><EmptyIcon size={28} /><h2>{empty.title}</h2><p>{empty.detail}</p></div>}
       {panel.blocks?.map((block, i) => <section className="panel-block" key={i}>{block.title && <h2>{block.title}</h2>}{(block.lines ?? []).map((line, j) => <p className="literal" key={j}>{line || " "}</p>)}</section>)}
-      {!panel.rows?.length && !panel.blocks?.length && !panel.notice && <p className="empty-hint">Nothing to review here yet.</p>}
+      {!empty && !panel.rows?.length && !panel.blocks?.length && !panel.notice && <p className="empty-hint">Nothing here yet.</p>}
     </div>
-    <footer className="workflow-footer"><div className="flex flex-wrap gap-2">{hints.map((hint) => <button className={`button ${hint.key === "enter" || hint.key === "ctrl+r" ? "primary" : ""}`} key={hint.id} disabled={busy} onClick={() => keyAction(hint.key)}>{hint.label}<kbd>{hint.shortcut}</kbd></button>)}</div>{panel.footer && <p>{panel.footer}</p>}</footer>
+    {(!!primary.length || panel.footer) && <footer className="workflow-footer"><div className="flex flex-wrap gap-2">{primary.map((hint) => <button className={`button ${hint.key !== "esc" ? "primary" : ""}`} key={hint.id} disabled={busy} onClick={() => keyAction(hint.key)}>{hint.label}<kbd>{hint.shortcut}</kbd></button>)}</div>{panel.footer && <p>{panel.footer}</p>}</footer>}
   </section>;
 }
