@@ -22,12 +22,18 @@ function emptyState(panel: BackendPanel) {
 export function Panel({ panel, send, title = panel.title, subtitle = panel.subtitle, navigation }: { panel: BackendPanel; send(frame: DesktopFrame): Promise<void>; title?: string; subtitle?: string; navigation?: ReactNode }) {
   const [fields, setFields] = useState<Record<number, string>>({});
   const [query, setQuery] = useState(panel.query ?? "");
+  const [filter, setFilter] = useState("");
   const [busy, setBusy] = useState(false);
   const selected = panel.selected ?? 0;
+  const modelCatalog = panel.title === "Cloud models" || panel.title === "Local models";
+  const rows = (panel.rows ?? []).map((row, index) => ({ row, index }));
+  const displayedRows = modelCatalog ? rows.filter(({ row }) => `${row.label} ${row.detail ?? ""}`.toLocaleLowerCase().includes(filter.trim().toLocaleLowerCase())) : rows;
+  const displayedSelected = displayedRows.some(({ index }) => index === selected) ? selected : displayedRows[0]?.index;
   const selectedRow = useRef<HTMLButtonElement>(null);
   const formIdentity = `${panel.kind}:${panel.title}:${panel.rows?.map((row) => row.label).join("|")}`;
   useEffect(() => { setFields({}); }, [formIdentity]);
   useEffect(() => { setQuery(panel.query ?? ""); }, [panel.query]);
+  useEffect(() => { setFilter(""); }, [panel.kind, panel.title]);
   useEffect(() => { selectedRow.current?.scrollIntoView({ block: "nearest" }); }, [selected, formIdentity]);
   const hasInputs = panel.rows?.some((row) => row.input);
   const action = async (value: Omit<PanelAction, "id">, key?: string) => {
@@ -38,16 +44,18 @@ export function Panel({ panel, send, title = panel.title, subtitle = panel.subti
     finally { setBusy(false); }
   };
   const keyAction = (key: string, row?: number) => {
+    if (modelCatalog && !displayedRows.length && !["esc", "r", "n", "g", "s", "i", "f1"].includes(key)) return;
     // Native form values are submitted together. Go still validates, reviews,
     // and commits the action; secrets never return in its display projection.
     if (key === "enter" && hasInputs && row === undefined) row = (panel.rows?.length ?? 1) - 1;
+    if (modelCatalog && row === undefined && key !== "esc") row = displayedSelected;
     void action({ action: "key", row, fields: key === "esc" ? undefined : fields }, key);
   };
   const hints = (panel.hints ?? []).flatMap((hint) => shortcutKeys(hint.shortcut).map((key, i, keys) => ({ key, label: keys.length > 1 ? `${hint.action} (${key})` : hint.action, shortcut: hint.shortcut, id: `${hint.shortcut}-${i}` }))).filter((hint) => !["up", "down", "tab", "shift+tab", "ctrl+u"].includes(hint.key));
 
-  const empty = emptyState(panel);
+  const empty = modelCatalog && filter.trim() && !displayedRows.length ? { icon: Search, title: "No matching models", detail: "Try another provider or model name." } : emptyState(panel);
   const EmptyIcon = empty?.icon;
-  const rowActivation = new Set(["select", "continue", "expand", "details", "choose", "open", "set effort"]);
+  const rowActivation = new Set(["select", "continue", "expand", "details", "choose", "open", "set effort", "use"]);
   const visibleHints = hints.filter((hint) => {
     if (empty && hint.key === "enter" && rowActivation.has(hint.label.toLowerCase())) return false;
     if (empty && panel.kind === "followup" && hint.key === "s") return false;
@@ -62,6 +70,8 @@ export function Panel({ panel, send, title = panel.title, subtitle = panel.subti
   const toolbar = visibleHints.filter((hint) => !primary.includes(hint));
   const refresh = toolbar.find((hint) => hint.key === "r" && hint.label.toLowerCase() === "refresh");
   const creates = (hint: typeof hints[number]) => hint.key === "n" && /^(new|add)\b/i.test(hint.label);
+  const administration = modelCatalog ? toolbar.filter((hint) => (panel.title === "Cloud models" ? ["n", "g", "e", "d", "x"] : ["e", "x"]).includes(hint.key)) : [];
+  const toolbarButton = (hint: typeof hints[number]) => hint === refresh ? <button className="icon-button" aria-label={hint.label} title={`${hint.label} (${hint.shortcut})`} key={hint.id} disabled={busy} onClick={() => keyAction(hint.key)}><RefreshCw size={17} /></button> : <button className={`button ${creates(hint) && !administration.includes(hint) ? "primary" : ""}`} key={hint.id} disabled={busy || modelCatalog && !displayedRows.length && !["n", "g", "r", "s", "i"].includes(hint.key)} onClick={() => keyAction(hint.key)}>{creates(hint) && <Plus size={16} />}{hint.label}<kbd>{hint.shortcut}</kbd></button>;
   const keyboardFooter = !hasInputs && panel.kind !== "confirmation" && /^(Esc\b|↑|↓|Type to filter|Tab\b)/i.test(panel.footer ?? "");
   const supportingBlock = (block: NonNullable<BackendPanel["blocks"]>[number]) => !hasInputs && panel.kind !== "confirmation" && (
     block.collapsible || ["Storage", "Retrieval", "Chat processing", "How to read this"].includes(block.title ?? "") ||
@@ -92,13 +102,14 @@ export function Panel({ panel, send, title = panel.title, subtitle = panel.subti
   return <section className="workflow" data-kind={panel.kind} aria-label={title}>
     <div className="workflow-heading"><button className="icon-button" aria-label="Back to conversation" disabled={busy} onClick={() => keyAction("esc")}><ArrowLeft size={18} /></button><div><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div>{panel.kind === "confirmation" && <span className="badge" data-tone="warning">Review</span>}</div>
     {navigation}
-    {!!toolbar.length && <div className="panel-toolbar" role="toolbar" aria-label={`${title} actions`}>{toolbar.map((hint) => hint === refresh ? <button className="icon-button" aria-label={hint.label} title={`${hint.label} (${hint.shortcut})`} key={hint.id} disabled={busy} onClick={() => keyAction(hint.key)}><RefreshCw size={17} /></button> : <button className={`button ${creates(hint) ? "primary" : ""}`} key={hint.id} disabled={busy} onClick={() => keyAction(hint.key)}>{creates(hint) && <Plus size={16} />}{hint.label}<kbd>{hint.shortcut}</kbd></button>)}</div>}
+    {!!toolbar.length && <div className="panel-toolbar" role="toolbar" aria-label={`${title} actions`}>{toolbar.filter((hint) => !administration.includes(hint)).map(toolbarButton)}{!!administration.length && <details className="panel-more"><summary>Manage providers<ChevronDown size={15} /></summary><div role="group" aria-label="Provider administration">{administration.map(toolbarButton)}</div></details>}</div>}
+    {modelCatalog && <div className="panel-filter"><div className="panel-search" role="search"><Search size={16} /><input type="search" aria-label="Filter models" value={filter} maxLength={256} onChange={(event) => setFilter(event.target.value)} placeholder="Filter by provider or model…" autoFocus />{filter && <button className="small-button" onClick={() => setFilter("")}>Clear</button>}</div><p className="collection-count" role="status">{displayedRows.length} of {rows.length} models</p></div>}
     {panel.kind === "picker" && <form className="panel-search" onSubmit={(event) => { event.preventDefault(); void action({ action: "query", text: query }); }}><Search size={16} /><input aria-label={`Search ${panel.title.toLowerCase()}`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search…" autoFocus /><button className="small-button" type="submit">Search</button>{query && <button className="small-button" type="button" onClick={() => { setQuery(""); void action({ action: "query", text: "" }); }}>Clear</button>}</form>}
     {panel.notice && empty?.detail !== panel.notice && !(empty && /^No (?:learnings|retained Work|recent results)/.test(panel.notice)) && <p className="panel-notice" role="status">{panel.notice}</p>}
     <div className="workflow-content">
       {!!panel.rows?.length && <div className={hasInputs ? "form-fields" : "panel-rows"}>
-        {panel.rows.map((row, index) => refresh && !row.input && row.label.toLowerCase() === "refresh" ? null : row.input ? <label className="field" key={`${index}-${row.label}`}><span>{row.label}</span>{row.input.multiline ? <textarea aria-label={row.label} value={fields[index] ?? row.input.value ?? ""} maxLength={row.input.limit} placeholder={row.input.placeholder} onChange={(event) => setFields({ ...fields, [index]: event.target.value })} rows={3} /> : <input aria-label={row.label} type={row.input.secret ? "password" : "text"} autoComplete="off" value={fields[index] ?? row.input.value ?? ""} maxLength={row.input.limit} placeholder={row.input.placeholder} onChange={(event) => setFields({ ...fields, [index]: event.target.value })} />}{row.input.secret && <small>Leave empty to keep the stored credential.</small>}</label> : <div className="panel-row-wrap" key={`${index}-${row.label}`}>
-          <button ref={index === selected ? selectedRow : undefined} className="panel-row" data-row={index} aria-current={index === selected ? "true" : undefined} onKeyDown={(event) => rowKeys(event, index)} onClick={() => panel.kind === "status-line" ? keyAction("space", index) : void action({ action: hasInputs ? "select" : "activate", row: index, fields })}><div><strong>{row.label.split(" · ←")[0]}</strong>{row.state && <span className="badge" data-tone={row.tone}>{row.state}</span>}</div>{row.detail && <p>{row.detail}</p>}{!hasInputs && <ChevronRight className="panel-row-chevron" size={16} />}</button>
+        {displayedRows.map(({ row, index }) => refresh && !row.input && row.label.toLowerCase() === "refresh" ? null : row.input ? <label className="field" key={`${index}-${row.label}`}><span>{row.label}</span>{row.input.multiline ? <textarea aria-label={row.label} value={fields[index] ?? row.input.value ?? ""} maxLength={row.input.limit} placeholder={row.input.placeholder} onChange={(event) => setFields({ ...fields, [index]: event.target.value })} rows={3} /> : <input aria-label={row.label} type={row.input.secret ? "password" : "text"} autoComplete="off" value={fields[index] ?? row.input.value ?? ""} maxLength={row.input.limit} placeholder={row.input.placeholder} onChange={(event) => setFields({ ...fields, [index]: event.target.value })} />}{row.input.secret && <small>Leave empty to keep the stored credential.</small>}</label> : <div className="panel-row-wrap" key={`${index}-${row.label}`}>
+          <button ref={index === displayedSelected ? selectedRow : undefined} className="panel-row" data-row={index} aria-current={index === displayedSelected ? "true" : undefined} onKeyDown={(event) => rowKeys(event, index)} onClick={() => panel.kind === "status-line" ? keyAction("space", index) : void action({ action: hasInputs ? "select" : "activate", row: index, fields })}><div><strong>{row.label.split(" · ←")[0]}</strong>{row.state && <span className="badge" data-tone={row.tone}>{row.state}</span>}</div>{row.detail && <p>{row.detail}</p>}{!hasInputs && <ChevronRight className="panel-row-chevron" size={16} />}</button>
           {hasInputs && <div className="row-adjust"><button className="icon-button" aria-label={`Previous ${row.label}`} onClick={() => keyAction("left", index)}><ChevronLeft size={16} /></button><button className="small-button" onClick={() => keyAction("space", index)}>Change</button><button className="icon-button" aria-label={`Next ${row.label}`} onClick={() => keyAction("right", index)}><ChevronRight size={16} /></button></div>}
         </div>)}
       </div>}
