@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import type { BackendPanel, PanelAction } from "../../ui/src/protocol";
 import type { DesktopFrame } from "./bridge";
@@ -7,7 +7,7 @@ function shortcutKeys(shortcut: string) {
   return shortcut.toLowerCase().replaceAll(" ", "").split("/").map((key) => ({ "←": "left", "→": "right", "↑": "up", "↓": "down", "f1/esc": "f1" })[key] ?? key).filter((key) => /^(enter|esc|up|down|left|right|tab|shift\+tab|space|ctrl\+[ru]|f1|[a-z0-9])$/.test(key));
 }
 
-export function Panel({ panel, send }: { panel: BackendPanel; send(frame: DesktopFrame): Promise<void> }) {
+export function Panel({ panel, send, title = panel.title, subtitle = panel.subtitle, navigation }: { panel: BackendPanel; send(frame: DesktopFrame): Promise<void>; title?: string; subtitle?: string; navigation?: ReactNode }) {
   const [fields, setFields] = useState<Record<number, string>>({});
   const [query, setQuery] = useState(panel.query ?? "");
   const [busy, setBusy] = useState(false);
@@ -33,8 +33,9 @@ export function Panel({ panel, send }: { panel: BackendPanel; send(frame: Deskto
   };
   const hints = (panel.hints ?? []).flatMap((hint) => shortcutKeys(hint.shortcut).map((key, i, keys) => ({ key, label: keys.length > 1 ? `${hint.action} (${key})` : hint.action, shortcut: hint.shortcut, id: `${hint.shortcut}-${i}` }))).filter((hint) => !["up", "down", "tab", "shift+tab", "ctrl+u"].includes(hint.key));
 
-  return <section className="workflow" aria-label={panel.title}>
-    <div className="workflow-heading"><button className="icon-button" aria-label="Back to conversation" onClick={() => keyAction("esc")}><ArrowLeft size={18} /></button><div><h1>{panel.title}</h1>{panel.subtitle && <p>{panel.subtitle}</p>}</div>{panel.kind === "confirmation" && <span className="badge" data-tone="warning">Review</span>}</div>
+  return <section className="workflow" aria-label={title}>
+    <div className="workflow-heading"><button className="icon-button" aria-label="Back to conversation" onClick={() => keyAction("esc")}><ArrowLeft size={18} /></button><div><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div>{panel.kind === "confirmation" && <span className="badge" data-tone="warning">Review</span>}</div>
+    {navigation}
     {panel.kind === "picker" && <form className="panel-search" onSubmit={(event) => { event.preventDefault(); void action({ action: "query", text: query }); }}><Search size={16} /><input aria-label={`Search ${panel.title.toLowerCase()}`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter…" autoFocus /><button className="small-button" type="submit">Search</button>{query && <button className="small-button" type="button" onClick={() => { setQuery(""); void action({ action: "query", text: "" }); }}>Clear</button>}</form>}
     {panel.notice && <p className="panel-notice" role="status">{panel.notice}</p>}
     <div className="workflow-content">

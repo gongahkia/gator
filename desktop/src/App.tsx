@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, BookOpen, Check, ChevronDown, ChevronRight, Clock3, Command, Database, Folder, Inbox, LayoutDashboard, ListChecks, LoaderCircle, MessageSquare, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Search, Settings2, ShieldCheck, Square, Target, Wallet, X } from "lucide-react";
+import { ArrowDown, ArrowUp, BookOpen, Check, ChevronDown, ChevronRight, Clock3, Command, Database, Folder, Inbox, LayoutDashboard, ListChecks, ListPlus, LoaderCircle, MessageSquare, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Search, Settings2, ShieldCheck, Square, Target, Wallet, X } from "lucide-react";
 import type { BackendMessage, BackendState } from "../../ui/src/protocol";
 import type { DesktopFrame, DesktopSnapshot } from "./bridge";
 import { Panel } from "./Panel";
@@ -7,6 +7,9 @@ import { Markdown, Result, bundleResult } from "./Result";
 import { useModalFocus } from "./useModalFocus";
 import { StarterDashboard } from "./StarterDashboard";
 import { UsagePanel } from "./UsagePanel";
+import { ConversationsPanel } from "./ConversationsPanel";
+import { IconSwap, Presence, useViewMotion, type PresenceRef } from "./motion";
+import { MessageQueue, useQueueAction } from "./MessageQueue";
 
 const destinations = [
   { command: "/overview", label: "Overview", icon: LayoutDashboard, group: "work" },
@@ -15,7 +18,6 @@ const destinations = [
   { command: "/inbox", label: "Inbox", icon: Inbox, group: "work" },
   { command: "/followup", label: "Follow-up checks", icon: ListChecks, group: "work" },
   { command: "/knowledge", label: "Saved knowledge", icon: BookOpen, group: "library" },
-  { command: "/history", label: "Work history", icon: Clock3, group: "library" },
   { command: "/usage", label: "Usage & limits", icon: Wallet, group: "settings" },
   { command: "/data", label: "Data & backups", icon: Database, group: "settings" },
   { command: "/recovery", label: "Recovery", icon: ShieldCheck, group: "settings" },
@@ -76,12 +78,14 @@ function OverviewCards({ state, navigate }: { state: BackendState; navigate(comm
   })}</section>;
 }
 
-function WorkspacePanel({ state, tab, setTab, navigate }: { state: BackendState; tab: string; setTab(value: string): void; navigate(command: string): void }) {
+function WorkspacePanel({ state, open, presenceRef, tab, setTab, navigate }: { state: BackendState; open: boolean; presenceRef: PresenceRef; tab: string; setTab(value: string): void; navigate(command: string): void }) {
+  const content = useRef<HTMLDivElement>(null);
+  useViewMotion(tab, content);
   const bundles = state.messages.filter((message) => message.bundle).map((message) => message.bundle!);
   const latest = bundles.at(-1);
-  return <aside className="workspace-panel" aria-label="Work details">
+  return <aside ref={presenceRef} className="workspace-panel" aria-label="Work details" data-open={open} inert={!open} aria-hidden={!open}>
     <div className="detail-tabs" role="tablist" aria-label="Work details">{["Deliverables", "Checks"].map((label) => <button key={label} role="tab" aria-selected={tab === label} onClick={() => setTab(label)}>{label}</button>)}</div>
-    <div className="workspace-content" role="tabpanel" aria-label={tab}>
+    <div className="workspace-content" ref={content} role="tabpanel" aria-label={tab}>
       {tab === "Deliverables" ? latest ? <Result result={bundleResult(latest)} /> : <Empty icon={<Folder size={24} />} title="Your work lands here" text="Documents, verified outputs, and proposed changes appear after a task produces them." /> : <>
         <div className="flex items-center justify-between mb-5"><span className="eyebrow">Recurring checks</span><button className="small-button" disabled={state.running} onClick={() => navigate("/followup")}>Manage<ChevronRight size={13} /></button></div>
         {state.checks?.length ? state.checks.map((check, i) => <div className="check-item" key={i}><div className="flex items-center gap-2"><span className="status-dot" data-tone={check.tone} /><strong>{check.title}</strong></div><span className="badge" data-tone={check.tone}>{check.state}</span><p>{check.health}</p></div>) : <Empty icon={<ListChecks size={24} />} title="Keep an eye on things" text="Set up a recurring check for an ongoing goal. Results arrive in your inbox." />}
@@ -106,13 +110,18 @@ export function App() {
   const [showCommands, setShowCommands] = useState(false);
   const [sending, setSending] = useState(false);
   const [approvalBusy, setApprovalBusy] = useState(false);
-  const [messageTiming, setMessageTiming] = useState("next");
+  const [draftError, setDraftError] = useState("");
+  const [queueEditing, setQueueEditing] = useState(false);
+  const queueAction = useQueueAction(state, send, error);
   const composer = useRef<HTMLTextAreaElement>(null);
   const transcript = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
   const backendInput = useRef<string | undefined>(undefined);
+  const view = useRef<HTMLDivElement>(null);
   const panel = state?.panel;
-  const hasUnsavedView = panel?.rows?.some((row) => row.input) || panel?.kind === "confirmation";
+  const viewKey = state ? `${state.destination || (state.home && !state.messages.length ? "home" : "chat")}:${panel?.kind ?? ""}:${panel?.title ?? ""}` : undefined;
+  useViewMotion(viewKey, view);
+  const hasUnsavedView = queueEditing || panel?.rows?.some((row) => row.input) || panel?.kind === "confirmation";
 
   useEffect(() => { localStorage.setItem("gator:sidebar-collapsed", String(collapsed)); }, [collapsed]);
   useEffect(() => {
@@ -123,7 +132,6 @@ export function App() {
   }, [state?.input]);
   useEffect(() => { if (atBottom.current && search === null) transcript.current?.scrollTo({ top: transcript.current.scrollHeight }); }, [state?.messages, state?.running, search]);
   useEffect(() => { if (composer.current) { composer.current.style.height = "auto"; composer.current.style.height = `${Math.min(180, composer.current.scrollHeight)}px`; } }, [draft]);
-  useEffect(() => { if (!state?.running) setMessageTiming("next"); }, [state?.running]);
 
   const attempt = useCallback((frame: DesktopFrame) => { void send(frame).catch(() => {}); }, [send]);
   const navigate = (command: string, prefill?: string) => {
@@ -156,12 +164,17 @@ export function App() {
 
   if (!state) return <main className="boot-screen"><Logo /><h1>{error ? "Gator could not connect" : "Getting your workspace ready"}</h1><p>{error || "Opening your local Gator profile…"}</p>{!error && <LoaderCircle className="spin accent" size={20} />}{error && window.gator && <button className="button" onClick={() => { clearError(); void window.gator!.restart().catch(() => {}); }}>Reconnect</button>}</main>;
 
-  const submit = async () => {
-    if (!draft.trim() || sending || panel || error) return;
-    const text = state.running && messageTiming === "guide" && !draft.startsWith("/") ? `/steer ${draft}` : draft;
+  const queueFull = state.running && state.queued >= 16 && !draft.trimStart().startsWith("/");
+  const submit = async (guide = false) => {
+    if (!draft.trim() || sending || queueAction.busy || panel || error || state.external || (guide ? !state.guidance_id : queueFull)) return;
     setSending(true);
-    try { await send({ type: "submit", text }); setDraft(""); setShowCommands(false); atBottom.current = true; }
-    catch {} finally { setSending(false); }
+    setDraftError("");
+    try {
+      if (guide) await queueAction.act({ id: state.guidance_id!, action: "guide", text: draft });
+      else await send({ type: "submit", text: draft });
+      setDraft(""); setShowCommands(false); atBottom.current = true;
+    } catch (err) { setDraftError(err instanceof Error ? err.message : String(err)); }
+    finally { setSending(false); composer.current?.focus(); }
   };
   const approve = async (approved: boolean) => {
     if (!state.pending_approval || approvalBusy) return;
@@ -170,9 +183,12 @@ export function App() {
     catch {} finally { setApprovalBusy(false); }
   };
   const composerKeys = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.nativeEvent.isComposing && state.running) { event.preventDefault(); void submit(true); return; }
     if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void submit(); }
   };
   const home = state.home && !state.messages.length && !panel;
+  const conversationBrowser = state.destination === "/conversations" || state.destination === "/history";
+  const activeDestination = state.destination === "/history" ? "/conversations" : state.destination;
   const messages = state.messages.filter((message) => !search || `${message.text} ${JSON.stringify(message.result ?? message.bundle ?? "")}`.toLowerCase().includes(search.toLowerCase()));
   const slash = draft.startsWith("/") && !draft.includes(" ") ? state.commands.filter((command) => command.name.startsWith(draft.slice(1))).slice(0, 7) : [];
   const sourceName = state.source.split("/").at(-1) || "Workspace";
@@ -180,21 +196,22 @@ export function App() {
   return <div className={`app-shell ${collapsed ? "sidebar-collapsed" : ""} ${details ? "details-open" : ""}`} data-theme={state.theme} data-platform={window.gator?.platform} data-fullscreen={fullScreen}>
     <div className="titlebar" aria-hidden="true"><span>Gator</span></div>
     <aside className="sidebar" aria-label="Main navigation">
-      <div className="sidebar-brand"><button className="brand-button" onClick={() => navigate("/new")} aria-label="Gator home"><Logo /><span>Gator</span></button><button className="icon-button collapse-button" onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>{collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button></div>
-      <button className="nav-button new-chat" onClick={() => navigate("/new")} disabled={state.running}><Plus size={18} /><span>New conversation</span><kbd>⌘N</kbd></button>
-      <button className="nav-button command-trigger" onClick={() => setShowCommands(true)} title="Search commands"><Search size={17} /><span>Search commands</span><kbd>⌘K</kbd></button>
-      <div className="sidebar-scroll">{["work", "library"].map((group) => <div className="nav-group" key={group}><div className="nav-group-label">{group === "work" ? "Your workspace" : "Library"}</div><nav aria-label={group}>{destinations.filter((destination) => destination.group === group).map(({ command, label, icon: Icon }) => <button className="nav-button" key={command} aria-current={state.destination === command ? "page" : undefined} onClick={() => navigate(command)} disabled={state.running} title={collapsed ? label : undefined}><Icon size={18} /><span>{label}</span></button>)}</nav></div>)}
+      <div className="sidebar-brand"><button className="brand-button" onClick={() => navigate("/new")} aria-label="Gator home"><Logo /><span>Gator</span></button><button className="icon-button collapse-button" onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}><IconSwap active={collapsed} size={17} on={<PanelLeftOpen size={17} />} off={<PanelLeftClose size={17} />} /></button></div>
+      <button className="nav-button new-chat" aria-label="New conversation" onClick={() => navigate("/new")} disabled={state.running}><Plus size={18} /><span>New conversation</span><kbd>⌘N</kbd></button>
+      <button className="nav-button command-trigger" aria-label="Search commands" onClick={() => setShowCommands(true)} title="Search commands"><Search size={17} /><span>Search commands</span><kbd>⌘K</kbd></button>
+      <div className="sidebar-scroll">{["work", "library"].map((group) => <div className="nav-group" key={group}><div className="nav-group-label">{group === "work" ? "Your workspace" : "Library"}</div><nav aria-label={group}>{destinations.filter((destination) => destination.group === group).map(({ command, label, icon: Icon }) => <button className="nav-button" key={command} aria-label={label} aria-current={activeDestination === command ? "page" : undefined} onClick={() => navigate(command)} disabled={state.running} title={collapsed ? label : undefined}><Icon size={18} /><span>{label}</span></button>)}</nav></div>)}
         <div className="sidebar-note"><div className="flex items-center gap-2"><span className="status-dot" /><span>Your personal agent</span></div><p>Ongoing goals.<br />A little less on your mind.</p></div>
       </div>
-      <div className="sidebar-bottom">{destinations.filter((destination) => destination.group === "settings").map(({ command, label, icon: Icon }) => <button className="nav-button" key={command} aria-current={state.destination === command ? "page" : undefined} onClick={() => navigate(command)} disabled={state.running} title={collapsed ? label : undefined}><Icon size={17} /><span>{label}</span></button>)}<button className="nav-button" aria-current={state.destination === "/model" ? "page" : undefined} onClick={() => navigate("/model")} disabled={state.running} title="Model settings"><Settings2 size={17} /><span>Model settings</span></button></div>
+      <div className="sidebar-bottom">{destinations.filter((destination) => destination.group === "settings").map(({ command, label, icon: Icon }) => <button className="nav-button" key={command} aria-label={label} aria-current={activeDestination === command ? "page" : undefined} onClick={() => navigate(command)} disabled={state.running} title={collapsed ? label : undefined}><Icon size={17} /><span>{label}</span></button>)}<button className="nav-button" aria-label="Model settings" aria-current={state.destination === "/model" ? "page" : undefined} onClick={() => navigate("/model")} disabled={state.running} title="Model settings"><Settings2 size={17} /><span>Model settings</span></button></div>
     </aside>
     <main className="main-area">
-      <header className="main-header"><div className="breadcrumbs"><span>{home ? "Your workspace" : panel ? panel.title : "Conversation"}</span><ChevronRight size={13} /><strong>{home ? "Home" : state.title}</strong></div><div className="header-actions"><button className="header-workspace" aria-label="Choose workspace folder" onClick={() => void window.gator?.chooseFolder().catch(() => {})} disabled={state.running || !!panel} title={state.source}><Folder size={15} /><span>{sourceName}</span><ChevronDown size={13} /></button><button className="icon-button" aria-label={details ? "Hide work details" : "Show work details"} aria-expanded={details} onClick={() => setDetails(!details)}>{details ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}</button></div></header>
+      <header className="main-header"><div className="breadcrumbs"><span>{home ? "Your workspace" : conversationBrowser ? "Conversations" : panel ? panel.title : "Conversation"}</span><ChevronRight size={13} /><strong>{home ? "Home" : state.title}</strong></div><div className="header-actions"><button className="header-workspace" aria-label="Choose workspace folder" onClick={() => void window.gator?.chooseFolder().catch(() => {})} disabled={state.running || !!panel} title={state.source}><Folder size={15} /><span>{sourceName}</span><ChevronDown size={13} /></button><button className="icon-button" aria-label={details ? "Hide work details" : "Show work details"} aria-expanded={details} onClick={() => setDetails(!details)}><IconSwap active={details} on={<PanelRightClose size={18} />} off={<PanelRightOpen size={18} />} /></button></div></header>
       {error && <div className="connection-error" role="alert"><span>{error}</span><button className="small-button" onClick={() => void window.gator?.restart().catch(() => {})}>Reconnect</button></div>}
       {state.notice && <div className="view-status" role="status">{state.notice}</div>}
       {panel && state.pending_approval && <div className="approval-reminder panel-approval"><ShieldCheck size={16} /><span>A current action needs your review.</span><button className="small-button" onClick={() => navigate("/chat")}>Review action<ChevronRight size={13} /></button></div>}
       {state.external && <div className="terminal-banner" role="status"><div><strong>Continue this step in Terminal</strong><p>Gator needs an interactive terminal for this {state.external.kind === "connector" ? "connection" : "action"}. Return here when it finishes.</p></div><button className="button" disabled={terminalBusy} onClick={() => void window.gator?.continueInTerminal().catch(() => {})}>{terminalBusy ? "Waiting for Terminal…" : "Open Terminal"}</button></div>}
-      {panel ? panel.kind === "usage" && panel.usage ? <UsagePanel panel={panel} usage={panel.usage} send={send} /> : <Panel panel={panel} send={send} /> : <>
+      <div className="view-content" ref={view}>
+      {panel ? conversationBrowser ? <ConversationsPanel panel={panel} send={send} navigate={navigate} /> : panel.kind === "usage" && panel.usage ? <UsagePanel panel={panel} usage={panel.usage} send={send} /> : <Panel panel={panel} send={send} /> : <>
         {search !== null && <div className="transcript-search"><Search size={16} /><input autoFocus aria-label="Search conversation" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find in this conversation…" /><span>{messages.length} messages</span><button className="icon-button" aria-label="Close search" onClick={() => setSearch(null)}><X size={16} /></button></div>}
         <div className={`conversation-scroll ${home ? "home-scroll" : ""}`} ref={transcript} onScroll={(event) => { const el = event.currentTarget; atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100; }}>
           {home ? <div className="home-content"><h1>What’s on your mind?</h1><p className="home-intro">Pick up where you left off, or make room for something new.</p><OverviewCards state={state} navigate={navigate} />
@@ -203,29 +220,37 @@ export function App() {
         </div>
         <div className="composer-area">{state.pending_approval && <div className="approval-reminder"><ShieldCheck size={16} /><span>An action is waiting for your review.</span><button className="small-button" onClick={() => { setSearch(null); transcript.current?.scrollTo({ top: transcript.current.scrollHeight }); }}>View request<ArrowDown size={13} /></button></div>}
           {!!slash.length && <div className="slash-suggestions" aria-label="Command suggestions">{slash.map((command) => <button key={command.name} onClick={() => { setDraft(`/${command.name}${command.needs_input ? " " : ""}`); composer.current?.focus(); }}><span>/{command.name}</span><span>{command.description}</span></button>)}</div>}
-          <div className="composer"><textarea ref={composer} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={composerKeys} placeholder={state.running ? messageTiming === "guide" ? "Add guidance for the current task…" : "Queue your next request…" : "Ask Gator, or / for commands…"} aria-label="Message Gator" disabled={sending || !!error || !!state.external} rows={2} /><div className="composer-toolbar"><button className="composer-model" disabled={state.running} onClick={() => navigate("/model")}><span className="status-dot" /><span>{state.model || "Choose a model"}</span><ChevronDown size={12} /></button><div className="flex items-center gap-2">{state.running && <select className="message-timing" aria-label="When to use this message" value={messageTiming} onChange={(event) => setMessageTiming(event.target.value)}><option value="next">Next request</option><option value="guide">Guide current task</option></select>}{state.running && state.queued > 0 && <span className="composer-queued">{state.queued} queued</span>}{state.running && <button className="send-button stop" aria-label="Stop current work" disabled={state.cancelling} onClick={() => attempt({ type: "key", key: "esc" })}><Square size={13} fill="currentColor" /></button>}<button className="send-button" aria-label="Send message" disabled={!draft.trim() || sending || !!error || !!state.external} onClick={() => void submit()}><ArrowUp size={18} /></button></div></div></div>
+          <MessageQueue items={state.queue ?? []} running={state.running} busy={queueAction.busy || sending || !!error || !!state.external} act={queueAction.act} onEditingChange={setQueueEditing} onUseDraft={(text) => { setDraft((current) => current ? `${current}\n\n${text}` : text); composer.current?.focus(); }} />
+          <div className="composer"><textarea ref={composer} value={draft} onChange={(event) => { setDraft(event.target.value); setDraftError(""); }} onKeyDown={composerKeys} placeholder={state.running ? "Add a follow-up…" : "Ask Gator, or / for commands…"} aria-label="Message Gator" disabled={sending || !!error || !!state.external} rows={2} /><div className="composer-toolbar"><button className="composer-model" disabled={state.running} onClick={() => navigate("/model")}><span className="status-dot" /><span>{state.model || "Choose a model"}</span><ChevronDown size={12} /></button><div className="composer-actions">
+            {state.running && <button className="small-button guide-button" title={`Guide the current task (${window.gator?.platform === "darwin" ? "⌘" : "Ctrl"}+Enter)`} disabled={!draft.trim() || sending || queueAction.busy || !state.guidance_id || !!error || !!state.external} onClick={() => void submit(true)}>Guide now</button>}
+            {state.running && <button className="send-button stop" aria-label="Stop current work" disabled={state.cancelling} onClick={() => attempt({ type: "key", key: "esc" })}><Square size={13} fill="currentColor" /></button>}
+            <button className="send-button" aria-label={state.running ? "Queue message" : "Send message"} title={queueFull ? "Queue is full (16 messages)" : state.running ? "Queue for after this task (Enter)" : "Send message"} aria-busy={sending} disabled={!draft.trim() || sending || queueAction.busy || queueFull || !!error || !!state.external} onClick={() => void submit()}><IconSwap active={sending} on={<LoaderCircle size={18} className="spin" />} off={state.running ? <ListPlus size={18} /> : <ArrowUp size={18} />} /></button>
+          </div></div></div>
+          {draftError && <p className="composer-error" role="alert">{draftError}</p>}
+          {queueFull && <p className="composer-error" role="status">Queue full. Edit or remove a message to make room.</p>}
         </div>
       </>}
+      </div>
     </main>
-    {details && <WorkspacePanel state={state} tab={tab} setTab={setTab} navigate={navigate} />}
+    <Presence open={details}>{(open, presenceRef) => <WorkspacePanel state={state} open={open} presenceRef={presenceRef} tab={tab} setTab={setTab} navigate={navigate} />}</Presence>
     {panel && <div className="panel-draft-anchor"><MessageSquare size={14} /><span>{draft ? "Your message draft is kept while you’re here." : "Return to the conversation to write a message."}</span><button className="small-button" onClick={() => attempt({ type: "panel", key: "esc", panel: { id: panel.id!, action: "key" } })}>Back<kbd>Esc</kbd></button></div>}
-    {showCommands && <CommandMenu commands={state.commands} close={() => setShowCommands(false)} select={(name, needsInput) => { setShowCommands(false); if (needsInput) navigate("/chat", `/${name} `); else navigate(`/${name}`); }} />}
-    {navigation && <DiscardDialog cancel={() => setNavigation(null)} confirm={() => { attempt({ type: "navigate", text: navigation.command }); if (navigation.draft !== undefined) setDraft(navigation.draft); setNavigation(null); }} />}
+    <Presence open={showCommands}>{(open, presenceRef) => <CommandMenu open={open} presenceRef={presenceRef} commands={state.commands} close={() => setShowCommands(false)} select={(name, needsInput) => { setShowCommands(false); if (needsInput) navigate("/chat", `/${name} `); else navigate(`/${name}`); }} />}</Presence>
+    <Presence open={!!navigation}>{(open, presenceRef) => <DiscardDialog open={open} presenceRef={presenceRef} cancel={() => setNavigation(null)} confirm={() => { if (!navigation) return; attempt({ type: "navigate", text: navigation.command }); if (navigation.draft !== undefined) setDraft(navigation.draft); setNavigation(null); }} />}</Presence>
   </div>;
 }
 
-function CommandMenu({ commands, close, select }: { commands: BackendState["commands"]; close(): void; select(name: string, needsInput: boolean): void }) {
+function CommandMenu({ commands, open, presenceRef, close, select }: { commands: BackendState["commands"]; open: boolean; presenceRef: PresenceRef; close(): void; select(name: string, needsInput: boolean): void }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
-  const focus = useModalFocus();
+  const focus = useModalFocus(open);
   const shown = commands.filter((command) => `${command.name} ${command.description}`.toLowerCase().includes(query.toLowerCase()));
-  return <div className="modal-backdrop" onClick={close}><section ref={focus} className="command-menu" role="dialog" aria-modal="true" aria-label="Search commands" onClick={(event) => event.stopPropagation()}><div className="command-search"><Search size={18} /><input autoFocus placeholder="Find a command…" aria-label="Find a command" value={query} onChange={(event) => { setQuery(event.target.value); setSelected(0); }} onKeyDown={(event) => {
+  return <div ref={presenceRef} className="modal-backdrop" data-open={open} inert={!open} aria-hidden={!open} onClick={close}><section ref={focus} className="command-menu" role="dialog" aria-modal="true" aria-label="Search commands" onClick={(event) => event.stopPropagation()}><div className="command-search"><Search size={18} /><input autoFocus placeholder="Find a command…" aria-label="Find a command" value={query} onChange={(event) => { setQuery(event.target.value); setSelected(0); }} onKeyDown={(event) => {
     if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); const next = Math.max(0, Math.min(shown.length - 1, selected + (event.key === "ArrowDown" ? 1 : -1))); setSelected(next); focus.current?.querySelectorAll(".command-list button")[next]?.scrollIntoView({ block: "nearest" }); }
     if (event.key === "Enter" && shown[selected]) { event.preventDefault(); select(shown[selected].name, shown[selected].needs_input); }
   }} /><button className="icon-button" aria-label="Close commands" onClick={close}><X size={16} /></button></div><div className="command-list">{shown.map((command, index) => <button key={command.name} data-selected={index === selected} onClick={() => select(command.name, command.needs_input)}><Command size={16} /><div><strong>/{command.name}</strong><p>{command.description}</p></div>{command.advanced && <span className="badge">Advanced</span>}<ChevronRight size={15} /></button>)}{!shown.length && <p className="empty-hint">No commands match “{query}”.</p>}</div><footer><span>↑↓ choose · Enter run · Tab move focus</span><kbd>Esc</kbd></footer></section></div>;
 }
 
-function DiscardDialog({ cancel, confirm }: { cancel(): void; confirm(): void }) {
-  const focus = useModalFocus();
-  return <div className="modal-backdrop"><section ref={focus} role="alertdialog" aria-modal="true" aria-labelledby="discard-title" className="confirm-dialog"><h2 id="discard-title">Leave this review?</h2><p>Your unsaved form changes will be discarded.</p><div className="flex justify-end gap-2"><button className="button" onClick={cancel}>Keep editing</button><button className="button primary" onClick={confirm}>Leave view</button></div></section></div>;
+function DiscardDialog({ open, presenceRef, cancel, confirm }: { open: boolean; presenceRef: PresenceRef; cancel(): void; confirm(): void }) {
+  const focus = useModalFocus(open);
+  return <div ref={presenceRef} className="modal-backdrop" data-open={open} inert={!open} aria-hidden={!open}><section ref={focus} role="alertdialog" aria-modal="true" aria-labelledby="discard-title" className="confirm-dialog"><h2 id="discard-title">Leave this edit?</h2><p>Your unsaved changes will be discarded.</p><div className="flex justify-end gap-2"><button className="button" onClick={cancel}>Keep editing</button><button className="button primary" onClick={confirm}>Leave view</button></div></section></div>;
 }

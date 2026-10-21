@@ -11,6 +11,255 @@ const launchDesktop = (env: Record<string, string | undefined>) => {
   return electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env: definedEnv });
 };
 
+test("motion is interruptible, releases dismissed controls, and honors reduced motion", async () => {
+  test.setTimeout(120_000); // Includes inspection at 10% playback and native startup.
+  const directory = await mkdtemp(join(tmpdir(), "gator-desktop-motion-e2e-"));
+  const env = { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") };
+  const application = await launchDesktop(env);
+  try {
+    const page = await application.firstWindow();
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await expect(page.getByRole("heading", { name: "What’s on your mind?" })).toBeVisible();
+    await page.getByRole("button", { name: "Pause dashboard scrolling", exact: true }).click();
+    const shell = page.locator(".app-shell");
+    const sidebar = page.getByRole("complementary", { name: "Main navigation" });
+    const width = () => sidebar.evaluate((element) => element.getBoundingClientRect().width);
+    const toggle = page.locator(".collapse-button");
+    expect(await shell.evaluate((element) => element.getAnimations().length)).toBe(0);
+    const session = await page.context().newCDPSession(page);
+    await session.send("Animation.setPlaybackRate", { playbackRate: 0.1 });
+    await toggle.click();
+    await expect.poll(width).toBeLessThan(239);
+    expect(await width()).toBeGreaterThan(68);
+    await page.evaluate(() => {
+      for (const animation of document.getAnimations()) {
+        if (animation instanceof CSSTransition) { animation.pause(); animation.currentTime = 100; }
+      }
+    });
+    await page.screenshot({ path: "test-results/desktop-motion-sidebar-midpoint.png" });
+    // Reverse before completion. The focused toggle and its DOM node persist.
+    await session.send("Animation.setPlaybackRate", { playbackRate: 1 });
+    await page.evaluate(() => document.getAnimations().forEach((animation) => animation.play()));
+    await toggle.press("Enter");
+    await expect.poll(width).toBeCloseTo(240, 0);
+    await expect(toggle).toBeFocused();
+    await toggle.press("Enter");
+    await toggle.press("Enter");
+    await expect.poll(width).toBeCloseTo(240, 0);
+
+    await session.send("Animation.setPlaybackRate", { playbackRate: 0.1 });
+    await page.getByRole("button", { name: "Show work details" }).click();
+    await expect(page.getByRole("complementary", { name: "Work details" })).toBeVisible();
+    await page.getByRole("button", { name: "Hide work details" }).click();
+    await expect(page.locator('.workspace-panel[data-open="false"]')).toHaveAttribute("inert", "");
+    await expect(page.getByRole("complementary", { name: "Work details" })).toHaveCount(0);
+    await session.send("Animation.setPlaybackRate", { playbackRate: 1 });
+    await expect(page.locator(".workspace-panel")).toHaveCount(0);
+
+    await session.send("Animation.setPlaybackRate", { playbackRate: 0.1 });
+    await page.getByRole("button", { name: "Search commands", exact: true }).press("Enter");
+    await expect(page.getByRole("textbox", { name: "Find a command" })).toBeFocused();
+    await page.screenshot({ path: "test-results/desktop-motion-command-menu.png" });
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog", { name: "Search commands" })).toHaveCount(0);
+    await expect(page.locator('.modal-backdrop[data-open="false"]')).toHaveAttribute("inert", "");
+    await expect(page.getByRole("button", { name: "Search commands", exact: true })).toBeFocused();
+    // Reopen while its exit is still running; no stale completion may remove it.
+    await page.keyboard.press("Meta+k");
+    await expect(page.getByRole("textbox", { name: "Find a command" })).toBeFocused();
+    await session.send("Animation.setPlaybackRate", { playbackRate: 1 });
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".modal-backdrop")).toHaveCount(0);
+
+    await page.evaluate(() => {
+      const state = window as unknown as { viewAnimations: number };
+      state.viewAnimations = 0;
+      const animate = Element.prototype.animate;
+      Element.prototype.animate = function (keyframes, options) {
+        if (this.classList.contains("view-content")) state.viewAnimations++;
+        return animate.call(this, keyframes, options);
+      };
+    });
+    const entrances = () => page.evaluate(() => (window as unknown as { viewAnimations: number }).viewAnimations);
+    await page.getByRole("button", { name: "Saved knowledge", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Saved knowledge", exact: true })).toBeVisible();
+    expect(await entrances()).toBe(1);
+    await page.getByRole("button", { name: /^refresh R$/i }).click();
+    expect(await entrances()).toBe(1);
+    await page.getByRole("button", { name: "Follow-up checks", exact: true }).click();
+    await page.getByRole("button", { name: /new check/i }).click();
+    const title = page.getByRole("textbox", { name: "Title", exact: true });
+    await expect(title).toBeVisible();
+    const beforeTyping = await entrances();
+    await title.fill("Keep my form during motion");
+    expect(await entrances()).toBe(beforeTyping);
+
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await toggle.click();
+    await expect.poll(width).toBeCloseTo(68, 0);
+    expect(await shell.evaluate((element) => element.getAnimations().length)).toBe(0);
+    await page.getByRole("button", { name: "Gator home" }).click();
+    await expect(page.getByRole("alertdialog")).toBeVisible();
+    await page.getByRole("button", { name: "Keep editing" }).press("Shift+Tab");
+    await expect(page.getByRole("button", { name: "Leave view" })).toBeFocused();
+    await page.getByRole("button", { name: "Keep editing" }).click();
+    await expect(title).toHaveValue("Keep my form during motion");
+    await expect(page.locator(".modal-backdrop")).toHaveCount(0);
+    await page.getByRole("button", { name: "Gator home" }).click();
+    await page.getByRole("button", { name: "Leave view" }).click();
+    await page.getByRole("button", { name: "Saved knowledge", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Saved knowledge", exact: true })).toBeVisible();
+    expect(await entrances()).toBe(beforeTyping);
+    expect(await page.locator(".view-content").evaluate((element) => element.getAnimations().length)).toBe(0);
+    for (const size of [{ width: 1024, panelWidth: 275 }, { width: 800, panelWidth: 300 }]) {
+      await application.evaluate(({ BrowserWindow }, value) => BrowserWindow.getAllWindows()[0].setSize(value, 768), size.width);
+      await page.getByRole("button", { name: "Show work details" }).click();
+      await expect.poll(width).toBeCloseTo(68, 0);
+      await expect.poll(() => page.locator(".workspace-panel").evaluate((element) => element.getBoundingClientRect().width)).toBeCloseTo(size.panelWidth, 0);
+      await page.screenshot({ path: `test-results/desktop-motion-details-${size.width}.png` });
+      if (size.width === 800) {
+        await page.evaluate(() => { document.querySelector<HTMLElement>(".app-shell")!.dataset.fullscreen = "true"; });
+        expect(await page.locator(".workspace-panel").evaluate((element) => element.getBoundingClientRect().top)).toBe(0);
+        await page.evaluate(() => { document.querySelector<HTMLElement>(".app-shell")!.dataset.fullscreen = "false"; });
+      }
+      await page.getByRole("button", { name: "Hide work details" }).click();
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    expect(errors).toEqual([]);
+  } finally { await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close()).catch(() => {}); await application.close(); await rm(directory, { recursive: true, force: true }); }
+});
+
+test("queued messages can be edited, reordered, removed, and resumed without losing drafts", async () => {
+  test.setTimeout(90_000);
+  const directory = await mkdtemp(join(tmpdir(), "gator-desktop-queue-e2e-"));
+  const workspace = join(directory, "workspace");
+  await mkdir(workspace);
+  await writeFile(join(workspace, "project.md"), "A local queue test.\n");
+  let hold = true;
+  const waiting: (() => void)[] = [];
+  const requests: string[] = [];
+  const release = () => { hold = false; waiting.splice(0).forEach((reply) => reply()); };
+  const server = createServer((req, res) => {
+    let body = "";
+    req.on("data", (chunk) => { body += chunk; });
+    req.on("end", () => {
+      requests.push(body);
+      const routing = body.includes("Classify the user's immediate request");
+      const reply = () => {
+        if (res.destroyed) return;
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ id: "local-queue-test", choices: [{ message: { role: "assistant", content: routing ? '{"mode":"inspect"}' : "Finished the local task." }, finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 10, total_tokens: 20 } }));
+      };
+      if (hold && !routing) waiting.push(reply); else reply();
+    });
+  });
+  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+  const address = server.address() as { port: number };
+  const env = { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop"), GATOR_DESKTOP_WORKSPACE: workspace };
+  const cli = (args: string[]) => execFileSync(resolve("runtime/gator"), args, { env, encoding: "utf8" });
+  cli(["provider", "add", "queue-fixture", "--base-url", `http://127.0.0.1:${address.port}/v1/chat/completions`, "--model", "fixture-model"]);
+  cli(["config", "set", "default-provider", "queue-fixture"]);
+  const application = await launchDesktop(env);
+  const page = await application.firstWindow();
+  const state = () => page.evaluate(async () => (await window.gator!.snapshot()).state!);
+  try {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    const composer = page.getByRole("textbox", { name: "Message Gator" });
+    const queue = page.getByRole("region", { name: "Queued messages" });
+    await composer.fill("Start the first task.");
+    await page.getByRole("button", { name: "Send message", exact: true }).click();
+    await expect.poll(() => requests.length).toBeGreaterThan(0);
+    await expect.poll(async () => (await state()).guidance_id).toBeTruthy();
+    for (const text of ["First follow-up", "Second follow-up", "Remove this request"]) {
+      await composer.fill(text);
+      await composer.press("Enter");
+      await expect(composer).toHaveValue("");
+    }
+    await expect(queue.locator(".queue-preview")).toHaveText(["First follow-up", "Second follow-up", "Remove this request"]);
+    await expect(page.getByRole("combobox", { name: "When to use this message" })).toHaveCount(0);
+    await composer.fill("Preserve my separate draft");
+    await queue.getByRole("button", { name: "Edit queued message 1", exact: true }).click();
+    const editor = queue.getByRole("textbox", { name: "Edit queued message", exact: true });
+    await expect(editor).toBeFocused();
+    await editor.fill("Discard this edit");
+    await editor.press("Escape");
+    expect((await state()).running).toBe(true);
+    await expect(composer).toHaveValue("Preserve my separate draft");
+    await queue.getByRole("button", { name: "Edit queued message 1", exact: true }).click();
+    await editor.fill("Edited first follow-up 🐊\nKeep the useful detail.");
+    await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(800, 600));
+    await page.screenshot({ path: "test-results/desktop-message-queue-edit.png" });
+    expect(await composer.evaluate((element) => element.getBoundingClientRect().bottom <= innerHeight)).toBe(true);
+    expect(await queue.getByRole("button", { name: "Save changes", exact: true }).evaluate((element) => element.getBoundingClientRect().bottom <= element.closest(".message-queue")!.getBoundingClientRect().bottom)).toBe(true);
+    await editor.press("Control+Enter");
+    await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 960));
+    await expect(editor).toHaveCount(0);
+    await expect(queue.locator(".queue-preview").first()).toContainText("Edited first follow-up 🐊");
+    await expect(composer).toHaveValue("Preserve my separate draft");
+    await queue.getByRole("button", { name: "Remove queued message 3", exact: true }).click();
+    await expect(queue.locator(".queued-message")).toHaveCount(2);
+    await queue.getByRole("button", { name: "Move queued message 2 up", exact: true }).click();
+    await expect(queue.locator(".queue-preview").first()).toHaveText("Second follow-up");
+    await composer.fill("Focus on the current task.");
+    await composer.press("Control+Enter");
+    await expect(composer).toHaveValue("");
+    await expect(page.locator(".run-progress")).toContainText("Steering submitted to current task");
+    await expect(queue.locator(".queued-message")).toHaveCount(2);
+    await page.screenshot({ path: "test-results/desktop-message-queue.png" });
+    await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(800, 768));
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: "test-results/desktop-message-queue-narrow.png" });
+    expect(await queue.locator(".icon-button").evaluateAll((buttons) => buttons.every((button) => button.getBoundingClientRect().width >= 40 && button.getBoundingClientRect().height >= 40))).toBe(true);
+    release();
+    await expect.poll(async () => (await state()).running).toBe(false);
+    await expect(queue).toHaveCount(0);
+    expect((await state()).messages.filter((message) => message.role === "You").map((message) => message.text)).toEqual(["Start the first task.", "Second follow-up", "Edited first follow-up 🐊\nKeep the useful detail."]);
+    expect(requests.some((body) => body.includes("Remove this request"))).toBe(false);
+
+    hold = true;
+    await composer.fill("Run to stop");
+    await page.getByRole("button", { name: "Send message", exact: true }).click();
+    await expect.poll(() => waiting.length).toBeGreaterThan(0);
+    await composer.fill("Run after stop");
+    await composer.press("Enter");
+    await expect(queue.locator(".queued-message")).toHaveCount(1);
+    await page.getByRole("button", { name: "Stop current work", exact: true }).click();
+    await expect.poll(async () => (await state()).running).toBe(false);
+    await expect(queue.getByText("Paused", { exact: true })).toBeVisible();
+    await page.screenshot({ path: "test-results/desktop-message-queue-paused.png" });
+    release();
+    hold = true;
+    await queue.getByRole("button", { name: "Send queued message 1 now", exact: true }).click();
+    await expect.poll(() => waiting.length).toBeGreaterThan(0);
+    await composer.fill("Original waiting message");
+    await composer.press("Enter");
+    await queue.getByRole("button", { name: "Edit queued message 1", exact: true }).click();
+    await editor.fill("Revised after the message started");
+    await composer.fill("Keep this other draft");
+    release();
+    await expect.poll(async () => (await state()).running).toBe(false);
+    await expect(queue.getByText("This message has left the queue. Your edits are kept here.", { exact: true })).toBeVisible();
+    await expect(editor).toHaveValue("Revised after the message started");
+    await queue.getByRole("button", { name: "Keep as new draft", exact: true }).click();
+    await expect(composer).toHaveValue("Keep this other draft\n\nRevised after the message started");
+    await expect(queue).toHaveCount(0);
+    expect((await state()).messages.filter((message) => message.role === "You").map((message) => message.text).slice(-2)).toEqual(["Run after stop", "Original waiting message"]);
+    expect(errors).toEqual([]);
+  } finally {
+    release();
+    await page.evaluate(async () => { if ((await window.gator?.snapshot())?.state?.running) await window.gator?.send({ type: "key", key: "esc" }); }).catch(() => {});
+    await expect.poll(async () => (await state()).running).toBe(false);
+    await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close());
+    await application.close();
+    server.closeAllConnections();
+    await new Promise<void>((done) => server.close(() => done()));
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("desktop uses real Go state, preserves drafts, edits native forms, and continues saved work", async () => {
   const directory = await mkdtemp(join(tmpdir(), "gator-desktop-e2e-"));
   const workspace = join(directory, "notes");
@@ -100,6 +349,35 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     await expect(page.getByRole("region", { name: "Tokens", exact: true })).toContainText(`${requests * 20} used`);
     await page.screenshot({ path: "test-results/desktop-usage-with-activity.png" });
     await page.getByRole("button", { name: "Back to conversation" }).click();
+    await page.getByRole("textbox", { name: "Message Gator" }).fill("keep my continuation draft");
+    await page.getByRole("button", { name: "Conversations", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Work history", exact: true })).toHaveCount(0);
+    const browser = page.getByRole("navigation", { name: "Conversation views" });
+    await expect(browser.getByRole("button", { name: "Chats", exact: true })).toHaveAttribute("aria-current", "page");
+    // Two turns belong to a single conversation, with two retained task runs.
+    await expect(page.locator(".panel-row")).toHaveCount(1);
+    await page.screenshot({ path: "test-results/desktop-conversations.png" });
+    await browser.getByRole("button", { name: "Task runs", exact: true }).click();
+    await expect(page.locator(".panel-row")).toHaveCount(2);
+    await page.getByRole("button", { name: /^filter F$/i }).click();
+    await expect(page.locator(".workflow-heading p")).toContainText("running");
+    await expect(page.locator(".panel-row")).toHaveCount(0);
+    await page.getByRole("button", { name: /^filter F$/i }).click();
+    await expect(page.locator(".workflow-heading p")).toContainText("completed");
+    await expect(page.locator(".panel-row")).toHaveCount(2);
+    await expect(page.getByRole("button", { name: "Conversations", exact: true })).toHaveAttribute("aria-current", "page");
+    await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Conversations", exact: true })).toHaveAttribute("aria-current", "page");
+    await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(800, 600));
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: "test-results/desktop-task-runs-800.png" });
+    await page.locator(".panel-row").first().click();
+    await expect(page.getByRole("heading", { name: "Artifacts", exact: true })).toBeVisible();
+    await expect(browser.getByRole("button", { name: "Task runs", exact: true })).toHaveAttribute("aria-current", "page");
+    await page.getByRole("button", { name: /^conversation C$/i }).click();
+    await expect(page.locator(".message-byline", { hasText: "Gator" })).toHaveCount(2);
+    await expect(page.getByRole("textbox", { name: "Message Gator" })).toHaveValue("keep my continuation draft");
+    await page.getByRole("button", { name: "Expand sidebar", exact: true }).click();
     for (const size of [{ width: 1440, height: 960 }, { width: 1024, height: 768 }, { width: 800, height: 600 }]) {
       await application.evaluate(({ BrowserWindow }, value) => BrowserWindow.getAllWindows()[0].setSize(value.width, value.height), size);
       await expect(page.getByRole("textbox", { name: "Message Gator" })).toBeVisible();

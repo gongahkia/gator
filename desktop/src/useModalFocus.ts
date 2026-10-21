@@ -1,9 +1,13 @@
 import { useEffect, useRef } from "react";
 
-export function useModalFocus() {
+export function useModalFocus(active = true) {
   const ref = useRef<HTMLElement>(null);
   const trigger = useRef(document.activeElement as HTMLElement | null);
+  const wasActive = useRef(active);
+  if (active && !wasActive.current) trigger.current = document.activeElement as HTMLElement | null;
+  wasActive.current = active;
   useEffect(() => {
+    if (!active) return;
     const previous = trigger.current;
     const root = ref.current;
     const controls = () => [...(root?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), [tabindex="0"]') ?? [])];
@@ -18,6 +22,6 @@ export function useModalFocus() {
     };
     document.addEventListener("keydown", trap);
     return () => { document.removeEventListener("keydown", trap); if (previous?.isConnected) previous.focus(); };
-  }, []);
+  }, [active]);
   return ref;
 }

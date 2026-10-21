@@ -265,6 +265,7 @@ type composerEditorDone struct {
 }
 
 type queuedRun struct {
+	id      uint64
 	prompt  string
 	options RunOptions
 }
@@ -319,6 +320,8 @@ type Model struct {
 	scroll                 int
 	options                RunOptions
 	queue                  []queuedRun
+	queueSequence          uint64
+	bridgeQueueResult      *BridgeQueueResult
 	lastOutput             string
 	lastBundle             BundleSummary
 	pendingBundleAction    *pendingBundleAction

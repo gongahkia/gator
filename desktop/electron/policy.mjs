@@ -27,6 +27,7 @@ export function validateFrame(frame) {
   const allowed = {
     submit: ["type", "text"], navigate: ["type", "text"], key: ["type", "key", "text"],
     panel: ["type", "key", "panel"], approval: ["type", "interaction_id", "approved"],
+    queue: ["type", "queue"],
   }[frame.type];
   if (!allowed || Object.keys(frame).some((key) => !allowed.includes(key))) throw new Error("Unsupported desktop action");
   if (JSON.stringify(frame).length > 256 * 1024) throw new Error("Desktop action is too large");
@@ -34,6 +35,13 @@ export function validateFrame(frame) {
   if (frame.type === "navigate" && (typeof frame.text !== "string" || frame.text.length > 4096 || !/^\/[a-z][a-z0-9-]*(?: [a-z][a-z0-9-]*)*$/.test(frame.text) || ["/approve", "/deny", "/quit", "/exit"].includes(frame.text))) throw new Error("Invalid destination");
   if (frame.type === "key" && !["esc", "ctrl+o", "ctrl+p", "ctrl+x", "ctrl+b"].includes(frame.key)) throw new Error("Unsupported shortcut");
   if (frame.type === "approval" && (!Number.isSafeInteger(frame.interaction_id) || frame.interaction_id < 1 || typeof frame.approved !== "boolean")) throw new Error("Invalid approval");
+  if (frame.type === "queue") {
+    const queue = frame.queue;
+    if (!queue || typeof queue !== "object" || Array.isArray(queue) || Object.keys(queue).some((key) => !["request_id", "id", "action", "text"].includes(key))) throw new Error("Invalid queue action");
+    if (typeof queue.request_id !== "string" || !/^[a-zA-Z0-9-]{1,64}$/.test(queue.request_id) || typeof queue.id !== "string" || !/^[a-f0-9]{64}$/.test(queue.id)) throw new Error("Invalid queue identity");
+    if (!["edit", "remove", "earlier", "later", "run", "guide"].includes(queue.action)) throw new Error("Invalid queue action");
+    if (["edit", "guide"].includes(queue.action) ? typeof queue.text !== "string" || !queue.text.trim() || Buffer.byteLength(queue.text, "utf8") > (queue.action === "guide" ? 64 : 128) * 1024 : queue.text !== undefined) throw new Error("Invalid queued message");
+  }
   if (frame.type === "panel") {
     const panel = frame.panel;
     if (!panel || typeof panel !== "object" || Array.isArray(panel) || !/^[a-f0-9]{64}$/.test(panel.id)) throw new Error("Invalid view");

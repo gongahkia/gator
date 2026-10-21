@@ -36,6 +36,9 @@ type BridgeState struct {
 	Elapsed              string             `json:"elapsed,omitempty"`
 	LoadingFrame         int                `json:"loading_frame"`
 	Queued               int                `json:"queued"`
+	Queue                []BridgeQueuedRun  `json:"queue"`
+	QueueResult          *BridgeQueueResult `json:"queue_result,omitempty"`
+	GuidanceID           string             `json:"guidance_id,omitempty"`
 	Home                 bool               `json:"home"`
 	FirstRun             bool               `json:"first_run"`
 	SupervisorNeedsStart bool               `json:"supervisor_needs_start"`
@@ -116,11 +119,17 @@ func (m Model) BridgeState() BridgeState {
 		Elapsed:           m.workElapsed(),
 		LoadingFrame:      m.loadingFrame,
 		Queued:            len(m.queue),
+		Queue:             make([]BridgeQueuedRun, 0, len(m.queue)),
+		QueueResult:       m.bridgeQueueResult,
 		Home:              m.home,
 		FirstRun:          m.firstRun,
 		External:          m.bridgeExternal,
 		Notice:            m.bridgeNotice,
 	}
+	for _, item := range m.queue {
+		state.Queue = append(state.Queue, BridgeQueuedRun{ID: bridgeQueuedRunID(item), Text: item.prompt})
+	}
+	state.GuidanceID = m.bridgeGuidanceID()
 	if !m.overview.At.IsZero() {
 		copy := m.overview
 		state.Overview = &copy

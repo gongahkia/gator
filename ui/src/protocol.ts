@@ -29,6 +29,10 @@ export type Overview = {
 };
 export type BackendCommand = { name: string; description: string; advanced: boolean; needs_input: boolean };
 export type BackendMessage = { role: string; text: string; bundle?: BackendBundle; result?: BackendResult };
+export type QueuedMessage = { id: string; text: string };
+export type QueueAction = {
+  request_id: string; id: string; action: "edit" | "remove" | "earlier" | "later" | "run" | "guide"; text?: string;
+};
 export type BackendPanel = {
   id?: string;
   kind: string;
@@ -84,6 +88,9 @@ export type BackendState = {
   elapsed?: string;
   loading_frame: number;
   queued: number;
+  queue: QueuedMessage[];
+  queue_result?: { request_id: string; error?: string };
+  guidance_id?: string;
   home: boolean;
   first_run: boolean;
   supervisor_needs_start: boolean;
@@ -100,7 +107,8 @@ export type PanelAction = {
 };
 export type Frame = {
   version: 1;
-  type: "submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval";
+  type: "submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue";
   text?: string; key?: string; error?: string; width?: number; height?: number;
   panel?: PanelAction; interaction_id?: number; approved?: boolean;
+  queue?: QueueAction;
 };

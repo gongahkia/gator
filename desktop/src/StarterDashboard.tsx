@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { IconSwap, useReducedMotion } from "./motion";
 import { BookOpen, ChevronLeft, ChevronRight, Clock3, Inbox, ListChecks, Pause, Play, Target } from "lucide-react";
 
 const cards = [
@@ -6,7 +7,7 @@ const cards = [
   { icon: ListChecks, title: "Set up a follow-up", text: "Let Gator watch for a meaningful change.", command: "/followup" },
   { icon: BookOpen, title: "Find what you’ve saved", text: "Notes, preferences, and useful context.", command: "/knowledge" },
   { icon: Inbox, title: "Review your inbox", text: "Updates and actions waiting for you.", command: "/inbox" },
-  { icon: Clock3, title: "Revisit recent work", text: "Past runs, outcomes, and deliverables.", command: "/history" },
+  { icon: Clock3, title: "Revisit recent work", text: "Saved chats and the tasks within them.", command: "/conversations" },
 ];
 
 export function StarterDashboard({ navigate }: { navigate(command: string): void }) {
@@ -15,13 +16,7 @@ export function StarterDashboard({ navigate }: { navigate(command: string): void
   const [paused, setPaused] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
-  const [reducedMotion, setReducedMotion] = useState(() => matchMedia("(prefers-reduced-motion: reduce)").matches);
-  useEffect(() => {
-    const media = matchMedia("(prefers-reduced-motion: reduce)");
-    const change = () => setReducedMotion(media.matches);
-    media.addEventListener("change", change);
-    return () => media.removeEventListener("change", change);
-  }, []);
+  const reducedMotion = useReducedMotion();
   const move = useCallback((direction: number) => {
     const element = track.current;
     if (!element) return;
@@ -46,7 +41,7 @@ export function StarterDashboard({ navigate }: { navigate(command: string): void
     </div>
     <div className="dashboard-controls">
       <button className="icon-button" aria-label="Previous dashboard cards" aria-controls={id} onClick={() => { setPaused(true); move(-1); }}><ChevronLeft size={16} /></button>
-      <button className="icon-button" aria-label={paused || reducedMotion ? "Resume dashboard scrolling" : "Pause dashboard scrolling"} aria-controls={id} disabled={reducedMotion} title={reducedMotion ? "Automatic scrolling is off for reduced motion" : undefined} onClick={() => setPaused(!paused)}>{paused || reducedMotion ? <Play size={14} /> : <Pause size={14} />}</button>
+      <button className="icon-button" aria-label={paused || reducedMotion ? "Resume dashboard scrolling" : "Pause dashboard scrolling"} aria-controls={id} disabled={reducedMotion} title={reducedMotion ? "Automatic scrolling is off for reduced motion" : undefined} onClick={() => setPaused(!paused)}><IconSwap active={paused || reducedMotion} size={14} on={<Play size={14} />} off={<Pause size={14} />} /></button>
       <button className="icon-button" aria-label="Next dashboard cards" aria-controls={id} onClick={() => { setPaused(true); move(1); }}><ChevronRight size={16} /></button>
     </div>
   </section>;

@@ -89,6 +89,7 @@ type uiFrame struct {
 	Width         int                        `json:"width,omitempty"`
 	Height        int                        `json:"height,omitempty"`
 	Panel         *worktui.BridgePanelAction `json:"panel,omitempty"`
+	Queue         *worktui.BridgeQueueAction `json:"queue,omitempty"`
 	InteractionID int                        `json:"interaction_id,omitempty"`
 	Approved      bool                       `json:"approved,omitempty"`
 }
@@ -136,6 +137,11 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 			next, command = m.model.ApplyBridgePanel(*frame.Panel, key)
 		case "approval":
 			next, command = m.model.RespondBridgeApproval(frame.InteractionID, frame.Approved)
+		case "queue":
+			if frame.Queue == nil {
+				return m, nil
+			}
+			next, command = m.model.ApplyBridgeQueue(*frame.Queue)
 		case "resize":
 			next, command = m.model.Update(tea.WindowSizeMsg{Width: max(20, frame.Width), Height: max(8, frame.Height)})
 		default:

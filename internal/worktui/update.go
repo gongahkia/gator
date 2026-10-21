@@ -712,7 +712,8 @@ func (m Model) submitRunningInput() (tea.Model, tea.Cmd) {
 		m.messages = append(m.messages, noticeMessage("Queue full", "The local queue is full (16 prompts).", "warning"))
 		return m, nil
 	}
-	m.queue = append(m.queue, queuedRun{prompt: prompt, options: cloneRunOptions(m.options)})
+	m.queueSequence++
+	m.queue = append(m.queue, queuedRun{id: m.queueSequence, prompt: prompt, options: cloneRunOptions(m.options)})
 	m.recordPrompt(prompt)
 	m.options.Attachments = nil
 	m.options.ExcludedKnowledgeIDs = nil
