@@ -12,6 +12,8 @@ import { IconSwap, Presence, useViewMotion, type PresenceRef } from "./motion";
 import { MessageQueue, useQueueAction } from "./MessageQueue";
 import { SettingsNavigation, settingsRoutes } from "./SettingsNavigation";
 import { CopyButton } from "./CopyButton";
+import { useDrafts } from "./useDrafts";
+import { DraftManager } from "./DraftManager";
 
 const destinations = [
   { command: "/overview", label: "Overview", icon: LayoutDashboard, group: "work" },
@@ -36,12 +38,14 @@ function Logo({ small = false }: { small?: boolean }) {
 function useBackend() {
   const [snapshot, setSnapshot] = useState<DesktopSnapshot>({});
   const [error, setError] = useState("");
+  const [reconnecting, setReconnecting] = useState(false);
+  const [reconnectError, setReconnectError] = useState("");
   useEffect(() => {
     const api = window.gator;
     if (!api) { setError("Open Gator as a desktop app with npm start from the desktop directory."); return; }
     let live = true;
     let received = false;
-    const unsubscribe = api.subscribe((next) => { received = true; if (live) setSnapshot(next); });
+    const unsubscribe = api.subscribe((next) => { received = true; if (live) { setSnapshot(next); if (next.connection === "connected" || next.connection === "disconnected") setReconnecting(false); } });
     api.snapshot().then((next) => { if (live && !received) setSnapshot(next); }).catch((err) => { if (live) setError(String(err)); });
     return () => { live = false; unsubscribe(); };
   }, []);
@@ -49,7 +53,13 @@ function useBackend() {
     try { await window.gator?.send(frame); setError(""); }
     catch (err) { setError(err instanceof Error ? err.message : String(err)); throw err; }
   }, []);
-  return { ...snapshot, error: error || snapshot.error, send, clearError: () => setError("") };
+  const reconnect = async () => {
+    if (reconnecting) return;
+    setReconnecting(true); setReconnectError(""); setError("");
+    try { await window.gator!.restart(); }
+    catch (error) { setReconnectError(error instanceof Error ? error.message : "Could not reconnect. Try again."); setReconnecting(false); }
+  };
+  return { ...snapshot, error: error || reconnectError || snapshot.error, reconnecting, reconnect, send, clearError: () => { setError(""); setReconnectError(""); } };
 }
 
 function Message({ message, pending, onApproval }: { message: BackendMessage; pending?: number; onApproval(approved: boolean): void }) {
@@ -105,11 +115,15 @@ function Empty({ icon, title, text }: { icon: ReactNode; title: string; text: st
 }
 
 export function App() {
-  const { state, error, terminalBusy, fullScreen, send, clearError } = useBackend();
+  const { state, error, connection, sessionID, terminalBusy, fullScreen, reconnecting, reconnect, send, clearError } = useBackend();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("gator:sidebar-collapsed") === "true");
   const [details, setDetails] = useState(false);
   const [tab, setTab] = useState("Deliverables");
-  const [draft, setDraft] = useState("");
+  const drafts = useDrafts(state);
+  const draft = drafts.text, setDraft = drafts.setText;
+  const [showDrafts, setShowDrafts] = useState(false);
+  const originalSession = useRef<string | undefined>(undefined);
+  const [sessionChanged, setSessionChanged] = useState(false);
   const [search, setSearch] = useState<string | null>(null);
   const [navigation, setNavigation] = useState<{ command: string; draft?: string } | null>(null);
   const [showCommands, setShowCommands] = useState(false);
@@ -131,6 +145,7 @@ export function App() {
   const hasUnsavedView = queueEditing || panel?.rows?.some((row) => row.input) || panel?.kind === "confirmation";
 
   useEffect(() => { localStorage.setItem("gator:sidebar-collapsed", String(collapsed)); }, [collapsed]);
+  useEffect(() => { if (sessionID) { if (originalSession.current && originalSession.current !== sessionID) setSessionChanged(true); originalSession.current = sessionID; } }, [sessionID]);
   useEffect(() => {
     if (state && (state.input ?? "") !== backendInput.current) {
       backendInput.current = state.input ?? "";
@@ -150,6 +165,7 @@ export function App() {
   };
   useEffect(() => {
     const keyboard = (event: globalThis.KeyboardEvent) => {
+      if (event.defaultPrevented || showDrafts) return;
       if (navigation && event.key !== "Escape") return;
       if ((event.metaKey || event.ctrlKey) && ["k", "f", "n", ","].includes(event.key.toLowerCase())) {
         event.preventDefault();
@@ -171,11 +187,11 @@ export function App() {
     return () => window.removeEventListener("keydown", keyboard);
   });
 
-  if (!state) return <main className="boot-screen"><Logo /><h1>{error ? "Gator could not connect" : "Getting your workspace ready"}</h1><p>{error || "Opening your local Gator profile…"}</p>{!error && <LoaderCircle className="spin accent" size={20} />}{error && window.gator && <button className="button" onClick={() => { clearError(); void window.gator!.restart().catch(() => {}); }}>Reconnect</button>}</main>;
+  if (!state) return <main className="boot-screen"><Logo /><h1>{reconnecting ? "Reconnecting to Gator…" : error ? "Gator could not connect" : "Getting your workspace ready"}</h1><p>{error || "Opening your local Gator profile. No messages will be submitted."}</p>{(!error || reconnecting) && <LoaderCircle className="spin accent" size={20} />}{error && window.gator && <button className="button" disabled={reconnecting} onClick={() => void reconnect()}>{reconnecting ? "Reconnecting…" : "Reconnect"}</button>}</main>;
 
   const queueFull = state.running && state.queued >= 16 && !draft.trimStart().startsWith("/");
   const submit = async (guide = false) => {
-    if (!draft.trim() || sending || queueAction.busy || panel || error || state.external || (guide ? !state.guidance_id : queueFull)) return;
+    if (!draft.trim() || !drafts.ready || sending || queueAction.busy || panel || error || state.external || (guide ? !state.guidance_id : queueFull)) return;
     setSending(true);
     setDraftError("");
     try {
@@ -217,7 +233,8 @@ export function App() {
     </aside>
     <main className="main-area">
       <header className="main-header"><div className="breadcrumbs"><span>{settingsPage ? "Settings" : sourceName}</span><ChevronRight size={13} /><strong title={headerTitle}>{headerTitle}</strong></div><div className="header-actions">{!settingsPage && <><button className="header-workspace" aria-label="Choose workspace folder" onClick={() => void window.gator?.chooseFolder().catch(() => {})} disabled={state.running || !!panel} title={state.source}><Folder size={15} /><span>{sourceName}</span><ChevronDown size={13} /></button><button className="icon-button" aria-label={details ? "Hide work details" : "Show work details"} aria-expanded={details} onClick={() => setDetails(!details)}><IconSwap active={details} on={<PanelRightClose size={18} />} off={<PanelRightOpen size={18} />} /></button></>}</div></header>
-      {error && <div className="connection-error" role="alert"><span>{error}</span><button className="small-button" onClick={() => void window.gator?.restart().catch(() => {})}>Reconnect</button></div>}
+      {error && <div className="connection-error" role="alert"><div><strong>{connection === "disconnected" ? "Connection lost" : "Action could not complete"}</strong><p>{connection === "disconnected" ? "This view may be out of date. Reconnecting opens a new local session and does not resume or resubmit work." : error}</p>{connection === "disconnected" && <details><summary>Technical details</summary><p>{error}</p></details>}</div>{connection === "disconnected" ? <button className="button" disabled={reconnecting} aria-busy={reconnecting} onClick={() => void reconnect()}>{reconnecting ? "Reconnecting…" : "Reconnect"}</button> : <button className="icon-button" aria-label="Dismiss action error" onClick={clearError}><X size={16} /></button>}</div>}
+      {sessionChanged && !error && <div className="session-notice" role="status"><span>A new local session is ready. Previous work was not resumed. Saved conversations and drafts remain available.</span><button className="icon-button" aria-label="Dismiss session notice" onClick={() => setSessionChanged(false)}><X size={16} /></button></div>}
       {state.notice && <div className="view-status" role="status">{state.notice}</div>}
       {panel && state.pending_approval && <div className="approval-reminder panel-approval"><ShieldCheck size={16} /><span>A current action needs your review.</span><button className="small-button" onClick={() => navigate("/chat")}>Review action<ChevronRight size={13} /></button></div>}
       {state.external && <div className="terminal-banner" role="status"><div><strong>Continue this step in Terminal</strong><p>Gator needs an interactive terminal for this {state.external.kind === "connector" ? "connection" : "action"}. Return here when it finishes.</p></div><button className="button" disabled={terminalBusy} onClick={() => void window.gator?.continueInTerminal().catch(() => {})}>{terminalBusy ? "Waiting for Terminal…" : "Open Terminal"}</button></div>}
@@ -232,10 +249,11 @@ export function App() {
         <div className="composer-area">{state.pending_approval && <div className="approval-reminder"><ShieldCheck size={16} /><span>An action is waiting for your review.</span><button className="small-button" onClick={() => { setSearch(null); transcript.current?.scrollTo({ top: transcript.current.scrollHeight }); }}>View request<ArrowDown size={13} /></button></div>}
           {!!slash.length && <div className="slash-suggestions" aria-label="Command suggestions">{slash.map((command) => <button key={command.name} onClick={() => { setDraft(`/${command.name}${command.needs_input ? " " : ""}`); composer.current?.focus(); }}><span>/{command.name}</span><span>{command.description}</span></button>)}</div>}
           <MessageQueue items={state.queue ?? []} running={state.running} busy={queueAction.busy || sending || !!error || !!state.external} act={queueAction.act} onEditingChange={setQueueEditing} onUseDraft={(text) => { setDraft((current) => current ? `${current}\n\n${text}` : text); composer.current?.focus(); }} />
-          <div className="composer"><textarea ref={composer} value={draft} onChange={(event) => { setDraft(event.target.value); setDraftError(""); }} onKeyDown={composerKeys} placeholder={state.running ? "Add a follow-up…" : "Ask Gator, or / for commands…"} aria-label="Message Gator" disabled={sending || !!error || !!state.external} rows={2} /><div className="composer-toolbar"><button className="composer-model" disabled={state.running} onClick={() => navigate("/model")}><span className="status-dot" /><span>{state.model || "Choose a model"}</span><ChevronDown size={12} /></button><div className="composer-actions">
+          {(drafts.recovered || drafts.issue) && <p className="draft-recovery" role="status">{drafts.issue || "Draft recovered. Review it before sending."}</p>}
+          <div className="composer"><textarea ref={composer} value={draft} onChange={(event) => { setDraft(event.target.value); setDraftError(""); }} onKeyDown={composerKeys} placeholder={state.running ? "Add a follow-up…" : "Ask Gator, or / for commands…"} aria-label="Message Gator" disabled={sending || !!state.external} rows={2} /><div className="composer-toolbar"><button className="composer-model" disabled={state.running || !!error} onClick={() => navigate("/model")}><span className="status-dot" /><span>{state.model || "Choose a model"}</span><ChevronDown size={12} /></button><button className="icon-button draft-trigger" aria-label="Saved drafts" title={drafts.saving ? "Saving draft…" : "Saved drafts and local retention"} onClick={() => { setShowDrafts(true); void drafts.manage({ action: "list" }).catch(() => {}); }}><Clock3 size={16} /></button><div className="composer-actions">
             {state.running && <button className="small-button guide-button" title={`Guide the current task (${window.gator?.platform === "darwin" ? "⌘" : "Ctrl"}+Enter)`} disabled={!draft.trim() || sending || queueAction.busy || !state.guidance_id || !!error || !!state.external} onClick={() => void submit(true)}>Guide now</button>}
             {state.running && <button className="send-button stop" aria-label="Stop current work" disabled={state.cancelling} onClick={() => attempt({ type: "key", key: "esc" })}><Square size={13} fill="currentColor" /></button>}
-            <button className="send-button" aria-label={state.running ? "Queue message" : "Send message"} title={queueFull ? "Queue is full (16 messages)" : state.running ? "Queue for after this task (Enter)" : "Send message"} aria-busy={sending} disabled={!draft.trim() || sending || queueAction.busy || queueFull || !!error || !!state.external} onClick={() => void submit()}><IconSwap active={sending} on={<LoaderCircle size={18} className="spin" />} off={state.running ? <ListPlus size={18} /> : <ArrowUp size={18} />} /></button>
+            <button className="send-button" aria-label={state.running ? "Queue message" : "Send message"} title={queueFull ? "Queue is full (16 messages)" : state.running ? "Queue for after this task (Enter)" : "Send message"} aria-busy={sending} disabled={!draft.trim() || !drafts.ready || sending || queueAction.busy || queueFull || !!error || !!state.external} onClick={() => void submit()}><IconSwap active={sending} on={<LoaderCircle size={18} className="spin" />} off={state.running ? <ListPlus size={18} /> : <ArrowUp size={18} />} /></button>
           </div></div></div>
           {draftError && <p className="composer-error" role="alert">{draftError}</p>}
           {queueFull && <p className="composer-error" role="status">Queue full. Edit or remove a message to make room.</p>}
@@ -247,6 +265,7 @@ export function App() {
     <Presence open={details}>{(open, presenceRef) => <WorkspacePanel state={state} open={open} presenceRef={presenceRef} tab={tab} setTab={setTab} navigate={navigate} />}</Presence>
     {panel && <div className="panel-draft-anchor"><MessageSquare size={14} /><span>{draft ? "Your message draft is kept while you’re here." : "Return to the conversation to write a message."}</span><button className="small-button" onClick={() => attempt({ type: "panel", key: "esc", panel: { id: panel.id!, action: "key" } })}>Back<kbd>Esc</kbd></button></div>}
     <Presence open={showCommands}>{(open, presenceRef) => <CommandMenu open={open} presenceRef={presenceRef} commands={state.commands} close={() => setShowCommands(false)} select={(name, needsInput) => { setShowCommands(false); if (needsInput) navigate("/chat", `/${name} `); else navigate(`/${name}`); }} />}</Presence>
+    <Presence open={showDrafts}>{(open, presenceRef) => <DraftManager open={open} presenceRef={presenceRef} saved={drafts.saved} issue={drafts.issue} manage={drafts.manage} close={() => setShowDrafts(false)} restore={(retained) => { setDraft((current) => !current || retained.context === drafts.context ? retained.text : `${current}\n\n${retained.text}`); composer.current?.focus(); }} />}</Presence>
     <Presence open={!!navigation}>{(open, presenceRef) => <DiscardDialog open={open} presenceRef={presenceRef} cancel={() => setNavigation(null)} confirm={() => { if (!navigation) return; attempt({ type: "navigate", text: navigation.command }); if (navigation.draft !== undefined) setDraft(navigation.draft); setNavigation(null); }} />}</Presence>
   </div>;
 }

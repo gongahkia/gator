@@ -25,6 +25,43 @@ const settlePresentation = async (page: Page) => {
   });
 };
 
+test("unsent drafts survive reload and reconnect without submission, and retention can be cleared", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "gator-desktop-drafts-e2e-"));
+  const env = { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") };
+  const application = await launchDesktop(env);
+  try {
+    const page = await application.firstWindow();
+    const composer = page.getByRole("textbox", { name: "Message Gator", exact: true });
+    await composer.fill("Keep my unsent work 🐊\nNothing should run automatically.");
+    await expect.poll(() => page.evaluate(async () => (await window.gator!.drafts({ action: "list" })).drafts[0]?.text)).toContain("Keep my unsent work");
+    await page.reload();
+    await expect(composer).toHaveValue("Keep my unsent work 🐊\nNothing should run automatically.");
+    await expect(page.getByText("Draft recovered. Review it before sending.")).toBeVisible();
+    const snapshot = await page.evaluate(() => window.gator!.snapshot());
+    await application.evaluate(({ BrowserWindow }, value) => BrowserWindow.getAllWindows()[0].webContents.send("gator:update", { ...value, connection: "disconnected", error: "Simulated transport loss" }), snapshot);
+    await expect(page.getByText("Connection lost", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Send message", exact: true })).toBeDisabled();
+    await composer.fill("Still editable while disconnected");
+    await page.getByRole("button", { name: "Reconnect", exact: true }).click();
+    await expect(page.getByText(/A new local session is ready/)).toBeVisible();
+    await expect(composer).toHaveValue("Still editable while disconnected");
+    expect((await page.evaluate(() => window.gator!.snapshot())).state!.messages).toEqual([]);
+    await page.getByRole("button", { name: "Saved drafts", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Saved drafts", exact: true });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText("Still editable while disconnected", { exact: true })).toBeVisible();
+    await dialog.getByRole("checkbox", { name: "Keep unsent messages on this device" }).uncheck();
+    await expect(dialog.getByText("No saved drafts.", { exact: true })).toBeVisible();
+    await dialog.getByRole("button", { name: "Close saved drafts" }).click();
+    await expect(page.getByRole("button", { name: "Saved drafts", exact: true })).toBeFocused();
+    await page.reload();
+    await expect(composer).toHaveValue("");
+    expect((await page.evaluate(() => window.gator!.drafts({ action: "list" }))).enabled).toBe(false);
+    await settlePresentation(page);
+    await page.screenshot({ path: "test-results/desktop-draft-recovery.png" });
+  } finally { await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close()).catch(() => {}); await application.close(); await rm(directory, { recursive: true, force: true }); }
+});
+
 test("motion is interruptible, releases dismissed controls, and honors reduced motion", async () => {
   test.setTimeout(120_000); // Includes inspection at 10% playback and native startup.
   const directory = await mkdtemp(join(tmpdir(), "gator-desktop-motion-e2e-"));

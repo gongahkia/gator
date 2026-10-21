@@ -444,3 +444,26 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .result-action-details[open] summary svg { rotate: 180deg; }
 .result-action-details .preview { margin: 0; }
 @media (max-width: 960px) { .result-fields > div { grid-template-columns: minmax(80px, .4fr) minmax(0, 1fr); gap: 12px; } }
+
+/* Local draft recovery uses the existing dialog and disclosure vocabulary. */
+.draft-manager { width: min(620px, calc(100vw - 40px)); max-height: min(80vh, 760px); overflow: auto; background: var(--color-surface); border: 1px solid var(--color-line); border-radius: 16px; padding: 22px; box-shadow: 0 24px 80px #0008; }
+.draft-manager header, .draft-manager footer, .saved-draft-actions, .session-notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.draft-manager h2 { font-size: var(--text-heading); font-weight: 500; }
+.draft-manager > p, .draft-manager footer p { font-size: var(--text-sm); line-height: 1.6; }
+.draft-preference { display: flex; align-items: center; gap: 10px; min-height: 44px; margin: 12px 0 6px; }
+.draft-preference input { accent-color: var(--color-accent); width: 18px; height: 18px; }
+.saved-draft-list { margin: 20px 0; }
+.saved-draft-list article { border-top: 1px solid var(--color-line); padding: 16px 0; }
+.saved-draft-list strong { font-weight: 500; }
+.saved-draft-list small { display: block; color: var(--color-muted); overflow-wrap: anywhere; font-size: var(--text-xs); }
+.saved-draft-list article p { white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-top: 10px; }
+.saved-draft-actions { justify-content: flex-end; margin-top: 8px; }
+.draft-manager footer { border-top: 1px solid var(--color-line); padding-top: 16px; flex-wrap: wrap; }
+.draft-recovery { color: var(--color-muted); font-size: var(--text-sm); margin: 0 4px 8px; }
+.composer-toolbar .draft-trigger { margin-right: auto; }
+.connection-error strong { font-weight: 500; }
+.connection-error details { font-size: var(--text-xs); margin-top: 6px; }
+.connection-error details p { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 100px; overflow: auto; }
+.connection-error summary { cursor: pointer; }
+.connection-error > .button { flex-shrink: 0; }
+.session-notice { margin: 10px 22px 0; padding: 8px 12px; border-radius: 8px; background: var(--color-surface); color: var(--color-muted); font-size: var(--text-sm); }
