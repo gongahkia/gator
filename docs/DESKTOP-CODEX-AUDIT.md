@@ -1,5 +1,9 @@
 # Codex Desktop presentation audit
 
+Latest app-wide check: [Desktop screen audit](DESKTOP-SCREEN-AUDIT.md), against
+`a14182fb9`. It records remaining gaps across the whole application; the scoped
+iteration approvals below should not be read as an app-wide polish approval.
+
 21 October 2026. Baseline: `c5b74d931` (the checkpoint of the previously
 completed conversation, motion, and queue work). The initial presentation pass
 through `9c4121f5a` changes desktop presentation, frontend tests, and docs.
