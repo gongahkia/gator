@@ -142,7 +142,7 @@ func (m Model) bridgeSectionPanel() uisnapshot.Panel {
 				tone = "success"
 			}
 			panel.Rows = append(panel.Rows, uisnapshot.Row{Label: safeInboxText(item.Title),
-				Detail: safeInboxText(item.Summary), State: state, Tone: tone, UpdatedAt: item.CreatedAt.Format(time.RFC3339), Metadata: []uisnapshot.Field{{Label: "Result status", Value: safeInboxText(item.Status)}}})
+				Detail: safeInboxText(item.Summary), State: safeInboxText(item.Status) + " · " + item.ID + " · " + state, StateLabel: state, Tone: tone, UpdatedAt: item.CreatedAt.Format(time.RFC3339), Metadata: []uisnapshot.Field{{Label: "Result status", Value: safeInboxText(item.Status)}}})
 		}
 		if len(panel.Rows) == 0 {
 			panel.Notice = "No recent results."

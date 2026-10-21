@@ -44,7 +44,7 @@ export type BackendPanel = {
   subtitle?: string;
   query?: string;
   rows?: {
-    label: string; group?: string; detail?: string; state?: string; tone?: ResultTone; checked?: boolean; position?: number;
+    label: string; group?: string; detail?: string; state?: string; state_label?: string; tone?: ResultTone; checked?: boolean; position?: number;
     source?: string; updated_at?: string; metadata?: ResultField[];
     input?: { value?: string; placeholder?: string; secret?: boolean; multiline?: boolean; limit: number;
       kind?: string; help?: string; options?: { value: string; label: string }[];

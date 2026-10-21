@@ -39,17 +39,18 @@ type Hint struct {
 }
 
 type Row struct {
-	Label     string  `json:"label"`
-	Group     string  `json:"group,omitempty"`
-	Checked   bool    `json:"checked,omitempty"`
-	Position  int     `json:"position,omitempty"`
-	Source    string  `json:"source,omitempty"`
-	UpdatedAt string  `json:"updated_at,omitempty"`
-	Metadata  []Field `json:"metadata,omitempty"`
-	Detail    string  `json:"detail,omitempty"`
-	State     string  `json:"state,omitempty"`
-	Tone      string  `json:"tone,omitempty"`
-	Input     *Input  `json:"input,omitempty"`
+	Label      string  `json:"label"`
+	Group      string  `json:"group,omitempty"`
+	Checked    bool    `json:"checked,omitempty"`
+	Position   int     `json:"position,omitempty"`
+	Source     string  `json:"source,omitempty"`
+	UpdatedAt  string  `json:"updated_at,omitempty"`
+	Metadata   []Field `json:"metadata,omitempty"`
+	Detail     string  `json:"detail,omitempty"`
+	State      string  `json:"state,omitempty"`
+	StateLabel string  `json:"state_label,omitempty"`
+	Tone       string  `json:"tone,omitempty"`
+	Input      *Input  `json:"input,omitempty"`
 }
 
 // Input describes an editable field without exposing secrets. Value is empty
