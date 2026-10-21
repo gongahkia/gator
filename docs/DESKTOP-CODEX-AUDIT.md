@@ -1,8 +1,10 @@
 # Codex Desktop presentation audit
 
 21 October 2026. Baseline: `c5b74d931` (the checkpoint of the previously
-completed conversation, motion, and queue work). Changes after that checkpoint
-are limited to desktop presentation, frontend tests, and documentation.
+completed conversation, motion, and queue work). The initial presentation pass
+through `9c4121f5a` changes desktop presentation, frontend tests, and docs.
+The later daily-use iteration below adds the small display/navigation contract
+and local host persistence needed for the next three agreed priorities.
 
 ## Reference and scope
 
@@ -48,7 +50,7 @@ Gator retains its alligator identity and personal-agent destinations.
 | K1 | Queue | Gator already has visible editable/reorderable queued cards | Retain Go acknowledgement, captured options, pause/resume, and draft protection; do not change scheduling | Retained |
 | K2 | Motion | Gator already has interruptible transitions and reduced-motion support | Keep existing motion rules; no entrance replay during typing or provider updates | Retained |
 | K3 | Usage | Gator accounts for local provider admission; Codex screenshots can show account/subscription quotas | Keep real local daily counters, uncapped states, UTC reset, and the separate review/confirm flow | Intentional difference |
-| D1 | Projects, pins, recent chats in sidebar | Gator's current snapshot does not project a stable global thread/project tree or pin actions | Do not invent cached thread lists or decorative pin controls; requires a separate data contract/product decision | Deferred: backend data |
+| D1 | Projects, pins, recent chats in sidebar | The initial snapshot had no stable recent/project tree or pin actions | The daily-use iteration adds Go-owned recent conversations grouped by workspace; global projects and pins remain separate product decisions | Recent groups implemented below; project/pin actions deferred |
 | D2 | Git review, file tree and terminal | Existing deliverable summary is not Codex's diff/worktree/terminal model | Keep Deliverables and Checks; no fake diff panes, commit controls, or arbitrary file/process actions | Deferred: backend capability |
 | D3 | Attachments, voice, remote/cloud, plugins | Gator does not expose equivalent native desktop capabilities for all these controls | Keep real commands and terminal handoffs; do not add unsupported composer buttons | Deferred: capability |
 | D4 | Theme editor / native translucency | Reference settings include custom colors/fonts and OS translucency | This pass adopts the type scale and neutral surfaces; custom/light/system themes need a presentation preference consistent with the shared Go theme, plus accessibility and native-material review | Deferred: separate UI scope |
@@ -125,9 +127,10 @@ reverse chronological order. The bounded presentation range is
 combined reversal for review and a rollback commit. It excludes the previous
 work checkpoint and this final verification documentation.
 
-### Verification record
+### Initial presentation verification record
 
-Verified locally on macOS on 21 October 2026:
+Verified locally on macOS on 21 October 2026, at the initial presentation pass
+(`9c4121f5a`); later display/host changes are recorded below:
 
 - `npm run check --prefix desktop`: passed.
 - `npm test --prefix desktop`: all six host tests passed.
@@ -181,3 +184,110 @@ Verdict: **Shippable for local macOS use within the existing unsigned desktop
 rollout.** P1–P10 are implemented and verified. D1–D5 remain explicit product,
 capability, or separate presentation decisions; they are not hidden controls
 or simulated functionality.
+
+## Daily-use iteration: priorities 1–3
+
+21 October 2026. Baseline `9c4121f5a`. Full review of draft retention/recovery,
+connection failure presentation, long transcript reading/search, recent
+conversation navigation, and their interaction with forms and paused queues.
+React DOM, Tailwind v4, semantic CSS, Lucide, and existing presence/focus hooks
+remain the stack. This iteration explicitly authorizes the small Go display
+projection and validated navigation action that the initial UI-only pass
+could not supply. Agent execution, tools, approvals, and scheduling policies
+are unchanged.
+
+### Scope and coverage
+
+| Category | Evidence inspected | Result |
+| --- | --- | --- |
+| Typography | Draft manager, connection notices, search toolbar, workspace/chat labels | Existing shared type scale retained; long paths wrap and chat titles truncate |
+| Surfaces | Recovered draft, disabled/cleared retention, unavailable connection, two workspaces with the same folder name, 300-message transcript | Clear state labels and bounded local storage/sidebar/search surfaces |
+| Animations | Existing presence/focus system; interrupted/reduced motion integration path | No new animation system or entrance on typing/search; motion coverage retained |
+| Icons | Existing Lucide set and 40px controls | Labelled draft/delete/search/jump and workspace disclosure controls |
+| Performance | Serialized host writes, bounded caches/projection, memoized messages, literal range search | 32 drafts, 24 recent records, 1,000 search matches; 300-message integration fixture; no full transcript filtering/remount on search |
+
+### Findings and changes
+
+| Severity | Location | Before | After | Why |
+| --- | --- | --- | --- | --- |
+| HIGH | `desktop/src/useDrafts.ts:5`, `desktop/electron/drafts.mjs:12` | Unsent text exists only in the renderer and has no durable conversation identity | Profile/conversation-scoped private atomic files, seven-day expiry, recovery notice, per-draft deletion and clear/disable controls | Losing text on reload/crash makes recovery unreliable; retention must be understandable and controllable |
+| MEDIUM | `desktop/src/App.tsx:277`, `desktop/electron/main.mjs` snapshot/restart | Action errors and disconnected sessions share a generic reconnect presentation | Separate disconnected/action states, editable unsent text while offline, explicit new-session semantics and no automatic submission | Recovery feedback must describe what will happen to work |
+| MEDIUM | `desktop/src/useConversationSearch.ts:5`, `desktop/src/App.tsx:284` | Search removes nonmatching messages and loses surrounding context | Literal native range highlights across Markdown spans, match count, previous/next, Enter/Shift+Enter, and all surrounding messages retained | Finding text should preserve reading context and selection/copy behavior |
+| MEDIUM | `desktop/src/App.tsx:145` transcript position handling | Scrolling away has no return affordance; remounting a conversation view loses the reading position | Jump to latest/new-activity cue and bounded per-conversation position memory, including panel round trips | Incoming updates and navigation should preserve the reader's place |
+| MEDIUM | `desktop/src/RecentConversations.tsx:5`, `internal/worktui/bridge_conversations.go:61` | Saved work requires opening a separate picker each time | Recent conversations grouped by workspace, folder-name disambiguation, local expansion, active state, and exact Go-validated selection through the existing restore path | Frequently resumed work should be directly accessible without inventing project state |
+| MEDIUM | `desktop/src/App.tsx:194` navigation preparation | A quick conversation switch can discard paused queued messages | Existing edit confirmation plus a specific queued-message confirmation before switching/new conversation | The action must disclose loss of unsent session work; queue execution remains Go-owned |
+
+### Considered but rejected
+
+| Location | Candidate | Rejected because |
+| --- | --- | --- |
+| Recovery | Automatically resend a recovered composer draft or resume a task after reconnect | Recovery needs a deliberate submit; a reconnect creates a new foreground session |
+| Transcript | Add virtualization immediately | The 300-message path is exercised; measure larger real transcripts before trading away native text search/selection and adding layout complexity |
+| Sidebar | Add pin, rename, archive, and full project management in the same change | These need separately agreed durable actions; the minimal recent-list contract supplies metadata and safe existing-conversation navigation |
+| Draft store | Require OS keychain encryption for the unsigned local build | Consistent macOS safeStorage behavior depends on signing; this rollout uses private local text files with explicit retention controls, matching the local conversation storage model. Revisit encryption with signed distribution. [Electron reference](https://www.electronjs.org/docs/latest/api/safe-storage) |
+
+### Atomic rollback ledger
+
+| Commit | Change |
+| --- | --- |
+| `166939f06` | Stable conversation identity in the display contract |
+| `1a2ae811e` | Profile-scoped host draft storage, bounded requests, expiry and store tests |
+| `4a9b4c3aa` | Draft recovery/manager and explicit failure/reconnect presentation |
+| `790a7de0b` | Bounded Go recent-conversation projection and validated restore action |
+| `0b65006a8` | In-place transcript search, match navigation, new activity and jump control |
+| `db2934b53` | Workspace groups, conversation draft/reading context, queued/edit navigation protection |
+| `46187b81b` | Shared-Electron-directory profile isolation and recovery screen captures |
+
+Each commit represents one functional layer and its checks. Foundations are
+used by later commits; roll back the full iteration in reverse order. The
+bounded range is `9c4121f5a..46187b81b`. The completion documentation is separate.
+
+### Verification
+
+- `npm run check --prefix desktop` and `npm run check --prefix ui`: passed.
+- `npm test --prefix desktop`: all ten host/store/policy tests passed.
+- `go test ./internal/worktui -count=1`: passed.
+- `go test ./cmd/gator`: passed on the full package rerun (97.264 seconds).
+  The first broader run failed `TestGoalWatchRetainsGateAndConversationAfterManyQuietMinutes`
+  with `job attempt is invalid`; the focused rerun and then the full package
+  rerun passed. No scheduler/job implementation was changed.
+- `go test -race ./internal/worktui -run 'TestBridge(Recent|Recents)' -count=1`:
+  passed.
+- `go vet ./internal/worktui ./cmd/gator`: passed.
+- `npm run pack --prefix desktop`: rebuilt the unsigned macOS x64 app.
+- `GATOR_DESKTOP_TEST_EXECUTABLE="$PWD/desktop/release/mac/Gator.app/Contents/MacOS/Gator" npm run test:e2e --prefix desktop`:
+  all **nine** packaged Electron paths passed together in **1.2 minutes**,
+  including the existing motion, queue, forms, usage, approvals, and secret
+  handling checks. No scoped rerun was needed for the final packaged run.
+- `git diff --check`: passed.
+
+The new checks exercise reload/reconnect without submission, editable offline
+text, retained/disabled/cleared copies, shared Electron data with different Go
+profiles, conversation-specific drafts, restoration without overwriting text,
+two workspaces with identical folder names, collapsed/expanded groups,
+unsaved forms, paused queues, 300 messages, literal punctuation and Markdown
+span matches, keyboard match navigation, preserved panel-round-trip position,
+new activity without moving the reader, focus return, and narrow layouts.
+
+The connection-loss UI check injects a disconnected display snapshot and then
+uses the real restart method; the host process lifecycle has separate tests.
+The transcript fixture is display-only, and the recent-work fixture uses real
+Go-loaded conversation metadata. Tests use temporary profiles and no paid
+inference, real accounts, live saved work, or enabled background services.
+
+### Boundaries and verdict
+
+Drafts are intentionally unencrypted local files and separate from Go's saved
+conversation backup/deletion controls. Expiry is enforced on store access,
+without an always-running deletion service. There is no guarantee of the last
+unacknowledged input surviving abrupt OS/power loss. Native system clipboard,
+Windows/Linux runtime, signed distribution, and larger-transcript benchmarks
+remain outside this iteration. Pin/rename/archive/project management remains
+deferred.
+
+Verdict: **Approve for local macOS use within the existing unsigned rollout.**
+No actionable interface-polish findings remain in the requested scope. Visual
+review covers the saved-draft dialog, disconnected state, recent sidebar, and
+narrow highlighted search, alongside existing motion/review/form surfaces.
+Unverified: Windows/Linux runtime, native system clipboard, signed release
+distribution, and performance beyond the exercised 300-message fixture.

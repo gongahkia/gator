@@ -53,8 +53,8 @@ current live interaction ID; retained cards have no approval authority.
 | Work details | Deliverables and recurring checks with linked keyboard-accessible tabs; no Context tab or profile footer |
 | Usage & limits | Daily request/token meters, shared limit controls, activity breakdown, and expandable accounting details |
 | Commands | Cmd/Ctrl+K, searchable commands, arrow navigation, input-prefilling commands |
-| Transcript search | Cmd/Ctrl+F, searches prose plus typed result/deliverable data |
-| Drafts | Kept in memory while opening views; unsaved forms prompt before leaving |
+| Transcript search | Cmd/Ctrl+F, literal in-place highlights over rendered prose/results, previous/next matches, Enter/Shift+Enter, and surrounding context preserved |
+| Drafts | Local recovery per profile/conversation (or selected workspace before a conversation exists); saved-draft manager with clear/disable controls; unsaved forms and paused queues prompt before leaving |
 | Terminal handoff | Reviewed connector sign-in and other interactive CLI steps open the system terminal and return their status |
 
 Enter sends and Shift+Enter inserts a line. Cmd/Ctrl+N starts a conversation
@@ -69,6 +69,45 @@ fields and dialogs; forms keep native editing keys. Supporting diagnostics and
 keyboard legends use disclosures. Review details and warnings remain visible.
 See the [Codex presentation audit](DESKTOP-CODEX-AUDIT.md) for the comparison,
 intentional differences, per-change commits, and current verification record.
+
+Recent work groups up to 24 recent saved conversations by workspace, with four
+initially shown per group and an All conversations route to the full picker.
+Folder names that collide show their parent folder too. Go projects metadata
+and validates the exact recent-list identity; selection uses the existing
+restore path and preserves retained run options. Sidebar metadata refreshes
+after runs/control changes and on the existing 15-second UI refresh. A failed
+read is shown as unavailable, and the full picker can retry it.
+
+Reading position is kept in memory for up to 32 conversations. Updates do not
+move someone reading older messages; a new-activity cue returns to the latest
+message. Search keeps the transcript intact and highlights up to 1,000 literal
+matches across rendered text, including Markdown spans. Closing search keeps
+the reading position. Unchanged messages are memoized during UI updates.
+
+### Unsent draft retention
+
+Only composer text is retained. Credential fields, native forms, queued
+messages, and approval state are excluded. The host writes private (0600)
+atomic files under the desktop user-data directory, separated by a hash of
+the effective Go state root. Copies are **unencrypted local data**, like saved
+conversation text; they are not synced or sent to a provider. The Saved drafts
+dialog exposes this policy, per-draft deletion, clear-all, and an enable/disable
+control. Disabling removes retained copies without erasing the current text.
+
+At most 32 drafts of 128 KiB each are retained. Entries expire seven days after
+their last edit and are pruned on the next draft-store access; a closed app
+does not run a deletion service. Writes are serialized, and a normal window
+close awaits pending writes. When a new conversation receives its durable ID,
+the new draft copy is acknowledged before the old workspace copy is removed.
+Recovered text is never submitted automatically. Adding another saved draft
+appends to existing composer text. Save failures leave the current text editable
+and explain that it could not be saved on this device.
+
+These desktop-only unsent copies are separate from Go's conversation backup
+and deletion controls; clear them through Saved drafts. Backend reconnect
+opens a new foreground session and does not resume/replay a task or queued
+message. Existing saved conversations remain available through Recent work
+and Conversations.
 
 The home dashboard advances every six seconds and pauses on hover, keyboard
 focus, or manual interaction. Previous/next and pause/resume controls remain
@@ -239,6 +278,23 @@ saved work, usage reviews, exact approval presentation, and credential fields.
 Settled wide/narrow screens were inspected. The audit contains the exact
 commands, rollback ledger, intentional differences, and remaining verification
 boundaries, including native system clipboard and other operating systems.
+
+### Daily-use priorities 1–3, 21 October 2026
+
+Draft recovery and explicit reconnect behavior, in-place long-conversation
+search/reading controls, and recent conversations grouped by workspace are
+implemented. Their source/test changes are split across seven atomic commits,
+with a rollback ledger in the audit. The Go additions are stable conversation
+identity, a bounded read-only recent-list projection/refresh, and a validated
+selection action using the existing restore path. Agent execution policies,
+tool behavior, queue scheduling, and approvals are unchanged.
+
+The fresh unsigned macOS x64 bundle passed all nine Electron integration paths
+together in 1.2 minutes. Ten host/store/policy tests, both frontend TypeScript
+checks, affected Go package tests, focused recent-list race tests, and vet
+passed. An initial unrelated job-attempt timing test failed; its focused and
+full-package reruns passed. The audit records verification boundaries and
+the full draft retention policy.
 
 Interactive OAuth/terminal handoffs have script quoting and return-status
 tests; live sign-in with an external account was not exercised. Linux runtime,
