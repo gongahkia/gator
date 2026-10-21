@@ -112,7 +112,7 @@ func (m Model) startRecallInstall() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) recallPanel() uisnapshot.Panel {
-	p := uisnapshot.Panel{Kind: "memory", Title: "Memory", Notice: m.sectionNotice, Subtitle: "Saved knowledge helps Gator continue your work. You control what is saved and supplied."}
+	p := uisnapshot.Panel{Kind: "memory", Title: "Memory & retrieval", Notice: m.sectionNotice, Subtitle: "Choose how Gator finds saved knowledge. You control what is stored and supplied."}
 	if m.recallConfirm != "" {
 		p.Kind, p.Title = "confirmation", "Review memory setup"
 		lines := []string{}
@@ -135,10 +135,16 @@ func (m Model) recallPanel() uisnapshot.Panel {
 		{Title: "Chat processing", Collapsible: true, Lines: []string{valueOrDefault(m.recall.Chat, "Selected saved context and task sources are supplied to the model chosen in /model. A cloud chat model processes that context remotely even when storage and retrieval are local.")}},
 		{Title: "Your controls", Collapsible: true, Lines: []string{"Browse saved knowledge to correct, forget, or omit it from the next run.", "Feedback ratings are retained for review. They do not automatically retrain your model.", "Local recall can fall back to basic word matching; each result's Context and sources shows the observed route."}},
 	}
+	fallback := "Readiness not available"
+	if m.recallBusy {
+		fallback = "Checking readiness…"
+	}
+	p.Summary = []uisnapshot.Field{{Label: "Recall readiness", Value: valueOrDefault(m.recall.State, fallback)}}
+	p.Blocks[0].Lines = []string{m.recall.Detail}
 	if m.recallBusy {
 		p.Hints = []uisnapshot.Hint{{Shortcut: "Esc", Action: "cancel download"}}
 	} else {
-		p.Hints = []uisnapshot.Hint{{Shortcut: "I", Action: "install local recall"}, {Shortcut: "L", Action: "use local"}, {Shortcut: "O", Action: "use OpenAI"}, {Shortcut: "G", Action: "use Gemini"}, {Shortcut: "K", Action: "saved knowledge"}, {Shortcut: "C", Action: "chat model"}, {Shortcut: "R", Action: "refresh"}, {Shortcut: "Esc", Action: "back"}}
+		p.Hints = []uisnapshot.Hint{{Shortcut: "I", Action: "install local recall", Group: "more"}, {Shortcut: "L", Action: "use local"}, {Shortcut: "O", Action: "use OpenAI", Group: "more"}, {Shortcut: "G", Action: "use Gemini", Group: "more"}, {Shortcut: "K", Action: "saved knowledge"}, {Shortcut: "C", Action: "chat model", Group: "more"}, {Shortcut: "R", Action: "refresh"}, {Shortcut: "Esc", Action: "back"}}
 	}
 	return p
 }

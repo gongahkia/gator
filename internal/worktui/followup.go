@@ -367,7 +367,7 @@ func editFormText(text *string, key tea.KeyMsg, limit int) {
 }
 
 func (m Model) followupPanel() uisnapshot.Panel {
-	p := uisnapshot.Panel{Kind: "followup", Title: "Project follow-up", Selected: m.selected, Notice: m.sectionNotice}
+	p := uisnapshot.Panel{Kind: "followup", Title: "Follow-up checks", Selected: m.selected, Notice: m.sectionNotice}
 	if f := m.followupForm; f != nil {
 		if f.Review {
 			p.Kind, p.Title = "confirmation", "Review ongoing check"
@@ -385,7 +385,7 @@ func (m Model) followupPanel() uisnapshot.Panel {
 			return p
 		}
 		d := f.Draft
-		p.Kind, p.Title, p.Selected = "followup-form", "Set up project follow-up", f.Field
+		p.Kind, p.Title, p.Selected = "followup-form", "Set up a follow-up check", f.Field
 		p.Subtitle = "Choose the outcome, sources, timing, and permitted actions. Nothing runs until you review and save."
 		selectedSource := "Local files only"
 		if m.config.ConnectorChoices != nil {

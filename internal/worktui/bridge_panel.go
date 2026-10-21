@@ -105,7 +105,7 @@ func (m Model) bridgeBackLabel(panel uisnapshot.Panel) string {
 
 func (m Model) bridgeLauncherPanel() uisnapshot.Panel {
 	if m.launcherMode == "status-line" {
-		panel := uisnapshot.Panel{Kind: "status-line", Title: "Configure status line", Selected: m.selected,
+		panel := uisnapshot.Panel{Kind: "status-line", Title: "Terminal status line", Selected: m.selected,
 			Footer: "V show or hide · Space toggle · ←/→ reorder · R defaults · Enter save · Esc cancel"}
 		panel.Toggle = &uisnapshot.Toggle{Label: "Show status line", Checked: m.statusLineDraftEnabled}
 		panel.Hints = []uisnapshot.Hint{{Shortcut: "V", Action: "show/hide"}, {Shortcut: "Space", Action: "toggle"}, {Shortcut: "←/→", Action: "reorder"}, {Shortcut: "R", Action: "defaults"}, {Shortcut: "Enter", Action: "save"}, {Shortcut: "Esc", Action: "cancel"}}
@@ -312,14 +312,14 @@ func (m Model) bridgeHistoryPanel() uisnapshot.Panel {
 }
 
 func (m Model) bridgeLearningsPanel() uisnapshot.Panel {
-	panel := uisnapshot.Panel{Kind: "learnings", Title: "Learnings", Subtitle: learningFilterName(m.learningFilter),
+	panel := uisnapshot.Panel{Kind: "learnings", Title: "Saved guidance", Subtitle: learningFilterName(m.learningFilter),
 		Selected: m.selected, Notice: m.sectionNotice, Footer: "↑/↓ select · Enter details · N add · F filter · R refresh · Esc back"}
 	panel.Hints = []uisnapshot.Hint{{Shortcut: "↑/↓", Action: "select"}, {Shortcut: "Enter", Action: "details"}, {Shortcut: "N", Action: "add"}, {Shortcut: "Esc", Action: "back"}}
 	if form := m.learningForm; form != nil {
 		panel.Kind = "learning-form"
-		panel.Title = "Add explicit learning"
+		panel.Title = "Add saved guidance"
 		if form.EditingID != "" {
-			panel.Title = "Edit explicit learning"
+			panel.Title = "Edit saved guidance"
 		}
 		panel.Rows = []uisnapshot.Row{
 			{Label: "Type", Detail: string(form.Type), Input: bridgeSelect(string(form.Type),
@@ -343,7 +343,7 @@ func (m Model) bridgeLearningsPanel() uisnapshot.Panel {
 		return panel
 	}
 	if record := m.learningDetail; record != nil {
-		panel.Title = "Learning detail"
+		panel.Title = "Guidance details"
 		panel.Subtitle = "Saved guidance for future work"
 		panel.Summary = []uisnapshot.Field{{Label: "Status", Value: string(record.Status)}, {Label: "Type", Value: strings.ReplaceAll(string(record.Type), "_", " ")}, {Label: "Scope", Value: learningScopeShort(record.Scope)}}
 		panel.Blocks = []uisnapshot.Block{

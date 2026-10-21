@@ -186,10 +186,14 @@ func (m Model) contextPanel() uisnapshot.Panel {
 			state += " · omitted next run"
 		}
 		p.Rows = append(p.Rows, uisnapshot.Row{Label: item.Title, Detail: item.Text, State: state})
+		if item.Scope == "global" {
+			p.Rows[len(p.Rows)-1].StateLabel = strings.Replace(state, "Global · available across goals", "Global", 1)
+		}
 	}
 	p.Blocks = []uisnapshot.Block{{Title: "Work context", Lines: []string{"Goal: " + valueOrNone(m.contextState.GoalID), "Permitted actions: " + valueOrNone(m.contextState.Permission), "Recall: " + valueOrNone(m.contextState.Recall), m.contextState.Usage}}, {Title: "Observed source references", Lines: m.contextState.Sources}, {Title: "How to read this", Lines: []string{fmt.Sprintf("%d saved items supplied at run start or available in this goal.", len(m.contextState.Items)), "Source labels and retained references do not prove that an answer's claim is supported.", "Use Enter to inspect a saved item and correct, forget, or omit it from the next run."}}}
 	if m.contextWorkID == "" {
 		p.Title = "Saved knowledge"
+		p.Subtitle = "Your saved notes and context"
 		p.Blocks[0].Lines = []string{"Scope: global plus " + valueOrNone(m.goalID), "Showing at most 100 saved items. /memory search and /note search find specific topics."}
 	}
 	p.Hints = []uisnapshot.Hint{{Shortcut: "↑/↓", Action: "choose"}, {Shortcut: "Enter", Action: "expand"}, {Shortcut: "A", Action: "all saved"}, {Shortcut: "R", Action: "refresh"}, {Shortcut: "Esc", Action: "back"}}

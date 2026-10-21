@@ -84,7 +84,7 @@ func (m *Model) openSourceMenu() {
 	m.launcherMode = "source"
 	m.entries = []entry{
 		{title: "Change workspace", subtitle: "Current: " + valueOrNone(m.source), kind: "command-input", command: "/source"},
-		{title: "Refresh workspace", subtitle: "Capture a new immutable snapshot on the next turn", kind: "command", command: "/source-refresh"},
+		{title: "Refresh workspace", subtitle: "Use an updated, read-only copy on your next request", kind: "command", command: "/source-refresh"},
 		{title: "Ignore project instruction", subtitle: "Skip one AGENTS or project-rules file for this conversation", kind: "command-input", command: "/source ignore"},
 		{title: "Restore project instruction", subtitle: "Read a previously ignored project instruction again", kind: "command-input", command: "/source unignore"},
 		{title: "List ignored project instructions", subtitle: valueOrNone(strings.Join(m.options.IgnoredInstructionPaths, ", ")), kind: "command", command: "/source ignored"},

@@ -149,7 +149,7 @@ func recoveryControlWith(ctx context.Context, stateDir, action string, args []st
 	if err != nil {
 		return worktui.ControlScreen{}, err
 	}
-	screen := worktui.ControlScreen{Panel: uisnapshot.Panel{Kind: "recovery", Title: "Recovery and background checks", Notice: notice}}
+	screen := worktui.ControlScreen{Panel: uisnapshot.Panel{Kind: "recovery", Title: "Recovery", Notice: notice}}
 	serviceState := "Not configured"
 	if installed {
 		serviceState = "Configuration installed; supervisor health is checked separately"

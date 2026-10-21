@@ -46,7 +46,7 @@ func workRecallStatus(ctx context.Context, stateDir string) (worktui.RecallStatu
 	}
 	models, err := client.Models(ctx)
 	if err != nil {
-		status.Detail = "Ollama is unavailable. Open /model → Local to install or start it, then return here. Basic recall continues."
+		status.Detail = "Ollama is unavailable. Choose Local model in Models to install or start it, then return here. Basic recall continues."
 		return status, nil
 	}
 	for _, model := range models {

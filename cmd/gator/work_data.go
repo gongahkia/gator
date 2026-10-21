@@ -197,7 +197,7 @@ func dataControl(ctx context.Context, stateDir, action string, args []string) (w
 	if !view.LastSweep.At.IsZero() {
 		retention = append(retention, fmt.Sprintf("Last automatic cleanup: %s · %d files removed", view.LastSweep.At.Local().Format(time.RFC1123), view.LastSweep.Removed))
 	}
-	screen := worktui.ControlScreen{SourceMoves: sourceMoves, ResetConversation: reset, ClearGoal: clearGoal, RemovedConversations: removedConversations, Panel: uisnapshot.Panel{Kind: "data", Title: "Private data and retention", Blocks: []uisnapshot.Block{{Title: "Storage and copies", Lines: lines}, {Title: "Retention", Lines: retention}}}}
+	screen := worktui.ControlScreen{SourceMoves: sourceMoves, ResetConversation: reset, ClearGoal: clearGoal, RemovedConversations: removedConversations, Panel: uisnapshot.Panel{Kind: "data", Title: "Data & backups", Blocks: []uisnapshot.Block{{Title: "Storage and copies", Lines: lines}, {Title: "Retention", Lines: retention}}}}
 	var totalFiles int
 	var totalBytes int64
 	for _, group := range view.Groups {
