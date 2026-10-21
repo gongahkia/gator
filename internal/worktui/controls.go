@@ -245,16 +245,22 @@ func (m Model) controlsPanel() uisnapshot.Panel {
 		p = uisnapshot.Panel{Title: f.Label, Kind: "settings-form", Selected: m.controlField, Notice: m.sectionNotice, Subtitle: f.Description}
 		if m.controlReview {
 			p.Kind = "confirmation"
-			lines := []string{f.Description}
+			fields := []uisnapshot.Field{}
 			for _, field := range f.Fields {
 				value := field.Value
 				if field.Secret {
 					value = "New credential (hidden)"
 				}
-				lines = append(lines, field.Label+": "+value)
+				fields = append(fields, uisnapshot.Field{Label: field.Label, Value: value})
 			}
-			p.Blocks = []uisnapshot.Block{{Title: "Review", Lines: lines}}
-			p.Hints = []uisnapshot.Hint{{Shortcut: "Enter", Action: "confirm"}, {Shortcut: "Esc", Action: "edit or cancel"}}
+			if len(fields) > 0 {
+				p.Blocks = []uisnapshot.Block{{Title: "Review details", Fields: fields}}
+			}
+			back := "cancel"
+			if len(f.Fields) > 0 {
+				back = "edit"
+			}
+			p.Hints = []uisnapshot.Hint{{Shortcut: "Enter", Action: controlReviewLabel(f.Action, f.Label)}, {Shortcut: "Esc", Action: back}}
 		} else {
 			for _, field := range f.Fields {
 				value := field.Value
@@ -284,13 +290,27 @@ func (m Model) controlsPanel() uisnapshot.Panel {
 			row.Affordance = "action"
 		}
 		p.Rows = append(p.Rows, row)
-		p.Hints = append(p.Hints, uisnapshot.Hint{Shortcut: a.Key, Action: a.Label})
+		hint := uisnapshot.Hint{Shortcut: a.Key, Action: a.Label}
+		if p.Kind == "confirmation" && a.Action == "apply" {
+			hint.Tone = "error"
+		}
+		p.Hints = append(p.Hints, hint)
 	}
 	p.Hints = append(p.Hints, uisnapshot.Hint{Shortcut: "Esc", Action: "back"})
 	if m.controlBusy {
 		p.Notice = "Working… Esc stops the operation"
 	}
 	return p
+}
+
+func controlReviewLabel(action, fallback string) string {
+	labels := map[string]string{"limits": "Save limits", "retention": "Save retention", "backup": "Export backup", "verify": "Verify backup",
+		"restore-plan": "Preview restore", "relink-plan": "Preview source changes", "install": "Enable start at login", "remove": "Disable start at login",
+		"token": "Replace credentials", "finish-restore-review": "Mark setup reviewed"}
+	if label := labels[action]; label != "" {
+		return label
+	}
+	return fallback
 }
 
 func (m *Model) clearRemovedData(screen ControlScreen) {

@@ -165,12 +165,13 @@ func (m Model) contextPanel() uisnapshot.Panel {
 		}
 		if m.contextEditing {
 			p.Kind, p.Title = "knowledge-form", "Correct saved knowledge"
+			p.Blocks = p.Blocks[1:]
 			p.Rows = []uisnapshot.Row{{Label: "Current saved text", Detail: m.contextEdit, Input: bridgeInput(m.contextEdit, 4096, true)}}
 			p.Hints = []uisnapshot.Hint{{Shortcut: "Ctrl+U", Action: "clear"}, {Shortcut: "Enter", Action: "save correction"}, {Shortcut: "Esc", Action: "cancel"}}
 		} else if m.contextConfirm {
 			p.Kind, p.Title = "confirmation", "Forget saved knowledge?"
 			p.Blocks = append(p.Blocks, uisnapshot.Block{Title: "Effect", Lines: []string{"Remove this item and its retrieval vectors from future saved recall.", "Prior transcripts and retained Work evidence may contain earlier excerpts."}})
-			p.Hints = []uisnapshot.Hint{{Shortcut: "Enter", Action: "forget"}, {Shortcut: "Esc", Action: "cancel"}}
+			p.Hints = []uisnapshot.Hint{{Shortcut: "Enter", Action: "forget saved knowledge", Tone: "error"}, {Shortcut: "Esc", Action: "cancel"}}
 		} else {
 			p.Hints = []uisnapshot.Hint{{Shortcut: "E", Action: "correct"}, {Shortcut: "F", Action: "forget"}, {Shortcut: "O", Action: "omit/include next run"}, {Shortcut: "Esc", Action: "back"}}
 			if !item.Available {

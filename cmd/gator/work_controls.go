@@ -100,9 +100,13 @@ func usageControl(stateDir, action string, args []string) (worktui.ControlScreen
 		usage.Categories = append(usage.Categories, uisnapshot.UsageCategory{Name: category, Requests: view.Categories[category]})
 	}
 	screen := worktui.ControlScreen{Panel: uisnapshot.Panel{Kind: "usage", Title: "Shared usage and limits", Usage: usage, Blocks: []uisnapshot.Block{{Title: "All work on this computer", Lines: lines}}}}
+	pauseLabel := "Pause provider requests"
+	if p.Paused {
+		pauseLabel = "Resume provider requests"
+	}
 	screen.Actions = []worktui.ControlAction{
 		{Key: "E", Label: "Edit shared limits", Action: "limits", Args: []string{string(previous)}, Description: "These limits apply across foreground and background requests. Zero means uncapped. Daily counters reset at 00:00 UTC; existing per-run limits still apply.", Fields: []worktui.ControlField{{Label: "Provider requests per day (0 uncapped)", Kind: "number", Value: strconv.Itoa(p.DailyRequests)}, {Label: "Tokens per day (0 uncapped)", Kind: "number", Value: strconv.FormatInt(p.DailyTokens, 10)}, {Label: "Concurrent requests (0 uncapped)", Kind: "number", Value: strconv.Itoa(p.ConcurrentRequests)}}, Review: true},
-		{Key: "P", Label: "Pause/resume provider requests", Action: "pause", Args: []string{string(previous)}, Description: "Pause or resume new requests across chat, routing, retrieval, specialists, and jobs. An in-flight provider request may finish. This does not change saved schedules.", Review: true},
+		{Key: "P", Label: pauseLabel, Action: "pause", Args: []string{string(previous)}, Description: "Pause or resume new requests across chat, routing, retrieval, specialists, and jobs. An in-flight provider request may finish. This does not change saved schedules.", Review: true},
 		{Key: "R", Label: "Refresh", Action: "status"},
 	}
 	return screen, nil
