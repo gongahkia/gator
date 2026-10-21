@@ -10,7 +10,7 @@ export function useModalFocus(active = true) {
     if (!active) return;
     const previous = trigger.current;
     const root = ref.current;
-    const controls = () => [...(root?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), [tabindex="0"]') ?? [])];
+    const controls = () => [...(root?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), summary, [tabindex="0"]') ?? [])].filter((element) => element.getClientRects().length > 0);
     controls()[0]?.focus();
     const trap = (event: KeyboardEvent) => {
       if (event.key !== "Tab") return;

@@ -16,6 +16,7 @@ import { useDrafts } from "./useDrafts";
 import { DraftManager } from "./DraftManager";
 import { useConversationSearch } from "./useConversationSearch";
 import { RecentConversations } from "./RecentConversations";
+import { WorkDetails } from "./WorkDetails";
 
 type Navigation = { command: string; draft?: string } | { conversation: NonNullable<DesktopFrame["conversation"]> };
 
@@ -91,38 +92,10 @@ function OverviewCards({ state, navigate }: { state: BackendState; navigate(comm
   })}</section>;
 }
 
-function WorkspacePanel({ state, open, presenceRef, tab, setTab, navigate }: { state: BackendState; open: boolean; presenceRef: PresenceRef; tab: string; setTab(value: string): void; navigate(command: string): void }) {
-  const content = useRef<HTMLDivElement>(null);
-  useViewMotion(tab, content);
-  const bundles = state.messages.filter((message) => message.bundle).map((message) => message.bundle!);
-  const latest = bundles.at(-1);
-  return <aside ref={presenceRef} className="workspace-panel" aria-label="Work details" data-open={open} inert={!open} aria-hidden={!open}>
-    <div className="detail-tabs" role="tablist" aria-label="Work details">{["Deliverables", "Checks"].map((label, index) => <button key={label} id={`work-details-tab-${label}`} role="tab" aria-controls="work-details-content" aria-selected={tab === label} tabIndex={tab === label ? 0 : -1} onClick={() => setTab(label)} onKeyDown={(event) => {
-      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-      event.preventDefault();
-      const next = event.key === "Home" ? 0 : event.key === "End" ? 1 : (index + (event.key === "ArrowRight" ? 1 : -1) + 2) % 2;
-      setTab(["Deliverables", "Checks"][next]);
-      event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
-    }}>{label}</button>)}</div>
-    <div className="workspace-content" id="work-details-content" ref={content} role="tabpanel" aria-labelledby={`work-details-tab-${tab}`} tabIndex={0}>
-      {tab === "Deliverables" ? latest ? <Result result={bundleResult(latest)} /> : <Empty icon={<Folder size={24} />} title="Your work lands here" text="Documents, verified outputs, and proposed changes appear after a task produces them." /> : <>
-        <div className="flex items-center justify-between mb-5"><span className="eyebrow">Recurring checks</span><button className="small-button" disabled={state.running} onClick={() => navigate("/followup")}>Manage<ChevronRight size={13} /></button></div>
-        {state.checks?.length ? state.checks.map((check, i) => <div className="check-item" key={i}><div className="flex items-center gap-2"><span className="status-dot" data-tone={check.tone} /><strong>{check.title}</strong></div><span className="badge" data-tone={check.tone}>{check.state}</span><p>{check.health}</p></div>) : <Empty icon={<ListChecks size={24} />} title="Keep an eye on things" text="Set up a recurring check for an ongoing goal. Results arrive in your inbox." />}
-        {state.supervisor_needs_start && <p className="panel-notice">Checks are configured, but the local supervisor needs to start. Open Recovery to review.</p>}
-      </>}
-    </div>
-  </aside>;
-}
-
-function Empty({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
-  return <div className="empty-state"><div>{icon}</div><h3>{title}</h3><p>{text}</p></div>;
-}
-
 export function App() {
   const { state, error, connection, sessionID, terminalBusy, fullScreen, reconnecting, reconnect, send, clearError } = useBackend();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("gator:sidebar-collapsed") === "true");
   const [details, setDetails] = useState(false);
-  const [tab, setTab] = useState("Deliverables");
   const drafts = useDrafts(state);
   const draft = drafts.text, setDraft = drafts.setText;
   const [showDrafts, setShowDrafts] = useState(false);
@@ -137,6 +110,8 @@ export function App() {
   const [queueEditing, setQueueEditing] = useState(false);
   const queueAction = useQueueAction(state, send, error);
   const composer = useRef<HTMLTextAreaElement>(null);
+  const detailsTrigger = useRef<HTMLButtonElement>(null);
+  const closeDetails = () => { setDetails(false); detailsTrigger.current?.focus({ preventScroll: true }); };
   const transcript = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
   const [atLatest, setAtLatest] = useState(true);
@@ -273,7 +248,7 @@ export function App() {
       </>}
     </aside>
     <main className="main-area">
-      <header className="main-header"><div className="breadcrumbs"><span>{settingsPage ? "Settings" : sourceName}</span><ChevronRight size={13} /><strong title={headerTitle}>{headerTitle}</strong></div><div className="header-actions">{!settingsPage && <><button className="header-workspace" aria-label="Choose workspace folder" onClick={() => void window.gator?.chooseFolder().catch(() => {})} disabled={state.running || !!panel} title={state.source}><Folder size={15} /><span>{sourceName}</span><ChevronDown size={13} /></button><button className="icon-button" aria-label={details ? "Hide work details" : "Show work details"} aria-expanded={details} onClick={() => setDetails(!details)}><IconSwap active={details} on={<PanelRightClose size={18} />} off={<PanelRightOpen size={18} />} /></button></>}</div></header>
+      <header className="main-header"><div className="breadcrumbs"><span>{settingsPage ? "Settings" : sourceName}</span><ChevronRight size={13} /><strong title={headerTitle}>{headerTitle}</strong></div><div className="header-actions">{!settingsPage && <><button className="header-workspace" aria-label="Choose workspace folder" onClick={() => void window.gator?.chooseFolder().catch(() => {})} disabled={state.running || !!panel} title={state.source}><Folder size={15} /><span>{sourceName}</span><ChevronDown size={13} /></button><button ref={detailsTrigger} className="icon-button" aria-controls="work-details-panel" aria-label={details ? "Hide work details" : "Show work details"} aria-expanded={details} onClick={() => setDetails(!details)}><IconSwap active={details} on={<PanelRightClose size={18} />} off={<PanelRightOpen size={18} />} /></button></>}</div></header>
       {error && <div className="connection-error" role="alert"><div><strong>{connection === "disconnected" ? "Connection lost" : "Action could not complete"}</strong><p>{connection === "disconnected" ? "This view may be out of date. Reconnecting opens a new local session and does not resume or resubmit work." : error}</p>{connection === "disconnected" && <details><summary>Technical details</summary><p>{error}</p></details>}</div>{connection === "disconnected" ? <button className="button" disabled={reconnecting} aria-busy={reconnecting} onClick={() => void reconnect()}>{reconnecting ? "Reconnecting…" : "Reconnect"}</button> : <button className="icon-button" aria-label="Dismiss action error" onClick={clearError}><X size={16} /></button>}</div>}
       {sessionChanged && !error && <div className="session-notice" role="status"><span>A new local session is ready. Previous work was not resumed. Saved conversations and drafts remain available.</span><button className="icon-button" aria-label="Dismiss session notice" onClick={() => setSessionChanged(false)}><X size={16} /></button></div>}
       {state.notice && <div className="view-status" role="status">{state.notice}</div>}
@@ -303,7 +278,7 @@ export function App() {
       </>}
       </div>
     </main>
-    <Presence open={details}>{(open, presenceRef) => <WorkspacePanel state={state} open={open} presenceRef={presenceRef} tab={tab} setTab={setTab} navigate={navigate} />}</Presence>
+    <Presence open={details}>{(open, presenceRef) => <WorkDetails state={state} open={open} presenceRef={presenceRef} close={closeDetails} navigate={navigate} />}</Presence>
     {panel && <div className="panel-draft-anchor"><MessageSquare size={14} /><span>{draft ? "Your message draft is kept while you’re here." : "Return to the conversation to write a message."}</span><button className="small-button" onClick={() => attempt({ type: "panel", key: "esc", panel: { id: panel.id!, action: "key" } })}>Back<kbd>Esc</kbd></button></div>}
     <Presence open={showCommands}>{(open, presenceRef) => <CommandMenu open={open} presenceRef={presenceRef} commands={state.commands} close={() => setShowCommands(false)} select={(name, needsInput) => { setShowCommands(false); if (needsInput) navigate("/chat", `/${name} `); else navigate(`/${name}`); }} />}</Presence>
     <Presence open={showDrafts}>{(open, presenceRef) => <DraftManager open={open} presenceRef={presenceRef} saved={drafts.saved} issue={drafts.issue} manage={drafts.manage} close={() => setShowDrafts(false)} restore={(retained) => { setDraft((current) => !current ? retained.text : current === retained.text ? current : `${current}\n\n${retained.text}`); composer.current?.focus(); }} />}</Presence>

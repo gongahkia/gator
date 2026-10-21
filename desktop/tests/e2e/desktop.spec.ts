@@ -291,7 +291,7 @@ test("motion is interruptible, releases dismissed controls, and honors reduced m
         expect(await page.locator(".workspace-panel").evaluate((element) => element.getBoundingClientRect().top)).toBe(0);
         await page.evaluate(() => { document.querySelector<HTMLElement>(".app-shell")!.dataset.fullscreen = "false"; });
       }
-      await page.getByRole("button", { name: "Hide work details" }).click();
+      await page.getByRole("button", { name: "Close work details" }).click();
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect(errors).toEqual([]);
@@ -508,15 +508,12 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     await expect(page.getByRole("textbox", { name: "Message Gator" })).toHaveValue("keep my draft 🐊");
     await page.getByRole("button", { name: "Show work details" }).click();
     await expect(page.getByRole("complementary", { name: "Work details" })).toBeVisible();
-    await expect(page.getByRole("tab", { name: "Context", exact: true })).toHaveCount(0);
-    await expect(page.getByRole("tab", { name: "Deliverables" })).toHaveAttribute("aria-selected", "true");
-    await page.getByRole("tab", { name: "Deliverables" }).press("ArrowRight");
-    await expect(page.getByRole("tab", { name: "Checks", exact: true })).toBeFocused();
-    await expect(page.getByRole("tabpanel", { name: "Checks", exact: true })).toBeVisible();
-    await page.getByRole("tab", { name: "Checks", exact: true }).press("Home");
-    await expect(page.getByRole("tab", { name: "Deliverables", exact: true })).toBeFocused();
-    await page.getByRole("tab", { name: "Deliverables" }).click();
-    await expect(page.getByText("Your work lands here")).toBeVisible();
+    const workDetails = page.getByRole("complementary", { name: "Work details" });
+    await expect(workDetails.getByRole("button", { name: /^Outputs/ })).toHaveAttribute("aria-expanded", "true");
+    await expect(workDetails.getByText("Files and proposed changes appear here when a task produces them.")).toBeVisible();
+    await workDetails.getByRole("button", { name: /^Context/ }).press("Enter");
+    await expect(workDetails.getByText("Context capacity isn’t measured yet. Daily token usage is tracked separately.")).toBeVisible();
+    await expect(workDetails.getByRole("progressbar")).toHaveCount(0);
     await page.getByRole("button", { name: "Hide work details" }).click();
     await page.getByRole("button", { name: "Follow-up checks", exact: true }).click();
     await page.getByRole("button", { name: /new check/i }).click();
@@ -619,10 +616,10 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     await page.screenshot({ path: `test-results/desktop-${size.width}.png` });
     }
     await page.getByRole("button", { name: "Show work details" }).click();
-    await expect(page.getByRole("complementary", { name: "Work details" })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Work details" })).toBeVisible();
     await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-details-800.png" });
-    await page.getByRole("button", { name: "Hide work details" }).click();
+    await page.getByRole("button", { name: "Close work details" }).click();
     await page.getByRole("button", { name: "Search commands" }).click();
     await page.getByRole("textbox", { name: "Find a command" }).fill("help");
     await page.getByRole("textbox", { name: "Find a command" }).press("Enter");
