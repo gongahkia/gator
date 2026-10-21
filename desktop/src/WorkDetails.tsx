@@ -48,6 +48,9 @@ export function WorkDetails({ state, open, presenceRef, close, navigate }: { sta
   const root = useRef<HTMLElement | null>(null);
   const previewHeading = useRef<HTMLHeadingElement>(null);
   const returnToOutput = useRef<string | undefined>(undefined);
+  const content = useRef<HTMLDivElement>(null);
+  const listPosition = useRef(0);
+  const previousIdentity = useRef(identity);
   const details = state.work_details;
   const bundles = useMemo(() => {
     const values = new Map<string, BackendBundle>();
@@ -69,8 +72,16 @@ export function WorkDetails({ state, open, presenceRef, close, navigate }: { sta
     return () => media.removeEventListener("change", change);
   }, []);
   useLayoutEffect(() => {
-    if (selected) previewHeading.current?.focus({ preventScroll: true });
+    if (previousIdentity.current !== identity) {
+      previousIdentity.current = identity;
+      if (content.current) content.current.scrollTop = 0;
+    }
+    if (selected) {
+      if (content.current) content.current.scrollTop = 0;
+      previewHeading.current?.focus({ preventScroll: true });
+    }
     else if (returnToOutput.current) {
+      if (content.current) content.current.scrollTop = listPosition.current;
       const button = [...(root.current?.querySelectorAll<HTMLButtonElement>("[data-output-id]") ?? [])].find((element) => element.dataset.outputId === returnToOutput.current);
       button?.focus({ preventScroll: true }); returnToOutput.current = undefined;
     }
@@ -93,7 +104,7 @@ export function WorkDetails({ state, open, presenceRef, close, navigate }: { sta
       if (narrow && (event.metaKey || event.ctrlKey) && ["n", "k", "f", ","].includes(event.key.toLowerCase())) event.stopPropagation();
     }}>
       <header className="work-details-heading"><h2>Work details</h2><button className="icon-button" aria-label="Close work details" onClick={close}><X size={16} /></button></header>
-      <div className="workspace-content">
+      <div ref={content} className="workspace-content">
         {selected ? <section className="output-preview" aria-label="Output preview">
           <button className="small-button output-back" onClick={back}><ArrowLeft size={15} />All outputs</button>
           <h3 ref={previewHeading} tabIndex={-1}>{title}</h3>
@@ -107,7 +118,7 @@ export function WorkDetails({ state, open, presenceRef, close, navigate }: { sta
           <details className="output-location"><summary>Retained location<ChevronDown size={14} /></summary><p>{selected.bundle.Path}</p>{selected.candidate?.PatchPath && <p>{selected.candidate.PatchPath}</p>}</details>
         </section> : <>
           <Section id="outputs" title="Outputs" icon={<Files size={16} />} summary={String(outputs.length)} open={sections.outputs} toggle={() => toggle("outputs")}>
-            {outputs.length ? <div className="work-output-list">{outputs.map((output) => <button key={output.id} data-output-id={output.id} className="work-output" onClick={() => setSelection({ conversation: identity, output: output.id })}>
+            {outputs.length ? <div className="work-output-list">{outputs.map((output) => <button key={output.id} data-output-id={output.id} className="work-output" onClick={() => { listPosition.current = content.current?.scrollTop ?? 0; setSelection({ conversation: identity, output: output.id }); }}>
               {output.candidate ? <FileCode2 size={17} /> : <FileText size={17} />}<span><strong>{output.file?.Path || `Change ${output.candidate?.ID}`}</strong><small data-tone={output.bundle.Status === "failed" || (output.file && !output.file.Valid) ? "warning" : undefined}>{outputState(output)}{output.bundle.Status === "failed" ? " · failed run" : ""}{bundles.length > 1 ? ` · Result ${output.group}` : ""}</small></span><ChevronRight size={14} />
             </button>)}</div> : <p className="work-details-empty">Files and proposed changes appear here when a task produces them.</p>}
           </Section>
