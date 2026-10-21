@@ -46,14 +46,19 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     await expect(page.getByRole("heading", { name: "Saved knowledge", exact: true })).toBeVisible();
     await expect(page.getByText("Gator’s view could not load.")).toHaveCount(0);
     await expect(page.getByText("No saved knowledge yet.")).toBeVisible();
+    await page.screenshot({ path: "test-results/desktop-knowledge-empty.png" });
     // The sources list is genuinely null in the Go wire format on this path.
     expect(await page.evaluate(async () => (await window.gator!.snapshot()).state?.panel?.blocks?.some((block) => block.lines === null))).toBe(true);
-    cli(["note", "add", "--title", "Desktop regression note", "--body", "Remember the project decision."]);
+    const noteID = cli(["note", "add", "--title", "Desktop regression note", "--body", "Remember the project decision."]).split(/\s/)[0];
     await page.getByRole("button", { name: /^refresh/i }).click();
     await page.getByRole("button", { name: /Desktop regression note/ }).click();
     await expect(page.getByRole("heading", { name: /Desktop regression note/ })).toBeVisible();
+    await expect(page.getByText("No saved knowledge yet.")).toHaveCount(0);
     await expect(page.getByText("Remember the project decision.", { exact: false }).first()).toBeVisible();
     await page.screenshot({ path: "test-results/desktop-knowledge.png" });
+    // Leave no recall corpus for later inference turns: they must not depend
+    // on a developer's local Ollama service or create embedding reservations.
+    cli(["note", "remove", noteID, "--yes"]);
     await page.getByRole("button", { name: "Gator home" }).click();
     await page.getByRole("button", { name: "Overview", exact: true }).click();
     await expect(page.getByRole("heading", { name: /overview/i }).first()).toBeVisible();
@@ -88,6 +93,13 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     await expect(page.locator(".message-byline", { hasText: "Gator" })).toHaveCount(2);
     const saved = JSON.parse(cli(["overview", "--json"]));
     expect(saved).toBeTruthy();
+    await expect(page.getByRole("button", { name: "Usage & limits", exact: true })).toBeEnabled();
+    await page.getByRole("button", { name: "Usage & limits", exact: true }).click();
+    // Count every call seen by the local provider, including auxiliary work.
+    await expect(page.getByRole("region", { name: "Provider requests", exact: true })).toContainText(`${requests} used`);
+    await expect(page.getByRole("region", { name: "Tokens", exact: true })).toContainText(`${requests * 20} used`);
+    await page.screenshot({ path: "test-results/desktop-usage-with-activity.png" });
+    await page.getByRole("button", { name: "Back to conversation" }).click();
     for (const size of [{ width: 1440, height: 960 }, { width: 1024, height: 768 }, { width: 800, height: 600 }]) {
       await application.evaluate(({ BrowserWindow }, value) => BrowserWindow.getAllWindows()[0].setSize(value.width, value.height), size);
       await expect(page.getByRole("textbox", { name: "Message Gator" })).toBeVisible();
@@ -133,7 +145,8 @@ test("dashboard scroll respects interaction and reduced motion; usage controls k
     }
     const track = page.locator(".starter-track");
     await page.mouse.move(1, 1);
-    // Native smooth scrolling is inspected at 10% speed during this interval.
+    // Inspect browser-managed state transitions with motion slowed to 10%.
+    // Native scroll timing remains owned by Chromium.
     const session = await page.context().newCDPSession(page);
     await session.send("Animation.setPlaybackRate", { playbackRate: 0.1 });
     await expect.poll(() => track.evaluate((element) => element.scrollLeft), { timeout: 10_000 }).toBeGreaterThan(20);
@@ -142,8 +155,22 @@ test("dashboard scroll respects interaction and reduced motion; usage controls k
     await expect(page.getByRole("button", { name: "Resume dashboard scrolling", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Previous dashboard cards" }).click();
     await expect.poll(() => track.evaluate((element) => element.scrollLeft)).toBeLessThan(5);
+    await page.clock.install();
+    await page.getByRole("button", { name: "Resume dashboard scrolling", exact: true }).click();
+    await page.mouse.move(1, 1);
+    // Focus inside the carousel pauses it, even when the pointer leaves.
+    await page.clock.runFor(6500);
+    expect(await track.evaluate((element) => element.scrollLeft)).toBeLessThan(5);
+    await page.getByRole("textbox", { name: "Message Gator" }).focus();
+    await track.hover();
+    await page.clock.runFor(6500);
+    expect(await track.evaluate((element) => element.scrollLeft)).toBeLessThan(5);
     await page.emulateMedia({ reducedMotion: "reduce" });
     await expect(page.getByRole("button", { name: "Resume dashboard scrolling", exact: true })).toBeDisabled();
+    await page.mouse.move(1, 1);
+    await page.clock.runFor(6500);
+    expect(await track.evaluate((element) => element.scrollLeft)).toBeLessThan(5);
+    await page.clock.resume();
     // Manual navigation remains available with reduced motion.
     await page.getByRole("button", { name: "Next dashboard cards" }).click();
     expect(await track.evaluate((element) => element.scrollLeft)).toBeGreaterThan(20);
@@ -173,9 +200,12 @@ test("dashboard scroll respects interaction and reduced motion; usage controls k
     expect(cli(["usage", "status"])).toContain("All new provider requests paused");
     await page.getByText("Usage details", { exact: true }).click();
     await expect(page.getByText("Failed attempts", { exact: true })).toBeVisible();
+    await page.screenshot({ path: "test-results/desktop-usage-details.png" });
+    await page.getByText("Usage details", { exact: true }).click();
     for (const size of [{ width: 1440, height: 960 }, { width: 1024, height: 768 }, { width: 800, height: 600 }]) {
       await application.evaluate(({ BrowserWindow }, value) => BrowserWindow.getAllWindows()[0].setSize(value.width, value.height), size);
       await expect(page.getByRole("heading", { name: "Usage & limits", exact: true })).toBeVisible();
+      await page.locator(".usage-page").evaluate((element) => element.scrollTo({ top: 0 }));
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await page.screenshot({ path: `test-results/desktop-usage-${size.width}.png` });
     }

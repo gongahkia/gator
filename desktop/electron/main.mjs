@@ -9,6 +9,7 @@ import { terminalHandoff } from "./terminal.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const assets = resolve(here, "../dist");
+const appIcon = resolve(here, "../assets/icon.png");
 app.setName("Gator");
 // Allows isolated development/test profiles without changing Gator's state.
 if (process.env.GATOR_DESKTOP_USER_DATA) app.setPath("userData", resolve(process.env.GATOR_DESKTOP_USER_DATA));
@@ -48,7 +49,7 @@ async function startBackend() {
 function createWindow() {
   window = new BrowserWindow({
     title: "Gator", width: 1440, height: 960, minWidth: 760, minHeight: 560,
-    backgroundColor: "#101010", show: false,
+    backgroundColor: "#101010", show: false, icon: appIcon,
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
     trafficLightPosition: { x: 20, y: 20 },
     webPreferences: { preload: join(here, "preload.cjs"), contextIsolation: true, sandbox: true, nodeIntegration: false, webviewTag: false, spellcheck: false },
@@ -82,6 +83,7 @@ if (!app.requestSingleInstanceLock()) app.quit();
 else {
   app.on("second-instance", () => { window?.show(); window?.focus(); });
   app.whenReady().then(async () => {
+    if (process.platform === "darwin") app.dock?.setIcon(appIcon);
     protocol.handle("gator", (request) => {
       const path = assetPath(request.url, assets);
       return path ? net.fetch(pathToFileURL(path).href) : new Response("Not found", { status: 404 });

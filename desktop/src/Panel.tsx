@@ -44,7 +44,7 @@ export function Panel({ panel, send }: { panel: BackendPanel; send(frame: Deskto
           {hasInputs && <div className="row-adjust"><button className="icon-button" aria-label={`Previous ${row.label}`} onClick={() => keyAction("left", index)}><ChevronLeft size={16} /></button><button className="small-button" onClick={() => keyAction("space", index)}>Change</button><button className="icon-button" aria-label={`Next ${row.label}`} onClick={() => keyAction("right", index)}><ChevronRight size={16} /></button></div>}
         </div>)}
       </div>}
-      {panel.kind === "context" && !panel.rows?.length && <p className="empty-hint">No saved knowledge yet.</p>}
+      {panel.kind === "context" && panel.title === "Saved knowledge" && !panel.rows?.length && <p className="empty-hint">No saved knowledge yet.</p>}
       {panel.blocks?.map((block, i) => <section className="panel-block" key={i}>{block.title && <h2>{block.title}</h2>}{(block.lines ?? []).map((line, j) => <p className="literal" key={j}>{line || " "}</p>)}</section>)}
       {!panel.rows?.length && !panel.blocks?.length && !panel.notice && <p className="empty-hint">Nothing to review here yet.</p>}
     </div>

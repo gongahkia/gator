@@ -44,12 +44,13 @@ current live interaction ID; retained cards have no approval authority.
 
 | Surface | Behavior |
 | --- | --- |
-| Home | Four live overview summaries and direct entry into ongoing work |
+| Home | Four live overview summaries and an automatically scrolling strip of workspace actions |
 | Navigation | Goals, conversations, inbox, follow-ups, knowledge, history, usage, backups, recovery, models |
 | Conversation | Markdown agent text, literal user/output text, typed result cards, streaming progress, stop/steering |
 | Reviews | Exact structured previews with request-bound approve/deny buttons; separate confirmation for workflow writes |
 | Native forms | Text/password/multiline fields; existing Go review and save actions |
-| Work details | Selected workspace, model, context inspection, verified deliverables, actual recurring-check state |
+| Work details | Deliverables and recurring checks; no Context tab or profile footer |
+| Usage & limits | Daily request/token meters, shared limit controls, activity breakdown, and expandable accounting details |
 | Commands | Cmd/Ctrl+K, searchable commands, arrow navigation, input-prefilling commands |
 | Transcript search | Cmd/Ctrl+F, searches prose plus typed result/deliverable data |
 | Drafts | Kept in memory while opening views; unsaved forms prompt before leaving |
@@ -58,6 +59,17 @@ current live interaction ID; retained cards have no approval authority.
 Enter sends and Shift+Enter inserts a line. Cmd/Ctrl+N starts a conversation
 in the selected workspace. Escape closes a view/menu/search or stops active
 work. Modal focus stays inside the dialog and returns to its trigger.
+
+The home dashboard advances every six seconds and pauses on hover, keyboard
+focus, or manual interaction. Previous/next and pause/resume controls remain
+available. Reduced-motion preferences disable automatic movement while keeping
+manual navigation. Profile tiles, promotional headings, refresh timestamps,
+composer footnotes, and the idle send shortcut have been removed.
+
+Usage is structured display data from Go's shared accounting store. Uncapped
+limits stay explicitly uncapped; the desktop does not invent billing estimates
+or provider subscription quotas. Limit edits and pause/resume actions retain
+the existing separate review and confirmation, including stale-policy checks.
 
 The desktop starts with a private empty folder rather than capturing the
 user's home directory. Choose a workspace with the native folder picker, set
@@ -104,7 +116,9 @@ headless CLI remain reusable regardless of that later product decision.
 The desktop's Electron integration test uses a real built Go backend and an
 isolated profile with a local fake inference endpoint. It exercises home,
 overview navigation, draft preservation, detail tabs, native follow-up edits
-and review, conversation continuation, and multiple window sizes. It does not
+and review, conversation continuation, and multiple window sizes. It also
+checks empty and populated Saved knowledge, dashboard motion controls and
+reduced motion, real usage counters, and reviewed usage changes. It does not
 call paid providers or enable background services. Go tests cover stale view
 actions, atomic field validation, secret redaction, reviewed mutations, live
 approval IDs, and active-run navigation guards. Host tests cover action and
@@ -117,16 +131,22 @@ desktop alongside the terminal locally.
 
 Referene attribution is in `desktop/licenses/OPENHANDS.txt`.
 
+The app icon is the same standalone 🐊 symbol used in the interface, on a
+transparent background. `desktop/assets/icon.icns` supplies the macOS bundle
+icon; `icon.png` supplies the running Dock/window icon and Linux packaging.
+Both assets are checked in. To regenerate them on macOS, run
+`swift desktop/scripts/generate-icons.swift`; ordinary builds do not need Swift.
+
 ### Local verification, 21 October 2026
 
 - `go test ./...` and `go vet ./...` passed; subsequent model-status and bridge
   changes passed the affected command/package tests and vet checks.
 - `go test -race ./internal/worktui ./internal/modelcatalog -count=1` passed.
 - Terminal TypeScript checks, all five UI tests, and bundle build passed. The
-  generated terminal bundle remained byte-for-byte unchanged.
+  regenerated terminal bundle includes the empty-block rendering fix.
 - Desktop TypeScript checks, all five host tests, and frontend/runtime build
   passed.
-- Both Electron integration tests passed in development and against the
+- All three Electron integration tests passed in development and against the
   packaged `Gator.app`. The packaged test exercised its bundled assets and Go
   executable, with two local inference turns and an isolated saved profile.
 - Screens were checked at 1440×960, 1024×768, and 800×600, including narrow
@@ -140,3 +160,39 @@ Interactive OAuth/terminal handoffs have script quoting and return-status
 tests; live sign-in with an external account was not exercised. Linux runtime,
 native OS fullscreen transitions, signed installers, and notarization were
 not verified in this local pass.
+
+### Interface review: requested desktop cleanup
+
+Full review of the requested home, right panel, Saved knowledge, and Usage &
+limits changes. React DOM, Tailwind v4, and the existing semantic CSS remain
+the styling system. Other workflow pages retain their existing layouts.
+
+| Category | Evidence inspected | Result |
+| --- | --- | --- |
+| Typography | Home, usage totals, reset date, narrow windows | Tabular numbers and existing font/wrapping conventions retained |
+| Surfaces | Home cards, usage meters/settings, native forms, details pane | Requested clutter removed; controls retain 40px hit areas |
+| Animations | Automatic advance, hover/focus pause, manual controls, reduced motion | Browser state transitions checked at 10% playback; native scroll timing belongs to Chromium |
+| Icons | Dashboard controls, usage actions, existing navigation | Existing Lucide/currentColor/stroke conventions retained |
+| Performance | Scroll container, six-second interval, hidden document guard | No animation dependency or continuous React render loop |
+
+| Severity | Location | Before | After | Why |
+| --- | --- | --- | --- | --- |
+| HIGH | `desktop/src/Panel.tsx:48`, `ui/src/main.tsx:281`, `ui/src/protocol.ts:43` | Empty source references caused an array dereference on null | Nullable wire type and empty-array rendering fallback in both frontends | Empty knowledge must remain usable |
+| MEDIUM | `desktop/src/App.tsx:185`, `desktop/src/styles.css:97` | Promotional headings, refresh copy, profile tile, composer footnote and idle send hint | Requested elements and obsolete styles removed | Reduce visual competition with the task |
+| MEDIUM | `desktop/src/App.tsx:79` | Context occupied the first right-panel tab and repeated workspace metadata | Deliverables opens first; Checks remains available | Keep the right panel focused on outputs and follow-ups |
+| MEDIUM | `desktop/src/StarterDashboard.tsx:13` | Static starter grid | Scrollable action dashboard with pause, manual navigation and reduced-motion support | User-requested motion remains controllable |
+| MEDIUM | `desktop/src/UsagePanel.tsx:20`, `internal/uisnapshot/usage.go:5`, `cmd/gator/work_controls.go:82` | Terminal action rows and a long prose dump | Typed quota cards, grouped settings, activity counts and collapsed details | Improve scanning without changing accounting or review ownership |
+
+| Location | Candidate | Rejected because |
+| --- | --- | --- |
+| Dashboard | Seamless duplicated cards and a continuous animation loop | Duplicate focus targets and constant motion add cost; native scrolling keeps normal keyboard and pointer behavior |
+| Usage | Copy Codex's subscription periods and credit balances | Gator owns daily UTC admission limits; provider billing/subscription data is not available here |
+| Desktop styling | Add a new animation/component framework | Existing CSS and browser scrolling cover the requested behavior |
+
+Verification uses the commands listed above, plus the real Go accounting
+projection test and Electron assertions that pending usage edits have not
+changed persisted policy before confirmation. The Saved knowledge regression
+failed against the previous build and passed after the fix. Screenshots cover
+empty, populated, uncapped, capped, paused, and narrow states. Verdict: Approve
+for the requested scope. Platform and external sign-in limitations above
+remain unverified.

@@ -42,9 +42,9 @@
     "appId": "com.gongahkia.gator",
     "asar": true,
     "directories": { "output": "release" },
-    "files": ["dist/**/*", "electron/**/*", "licenses/**/*", "package.json", "!**/*.test.mjs"],
+    "files": ["dist/**/*", "electron/**/*", "assets/**/*", "licenses/**/*", "package.json", "!**/*.test.mjs"],
     "extraResources": [{ "from": "runtime/gator", "to": "runtime/gator" }],
-    "mac": { "category": "public.app-category.productivity", "identity": null, "target": ["dmg", "zip"] },
-    "linux": { "category": "Utility", "target": ["AppImage", "deb"] }
+    "mac": { "icon": "assets/icon.icns", "category": "public.app-category.productivity", "identity": null, "target": ["dmg", "zip"] },
+    "linux": { "icon": "assets/icon.png", "category": "Utility", "target": ["AppImage", "deb"] }
   }
 }
