@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, BookOpen, Check, ChevronDown, ChevronRight, Clock3, Command, Folder, Inbox, LayoutDashboard, ListChecks, ListPlus, LoaderCircle, MessageSquare, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Search, Settings2, ShieldCheck, Square, Target, X } from "lucide-react";
 import type { BackendMessage, BackendState } from "../../ui/src/protocol";
 import type { DesktopFrame, DesktopSnapshot } from "./bridge";
@@ -14,6 +14,7 @@ import { SettingsNavigation, settingsRoutes } from "./SettingsNavigation";
 import { CopyButton } from "./CopyButton";
 import { useDrafts } from "./useDrafts";
 import { DraftManager } from "./DraftManager";
+import { useConversationSearch } from "./useConversationSearch";
 
 const destinations = [
   { command: "/overview", label: "Overview", icon: LayoutDashboard, group: "work" },
@@ -62,7 +63,7 @@ function useBackend() {
   return { ...snapshot, error: error || reconnectError || snapshot.error, reconnecting, reconnect, send, clearError: () => { setError(""); setReconnectError(""); } };
 }
 
-function Message({ message, pending, onApproval }: { message: BackendMessage; pending?: number; onApproval(approved: boolean): void }) {
+const Message = memo(function Message({ message, pending, onApproval }: { message: BackendMessage; pending?: number; onApproval(approved: boolean): void }) {
   const user = message.role === "You";
   const result = message.result ?? (message.bundle ? bundleResult(message.bundle) : undefined);
   const approval = result?.kind === "approval" && result.fields?.some((field) => field.label === "Request" && field.value === String(pending)) ? pending : undefined;
@@ -72,7 +73,7 @@ function Message({ message, pending, onApproval }: { message: BackendMessage; pe
       {!result && message.role === "Gator" && message.text && <div className="message-actions"><CopyButton text={message.text} label="Copy response" compact /></div>}
     </div>
   </article>;
-}
+}, (before, after) => before.pending === after.pending && before.message.role === after.message.role && before.message.text === after.message.text && JSON.stringify(before.message.result ?? before.message.bundle) === JSON.stringify(after.message.result ?? after.message.bundle) && before.onApproval === after.onApproval);
 
 function OverviewCards({ state, navigate }: { state: BackendState; navigate(command: string): void }) {
   return <section className="overview-grid" aria-label="Everyday overview">{["changed", "needs", "next", "blocked"].map((id) => {
@@ -135,9 +136,14 @@ export function App() {
   const composer = useRef<HTMLTextAreaElement>(null);
   const transcript = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
+  const [atLatest, setAtLatest] = useState(true);
+  const [newActivity, setNewActivity] = useState(false);
+  const previousTranscript = useRef({ identity: "", content: "" });
   const backendInput = useRef<string | undefined>(undefined);
   const view = useRef<HTMLDivElement>(null);
   const panel = state?.panel;
+  const conversationIdentity = state?.conversation_id || state?.source || "";
+  const conversationSearch = useConversationSearch(transcript, search, conversationIdentity, !panel);
   const settingsPage = settingsRoutes.some((route) => route.command === state?.destination);
   const modifier = window.gator?.platform === "darwin" ? "⌘" : "Ctrl+";
   const viewKey = state ? `${state.destination || (state.home && !state.messages.length ? "home" : "chat")}:${panel?.kind ?? ""}:${panel?.title ?? ""}` : undefined;
@@ -152,7 +158,14 @@ export function App() {
       if (state.input) { setDraft(state.input); composer.current?.focus(); }
     }
   }, [state?.input]);
-  useEffect(() => { if (atBottom.current && search === null) transcript.current?.scrollTo({ top: transcript.current.scrollHeight }); }, [state?.messages, state?.running, search]);
+  useLayoutEffect(() => {
+    if (!state || panel) return;
+    const content = JSON.stringify(state.messages);
+    if (previousTranscript.current.identity !== conversationIdentity) { atBottom.current = true; setAtLatest(true); setNewActivity(false); }
+    else if (previousTranscript.current.content !== content && !atBottom.current) setNewActivity(true);
+    previousTranscript.current = { identity: conversationIdentity, content };
+    if (atBottom.current && search === null) transcript.current?.scrollTo({ top: transcript.current.scrollHeight });
+  }, [state?.messages, state?.running, panel, conversationIdentity, search]);
   useEffect(() => { if (composer.current) { composer.current.style.height = "auto"; composer.current.style.height = `${Math.min(180, composer.current.scrollHeight)}px`; } }, [draft]);
 
   const attempt = useCallback((frame: DesktopFrame) => { void send(frame).catch(() => {}); }, [send]);
@@ -187,6 +200,13 @@ export function App() {
     return () => window.removeEventListener("keydown", keyboard);
   });
 
+  const approve = useCallback(async (approved: boolean) => {
+    if (!state?.pending_approval || approvalBusy) return;
+    setApprovalBusy(true);
+    try { await send({ type: "approval", interaction_id: state.pending_approval.id, approved }); }
+    catch {} finally { setApprovalBusy(false); }
+  }, [state?.pending_approval?.id, approvalBusy, send]);
+
   if (!state) return <main className="boot-screen"><Logo /><h1>{reconnecting ? "Reconnecting to Gator…" : error ? "Gator could not connect" : "Getting your workspace ready"}</h1><p>{error || "Opening your local Gator profile. No messages will be submitted."}</p>{(!error || reconnecting) && <LoaderCircle className="spin accent" size={20} />}{error && window.gator && <button className="button" disabled={reconnecting} onClick={() => void reconnect()}>{reconnecting ? "Reconnecting…" : "Reconnect"}</button>}</main>;
 
   const queueFull = state.running && state.queued >= 16 && !draft.trimStart().startsWith("/");
@@ -201,12 +221,6 @@ export function App() {
     } catch (err) { setDraftError(err instanceof Error ? err.message : String(err)); }
     finally { setSending(false); composer.current?.focus(); }
   };
-  const approve = async (approved: boolean) => {
-    if (!state.pending_approval || approvalBusy) return;
-    setApprovalBusy(true);
-    try { await send({ type: "approval", interaction_id: state.pending_approval.id, approved }); }
-    catch {} finally { setApprovalBusy(false); }
-  };
   const composerKeys = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.nativeEvent.isComposing && state.running) { event.preventDefault(); void submit(true); return; }
     if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void submit(); }
@@ -214,7 +228,8 @@ export function App() {
   const home = state.home && !state.messages.length && !panel;
   const conversationBrowser = state.destination === "/conversations" || state.destination === "/history";
   const activeDestination = state.destination === "/history" ? "/conversations" : state.destination;
-  const messages = state.messages.filter((message) => !search || `${message.text} ${JSON.stringify(message.result ?? message.bundle ?? "")}`.toLowerCase().includes(search.toLowerCase()));
+  const messages = state.messages;
+  const jumpToLatest = () => { setSearch(null); atBottom.current = true; setAtLatest(true); setNewActivity(false); transcript.current?.scrollTo({ top: transcript.current.scrollHeight }); composer.current?.focus({ preventScroll: true }); };
   const slash = draft.startsWith("/") && !draft.includes(" ") ? state.commands.filter((command) => command.name.startsWith(draft.slice(1))).slice(0, 7) : [];
   const sourceName = state.source.split("/").at(-1) || "Workspace";
   const headerTitle = home ? "New conversation" : panel ? conversationBrowser ? "Conversations" : panel.title : state.title;
@@ -240,13 +255,13 @@ export function App() {
       {state.external && <div className="terminal-banner" role="status"><div><strong>Continue this step in Terminal</strong><p>Gator needs an interactive terminal for this {state.external.kind === "connector" ? "connection" : "action"}. Return here when it finishes.</p></div><button className="button" disabled={terminalBusy} onClick={() => void window.gator?.continueInTerminal().catch(() => {})}>{terminalBusy ? "Waiting for Terminal…" : "Open Terminal"}</button></div>}
       <div className="view-content" data-home={home} data-settings={settingsPage} ref={view}>
       {panel ? conversationBrowser ? <ConversationsPanel panel={panel} send={send} navigate={navigate} /> : panel.kind === "usage" && panel.usage ? <UsagePanel panel={panel} usage={panel.usage} send={send} /> : <Panel panel={panel} send={send} /> : <>
-        {search !== null && <div className="transcript-search"><Search size={16} /><input autoFocus aria-label="Search conversation" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find in this conversation…" /><span>{messages.length} messages</span><button className="icon-button" aria-label="Close search" onClick={() => setSearch(null)}><X size={16} /></button></div>}
-        <div className={`conversation-scroll ${home ? "home-scroll" : ""}`} ref={transcript} onScroll={(event) => { const el = event.currentTarget; atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100; }}>
+        {search !== null && <div className="transcript-search" role="search" aria-label="Find in conversation"><Search size={16} /><input autoFocus aria-label="Search conversation" maxLength={256} value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); conversationSearch.move(event.shiftKey ? -1 : 1); } }} placeholder="Find in this conversation…" /><span className="search-count" role="status">{!search ? "Find text" : !conversationSearch.count ? "No matches" : `${conversationSearch.active + 1} of ${conversationSearch.count}${conversationSearch.capped ? "+" : ""}`}</span><button className="icon-button" aria-label="Previous match" title="Previous match (Shift+Enter)" disabled={!conversationSearch.count} onClick={() => conversationSearch.move(-1)}><ArrowUp size={16} /></button><button className="icon-button" aria-label="Next match" title="Next match (Enter)" disabled={!conversationSearch.count} onClick={() => conversationSearch.move(1)}><ArrowDown size={16} /></button><button className="icon-button" aria-label="Close search" onClick={() => { setSearch(null); composer.current?.focus(); }}><X size={16} /></button></div>}
+        <div className={`transcript-stage ${home ? "home-stage" : ""}`}><div className={`conversation-scroll ${home ? "home-scroll" : ""}`} ref={transcript} onScroll={(event) => { const el = event.currentTarget; const near = el.scrollHeight - el.scrollTop - el.clientHeight < 100; atBottom.current = near; setAtLatest(near); if (near) setNewActivity(false); }}>
           {home ? <div className="home-content"><h1>What’s on your mind?</h1>
             {state.first_run && <div className="setup-callout"><div><Settings2 size={18} /><div><strong>Make Gator yours</strong><p>Choose a cloud or local model to start your first conversation.</p></div></div><button className="button" onClick={() => navigate("/model")}>Choose a model<ChevronRight size={15} /></button></div>}
-            </div> : <div className="transcript-content" aria-label="Conversation">{messages.map((message, index) => <Message key={index} message={message} pending={approvalBusy ? undefined : state.pending_approval?.id} onApproval={(approved) => void approve(approved)} />)}{search && !messages.length && <Empty icon={<Search size={24} />} title="No matching messages" text="Try another word or close search to return to the conversation." />}{state.running && <div className="run-progress" role="status"><LoaderCircle size={16} className="spin" /><span>{state.cancelling ? "Stopping…" : state.pending_approval ? "Waiting for your approval" : state.status || "Gator is working…"}</span><span className="elapsed">{state.elapsed}</span></div>}</div>}
-        </div>
-        <div className="composer-area">{state.pending_approval && <div className="approval-reminder"><ShieldCheck size={16} /><span>An action is waiting for your review.</span><button className="small-button" onClick={() => { setSearch(null); transcript.current?.scrollTo({ top: transcript.current.scrollHeight }); }}>View request<ArrowDown size={13} /></button></div>}
+            </div> : <div className="transcript-content" aria-label="Conversation">{messages.map((message, index) => <Message key={`${conversationIdentity}:${index}`} message={message} pending={approvalBusy ? undefined : state.pending_approval?.id} onApproval={approve} />)}{state.running && <div className="run-progress" role="status"><LoaderCircle size={16} className="spin" /><span>{state.cancelling ? "Stopping…" : state.pending_approval ? "Waiting for your approval" : state.status || "Gator is working…"}</span><span className="elapsed">{state.elapsed}</span></div>}</div>}
+        </div>{!home && !atLatest && <button className="jump-latest" aria-label={newActivity ? "New activity. Jump to latest" : "Jump to latest"} onClick={jumpToLatest}><ArrowDown size={16} />{newActivity && <span>New activity</span>}</button>}</div>
+        <div className="composer-area">{state.pending_approval && <div className="approval-reminder"><ShieldCheck size={16} /><span>An action is waiting for your review.</span><button className="small-button" onClick={jumpToLatest}>View request<ArrowDown size={13} /></button></div>}
           {!!slash.length && <div className="slash-suggestions" aria-label="Command suggestions">{slash.map((command) => <button key={command.name} onClick={() => { setDraft(`/${command.name}${command.needs_input ? " " : ""}`); composer.current?.focus(); }}><span>/{command.name}</span><span>{command.description}</span></button>)}</div>}
           <MessageQueue items={state.queue ?? []} running={state.running} busy={queueAction.busy || sending || !!error || !!state.external} act={queueAction.act} onEditingChange={setQueueEditing} onUseDraft={(text) => { setDraft((current) => current ? `${current}\n\n${text}` : text); composer.current?.focus(); }} />
           {(drafts.recovered || drafts.issue) && <p className="draft-recovery" role="status">{drafts.issue || "Draft recovered. Review it before sending."}</p>}

@@ -62,6 +62,55 @@ test("unsent drafts survive reload and reconnect without submission, and retenti
   } finally { await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close()).catch(() => {}); await application.close(); await rm(directory, { recursive: true, force: true }); }
 });
 
+test("long conversations retain context while searching and signal activity without moving the reader", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "gator-desktop-transcript-e2e-"));
+  const env = { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") };
+  const application = await launchDesktop(env);
+  try {
+    const page = await application.firstWindow();
+    await expect(page.getByRole("textbox", { name: "Message Gator" })).toBeVisible();
+    const snapshot = await page.evaluate(() => window.gator!.snapshot());
+    const messages = Array.from({ length: 300 }, (_, index) => ({ role: index % 2 ? "Gator" : "You", text: `Message ${index}: surrounding context stays readable.\n\n${index === 101 || index === 201 ? "Find this needle **in** context. Literal [.*] stays literal." : "A useful project detail with enough text to wrap naturally."}` }));
+    const state = { ...snapshot.state!, home: false, conversation_id: "work-long-transcript", title: "Long transcript", messages };
+    await application.evaluate(({ BrowserWindow }, value) => BrowserWindow.getAllWindows()[0].webContents.send("gator:update", value), { ...snapshot, state });
+    await expect(page.locator(".message")).toHaveCount(300);
+    const scroll = page.locator(".conversation-scroll");
+    await scroll.evaluate((element) => { element.scrollTop = 0; });
+    await expect(page.getByRole("button", { name: "Jump to latest", exact: true })).toBeVisible();
+    const updated = { ...state, messages: [...messages, { role: "Gator", text: "A new update while you were reading." }] };
+    await application.evaluate(({ BrowserWindow }, value) => BrowserWindow.getAllWindows()[0].webContents.send("gator:update", value), { ...snapshot, state: updated });
+    await expect(page.getByRole("button", { name: "New activity. Jump to latest", exact: true })).toBeVisible();
+    expect(await scroll.evaluate((element) => element.scrollTop)).toBe(0);
+    await page.keyboard.press("Meta+f");
+    const search = page.getByRole("textbox", { name: "Search conversation" });
+    await search.fill("needle in context");
+    await expect(page.locator(".search-count")).toHaveText("1 of 2");
+    await expect(page.locator(".message")).toHaveCount(301);
+    expect(await page.evaluate(() => [...CSS.highlights.get("gator-search-active")!].map((range) => range.toString()))).toEqual(["needle in context"]);
+    await search.press("Enter");
+    await expect(page.locator(".search-count")).toHaveText("2 of 2");
+    await search.press("Shift+Enter");
+    await expect(page.locator(".search-count")).toHaveText("1 of 2");
+    await search.fill("[.*]");
+    await expect(page.locator(".search-count")).toHaveText("1 of 2");
+    await search.fill("not present anywhere");
+    await expect(page.locator(".search-count")).toHaveText("No matches");
+    await expect(page.locator(".message")).toHaveCount(301);
+    await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(800, 600));
+    await search.fill("needle in context");
+    await settlePresentation(page);
+    await page.screenshot({ path: "test-results/desktop-transcript-search-800.png" });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.keyboard.press("Escape");
+    await expect(search).toHaveCount(0);
+    expect(await page.evaluate(() => CSS.highlights.size)).toBe(0);
+    await page.getByRole("button", { name: /Jump to latest/ }).click();
+    await expect(page.getByText("A new update while you were reading.", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Jump to latest/ })).toHaveCount(0);
+    await expect(page.getByRole("textbox", { name: "Message Gator" })).toBeFocused();
+  } finally { await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close()).catch(() => {}); await application.close(); await rm(directory, { recursive: true, force: true }); }
+});
+
 test("motion is interruptible, releases dismissed controls, and honors reduced motion", async () => {
   test.setTimeout(120_000); // Includes inspection at 10% playback and native startup.
   const directory = await mkdtemp(join(tmpdir(), "gator-desktop-motion-e2e-"));
