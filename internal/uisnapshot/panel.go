@@ -49,6 +49,7 @@ type Row struct {
 	Detail     string  `json:"detail,omitempty"`
 	State      string  `json:"state,omitempty"`
 	StateLabel string  `json:"state_label,omitempty"`
+	Affordance string  `json:"affordance,omitempty"`
 	Tone       string  `json:"tone,omitempty"`
 	Input      *Input  `json:"input,omitempty"`
 }

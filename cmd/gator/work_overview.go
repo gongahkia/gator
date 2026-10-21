@@ -76,9 +76,9 @@ func overviewControl(ctx context.Context, root, action string, args []string) (w
 	}
 	screen := worktui.ControlScreen{Location: strings.Join(args, "\x00"), Panel: uisnapshot.Panel{Kind: "overview", Title: "Everyday overview", Subtitle: "Retained facts · choose an item to act"}}
 	if len(args) == 0 {
-		screen.Panel.Subtitle = "Changes from the last 24 hours · no model call"
+		screen.Panel.Title, screen.Panel.Subtitle = "Overview", "Changes from the last 24 hours"
 		if view.Reviewed {
-			screen.Panel.Subtitle = "Changes since " + view.Since.Local().Format("Jan 2 15:04") + " · no model call"
+			screen.Panel.Subtitle = "Changes since " + view.Since.Local().Format("Jan 2 15:04")
 		}
 		for index, section := range view.Sections {
 			screen.Actions = append(screen.Actions, worktui.ControlAction{Key: strconv.Itoa(index + 1), Label: section.Title, Detail: section.Summary, Action: "section", Args: []string{section.ID}})
@@ -189,6 +189,10 @@ func overviewControl(ctx context.Context, root, action string, args []string) (w
 		refreshed += " · " + screen.Panel.Footer
 	}
 	screen.Panel.Footer = refreshed
+	if len(args) == 0 {
+		screen.Panel.Blocks = append(screen.Panel.Blocks, uisnapshot.Block{Title: "About this overview", Collapsible: true, Lines: []string{screen.Panel.Footer, "This view reads retained activity without making a model request."}})
+		screen.Panel.Footer = ""
+	}
 	screen.Actions = append(screen.Actions, worktui.ControlAction{Key: "R", Label: "Refresh", Action: "status", Args: append([]string(nil), args...)})
 	return screen, nil
 }

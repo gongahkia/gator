@@ -279,7 +279,11 @@ func (m Model) controlsPanel() uisnapshot.Panel {
 		return p
 	}
 	for _, a := range m.controlScreen.Actions {
-		p.Rows = append(p.Rows, uisnapshot.Row{Label: a.Label, Detail: a.Detail})
+		row := uisnapshot.Row{Label: a.Label, Detail: a.Detail}
+		if a.Action == "seen" || a.Action == "start" || a.Action == "retry" {
+			row.Affordance = "action"
+		}
+		p.Rows = append(p.Rows, row)
 		p.Hints = append(p.Hints, uisnapshot.Hint{Shortcut: a.Key, Action: a.Label})
 	}
 	p.Hints = append(p.Hints, uisnapshot.Hint{Shortcut: "Esc", Action: "back"})
