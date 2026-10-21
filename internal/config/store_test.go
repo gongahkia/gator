@@ -104,7 +104,7 @@ func TestStoreAcceptsEveryWorkStatusLineItem(t *testing.T) {
 		t.Fatalf("new store: %v", err)
 	}
 	items := []string{
-		"queue", "send", "commands", "conversations", "inbox", "jobs", "model", "model-access",
+		"queue", "send", "editor", "source", "commands", "conversations", "inbox", "jobs", "model", "model-access",
 		"current-dir", "mode", "artifacts", "connectors", "conversation", "effort", "sandbox", "status",
 	}
 	settings := Default()

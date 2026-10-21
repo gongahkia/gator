@@ -211,6 +211,7 @@ func (m Model) updateStatusLineEditor(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.config.SetStatusLine != nil {
 			if err := m.config.SetStatusLine(m.statusLineDraftEnabled, configured); err != nil {
 				m.status = "Save status line: " + err.Error()
+				m.bridgeNotice = m.status
 				return m, nil
 			}
 		}

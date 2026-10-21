@@ -1,6 +1,7 @@
 package worktui
 
 import (
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -8,6 +9,16 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
 )
+
+func TestStatusLineSaveFailureRetainsEditorAndIsVisibleToDesktop(t *testing.T) {
+	model := New(Config{CurrentFolder: t.TempDir(), SetStatusLine: func(bool, *[]string) error { return errors.New("settings are read-only") }})
+	model.openStatusLineEditor()
+	next, _ := model.ApplyBridgePanel(BridgePanelAction{ID: model.BridgeState().Panel.ID, Action: "key"}, tea.KeyMsg{Type: tea.KeyEnter})
+	state := next.(Model).BridgeState()
+	if state.Panel == nil || state.Panel.Kind != "status-line" || !strings.Contains(state.Notice, "settings are read-only") {
+		t.Fatalf("save failure lost editor or visible feedback: panel=%#v notice=%q", state.Panel, state.Notice)
+	}
+}
 
 func TestConfiguredEmptyStatusLineHidesComposerFooter(t *testing.T) {
 	empty := []string{}

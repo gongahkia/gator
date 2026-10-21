@@ -530,7 +530,7 @@ func validate(settings Settings) error {
 
 func validStatusLineItem(item string) bool {
 	switch item {
-	case "queue", "send", "commands", "conversations", "inbox", "jobs", "model", "model-access", "current-dir", "mode", "artifacts", "connectors", "conversation", "effort", "sandbox", "status":
+	case "queue", "send", "editor", "source", "commands", "conversations", "inbox", "jobs", "model", "model-access", "current-dir", "mode", "artifacts", "connectors", "conversation", "effort", "sandbox", "status":
 		return true
 	default:
 		return false
