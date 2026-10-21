@@ -37,6 +37,7 @@ func (m Model) bridgeLauncherPanel() uisnapshot.Panel {
 	if m.launcherMode == "status-line" {
 		panel := uisnapshot.Panel{Kind: "status-line", Title: "Configure status line", Selected: m.selected,
 			Footer: "V show or hide · Space toggle · ←/→ reorder · R defaults · Enter save · Esc cancel"}
+		panel.Toggle = &uisnapshot.Toggle{Label: "Show status line", Checked: m.statusLineDraftEnabled}
 		panel.Hints = []uisnapshot.Hint{{Shortcut: "V", Action: "show/hide"}, {Shortcut: "Space", Action: "toggle"}, {Shortcut: "←/→", Action: "reorder"}, {Shortcut: "R", Action: "defaults"}, {Shortcut: "Enter", Action: "save"}, {Shortcut: "Esc", Action: "cancel"}}
 		if m.statusLineDraftEnabled {
 			panel.Subtitle = "Status line shown. Choose items; selected order is preserved."
@@ -49,7 +50,7 @@ func (m Model) bridgeLauncherPanel() uisnapshot.Panel {
 			if position >= 0 {
 				state = fmt.Sprintf("%d", position+1)
 			}
-			panel.Rows = append(panel.Rows, uisnapshot.Row{Label: option.label, Detail: option.description, State: state})
+			panel.Rows = append(panel.Rows, uisnapshot.Row{Label: option.label, Detail: option.description, State: state, Checked: position >= 0, Position: position + 1})
 		}
 		if preview := m.statusLineDraftValues(); m.statusLineDraftEnabled && len(preview) > 0 {
 			panel.Blocks = []uisnapshot.Block{{Title: "Preview", Lines: preview}}

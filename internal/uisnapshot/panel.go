@@ -16,6 +16,12 @@ type Panel struct {
 	Hints    []Hint  `json:"hints,omitempty"`
 	Usage    *Usage  `json:"usage,omitempty"`
 	Filter   *Filter `json:"filter,omitempty"`
+	Toggle   *Toggle `json:"toggle,omitempty"`
+}
+
+type Toggle struct {
+	Label   string `json:"label"`
+	Checked bool   `json:"checked"`
 }
 
 type Filter struct {
@@ -31,12 +37,14 @@ type Hint struct {
 }
 
 type Row struct {
-	Label  string `json:"label"`
-	Group  string `json:"group,omitempty"`
-	Detail string `json:"detail,omitempty"`
-	State  string `json:"state,omitempty"`
-	Tone   string `json:"tone,omitempty"`
-	Input  *Input `json:"input,omitempty"`
+	Label    string `json:"label"`
+	Group    string `json:"group,omitempty"`
+	Checked  bool   `json:"checked,omitempty"`
+	Position int    `json:"position,omitempty"`
+	Detail   string `json:"detail,omitempty"`
+	State    string `json:"state,omitempty"`
+	Tone     string `json:"tone,omitempty"`
+	Input    *Input `json:"input,omitempty"`
 }
 
 // Input describes an editable field without exposing secrets. Value is empty
