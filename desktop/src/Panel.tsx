@@ -72,6 +72,17 @@ export function Panel({ panel, send, title = panel.title, subtitle = panel.subti
     const target = buttons[next];
     if (target) { target.focus(); void action({ action: "select", row: Number(target.dataset.row ?? index), fields }); }
   };
+  useEffect(() => {
+    const shortcut = (event: globalThis.KeyboardEvent) => {
+      if (event.defaultPrevented || event.repeat || busy || event.metaKey || event.altKey || !(event.target instanceof HTMLElement)) return;
+      if (event.target.closest('input, textarea, [contenteditable], [role="dialog"], [role="alertdialog"]')) return;
+      const key = event.ctrlKey ? `ctrl+${event.key.toLowerCase()}` : event.key.toLowerCase();
+      if (["escape", "enter", " "].includes(key)) return; // Native buttons and App own these.
+      if (hints.some((hint) => hint.key === key)) { event.preventDefault(); keyAction(key); }
+    };
+    window.addEventListener("keydown", shortcut);
+    return () => window.removeEventListener("keydown", shortcut);
+  });
 
   return <section className="workflow" data-kind={panel.kind} aria-label={title}>
     <div className="workflow-heading"><button className="icon-button" aria-label="Back to conversation" disabled={busy} onClick={() => keyAction("esc")}><ArrowLeft size={18} /></button><div><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div>{panel.kind === "confirmation" && <span className="badge" data-tone="warning">Review</span>}</div>

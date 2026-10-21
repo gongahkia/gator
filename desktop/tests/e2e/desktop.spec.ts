@@ -417,7 +417,7 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     await expect.poll(async () => (await page.evaluate(async () => (await window.gator!.snapshot()).state?.panel?.selected))).toBe(1);
     await page.locator(".panel-row").last().press("Home");
     await expect(page.locator(".panel-row").first()).toBeFocused();
-    await page.getByRole("button", { name: /^filter F$/i }).click();
+    await page.locator(".panel-row").first().press("f");
     await expect(page.locator(".workflow-heading p")).toContainText("running");
     await expect(page.locator(".panel-row")).toHaveCount(0);
     await page.getByRole("button", { name: /^filter F$/i }).click();
