@@ -222,10 +222,20 @@ func (m Model) bridgeLearningsPanel() uisnapshot.Panel {
 			panel.Title = "Edit explicit learning"
 		}
 		panel.Rows = []uisnapshot.Row{
-			{Label: "Type", Detail: string(form.Type)},
-			{Label: "Scope", Detail: learningScopeText(form.Scope)},
+			{Label: "Type", Detail: string(form.Type), Input: bridgeSelect(string(form.Type),
+				uisnapshot.Option{Value: string(learning.Preference), Label: "Preference"},
+				uisnapshot.Option{Value: string(learning.EnvironmentFact), Label: "Environment fact"},
+				uisnapshot.Option{Value: string(learning.Procedure), Label: "Procedure"},
+				uisnapshot.Option{Value: string(learning.FailurePrevention), Label: "Failure prevention"})},
+			{Label: "Scope", Detail: learningScopeText(form.Scope), Input: bridgeSelect(string(form.Scope.Kind),
+				uisnapshot.Option{Value: string(learning.Global), Label: "All workspaces"},
+				uisnapshot.Option{Value: string(learning.Project), Label: "This workspace"})},
 			{Label: "Key", Detail: valueOrNone(form.Key), Input: bridgeInput(form.Key, 4096, false)},
 			{Label: "Text", Detail: valueOrNone(form.Content), Input: bridgeInput(form.Content, 4096, true)},
+		}
+		panel.Rows[0].Input.ReadOnly, panel.Rows[1].Input.ReadOnly = form.EditingID != "", form.EditingID != ""
+		if form.EditingID != "" {
+			panel.Rows[0].Input.Help = "Type and scope are retained when editing existing guidance."
 		}
 		panel.Selected = form.Field
 		panel.Footer = "Tab next field · Enter continue or save · Esc cancel"

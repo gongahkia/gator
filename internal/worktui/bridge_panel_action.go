@@ -8,6 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/learning"
 	"github.com/gongahkia/gator/internal/uisnapshot"
 )
 
@@ -145,7 +146,14 @@ func (m *Model) setBridgeField(index int, value string) {
 			d.MaxChecksPerDay, _ = strconv.Atoi(value)
 		}
 	case m.learningForm != nil:
-		if index == 2 {
+		if index == 0 && m.learningForm.EditingID == "" {
+			m.learningForm.Type = learning.Type(value)
+		} else if index == 1 && m.learningForm.EditingID == "" {
+			m.learningForm.Scope = learning.Scope{Kind: learning.ScopeKind(value)}
+			if value == string(learning.Project) {
+				m.learningForm.Scope.Value = m.source
+			}
+		} else if index == 2 {
 			m.learningForm.Key = value
 		} else if index == 3 {
 			m.learningForm.Content = value
