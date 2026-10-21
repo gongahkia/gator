@@ -549,3 +549,12 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .work-output small[data-tone="warning"], .work-check [data-tone="warning"] { color: #e2c589; }
 .work-check [data-tone="error"] { color: #f49a9a; }
 .work-check [data-tone="success"] { color: var(--color-accent); }
+.recent-filter { min-height: 40px; display: flex; align-items: center; gap: 7px; margin: 0 1px 8px; padding-left: 10px; border-radius: var(--radius-sm); background: var(--color-base); color: var(--color-muted); box-shadow: inset 0 0 0 1px var(--color-line); }
+.recent-filter input { min-width: 0; width: 100%; background: transparent; border: 0; color: var(--color-contrast); font-size: var(--text-xs); padding: 8px 0; }
+.recent-filter input::-webkit-search-cancel-button { display: none; }
+.recent-filter input:focus-visible { outline-offset: 0; }
+.recent-filter .icon-button { width: 40px; min-width: 40px; }
+.recent-filter-status { padding: 5px 10px 10px; color: var(--color-muted); font-size: var(--text-xs); }
+.recent-chat > span { flex: 1; }
+.recent-chat-activity { flex-shrink: 0; font-size: var(--text-xs); color: var(--color-muted); }
+.recent-chat-activity[data-attention="true"] { color: #e2c589; }
