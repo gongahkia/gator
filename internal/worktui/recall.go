@@ -124,7 +124,8 @@ func (m Model) recallPanel() uisnapshot.Panel {
 			lines = []string{fmt.Sprintf("Use %s for enhanced retrieval.", m.recallConfirm), "This uploads eligible saved memory and note text, plus search queries, to that embedding provider.", "A separate API key is required. Local Gator storage remains on this computer.", "Chat processing uses the model chosen in /model and may use a different provider."}
 		}
 		p.Blocks = []uisnapshot.Block{{Title: "Data and processing", Lines: lines}}
-		p.Hints = []uisnapshot.Hint{{Shortcut: "Enter", Action: "confirm"}, {Shortcut: "Esc", Action: "cancel"}}
+		label := map[string]string{"install": "download local recall model", "ollama": "use local recall", "openai": "use OpenAI retrieval", "gemini": "use Gemini retrieval"}[m.recallConfirm]
+		p.Hints = []uisnapshot.Hint{{Shortcut: "Enter", Action: label}, {Shortcut: "Esc", Action: "cancel"}}
 		return p
 	}
 	p.Blocks = []uisnapshot.Block{

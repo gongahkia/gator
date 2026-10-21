@@ -37,8 +37,11 @@ func TestFollowupRequiresSeparateReviewAndSave(t *testing.T) {
 		t.Fatal("review performed a write")
 	}
 	panel := m.BridgeState().Panel
+	if panel.Kind != "confirmation" {
+		t.Fatal("agreement is not a confirmation")
+	}
 	for _, want := range []string{"Outcome:", "Sources:", "When:", "Notify when:", "Permitted actions:", "Limits:"} {
-		if !strings.Contains(strings.Join(panel.Blocks[0].Lines, "\n"), want) {
+		if !strings.Contains(m.snapshotText(), want) {
 			t.Fatalf("review omitted %s", want)
 		}
 	}

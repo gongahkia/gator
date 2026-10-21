@@ -93,9 +93,10 @@ func (p *ModelCatalogPanel) focusedSnapshot(panel uisnapshot.Panel) uisnapshot.P
 	state := p.model.localModels
 	switch {
 	case state.confirmation != localModelNoConfirmation:
-		panel.Title = "Confirm model action"
+		panel.Kind = "confirmation"
 		title, hint, detail := p.model.modelCatalogConfirmationContent()
-		panel.Blocks = []uisnapshot.Block{snapshotContent(title, hint, detail)}
+		panel.Title = title
+		panel.Blocks = []uisnapshot.Block{snapshotContent("", hint, detail)}
 		panel.Footer = p.confirmationFooter(state.confirmation) + " · F1 help"
 		panel.Hints = []uisnapshot.Hint{{Shortcut: "Enter", Action: "confirm"}, {Shortcut: "Esc", Action: "cancel"}}
 		switch state.confirmation {
@@ -107,6 +108,16 @@ func (p *ModelCatalogPanel) focusedSnapshot(panel uisnapshot.Panel) uisnapshot.P
 			panel.Hints = []uisnapshot.Hint{{Shortcut: "Enter", Action: "run shown action"}, {Shortcut: "Esc", Action: "cancel"}}
 		case localModelConfirmPull:
 			panel.Hints = []uisnapshot.Hint{{Shortcut: "Enter", Action: "download"}, {Shortcut: "Esc", Action: "cancel"}}
+		case localModelConfirmRemove:
+			panel.Hints[0].Action, panel.Hints[0].Tone = "remove model", "error"
+		case localModelConfirmRemoveCredential:
+			panel.Hints[0].Action, panel.Hints[0].Tone = "remove stored credential", "error"
+		case localModelConfirmRemoveCustom:
+			panel.Hints[0].Action, panel.Hints[0].Tone = "remove provider", "error"
+		case localModelConfirmSaveCustom:
+			panel.Hints[0].Action = "save provider"
+		case localModelConfirmApplyDiscovery:
+			panel.Hints[0].Action = "replace configured models"
 		}
 	case state.cloudSetup != nil:
 		panel.Title = "Configure " + state.cloudSetup.provider

@@ -372,7 +372,15 @@ func (m Model) followupPanel() uisnapshot.Panel {
 		if f.Review {
 			p.Kind, p.Title = "confirmation", "Review ongoing check"
 			p.Subtitle = f.Draft.Title
-			p.Blocks = []uisnapshot.Block{{Title: "Your agreement", Lines: f.Draft.ReviewLines()}}
+			agreement := uisnapshot.Block{Title: "Your agreement"}
+			for _, line := range f.Draft.ReviewLines() {
+				if label, value, ok := strings.Cut(line, ": "); ok {
+					agreement.Fields = append(agreement.Fields, uisnapshot.Field{Label: label, Value: value})
+				} else {
+					agreement.Lines = append(agreement.Lines, line)
+				}
+			}
+			p.Blocks = []uisnapshot.Block{agreement}
 			p.Hints = []uisnapshot.Hint{{Shortcut: "Enter", Action: "save check"}, {Shortcut: "E", Action: "edit"}, {Shortcut: "Esc", Action: "back"}}
 			return p
 		}
