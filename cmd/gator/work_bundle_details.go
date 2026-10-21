@@ -41,18 +41,40 @@ func projectWorkBundleDetails(bundle artifact.Bundle, summary *worktui.BundleSum
 			summary.Connections[index].Operations = append(operations, source.Operation)
 		}
 	}
-	previews, err := artifact.PreviewBundle(bundle)
+	// Keep the extra preview read/formatting work bounded on long restores.
+	// Larger files still retain their metadata and validation state.
+	var paths []string
+	readBudget := int64(1024 * 1024)
+	for _, file := range bundle.Manifest.Artifacts {
+		if len(paths) < 8 && file.Bytes <= readBudget {
+			paths = append(paths, file.Path)
+			readBudget -= file.Bytes
+		}
+	}
+	if len(paths) == 0 {
+		return
+	}
+	previews, err := artifact.PreviewSelectedFiles(bundle, paths)
 	if err != nil {
 		// A preview failure must not turn a completed run into an execution
 		// failure. The UI can still show verified metadata without content.
 		return
 	}
 	remaining := 32 * 1024
-	for index, preview := range previews {
-		if index >= len(summary.Artifacts) || index >= 8 || remaining == 0 {
+	for _, preview := range previews {
+		if remaining == 0 {
 			break
 		}
-		file := &summary.Artifacts[index]
+		var file *worktui.ArtifactSummary
+		for index := range summary.Artifacts {
+			if summary.Artifacts[index].Path == preview.Path {
+				file = &summary.Artifacts[index]
+				break
+			}
+		}
+		if file == nil {
+			continue
+		}
 		file.PreviewKind = preview.Kind
 		limit := min(4096, remaining)
 		file.Preview, file.Truncated = boundedDetailPreview(preview.Content, limit)

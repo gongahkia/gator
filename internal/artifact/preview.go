@@ -28,11 +28,39 @@ type Preview struct {
 
 // PreviewBundle creates media-aware previews only after bundle verification.
 func PreviewBundle(bundle Bundle) ([]Preview, error) {
+	return previewBundleFiles(bundle, nil)
+}
+
+// PreviewSelectedFiles uses the same verification and renderers as a full
+// bundle preview, while reading only the requested manifest members. An empty
+// selection reads no artifact content. Unknown paths are rejected.
+func PreviewSelectedFiles(bundle Bundle, paths []string) ([]Preview, error) {
+	selected := make(map[string]bool, len(paths))
+	for _, path := range paths {
+		selected[path] = false
+	}
+	for _, file := range bundle.Manifest.Artifacts {
+		if _, ok := selected[file.Path]; ok {
+			selected[file.Path] = true
+		}
+	}
+	for path, found := range selected {
+		if !found {
+			return nil, fmt.Errorf("preview path %q is not an artifact in this bundle", path)
+		}
+	}
+	return previewBundleFiles(bundle, selected)
+}
+
+func previewBundleFiles(bundle Bundle, selected map[string]bool) ([]Preview, error) {
 	if err := VerifyBundle(bundle); err != nil {
 		return nil, fmt.Errorf("verify artifact bundle before preview: %w", err)
 	}
 	previews := make([]Preview, 0, len(bundle.Manifest.Artifacts))
 	for _, file := range bundle.Manifest.Artifacts {
+		if selected != nil && !selected[file.Path] {
+			continue
+		}
 		contents, err := bundle.Output.ReadRegularFile(filepath.FromSlash(file.Path), bundle.Manifest.Contract.MaxArtifactBytes)
 		if err != nil {
 			return nil, fmt.Errorf("read artifact %q for preview: %w", file.Path, err)

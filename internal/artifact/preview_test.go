@@ -49,6 +49,30 @@ func TestPreviewFileSummarizesCSVAndBoundsText(t *testing.T) {
 	}
 }
 
+func TestSelectedPreviewKeepsBundleVerificationAndRejectsUnknownFiles(t *testing.T) {
+	bundlePath, _ := sealedBundleFixture(t)
+	bundle, err := OpenBundle(bundlePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	previews, err := PreviewSelectedFiles(bundle, []string{"report.md"})
+	if err != nil || len(previews) != 1 || previews[0].Path != "report.md" {
+		t.Fatalf("selected preview = %#v, %v", previews, err)
+	}
+	if previews, err := PreviewSelectedFiles(bundle, nil); err != nil || len(previews) != 0 {
+		t.Fatalf("empty selection = %#v, %v", previews, err)
+	}
+	if _, err := PreviewSelectedFiles(bundle, []string{"../private.txt"}); err == nil {
+		t.Fatal("a non-member path was accepted")
+	}
+	if err := os.WriteFile(filepath.Join(bundlePath, "output", "report.md"), []byte("changed after seal"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := PreviewSelectedFiles(bundle, []string{"report.md"}); err == nil {
+		t.Fatal("selected preview bypassed bundle verification")
+	}
+}
+
 func mustOpenRoot(t *testing.T, path string) workspace.Root {
 	t.Helper()
 	root, err := workspace.Open(path)
