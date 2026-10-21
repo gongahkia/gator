@@ -289,6 +289,14 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     await expect(page.getByRole("heading", { name: "What’s on your mind?" })).toBeVisible();
     await expect(page.getByRole("region", { name: "Everyday overview" })).toBeVisible();
     await expect(page.locator(".composer-model")).toContainText("fixture-model");
+    const homeLayout = await page.evaluate(() => ({
+      heading: document.querySelector(".home-content h1")!.getBoundingClientRect().bottom,
+      composerTop: document.querySelector(".composer")!.getBoundingClientRect().top,
+      composerBottom: document.querySelector(".composer")!.getBoundingClientRect().bottom,
+      overview: document.querySelector(".overview-grid")!.getBoundingClientRect().top,
+    }));
+    expect(homeLayout.heading).toBeLessThan(homeLayout.composerTop);
+    expect(homeLayout.composerBottom).toBeLessThan(homeLayout.overview);
     await page.screenshot({ path: "test-results/desktop-home.png" });
     await page.getByRole("textbox", { name: "Message Gator" }).fill("keep my draft 🐊");
     await page.getByRole("button", { name: "Saved knowledge", exact: true }).click();
