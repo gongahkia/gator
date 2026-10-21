@@ -1,8 +1,12 @@
-# Desktop screen audit: compact visual direction
+# Desktop screen audit: compact visual direction (baseline)
 
 21 October 2026. Source baseline: `a14182fb9`. **Full review** using the
 `make-interfaces-feel-better` skill. This is an audit of the existing application;
-the findings below are open work, not implemented fixes.
+the findings below describe the baseline before implementation.
+
+**Follow-up:** the requested fixes and current screen-by-screen results are
+recorded in [Desktop polish: implementation and verification](DESKTOP-POLISH-VERIFICATION.md).
+The assessments below are retained as the historical comparison.
 
 ## Answer
 
