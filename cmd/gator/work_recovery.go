@@ -162,6 +162,24 @@ func recoveryControlWith(ctx context.Context, stateDir, action string, args []st
 		active = "Supervisor reachable"
 	}
 	lines := []string{active, "Start at login: " + serviceState, "Only this computer performs checks; it must be on and your user session must be active.", "Start-at-login uses " + servicePath}
+	loginLabel, healthTone := "Not configured", "muted"
+	if installed {
+		loginLabel = "Configured"
+		if !ownsService {
+			loginLabel = "Another profile"
+		}
+	}
+	if running {
+		healthTone = "success"
+	} else {
+		for _, check := range checks {
+			if check.Enabled {
+				healthTone = "warning"
+			}
+		}
+	}
+	screen.Panel.Summary = []uisnapshot.Field{{Label: "Background checks", Value: active, Tone: healthTone}, {Label: "Start at login", Value: loginLabel}}
+	screen.Panel.Subtitle = "Checks run on this computer while it is on and your user session is active."
 	a, err := store.Availability()
 	if err != nil {
 		return screen, err
@@ -172,7 +190,7 @@ func recoveryControlWith(ctx context.Context, stateDir, action string, args []st
 	if !running && !a.LastSeen.IsZero() {
 		lines = append(lines, "Monitoring is not confirmed after that heartbeat. Start the supervisor, then check current sources.")
 	}
-	screen.Panel.Blocks = []uisnapshot.Block{{Title: "Background availability", Lines: lines}}
+	screen.Panel.Blocks = []uisnapshot.Block{{Title: "Background availability", Collapsible: true, Lines: lines}}
 	gapLines := []string{"An interval without heartbeats does not reveal which source changes happened. A catch-up check reads current sources; intermediate changes may be unavailable."}
 	for i := len(a.Gaps) - 1; i >= 0 && i >= len(a.Gaps)-5; i-- {
 		gapLines = append(gapLines, a.Gaps[i].From.Local().Format(time.RFC1123)+" → "+a.Gaps[i].To.Local().Format(time.RFC1123)+" · no continuous monitoring confirmed")
@@ -180,12 +198,13 @@ func recoveryControlWith(ctx context.Context, stateDir, action string, args []st
 	if len(a.Gaps) == 0 {
 		gapLines = append(gapLines, "No recorded coverage gaps yet; this does not establish earlier coverage.")
 	}
-	screen.Panel.Blocks = append(screen.Panel.Blocks, uisnapshot.Block{Title: "What happened while offline", Lines: gapLines})
+	screen.Panel.Blocks = append(screen.Panel.Blocks, uisnapshot.Block{Title: "Monitoring coverage", Lines: []string{gapLines[0]}})
+	screen.Panel.Blocks = append(screen.Panel.Blocks, uisnapshot.Block{Title: "What happened while offline", Collapsible: true, Lines: gapLines[1:]})
 	for _, check := range checks {
 		if jobID != "" && check.ID != jobID {
 			continue
 		}
-		screen.Panel.Blocks = append(screen.Panel.Blocks, uisnapshot.Block{Title: check.Title, Lines: []string{check.HealthLine(), check.Issue, "Next action: " + check.NextAction}})
+		screen.Panel.Blocks = append(screen.Panel.Blocks, uisnapshot.Block{Title: check.Title, Collapsible: jobID == "", Lines: []string{check.HealthLine(), check.Issue, "Next action: " + check.NextAction}})
 		if jobID == "" {
 			if len(screen.Actions) < 9 {
 				screen.Actions = append(screen.Actions, worktui.ControlAction{Key: strconv.Itoa(len(screen.Actions) + 1), Label: "Recover " + check.Title, Action: "select", Args: []string{check.ID}})
@@ -203,7 +222,7 @@ func recoveryControlWith(ctx context.Context, stateDir, action string, args []st
 		if len(attempts) == 0 {
 			attempts = []string{"No retained attempt yet."}
 		}
-		screen.Panel.Blocks = append(screen.Panel.Blocks, uisnapshot.Block{Title: "Recent checks and catch-up", Lines: attempts})
+		screen.Panel.Blocks = append(screen.Panel.Blocks, uisnapshot.Block{Title: "Recent checks and catch-up", Collapsible: true, Lines: attempts})
 		if check.Enabled && check.State != "goal paused" {
 			screen.Actions = append(screen.Actions, worktui.ControlAction{Key: "X", Label: "Retry this check now", Action: "retry", Args: []string{jobID}})
 		}
