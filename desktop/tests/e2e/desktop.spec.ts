@@ -104,10 +104,67 @@ test("long conversations retain context while searching and signal activity with
     await page.keyboard.press("Escape");
     await expect(search).toHaveCount(0);
     expect(await page.evaluate(() => CSS.highlights.size)).toBe(0);
+    const readingPosition = await scroll.evaluate((element) => element.scrollTop);
+    await application.evaluate(({ BrowserWindow }, value) => BrowserWindow.getAllWindows()[0].webContents.send("gator:update", value), { ...snapshot, state: { ...updated, mode: "panel", panel: { kind: "report", title: "Reading details", blocks: [{ title: "Details", lines: ["A temporary view."] }] } } });
+    await expect(page.getByRole("heading", { name: "Reading details", exact: true })).toBeVisible();
+    await application.evaluate(({ BrowserWindow }, value) => BrowserWindow.getAllWindows()[0].webContents.send("gator:update", value), { ...snapshot, state: updated });
+    await expect.poll(() => scroll.evaluate((element) => element.scrollTop)).toBeCloseTo(readingPosition, 0);
     await page.getByRole("button", { name: /Jump to latest/ }).click();
     await expect(page.getByText("A new update while you were reading.", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: /Jump to latest/ })).toHaveCount(0);
     await expect(page.getByRole("textbox", { name: "Message Gator" })).toBeFocused();
+  } finally { await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close()).catch(() => {}); await application.close(); await rm(directory, { recursive: true, force: true }); }
+});
+
+test("recent work groups real saved conversations by workspace and isolates their drafts", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "gator-desktop-recents-e2e-"));
+  const first = join(directory, "area-a/shared"), second = join(directory, "area-b/shared");
+  await mkdir(first, { recursive: true }); await mkdir(second, { recursive: true });
+  for (let index = 0; index < 6; index++) {
+    const id = `work-test-${index}`, root = join(directory, "state/gator/conversations", id);
+    await mkdir(root, { recursive: true });
+    await writeFile(join(root, "conversation.json"), JSON.stringify({ version: 2, id, title: `Plan ${index}`, source_path: index < 5 ? first : second, snapshot_id: "snap-test", created_at: new Date(0).toISOString(), updated_at: new Date(1000000 - index).toISOString() }), { mode: 0o600 });
+  }
+  const env = { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop"), GATOR_DESKTOP_WORKSPACE: first };
+  const application = await launchDesktop(env);
+  try {
+    const page = await application.firstWindow();
+    const recent = page.getByRole("region", { name: "Recent work", exact: true });
+    await expect(recent).toBeVisible();
+    await expect(recent.getByRole("button", { name: "area-a/shared", exact: true })).toBeVisible();
+    await expect(recent.getByRole("button", { name: "area-b/shared", exact: true })).toBeVisible();
+    await recent.getByRole("button", { name: "Show 1 more", exact: true }).click();
+    await expect(recent.getByRole("button", { name: "Open conversation: Plan 4", exact: true })).toBeVisible();
+    await recent.getByRole("button", { name: "area-a/shared", exact: true }).press("Enter");
+    await expect(recent.getByRole("button", { name: "Open conversation: Plan 0", exact: true })).toBeHidden();
+    await recent.getByRole("button", { name: "area-a/shared", exact: true }).press("Enter");
+    const composer = page.getByRole("textbox", { name: "Message Gator", exact: true });
+    const open = async (index: number) => { await recent.getByRole("button", { name: `Open conversation: Plan ${index}`, exact: true }).click(); await expect.poll(() => page.evaluate(async () => (await window.gator!.snapshot()).state?.conversation_id)).toBe(`work-test-${index}`); };
+    await open(0); await composer.fill("Draft for the first project");
+    await open(5); await expect(composer).toHaveValue(""); await composer.fill("Draft for the second project");
+    await open(0); await expect(composer).toHaveValue("Draft for the first project");
+    await page.reload(); await expect(composer).toHaveValue("Draft for the first project");
+    await expect(recent.getByRole("button", { name: "Open conversation: Plan 0", exact: true })).toHaveAttribute("aria-current", "page");
+    await page.getByRole("button", { name: "Follow-up checks", exact: true }).click();
+    await page.getByRole("button", { name: /new check/i }).click();
+    await page.getByRole("textbox", { name: "Title", exact: true }).fill("Keep my form edit");
+    await recent.getByRole("button", { name: "Open conversation: Plan 5", exact: true }).click();
+    await expect(page.getByRole("alertdialog")).toBeVisible();
+    await page.getByRole("button", { name: "Keep editing", exact: true }).click();
+    await expect(page.getByRole("textbox", { name: "Title", exact: true })).toHaveValue("Keep my form edit");
+    await recent.getByRole("button", { name: "Open conversation: Plan 5", exact: true }).click();
+    await page.getByRole("button", { name: "Leave view", exact: true }).click();
+    await expect(composer).toHaveValue("Draft for the second project");
+    await page.getByRole("button", { name: "Saved drafts", exact: true }).click();
+    const manager = page.getByRole("dialog", { name: "Saved drafts", exact: true });
+    await manager.locator("article").filter({ hasText: "Draft for the first project" }).getByRole("button", { name: "Add to current message", exact: true }).click();
+    await expect(composer).toHaveValue("Draft for the second project\n\nDraft for the first project");
+    await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1024, 768));
+    await settlePresentation(page);
+    await page.screenshot({ path: "test-results/desktop-recent-work.png" });
+    await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+    await expect(recent).toBeHidden();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   } finally { await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close()).catch(() => {}); await application.close(); await rm(directory, { recursive: true, force: true }); }
 });
 
@@ -334,6 +391,10 @@ test("queued messages can be edited, reordered, removed, and resumed without los
     await expect(queue.getByText("Paused", { exact: true })).toBeVisible();
     await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-message-queue-paused.png" });
+    await page.getByRole("button", { name: "New conversation", exact: true }).click();
+    await expect(page.getByRole("alertdialog", { name: "Leave queued messages?" })).toBeVisible();
+    await page.getByRole("button", { name: "Keep working", exact: true }).click();
+    await expect(queue.locator(".queued-message")).toHaveCount(1);
     release();
     hold = true;
     await queue.getByRole("button", { name: "Send queued message 1 now", exact: true }).click();

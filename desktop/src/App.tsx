@@ -15,6 +15,9 @@ import { CopyButton } from "./CopyButton";
 import { useDrafts } from "./useDrafts";
 import { DraftManager } from "./DraftManager";
 import { useConversationSearch } from "./useConversationSearch";
+import { RecentConversations } from "./RecentConversations";
+
+type Navigation = { command: string; draft?: string } | { conversation: NonNullable<DesktopFrame["conversation"]> };
 
 const destinations = [
   { command: "/overview", label: "Overview", icon: LayoutDashboard, group: "work" },
@@ -126,7 +129,7 @@ export function App() {
   const originalSession = useRef<string | undefined>(undefined);
   const [sessionChanged, setSessionChanged] = useState(false);
   const [search, setSearch] = useState<string | null>(null);
-  const [navigation, setNavigation] = useState<{ command: string; draft?: string } | null>(null);
+  const [navigation, setNavigation] = useState<{ target: Navigation; queued: boolean } | null>(null);
   const [showCommands, setShowCommands] = useState(false);
   const [sending, setSending] = useState(false);
   const [approvalBusy, setApprovalBusy] = useState(false);
@@ -138,7 +141,9 @@ export function App() {
   const atBottom = useRef(true);
   const [atLatest, setAtLatest] = useState(true);
   const [newActivity, setNewActivity] = useState(false);
-  const previousTranscript = useRef({ identity: "", content: "" });
+  const previousTranscript = useRef({ identity: "", content: "", running: false });
+  const transcriptPositions = useRef(new Map<string, { top: number; latest: boolean }>());
+  const returningToTranscript = useRef(false);
   const backendInput = useRef<string | undefined>(undefined);
   const view = useRef<HTMLDivElement>(null);
   const panel = state?.panel;
@@ -159,22 +164,42 @@ export function App() {
     }
   }, [state?.input]);
   useLayoutEffect(() => {
-    if (!state || panel) return;
+    if (!state) return;
+    if (panel) { returningToTranscript.current = true; return; }
     const content = JSON.stringify(state.messages);
-    if (previousTranscript.current.identity !== conversationIdentity) { atBottom.current = true; setAtLatest(true); setNewActivity(false); }
-    else if (previousTranscript.current.content !== content && !atBottom.current) setNewActivity(true);
-    previousTranscript.current = { identity: conversationIdentity, content };
+    const changed = previousTranscript.current.identity !== conversationIdentity;
+    if (changed) {
+      const promoted = previousTranscript.current.identity === state.source && state.conversation_id && previousTranscript.current.running;
+      const position = transcriptPositions.current.get(promoted ? state.source : conversationIdentity);
+      atBottom.current = position?.latest ?? true; setAtLatest(atBottom.current); setNewActivity(false);
+      if (!atBottom.current && position) transcript.current?.scrollTo({ top: position.top });
+    } else if (returningToTranscript.current && !atBottom.current) {
+      transcript.current?.scrollTo({ top: transcriptPositions.current.get(conversationIdentity)?.top ?? 0 });
+    }
+    if (!changed && previousTranscript.current.content !== content && !atBottom.current) setNewActivity(true);
+    previousTranscript.current = { identity: conversationIdentity, content, running: state.running };
+    returningToTranscript.current = false;
     if (atBottom.current && search === null) transcript.current?.scrollTo({ top: transcript.current.scrollHeight });
   }, [state?.messages, state?.running, panel, conversationIdentity, search]);
   useEffect(() => { if (composer.current) { composer.current.style.height = "auto"; composer.current.style.height = `${Math.min(180, composer.current.scrollHeight)}px`; } }, [draft]);
 
   const attempt = useCallback((frame: DesktopFrame) => { void send(frame).catch(() => {}); }, [send]);
-  const navigate = (command: string, prefill?: string) => {
-    if (hasUnsavedView) { setNavigation({ command, draft: prefill }); return; }
+  const performNavigation = (target: Navigation) => {
     setSearch(null); setShowCommands(false);
-    if (settingsRoutes.some((route) => route.command === command)) setDetails(false);
-    attempt({ type: "navigate", text: command });
-    if (prefill !== undefined) setDraft(prefill);
+    if ("conversation" in target) { attempt({ type: "conversation", conversation: target.conversation }); return; }
+    if (settingsRoutes.some((route) => route.command === target.command)) setDetails(false);
+    attempt({ type: "navigate", text: target.command });
+    if (target.draft !== undefined) setDraft(target.draft);
+  };
+  const requestNavigation = (target: Navigation) => {
+    const queued = !!state?.queued && ("conversation" in target || target.command === "/new");
+    if (hasUnsavedView || queued) { setNavigation({ target, queued }); return; }
+    performNavigation(target);
+  };
+  const navigate = (command: string, prefill?: string) => requestNavigation({ command, draft: prefill });
+  const openRecent = (id: string) => {
+    if (id === state?.conversation_id) { if (panel) navigate("/chat"); return; }
+    if (state?.recent_id) requestNavigation({ conversation: { id, list_id: state.recent_id } });
   };
   useEffect(() => {
     const keyboard = (event: globalThis.KeyboardEvent) => {
@@ -242,6 +267,7 @@ export function App() {
       <button className="nav-button new-chat" aria-label="New conversation" onClick={() => navigate("/new")} disabled={state.running}><Plus size={18} /><span>New conversation</span><kbd>{modifier}N</kbd></button>
       <button className="nav-button command-trigger" aria-label="Search commands" onClick={() => setShowCommands(true)} title="Search commands"><Search size={17} /><span>Search commands</span><kbd>{modifier}K</kbd></button>
       <div className="sidebar-scroll">{["work", "library"].map((group) => <div className="nav-group" key={group}><div className="nav-group-label">{group === "work" ? "Your workspace" : "Library"}</div><nav aria-label={group}>{destinations.filter((destination) => destination.group === group).map(({ command, label, icon: Icon }) => <button className="nav-button" key={command} aria-label={label} aria-current={activeDestination === command ? "page" : undefined} onClick={() => navigate(command)} disabled={state.running} title={collapsed ? label : undefined}><Icon size={18} /><span>{label}</span></button>)}</nav></div>)}
+      <RecentConversations state={state} disabled={state.running || !!error} open={openRecent} browse={() => navigate("/conversations")} />
       </div>
       <div className="sidebar-bottom"><button className="nav-button" aria-label="Settings" title={collapsed ? "Settings" : `Settings (${modifier},)`} onClick={() => navigate("/model")} disabled={state.running}><Settings2 size={17} /><span>Settings</span><kbd>{modifier},</kbd></button></div>
       </>}
@@ -256,7 +282,7 @@ export function App() {
       <div className="view-content" data-home={home} data-settings={settingsPage} ref={view}>
       {panel ? conversationBrowser ? <ConversationsPanel panel={panel} send={send} navigate={navigate} /> : panel.kind === "usage" && panel.usage ? <UsagePanel panel={panel} usage={panel.usage} send={send} /> : <Panel panel={panel} send={send} /> : <>
         {search !== null && <div className="transcript-search" role="search" aria-label="Find in conversation"><Search size={16} /><input autoFocus aria-label="Search conversation" maxLength={256} value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); conversationSearch.move(event.shiftKey ? -1 : 1); } }} placeholder="Find in this conversation…" /><span className="search-count" role="status">{!search ? "Find text" : !conversationSearch.count ? "No matches" : `${conversationSearch.active + 1} of ${conversationSearch.count}${conversationSearch.capped ? "+" : ""}`}</span><button className="icon-button" aria-label="Previous match" title="Previous match (Shift+Enter)" disabled={!conversationSearch.count} onClick={() => conversationSearch.move(-1)}><ArrowUp size={16} /></button><button className="icon-button" aria-label="Next match" title="Next match (Enter)" disabled={!conversationSearch.count} onClick={() => conversationSearch.move(1)}><ArrowDown size={16} /></button><button className="icon-button" aria-label="Close search" onClick={() => { setSearch(null); composer.current?.focus(); }}><X size={16} /></button></div>}
-        <div className={`transcript-stage ${home ? "home-stage" : ""}`}><div className={`conversation-scroll ${home ? "home-scroll" : ""}`} ref={transcript} onScroll={(event) => { const el = event.currentTarget; const near = el.scrollHeight - el.scrollTop - el.clientHeight < 100; atBottom.current = near; setAtLatest(near); if (near) setNewActivity(false); }}>
+        <div className={`transcript-stage ${home ? "home-stage" : ""}`}><div className={`conversation-scroll ${home ? "home-scroll" : ""}`} ref={transcript} onScroll={(event) => { const el = event.currentTarget; const near = el.scrollHeight - el.scrollTop - el.clientHeight < 100; atBottom.current = near; setAtLatest(near); if (near) setNewActivity(false); transcriptPositions.current.delete(conversationIdentity); transcriptPositions.current.set(conversationIdentity, { top: el.scrollTop, latest: near }); if (transcriptPositions.current.size > 32) transcriptPositions.current.delete(transcriptPositions.current.keys().next().value!); }}>
           {home ? <div className="home-content"><h1>What’s on your mind?</h1>
             {state.first_run && <div className="setup-callout"><div><Settings2 size={18} /><div><strong>Make Gator yours</strong><p>Choose a cloud or local model to start your first conversation.</p></div></div><button className="button" onClick={() => navigate("/model")}>Choose a model<ChevronRight size={15} /></button></div>}
             </div> : <div className="transcript-content" aria-label="Conversation">{messages.map((message, index) => <Message key={`${conversationIdentity}:${index}`} message={message} pending={approvalBusy ? undefined : state.pending_approval?.id} onApproval={approve} />)}{state.running && <div className="run-progress" role="status"><LoaderCircle size={16} className="spin" /><span>{state.cancelling ? "Stopping…" : state.pending_approval ? "Waiting for your approval" : state.status || "Gator is working…"}</span><span className="elapsed">{state.elapsed}</span></div>}</div>}
@@ -280,8 +306,8 @@ export function App() {
     <Presence open={details}>{(open, presenceRef) => <WorkspacePanel state={state} open={open} presenceRef={presenceRef} tab={tab} setTab={setTab} navigate={navigate} />}</Presence>
     {panel && <div className="panel-draft-anchor"><MessageSquare size={14} /><span>{draft ? "Your message draft is kept while you’re here." : "Return to the conversation to write a message."}</span><button className="small-button" onClick={() => attempt({ type: "panel", key: "esc", panel: { id: panel.id!, action: "key" } })}>Back<kbd>Esc</kbd></button></div>}
     <Presence open={showCommands}>{(open, presenceRef) => <CommandMenu open={open} presenceRef={presenceRef} commands={state.commands} close={() => setShowCommands(false)} select={(name, needsInput) => { setShowCommands(false); if (needsInput) navigate("/chat", `/${name} `); else navigate(`/${name}`); }} />}</Presence>
-    <Presence open={showDrafts}>{(open, presenceRef) => <DraftManager open={open} presenceRef={presenceRef} saved={drafts.saved} issue={drafts.issue} manage={drafts.manage} close={() => setShowDrafts(false)} restore={(retained) => { setDraft((current) => !current || retained.context === drafts.context ? retained.text : `${current}\n\n${retained.text}`); composer.current?.focus(); }} />}</Presence>
-    <Presence open={!!navigation}>{(open, presenceRef) => <DiscardDialog open={open} presenceRef={presenceRef} cancel={() => setNavigation(null)} confirm={() => { if (!navigation) return; attempt({ type: "navigate", text: navigation.command }); if (navigation.draft !== undefined) setDraft(navigation.draft); setNavigation(null); }} />}</Presence>
+    <Presence open={showDrafts}>{(open, presenceRef) => <DraftManager open={open} presenceRef={presenceRef} saved={drafts.saved} issue={drafts.issue} manage={drafts.manage} close={() => setShowDrafts(false)} restore={(retained) => { setDraft((current) => !current ? retained.text : current === retained.text ? current : `${current}\n\n${retained.text}`); composer.current?.focus(); }} />}</Presence>
+    <Presence open={!!navigation}>{(open, presenceRef) => <DiscardDialog open={open} presenceRef={presenceRef} queued={navigation?.queued ?? false} cancel={() => setNavigation(null)} confirm={() => { if (!navigation) return; performNavigation(navigation.target); setNavigation(null); }} />}</Presence>
   </div>;
 }
 
@@ -296,7 +322,7 @@ function CommandMenu({ commands, open, presenceRef, close, select }: { commands:
   }} /><button className="icon-button" aria-label="Close commands" onClick={close}><X size={16} /></button></div><div className="command-list">{shown.map((command, index) => <button key={command.name} data-selected={index === selected} onClick={() => select(command.name, command.needs_input)}><Command size={16} /><div><strong>/{command.name}</strong><p>{command.description}</p></div>{command.advanced && <span className="badge">Advanced</span>}<ChevronRight size={15} /></button>)}{!shown.length && <p className="empty-hint">No commands match “{query}”.</p>}</div><footer><span>↑↓ choose · Enter run · Tab move focus</span><kbd>Esc</kbd></footer></section></div>;
 }
 
-function DiscardDialog({ open, presenceRef, cancel, confirm }: { open: boolean; presenceRef: PresenceRef; cancel(): void; confirm(): void }) {
+function DiscardDialog({ open, presenceRef, queued, cancel, confirm }: { open: boolean; presenceRef: PresenceRef; queued: boolean; cancel(): void; confirm(): void }) {
   const focus = useModalFocus(open);
-  return <div ref={presenceRef} className="modal-backdrop" data-open={open} inert={!open} aria-hidden={!open}><section ref={focus} role="alertdialog" aria-modal="true" aria-labelledby="discard-title" className="confirm-dialog"><h2 id="discard-title">Leave this edit?</h2><p>Your unsaved changes will be discarded.</p><div className="flex justify-end gap-2"><button className="button" onClick={cancel}>Keep editing</button><button className="button primary" onClick={confirm}>Leave view</button></div></section></div>;
+  return <div ref={presenceRef} className="modal-backdrop" data-open={open} inert={!open} aria-hidden={!open}><section ref={focus} role="alertdialog" aria-modal="true" aria-labelledby="discard-title" className="confirm-dialog"><h2 id="discard-title">{queued ? "Leave queued messages?" : "Leave this edit?"}</h2><p>{queued ? "Queued messages belong to this session. Opening another conversation will discard them and any unsaved edits. Your composer drafts remain saved if local retention is enabled." : "Your unsaved changes will be discarded."}</p><div className="flex justify-end gap-2"><button className="button" onClick={cancel}>{queued ? "Keep working" : "Keep editing"}</button><button className="button primary" onClick={confirm}>{queued ? "Leave conversation" : "Leave view"}</button></div></section></div>;
 }

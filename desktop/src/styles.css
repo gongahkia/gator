@@ -478,3 +478,19 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 ::highlight(gator-search) { color: #f6e5b7; background-color: #81611a80; }
 ::highlight(gator-search-active) { color: #161616; background-color: #e4c275; }
 @media (max-width: 900px) { .transcript-search { gap: 3px; padding-left: 12px; padding-right: 12px; } .transcript-search > svg { display: none; } }
+
+.recent-work { padding-bottom: 20px; }
+.recent-workspace, .recent-chat, .recent-more, .recent-browse { display: flex; align-items: center; gap: 7px; min-height: 40px; width: 100%; border-radius: 8px; padding: 8px 10px; color: var(--color-muted); text-align: left; font-size: var(--text-sm); }
+.recent-workspace span, .recent-chat span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent-workspace > svg:first-child { rotate: 90deg; transition: rotate 120ms ease-out; }
+.recent-workspace[aria-expanded="false"] > svg:first-child { rotate: 0deg; }
+.recent-workspace { color: #b8b8b8; }
+.recent-chat { padding-left: 33px; }
+.recent-chat[aria-current="page"] { color: var(--color-contrast); background: #ffffff08; }
+.recent-work button:hover:not(:disabled) { background: var(--color-raised); color: var(--color-contrast); }
+.recent-more { padding-left: 33px; font-size: var(--text-xs); }
+.recent-browse { margin-top: 8px; padding-left: 11px; }
+.recent-browse svg { margin-left: auto; }
+.recent-group-list[hidden] { display: none; }
+.recent-issue { padding: 0 11px; color: var(--color-muted); font-size: var(--text-xs); }
+.sidebar-collapsed .recent-work { display: none; }

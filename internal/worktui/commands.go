@@ -31,8 +31,10 @@ func (m *Model) openConversationPicker() {
 		conversations, err := m.config.ListConversations()
 		if err != nil {
 			m.status = "List conversations: " + err.Error()
+			m.bridgeRecentIssue = "Recent conversations are unavailable. Open Conversations to retry."
 		} else {
 			m.config.Conversations = conversations
+			m.bridgeRecentIssue = ""
 		}
 	}
 	m.launcher = true
