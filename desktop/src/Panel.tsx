@@ -20,7 +20,7 @@ function emptyState(panel: BackendPanel) {
   if (panel.kind === "picker" && panel.title === "Conversations") return { icon: MessageSquare, title: "No conversations yet", detail: "Start a conversation to see it here." };
   if (panel.kind === "picker" && panel.title === "Ongoing goals") return { icon: Target, title: "No ongoing goals", detail: "Set up a follow-up check to create an ongoing goal, or add one with gator goal add in Terminal." };
   if (panel.kind === "followup" && !panel.subtitle) return { icon: ListChecks, title: "No follow-up checks yet", detail: "Choose a project and what to watch. You’ll review the sources, timing, and permissions before saving." };
-  if (panel.kind === "learnings" && !panel.blocks?.length) return { icon: BookOpen, title: "No saved guidance yet", detail: "Add a preference or procedure for Gator to follow in future work." };
+  if (panel.kind === "learnings" && !panel.blocks?.length) return panel.filter && panel.filter.value !== "all" ? { icon: BookOpen, title: "No guidance with this status", detail: "Choose another status or add new guidance." } : { icon: BookOpen, title: "No saved guidance yet", detail: "Add a preference or procedure for Gator to follow in future work." };
   if (panel.kind === "inbox" && (!panel.notice || panel.notice === "No recent results.")) return { icon: Inbox, title: "You’re all caught up", detail: panel.notice || "Results from your follow-up checks will appear here." };
   if (panel.kind === "history" && !panel.blocks?.length) return { icon: MessageSquare, title: "No task runs in this view", detail: "Try another filter or start a conversation." };
 }
@@ -125,7 +125,7 @@ export function Panel({ panel, send, title = panel.title, subtitle = panel.subti
       </div>}
       {empty && EmptyIcon && <div className="panel-empty"><EmptyIcon size={28} /><h2>{empty.title}</h2><p>{empty.detail}</p></div>}
       <PanelBlocks panel={panel} hasInputs={hasInputs} empty={!!empty} />
-      {!empty && !panel.rows?.length && !panel.blocks?.length && !panel.notice && <p className="empty-hint">Nothing here yet.</p>}
+      {!empty && panel.kind !== "confirmation" && !panel.rows?.length && !panel.blocks?.length && !panel.notice && <p className="empty-hint">Nothing here yet.</p>}
     </div>
     {(!!primary.length || panel.footer) && <footer className="workflow-footer"><div className="flex flex-wrap gap-2">{primary.map((hint) => <button className={`button ${hint.tone === "error" ? "danger" : hint.key !== "esc" ? "primary" : ""}`} key={hint.id} disabled={busy} onClick={() => keyAction(hint.key)}>{hint.label}<kbd>{shortcutLabel(hint.key, hint.shortcut)}</kbd></button>)}</div>{keyboardFooter ? <details className="keyboard-shortcuts"><summary>Keyboard shortcuts<ChevronDown size={14} aria-hidden="true" /></summary><p>{panel.footer}</p></details> : panel.footer && <p>{panel.footer}</p>}</footer>}
   </section>;
