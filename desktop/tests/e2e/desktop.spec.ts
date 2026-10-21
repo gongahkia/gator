@@ -311,6 +311,12 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     await expect(page.getByRole("heading", { name: "Saved knowledge", exact: true })).toBeVisible();
     await expect(page.getByText("Gator’s view could not load.")).toHaveCount(0);
     await expect(page.getByText("No saved knowledge yet.")).toBeVisible();
+    const contextID = await page.evaluate(async () => (await window.gator!.snapshot()).state?.panel?.id);
+    const explanation = page.locator(".panel-disclosure").filter({ has: page.locator("summary", { hasText: "How to read this" }) });
+    await expect(explanation).not.toHaveAttribute("open", "");
+    await explanation.locator("summary").click();
+    await expect(explanation).toHaveAttribute("open", "");
+    expect(await page.evaluate(async () => (await window.gator!.snapshot()).state?.panel?.id)).toBe(contextID);
     await page.screenshot({ path: "test-results/desktop-knowledge-empty.png" });
     // The sources list is genuinely null in the Go wire format on this path.
     expect(await page.evaluate(async () => (await window.gator!.snapshot()).state?.panel?.blocks?.some((block) => block.lines === null))).toBe(true);

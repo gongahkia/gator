@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { ArrowLeft, BookOpen, ChevronLeft, ChevronRight, Inbox, MessageSquare, Plus, RefreshCw, Search, Target } from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronDown, ChevronLeft, ChevronRight, Inbox, MessageSquare, Plus, RefreshCw, Search, Target } from "lucide-react";
 import type { BackendPanel, PanelAction } from "../../ui/src/protocol";
 import type { DesktopFrame } from "./bridge";
 
@@ -57,6 +57,11 @@ export function Panel({ panel, send, title = panel.title, subtitle = panel.subti
   const primary = visibleHints.filter((hint) => ["enter", "ctrl+r", "esc"].includes(hint.key));
   const toolbar = visibleHints.filter((hint) => !primary.includes(hint));
   const refresh = toolbar.find((hint) => hint.key === "r" && hint.label.toLowerCase() === "refresh");
+  const keyboardFooter = !hasInputs && panel.kind !== "confirmation" && /^(Esc\b|↑|↓|Type to filter|Tab\b)/i.test(panel.footer ?? "");
+  const supportingBlock = (block: NonNullable<BackendPanel["blocks"]>[number]) => !hasInputs && panel.kind !== "confirmation" && (
+    ["Storage", "Retrieval", "Chat processing", "How to read this"].includes(block.title ?? "") ||
+    panel.title === "Saved knowledge" && ["Work context", "Observed source references"].includes(block.title ?? "")
+  );
   const rowKeys = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
     if (busy) { event.preventDefault(); return; }
@@ -82,9 +87,9 @@ export function Panel({ panel, send, title = panel.title, subtitle = panel.subti
         </div>)}
       </div>}
       {empty && EmptyIcon && <div className="panel-empty"><EmptyIcon size={28} /><h2>{empty.title}</h2><p>{empty.detail}</p></div>}
-      {panel.blocks?.map((block, i) => <section className="panel-block" key={i}>{block.title && <h2>{block.title}</h2>}{(block.lines ?? []).map((line, j) => <p className="literal" key={j}>{line || " "}</p>)}</section>)}
+      {panel.blocks?.map((block, i) => supportingBlock(block) ? <details className="panel-block panel-disclosure" key={block.title || i}><summary>{block.title}<ChevronDown size={16} aria-hidden="true" /></summary><div className="disclosure-content">{(block.lines ?? []).map((line, j) => <p className="literal" key={j}>{line || " "}</p>)}</div></details> : <section className="panel-block" key={block.title || i}>{block.title && <h2>{block.title}</h2>}{(block.lines ?? []).map((line, j) => <p className="literal" key={j}>{line || " "}</p>)}</section>)}
       {!empty && !panel.rows?.length && !panel.blocks?.length && !panel.notice && <p className="empty-hint">Nothing here yet.</p>}
     </div>
-    {(!!primary.length || panel.footer) && <footer className="workflow-footer"><div className="flex flex-wrap gap-2">{primary.map((hint) => <button className={`button ${hint.key !== "esc" ? "primary" : ""}`} key={hint.id} disabled={busy} onClick={() => keyAction(hint.key)}>{hint.label}<kbd>{hint.shortcut}</kbd></button>)}</div>{panel.footer && <p>{panel.footer}</p>}</footer>}
+    {(!!primary.length || panel.footer) && <footer className="workflow-footer"><div className="flex flex-wrap gap-2">{primary.map((hint) => <button className={`button ${hint.key !== "esc" ? "primary" : ""}`} key={hint.id} disabled={busy} onClick={() => keyAction(hint.key)}>{hint.label}<kbd>{hint.shortcut}</kbd></button>)}</div>{keyboardFooter ? <details className="keyboard-shortcuts"><summary>Keyboard shortcuts<ChevronDown size={14} aria-hidden="true" /></summary><p>{panel.footer}</p></details> : panel.footer && <p>{panel.footer}</p>}</footer>}
   </section>;
 }
