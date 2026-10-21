@@ -100,6 +100,12 @@ func cloneBundlePointer(value *BundleSummary) *BundleSummary {
 func cloneBundleSummary(value BundleSummary) BundleSummary {
 	copy := value
 	copy.Artifacts = append([]ArtifactSummary(nil), value.Artifacts...)
+	copy.Sources = append([]string(nil), value.Sources...)
+	copy.Connections = make([]ConnectionUse, len(value.Connections))
+	for index, connection := range value.Connections {
+		copy.Connections[index] = connection
+		copy.Connections[index].Operations = append([]string(nil), connection.Operations...)
+	}
 	copy.Candidates = make([]CandidateSummary, len(value.Candidates))
 	for index, candidate := range value.Candidates {
 		copy.Candidates[index] = candidate

@@ -19,8 +19,12 @@ export type BackendResult = {
 export type BackendBundle = {
   Path: string;
   Status: string;
-  Artifacts: { Path: string; MediaType: string; Valid: boolean }[] | null;
-  Candidates: { ID: string; Status: string; ChangedPaths: string[] }[] | null;
+  Artifacts: { Path: string; MediaType: string; Valid: boolean; Bytes?: number; Preview?: string; PreviewKind?: string; Truncated?: boolean }[] | null;
+  Candidates: { ID: string; Status: string; ChangedPaths: string[]; PatchPath?: string }[] | null;
+  RunID?: string;
+  FinishedAt?: string;
+  Sources?: string[] | null;
+  Connections?: { ID: string; Operations: string[] }[] | null;
 };
 export type Overview = {
   at: string;
@@ -79,6 +83,13 @@ export type BackendState = {
   recent_id?: string;
   recent_issue?: string;
   goal_id?: string;
+  work_details?: {
+    mode: string;
+    snapshot_id?: string;
+    attachments: string[];
+    connector_ids: string[];
+    latest_bundle?: BackendBundle;
+  };
   checks?: { title: string; health: string; state: string; tone?: ResultTone }[];
   provider?: string;
   model?: string;

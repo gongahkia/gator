@@ -28,6 +28,7 @@ type BridgeState struct {
 	RecentID             string               `json:"recent_id,omitempty"`
 	RecentIssue          string               `json:"recent_issue,omitempty"`
 	GoalID               string               `json:"goal_id,omitempty"`
+	WorkDetails          BridgeWorkDetails    `json:"work_details"`
 	Provider             string               `json:"provider,omitempty"`
 	Model                string               `json:"model,omitempty"`
 	Theme                string               `json:"theme"`
@@ -102,6 +103,17 @@ type BridgeCheck struct {
 	Tone   string `json:"tone"`
 }
 
+// BridgeWorkDetails contains selections for new requests and the latest
+// retained result, including a failed run. It does not measure context usage
+// or assert that a selected connector is authenticated or authorized.
+type BridgeWorkDetails struct {
+	Mode         string         `json:"mode"`
+	SnapshotID   string         `json:"snapshot_id,omitempty"`
+	Attachments  []string       `json:"attachments"`
+	ConnectorIDs []string       `json:"connector_ids"`
+	LatestBundle *BundleSummary `json:"latest_bundle,omitempty"`
+}
+
 func (m Model) BridgeState() BridgeState {
 	state := BridgeState{
 		Mode:              "chat",
@@ -135,6 +147,15 @@ func (m Model) BridgeState() BridgeState {
 		state.Queue = append(state.Queue, BridgeQueuedRun{ID: bridgeQueuedRunID(item), Text: item.prompt})
 	}
 	state.GuidanceID = m.bridgeGuidanceID()
+	state.WorkDetails = BridgeWorkDetails{
+		Mode: m.options.Mode, SnapshotID: m.snapshot,
+		Attachments:  append([]string{}, m.options.Attachments...),
+		ConnectorIDs: append([]string{}, m.options.ConnectorIDs...),
+	}
+	if m.lastBundle.Path != "" {
+		bundle := cloneBundleSummary(m.lastBundle)
+		state.WorkDetails.LatestBundle = &bundle
+	}
 	state.RecentConversations, state.RecentID = m.bridgeRecentConversations()
 	state.RecentIssue = m.bridgeRecentIssue
 	if !m.overview.At.IsZero() {

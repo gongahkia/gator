@@ -36,10 +36,20 @@ type RunResult struct {
 // BundleSummary is the display-safe, verified projection of a retained Work
 // bundle. The TUI never trusts model prose to describe produced files.
 type BundleSummary struct {
-	Path       string
-	Status     string
-	Artifacts  []ArtifactSummary
-	Candidates []CandidateSummary
+	Path        string
+	Status      string
+	Artifacts   []ArtifactSummary
+	Candidates  []CandidateSummary
+	RunID       string
+	FinishedAt  string
+	Sources     []string
+	Connections []ConnectionUse
+}
+
+// ConnectionUse describes retained provenance, never current authorization.
+type ConnectionUse struct {
+	ID         string
+	Operations []string
 }
 
 type ArtifactSummary struct {

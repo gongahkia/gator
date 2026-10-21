@@ -762,6 +762,7 @@ func summarizeWorkBundle(path string) (worktui.BundleSummary, error) {
 			ChangedPaths: append([]string(nil), candidate.ChangedPaths...),
 		})
 	}
+	projectWorkBundleDetails(bundle, &summary)
 	return summary, nil
 }
 
