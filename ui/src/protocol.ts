@@ -39,11 +39,27 @@ export type BackendPanel = {
     label: string; detail?: string; state?: string; tone?: ResultTone;
     input?: { value?: string; placeholder?: string; secret?: boolean; multiline?: boolean; limit: number };
   }[];
-  blocks?: { title?: string; lines: string[] }[];
+  blocks?: { title?: string; lines: string[] | null }[];
+  usage?: Usage;
   selected?: number;
   notice?: string;
   footer?: string;
   hints?: { shortcut: string; action: string }[];
+};
+export type Usage = {
+  day: string;
+  reset_at: string;
+  paused: boolean;
+  requests: number;
+  tokens: number;
+  active_requests: number;
+  failed_requests: number;
+  estimated_requests: number;
+  daily_request_limit: number;
+  daily_token_limit: number;
+  concurrent_limit: number;
+  categories: { name: string; requests: number }[];
+  known_cost_usd?: number;
 };
 export type ExternalCommand = { kind: string; program: string; args: string[]; dir?: string; env?: string[] };
 export type BackendState = {

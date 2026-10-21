@@ -42,12 +42,27 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     await expect(page.locator(".composer-model")).toContainText("fixture-model");
     await page.screenshot({ path: "test-results/desktop-home.png" });
     await page.getByRole("textbox", { name: "Message Gator" }).fill("keep my draft 🐊");
+    await page.getByRole("button", { name: "Saved knowledge", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Saved knowledge", exact: true })).toBeVisible();
+    await expect(page.getByText("Gator’s view could not load.")).toHaveCount(0);
+    await expect(page.getByText("No saved knowledge yet.")).toBeVisible();
+    // The sources list is genuinely null in the Go wire format on this path.
+    expect(await page.evaluate(async () => (await window.gator!.snapshot()).state?.panel?.blocks?.some((block) => block.lines === null))).toBe(true);
+    cli(["note", "add", "--title", "Desktop regression note", "--body", "Remember the project decision."]);
+    await page.getByRole("button", { name: /^refresh/i }).click();
+    await page.getByRole("button", { name: /Desktop regression note/ }).click();
+    await expect(page.getByRole("heading", { name: /Desktop regression note/ })).toBeVisible();
+    await expect(page.getByText("Remember the project decision.", { exact: false }).first()).toBeVisible();
+    await page.screenshot({ path: "test-results/desktop-knowledge.png" });
+    await page.getByRole("button", { name: "Gator home" }).click();
     await page.getByRole("button", { name: "Overview", exact: true }).click();
     await expect(page.getByRole("heading", { name: /overview/i }).first()).toBeVisible();
     await page.getByRole("button", { name: "Back to conversation" }).click();
     await expect(page.getByRole("textbox", { name: "Message Gator" })).toHaveValue("keep my draft 🐊");
     await page.getByRole("button", { name: "Show work details" }).click();
     await expect(page.getByRole("complementary", { name: "Work details" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Context", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("tab", { name: "Deliverables" })).toHaveAttribute("aria-selected", "true");
     await page.getByRole("tab", { name: "Deliverables" }).click();
     await expect(page.getByText("Your work lands here")).toBeVisible();
     await page.getByRole("button", { name: "Hide work details" }).click();
@@ -101,6 +116,70 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     await new Promise<void>((done) => server.close(() => done()));
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test("dashboard scroll respects interaction and reduced motion; usage controls keep the Go review flow", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "gator-desktop-dashboard-e2e-"));
+  const env = { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") };
+  const binary = resolve("runtime/gator");
+  const cli = (args: string[]) => execFileSync(binary, args, { env, encoding: "utf8" });
+  const application = await launchDesktop(env);
+  try {
+    const page = await application.firstWindow();
+    await expect(page.getByRole("heading", { name: "What’s on your mind?" })).toBeVisible();
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    for (const copy of ["Refreshes quietly every 15 seconds", "Your work stays connected. You choose what happens next.", "↵ send", "Same Gator profile as your terminal", "A little more continuity", "A good place to start", "Built around your ongoing work", "Personal workspace", "Local Gator profile"]) {
+      await expect(page.getByText(copy, { exact: false })).toHaveCount(0);
+    }
+    const track = page.locator(".starter-track");
+    await page.mouse.move(1, 1);
+    // Native smooth scrolling is inspected at 10% speed during this interval.
+    const session = await page.context().newCDPSession(page);
+    await session.send("Animation.setPlaybackRate", { playbackRate: 0.1 });
+    await expect.poll(() => track.evaluate((element) => element.scrollLeft), { timeout: 10_000 }).toBeGreaterThan(20);
+    await session.send("Animation.setPlaybackRate", { playbackRate: 1 });
+    await page.getByRole("button", { name: "Pause dashboard scrolling", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Resume dashboard scrolling", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Previous dashboard cards" }).click();
+    await expect.poll(() => track.evaluate((element) => element.scrollLeft)).toBeLessThan(5);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await expect(page.getByRole("button", { name: "Resume dashboard scrolling", exact: true })).toBeDisabled();
+    // Manual navigation remains available with reduced motion.
+    await page.getByRole("button", { name: "Next dashboard cards" }).click();
+    expect(await track.evaluate((element) => element.scrollLeft)).toBeGreaterThan(20);
+    await page.getByRole("button", { name: /Find what you’ve saved/ }).click();
+    await expect(page.getByRole("heading", { name: "Saved knowledge", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Usage & limits", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Usage & limits", exact: true })).toBeVisible();
+    await expect(page.getByText("Uncapped", { exact: true })).toHaveCount(3);
+    await expect(page.getByRole("meter")).toHaveCount(0);
+    await page.screenshot({ path: "test-results/desktop-usage-uncapped.png" });
+    await page.getByRole("button", { name: "Edit limits", exact: true }).click();
+    await page.getByRole("textbox", { name: "Provider requests per day (0 uncapped)", exact: true }).fill("100");
+    await page.getByRole("textbox", { name: "Tokens per day (0 uncapped)", exact: true }).fill("10000");
+    await page.getByRole("textbox", { name: "Concurrent requests (0 uncapped)", exact: true }).fill("2");
+    await page.getByRole("button", { name: /^review/i }).click();
+    await expect(page.locator(".workflow")).toContainText("Provider requests per day (0 uncapped): 100");
+    expect(cli(["usage", "status"])).toContain("uncapped requests/day");
+    await page.getByRole("button", { name: /^confirm/i }).click();
+    await expect(page.getByRole("meter", { name: "Provider requests remaining" })).toHaveAttribute("max", "100");
+    await expect(page.getByRole("meter", { name: "Tokens remaining" })).toHaveAttribute("max", "10000");
+    expect(cli(["usage", "status"])).toContain("100 requests/day");
+    await page.getByRole("button", { name: "Pause requests", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Pause/resume provider requests", exact: true })).toBeVisible();
+    expect(cli(["usage", "status"])).toContain("Requests allowed");
+    await page.getByRole("button", { name: /^confirm/i }).click();
+    await expect(page.getByRole("button", { name: "Resume requests", exact: true })).toBeVisible();
+    expect(cli(["usage", "status"])).toContain("All new provider requests paused");
+    await page.getByText("Usage details", { exact: true }).click();
+    await expect(page.getByText("Failed attempts", { exact: true })).toBeVisible();
+    for (const size of [{ width: 1440, height: 960 }, { width: 1024, height: 768 }, { width: 800, height: 600 }]) {
+      await application.evaluate(({ BrowserWindow }, value) => BrowserWindow.getAllWindows()[0].setSize(value.width, value.height), size);
+      await expect(page.getByRole("heading", { name: "Usage & limits", exact: true })).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      await page.screenshot({ path: `test-results/desktop-usage-${size.width}.png` });
+    }
+  } finally { await application.close(); await rm(directory, { recursive: true, force: true }); }
 });
 
 test("first-run model setup uses native fields and keeps credentials out of display state", async () => {

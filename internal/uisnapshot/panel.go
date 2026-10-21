@@ -14,6 +14,7 @@ type Panel struct {
 	Notice   string  `json:"notice,omitempty"`
 	Footer   string  `json:"footer,omitempty"`
 	Hints    []Hint  `json:"hints,omitempty"`
+	Usage    *Usage  `json:"usage,omitempty"`
 }
 
 // Hint is a keyboard action the frontend can present with the kit's shared

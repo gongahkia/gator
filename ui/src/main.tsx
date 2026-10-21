@@ -278,7 +278,7 @@ function PanelScreen({ panel, status, draft, statusLine, bridge, exit }: { panel
   const geometry = panelGeometry(terminal?.columns ?? 80, terminal?.rows ?? 24, focused, panel.kind === "picker", !!panel.subtitle);
   const blocks = (panel.blocks ?? []).flatMap((block) => [
     ...(block.title ? [{ text: block.title, heading: true }] : []),
-    ...(block.lines.length ? block.lines.flatMap((line) => wrapTerminalText(line, geometry.contentWidth).map((text) => ({ text, heading: false }))) : [{ text: "None", heading: false }]),
+    ...(block.lines?.length ? block.lines.flatMap((line) => wrapTerminalText(line, geometry.contentWidth).map((text) => ({ text, heading: false }))) : [{ text: "None", heading: false }]),
     { text: "", heading: false },
   ]);
   const overviewRows = panel.kind === "overview";

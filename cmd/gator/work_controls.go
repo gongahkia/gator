@@ -73,11 +73,19 @@ func usageControl(stateDir, action string, args []string) (worktui.ControlScreen
 			return worktui.ControlScreen{}, err
 		}
 	}
-	view, err := s.Snapshot(time.Now())
+	now := time.Now().UTC()
+	view, err := s.Snapshot(now)
 	if err != nil {
 		return worktui.ControlScreen{}, err
 	}
 	p := view.Policy
+	usage := &uisnapshot.Usage{
+		Day: view.Day, ResetAt: time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339),
+		Paused: p.Paused, Requests: view.Requests, Tokens: view.Tokens,
+		ActiveRequests: view.ActiveRequests, FailedRequests: view.Failed, EstimatedRequests: view.EstimatedRequests,
+		DailyRequestLimit: p.DailyRequests, DailyTokenLimit: p.DailyTokens, ConcurrentLimit: p.ConcurrentRequests,
+		KnownCostUSD: view.KnownCostUSD,
+	}
 	previous, _ := json.Marshal(p)
 	status := "Requests allowed within the shared limits"
 	if p.Paused {
@@ -89,8 +97,9 @@ func usageControl(stateDir, action string, args []string) (worktui.ControlScreen
 	}
 	for _, category := range []string{"chat", "work", "background", "routing", "retrieval", "code"} {
 		lines = append(lines, fmt.Sprintf("%s: %d requests", category, view.Categories[category]))
+		usage.Categories = append(usage.Categories, uisnapshot.UsageCategory{Name: category, Requests: view.Categories[category]})
 	}
-	screen := worktui.ControlScreen{Panel: uisnapshot.Panel{Kind: "usage", Title: "Shared usage and limits", Blocks: []uisnapshot.Block{{Title: "All work on this computer", Lines: lines}}}}
+	screen := worktui.ControlScreen{Panel: uisnapshot.Panel{Kind: "usage", Title: "Shared usage and limits", Usage: usage, Blocks: []uisnapshot.Block{{Title: "All work on this computer", Lines: lines}}}}
 	screen.Actions = []worktui.ControlAction{
 		{Key: "E", Label: "Edit shared limits", Action: "limits", Args: []string{string(previous)}, Description: "These limits apply across foreground and background requests. Zero means uncapped. Daily counters reset at 00:00 UTC; existing per-run limits still apply.", Fields: []worktui.ControlField{{Label: "Provider requests per day (0 uncapped)", Value: strconv.Itoa(p.DailyRequests)}, {Label: "Tokens per day (0 uncapped)", Value: strconv.FormatInt(p.DailyTokens, 10)}, {Label: "Concurrent requests (0 uncapped)", Value: strconv.Itoa(p.ConcurrentRequests)}}, Review: true},
 		{Key: "P", Label: "Pause/resume provider requests", Action: "pause", Args: []string{string(previous)}, Description: "Pause or resume new requests across chat, routing, retrieval, specialists, and jobs. An in-flight provider request may finish. This does not change saved schedules.", Review: true},
