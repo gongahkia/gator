@@ -291,3 +291,127 @@ review covers the saved-draft dialog, disconnected state, recent sidebar, and
 narrow highlighted search, alongside existing motion/review/form surfaces.
 Unverified: Windows/Linux runtime, native system clipboard, signed release
 distribution, and performance beyond the exercised 300-message fixture.
+
+## Compact work details — 2026-10-21
+
+Decision and data semantics: [DESKTOP-WORK-DETAILS.md](DESKTOP-WORK-DETAILS.md).
+This iteration adopts the compact proposal from the Claude desktop exploration.
+It changes presentation and adds read-only projections at existing run/restore
+boundaries. Agent routing, inference, context construction, connection grants,
+action approvals, delivery, scheduling, and terminal workflows retain their
+existing behavior.
+
+### Scope and coverage
+
+Full review: React DOM, existing semantic CSS/Tailwind tokens, Lucide, and the
+existing interruptible presence system. Review covers recent navigation and
+work details; it does not claim a fresh audit of every application surface.
+
+| Category | Evidence inspected | Result |
+| --- | --- | --- |
+| Typography | Compact sections, long paths, MIME types, validation labels, preview text, recent titles and activity | Existing 12–15px scale, wrapping paths, ellipsis only on summaries, tabular counts |
+| Surfaces | Empty/populated outputs, historical and failed results, previews, wide rail and narrow drawer | Independent disclosure, inert retained exits, structural borders, opaque drawer and scrim |
+| Animations | Existing presence system and 120ms chevrons; packaged motion regression at 10% playback and reduced motion | No new animation framework, no provider-update entrance, no repeated text animation |
+| Icons | Existing Lucide vocabulary, currentColor, labelled controls | Consistent stroke and at least 40px primary controls |
+| Performance | Bridge projection, bounded preview extraction, local recent filtering, transcript fixture | No settings/network/file reads in streaming projection; preview formatting limited to 1 MiB of selected files per bundle, eight previews, 4 KiB each, at most 32 KiB retained text; bundle verification still reads all retained files |
+
+### Findings and changes
+
+| Severity | Location | Before | After | Why |
+| --- | --- | --- | --- | --- |
+| MEDIUM | `desktop/src/WorkDetails.tsx:42`, `desktop/src/App.tsx:95` | Deliverables/Checks tab switch and latest bundle only | Compact independent Outputs, Context, Connections, Workspace and relevant Checks sections | Progressive disclosure keeps task information accessible without permanently filling the conversation with diagnostics |
+| MEDIUM | `desktop/src/WorkDetails.tsx:108` output list/preview | Earlier outputs require transcript navigation; no local preview drill-down | All verified bundles in the selected lineage, stable bundle/file identities, validation labels, failed-result notice, bounded inert previews and focus return | Review must preserve draft, reading position and output identity; passing file checks does not establish delivery |
+| MEDIUM | `internal/worktui/bridge.go:109`, `desktop/src/WorkDetails.tsx:125` context/connections | No task-specific projection; daily usage is the only exposed accounting | Explicit unmeasured context; selected attachments/connectors separated from retained evidence and inherited connector sources | Honest scope avoids presenting cumulative usage as occupancy, selection as authorization, or inherited data as fresh tool use |
+| MEDIUM | `desktop/src/WorkDetails.tsx:42`, `desktop/src/useModalFocus.ts:3` | Narrow details overlay lacks modal keyboard behavior | Dismissible drawer, visible close control, focus trap over visible controls, Escape returns from preview or closes drawer without stopping a task | Focus and dismissal must follow the visible interaction rather than dispatch an unrelated task command |
+| MEDIUM | `desktop/src/RecentConversations.tsx:5` | Recent list requires manually expanding each group to locate an older item | Local title/workspace filter reveals all matches, clear/empty states, retained group preferences, active chat visible in a short group, and real Working/Needs review/Stopping labels | Frequent navigation should preserve orientation and give static, accessible feedback without fabricated unread state |
+
+### Considered but rejected
+
+| Location | Candidate | Rejected because |
+| --- | --- | --- |
+| Context | Convert run/day token usage into a percentage | Totals across requests and specialists do not measure one active context window; no reliable capacity/request snapshot exists in this display contract |
+| Connections | Green connected indicators, account names, enable switches | A selected ID or inherited source record cannot establish current authentication, account identity, fresh use, consent, or permission |
+| Outputs | Label every completed/validated file Ready, Sent or Applied | Validation, run completion and delivery are different facts; this inspector does not query or mutate delivery state |
+| Preview | Execute HTML/SVG or read arbitrary frontend-supplied paths | The existing artifact preview service supplies verified, bounded, inert text; binary formats can remain metadata-only |
+| Navigation | Add pins, archives, an artifact library and persistent project management | Those are distinct durable product actions and remain outside this presentation iteration |
+
+### Atomic rollback ledger
+
+| Commit | Change |
+| --- | --- |
+| `b5ddd08fb` | Compact direction and data-label decisions |
+| `11470cc66` | Read-only selections, retained provenance and verified preview projection |
+| `5cb55e80c` | Compact inspector, output previews, disclosure, drawer and focus behavior |
+| `f8d9fb5b6` | Local recent filtering and current-task activity labels |
+| `aaefa0fd2` | Bound extra preview reads and keep selected-file verification |
+| `1f3a89bf5` | Correct inherited connection-source wording and integration captures |
+| `a422bd82b` | Preview budget, selected-path matching and recent group restoration regressions |
+| `9c818fb06` | Start previews at the top and restore output-list position on Back |
+| `dec6a3cf4` | Deterministic isolated Electron shutdown and preview-position checks |
+
+Later changes depend on the earlier projection. Roll back in reverse order.
+
+### Verification
+
+- `npm run check --prefix desktop` and `npm run check --prefix ui`: passed.
+- `npm test --prefix desktop`: all ten host/storage/policy tests passed.
+- `go test ./internal/worktui ./internal/artifact ./cmd/gator -count=1`:
+  all packages passed; the CLI package took 155.342 seconds.
+- `go test ./cmd/gator -run TestWorkBundleDetailsBoundsPreviewReadsAndMatchesSelectedPaths -count=1`:
+  passed after adding the large-file/UTF-8/budget/path-identity regression.
+- `go vet ./internal/worktui ./internal/artifact ./cmd/gator`: passed.
+- `npm run pack --prefix desktop`: rebuilt the unsigned macOS x64 application.
+  After the final preview-position refinement, `npm run build:ui --prefix desktop`
+  and `./node_modules/.bin/electron-builder --dir --publish never` (from `desktop/`)
+  rebuilt its UI and package again.
+- `GATOR_DESKTOP_TEST_EXECUTABLE="$PWD/desktop/release/mac/Gator.app/Contents/MacOS/Gator" npm run test:e2e --prefix desktop`:
+  all **ten** packaged desktop paths passed together in **1.2 minutes**.
+  This includes the existing recovery, 300-message transcript, real saved
+  conversations, 10% motion playback, queue, native forms, usage controls,
+  exact approval, and credential-isolation paths, plus the new inspector.
+- `git diff --check`: passed.
+
+The focused new inspector check passed before packaging. It exercises repeated
+filenames across runs, earlier outputs, a failed retained result, validation
+state, bounded Markdown/source/binary previews, unexecuted HTML, current versus
+retained connector selection, inherited-source disclosure, persistent section
+choices, provider updates, cross-conversation clearing, draft/reading-position
+preservation, return focus, modal Tab/Shift+Tab, Escape without cancellation,
+reduced motion, and narrow layout. The recent-navigation check uses real
+Go-loaded conversation metadata; preview-rich inspector state is a display-only
+fixture. The Go tests separately verify actual bundle projection, tamper and
+unknown-path rejection, snapshot semantics, cloned state, preview read/content
+budgets, and UTF-8 truncation.
+
+Earlier packaged attempts exposed a test shutdown race: manually closing the
+last window and/or calling the context close path could leave Node waiting for
+its attached debugger. An intermediate wait-for-exit helper confirmed that
+waiting alone did not detach the debugger. A minimal isolated diagnostic then
+verified normal exit code 0 after deferring inspector detachment before the
+normal `app.quit()` path. The final shared helper does this only inside the
+launched test process and fails with a bounded cleanup deadline. Production
+shutdown code was not changed. A fresh complete suite passed with that helper;
+interrupted/failed diagnostic attempts are not counted as successful checks.
+
+All runtime checks use temporary profiles, no paid inference, no real connector
+accounts, and no user saved-work mutations. Existing build warnings about CSS
+`::highlight` and Lucide `use client` directives remain; they did not prevent
+bundling.
+
+### Boundaries
+
+Context occupancy and capacity remain **Not measured**. Account/authentication
+status, OAuth scope, per-request fresh connector use, delivery lifecycle,
+artifact editing/execution, and pin/rename/archive are not invented. Retained
+previews describe a verified snapshot and are not live file monitors. Files
+outside the preview read/content budget and binary formats remain inspectable
+through metadata. Windows/Linux runtime and signed/notarized distribution
+remain outside this local macOS verification.
+
+
+Verdict: **Approve for the existing local macOS rollout.** No actionable
+interface-polish findings remain in this iteration's scope. Unverified:
+Windows/Linux runtime, signed/notarized distribution, native screen-reader and
+system clipboard behavior, and large retained-bundle restore benchmarks beyond
+the explicit bounds and exercised fixtures. Full-bundle verification can still
+scan large files even when their text previews are omitted.
