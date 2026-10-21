@@ -198,6 +198,21 @@ func dataControl(ctx context.Context, stateDir, action string, args []string) (w
 		retention = append(retention, fmt.Sprintf("Last automatic cleanup: %s · %d files removed", view.LastSweep.At.Local().Format(time.RFC1123), view.LastSweep.Removed))
 	}
 	screen := worktui.ControlScreen{SourceMoves: sourceMoves, ResetConversation: reset, ClearGoal: clearGoal, RemovedConversations: removedConversations, Panel: uisnapshot.Panel{Kind: "data", Title: "Private data and retention", Blocks: []uisnapshot.Block{{Title: "Storage and copies", Lines: lines}, {Title: "Retention", Lines: retention}}}}
+	var totalFiles int
+	var totalBytes int64
+	for _, group := range view.Groups {
+		totalFiles += group.Files
+		totalBytes += group.Bytes
+	}
+	retentionState := "Keep until deleted"
+	if p.HistoryDays > 0 || p.KnowledgeDays > 0 || p.SnapshotDays > 0 {
+		retentionState = "Automatic expiry configured"
+	}
+	screen.Panel.Summary = []uisnapshot.Field{{Label: "Retained files", Value: strconv.Itoa(totalFiles)}, {Label: "Local storage", Value: byteLabel(totalBytes)}, {Label: "Retention", Value: retentionState}}
+	for index := range screen.Panel.Blocks {
+		screen.Panel.Blocks[index].Collapsible = true
+	}
+	screen.Panel.Subtitle = "Manage Gator’s private content. Original project files stay outside these controls."
 	if notice != "" {
 		screen.Panel.Blocks = append([]uisnapshot.Block{{Title: "Action result", Lines: []string{notice}}}, screen.Panel.Blocks...)
 	}
