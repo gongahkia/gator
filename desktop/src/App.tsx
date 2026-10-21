@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, BookOpen, Check, ChevronDown, ChevronRight, Clock3, Command, Database, Folder, Inbox, LayoutDashboard, ListChecks, ListPlus, LoaderCircle, MessageSquare, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Search, Settings2, ShieldCheck, Square, Target, Wallet, X } from "lucide-react";
+import { ArrowDown, ArrowUp, BookOpen, Check, ChevronDown, ChevronRight, Clock3, Command, Folder, Inbox, LayoutDashboard, ListChecks, ListPlus, LoaderCircle, MessageSquare, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Search, Settings2, ShieldCheck, Square, Target, X } from "lucide-react";
 import type { BackendMessage, BackendState } from "../../ui/src/protocol";
 import type { DesktopFrame, DesktopSnapshot } from "./bridge";
 import { Panel } from "./Panel";
@@ -10,6 +10,7 @@ import { UsagePanel } from "./UsagePanel";
 import { ConversationsPanel } from "./ConversationsPanel";
 import { IconSwap, Presence, useViewMotion, type PresenceRef } from "./motion";
 import { MessageQueue, useQueueAction } from "./MessageQueue";
+import { SettingsNavigation, settingsRoutes } from "./SettingsNavigation";
 
 const destinations = [
   { command: "/overview", label: "Overview", icon: LayoutDashboard, group: "work" },
@@ -18,9 +19,6 @@ const destinations = [
   { command: "/inbox", label: "Inbox", icon: Inbox, group: "work" },
   { command: "/followup", label: "Follow-up checks", icon: ListChecks, group: "work" },
   { command: "/knowledge", label: "Saved knowledge", icon: BookOpen, group: "library" },
-  { command: "/usage", label: "Usage & limits", icon: Wallet, group: "settings" },
-  { command: "/data", label: "Data & backups", icon: Database, group: "settings" },
-  { command: "/recovery", label: "Recovery", icon: ShieldCheck, group: "settings" },
 ] as const;
 
 const overviewCopy: Record<string, { label: string; empty: string; icon: typeof Check }> = {
@@ -119,6 +117,8 @@ export function App() {
   const backendInput = useRef<string | undefined>(undefined);
   const view = useRef<HTMLDivElement>(null);
   const panel = state?.panel;
+  const settingsPage = settingsRoutes.some((route) => route.command === state?.destination);
+  const modifier = window.gator?.platform === "darwin" ? "⌘" : "Ctrl+";
   const viewKey = state ? `${state.destination || (state.home && !state.messages.length ? "home" : "chat")}:${panel?.kind ?? ""}:${panel?.title ?? ""}` : undefined;
   useViewMotion(viewKey, view);
   const hasUnsavedView = queueEditing || panel?.rows?.some((row) => row.input) || panel?.kind === "confirmation";
@@ -137,16 +137,18 @@ export function App() {
   const navigate = (command: string, prefill?: string) => {
     if (hasUnsavedView) { setNavigation({ command, draft: prefill }); return; }
     setSearch(null); setShowCommands(false);
+    if (settingsRoutes.some((route) => route.command === command)) setDetails(false);
     attempt({ type: "navigate", text: command });
     if (prefill !== undefined) setDraft(prefill);
   };
   useEffect(() => {
     const keyboard = (event: globalThis.KeyboardEvent) => {
       if (navigation && event.key !== "Escape") return;
-      if ((event.metaKey || event.ctrlKey) && ["k", "f", "n"].includes(event.key.toLowerCase())) {
+      if ((event.metaKey || event.ctrlKey) && ["k", "f", "n", ","].includes(event.key.toLowerCase())) {
         event.preventDefault();
         if (event.key.toLowerCase() === "f") setSearch((current) => current === null ? "" : null);
         else if (event.key.toLowerCase() === "k") setShowCommands((current) => !current);
+        else if (event.key === ",") { if (!state?.running) navigate("/model"); }
         else navigate("/new");
       }
       if (event.key === "Escape") {
@@ -197,20 +199,21 @@ export function App() {
     <div className="titlebar" aria-hidden="true"><span>Gator</span></div>
     <aside className="sidebar" aria-label="Main navigation">
       <div className="sidebar-brand"><button className="brand-button" onClick={() => navigate("/new")} aria-label="Gator home"><Logo /><span>Gator</span></button><button className="icon-button collapse-button" onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}><IconSwap active={collapsed} size={17} on={<PanelLeftOpen size={17} />} off={<PanelLeftClose size={17} />} /></button></div>
-      <button className="nav-button new-chat" aria-label="New conversation" onClick={() => navigate("/new")} disabled={state.running}><Plus size={18} /><span>New conversation</span><kbd>⌘N</kbd></button>
-      <button className="nav-button command-trigger" aria-label="Search commands" onClick={() => setShowCommands(true)} title="Search commands"><Search size={17} /><span>Search commands</span><kbd>⌘K</kbd></button>
+      {settingsPage ? <SettingsNavigation destination={state.destination} collapsed={collapsed} navigate={navigate} /> : <>
+      <button className="nav-button new-chat" aria-label="New conversation" onClick={() => navigate("/new")} disabled={state.running}><Plus size={18} /><span>New conversation</span><kbd>{modifier}N</kbd></button>
+      <button className="nav-button command-trigger" aria-label="Search commands" onClick={() => setShowCommands(true)} title="Search commands"><Search size={17} /><span>Search commands</span><kbd>{modifier}K</kbd></button>
       <div className="sidebar-scroll">{["work", "library"].map((group) => <div className="nav-group" key={group}><div className="nav-group-label">{group === "work" ? "Your workspace" : "Library"}</div><nav aria-label={group}>{destinations.filter((destination) => destination.group === group).map(({ command, label, icon: Icon }) => <button className="nav-button" key={command} aria-label={label} aria-current={activeDestination === command ? "page" : undefined} onClick={() => navigate(command)} disabled={state.running} title={collapsed ? label : undefined}><Icon size={18} /><span>{label}</span></button>)}</nav></div>)}
-        <div className="sidebar-note"><div className="flex items-center gap-2"><span className="status-dot" /><span>Your personal agent</span></div><p>Ongoing goals.<br />A little less on your mind.</p></div>
       </div>
-      <div className="sidebar-bottom">{destinations.filter((destination) => destination.group === "settings").map(({ command, label, icon: Icon }) => <button className="nav-button" key={command} aria-label={label} aria-current={activeDestination === command ? "page" : undefined} onClick={() => navigate(command)} disabled={state.running} title={collapsed ? label : undefined}><Icon size={17} /><span>{label}</span></button>)}<button className="nav-button" aria-label="Model settings" aria-current={state.destination === "/model" ? "page" : undefined} onClick={() => navigate("/model")} disabled={state.running} title="Model settings"><Settings2 size={17} /><span>Model settings</span></button></div>
+      <div className="sidebar-bottom"><button className="nav-button" aria-label="Settings" title={collapsed ? "Settings" : `Settings (${modifier},)`} onClick={() => navigate("/model")} disabled={state.running}><Settings2 size={17} /><span>Settings</span><kbd>{modifier},</kbd></button></div>
+      </>}
     </aside>
     <main className="main-area">
-      <header className="main-header"><div className="breadcrumbs"><span>{home ? "Your workspace" : conversationBrowser ? "Conversations" : panel ? panel.title : "Conversation"}</span><ChevronRight size={13} /><strong>{home ? "Home" : state.title}</strong></div><div className="header-actions"><button className="header-workspace" aria-label="Choose workspace folder" onClick={() => void window.gator?.chooseFolder().catch(() => {})} disabled={state.running || !!panel} title={state.source}><Folder size={15} /><span>{sourceName}</span><ChevronDown size={13} /></button><button className="icon-button" aria-label={details ? "Hide work details" : "Show work details"} aria-expanded={details} onClick={() => setDetails(!details)}><IconSwap active={details} on={<PanelRightClose size={18} />} off={<PanelRightOpen size={18} />} /></button></div></header>
+      <header className="main-header"><div className="breadcrumbs"><span>{home ? "Your workspace" : settingsPage ? "Settings" : conversationBrowser ? "Conversations" : panel ? panel.title : "Conversation"}</span><ChevronRight size={13} /><strong>{home ? "Home" : state.title}</strong></div><div className="header-actions"><button className="header-workspace" aria-label="Choose workspace folder" onClick={() => void window.gator?.chooseFolder().catch(() => {})} disabled={state.running || !!panel} title={state.source}><Folder size={15} /><span>{sourceName}</span><ChevronDown size={13} /></button><button className="icon-button" aria-label={details ? "Hide work details" : "Show work details"} aria-expanded={details} onClick={() => setDetails(!details)}><IconSwap active={details} on={<PanelRightClose size={18} />} off={<PanelRightOpen size={18} />} /></button></div></header>
       {error && <div className="connection-error" role="alert"><span>{error}</span><button className="small-button" onClick={() => void window.gator?.restart().catch(() => {})}>Reconnect</button></div>}
       {state.notice && <div className="view-status" role="status">{state.notice}</div>}
       {panel && state.pending_approval && <div className="approval-reminder panel-approval"><ShieldCheck size={16} /><span>A current action needs your review.</span><button className="small-button" onClick={() => navigate("/chat")}>Review action<ChevronRight size={13} /></button></div>}
       {state.external && <div className="terminal-banner" role="status"><div><strong>Continue this step in Terminal</strong><p>Gator needs an interactive terminal for this {state.external.kind === "connector" ? "connection" : "action"}. Return here when it finishes.</p></div><button className="button" disabled={terminalBusy} onClick={() => void window.gator?.continueInTerminal().catch(() => {})}>{terminalBusy ? "Waiting for Terminal…" : "Open Terminal"}</button></div>}
-      <div className="view-content" data-home={home} ref={view}>
+      <div className="view-content" data-home={home} data-settings={settingsPage} ref={view}>
       {panel ? conversationBrowser ? <ConversationsPanel panel={panel} send={send} navigate={navigate} /> : panel.kind === "usage" && panel.usage ? <UsagePanel panel={panel} usage={panel.usage} send={send} /> : <Panel panel={panel} send={send} /> : <>
         {search !== null && <div className="transcript-search"><Search size={16} /><input autoFocus aria-label="Search conversation" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find in this conversation…" /><span>{messages.length} messages</span><button className="icon-button" aria-label="Close search" onClick={() => setSearch(null)}><X size={16} /></button></div>}
         <div className={`conversation-scroll ${home ? "home-scroll" : ""}`} ref={transcript} onScroll={(event) => { const el = event.currentTarget; atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100; }}>

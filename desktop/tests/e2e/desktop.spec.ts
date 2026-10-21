@@ -1,4 +1,4 @@
-import { _electron as electron, test, expect } from "@playwright/test";
+import { _electron as electron, test, expect, type Page } from "@playwright/test";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
@@ -9,6 +9,13 @@ const launchDesktop = (env: Record<string, string | undefined>) => {
   const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
   const definedEnv = Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
   return electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env: definedEnv });
+};
+
+const openSettingsCategory = async (page: Page, name: string) => {
+  const navigation = page.getByRole("navigation", { name: "Settings categories" });
+  if (!await navigation.isVisible()) await page.getByRole("button", { name: "Settings", exact: true }).click();
+  const category = navigation.getByRole("button", { name, exact: true });
+  if (await category.getAttribute("aria-current") !== "page") await category.click();
 };
 
 test("motion is interruptible, releases dismissed controls, and honors reduced motion", async () => {
@@ -350,8 +357,8 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     await expect(page.locator(".message-byline", { hasText: "Gator" })).toHaveCount(2);
     const saved = JSON.parse(cli(["overview", "--json"]));
     expect(saved).toBeTruthy();
-    await expect(page.getByRole("button", { name: "Usage & limits", exact: true })).toBeEnabled();
-    await page.getByRole("button", { name: "Usage & limits", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Settings", exact: true })).toBeEnabled();
+    await openSettingsCategory(page, "Usage & limits");
     // Count every call seen by the local provider, including auxiliary work.
     await expect(page.getByRole("region", { name: "Provider requests", exact: true })).toContainText(`${requests} used`);
     await expect(page.getByRole("region", { name: "Tokens", exact: true })).toContainText(`${requests * 20} used`);
@@ -462,7 +469,7 @@ test("dashboard scroll respects interaction and reduced motion; usage controls k
     expect(await track.evaluate((element) => element.scrollLeft)).toBeGreaterThan(20);
     await page.getByRole("button", { name: /Find what you’ve saved/ }).click();
     await expect(page.getByRole("heading", { name: "Saved knowledge", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Usage & limits", exact: true }).click();
+    await openSettingsCategory(page, "Usage & limits");
     await expect(page.getByRole("heading", { name: "Usage & limits", exact: true })).toBeVisible();
     await expect(page.getByText("Uncapped", { exact: true })).toHaveCount(3);
     await expect(page.getByRole("meter")).toHaveCount(0);
@@ -505,7 +512,7 @@ test("first-run model setup uses native fields and keeps credentials out of disp
   try {
     const page = await application.firstWindow();
     await expect(page.getByRole("heading", { name: "What’s on your mind?" })).toBeVisible();
-    await page.getByRole("button", { name: "Model settings", exact: true }).click();
+    await openSettingsCategory(page, "Model settings");
     await page.getByRole("button", { name: /^Cloud API key/ }).click();
     await expect(page.getByRole("heading", { name: "Cloud models", exact: true })).toBeVisible();
     await page.getByRole("button", { name: /^configure /i }).click();
