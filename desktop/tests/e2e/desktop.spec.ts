@@ -18,6 +18,13 @@ const openSettingsCategory = async (page: Page, name: string) => {
   if (await category.getAttribute("aria-current") !== "page") await category.click();
 };
 
+const settlePresentation = async (page: Page) => {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await Promise.allSettled(document.getAnimations().filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity).map((animation) => animation.finished));
+  });
+};
+
 test("motion is interruptible, releases dismissed controls, and honors reduced motion", async () => {
   test.setTimeout(120_000); // Includes inspection at 10% playback and native startup.
   const directory = await mkdtemp(join(tmpdir(), "gator-desktop-motion-e2e-"));
@@ -93,7 +100,7 @@ test("motion is interruptible, releases dismissed controls, and honors reduced m
     await page.getByRole("button", { name: "Saved knowledge", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Saved knowledge", exact: true })).toBeVisible();
     expect(await entrances()).toBe(1);
-    await page.getByRole("button", { name: /^refresh R$/i }).click();
+    await page.getByRole("button", { name: /^refresh$/i }).click();
     expect(await entrances()).toBe(1);
     await page.getByRole("button", { name: "Follow-up checks", exact: true }).click();
     await page.getByRole("button", { name: /new check/i }).click();
@@ -198,6 +205,7 @@ test("queued messages can be edited, reordered, removed, and resumed without los
     await queue.getByRole("button", { name: "Edit queued message 1", exact: true }).click();
     await editor.fill("Edited first follow-up 🐊\nKeep the useful detail.");
     await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(800, 600));
+    await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-message-queue-edit.png" });
     expect(await composer.evaluate((element) => element.getBoundingClientRect().bottom <= innerHeight)).toBe(true);
     expect(await queue.getByRole("button", { name: "Save changes", exact: true }).evaluate((element) => element.getBoundingClientRect().bottom <= element.closest(".message-queue")!.getBoundingClientRect().bottom)).toBe(true);
@@ -215,9 +223,11 @@ test("queued messages can be edited, reordered, removed, and resumed without los
     await expect(composer).toHaveValue("");
     await expect(page.locator(".run-progress")).toContainText("Steering submitted to current task");
     await expect(queue.locator(".queued-message")).toHaveCount(2);
+    await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-message-queue.png" });
     await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(800, 768));
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-message-queue-narrow.png" });
     expect(await queue.locator(".icon-button").evaluateAll((buttons) => buttons.every((button) => button.getBoundingClientRect().width >= 40 && button.getBoundingClientRect().height >= 40))).toBe(true);
     release();
@@ -236,6 +246,7 @@ test("queued messages can be edited, reordered, removed, and resumed without los
     await page.getByRole("button", { name: "Stop current work", exact: true }).click();
     await expect.poll(async () => (await state()).running).toBe(false);
     await expect(queue.getByText("Paused", { exact: true })).toBeVisible();
+    await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-message-queue-paused.png" });
     release();
     hold = true;
@@ -305,6 +316,7 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     }));
     expect(homeLayout.heading).toBeLessThan(homeLayout.composerTop);
     expect(homeLayout.composerBottom).toBeLessThan(homeLayout.overview);
+    await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-home.png" });
     await page.getByRole("textbox", { name: "Message Gator" }).fill("keep my draft 🐊");
     await page.getByRole("button", { name: "Saved knowledge", exact: true }).click();
@@ -317,6 +329,7 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     await explanation.locator("summary").click();
     await expect(explanation).toHaveAttribute("open", "");
     expect(await page.evaluate(async () => (await window.gator!.snapshot()).state?.panel?.id)).toBe(contextID);
+    await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-knowledge-empty.png" });
     // The sources list is genuinely null in the Go wire format on this path.
     expect(await page.evaluate(async () => (await window.gator!.snapshot()).state?.panel?.blocks?.some((block) => block.lines === null))).toBe(true);
@@ -326,6 +339,7 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     await expect(page.getByRole("heading", { name: /Desktop regression note/ })).toBeVisible();
     await expect(page.getByText("No saved knowledge yet.")).toHaveCount(0);
     await expect(page.getByText("Remember the project decision.", { exact: false }).first()).toBeVisible();
+    await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-knowledge.png" });
     // Leave no recall corpus for later inference turns: they must not depend
     // on a developer's local Ollama service or create embedding reservations.
@@ -355,6 +369,7 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     await page.getByRole("button", { name: /^review/i }).click();
     await expect(page.getByRole("heading", { name: "Review ongoing check" })).toBeVisible();
     await expect(page.getByText("Watch my project", { exact: false }).first()).toBeVisible();
+    await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-review.png" });
     // Back cancels the review; no background service or real check is started.
     await page.getByRole("button", { name: "Gator home" }).click();
@@ -399,6 +414,7 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     // Count every call seen by the local provider, including auxiliary work.
     await expect(page.getByRole("region", { name: "Provider requests", exact: true })).toContainText(`${requests} used`);
     await expect(page.getByRole("region", { name: "Tokens", exact: true })).toContainText(`${requests * 20} used`);
+    await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-usage-with-activity.png" });
     await page.getByRole("button", { name: "Back to conversation" }).click();
     await page.getByRole("textbox", { name: "Message Gator" }).fill("keep my continuation draft");
@@ -408,6 +424,7 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     await expect(browser.getByRole("button", { name: "Chats", exact: true })).toHaveAttribute("aria-current", "page");
     // Two turns belong to a single conversation, with two retained task runs.
     await expect(page.locator(".panel-row")).toHaveCount(1);
+    await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-conversations.png" });
     await browser.getByRole("button", { name: "Task runs", exact: true }).click();
     await expect(page.locator(".panel-row")).toHaveCount(2);
@@ -428,6 +445,7 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     await expect(page.getByRole("button", { name: "Conversations", exact: true })).toHaveAttribute("aria-current", "page");
     await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(800, 600));
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-task-runs-800.png" });
     await page.locator(".panel-row").first().click();
     await expect(page.getByRole("heading", { name: "Artifacts", exact: true })).toBeVisible();
@@ -440,10 +458,12 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
       await application.evaluate(({ BrowserWindow }, value) => BrowserWindow.getAllWindows()[0].setSize(value.width, value.height), size);
       await expect(page.getByRole("textbox", { name: "Message Gator" })).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-      await page.screenshot({ path: `test-results/desktop-${size.width}.png` });
+      await settlePresentation(page);
+    await page.screenshot({ path: `test-results/desktop-${size.width}.png` });
     }
     await page.getByRole("button", { name: "Show work details" }).click();
     await expect(page.getByRole("complementary", { name: "Work details" })).toBeVisible();
+    await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-details-800.png" });
     await page.getByRole("button", { name: "Hide work details" }).click();
     await page.getByRole("button", { name: "Search commands" }).click();
@@ -516,6 +536,7 @@ test("dashboard scroll respects interaction and reduced motion; usage controls k
     await expect(page.getByRole("heading", { name: "Usage & limits", exact: true })).toBeVisible();
     await expect(page.getByText("Uncapped", { exact: true })).toHaveCount(3);
     await expect(page.getByRole("meter")).toHaveCount(0);
+    await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-usage-uncapped.png" });
     await page.getByRole("button", { name: "Edit limits", exact: true }).click();
     await page.getByRole("textbox", { name: "Provider requests per day (0 uncapped)", exact: true }).fill("100");
@@ -536,6 +557,7 @@ test("dashboard scroll respects interaction and reduced motion; usage controls k
     expect(cli(["usage", "status"])).toContain("All new provider requests paused");
     await page.getByText("Usage details", { exact: true }).click();
     await expect(page.getByText("Failed attempts", { exact: true })).toBeVisible();
+    await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-usage-details.png" });
     await page.getByText("Usage details", { exact: true }).click();
     for (const size of [{ width: 1440, height: 960 }, { width: 1024, height: 768 }, { width: 800, height: 600 }]) {
@@ -543,7 +565,8 @@ test("dashboard scroll respects interaction and reduced motion; usage controls k
       await expect(page.getByRole("heading", { name: "Usage & limits", exact: true })).toBeVisible();
       await page.locator(".usage-page").evaluate((element) => element.scrollTo({ top: 0 }));
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-      await page.screenshot({ path: `test-results/desktop-usage-${size.width}.png` });
+      await settlePresentation(page);
+    await page.screenshot({ path: `test-results/desktop-usage-${size.width}.png` });
     }
   } finally { await application.close(); await rm(directory, { recursive: true, force: true }); }
 });
@@ -575,6 +598,7 @@ test("review presentation preserves exact previews and only the live approval ac
     await expect(current.locator(".preview")).toBeVisible();
     expect(JSON.parse((await current.locator(".preview").textContent())!)).toEqual(preview);
     await expect(previous.getByRole("button", { name: "Approve this action" })).toHaveCount(0);
+    await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-approval-review.png" });
     await current.getByRole("button", { name: "Approve this action", exact: true }).click();
     expect(await application.evaluate(() => (globalThis as unknown as { __reviewFrames: unknown[] }).__reviewFrames)).toEqual([{ type: "approval", interaction_id: 17, approved: true }]);
@@ -599,6 +623,7 @@ test("first-run model setup uses native fields and keeps credentials out of disp
     const key = page.locator('input[type="password"]');
     await expect(key).toHaveCount(1);
     await key.fill("isolated-test-value");
+    await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-model-setup.png" });
     const display = await page.evaluate(async () => JSON.stringify(await window.gator!.snapshot()));
     expect(display).not.toContain("isolated-test-value");
