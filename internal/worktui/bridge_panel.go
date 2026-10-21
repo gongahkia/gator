@@ -3,6 +3,7 @@ package worktui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/gongahkia/gator/internal/learning"
 	"github.com/gongahkia/gator/internal/uisnapshot"
@@ -71,7 +72,25 @@ func (m Model) bridgeLauncherPanel() uisnapshot.Panel {
 		panel.Title = "Copy"
 	}
 	for _, item := range m.filteredEntries() {
-		panel.Rows = append(panel.Rows, uisnapshot.Row{Label: item.title, Detail: item.subtitle})
+		row := uisnapshot.Row{Label: item.title, Detail: item.subtitle}
+		if item.kind == "conversation" {
+			row.Source = item.source
+			for _, conversation := range m.config.Conversations {
+				if conversation.ID == item.id {
+					row.UpdatedAt = conversation.UpdatedAt.Format(time.RFC3339)
+				}
+			}
+		} else if item.kind == "goal" {
+			for _, goal := range m.config.Goals {
+				if goal.ID == item.id {
+					row.Source = goal.SourcePath
+				}
+			}
+			row.Metadata = []uisnapshot.Field{{Label: "Follow-up", Value: strings.TrimSuffix(item.subtitle, " · /followup new")}}
+		} else if m.launcherMode == "source" && item.command == "/source" {
+			row.Source = m.source
+		}
+		panel.Rows = append(panel.Rows, row)
 	}
 	return panel
 }
@@ -162,12 +181,13 @@ func (m Model) bridgeHistoryPanel() uisnapshot.Panel {
 		panel.Title = "History detail"
 		panel.Subtitle = detail.Record.ObjectiveSummary
 		panel.Rows = nil
+		panel.Summary = []uisnapshot.Field{{Label: "Task status", Value: detail.Record.DisplayStatus()}, {Label: "File verification", Value: valueOrNone(string(detail.Record.VerificationStatus))}, {Label: "Delivery", Value: detail.Delivery}}
 		panel.Blocks = []uisnapshot.Block{
-			{Title: "Work", Lines: []string{historyStatusLine(detail.Record, detail.Project, detail.Delivery), "Source: " + valueOrNone(detail.Project), "Snapshot: " + valueOrNone(detail.Record.SnapshotID), "Verification: " + valueOrNone(string(detail.Record.VerificationStatus)) + " · artifact " + valueOrNone(detail.Record.ArtifactStatus)}},
+			{Title: "Run details", Collapsible: true, Lines: []string{historyStatusLine(detail.Record, detail.Project, detail.Delivery), "Source: " + valueOrNone(detail.Project), "Snapshot: " + valueOrNone(detail.Record.SnapshotID), "Verification: " + valueOrNone(string(detail.Record.VerificationStatus)) + " · artifact " + valueOrNone(detail.Record.ArtifactStatus)}},
 			{Title: "Artifacts", Lines: historyArtifactLines(detail.Artifacts, detail.ArtifactIssue)},
 			{Title: "Delivery", Lines: formatHistoryDeliveries(detail.Deliveries)},
-			{Title: "Feedback", Lines: historyFeedbackLines(detail.Observations)},
-			{Title: "Derived learnings", Lines: historyLearningLines(detail.Learnings)},
+			{Title: "Feedback", Collapsible: true, Lines: historyFeedbackLines(detail.Observations)},
+			{Title: "Derived learnings", Collapsible: true, Lines: historyLearningLines(detail.Learnings)},
 		}
 		if decision := detail.Record.Decision; decision != nil {
 			lines := []string{"Purpose: " + decision.Intent + " · " + string(decision.Mode), "Chosen by: " + decision.Origin, "Connected sources: " + valueOrNone(strings.Join(decision.Connectors, ", ")), "Recall: " + valueOrNone(decision.RecallStatus)}
@@ -180,7 +200,7 @@ func (m Model) bridgeHistoryPanel() uisnapshot.Panel {
 			if decision.Reason != "" {
 				lines = append(lines, decision.Reason)
 			}
-			panel.Blocks = append(panel.Blocks, uisnapshot.Block{Title: "Work context · /context " + detail.Record.ID, Lines: lines})
+			panel.Blocks = append(panel.Blocks, uisnapshot.Block{Title: "Context and sources", Collapsible: true, Lines: append([]string{"Run: " + detail.Record.ID}, lines...)})
 		}
 		if detail.Review != "" {
 			panel.Blocks = append(panel.Blocks, uisnapshot.Block{Title: "Review", Lines: []string{detail.Review}})
@@ -204,8 +224,17 @@ func (m Model) bridgeHistoryPanel() uisnapshot.Panel {
 	}
 	panel.Filter = &uisnapshot.Filter{Value: historyFilterName(m.historyFilter), Options: []uisnapshot.Option{{Value: "all", Label: "All task runs"}, {Value: "running", Label: "Running"}, {Value: "completed", Label: "Completed"}, {Value: "failed", Label: "Failed"}}}
 	for _, item := range m.historyItems {
-		panel.Rows = append(panel.Rows, uisnapshot.Row{Label: item.Record.ObjectiveSummary,
-			Detail: historyStatusLine(item.Record, item.Project, item.Delivery)})
+		at := item.Record.FinishedAt
+		if at.IsZero() {
+			at = item.Record.StartedAt
+		}
+		tone := "muted"
+		if item.Record.Status == "failed" {
+			tone = "error"
+		}
+		panel.Rows = append(panel.Rows, uisnapshot.Row{Label: item.Record.ObjectiveSummary, Detail: historyStatusLine(item.Record, item.Project, item.Delivery),
+			Source: item.Project, UpdatedAt: at.Format(time.RFC3339), State: item.Record.DisplayStatus(), Tone: tone,
+			Metadata: []uisnapshot.Field{{Label: "Mode", Value: string(item.Record.Mode)}}})
 	}
 	if len(panel.Rows) == 0 && panel.Notice == "" {
 		panel.Notice = "No retained Work matches this view yet."
