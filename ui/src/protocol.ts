@@ -74,6 +74,7 @@ export type BackendState = {
   actions: { Label: string; Command: string }[];
   title: string;
   source: string;
+  conversation_id?: string;
   goal_id?: string;
   checks?: { title: string; health: string; state: string; tone?: ResultTone }[];
   provider?: string;

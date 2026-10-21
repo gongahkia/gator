@@ -23,6 +23,7 @@ type BridgeState struct {
 	Actions              []workhome.Action  `json:"actions"`
 	Title                string             `json:"title"`
 	Source               string             `json:"source"`
+	ConversationID       string             `json:"conversation_id,omitempty"`
 	GoalID               string             `json:"goal_id,omitempty"`
 	Provider             string             `json:"provider,omitempty"`
 	Model                string             `json:"model,omitempty"`
@@ -106,6 +107,7 @@ func (m Model) BridgeState() BridgeState {
 		Actions:           m.config.Attention.Next(),
 		Title:             m.title,
 		Source:            m.source,
+		ConversationID:    m.conversation,
 		GoalID:            m.goalID,
 		Provider:          m.modelStatus.Provider,
 		Model:             m.modelStatus.Model,

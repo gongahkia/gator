@@ -14,6 +14,10 @@ func TestBridgeUsesLiveCommandAndMessageState(t *testing.T) {
 	if initial.Mode != "chat" || !initial.Home || len(initial.Actions) == 0 || initial.Actions[0].Command != "/inbox" {
 		t.Fatalf("initial bridge state = %#v", initial)
 	}
+	model.conversation = "work-retained"
+	if model.BridgeState().ConversationID != "work-retained" {
+		t.Fatal("bridge lost the durable conversation identity")
+	}
 	foundHelp := false
 	for _, command := range initial.Commands {
 		foundHelp = foundHelp || command.Name == "help"
