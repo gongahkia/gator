@@ -81,17 +81,18 @@ func supportedNodeUI(node string) bool {
 }
 
 type uiFrame struct {
-	Version       int                        `json:"version"`
-	Type          string                     `json:"type"`
-	Text          string                     `json:"text,omitempty"`
-	Key           string                     `json:"key,omitempty"`
-	Error         string                     `json:"error,omitempty"`
-	Width         int                        `json:"width,omitempty"`
-	Height        int                        `json:"height,omitempty"`
-	Panel         *worktui.BridgePanelAction `json:"panel,omitempty"`
-	Queue         *worktui.BridgeQueueAction `json:"queue,omitempty"`
-	InteractionID int                        `json:"interaction_id,omitempty"`
-	Approved      bool                       `json:"approved,omitempty"`
+	Version       int                               `json:"version"`
+	Type          string                            `json:"type"`
+	Text          string                            `json:"text,omitempty"`
+	Key           string                            `json:"key,omitempty"`
+	Error         string                            `json:"error,omitempty"`
+	Width         int                               `json:"width,omitempty"`
+	Height        int                               `json:"height,omitempty"`
+	Panel         *worktui.BridgePanelAction        `json:"panel,omitempty"`
+	Queue         *worktui.BridgeQueueAction        `json:"queue,omitempty"`
+	Conversation  *worktui.BridgeConversationAction `json:"conversation,omitempty"`
+	InteractionID int                               `json:"interaction_id,omitempty"`
+	Approved      bool                              `json:"approved,omitempty"`
 }
 
 type uiBridgeModel struct {
@@ -142,6 +143,11 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			next, command = m.model.ApplyBridgeQueue(*frame.Queue)
+		case "conversation":
+			if frame.Conversation == nil {
+				return m, nil
+			}
+			next, command = m.model.OpenBridgeConversation(*frame.Conversation)
 		case "resize":
 			next, command = m.model.Update(tea.WindowSizeMsg{Width: max(20, frame.Width), Height: max(8, frame.Height)})
 		default:

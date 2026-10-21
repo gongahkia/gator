@@ -59,6 +59,7 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 			m.selected = selection
 			m.sectionNotice = ""
 			m.clearRemovedData(value.Screen)
+			m.refreshBridgeConversations()
 		}
 		return m, nil
 	case followupSaved:
@@ -108,6 +109,7 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case checksTick:
+		m.refreshBridgeConversations()
 		if m.config.ReadChecks == nil {
 			return m, nil
 		}
@@ -139,7 +141,10 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 	case workrun.Interaction:
 		return m.updateInteraction(value)
 	case runDone:
-		return m.updateRunDone(value)
+		next, command := m.updateRunDone(value)
+		model := next.(Model)
+		model.refreshBridgeConversations()
+		return model, command
 	case bundleActionDone:
 		return m.updateBundleActionDone(value)
 	case connectorActionDone:

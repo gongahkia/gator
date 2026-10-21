@@ -31,3 +31,9 @@ test("queue actions bind to a message or active run and accept bounded text only
   assert.throws(() => validateFrame({ type: "queue", queue: { ...queue, action: "guide", text: "x".repeat(65537) } }));
   assert.equal(validateFrame({ type: "queue", queue: { request_id: "move", id: queue.id, action: "earlier" } }).version, 1);
 });
+
+test("recent conversation selection requires the exact projected list and a bounded identity", () => {
+  const conversation = { id: "work-one", list_id: "a".repeat(64) };
+  assert.equal(validateFrame({ type: "conversation", conversation }).version, 1);
+  for (const change of [{ id: "../other" }, { id: "" }, { list_id: "" }, { program: "sh" }]) assert.throws(() => validateFrame({ type: "conversation", conversation: { ...conversation, ...change } }));
+});

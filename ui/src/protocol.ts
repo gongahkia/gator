@@ -75,6 +75,9 @@ export type BackendState = {
   title: string;
   source: string;
   conversation_id?: string;
+  recent_conversations?: { id: string; title: string; source: string; updated_at: string }[];
+  recent_id?: string;
+  recent_issue?: string;
   goal_id?: string;
   checks?: { title: string; health: string; state: string; tone?: ResultTone }[];
   provider?: string;
@@ -108,8 +111,9 @@ export type PanelAction = {
 };
 export type Frame = {
   version: 1;
-  type: "submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue";
+  type: "submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "conversation";
   text?: string; key?: string; error?: string; width?: number; height?: number;
   panel?: PanelAction; interaction_id?: number; approved?: boolean;
   queue?: QueueAction;
+  conversation?: { id: string; list_id: string };
 };

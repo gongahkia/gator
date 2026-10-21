@@ -332,6 +332,7 @@ type Model struct {
 	runStarted             time.Time
 	modelStatus            ModelStatus
 	bridgeNotice           string
+	bridgeRecentIssue      string
 	statusLine             []string
 	statusLineConfigured   bool
 	statusLineEnabled      bool

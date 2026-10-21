@@ -28,6 +28,7 @@ export function validateFrame(frame) {
     submit: ["type", "text"], navigate: ["type", "text"], key: ["type", "key", "text"],
     panel: ["type", "key", "panel"], approval: ["type", "interaction_id", "approved"],
     queue: ["type", "queue"],
+    conversation: ["type", "conversation"],
   }[frame.type];
   if (!allowed || Object.keys(frame).some((key) => !allowed.includes(key))) throw new Error("Unsupported desktop action");
   if (JSON.stringify(frame).length > 256 * 1024) throw new Error("Desktop action is too large");
@@ -41,6 +42,10 @@ export function validateFrame(frame) {
     if (typeof queue.request_id !== "string" || !/^[a-zA-Z0-9-]{1,64}$/.test(queue.request_id) || typeof queue.id !== "string" || !/^[a-f0-9]{64}$/.test(queue.id)) throw new Error("Invalid queue identity");
     if (!["edit", "remove", "earlier", "later", "run", "guide"].includes(queue.action)) throw new Error("Invalid queue action");
     if (["edit", "guide"].includes(queue.action) ? typeof queue.text !== "string" || !queue.text.trim() || Buffer.byteLength(queue.text, "utf8") > (queue.action === "guide" ? 64 : 128) * 1024 : queue.text !== undefined) throw new Error("Invalid queued message");
+  }
+  if (frame.type === "conversation") {
+    const value = frame.conversation;
+    if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some((key) => !["id", "list_id"].includes(key)) || typeof value.id !== "string" || !/^[a-zA-Z0-9-]{1,128}$/.test(value.id) || typeof value.list_id !== "string" || !/^[a-f0-9]{64}$/.test(value.list_id)) throw new Error("Invalid conversation selection");
   }
   if (frame.type === "panel") {
     const panel = frame.panel;
