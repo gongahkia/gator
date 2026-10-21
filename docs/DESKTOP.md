@@ -44,13 +44,13 @@ current live interaction ID; retained cards have no approval authority.
 
 | Surface | Behavior |
 | --- | --- |
-| Home | Four live overview summaries and an automatically scrolling strip of workspace actions |
-| Navigation | Goals, conversations, inbox, follow-ups, knowledge, usage, backups, recovery, models |
+| Home | Centered starting question/composer, followed by four live overview summaries and an automatically scrolling strip of workspace actions |
+| Navigation | Goals, conversations, inbox, follow-ups, and knowledge; one Settings entry opens categories for models, usage, data/backups, and recovery |
 | Conversations | One sidebar entry with Chats and Task runs views; saved chats reopen the transcript, while runs retain outcomes, verification, delivery, and review controls |
-| Conversation | Markdown agent text, literal user/output text, typed result cards, streaming progress, stop/steering, and editable queued-message cards |
-| Reviews | Exact structured previews with request-bound approve/deny buttons; separate confirmation for workflow writes |
-| Native forms | Text/password/multiline fields; existing Go review and save actions |
-| Work details | Deliverables and recurring checks; no Context tab or profile footer |
+| Conversation | User bubbles, an assistant reading column, response/code copy controls, typed result cards, streaming progress, stop/steering, and editable queued-message cards |
+| Reviews | Semantic status and exact structured previews, open by default, with request-bound approve/deny buttons; separate confirmation for workflow writes |
+| Native forms | Bounded text/password/multiline fields, desktop action toolbars and keyboard list navigation; existing Go review and save actions |
+| Work details | Deliverables and recurring checks with linked keyboard-accessible tabs; no Context tab or profile footer |
 | Usage & limits | Daily request/token meters, shared limit controls, activity breakdown, and expandable accounting details |
 | Commands | Cmd/Ctrl+K, searchable commands, arrow navigation, input-prefilling commands |
 | Transcript search | Cmd/Ctrl+F, searches prose plus typed result/deliverable data |
@@ -63,6 +63,12 @@ Cmd/Ctrl+Enter (or Guide now) sends guidance to the current task. Shift+Enter
 keeps inserting a line. Escape closes a view/menu/search or stops active
 work; Escape inside a queue editor cancels that edit. Modal focus stays inside
 the dialog and returns to its trigger.
+
+Cmd/Ctrl+, opens Settings. Existing panel action shortcuts work outside text
+fields and dialogs; forms keep native editing keys. Supporting diagnostics and
+keyboard legends use disclosures. Review details and warnings remain visible.
+See the [Codex presentation audit](DESKTOP-CODEX-AUDIT.md) for the comparison,
+intentional differences, per-change commits, and current verification record.
 
 The home dashboard advances every six seconds and pauses on hover, keyboard
 focus, or manual interaction. Previous/next and pause/resume controls remain
@@ -192,7 +198,7 @@ icon; `icon.png` supplies the running Dock/window icon and Linux packaging.
 Both assets are checked in. To regenerate them on macOS, run
 `swift desktop/scripts/generate-icons.swift`; ordinary builds do not need Swift.
 
-### Local verification, 21 October 2026
+### Earlier desktop verification, 21 October 2026
 
 - `go test ./...` and `go vet ./...` passed; subsequent model-status and bridge
   changes passed the affected command/package tests and vet checks.
@@ -217,6 +223,22 @@ Both assets are checked in. To regenerate them on macOS, run
 - `npm run pack --prefix desktop` produced an unsigned macOS x64 application
   at `desktop/release/mac/Gator.app` (about 362 MB). Test screenshots are under
   `desktop/test-results/` and are intentionally untracked.
+
+### Codex presentation pass, 21 October 2026
+
+The later [presentation audit](DESKTOP-CODEX-AUDIT.md) adopts readable type,
+centered new-chat composition, categorized Settings, user bubbles, copy
+controls, desktop panel actions, supporting disclosures, and clearer reviews.
+Every presentation change has its own commit. No Go, shared protocol, terminal
+UI, or Electron host files changed after the previous-work checkpoint.
+
+TypeScript and all six host tests passed. A fresh unsigned macOS x64 bundle
+passed all **six** Electron integration paths together in 50.8 seconds,
+including slow-motion/reduced-motion behavior, queue/drafts, native forms,
+saved work, usage reviews, exact approval presentation, and credential fields.
+Settled wide/narrow screens were inspected. The audit contains the exact
+commands, rollback ledger, intentional differences, and remaining verification
+boundaries, including native system clipboard and other operating systems.
 
 Interactive OAuth/terminal handoffs have script quoting and return-status
 tests; live sign-in with an external account was not exercised. Linux runtime,
