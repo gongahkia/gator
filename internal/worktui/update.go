@@ -408,6 +408,7 @@ func (m Model) updateKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if value.Type == tea.KeyCtrlB && !m.running {
 		m.launcher = false
 		m.section = "inbox"
+		m.inboxDetail, m.selected = "", 0
 		m.sectionNotice = ""
 		if err := m.refreshInbox(); err != nil {
 			m.sectionNotice = "Inbox refresh failed: " + err.Error()
@@ -461,6 +462,8 @@ func (m Model) updateSectionKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.updateRecallKey(value)
 	case "context":
 		return m.updateContextKey(value)
+	case "inbox":
+		return m.updateInboxKey(value)
 	case "effort":
 		switch value.String() {
 		case "esc":

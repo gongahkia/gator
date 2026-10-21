@@ -57,6 +57,7 @@ export function Panel({ panel, send, title = panel.title, subtitle = panel.subti
   const primary = visibleHints.filter((hint) => ["enter", "ctrl+r", "esc"].includes(hint.key));
   const toolbar = visibleHints.filter((hint) => !primary.includes(hint));
   const refresh = toolbar.find((hint) => hint.key === "r" && hint.label.toLowerCase() === "refresh");
+  const creates = (hint: typeof hints[number]) => hint.key === "n" && /^(new|add)\b/i.test(hint.label);
   const keyboardFooter = !hasInputs && panel.kind !== "confirmation" && /^(Esc\b|↑|↓|Type to filter|Tab\b)/i.test(panel.footer ?? "");
   const supportingBlock = (block: NonNullable<BackendPanel["blocks"]>[number]) => !hasInputs && panel.kind !== "confirmation" && (
     ["Storage", "Retrieval", "Chat processing", "How to read this"].includes(block.title ?? "") ||
@@ -87,7 +88,7 @@ export function Panel({ panel, send, title = panel.title, subtitle = panel.subti
   return <section className="workflow" data-kind={panel.kind} aria-label={title}>
     <div className="workflow-heading"><button className="icon-button" aria-label="Back to conversation" disabled={busy} onClick={() => keyAction("esc")}><ArrowLeft size={18} /></button><div><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div>{panel.kind === "confirmation" && <span className="badge" data-tone="warning">Review</span>}</div>
     {navigation}
-    {!!toolbar.length && <div className="panel-toolbar" role="toolbar" aria-label={`${title} actions`}>{toolbar.map((hint) => hint === refresh ? <button className="icon-button" aria-label={hint.label} title={`${hint.label} (${hint.shortcut})`} key={hint.id} disabled={busy} onClick={() => keyAction(hint.key)}><RefreshCw size={17} /></button> : <button className={`button ${hint.key === "n" ? "primary" : ""}`} key={hint.id} disabled={busy} onClick={() => keyAction(hint.key)}>{hint.key === "n" && <Plus size={16} />}{hint.label}<kbd>{hint.shortcut}</kbd></button>)}</div>}
+    {!!toolbar.length && <div className="panel-toolbar" role="toolbar" aria-label={`${title} actions`}>{toolbar.map((hint) => hint === refresh ? <button className="icon-button" aria-label={hint.label} title={`${hint.label} (${hint.shortcut})`} key={hint.id} disabled={busy} onClick={() => keyAction(hint.key)}><RefreshCw size={17} /></button> : <button className={`button ${creates(hint) ? "primary" : ""}`} key={hint.id} disabled={busy} onClick={() => keyAction(hint.key)}>{creates(hint) && <Plus size={16} />}{hint.label}<kbd>{hint.shortcut}</kbd></button>)}</div>}
     {panel.kind === "picker" && <form className="panel-search" onSubmit={(event) => { event.preventDefault(); void action({ action: "query", text: query }); }}><Search size={16} /><input aria-label={`Search ${panel.title.toLowerCase()}`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search…" autoFocus /><button className="small-button" type="submit">Search</button>{query && <button className="small-button" type="button" onClick={() => { setQuery(""); void action({ action: "query", text: "" }); }}>Clear</button>}</form>}
     {panel.notice && empty?.detail !== panel.notice && <p className="panel-notice" role="status">{panel.notice}</p>}
     <div className="workflow-content">

@@ -699,6 +699,8 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		if len(fields) == 1 {
 			if err = m.refreshInbox(); err == nil {
 				m.section = "inbox"
+				m.inboxDetail = ""
+				m.selected = 0
 				m.sectionNotice = ""
 				return m, nil
 			}

@@ -327,6 +327,7 @@ func (m *Model) clearRemovedData(screen ControlScreen) {
 	m.tasks = map[string]string{}
 	m.contextState = ContextState{}
 	m.contextDetail = nil
+	m.inboxDetail = ""
 	m.contextEdit = ""
 	m.contextWorkID = ""
 	m.contextEditing = false

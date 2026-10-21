@@ -352,6 +352,7 @@ type Model struct {
 	historyItems           []historyItem
 	historyDetail          *historyDetail
 	historyFilter          workhistory.Status
+	inboxDetail            string
 	learningItems          []learning.Record
 	learningDetail         *learning.Record
 	learningFilter         learning.Status

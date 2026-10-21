@@ -99,9 +99,11 @@ func (m Model) bridgeSectionPanel() uisnapshot.Panel {
 			panel.Rows = append(panel.Rows, uisnapshot.Row{Label: name, Detail: []string{"Quick requests · up to 12 steps", "Everyday work · up to 24 steps", "Complex work · up to 48 steps"}[index], State: state})
 		}
 	case "inbox":
+		if m.inboxDetail != "" {
+			return m.inboxDetailPanel()
+		}
 		panel.Title = "Inbox"
-		panel.Footer = "Esc back · /inbox rate ID useful|noise|wrong · /inbox read ID"
-		panel.Hints = []uisnapshot.Hint{{Shortcut: "Esc", Action: "back"}, {Shortcut: "/inbox read ID", Action: "open"}, {Shortcut: "/inbox rate", Action: "rate"}}
+		panel.Hints = []uisnapshot.Hint{{Shortcut: "Esc", Action: "back"}, {Shortcut: "Enter", Action: "open"}, {Shortcut: "R", Action: "refresh"}}
 		for _, item := range m.config.Inbox {
 			state := "unread"
 			if !item.ReadAt.IsZero() {
