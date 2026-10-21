@@ -1,4 +1,5 @@
 import { _electron as electron, test, expect, type Page } from "@playwright/test";
+import { closeDesktop } from "./lifecycle";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
@@ -26,6 +27,7 @@ const settlePresentation = async (page: Page) => {
 };
 
 test("unsent drafts survive reload and reconnect without submission, and retention can be cleared", async () => {
+  test.setTimeout(90_000); // Reconnect plus two isolated app launches and native teardown.
   const directory = await mkdtemp(join(tmpdir(), "gator-desktop-drafts-e2e-"));
   const env = { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") };
   let application = await launchDesktop(env);
@@ -63,13 +65,12 @@ test("unsent drafts survive reload and reconnect without submission, and retenti
     expect((await page.evaluate(() => window.gator!.drafts({ action: "list" }))).enabled).toBe(false);
     await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-draft-recovery.png" });
-    await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close());
-    await application.close();
+    await closeDesktop(application);
     application = await launchDesktop({ ...env, GATOR_STATE_DIR: join(directory, "other-state"), GATOR_CONFIG_DIR: join(directory, "other-config") });
     const otherPage = await application.firstWindow();
     await expect(otherPage.getByRole("textbox", { name: "Message Gator", exact: true })).toHaveValue("");
     expect(await otherPage.evaluate(() => window.gator!.drafts({ action: "list" }))).toEqual({ enabled: true, drafts: [] });
-  } finally { await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close()).catch(() => {}); await application.close(); await rm(directory, { recursive: true, force: true }); }
+  } finally { await closeDesktop(application); await rm(directory, { recursive: true, force: true }); }
 });
 
 test("long conversations retain context while searching and signal activity without moving the reader", async () => {
@@ -123,7 +124,7 @@ test("long conversations retain context while searching and signal activity with
     await expect(page.getByText("A new update while you were reading.", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: /Jump to latest/ })).toHaveCount(0);
     await expect(page.getByRole("textbox", { name: "Message Gator" })).toBeFocused();
-  } finally { await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close()).catch(() => {}); await application.close(); await rm(directory, { recursive: true, force: true }); }
+  } finally { await closeDesktop(application); await rm(directory, { recursive: true, force: true }); }
 });
 
 test("recent work groups real saved conversations by workspace and isolates their drafts", async () => {
@@ -193,7 +194,7 @@ test("recent work groups real saved conversations by workspace and isolates thei
     await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
     await expect(recent).toBeHidden();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  } finally { await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close()).catch(() => {}); await application.close(); await rm(directory, { recursive: true, force: true }); }
+  } finally { await closeDesktop(application); await rm(directory, { recursive: true, force: true }); }
 });
 
 test("motion is interruptible, releases dismissed controls, and honors reduced motion", async () => {
@@ -313,7 +314,7 @@ test("motion is interruptible, releases dismissed controls, and honors reduced m
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect(errors).toEqual([]);
-  } finally { await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close()).catch(() => {}); await application.close(); await rm(directory, { recursive: true, force: true }); }
+  } finally { await closeDesktop(application); await rm(directory, { recursive: true, force: true }); }
 });
 
 test("queued messages can be edited, reordered, removed, and resumed without losing drafts", async () => {
@@ -445,8 +446,7 @@ test("queued messages can be edited, reordered, removed, and resumed without los
     release();
     await page.evaluate(async () => { if ((await window.gator?.snapshot())?.state?.running) await window.gator?.send({ type: "key", key: "esc" }); }).catch(() => {});
     await expect.poll(async () => (await state()).running).toBe(false);
-    await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close());
-    await application.close();
+    await closeDesktop(application);
     server.closeAllConnections();
     await new Promise<void>((done) => server.close(() => done()));
     await rm(directory, { recursive: true, force: true });
@@ -652,7 +652,7 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     expect(errors).toEqual([]);
     expect(await page.evaluate(() => typeof (window as unknown as { require?: unknown }).require)).toBe("undefined");
   } finally {
-    await application.close();
+    await closeDesktop(application);
     await new Promise<void>((done) => server.close(() => done()));
     await rm(directory, { recursive: true, force: true });
   }
@@ -740,7 +740,7 @@ test("dashboard scroll respects interaction and reduced motion; usage controls k
       await settlePresentation(page);
     await page.screenshot({ path: `test-results/desktop-usage-${size.width}.png` });
     }
-  } finally { await application.close(); await rm(directory, { recursive: true, force: true }); }
+  } finally { await closeDesktop(application); await rm(directory, { recursive: true, force: true }); }
 });
 
 test("review presentation preserves exact previews and only the live approval action", async () => {
@@ -775,8 +775,7 @@ test("review presentation preserves exact previews and only the live approval ac
     await current.getByRole("button", { name: "Approve this action", exact: true }).click();
     expect(await application.evaluate(() => (globalThis as unknown as { __reviewFrames: unknown[] }).__reviewFrames)).toEqual([{ type: "approval", interaction_id: 17, approved: true }]);
   } finally {
-    await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close()).catch(() => {});
-    await application.close();
+    await closeDesktop(application);
     await rm(directory, { recursive: true, force: true });
   }
 });
@@ -809,5 +808,5 @@ test("first-run model setup uses native fields and keeps credentials out of disp
     await page.getByRole("button", { name: "Leave view" }).click();
     await expect(page.getByRole("heading", { name: "What’s on your mind?" })).toBeVisible();
     expect(await page.evaluate(async () => JSON.stringify(await window.gator!.snapshot()))).not.toContain("isolated-test-value");
-  } finally { await application.close(); await rm(directory, { recursive: true, force: true }); }
+  } finally { await closeDesktop(application); await rm(directory, { recursive: true, force: true }); }
 });

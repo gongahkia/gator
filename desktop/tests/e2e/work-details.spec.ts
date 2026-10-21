@@ -1,4 +1,5 @@
 import { _electron as electron, test, expect } from "@playwright/test";
+import { closeDesktop } from "./lifecycle";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
@@ -46,13 +47,18 @@ test("compact work details preserve conversation state and distinguish selection
     await page.evaluate(async () => { await Promise.allSettled(document.getAnimations().filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity).map((animation) => animation.finished)); });
     expect(await page.evaluate(() => scrollY)).toBe(0);
     await page.screenshot({ path: "test-results/desktop-work-details-expanded.png" });
-    await outputs.getByRole("button", { name: /report.md Checks passed/ }).click();
+    const earlierOutput = outputs.getByRole("button", { name: /report.md Checks passed/ });
+    await earlierOutput.scrollIntoViewIfNeeded();
+    const listPosition = await rail.locator(".workspace-content").evaluate((element) => element.scrollTop);
+    await earlierOutput.click();
     await expect(rail.getByRole("heading", { name: "Earlier report", exact: true })).toBeVisible();
     await page.screenshot({ path: "test-results/desktop-work-details-preview.png" });
     await expect(composer).toHaveValue("Keep my unsent follow-up");
+    expect(await rail.locator(".workspace-content").evaluate((element) => element.scrollTop)).toBe(0);
     expect(await scroll.evaluate((element) => element.scrollTop)).toBe(0);
     await rail.getByRole("button", { name: "All outputs", exact: true }).click();
     await expect(outputs.getByRole("button", { name: /report.md Checks passed/ })).toBeFocused();
+    expect(await rail.locator(".workspace-content").evaluate((element) => element.scrollTop)).toBeCloseTo(listPosition, 0);
     await outputs.getByRole("button", { name: /report.md Needs review/ }).click();
     await expect(rail.getByText("Retained from a failed run.")).toBeVisible();
     await expect(rail.getByText("Showing a shortened preview.")).toBeVisible();
@@ -98,5 +104,5 @@ test("compact work details preserve conversation state and distinguish selection
     await expect(page.getByRole("button", { name: "Stop current work", exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect(errors).toEqual([]);
-  } finally { await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close()).catch(() => {}); await application.close(); await rm(directory, { recursive: true, force: true }); }
+  } finally { await closeDesktop(application); await rm(directory, { recursive: true, force: true }); }
 });
