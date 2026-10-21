@@ -1,5 +1,6 @@
 import { ChevronDown } from "lucide-react";
 import type { BackendPanel, ResultField } from "../../ui/src/protocol";
+import { ShortcutReference } from "./DesktopHelp";
 
 export function PanelFacts({ fields, summary = false }: { fields: ResultField[]; summary?: boolean }) {
   return <dl className={summary ? "panel-summary" : "panel-facts"}>{fields.map((field, index) => <div key={`${field.label}-${index}`}><dt>{field.label}</dt><dd data-tone={field.tone}>{field.value}</dd></div>)}</dl>;
@@ -7,7 +8,8 @@ export function PanelFacts({ fields, summary = false }: { fields: ResultField[];
 
 export function PanelBlocks({ panel, hasInputs, empty }: { panel: BackendPanel; hasInputs?: boolean; empty?: boolean }) {
   return <>{panel.blocks?.filter((block) => !(empty && panel.kind === "followup" && block.title === "Start with one useful loop")).map((block, index) => {
-    const content = <>{block.fields?.length ? <PanelFacts fields={block.fields} /> : null}{(block.lines ?? []).filter((line) => line.trim()).map((line, lineIndex) => <p className="literal" key={lineIndex}>{line}</p>)}</>;
+    const lines = (block.lines ?? []).filter((line) => line.trim() && !(panel.kind === "confirmation" && /^(Enter\/y|n\/esc)\s/i.test(line)));
+    const content = <>{block.fields?.length ? <PanelFacts fields={block.fields} /> : null}{panel.kind === "help" || panel.title === "Model help" ? <ShortcutReference lines={lines} /> : lines.map((line, lineIndex) => <p className="literal" key={lineIndex}>{/^https?:\/\/\S+$/.test(line) ? <a href={line} onClick={(event) => { event.preventDefault(); void window.gator?.openLink(line).catch(() => {}); }}>{line}</a> : line}</p>)}</>;
     const supporting = panel.kind !== "confirmation" && (block.collapsible || !hasInputs && (
       ["Storage", "Retrieval", "Chat processing", "How to read this"].includes(block.title ?? "") ||
       panel.title === "Saved knowledge" && ["Work context", "Observed source references"].includes(block.title ?? "")

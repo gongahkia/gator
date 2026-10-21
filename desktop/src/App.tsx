@@ -18,6 +18,7 @@ import { DraftManager } from "./DraftManager";
 import { useConversationSearch } from "./useConversationSearch";
 import { RecentConversations } from "./RecentConversations";
 import { WorkDetails } from "./WorkDetails";
+import { DesktopHelp } from "./DesktopHelp";
 
 type Navigation = { command: string; draft?: string } | { conversation: NonNullable<DesktopFrame["conversation"]> };
 
@@ -68,17 +69,17 @@ function useBackend() {
   return { ...snapshot, error: error || reconnectError || snapshot.error, reconnecting, reconnect, send, clearError: () => { setError(""); setReconnectError(""); } };
 }
 
-const Message = memo(function Message({ message, pending, onApproval }: { message: BackendMessage; pending?: number; onApproval(approved: boolean): void }) {
+const Message = memo(function Message({ message, pending, onApproval, commands, navigate, disabled }: { message: BackendMessage; pending?: number; onApproval(approved: boolean): void; commands?: BackendState["commands"]; navigate?(route: string): void; disabled?: boolean }) {
   const user = message.role === "You";
   const result = message.result ?? (message.bundle ? bundleResult(message.bundle) : undefined);
   const approval = result?.kind === "approval" && result.fields?.some((field) => field.label === "Request" && field.value === String(pending)) ? pending : undefined;
   return <article className={`message ${user ? "user-message" : message.role === "Gator" ? "assistant-message" : "result-message"}`} aria-label={user ? "Your message" : `${message.role} message`}>
     <div className="message-content"><div className="message-byline">{user ? "You" : message.role === "Gator" ? "Gator" : message.role}</div>
-      {result ? <Result result={result} approval={approval} onApproval={onApproval} /> : message.role === "Gator" ? <Markdown text={message.text} /> : <div className="literal prose-text">{message.text}</div>}
+      {commands && navigate && result?.title === "Gator commands" && result.kind === "report" ? <DesktopHelp commands={commands} navigate={navigate} disabled={!!disabled} /> : result ? <Result result={result} approval={approval} onApproval={onApproval} /> : message.role === "Gator" ? <Markdown text={message.text} /> : <div className="literal prose-text">{message.text}</div>}
       {!result && message.role === "Gator" && message.text && <div className="message-actions"><CopyButton text={message.text} label="Copy response" compact /></div>}
     </div>
   </article>;
-}, (before, after) => before.pending === after.pending && before.message.role === after.message.role && before.message.text === after.message.text && JSON.stringify(before.message.result ?? before.message.bundle) === JSON.stringify(after.message.result ?? after.message.bundle) && before.onApproval === after.onApproval);
+}, (before, after) => before.pending === after.pending && before.message.role === after.message.role && before.message.text === after.message.text && JSON.stringify(before.message.result ?? before.message.bundle) === JSON.stringify(after.message.result ?? after.message.bundle) && before.onApproval === after.onApproval && before.disabled === after.disabled && before.commands === after.commands && before.navigate === after.navigate);
 
 function OverviewCards({ state, navigate }: { state: BackendState; navigate(command: string): void }) {
   return <section className="overview-grid" aria-label="Everyday overview">{["changed", "needs", "next", "blocked"].map((id) => {
@@ -261,7 +262,7 @@ export function App() {
         <div className={`transcript-stage ${home ? "home-stage" : ""}`}><div className={`conversation-scroll ${home ? "home-scroll" : ""}`} ref={transcript} onScroll={(event) => { const el = event.currentTarget; const near = el.scrollHeight - el.scrollTop - el.clientHeight < 100; atBottom.current = near; setAtLatest(near); if (near) setNewActivity(false); transcriptPositions.current.delete(conversationIdentity); transcriptPositions.current.set(conversationIdentity, { top: el.scrollTop, latest: near }); if (transcriptPositions.current.size > 32) transcriptPositions.current.delete(transcriptPositions.current.keys().next().value!); }}>
           {home ? <div className="home-content"><h1>What’s on your mind?</h1>
             {state.first_run && <div className="setup-callout"><div><Settings2 size={18} /><div><strong>Make Gator yours</strong><p>Choose a cloud or local model to start your first conversation.</p></div></div><button className="button" onClick={() => navigate("/model")}>Choose a model<ChevronRight size={15} /></button></div>}
-            </div> : <div className="transcript-content" aria-label="Conversation">{messages.map((message, index) => <Message key={`${conversationIdentity}:${index}`} message={message} pending={approvalBusy ? undefined : state.pending_approval?.id} onApproval={approve} />)}{state.running && <div className="run-progress" role="status"><LoaderCircle size={16} className="spin" /><span>{state.cancelling ? "Stopping…" : state.pending_approval ? "Waiting for your approval" : state.status || "Gator is working…"}</span><span className="elapsed">{state.elapsed}</span></div>}</div>}
+            </div> : <div className="transcript-content" aria-label="Conversation">{messages.map((message, index) => <Message key={`${conversationIdentity}:${index}`} message={message} pending={approvalBusy ? undefined : state.pending_approval?.id} onApproval={approve} commands={message.result?.title === "Gator commands" ? state.commands : undefined} navigate={message.result?.title === "Gator commands" ? navigate : undefined} disabled={message.result?.title === "Gator commands" ? state.running || !!error : undefined} />)}{state.running && <div className="run-progress" role="status"><LoaderCircle size={16} className="spin" /><span>{state.cancelling ? "Stopping…" : state.pending_approval ? "Waiting for your approval" : state.status || "Gator is working…"}</span><span className="elapsed">{state.elapsed}</span></div>}</div>}
         </div>{!home && !atLatest && <button className="jump-latest" aria-label={newActivity ? "New activity. Jump to latest" : "Jump to latest"} onClick={jumpToLatest}><ArrowDown size={16} />{newActivity && <span>New activity</span>}</button>}</div>
         <div className="composer-area">{state.pending_approval && <div className="approval-reminder"><ShieldCheck size={16} /><span>An action is waiting for your review.</span><button className="small-button" onClick={jumpToLatest}>View request<ArrowDown size={13} /></button></div>}
           {!!slash.length && <div className="slash-suggestions" aria-label="Command suggestions">{slash.map((command) => <button key={command.name} onClick={() => { setDraft(`/${command.name}${command.needs_input ? " " : ""}`); composer.current?.focus(); }}><span>/{command.name}</span><span>{command.description}</span></button>)}</div>}

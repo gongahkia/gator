@@ -358,6 +358,25 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .panel-facts dt { color: var(--color-muted); }
 .panel-facts dd { margin: 0; color: var(--color-secondary); overflow-wrap: anywhere; white-space: pre-wrap; font-variant-numeric: tabular-nums; }
 .panel-content p { font-size: var(--text-body); color: var(--color-contrast); line-height: 1.75; }
+.panel-block a { color: var(--color-accent); text-decoration: underline; text-underline-offset: 3px; }
+.desktop-help { max-width: 760px; }
+.desktop-help h3 { font-size: var(--text-heading); font-weight: 500; margin-bottom: 8px; }
+.desktop-help header p, .help-commands > p { color: var(--color-muted); font-size: var(--text-sm); line-height: 1.7; }
+.help-pages { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; margin-top: 20px; }
+.help-pages button { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; text-align: left; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-secondary); padding: 8px 10px; font-size: var(--text-sm); }
+.help-pages button:hover { background: var(--color-hover); }
+.help-shortcuts { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--color-line); }
+.help-shortcuts h4 { display: flex; align-items: center; gap: 8px; font-size: var(--text-ui); font-weight: 500; margin-bottom: 12px; }
+.help-shortcuts dl, .shortcut-reference { display: grid; gap: 8px; margin: 0; }
+.help-shortcuts dl > div, .shortcut-reference > div { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 32px; font-size: var(--text-sm); }
+.help-shortcuts dt, .shortcut-reference dt { color: var(--color-muted); }
+.help-shortcuts dd, .shortcut-reference dd { margin: 0; flex-shrink: 0; }
+.help-shortcuts kbd, .shortcut-reference kbd { border: 1px solid var(--color-line); border-radius: 5px; padding: 3px 7px; color: var(--color-secondary); }
+.help-commands { margin-top: 24px; border-top: 1px solid var(--color-line); }
+.help-commands > summary { display: flex; align-items: center; justify-content: space-between; min-height: 44px; cursor: pointer; font-size: var(--text-sm); list-style: none; }
+.help-command { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--color-line); }
+.help-command p { margin-top: 5px; color: var(--color-muted); font-size: var(--text-xs); }
+.help-command code { font-size: var(--text-sm); color: var(--color-secondary); }
 .panel-row-meta { display: flex; flex-wrap: wrap; justify-content: flex-start !important; gap: 6px 14px !important; margin-top: 7px; color: var(--color-muted); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
 .panel-row-meta time { margin-left: auto; }
 .draft-metadata { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 6px 16px; color: var(--color-muted); font-size: var(--text-xs); }
