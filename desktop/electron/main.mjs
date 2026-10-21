@@ -119,7 +119,7 @@ else {
       trusted(event);
       const owner = backend;
       const panel = owner?.state?.panel;
-      if (!request || !["directory", "file", "save"].includes(request.kind) || !panel?.id || request.panel_id !== panel.id || owner.state.running || owner.state.external || !panel.rows?.some((row) => row.input?.kind === request.kind)) return null;
+      if (!request || !["directory", "file", "save"].includes(request.kind) || !panel?.id || request.panel_id !== panel.id || owner.state.running || owner.state.external || !panel.rows?.some((row) => row.input?.kind === request.kind || request.kind === "directory" && row.input?.kind === "mappings")) return null;
       const result = request.kind === "save"
         ? await dialog.showSaveDialog(window, { title: "Choose a destination" })
         : await dialog.showOpenDialog(window, { title: request.kind === "directory" ? "Choose a folder" : "Choose a file", properties: [request.kind === "directory" ? "openDirectory" : "openFile"] });

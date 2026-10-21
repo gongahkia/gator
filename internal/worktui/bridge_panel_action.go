@@ -140,6 +140,9 @@ func (m *Model) setBridgeField(index int, value string) {
 			fields.SetBridgeField(index, value)
 		}
 	case m.controlForm != nil:
+		if m.controlForm.Fields[index].Kind == "mappings" {
+			value = bridgeMappingsText(value)
+		}
 		m.controlForm.Fields[index].Value = value
 	case m.followupForm != nil:
 		d := &m.followupForm.Draft

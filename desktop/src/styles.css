@@ -365,6 +365,12 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .field-options > p { font-size: var(--text-sm); padding: 12px; background: var(--color-surface); border-radius: var(--radius-sm); }
 .field-budget { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .field-budget > label { min-width: 0; display: flex; flex-direction: column; gap: 6px; font-size: var(--text-xs); color: var(--color-muted); }
+.field-mappings { border: 0; padding: 0; margin: 0; min-width: 0; display: grid; gap: 12px; }
+.field-mappings > .button { justify-self: start; }
+.mapping-row { padding: 14px; border: 1px solid var(--color-line); border-radius: var(--radius-md); }
+.mapping-row > div { display: grid; gap: 12px; }
+.mapping-row label { display: grid; gap: 6px; font-size: var(--text-xs); color: var(--color-muted); }
+.mapping-row > button { margin-top: 8px; }
 .field small { line-height: 1.6; }
 .status-line-toggle { display: flex; align-items: center; min-height: 44px; gap: 10px; margin-right: auto; cursor: pointer; }
 .status-line-toggle input, .status-line-option input { accent-color: var(--color-accent); width: 16px; height: 16px; flex-shrink: 0; }

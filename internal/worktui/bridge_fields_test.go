@@ -58,3 +58,23 @@ func TestDesktopListFilterAcceptsOnlyProjectedChoices(t *testing.T) {
 		t.Fatal("a projected filter was not selected directly")
 	}
 }
+
+func TestNativeRestoreMappingsKeepCanonicalArgumentsAndReview(t *testing.T) {
+	m := New(Config{})
+	m.section = "controls"
+	m.controlForm = &ControlAction{Label: "Restore", Review: true, Fields: []ControlField{{Label: "Mappings", Kind: "mappings", Value: "/old=/new"}, {Label: "Name", Value: "unchanged"}}}
+	panel := m.BridgeState().Panel
+	if panel.Rows[0].Input.Value != `[{"from":"/old","to":"/new"}]` {
+		t.Fatal("mapping pairs were not projected as structured fields")
+	}
+	next, _ := m.ApplyBridgePanel(BridgePanelAction{ID: panel.ID, Action: "key", Fields: map[int]string{0: `[{"from":"/bad=path","to":"/new"}]`, 1: "must not change"}}, tea.KeyMsg{Type: tea.KeyCtrlR})
+	m = next.(Model)
+	if m.controlForm.Fields[1].Value != "unchanged" || m.controlReview {
+		t.Fatal("an ambiguous mapping partly changed the form")
+	}
+	next, cmd := m.ApplyBridgePanel(BridgePanelAction{ID: m.BridgeState().Panel.ID, Action: "key", Fields: map[int]string{0: `[{"from":"/original one","to":"/replacement"},{"from":"/original-two","to":"/other=folder"}]`}}, tea.KeyMsg{Type: tea.KeyCtrlR})
+	m = next.(Model)
+	if cmd != nil || !m.controlReview || m.controlForm.Fields[0].Value != "/original one=/replacement; /original-two=/other=folder" {
+		t.Fatal("mapping editor changed canonical arguments or skipped review")
+	}
+}

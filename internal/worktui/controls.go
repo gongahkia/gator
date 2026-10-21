@@ -14,6 +14,7 @@ import (
 // the display projection, never action arguments or secret form values.
 type ControlField struct {
 	Label, Value string
+	Kind, Help   string
 	Secret       bool
 }
 type ControlAction struct {
@@ -264,6 +265,10 @@ func (m Model) controlsPanel() uisnapshot.Panel {
 					value = " "
 				}
 				input := bridgeInput(field.Value, 8192, false)
+				input.Kind, input.Help = field.Kind, field.Help
+				if field.Kind == "mappings" {
+					input.Value = bridgeMappingsJSON(field.Value)
+				}
 				if field.Secret {
 					input.Secret, input.Value = true, ""
 				}

@@ -11,14 +11,17 @@ export function PanelField({ row, value, disabled, group, panelID, change }: { r
   const locked = disabled || field.read_only || choosing;
   const help = field.help || (field.secret ? "Leave empty to keep the stored credential." : "");
   const describedBy = help ? `${id}-help` : undefined;
-  const choose = async () => {
+  const choose = async (kind = field.kind!, selected = change) => {
     setChoosing(true);
     setIssue("");
-    try { const path = panelID && await window.gator?.choosePath({ panel_id: panelID, kind: field.kind! }); if (path) change(path); }
+    try { const path = panelID && await window.gator?.choosePath({ panel_id: panelID, kind }); if (path) selected(path); }
     catch (error) { setIssue(error instanceof Error ? error.message : "Could not open the path picker."); }
     finally { setChoosing(false); }
   };
-  const control = field.kind === "select" ? <select id={id} aria-label={row.label} aria-describedby={describedBy} value={value} disabled={locked} onChange={(event) => change(event.target.value)}>{field.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+  const mappings: { from: string; to: string }[] = field.kind === "mappings" ? JSON.parse(value || "[]") : [];
+  const updateMapping = (index: number, key: "from" | "to", text: string) => change(JSON.stringify(mappings.map((mapping, position) => position === index ? { ...mapping, [key]: text } : mapping)));
+  const control = field.kind === "mappings" ? <fieldset className="field-mappings" disabled={locked} aria-describedby={describedBy}><legend className="visually-hidden">{row.label}</legend>{mappings.map((mapping, index) => <div className="mapping-row" key={index}><div>{(["from", "to"] as const).map((key) => <label key={key}><span>{key === "from" ? "Original folder" : "Replacement folder"} {index + 1}</span><div className="field-input"><input aria-label={`${key === "from" ? "Original" : "Replacement"} folder ${index + 1}`} value={mapping[key]} onChange={(event) => updateMapping(index, key, event.target.value)} /><button className="small-button" aria-label={`Browse ${key === "from" ? "original" : "replacement"} folder ${index + 1}`} onClick={() => void choose("directory", (path) => updateMapping(index, key, path))}>Browse…</button></div></label>)}</div><button className="small-button" aria-label={`Remove folder mapping ${index + 1}`} onClick={() => change(JSON.stringify(mappings.filter((_, position) => position !== index)))}>Remove mapping</button></div>)}<button className="button" onClick={() => change(JSON.stringify([...mappings, { from: "", to: "" }]))}>Add folder mapping</button></fieldset>
+    : field.kind === "select" ? <select id={id} aria-label={row.label} aria-describedby={describedBy} value={value} disabled={locked} onChange={(event) => change(event.target.value)}>{field.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
     : field.kind === "multi" ? <fieldset className="field-options" aria-describedby={describedBy} disabled={locked}><legend className="visually-hidden">{row.label}</legend>{field.options?.length ? field.options.map((option) => {
       let selected: string[] = []; try { selected = JSON.parse(value) || []; } catch { /* An empty saved choice means local files only. */ }
       return <label key={option.value}><input type="checkbox" checked={selected.includes(option.value)} onChange={(event) => change(JSON.stringify(event.target.checked ? [...selected, option.value] : selected.filter((item) => item !== option.value)))} /><span>{option.label}</span></label>;

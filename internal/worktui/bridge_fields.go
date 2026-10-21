@@ -49,8 +49,44 @@ func validBridgeInput(field *uisnapshot.Input, value string) bool {
 				return false
 			}
 		}
+	case "mappings":
+		var mappings []bridgeSourceMap
+		if json.Unmarshal([]byte(value), &mappings) != nil || len(mappings) > 32 {
+			return false
+		}
+		for _, mapping := range mappings {
+			if strings.TrimSpace(mapping.From) == "" || strings.TrimSpace(mapping.To) == "" || strings.ContainsAny(mapping.From, "=;\r\n") || strings.ContainsAny(mapping.To, ";\r\n") {
+				return false
+			}
+		}
 	}
 	return true
+}
+
+type bridgeSourceMap struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+}
+
+func bridgeMappingsJSON(value string) string {
+	mappings := []bridgeSourceMap{}
+	for _, pair := range strings.FieldsFunc(value, func(r rune) bool { return r == ';' || r == '\n' }) {
+		if from, to, ok := strings.Cut(pair, "="); ok {
+			mappings = append(mappings, bridgeSourceMap{strings.TrimSpace(from), strings.TrimSpace(to)})
+		}
+	}
+	encoded, _ := json.Marshal(mappings)
+	return string(encoded)
+}
+
+func bridgeMappingsText(value string) string {
+	var mappings []bridgeSourceMap
+	_ = json.Unmarshal([]byte(value), &mappings)
+	var pairs []string
+	for _, mapping := range mappings {
+		pairs = append(pairs, mapping.From+"="+mapping.To)
+	}
+	return strings.Join(pairs, "; ")
 }
 
 func bridgeNumber(value string, min, max int64) bool {

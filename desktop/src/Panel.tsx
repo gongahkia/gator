@@ -94,7 +94,7 @@ export function Panel({ panel, send, title = panel.title, subtitle = panel.subti
   useEffect(() => {
     const shortcut = (event: globalThis.KeyboardEvent) => {
       if (event.defaultPrevented || event.repeat || busy || event.metaKey || event.altKey || !(event.target instanceof HTMLElement)) return;
-      if (event.target.closest('input, textarea, [contenteditable], [role="dialog"], [role="alertdialog"]')) return;
+      if (event.target.closest('input, textarea, select, [contenteditable], [role="dialog"], [role="alertdialog"]')) return;
       const key = event.ctrlKey ? `ctrl+${event.key.toLowerCase()}` : event.key.toLowerCase();
       if (["escape", "enter", " "].includes(key)) return; // Native buttons and App own these.
       if (hints.some((hint) => hint.key === key)) { event.preventDefault(); keyAction(key); }
