@@ -201,6 +201,7 @@ func (m Model) bridgeHistoryPanel() uisnapshot.Panel {
 		}
 		return panel
 	}
+	panel.Filter = &uisnapshot.Filter{Value: historyFilterName(m.historyFilter), Options: []uisnapshot.Option{{Value: "all", Label: "All task runs"}, {Value: "running", Label: "Running"}, {Value: "completed", Label: "Completed"}, {Value: "failed", Label: "Failed"}}}
 	for _, item := range m.historyItems {
 		panel.Rows = append(panel.Rows, uisnapshot.Row{Label: item.Record.ObjectiveSummary,
 			Detail: historyStatusLine(item.Record, item.Project, item.Delivery)})
@@ -286,6 +287,7 @@ func (m Model) bridgeLearningsPanel() uisnapshot.Panel {
 		}
 		return panel
 	}
+	panel.Filter = &uisnapshot.Filter{Value: learningFilterName(m.learningFilter), Options: []uisnapshot.Option{{Value: "all", Label: "All guidance"}, {Value: "active", Label: "Active"}, {Value: "candidate", Label: "Awaiting review"}, {Value: "disabled", Label: "Disabled"}, {Value: "rejected", Label: "Rejected"}}}
 	for _, item := range m.learningItems {
 		detail := string(item.Status) + " · " + string(item.Type) + " · " + learningScopeShort(item.Scope)
 		if item.Origin == learning.Inferred {

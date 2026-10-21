@@ -391,6 +391,8 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .panel-filter { flex-shrink: 0; margin-bottom: 16px; }
 .panel-filter .panel-search { margin-bottom: 8px; }
 .collection-count { color: var(--color-muted); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+.collection-filter { display: inline-flex; align-items: center; gap: 12px; font-size: var(--text-sm); color: var(--color-muted); margin-bottom: 16px; }
+.collection-filter select { min-height: 40px; min-width: 160px; padding: 8px 12px; color: var(--color-contrast); background: var(--color-surface); border: 1px solid var(--color-line); border-radius: var(--radius-sm); }
 .collection-search-help { color: var(--color-muted); font-size: var(--text-xs); margin-top: 6px; }
 .collection-search-help summary { display: inline-flex; min-height: 40px; align-items: center; gap: 6px; cursor: pointer; }
 .collection-search-help p { max-width: 640px; line-height: 1.7; padding: 4px 0 10px; }

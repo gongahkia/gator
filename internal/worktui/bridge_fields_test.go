@@ -44,3 +44,17 @@ func TestNativeFollowupFieldsKeepReviewAndRejectInvalidChoicesAtomically(t *test
 		t.Fatal("native values saved without a separate confirmation")
 	}
 }
+
+func TestDesktopListFilterAcceptsOnlyProjectedChoices(t *testing.T) {
+	m := New(Config{})
+	m.section = "history"
+	next, _ := m.ApplyBridgePanel(BridgePanelAction{ID: m.BridgeState().Panel.ID, Action: "filter", Text: "delete"}, tea.KeyMsg{})
+	m = next.(Model)
+	if m.historyFilter != "" {
+		t.Fatal("an unprojected filter changed the view")
+	}
+	next, _ = m.ApplyBridgePanel(BridgePanelAction{ID: m.BridgeState().Panel.ID, Action: "filter", Text: "failed"}, tea.KeyMsg{})
+	if next.(Model).historyFilter != "failed" {
+		t.Fatal("a projected filter was not selected directly")
+	}
+}

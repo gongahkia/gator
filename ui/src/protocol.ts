@@ -51,6 +51,7 @@ export type BackendPanel = {
   }[];
   blocks?: { title?: string; lines: string[] | null; collapsible?: boolean }[];
   usage?: Usage;
+  filter?: { value: string; options: { value: string; label: string }[] };
   selected?: number;
   notice?: string;
   footer?: string;
@@ -119,7 +120,7 @@ export type BackendState = {
   destination?: string;
 };
 export type PanelAction = {
-  id: string; action: "select" | "activate" | "key" | "query";
+  id: string; action: "select" | "activate" | "key" | "query" | "filter";
   row?: number; fields?: Record<number, string>; text?: string;
 };
 export type Frame = {

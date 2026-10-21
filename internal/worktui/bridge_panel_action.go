@@ -36,7 +36,7 @@ func (m Model) ApplyBridgePanel(event BridgePanelAction, key tea.KeyMsg) (tea.Mo
 		m.bridgeNotice = m.status
 		return m, nil
 	}
-	if event.Action != "select" && event.Action != "activate" && event.Action != "key" && event.Action != "query" {
+	if event.Action != "select" && event.Action != "activate" && event.Action != "key" && event.Action != "query" && event.Action != "filter" {
 		return m, nil
 	}
 	if m.controlBusy || m.followupSaving {
@@ -47,6 +47,31 @@ func (m Model) ApplyBridgePanel(event BridgePanelAction, key tea.KeyMsg) (tea.Mo
 		return m, nil
 	}
 	if event.Row != nil && (*event.Row < 0 || *event.Row >= len(panel.Rows)) {
+		return m, nil
+	}
+	if event.Action == "filter" {
+		if panel.Filter == nil {
+			return m, nil
+		}
+		allowed := false
+		for _, option := range panel.Filter.Options {
+			allowed = allowed || option.Value == event.Text
+		}
+		if !allowed {
+			return m, nil
+		}
+		switch m.section {
+		case "history":
+			if m.setHistoryFilter(event.Text) == nil {
+				m.selected, m.sectionNotice = 0, ""
+				m.refreshGlobalHistory("")
+			}
+		case "learnings":
+			if m.setLearningFilter(event.Text) == nil {
+				m.selected, m.sectionNotice = 0, ""
+				m.refreshLearnings("")
+			}
+		}
 		return m, nil
 	}
 	for index, value := range event.Fields {

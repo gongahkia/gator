@@ -609,7 +609,8 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     await page.locator(".panel-row").first().press("f");
     await expect(page.locator(".workflow-heading p")).toContainText("running");
     await expect(page.locator(".panel-row")).toHaveCount(0);
-    await page.getByRole("button", { name: /^filter F$/i }).click();
+    await expect(page.getByRole("combobox", { name: "Filter task runs" })).toHaveValue("running");
+    await page.getByRole("combobox", { name: "Filter task runs" }).selectOption("completed");
     await expect(page.locator(".workflow-heading p")).toContainText("completed");
     await expect(page.locator(".panel-row")).toHaveCount(2);
     await expect(page.getByRole("button", { name: "Conversations", exact: true })).toHaveAttribute("aria-current", "page");
