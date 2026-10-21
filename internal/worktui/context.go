@@ -154,7 +154,9 @@ func (m Model) contextPanel() uisnapshot.Panel {
 	p := uisnapshot.Panel{Kind: "context", Title: "Context and sources", Subtitle: m.contextState.Outcome, Selected: m.selected, Notice: m.sectionNotice}
 	if item := m.contextDetail; item != nil {
 		p.Title = item.Title
-		p.Blocks = []uisnapshot.Block{{Title: "Supplied excerpt", Lines: []string{item.Text}}, {Title: "Scope and provenance", Lines: []string{"Scope: " + knowledgeScope(item.Scope, m.contextState.GoalID), "Source labels: " + valueOrNone(item.Source), item.Updated, "This is supplied context, not proof of hidden reasoning or that a source supports a claim."}}}
+		p.Blocks = []uisnapshot.Block{{Title: "Supplied excerpt", Role: "content", Lines: []string{item.Text}}, {Title: "Scope and provenance", Collapsible: true,
+			Fields: []uisnapshot.Field{{Label: "Scope", Value: knowledgeScope(item.Scope, m.contextState.GoalID)}, {Label: "Source labels", Value: valueOrNone(item.Source)}, {Label: "Updated", Value: item.Updated}},
+			Lines:  []string{"This is supplied context, not proof of hidden reasoning or that a source supports a claim."}}}
 		if item.SourceReviewNeeded {
 			p.Blocks = append(p.Blocks, uisnapshot.Block{Title: "Source needs review", Lines: []string{"The linked file changed or is unavailable. Automatic recall skips this memory until you review the file and relink it.", "/memory correct " + item.ID + " --source-file PATH TEXT"}})
 		}

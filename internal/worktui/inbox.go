@@ -89,8 +89,9 @@ func (m Model) inboxDetailPanel() uisnapshot.Panel {
 	if !entry.ReadAt.IsZero() {
 		read = "Read"
 	}
-	p.Blocks = []uisnapshot.Block{{Title: "Retained update", Lines: []string{safeInboxText(entry.Summary)}},
-		{Title: "Result details", Lines: []string{read, "Rating: " + valueOrDefault(entry.Rating, "Not rated"),
+	p.Summary = []uisnapshot.Field{{Label: "Read status", Value: read}, {Label: "Rating", Value: valueOrDefault(entry.Rating, "Not rated")}}
+	p.Blocks = []uisnapshot.Block{{Title: "Retained update", Role: "content", Lines: []string{safeInboxText(entry.Summary)}},
+		{Title: "Result details", Collapsible: true, Lines: []string{read, "Rating: " + valueOrDefault(entry.Rating, "Not rated"),
 			fmt.Sprintf("Urgent: %t", entry.Urgent), "Result ID: " + entry.ID,
 			"Goal: " + valueOrNone(entry.GoalID), "Check: " + valueOrNone(entry.JobID)}}}
 	if m.config.InboxAction != nil {

@@ -142,7 +142,7 @@ func (m Model) bridgeSectionPanel() uisnapshot.Panel {
 				tone = "success"
 			}
 			panel.Rows = append(panel.Rows, uisnapshot.Row{Label: safeInboxText(item.Title),
-				Detail: safeInboxText(item.Summary), State: safeInboxText(item.Status) + " · " + item.ID + " · " + state, Tone: tone})
+				Detail: safeInboxText(item.Summary), State: state, Tone: tone, UpdatedAt: item.CreatedAt.Format(time.RFC3339), Metadata: []uisnapshot.Field{{Label: "Result status", Value: safeInboxText(item.Status)}}})
 		}
 		if len(panel.Rows) == 0 {
 			panel.Notice = "No recent results."
@@ -275,20 +275,19 @@ func (m Model) bridgeLearningsPanel() uisnapshot.Panel {
 	}
 	if record := m.learningDetail; record != nil {
 		panel.Title = "Learning detail"
-		panel.Subtitle = singleLine(record.Content)
+		panel.Subtitle = "Saved guidance for future work"
+		panel.Summary = []uisnapshot.Field{{Label: "Status", Value: string(record.Status)}, {Label: "Type", Value: strings.ReplaceAll(string(record.Type), "_", " ")}, {Label: "Scope", Value: learningScopeShort(record.Scope)}}
 		panel.Blocks = []uisnapshot.Block{
-			{Title: "Status", Lines: []string{string(record.Status) + " · " + string(record.Origin)}},
-			{Title: "Type and scope", Lines: []string{string(record.Type) + " · " + learningScopeText(record.Scope)}},
-			{Title: "Key", Lines: []string{record.Key}},
-			{Title: "Created", Lines: []string{record.CreatedAt.Local().Format("2006-01-02 15:04")}},
-			{Title: "Derived from Work", Lines: compactLines(record.Provenance.WorkIDs, 3)},
-			{Title: "Evidence", Lines: compactLines(record.Provenance.EvidenceRefs, 3)},
+			{Title: "Guidance", Role: "content", Lines: []string{record.Content}},
+			{Title: "Record details", Collapsible: true, Fields: []uisnapshot.Field{{Label: "Origin", Value: string(record.Origin)}, {Label: "Scope", Value: learningScopeText(record.Scope)}, {Label: "Key", Value: record.Key}, {Label: "Created", Value: record.CreatedAt.Local().Format("2006-01-02 15:04")}}},
+			{Title: "Derived from Work", Collapsible: true, Lines: compactLines(record.Provenance.WorkIDs, 3)},
+			{Title: "Evidence", Collapsible: true, Lines: compactLines(record.Provenance.EvidenceRefs, 3)},
 		}
 		if record.Origin == learning.Inferred {
-			panel.Blocks = append(panel.Blocks, uisnapshot.Block{Title: "Confidence", Lines: []string{fmt.Sprint(record.Confidence)}})
+			panel.Blocks = append(panel.Blocks, uisnapshot.Block{Title: "Confidence", Collapsible: true, Lines: []string{fmt.Sprint(record.Confidence)}})
 		}
 		if !record.Provenance.UserConfirmedAt.IsZero() {
-			panel.Blocks = append(panel.Blocks, uisnapshot.Block{Title: "Confirmed", Lines: []string{record.Provenance.UserConfirmedAt.Local().Format("2006-01-02 15:04")}})
+			panel.Blocks = append(panel.Blocks, uisnapshot.Block{Title: "Confirmed", Collapsible: true, Lines: []string{record.Provenance.UserConfirmedAt.Local().Format("2006-01-02 15:04")}})
 		}
 		controls := []string{"Esc back", "N add"}
 		switch record.Status {
@@ -323,7 +322,8 @@ func (m Model) bridgeLearningsPanel() uisnapshot.Panel {
 		if item.Origin == learning.Inferred {
 			detail += fmt.Sprintf(" · confidence %d", item.Confidence)
 		}
-		panel.Rows = append(panel.Rows, uisnapshot.Row{Label: singleLine(item.Content), Detail: detail})
+		panel.Rows = append(panel.Rows, uisnapshot.Row{Label: singleLine(item.Content), Detail: detail, State: string(item.Status), UpdatedAt: item.CreatedAt.Format(time.RFC3339),
+			Metadata: []uisnapshot.Field{{Label: "Type", Value: strings.ReplaceAll(string(item.Type), "_", " ")}, {Label: "Scope", Value: learningScopeShort(item.Scope)}}})
 	}
 	if len(panel.Rows) == 0 && panel.Notice == "" {
 		panel.Notice = "No learnings match this view. Press N to add a preference."
