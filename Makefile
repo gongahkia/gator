@@ -1,4 +1,4 @@
-.PHONY: build check fmt test vet
+.PHONY: build check fmt test vet desktop
 
 VERSION ?= dev
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
@@ -8,6 +8,9 @@ LDFLAGS = -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(BUI
 build:
 	mkdir -p bin
 	go build -ldflags "$(LDFLAGS)" -o bin/gator ./cmd/gator
+
+desktop:
+	npm start --prefix desktop
 
 check: fmt test vet build
 

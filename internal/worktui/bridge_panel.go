@@ -222,8 +222,8 @@ func (m Model) bridgeLearningsPanel() uisnapshot.Panel {
 		panel.Rows = []uisnapshot.Row{
 			{Label: "Type", Detail: string(form.Type)},
 			{Label: "Scope", Detail: learningScopeText(form.Scope)},
-			{Label: "Key", Detail: valueOrNone(form.Key)},
-			{Label: "Text", Detail: valueOrNone(form.Content)},
+			{Label: "Key", Detail: valueOrNone(form.Key), Input: bridgeInput(form.Key, 4096, false)},
+			{Label: "Text", Detail: valueOrNone(form.Content), Input: bridgeInput(form.Content, 4096, true)},
 		}
 		panel.Selected = form.Field
 		panel.Footer = "Tab next field · Enter continue or save · Esc cancel"

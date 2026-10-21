@@ -163,7 +163,7 @@ func (m Model) contextPanel() uisnapshot.Panel {
 		}
 		if m.contextEditing {
 			p.Kind, p.Title = "knowledge-form", "Correct saved knowledge"
-			p.Rows = []uisnapshot.Row{{Label: "Current saved text", Detail: m.contextEdit}}
+			p.Rows = []uisnapshot.Row{{Label: "Current saved text", Detail: m.contextEdit, Input: bridgeInput(m.contextEdit, 4096, true)}}
 			p.Hints = []uisnapshot.Hint{{Shortcut: "Ctrl+U", Action: "clear"}, {Shortcut: "Enter", Action: "save correction"}, {Shortcut: "Esc", Action: "cancel"}}
 		} else if m.contextConfirm {
 			p.Kind, p.Title = "confirmation", "Forget saved knowledge?"

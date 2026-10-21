@@ -31,6 +31,24 @@ func TestCurrentWorkModelStatusReportsConfiguredLocalModel(t *testing.T) {
 	}
 }
 
+func TestCurrentWorkModelStatusResolvesImplicitCustomDefault(t *testing.T) {
+	store, err := config.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings := config.Default()
+	settings.Defaults.Provider = "custom-test"
+	settings.Defaults.Model = ""
+	settings.CustomProviders = []config.CustomProvider{{ID: "custom-test", BaseURL: "http://127.0.0.1:11434/v1/chat/completions", Models: []string{"configured-model"}, DefaultModel: "configured-model"}}
+	if err := store.Save(settings); err != nil {
+		t.Fatal(err)
+	}
+	status, err := currentWorkModelStatus(store, t.TempDir())
+	if err != nil || status.Model != "configured-model" || status.Access != "custom endpoint configured (keyless)" {
+		t.Fatalf("implicit model readiness = %#v, %v", status, err)
+	}
+}
+
 func TestCurrentWorkModelStatusReportsStoredAPIKeyAuthentication(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "")
 	store, err := config.New(t.TempDir())

@@ -33,6 +33,12 @@ Headless commands still run without Node.js. `gator doctor` also uses the Node
 terminal interface and requires Node.js 22 or newer. The Go Work
 engine owns conversations, commands, and approvals behind the React interface.
 
+An optional Electron desktop companion is available alongside the terminal.
+Run `npm ci --prefix desktop` once, then `make desktop`. It adapts the sibling
+Referene frontend to the same Go runtime and saved Gator profile. Choose a
+workspace using its folder control or resume an existing goal/conversation.
+See desktop/README.md and docs/DESKTOP.md. The terminal remains available.
+
 = = = = = = = =
 
 🐊

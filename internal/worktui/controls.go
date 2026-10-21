@@ -263,7 +263,11 @@ func (m Model) controlsPanel() uisnapshot.Panel {
 				if value == "" {
 					value = " "
 				}
-				p.Rows = append(p.Rows, uisnapshot.Row{Label: field.Label, Detail: value})
+				input := bridgeInput(field.Value, 8192, false)
+				if field.Secret {
+					input.Secret, input.Value = true, ""
+				}
+				p.Rows = append(p.Rows, uisnapshot.Row{Label: field.Label, Detail: value, Input: input})
 			}
 			p.Hints = []uisnapshot.Hint{{Shortcut: "Tab", Action: "next field"}, {Shortcut: "Ctrl+R", Action: "review"}, {Shortcut: "Ctrl+U", Action: "clear"}, {Shortcut: "Esc", Action: "cancel"}}
 		}

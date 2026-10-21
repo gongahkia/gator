@@ -6,7 +6,7 @@ import (
 	"github.com/gongahkia/gator/internal/uisnapshot"
 )
 
-// UISnapshot exposes model-management state to the React terminal renderer.
+// UISnapshot exposes model-management state to the terminal and desktop.
 // Model selection, credential handling, and confirmations still run in Go.
 func (p *ModelCatalogPanel) UISnapshot() uisnapshot.Panel {
 	panel := uisnapshot.Panel{Kind: "models", Title: "Models", Notice: p.noticeText()}
@@ -49,7 +49,7 @@ func (p *ModelCatalogPanel) UISnapshot() uisnapshot.Panel {
 			panel.Rows = append(panel.Rows, uisnapshot.Row{Label: entry.name, Detail: entry.status})
 		}
 		panel.Footer = "↑/↓ choose · Enter use · C configure key · D forget · N provider · G discover · Esc back · F1 help"
-		panel.Hints = []uisnapshot.Hint{{Shortcut: "↑/↓", Action: "choose"}, {Shortcut: "Enter", Action: "use"}, {Shortcut: "C", Action: "configure"}, {Shortcut: "Esc", Action: "back"}}
+		panel.Hints = []uisnapshot.Hint{{Shortcut: "↑/↓", Action: "choose"}, {Shortcut: "Enter", Action: "use"}, {Shortcut: "C", Action: "configure"}, {Shortcut: "N", Action: "new provider"}, {Shortcut: "G", Action: "discover"}, {Shortcut: "E", Action: "rename"}, {Shortcut: "D", Action: "forget credential"}, {Shortcut: "X", Action: "remove provider"}, {Shortcut: "Esc", Action: "back"}}
 	} else {
 		panel.Title = "Local models"
 		panel.Selected = p.model.localModels.selected
@@ -71,7 +71,7 @@ func (p *ModelCatalogPanel) UISnapshot() uisnapshot.Panel {
 			panel.Rows = append(panel.Rows, uisnapshot.Row{Label: model.Name, Detail: state, State: model.Category})
 		}
 		panel.Footer = "↑/↓ choose · Enter use · P download · X remove · S start · I setup · R refresh · Esc back · F1 help"
-		panel.Hints = []uisnapshot.Hint{{Shortcut: "↑/↓", Action: "choose"}, {Shortcut: "Enter", Action: "use"}, {Shortcut: "P", Action: "download"}, {Shortcut: "Esc", Action: "back"}}
+		panel.Hints = []uisnapshot.Hint{{Shortcut: "↑/↓", Action: "choose"}, {Shortcut: "Enter", Action: "use"}, {Shortcut: "P", Action: "download"}, {Shortcut: "S", Action: "start Ollama"}, {Shortcut: "I", Action: "setup"}, {Shortcut: "E", Action: "rename"}, {Shortcut: "X", Action: "remove model"}, {Shortcut: "R", Action: "refresh"}, {Shortcut: "Esc", Action: "back"}}
 	}
 	if p.model.localModels.action != localModelIdle {
 		panel.Notice = p.model.localModelActionLabel()
@@ -117,7 +117,11 @@ func (p *ModelCatalogPanel) focusedSnapshot(panel uisnapshot.Panel) uisnapshot.P
 			if field == cloudSetupCredentialField && input.Value() != "" {
 				value = "••••••••"
 			}
-			panel.Rows = append(panel.Rows, uisnapshot.Row{Label: label, Detail: value})
+			fieldInput := &uisnapshot.Input{Value: input.Value(), Placeholder: input.Placeholder, Limit: input.CharLimit}
+			if field == cloudSetupCredentialField {
+				fieldInput.Secret, fieldInput.Value = true, ""
+			}
+			panel.Rows = append(panel.Rows, uisnapshot.Row{Label: label, Detail: value, Input: fieldInput})
 			if field == state.cloudSetup.focus {
 				panel.Selected = index
 			}
@@ -129,7 +133,7 @@ func (p *ModelCatalogPanel) focusedSnapshot(panel uisnapshot.Panel) uisnapshot.P
 		panel.Subtitle = "Endpoint metadata only; secrets remain in environment variables."
 		for index, field := range state.customSetup.fields() {
 			label, value := state.customSetup.snapshotField(field)
-			panel.Rows = append(panel.Rows, uisnapshot.Row{Label: label, Detail: value})
+			panel.Rows = append(panel.Rows, uisnapshot.Row{Label: label, Detail: value, Input: state.customSetup.bridgeInput(field)})
 			if field == state.customSetup.focus {
 				panel.Selected = index
 			}
@@ -139,7 +143,7 @@ func (p *ModelCatalogPanel) focusedSnapshot(panel uisnapshot.Panel) uisnapshot.P
 	case state.renaming != nil:
 		panel.Title = "Rename model"
 		panel.Subtitle = "The provider model ID does not change."
-		panel.Rows = []uisnapshot.Row{{Label: "Display name", Detail: state.renaming.input.Value()}}
+		panel.Rows = []uisnapshot.Row{{Label: "Display name", Detail: state.renaming.input.Value(), Input: &uisnapshot.Input{Value: state.renaming.input.Value(), Limit: 2048}}}
 		panel.Footer = "Enter save · Esc cancel"
 		panel.Hints = []uisnapshot.Hint{{Shortcut: "Enter", Action: "save"}, {Shortcut: "Esc", Action: "cancel"}}
 	case state.dependencyHelp:

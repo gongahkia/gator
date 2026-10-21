@@ -31,6 +31,9 @@ func currentWorkModelStatus(settingsStore config.Store, stateDir string) (worktu
 	}
 
 	if custom, found := configuredCustomProvider(settings, status.Provider); found {
+		if status.Model == "" {
+			status.Model = custom.DefaultModel
+		}
 		status.Access = customProviderAccess(custom, status.Model)
 		return status, nil
 	}
@@ -38,6 +41,7 @@ func currentWorkModelStatus(settingsStore config.Store, stateDir string) (worktu
 	if err != nil {
 		return status, err
 	}
+	status.Model = model.EffectiveModel(provider, status.Model)
 	credentials, err := auth.New(stateDir)
 	if err != nil {
 		return status, err

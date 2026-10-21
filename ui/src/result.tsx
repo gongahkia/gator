@@ -3,23 +3,8 @@ import { Box, Text, TerminalSizeContext } from "@claude-code-kit/ink-renderer";
 import { Markdown } from "@claude-code-kit/ui";
 import { useGatorPalette, type GatorPalette } from "./theme.js";
 
-export type ResultTone = "success" | "warning" | "error" | "muted" | "";
-export type ResultField = { label: string; value: string; tone?: ResultTone };
-export type ResultItem = { label: string; detail?: string; state?: string; tone?: ResultTone };
-export type ResultSection = { title: string; summary?: string; fields?: ResultField[]; items?: ResultItem[]; lines?: string[]; markdown?: string };
-export type BackendResult = {
-  kind: "notice" | "details" | "list" | "report" | "preview" | "approval";
-  title: string;
-  tone?: ResultTone;
-  summary?: string;
-  fields?: ResultField[];
-  items?: ResultItem[];
-  sections?: ResultSection[];
-  lines?: string[];
-  markdown?: string;
-  preview?: unknown;
-  footer?: string;
-};
+import type { BackendResult, ResultTone } from "./protocol.js";
+export type { BackendResult, ResultField, ResultItem, ResultSection, ResultTone } from "./protocol.js";
 
 function toneColor(tone: ResultTone | undefined, palette: GatorPalette): string | undefined {
   return tone === "success" ? palette.accent : tone === "warning" ? palette.warning : tone === "error" ? palette.error : tone === "muted" ? palette.secondary : undefined;

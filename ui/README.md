@@ -4,6 +4,8 @@ This is the live React terminal frontend. The Go Work TUI remains the source
 of truth for commands, model setup, runs, approvals, conversation history, and
 deliverables. The frontend renders the chat and command panels from a versioned
 JSON-line state projection; it sends requests and keyboard controls back.
+`src/protocol.ts` also supplies the display types used by the optional desktop
+companion. Native desktop actions run through the same Go application.
 
 The Go executable embeds `cmd/gator/ui/gator-ui.cjs`. To change this frontend:
 

@@ -1,5 +1,10 @@
 # Gator terminal interface
 
+The optional [desktop companion](DESKTOP.md) adapts Referene's React DOM /
+Tailwind layout and shares the Go UI bridge with this terminal. Desktop
+components live under `desktop/`; the Claude Code Kit terminal conventions
+below continue to apply to `ui/`.
+
 ## Reference and ownership
 
 The interactive UI is the React renderer in `ui/src/main.tsx`, built with

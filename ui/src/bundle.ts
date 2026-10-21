@@ -1,11 +1,5 @@
-import type { BackendResult } from "./result.js";
-
-export type BackendBundle = {
-  Path: string;
-  Status: string;
-  Artifacts: { Path: string; MediaType: string; Valid: boolean }[] | null;
-  Candidates: { ID: string; Status: string; ChangedPaths: string[] }[] | null;
-};
+import type { BackendBundle, BackendResult } from "./protocol.js";
+export type { BackendBundle } from "./protocol.js";
 
 export function bundleResult(bundle: BackendBundle): BackendResult {
   return {

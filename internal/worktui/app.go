@@ -328,6 +328,7 @@ type Model struct {
 	loadingRun             uint64
 	runStarted             time.Time
 	modelStatus            ModelStatus
+	bridgeNotice           string
 	statusLine             []string
 	statusLineConfigured   bool
 	statusLineEnabled      bool

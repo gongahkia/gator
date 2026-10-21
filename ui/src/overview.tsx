@@ -2,11 +2,8 @@ import React from "react";
 import { Box, Text } from "@claude-code-kit/ink-renderer";
 import { useGatorPalette } from "./theme.js";
 
-export type Overview = {
-  at: string;
-  since: string;
-  sections: { id: string; title: string; summary: string; total: number }[];
-};
+import type { Overview } from "./protocol.js";
+export type { Overview } from "./protocol.js";
 
 export const overviewLabels: Record<string, string> = {
   changed: "Changed",

@@ -1,0 +1,134 @@
+import { _electron as electron, test, expect } from "@playwright/test";
+import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { resolve, join } from "node:path";
+import { execFileSync } from "node:child_process";
+import { createServer } from "node:http";
+
+const launchDesktop = (env: Record<string, string | undefined>) => {
+  const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
+  const definedEnv = Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+  return electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env: definedEnv });
+};
+
+test("desktop uses real Go state, preserves drafts, edits native forms, and continues saved work", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "gator-desktop-e2e-"));
+  const workspace = join(directory, "notes");
+  await mkdir(workspace);
+  await writeFile(join(workspace, "project.md"), "A personal project with one open decision.\n");
+  let requests = 0;
+  const server = createServer((req, res) => {
+    req.resume();
+    req.on("end", () => {
+      requests++;
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ id: "local-desktop-test", choices: [{ message: { role: "assistant", content: "The desktop is connected to Gator’s Go runtime. Your project has one open decision." }, finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 10, total_tokens: 20 } }));
+    });
+  });
+  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+  const address = server.address() as { port: number };
+  const env = { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop"), GATOR_DESKTOP_WORKSPACE: workspace };
+  const binary = resolve("runtime/gator");
+  const cli = (args: string[]) => execFileSync(binary, args, { env, encoding: "utf8" });
+  cli(["provider", "add", "desktop-fixture", "--base-url", `http://127.0.0.1:${address.port}/v1/chat/completions`, "--model", "fixture-model"]);
+  cli(["config", "set", "default-provider", "desktop-fixture"]);
+  const application = await launchDesktop(env);
+  try {
+    const page = await application.firstWindow();
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await expect(page.getByRole("heading", { name: "What’s on your mind?" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Everyday overview" })).toBeVisible();
+    await expect(page.locator(".composer-model")).toContainText("fixture-model");
+    await page.screenshot({ path: "test-results/desktop-home.png" });
+    await page.getByRole("textbox", { name: "Message Gator" }).fill("keep my draft 🐊");
+    await page.getByRole("button", { name: "Overview", exact: true }).click();
+    await expect(page.getByRole("heading", { name: /overview/i }).first()).toBeVisible();
+    await page.getByRole("button", { name: "Back to conversation" }).click();
+    await expect(page.getByRole("textbox", { name: "Message Gator" })).toHaveValue("keep my draft 🐊");
+    await page.getByRole("button", { name: "Show work details" }).click();
+    await expect(page.getByRole("complementary", { name: "Work details" })).toBeVisible();
+    await page.getByRole("tab", { name: "Deliverables" }).click();
+    await expect(page.getByText("Your work lands here")).toBeVisible();
+    await page.getByRole("button", { name: "Hide work details" }).click();
+    await page.getByRole("button", { name: "Follow-up checks", exact: true }).click();
+    await page.getByRole("button", { name: /new check/i }).click();
+    await expect(page.getByRole("textbox", { name: "Desired outcome", exact: true })).toBeVisible();
+    await page.getByRole("textbox", { name: "Title", exact: true }).fill("Watch my project");
+    await page.getByRole("textbox", { name: "Desired outcome", exact: true }).fill("Tell me when the open decision changes.");
+    await page.getByRole("button", { name: /^review/i }).click();
+    await expect(page.getByRole("heading", { name: "Review ongoing check" })).toBeVisible();
+    await expect(page.getByText("Watch my project", { exact: false }).first()).toBeVisible();
+    await page.screenshot({ path: "test-results/desktop-review.png" });
+    // Back cancels the review; no background service or real check is started.
+    await page.getByRole("button", { name: "Gator home" }).click();
+    await page.getByRole("button", { name: "Leave view", exact: true }).click();
+    await expect(page.getByRole("textbox", { name: "Message Gator" })).toHaveValue("keep my draft 🐊");
+    await page.getByRole("textbox", { name: "Message Gator" }).fill("Summarize my project in one sentence.");
+    await page.getByRole("button", { name: "Send message" }).click();
+    await expect(page.getByText("The desktop is connected to Gator’s Go runtime.", { exact: false }).first()).toBeVisible();
+    expect(requests).toBeGreaterThan(0);
+    await page.getByRole("textbox", { name: "Message Gator" }).fill("What should I decide next?");
+    await page.getByRole("button", { name: "Send message" }).click();
+    await expect(page.locator(".message-byline", { hasText: "Gator" })).toHaveCount(2);
+    const saved = JSON.parse(cli(["overview", "--json"]));
+    expect(saved).toBeTruthy();
+    for (const size of [{ width: 1440, height: 960 }, { width: 1024, height: 768 }, { width: 800, height: 600 }]) {
+      await application.evaluate(({ BrowserWindow }, value) => BrowserWindow.getAllWindows()[0].setSize(value.width, value.height), size);
+      await expect(page.getByRole("textbox", { name: "Message Gator" })).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      await page.screenshot({ path: `test-results/desktop-${size.width}.png` });
+    }
+    await page.getByRole("button", { name: "Show work details" }).click();
+    await expect(page.getByRole("complementary", { name: "Work details" })).toBeVisible();
+    await page.screenshot({ path: "test-results/desktop-details-800.png" });
+    await page.getByRole("button", { name: "Hide work details" }).click();
+    await page.getByRole("button", { name: "Search commands" }).click();
+    await page.getByRole("textbox", { name: "Find a command" }).fill("help");
+    await page.getByRole("textbox", { name: "Find a command" }).press("Enter");
+    await expect(page.getByRole("dialog", { name: "Search commands" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Search commands" })).toBeFocused();
+    // Exercise the titlebar-free grid used by fullscreen and Linux without
+    // switching the developer's macOS Space during this test.
+    await page.evaluate(() => { document.querySelector<HTMLElement>(".app-shell")!.dataset.fullscreen = "true"; });
+    await expect(page.locator(".titlebar")).toBeHidden();
+    await expect(page.getByRole("textbox", { name: "Message Gator" })).toBeVisible();
+    expect(await page.locator(".main-area").evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThan(300);
+    expect(errors).toEqual([]);
+    expect(await page.evaluate(() => typeof (window as unknown as { require?: unknown }).require)).toBe("undefined");
+  } finally {
+    await application.close();
+    await new Promise<void>((done) => server.close(() => done()));
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("first-run model setup uses native fields and keeps credentials out of display state", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "gator-desktop-setup-e2e-"));
+  const env = { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") };
+  const application = await launchDesktop(env);
+  try {
+    const page = await application.firstWindow();
+    await expect(page.getByRole("heading", { name: "What’s on your mind?" })).toBeVisible();
+    await page.getByRole("button", { name: "Model settings", exact: true }).click();
+    await page.getByRole("button", { name: /^Cloud API key/ }).click();
+    await expect(page.getByRole("heading", { name: "Cloud models", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: /^configure /i }).click();
+    const key = page.locator('input[type="password"]');
+    await expect(key).toHaveCount(1);
+    await key.fill("isolated-test-value");
+    await page.screenshot({ path: "test-results/desktop-model-setup.png" });
+    const display = await page.evaluate(async () => JSON.stringify(await window.gator!.snapshot()));
+    expect(display).not.toContain("isolated-test-value");
+    await page.getByRole("button", { name: "Gator home" }).click();
+    await expect(page.getByRole("alertdialog")).toBeVisible();
+    await page.getByRole("button", { name: "Keep editing" }).press("Shift+Tab");
+    await expect(page.getByRole("button", { name: "Leave view" })).toBeFocused();
+    await page.getByRole("button", { name: "Keep editing" }).click();
+    await expect(key).toHaveValue("isolated-test-value");
+    await page.getByRole("button", { name: "Gator home" }).click();
+    await page.getByRole("button", { name: "Leave view" }).click();
+    await expect(page.getByRole("heading", { name: "What’s on your mind?" })).toBeVisible();
+    expect(await page.evaluate(async () => JSON.stringify(await window.gator!.snapshot()))).not.toContain("isolated-test-value");
+  } finally { await application.close(); await rm(directory, { recursive: true, force: true }); }
+});

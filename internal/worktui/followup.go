@@ -370,6 +370,7 @@ func (m Model) followupPanel() uisnapshot.Panel {
 	if f := m.followupForm; f != nil {
 		if f.Review {
 			p.Kind, p.Title = "confirmation", "Review ongoing check"
+			p.Subtitle = f.Draft.Title
 			p.Blocks = []uisnapshot.Block{{Title: "Your agreement", Lines: f.Draft.ReviewLines()}}
 			p.Hints = []uisnapshot.Hint{{Shortcut: "Enter", Action: "save check"}, {Shortcut: "E", Action: "edit"}, {Shortcut: "Esc", Action: "back"}}
 			return p
@@ -386,6 +387,9 @@ func (m Model) followupPanel() uisnapshot.Panel {
 		}
 		p.Rows = []uisnapshot.Row{{Label: "Title", Detail: d.Title}, {Label: "Desired outcome", Detail: d.Outcome}, {Label: "Local workspace", Detail: d.SourcePath}, {Label: "Connected sources · ←/→ choose, Space toggle", Detail: selectedSource}, {Label: "Mail selection · exact Gmail query", Detail: valueOrNone(d.GmailQuery)}, {Label: "Calendar window · ←/→ change", Detail: strconv.Itoa(d.CalendarDays) + " days (0 disables)"}, {Label: "When Gator works · ←/→ change", Detail: fmt.Sprintf("Every %d minutes", d.IntervalMinutes)}, {Label: "Notify me when", Detail: d.AlertWhen}, {Label: "What Gator may do · ←/→ change", Detail: string(d.Mode) + "; sending requires foreground approval"}, {Label: "Per-try budget · ←/→ change", Detail: fmt.Sprintf("%d requests · %d tokens · %ds", d.MaxRequests, d.MaxTokens, d.MaxSeconds)}, {Label: "Daily Work checks · ←/→ change", Detail: fmt.Sprintf("Up to %d per UTC day; then review with Enter", d.MaxChecksPerDay)}}
 		p.Hints = []uisnapshot.Hint{{Shortcut: "Tab", Action: "next field"}, {Shortcut: "Ctrl+R", Action: "review"}, {Shortcut: "Ctrl+U", Action: "clear field"}, {Shortcut: "Esc", Action: "cancel"}}
+		for index, value := range map[int]string{0: d.Title, 1: d.Outcome, 2: d.SourcePath, 4: d.GmailQuery, 7: d.AlertWhen} {
+			p.Rows[index].Input = bridgeInput(value, 4096, index == 1 || index == 7)
+		}
 		return p
 	}
 	if c := m.checkDetail; c != nil {

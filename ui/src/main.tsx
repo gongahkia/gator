@@ -11,52 +11,7 @@ import { searchMessages } from "./search.js";
 import { panelGeometry, wrapTerminalText, fitPanelHints, formFieldTail } from "./layout.js";
 import { cursorAtGraphemeColumn, graphemeAt, graphemeColumn, nextGrapheme, previousGrapheme } from "./text.js";
 import { GatorPaletteContext, paletteForTheme, synchronizeKitTheme, useGatorPalette } from "./theme.js";
-
-type BackendCommand = { name: string; description: string; advanced: boolean; needs_input: boolean };
-type BackendMessage = { role: string; text: string; bundle?: BackendBundle; result?: BackendResult };
-type BackendPanel = {
-  kind: string;
-  title: string;
-  subtitle?: string;
-  query?: string;
-  rows?: { label: string; detail?: string; state?: string; tone?: "success" | "warning" | "error" | "muted" }[];
-  blocks?: { title?: string; lines: string[] }[];
-  selected?: number;
-  notice?: string;
-  footer?: string;
-  hints?: { shortcut: string; action: string }[];
-};
-type ExternalCommand = { kind: string; program: string; args: string[]; dir?: string; env?: string[] };
-type BackendState = {
-  mode: "chat" | "panel";
-  panel?: BackendPanel;
-  messages: BackendMessage[];
-  commands: BackendCommand[];
-  actions: { Label: string; Command: string }[];
-  title: string;
-  source: string;
-  goal_id?: string;
-  checks?: { title: string; health: string; state: string }[];
-  provider?: string;
-  model?: string;
-  theme: string;
-  status?: string;
-  status_line: string[];
-  status_line_enabled: boolean;
-  input?: string;
-  running: boolean;
-  cancelling: boolean;
-  elapsed?: string;
-  loading_frame: number;
-  queued: number;
-  home: boolean;
-  first_run: boolean;
-  supervisor_needs_start: boolean;
-  overview?: Overview;
-  overview_issue?: string;
-  external?: ExternalCommand;
-};
-type Frame = { version: 1; type: "submit" | "key" | "resize" | "exit" | "external_done"; text?: string; key?: string; error?: string; width?: number; height?: number };
+import type { BackendCommand, BackendMessage, BackendPanel, BackendState, ExternalCommand, Frame } from "./protocol.js";
 
 class GatorBridge {
   private child: ChildProcessWithoutNullStreams;

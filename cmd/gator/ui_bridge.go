@@ -81,13 +81,16 @@ func supportedNodeUI(node string) bool {
 }
 
 type uiFrame struct {
-	Version int    `json:"version"`
-	Type    string `json:"type"`
-	Text    string `json:"text,omitempty"`
-	Key     string `json:"key,omitempty"`
-	Error   string `json:"error,omitempty"`
-	Width   int    `json:"width,omitempty"`
-	Height  int    `json:"height,omitempty"`
+	Version       int                        `json:"version"`
+	Type          string                     `json:"type"`
+	Text          string                     `json:"text,omitempty"`
+	Key           string                     `json:"key,omitempty"`
+	Error         string                     `json:"error,omitempty"`
+	Width         int                        `json:"width,omitempty"`
+	Height        int                        `json:"height,omitempty"`
+	Panel         *worktui.BridgePanelAction `json:"panel,omitempty"`
+	InteractionID int                        `json:"interaction_id,omitempty"`
+	Approved      bool                       `json:"approved,omitempty"`
 }
 
 type uiBridgeModel struct {
@@ -109,6 +112,8 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 		switch frame.Type {
 		case "submit":
 			next, command = m.model.SubmitText(frame.Text)
+		case "navigate":
+			next, command = m.model.NavigateBridge(frame.Text)
 		case "key":
 			if frame.Key == "ctrl+g" || frame.Key == "ctrl+o" {
 				m.model = m.model.SetBridgeInput(frame.Text)
@@ -120,6 +125,17 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 			next, command = m.model.Update(key)
 		case "external_done":
 			next, command = m.model.FinishBridgeExternal(frame.Error)
+		case "panel":
+			if frame.Panel == nil {
+				return m, nil
+			}
+			key, ok := bridgeKey(frame.Key)
+			if frame.Panel.Action == "key" && !ok {
+				return m, nil
+			}
+			next, command = m.model.ApplyBridgePanel(*frame.Panel, key)
+		case "approval":
+			next, command = m.model.RespondBridgeApproval(frame.InteractionID, frame.Approved)
 		case "resize":
 			next, command = m.model.Update(tea.WindowSizeMsg{Width: max(20, frame.Width), Height: max(8, frame.Height)})
 		default:
