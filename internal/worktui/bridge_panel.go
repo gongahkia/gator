@@ -9,7 +9,12 @@ import (
 	"github.com/gongahkia/gator/internal/uisnapshot"
 )
 
-func (m Model) bridgePanel() *uisnapshot.Panel {
+func (m Model) bridgePanel() (result *uisnapshot.Panel) {
+	defer func() {
+		if result != nil {
+			result.BackLabel = m.bridgeBackLabel(*result)
+		}
+	}()
 	if m.models != nil {
 		panel := m.models.UISnapshot()
 		return &panel
@@ -32,6 +37,70 @@ func (m Model) bridgePanel() *uisnapshot.Panel {
 		}
 	}
 	return nil
+}
+
+func (m Model) bridgeBackLabel(panel uisnapshot.Panel) string {
+	if m.productHelp {
+		return "Close shortcuts"
+	}
+	if m.models != nil {
+		if panel.Kind == "confirmation" {
+			return "Cancel model action"
+		}
+		if panel.Title != "Models" {
+			return "Back to model setup"
+		}
+	}
+	if m.controlBusy {
+		return "Stop operation"
+	}
+	if m.controlForm != nil && m.section == "controls" {
+		if m.controlReview && len(m.controlForm.Fields) > 0 {
+			return "Edit review details"
+		}
+		return "Cancel changes"
+	}
+	if m.section == "overview" || m.controlFamily == "overview" && m.section == "controls" && len(m.controlRootArgs) > 0 {
+		return "Back to overview"
+	}
+	if m.section == "inbox" && m.inboxDetail != "" {
+		return "Back to Inbox"
+	}
+	if m.section == "history" && m.historyDetail != nil {
+		return "Back to task runs"
+	}
+	if m.section == "learnings" {
+		if m.learningForm != nil {
+			return "Cancel guidance changes"
+		}
+		if m.learningDetail != nil {
+			return "Back to saved guidance"
+		}
+	}
+	if m.section == "context" && m.contextDetail != nil {
+		if m.contextEditing {
+			return "Cancel correction"
+		}
+		if m.contextConfirm {
+			return "Cancel forgetting"
+		}
+		if m.contextWorkID != "" {
+			return "Back to context and sources"
+		}
+		return "Back to saved knowledge"
+	}
+	if m.section == "followup" {
+		if m.followupForm != nil {
+			if m.followupForm.Review {
+				return "Edit agreement"
+			}
+			return "Cancel check setup"
+		}
+		if m.checkDetail != nil {
+			return "Back to follow-up checks"
+		}
+	}
+	return "Back to conversation"
 }
 
 func (m Model) bridgeLauncherPanel() uisnapshot.Panel {

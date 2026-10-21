@@ -42,6 +42,7 @@ export type BackendPanel = {
   kind: string;
   title: string;
   subtitle?: string;
+  back_label?: string;
   query?: string;
   rows?: {
     label: string; group?: string; detail?: string; state?: string; state_label?: string; affordance?: string; tone?: ResultTone; checked?: boolean; position?: number;

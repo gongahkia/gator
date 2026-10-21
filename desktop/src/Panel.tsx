@@ -6,6 +6,9 @@ import { PanelField } from "./PanelField";
 import { PanelBlocks, PanelFacts } from "./PanelBlocks";
 import { shortDate, workspaceName } from "./presentation";
 
+const actionLabel = (value: string) => value ? value[0].toLocaleUpperCase() + value.slice(1) : value;
+const shortcutLabel = (key: string, shortcut: string) => key === "ctrl+r" ? `${window.gator?.platform === "darwin" ? "⌘" : "Ctrl+"}Enter` : shortcut;
+
 function shortcutKeys(shortcut: string) {
   return shortcut.toLowerCase().replaceAll(" ", "").split("/").map((key) => ({ "←": "left", "→": "right", "↑": "up", "↓": "down", "f1/esc": "f1" })[key] ?? key).filter((key) => /^(enter|esc|up|down|left|right|tab|shift\+tab|space|ctrl\+[ru]|f1|[a-z0-9])$/.test(key));
 }
@@ -56,7 +59,7 @@ export function Panel({ panel, send, title = panel.title, subtitle = panel.subti
     if (modelCatalog && row === undefined && key !== "esc") row = displayedSelected;
     void action({ action: "key", row, fields: key === "esc" ? undefined : fields }, key);
   };
-  const hints = (panel.hints ?? []).flatMap((hint) => shortcutKeys(hint.shortcut).map((key, i, keys) => ({ key, label: keys.length > 1 ? `${hint.action} (${key})` : hint.action, group: hint.group, tone: hint.tone, shortcut: hint.shortcut, id: `${hint.shortcut}-${i}` }))).filter((hint) => !["up", "down", "tab", "shift+tab", "ctrl+u"].includes(hint.key));
+  const hints = (panel.hints ?? []).flatMap((hint) => shortcutKeys(hint.shortcut).map((key, i, keys) => ({ key, label: actionLabel(keys.length > 1 ? `${hint.action} (${key})` : hint.action), group: hint.group, tone: hint.tone, shortcut: hint.shortcut, id: `${hint.shortcut}-${i}` }))).filter((hint) => !["up", "down", "tab", "shift+tab", "ctrl+u"].includes(hint.key));
 
   const empty = localFilter && filter.trim() && !displayedRows.length ? { icon: Search, title: knowledgeLibrary ? "No matching loaded items" : "No matching models", detail: knowledgeLibrary ? "Try another phrase, or search beyond this list using the commands below." : "Try another provider or model name." } : emptyState(panel);
   const EmptyIcon = empty?.icon;
@@ -77,8 +80,8 @@ export function Panel({ panel, send, title = panel.title, subtitle = panel.subti
   const refresh = toolbar.find((hint) => hint.key === "r" && hint.label.toLowerCase() === "refresh");
   const creates = (hint: typeof hints[number]) => hint.key === "n" && /^(new|add)\b/i.test(hint.label);
   const administration = toolbar.filter((hint) => hint.group === "more" || modelCatalog && (panel.title === "Cloud models" ? ["n", "g", "e", "d", "x"] : ["e", "x"]).includes(hint.key));
-  const toolbarButton = (hint: typeof hints[number]) => hint === refresh ? <button className="icon-button" aria-label={hint.label} title={`${hint.label} (${hint.shortcut})`} key={hint.id} disabled={busy} onClick={() => keyAction(hint.key)}><RefreshCw size={17} /></button> : <button className={`button ${creates(hint) && !administration.includes(hint) ? "primary" : ""}`} key={hint.id} disabled={busy || modelCatalog && !displayedRows.length && !["n", "g", "r", "s", "i"].includes(hint.key)} onClick={() => keyAction(hint.key)}>{creates(hint) && <Plus size={16} />}{hint.label}<kbd>{hint.shortcut}</kbd></button>;
-  const keyboardFooter = !hasInputs && panel.kind !== "confirmation" && /^(Esc\b|↑|↓|Type to filter|Tab\b)/i.test(panel.footer ?? "");
+  const toolbarButton = (hint: typeof hints[number]) => hint === refresh ? <button className="icon-button" aria-label={hint.label} title={`${hint.label} (${hint.shortcut})`} key={hint.id} disabled={busy} onClick={() => keyAction(hint.key)}><RefreshCw size={17} /></button> : <button className={`button ${creates(hint) && !administration.includes(hint) ? "primary" : ""}`} key={hint.id} disabled={busy || modelCatalog && !displayedRows.length && !["n", "g", "r", "s", "i"].includes(hint.key)} onClick={() => keyAction(hint.key)}>{creates(hint) && <Plus size={16} />}{hint.label}<kbd>{shortcutLabel(hint.key, hint.shortcut)}</kbd></button>;
+  const keyboardFooter = /^(Esc\b|↑|↓|Type to filter|Tab\b|Enter(?:\/| or | confirm| save)|V show|F1\b)/i.test(panel.footer ?? "");
   const rowKeys = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
     if (busy) { event.preventDefault(); return; }
@@ -91,8 +94,11 @@ export function Panel({ panel, send, title = panel.title, subtitle = panel.subti
   };
   useEffect(() => {
     const shortcut = (event: globalThis.KeyboardEvent) => {
-      if (event.defaultPrevented || event.repeat || busy || event.metaKey || event.altKey || !(event.target instanceof HTMLElement)) return;
-      if (event.target.closest('input, textarea, select, [contenteditable], [role="dialog"], [role="alertdialog"]')) return;
+      if (event.defaultPrevented || event.repeat || busy || event.altKey || !(event.target instanceof HTMLElement)) return;
+      if (event.target.closest('[role="dialog"], [role="alertdialog"]')) return;
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter" && hints.some((hint) => hint.key === "ctrl+r")) { event.preventDefault(); keyAction("ctrl+r"); return; }
+      if (event.metaKey) return;
+      if (event.target.closest('input, textarea, select, [contenteditable]') && !(event.ctrlKey && event.key.toLowerCase() === "r")) return;
       const key = event.ctrlKey ? `ctrl+${event.key.toLowerCase()}` : event.key.toLowerCase();
       if (["escape", "enter", " "].includes(key)) return; // Native buttons and App own these.
       if (hints.some((hint) => hint.key === key)) { event.preventDefault(); keyAction(key); }
@@ -102,7 +108,7 @@ export function Panel({ panel, send, title = panel.title, subtitle = panel.subti
   });
 
   return <section className="workflow" data-kind={panel.kind} aria-label={title}>
-    <div className="workflow-heading"><button className="icon-button" aria-label="Back to conversation" disabled={busy} onClick={() => keyAction("esc")}><ArrowLeft size={18} /></button><div><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div>{panel.kind === "confirmation" && <span className="badge" data-tone="warning">Review</span>}</div>
+    <div className="workflow-heading"><button className="icon-button" aria-label={panel.back_label || "Back to conversation"} disabled={busy} onClick={() => keyAction("esc")}><ArrowLeft size={18} /></button><div><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div>{panel.kind === "confirmation" && <span className="badge" data-tone="warning">Review</span>}</div>
     {navigation}
     {panel.filter && <label className="collection-filter"><span>Status</span><select aria-label={panel.kind === "history" ? "Filter task runs" : "Filter saved guidance"} value={panel.filter.value} disabled={busy} onChange={(event) => void action({ action: "filter", text: event.target.value })}>{panel.filter.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>}
     {!!toolbar.length && <div className="panel-toolbar" role="toolbar" aria-label={`${title} actions`}>{toolbar.filter((hint) => !administration.includes(hint)).map(toolbarButton)}{!!administration.length && <details className="panel-more"><summary>{modelCatalog ? "Manage providers" : "More actions"}<ChevronDown size={15} /></summary><div role="group" aria-label={modelCatalog ? "Provider administration" : "Additional actions"}>{administration.map(toolbarButton)}</div></details>}</div>}
@@ -121,6 +127,6 @@ export function Panel({ panel, send, title = panel.title, subtitle = panel.subti
       <PanelBlocks panel={panel} hasInputs={hasInputs} empty={!!empty} />
       {!empty && !panel.rows?.length && !panel.blocks?.length && !panel.notice && <p className="empty-hint">Nothing here yet.</p>}
     </div>
-    {(!!primary.length || panel.footer) && <footer className="workflow-footer"><div className="flex flex-wrap gap-2">{primary.map((hint) => <button className={`button ${hint.tone === "error" ? "danger" : hint.key !== "esc" ? "primary" : ""}`} key={hint.id} disabled={busy} onClick={() => keyAction(hint.key)}>{hint.label}<kbd>{hint.shortcut}</kbd></button>)}</div>{keyboardFooter ? <details className="keyboard-shortcuts"><summary>Keyboard shortcuts<ChevronDown size={14} aria-hidden="true" /></summary><p>{panel.footer}</p></details> : panel.footer && <p>{panel.footer}</p>}</footer>}
+    {(!!primary.length || panel.footer) && <footer className="workflow-footer"><div className="flex flex-wrap gap-2">{primary.map((hint) => <button className={`button ${hint.tone === "error" ? "danger" : hint.key !== "esc" ? "primary" : ""}`} key={hint.id} disabled={busy} onClick={() => keyAction(hint.key)}>{hint.label}<kbd>{shortcutLabel(hint.key, hint.shortcut)}</kbd></button>)}</div>{keyboardFooter ? <details className="keyboard-shortcuts"><summary>Keyboard shortcuts<ChevronDown size={14} aria-hidden="true" /></summary><p>{panel.footer}</p></details> : panel.footer && <p>{panel.footer}</p>}</footer>}
   </section>;
 }

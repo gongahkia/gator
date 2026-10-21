@@ -329,7 +329,7 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .usage-accounting p { line-height: 1.8; margin: 12px 0; }
 .workflow-content { min-height: 0; flex: 1; overflow: auto; padding-right: 8px; padding-bottom: 16px; }
 .panel-toolbar { display: flex; flex-shrink: 0; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 20px; }
-.panel-toolbar .button { text-transform: capitalize; }
+.panel-toolbar .button { text-transform: none; }
 .panel-toolbar .icon-button:last-child { margin-left: auto; }
 .panel-empty { display: flex; align-items: center; flex-direction: column; text-align: center; padding: 54px 24px; color: var(--color-muted); }
 .panel-empty h2 { color: var(--color-contrast); font-size: var(--text-body); font-weight: 500; margin: 18px 0 8px; }
@@ -409,7 +409,8 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .form-fields .panel-row-wrap { border-bottom: 1px solid var(--color-line); }
 .workflow-footer { flex-shrink: 0; padding-top: 15px; border-top: 1px solid var(--color-line); }
 .workflow-footer > p { margin-top: 12px; font-size: var(--text-xs); color: var(--color-muted); }
-.workflow-footer .button { text-transform: capitalize; }
+.workflow-footer .button { text-transform: none; }
+.workflow-heading p { line-height: 1.7; overflow-wrap: anywhere; }
 .panel-draft-anchor { position: absolute; bottom: 0; left: var(--sidebar-width); right: 0; display: none; }
 .connection-error, .terminal-banner { margin: 12px 22px 0; border: 1px solid #f49a9a30; background: #f49a9a08; padding: 10px 14px; border-radius: 8px; color: var(--color-danger); display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: var(--text-sm); }
 .terminal-banner { color: var(--color-muted); background: var(--color-selected-fill); border-color: #a5d6a726; }
