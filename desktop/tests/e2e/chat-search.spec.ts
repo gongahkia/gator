@@ -10,7 +10,7 @@ test("dated chat search highlights literal matches and opens the intended topic 
   await mkdir(workspace);
   const dates = [new Date(), new Date(), new Date()];
   dates[1].setDate(dates[1].getDate() - 1); dates[2].setDate(dates[2].getDate() - 12);
-  const titles = ["Plan [draft]", "Weekend plan", "Older notes"];
+  const titles = ["Plan [draft]", "Weekend plan", "Older notes with a longer conversation title that wraps naturally in a narrow window"];
   for (const [index, title] of titles.entries()) {
     const id = `work-search-${index}`, root = join(directory, "state/gator/conversations", id);
     await mkdir(root, { recursive: true });
@@ -44,6 +44,16 @@ test("dated chat search highlights literal matches and opens the intended topic 
     await expect(browser.getByText(/The conversation list couldn’t refresh/)).toBeVisible();
     await browser.getByRole("button", { name: "Try again", exact: true }).click();
     await expect(browser.getByText(/The conversation list couldn’t refresh/)).toHaveCount(0);
+    for (const width of [1440, 800]) {
+      await app.evaluate(({BrowserWindow},width)=>BrowserWindow.getAllWindows()[0].setSize(width,800),width);
+      const positions=await browser.locator(".chat-search-row").evaluateAll(rows=>rows.map(row=>{
+        const time=row.querySelector("time")!.getBoundingClientRect(),icon=row.querySelector(".chat-search-meta svg")!.getBoundingClientRect(),box=row.getBoundingClientRect(),copy=row.querySelector(".chat-search-copy")!.getBoundingClientRect();
+        return {offset:Math.abs(time.y+time.height/2-icon.y-icon.height/2),right:icon.right,left:copy.right,meta:row.querySelector(".chat-search-meta")!.getBoundingClientRect().left,contained:icon.right<=box.right && icon.y>=box.y && icon.bottom<=box.bottom};
+      }));
+      for (const position of positions) {expect(position.offset).toBeLessThan(1);expect(position.contained).toBe(true);expect(position.left).toBeLessThan(position.meta);expect(position.right).toBeCloseTo(positions[0].right,0);}
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+      await page.screenshot({path:`test-results/conversation-chevron-alignment-${width}.png`});
+    }
     const search = browser.getByRole("searchbox", { name: "Search conversations", exact: true });
     await search.fill("no such title");
     await expect(browser.getByRole("heading", { name: "No matching conversations" })).toBeVisible();
