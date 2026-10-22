@@ -608,7 +608,7 @@ func resolveInteractiveWork(ctx context.Context, prompt string, options workapp.
 	routeCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
 	defer cancel()
 	turn, err := backend.Complete(sharedusage.WithCategory(routeCtx, "routing"), agent.TurnRequest{
-		System:   `Classify the user's immediate request for a terminal work agent. Return one JSON object only: {"mode":"inspect"|"draft","artifact":"optional basename.ext"}. Inspect answers questions. Draft creates a file. Never choose act, a connector, a goal, or a schedule. If uncertain, choose inspect.`,
+		System:   `Classify the user's immediate request for the Gator desktop personal agent. Return one JSON object only: {"mode":"inspect"|"draft","artifact":"optional basename.ext"}. Inspect answers questions, including questions about Gator and its settings. Draft creates a file. Never choose act, a connector, a goal, or a schedule. If uncertain, choose inspect.`,
 		Messages: []agent.Message{{Role: agent.RoleUser, Content: prompt}},
 	})
 	if err != nil || len(turn.ToolCalls) > 0 || len(turn.Text) > 2048 {

@@ -42,6 +42,16 @@ GATOR_DESKTOP_WORKSPACE=/absolute/path/to/notes make desktop
 `GATOR_DESKTOP_BINARY` can select a separately built private runtime during
 development. These overrides are useful for isolated testing.
 
+## Ask Gator about the app
+
+You can ask questions such as “Where do I change the model?”, “Which model are
+you using?”, “What can you access?”, or “How do I manage what you remember?”.
+Each request includes a bundled guide to Gator's actual desktop controls and a
+limited snapshot of the current model, effective work mode, selected connections,
+and supplied saved-context count. The snapshot excludes credentials and arbitrary
+app logs. Gator can guide you to settings; changing the model still uses
+Settings → Models or `/model`.
+
 ## Check and package
 
 ```sh
