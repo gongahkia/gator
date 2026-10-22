@@ -50,6 +50,7 @@ type BridgeState struct {
 	FirstRun              bool                  `json:"first_run"`
 	SupervisorNeedsStart  bool                  `json:"supervisor_needs_start"`
 	Checks                []BridgeCheck         `json:"checks,omitempty"`
+	ChecksIssue           string                `json:"checks_issue,omitempty"`
 	FollowingGoals        []BridgeFollowingGoal `json:"following_goals,omitempty"`
 	FollowingIssue        string                `json:"following_issue,omitempty"`
 	Overview              *workhome.Overview    `json:"overview,omitempty"`
@@ -172,6 +173,7 @@ func (m Model) BridgeState() BridgeState {
 	state.RecentConversations, state.RecentID = m.bridgeRecentConversations()
 	state.RecentIssue = m.bridgeRecentIssue
 	state.FollowingIssue = m.bridgeFollowingIssue
+	state.ChecksIssue = m.checksIssue
 	if m.bridgeFollowingIssue == "" {
 		for _, record := range m.config.Goals {
 			if record.Status == "active" || record.Status == "paused" {

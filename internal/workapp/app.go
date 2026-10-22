@@ -347,6 +347,7 @@ type Model struct {
 	bridgeNotice           string
 	bridgeRecentIssue      string
 	bridgeFollowingIssue   string
+	checksIssue            string
 	statusLine             []string
 	statusLineConfigured   bool
 	statusLineEnabled      bool

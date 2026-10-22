@@ -90,6 +90,7 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.recallStatusCommand()
 	case checksRefreshed:
 		if value.Err == nil {
+			m.checksIssue = ""
 			m.checks, m.config.SupervisorRunning = value.Checks, value.Running
 			m.config.Jobs = nil
 			for _, check := range value.Checks {
@@ -104,8 +105,11 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
-		} else if m.section == "followup" {
-			m.sectionNotice = "Health unavailable: " + value.Err.Error()
+		} else {
+			m.checksIssue = "Check health is unavailable: " + value.Err.Error()
+			if m.section == "followup" {
+				m.sectionNotice = "Health unavailable: " + value.Err.Error()
+			}
 		}
 		return m, nil
 	case checksTick:

@@ -100,6 +100,7 @@ export type BackendState = {
     latest_bundle?: BackendBundle;
   };
   checks?: { goal_id?: string; title: string; health: string; state: string; tone?: ResultTone }[];
+  checks_issue?: string;
   following_goals?: { id: string; title: string; status: string }[];
   following_issue?: string;
   provider?: string;
