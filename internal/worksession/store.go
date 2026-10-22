@@ -41,7 +41,7 @@ type ReplayState struct {
 }
 
 type Revision struct {
-	InputIDs []string `json:"-"`
+	InputIDs         []string               `json:"-"`
 	InputNames       []string               `json:"-"`
 	Activity         *workactivity.Trace    `json:"-"`
 	AcceptedCode     map[string]string      `json:"accepted_code,omitempty"`

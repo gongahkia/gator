@@ -61,7 +61,7 @@ type ConnectionUse struct {
 }
 
 type ArtifactSummary struct {
-	SHA256 string
+	SHA256      string
 	Path        string
 	MediaType   string
 	Bytes       int64

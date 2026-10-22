@@ -24,7 +24,8 @@ func TestActivitySidecarPreservesRevisionSchemaAndSurvivesRestore(t *testing.T) 
 	activity := workactivity.New(now)
 	activity.Record(agent.Event{Kind: agent.EventText, Text: "Checked the notes", At: now})
 	activity.Finish(now.Add(time.Second), "completed", "The answer")
-	_, err = store.AddRevision(conversation.ID, Revision{ID: "rev-one", SnapshotID: "snap-test", Objective: "Read the notes", BundlePath: "/bundle", Status: "completed", FinalText: "The answer", Activity: activity, InputNames: []string{"brief.txt"}})
+	inputID := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/brief.txt"
+	_, err = store.AddRevision(conversation.ID, Revision{ID: "rev-one", SnapshotID: "snap-test", Objective: "Read the notes", BundlePath: "/bundle", Status: "completed", FinalText: "The answer", Activity: activity, InputNames: []string{"brief.txt"}, InputIDs: []string{inputID}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,6 +49,12 @@ func TestActivitySidecarPreservesRevisionSchemaAndSurvivesRestore(t *testing.T) 
 	}
 	if len(restored.InputNames) != 1 || restored.InputNames[0] != "brief.txt" {
 		t.Fatal("restored attachment names were lost")
+	}
+	if len(restored.InputIDs) != 1 || restored.InputIDs[0] != inputID {
+		t.Fatal("input identities were lost")
+	}
+	if _, exists := fields["InputIDs"]; exists {
+		t.Fatal("input references changed replay schema")
 	}
 	if err := os.WriteFile(store.activityPath(conversation.ID, "rev-one"), []byte("damaged display data"), 0600); err != nil {
 		t.Fatal(err)

@@ -824,7 +824,7 @@ func summarizeWorkBundle(path string) (workapp.BundleSummary, error) {
 	summary := workapp.BundleSummary{Path: bundle.Path, Status: string(bundle.Manifest.Status)}
 	for _, file := range bundle.Manifest.Artifacts {
 		summary.Artifacts = append(summary.Artifacts, workapp.ArtifactSummary{
-			Path: file.Path, MediaType: file.MediaType, Bytes: file.Bytes, Valid: valid[file.Path],
+			SHA256: file.SHA256, Path: file.Path, MediaType: file.MediaType, Bytes: file.Bytes, Valid: valid[file.Path],
 		})
 	}
 	for _, candidate := range bundle.Manifest.Candidates {

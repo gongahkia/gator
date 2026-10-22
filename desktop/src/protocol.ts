@@ -19,7 +19,7 @@ export type BackendResult = {
 export type BackendBundle = {
   Path: string;
   Status: string;
-  Artifacts: { Path: string; MediaType: string; Valid: boolean; Bytes?: number; Preview?: string; PreviewKind?: string; Truncated?: boolean }[] | null;
+  Artifacts: { Path: string; MediaType: string; SHA256?: string; Valid: boolean; Bytes?: number; Preview?: string; PreviewKind?: string; Truncated?: boolean }[] | null;
   Candidates: { ID: string; Status: string; ChangedPaths: string[]; PatchPath?: string }[] | null;
   RunID?: string;
   FinishedAt?: string;
@@ -34,7 +34,7 @@ export type Overview = {
 export type BackendCommand = { name: string; description: string; advanced: boolean; needs_input: boolean };
 export type ActivityEntry = { id: string; kind: "text" | "tool" | "status"; text?: string; tool?: string; state: "running" | "completed" | "failed" | "stopped"; started_at: string; finished_at?: string };
 export type BackendActivity = { started_at: string; finished_at?: string; state: "running" | "completed" | "failed" | "stopped"; entries: ActivityEntry[]; truncated?: boolean };
-export type BackendMessage = { activity?: BackendActivity; inputs?: string[]; role: string; text: string; bundle?: BackendBundle; result?: BackendResult };
+export type BackendMessage = { activity?: BackendActivity; inputs?: string[]; input_ids?: string[]; role: string; text: string; bundle?: BackendBundle; result?: BackendResult };
 export type QueuedMessage = { id: string; text: string; inputs?: string[] };
 export type QueueAction = {
   request_id: string; id: string; action: "edit" | "remove" | "earlier" | "later" | "move" | "run" | "guide"; text?: string;

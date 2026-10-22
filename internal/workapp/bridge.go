@@ -99,7 +99,7 @@ func bridgeExternal(kind, action, id string, command *exec.Cmd) *BridgeExternal 
 }
 
 type BridgeMessage struct {
-	InputIDs []string `json:"input_ids,omitempty"`
+	InputIDs []string            `json:"input_ids,omitempty"`
 	Inputs   []string            `json:"inputs,omitempty"`
 	Activity *workactivity.Trace `json:"activity,omitempty"`
 	Role     string              `json:"role"`
