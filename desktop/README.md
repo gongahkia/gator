@@ -49,8 +49,11 @@ you using?”, “What can you access?”, or “How do I manage what you rememb
 Each request includes a bundled guide to Gator's actual desktop controls and a
 limited snapshot of the current model, effective work mode, selected connections,
 and supplied saved-context count. The snapshot excludes credentials and arbitrary
-app logs. Gator can guide you to settings; changing the model still uses
-Settings → Models or `/model`.
+app logs. Gator can inspect live settings and apply explicitly requested changes
+through app tools, including model selection, usage limits, retention, connection
+selections, and shortcut rebinding. Higher-impact changes use the existing review
+flows. The composer also supports microphone dictation into a reviewable draft
+and optional spoken replies. See [chat controls and voice](../docs/APP-CONTROL.md).
 
 ## Check and package
 
