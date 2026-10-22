@@ -301,3 +301,41 @@ for this reversible decoration removal.
 
 **Verdict: Approve for this scoped macOS removal.** Windows/Linux and
 assistive-technology checks were not repeated.
+
+## InvestmentGini reference preview and cleanup reminder
+
+22 October 2026. Use InvestmentGini's frontend as a reference for further Gator
+presentation work. Preserve Gator's existing palette, typography, Lucide icons,
+command palette and conversation model. Select the specific surface with the
+user before making another visual change; the Tide and hybrid activity decisions
+above are already implemented.
+
+On the current development Mac:
+
+- Reference checkout: `~/Desktop/temasek-repos/invgini/invgini-core-web`, branch
+  `develop`. Its working tree was clean and its HEAD matched `origin/develop`
+  when the preview was verified. No InvestmentGini commits or pushes were made.
+- Preview launcher: `~/Desktop/temasek-repos/invgini-local-preview/run.mjs`.
+  Run it with Node, then open `https://localhost:3002`. It injects sample API
+  responses into Vite's served modules; it does not edit the reference source.
+  Its separate origin isolates preview preferences from normal development.
+- The preview exercises real frontend components with synthetic data. Its
+  sample activity is not evidence of live reasoning, integrations, file upload,
+  persistence or model execution. The separate experimental Studio branch is
+  outside this preview's scope.
+
+Reference locations inspected:
+
+| Surface | InvestmentGini reference | Gator counterpart |
+| --- | --- | --- |
+| Landing atmosphere | `src/components/PageBackground/PageBackground.tsx` | `desktop/src/AsciiWaves.tsx`; the approved Tide field already exists |
+| Completed activity and prose | `ChatMessageResponseDisplay/CollapsedReasoningSteps.tsx`, `ThinkingAnalysisMessage.tsx`, `HistoricalChatMessages.tsx` under `src/pages/ProjectDetailPage/ChatPage/` | `desktop/src/ActivityTimeline.tsx`; retain public activity and the canonical answer without duplicating it |
+| Composer controls and attachments | `src/components/Chat/HomePageChatInput/HomePageChatInput.tsx` and adjacent source/attachment components | Existing composer in `desktop/src/App.tsx` and `desktop/src/Attachments.tsx` |
+| Motion | `src/themes/FramerMotion.ts` | `desktop/src/motion.tsx` and shared CSS; preserve reduced-motion behavior and the existing stack |
+
+**Pending cleanup after the reference work:** stop the separate launcher and
+remove `~/Desktop/temasek-repos/invgini-local-preview` when it is no longer
+needed. Normal frontend development still uses `npm run dev` in the reference
+checkout. There is no frontend source patch to reverse. Recheck `git status`
+before cleanup and preserve any subsequent user changes; do not use a blanket
+reset or clean. This is a recorded reminder, not a scheduled notification.
