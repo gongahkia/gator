@@ -109,6 +109,8 @@ export function App() {
   const [queueEditing, setQueueEditing] = useState(false);
   const [dirtyFiles, setDirtyFiles] = useState<Set<string>>(() => new Set());
   const fileAttachments = useRef(new Map<string,string>());
+  const attachmentKeys = useRef(new Map<string,string>());
+  const attachmentKey = useCallback((id: string) => attachmentKeys.current.get(id) ?? id, []);
   const queueAction = useQueueAction(state, send, error);
   const attachments = useAttachmentPicker(drafts.context, drafts.uploads, (files) => { drafts.setUploads(files); setDraftError(""); }, sending || queueAction.busy || !!error || !!state?.external || !!updatePreparing || !drafts.ready);
   const composer = useRef<HTMLTextAreaElement>(null);
@@ -151,12 +153,13 @@ export function App() {
     const original = JSON.parse(key) as { kind: string; id?: string };
     const previous = fileAttachments.current.get(`${owner.context}:${key}`);
     const position = owner.uploads.findIndex(value => value.id === previous || original.kind === "upload" && value.id === original.id);
+    if (position >= 0) attachmentKeys.current.set(file.id, attachmentKeys.current.get(owner.uploads[position].id) ?? owner.uploads[position].id);
     const selected = [...owner.uploads]; if (position < 0) selected.push(file); else selected[position] = file;
     owner.uploads = selected; owner.setUploads(selected);
     fileAttachments.current.set(`${owner.context}:${key}`, file.id);
     if (prompt) { owner.setText(current => current ? `${current}\n\n${prompt}` : prompt); requestAnimationFrame(() => composer.current?.focus()); }
   }, []);
-  const fileChat = useMemo(() => ({ context: drafts.context, dirtyKeys: dirtyFiles, blocked: sending || queueAction.busy || !!error || !!state?.external || !!updatePreparing || !drafts.ready, useFile, dirty: fileDirty }), [drafts.context, sending, queueAction.busy, error, state?.external, updatePreparing, drafts.ready, useFile, fileDirty, dirtyFiles]);
+  const fileChat = useMemo(() => ({ context: drafts.context, dirtyKeys: dirtyFiles, attachmentKey, blocked: sending || queueAction.busy || !!error || !!state?.external || !!updatePreparing || !drafts.ready, useFile, dirty: fileDirty }), [drafts.context, sending, queueAction.busy, error, state?.external, updatePreparing, drafts.ready, useFile, fileDirty, dirtyFiles, attachmentKey]);
 
   const hasUnsavedView = dirtyFiles.size > 0 || queueEditing || panel?.rows?.some((row) => row.input) || panel?.kind === "confirmation" || panel?.kind === "status-line";
 

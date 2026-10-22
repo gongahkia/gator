@@ -26,14 +26,18 @@ const pick=(app:ElectronApplication,paths:string[])=>app.evaluate(({dialog},path
 test("inline text editing saves full versions, recovers drafts and sends the edited bytes",async()=>{
   const f=await fixture();try{
     const path=join(f.directory,"notes.md"), original="# A useful document\n\n"+"Context to preserve.\n".repeat(300)+"\nOriginal final paragraph.";
+    const spare=join(f.directory,"spare.txt");await writeFile(spare,"Another attachment");
     await writeFile(path,original);const app=await f.launch(),page=await app.firstWindow();const errors:string[]=[];page.on("pageerror",e=>errors.push(e.message));
     const composer=page.getByRole("textbox",{name:"Message Gator",exact:true});await composer.fill("Keep my unsent question.");
-    await pick(app,[path]);await page.getByRole("button",{name:"Attach files",exact:true}).click();
+    await pick(app,[spare,path]);await page.getByRole("button",{name:"Attach files",exact:true}).click();
     const pending=page.getByRole("region",{name:"Attachments for your next message"});
-    const card=pending.locator(".inline-file");await card.getByRole("button",{name:"Open file notes.md",exact:true}).click();
+    const card=pending.locator(".inline-file").filter({has:page.getByRole("button",{name:"Open file notes.md",exact:true})});await card.getByRole("button",{name:"Open file notes.md",exact:true}).click();
     await expect(card.getByText("Original final paragraph.",{exact:true})).toBeVisible();await card.getByRole("button",{name:"Edit",exact:true}).click();
     const editor=card.getByRole("textbox",{name:"Edit notes.md",exact:true}),edited=original.replace("Original final paragraph.","Edited final paragraph: violet kiwi.");
-    await editor.fill(edited);await card.getByRole("button",{name:"Save",exact:true}).click();
+    await editor.fill(edited);
+    await pending.getByRole("button",{name:"Remove attachment spare.txt",exact:true}).click();
+    await expect(editor).toHaveValue(edited);await expect(page.getByRole("button",{name:"Send message",exact:true})).toBeDisabled();
+    await card.getByRole("button",{name:"Save",exact:true}).click();
     await expect(card.getByText("Saved · included in your next message",{exact:true})).toBeVisible();await expect(composer).toHaveValue("Keep my unsent question.");
     expect(await readFile(path,"utf8")).toBe(original);expect(f.requests).toHaveLength(0);
     await card.getByRole("button",{name:"Version history for notes.md",exact:true}).click();await expect(card.getByText("Version 1 · Original",{exact:true})).toBeVisible();

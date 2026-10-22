@@ -7,7 +7,7 @@ import type { FileEdit, FileParagraph, FileReference, FileRequest, FileView, Wor
 import type { UploadedFile } from "./bridge";
 
 const PDFPreview = lazy(() => import("./PDFPreview"));
-export const FileChatContext = createContext<{ context?: string; dirtyKeys?: Set<string>; blocked: boolean; useFile(file: UploadedFile, key: string, prompt?: string): void; dirty(key: string, value: boolean): void }>({ blocked: true, useFile: () => {}, dirty: () => {} });
+export const FileChatContext = createContext<{ context?: string; dirtyKeys?: Set<string>; attachmentKey?(id: string): string; blocked: boolean; useFile(file: UploadedFile, key: string, prompt?: string): void; dirty(key: string, value: boolean): void }>({ blocked: true, useFile: () => {}, dirty: () => {} });
 const errorText = (error: unknown) => error instanceof Error ? error.message : "This file could not be opened. Try again.";
 const keyOf = (ref: FileReference) => JSON.stringify(ref);
 const empty = (edit: FileEdit) => edit.text === undefined && !Object.keys(edit.cells ?? {}).length && !Object.keys(edit.paragraphs ?? {}).length;

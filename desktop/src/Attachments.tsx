@@ -38,7 +38,7 @@ export function AttachButton({ busy, disabled, choose }: { busy: boolean; disabl
 export function PendingAttachments({ files, disabled, remove }: { files: UploadedFile[]; disabled: boolean; remove(id: string): void }) {
   const chat = useContext(FileChatContext);
   if (!files.length) return null;
-  return <section className="pending-attachments" aria-label="Attachments for your next message"><ul>{files.map((file,index) => <li key={`${index}:${file.name}`}><FileCard reference={{ kind: "upload", id: file.id }} name={file.name} caption={file.size < 1024 ? `${file.size} B` : `${Math.ceil(file.size / 1024)} KB`} /><button className="icon-button attachment-remove" aria-label={`Remove attachment ${file.name}`} disabled={disabled || chat.dirtyKeys?.has(JSON.stringify({ kind: "upload", id: file.id }))} onClick={() => remove(file.id)}><X size={14} /></button></li>)}</ul></section>;
+  return <section className="pending-attachments" aria-label="Attachments for your next message"><ul>{files.map(file => <li key={chat.attachmentKey?.(file.id) ?? file.id}><FileCard reference={{ kind: "upload", id: file.id }} name={file.name} caption={file.size < 1024 ? `${file.size} B` : `${Math.ceil(file.size / 1024)} KB`} /><button className="icon-button attachment-remove" aria-label={`Remove attachment ${file.name}`} disabled={disabled || chat.dirtyKeys?.has(JSON.stringify({ kind: "upload", id: file.id }))} onClick={() => remove(file.id)}><X size={14} /></button></li>)}</ul></section>;
 }
 
 export function InputFiles({ names, ids }: { names?: string[]; ids?: string[] }) {
