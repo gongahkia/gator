@@ -63,6 +63,11 @@ reported while the host is alive attempt the same recovery. After the OS takes
 over installation, native failure/relaunch handling still needs platform tests.
 Foreground runs and in-memory queues are not promised to resume after restart.
 
+Relative profile overrides retain their existing platform interpretation:
+workspace-relative on Unix, host-resolved in the Windows preview. The guard uses
+the same launch workspace and environment as the foreground runtime. A packaged
+regression test seeds existing data and verifies that the app still opens it.
+
 ## One-time signing setup
 
 Use the GitHub `desktop-release` environment. Required reviewers are an external
@@ -155,7 +160,7 @@ part of the local implementation work.
 | Desktop TypeScript | Pass |
 | Host/controller/release tests | 27 pass; one native Windows handoff test skipped on macOS |
 | Unsigned macOS application packaging | Pass |
-| Packaged desktop suite | 16/16 pass in the final complete run, including About & updates, real bundled updater loading, draft preservation and no standalone CLI/Node requirement |
+| Packaged desktop suite | 17/17 pass in the final complete run, including relative-profile preservation, About & updates, real bundled updater loading, draft preservation and no standalone CLI/Node requirement |
 | Real macOS ZIP update manifest | `stable-x64-mac.yml` generated; version, architecture and artifact SHA-512 verified in an isolated unsigned preview; temporary bundle removed |
 | Workflow YAML | Both changed workflows parse |
 | Signing, notarization, native Windows installer/update, ARM64 hardware, remote CI and release publication | Not executed; require account setup and/or native infrastructure |

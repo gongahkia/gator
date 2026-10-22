@@ -26,6 +26,27 @@ const settlePresentation = async (page: Page) => {
   });
 };
 
+test("relative profile overrides keep the existing platform interpretation", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "gator-relative-profile-e2e-"));
+  const workspace = join(directory, "workspace");
+  await mkdir(workspace);
+  const root = process.platform === "win32" ? directory : workspace;
+  const binary = resolve(`runtime/gator-runtime${process.platform === "win32" ? ".exe" : ""}`);
+  const env = { ...process.env, GATOR_STATE_DIR: "profile-state", GATOR_CONFIG_DIR: "profile-config", GATOR_DESKTOP_WORKSPACE: workspace, GATOR_DESKTOP_USER_DATA: join(directory, "desktop") };
+  execFileSync(binary, ["note", "add", "--title", "Kept relative profile", "--body", "Existing private data remains in the same profile."], { cwd: directory, env: { ...env, GATOR_INTERNAL_COMMANDS: "1", GATOR_STATE_DIR: join(root, "profile-state"), GATOR_CONFIG_DIR: join(root, "profile-config") } });
+  const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
+  const application = await electron.launch({ executablePath, args: executablePath ? [] : [resolve(".")], cwd: directory, env: { ...Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => typeof entry[1] === "string")), GATOR_INTERNAL_COMMANDS: "" } });
+  try {
+    const page = await application.firstWindow();
+    await expect(page.getByRole("textbox", { name: "Message Gator", exact: true })).toBeVisible();
+    await page.evaluate(() => window.gator!.send({ type: "submit", text: "/note list" }));
+    await expect(page.locator(".main-area")).toContainText("Kept relative profile");
+    await closeDesktop(application);
+    // The update guard must resolve the very same profile from the same cwd.
+    execFileSync(binary, ["desktop-update-guard"], { cwd: workspace, input: "", env: { ...env, GATOR_DESKTOP_UPDATE_GUARD: "1", ...(process.platform === "win32" ? { GATOR_STATE_DIR: join(root, "profile-state") } : {}) } });
+  } finally { await closeDesktop(application); await rm(directory, { recursive: true, force: true }); }
+});
+
 test("About & updates explains development builds and preserves an unsent message", async () => {
   const directory = await mkdtemp(join(tmpdir(), "gator-desktop-updates-e2e-"));
   const application = await launchDesktop({ ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") });

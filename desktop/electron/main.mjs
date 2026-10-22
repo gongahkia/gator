@@ -34,9 +34,15 @@ let updatesOpen = false;
 let updatePreparing = false;
 
 const runtimeBinary = () => process.env.GATOR_DESKTOP_BINARY || (app.isPackaged ? join(process.resourcesPath, "runtime", runtimeName()) : join(here, "../runtime", runtimeName()));
+const runtimeWorkspace = () => process.env.GATOR_DESKTOP_WORKSPACE || join(app.getPath("userData"), "workspace");
 function runtimeEnvironment() {
-  const environment = { ...process.env, GATOR_STATE_DIR: stateRoot, GATOR_DESKTOP_DRAFT_DIR: join(app.getPath("userData"), "drafts") };
-  for (const key of ["GATOR_CONFIG_DIR", "XDG_CONFIG_HOME"]) if (environment[key]?.trim()) environment[key] = resolve(environment[key]);
+  const environment = { ...process.env, GATOR_DESKTOP_DRAFT_DIR: join(app.getPath("userData"), "drafts") };
+  // Preserve existing Unix workspace-relative overrides. The Windows port
+  // already resolves its profile overrides in the host before changing cwd.
+  if (process.platform === "win32") {
+    environment.GATOR_STATE_DIR = stateRoot;
+    for (const key of ["GATOR_CONFIG_DIR", "XDG_CONFIG_HOME"]) if (environment[key]?.trim()) environment[key] = resolve(environment[key]);
+  }
   return environment;
 }
 
@@ -57,7 +63,7 @@ async function startBackend() {
     const binary = runtimeBinary();
     await access(binary, constants.X_OK);
     // A desktop launch never implicitly captures the user's home directory.
-    const workspace = process.env.GATOR_DESKTOP_WORKSPACE || join(app.getPath("userData"), "workspace");
+    const workspace = runtimeWorkspace();
     if (!process.env.GATOR_DESKTOP_WORKSPACE) await mkdir(workspace, { recursive: true, mode: 0o700 });
     backend = new Backend(binary, workspace, runtimeEnvironment());
     sessionID = randomUUID();
@@ -83,7 +89,7 @@ async function configureUpdates() {
       try {
         await drafts.flush();
         await backend.prepareUpdate();
-        const guard = await acquireUpdateGuard(runtimeBinary(), app.getPath("userData"), runtimeEnvironment());
+        const guard = await acquireUpdateGuard(runtimeBinary(), runtimeWorkspace(), runtimeEnvironment());
         await guard.release();
         closing = true;
       } catch (error) {
