@@ -88,6 +88,44 @@ func TestGatorAppModelAndThemeChangesStayWithinKnownSettings(t *testing.T) {
 	}
 }
 
+func TestGatorAppRetrievalChangesRequireUploadReviewAndPreserveChat(t *testing.T) {
+	c := appControllerForTest(t)
+	before, _ := c.settings.Load()
+	mutation, err := c.Prepare(context.Background(), workrun.AppChange{Setting: "retrieval", Value: json.RawMessage(`{"provider":"gemini"}`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	preview, _ := json.Marshal(mutation.Preview)
+	if !mutation.Review || !mutation.AfterRun || !strings.Contains(string(preview), "Uploads eligible saved memory") {
+		t.Fatal("cloud retrieval did not disclose the saved text upload for review")
+	}
+	unchanged, _ := c.settings.Load()
+	if unchanged.Embeddings != before.Embeddings {
+		t.Fatal("preparing a review changed retrieval")
+	}
+	if _, err := mutation.Apply(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	after, _ := c.settings.Load()
+	if after.Embeddings.Provider != "gemini" || !after.Embeddings.CloudUploadApproved || after.Defaults != before.Defaults {
+		t.Fatal("retrieval selection changed unrelated settings or lost upload consent")
+	}
+	if _, err := mutation.Apply(context.Background()); err == nil {
+		t.Fatal("stale retrieval review was applied")
+	}
+	local, err := c.Prepare(context.Background(), workrun.AppChange{Setting: "retrieval", Value: json.RawMessage(`{"provider":"ollama"}`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := local.Apply(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	after, _ = c.settings.Load()
+	if after.Embeddings.CloudUploadApproved {
+		t.Fatal("local retrieval kept the cloud upload opt-in")
+	}
+}
+
 func TestGatorAppInspectionReadsUsageAndOmitsEndpointSecrets(t *testing.T) {
 	c := appControllerForTest(t)
 	settings := config.Default()

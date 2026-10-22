@@ -30,7 +30,7 @@ func (c gatorAppController) Inspect(ctx context.Context, query workrun.AppQuery)
 	switch query.Topic {
 	case "settings":
 		selected, err := currentWorkModelStatus(c.settings, c.stateDir)
-		return map[string]any{"model": selected, "theme": settings.Theme, "settings_pages": []string{"Models", "Usage & limits", "Data & backups", "Recovery", "About & updates"}}, err
+		return map[string]any{"model": selected, "theme": settings.Theme, "retrieval": settings.Embeddings, "storage": "Private Gator content is stored locally. Cloud retrieval uploads eligible saved text and queries; cloud chat processes supplied context remotely.", "settings_pages": []string{"Models", "Usage & limits", "Data & backups", "Recovery", "About & updates"}}, err
 	case "models":
 		type choice struct {
 			Provider string   `json:"provider"`

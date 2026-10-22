@@ -28,6 +28,31 @@ func (c gatorAppController) prepareSettings(ctx context.Context, change workrun.
 		return c.prepareUsage(change)
 	case "retention":
 		return c.prepareRetention(change)
+	case "retrieval":
+		var next struct {
+			Provider string `json:"provider"`
+		}
+		if err := workrun.DecodeAppArguments(change.Value, &next); err != nil {
+			return workrun.AppMutation{}, err
+		}
+		if !slices.Contains([]string{"ollama", "openai", "gemini"}, next.Provider) {
+			return workrun.AppMutation{}, errors.New("retrieval provider must be ollama, openai or gemini")
+		}
+		embeddings := config.EmbeddingSettings{Provider: next.Provider, CloudUploadApproved: next.Provider != "ollama"}
+		effect := "Uses local Ollama embeddings when installed, with basic matching as fallback. No model is downloaded and the chat model stays the same."
+		if embeddings.CloudUploadApproved {
+			effect = "Uploads eligible saved memory, note text, and search queries to " + next.Provider + " for embedding on subsequent runs. Requires its configured API key. Local storage and the chat model stay the same."
+		}
+		return workrun.AppMutation{Review: true, AfterRun: true, Summary: "Retrieval preference saved: " + next.Provider + ".", Preview: map[string]any{"before": prior.Embeddings, "after": embeddings, "effect": effect}, Apply: func(context.Context) (any, error) {
+			err := c.settings.Update(func(current *config.Settings) error {
+				if current.Embeddings != prior.Embeddings {
+					return errors.New("retrieval settings changed; inspect settings and try again")
+				}
+				current.Embeddings = embeddings
+				return nil
+			})
+			return embeddings, err
+		}}, nil
 	case "model":
 		var next config.Defaults
 		if err := workrun.DecodeAppArguments(change.Value, &next); err != nil {
