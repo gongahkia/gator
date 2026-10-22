@@ -64,6 +64,9 @@ func (p CodePolicy) HasCapability(name string) bool {
 
 // Request describes one bounded local work session.
 type Request struct {
+	ForegroundApp           bool
+	ApproveAppChange        func(context.Context, any) (bool, error)
+	OnAppChange             func(AppChange)
 	DisabledRoles           []string
 	RoleConfiguration       map[string]orchestrator.RoleConfiguration
 	OnSupervisor            func(*orchestrator.Supervisor)
@@ -207,6 +210,7 @@ type CodeDelegate func(context.Context, CodeRequest) (CodeResult, error)
 // Executor combines a provider-independent model with private workspace
 // allocation and artifact sealing.
 type Executor struct {
+	App               AppController
 	RoleConfiguration map[string]orchestrator.RoleConfiguration
 	RoleSteps         map[string]int
 	HTTP              tools.HTTPFetchOptions

@@ -102,12 +102,13 @@ func effectiveConfiguration(request Request) any {
 		DisableBrowser       bool
 		ExcludedKnowledgeIDs []string
 		DesktopSession       string
+		ForegroundApp        bool
 	}{request.Contract, request.Mode, request.Code, request.ConnectorIDs, request.OAuthRefreshPins, request.OAuthAccountPins, request.ConnectorPermissions, request.WebOrigins, request.IgnoredInstructionPaths, request.Limits, request.MaxSteps, request.Provider, request.GoalContext, request.GoalPlanContext, request.GoalID, request.MemoryContext, request.NoteContext, request.RoleConfiguration, func() string {
 		if request.Project != nil {
 			return request.Project.SHA256
 		}
 		return ""
-	}(), request.DisableDelegation, request.DisabledRoles, request.EnableCode, request.RequireCode, request.BrowserSession, request.DisableBrowser, request.ExcludedKnowledgeIDs, request.DesktopSession}
+	}(), request.DisableDelegation, request.DisabledRoles, request.EnableCode, request.RequireCode, request.BrowserSession, request.DisableBrowser, request.ExcludedKnowledgeIDs, request.DesktopSession, request.ForegroundApp}
 }
 
 type Interaction struct {
@@ -309,6 +310,9 @@ func (s Service) Start(ctx context.Context, request Request) *Operation {
 			Connector, Operation string
 			Arguments            json.RawMessage
 		}{id, operation, args})
+	}
+	request.ApproveAppChange = func(ctx context.Context, preview any) (bool, error) {
+		return ask(ctx, "app_change", preview)
 	}
 	// external actions keep their exact request and digest at the domain boundary.
 	request.ApproveAction = func(ctx context.Context, proposal action.Proposal) (action.Decision, error) {

@@ -519,6 +519,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	}
 	defer closeSpecialists()
 	surface = append(surface, delegationSurface...)
+	surface = append(surface, applicationTools(e.App, request)...)
 	runner := agent.Runner{Model: e.Model, Tools: surface, Now: now}
 	var malformedCallFallback []string
 	if !request.codeEnabled() {
