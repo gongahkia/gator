@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, CornerUpLeft, RotateCcw } from "lucide-react";
+import { Check, CircleAlert, CirclePause, CornerUpLeft, RotateCcw } from "lucide-react";
 import type { BackendMessage, ChatUpdate } from "./protocol";
 import type { DesktopFrame } from "./bridge";
+import "./chat-updates.css";
 
 type TimelineItem = { kind: "message"; message: BackendMessage; index: number } | { kind: "update"; update: ChatUpdate };
 const time = (value?: string) => Math.max(0, Date.parse(value ?? "") || 0);
@@ -47,10 +48,13 @@ export function ChatUpdateCard({ update, conversation, send, reply, disabled }: 
     finally { setBusy(false); }
   };
   const summary = update.summary.length > 240 ? `${update.summary.slice(0, 240).trimEnd()}…` : update.summary;
+  const failed = update.status === "failed", interrupted = update.status === "interrupted";
+  const checkIssue = failed || interrupted;
   return <article ref={element} className="chat-update" data-update-id={update.id} data-resolved={update.resolved} aria-label={`Follow-up: ${update.title}`}>
-    <header><span className="chat-update-state">{update.resolved ? <><Check size={14} />Done</> : !update.read ? "New update" : "Follow-up"}</span><time dateTime={update.created_at}>{new Date(update.created_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</time></header>
+    <header><span className="chat-update-state" data-check-issue={checkIssue || undefined}>{checkIssue ? <>{failed ? <CircleAlert size={14} aria-hidden="true" /> : <CirclePause size={14} aria-hidden="true" />}{failed ? "Couldn’t check" : "Check interrupted"}{update.resolved && <span className="chat-update-handled">· Marked done</span>}</> : update.resolved ? <><Check size={14} aria-hidden="true" />Done</> : !update.read ? "New update" : "Follow-up"}</span><time dateTime={update.created_at}>{new Date(update.created_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</time></header>
     <h3>{update.title}</h3>
     {!update.resolved && <p className="literal">{summary}</p>}
+    {checkIssue && <p className="chat-update-status-note">{failed ? "This check didn’t complete successfully." : "This check stopped before it finished."} Earlier results don’t confirm that nothing changed.</p>}
     <details><summary>Details</summary><div className="chat-update-details"><p className="literal">{update.summary}</p>{update.next_step && <p className="literal">Next step: {update.next_step}</p>}{!!update.evidence?.length && <ul aria-label="Supporting sources">{update.evidence.map((reference, index) => <li key={index}>{reference}</li>)}</ul>}<dl><dt>Check result</dt><dd>{update.status}</dd>{update.job_id && <><dt>Responsibility</dt><dd>{update.job_id}</dd></>}<dt>Update</dt><dd>{update.id}</dd></dl></div></details>
     <footer><button className="small-button" disabled={disabled || busy} onClick={() => reply(update)}><CornerUpLeft size={15} />Reply</button>{!update.read && <button className="small-button" disabled={disabled || busy} onClick={() => void act("read")}>Mark read</button>}<button className="small-button" disabled={disabled || busy} onClick={() => void act(update.resolved ? "reopen" : "resolve")}>{update.resolved ? <RotateCcw size={15} /> : <Check size={15} />}{update.resolved ? "Reopen" : "Done"}</button></footer>
     {issue && <p className="composer-error" role="alert">{issue}</p>}

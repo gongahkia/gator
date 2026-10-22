@@ -6,6 +6,61 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { closeDesktop, temporaryDirectory } from "./lifecycle";
 
+test("failed and interrupted checks remain explicit after reading or marking done", async () => {
+  const root = await temporaryDirectory(join(tmpdir(), "gator-check-status-"));
+  const workspace = join(root, "workspace"); await mkdir(workspace);
+  const config = join(root, "config", "gator"); await mkdir(config, { recursive: true });
+  await writeFile(join(config, "config.json"), JSON.stringify({ version: 4, defaults: { provider: "status-fixture", model: "fixture" }, custom_providers: [{ id: "status-fixture", base_url: "http://127.0.0.1:9/v1/chat/completions", models: ["fixture"], default_model: "fixture" }] }), { mode: 0o600 });
+  const env = { ...process.env, GATOR_STATE_DIR: join(root, "state"), GATOR_CONFIG_DIR: join(root, "config"), GATOR_DESKTOP_USER_DATA: join(root, "desktop"), GATOR_DESKTOP_WORKSPACE: workspace };
+  const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
+  const app = await electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env });
+  try {
+    const page = await app.firstWindow();
+    await expect(page.getByRole("textbox", { name: "Message Gator", exact: true })).toBeVisible();
+    const origin = await page.evaluate(async () => (await window.gator!.snapshot()).state!.conversation_id!);
+    const inbox = join(env.GATOR_STATE_DIR, "gator", "inbox"); await mkdir(inbox, { recursive: true });
+    const states = [
+      { id: "inbox-check-failed", title: "Calendar check", status: "failed", summary: "The calendar connection could not be reached." },
+      { id: "inbox-check-interrupted", title: "Venue check", status: "interrupted", summary: "The computer stopped before the check finished." },
+      { id: "inbox-check-completed", title: "Travel check", status: "completed", summary: "The departure time changed to 9:30." },
+    ];
+    for (const entry of states) await writeFile(join(inbox, `${entry.id}.json`), JSON.stringify({ ...entry, version: 1, kind: "job", origin_conversation_id: origin, job_id: `job-${entry.status}`, created_at: new Date().toISOString(), evidence: [`source/${entry.status}.txt:4`] }));
+    const failed = page.getByRole("article", { name: "Follow-up: Calendar check", exact: true });
+    const interrupted = page.getByRole("article", { name: "Follow-up: Venue check", exact: true });
+    const completed = page.getByRole("article", { name: "Follow-up: Travel check", exact: true });
+    await expect(failed.getByText("Couldn’t check", { exact: true })).toBeVisible({ timeout: 25_000 });
+    await expect(interrupted.getByText("Check interrupted", { exact: true })).toBeVisible();
+    await expect(failed.locator(".chat-update-status-note")).toHaveText("This check didn’t complete successfully. Earlier results don’t confirm that nothing changed.");
+    await expect(interrupted.locator(".chat-update-status-note")).toHaveText("This check stopped before it finished. Earlier results don’t confirm that nothing changed.");
+    await expect(completed.getByText("New update", { exact: true })).toBeVisible();
+    await expect(completed.locator(".chat-update-status-note")).toHaveCount(0);
+    await expect(failed.locator("details")).not.toHaveAttribute("open");
+    await failed.getByRole("button", { name: "Mark read", exact: true }).click();
+    await expect(failed.getByRole("button", { name: "Mark read", exact: true })).toHaveCount(0);
+    await expect(failed.locator(".chat-update-state")).toHaveText("Couldn’t check");
+    await failed.getByRole("button", { name: "Done", exact: true }).click();
+    await expect(failed.getByRole("button", { name: "Reopen", exact: true })).toBeVisible();
+    await expect(failed.locator(".chat-update-state")).toContainText("Couldn’t check");
+    await expect(failed.locator(".chat-update-state")).toContainText("Marked done");
+    await expect(failed.locator(".chat-update-status-note")).toBeVisible();
+    await failed.getByText("Details", { exact: true }).click();
+    await expect(failed.getByText("source/failed.txt:4", { exact: true })).toBeVisible();
+    await failed.getByText("Details", { exact: true }).click();
+    await failed.getByRole("button", { name: "Reopen", exact: true }).click();
+    await expect(failed.locator(".chat-update-state")).toHaveText("Couldn’t check");
+    await interrupted.getByRole("button", { name: "Reply", exact: true }).click();
+    await expect(page.locator(".update-reply-chip")).toContainText("Venue check");
+    expect(await page.evaluate(async () => (await window.gator!.snapshot()).state!.conversation_id)).toBe(origin);
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(760, 560));
+    await failed.scrollIntoViewIfNeeded();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: "test-results/chat-update-check-status.png" });
+  } finally {
+    try { await closeDesktop(app); }
+    finally { await rm(root, { recursive: true, force: true }); }
+  }
+});
+
 test("durable follow-up cards return to their chat and retain explicit reply ownership", async () => {
   test.setTimeout(100_000);
   const root = await temporaryDirectory(join(tmpdir(), "gator-chat-updates-"));
