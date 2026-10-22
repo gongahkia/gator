@@ -1,5 +1,5 @@
 import { _electron as electron, test, expect, type Page } from "@playwright/test";
-import { openSurface } from "./navigation";
+import { openCommandSearch, openSurface } from "./navigation";
 import { closeDesktop, temporaryDirectory as mkdtemp } from "./lifecycle";
 import { mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -241,7 +241,7 @@ test("recent chats default to a flat list, offer folder grouping, and isolate dr
     await expect(page.getByRole("button", { name: "New chat", exact: true })).toBeVisible();
     await page.keyboard.press(`${process.platform === "darwin" ? "Meta" : "Control"}+n`);
     await expect(composer).toHaveValue("");
-    await page.getByRole("button", { name: "Search commands", exact: true }).click();
+    await openCommandSearch(page);
     await page.getByRole("textbox", { name: "Find a command", exact: true }).fill("/new");
     await expect(page.locator(".command-list button")).toHaveCount(1);
     await page.keyboard.press("Escape");
@@ -331,13 +331,14 @@ test("motion is interruptible, releases dismissed controls, and honors reduced m
     await expect(page.locator(".workspace-panel")).toHaveCount(0);
 
     await session.send("Animation.setPlaybackRate", { playbackRate: 0.1 });
-    await page.getByRole("button", { name: "Search commands", exact: true }).press("Enter");
+    await page.getByRole("textbox", { name: "Message Gator", exact: true }).focus();
+    await openCommandSearch(page);
     await expect(page.getByRole("textbox", { name: "Find a command" })).toBeFocused();
     await page.screenshot({ path: "test-results/desktop-motion-command-menu.png" });
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog", { name: "Search commands" })).toHaveCount(0);
     await expect(page.locator('.modal-backdrop[data-open="false"]')).toHaveAttribute("inert", "");
-    await expect(page.getByRole("button", { name: "Search commands", exact: true })).toBeFocused();
+    await expect(page.getByRole("textbox", { name: "Message Gator", exact: true })).toBeFocused();
     // Reopen while its exit is still running; no stale completion may remove it.
     await page.keyboard.press(`${process.platform === "darwin" ? "Meta" : "Control"}+k`);
     await expect(page.getByRole("textbox", { name: "Find a command" })).toBeFocused();
@@ -345,7 +346,7 @@ test("motion is interruptible, releases dismissed controls, and honors reduced m
     await page.keyboard.press("Escape");
     await expect(page.locator(".modal-backdrop")).toHaveCount(0);
 
-    await page.getByRole("button", { name: "Search commands", exact: true }).click();
+    await openCommandSearch(page);
     await page.getByRole("textbox", { name: "Find a command" }).fill("Following");
     await page.getByRole("textbox", { name: "Find a command" }).press("Enter");
     await expect(page.getByRole("complementary", { name: "Following", exact: true })).toBeVisible();
@@ -772,11 +773,12 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-details-800.png" });
     await page.getByRole("button", { name: "Close conversation information" }).click();
-    await page.getByRole("button", { name: "Search commands" }).click();
+    await page.getByRole("textbox", { name: "Message Gator", exact: true }).focus();
+    await openCommandSearch(page);
     await page.getByRole("textbox", { name: "Find a command" }).fill("help");
     await page.getByRole("textbox", { name: "Find a command" }).press("Enter");
     await expect(page.getByRole("dialog", { name: "Search commands" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Search commands" })).toBeFocused();
+    await expect(page.getByRole("textbox", { name: "Message Gator", exact: true })).toBeFocused();
     // Exercise the titlebar-free grid used by fullscreen and Linux without
     // switching the developer's macOS Space during this test.
     await page.evaluate(() => { document.querySelector<HTMLElement>(".app-shell")!.dataset.fullscreen = "true"; });

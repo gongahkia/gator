@@ -1,3 +1,4 @@
+import { openCommandSearch } from "./navigation";
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -105,6 +106,6 @@ test("new chat and pasted attachments keep focus and layout across themes and co
       for(const width of [1440,800]){await app.evaluate(({BrowserWindow},width)=>BrowserWindow.getAllWindows()[0].setSize(width,700),width);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:`test-results/shared-chat-${theme}-${width}.png`});}
     }
     await page.emulateMedia({reducedMotion:"reduce"});await page.getByRole("button",{name:"Collapse sidebar",exact:true}).click();await expect(page.getByRole("button",{name:"Expand sidebar",exact:true})).toBeVisible();await newChat.press("Enter");await expect(composer(page)).toBeFocused();await expect(page.getByRole("region",{name:"Attachments for your next message"})).toHaveCount(0);
-    await page.getByRole("button",{name:"Search commands",exact:true}).click();const search=page.getByRole("textbox",{name:"Find a command",exact:true});await search.fill("/new");await expect(page.locator(".command-list button")).toHaveCount(1);await search.fill("new chat");await expect(page.locator(".command-list button")).toHaveCount(1);await page.keyboard.press("Escape");expect(f.requests).toHaveLength(0);
+    await openCommandSearch(page);const search=page.getByRole("textbox",{name:"Find a command",exact:true});await search.fill("/new");await expect(page.locator(".command-list button")).toHaveCount(1);await search.fill("new chat");await expect(page.locator(".command-list button")).toHaveCount(1);await page.keyboard.press("Escape");expect(f.requests).toHaveLength(0);
   }finally{await f.close();}
 });

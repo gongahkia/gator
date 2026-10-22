@@ -101,6 +101,7 @@ export function App() {
   const [search, setSearch] = useState<string | null>(null);
   const [navigation, setNavigation] = useState<{ target: Navigation; queued: boolean } | null>(null);
   const [showCommands, setShowCommands] = useState(false);
+  const commandReturn = useRef<HTMLElement | null>(null);
   const [sending, setSending] = useState(false);
   const [voiceBusy, setVoiceBusy] = useState(false);
   const [modelBusy, setModelBusy] = useState(false);
@@ -222,7 +223,7 @@ export function App() {
       if (navigation && event.key !== "Escape") return;
       const bindings = state?.desktop?.shortcuts;
       if (shortcutMatches(event, "new_chat", bindings)) { event.preventDefault(); if (!state?.running) navigate("/new"); }
-      else if (shortcutMatches(event, "command_search", bindings)) { event.preventDefault(); setShowCommands(current => !current); }
+      else if (shortcutMatches(event, "command_search", bindings)) { event.preventDefault(); if (!showCommands) commandReturn.current = document.activeElement as HTMLElement | null; setShowCommands(current => !current); }
       else if (shortcutMatches(event, "conversation_search", bindings)) { event.preventDefault(); setSearch(current => current === null ? "" : null); }
       else if (shortcutMatches(event, "settings", bindings)) { event.preventDefault(); if (!state?.running) navigate("/model"); }
       else if (!panel && shortcutMatches(event, "help", bindings)) { event.preventDefault(); if (!state?.running) navigate("/help"); }
@@ -295,7 +296,6 @@ export function App() {
       {settingsPage ? <SettingsNavigation destination={state.destination} collapsed={collapsed} navigate={navigate} about={() => void window.gator?.updates({ action: "open" })} /> : <>
       <button className="nav-button new-chat" aria-label="New chat" title={`New chat (${shortcutLabel("new_chat", state.desktop?.shortcuts)})`} onClick={() => navigate("/new")} disabled={state.running || !!state.external || !!error}><Plus size={18}/><span>New chat</span><kbd>{shortcutLabel("new_chat",state.desktop?.shortcuts)}</kbd></button>
       <button className="nav-button primary-chat" aria-label="Talk with Gator" aria-current={!panel ? "page" : undefined} onClick={() => navigate("/chat")}><MessageSquare size={18} /><span>Talk with Gator</span></button>
-      <button className="nav-button command-trigger" aria-label="Search commands" onClick={() => setShowCommands(true)} title="Search commands"><Search size={17} /><span>Search</span><kbd>{shortcutLabel("command_search", state.desktop?.shortcuts)}</kbd></button>
       <div className="sidebar-scroll"><nav className="personal-navigation" aria-label="Your Gator"><button className="nav-button" aria-label="Following" aria-expanded={details && detailKind === "following"} aria-controls="library-panel" onClick={() => openDetails("following")} title={collapsed ? "Following" : undefined}><Target size={18} /><span>Following</span></button><button className="nav-button" aria-label="Saved" aria-expanded={details && detailKind === "saved"} aria-controls="library-panel" onClick={() => openDetails("saved")} title={collapsed ? "Saved" : undefined}><Bookmark size={18} /><span>Saved</span></button></nav>
       <RecentConversations state={state} disabled={state.running || !!error} open={openRecent} browse={() => navigate("/conversations")} />
       </div>
@@ -339,7 +339,7 @@ export function App() {
     {panel && <div className="panel-draft-anchor"><MessageSquare size={14} /><span>{draft ? "Your message draft is kept while you’re here." : "Return to the conversation to write a message."}</span><button className="small-button" onClick={() => attempt({ type: "panel", key: "esc", panel: { id: panel.id!, action: "key" } })}>Back<kbd>Esc</kbd></button></div>}
     <Presence open={showCommands}>{(open, presenceRef) => <CommandMenu open={open} presenceRef={presenceRef} commands={commands} close={() => setShowCommands(false)} select={(name, needsInput) => {
       setShowCommands(false);
-      if (name === "@following" || name === "@saved") { drawerReturn.current = document.querySelector<HTMLElement>(".command-trigger"); setRequestedOutput(undefined); setDetailKind(name === "@following" ? "following" : "saved"); setDetails(true); }
+      if (name === "@following" || name === "@saved") { drawerReturn.current = commandReturn.current?.isConnected ? commandReturn.current : composer.current; setRequestedOutput(undefined); setDetailKind(name === "@following" ? "following" : "saved"); setDetails(true); }
       else if (name === "@gator") navigate("/chat");
       else if (needsInput) navigate("/chat", `/${name} `);
       else navigate(`/${name}`);

@@ -1,3 +1,4 @@
+import { openCommandSearch } from "./navigation";
 import { _electron as electron, expect, test, type Page } from "@playwright/test";
 import { execFileSync } from "node:child_process";
 import { access, mkdtemp, mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
@@ -194,7 +195,7 @@ test("saved guidance persists native choices and retired terminal settings are a
     await page.getByRole("combobox", { name: "Filter saved guidance", exact: true }).selectOption("active");
     await expect(page.locator(".panel-row")).toHaveCount(1);
     expect((await snapshot(page)).commands?.some((command) => command.name === "statusline")).toBe(false);
-    await page.getByRole("button", { name: "Search commands", exact: true }).click();
+    await openCommandSearch(page);
     await page.getByRole("textbox", { name: "Find a command", exact: true }).fill("statusline");
     await expect(page.locator(".command-list button")).toHaveCount(0);
     await expect(page.getByText("No commands match “statusline”.", { exact: true })).toBeVisible();

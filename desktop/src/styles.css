@@ -112,9 +112,8 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .nav-button kbd { margin-left: auto; color: var(--color-faint); }
 .new-chat { color: var(--color-contrast); margin-bottom: 5px; }
 .new-chat svg { color: var(--color-accent); }
-.command-trigger { margin-bottom: 17px; }
 .primary-chat { margin-bottom: 4px; color: var(--color-contrast); }
-.personal-navigation { margin-bottom: 22px; }
+.personal-navigation { margin: 16px 0 22px; }
 .personal-navigation .nav-button[aria-expanded="true"] { background: var(--color-soft-fill); color: var(--color-contrast); }
 .recent-heading { display: flex; align-items: center; justify-content: space-between; }
 .recent-heading .nav-group-label { padding-bottom: 0; }
