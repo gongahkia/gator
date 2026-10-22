@@ -34,6 +34,7 @@ type WorkRole struct {
 }
 
 type Settings struct {
+	Desktop    DesktopSettings   `json:"desktop,omitzero"`
 	WorkRoles  []WorkRole        `json:"work_roles,omitempty"`
 	Version    int               `json:"version"`
 	Defaults   Defaults          `json:"defaults"`
@@ -310,6 +311,9 @@ func (s Store) Save(settings Settings) error {
 }
 
 func validate(settings Settings) error {
+	if err := settings.Desktop.Validate(); err != nil {
+		return err
+	}
 	seenRoles := map[string]bool{}
 	for _, role := range settings.WorkRoles {
 		if role.Version != 1 || seenRoles[role.Name] || role.MaxSteps < 0 || role.MaxSteps > 32 {
