@@ -15,12 +15,13 @@ The standalone CLI and React terminal renderer are retired.
 From the repository root, with Go 1.25.13 and Node.js 22.12+ installed:
 
 ```sh
-npm ci --prefix desktop
-make desktop
+make run
 ```
 
-On Windows, use `npm start --prefix desktop` in place of `make desktop`;
-Make is optional. This builds the private runtime and frontend, then opens Gator. Installed apps
+`make run` (or `make desktop`) installs the pinned desktop dependencies when
+needed, builds the private runtime and frontend, then opens Gator.
+On Windows or without Make, run `npm ci --prefix desktop` followed by
+`npm start --prefix desktop`. Installed apps
 bundle Electron's Node runtime; users do not need Node or a Gator CLI on PATH.
 
 The app uses the existing local Gator profile and opens your continuing main

@@ -4,12 +4,23 @@ The Electron app is Gator's supported user interface. Install Go 1.25.13 and
 Node.js 22.12 or newer, then run from the repository root:
 
 ```sh
+make run
+```
+
+`make run` installs the pinned desktop dependencies when missing or when the
+package manifests change, builds the runtime and frontend, then opens Gator.
+`make desktop` is an alias for the same command. `make build` builds the
+private runtime and renderer; `make package` creates an unpacked local app under
+`desktop/release/`; `make dist` creates installers there. These app targets
+handle desktop dependencies automatically. Run `make help` to list the commands.
+
+On Windows or without Make, use:
+
+```sh
 npm ci --prefix desktop
 npm start --prefix desktop
 ```
 
-`make desktop` is the equivalent on systems with Make. `make build` builds the
-private runtime and renderer; `make package` creates an unpacked local app.
 No Gator executable is installed on PATH. Users of packaged releases need
 neither Go nor Node.
 
