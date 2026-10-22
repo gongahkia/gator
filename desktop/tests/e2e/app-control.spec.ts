@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { closeDesktop, temporaryDirectory } from "./lifecycle";
 
-async function fixture() {
+async function fixture(waitForReply?: Promise<void>) {
   const directory = await temporaryDirectory(join(tmpdir(), "gator-app-control-"));
   const workspace = join(directory, "workspace"), configRoot = join(directory, "config/gator");
   await mkdir(workspace); await mkdir(configRoot, { recursive: true });
@@ -13,7 +13,7 @@ async function fixture() {
   let voiceRequests = 0;
   const server = createServer((req, res) => {
     let body = ""; req.on("data", chunk => { body += chunk; });
-    req.on("end", () => {
+    req.on("end", async () => {
       res.writeHead(200, { "Content-Type": "application/json" });
       if (req.url?.includes(":generateContent")) {
         voiceRequests++;
@@ -22,6 +22,7 @@ async function fixture() {
         res.end(JSON.stringify({ candidates: [{ content: { parts: [{ text: "What is my usage?" }] } }], usageMetadata: { totalTokenCount: 25 } })); return;
       }
       const payload = JSON.parse(body); payloads.push(payload);
+      if (waitForReply) await waitForReply;
       if (payload.messages.some((message: { role: string; content?: string }) => message.role === "system" && message.content?.includes("Classify the user's immediate request"))) {
         res.end(JSON.stringify({ choices: [{ message: { role: "assistant", content: '{"mode":"inspect"}' }, finish_reason: "stop" }] })); return;
       }
@@ -152,4 +153,64 @@ test("dictation preserves the draft, records voice usage and reads only new repl
     expect(await page.evaluate(() => (window as unknown as { testTracks: MediaStreamTrack[] }).testTracks.every(track => track.readyState === "ended"))).toBe(true);
     await page.screenshot({ path: "test-results/voice-dictation-and-replies.png" });
   } finally { await f.close(); }
+});
+
+
+test("composer model picker preserves drafts, changes actual defaults and honors active-work locks", async () => {
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const f = await fixture(gate);
+  const configFile = join(f.directory, "config/gator/config.json");
+  const config = JSON.parse(await readFile(configFile, "utf8"));
+  config.model_aliases = { "control-fixture:model-two": "Careful model" };
+  config.custom_providers[0].models.push(...Array.from({ length: 8 }, (_, i) => `extra-model-${i}`));
+  config.custom_providers.push({ id: "locked-fixture", base_url: "http://127.0.0.1:1/v1/chat/completions", api_key_env: "GATOR_PICKER_UNCONFIGURED_TEST_KEY", models: ["unavailable-model"], default_model: "unavailable-model" });
+  await writeFile(configFile, JSON.stringify(config), { mode: 0o600 });
+  try {
+    const app = await f.launch(), page = await app.firstWindow();
+    const errors: string[] = []; page.on("pageerror", error => errors.push(error.message));
+    const composer = page.getByRole("textbox", { name: "Message Gator", exact: true });
+    const trigger = page.getByRole("button", { name: /^Model and work effort:/ });
+    await composer.fill("Keep my unsent draft.");
+    const before = (await page.evaluate(() => window.gator!.snapshot())).state!;
+    await trigger.click();
+    const dialog = page.getByRole("dialog", { name: "Model and work effort" });
+    await expect(dialog).toBeVisible();
+    const slider = dialog.getByRole("slider", { name: "Work effort" });
+    await expect(slider).toHaveAttribute("aria-valuetext", "Standard");
+    await slider.focus(); await page.keyboard.press("End");
+    await expect.poll(async () => (await page.evaluate(() => window.gator!.snapshot())).state!.composer!.effort).toBe("high");
+    await dialog.getByRole("button", { name: "Reset work effort to Standard" }).click();
+    await expect.poll(async () => (await page.evaluate(() => window.gator!.snapshot())).state!.composer!.effort).toBe("standard");
+    await expect.poll(() => page.locator(".effort-fill").evaluate(element => { const fill = element.getBoundingClientRect(), track = element.parentElement!.getBoundingClientRect(); return Math.abs(fill.right - (track.left + track.width / 2)); })).toBeLessThan(1.5);
+    await page.screenshot({ path: "test-results/model-picker-effort.png" });
+    await dialog.getByRole("button", { name: "model-one", exact: true }).click();
+    await expect(dialog.getByRole("option", { name: /unavailable-model/ })).toBeDisabled();
+    await page.screenshot({ path: "test-results/model-picker-models.png" });
+    const filter = dialog.getByRole("searchbox", { name: "Find a model" });
+    await filter.fill("Careful"); await filter.press("ArrowDown"); await page.keyboard.press("Enter");
+    await expect(trigger).toHaveAccessibleName(/Careful model, Standard/);
+    expect(JSON.parse(await readFile(configFile, "utf8")).defaults.model).toBe("model-two");
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0); await expect(trigger).toBeFocused();
+    await expect(composer).toHaveValue("Keep my unsent draft.");
+    const after = (await page.evaluate(() => window.gator!.snapshot())).state!;
+    expect(after.source).toBe(before.source); expect(after.conversation_id).toBe(before.conversation_id); expect(after.messages).toEqual(before.messages);
+    await trigger.click(); await composer.click(); await expect(dialog).toHaveCount(0);
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(800, 650));
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await trigger.click();
+    const box = await dialog.boundingBox(); expect(box!.x).toBeGreaterThanOrEqual(0); expect(box!.y).toBeGreaterThanOrEqual(0); expect(box!.x + box!.width).toBeLessThanOrEqual(800);
+    await page.screenshot({ path: "test-results/model-picker-narrow.png" });
+    await page.keyboard.press("Escape");
+    await composer.fill("What is my usage?"); await page.getByRole("button", { name: "Send message", exact: true }).click();
+    await expect.poll(() => f.payloads.length).toBeGreaterThan(0);
+    expect(f.payloads[0].model).toBe("model-two");
+    await trigger.click(); await expect(slider).toBeDisabled();
+    await expect(dialog.getByText("Available after current and queued work finishes.")).toBeVisible();
+    await page.keyboard.press("Escape");
+    expect((await page.evaluate(() => window.gator!.snapshot())).state!.running).toBe(true);
+    release(); await expect.poll(async () => (await page.evaluate(() => window.gator!.snapshot())).state!.running).toBe(false);
+    expect(errors).toEqual([]);
+  } finally { release(); await f.close(); }
 });

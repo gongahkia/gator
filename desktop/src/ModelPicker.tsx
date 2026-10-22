@@ -14,6 +14,7 @@ export function ModelPicker({ state, disabled, send, manage, onBusyChange }: Pro
   const [open, setOpen] = useState(false);
   const [view, setView] = useState("effort");
   const [query, setQuery] = useState("");
+  const [activeModel, setActiveModel] = useState("");
   const [pending, setPending] = useState<{ id: string; model: boolean }>();
   const [issue, setIssue] = useState("");
   const [position, setPosition] = useState(1);
@@ -30,7 +31,8 @@ export function ModelPicker({ state, disabled, send, manage, onBusyChange }: Pro
   const locked = disabled || !!pending || !!settings?.disabled;
   const filtered = choices.filter(choice => `${choice.label} ${choice.model} ${providerLabel(choice.provider)}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
   const groups = [...new Set(filtered.map(choice => choice.provider))];
-  useViewMotion(open ? view : undefined, body);
+  const activeChoice = filtered.find(choice => !choice.unavailable && `${choice.provider}:${choice.model}` === activeModel) ?? filtered.find(choice => !choice.unavailable && choice.provider === state.provider && choice.model === state.model) ?? filtered.find(choice => !choice.unavailable);
+  useViewMotion(view, body);
   useEffect(() => { if (!dragging.current && !pending) setPosition(effort); }, [effort, open, pending]);
   useEffect(() => { onBusyChange(!!pending); }, [pending, onBusyChange]);
   useEffect(() => () => onBusyChange(false), [onBusyChange]);
@@ -54,7 +56,7 @@ export function ModelPicker({ state, disabled, send, manage, onBusyChange }: Pro
       const rect = trigger.current?.getBoundingClientRect(); if (!rect) return;
       const width = Math.min(304, innerWidth - 24), above = rect.top - 16, below = innerHeight - rect.bottom - 16;
       const upwards = above >= 240 || above >= below;
-      setPlacement({ width, left: Math.max(12, Math.min(rect.right - width, innerWidth - width - 12)), maxHeight: Math.max(120, upwards ? above : below), ...(upwards ? { bottom: innerHeight - rect.top + 8 } : { top: rect.bottom + 8 }) });
+      setPlacement({ width, left: Math.max(12, Math.min(rect.right - width, innerWidth - width - 12)), maxHeight: Math.min(420, Math.max(120, upwards ? above : below)), ...(upwards ? { bottom: innerHeight - rect.top + 8 } : { top: rect.bottom + 8 }) });
     };
     place();
     window.addEventListener("resize", place); window.addEventListener("scroll", place, true);
@@ -63,7 +65,7 @@ export function ModelPicker({ state, disabled, send, manage, onBusyChange }: Pro
   }, [open]);
   useLayoutEffect(() => {
     if (!open) return;
-    const focus = view === "models" ? (popup.current?.querySelector<HTMLElement>('input[type="search"], [role="option"][aria-selected="true"]:not(:disabled)') ?? popup.current?.querySelector<HTMLElement>('[role="option"]:not(:disabled), .picker-heading button')) : popup.current?.querySelector<HTMLElement>(".picker-model-select");
+    const focus = view === "models" ? (popup.current?.querySelector<HTMLElement>('input[type="search"], [role="option"][aria-selected="true"]:not(:disabled)') ?? popup.current?.querySelector<HTMLElement>('[role="option"]:not(:disabled)') ?? popup.current?.querySelector<HTMLElement>('.picker-heading button')) : popup.current?.querySelector<HTMLElement>(".picker-model-select");
     focus?.focus({ preventScroll: true });
   }, [open, view]);
   useEffect(() => {
@@ -104,7 +106,7 @@ export function ModelPicker({ state, disabled, send, manage, onBusyChange }: Pro
         <div className="picker-models" role="listbox" aria-label="Models" onKeyDown={listKeys}>
           {groups.map(provider => <div role="group" aria-label={providerLabel(provider)} key={provider}><h3>{providerLabel(provider)}</h3>{filtered.filter(choice => choice.provider === provider).map(choice => {
             const selected = choice.provider === state.provider && choice.model === state.model;
-            return <button key={choice.model} role="option" aria-selected={selected} title={choice.unavailable || choice.model} disabled={locked || !!choice.unavailable} onClick={() => { if (selected) setView("effort"); else void change({ action: "model", provider: choice.provider, model: choice.model }); }}><Cpu size={17} /><span><strong>{choice.label}</strong>{choice.unavailable && <small>{choice.unavailable}</small>}</span>{selected && <Check size={16} />}</button>;
+            return <button key={choice.model} role="option" aria-selected={selected} tabIndex={choice === activeChoice ? 0 : -1} onFocus={() => setActiveModel(`${choice.provider}:${choice.model}`)} title={choice.unavailable || choice.model} disabled={locked || !!choice.unavailable} onClick={() => { if (selected) setView("effort"); else void change({ action: "model", provider: choice.provider, model: choice.model }); }}><Cpu size={17} /><span><strong>{choice.label}</strong>{choice.unavailable && <small>{choice.unavailable}</small>}</span>{selected && <Check size={16} />}</button>;
           })}</div>)}
           {!filtered.length && <p className="picker-empty">{choices.length ? "No matching models" : "Add a cloud or local model to get started."}</p>}
         </div>
