@@ -31,7 +31,7 @@ import { FileChatContext } from "./FileSurface";
 import type { UploadedFile } from "./bridge";
 import { shortcutMatches, shortcutLabel } from "./shortcuts";
 
-type Navigation = { command: string; draft?: string } | { conversation: NonNullable<DesktopFrame["conversation"]> };
+type Navigation = { command: string; draft?: string } | { conversation: NonNullable<DesktopFrame["conversation"]> } | { session: string };
 
 function Logo({ small = false }: { small?: boolean }) {
   return <span className={`gator-logo ${small ? "small" : ""}`} aria-hidden="true">🐊</span>;
@@ -83,7 +83,7 @@ const Message = memo(function Message({ message, pending, onApproval, commands, 
 }, (before, after) => JSON.stringify(before.message.input_ids) === JSON.stringify(after.message.input_ids) && JSON.stringify(before.message.inputs) === JSON.stringify(after.message.inputs) && JSON.stringify(before.message.activity) === JSON.stringify(after.message.activity) && before.pending === after.pending && before.message.role === after.message.role && before.message.text === after.message.text && JSON.stringify(before.message.result ?? before.message.bundle) === JSON.stringify(after.message.result ?? after.message.bundle) && before.onApproval === after.onApproval && before.disabled === after.disabled && before.commands === after.commands && before.navigate === after.navigate && before.preview === after.preview);
 
 export function App() {
-  const { state, error, connection, sessionID, terminalBusy, fullScreen, updates, updatesOpen, updatePreparing, reconnecting, reconnect, send, clearError } = useBackend();
+  const { state, error, connection, sessionID, sessionSwitching, sessionIssue, chatActivity, allChatsBusy, allChatsQueued, terminalBusy, fullScreen, updates, updatesOpen, updatePreparing, reconnecting, reconnect, send, clearError } = useBackend();
   const commands = useMemo(() => (state?.commands ?? []), [state?.commands]);
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("gator:sidebar-collapsed") === "true");
   const [details, setDetails] = useState(false);
@@ -103,6 +103,7 @@ export function App() {
   const [showCommands, setShowCommands] = useState(false);
   const commandReturn = useRef<HTMLElement | null>(null);
   const [sending, setSending] = useState(false);
+  const [navigationPending, setNavigationPending] = useState(false);
   const admission = useRef<{ key: string; id: string } | null>(null);
   const [voiceBusy, setVoiceBusy] = useState(false);
   const [modelBusy, setModelBusy] = useState(false);
@@ -116,7 +117,7 @@ export function App() {
   const queueAction = useQueueAction(state, send, error);
   const attachments = useAttachmentPicker(drafts.context, drafts.uploads, (files) => { drafts.setUploads(files); setDraftError(""); }, sending || queueAction.busy || !!error || !!state?.external || !!updatePreparing || !drafts.ready);
   const composer = useRef<HTMLTextAreaElement>(null);
-  const newChatFocus = useRef(false);
+  const newChatFocus = useRef<string | undefined>(undefined);
   const detailsTrigger = useRef<HTMLButtonElement>(null);
   const closeDetails = () => { setDetails(false); (drawerReturn.current?.isConnected ? drawerReturn.current : detailsTrigger.current)?.focus({ preventScroll: true }); };
   const openDetails = (kind: typeof detailKind) => { drawerReturn.current = document.activeElement as HTMLElement; setRequestedOutput(undefined); setDetailKind(kind); setFilesOnly(false); setDetails(!(details && detailKind === kind && !filesOnly)); };
@@ -165,6 +166,7 @@ export function App() {
   const fileChat = useMemo(() => ({ context: drafts.context, dirtyKeys: dirtyFiles, attachmentKey, blocked: sending || queueAction.busy || !!error || !!state?.external || !!updatePreparing || !drafts.ready, useFile, dirty: fileDirty }), [drafts.context, sending, queueAction.busy, error, state?.external, updatePreparing, drafts.ready, useFile, fileDirty, dirtyFiles, attachmentKey]);
 
   const hasUnsavedView = dirtyFiles.size > 0 || queueEditing || panel?.rows?.some((row) => row.input) || panel?.kind === "confirmation" || panel?.kind === "status-line";
+  const navigationBusy = navigationPending || !!sessionSwitching || sending || queueAction.busy || voiceBusy || attachments.busy;
 
   useEffect(() => { localStorage.setItem("gator:sidebar-collapsed", String(collapsed)); }, [collapsed]);
   useEffect(() => { if (sessionID) { if (originalSession.current && originalSession.current !== sessionID) setSessionChanged(true); originalSession.current = sessionID; } }, [sessionID]);
@@ -175,10 +177,10 @@ export function App() {
     }
   }, [state?.input]);
   useEffect(() => {
-    if (newChatFocus.current && drafts.ready && !panel && composer.current && !composer.current.disabled) {
-      composer.current.focus(); newChatFocus.current = false;
+    if (newChatFocus.current && newChatFocus.current !== drafts.context && drafts.ready && !panel && composer.current && !composer.current.disabled) {
+      composer.current.focus(); newChatFocus.current = undefined;
     }
-  }, [drafts.context, drafts.ready, panel, sending]);
+  }, [drafts.context, drafts.ready, panel, sending, navigationPending, sessionSwitching]);
   useLayoutEffect(() => {
     if (!state) return;
     if (panel) { returningToTranscript.current = true; return; }
@@ -201,16 +203,18 @@ export function App() {
 
   const attempt = useCallback((frame: DesktopFrame) => { void send(frame).catch(() => {}); }, [send]);
   const performNavigation = (target: Navigation) => {
-    setSearch(null); setShowCommands(false); setDetails(false);
-    if ("conversation" in target) { attempt({ type: "conversation", conversation: target.conversation }); return; }
-    if (settingsRoutes.some((route) => route.command === target.command)) setDetails(false);
-    if (target.command === "/new") newChatFocus.current = true;
-    attempt({ type: "navigate", text: target.command });
-    if (target.draft !== undefined) setDraft(target.draft);
+    setNavigationPending(true); setSearch(null); setShowCommands(false); setDetails(false);
+    void (async () => {
+      if ("session" in target) { await window.gator!.openSession(target.session); return; }
+      if ("conversation" in target) { await send({ type: "conversation", conversation: target.conversation }); return; }
+      if (target.command === "/new") newChatFocus.current = drafts.context;
+      await send({ type: "navigate", text: target.command });
+      if (target.draft !== undefined) setDraft(target.draft);
+    })().catch(error => setDraftError(String(error))).finally(() => setNavigationPending(false));
   };
   const requestNavigation = (target: Navigation) => {
-    const queued = !!state?.queued && ("conversation" in target || ["/new", "/gator"].includes(target.command));
-    if (hasUnsavedView || queued) { setNavigation({ target, queued }); return; }
+    if (navigationBusy) return;
+    if (hasUnsavedView) { setNavigation({ target, queued: false }); return; }
     performNavigation(target);
   };
   const navigate = (command: string, prefill?: string) => requestNavigation({ command, draft: prefill });
@@ -223,11 +227,11 @@ export function App() {
       if (event.defaultPrevented || showDrafts || updatesOpen || updatePreparing) return;
       if (navigation && event.key !== "Escape") return;
       const bindings = state?.desktop?.shortcuts;
-      if (shortcutMatches(event, "new_chat", bindings)) { event.preventDefault(); if (!state?.running) navigate("/new"); }
+      if (shortcutMatches(event, "new_chat", bindings)) { event.preventDefault(); navigate("/new"); }
       else if (shortcutMatches(event, "command_search", bindings)) { event.preventDefault(); if (!showCommands) commandReturn.current = document.activeElement as HTMLElement | null; setShowCommands(current => !current); }
       else if (shortcutMatches(event, "conversation_search", bindings)) { event.preventDefault(); setSearch(current => current === null ? "" : null); }
-      else if (shortcutMatches(event, "settings", bindings)) { event.preventDefault(); if (!state?.running) navigate("/model"); }
-      else if (!panel && shortcutMatches(event, "help", bindings)) { event.preventDefault(); if (!state?.running) navigate("/help"); }
+      else if (shortcutMatches(event, "settings", bindings)) { event.preventDefault(); navigate("/model"); }
+      else if (!panel && shortcutMatches(event, "help", bindings)) { event.preventDefault(); navigate("/help"); }
       else if (shortcutMatches(event, "voice_input", bindings)) { event.preventDefault(); window.dispatchEvent(new CustomEvent("gator:voice-input")); }
       if (event.key === "Escape") {
         if (navigation) setNavigation(null);
@@ -252,13 +256,13 @@ export function App() {
 
   const retainedDraft = drafts.saved.drafts.find((item) => item.context === drafts.context);
   const unsavedComposer = (draft.trim() || drafts.uploads.length) && (!drafts.saved.enabled || retainedDraft?.text !== draft || JSON.stringify(retainedDraft?.uploads ?? []) !== JSON.stringify(drafts.uploads));
-  const updateDialog = <Presence open={!!updatesOpen && !!updates}>{(open, presenceRef) => <UpdateDialog open={open} presenceRef={presenceRef} state={updates!} blocked={attachments.busy ? "Wait for attachments to finish preparing." : drafts.saving ? "Wait for your message draft to finish saving." : drafts.issue ? "Save or copy your unsent message before restarting." : unsavedComposer ? "Your unsent message or attachments are not saved. Save or clear them before restarting." : hasUnsavedView ? "Save or close the form or queue editor before restarting." : state?.running || state?.queued || state?.pending_approval || state?.external || terminalBusy ? "Finish the current work and queued messages before restarting." : connection !== "connected" ? "Reconnect before restarting for an update." : ""} close={() => void window.gator?.updates({ action: "close" })} />}</Presence>;
+  const updateDialog = <Presence open={!!updatesOpen && !!updates}>{(open, presenceRef) => <UpdateDialog open={open} presenceRef={presenceRef} state={updates!} blocked={attachments.busy ? "Wait for attachments to finish preparing." : drafts.saving ? "Wait for your message draft to finish saving." : drafts.issue ? "Save or copy your unsent message before restarting." : unsavedComposer ? "Your unsent message or attachments are not saved. Save or clear them before restarting." : hasUnsavedView ? "Save or close the form or queue editor before restarting." : allChatsBusy || allChatsQueued || state?.running || state?.queued || state?.pending_approval || state?.external || terminalBusy ? "Finish work and queued messages in all chats before restarting." : connection !== "connected" ? "Reconnect before restarting for an update." : ""} close={() => void window.gator?.updates({ action: "close" })} />}</Presence>;
 
   if (!state) return <><main className="boot-screen"><Logo /><h1>{reconnecting ? "Reconnecting to Gator…" : error ? "Gator could not connect" : "Getting your workspace ready"}</h1><p>{error || "Opening your local Gator profile. No messages will be submitted."}</p>{(!error || reconnecting) && <LoaderCircle className="spin accent" size={20} />}{error && window.gator && <button className="button" disabled={reconnecting} onClick={() => void reconnect()}>{reconnecting ? "Reconnecting…" : "Reconnect"}</button>}</main>{updateDialog}</>;
 
   const queueFull = state.running && state.queued >= 16 && !draft.trimStart().startsWith("/");
   const submit = async (guide = false) => {
-    if (voiceBusy || modelBusy || dirtyFiles.size) return;
+    if (navigationPending || sessionSwitching || voiceBusy || modelBusy || dirtyFiles.size) return;
     if ((!draft.trim() && !drafts.uploads.length) || !drafts.ready || sending || attachments.busy || queueAction.busy || panel || error || state.external || (guide ? !state.guidance_id : queueFull)) return;
     if (drafts.uploads.length && (guide || draft.trimStart().startsWith("/"))) { setDraftError("Send attachments with a message or queued follow-up."); return; }
     if (!state.running && !state.provider && !draft.trimStart().startsWith("/")) { navigate("/model"); return; }
@@ -300,15 +304,17 @@ export function App() {
     <aside className="sidebar" aria-label="Main navigation">
       <div className="sidebar-brand"><button className="brand-button" onClick={() => navigate("/gator")} aria-label="Gator home"><Logo /><span>Gator</span></button><button className="icon-button collapse-button" onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}><IconSwap active={collapsed} size={17} on={<PanelLeftOpen size={17} />} off={<PanelLeftClose size={17} />} /></button></div>
       {settingsPage ? <SettingsNavigation destination={state.destination} collapsed={collapsed} navigate={navigate} about={() => void window.gator?.updates({ action: "open" })} /> : <>
-      <button className="nav-button new-chat" aria-label="New chat" title={`New chat (${shortcutLabel("new_chat", state.desktop?.shortcuts)})`} onClick={() => navigate("/new")} disabled={state.running || !!state.external || !!error}><Plus size={18}/><span>New chat</span><kbd>{shortcutLabel("new_chat",state.desktop?.shortcuts)}</kbd></button>
+      <button className="nav-button new-chat" aria-label="New chat" title={`New chat (${shortcutLabel("new_chat", state.desktop?.shortcuts)})`} onClick={() => navigate("/new")} disabled={navigationBusy || !!state.external || !!error}><Plus size={18}/><span>New chat</span><kbd>{shortcutLabel("new_chat",state.desktop?.shortcuts)}</kbd></button>
       <button className="nav-button primary-chat" aria-label="Talk with Gator" aria-current={!panel ? "page" : undefined} onClick={() => navigate("/chat")}><MessageSquare size={18} /><span>Talk with Gator</span></button>
       <div className="sidebar-scroll"><nav className="personal-navigation" aria-label="Your Gator"><button className="nav-button" aria-label="Following" aria-expanded={details && detailKind === "following"} aria-controls="library-panel" onClick={() => openDetails("following")} title={collapsed ? "Following" : undefined}><Target size={18} /><span>Following</span></button><button className="nav-button" aria-label="Saved" aria-expanded={details && detailKind === "saved"} aria-controls="library-panel" onClick={() => openDetails("saved")} title={collapsed ? "Saved" : undefined}><Bookmark size={18} /><span>Saved</span></button></nav>
-      <RecentConversations state={state} disabled={state.running || !!error} open={openRecent} browse={() => navigate("/conversations")} />
+      <RecentConversations state={state} activity={chatActivity} disabled={navigationBusy || !!error} open={openRecent} browse={() => navigate("/conversations")} />
       </div>
-      <div className="sidebar-bottom"><button className="nav-button" aria-label="Settings" title={collapsed ? "Settings" : `Settings (${shortcutLabel("settings", state.desktop?.shortcuts)})`} onClick={() => navigate("/model")} disabled={state.running}><Settings2 size={17} /><span>Settings</span><kbd>{shortcutLabel("settings", state.desktop?.shortcuts)}</kbd></button></div>
+      <div className="sidebar-bottom"><button className="nav-button" aria-label="Settings" title={collapsed ? "Settings" : `Settings (${shortcutLabel("settings", state.desktop?.shortcuts)})`} onClick={() => navigate("/model")} disabled={navigationBusy}><Settings2 size={17} /><span>Settings</span><kbd>{shortcutLabel("settings", state.desktop?.shortcuts)}</kbd></button></div>
       </>}
     </aside>
     <main className="main-area">
+      {chatActivity?.some(item => item.id !== state.conversation_id) && <nav className="chat-activity-strip" aria-label="Work in other chats">{chatActivity.filter(item => item.id !== state.conversation_id).map(item => <button key={item.id} className="small-button" disabled={navigationBusy} onClick={() => requestNavigation({ session: item.id })}><span>{item.title}</span><small>{item.status}</small></button>)}</nav>}
+      {(sessionSwitching || sessionIssue) && <div className="session-notice" role="status">{sessionSwitching ? "Opening chat… Your other tasks keep working." : sessionIssue}</div>}
       <header className="main-header"><div className="breadcrumbs">{settingsPage && <><span>Settings</span><ChevronRight size={13} /></>}<strong title={headerTitle}>{headerTitle}</strong></div><div className="header-actions">{!panel && fileCount > 0 && <button className="small-button files-trigger" aria-label={`Files in this conversation (${fileCount})`} aria-controls="work-details-panel" aria-expanded={details && detailKind === "info" && filesOnly} onClick={openFiles}><Files size={16} /><span>Files</span><small>{fileCount}</small></button>}{!settingsPage && <button ref={detailsTrigger} className="icon-button" aria-controls="work-details-panel" aria-label={details && detailKind === "info" && !filesOnly ? "Hide conversation information" : "Conversation information"} aria-expanded={details && detailKind === "info" && !filesOnly} onClick={() => openDetails("info")}><Info size={18} /></button>}</div></header>
       {error && <div className="connection-error" role="alert"><div><strong>{connection === "disconnected" ? "Connection lost" : "Action could not complete"}</strong><p>{connection === "disconnected" ? "This view may be out of date. Reconnecting opens a new local session and does not resume or resubmit work." : error}</p>{connection === "disconnected" && <details><summary>Technical details</summary><p>{error}</p></details>}</div>{connection === "disconnected" ? <button className="button" disabled={reconnecting} aria-busy={reconnecting} onClick={() => void reconnect()}>{reconnecting ? "Reconnecting…" : "Reconnect"}</button> : <button className="icon-button" aria-label="Dismiss action error" onClick={clearError}><X size={16} /></button>}</div>}
       {sessionChanged && !error && <div className="session-notice" role="status"><span>A new local session is ready. Previous work was not resumed. Saved conversations and drafts remain available.</span><button className="icon-button" aria-label="Dismiss session notice" onClick={() => setSessionChanged(false)}><X size={16} /></button></div>}
@@ -325,9 +331,9 @@ export function App() {
         </div>{!home && !atLatest && <button className="jump-latest" aria-label={newActivity ? "New activity. Jump to latest" : "Jump to latest"} onClick={jumpToLatest}><ArrowDown size={16} />{newActivity && <span>New activity</span>}</button>}</div>
         <div className="composer-area">{state.pending_approval && <div className="approval-reminder"><ShieldCheck size={16} /><span>An action is waiting for your review.</span><button className="small-button" onClick={jumpToLatest}>View request<ArrowDown size={13} /></button></div>}
           {!!slash.length && <div className="slash-suggestions" aria-label="Command suggestions">{slash.map((command) => <button key={command.name} onClick={() => { setDraft(`/${command.name}${command.needs_input ? " " : ""}`); composer.current?.focus(); }}><span>/{command.name}</span><span>{command.description}</span></button>)}</div>}
-          <MessageQueue recovered={state.requests_recovered} issue={state.requests_issue} items={state.queue ?? []} running={state.running} busy={queueAction.busy || sending || !!error || !!state.external} act={queueAction.act} onEditingChange={setQueueEditing} onUseDraft={(text) => { setDraft((current) => current ? `${current}\n\n${text}` : text); composer.current?.focus(); }} />
+          <MessageQueue key={conversationIdentity} recovered={state.requests_recovered} issue={state.requests_issue} items={state.queue ?? []} running={state.running} busy={queueAction.busy || sending || !!error || !!state.external} act={queueAction.act} onEditingChange={setQueueEditing} onUseDraft={(text) => { setDraft((current) => current ? `${current}\n\n${text}` : text); composer.current?.focus(); }} />
           {(drafts.recovered || drafts.issue) && <p className="draft-recovery" role="status">{drafts.issue || "Draft recovered. Review it before sending."}</p>}
-          <div className="composer" data-file-drop={attachments.dragging} data-voice-busy={voiceBusy} {...attachments.drop}><PendingAttachments files={drafts.uploads} disabled={sending || attachments.busy} remove={(id) => { drafts.setUploads(drafts.uploads.filter((file) => file.id !== id)); setDraftError(""); composer.current?.focus(); }} /><textarea ref={composer} value={draft} onChange={(event) => { setDraft(event.target.value); setDraftError(""); }} onKeyDown={composerKeys} onPaste={event => attachments.paste(event, value => { setDraft(value); setDraftError(""); })} placeholder={state.running ? "Add a follow-up…" : "Message Gator…"} aria-label="Message Gator" disabled={sending || !drafts.ready || !!state.external} rows={2} /><div className="composer-toolbar"><AttachButton busy={attachments.busy} disabled={sending || queueAction.busy || !!error || !!state.external || !!updatePreparing || !drafts.ready || drafts.uploads.length >= 4} choose={() => void attachments.choose().then(() => composer.current?.focus())} /><button className="icon-button composer-options" aria-label="Conversation options" title="Conversation options" onClick={() => openDetails("info")}><SlidersHorizontal size={17} /></button><button className="icon-button draft-trigger" aria-label="Saved drafts" title={drafts.saving ? "Saving draft…" : "Saved drafts and local retention"} onClick={() => { setShowDrafts(true); void drafts.manage({ action: "list" }).catch(() => {}); }}><Clock3 size={16} /></button><div className="composer-actions"><ModelPicker state={state} disabled={sending || voiceBusy || queueAction.busy || !!error || !!state.external || !!updatePreparing || !drafts.ready} send={send} manage={() => navigate("/model")} onBusyChange={setModelBusy} /><VoiceControls context={drafts.context} speakingContext={state.primary ? `primary:${state.source}` : conversationIdentity} disabled={sending || queueAction.busy || !!error || !!state.external || !!updatePreparing || !drafts.ready || showCommands || showDrafts || !!updatesOpen || !!navigation} preferences={state.desktop?.voice} messages={state.messages} running={state.running} shortcuts={state.desktop?.shortcuts} onBusyChange={setVoiceBusy} onTranscript={text => { setDraft(current => current ? `${current}${/\s$/.test(current) ? "" : " "}${text}` : text); setDraftError(""); requestAnimationFrame(() => composer.current?.focus()); }} />
+          <div className="composer" data-file-drop={attachments.dragging} data-voice-busy={voiceBusy} {...attachments.drop}><PendingAttachments files={drafts.uploads} disabled={sending || attachments.busy} remove={(id) => { drafts.setUploads(drafts.uploads.filter((file) => file.id !== id)); setDraftError(""); composer.current?.focus(); }} /><textarea ref={composer} value={draft} onChange={(event) => { setDraft(event.target.value); setDraftError(""); }} onKeyDown={composerKeys} onPaste={event => attachments.paste(event, value => { setDraft(value); setDraftError(""); })} placeholder={state.running ? "Add a follow-up…" : "Message Gator…"} aria-label="Message Gator" disabled={navigationPending || sessionSwitching || sending || !drafts.ready || !!state.external} rows={2} /><div className="composer-toolbar"><AttachButton busy={attachments.busy} disabled={sending || queueAction.busy || !!error || !!state.external || !!updatePreparing || !drafts.ready || drafts.uploads.length >= 4} choose={() => void attachments.choose().then(() => composer.current?.focus())} /><button className="icon-button composer-options" aria-label="Conversation options" title="Conversation options" onClick={() => openDetails("info")}><SlidersHorizontal size={17} /></button><button className="icon-button draft-trigger" aria-label="Saved drafts" title={drafts.saving ? "Saving draft…" : "Saved drafts and local retention"} onClick={() => { setShowDrafts(true); void drafts.manage({ action: "list" }).catch(() => {}); }}><Clock3 size={16} /></button><div className="composer-actions"><ModelPicker state={state} disabled={sending || voiceBusy || queueAction.busy || !!error || !!state.external || !!updatePreparing || !drafts.ready} send={send} manage={() => navigate("/model")} onBusyChange={setModelBusy} /><VoiceControls context={drafts.context} speakingContext={state.primary ? `primary:${state.source}` : conversationIdentity} disabled={sending || queueAction.busy || !!error || !!state.external || !!updatePreparing || !drafts.ready || showCommands || showDrafts || !!updatesOpen || !!navigation} preferences={state.desktop?.voice} messages={state.messages} running={state.running} shortcuts={state.desktop?.shortcuts} onBusyChange={setVoiceBusy} onTranscript={text => { setDraft(current => current ? `${current}${/\s$/.test(current) ? "" : " "}${text}` : text); setDraftError(""); requestAnimationFrame(() => composer.current?.focus()); }} />
             {state.running && <button className="small-button guide-button" title={drafts.uploads.length ? "Files will be sent with a queued follow-up" : `Guide the current task (${shortcutLabel("guide_work", state.desktop?.shortcuts)})`} disabled={!draft.trim() || !!drafts.uploads.length || sending || modelBusy || dirtyFiles.size > 0 || attachments.busy || queueAction.busy || !state.guidance_id || !!error || !!state.external} onClick={() => void submit(true)}>Guide now</button>}
             {state.running && <button className="send-button stop" aria-label="Stop current work" disabled={state.cancelling} onClick={() => attempt({ type: "key", key: "esc" })}><Square size={13} fill="currentColor" /></button>}
             <button className="send-button" aria-label={state.running ? "Queue message" : "Send message"} title={queueFull ? "Queue is full (16 messages)" : state.running ? "Queue for after this task (Enter)" : "Send message"} aria-busy={sending} disabled={(!draft.trim() && !drafts.uploads.length) || !drafts.ready || sending || modelBusy || voiceBusy || dirtyFiles.size > 0 || attachments.busy || queueAction.busy || queueFull || !!error || !!state.external} onClick={() => void submit()}><IconSwap active={sending} on={<LoaderCircle size={18} className="spin" />} off={state.running ? <ListPlus size={18} /> : <ArrowUp size={18} />} /></button>

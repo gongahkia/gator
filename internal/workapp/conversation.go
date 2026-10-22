@@ -40,7 +40,7 @@ func (m Model) openPrimaryConversation() (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) rememberChat() {
-	if m.conversation != "" && m.config.RememberConversation != nil {
+	if !m.background && m.conversation != "" && m.config.RememberConversation != nil {
 		if err := m.config.RememberConversation(m.conversation); err != nil {
 			m.bridgeNotice = "Your chat is saved, but its last-opened position could not be retained: " + err.Error()
 		}

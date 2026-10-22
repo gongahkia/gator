@@ -19,6 +19,8 @@ import (
 // BridgeState is a display-only projection for the desktop.
 // The Go model remains the sole owner of commands, runs, approvals and history.
 type BridgeState struct {
+	Foreground            bool                      `json:"foreground"`
+	SessionRequest        *BridgeSessionRequest     `json:"session_request,omitempty"`
 	RequestsRecovered     bool                      `json:"requests_recovered,omitempty"`
 	RequestsIssue         string                    `json:"requests_issue,omitempty"`
 	Composer              ComposerSettings          `json:"composer"`
@@ -145,6 +147,8 @@ func (m Model) BridgeState() BridgeState {
 	desktop := m.desktop
 	desktop.Shortcuts = m.desktop.ResolvedShortcuts()
 	state := BridgeState{
+		Foreground:            !m.background,
+		SessionRequest:        m.sessionRequest,
 		RequestsRecovered:     m.requestsRecovered,
 		RequestsIssue:         m.requestsIssue,
 		Desktop:               desktop,
@@ -307,6 +311,14 @@ func (m Model) NavigateBridge(command string) (tea.Model, tea.Cmd) {
 		if !known {
 			return m, nil
 		}
+	}
+	if m.config.ManagedSessions && m.running && command != "/chat" && !m.controlBusy && !m.followupSaving && !m.recallBusy && m.bridgeExternal == nil {
+		if command == "/new" {
+			m.requestSession(BridgeSessionRequest{New: true})
+		} else {
+			m.requestSession(BridgeSessionRequest{View: command})
+		}
+		return m, nil
 	}
 	if (m.running && command != "/chat") || m.controlBusy || m.followupSaving || m.recallBusy || m.bridgeExternal != nil {
 		m.status = "Finish or stop the current operation before switching views."

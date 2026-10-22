@@ -64,6 +64,20 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 	if err != nil {
 		return err
 	}
+	if os.Getenv("GATOR_UI_SESSION_HOST") == "1" && os.Getenv("GATOR_UI_START_SOURCE") != "" {
+		source, sourceErr := filepath.EvalSymlinks(os.Getenv("GATOR_UI_START_SOURCE"))
+		if sourceErr != nil {
+			return sourceErr
+		}
+		info, sourceErr := os.Stat(source)
+		if sourceErr != nil {
+			return sourceErr
+		}
+		if !info.IsDir() {
+			return errors.New("the chat workspace is not a directory")
+		}
+		workingDirectory = source
+	}
 	goalStore, err := goal.Open(stateDir)
 	if err != nil {
 		return err
@@ -180,11 +194,14 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		ModelStatus: func() (workapp.ModelStatus, error) {
 			return currentWorkModelStatus(settingsStore, stateDir)
 		},
-		Live:          true,
-		BridgeMode:    backend,
-		InitialTitle:  goalTitle,
-		GoalID:        goalID,
-		CurrentFolder: workingDirectory, Conversations: conversations, Jobs: definitions, SupervisorRunning: supervisorRunning, Inbox: inboxEntries, Goals: goals, Attention: attention,
+		Live:            true,
+		BridgeMode:      backend,
+		ManagedSessions: os.Getenv("GATOR_UI_SESSION_HOST") == "1",
+		StartNew:        os.Getenv("GATOR_UI_BOOT_MODE") == "new",
+		StartView:       os.Getenv("GATOR_UI_BOOT_MODE") == "view",
+		InitialTitle:    goalTitle,
+		GoalID:          goalID,
+		CurrentFolder:   workingDirectory, Conversations: conversations, Jobs: definitions, SupervisorRunning: supervisorRunning, Inbox: inboxEntries, Goals: goals, Attention: attention,
 		RefreshAttention: func() (workhome.Attention, error) {
 			freshGoals, err := goalStore.List()
 			if err != nil {
@@ -619,7 +636,7 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 	if err != nil {
 		return workapp.RunResult{Error: err.Error()}
 	}
-	service, err := configuredWorkService("", "", stateDir, &request)
+	service, err := configuredWorkService(options.ModelProvider, options.ModelName, stateDir, &request)
 	if err != nil {
 		return workapp.RunResult{Error: err.Error()}
 	}
@@ -691,6 +708,12 @@ func resolveInteractiveWork(ctx context.Context, prompt string, options workapp.
 	defaults, err := configuredDefaults()
 	if err != nil {
 		return action.Inspect, nil, "auto", "Classification unavailable; using inspect mode.", nil
+	}
+	if options.ModelProvider != "" {
+		defaults.Provider = options.ModelProvider
+	}
+	if options.ModelName != "" {
+		defaults.Model = options.ModelName
 	}
 	provider, modelName, err := resolveConfiguredProvider(defaults.Provider, defaults.Model)
 	if err != nil {

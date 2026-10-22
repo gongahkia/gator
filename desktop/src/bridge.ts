@@ -3,7 +3,8 @@ import type { FileRequest, FileView } from "./fileProtocol";
 
 export type UpdateState = { phase: "manual" | "idle" | "checking" | "current" | "available" | "downloading" | "ready" | "installing" | "error"; installed: string; version?: string; reason?: string; percent?: number; checkedAt?: string };
 export type UpdateRequest = { action: "open" | "close" | "check" | "download" | "install" | "releases" };
-export type DesktopSnapshot = { state?: BackendState; error?: string; connection?: "starting" | "connected" | "disconnected"; sessionID?: string; terminalBusy?: boolean; fullScreen?: boolean; updates?: UpdateState; updatesOpen?: boolean; updatePreparing?: boolean };
+export type ChatActivity = { id: string; title: string; status: string; running: boolean };
+export type DesktopSnapshot = { state?: BackendState; error?: string; connection?: "starting" | "connected" | "disconnected"; sessionID?: string; sessionSwitching?: boolean; sessionIssue?: string; chatActivity?: ChatActivity[]; allChatsBusy?: boolean; allChatsQueued?: boolean; terminalBusy?: boolean; fullScreen?: boolean; updates?: UpdateState; updatesOpen?: boolean; updatePreparing?: boolean };
 export type DesktopFrame = Omit<Frame, "version">;
 export type UploadedFile = { id: string; name: string; size: number };
 export type SavedDraft = { context: string; text: string; title: string; source: string; updated: number; uploads?: UploadedFile[] };
@@ -18,6 +19,7 @@ declare global {
     gator?: {
       platform: string;
       snapshot(): Promise<DesktopSnapshot>;
+      openSession(id: string): Promise<void>;
       subscribe(callback: (snapshot: DesktopSnapshot) => void): () => void;
       send(frame: DesktopFrame): Promise<void>;
       chooseFolder(): Promise<string | null>;

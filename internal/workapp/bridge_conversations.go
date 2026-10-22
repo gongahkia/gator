@@ -80,7 +80,7 @@ func (m *Model) refreshBridgeFollowing() {
 // A stale sidebar click cannot select a different row or bypass active work.
 func (m Model) OpenBridgeConversation(action BridgeConversationAction) (tea.Model, tea.Cmd) {
 	m.bridgeNotice = ""
-	if m.running || m.controlBusy || m.followupSaving || m.recallBusy || m.bridgeExternal != nil {
+	if (m.running && !m.config.ManagedSessions) || m.controlBusy || m.followupSaving || m.recallBusy || m.bridgeExternal != nil {
 		m.bridgeNotice = "Finish or stop the current operation before switching conversations."
 		return m, nil
 	}
@@ -96,6 +96,10 @@ func (m Model) OpenBridgeConversation(action BridgeConversationAction) (tea.Mode
 	}
 	if !found {
 		m.bridgeNotice = "This conversation is no longer in the recent list."
+		return m, nil
+	}
+	if m.config.ManagedSessions {
+		m.requestSession(BridgeSessionRequest{ConversationID: action.ID})
 		return m, nil
 	}
 	next, _ := m.NavigateBridge("/conversations")

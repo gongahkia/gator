@@ -244,6 +244,10 @@ func (m *Model) resumeHistoryConversation() {
 		return
 	}
 	conversationID := m.historyDetail.Record.ConversationID
+	if m.config.ManagedSessions {
+		m.requestSession(BridgeSessionRequest{ConversationID: conversationID})
+		return
+	}
 	m.section, m.historyDetail, m.sectionNotice = "", nil, ""
 	m.restoreConversation(conversationID, "Opened from History.")
 }

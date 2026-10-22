@@ -15,7 +15,7 @@ export function useDrafts(state?: BackendState) {
   const [saved, setSaved] = useState<DraftSnapshot>({ enabled: true, drafts: [] });
   const [issue, setIssue] = useState("");
   const [saving, setSaving] = useState(false);
-  const [ready, setReady] = useState(false);
+  const [readyContext, setReadyContext] = useState<string>();
   const [recovered, setRecovered] = useState(false);
   const live = useRef(true);
   const remember = (context: string, value: string) => {
@@ -65,7 +65,7 @@ export function useDrafts(state?: BackendState) {
     }
     identity.current = { context, source: state.source, title: state.conversation_id ? state.title : "Conversation" };
     const cached = values.current.get(context);
-    current.current = cached?.text ?? ""; currentUploads.current = cached?.uploads ?? []; renderUploads(currentUploads.current); renderText(current.current); setRecovered(false); setReady(false);
+    current.current = cached?.text ?? ""; currentUploads.current = cached?.uploads ?? []; renderUploads(currentUploads.current); renderText(current.current); setRecovered(false); setReadyContext(undefined);
     const owner = identity.current;
     if (promoted && before) void request({ action: "save", draft: { ...owner, text: current.current, uploads: currentUploads.current } })
       .then(() => request({ action: "remove", context: before.context }))
@@ -77,7 +77,7 @@ export function useDrafts(state?: BackendState) {
         current.current = retained?.text ?? ""; currentUploads.current = retained?.uploads ?? []; renderUploads(currentUploads.current); remember(context, current.current); renderText(current.current); setRecovered(!!retained);
       }
     }).catch((error) => { if (active) setIssue(error instanceof Error ? error.message : "Saved drafts are unavailable."); })
-      .finally(() => { if (active) setReady(true); });
+      .finally(() => { if (active) setReadyContext(context); });
     return () => { active = false; };
   }, [context, request]);
   useLayoutEffect(() => {
@@ -94,5 +94,5 @@ export function useDrafts(state?: BackendState) {
     }
     catch (error) { setIssue(error instanceof Error ? error.message : "Saved drafts are unavailable."); throw error; }
   };
-  return { text, setText, uploads, setUploads, clearSent, saved, issue, saving, ready, recovered, manage, context };
+  return { text, setText, uploads, setUploads, clearSent, saved, issue, saving, ready: !!context && readyContext === context, recovered, manage, context };
 }

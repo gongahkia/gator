@@ -6,8 +6,9 @@ export function updateBlockReason(snapshot) {
   const state = snapshot?.state;
   if (!state || snapshot.connection !== "connected") return "Reconnect to Gator before restarting for an update.";
   if (snapshot.terminalBusy || state.external) return "Finish the current sign-in or reviewed action first.";
-  if (state.running || state.cancelling || state.pending_approval) return "Finish or stop the current work before restarting.";
-  if (state.queued || state.queue?.length) return "Send or remove queued messages before restarting.";
+  if (snapshot.sessionSwitching) return "Wait for this chat to open before restarting.";
+  if (snapshot.allChatsBusy || state.running || state.cancelling || state.pending_approval) return "Finish or stop work in all chats before restarting.";
+  if (snapshot.allChatsQueued || state.queued || state.queue?.length) return "Send or remove queued messages in all open chats before restarting.";
   if (state.panel?.kind === "confirmation" || state.panel?.rows?.some((row) => row.input)) return "Save or close the form you’re editing before restarting.";
   return "";
 }

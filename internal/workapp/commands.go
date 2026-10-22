@@ -452,6 +452,10 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 			err = fmt.Errorf("usage: /help [advanced]")
 		}
 	case "/new":
+		if m.config.ManagedSessions {
+			m.requestSession(BridgeSessionRequest{New: true})
+			return m, nil
+		}
 		source := m.config.CurrentFolder
 		if m.config.CreateConversation != nil {
 			source = m.primarySource
@@ -554,6 +558,10 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		resolved, err = m.config.ResolveSource(value)
 		if err == nil {
 			if m.source != resolved {
+				if m.config.ManagedSessions {
+					m.requestSession(BridgeSessionRequest{New: true, Source: resolved})
+					return m, nil
+				}
 				if !m.beginChat(resolved) {
 					return m, nil
 				}

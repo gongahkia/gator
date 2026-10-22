@@ -1,0 +1,101 @@
+import { _electron as electron, expect, test } from "@playwright/test";
+import { execFileSync } from "node:child_process";
+import { createServer } from "node:http";
+import { mkdir, readFile, readdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { closeDesktop, temporaryDirectory } from "./lifecycle";
+
+test("independent chats retain task ownership, drafts and queues while browsing and completing elsewhere", async () => {
+  test.setTimeout(90_000);
+  const root = await temporaryDirectory(join(tmpdir(), "gator-concurrent-chats-"));
+  const workspace = join(root, "workspace"); await mkdir(workspace);
+  const calls: string[] = []; let release = () => {};
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const server = createServer((request, response) => {
+    let body = ""; request.on("data", chunk => { body += chunk; });
+    request.on("end", async () => {
+      const index = calls.push(body);
+      if (index === 1) await gate;
+      if (response.destroyed) return;
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ id: `concurrent-${index}`, choices: [{ message: { role: "assistant", content: `Finished isolated request ${index}.` }, finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 10, total_tokens: 20 } }));
+    });
+  });
+  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+  const env = { ...process.env, GATOR_STATE_DIR: join(root, "state"), GATOR_CONFIG_DIR: join(root, "config"), GATOR_DESKTOP_USER_DATA: join(root, "desktop"), GATOR_DESKTOP_WORKSPACE: workspace };
+  const cli = (args: string[]) => execFileSync(resolve("runtime", process.platform === "win32" ? "gator-runtime.exe" : "gator-runtime"), args, { env: { ...env, GATOR_INTERNAL_COMMANDS: "1" }, encoding: "utf8" });
+  cli(["provider", "add", "concurrent-fixture", "--base-url", `http://127.0.0.1:${(server.address() as { port: number }).port}/v1/chat/completions`, "--model", "fixture"]);
+  cli(["config", "set", "default-provider", "concurrent-fixture"]);
+  const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
+  const app = await electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env });
+  try {
+    const page = await app.firstWindow(), composer = page.getByRole("textbox", { name: "Message Gator", exact: true });
+    const snapshot = () => page.evaluate(() => window.gator!.snapshot());
+    await expect(composer).toBeVisible();
+    const firstID = (await snapshot()).state!.conversation_id;
+    const originalSession = (await snapshot()).sessionID;
+    await page.evaluate(() => window.gator!.send({ type: "submit", text: "/mode inspect" }));
+    await composer.fill("First concurrent task"); await page.getByRole("button", { name: "Send message", exact: true }).click();
+    await expect.poll(() => calls.length).toBe(1);
+    await composer.fill("First task follow-up"); await page.getByRole("button", { name: "Queue message", exact: true }).click();
+    await expect(composer).toHaveValue("");
+    await composer.fill("Keep the first chat draft");
+    await page.getByRole("button", { name: "New chat", exact: true }).click();
+    await expect.poll(async () => (await snapshot()).state!.conversation_id).not.toBe(firstID);
+    await expect.poll(async () => !!(await snapshot()).sessionSwitching).toBe(false);
+    const secondID = (await snapshot()).state!.conversation_id;
+    expect((await snapshot()).sessionID).toBe(originalSession);
+    await expect(page.getByRole("navigation", { name: "Work in other chats" })).toContainText("Working");
+    await expect(composer).toHaveValue("");
+    await page.evaluate(() => window.gator!.send({ type: "submit", text: "/mode inspect" }));
+    await composer.fill("Second independent task"); await page.getByRole("button", { name: "Send message", exact: true }).click();
+    await expect(page.getByText("Finished isolated request 2.", { exact: true })).toBeVisible();
+    expect((await snapshot()).allChatsBusy).toBe(true);
+    expect(calls[1]).not.toContain("First concurrent task");
+    await composer.fill("Keep the second chat draft");
+    await page.getByRole("navigation", { name: "Work in other chats" }).getByRole("button").first().click();
+    await expect.poll(async () => (await snapshot()).state!.conversation_id).toBe(firstID);
+    await expect(composer).toHaveValue("Keep the first chat draft");
+    await expect(page.getByRole("region", { name: "Queued messages" })).toContainText("First task follow-up");
+    expect((await snapshot()).state!.running).toBe(true);
+    await composer.fill("Focus the original task on its first request.");
+    await page.getByRole("button", { name: "Guide now", exact: true }).click();
+    await expect(composer).toHaveValue("");
+    await expect(page.locator(".run-progress")).toContainText("Steering submitted to current task");
+    await expect(page.getByRole("region", { name: "Queued messages" })).toContainText("First task follow-up");
+    await composer.fill("Keep the first chat draft");
+
+    const conversationsRoot = join(env.GATOR_STATE_DIR, "gator/conversations");
+    const count = (await readdir(conversationsRoot)).filter(name => name.startsWith("work-")).length;
+    await page.getByRole("button", { name: "All conversations", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Conversations", exact: true })).toBeVisible();
+    expect((await readdir(conversationsRoot)).filter(name => name.startsWith("work-")).length).toBe(count);
+    const rows = (await snapshot()).state!.panel!.rows!;
+    const row = rows.findIndex(value => value.label === "Second independent task");
+    expect(row).toBeGreaterThanOrEqual(0);
+    await page.locator(`.chat-search-row[data-row="${row}"]`).click();
+    await expect.poll(async () => (await snapshot()).state!.conversation_id).toBe(secondID);
+    await expect(composer).toHaveValue("Keep the second chat draft");
+    release();
+    await expect.poll(async () => (await snapshot()).allChatsBusy).toBe(false);
+    await expect(page.getByRole("navigation", { name: "Work in other chats" })).toContainText("Finished");
+    expect((await snapshot()).state!.conversation_id).toBe(secondID);
+    expect(calls).toHaveLength(4); // Steering adds one turn to the original task.
+    expect(calls[2]).toContain("Focus the original task on its first request.");
+    expect(calls[3]).toContain("First task follow-up");
+    for (const body of calls.slice(2)) expect(body).not.toContain("Second independent task");
+    const journal = JSON.parse(await readFile(join(conversationsRoot, firstID!, "requests.json"), "utf8"));
+    expect(journal.requests.map((item: { state: string }) => item.state)).toEqual(["completed", "completed"]);
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(760, 560));
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: "test-results/concurrent-chats-compact.png" });
+    await page.getByRole("navigation", { name: "Work in other chats" }).getByRole("button").first().click();
+    await expect(page.getByText("Finished isolated request 4.", { exact: true })).toBeVisible();
+    await expect(composer).toHaveValue("Keep the first chat draft");
+    await expect(page.getByRole("region", { name: "Queued messages" })).toHaveCount(0);
+  } finally {
+    release(); await app.evaluate(({ dialog }) => { dialog.showMessageBox = async () => ({ response: 1, checkboxChecked: false }); }).catch(() => {});
+    await closeDesktop(app); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); await rm(root, { recursive: true, force: true });
+  }
+});

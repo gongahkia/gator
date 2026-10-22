@@ -8,6 +8,7 @@ async function attachmentRequest(channel, ...args) {
 contextBridge.exposeInMainWorld("gator", {
   platform: process.platform,
   snapshot: () => ipcRenderer.invoke("gator:snapshot"),
+  openSession: (id) => ipcRenderer.invoke("gator:session", id),
   send: (frame) => frame?.type === "upload_submit" ? attachmentRequest("gator:send", frame) : ipcRenderer.invoke("gator:send", frame),
   chooseFolder: () => ipcRenderer.invoke("gator:folder"),
   chooseFiles: (context) => attachmentRequest("gator:files", context),

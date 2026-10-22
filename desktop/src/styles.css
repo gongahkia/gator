@@ -912,3 +912,7 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 @media (max-width: 900px) { .file-markdown-tools span { display: none; } }
 
 .view-content[data-home="true"]:has(.pending-attachments .inline-file[data-expanded="true"]) .home-content { display: none; }
+.chat-activity-strip { display: flex; gap: 8px; padding: 8px 20px; overflow-x: auto; flex-shrink: 0; border-bottom: 1px solid var(--color-line); }
+.chat-activity-strip .small-button { max-width: 280px; flex-shrink: 0; gap: 10px; }
+.chat-activity-strip .small-button > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-activity-strip small { color: var(--color-muted); white-space: nowrap; }

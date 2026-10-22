@@ -118,6 +118,8 @@ type BundleActionRequest struct {
 // one prompt. They configure Gator and bound its internal Code specialist;
 // they are never editable by the manager model itself.
 type RunOptions struct {
+	ModelProvider           string
+	ModelName               string
 	Context                 context.Context          `json:"-"`
 	OnEvent                 agent.EventSink          `json:"-"`
 	Steering                <-chan string            `json:"-"`
@@ -173,6 +175,9 @@ type Config struct {
 	ModelStatus             func() (ModelStatus, error)
 	Live                    bool
 	BridgeMode              bool
+	ManagedSessions         bool
+	StartNew                bool
+	StartView               bool
 	CurrentFolder           string
 	GoalID                  string
 	InitialTitle            string
@@ -316,6 +321,9 @@ type pendingBundleAction struct {
 }
 
 type Model struct {
+	background             bool
+	sessionRequest         *BridgeSessionRequest
+	sessionSequence        uint64
 	desktop                appconfig.DesktopSettings
 	models                 ModelPanel
 	tasks                  map[string]string
@@ -453,14 +461,15 @@ func New(config Config) Model {
 		}
 	}
 	model := Model{
-		desktop:  config.Desktop,
-		config:   config,
-		home:     true,
-		firstRun: config.FirstRun,
-		source:   config.CurrentFolder,
-		goalID:   config.GoalID,
-		title:    "Work in " + filepath.Base(config.CurrentFolder),
-		theme:    normalizeTheme(config.Theme),
+		background: config.ManagedSessions,
+		desktop:    config.Desktop,
+		config:     config,
+		home:       true,
+		firstRun:   config.FirstRun,
+		source:     config.CurrentFolder,
+		goalID:     config.GoalID,
+		title:      "Work in " + filepath.Base(config.CurrentFolder),
+		theme:      normalizeTheme(config.Theme),
 		options: RunOptions{MaxSteps: 24, Mode: "auto", Code: CodeOptions{
 			MaxSteps: 16, Sandbox: "strict", Network: "deny",
 		}},
@@ -470,7 +479,7 @@ func New(config Config) Model {
 	model.statusLineEnabled = config.StatusLineEnabled
 	model.refreshModelStatus()
 	model.primarySource = config.CurrentFolder
-	if config.LastConversation != nil && config.StartConversationID == "" && config.GoalID == "" {
+	if !config.StartNew && !config.StartView && config.LastConversation != nil && config.StartConversationID == "" && config.GoalID == "" {
 		id, err := config.LastConversation()
 		if err != nil {
 			model.bridgeNotice = "Couldn't reopen your last chat: " + err.Error()
@@ -513,7 +522,7 @@ func New(config Config) Model {
 			model.restoreConversation(config.StartConversationID, "")
 		}
 	}
-	if model.conversation == "" && config.GoalID == "" && config.CreateConversation != nil && model.bridgeNotice == "" {
+	if !config.StartView && model.conversation == "" && config.GoalID == "" && config.CreateConversation != nil && model.bridgeNotice == "" {
 		model.createChat()
 	}
 	if config.InitialTitle != "" {

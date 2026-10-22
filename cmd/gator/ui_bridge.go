@@ -16,6 +16,7 @@ import (
 )
 
 type uiFrame struct {
+	Foreground    bool                              `json:"foreground,omitempty"`
 	Composer      *workapp.ComposerAction           `json:"composer,omitempty"`
 	Version       int                               `json:"version"`
 	Type          string                            `json:"type"`
@@ -51,6 +52,10 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 	switch frame := value.(type) {
 	case uiFrame:
 		switch frame.Type {
+		case "focus_session":
+			m.model = m.model.FocusBridgeSession(frame.Foreground)
+			m.sendState()
+			return m, nil
 		case "refresh_preferences":
 			m.model = m.model.RefreshDesktopPreferences()
 			m.sendState()
@@ -127,6 +132,13 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	m.model = next.(workapp.Model)
 	m.sendState()
+	if frame, ok := value.(uiFrame); ok && frame.Nonce != "" && len(frame.Nonce) <= 128 {
+		_ = m.out.Encode(struct {
+			Version int    `json:"version"`
+			Type    string `json:"type"`
+			Nonce   string `json:"nonce"`
+		}{1, "action_applied", frame.Nonce})
+	}
 	return m, command
 }
 

@@ -5,6 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createHash, randomUUID } from "node:crypto";
 import { Backend } from "./backend.mjs";
+import { Sessions } from "./sessions.mjs";
 import { APP_URL, assetPath, externalURL, validateFrame } from "./policy.mjs";
 import { UploadStore, uploadContext, uploadExtensions } from "./uploads.mjs";
 import { terminalHandoff } from "./terminal.mjs";
@@ -34,6 +35,7 @@ protocol.registerSchemesAsPrivileged([{ scheme: "gator", privileges: { standard:
 
 let window;
 let backend;
+let sessions;
 let terminalBusy = false;
 let closing = false;
 let starting;
@@ -62,25 +64,27 @@ function update() {
   if (window && !window.isDestroyed()) window.webContents.send("gator:update", snapshot());
 }
 function snapshot() {
-  return { state: backend?.state, error: backend?.closed ? backend.failure : undefined, connection: backend?.closed ? "disconnected" : backend?.state ? "connected" : "starting", sessionID, terminalBusy, fullScreen: window?.isFullScreen() ?? false, updates: updates?.snapshot(), updatesOpen, updatePreparing };
+  return { state: backend?.state, error: backend?.closed ? backend.failure : undefined, connection: backend?.closed ? "disconnected" : backend?.state ? "connected" : "starting", sessionID, sessionSwitching: sessions?.switching, sessionIssue: sessions?.issue, chatActivity: sessions?.activity(), allChatsBusy: sessions?.busy, allChatsQueued: sessions?.pending, terminalBusy, fullScreen: window?.isFullScreen() ?? false, updates: updates?.snapshot(), updatesOpen, updatePreparing };
 }
 function trusted(event) {
   if (!window || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || event.senderFrame.url !== APP_URL) throw new Error("Untrusted desktop request");
 }
-function mutable(event) { trusted(event); if (updatePreparing) throw new Error("Gator is preparing to restart. Please wait."); }
+function mutable(event) { trusted(event); if (updatePreparing) throw new Error("Gator is preparing to restart. Please wait."); if (sessions?.switching) throw new Error("Wait for this conversation to open."); }
 async function startBackend() {
   if (starting) return starting;
   starting = (async () => {
-    if (backend && !backend.closed) await backend.stop();
     const binary = runtimeBinary();
     await access(binary, constants.X_OK);
     // A desktop launch never implicitly captures the user's home directory.
     const workspace = runtimeWorkspace();
     if (!process.env.GATOR_DESKTOP_WORKSPACE) await mkdir(workspace, { recursive: true, mode: 0o700 });
-    backend = new Backend(binary, workspace, runtimeEnvironment());
+    if (!sessions) {
+      sessions = new Sessions(request => new Backend(binary, workspace, { ...runtimeEnvironment(), GATOR_UI_SESSION_HOST: "1", GATOR_UI_BOOT_MODE: request.new ? "new" : request.view ? "view" : "", GATOR_UI_START_SOURCE: request.source || (request.new || request.view ? sessions?.current?.state?.source || "" : "") }, ["ui-backend", request.goal ? "" : request.conversation_id || "", request.goal ? request.conversation_id : ""]));
+      sessions.on("change", () => { backend = sessions.current; update(); });
+      await sessions.open();
+    } else await sessions.restart();
+    backend = sessions.current;
     sessionID = randomUUID();
-    backend.on("state", update);
-    backend.on("closed", update);
   })();
   try { await starting; } finally { starting = undefined; }
 }
@@ -100,7 +104,7 @@ async function configureUpdates() {
       updatePreparing = true; update();
       try {
         await drafts.flush(); await files.flush();
-        await backend.prepareUpdate();
+        await sessions.prepareUpdate();
         const guard = await acquireUpdateGuard(runtimeBinary(), runtimeWorkspace(), runtimeEnvironment());
         await guard.release();
         closing = true;
@@ -139,8 +143,8 @@ function createWindow() {
       await dialog.showMessageBox(window, { type: "info", message: "Finish the action in Terminal first.", detail: "Gator is waiting for its result. You can cancel the action in that terminal window.", buttons: ["Keep Gator open"] });
       return;
     }
-    if (backend?.state?.running) {
-      const answer = await dialog.showMessageBox(window, { type: "question", message: "Stop the current work and close Gator?", detail: "Saved conversations and scheduled checks are retained. This foreground run will stop.", buttons: ["Keep working", "Stop and close"], defaultId: 0, cancelId: 0 });
+    if (sessions?.busy) {
+      const answer = await dialog.showMessageBox(window, { type: "question", message: "Stop active work and close Gator?", detail: "Tasks in all open chats will stop. Saved chats and queued messages are retained for review when you return.", buttons: ["Keep working", "Stop and close"], defaultId: 0, cancelId: 0 });
       if (answer.response !== 1) return;
     }
     closing = true;
@@ -151,7 +155,7 @@ function createWindow() {
       if (answer.response !== 1) return;
       closing = true;
     }
-    await backend?.stop();
+    await sessions?.stop();
     window.destroy();
     app.quit();
   });
@@ -179,6 +183,11 @@ else {
       { label: "Help", submenu: [{ label: "About & updates…", click: showUpdates }, { label: "Release notes", click: () => void shell.openExternal(releaseURL) }] },
     ]));
     ipcMain.handle("gator:snapshot", (event) => { trusted(event); return snapshot(); });
+    ipcMain.handle("gator:session", async (event, id) => {
+      mutable(event);
+      if (typeof id !== "string" || !sessions.activity().some(item => item.id === id)) throw new Error("This task is no longer in the open-chat list.");
+      await sessions.open({ conversation_id: id });
+    });
     ipcMain.handle("gator:file", async (event, request) => {
       mutable(event); validateFileRequest(request);
       const owner = backend, context = request.context;
@@ -233,7 +242,7 @@ else {
         return result;
       } finally { if (speechAbort === controller) speechAbort = undefined; }
     });
-    ipcMain.handle("gator:drafts", (event, request) => { mutable(event); return drafts.request(request); });
+    ipcMain.handle("gator:drafts", (event, request) => { trusted(event); if (updatePreparing) throw new Error("Gator is preparing to restart."); return drafts.request(request); });
     ipcMain.handle("gator:updates", async (event, request) => {
       trusted(event);
       if (!request || typeof request !== "object" || Array.isArray(request) || Object.keys(request).some((key) => key !== "action")) throw new Error("Invalid update action");
@@ -245,7 +254,9 @@ else {
       mutable(event);
       if (backend?.state?.external) throw new Error("Finish the current step in Terminal first");
       validateFrame(frame);
-      if (frame.type !== "upload_submit") return backend.send(frame);
+      sessions.assertSend(frame);
+      await sessions.prepareProfileAction(frame);
+      if (frame.type !== "upload_submit") { await backend.apply(frame); await sessions.settled(); return; }
       const owner = backend;
       if (frame.upload.files.length) await uploads.check(frame.upload.files);
       mutable(event);

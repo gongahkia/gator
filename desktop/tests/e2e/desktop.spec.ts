@@ -259,7 +259,7 @@ test("recent chats default to a flat list, offer folder grouping, and isolate dr
     const current = await page.evaluate(() => window.gator!.snapshot());
     await application.evaluate(({ BrowserWindow }, snapshot) => BrowserWindow.getAllWindows()[0].webContents.send("gator:update", { ...snapshot, state: { ...snapshot.state!, running: true, pending_approval: { id: 99 } } }), current);
     await expect(recent.getByText("Needs review", { exact: true })).toBeVisible();
-    await expect(recent.getByRole("button", { name: "Open conversation: Plan 0", exact: true })).toBeDisabled();
+    await expect(recent.getByRole("button", { name: "Open conversation: Plan 0", exact: true })).toBeEnabled();
     await application.evaluate(({ BrowserWindow }, snapshot) => BrowserWindow.getAllWindows()[0].webContents.send("gator:update", snapshot), current);
     await openSurface(page, "Follow-up checks");
     await page.getByRole("button", { name: /new check/i }).click();
@@ -541,8 +541,9 @@ test("queued messages can be edited, reordered, removed, and resumed without los
     await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-message-queue-paused.png" });
     await page.getByRole("button", { name: "Open conversation: Saved queue topic", exact: true }).click();
-    await expect(page.getByRole("alertdialog", { name: "Leave queued messages?" })).toBeVisible();
-    await page.getByRole("button", { name: "Keep working", exact: true }).click();
+    await expect.poll(async () => (await state()).conversation_id).toBe("work-saved-topic");
+    await expect(queue).toHaveCount(0);
+    await page.getByRole("navigation", { name: "Work in other chats" }).getByRole("button", { name: /Paused/ }).click();
     await expect(queue.locator(".queued-message")).toHaveCount(1);
     release();
     hold = true;

@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { validateFrame } from "./policy.mjs";
 
-// The host owns one Go session. No HTTP listener, browser credential storage,
+// Each instance owns one chat runtime. No HTTP listener, browser credential storage,
 // alternate agent loop, or renderer-side subprocess execution is involved.
 export class Backend extends EventEmitter {
   state;
@@ -38,6 +38,7 @@ export class Backend extends EventEmitter {
       this.#buffer = this.#buffer.slice(newline + 1);
       try {
         const frame = JSON.parse(line);
+        if (frame.version === 1 && frame.type === "action_applied") { this.emit("action-applied", frame.nonce); continue; }
         if (frame.version === 1 && frame.type === "update_ready") {
           if (frame.nonce === this.#updateNonce) this.emit("update-ready", frame);
           continue;
@@ -64,6 +65,39 @@ export class Backend extends EventEmitter {
   }
 
   refreshPreferences() { this.#write({ version: 1, type: "refresh_preferences" }); }
+
+  apply(frame) {
+    const checked = validateFrame(frame), nonce = randomUUID();
+    return new Promise((resolve, reject) => {
+      if (this.closed) { reject(new Error(this.failure || "Gator is disconnected.")); return; }
+      const finish = error => { clearTimeout(timer); this.off("action-applied", applied); this.off("closed", closed); error ? reject(new Error(error)) : resolve(); };
+      const applied = id => { if (id === nonce) finish(); };
+      const closed = () => finish("Gator disconnected before confirming this action.");
+      const timer = setTimeout(() => finish("This action was not confirmed. Check the current view before trying again."), 15000);
+      this.on("action-applied", applied); this.once("closed", closed);
+      this.#write({ ...checked, nonce });
+    });
+  }
+
+  ready() { return this.#waitForState(() => true, () => {}, 15000); }
+
+  focus(foreground) {
+    const accepted = state => state.foreground === foreground && !state.session_request;
+    if (this.state && accepted(this.state)) return Promise.resolve();
+    return this.#waitForState(accepted, () => this.#write({ version: 1, type: "focus_session", foreground }), 5000);
+  }
+
+  #waitForState(accepted, send, timeout) {
+    return new Promise((resolve, reject) => {
+      if (this.closed) { reject(new Error(this.failure || "Gator is disconnected.")); return; }
+      const finish = error => { clearTimeout(timer); this.off("state", changed); this.off("closed", closed); error ? reject(new Error(error)) : resolve(); };
+      const changed = state => { if (accepted(state)) finish(); };
+      const closed = () => finish(this.failure || "Gator disconnected while opening this chat.");
+      const timer = setTimeout(() => finish("Gator did not confirm this chat. Try opening it again."), timeout);
+      this.on("state", changed); this.once("closed", closed);
+      try { send(); if (this.state) changed(this.state); } catch (error) { finish(error.message); }
+    });
+  }
 
   submitUpload(frame) {
     return new Promise((resolve, reject) => {

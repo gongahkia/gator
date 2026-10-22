@@ -801,7 +801,7 @@ func (m Model) submitRunningInput() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.queueSequence++
-	queue := append(append([]queuedRun(nil), m.queue...), queuedRun{id: m.queueSequence, prompt: prompt, options: cloneRunOptions(m.options)})
+	queue := append(append([]queuedRun(nil), m.queue...), queuedRun{id: m.queueSequence, prompt: prompt, options: m.submissionOptions()})
 	if err := m.persistQueue(queue); err != nil {
 		m.bridgeNotice = "Message not queued: " + err.Error()
 		if m.bridgeUploadResult != nil {
@@ -872,6 +872,16 @@ func (m Model) submitComposerInput() (tea.Model, tea.Cmd) {
 		m.pendingPrompt = prompt
 		return m.openModels()
 	}
+	if m.conversation == "" && m.config.CreateConversation != nil {
+		options := cloneRunOptions(m.options)
+		if !m.beginChat(m.source) {
+			if m.bridgeUploadResult != nil {
+				m.bridgeUploadResult.Error = m.bridgeNotice
+			}
+			return m, nil
+		}
+		m.options = options
+	}
 	m.messages = append(m.messages, message{role: "You", text: prompt})
 	m.recordPrompt(prompt)
 	m.home = false
@@ -883,7 +893,7 @@ func (m Model) submitComposerInput() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	source, conversation := m.source, m.conversation
-	options := cloneRunOptions(m.options)
+	options := m.submissionOptions()
 	options.PreviousArtifacts = m.previousArtifactPaths()
 	m.options.Attachments = nil
 	m.options.Uploads = nil
@@ -986,6 +996,10 @@ func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "copy":
 			return m.copySelection(selected.id)
 		case "conversation":
+			if m.config.ManagedSessions {
+				m.requestSession(BridgeSessionRequest{ConversationID: selected.id})
+				return m, nil
+			}
 			if m.running {
 				m.status = "Finish the current task before switching conversations"
 				return m, nil
@@ -1005,6 +1019,10 @@ func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.restoreConversation(selected.id, "")
 			m.scroll = 0
 		case "goal":
+			if m.config.ManagedSessions {
+				m.requestSession(BridgeSessionRequest{ConversationID: selected.id, Goal: true})
+				return m, nil
+			}
 			m.primary = false
 			if m.running {
 				m.status = "Finish the current task before switching goals"

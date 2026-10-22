@@ -1,9 +1,10 @@
 import { ChevronDown, ChevronRight, Folder, Search, X } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import type { BackendState } from "./protocol";
+import type { ChatActivity } from "./bridge";
 import { datedChats, Highlight } from "./chatPresentation";
 
-export function RecentConversations({ state, disabled, open, browse }: { state: BackendState; disabled: boolean; open(id: string): void; browse(): void }) {
+export function RecentConversations({ state, activity: activityRows, disabled, open, browse }: { state: BackendState; activity?: ChatActivity[]; disabled: boolean; open(id: string): void; browse(): void }) {
   const [grouped, setGrouped] = useState(() => localStorage.getItem("gator:group-topics-by-folder") === "true");
   const [all, setAll] = useState(false);
   const [closed, setClosed] = useState(new Set<string>());
@@ -26,7 +27,7 @@ export function RecentConversations({ state, disabled, open, browse }: { state: 
   const total = matches.reduce((count, group) => count + group.visible.length, 0);
   const toggle = (source: string, current: Set<string>, set: (next: Set<string>) => void) => { const next = new Set(current); if (next.has(source)) next.delete(source); else next.add(source); set(next); };
   const row = (item: NonNullable<BackendState["recent_conversations"]>[number]) => {
-    const activity = item.id === state.conversation_id && state.running ? state.cancelling ? "Stopping" : state.pending_approval ? "Needs review" : "Working" : undefined;
+    const activity = activityRows?.find(row => row.id === item.id)?.status ?? (item.id === state.conversation_id && state.running ? state.cancelling ? "Stopping" : state.pending_approval ? "Needs review" : "Working" : undefined);
     return <button key={item.id} className="recent-chat" aria-label={`Open conversation: ${item.title}`} aria-describedby={activity ? `${prefix}-${item.id}-activity` : undefined} aria-current={state.conversation_id === item.id && !state.panel ? "page" : undefined} title={`${item.title}\n${item.source}\n${new Date(item.updated_at).toLocaleString()}`} disabled={disabled} onKeyDown={(event) => {
       if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
       event.preventDefault();
@@ -34,7 +35,7 @@ export function RecentConversations({ state, disabled, open, browse }: { state: 
       const position = buttons.indexOf(event.currentTarget);
       const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : Math.max(0, Math.min(buttons.length - 1, position + (event.key === "ArrowDown" ? 1 : -1)));
       buttons[next]?.focus();
-    }} onClick={() => open(item.id)}><span><Highlight text={item.title || "Untitled conversation"} query={query} />{term && item.source.toLocaleLowerCase().includes(term) && <small className="recent-chat-source"><Highlight text={item.source} query={query} /></small>}</span>{activity && <small id={`${prefix}-${item.id}-activity`} className="recent-chat-activity" data-attention={!!state.pending_approval}>{activity}</small>}</button>;
+    }} onClick={() => open(item.id)}><span><Highlight text={item.title || "Untitled conversation"} query={query} />{term && item.source.toLocaleLowerCase().includes(term) && <small className="recent-chat-source"><Highlight text={item.source} query={query} /></small>}</span>{activity && <small id={`${prefix}-${item.id}-activity`} className="recent-chat-activity" data-attention={activity === "Needs review" || activity === "Needs attention"}>{activity}</small>}</button>;
   };
   const flat = (state.recent_conversations ?? []).filter((item) => matchesTopic(item));
   const shown = all || term ? flat : flat.slice(0, 8);

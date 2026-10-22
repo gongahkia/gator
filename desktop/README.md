@@ -77,6 +77,18 @@ setting changes. Drafts and attachments stay in the composer.
 
 ## Message recovery
 
+Chats can work independently. Open another chat or browse the app while a task
+continues; its follow-ups, steering, approval requests and results stay with the
+original chat. The sidebar and the small activity row show other open tasks.
+The host permits three running chats and retains at most four chat processes.
+It does not evict running tasks or paused queues to make space. Model selections
+are captured with admitted messages, so another chat changing the default does
+not silently change a waiting request's model.
+
+Closing the app stops tasks in all its open chats. Restart/update checks cover
+all those chats, and reconnecting affects the selected chat. This is local
+execution; an always-on remote companion is still separate implementation work.
+
 The composer clears ordinary messages only after the runtime confirms admission
 to the private conversation journal. Queued messages retain their text, order,
 edits, settings and attachment references across a restart. Restored messages
