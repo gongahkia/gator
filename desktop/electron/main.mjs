@@ -255,6 +255,7 @@ else {
       if (backend?.state?.external) throw new Error("Finish the current step in Terminal first");
       validateFrame(frame);
       sessions.assertSend(frame);
+      if (await sessions.resumeConnection(frame)) return;
       await sessions.prepareProfileAction(frame);
       if (frame.type !== "upload_submit") { await backend.apply(frame); await sessions.settled(); return; }
       const owner = backend;

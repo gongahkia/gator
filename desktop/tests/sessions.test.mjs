@@ -20,6 +20,24 @@ const setup = () => {
   return new Sessions(request => new Worker(request.conversation_id || `chat-${++count}`));
 };
 
+test("browser sign-in retains its owner and Connections returns to it", async () => {
+  const sessions = setup(); await sessions.open(); const owner = sessions.current;
+  owner.change({ pending_connection: "google" });
+  assert.equal(sessions.busy, true);
+  await assert.rejects(sessions.restart(), /current operation/);
+  await sessions.open({ new: true });
+  await assert.rejects(sessions.prepareProfileAction({ type: "navigate", text: "/data" }), /other chats/);
+  assert.equal(await sessions.resumeConnection({ type: "navigate", text: "/connections" }), true);
+  assert.equal(sessions.current, owner);
+  assert.deepEqual(owner.frames.at(-1), { type: "navigate", text: "/connections" });
+  for (let i = 0; i < 5; i++) await sessions.open({ new: true });
+  assert.equal(owner.closed, false);
+  await assert.rejects(sessions.prepareUpdate(), /all chats/);
+  owner.change({ pending_connection: undefined });
+  assert.equal(sessions.busy, false);
+  await sessions.stop();
+});
+
 test("durable update badges include unopened chats and clear from fresh receipts", async () => {
   const sessions = setup(); await sessions.open();
   sessions.current.change({ update_conversations: [{ id: "unopened-chat", title: "Offsite", count: 2 }] });

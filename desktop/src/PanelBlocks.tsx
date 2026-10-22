@@ -1,9 +1,19 @@
-import { ChevronDown } from "lucide-react";
+import { useState } from "react";
+import { ChevronDown, ExternalLink } from "lucide-react";
 import type { BackendPanel, ResultField } from "./protocol";
 import { ShortcutReference } from "./DesktopHelp";
 
 export function PanelFacts({ fields, summary = false }: { fields: ResultField[]; summary?: boolean }) {
   return <dl className={summary ? "panel-summary" : "panel-facts"}>{fields.map((field, index) => <div key={`${field.label}-${index}`}><dt>{field.label}</dt><dd data-tone={field.tone}>{field.value}</dd></div>)}</dl>;
+}
+
+export function PanelLinks({ links }: { links: NonNullable<BackendPanel["links"]> }) {
+  const [issue, setIssue] = useState("");
+  return <div className="panel-links"><div className="flex flex-wrap gap-2">{links.map(link => <button className="button primary" key={link.url} onClick={() => {
+    setIssue("");
+    if (!window.gator) { setIssue("Open Gator on your desktop to continue sign-in."); return; }
+    void window.gator.openLink(link.url).catch(() => setIssue("Could not open your browser. Try again."));
+  }}>{link.label}<ExternalLink size={16} aria-hidden="true" /></button>)}</div>{issue && <p role="alert" className="panel-notice">{issue}</p>}</div>;
 }
 
 export function PanelBlocks({ panel, hasInputs, empty }: { panel: BackendPanel; hasInputs?: boolean; empty?: boolean }) {

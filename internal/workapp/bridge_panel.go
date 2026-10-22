@@ -12,7 +12,9 @@ import (
 func (m Model) bridgePanel() (result *uisnapshot.Panel) {
 	defer func() {
 		if result != nil {
-			result.BackLabel = m.bridgeBackLabel(*result)
+			if result.BackLabel == "" || m.controlBusy {
+				result.BackLabel = m.bridgeBackLabel(*result)
+			}
 		}
 	}()
 	if m.models != nil {

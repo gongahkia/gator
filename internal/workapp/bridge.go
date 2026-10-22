@@ -20,6 +20,7 @@ import (
 // BridgeState is a display-only projection for the desktop.
 // The Go model remains the sole owner of commands, runs, approvals and history.
 type BridgeState struct {
+	PendingConnection     string                     `json:"pending_connection,omitempty"`
 	UpdatesHaveOlder      bool                       `json:"updates_have_older,omitempty"`
 	UpdatesHaveNewer      bool                       `json:"updates_have_newer,omitempty"`
 	UpdateConversations   []BridgeUpdateConversation `json:"update_conversations,omitempty"`
@@ -156,7 +157,8 @@ func (m Model) BridgeState() BridgeState {
 	desktop := m.desktop
 	desktop.Shortcuts = m.desktop.ResolvedShortcuts()
 	state := BridgeState{
-		UpdatesHaveOlder: m.updatesHaveOlder, UpdatesHaveNewer: len(m.updatePageAnchors) > 0,
+		PendingConnection: m.pendingConnection(),
+		UpdatesHaveOlder:  m.updatesHaveOlder, UpdatesHaveNewer: len(m.updatePageAnchors) > 0,
 		UpdateConversations: append([]BridgeUpdateConversation(nil), m.updateConversations...),
 		ChatUpdates:         m.bridgeChatUpdates(), ChatUpdatesIssue: m.chatUpdatesIssue, ChatUpdatesTotal: m.chatUpdatesTotal,
 		Foreground:            !m.background,
@@ -314,7 +316,7 @@ func (m Model) RespondBridgeApproval(id int, token string, approved bool) (tea.M
 func (m Model) NavigateBridge(command string) (tea.Model, tea.Cmd) {
 	m.bridgeNotice = ""
 	switch command {
-	case "/gator", "/chat", "/knowledge", "/new", "/overview", "/goals", "/conversations", "/inbox", "/followup", "/history", "/memory", "/context", "/usage", "/data", "/recovery", "/model", "/settings", "/help":
+	case "/gator", "/chat", "/knowledge", "/new", "/overview", "/goals", "/conversations", "/inbox", "/followup", "/history", "/memory", "/context", "/usage", "/data", "/recovery", "/connections", "/model", "/settings", "/help":
 	default:
 		known := false
 		for _, entry := range m.availableCommandEntries() {
@@ -324,7 +326,7 @@ func (m Model) NavigateBridge(command string) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	}
-	if m.config.ManagedSessions && m.running && command != "/chat" && !m.controlBusy && !m.followupSaving && !m.recallBusy && m.bridgeExternal == nil {
+	if m.config.ManagedSessions && (m.running && command != "/chat" || m.pendingConnection() != "" && command != "/connections") && !m.controlBusy && !m.followupSaving && !m.recallBusy && m.bridgeExternal == nil {
 		if command == "/new" {
 			m.requestSession(BridgeSessionRequest{New: true})
 		} else {

@@ -15,7 +15,7 @@ export class Sessions extends EventEmitter {
   #stopping = false;
   #retiring = new WeakSet();
   constructor(spawn) { super(); this.#spawn = spawn; }
-  get busy() { return [...this.workers].some(worker => !worker.closed && (worker.state?.running || worker.state?.pending_approval || worker.state?.external)); }
+  get busy() { return [...this.workers].some(worker => !worker.closed && (worker.state?.running || worker.state?.pending_connection || worker.state?.pending_approval || worker.state?.external)); }
   get pending() { return [...this.workers].some(worker => !worker.closed && worker.state?.queued); }
   settled() { return this.#transition; }
   activity() {
@@ -49,7 +49,7 @@ export class Sessions extends EventEmitter {
   }
   async #create(request) {
     if (this.workers.size >= 4) {
-      const idle = [...this.workers].find(worker => worker !== this.current && (worker.closed || !worker.state?.running && !worker.state?.queued && !worker.state?.external && !worker.state?.pending_approval));
+      const idle = [...this.workers].find(worker => worker !== this.current && (worker.closed || !worker.state?.running && !worker.state?.queued && !worker.state?.external && !worker.state?.pending_connection && !worker.state?.pending_approval));
       if (!idle) throw new Error("Four chats are open. Finish a task or review a paused queue before opening another.");
       this.#retiring.add(idle); await idle.stop(); this.workers.delete(idle);
     }
@@ -69,6 +69,7 @@ export class Sessions extends EventEmitter {
       try {
         if (previous && !previous.closed) await previous.focus(false);
         next = [...this.workers].find(worker => !worker.closed && request.conversation_id && (request.goal ? worker.state?.goal_id === request.conversation_id : worker.state?.conversation_id === request.conversation_id));
+        if (request.view === "/connections") next ??= [...this.workers].find(worker => !worker.closed && worker.state?.pending_connection);
         next ??= await this.#create(request);
         await next.focus(true);
         this.current = next;
@@ -87,10 +88,16 @@ export class Sessions extends EventEmitter {
   assertSend(frame) {
     if (this.switching || this.#stopping) throw new Error("Wait for this conversation to open.");
     if (!this.current || this.current.closed) throw new Error("Reconnect to this chat before sending.");
-    const otherBusy = [...this.workers].some(worker => worker !== this.current && !worker.closed && (worker.state?.running || worker.state?.queued || worker.state?.pending_approval || worker.state?.external));
+    const otherBusy = [...this.workers].some(worker => worker !== this.current && !worker.closed && (worker.state?.running || worker.state?.queued || worker.state?.pending_connection || worker.state?.pending_approval || worker.state?.external));
     if (otherBusy && (/^\/(data|recovery)(\s|$)/.test(frame.text ?? "") || ["/data", "/recovery"].includes(this.current.state?.destination))) throw new Error("Finish work in the other chats before changing retained data or recovery settings.");
     const starting = frame.type === "upload_submit" || frame.type === "queue" && frame.queue?.action === "run" || frame.type === "submit" && !frame.text?.startsWith("/");
     if (starting && !this.current.state?.running && [...this.workers].filter(worker => !worker.closed && worker.state?.running).length >= 3) throw new Error("Three chats are working. Wait for one to finish, or stop it before sending this message.");
+  }
+  async resumeConnection(frame) {
+    if (frame.type !== "navigate" || frame.text !== "/connections") return false;
+    const owner = [...this.workers].find(worker => !worker.closed && worker.state?.pending_connection);
+    if (!owner || owner === this.current) return false;
+    await this.open({ view: "/connections" }); return true;
   }
   async prepareProfileAction(frame) {
     if (!/^\/(data|recovery)(\s|$)/.test(frame.text ?? "") && !["/data", "/recovery"].includes(this.current?.state?.destination)) return;
@@ -105,7 +112,7 @@ export class Sessions extends EventEmitter {
   async restart() {
     await this.#transition;
     const current = this.current, id = current?.state?.conversation_id;
-    if (current && !current.closed && (current.state?.running || current.state?.external)) throw new Error("Finish this chat's current operation before reconnecting.");
+    if (current && !current.closed && (current.state?.running || current.state?.external || current.state?.pending_connection)) throw new Error("Finish this chat's current operation before reconnecting.");
     if (current) { this.#retiring.add(current); await current.stop(); this.workers.delete(current); }
     return this.open(id ? { conversation_id: id } : {});
   }

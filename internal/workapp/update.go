@@ -38,6 +38,17 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, tea.Batch(m.controlCommand("status", nil), m.refreshOverviewCommand())
 
+	case connectionTick:
+		pending := m.pendingConnection() != ""
+		m.connectionPolling = pending
+		var commands []tea.Cmd
+		if pending {
+			commands = append(commands, nextConnectionTick())
+		}
+		if m.section == "controls" && m.controlFamily == "connections" && !m.controlBusy && !m.controlBackground && m.controlForm == nil {
+			commands = append(commands, m.refreshControlBackground())
+		}
+		return m, tea.Batch(commands...)
 	case controlDone:
 		if value.Generation != m.controlGeneration {
 			return m, nil
@@ -52,14 +63,24 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 			m.sectionNotice = value.Err.Error()
 		} else {
 			selection := 0
-			if m.controlFamily == "overview" {
+			if m.controlFamily == "overview" || m.controlFamily == "connections" {
 				selection = preservedControlSelection(m.controlScreen, value.Screen, m.selected)
 			}
 			m.controlScreen = value.Screen
+			if m.controlFamily == "connections" {
+				m.controlRootArgs = nil
+				if value.Screen.Location != "" {
+					m.controlRootArgs = []string{value.Screen.Location}
+				}
+			}
 			m.selected = selection
 			m.sectionNotice = ""
 			m.clearRemovedData(value.Screen)
 			m.refreshBridgeConversations()
+		}
+		if m.pendingConnection() != "" && !m.connectionPolling {
+			m.connectionPolling = true
+			return m, nextConnectionTick()
 		}
 		return m, nil
 	case followupSaved:

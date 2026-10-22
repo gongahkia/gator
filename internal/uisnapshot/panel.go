@@ -3,22 +3,29 @@ package uisnapshot
 // Panel carries display-independent state from a Go workflow to its frontends.
 // Workflow actions remain owned by the Go application that produced it.
 type Panel struct {
-	ID        string  `json:"id,omitempty"`
-	Kind      string  `json:"kind"`
-	Title     string  `json:"title"`
-	Subtitle  string  `json:"subtitle,omitempty"`
-	BackLabel string  `json:"back_label,omitempty"`
-	Query     string  `json:"query,omitempty"`
-	Rows      []Row   `json:"rows,omitempty"`
-	Blocks    []Block `json:"blocks,omitempty"`
-	Selected  int     `json:"selected,omitempty"`
-	Notice    string  `json:"notice,omitempty"`
-	Footer    string  `json:"footer,omitempty"`
-	Hints     []Hint  `json:"hints,omitempty"`
-	Usage     *Usage  `json:"usage,omitempty"`
-	Filter    *Filter `json:"filter,omitempty"`
-	Toggle    *Toggle `json:"toggle,omitempty"`
-	Summary   []Field `json:"summary,omitempty"`
+	Links      []Link  `json:"links,omitempty"`
+	ID         string  `json:"id,omitempty"`
+	Kind       string  `json:"kind"`
+	Title      string  `json:"title"`
+	Subtitle   string  `json:"subtitle,omitempty"`
+	BackLabel  string  `json:"back_label,omitempty"`
+	Query      string  `json:"query,omitempty"`
+	Rows       []Row   `json:"rows,omitempty"`
+	Blocks     []Block `json:"blocks,omitempty"`
+	Selected   int     `json:"selected,omitempty"`
+	NoticeTone string  `json:"notice_tone,omitempty"`
+	Notice     string  `json:"notice,omitempty"`
+	Footer     string  `json:"footer,omitempty"`
+	Hints      []Hint  `json:"hints,omitempty"`
+	Usage      *Usage  `json:"usage,omitempty"`
+	Filter     *Filter `json:"filter,omitempty"`
+	Toggle     *Toggle `json:"toggle,omitempty"`
+	Summary    []Field `json:"summary,omitempty"`
+}
+
+type Link struct {
+	Label string `json:"label"`
+	URL   string `json:"url"`
 }
 
 type Toggle struct {

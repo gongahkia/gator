@@ -17,11 +17,16 @@ import (
 )
 
 func workControls(stateDir string) func(context.Context, string, string, []string) (workapp.ControlScreen, error) {
+	return workControlsWithConnections(stateDir, &connectionControls{stateDir: stateDir})
+}
+func workControlsWithConnections(stateDir string, connections *connectionControls) func(context.Context, string, string, []string) (workapp.ControlScreen, error) {
 	return func(ctx context.Context, family, action string, args []string) (workapp.ControlScreen, error) {
 		if err := ctx.Err(); err != nil {
 			return workapp.ControlScreen{}, err
 		}
 		switch family {
+		case "connections":
+			return connections.call(ctx, action, args)
 		case "overview":
 			return overviewControl(ctx, stateDir, action, args)
 		case "recovery":

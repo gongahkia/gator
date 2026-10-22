@@ -3,6 +3,7 @@ package workapp
 import (
 	"context"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/uisnapshot"
@@ -16,6 +17,7 @@ type ControlField struct {
 	Label, Value string
 	Kind, Help   string
 	Secret       bool
+	Options      []uisnapshot.Option
 }
 type ControlAction struct {
 	Key, Label, Action, Description string
@@ -171,7 +173,7 @@ func (m Model) updateControls(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if key.String() == "esc" {
-		if m.controlFamily == "overview" && len(m.controlRootArgs) > 0 {
+		if (m.controlFamily == "overview" || m.controlFamily == "connections") && len(m.controlRootArgs) > 0 {
 			m.controlRootArgs = m.controlRootArgs[:len(m.controlRootArgs)-1]
 			cmd := m.controlCommand("status", m.controlRootArgs)
 			return m, cmd
@@ -210,7 +212,7 @@ func (m Model) updateControls(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		if a.Family != "" {
 			m.controlFamily = a.Family
-			m.controlRootArgs = nil
+			m.controlRootArgs = append([]string(nil), a.Args...)
 			cmd := m.controlCommand(a.Action, a.Args)
 			return m, cmd
 		}
@@ -223,7 +225,7 @@ func (m Model) updateControls(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if a.Command != "" {
 			return m.runLocalCommand(a.Command)
 		}
-		if (a.Action == "select" && m.controlFamily == "recovery") || ((a.Action == "section" || a.Action == "item" || a.Action == "status") && m.controlFamily == "overview") {
+		if (a.Action == "select" && (m.controlFamily == "recovery" || m.controlFamily == "connections")) || ((a.Action == "section" || a.Action == "item" || a.Action == "status") && m.controlFamily == "overview") {
 			m.controlRootArgs = append([]string(nil), a.Args...)
 		}
 		return m, m.controlCommand(a.Action, a.Args)
@@ -233,7 +235,10 @@ func (m Model) updateControls(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) controlsPanel() uisnapshot.Panel {
 	p := m.controlScreen.Panel
 	p.Selected = m.selected
-	p.Notice = m.sectionNotice
+	if m.sectionNotice != "" {
+		p.Notice = m.sectionNotice
+		p.NoticeTone = "error"
+	}
 	if p.Notice == "" {
 		p.Notice = m.controlResultNotice
 	}
@@ -272,6 +277,7 @@ func (m Model) controlsPanel() uisnapshot.Panel {
 				}
 				input := bridgeInput(field.Value, 8192, false)
 				input.Kind, input.Help = field.Kind, field.Help
+				input.Options = append([]uisnapshot.Option(nil), field.Options...)
 				if field.Kind == "mappings" {
 					input.Value = bridgeMappingsJSON(field.Value)
 				}
@@ -299,6 +305,7 @@ func (m Model) controlsPanel() uisnapshot.Panel {
 	p.Hints = append(p.Hints, uisnapshot.Hint{Shortcut: "Esc", Action: "back"})
 	if m.controlBusy {
 		p.Notice = "Working… Esc stops the operation"
+		p.NoticeTone = "info"
 	}
 	return p
 }
@@ -380,4 +387,18 @@ func (m *Model) clearRemovedData(screen ControlScreen) {
 			}
 		}
 	}
+}
+
+// Poll only while a host-owned browser sign-in is pending, including after
+// navigation. The host retains this process until the callback settles.
+type connectionTick struct{}
+
+func nextConnectionTick() tea.Cmd {
+	return tea.Tick(time.Second, func(time.Time) tea.Msg { return connectionTick{} })
+}
+func (m Model) pendingConnection() string {
+	if m.config.PendingConnection == nil {
+		return ""
+	}
+	return m.config.PendingConnection()
 }

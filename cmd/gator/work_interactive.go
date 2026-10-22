@@ -169,6 +169,7 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 	}
 	localModels := newLocalModelManager(settingsStore)
 	defer localModels.Close()
+	connections := &connectionControls{stateDir: stateDir}
 	application := workapp.New(workapp.Config{
 		SaveConnections: func(id string, ids []string) error {
 			release, err := state.Guard(stateDir, false)
@@ -301,7 +302,8 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		InboxStore:         &inboxStore,
 		StartSupervisor:    func() error { return startLocalSupervisor(stateDir) },
 		PilotAction:        workPilotResult,
-		Controls:           workControls(stateDir),
+		Controls:           workControlsWithConnections(stateDir, connections),
+		PendingConnection:  connections.signIn.Pending,
 		ReadOverview:       func(ctx context.Context) (workhome.Overview, error) { return readEverydayOverview(ctx, stateDir) },
 		ControlCommand:     func(args []string) *exec.Cmd { return overviewTerminalCommand(stateDir, args) },
 		BeforeLocalCommand: func() (func(), error) { return state.Guard(stateDir, false) },

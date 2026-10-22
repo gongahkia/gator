@@ -252,13 +252,8 @@ func recoveryControlWith(ctx context.Context, stateDir, action string, args []st
 				return screen, err
 			}
 			screen.Panel.Blocks = append(screen.Panel.Blocks, uisnapshot.Block{Title: descriptor.Name, Lines: []string{status, "Resource: " + descriptor.Resource, "Existing OAuth scopes: " + descriptor.OAuthScopes, "Reconnect preserves this connector configuration and the check's permissions. An account change needs a reviewed agreement edit through /followup."}})
-			control := workapp.ControlAction{Key: strconv.Itoa(index + 1), Label: "Reconnect " + descriptor.Name, Action: "token", Args: []string{jobID, id, descriptor.CredentialRef()}, Description: "Replace credentials only for " + descriptor.ID + " at " + descriptor.Resource + ". Existing OAuth scopes: " + descriptor.OAuthScopes + ". Reconnecting does not authorize new operations.", Review: true}
-			if descriptor.Authentication == connector.AuthOAuth {
-				control.ConnectorID = id
-				control.ConnectorReview = connectorLoginReview(descriptor)
-			} else if descriptor.Authentication == connector.AuthBearer {
-				control.Fields = []workapp.ControlField{{Label: "New bearer token", Secret: true}}
-			} else {
+			control := workapp.ControlAction{Key: strconv.Itoa(index + 1), Label: "Reconnect " + descriptor.Name, Family: "connections", Action: "select", Args: []string{id}}
+			if descriptor.Authentication == connector.AuthNone {
 				continue
 			}
 			screen.Actions = append(screen.Actions, control)

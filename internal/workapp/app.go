@@ -224,6 +224,7 @@ type Config struct {
 	ReadChecks               func() ([]workhome.Check, bool, error)
 	StartSupervisor          func() error
 	Controls                 func(context.Context, string, string, []string) (ControlScreen, error)
+	PendingConnection        func() string
 	BeforeLocalCommand       func() (func(), error)
 	ResetPrivateState        func() (GoalState, error)
 	PilotAction              func(workID string, arguments []string) (*uisnapshot.Result, error)
@@ -434,6 +435,7 @@ type Model struct {
 	controlReview          bool
 	controlBusy            bool
 	controlBackground      bool
+	connectionPolling      bool
 	controlResultNotice    string
 	controlCancel          context.CancelFunc
 	controlGeneration      uint64

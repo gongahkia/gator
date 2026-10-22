@@ -61,3 +61,41 @@ func TestRemovedDataClearsVisibleHistoryAndGoalOnlyWhenDeleted(t *testing.T) {
 		t.Fatal("all-content deletion retained the deleted goal binding")
 	}
 }
+
+func TestConnectionsRefreshKeepsDetailAndRoutesWithoutTerminal(t *testing.T) {
+	pending := "google"
+	m := New(Config{ManagedSessions: true, PendingConnection: func() string { return pending }, Controls: func(_ context.Context, family, action string, args []string) (ControlScreen, error) {
+		if family != "connections" {
+			t.Fatalf("unexpected family %s", family)
+		}
+		id := ""
+		if len(args) > 0 {
+			id = args[0]
+		}
+		return ControlScreen{Location: id, Panel: uisnapshot.Panel{Kind: "connections", Title: "Google", Notice: "Credentials saved"}}, nil
+	}})
+	next, cmd := m.NavigateBridge("/connections")
+	m = next.(Model)
+	next, poll := m.Update(cmd())
+	m = next.(Model)
+	if poll == nil || m.BridgeState().PendingConnection != "google" || m.BridgeState().Panel.Notice != "Credentials saved" {
+		t.Fatal("pending sign-in or notice missing")
+	}
+	m.controlRootArgs = []string{"google"}
+	next, _ = m.Update(m.refreshControlBackground()())
+	m = next.(Model)
+	if len(m.controlRootArgs) != 1 || m.controlRootArgs[0] != "google" {
+		t.Fatal("refresh left connection detail")
+	}
+	next, _ = m.NavigateBridge("/new")
+	m = next.(Model)
+	if m.sessionRequest == nil || !m.sessionRequest.New {
+		t.Fatal("sign-in owner was reused for new chat")
+	}
+	pending = ""
+	next, _ = m.Update(connectionTick{})
+	m = next.(Model)
+	if m.BridgeState().PendingConnection != "" || m.connectionPolling {
+		t.Fatal("completed sign-in retained busy state")
+	}
+}

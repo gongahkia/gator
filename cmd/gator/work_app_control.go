@@ -33,7 +33,7 @@ func (c gatorAppController) Inspect(ctx context.Context, query workrun.AppQuery)
 		return c.inspectFollowups(query)
 	case "settings":
 		selected, err := currentWorkModelStatus(c.settings, c.stateDir)
-		return map[string]any{"model": selected, "theme": settings.Theme, "retrieval": settings.Embeddings, "learn_from_chats": settings.Desktop.LearnsFromChats(), "storage": "Private Gator content is stored locally. Cloud retrieval uploads eligible saved text and queries; cloud chat processes supplied context remotely.", "settings_pages": []string{"Models", "Usage & limits", "Data & backups", "Recovery", "About & updates"}}, err
+		return map[string]any{"model": selected, "theme": settings.Theme, "retrieval": settings.Embeddings, "learn_from_chats": settings.Desktop.LearnsFromChats(), "storage": "Private Gator content is stored locally. Cloud retrieval uploads eligible saved text and queries; cloud chat processes supplied context remotely.", "settings_pages": []string{"Connections", "Models", "Usage & limits", "Data & backups", "Recovery", "About & updates"}}, err
 	case "models":
 		type choice struct {
 			Provider string   `json:"provider"`
@@ -60,7 +60,7 @@ func (c gatorAppController) Inspect(ctx context.Context, query workrun.AppQuery)
 			}
 			choices = append(choices, map[string]any{"id": descriptor.ID, "name": descriptor.Name, "operations": operations, "selected_for_this_run": slices.Contains(c.request.ConnectorIDs, descriptor.ID)})
 		}
-		return map[string]any{"connections": choices, "note": "Selection applies to future requests; it does not authenticate or authorize external changes."}, nil
+		return map[string]any{"connections": choices, "note": "Manage accounts in Settings → Connections. Sign-in, live access checks and reconnect happen there; never ask for credentials in chat. Selection applies to future requests; it does not authenticate or authorize external changes."}, nil
 	case "outputs":
 		return c.inspectOutputs(query.ID)
 	case "shortcuts":

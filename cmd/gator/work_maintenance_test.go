@@ -187,16 +187,31 @@ func TestRecoveryTokenIsBoundToReviewedConnectorResource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	controls := &connectionControls{stateDir: root}
+	routed := false
+	for _, a := range screen.Actions {
+		if a.Family == "connections" && a.Action == "select" && len(a.Args) == 1 && a.Args[0] == "planning" {
+			routed = true
+			screen, err = controls.call(context.Background(), a.Action, a.Args)
+			if err != nil {
+				t.Fatal(err)
+			}
+			break
+		}
+	}
+	if !routed {
+		t.Fatal("recovery did not route to native connection management")
+	}
 	var args []string
-	for _, action := range screen.Actions {
-		if action.Action == "token" {
-			args = append(append([]string(nil), action.Args...), "private-token")
+	for _, a := range screen.Actions {
+		if a.Action == "token" {
+			args = append(append([]string(nil), a.Args...), "private-token")
 		}
 	}
 	if len(args) != 4 {
-		t.Fatal("recovery did not offer a bound credential form")
+		t.Fatal("native connection did not offer a reviewed token form")
 	}
-	screen, err = recoveryControl(context.Background(), root, "token", args)
+	screen, err = controls.call(context.Background(), "token", args)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,7 +234,7 @@ func TestRecoveryTokenIsBoundToReviewedConnectorResource(t *testing.T) {
 	if err = settingsStore.Save(settings); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = recoveryControl(context.Background(), root, "token", args); err == nil {
+	if _, err = controls.call(context.Background(), "token", args); err == nil {
 		t.Fatal("stale reconnect review accepted a different resource")
 	}
 	if err = loginConnector("planning", []string{"--review-digest", connectorLoginReview(descriptor)}, strings.NewReader(""), &output); err == nil || !strings.Contains(err.Error(), "changed during review") {

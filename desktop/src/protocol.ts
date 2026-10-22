@@ -41,6 +41,7 @@ export type QueueAction = {
   target_id?: string; placement?: "before" | "after";
 };
 export type BackendPanel = {
+  links?: { label: string; url: string }[];
   id?: string;
   kind: string;
   title: string;
@@ -61,6 +62,7 @@ export type BackendPanel = {
   toggle?: { label: string; checked: boolean };
   selected?: number;
   notice?: string;
+  notice_tone?: "info" | "error";
   footer?: string;
   hints?: { shortcut: string; action: string; group?: string; tone?: ResultTone }[];
 };
@@ -85,6 +87,7 @@ export type ComposerSettings = { id: string; effort: "low" | "standard" | "high"
 export type ComposerAction = { id: string; request_id: string } & ({ action: "model"; provider: string; model: string } | { action: "effort"; effort: "low" | "standard" | "high" });
 export type ChatUpdate = { next_step?: string; evidence?: string[]; id: string; title: string; summary: string; status: string; job_id?: string; goal_id?: string; created_at: string; delivered: boolean; read: boolean; resolved: boolean; version: number };
 export type BackendState = {
+  pending_connection?: string;
   chat_updates?: ChatUpdate[]; chat_updates_issue?: string; chat_updates_total?: number; updates_have_older?: boolean; updates_have_newer?: boolean;
   composer?: ComposerSettings;
   composer_result?: { request_id: string; error?: string };

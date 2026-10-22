@@ -10,11 +10,12 @@ enabled Gmail send operation can send one plain-text message to one recipient
 only in a foreground `act` run after exact approval. Gator does not change
 calendar events through this connector.
 
-An ongoing goal can select this connector in a timed, read-only follow-up with
-`gator goal schedule GOAL_ID --cron '0 9 * * *' --connector google-work --task 'Prepare the daily brief from selected mail and calendar events'`.
-This runs only while the local supervisor is available. For a bounded connected
-poll, use `gator goal watch GOAL_ID --connector google-work --gmail-query 'label:offsite newer_than:7d' --calendar-days 14`.
-It checks about every five minutes, requires the needed read scopes, and keeps a
+Ask Gator in chat to watch selected mail or calendar changes, then review the
+sources, timing, end date and notification condition before saving. The
+**Following → Manage checks** form remains available for precise edits. Checks
+run only while the local supervisor is available; the agreement reports that
+availability. A bounded mail/calendar poll uses the schedule you review.
+It requires the needed read scopes and keeps a
 durable content hash. Gmail watches retain a mailbox history cursor alongside
 selected message fingerprints. They still list the selected search query on
 every poll, so messages entering or leaving a time-relative query remain
@@ -37,21 +38,37 @@ query. Authenticated recurring checks need an account or grant pin before they
 reuse cached message fingerprints; older unpinned checks continue with full
 detail scans so a changed account cannot inherit another account's cache.
 
-## Set up from Work
+## Set up in the desktop app
 
-After creating a Desktop OAuth client and enabling the Drive, Docs, Sheets,
-Calendar, and Gmail
-APIs, setup can remain inside `gator work`:
+1. Open **Settings → Connections → Connect Google email & calendar**.
+2. Enter a unique connection ID, a display name and your Google Cloud **Desktop app** OAuth client ID. Enable the Gmail and Calendar APIs in that project. Gator does not yet operate a managed Google OAuth application, so this is still an advanced prerequisite.
+3. Review and save. Choose **Sign in**, optionally enter the client secret required by your own OAuth app, and review the requested scopes.
+4. Choose **Continue in browser**. Finish Google consent and return to Gator. Sign-in waits up to five minutes; you can cancel it or switch to another chat and return through Connections.
+5. Choose **Check account & read access**. Gator verifies the account identity and makes bounded reads for the configured email, calendar and Drive metadata scopes. A failure on one service is reported as a failed check. A verified email is shown only if Google marks it verified.
+6. Select the connection in chat settings or in a follow-up agreement. Saving credentials does not select it for a chat or authorize writes.
 
-```text
-/connector setup google-work YOUR_CLIENT_ID
-/connector login google-work prompt
-/connector test google-work
-```
+The native email/calendar setup requests OpenID, email, Gmail read and Calendar
+event read scopes. It does not request document editing or email sending.
+Existing Google connections with other scopes can also be signed in and managed
+here. The advanced developer configuration below can create those connections.
 
-`/connector status google-work`, `/connector permission ...`, `/connector
-logout google-work`, and `/connector delete google-work` cover the rest of the
-connector lifecycle. Select it for a Work run with `--connector google-work`.
+**Reconnect account** replaces credentials after browser authorization. A
+scheduled check pinned to a different account still needs a reviewed agreement
+edit. **Disconnect account** removes local credentials; it does not revoke the
+grant at Google. Remove that grant in your Google account settings when needed.
+**Remove connection** also removes its local configuration; dependent checks
+retain their source references and report unavailable access.
+
+Credential status is local state, not proof of current access. Live checks
+report only the surfaces they actually read, never successful writes. Tokens,
+refresh tokens and client secrets stay in the private credential store; the
+renderer receives a temporary authorization URL and status. Late sign-in or
+refresh results cannot overwrite credentials changed since the operation began.
+
+The native browser flow uses PKCE and an ephemeral loopback callback, matching
+Google's [installed-app OAuth guidance](https://developers.google.com/identity/protocols/oauth2/native-app).
+A managed app still needs provider verification and an operational owner; a
+client-ID form does not remove those requirements.
 
 ## User-owned Google desktop OAuth app
 
