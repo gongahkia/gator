@@ -58,7 +58,7 @@ export function useConversationSearch(root: RefObject<HTMLDivElement | null>, qu
       })) return;
       cancelAnimationFrame(frame); frame = requestAnimationFrame(() => rebuild(false));
     });
-    observer.observe(container, { childList: true, characterData: true, subtree: true });
+    observer.observe(container, { childList: true, characterData: true, attributes: true, attributeFilter: ["aria-hidden"], subtree: true });
     return () => { observer.disconnect(); cancelAnimationFrame(frame); CSS.highlights.delete("gator-search"); CSS.highlights.delete("gator-search-active"); };
   }, [root, query, identity, enabled]);
   const move = (delta: number) => { if (ranges.current.length) show((position.current + delta + ranges.current.length) % ranges.current.length, true); };

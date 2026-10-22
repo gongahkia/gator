@@ -70,6 +70,24 @@ test("public activity interleaves, folds above the answer, and preserves the rea
     await expect(history).toHaveAttribute("aria-expanded", "false");
     expect(await page.evaluate(() => document.getAnimations().filter((animation) => animation.playState === "running").length)).toBe(0);
     await expect(composer).toHaveValue("Keep my next question");
+    // Opening and closing work history updates existing transcript search.
+    await page.keyboard.press(`${process.platform === "darwin" ? "Meta" : "Control"}+f`);
+    await page.getByRole("textbox", { name: "Search conversation", exact: true }).fill("check your notes");
+    await expect(page.locator(".search-count")).toHaveText("No matches");
+    await history.click();
+    await expect(page.locator(".search-count")).toHaveText("1 of 1");
+    await history.click();
+    await expect(page.locator(".search-count")).toHaveText("No matches");
+    await page.getByRole("button", { name: "Close search", exact: true }).click();
+    const stopped: BackendActivity = { ...completed, state: "stopped", entries: completed.entries.map((entry) => entry.kind === "tool" ? { ...entry, state: "stopped" as const } : entry) };
+    await publish({ ...done, messages: [...state.messages, { role: "Gator", text: "Work was interrupted.", activity: stopped }] });
+    const stoppedHistory = page.getByRole("button", { name: "Stopped after 12s", exact: true });
+    await stoppedHistory.click();
+    await page.getByRole("button", { name: "Used 2 tools", exact: true }).click();
+    await expect(page.getByText("Unfinished", { exact: true })).toHaveCount(2);
+    await publish({ ...done, messages: [...state.messages, { role: "Gator", text: "Just a simple reply.", activity: { ...completed, entries: [] } }] });
+    await expect(page.locator(".activity-summary")).toHaveText("Worked for 12s");
+    await expect(page.locator(".activity-history")).toHaveCount(0);
     // New live content must not pull someone away from an earlier message.
     const long = Array.from({ length: 50 }, (_, i) => ({ role: i % 2 ? "Gator" : "You", text: `Earlier message ${i}.\n\nKeep this paragraph in view while Gator works.` }));
     await publish({ ...state, messages: long });
