@@ -3,7 +3,7 @@ package config
 import "testing"
 
 func TestDesktopShortcutValidationPreservesTypingAndConflicts(t *testing.T) {
-	for _, binding := range []string{"K", "Mod+Q", "Tab", "Escape", "Mod+K+K", "Ctrl+Ctrl+K"} {
+	for _, binding := range []string{"K", "Mod+Q", "Tab", "Escape", "Mod+K+K", "Ctrl+Ctrl+K", "Mod+" + physicalShortcut("Mod") + "+K"} {
 		if _, err := NormalizeShortcut(binding); err == nil {
 			t.Errorf("accepted %q", binding)
 		}

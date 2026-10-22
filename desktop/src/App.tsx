@@ -189,7 +189,7 @@ export function App() {
       if (shortcutMatches(event, "command_search", bindings)) { event.preventDefault(); setShowCommands(current => !current); }
       else if (shortcutMatches(event, "conversation_search", bindings)) { event.preventDefault(); setSearch(current => current === null ? "" : null); }
       else if (shortcutMatches(event, "settings", bindings)) { event.preventDefault(); if (!state?.running) navigate("/model"); }
-      else if (shortcutMatches(event, "help", bindings)) { event.preventDefault(); if (!state?.running) navigate("/help"); }
+      else if (!panel && shortcutMatches(event, "help", bindings)) { event.preventDefault(); if (!state?.running) navigate("/help"); }
       else if (shortcutMatches(event, "voice_input", bindings)) { event.preventDefault(); window.dispatchEvent(new CustomEvent("gator:voice-input")); }
       if (event.key === "Escape") {
         if (navigation) setNavigation(null);

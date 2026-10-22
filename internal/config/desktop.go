@@ -67,6 +67,13 @@ func NormalizeShortcut(value string) (string, error) {
 		mods[name] = true
 	}
 	key := strings.TrimSpace(parts[len(parts)-1])
+	primary := "Ctrl"
+	if runtime.GOOS == "darwin" {
+		primary = "Meta"
+	}
+	if mods["Mod"] && mods[primary] {
+		return "", errors.New("Mod already includes the primary modifier")
+	}
 	lower := strings.ToLower(key)
 	switch lower {
 	case "enter", "return":
