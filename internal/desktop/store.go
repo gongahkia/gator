@@ -12,6 +12,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/gongahkia/gator/internal/privatefs"
 )
 
 const sessionsFile = "sessions.json"
@@ -34,7 +36,7 @@ func Open(stateDir string) (*Store, error) {
 		return nil, errors.New("desktop state directory must be absolute")
 	}
 	directory := filepath.Join(stateDir, "gator", "desktop")
-	if err := os.MkdirAll(directory, 0o700); err != nil {
+	if err := privatefs.MkdirAll(directory); err != nil {
 		return nil, fmt.Errorf("create desktop state directory: %w", err)
 	}
 	if err := os.Chmod(directory, 0o700); err != nil {
@@ -147,7 +149,7 @@ func (s *Store) loadLocked() (storedSessions, error) {
 	if err != nil {
 		return storedSessions{}, err
 	}
-	if !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 {
+	if !info.Mode().IsRegular() || privatefs.Check(s.path) != nil {
 		return storedSessions{}, errors.New("desktop session state must be a private regular file")
 	}
 	var record storedSessions

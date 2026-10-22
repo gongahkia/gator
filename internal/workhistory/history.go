@@ -9,12 +9,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gongahkia/gator/internal/filelock"
+	"github.com/gongahkia/gator/internal/privatefs"
 	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
-	"syscall"
 	"time"
 	"unicode/utf8"
 
@@ -191,7 +192,7 @@ func (s Store) AcquireRun(id string) (*os.File, error) {
 		return nil, err
 	}
 	defer root.Close()
-	file, err := root.OpenFile(id+".lock", os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW, 0600)
+	file, err := filelock.OpenRootFile(root, id+".lock", os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
 		return nil, err
 	}
@@ -204,9 +205,9 @@ func (s Store) AcquireRun(id string) (*os.File, error) {
 		file.Close()
 		return nil, err
 	}
-	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+	if err := filelock.Lock(file, filelock.Exclusive|filelock.Nonblocking); err != nil {
 		file.Close()
-		if errors.Is(err, syscall.EWOULDBLOCK) {
+		if errors.Is(err, filelock.ErrWouldBlock) {
 			return nil, errors.New("Work run is already active")
 		}
 		return nil, err
@@ -225,7 +226,7 @@ func (s Store) LiveStatus(id string) (string, error) {
 		return "", err
 	}
 	defer root.Close()
-	file, err := root.OpenFile(id+".lock", os.O_RDWR|syscall.O_NOFOLLOW, 0)
+	file, err := filelock.OpenRootFile(root, id+".lock", os.O_RDWR, 0)
 	if errors.Is(err, os.ErrNotExist) {
 		return "unknown", nil
 	}
@@ -237,13 +238,13 @@ func (s Store) LiveStatus(id string) (string, error) {
 	if err != nil || !info.Mode().IsRegular() {
 		return "", errors.New("invalid Work run lease")
 	}
-	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
-		if errors.Is(err, syscall.EWOULDBLOCK) {
+	if err := filelock.Lock(file, filelock.Exclusive|filelock.Nonblocking); err != nil {
+		if errors.Is(err, filelock.ErrWouldBlock) {
 			return "active", nil
 		}
 		return "", err
 	}
-	return "stopped", syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+	return "stopped", filelock.Unlock(file)
 }
 
 // Start creates an immutable Work identity in the running lifecycle state.
@@ -600,7 +601,7 @@ func syncDirectory(path string) error {
 	if err != nil {
 		return err
 	}
-	err = directory.Sync()
+	err = privatefs.SyncDir(directory)
 	closeErr := directory.Close()
 	if err != nil {
 		return err

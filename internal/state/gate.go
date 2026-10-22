@@ -4,7 +4,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"syscall"
+
+	"github.com/gongahkia/gator/internal/filelock"
 )
 
 var ErrBusy = errors.New("work is using private data; finish or stop it before exporting or deleting data")
@@ -20,16 +21,16 @@ func Guard(stateDir string, exclusive bool) (func(), error) {
 	if err != nil {
 		return nil, err
 	}
-	mode := syscall.LOCK_SH
+	mode := filelock.Shared
 	if exclusive {
-		mode = syscall.LOCK_EX | syscall.LOCK_NB
+		mode = filelock.Exclusive | filelock.Nonblocking
 	}
-	if err = syscall.Flock(int(f.Fd()), mode); err != nil {
+	if err = filelock.Lock(f, mode); err != nil {
 		f.Close()
-		if exclusive && (errors.Is(err, syscall.EWOULDBLOCK) || errors.Is(err, syscall.EAGAIN)) {
+		if exclusive && (errors.Is(err, filelock.ErrWouldBlock)) {
 			return nil, ErrBusy
 		}
 		return nil, err
 	}
-	return func() { _ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN); _ = f.Close() }, nil
+	return func() { _ = filelock.Unlock(f); _ = f.Close() }, nil
 }

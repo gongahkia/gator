@@ -22,6 +22,7 @@ import (
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/learning"
 	"github.com/gongahkia/gator/internal/patch"
+	"github.com/gongahkia/gator/internal/privatefs"
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
@@ -731,7 +732,7 @@ func writeJSON(path string, value any) error {
 	directoryHandle, err := os.Open(directory)
 	if err == nil {
 		defer directoryHandle.Close()
-		if err := directoryHandle.Sync(); err != nil {
+		if err := privatefs.SyncDir(directoryHandle); err != nil {
 			return err
 		}
 	}

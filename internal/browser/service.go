@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/gongahkia/gator/internal/privatefs"
 )
 
 const (
@@ -98,7 +100,7 @@ func NewService(config ServiceConfig) (*Service, error) {
 // requests through one controller lock so an agent cannot race a user takeover
 // or another granted run on the same selected tab.
 func (service *Service) Run(ctx context.Context) error {
-	if err := os.MkdirAll(filepath.Dir(service.socket), 0o700); err != nil {
+	if err := privatefs.MkdirAll(filepath.Dir(service.socket)); err != nil {
 		return fmt.Errorf("create browser socket directory: %w", err)
 	}
 	if err := os.Chmod(filepath.Dir(service.socket), 0o700); err != nil {
@@ -453,7 +455,7 @@ func (service *Service) writeArtifact(kind, name string, contents []byte) (Artif
 	digest := sha256.Sum256(append([]byte(kind+"\x00"), contents...))
 	id := hex.EncodeToString(digest[:16])
 	directory := filepath.Join(service.store.Directory(), "artifacts", service.sessionID)
-	if err := os.MkdirAll(directory, 0o700); err != nil {
+	if err := privatefs.MkdirAll(directory); err != nil {
 		return Artifact{}, fmt.Errorf("create browser artifact directory: %w", err)
 	}
 	path := filepath.Join(directory, id+"-"+name)
@@ -524,7 +526,7 @@ func CreateToken(store *Store, sessionID string) (string, []byte, error) {
 		return "", nil, err
 	}
 	directory := filepath.Dir(tokenPath(store, sessionID))
-	if err := os.MkdirAll(directory, 0o700); err != nil {
+	if err := privatefs.MkdirAll(directory); err != nil {
 		return "", nil, fmt.Errorf("create browser runtime directory: %w", err)
 	}
 	if err := os.Chmod(directory, 0o700); err != nil {
@@ -547,7 +549,7 @@ func readToken(store *Store, sessionID string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read browser session token: %w", err)
 	}
-	if !info.Mode().IsRegular() || info.Mode().Perm() != 0o600 {
+	if !info.Mode().IsRegular() || privatefs.Check(path) != nil {
 		return nil, errors.New("browser session token must be a private regular file")
 	}
 	contents, err := os.ReadFile(path)

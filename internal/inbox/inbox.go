@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gongahkia/gator/internal/privatefs"
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
@@ -104,7 +105,7 @@ func (s Store) Add(entry Entry) (Entry, error) {
 	if err != nil {
 		return Entry{}, err
 	}
-	err = directory.Sync()
+	err = privatefs.SyncDir(directory)
 	_ = directory.Close()
 	if err != nil {
 		return Entry{}, err

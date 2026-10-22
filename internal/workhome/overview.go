@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"syscall"
 	"time"
 	"unicode"
 
+	"github.com/gongahkia/gator/internal/filelock"
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/suggestion"
@@ -303,15 +303,20 @@ func MarkOverviewSeen(stateDir string, at time.Time) error {
 	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		return errors.New("overview state must be an ordinary directory")
 	}
-	lock, err := os.OpenFile(filepath.Join(root, ".lock"), os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW, 0600)
+	directory, err := os.OpenRoot(root)
+	if err != nil {
+		return err
+	}
+	defer directory.Close()
+	lock, err := filelock.OpenRootFile(directory, ".lock", os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
 		return err
 	}
 	defer lock.Close()
-	if err = syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
+	if err = filelock.Lock(lock, filelock.Exclusive); err != nil {
 		return err
 	}
-	defer syscall.Flock(int(lock.Fd()), syscall.LOCK_UN)
+	defer filelock.Unlock(lock)
 	var prior struct{ At time.Time }
 	if data, err := os.ReadFile(filepath.Join(root, "seen.json")); err == nil {
 		if err = json.Unmarshal(data, &prior); err != nil {

@@ -9,6 +9,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+
+	"github.com/gongahkia/gator/internal/privatefs"
 )
 
 // WriteRegularFileAtomic replaces a bounded regular file inside the workspace.
@@ -75,7 +77,7 @@ func (r Root) WriteRegularFileAtomic(path string, contents []byte, maxBytes int6
 	}
 	keepTemporary = false
 	if directory, err := root.Open(parent); err == nil {
-		_ = directory.Sync()
+		_ = privatefs.SyncDir(directory)
 		_ = directory.Close()
 	}
 	return nil

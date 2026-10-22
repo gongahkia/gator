@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/gongahkia/gator/internal/connector"
@@ -204,7 +203,7 @@ func startLocalSupervisor(stateDir string) error {
 	command := exec.Command(binary, "job", "supervisor")
 	command.Env = append(os.Environ(), "GATOR_STATE_DIR="+stateDir)
 	command.Stdout, command.Stderr = log, log
-	command.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	configureDetached(command, true)
 	if err := command.Start(); err != nil {
 		return err
 	}

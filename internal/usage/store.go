@@ -11,9 +11,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
+	"github.com/gongahkia/gator/internal/filelock"
 	"github.com/gongahkia/gator/internal/state"
 )
 
@@ -81,11 +81,11 @@ func (s Store) lock() (func(), error) {
 	if err != nil {
 		return nil, err
 	}
-	if err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+	if err = filelock.Lock(f, filelock.Exclusive); err != nil {
 		f.Close()
 		return nil, err
 	}
-	return func() { _ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN); _ = f.Close() }, nil
+	return func() { _ = filelock.Unlock(f); _ = f.Close() }, nil
 }
 func read(path string, value any) error {
 	f, err := os.Open(path)
@@ -196,11 +196,15 @@ func (s Store) active() (int, error) {
 		if openErr != nil {
 			return 0, openErr
 		}
-		lockErr := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+		lockErr := filelock.Lock(f, filelock.Exclusive|filelock.Nonblocking)
 		if lockErr == nil {
+			_ = filelock.Unlock(f)
+			_ = f.Close()
+			// Windows cannot delete an open lease. The store lock serializes
+			// cleanup with reservation creation on every platform.
 			_ = os.Remove(path)
-			_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
-		} else if errors.Is(lockErr, syscall.EWOULDBLOCK) || errors.Is(lockErr, syscall.EAGAIN) {
+			continue
+		} else if errors.Is(lockErr, filelock.ErrWouldBlock) {
 			count++
 		} else {
 			f.Close()
@@ -316,7 +320,7 @@ func (s Store) Reserve(now time.Time, category, provider string, tokens int64) (
 	if err != nil {
 		return nil, err
 	}
-	if err = syscall.Flock(int(lease.Fd()), syscall.LOCK_EX); err != nil {
+	if err = filelock.Lock(lease, filelock.Exclusive); err != nil {
 		lease.Close()
 		os.Remove(lease.Name())
 		return nil, err
@@ -337,7 +341,18 @@ func (r *Reservation) Finish(tokens int64, reported, failed bool, cost *float64)
 	if r == nil || r.lease == nil {
 		return nil
 	}
-	defer func() { _ = syscall.Flock(int(r.lease.Fd()), syscall.LOCK_UN); _ = r.lease.Close(); r.lease = nil }()
+	closeLease := func() {
+		if r.lease != nil {
+			_ = filelock.Unlock(r.lease)
+			_ = r.lease.Close()
+			r.lease = nil
+		}
+		if r.releaseData != nil {
+			r.releaseData()
+			r.releaseData = nil
+		}
+	}
+	defer closeLease()
 	unlock, err := r.store.lock()
 	if err != nil {
 		return err
@@ -362,5 +377,6 @@ func (r *Reservation) Finish(tokens int64, reported, failed bool, cost *float64)
 	if err = write(filepath.Join(r.store.root, "days", r.day+".json"), d); err != nil {
 		return fmt.Errorf("record shared usage: %w", err)
 	}
+	closeLease()
 	return os.Remove(filepath.Join(r.store.root, "active", r.id))
 }

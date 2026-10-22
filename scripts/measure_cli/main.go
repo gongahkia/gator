@@ -1,3 +1,5 @@
+//go:build darwin || linux
+
 // measure_cli records process cost for one CLI invocation without retaining its output.
 // Run with: go run ./scripts/measure_cli --label gator-help -- gator --help
 package main

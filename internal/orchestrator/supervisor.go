@@ -16,6 +16,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/privatefs"
 )
 
 const TaskVersion = 1
@@ -187,7 +188,7 @@ func (s *Supervisor) persist(task Task) error {
 		return err
 	}
 	defer directory.Close()
-	return directory.Sync()
+	return privatefs.SyncDir(directory)
 }
 func (s *Supervisor) Start(request StartRequest) (Task, error) {
 	s.mu.Lock()

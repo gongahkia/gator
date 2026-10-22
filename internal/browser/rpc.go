@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"sync/atomic"
 	"time"
+
+	"github.com/gongahkia/gator/internal/privatefs"
 )
 
 const maxRPCBytes = 9 * 1024 * 1024
@@ -259,7 +261,7 @@ func (client *Client) Artifacts() ([]Artifact, error) {
 			continue
 		}
 		info, err := entry.Info()
-		if err != nil || info.Mode().Perm()&0o077 != 0 {
+		if err != nil || privatefs.Check(filepath.Join(directory, entry.Name())) != nil {
 			continue
 		}
 		name := entry.Name()
@@ -305,7 +307,7 @@ func (client *Client) ExportArtifact(id, destination string) error {
 	}
 	sourcePath := filepath.Join(client.store.Directory(), "artifacts", client.sessionID, artifact.ID+"-"+artifact.Name)
 	sourceInfo, err := os.Lstat(sourcePath)
-	if err != nil || !sourceInfo.Mode().IsRegular() || sourceInfo.Mode().Perm()&0o077 != 0 {
+	if err != nil || !sourceInfo.Mode().IsRegular() || privatefs.Check(sourcePath) != nil {
 		return errors.New("browser artifact is unavailable or no longer private")
 	}
 	source, err := os.Open(sourcePath)

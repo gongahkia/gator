@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gongahkia/gator/internal/filelock"
+	"github.com/gongahkia/gator/internal/privatefs"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 	"unicode/utf8"
 )
@@ -91,7 +92,7 @@ func (s Store) InitializePlan(goalID, outcome string, titles []string) (Plan, er
 	if err != nil {
 		return Plan{}, err
 	}
-	defer func() { _ = syscall.Flock(int(lock.Fd()), syscall.LOCK_UN); _ = lock.Close() }()
+	defer func() { _ = filelock.Unlock(lock); _ = lock.Close() }()
 	current, err := s.loadPlan(goalID)
 	if err != nil {
 		return Plan{}, err
@@ -180,7 +181,7 @@ func (s Store) ApplyPlanChange(goalID string, change PlanChange) (Plan, error) {
 	if err != nil {
 		return Plan{}, err
 	}
-	defer func() { _ = syscall.Flock(int(lock.Fd()), syscall.LOCK_UN); _ = lock.Close() }()
+	defer func() { _ = filelock.Unlock(lock); _ = lock.Close() }()
 	plan, err := s.loadPlan(goalID)
 	if err != nil {
 		return Plan{}, err
@@ -285,7 +286,7 @@ func (s Store) lockPlan(goalID string) (*os.File, error) {
 		_ = file.Close()
 		return nil, errors.New("goal plan lock is not a regular file")
 	}
-	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
+	if err := filelock.Lock(file, filelock.Exclusive); err != nil {
 		_ = file.Close()
 		return nil, err
 	}
@@ -321,7 +322,7 @@ func writePrivatePlan(path string, data []byte) error {
 		return err
 	}
 	defer directory.Close()
-	return directory.Sync()
+	return privatefs.SyncDir(directory)
 }
 
 func validateChange(change PlanChange) error {

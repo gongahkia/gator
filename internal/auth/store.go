@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/gongahkia/gator/internal/privatefs"
 )
 
 const (
@@ -163,7 +165,7 @@ func (s Store) withLock(update func(map[string]Credential) (bool, error)) error 
 	if strings.TrimSpace(s.path) == "" {
 		return errors.New("credential store is not initialized")
 	}
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o700); err != nil {
+	if err := privatefs.MkdirAll(filepath.Dir(s.path)); err != nil {
 		return fmt.Errorf("create credential directory: %w", err)
 	}
 	release, err := acquireLock(s.path + ".lock")

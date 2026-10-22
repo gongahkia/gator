@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -20,6 +21,13 @@ func ResolveDir(override string) (string, error) {
 	}
 	if configured := os.Getenv("XDG_STATE_HOME"); strings.TrimSpace(configured) != "" {
 		return absoluteDirectory(configured)
+	}
+	if runtime.GOOS == "windows" {
+		base, err := os.UserCacheDir()
+		if err != nil {
+			return "", fmt.Errorf("resolve local application data: %w", err)
+		}
+		return filepath.Join(base, "Gator", "state"), nil
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {

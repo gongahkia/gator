@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gongahkia/gator/internal/privatefs"
 	"github.com/gongahkia/gator/internal/state"
 )
 
@@ -279,7 +280,7 @@ func writeRootBytes(root *os.Root, path string, data []byte) error {
 		return err
 	}
 	defer dir.Close()
-	return dir.Sync()
+	return privatefs.SyncDir(dir)
 }
 func (s Store) recoverRelink() error {
 	if _, err := os.Lstat(filepath.Join(s.control, "relink-pending.json")); errors.Is(err, os.ErrNotExist) {

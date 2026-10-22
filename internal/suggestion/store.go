@@ -7,13 +7,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gongahkia/gator/internal/filelock"
+	"github.com/gongahkia/gator/internal/privatefs"
 	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
-	"syscall"
 	"time"
 	"unicode/utf8"
 
@@ -188,10 +189,10 @@ func (s Store) Resolve(id, decision string, apply func(Record) (string, error)) 
 	if statErr != nil || openErr != nil || !info.Mode().IsRegular() || !os.SameFile(info, opened) {
 		return Record{}, errors.New("suggestion lock is not a regular file")
 	}
-	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
+	if err := filelock.Lock(lock, filelock.Exclusive); err != nil {
 		return Record{}, err
 	}
-	defer syscall.Flock(int(lock.Fd()), syscall.LOCK_UN)
+	defer filelock.Unlock(lock)
 	record, err := s.Load(id)
 	if err != nil {
 		return Record{}, err
@@ -244,7 +245,7 @@ func (s Store) Resolve(id, decision string, apply func(Record) (string, error)) 
 		return Record{}, err
 	}
 	defer directory.Close()
-	if err := directory.Sync(); err != nil {
+	if err := privatefs.SyncDir(directory); err != nil {
 		return Record{}, err
 	}
 	return record, nil

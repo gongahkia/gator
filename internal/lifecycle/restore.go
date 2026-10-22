@@ -15,6 +15,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/gongahkia/gator/internal/privatefs"
 )
 
 type SourceMap struct {
@@ -243,7 +245,7 @@ func (s Store) Restore(ctx context.Context, id string) (RestoreReceipt, error) {
 	}
 	// Publication succeeded even if the final parent sync is unavailable.
 	if dir, err := parent.Open("."); err == nil {
-		_ = dir.Sync()
+		_ = privatefs.SyncDir(dir)
 		_ = dir.Close()
 	}
 	return receipt, nil
@@ -340,7 +342,7 @@ func syncProfile(ctx context.Context, profile string) error {
 			dirs = append(dirs, path)
 			return nil
 		}
-		file, err := os.Open(path)
+		file, err := os.OpenFile(path, os.O_RDWR, 0)
 		if err != nil {
 			return err
 		}
@@ -359,7 +361,7 @@ func syncProfile(ctx context.Context, profile string) error {
 		if err != nil {
 			return err
 		}
-		err = dir.Sync()
+		err = privatefs.SyncDir(dir)
 		dir.Close()
 		if err != nil {
 			return err

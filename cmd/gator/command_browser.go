@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"syscall"
 	"time"
 
 	gatorbrowser "github.com/gongahkia/gator/internal/browser"
@@ -234,7 +233,7 @@ func launchBrowserDaemon(store *gatorbrowser.Store, stateDir string, session gat
 	command := exec.Command(os.Args[0], arguments...)
 	command.Stdout = logFile
 	command.Stderr = logFile
-	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	configureDetached(command, false)
 	if err := command.Start(); err != nil {
 		_ = logFile.Close()
 		return fmt.Errorf("start browser daemon: %w", err)

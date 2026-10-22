@@ -199,6 +199,9 @@ func cleanRelativePath(path string) (string, error) {
 	if filepath.IsAbs(path) {
 		return "", fmt.Errorf("%w: absolute path %q is not allowed", ErrPathEscapesWorkspace, path)
 	}
+	if !filepath.IsLocal(path) {
+		return "", fmt.Errorf("%w: path %q is not local", ErrPathEscapesWorkspace, path)
+	}
 	cleaned := filepath.Clean(path)
 	if cleaned == "." || cleaned == ".." || strings.HasPrefix(cleaned, ".."+string(filepath.Separator)) {
 		return "", fmt.Errorf("%w: %q", ErrPathEscapesWorkspace, path)

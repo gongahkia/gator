@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/gongahkia/gator/internal/privatefs"
 )
 
 const (
@@ -45,7 +47,7 @@ func Open(stateDir string) (*Store, error) {
 		return nil, errors.New("browser state directory must be absolute")
 	}
 	directory := filepath.Join(stateDir, "gator", "browser")
-	if err := os.MkdirAll(directory, 0o700); err != nil {
+	if err := privatefs.MkdirAll(directory); err != nil {
 		return nil, fmt.Errorf("create browser state directory: %w", err)
 	}
 	if err := os.Chmod(directory, 0o700); err != nil {
@@ -271,7 +273,7 @@ func (s *Store) loadLocked() (storedSessions, error) {
 	if err != nil {
 		return storedSessions{}, fmt.Errorf("stat browser session state: %w", err)
 	}
-	if !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 {
+	if !info.Mode().IsRegular() || privatefs.Check(s.path) != nil {
 		return storedSessions{}, errors.New("browser session state must be a private regular file")
 	}
 	var record storedSessions

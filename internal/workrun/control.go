@@ -19,6 +19,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/gongahkia/gator/internal/privatefs"
 	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workspace"
 )
@@ -52,11 +53,11 @@ func startWorkControl(ctx context.Context, stateDir, runID string, cancel contex
 		return nil, nil, errors.New("invalid Work control run ID")
 	}
 	directory := filepath.Join(stateDir, "gator", "work-control")
-	if err := os.MkdirAll(directory, 0700); err != nil {
+	if err := privatefs.MkdirAll(directory); err != nil {
 		return nil, nil, err
 	}
 	info, err := os.Lstat(directory)
-	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || info.Mode().Perm()&0077 != 0 {
+	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || privatefs.Check(directory) != nil {
 		return nil, nil, errors.New("Work control directory must be private and regular")
 	}
 	root, err := workspace.Open(directory)

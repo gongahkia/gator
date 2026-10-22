@@ -8,11 +8,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gongahkia/gator/internal/filelock"
+	"github.com/gongahkia/gator/internal/privatefs"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
-	"syscall"
 	"time"
 	"unicode/utf8"
 
@@ -233,11 +234,11 @@ func (s Store) lockDefinitions() (func(), error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
+	if err := filelock.Lock(file, filelock.Exclusive); err != nil {
 		file.Close()
 		return nil, err
 	}
-	return func() { _ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN); _ = file.Close() }, nil
+	return func() { _ = filelock.Unlock(file); _ = file.Close() }, nil
 }
 
 func (s Store) save(definition Definition) (Definition, error) {
@@ -826,7 +827,7 @@ func syncDirectory(path string) error {
 		return err
 	}
 	defer directory.Close()
-	return directory.Sync()
+	return privatefs.SyncDir(directory)
 }
 
 // ClaimBegin retains intent before moving the schedule watermark. The foreground

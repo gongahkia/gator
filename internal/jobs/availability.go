@@ -4,8 +4,9 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"syscall"
 	"time"
+
+	"github.com/gongahkia/gator/internal/filelock"
 )
 
 type CoverageGap struct{ From, To time.Time }
@@ -31,10 +32,10 @@ func (s Store) Observe(now time.Time, stopped bool) error {
 		return err
 	}
 	defer f.Close()
-	if err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+	if err = filelock.Lock(f, filelock.Exclusive); err != nil {
 		return err
 	}
-	defer syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+	defer filelock.Unlock(f)
 	a, err := s.Availability()
 	if err != nil {
 		return err

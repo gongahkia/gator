@@ -12,8 +12,9 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"syscall"
 	"time"
+
+	"github.com/gongahkia/gator/internal/filelock"
 )
 
 // Document is eligible saved knowledge after its owner has checked scope,
@@ -232,9 +233,9 @@ func lockIndex(ctx context.Context, root string) (func(), error) {
 		return nil, err
 	}
 	for {
-		if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err == nil {
-			return func() { _ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN); _ = file.Close() }, nil
-		} else if err != syscall.EWOULDBLOCK && err != syscall.EAGAIN {
+		if err := filelock.Lock(file, filelock.Exclusive|filelock.Nonblocking); err == nil {
+			return func() { _ = filelock.Unlock(file); _ = file.Close() }, nil
+		} else if !errors.Is(err, filelock.ErrWouldBlock) {
 			_ = file.Close()
 			return nil, err
 		}

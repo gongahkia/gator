@@ -49,6 +49,9 @@ func runDesktopRuntime(args []string, out io.Writer) error {
 			}
 		}()
 	}
+	if err := preparePlatformProfile(); err != nil {
+		return err
+	}
 	if root, err := state.ResolveDir(""); err == nil {
 		if _, err := lifecycle.Maintain(context.Background(), root, time.Now()); err != nil && !errors.Is(err, state.ErrBusy) {
 			if errors.Is(err, lifecycle.ErrRecovery) {

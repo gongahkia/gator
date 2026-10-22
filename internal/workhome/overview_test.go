@@ -6,12 +6,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/filelock"
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
@@ -205,7 +205,7 @@ func TestOverviewSeparatesLiveReviewsFromStaleDecisionRecords(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer lock.Close()
-	if err = syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
+	if err = filelock.Lock(lock, filelock.Exclusive); err != nil {
 		t.Fatal(err)
 	}
 	record := workrun.InteractionRecord{Version: 1, Status: "pending", Interaction: workrun.Interaction{ID: 1, Kind: "approval", Preview: map[string]string{"action": "review only"}}}
@@ -220,7 +220,7 @@ func TestOverviewSeparatesLiveReviewsFromStaleDecisionRecords(t *testing.T) {
 	if !hasOverviewItem(findSection(t, view, "needs"), "decision", "awaiting-review") {
 		t.Fatal("live review was not actionable")
 	}
-	if err = syscall.Flock(int(lock.Fd()), syscall.LOCK_UN); err != nil {
+	if err = filelock.Unlock(lock); err != nil {
 		t.Fatal(err)
 	}
 	view, err = ReadOverview(context.Background(), root, true, now)

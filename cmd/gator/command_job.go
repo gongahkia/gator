@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/privatefs"
 	sharedusage "github.com/gongahkia/gator/internal/usage"
 	"github.com/gongahkia/gator/internal/workrun"
 	"io"
@@ -834,8 +835,7 @@ func acquireSupervisorLock(path string) error {
 		if readErr != nil || parseErr != nil || pid < 1 {
 			return errors.New("job supervisor lock is invalid; inspect it before removing it")
 		}
-		process, findErr := os.FindProcess(pid)
-		alive := findErr == nil && process.Signal(syscall.Signal(0)) == nil
+		alive := processAlive(pid)
 		if alive {
 			return fmt.Errorf("job supervisor is already running with PID %d", pid)
 		}
@@ -1214,7 +1214,7 @@ func writePrivateFileAtomic(path string, contents []byte) error {
 		return err
 	}
 	defer directory.Close()
-	return directory.Sync()
+	return privatefs.SyncDir(directory)
 }
 
 func desktopNotification(name, status string) {
