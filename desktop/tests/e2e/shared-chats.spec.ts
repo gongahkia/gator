@@ -27,7 +27,10 @@ async function fixture() {
     if(last?.role!=="tool" && user.includes(quote)) message=call("memory_remember",{subject:"preference.response_length",kind:"preference",quote,scope:"personal",explicit:user.includes("Remember")});
     if(last?.role!=="tool" && user.includes("Please forget my reply preference")) {
       const memory=input.messages.filter(m=>m.role==="system").map(textOf).join("\n").match(/\[(mem-[a-f0-9]+)\]/);
-      message=call("memory_forget",{id:memory?.[1]??"missing",quote:"Please forget my reply preference."});
+      message=call("knowledge_read",{id:memory?.[1]??"missing"});
+    } else if(last?.role==="tool" && user.includes("Please forget my reply preference") && input.messages.at(-2)?.tool_calls?.some(tool=>tool.function.name==="knowledge_read")) {
+      const memory=JSON.parse(textOf(last)).result;
+      message=call("memory_forget",{id:memory.id,quote:"Please forget my reply preference.",expected_updated:memory.updated});
     }
     if(last?.role!=="tool" && user.includes("Find the earlier Birch Hall discussion")) message=call("chat_search",{query:"Birch Hall"});
     response.writeHead(200,{"Content-Type":"application/json"});response.end(JSON.stringify({choices:[{message,finish_reason:JSON.stringify(message).includes('"tool_calls"')?"tool_calls":"stop"}],usage:{prompt_tokens:10,completion_tokens:10,total_tokens:20}}));

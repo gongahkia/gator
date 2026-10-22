@@ -81,6 +81,22 @@ func retainedTurn(c worksession.Conversation, r worksession.Revision, terms []st
 	return historyTurn{ConversationID: c.ID, RevisionID: r.ID, Title: c.Title, Folder: filepath.Base(c.SourcePath), At: r.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), User: user, Assistant: assistant, Truncated: ut || at}
 }
 
+// Keep combining marks with their letters, and permit short CJK search terms.
+// Query, page and result bounds stay the same for every script.
+func historySearchTerms(query string) []string {
+	var terms []string
+	for _, term := range strings.FieldsFunc(strings.ToLower(query), func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsNumber(r) && !unicode.IsMark(r) }) {
+		shortScript := false
+		for _, r := range term {
+			shortScript = shortScript || unicode.Is(unicode.Han, r) || unicode.Is(unicode.Hiragana, r) || unicode.Is(unicode.Katakana, r) || unicode.Is(unicode.Hangul, r)
+		}
+		if len([]rune(term)) >= 2 || shortScript {
+			terms = append(terms, term)
+		}
+	}
+	return terms
+}
+
 type chatSearch struct{ ChatHistory }
 
 func (chatSearch) Definition() agent.ToolDefinition {
@@ -99,14 +115,9 @@ func (t chatSearch) Execute(ctx context.Context, raw json.RawMessage) (agent.Too
 	if len(a.Query) > 512 || a.Offset < 0 || a.Offset > 100000 || a.Before != "" && a.ConversationID == "" {
 		return agent.ToolResult{}, errors.New("invalid chat search")
 	}
-	var terms []string
-	for _, term := range strings.FieldsFunc(strings.ToLower(a.Query), func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsNumber(r) }) {
-		if len([]rune(term)) >= 3 {
-			terms = append(terms, term)
-		}
-	}
+	terms := historySearchTerms(a.Query)
 	if len(terms) == 0 || len(terms) > 24 {
-		return agent.ToolResult{}, errors.New("use 1–24 specific search words of at least three characters")
+		return agent.ToolResult{}, errors.New("use 1–24 specific search words")
 	}
 	sessions, denied, err := t.access()
 	if err != nil {
