@@ -1,5 +1,10 @@
 # Muse and dots feature map for Gator
 
+**Historical comparison.** For current planning, use the
+[22 October 2026 competitive gap audit](COMPETITIVE_GAP_AUDIT_2026-10-22.md).
+The terminal-first direction and capability counts below describe an earlier
+implementation; Gator is now desktop-first and several listed gaps have been closed.
+
 Researched 2026-10-17. This is a product comparison, not a claim that either competitor works perfectly in every case. It uses [Meta's Muse launch][muse-launch], [Muse's design account][muse-design], [Meta's security account][muse-security], and [OpenAI's dots documentation][dots-overview]. Meta's [Connect 2026 announcement][muse-connect] is labeled separately where it describes future features. Gator status reflects this repository's implementation as of 2026-10-18; it is an implementation audit, not a live quality benchmark.
 
 The product goal remains a **terminal-native personal agent that remembers goals, works across selected local and connected sources, and follows through over time**. Feature parity is useful only when the same user job works reliably. In particular, a saved goal is not proof of useful follow-through, a connector is not event monitoring, a generated draft is not a completed external action, and a local supervisor is not an always-on cloud agent.

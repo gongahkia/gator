@@ -2,6 +2,10 @@
 
 Research and implementation constraint: 22 October 2026.
 
+The [current competitive gap audit](COMPETITIVE_GAP_AUDIT_2026-10-22.md) checks
+this direction against the implemented desktop application and seven competitor
+references, with priorities and acceptance scenarios for the remaining work.
+
 Gator's intended audience wants an ongoing relationship with a useful personal
 agent. Messaging is the main product surface. Goals, files, connections and
 activity explain or support that conversation. This refines the

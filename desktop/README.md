@@ -10,6 +10,9 @@ React DOM and Tailwind render the frontend; the private Go runtime owns
 conversations, tools, model configuration, approvals, goals, usage, and data.
 The standalone CLI and React terminal renderer are retired.
 
+Product direction and the remaining capability gaps are recorded in the
+[22 October competitive audit](../docs/COMPETITIVE_GAP_AUDIT_2026-10-22.md).
+
 ## Run
 
 From the repository root, with Go 1.25.13 and Node.js 22.12+ installed:

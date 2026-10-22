@@ -1,5 +1,9 @@
 # Product capability audit
 
+For current planning, use the [22 October 2026 competitive gap audit](COMPETITIVE_GAP_AUDIT_2026-10-22.md).
+The findings below preserve the September baseline; terminal interfaces,
+scheduler availability and several missing-feature classifications have since changed.
+
 This is a historical source-backed product audit as of 2026-09-09, not a model-quality
 benchmark. The current personal-agent direction is in
 [PERSONAL_AGENT_DIRECTION.md](PERSONAL_AGENT_DIRECTION.md). It compares the then-current Gator architecture and tests with public
