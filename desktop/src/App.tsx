@@ -22,6 +22,7 @@ import { bundleOutputs } from "./conversationOutputs";
 import { DesktopHelp } from "./DesktopHelp";
 import { UpdateDialog } from "./UpdateDialog";
 import { AsciiWaves } from "./AsciiWaves";
+import { ActivityHistory, LiveActivity } from "./ActivityTimeline";
 
 type Navigation = { command: string; draft?: string } | { conversation: NonNullable<DesktopFrame["conversation"]> };
 
@@ -61,12 +62,12 @@ const Message = memo(function Message({ message, pending, onApproval, commands, 
   const result = message.result ?? (message.bundle ? bundleResult(message.bundle) : undefined);
   const approval = result?.kind === "approval" && result.fields?.some((field) => field.label === "Request" && field.value === String(pending)) ? pending : undefined;
   return <article className={`message ${user ? "user-message" : message.role === "Gator" ? "assistant-message" : "result-message"}`} aria-label={user ? "Your message" : `${message.role} message`}>
-    <div className="message-content"><div className="message-byline">{user ? "You" : message.role === "Gator" ? "Gator" : message.bundle ? "Files & changes" : message.role}</div>
+    <div className="message-content">{message.activity && <ActivityHistory trace={message.activity} />}<div className="message-byline">{user ? "You" : message.role === "Gator" ? "Gator" : message.bundle ? "Files & changes" : message.role}</div>
       {commands && navigate && result?.title === "Gator commands" && result.kind === "report" ? <DesktopHelp commands={commands} navigate={navigate} disabled={!!disabled} /> : message.bundle ? <><OutputCards outputs={bundleOutputs(message.bundle)} preview={preview} /><details className="message-result-details"><summary>Result details</summary><Result result={result!} /></details></> : result ? <Result result={result} approval={approval} onApproval={onApproval} /> : message.role === "Gator" ? <div className="assistant-speech"><Markdown text={message.text} /></div> : <div className="literal prose-text">{message.text}</div>}
       {!result && message.role === "Gator" && message.text && <div className="message-actions"><CopyButton text={message.text} label="Copy response" compact /></div>}
     </div>
   </article>;
-}, (before, after) => before.pending === after.pending && before.message.role === after.message.role && before.message.text === after.message.text && JSON.stringify(before.message.result ?? before.message.bundle) === JSON.stringify(after.message.result ?? after.message.bundle) && before.onApproval === after.onApproval && before.disabled === after.disabled && before.commands === after.commands && before.navigate === after.navigate && before.preview === after.preview);
+}, (before, after) => JSON.stringify(before.message.activity) === JSON.stringify(after.message.activity) && before.pending === after.pending && before.message.role === after.message.role && before.message.text === after.message.text && JSON.stringify(before.message.result ?? before.message.bundle) === JSON.stringify(after.message.result ?? after.message.bundle) && before.onApproval === after.onApproval && before.disabled === after.disabled && before.commands === after.commands && before.navigate === after.navigate && before.preview === after.preview);
 
 export function App() {
   const { state, error, connection, sessionID, terminalBusy, fullScreen, updates, updatesOpen, updatePreparing, reconnecting, reconnect, send, clearError } = useBackend();
@@ -124,7 +125,7 @@ export function App() {
   useLayoutEffect(() => {
     if (!state) return;
     if (panel) { returningToTranscript.current = true; return; }
-    const content = JSON.stringify(state.messages);
+    const content = JSON.stringify([state.messages, state.activity]);
     const changed = previousTranscript.current.identity !== conversationIdentity;
     if (changed) {
       const promoted = previousTranscript.current.identity === `${state.primary ? "primary" : "topic"}:${state.source}` && state.conversation_id && previousTranscript.current.running;
@@ -138,7 +139,7 @@ export function App() {
     previousTranscript.current = { identity: conversationIdentity, content, running: state.running };
     returningToTranscript.current = false;
     if (atBottom.current && search === null) transcript.current?.scrollTo({ top: transcript.current.scrollHeight });
-  }, [state?.messages, state?.running, panel, conversationIdentity, search]);
+  }, [state?.messages, state?.activity, state?.running, panel, conversationIdentity, search]);
   useEffect(() => { if (composer.current) { composer.current.style.height = "auto"; composer.current.style.height = `${Math.min(180, composer.current.scrollHeight)}px`; } }, [draft]);
 
   const attempt = useCallback((frame: DesktopFrame) => { void send(frame).catch(() => {}); }, [send]);
@@ -246,7 +247,7 @@ export function App() {
         <div className={`transcript-stage ${home ? "home-stage" : ""}`}><div className={`conversation-scroll ${home ? "home-scroll" : ""}`} ref={transcript} onScroll={(event) => { const el = event.currentTarget; const near = el.scrollHeight - el.scrollTop - el.clientHeight < 100; atBottom.current = near; setAtLatest(near); if (near) setNewActivity(false); transcriptPositions.current.delete(conversationIdentity); transcriptPositions.current.set(conversationIdentity, { top: el.scrollTop, latest: near }); if (transcriptPositions.current.size > 32) transcriptPositions.current.delete(transcriptPositions.current.keys().next().value!); }}>
           {home ? <><AsciiWaves /><div className="home-content"><div className="home-art"><Logo /></div><h1>{state.primary ? "Hi. I’m Gator." : "A fresh place to talk."}</h1><p>{state.primary ? "Bring a question, a plan, or something you’d like a hand with." : "Keep this topic separate from your main conversation."}</p>
             {!state.provider && <div className="setup-callout"><div><Settings2 size={18} /><div><strong>Set up Gator</strong><p>Choose a cloud or local model so Gator can reply. Your unsent message is kept while you set up.</p></div></div><button className="button" onClick={() => navigate("/model")}>Choose a model<ChevronRight size={15} /></button></div>}
-            </div></> : <div className="transcript-content" aria-label="Conversation">{messages.map((message, index) => <Message key={`${conversationIdentity}:${index}`} message={message} preview={openOutput} pending={approvalBusy ? undefined : state.pending_approval?.id} onApproval={approve} commands={message.result?.title === "Gator commands" ? state.commands : undefined} navigate={message.result?.title === "Gator commands" ? navigate : undefined} disabled={message.result?.title === "Gator commands" ? state.running || !!error : undefined} />)}{state.running && <div className="run-progress" role="status"><LoaderCircle size={16} className="spin" /><span>{state.cancelling ? "Stopping…" : state.pending_approval ? "Waiting for your approval" : state.status || "Gator is working…"}</span><span className="elapsed">{state.elapsed}</span></div>}</div>}
+            </div></> : <div className="transcript-content" aria-label="Conversation">{messages.map((message, index) => <Message key={`${conversationIdentity}:${index}`} message={message} preview={openOutput} pending={approvalBusy ? undefined : state.pending_approval?.id} onApproval={approve} commands={message.result?.title === "Gator commands" ? state.commands : undefined} navigate={message.result?.title === "Gator commands" ? navigate : undefined} disabled={message.result?.title === "Gator commands" ? state.running || !!error : undefined} />)}{state.running && <LiveActivity trace={state.activity} status={state.cancelling ? "Stopping…" : state.pending_approval ? "Waiting for your approval" : state.status || "Gator is working…"} elapsed={state.elapsed} attention={state.cancelling || !!state.pending_approval} />}</div>}
         </div>{!home && !atLatest && <button className="jump-latest" aria-label={newActivity ? "New activity. Jump to latest" : "Jump to latest"} onClick={jumpToLatest}><ArrowDown size={16} />{newActivity && <span>New activity</span>}</button>}</div>
         <div className="composer-area">{state.pending_approval && <div className="approval-reminder"><ShieldCheck size={16} /><span>An action is waiting for your review.</span><button className="small-button" onClick={jumpToLatest}>View request<ArrowDown size={13} /></button></div>}
           {!!slash.length && <div className="slash-suggestions" aria-label="Command suggestions">{slash.map((command) => <button key={command.name} onClick={() => { setDraft(`/${command.name}${command.needs_input ? " " : ""}`); composer.current?.focus(); }}><span>/{command.name}</span><span>{command.description}</span></button>)}</div>}
