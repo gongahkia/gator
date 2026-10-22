@@ -55,6 +55,28 @@ model. Model selection is saved for subsequent requests; effort keeps the existi
 conversation/session behavior. Current and queued work must finish before either
 setting changes. Drafts and attachments stay in the composer.
 
+## Files inside chat
+
+Click an attached or generated file to open it directly in its message. The
+compact Preview/Edit header supports text, Markdown, code, JSON and CSV/TSV,
+plus native Word paragraph/table text, Excel cells/formulas and PowerPoint
+slide text. Images and PDFs have visual previews. Office rendering is simplified;
+complex layout and drawing tools remain in the native apps.
+
+Save creates a new private version and includes its bytes in your next message,
+subject to the existing attachment limits. Ask Gator stages a request with the
+file/version and selected text or cell; it does not send automatically. File
+edit drafts survive reload independently of message drafts. Save or Discard
+before sending so Gator receives the version you intend. Version history can
+restore earlier contents as another version. Export saves a copy to a chosen
+location; original uploads and historical outputs stay intact.
+
+Files are opened on demand. Previewing and direct editing do not call a model
+or upload the file to a document-rendering service. File working versions and
+drafts are included in private backups and explicit history/all-content deletion.
+Automatic age retention leaves them until you explicitly delete them.
+See [format support, architecture and verification](../docs/INLINE-FILES-RESEARCH.md).
+
 ## Ask Gator about the app
 
 You can ask questions such as “Where do I change the model?”, “Which model are

@@ -67,6 +67,17 @@ and [Gemini inline media input](https://ai.google.dev/api/generate-content#Part)
 Provider model availability, billing, and retention are governed by the selected
 provider; Gator's local audio lifecycle does not establish the provider's policy.
 
+## Files in the conversation
+
+Open an attached or generated file card inside chat. Preview/Edit exposes only
+the controls supported by that format. Save creates a private working version;
+Ask Gator adds its saved version and selected text/cell to a reviewable message.
+Neither action sends that message automatically. File edit drafts are separate
+from composer drafts and recover on reopening the file. Export uses a native
+save dialog and does not overwrite an original unless that destination is
+explicitly chosen. See [file workflows](INLINE-FILES-RESEARCH.md) for native
+Office limitations, version retention and tests.
+
 ## Development verification
 
 ```sh
