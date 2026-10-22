@@ -97,10 +97,12 @@ func ReadChecks(stateDir string, supervisor bool, now time.Time) ([]Check, error
 		if err != nil {
 			return nil, err
 		}
-		if !definition.Enabled || !active {
+		if definition.Expired(now) {
+			check.State, check.NextAction = "ended", "Review a new end date to continue this check"
+		} else if !definition.Enabled || !active {
 			check.State, check.NextAction = "paused", "Resume this check when ready"
 			if !active {
-				check.State, check.NextAction = "goal paused", "Resume the goal with gator goal resume "+definition.GoalID
+				check.State, check.NextAction = "goal paused", "Resume this goal in Following"
 			}
 		} else if !supervisor {
 			check.State, check.NextAction = "offline", "Start the local supervisor"
@@ -110,6 +112,9 @@ func ReadChecks(stateDir string, supervisor bool, now time.Time) ([]Check, error
 				return nil, scheduleErr
 			}
 			check.NextDue = schedule.Next(now)
+			if definition.Expired(check.NextDue) {
+				check.NextDue = time.Time{}
+			}
 		}
 		checks = append(checks, check)
 	}

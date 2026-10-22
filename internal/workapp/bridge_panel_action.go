@@ -172,6 +172,8 @@ func (m *Model) setBridgeField(index int, value string) {
 			d.MaxSeconds, _ = strconv.Atoi(parts[2])
 		case 10:
 			d.MaxChecksPerDay, _ = strconv.Atoi(value)
+		case 11:
+			d.EndsAt = value
 		}
 	case m.learningForm != nil:
 		if index == 0 && m.learningForm.EditingID == "" {

@@ -458,6 +458,10 @@ func executeJobContext(ctx context.Context, definition jobs.Definition, attempt 
 }
 
 func executeJobContextWith(ctx context.Context, definition jobs.Definition, attempt jobs.Attempt, stateDir string, notify bool, execute func(context.Context, jobs.Definition, string, ...string) (jobResult, error)) jobs.Attempt {
+	if definition.Expired(time.Now()) {
+		attempt.Status, attempt.Summary, attempt.FinishedAt = "expired", "This check reached its reviewed end date.", time.Now().UTC()
+		return attempt
+	}
 	var result jobResult
 	var runErr error
 	store, runErr := jobs.Open(stateDir)
@@ -513,6 +517,10 @@ func executeJobContextWith(ctx context.Context, definition jobs.Definition, atte
 		}
 	}
 	for try := 1; runErr == nil && try <= 3; try++ {
+		if definition.Expired(time.Now()) {
+			attempt.Status, attempt.Summary, attempt.FinishedAt = "expired", "No further attempts: this check reached its reviewed end date.", time.Now().UTC()
+			return attempt
+		}
 		attempt.Try = try
 		reference := jobs.RunReference{Try: try, RunID: attempt.ID + "-try-" + strconv.Itoa(try)}
 		if err := store.RecordRun(attempt, reference); err != nil {

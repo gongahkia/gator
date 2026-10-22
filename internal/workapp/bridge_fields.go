@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gongahkia/gator/internal/uisnapshot"
 )
@@ -23,6 +24,12 @@ func validBridgeInput(field *uisnapshot.Input, value string) bool {
 		return false
 	}
 	switch field.Kind {
+	case "datetime":
+		if value == "" {
+			return true
+		}
+		date, err := time.Parse(time.RFC3339, value)
+		return err == nil && !date.IsZero()
 	case "select":
 		return allowed(value)
 	case "multi":

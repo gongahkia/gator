@@ -62,4 +62,14 @@ func TestCheckHealthSeparatesFailureOfflineAndLastSuccessfulPolicy(t *testing.T)
 	if !checks[0].LastSuccess.IsZero() {
 		t.Fatal("old policy's success was applied to new settings")
 	}
+	definition.EndsAt = now
+	if _, err := store.Save(definition); err != nil {
+		t.Fatal(err)
+	}
+	for _, online := range []bool{true, false} {
+		checks, err = ReadChecks(state, online, now)
+		if err != nil || checks[0].State != "ended" || !checks[0].NextDue.IsZero() {
+			t.Fatalf("expiry health: %+v %v", checks, err)
+		}
+	}
 }

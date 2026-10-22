@@ -86,6 +86,9 @@ func (m *Model) editFollowup() {
 	draft.Enabled = definition.Enabled
 	draft.OriginConversationID = definition.OriginConversationID
 	draft.JobID, draft.Title, draft.Outcome = definition.ID, definition.Name, definition.Objective
+	if !definition.EndsAt.IsZero() {
+		draft.EndsAt = definition.EndsAt.Format(time.RFC3339)
+	}
 	draft.ExpectedDigest, _ = definition.PolicyDigest()
 	draft.ConnectorIDs, draft.AlertWhen, draft.Mode = append([]string(nil), definition.ConnectorIDs...), definition.AlertWhen, definition.Mode
 	if draft.AlertWhen == "" {
@@ -223,10 +226,10 @@ func (m Model) updateFollowupForm(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.followupForm, m.sectionNotice = nil, ""
 		return m, nil
 	case "tab", "down":
-		f.Field = (f.Field + 1) % 11
+		f.Field = (f.Field + 1) % 12
 		return m, nil
 	case "shift+tab", "up":
-		f.Field = (f.Field + 10) % 11
+		f.Field = (f.Field + 11) % 12
 		return m, nil
 	case "ctrl+r":
 		if err := f.Draft.Validate(); err != nil {
@@ -236,7 +239,7 @@ func (m Model) updateFollowupForm(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "enter":
-		if f.Field == 10 {
+		if f.Field == 11 {
 			if err := f.Draft.Validate(); err != nil {
 				m.sectionNotice = err.Error()
 			} else {
@@ -281,6 +284,8 @@ func (m Model) updateFollowupForm(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		text = &f.Draft.GmailQuery
 	case 7:
 		text = &f.Draft.AlertWhen
+	case 11:
+		text = &f.Draft.EndsAt
 	}
 	if f.Field == 3 {
 		// A focused picker cycles configured sources; Space toggles membership.
@@ -437,13 +442,14 @@ func (m Model) followupPanel() uisnapshot.Panel {
 			Parts: []uisnapshot.NumberPart{{Label: "Provider requests", Min: 1, Max: 256}, {Label: "Tokens", Min: 1000, Max: 1000000}, {Label: "Time (seconds)", Min: 30, Max: 1800}},
 			Help:  "Up to three transient attempts per check. Usage and shared limits also apply."}
 		p.Rows[10].Label, p.Rows[10].Input = "Checks per UTC day", bridgeNumberInput(int64(d.MaxChecksPerDay), 1, 288)
+		p.Rows = append(p.Rows, uisnapshot.Row{Label: "End date (optional)", Input: &uisnapshot.Input{Kind: "datetime", Value: d.EndsAt, Limit: 40, Help: "Choose in your local timezone. Leave empty to continue until paused. A current check may finish after this time."}})
 		for index := range p.Rows {
 			switch {
 			case index < 2:
 				p.Rows[index].Group = "Outcome"
 			case index < 6:
 				p.Rows[index].Group = "Sources"
-			case index < 8:
+			case index < 8 || index == 11:
 				p.Rows[index].Group = "Timing and notifications"
 			case index == 8:
 				p.Rows[index].Group = "Permissions"
@@ -463,6 +469,9 @@ func (m Model) followupPanel() uisnapshot.Panel {
 			next = c.NextDue.Local().Format("2 Jan, 15:04")
 		}
 		p.Summary = []uisnapshot.Field{{Label: "Status", Value: c.State, Tone: checkTone(c.State)}, {Label: "Last successful check", Value: last}, {Label: "Next scheduled check", Value: next}}
+		if !c.Definition.EndsAt.IsZero() {
+			p.Summary = append(p.Summary, uisnapshot.Field{Label: "End date", Value: c.Definition.EndsAt.Local().Format("2 Jan 2006, 15:04 MST (Z07:00)")})
+		}
 		permission := "Read and recommend"
 		if c.Definition.Mode == action.Draft {
 			permission = "Read and prepare drafts"
@@ -505,7 +514,7 @@ func checkTone(state string) string {
 	if state == "offline" || state == "couldn't check" {
 		return "warning"
 	}
-	if state == "paused" {
+	if state == "paused" || state == "ended" {
 		return "muted"
 	}
 	return "success"

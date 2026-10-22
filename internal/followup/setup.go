@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/agent"
@@ -18,6 +19,7 @@ import (
 )
 
 type Draft struct {
+	EndsAt                                   string
 	OriginConversationID                     string
 	Enabled                                  bool
 	ID, GoalID, JobID, ExpectedDigest        string
@@ -43,6 +45,9 @@ func New(source, goalID string) (Draft, error) {
 }
 
 func (d Draft) Validate() error {
+	if _, err := d.EndTime(); err != nil {
+		return err
+	}
 	if d.OriginConversationID != "" && !regexp.MustCompile(`\A[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}\z`).MatchString(d.OriginConversationID) {
 		return errors.New("invalid originating conversation")
 	}
@@ -76,11 +81,23 @@ func (d Draft) Validate() error {
 	return nil
 }
 
+func (d Draft) EndTime() (time.Time, error) {
+	if d.EndsAt == "" {
+		return time.Time{}, nil
+	}
+	end, err := time.Parse(time.RFC3339, d.EndsAt)
+	if err != nil || end.IsZero() {
+		return time.Time{}, errors.New("end date must include a time and timezone, such as 2026-10-30T18:00:00+08:00; leave blank for no end date")
+	}
+	return end, nil
+}
+
 func (d Draft) Definition(goalID string, sources []jobs.WatchSource) (jobs.Definition, error) {
 	if err := d.Validate(); err != nil {
 		return jobs.Definition{}, err
 	}
 	schedule, _ := jobs.WatchSchedule(d.IntervalMinutes)
+	end, _ := d.EndTime()
 	contract := artifact.InspectionContract()
 	if d.Mode == action.Draft {
 		contract = artifact.OptionalDraftContract()
@@ -89,7 +106,7 @@ func (d Draft) Definition(goalID string, sources []jobs.WatchSource) (jobs.Defin
 	if id == "" {
 		id = "job-" + d.ID
 	}
-	return jobs.Definition{ID: id, Name: d.Title, GoalID: goalID, OriginConversationID: d.OriginConversationID, Enabled: d.Enabled, GoalWatch: true, ChangeOnly: true,
+	return jobs.Definition{ID: id, Name: d.Title, GoalID: goalID, EndsAt: end, OriginConversationID: d.OriginConversationID, Enabled: d.Enabled, GoalWatch: true, ChangeOnly: true,
 		RefreshSnapshot: true, SourcePath: d.SourcePath, Objective: d.Outcome, AlertWhen: d.AlertWhen,
 		Schedule: schedule, PollMinutes: d.IntervalMinutes, Timezone: "UTC", Missed: "run_once", Mode: d.Mode,
 		Contract: contract, ConnectorIDs: append([]string(nil), d.ConnectorIDs...), WatchSources: sources,
@@ -108,6 +125,11 @@ func (d Draft) ReviewLines() []string {
 	lines := []string{"Outcome: " + d.Outcome, "Sources: " + sources, fmt.Sprintf("When: every %d minutes while this computer and the supervisor are running", d.IntervalMinutes), "Notify when: " + d.AlertWhen, "Permitted actions: " + permission, "Sending and publishing require a separate foreground approval.", fmt.Sprintf("Limits: %d Work checks/day; per try %d requests, %d tokens, %ds", d.MaxChecksPerDay, d.MaxRequests, d.MaxTokens, d.MaxSeconds), "Transient failures may retry up to 3 times per check. Cost estimate unavailable; usage is recorded."}
 	if d.GmailQuery != "" {
 		lines = append(lines, "Mail selection: "+d.GmailQuery)
+	}
+	if end, _ := d.EndTime(); !end.IsZero() {
+		lines = append(lines, "Ends: "+end.Format("Mon 2 Jan 2006, 15:04 MST (Z07:00)"), "No new checks or retries start after the end date. A current check may finish.")
+	} else {
+		lines = append(lines, "Ends: When you pause this check")
 	}
 	if d.OriginConversationID != "" {
 		lines = append(lines, "Updates return to the conversation where you requested this check.")

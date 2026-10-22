@@ -29,6 +29,7 @@ import (
 const Version = 2
 
 type Definition struct {
+	EndsAt               time.Time              `json:"ends_at,omitzero"`
 	OriginConversationID string                 `json:"origin_conversation_id,omitempty"`
 	Limits               agent.Limits           `json:"limits"`
 	WebOrigins           []string               `json:"web_origins,omitempty"`
@@ -501,6 +502,9 @@ func (s Store) SetEnabled(id string, enabled bool) (Definition, error) {
 	if err != nil {
 		return Definition{}, err
 	}
+	if enabled && definition.Expired(time.Now()) {
+		return Definition{}, errors.New("this check has ended; review a new end date before resuming")
+	}
 	definition.Enabled = enabled
 	return s.save(definition)
 }
@@ -516,6 +520,9 @@ func (s Store) Claim(id string, scheduled time.Time) (Definition, bool, error) {
 		return Definition{}, false, err
 	}
 	scheduled = scheduled.UTC().Truncate(time.Minute)
+	if definition.Expired(time.Now()) || definition.Expired(scheduled) {
+		return definition, false, nil
+	}
 	if !definition.LastScheduledAt.IsZero() && !definition.LastScheduledAt.Before(scheduled) {
 		return definition, false, nil
 	}
@@ -534,6 +541,9 @@ func (s Store) Remove(id string) error {
 // Begin persists immutable intent and lifecycle records before model work
 // starts. The returned attempt must be completed with Record.
 func (s Store) Begin(definition Definition, scheduledAt time.Time) (Attempt, error) {
+	if definition.Expired(time.Now()) {
+		return Attempt{}, errors.New("this check reached its reviewed end date")
+	}
 	digest, err := definition.Digest()
 	if err != nil {
 		return Attempt{}, err
@@ -683,6 +693,9 @@ func (s locatedSchedule) Next(after time.Time) time.Time {
 }
 
 func Due(definition Definition, now time.Time) (time.Time, bool, error) {
+	if definition.Expired(now) {
+		return time.Time{}, false, nil
+	}
 	schedule, err := Schedule(definition)
 	if err != nil {
 		return time.Time{}, false, err
@@ -703,6 +716,11 @@ func Due(definition Definition, now time.Time) (time.Time, bool, error) {
 		}
 	}
 	return time.Time{}, false, nil
+}
+
+// Expiry prevents new checks and retries. An already executing check may finish.
+func (d Definition) Expired(now time.Time) bool {
+	return !d.EndsAt.IsZero() && !now.Before(d.EndsAt)
 }
 
 func newID(prefix string) string {
@@ -847,6 +865,9 @@ func (s Store) ClaimBegin(id string, scheduled time.Time) (Definition, Attempt, 
 		return Definition{}, Attempt{}, false, err
 	}
 	scheduled = scheduled.UTC().Truncate(time.Minute)
+	if !definition.Enabled || definition.Expired(time.Now()) || definition.Expired(scheduled) {
+		return definition, Attempt{}, false, nil
+	}
 	if !definition.LastScheduledAt.Before(scheduled) {
 		return definition, Attempt{}, false, nil
 	}

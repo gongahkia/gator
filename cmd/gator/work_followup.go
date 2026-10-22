@@ -30,6 +30,9 @@ func saveFollowup(stateDir string, draft followup.Draft) (goal.Record, jobs.Defi
 	if err := draft.Validate(); err != nil {
 		return goal.Record{}, jobs.Definition{}, err
 	}
+	if end, _ := draft.EndTime(); draft.Enabled && !end.IsZero() && !end.After(time.Now()) {
+		return goal.Record{}, jobs.Definition{}, errors.New("choose a future end date before enabling this check")
+	}
 	if draft.OriginConversationID != "" {
 		sessions, err := worksession.Open(stateDir)
 		if err != nil {

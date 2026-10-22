@@ -1,10 +1,27 @@
 package followup
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/gongahkia/gator/internal/action"
 )
+
+func TestEndDateIsExplicitAndRetainedInReview(t *testing.T) {
+	d, _ := New(t.TempDir(), "")
+	d.EndsAt = "Friday"
+	if err := d.Validate(); err == nil {
+		t.Fatal("ambiguous date accepted")
+	}
+	d.EndsAt = "2030-10-25T17:00:00+08:00"
+	definition, err := d.Definition("goal-aaaaaaaaaaaaaaaaaaaaaaaa", nil)
+	if err != nil || definition.EndsAt.IsZero() {
+		t.Fatalf("lost expiry: %v", err)
+	}
+	if !strings.Contains(strings.Join(d.ReviewLines(), "\n"), "+08:00") {
+		t.Fatal("timezone missing from review")
+	}
+}
 
 func TestReviewedDraftAllowsQuietChecksWithoutGrantingActions(t *testing.T) {
 	draft, err := New(t.TempDir(), "")
