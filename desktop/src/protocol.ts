@@ -81,6 +81,7 @@ export type Usage = {
 };
 export type ExternalCommand = { kind: string; program: string; args: string[]; dir?: string; env?: string[] };
 export type BackendState = {
+	 desktop?: { shortcuts: Record<string,string>; voice: { spoken_replies: boolean; provider?: string; model?: string; language?: string; rate?: number } };
   mode: "chat" | "panel";
   panel?: BackendPanel;
   messages: BackendMessage[];

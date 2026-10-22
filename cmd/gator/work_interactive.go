@@ -156,6 +156,11 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 	localModels := newLocalModelManager(settingsStore)
 	defer localModels.Close()
 	application := workapp.New(workapp.Config{
+		Desktop: settings.Desktop,
+		ReadDesktop: func() (config.DesktopSettings, error) {
+			current, err := settingsStore.Load()
+			return current.Desktop, err
+		},
 		Models: workModelPanel(settingsStore, stateDir, localModels),
 		SelectedModel: func() (string, string, error) {
 			current, err := settingsStore.Load()

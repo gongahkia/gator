@@ -60,8 +60,10 @@ func (c gatorAppController) Inspect(ctx context.Context, query workrun.AppQuery)
 		return map[string]any{"connections": choices, "note": "Selection applies to future requests; it does not authenticate or authorize external changes."}, nil
 	case "outputs":
 		return c.inspectOutputs(query.ID)
-	case "shortcuts", "voice":
-		return map[string]string{"status": "not configured", "topic": query.Topic}, nil
+	case "shortcuts":
+		return map[string]any{"bindings": settings.Desktop.ResolvedShortcuts(), "defaults": config.DefaultShortcuts, "note": "Mod means Cmd on macOS and Ctrl elsewhere. Use shortcut default to reset one action. Escape and operating-system shortcuts remain reserved."}, nil
+	case "voice":
+		return settings.Desktop.Voice, nil
 	default:
 		return nil, fmt.Errorf("unknown Gator app topic %q", query.Topic)
 	}

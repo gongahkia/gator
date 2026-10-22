@@ -277,6 +277,11 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 	}
 	if len(value.AppChanges) > 0 {
 		m.refreshModelStatus()
+		if m.config.ReadDesktop != nil {
+			if preferences, err := m.config.ReadDesktop(); err == nil {
+				m.desktop = preferences
+			}
+		}
 	}
 	activity := m.activity
 	activityState := "completed"

@@ -10,6 +10,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/agent"
+	appconfig "github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/delivery"
 	"github.com/gongahkia/gator/internal/followup"
 	"github.com/gongahkia/gator/internal/goal"
@@ -156,6 +157,8 @@ type ModelStatus struct {
 type GoalState struct{ Title, SourcePath, ConversationID string }
 
 type Config struct {
+	Desktop                 appconfig.DesktopSettings
+	ReadDesktop             func() (appconfig.DesktopSettings, error)
 	ValidateUploads         func(source string, paths, uploads []string) error
 	Models                  func() (ModelPanel, error)
 	SelectedModel           func() (provider, model string, err error)
@@ -298,6 +301,7 @@ type pendingBundleAction struct {
 }
 
 type Model struct {
+	desktop                appconfig.DesktopSettings
 	models                 ModelPanel
 	tasks                  map[string]string
 	quitting               bool
@@ -425,6 +429,7 @@ func New(config Config) Model {
 		}
 	}
 	model := Model{
+		desktop:  config.Desktop,
 		config:   config,
 		home:     true,
 		firstRun: config.FirstRun,

@@ -20,6 +20,37 @@ func appControllerForTest(t *testing.T) gatorAppController {
 	return gatorAppController{stateDir: t.TempDir(), settings: store, request: &workrun.Request{}}
 }
 
+func TestGatorAppChatRebindsShortcutsAndVoicePreferences(t *testing.T) {
+	c := appControllerForTest(t)
+	for _, change := range []workrun.AppChange{
+		{Setting: "shortcuts", Value: json.RawMessage(`{"action":"command_search","shortcut":"Mod+P"}`)},
+		{Setting: "voice", Value: json.RawMessage(`{"spoken_replies":true,"language":"en-SG"}`)},
+	} {
+		mutation, err := c.Prepare(context.Background(), change)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := mutation.Apply(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	saved, _ := c.settings.Load()
+	if saved.Desktop.ResolvedShortcuts()["command_search"] != "Mod+P" || !saved.Desktop.Voice.SpokenReplies || saved.Desktop.Voice.Language != "en-SG" {
+		t.Fatalf("preferences not saved: %#v", saved.Desktop)
+	}
+	conflict, err := c.Prepare(context.Background(), workrun.AppChange{Setting: "shortcuts", Value: json.RawMessage(`{"action":"command_search","shortcut":"Mod+F"}`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conflict.Apply(context.Background()); err == nil {
+		t.Fatal("conflicting keybind saved")
+	}
+	saved, _ = c.settings.Load()
+	if saved.Desktop.ResolvedShortcuts()["command_search"] != "Mod+P" {
+		t.Fatal("failed rebind altered the saved binding")
+	}
+}
+
 func TestGatorAppModelAndThemeChangesStayWithinKnownSettings(t *testing.T) {
 	c := appControllerForTest(t)
 	settings := config.Default()
