@@ -736,6 +736,11 @@ func inferInteractiveWork(prompt string, options workapp.RunOptions) (action.Mod
 	}
 	codeWork := containsAny(lower, "implement ", "fix ", "refactor ", "add a test", "create a test", "write code", "write a script", "add a feature", "add support", "change the code", "update the code", "patch ")
 	createWork := containsAny(lower, "write ", "create ", "draft ", "produce ", "generate ", "prepare ", "build ", "reconcile ", "turn this into", "make a ")
+	// A question or a connection choice can mention "Reports", JSON, or a
+	// retained filename without asking for a new deliverable.
+	if !codeWork && !createWork && (strings.HasSuffix(strings.TrimSpace(lower), "?") || containsAny(lower, "select ", "use ") && containsAny(lower, "next message", "connection")) {
+		return action.Inspect, nil, nil
+	}
 	documentWork := containsAny(lower, "report", "brief", "memo", "document", "spreadsheet", "workbook", "csv", "json", "pdf", "docx", "presentation", "slide", "deck", "pptx", "poster", "svg", "html", "web page", "webpage", "dashboard")
 	if !codeWork && !createWork && !documentWork {
 		return action.Inspect, nil, nil

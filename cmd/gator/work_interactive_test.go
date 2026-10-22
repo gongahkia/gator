@@ -24,6 +24,10 @@ func TestInferInteractiveWorkKeepsConversationNatural(t *testing.T) {
 		paths  []string
 	}{
 		{name: "question", prompt: "What conflicts are in these notes?", mode: action.Inspect},
+		{name: "select named connection", prompt: "Can you select Reports for my next messages?", mode: action.Inspect},
+		{name: "select connection without punctuation", prompt: "Use Reports for my next messages", mode: action.Inspect},
+		{name: "ask about retained output", prompt: "Where is the report you created?", mode: action.Inspect},
+		{name: "explicit deliverable question", prompt: "Can you create a report?", mode: action.Draft, paths: []string{"report.md"}},
 		{name: "brief", prompt: "Write a cited brief", mode: action.Draft, paths: []string{"brief.md"}},
 		{name: "named output", prompt: "Create summary.json", mode: action.Draft, paths: []string{"summary.json"}},
 		{name: "named deck", prompt: "Create launch.pptx from the notes", mode: action.Draft, paths: []string{"launch.pptx"}},
