@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld("gator", {
   restart: () => ipcRenderer.invoke("gator:restart"),
   drafts: (request) => ipcRenderer.invoke("gator:drafts", request),
   updates: (request) => ipcRenderer.invoke("gator:updates", request),
+	voice: (request) => attachmentRequest("gator:voice", request),
   subscribe(callback) {
     const listener = (_event, message) => callback(message);
     ipcRenderer.on("gator:update", listener);

@@ -7,6 +7,9 @@ export type DesktopFrame = Omit<Frame, "version">;
 export type UploadedFile = { id: string; name: string; size: number };
 export type SavedDraft = { context: string; text: string; title: string; source: string; updated: number; uploads?: UploadedFile[] };
 export type DraftSnapshot = { enabled: boolean; drafts: SavedDraft[] };
+export type VoicePreferences = { spoken_replies: boolean; provider?: string; model?: string; language?: string; rate?: number };
+export type VoiceStatus = { ready: boolean; issue?: string; provider: string; model: string; preferences: VoicePreferences; max_seconds: number; max_audio_bytes: number; allowed?: boolean; text?: string };
+export type VoiceRequest = { action: "status" | "release" | "cancel" } | { action: "authorize"; context: string } | { action: "configure"; preferences: Partial<VoicePreferences> } | { action: "transcribe"; context: string; media_type: string; data: Uint8Array };
 export type DraftRequest = { action: "list" | "clear" } | { action: "remove"; context: string } | { action: "configure"; enabled: boolean } | { action: "save"; draft: Omit<SavedDraft, "updated"> };
 
 declare global {
@@ -25,6 +28,7 @@ declare global {
       restart(): Promise<void>;
       drafts(request: DraftRequest): Promise<DraftSnapshot>;
       updates(request: UpdateRequest): Promise<UpdateState>;
+			voice(request: VoiceRequest): Promise<VoiceStatus>;
     };
   }
 }

@@ -49,6 +49,10 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 	switch frame := value.(type) {
 	case uiFrame:
 		switch frame.Type {
+		case "refresh_preferences":
+			m.model = m.model.RefreshDesktopPreferences()
+			m.sendState()
+			return m, nil
 		case "prepare_update":
 			if frame.Nonce == "" || len(frame.Nonce) > 128 {
 				return m, nil

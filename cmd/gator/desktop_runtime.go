@@ -30,6 +30,12 @@ func runDesktopRuntime(args []string, out io.Writer) error {
 	if len(args) == 0 {
 		return errors.New(desktopOnlyMessage)
 	}
+	if len(args) == 1 && args[0] == "desktop-speech" && os.Getenv("GATOR_DESKTOP_SPEECH") == "1" {
+		if err := preparePlatformProfile(); err != nil {
+			return err
+		}
+		return runDesktopSpeech(os.Stdin, out)
+	}
 	if len(args) == 1 && args[0] == "desktop-update-guard" && os.Getenv("GATOR_DESKTOP_UPDATE_GUARD") == "1" {
 		return holdDesktopUpdateGuard(os.Stdin, out)
 	}

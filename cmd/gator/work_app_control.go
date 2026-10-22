@@ -63,7 +63,8 @@ func (c gatorAppController) Inspect(ctx context.Context, query workrun.AppQuery)
 	case "shortcuts":
 		return map[string]any{"bindings": settings.Desktop.ResolvedShortcuts(), "defaults": config.DefaultShortcuts, "note": "Mod means Cmd on macOS and Ctrl elsewhere. Use shortcut default to reset one action. Escape and operating-system shortcuts remain reserved."}, nil
 	case "voice":
-		return settings.Desktop.Voice, nil
+		_, status, err := voiceConfiguration(settings, c.stateDir)
+		return status, err
 	default:
 		return nil, fmt.Errorf("unknown Gator app topic %q", query.Topic)
 	}

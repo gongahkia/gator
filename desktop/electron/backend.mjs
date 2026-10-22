@@ -63,6 +63,8 @@ export class Backend extends EventEmitter {
     this.#write({ version: 1, type: "external_done", error });
   }
 
+  refreshPreferences() { this.#write({ version: 1, type: "refresh_preferences" }); }
+
   submitUpload(frame) {
     return new Promise((resolve, reject) => {
       const finish = (error) => {

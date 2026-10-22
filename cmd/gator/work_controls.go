@@ -95,7 +95,7 @@ func usageControl(stateDir, action string, args []string) (workapp.ControlScreen
 	if view.KnownCostUSD != nil {
 		lines = append(lines, fmt.Sprintf("Retained provider-reported cost: $%.4f", *view.KnownCostUSD))
 	}
-	for _, category := range []string{"chat", "work", "background", "routing", "retrieval", "code"} {
+	for _, category := range []string{"chat", "work", "background", "routing", "retrieval", "code", "voice"} {
 		lines = append(lines, fmt.Sprintf("%s: %d requests", category, view.Categories[category]))
 		usage.Categories = append(usage.Categories, uisnapshot.UsageCategory{Name: category, Requests: view.Categories[category]})
 	}

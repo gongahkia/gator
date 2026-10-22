@@ -286,7 +286,7 @@ func (s Store) Reserve(now time.Time, category, provider string, tokens int64) (
 		return nil, errors.New("invalid usage reservation")
 	}
 	switch category {
-	case "chat", "background", "routing", "retrieval", "work", "code":
+	case "chat", "background", "routing", "retrieval", "work", "code", "voice":
 	default:
 		category = "work"
 	}

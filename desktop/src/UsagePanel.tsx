@@ -4,7 +4,7 @@ import type { BackendPanel, Usage } from "./protocol";
 import type { DesktopFrame } from "./bridge";
 
 const number = new Intl.NumberFormat();
-const categoryLabels: Record<string, string> = { chat: "Conversations", work: "Tasks", background: "Background jobs", routing: "Routing", retrieval: "Retrieval", code: "Code" };
+const categoryLabels: Record<string, string> = { chat: "Conversations", work: "Tasks", background: "Background jobs", routing: "Routing", retrieval: "Retrieval", code: "Code", voice: "Voice dictation" };
 
 function UsageMeter({ title, used, limit, period }: { title: string; used: number; limit: number; period: string }) {
   const remaining = Math.max(0, limit - used);

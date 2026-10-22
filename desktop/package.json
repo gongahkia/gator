@@ -73,7 +73,10 @@
       "target": [
         "dmg",
         "zip"
-      ]
+      ],
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Gator uses the microphone only when you start dictation. Recorded audio is sent to your selected voice provider for transcription."
+      }
     },
     "linux": {
       "icon": "assets/icon.png",

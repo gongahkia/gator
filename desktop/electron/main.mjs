@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session, shell, systemPreferences } from "electron";
 import { mkdir, access, readFile } from "node:fs/promises";
 import { constants, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -12,6 +12,7 @@ import { DraftStore } from "./drafts.mjs";
 import { runtimeName, stateDirectory } from "./platform.mjs";
 import { Updates, releaseURL, updateBlockReason } from "./updates.mjs";
 import { acquireUpdateGuard } from "./update-guard.mjs";
+import { microphoneAllowed, runSpeechRequest, validateVoiceRequest } from "./voice.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const assets = resolve(here, "../dist");
@@ -34,6 +35,9 @@ let sessionID;
 let updates;
 let updatesOpen = false;
 let updatePreparing = false;
+let microphoneGrant;
+let speechAbort;
+let voiceGeneration = 0;
 
 const runtimeBinary = () => process.env.GATOR_DESKTOP_BINARY || (app.isPackaged ? join(process.resourcesPath, "runtime", runtimeName()) : join(here, "../runtime", runtimeName()));
 const runtimeWorkspace = () => process.env.GATOR_DESKTOP_WORKSPACE || join(app.getPath("userData"), "workspace");
@@ -115,6 +119,7 @@ function createWindow() {
     webPreferences: { preload: join(here, "preload.cjs"), contextIsolation: true, sandbox: true, nodeIntegration: false, webviewTag: false, spellcheck: false },
   });
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+	window.on("closed", () => { microphoneGrant = undefined; speechAbort?.abort(); });
   window.webContents.on("will-navigate", (event) => event.preventDefault());
   window.webContents.on("will-attach-webview", (event) => event.preventDefault());
   window.on("enter-full-screen", update);
@@ -156,8 +161,8 @@ else {
       const path = assetPath(request.url, assets);
       return path ? net.fetch(pathToFileURL(path).href) : new Response("Not found", { status: 404 });
     });
-    session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
-    session.defaultSession.setPermissionCheckHandler(() => false);
+    session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) => callback(microphoneAllowed(window?.webContents, contents, permission, details, microphoneGrant)));
+    session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) => microphoneAllowed(window?.webContents, contents, permission, details, microphoneGrant));
     await configureUpdates();
     const showUpdates = () => { updatesOpen = true; update(); };
     Menu.setApplicationMenu(Menu.buildFromTemplate([
@@ -168,6 +173,36 @@ else {
       { label: "Help", submenu: [{ label: "About & updates…", click: showUpdates }, { label: "Release notes", click: () => void shell.openExternal(releaseURL) }] },
     ]));
     ipcMain.handle("gator:snapshot", (event) => { trusted(event); return snapshot(); });
+    ipcMain.handle("gator:voice", async (event, value) => {
+      mutable(event);
+      const request = validateVoiceRequest(value);
+      const call = (payload, signal) => runSpeechRequest(runtimeBinary(), runtimeWorkspace(), runtimeEnvironment(), payload, signal);
+      if (request.action === "release" || request.action === "cancel") { voiceGeneration++; microphoneGrant = undefined; if (request.action === "cancel") speechAbort?.abort(); return {}; }
+      if (request.action === "status") return call({ action: "status" });
+      if (request.action === "configure") { const result = await call({ action: "configure", preferences: request.preferences }); backend?.refreshPreferences(); return result; }
+      const owner = backend;
+      const context = uploadContext(owner?.state);
+      if (!owner || owner.closed || owner.state?.panel || owner.state?.external || request.context !== context) throw new Error("Return to the same conversation before using dictation.");
+      if (request.action === "authorize") {
+		const generation = ++voiceGeneration;
+        if (speechAbort) throw new Error("Finish the current transcription first.");
+        const status = await call({ action: "status" });
+        if (!status.ready) throw new Error(status.issue || "Configure a voice provider first.");
+        if (process.platform === "darwin" && !await systemPreferences.askForMediaAccess("microphone")) throw new Error("Allow microphone access for Gator in macOS System Settings → Privacy & Security → Microphone.");
+        if (generation !== voiceGeneration || backend !== owner || uploadContext(owner.state) !== context) throw new Error("Dictation was cancelled or the conversation changed before recording started.");
+        microphoneGrant = { context, route: status.route, expires: Date.now() + 130000 };
+        return { ...status, allowed: true };
+      }
+      if (!microphoneGrant || microphoneGrant.context !== context || microphoneGrant.expires < Date.now() || speechAbort) throw new Error("Start dictation from the microphone button before transcribing.");
+      const grant = microphoneGrant;
+      microphoneGrant = undefined;
+      const controller = new AbortController(); speechAbort = controller;
+      try {
+        const result = await call({ action: "transcribe", route: grant.route, recording: { media_type: request.media_type, data: Buffer.from(request.data).toString("base64") } }, controller.signal);
+        if (backend !== owner || uploadContext(owner.state) !== context) throw new Error("The conversation changed. The transcript was not added to another chat.");
+        return result;
+      } finally { if (speechAbort === controller) speechAbort = undefined; }
+    });
     ipcMain.handle("gator:drafts", (event, request) => { mutable(event); return drafts.request(request); });
     ipcMain.handle("gator:updates", async (event, request) => {
       trusted(event);
