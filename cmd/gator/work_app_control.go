@@ -98,6 +98,10 @@ func (c gatorAppController) inspectOutputs(id string) (any, error) {
 			items = append(items, map[string]any{"id": record.ID, "issue": err.Error()})
 			continue
 		}
+		for i := range bundle.Artifacts {
+			bundle.Artifacts[i].Preview = ""
+			bundle.Artifacts[i].PreviewKind = ""
+		}
 		items = append(items, map[string]any{"id": record.ID, "title": record.ObjectiveSummary, "status": bundle.Status, "artifacts": bundle.Artifacts})
 	}
 	return map[string]any{"runs": items, "limit": 20}, nil
