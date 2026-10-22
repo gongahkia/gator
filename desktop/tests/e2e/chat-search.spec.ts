@@ -39,6 +39,11 @@ test("dated chat search highlights literal matches and opens the intended topic 
     const browser = page.getByRole("region", { name: "Conversations", exact: true });
     await expect(browser.getByRole("heading", { name: "Yesterday", exact: true })).toBeVisible();
     await expect(browser.getByText("Titles and folders · up to 50 recent saved conversations", { exact: true })).toBeVisible();
+    const snapshot = await page.evaluate(() => window.gator!.snapshot());
+    await app.evaluate(({ BrowserWindow }, value) => BrowserWindow.getAllWindows()[0].webContents.send("gator:update", value), { ...snapshot, state: { ...snapshot.state!, recent_issue: "List unavailable" } });
+    await expect(browser.getByText(/The conversation list couldn’t refresh/)).toBeVisible();
+    await browser.getByRole("button", { name: "Try again", exact: true }).click();
+    await expect(browser.getByText(/The conversation list couldn’t refresh/)).toHaveCount(0);
     const search = browser.getByRole("searchbox", { name: "Search conversations", exact: true });
     await search.fill("no such title");
     await expect(browser.getByRole("heading", { name: "No matching conversations" })).toBeVisible();
