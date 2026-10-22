@@ -19,6 +19,8 @@ import (
 // BridgeState is a display-only projection for the desktop.
 // The Go model remains the sole owner of commands, runs, approvals and history.
 type BridgeState struct {
+	RequestsRecovered     bool                      `json:"requests_recovered,omitempty"`
+	RequestsIssue         string                    `json:"requests_issue,omitempty"`
 	Composer              ComposerSettings          `json:"composer"`
 	ComposerResult        *ComposerResult           `json:"composer_result,omitempty"`
 	Desktop               appconfig.DesktopSettings `json:"desktop"`
@@ -143,6 +145,8 @@ func (m Model) BridgeState() BridgeState {
 	desktop := m.desktop
 	desktop.Shortcuts = m.desktop.ResolvedShortcuts()
 	state := BridgeState{
+		RequestsRecovered:     m.requestsRecovered,
+		RequestsIssue:         m.requestsIssue,
 		Desktop:               desktop,
 		UploadResult:          m.bridgeUploadResult,
 		Mode:                  "chat",
@@ -178,7 +182,7 @@ func (m Model) BridgeState() BridgeState {
 		Notice:                m.bridgeNotice,
 	}
 	for _, item := range m.queue {
-		state.Queue = append(state.Queue, BridgeQueuedRun{Inputs: uploadNames(item.options.Uploads), ID: bridgeQueuedRunID(item), Text: item.prompt})
+		state.Queue = append(state.Queue, BridgeQueuedRun{Interrupted: item.interrupted, Inputs: uploadNames(item.options.Uploads), ID: bridgeQueuedRunID(item), Text: item.prompt})
 	}
 	state.GuidanceID = m.bridgeGuidanceID()
 	state.WorkDetails = BridgeWorkDetails{

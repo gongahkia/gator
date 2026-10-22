@@ -76,6 +76,7 @@ func (m *Model) beginChat(source string) bool {
 	m.lastBundle = BundleSummary{}
 	m.pendingBundleAction = nil
 	m.options = RunOptions{MaxSteps: 24, Mode: "auto", Code: CodeOptions{MaxSteps: 16, Sandbox: "strict", Network: "deny"}}
+	m.restoreRequests()
 	m.rememberChat()
 	m.refreshBridgeConversations()
 	return true
@@ -118,6 +119,7 @@ func (m *Model) restoreConversation(conversationID, announcement string) {
 	if m.config.CreateConversation != nil {
 		m.home = len(m.messages) == 0
 	}
+	m.restoreRequests()
 	m.rememberChat()
 	m.status = joinConversationStatus(announcement, m.revisionStatus())
 }

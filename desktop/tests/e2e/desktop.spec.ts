@@ -458,6 +458,10 @@ test("queued messages can be edited, reordered, removed, and resumed without los
     page.on("pageerror", (error) => errors.push(error.message));
     const composer = page.getByRole("textbox", { name: "Message Gator" });
     const queue = page.getByRole("region", { name: "Queued messages" });
+    // Startup restores the last chat. Keep the navigation-only saved fixture
+    // separate from the real workspace task exercised here.
+    await page.getByRole("button", { name: "New chat", exact: true }).click();
+    await expect.poll(async () => (await state()).conversation_id).not.toBe("work-saved-topic");
     await composer.fill("Start the first task.");
     await page.getByRole("button", { name: "Send message", exact: true }).click();
     await expect.poll(() => requests.length).toBeGreaterThan(0);
@@ -507,7 +511,7 @@ test("queued messages can be edited, reordered, removed, and resumed without los
     await page.getByRole("button", { name: "Reorder queued message 2", exact: true }).press("Enter");
     await expect(queue.locator(".queue-preview").first()).toHaveText("Second follow-up");
     await composer.fill("Focus on the current task.");
-    await composer.press("Control+Enter");
+    await composer.press("ControlOrMeta+Enter");
     await expect(composer).toHaveValue("");
     await expect(page.locator(".run-progress")).toContainText("Steering submitted to current task");
     await expect(queue.locator(".queued-message")).toHaveCount(2);

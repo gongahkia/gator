@@ -643,11 +643,11 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		if len(m.queue) == 0 {
 			result = "The prompt queue is empty."
 		} else {
-			m.queue = m.queue[1:]
+			err = m.persistQueue(append([]queuedRun(nil), m.queue[1:]...))
 			result = m.queueStatus()
 		}
 	case "/clear-queue":
-		m.queue = nil
+		err = m.persistQueue(nil)
 		result = "Cleared the prompt queue."
 	case "/jobs":
 		if len(fields) == 1 {

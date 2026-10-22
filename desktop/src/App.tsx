@@ -103,6 +103,7 @@ export function App() {
   const [showCommands, setShowCommands] = useState(false);
   const commandReturn = useRef<HTMLElement | null>(null);
   const [sending, setSending] = useState(false);
+  const admission = useRef<{ key: string; id: string } | null>(null);
   const [voiceBusy, setVoiceBusy] = useState(false);
   const [modelBusy, setModelBusy] = useState(false);
   const [approvalBusy, setApprovalBusy] = useState(false);
@@ -266,8 +267,13 @@ export function App() {
     const files = drafts.uploads, context = drafts.context!;
     try {
       if (guide) await queueAction.act({ id: state.guidance_id!, action: "guide", text: draft });
-      else if (files.length) await send({ type: "upload_submit", upload: { request_id: crypto.randomUUID(), context, text: draft, files: files.map((file) => file.id) } });
-      else await send({ type: "submit", text: draft });
+      else if (draft.trimStart().startsWith("/") || draft.trim() === "exit") await send({ type: "submit", text: draft });
+      else {
+        const ids = files.map(file => file.id), key = JSON.stringify([context, draft, ids]);
+        if (admission.current?.key !== key) admission.current = { key, id: crypto.randomUUID() };
+        await send({ type: "upload_submit", upload: { request_id: admission.current.id, context, text: draft, files: ids } });
+        admission.current = null;
+      }
       drafts.clearSent(context, files); setShowCommands(false); atBottom.current = true;
     } catch (err) { setDraftError(err instanceof Error ? err.message : String(err)); }
     finally { setSending(false); composer.current?.focus(); }
@@ -319,7 +325,7 @@ export function App() {
         </div>{!home && !atLatest && <button className="jump-latest" aria-label={newActivity ? "New activity. Jump to latest" : "Jump to latest"} onClick={jumpToLatest}><ArrowDown size={16} />{newActivity && <span>New activity</span>}</button>}</div>
         <div className="composer-area">{state.pending_approval && <div className="approval-reminder"><ShieldCheck size={16} /><span>An action is waiting for your review.</span><button className="small-button" onClick={jumpToLatest}>View request<ArrowDown size={13} /></button></div>}
           {!!slash.length && <div className="slash-suggestions" aria-label="Command suggestions">{slash.map((command) => <button key={command.name} onClick={() => { setDraft(`/${command.name}${command.needs_input ? " " : ""}`); composer.current?.focus(); }}><span>/{command.name}</span><span>{command.description}</span></button>)}</div>}
-          <MessageQueue items={state.queue ?? []} running={state.running} busy={queueAction.busy || sending || !!error || !!state.external} act={queueAction.act} onEditingChange={setQueueEditing} onUseDraft={(text) => { setDraft((current) => current ? `${current}\n\n${text}` : text); composer.current?.focus(); }} />
+          <MessageQueue recovered={state.requests_recovered} issue={state.requests_issue} items={state.queue ?? []} running={state.running} busy={queueAction.busy || sending || !!error || !!state.external} act={queueAction.act} onEditingChange={setQueueEditing} onUseDraft={(text) => { setDraft((current) => current ? `${current}\n\n${text}` : text); composer.current?.focus(); }} />
           {(drafts.recovered || drafts.issue) && <p className="draft-recovery" role="status">{drafts.issue || "Draft recovered. Review it before sending."}</p>}
           <div className="composer" data-file-drop={attachments.dragging} data-voice-busy={voiceBusy} {...attachments.drop}><PendingAttachments files={drafts.uploads} disabled={sending || attachments.busy} remove={(id) => { drafts.setUploads(drafts.uploads.filter((file) => file.id !== id)); setDraftError(""); composer.current?.focus(); }} /><textarea ref={composer} value={draft} onChange={(event) => { setDraft(event.target.value); setDraftError(""); }} onKeyDown={composerKeys} onPaste={event => attachments.paste(event, value => { setDraft(value); setDraftError(""); })} placeholder={state.running ? "Add a follow-up…" : "Message Gator…"} aria-label="Message Gator" disabled={sending || !drafts.ready || !!state.external} rows={2} /><div className="composer-toolbar"><AttachButton busy={attachments.busy} disabled={sending || queueAction.busy || !!error || !!state.external || !!updatePreparing || !drafts.ready || drafts.uploads.length >= 4} choose={() => void attachments.choose().then(() => composer.current?.focus())} /><button className="icon-button composer-options" aria-label="Conversation options" title="Conversation options" onClick={() => openDetails("info")}><SlidersHorizontal size={17} /></button><button className="icon-button draft-trigger" aria-label="Saved drafts" title={drafts.saving ? "Saving draft…" : "Saved drafts and local retention"} onClick={() => { setShowDrafts(true); void drafts.manage({ action: "list" }).catch(() => {}); }}><Clock3 size={16} /></button><div className="composer-actions"><ModelPicker state={state} disabled={sending || voiceBusy || queueAction.busy || !!error || !!state.external || !!updatePreparing || !drafts.ready} send={send} manage={() => navigate("/model")} onBusyChange={setModelBusy} /><VoiceControls context={drafts.context} speakingContext={state.primary ? `primary:${state.source}` : conversationIdentity} disabled={sending || queueAction.busy || !!error || !!state.external || !!updatePreparing || !drafts.ready || showCommands || showDrafts || !!updatesOpen || !!navigation} preferences={state.desktop?.voice} messages={state.messages} running={state.running} shortcuts={state.desktop?.shortcuts} onBusyChange={setVoiceBusy} onTranscript={text => { setDraft(current => current ? `${current}${/\s$/.test(current) ? "" : " "}${text}` : text); setDraftError(""); requestAnimationFrame(() => composer.current?.focus()); }} />
             {state.running && <button className="small-button guide-button" title={drafts.uploads.length ? "Files will be sent with a queued follow-up" : `Guide the current task (${shortcutLabel("guide_work", state.desktop?.shortcuts)})`} disabled={!draft.trim() || !!drafts.uploads.length || sending || modelBusy || dirtyFiles.size > 0 || attachments.busy || queueAction.busy || !state.guidance_id || !!error || !!state.external} onClick={() => void submit(true)}>Guide now</button>}

@@ -19,7 +19,7 @@ Objective: implement the code changes in the [22 October gap audit](COMPETITIVE_
 | G11 | Integrated browser readiness/state/private sign-in/takeover, scoped browsing authority and representative workflow tests | Pending |
 | G12 | Paginated/searchable chats, rename/archive/pin, scoped cross-chat files; retrieval over hundreds of records | Pending |
 | G13 | Release/update lifecycle, supervisor drain/restart and native platform gates; signed distribution requires external accounts | Pending |
-| G14 | Authenticated remote execution option with explicit ownership/availability; client-off completion and local-resource boundaries | Pending |
+| G14 | Authenticated remote execution option with explicit ownership/availability; client-off completion and local-resource boundaries | Direction chosen: self-hosted companion on an always-on machine |
 | G15 | Authenticated remote conversation/update/decision surface, revocation, offline delivery and deduplication | Pending |
 | G16 | Useful conversational voice/steering, interruption and transcript correction; inspectable personal style | Pending |
 | G17 | Save/test/version/revert reusable procedures from successful tasks; skills remain separate from permissions | Pending |
@@ -35,6 +35,9 @@ Objective: implement the code changes in the [22 October gap audit](COMPETITIVE_
 
 Use the current React/CSS/Lucide conventions, neutral text-field focus, keyboard command palette, compact chat and inline files. Do not revive the retired user CLI. Credentials, production signings, real-account operations and independent user judgments cannot be manufactured by code changes; record their status accurately while completing all independent work.
 
+Remote direction confirmed by the user: a self-hosted companion on an always-on machine. That machine owns remote execution and its own accessible files/accounts; a laptop connection is a client. Do not imply that a remote task can access an offline laptop's files or that local tasks automatically migrate. Authentication, revocation, original-chat routing and retry receipts are required before remote control is usable.
+
 ## Completed changes and verification
 
-- Admission storage: private, bounded per-chat message journals; atomic generation checks for edits/reorders/admission; independent execution leases released by process exit. `go test -race ./internal/worksession` passed, including concurrent writers, stale changes, corruption, retained options and cross-process ownership. Desktop integration/recovery behavior is still in progress.
+- Admission storage: private, bounded per-chat message journals; atomic generation checks for edits/reorders/admission; independent execution leases released by process exit. `go test -race ./internal/worksession` passed, including concurrent writers, stale changes, corruption, retained options and cross-process ownership.
+- Desktop admission/recovery: messages are acknowledged after durable admission; transport retries reuse their identity. Queued text, settings and upload references survive restart. Interrupted work is paused with an explicit uncertainty notice; retry creates a new linked attempt. Old files referenced by pending requests or saved drafts are protected from attachment cleanup. Corrupt/stale journals reject submission and preserve the draft. `go test ./...`, targeted race tests, TypeScript checks, Electron upload/recovery tests and a renderer build passed. Recovery was inspected at wide and minimum window sizes. These scripted local-provider tests verify interaction and retention, not live model quality or automatic execution checkpoint recovery.

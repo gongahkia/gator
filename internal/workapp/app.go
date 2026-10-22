@@ -118,10 +118,10 @@ type BundleActionRequest struct {
 // one prompt. They configure Gator and bound its internal Code specialist;
 // they are never editable by the manager model itself.
 type RunOptions struct {
-	Context                 context.Context
-	OnEvent                 agent.EventSink
-	Steering                <-chan string
-	OnOperation             func(*workrun.Operation)
+	Context                 context.Context          `json:"-"`
+	OnEvent                 agent.EventSink          `json:"-"`
+	Steering                <-chan string            `json:"-"`
+	OnOperation             func(*workrun.Operation) `json:"-"`
 	MaxSteps                int
 	Attachments             []string
 	Uploads                 []string
@@ -303,9 +303,11 @@ type composerEditorDone struct {
 }
 
 type queuedRun struct {
-	id      uint64
-	prompt  string
-	options RunOptions
+	id          uint64
+	prompt      string
+	options     RunOptions
+	requestID   string
+	interrupted bool
 }
 
 type pendingBundleAction struct {
@@ -360,6 +362,12 @@ type Model struct {
 	options                RunOptions
 	queue                  []queuedRun
 	queueSequence          uint64
+	requests               worksession.RequestJournal
+	activeRequest          string
+	nextRequest            string
+	submissionID           string
+	requestsRecovered      bool
+	requestsIssue          string
 	bridgeQueueResult      *BridgeQueueResult
 	lastOutput             string
 	lastBundle             BundleSummary

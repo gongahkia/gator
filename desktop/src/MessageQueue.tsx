@@ -40,8 +40,8 @@ export function useQueueAction(state: BackendState | undefined, send: (frame: De
   return { act, busy };
 }
 
-export function MessageQueue({ items, running, busy, act, onUseDraft, onEditingChange }: {
-  items: QueuedMessage[]; running: boolean; busy: boolean; act(change: QueueChange): Promise<void>; onUseDraft(text: string): void; onEditingChange(editing: boolean): void;
+export function MessageQueue({ items, running, busy, recovered, issue, act, onUseDraft, onEditingChange }: {
+  items: QueuedMessage[]; running: boolean; busy: boolean; recovered?: boolean; issue?: string; act(change: QueueChange): Promise<void>; onUseDraft(text: string): void; onEditingChange(editing: boolean): void;
 }) {
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
   const [error, setError] = useState("");
@@ -118,10 +118,12 @@ export function MessageQueue({ items, running, busy, act, onUseDraft, onEditingC
     setAnnouncement(`Position ${position + 1} of ${items.length}. Press Enter to move this message here.`);
   };
   const dropPosition = (event: DragEvent<HTMLLIElement>) => event.clientY < event.currentTarget.getBoundingClientRect().top + event.currentTarget.offsetHeight / 2 ? "before" as const : "after" as const;
-  if (!items.length && !editing && !error) return null;
+  if (!items.length && !editing && !error && !issue) return null;
   const stale = editing && !items.some((item) => item.id === editing.id);
   return <section className="message-queue" aria-label="Queued messages" tabIndex={-1} ref={region} onBlur={(event) => { if (drag?.keyboard && !event.currentTarget.contains(event.relatedTarget as Node | null)) { setDrag(null); setAnnouncement("Reordering cancelled."); } }}>
     <div className="queue-heading"><ListOrdered size={14} /><span role="status">{items.length ? `${items.length} queued` : editing ? "Unsent edits" : "Queue changed"}</span>{!running && items.length > 0 && <span className="queue-paused">Paused</span>}</div>
+  {recovered && items.length > 0 && <p className="queue-recovery">Saved messages restored. Choose a message to send when you’re ready.</p>}
+  {issue && <p className="queue-error" role="alert">{issue}</p>}
     <p id={instructions} className="sr-only">Drag to reorder. With the keyboard, press Space or Enter to pick up a message, use arrow keys to choose a position, then Enter to drop. Escape cancels.</p>
     <p className="sr-only" role="status" aria-live="polite">{announcement}</p>
     <ol className="queue-list" onDragOver={(event) => {
@@ -151,9 +153,9 @@ export function MessageQueue({ items, running, busy, act, onUseDraft, onEditingC
         event.dataTransfer.setData("application/x-gator-queued-message", item.id);
         event.dataTransfer.setDragImage(event.currentTarget.closest("li")!, 20, 20);
       }} onDragEnd={() => setDrag(null)}><GripVertical size={16} /></button>}
-      <span className="queue-position" aria-hidden="true">{index + 1}</span><div className="queue-message"><p className="queue-preview">{item.text}</p><InputFiles names={item.inputs} /></div>
+      <span className="queue-position" aria-hidden="true">{index + 1}</span><div className="queue-message"><p className="queue-preview">{item.text}</p><InputFiles names={item.inputs} />{item.interrupted && <p className="queue-interrupted">Interrupted · Check retained work before sending again. Some actions may already have completed.</p>}</div>
       <div className="queue-actions">
-        {!running && <button className="icon-button" aria-label={`Send queued message ${index + 1} now`} title="Send now" disabled={busy} onClick={() => void change({ id: item.id, action: "run" })}><CornerDownLeft size={15} /></button>}
+        {!running && <button className="icon-button" aria-label={item.interrupted ? `Retry interrupted message ${index + 1}` : `Send queued message ${index + 1} now`} title={item.interrupted ? "Send again as a new attempt" : "Send now"} disabled={busy || !!issue} onClick={() => void change({ id: item.id, action: "run" })}><CornerDownLeft size={15} /></button>}
         <button className="icon-button" aria-label={`Edit queued message ${index + 1}`} title="Edit message" disabled={busy || !!editing} onClick={() => { setError(""); setEditing({ ...item }); }}><Pencil size={14} /></button>
         <button className="icon-button" aria-label={`Remove queued message ${index + 1}`} title="Remove message" disabled={busy} onClick={() => void change({ id: item.id, action: "remove" })}><X size={15} /></button>
       </div>

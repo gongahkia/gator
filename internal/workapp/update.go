@@ -246,6 +246,7 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 		m.lastWorkID = m.operation.RunID
 	}
 	wasCancelling := m.cancelling
+	m.finishRequest(value, wasCancelling)
 	if m.cancel != nil {
 		m.cancel()
 	}
@@ -377,15 +378,8 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	if value.Error == "" && !wasCancelling && len(m.queue) > 0 && m.config.Run != nil {
-		next := m.queue[0]
-		m.queue = m.queue[1:]
-		m.messages = append(m.messages, message{role: "You", text: next.prompt})
-		m.running = true
-		m.status = fmt.Sprintf("Working from an immutable snapshot… · %d queued", len(m.queue))
-		next.options.PreviousArtifacts = m.previousArtifactPaths()
-		source, conversation := m.source, m.conversation
-		return m.startWork(source, conversation, next.prompt, next.options)
+	if value.Error == "" && !wasCancelling && len(m.queue) > 0 && m.config.Run != nil && !m.requestsRecovered && m.requestsIssue == "" && !m.queue[0].interrupted {
+		return m.runQueued(0)
 	}
 	if len(m.queue) > 0 && (value.Error != "" || wasCancelling) {
 		m.status = fmt.Sprintf("Run stopped · %d queued prompt(s) paused", len(m.queue))
@@ -807,7 +801,14 @@ func (m Model) submitRunningInput() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.queueSequence++
-	m.queue = append(m.queue, queuedRun{id: m.queueSequence, prompt: prompt, options: cloneRunOptions(m.options)})
+	queue := append(append([]queuedRun(nil), m.queue...), queuedRun{id: m.queueSequence, prompt: prompt, options: cloneRunOptions(m.options)})
+	if err := m.persistQueue(queue); err != nil {
+		m.bridgeNotice = "Message not queued: " + err.Error()
+		if m.bridgeUploadResult != nil {
+			m.bridgeUploadResult.Error = m.bridgeNotice
+		}
+		return m, nil
+	}
 	m.recordPrompt(prompt)
 	m.options.Attachments = nil
 	m.options.Uploads = nil

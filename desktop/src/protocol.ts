@@ -35,7 +35,7 @@ export type BackendCommand = { name: string; description: string; advanced: bool
 export type ActivityEntry = { id: string; kind: "text" | "tool" | "status"; text?: string; tool?: string; state: "running" | "completed" | "failed" | "stopped"; started_at: string; finished_at?: string };
 export type BackendActivity = { started_at: string; finished_at?: string; state: "running" | "completed" | "failed" | "stopped"; entries: ActivityEntry[]; truncated?: boolean };
 export type BackendMessage = { activity?: BackendActivity; inputs?: string[]; input_ids?: string[]; role: string; text: string; bundle?: BackendBundle; result?: BackendResult };
-export type QueuedMessage = { id: string; text: string; inputs?: string[] };
+export type QueuedMessage = { id: string; text: string; inputs?: string[]; interrupted?: boolean };
 export type QueueAction = {
   request_id: string; id: string; action: "edit" | "remove" | "earlier" | "later" | "move" | "run" | "guide"; text?: string;
   target_id?: string; placement?: "before" | "after";
@@ -86,7 +86,7 @@ export type ComposerAction = { id: string; request_id: string } & ({ action: "mo
 export type BackendState = {
   composer?: ComposerSettings;
   composer_result?: { request_id: string; error?: string };
-	 desktop?: { shortcuts: Record<string,string>; voice?: { spoken_replies: boolean; provider?: string; model?: string; language?: string; rate?: number } };
+  desktop?: { shortcuts: Record<string,string>; voice?: { spoken_replies: boolean; provider?: string; model?: string; language?: string; rate?: number } };
   mode: "chat" | "panel";
   panel?: BackendPanel;
   messages: BackendMessage[];
@@ -126,6 +126,8 @@ export type BackendState = {
   loading_frame: number;
   queued: number;
   queue: QueuedMessage[];
+  requests_recovered?: boolean;
+  requests_issue?: string;
   queue_result?: { request_id: string; error?: string };
   guidance_id?: string;
   home: boolean;

@@ -1,11 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { UploadStore, validUploadID, uploadContext } from "../electron/uploads.mjs";
 import { validateFrame } from "../electron/policy.mjs";
 import { DraftStore } from "../electron/drafts.mjs";
+import { retainedRequestUploads } from "../electron/request-retention.mjs";
 
 test("selected files become private independent copies and attachment-only drafts survive restart", async () => {
   const root = await mkdtemp(join(tmpdir(), "gator-uploads-"));
@@ -50,8 +51,29 @@ test("imports reject unsupported, oversized and excessive inputs without leaving
 test("upload submission carries bounded opaque identities and a conversation binding", () => {
   const upload = { request_id: "send-1", context: "conversation:one", text: "Read this", files: [`${"a".repeat(32)}/plan.txt`] };
   assert.equal(validateFrame({ type: "upload_submit", upload }).version, 1);
+  assert.equal(validateFrame({ type: "upload_submit", upload: { ...upload, files: [] } }).version, 1);
+  assert.throws(() => validateFrame({ type: "upload_submit", upload: { ...upload, files: [], text: " " } }));
   for (const change of [{ files: ["/private/secret.txt"] }, { files: Array(5).fill(upload.files[0]) }, { text: "x".repeat(131073) }, { request_id: "" }, { program: "sh" }]) assert.throws(() => validateFrame({ type: "upload_submit", upload: { ...upload, ...change } }));
   assert.equal(uploadContext({ source: "/project", primary: true }), "workspace:/project");
   assert.equal(uploadContext({ source: "/project", primary: false }), "workspace:topic:/project");
   assert.equal(uploadContext({ conversation_id: "one", source: "/project" }), "conversation:one");
+});
+
+test("cleanup keeps files belonging to admitted messages and defers unreadable journals", async () => {
+  const root = await mkdtemp(join(tmpdir(), "gator-retained-uploads-"));
+  try {
+    const uploads = new UploadStore(join(root, "uploads")), chats = join(root, "conversations");
+    const pending = await uploads.importContent("pending.txt", Buffer.from("Keep while queued"));
+    const unused = await uploads.importContent("unused.txt", Buffer.from("Expired unselected file"));
+    for (const file of [pending, unused]) await utimes(join(uploads.root, file.id.split("/")[0]), 0, 0);
+    await mkdir(join(chats, "one"), { recursive: true });
+    const path = join(chats, "one", "requests.json");
+    await writeFile(path, JSON.stringify({ version: 1, requests: [{ state: "interrupted", options: { Uploads: [pending.id] } }] }));
+    await uploads.prune(Date.now(), await retainedRequestUploads(chats));
+    await uploads.check([pending.id]);
+    await assert.rejects(uploads.check([unused.id]));
+    await writeFile(path, "broken");
+    await assert.rejects(retainedRequestUploads(chats));
+    await uploads.check([pending.id]);
+  } finally { await rm(root, { recursive: true, force: true }); }
 });

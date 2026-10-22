@@ -234,6 +234,8 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .queue-heading { display: flex; flex-shrink: 0; align-items: center; gap: 7px; padding: 10px 14px 4px; color: var(--color-muted); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
 .queue-heading > svg { color: var(--color-muted); }
 .queue-paused { margin-left: auto; font-size: var(--text-xs); color: var(--color-warning); }
+.queue-recovery { padding: 4px 14px 8px; color: var(--color-muted); font-size: var(--text-sm); line-height: 1.5; }
+.queue-interrupted { color: var(--color-warning); font-size: var(--text-xs); line-height: 1.5; padding: 3px 0; }
 .queue-list { flex: 0 1 auto; min-height: 0; list-style: none; margin: 0; padding: 0 6px 6px; max-height: min(240px, 28vh); overflow-y: auto; overscroll-behavior: contain; }
 .queued-message { position: relative; display: flex; align-items: center; min-width: 0; gap: 8px; padding: 4px 4px 4px 8px; border-radius: 6px; }
 .queued-message + .queued-message { border-top: 1px solid #ffffff06; }

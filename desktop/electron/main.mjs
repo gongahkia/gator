@@ -16,6 +16,7 @@ import { microphoneAllowed, runSpeechRequest, validateVoiceRequest } from "./voi
 import { FileStore, readBoundedFile, validateFileRequest } from "./files.mjs";
 import { selectedFileSource } from "./file-sources.mjs";
 import { importPastedImages, validatePastedImages } from "./pasted-images.mjs";
+import { retainedRequestUploads } from "./request-retention.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const assets = resolve(here, "../dist");
@@ -124,7 +125,7 @@ function createWindow() {
     webPreferences: { preload: join(here, "preload.cjs"), contextIsolation: true, sandbox: true, nodeIntegration: false, webviewTag: false, spellcheck: false },
   });
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-	window.on("closed", () => { microphoneGrant = undefined; speechAbort?.abort(); });
+  window.on("closed", () => { microphoneGrant = undefined; speechAbort?.abort(); });
   window.webContents.on("will-navigate", (event) => event.preventDefault());
   window.webContents.on("will-attach-webview", (event) => event.preventDefault());
   window.on("enter-full-screen", update);
@@ -213,7 +214,7 @@ else {
       const context = uploadContext(owner?.state);
       if (!owner || owner.closed || owner.state?.panel || owner.state?.external || request.context !== context) throw new Error("Return to the same conversation before using dictation.");
       if (request.action === "authorize") {
-		const generation = ++voiceGeneration;
+        const generation = ++voiceGeneration;
         if (speechAbort) throw new Error("Finish the current transcription first.");
         const status = await call({ action: "status" });
         if (!status.ready) throw new Error(status.issue || "Configure a voice provider first.");
@@ -246,7 +247,7 @@ else {
       validateFrame(frame);
       if (frame.type !== "upload_submit") return backend.send(frame);
       const owner = backend;
-      await uploads.check(frame.upload.files);
+      if (frame.upload.files.length) await uploads.check(frame.upload.files);
       mutable(event);
       if (backend !== owner || owner.closed || uploadContext(owner.state) !== frame.upload.context) throw new Error("The conversation changed. Review your attachments before sending.");
       return owner.submitUpload(frame);
@@ -324,7 +325,12 @@ else {
       try { failure = await terminalHandoff(job); } catch (error) { failure = `Could not complete the terminal action: ${error.message}`; }
       finally { terminalBusy = false; owner.finishExternal(failure); update(); }
     });
-    await uploads.prune();
+    try {
+      const retained = await retainedRequestUploads(join(stateRoot, "gator", "conversations"));
+      const saved = await drafts.request({ action: "list" });
+      for (const draft of saved.drafts) for (const file of draft.uploads ?? []) retained.add(file.id);
+      await uploads.prune(Date.now(), retained);
+    } catch { console.warn("Attachment cleanup deferred because retained references could not be read."); }
     await startBackend();
     createWindow();
   }).catch((error) => { console.error("Gator could not start:", error.message); dialog.showErrorBox("Gator could not start", error.message); app.exit(1); });

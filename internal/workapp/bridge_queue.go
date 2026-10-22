@@ -9,9 +9,10 @@ import (
 )
 
 type BridgeQueuedRun struct {
-	Inputs []string `json:"inputs,omitempty"`
-	ID     string   `json:"id"`
-	Text   string   `json:"text"`
+	Interrupted bool     `json:"interrupted,omitempty"`
+	Inputs      []string `json:"inputs,omitempty"`
+	ID          string   `json:"id"`
+	Text        string   `json:"text"`
 }
 
 type BridgeQueueAction struct {
@@ -31,6 +32,9 @@ type BridgeQueueResult struct {
 }
 
 func bridgeQueuedRunID(item queuedRun) string {
+	if item.requestID != "" {
+		return fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("%s:%d:%s", item.requestID, item.id, item.prompt))))
+	}
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("%d:%s", item.id, item.prompt))))
 }
 
@@ -83,6 +87,8 @@ func (m Model) ApplyBridgeQueue(action BridgeQueueAction) (tea.Model, tea.Cmd) {
 	if index < 0 {
 		return fail("This message has already left the queue or changed. Your edits are still here.")
 	}
+	priorQueue := m.queue
+	m.queue = append([]queuedRun(nil), m.queue...)
 	switch action.Action {
 	case "edit":
 		text := strings.TrimSpace(action.Text)
@@ -132,16 +138,13 @@ func (m Model) ApplyBridgeQueue(action BridgeQueueAction) (tea.Model, tea.Cmd) {
 		if m.running || m.cancelling || m.config.Run == nil {
 			return fail("Wait for the current task to stop before sending this message.")
 		}
-		next := m.queue[index]
-		m.queue = append(m.queue[:index], m.queue[index+1:]...)
-		m.home = false
-		m.messages = append(m.messages, message{role: "You", text: next.prompt})
-		m.running = true
-		m.status = fmt.Sprintf("Working from an immutable snapshot… · %d queued", len(m.queue))
-		next.options.PreviousArtifacts = m.previousArtifactPaths()
-		return m.startWork(m.source, m.conversation, next.prompt, next.options)
+		return m.runQueued(index)
 	default:
 		return fail("Unknown queue action.")
+	}
+	if err := m.persistQueue(m.queue); err != nil {
+		m.queue = priorQueue
+		return fail(err.Error())
 	}
 	return m, nil
 }

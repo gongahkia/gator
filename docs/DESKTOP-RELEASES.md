@@ -61,7 +61,11 @@ Draft writes finish before preparation. A failed preparation reconnects only if
 the old session actually exited, and never replays a request. Installer errors
 reported while the host is alive attempt the same recovery. After the OS takes
 over installation, native failure/relaunch handling still needs platform tests.
-Foreground runs and in-memory queues are not promised to resume after restart.
+Admitted messages and captured queue settings are retained per conversation.
+After restart, queued messages remain paused for explicit selection; a run whose
+completion was not recorded is shown as interrupted. It may already have made
+external changes, so it is never replayed automatically. Retrying creates a new
+attempt. This restores the request, not the prior model's execution checkpoint.
 
 Relative profile overrides retain their existing platform interpretation:
 workspace-relative on Unix, host-resolved in the Windows preview. The guard uses

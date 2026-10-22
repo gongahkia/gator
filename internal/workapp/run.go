@@ -38,6 +38,11 @@ func (m Model) workElapsed() string {
 }
 
 func (m Model) startWork(source, conversation, prompt string, options RunOptions) (tea.Model, tea.Cmd) {
+	release, err := m.admitRun(prompt, options)
+	if err != nil {
+		m.admissionFailed(err)
+		return m, nil
+	}
 	if len(m.messages) > 0 && m.messages[len(m.messages)-1].role == "You" {
 		m.messages[len(m.messages)-1].inputs = uploadNames(options.Uploads)
 		m.messages[len(m.messages)-1].inputIDs = append([]string(nil), options.Uploads...)
@@ -47,7 +52,7 @@ func (m Model) startWork(source, conversation, prompt string, options RunOptions
 	m.activity = workactivity.New(m.runStarted)
 	m.cancelling = false
 	if !m.config.Live {
-		return m, func() tea.Msg { return runDone(m.config.Run(source, conversation, prompt, options)) }
+		return m, func() tea.Msg { defer release(); return runDone(m.config.Run(source, conversation, prompt, options)) }
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	events := make(chan tea.Msg, 128)
@@ -74,7 +79,11 @@ func (m Model) startWork(source, conversation, prompt string, options RunOptions
 	}
 	run := m.config.Run
 	return m, tea.Batch(func() tea.Msg {
+		defer release()
 		result := run(source, conversation, prompt, options)
+		// The event loop may immediately start the next admitted request.
+		// Release the completed run's lease before publishing its completion.
+		release()
 		events <- runDone(result)
 		return nil
 	}, waitWorkEvent(events), m.nextLoadingTick())

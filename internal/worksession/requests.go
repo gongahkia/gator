@@ -23,6 +23,8 @@ import (
 // reading this journal never starts work.
 type Request struct {
 	ID         string          `json:"id"`
+	ClientID   string          `json:"client_id,omitempty"`
+	RetryOf    string          `json:"retry_of,omitempty"`
 	Edit       uint64          `json:"edit"`
 	Text       string          `json:"text"`
 	Options    json.RawMessage `json:"options"`
@@ -63,12 +65,23 @@ func (r Request) Pending() bool {
 }
 
 func validateRequest(r Request) error {
+	if r.RetryOf != "" {
+		id, err := hex.DecodeString(r.RetryOf)
+		if err != nil || len(id) != 16 || r.RetryOf == r.ID {
+			return errors.New("invalid retry identity")
+		}
+	}
+	if len(r.ClientID) > 64 || strings.IndexFunc(r.ClientID, func(c rune) bool {
+		return !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '-')
+	}) >= 0 {
+		return errors.New("invalid message admission identity")
+	}
 	id, err := hex.DecodeString(r.ID)
 	if err != nil || len(id) != 16 || r.Edit == 0 || strings.TrimSpace(r.Text) == "" || len(r.Text) > 128*1024 || len(r.Options) > 128*1024 || !json.Valid(r.Options) || len(r.Options) == 0 || r.Options[0] != '{' || r.CreatedAt.IsZero() || r.UpdatedAt.Before(r.CreatedAt) || len(r.Issue) > 4096 {
 		return errors.New("invalid retained message")
 	}
 	switch r.State {
-	case "queued", "running", "interrupted", "completed", "failed", "stopped", "discarded":
+	case "queued", "running", "interrupted", "completed", "failed", "stopped", "discarded", "retried":
 		return nil
 	default:
 		return errors.New("invalid message state")
@@ -80,6 +93,7 @@ func validateRequests(j RequestJournal) error {
 		return errors.New("invalid message journal")
 	}
 	seen, pending, running := map[string]bool{}, 0, 0
+	clients := map[string]bool{}
 	for _, r := range j.Requests {
 		if err := validateRequest(r); err != nil {
 			return err
@@ -88,6 +102,12 @@ func validateRequests(j RequestJournal) error {
 			return errors.New("duplicate message identity")
 		}
 		seen[r.ID] = true
+		if r.ClientID != "" {
+			if clients[r.ClientID] {
+				return errors.New("duplicate message admission identity")
+			}
+			clients[r.ClientID] = true
+		}
 		if r.Pending() {
 			pending++
 		}
@@ -157,6 +177,10 @@ func (s Store) SaveRequests(id string, next RequestJournal) (RequestJournal, err
 		return RequestJournal{}, errors.New("message journal generation exhausted")
 	}
 	next.Generation++
+	payload, err := json.MarshalIndent(next, "", "  ")
+	if err != nil || len(payload) >= maxRequestJournalBytes {
+		return RequestJournal{}, errors.New("retained messages exceed the journal limit")
+	}
 	if err := writeJSON(filepath.Join(s.root, id, "requests.json"), next); err != nil {
 		return RequestJournal{}, err
 	}

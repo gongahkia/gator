@@ -75,6 +75,19 @@ model. Model selection is saved for subsequent requests; effort keeps the existi
 conversation/session behavior. Current and queued work must finish before either
 setting changes. Drafts and attachments stay in the composer.
 
+## Message recovery
+
+The composer clears ordinary messages only after the runtime confirms admission
+to the private conversation journal. Queued messages retain their text, order,
+edits, settings and attachment references across a restart. Restored messages
+stay paused; choose an individual message to send or remove it.
+
+Interrupted requests are identified separately because earlier actions may have
+completed before the connection was lost. They are not replayed automatically.
+An explicit retry creates a new attempt, retaining the interrupted receipt.
+This does not restore a model's in-flight execution checkpoint. Files referenced
+by pending requests are protected from automatic attachment cleanup.
+
 ## Files inside chat
 
 Click an attached or generated file to open it directly in its message. The
