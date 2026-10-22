@@ -520,3 +520,44 @@ Verification:
 
 **Verdict: Approve for the exercised macOS presentation scope.** Windows/Linux,
 physical-microphone accuracy and screen-reader execution were not repeated.
+
+## ASCII atmosphere throughout chat
+
+22 October 2026. Restored the existing pulsating Tide field after the first
+message, as requested. One viewport-sized canvas now lives behind the transcript
+scroller in both home and chat; it keeps its animation clock when the first
+message arrives. Chat uses 45% of the landing field's intensity, fading between
+the two treatments. Text bubbles, controls and the composer remain above it.
+Click ripples remain removed. Settings keep their existing presentation.
+
+Full scoped `make-interfaces-feel-better` review: `desktop/src/App.tsx` and
+`desktop/src/styles.css`, using the existing React/native CSS/canvas stack.
+
+| Category | Evidence inspected | Result |
+| --- | --- | --- |
+| Typography | Short and long chat replies, Markdown headings/lists, composer draft | Existing type and opaque message surfaces remain readable |
+| Surfaces | Landing/chat transition, scrolled chat, 800×650 screenshot and composer controls | One isolated background layer; no pointer interception or horizontal overflow |
+| Animations | Existing canvas clock at 10% playback, live pixel updates and reduced-motion frames | Pulse continues into chat; reduced motion is stationary after layout settles |
+| Icons | Existing message actions and jump-to-latest control over the field | No icon changes; controls remain clickable above the canvas |
+| Performance | Canvas bounds with 18-message inspection and 300-message regression | Canvas stays viewport-sized; no canvas per message or React render per frame; existing hidden-window pause retained |
+
+| Severity | Location | Before | After | Why |
+| --- | --- | --- | --- | --- |
+| MEDIUM | `desktop/src/App.tsx:280` | The atmospheric field disappeared when chat replaced the landing view | Shared canvas outside the home/chat content branch | Preserve continuity without restarting the effect |
+| LOW | `desktop/src/styles.css:618` | Landing strength would compete with sustained reading | Quieter background with an isolated stacking context and no pointer events | Keep the requested atmosphere while preserving the conversation's hierarchy |
+
+Considered and rejected: a canvas inside each message would multiply work;
+placing it on the whole app would affect settings/sidebar; restoring click
+ripples would reverse the user's earlier removal request.
+
+Verification: TypeScript check, UI build and macOS packaging passed.
+`npm run test:e2e -- desktop.spec.ts --grep 'long conversations retain context'
+--reporter=line` passed (one check, 5.0 seconds). Isolated packaged-app inspection
+verified canvas identity across home/chat, changing pixels at 10% playback,
+viewport-sized bounds, typing, jump-to-latest, narrow layout and stationary
+reduced-motion rendering. The initial static-frame comparison preceded a pending
+resize redraw; comparing after layout settled passed. Screenshots were inspected.
+
+**Verdict: Approve for this macOS scope.** Windows/Linux and screen-reader
+execution were not repeated. File preview/editing remains a separate proposal
+in [Files inside Gator chat](INLINE-FILES-RESEARCH.md), pending user verification.
