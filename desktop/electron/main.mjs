@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session, shell } from "electron";
-import { mkdir, access } from "node:fs/promises";
-import { constants } from "node:fs";
+import { mkdir, access, readFile } from "node:fs/promises";
+import { constants, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createHash, randomUUID } from "node:crypto";
@@ -9,6 +9,8 @@ import { APP_URL, assetPath, externalURL } from "./policy.mjs";
 import { terminalHandoff } from "./terminal.mjs";
 import { DraftStore } from "./drafts.mjs";
 import { runtimeName, stateDirectory } from "./platform.mjs";
+import { Updates, releaseURL, updateBlockReason } from "./updates.mjs";
+import { acquireUpdateGuard } from "./update-guard.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const assets = resolve(here, "../dist");
@@ -27,40 +29,73 @@ let terminalBusy = false;
 let closing = false;
 let starting;
 let sessionID;
+let updates;
+let updatesOpen = false;
+let updatePreparing = false;
+
+const runtimeBinary = () => process.env.GATOR_DESKTOP_BINARY || (app.isPackaged ? join(process.resourcesPath, "runtime", runtimeName()) : join(here, "../runtime", runtimeName()));
+function runtimeEnvironment() {
+  const environment = { ...process.env, GATOR_STATE_DIR: stateRoot, GATOR_DESKTOP_DRAFT_DIR: join(app.getPath("userData"), "drafts") };
+  for (const key of ["GATOR_CONFIG_DIR", "XDG_CONFIG_HOME"]) if (environment[key]?.trim()) environment[key] = resolve(environment[key]);
+  return environment;
+}
 
 function update() {
   if (window && !window.isDestroyed()) window.webContents.send("gator:update", snapshot());
 }
 function snapshot() {
-  return { state: backend?.state, error: backend?.closed ? backend.failure : undefined, connection: backend?.closed ? "disconnected" : backend?.state ? "connected" : "starting", sessionID, terminalBusy, fullScreen: window?.isFullScreen() ?? false };
+  return { state: backend?.state, error: backend?.closed ? backend.failure : undefined, connection: backend?.closed ? "disconnected" : backend?.state ? "connected" : "starting", sessionID, terminalBusy, fullScreen: window?.isFullScreen() ?? false, updates: updates?.snapshot(), updatesOpen, updatePreparing };
 }
 function trusted(event) {
   if (!window || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || event.senderFrame.url !== APP_URL) throw new Error("Untrusted desktop request");
 }
+function mutable(event) { trusted(event); if (updatePreparing) throw new Error("Gator is preparing to restart. Please wait."); }
 async function startBackend() {
   if (starting) return starting;
   starting = (async () => {
     if (backend && !backend.closed) await backend.stop();
-    const binary = process.env.GATOR_DESKTOP_BINARY || (app.isPackaged ? join(process.resourcesPath, "runtime", runtimeName()) : join(here, "../runtime", runtimeName()));
+    const binary = runtimeBinary();
     await access(binary, constants.X_OK);
     // A desktop launch never implicitly captures the user's home directory.
     const workspace = process.env.GATOR_DESKTOP_WORKSPACE || join(app.getPath("userData"), "workspace");
     if (!process.env.GATOR_DESKTOP_WORKSPACE) await mkdir(workspace, { recursive: true, mode: 0o700 });
-    const environment = { ...process.env, GATOR_DESKTOP_DRAFT_DIR: join(app.getPath("userData"), "drafts") };
-    if (process.platform === "win32") {
-      // The runtime starts in the workspace. Resolve profile overrides in the
-      // host first so relative values agree with the draft profile identity.
-      environment.GATOR_STATE_DIR = stateRoot;
-      for (const key of ["GATOR_CONFIG_DIR", "XDG_CONFIG_HOME"]) {
-        if (environment[key]?.trim()) environment[key] = resolve(environment[key]);
-      }
-    }
-    backend = new Backend(binary, workspace, environment);
+    backend = new Backend(binary, workspace, runtimeEnvironment());
     sessionID = randomUUID();
     backend.on("state", update);
     backend.on("closed", update);
   })();
   try { await starting; } finally { starting = undefined; }
+}
+
+async function configureUpdates() {
+  const metadata = JSON.parse(await readFile(join(app.getAppPath(), "package.json"), "utf8"));
+  const official = app.isPackaged && metadata.gatorDistribution?.released === true;
+  const signed = official && metadata.gatorDistribution?.signed === true;
+  const installedWindows = process.platform !== "win32" || existsSync(join(dirname(app.getPath("exe")), "Uninstall Gator.exe"));
+  const supported = signed && ["darwin", "win32"].includes(process.platform) && installedWindows;
+  const reason = !official ? "This development build uses manual updates. Signed releases can check and download updates here." : !installedWindows ? "This portable copy uses manual updates. Install the Windows setup version for in-app updates." : "Update this installation through your package manager or the releases page.";
+  const updater = supported ? (await import("electron-updater")).default.autoUpdater : undefined;
+  updates = new Updates({ updater, supported, reason: supported ? "" : reason, version: app.getVersion(),
+    blocked: () => updateBlockReason(snapshot()),
+    confirm: async (version) => (await dialog.showMessageBox(window, { type: "question", message: `Restart Gator to install ${version}?`, detail: "Saved conversations, settings and retained drafts stay on this device. Work does not resume or send automatically after restarting. If background checks are running, disable start at login and stop them in Recovery first. Re-enable them after updating.", buttons: ["Keep Gator open", "Restart and install"], defaultId: 0, cancelId: 0 })).response === 1,
+    prepare: async () => {
+      updatePreparing = true; update();
+      try {
+        await drafts.flush();
+        await backend.prepareUpdate();
+        const guard = await acquireUpdateGuard(runtimeBinary(), app.getPath("userData"), runtimeEnvironment());
+        await guard.release();
+        closing = true;
+      } catch (error) {
+        updatePreparing = false;
+        if (backend?.closed) await startBackend();
+        update();
+        throw error;
+      }
+      return async () => { closing = false; updatePreparing = false; await startBackend(); update(); };
+    },
+  });
+  updates.on("change", update);
 }
 
 function createWindow() {
@@ -80,6 +115,7 @@ function createWindow() {
   window.on("close", async (event) => {
     if (closing) return;
     event.preventDefault();
+    if (updatePreparing) return;
     if (terminalBusy) {
       await dialog.showMessageBox(window, { type: "info", message: "Finish the action in Terminal first.", detail: "Gator is waiting for its result. You can cancel the action in that terminal window.", buttons: ["Keep Gator open"] });
       return;
@@ -89,7 +125,13 @@ function createWindow() {
       if (answer.response !== 1) return;
     }
     closing = true;
-    await drafts.flush();
+    try { await drafts.flush(); }
+    catch {
+      closing = false;
+      const answer = await dialog.showMessageBox(window, { type: "warning", message: "Your message draft could not be saved.", detail: "Keep Gator open to copy your unsent text, or close without saving that draft.", buttons: ["Keep Gator open", "Close without saving"], defaultId: 0, cancelId: 0 });
+      if (answer.response !== 1) return;
+      closing = true;
+    }
     await backend?.stop();
     window.destroy();
     app.quit();
@@ -108,17 +150,27 @@ else {
     });
     session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
     session.defaultSession.setPermissionCheckHandler(() => false);
+    await configureUpdates();
+    const showUpdates = () => { updatesOpen = true; update(); };
     Menu.setApplicationMenu(Menu.buildFromTemplate([
-      ...(process.platform === "darwin" ? [{ label: "Gator", submenu: [{ role: "about" }, { type: "separator" }, { role: "hide" }, { role: "hideOthers" }, { type: "separator" }, { role: "quit" }] }] : []),
+      ...(process.platform === "darwin" ? [{ label: "Gator", submenu: [{ label: "About & updates…", click: showUpdates }, { type: "separator" }, { role: "hide" }, { role: "hideOthers" }, { type: "separator" }, { role: "quit" }] }] : []),
       { label: "Edit", submenu: [{ role: "undo" }, { role: "redo" }, { type: "separator" }, { role: "cut" }, { role: "copy" }, { role: "paste" }, { role: "selectAll" }] },
       { label: "View", submenu: [{ role: "reload" }, { role: "resetZoom" }, { role: "zoomIn" }, { role: "zoomOut" }, { role: "togglefullscreen" }, ...(!app.isPackaged ? [{ role: "toggleDevTools" }] : [])] },
       { label: "Window", submenu: [{ role: "minimize" }, { role: "close" }] },
+      { label: "Help", submenu: [{ label: "About & updates…", click: showUpdates }, { label: "Release notes", click: () => void shell.openExternal(releaseURL) }] },
     ]));
     ipcMain.handle("gator:snapshot", (event) => { trusted(event); return snapshot(); });
-    ipcMain.handle("gator:drafts", (event, request) => { trusted(event); return drafts.request(request); });
-    ipcMain.handle("gator:send", (event, frame) => { trusted(event); if (backend?.state?.external) throw new Error("Finish the current step in Terminal first"); backend.send(frame); });
-    ipcMain.handle("gator:folder", async (event) => {
+    ipcMain.handle("gator:drafts", (event, request) => { mutable(event); return drafts.request(request); });
+    ipcMain.handle("gator:updates", async (event, request) => {
       trusted(event);
+      if (!request || typeof request !== "object" || Array.isArray(request) || Object.keys(request).some((key) => key !== "action")) throw new Error("Invalid update action");
+      if (request.action === "open" || request.action === "close") { updatesOpen = request.action === "open"; update(); return updates.snapshot(); }
+      if (request.action === "releases") { await shell.openExternal(releaseURL); return updates.snapshot(); }
+      return updates.request(request);
+    });
+    ipcMain.handle("gator:send", (event, frame) => { mutable(event); if (backend?.state?.external) throw new Error("Finish the current step in Terminal first"); backend.send(frame); });
+    ipcMain.handle("gator:folder", async (event) => {
+      mutable(event);
       if (backend?.state?.running || backend?.state?.panel) return null;
       const result = await dialog.showOpenDialog(window, { title: "Choose Gator's workspace", properties: ["openDirectory"] });
       if (result.canceled || !result.filePaths[0] || backend?.state?.running || backend?.state?.panel) return null;
@@ -126,7 +178,7 @@ else {
       return result.filePaths[0];
     });
     ipcMain.handle("gator:pick-path", async (event, request) => {
-      trusted(event);
+      mutable(event);
       const owner = backend;
       const panel = owner?.state?.panel;
       if (!request || !["directory", "file", "save"].includes(request.kind) || !panel?.id || request.panel_id !== panel.id || owner.state.running || owner.state.external || !panel.rows?.some((row) => row.input?.kind === request.kind || request.kind === "directory" && row.input?.kind === "mappings")) return null;
@@ -139,9 +191,9 @@ else {
       return request.kind === "save" ? result.filePath || null : result.filePaths[0] || null;
     });
     ipcMain.handle("gator:link", async (event, value) => { trusted(event); const url = externalURL(value); if (!url) throw new Error("Only web links can be opened"); await shell.openExternal(url); });
-    ipcMain.handle("gator:restart", async (event) => { trusted(event); if (terminalBusy || (backend?.state?.running && !backend.closed)) throw new Error("Finish the current operation first"); await startBackend(); update(); });
+    ipcMain.handle("gator:restart", async (event) => { mutable(event); if (terminalBusy || (backend?.state?.running && !backend.closed)) throw new Error("Finish the current operation first"); await startBackend(); update(); });
     ipcMain.handle("gator:terminal", async (event) => {
-      trusted(event);
+      mutable(event);
       if (!backend?.state?.external || terminalBusy) return;
       const owner = backend;
       const job = owner.state.external;

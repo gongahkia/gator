@@ -34,7 +34,7 @@ func holdDesktopUpdateGuard(in io.Reader, out io.Writer) error {
 			return errors.New("background-check state needs attention in Recovery before updating")
 		}
 		if processAlive(pid) {
-			return errors.New("stop background checks in Settings > Recovery before updating; saved checks will be retained")
+			return errors.New("disable start at login and stop background checks in Settings > Recovery before updating; saved check definitions will be retained")
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("cannot inspect background checks before updating: %w", err)

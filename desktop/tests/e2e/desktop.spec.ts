@@ -26,6 +26,46 @@ const settlePresentation = async (page: Page) => {
   });
 };
 
+test("About & updates explains development builds and preserves an unsent message", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "gator-desktop-updates-e2e-"));
+  const application = await launchDesktop({ ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") });
+  try {
+    const page = await application.firstWindow();
+    const composer = page.getByRole("textbox", { name: "Message Gator", exact: true });
+    await composer.fill("Keep this message through update review");
+    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await page.getByRole("button", { name: "About & updates", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "About & updates", exact: true });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText("Manual updates", { exact: true })).toBeVisible();
+    await expect(dialog.getByText(/This development build uses manual updates/)).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Check for updates", exact: true })).toHaveCount(0);
+    const rejection = await page.evaluate(async () => {
+      try { await window.gator!.updates({ action: "install" }); return "accepted"; }
+      catch (error) { return String(error); }
+    });
+    expect(rejection).toContain("manual updates");
+    expect((await page.evaluate(() => window.gator!.snapshot())).updates?.phase).toBe("manual");
+    const bundledUpdater = await application.evaluate(async ({ app }) => {
+      const path = process.getBuiltinModule("path");
+      const require = process.getBuiltinModule("module").createRequire(path.join(app.getAppPath(), "package.json"));
+      const library = require("electron-updater");
+      const controller = require("./electron/updates.mjs");
+      const updates = new controller.Updates({ updater: library.autoUpdater, version: app.getVersion(), supported: true, blocked: () => "", confirm: async () => false, prepare: async () => async () => {} });
+      return { phase: updates.snapshot().phase, autoDownload: library.autoUpdater.autoDownload, autoInstall: library.autoUpdater.autoInstallOnAppQuit };
+    });
+    expect(bundledUpdater).toEqual({ phase: "idle", autoDownload: false, autoInstall: false });
+    await settlePresentation(page);
+    await page.screenshot({ path: "test-results/desktop-about-updates.png" });
+    await page.keyboard.press("Escape");
+    await expect(dialog).not.toBeVisible();
+    await expect(page.getByRole("button", { name: "About & updates", exact: true })).toBeFocused();
+    await page.getByRole("button", { name: "Back to app", exact: true }).click();
+    await expect(composer).toHaveValue("Keep this message through update review");
+    expect((await page.evaluate(() => window.gator!.snapshot())).state!.messages).toEqual([]);
+  } finally { await closeDesktop(application); await rm(directory, { recursive: true, force: true }); }
+});
+
 test("unsent drafts survive reload and reconnect without submission, and retention can be cleared", async () => {
   test.setTimeout(90_000); // Reconnect plus two isolated app launches and native teardown.
   const directory = await mkdtemp(join(tmpdir(), "gator-desktop-drafts-e2e-"));

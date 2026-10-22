@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld("gator", {
   continueInTerminal: () => ipcRenderer.invoke("gator:terminal"),
   restart: () => ipcRenderer.invoke("gator:restart"),
   drafts: (request) => ipcRenderer.invoke("gator:drafts", request),
+  updates: (request) => ipcRenderer.invoke("gator:updates", request),
   subscribe(callback) {
     const listener = (_event, message) => callback(message);
     ipcRenderer.on("gator:update", listener);

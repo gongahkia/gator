@@ -18,6 +18,7 @@ import { useConversationSearch } from "./useConversationSearch";
 import { RecentConversations } from "./RecentConversations";
 import { WorkDetails } from "./WorkDetails";
 import { DesktopHelp } from "./DesktopHelp";
+import { UpdateDialog } from "./UpdateDialog";
 
 type Navigation = { command: string; draft?: string } | { conversation: NonNullable<DesktopFrame["conversation"]> };
 
@@ -94,7 +95,7 @@ function OverviewCards({ state, navigate }: { state: BackendState; navigate(comm
 }
 
 export function App() {
-  const { state, error, connection, sessionID, terminalBusy, fullScreen, reconnecting, reconnect, send, clearError } = useBackend();
+  const { state, error, connection, sessionID, terminalBusy, fullScreen, updates, updatesOpen, updatePreparing, reconnecting, reconnect, send, clearError } = useBackend();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("gator:sidebar-collapsed") === "true");
   const [details, setDetails] = useState(false);
   const drafts = useDrafts(state);
@@ -179,7 +180,7 @@ export function App() {
   };
   useEffect(() => {
     const keyboard = (event: globalThis.KeyboardEvent) => {
-      if (event.defaultPrevented || showDrafts) return;
+      if (event.defaultPrevented || showDrafts || updatesOpen || updatePreparing) return;
       if (navigation && event.key !== "Escape") return;
       if ((event.metaKey || event.ctrlKey) && ["k", "f", "n", ","].includes(event.key.toLowerCase())) {
         event.preventDefault();
@@ -208,7 +209,9 @@ export function App() {
     catch {} finally { setApprovalBusy(false); }
   }, [state?.pending_approval?.id, approvalBusy, send]);
 
-  if (!state) return <main className="boot-screen"><Logo /><h1>{reconnecting ? "Reconnecting to Gator…" : error ? "Gator could not connect" : "Getting your workspace ready"}</h1><p>{error || "Opening your local Gator profile. No messages will be submitted."}</p>{(!error || reconnecting) && <LoaderCircle className="spin accent" size={20} />}{error && window.gator && <button className="button" disabled={reconnecting} onClick={() => void reconnect()}>{reconnecting ? "Reconnecting…" : "Reconnect"}</button>}</main>;
+  const updateDialog = <Presence open={!!updatesOpen && !!updates}>{(open, presenceRef) => <UpdateDialog open={open} presenceRef={presenceRef} state={updates!} blocked={drafts.saving ? "Wait for your message draft to finish saving." : drafts.issue ? "Save or copy your unsent message before restarting." : draft.trim() && (!drafts.saved.enabled || drafts.saved.drafts.find((item) => item.context === drafts.context)?.text !== draft) ? "Your unsent message is not saved. Copy or clear it before restarting." : hasUnsavedView ? "Save or close the form or queue editor before restarting." : state?.running || state?.queued || state?.pending_approval || state?.external || terminalBusy ? "Finish the current work and queued messages before restarting." : connection !== "connected" ? "Reconnect before restarting for an update." : ""} close={() => void window.gator?.updates({ action: "close" })} />}</Presence>;
+
+  if (!state) return <><main className="boot-screen"><Logo /><h1>{reconnecting ? "Reconnecting to Gator…" : error ? "Gator could not connect" : "Getting your workspace ready"}</h1><p>{error || "Opening your local Gator profile. No messages will be submitted."}</p>{(!error || reconnecting) && <LoaderCircle className="spin accent" size={20} />}{error && window.gator && <button className="button" disabled={reconnecting} onClick={() => void reconnect()}>{reconnecting ? "Reconnecting…" : "Reconnect"}</button>}</main>{updateDialog}</>;
 
   const queueFull = state.running && state.queued >= 16 && !draft.trimStart().startsWith("/");
   const submit = async (guide = false) => {
@@ -239,7 +242,7 @@ export function App() {
     <div className="titlebar" aria-hidden="true"><span>Gator</span></div>
     <aside className="sidebar" aria-label="Main navigation">
       <div className="sidebar-brand"><button className="brand-button" onClick={() => navigate("/new")} aria-label="Gator home"><Logo /><span>Gator</span></button><button className="icon-button collapse-button" onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}><IconSwap active={collapsed} size={17} on={<PanelLeftOpen size={17} />} off={<PanelLeftClose size={17} />} /></button></div>
-      {settingsPage ? <SettingsNavigation destination={state.destination} collapsed={collapsed} navigate={navigate} /> : <>
+      {settingsPage ? <SettingsNavigation destination={state.destination} collapsed={collapsed} navigate={navigate} about={() => void window.gator?.updates({ action: "open" })} /> : <>
       <button className="nav-button new-chat" aria-label="New conversation" onClick={() => navigate("/new")} disabled={state.running}><Plus size={18} /><span>New conversation</span><kbd>{modifier}N</kbd></button>
       <button className="nav-button command-trigger" aria-label="Search commands" onClick={() => setShowCommands(true)} title="Search commands"><Search size={17} /><span>Search commands</span><kbd>{modifier}K</kbd></button>
       <div className="sidebar-scroll">{["work", "library"].map((group) => <div className="nav-group" key={group}><div className="nav-group-label">{group === "work" ? "Your workspace" : "Library"}</div><nav aria-label={group}>{destinations.filter((destination) => destination.group === group).map(({ command, label, icon: Icon }) => <button className="nav-button" key={command} aria-label={label} aria-current={activeDestination === command ? "page" : undefined} onClick={() => navigate(command)} disabled={state.running} title={collapsed ? label : undefined}><Icon size={18} /><span>{label}</span></button>)}</nav></div>)}
@@ -280,6 +283,7 @@ export function App() {
       </div>
     </main>
     <Presence open={details}>{(open, presenceRef) => <WorkDetails state={state} open={open} presenceRef={presenceRef} close={closeDetails} navigate={navigate} />}</Presence>
+    {updateDialog}
     {panel && <div className="panel-draft-anchor"><MessageSquare size={14} /><span>{draft ? "Your message draft is kept while you’re here." : "Return to the conversation to write a message."}</span><button className="small-button" onClick={() => attempt({ type: "panel", key: "esc", panel: { id: panel.id!, action: "key" } })}>Back<kbd>Esc</kbd></button></div>}
     <Presence open={showCommands}>{(open, presenceRef) => <CommandMenu open={open} presenceRef={presenceRef} commands={state.commands} close={() => setShowCommands(false)} select={(name, needsInput) => { setShowCommands(false); if (needsInput) navigate("/chat", `/${name} `); else navigate(`/${name}`); }} />}</Presence>
     <Presence open={showDrafts}>{(open, presenceRef) => <DraftManager open={open} presenceRef={presenceRef} saved={drafts.saved} issue={drafts.issue} manage={drafts.manage} close={() => setShowDrafts(false)} restore={(retained) => { setDraft((current) => !current ? retained.text : current === retained.text ? current : `${current}\n\n${retained.text}`); composer.current?.focus(); }} />}</Presence>
