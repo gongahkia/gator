@@ -86,8 +86,14 @@ test("public activity interleaves, folds above the answer, and preserves the rea
     await page.getByRole("button", { name: "Used 2 tools", exact: true }).click();
     await expect(page.getByText("Unfinished", { exact: true })).toHaveCount(2);
     await publish({ ...done, messages: [...state.messages, { role: "Gator", text: "Just a simple reply.", activity: { ...completed, entries: [] } }] });
-    await expect(page.locator(".activity-summary")).toHaveText("Worked for 12s");
+    await expect(page.getByText("Just a simple reply.", { exact: true })).toBeVisible();
+    await expect(page.locator(".activity-summary")).toHaveCount(0);
     await expect(page.locator(".activity-history")).toHaveCount(0);
+    // Empty successful work stays quiet; failed/stopped work still has a cue.
+    for (const [state, label] of [["failed", "Work ended after 12s"], ["stopped", "Stopped after 12s"]] as const) {
+      await publish({ ...done, messages: [{ role: "Gator", text: "Review this incomplete work.", activity: { ...completed, state, entries: [] } }] });
+      await expect(page.locator(".activity-summary")).toHaveText(label);
+    }
     // New live content must not pull someone away from an earlier message.
     const long = Array.from({ length: 50 }, (_, i) => ({ role: i % 2 ? "Gator" : "You", text: `Earlier message ${i}.\n\nKeep this paragraph in view while Gator works.` }));
     await publish({ ...state, messages: long });
@@ -150,6 +156,12 @@ test("real runner narration and tools survive a desktop restart without replayin
     expect(trace?.entries.map((entry) => entry.kind)).toEqual(["text", "tool"]);
     expect(JSON.stringify(trace)).not.toContain("Internal fixture body");
     expect(JSON.stringify(trace)).not.toContain("source/note.md");
+    // Run records are still retained, without empty file groups/context links.
+    expect(snapshot.state?.messages.some((message) => message.bundle?.Path)).toBe(true);
+    expect(snapshot.state?.messages.some((message) => message.role === "Context")).toBe(true);
+    await expect(page.getByRole("article", { name: "Deliverables message", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("article", { name: "Context message", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^Files in this conversation/ })).toHaveCount(0);
     await closeDesktop(app);
     app = await launch();
     page = await app.firstWindow();
@@ -158,6 +170,8 @@ test("real runner narration and tools survive a desktop restart without replayin
     await history.click();
     await expect(page.getByText("I’ll read the note.", { exact: true })).toBeVisible();
     await expect(page.getByText("Sage Tide is selected.", { exact: true })).toBeVisible();
+    await expect(page.getByRole("article", { name: "Deliverables message", exact: true })).toHaveCount(0);
+    expect(await page.evaluate(async () => (await window.gator!.snapshot()).state?.messages.some((message) => message.bundle?.Path))).toBe(true);
     expect(requests).toBe(2);
   } finally {
     release(); await closeDesktop(app); server.closeAllConnections();

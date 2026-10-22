@@ -2,7 +2,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Children, isValidElement, type ReactNode } from "react";
 import { Check, ChevronDown, FileText, Info, ShieldCheck, TriangleAlert } from "lucide-react";
-import type { BackendBundle, BackendResult, ResultSection } from "./protocol";
+import type { BackendResult, ResultSection } from "./protocol";
 import { CopyButton } from "./CopyButton";
 
 function CodeBlock({ children }: { children?: ReactNode }) {
@@ -41,14 +41,4 @@ export function Result({ result, approval, onApproval }: { result: BackendResult
     {result.footer && <p className="result-footer literal">{result.footer}</p>}
     {approval !== undefined && onApproval && <div className="flex flex-wrap gap-2 mt-4"><button className="button" onClick={() => onApproval(false)}>Deny</button><button className="button primary" onClick={() => onApproval(true)}>Approve this action</button></div>}
   </section>;
-}
-
-export function bundleResult(bundle: BackendBundle): BackendResult {
-  return {
-    kind: "list", title: "Deliverables", tone: bundle.Status === "verified" ? "success" : "warning", summary: bundle.Status,
-    items: [
-      ...(bundle.Artifacts ?? []).map((item) => ({ label: item.Path, detail: item.MediaType, state: item.Valid ? "verified" : "needs review", tone: item.Valid ? "success" as const : "warning" as const })),
-      ...(bundle.Candidates ?? []).map((item) => ({ label: `Change ${item.ID}`, detail: item.ChangedPaths.join(", "), state: item.Status })),
-    ], footer: bundle.Path,
-  };
 }

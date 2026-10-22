@@ -13,7 +13,7 @@ command palette, existing review flows and React/CSS stack.
 | --- | --- |
 | Landing page | Ambient Tide: two crossing, noise-warped ASCII swells across the empty chat area. Mask the greeting for readability. No pointer-triggered effects or pattern picker. |
 | Live response | Public parent-agent narration and tool activity in delivery order. Tool completion updates the original row; consecutive tools share a disclosure. Narration separates tool groups. |
-| Completed response | Fold work above the answer, preserving the answer outside the disclosure. Show measured work duration. An answer without retained work gets a static summary instead of an empty disclosure. |
+| Completed response | Fold retained activity above the answer and show its measured duration. A successful answer without retained activity has no work summary. Keep failed/stopped cues visible. |
 | Recent topics | Date buckets in the flat view. Keep optional folder grouping, active-topic preservation and recent-only filtering. Highlight literal title/folder matches; support arrows and Enter. |
 | Conversations | Search titles and folders in the existing Go-supplied list of up to 50 recent saved conversations. Today, Yesterday, Previous 7 days, Older and Undated headings. Escape clears search before leaving the screen. Failed refreshes explain that loaded rows may be stale and offer a retry. |
 | Files | Show a contextual Files button when the conversation has retained outputs. Open the existing rail, filter filenames, preview retained text/Markdown, and link back to the exact loaded output card. |
@@ -200,3 +200,70 @@ used. Windows/Linux execution and assistive-technology checks were not repeated.
 
 The implementation is retained in the existing atomic commit `d59484280`.
 **Verdict: Approve for this scoped macOS removal.**
+
+## Follow-up: quiet ordinary replies
+
+22 October 2026. A plain answer should read as a message. The runtime retains
+a bundle and appends a context shortcut after every successful run; neither
+record is itself a reason to add another chat card.
+
+- Omit empty bundle messages, including their heading and spacing, for live
+  and restored conversations. Actual files and proposed changes keep their
+  existing preview cards, check states and exact Show in chat identities.
+- Remove the duplicate Result details disclosure from file groups. Retained
+  file locations remain in output previews; task-run screens retain run details.
+- Omit the automatic Context and sources shortcut. Sources & memory in
+  Conversation information still opens saved context. Explicit context panels,
+  warnings, errors and approvals remain visible.
+- Omit successful work timing when no activity was retained. Meaningful public
+  activity stays in its disclosure; failed/stopped runs keep a status cue even
+  without entries. Live progress is unchanged.
+
+These are renderer decisions. Raw messages, bundles, source records, activity,
+task history and agent execution are unchanged. Filtering before rendering
+also keeps empty articles and repeated metadata out of transcript search.
+
+Full scoped review using `make-interfaces-feel-better`, React and existing
+native CSS. This covers completed replies and their information/file paths.
+
+| Category | Evidence inspected | Result |
+| --- | --- | --- |
+| Typography | Message labels, answer body, timing and file metadata | Existing tokens; ordinary replies lose repeated headings. |
+| Surfaces | Empty bundle, automatic context link, actual output and approval cards | Omit boilerplate articles; keep real outputs and review surfaces. |
+| Animations | Completed activity and existing disclosure | No new motion; existing disclosure/reduced-motion checks retained. |
+| Icons | Existing activity indicators, file previews and approvals | Same Lucide system; failed/stopped icons keep text labels. |
+| Performance | Message renderer and transcript search | Skip unused cards rather than mounting hidden diagnostics; remove dead bundle formatter and CSS. |
+
+| Severity | Location | Before | After | Why |
+| --- | --- | --- | --- | --- |
+| MEDIUM | `desktop/src/App.tsx:59`, `Result.tsx:5`, `styles.css:207` | Every reply received empty Files & changes, Result details and Context cards | Only render actual outputs; use the optional inspector for metadata; remove unused fallback formatter/styles | Repeated chrome interrupts reading without adding information. Explicit results retain their review and warning behavior. |
+| LOW | `desktop/src/ActivityTimeline.tsx:62` | Empty successful activity added a standalone Worked for line | Show timing with inspectable activity; retain failure/interruption cues | Routine answers need no empty progress recap. |
+
+Considered and rejected: dropping records from the runtime would lose useful
+retained evidence and change backend behavior; suppressing all result messages
+would hide warnings and actionable approvals.
+
+Verification:
+
+- `npm run check --prefix desktop` and `npm run build:ui --prefix desktop`
+  passed. The build retains the existing highlight/Lucide warnings.
+- From `desktop`, `./node_modules/.bin/electron-builder --dir --publish never`
+  rebuilt the macOS app successfully.
+- With `GATOR_DESKTOP_TEST_EXECUTABLE` pointing to the rebuilt
+  `desktop/release/mac/Gator.app/Contents/MacOS/Gator`, ran
+  `npm run test:e2e --prefix desktop -- activity.spec.ts files.spec.ts work-details.spec.ts desktop.spec.ts --grep 'public activity interleaves|real runner narration|contextual files reuse|compact work details|desktop uses real Go state|review presentation preserves' --reporter=line --output=node_modules/.cache/quiet-replies-results`.
+  Five checks passed. The full Go-state check initially closed an already-open,
+  remembered Sources section; corrected the test to assert its persisted state.
+  Reran `npm run test:e2e --prefix desktop -- desktop.spec.ts --grep 'desktop uses real Go state' --reporter=line --output=node_modules/.cache/quiet-replies-recheck`
+  with the same packaged executable: passed in 17.4 seconds.
+- The six passing checks cover plain replies, saved context inspection and
+  draft preservation, real runner activity before/after restart, empty
+  failed/stopped cues, explicit context warnings, exact live approvals, real
+  output previews and Show in chat. Existing activity motion was inspected at
+  10% speed and with reduced motion; file drawers also ran at 800 px.
+- Inspected the current quiet-reply, completed-activity and file-preview
+  screenshots. Plain replies have no empty file/context cards or timing line.
+  Tests used isolated profiles and a local inference fixture.
+
+**Verdict: Approve for the exercised macOS presentation scope.** Windows/Linux
+execution and assistive-technology checks were not repeated.

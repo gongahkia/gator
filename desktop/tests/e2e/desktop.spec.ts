@@ -672,6 +672,21 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     await expect(page.locator(".message-byline", { hasText: "Gator" })).toHaveCount(2);
     await expect(page.locator(".message-avatar")).toHaveCount(0);
     await expect(page.getByRole("article", { name: "Your message", exact: true })).toHaveCount(2);
+    // Plain replies retain their run metadata without adding transcript cards.
+    await expect(page.getByRole("article", { name: "Deliverables message", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("article", { name: "Context message", exact: true })).toHaveCount(0);
+    await expect(page.locator(".activity-summary, .activity-history")).toHaveCount(0);
+    await page.getByRole("textbox", { name: "Message Gator" }).fill("Keep this while inspecting context");
+    await page.getByRole("button", { name: "Conversation information", exact: true }).click();
+    const contextRail = page.getByRole("complementary", { name: "Conversation information", exact: true });
+    await expect(contextRail.getByRole("button", { name: /^Sources & memory/ })).toHaveAttribute("aria-expanded", "true");
+    await contextRail.getByRole("button", { name: /^Inspect saved context/ }).click();
+    await expect(page.getByRole("heading", { name: "Context and sources", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Back to conversation", exact: true }).click();
+    await expect(page.getByRole("textbox", { name: "Message Gator" })).toHaveValue("Keep this while inspecting context");
+    await page.getByRole("textbox", { name: "Message Gator" }).fill("");
+    await settlePresentation(page);
+    await page.screenshot({ path: "test-results/desktop-quiet-replies.png" });
     const conversationLayout = await page.evaluate(() => ({
       user: document.querySelector(".user-message .message-content")!.getBoundingClientRect().left,
       assistant: document.querySelector(".assistant-message .message-content")!.getBoundingClientRect().left,
@@ -879,6 +894,7 @@ test("review presentation preserves exact previews and only the live approval ac
     }, { ...base, first_run: false, home: false, running: true, pending_approval: { id: 17 }, messages: [
       { role: "Gator", text: "", result: { kind: "approval", title: "Previous file write", tone: "success", fields: [{ label: "Request", value: "16" }], footer: "Approved" } },
       { role: "Gator", text: "", result: { kind: "approval", title: "Review proposed file write", tone: "warning", summary: "Write the proposed plan.", fields: [{ label: "Request", value: "17" }], preview } },
+      { role: "Context", text: "", result: { kind: "notice", title: "Context and sources", tone: "warning", summary: "Some source references could not be retained.", footer: "/context work-review" } },
     ] } as typeof base);
     const current = page.getByRole("region", { name: "Review proposed file write", exact: true });
     const previous = page.getByRole("region", { name: "Previous file write", exact: true });
@@ -887,6 +903,7 @@ test("review presentation preserves exact previews and only the live approval ac
     await expect(current.locator(".preview")).toBeVisible();
     expect(JSON.parse((await current.locator(".preview").textContent())!)).toEqual(preview);
     await expect(previous.getByRole("button", { name: "Approve this action" })).toHaveCount(0);
+    await expect(page.getByText("Some source references could not be retained.", { exact: true })).toBeVisible();
     await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-approval-review.png" });
     await current.getByRole("button", { name: "Approve this action", exact: true }).click();

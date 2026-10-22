@@ -3,7 +3,7 @@ import { ArrowDown, ArrowUp, Bookmark, ChevronRight, Clock3, Command, Files, Inf
 import type { BackendMessage, BackendState } from "./protocol";
 import type { DesktopFrame, DesktopSnapshot } from "./bridge";
 import { Panel } from "./Panel";
-import { Markdown, Result, bundleResult } from "./Result";
+import { Markdown, Result } from "./Result";
 import { useModalFocus } from "./useModalFocus";
 import { UsagePanel } from "./UsagePanel";
 import { ConversationsPanel } from "./ConversationsPanel";
@@ -59,11 +59,16 @@ function useBackend() {
 
 const Message = memo(function Message({ message, pending, onApproval, commands, navigate, disabled, preview }: { message: BackendMessage; pending?: number; onApproval(approved: boolean): void; commands?: BackendState["commands"]; navigate?(route: string): void; disabled?: boolean; preview(id: string): void }) {
   const user = message.role === "You";
-  const result = message.result ?? (message.bundle ? bundleResult(message.bundle) : undefined);
+  const result = message.result;
+  const outputs = message.bundle ? bundleOutputs(message.bundle) : [];
+  // The runtime retains a bundle and context shortcut for every run. Keep
+  // those records available to the inspector without repeating them in chat.
+  const contextLink = message.role === "Context" && result?.kind === "notice" && result.title === "Context and sources" && result.footer?.startsWith("/context ") && !result.tone;
+  if (contextLink || (message.bundle && !result && !outputs.length)) return null;
   const approval = result?.kind === "approval" && result.fields?.some((field) => field.label === "Request" && field.value === String(pending)) ? pending : undefined;
   return <article className={`message ${user ? "user-message" : message.role === "Gator" ? "assistant-message" : "result-message"}`} aria-label={user ? "Your message" : `${message.role} message`}>
     <div className="message-content">{message.activity && <ActivityHistory trace={message.activity} />}<div className="message-byline">{user ? "You" : message.role === "Gator" ? "Gator" : message.bundle ? "Files & changes" : message.role}</div>
-      {commands && navigate && result?.title === "Gator commands" && result.kind === "report" ? <DesktopHelp commands={commands} navigate={navigate} disabled={!!disabled} /> : message.bundle ? <><OutputCards outputs={bundleOutputs(message.bundle)} preview={preview} /><details className="message-result-details"><summary>Result details</summary><Result result={result!} /></details></> : result ? <Result result={result} approval={approval} onApproval={onApproval} /> : message.role === "Gator" ? <div className="assistant-speech"><Markdown text={message.text} /></div> : <div className="literal prose-text">{message.text}</div>}
+      {commands && navigate && result?.title === "Gator commands" && result.kind === "report" ? <DesktopHelp commands={commands} navigate={navigate} disabled={!!disabled} /> : result ? <Result result={result} approval={approval} onApproval={onApproval} /> : message.bundle ? <OutputCards outputs={outputs} preview={preview} /> : message.role === "Gator" ? <div className="assistant-speech"><Markdown text={message.text} /></div> : <div className="literal prose-text">{message.text}</div>}
       {!result && message.role === "Gator" && message.text && <div className="message-actions"><CopyButton text={message.text} label="Copy response" compact /></div>}
     </div>
   </article>;
