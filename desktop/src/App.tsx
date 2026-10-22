@@ -114,6 +114,7 @@ export function App() {
   const queueAction = useQueueAction(state, send, error);
   const attachments = useAttachmentPicker(drafts.context, drafts.uploads, (files) => { drafts.setUploads(files); setDraftError(""); }, sending || queueAction.busy || !!error || !!state?.external || !!updatePreparing || !drafts.ready);
   const composer = useRef<HTMLTextAreaElement>(null);
+  const newChatFocus = useRef(false);
   const detailsTrigger = useRef<HTMLButtonElement>(null);
   const closeDetails = () => { setDetails(false); (drawerReturn.current?.isConnected ? drawerReturn.current : detailsTrigger.current)?.focus({ preventScroll: true }); };
   const openDetails = (kind: typeof detailKind) => { drawerReturn.current = document.activeElement as HTMLElement; setRequestedOutput(undefined); setDetailKind(kind); setFilesOnly(false); setDetails(!(details && detailKind === kind && !filesOnly)); };
@@ -171,6 +172,11 @@ export function App() {
       if (state.input) { setDraft(state.input); composer.current?.focus(); }
     }
   }, [state?.input]);
+  useEffect(() => {
+    if (newChatFocus.current && drafts.ready && !panel && composer.current && !composer.current.disabled) {
+      composer.current.focus(); newChatFocus.current = false;
+    }
+  }, [drafts.context, drafts.ready, panel, sending]);
   useLayoutEffect(() => {
     if (!state) return;
     if (panel) { returningToTranscript.current = true; return; }
@@ -196,6 +202,7 @@ export function App() {
     setSearch(null); setShowCommands(false); setDetails(false);
     if ("conversation" in target) { attempt({ type: "conversation", conversation: target.conversation }); return; }
     if (settingsRoutes.some((route) => route.command === target.command)) setDetails(false);
+    if (target.command === "/new") newChatFocus.current = true;
     attempt({ type: "navigate", text: target.command });
     if (target.draft !== undefined) setDraft(target.draft);
   };
@@ -279,7 +286,7 @@ export function App() {
   const messages = state.messages;
   const jumpToLatest = () => { setSearch(null); atBottom.current = true; setAtLatest(true); setNewActivity(false); transcript.current?.scrollTo({ top: transcript.current.scrollHeight }); composer.current?.focus({ preventScroll: true }); };
   const slash = draft.startsWith("/") && !draft.includes(" ") ? commands.filter((command) => command.name.startsWith(draft.slice(1))).slice(0, 7) : [];
-  const headerTitle = panel ? conversationBrowser ? state.destination === "/history" ? "Task runs" : "Conversations" : panel.title : home ? "New chat" : state.title || "Gator";
+  const headerTitle = panel ? conversationBrowser ? state.destination === "/history" ? "Task runs" : "Conversations" : panel.title : state.title || (home ? "New chat" : "Gator");
 
   return <FileChatContext.Provider value={fileChat}><div className={`app-shell ${collapsed ? "sidebar-collapsed" : ""} ${details ? "details-open" : ""}`} data-theme={state.theme} data-platform={window.gator?.platform} data-fullscreen={fullScreen}>
     <div className="titlebar" aria-hidden="true"><span>Gator</span></div>
@@ -350,9 +357,10 @@ function CommandMenu({ commands, open, presenceRef, close, select }: { commands:
     { name: "@gator", label: "Talk with Gator", description: "Return to the current chat", advanced: false, needs_input: false },
     { name: "@following", label: "Following", description: "Ongoing goals, configured checks and updates", advanced: false, needs_input: false },
     { name: "@saved", label: "Saved", description: "Knowledge, files, conversations and task runs", advanced: false, needs_input: false },
-    ...commands,
+    ...commands.map(command => command.name === "new" ? { ...command, label: "New chat" } : command),
   ];
-  const shown = choices.filter((command) => `${command.name} ${command.label || ""} ${command.description}`.toLowerCase().includes(query.toLowerCase()));
+  const search = query.trim().replace(/^\/+/, "").toLowerCase();
+  const shown = choices.filter((command) => `${command.name} ${command.label || ""} ${command.description}`.toLowerCase().includes(search));
   return <div ref={presenceRef} className="modal-backdrop" data-open={open} inert={!open} aria-hidden={!open} onClick={close}><section ref={focus} className="command-menu" role="dialog" aria-modal="true" aria-label="Search commands" onClick={(event) => event.stopPropagation()}><div className="command-search"><Search size={18} /><input autoFocus placeholder="Find a command…" aria-label="Find a command" value={query} onChange={(event) => { setQuery(event.target.value); setSelected(0); }} onKeyDown={(event) => {
     if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); const next = Math.max(0, Math.min(shown.length - 1, selected + (event.key === "ArrowDown" ? 1 : -1))); setSelected(next); focus.current?.querySelectorAll(".command-list button")[next]?.scrollIntoView({ block: "nearest" }); }
     if (event.key === "Enter" && shown[selected]) { event.preventDefault(); select(shown[selected].name, shown[selected].needs_input); }
