@@ -268,7 +268,10 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		},
 		RecallStatus:    func(ctx context.Context) (workapp.RecallStatus, error) { return workRecallStatus(ctx, stateDir) },
 		ConfigureRecall: configureWorkRecall,
-		InstallRecall:   installWorkRecall,
+		ConfigureChatLearning: func(enabled bool) error {
+			return settingsStore.Update(func(settings *config.Settings) error { settings.Desktop.LearnFromChats = &enabled; return nil })
+		},
+		InstallRecall: installWorkRecall,
 		ReadContext: func(workID, activeGoal string) (workapp.ContextState, error) {
 			return readWorkContext(stateDir, workID, activeGoal)
 		},

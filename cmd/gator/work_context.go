@@ -12,6 +12,7 @@ import (
 	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/workapp"
 	"github.com/gongahkia/gator/internal/workhistory"
+	"github.com/gongahkia/gator/internal/worksession"
 )
 
 func readWorkContext(stateDir, workID, goalID string) (workapp.ContextState, error) {
@@ -30,6 +31,17 @@ func readWorkContext(stateDir, workID, goalID string) (workapp.ContextState, err
 			if r, err := memories.Load(id); err == nil && (r.GoalID == "" || r.GoalID == result.GoalID) {
 				item.Kind, item.Title, item.Text, item.CurrentText, item.Scope, item.Source, item.Available = "memory", r.Kind, r.Text, r.Text, contextScope(r.GoalID), r.Source, true
 				item.SourceReviewNeeded = r.SourceStatus == "changed" || r.SourceStatus == "unavailable"
+				if r.Subject != "" {
+					item.Title = r.Kind + " · " + strings.ReplaceAll(strings.ReplaceAll(r.Subject, ".", " · "), "_", " ")
+				}
+				if r.Origin != nil {
+					item.Source = "From a chat · " + r.Origin.Basis
+					if sessions, err := worksession.Open(stateDir); err == nil {
+						if chat, err := sessions.Load(r.Origin.ConversationID); err == nil {
+							item.Source = "Chat: " + chat.Title + " · " + r.Origin.Basis
+						}
+					}
+				}
 				item.Updated = r.UpdatedAt.Local().Format("Jan 2 15:04")
 			}
 		} else if strings.HasPrefix(id, "note-") {

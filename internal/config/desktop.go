@@ -10,9 +10,12 @@ import (
 )
 
 type DesktopSettings struct {
-	Shortcuts map[string]string `json:"shortcuts,omitempty"`
-	Voice     VoiceSettings     `json:"voice,omitzero"`
+	LearnFromChats *bool             `json:"learn_from_chats,omitempty"`
+	Shortcuts      map[string]string `json:"shortcuts,omitempty"`
+	Voice          VoiceSettings     `json:"voice,omitzero"`
 }
+
+func (d DesktopSettings) LearnsFromChats() bool { return d.LearnFromChats == nil || *d.LearnFromChats }
 
 type VoiceSettings struct {
 	SpokenReplies bool    `json:"spoken_replies"`

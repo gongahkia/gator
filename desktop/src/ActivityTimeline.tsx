@@ -12,7 +12,7 @@ function duration(trace: BackendActivity) {
 }
 
 function toolLabel(name = "") {
-  const labels: Record<string, string> = { read_file: "Read a file", list_files: "Listed files", search_files: "Searched files", write_artifact: "Prepared a file", web_search: "Searched the web", web_fetch: "Read a web page", delegate_agents: "Consulted specialists", knowledge_read: "Read saved knowledge" };
+  const labels: Record<string, string> = { read_file: "Read a file", list_files: "Listed files", search_files: "Searched files", write_artifact: "Prepared a file", web_search: "Searched the web", web_fetch: "Read a web page", delegate_agents: "Consulted specialists", knowledge_read: "Read saved knowledge", knowledge_search: "Searched saved knowledge", memory_remember: "Saved a memory", memory_forget: "Forgot a memory", chat_search: "Searched earlier chats", chat_read: "Read an earlier chat" };
   return labels[name] || name.replace(/[_.-]+/g, " ").replace(/^./, (letter) => letter.toUpperCase()) || "Tool activity";
 }
 

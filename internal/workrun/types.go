@@ -66,6 +66,7 @@ func (p CodePolicy) HasCapability(name string) bool {
 type Request struct {
 	InputIDs                []string
 	ForegroundApp           bool
+	LearnFromChats          bool
 	ApproveAppChange        func(context.Context, any) (bool, error)
 	OnAppChange             func(AppChange)
 	AfterAppRun             func(AppChange, AppMutation)

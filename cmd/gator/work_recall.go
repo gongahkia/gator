@@ -21,6 +21,7 @@ func workRecallStatus(ctx context.Context, stateDir string) (workapp.RecallStatu
 		provider = "ollama"
 	}
 	status := workapp.RecallStatus{Provider: provider, State: "Basic recall available", Storage: "Saved memories, notes, transcripts, and Work records stay in the private local Gator state directory on this computer. Forgetting removes an item from future recall; prior transcripts and retained Work evidence may still contain it."}
+	status.LearnFromChats = settings.Desktop.LearnsFromChats()
 	status.Retrieval = "Basic word matching works without a download. Enhanced recall uses " + provider + "; unavailable embeddings fall back to basic matching."
 	status.Chat = "Selected saved context and task sources are supplied to the chat model chosen in /model."
 	if settings.Defaults.Provider == localmodel.ProviderID {

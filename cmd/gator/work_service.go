@@ -67,6 +67,7 @@ func configuredWorkService(provider, modelName, stateDir string, request *workru
 	}
 	request.OTLPEndpoint = os.Getenv("GATOR_OTLP_ENDPOINT")
 	request.Provider = provider + "/" + modelName
+	request.LearnFromChats = request.ForegroundApp && settings.Desktop.LearnsFromChats()
 	request.DisableBrowser = provider == "gator-local"
 	request.StateDir = stateDir
 	if err := applyLearningContext(stateDir, request); err != nil {
@@ -203,7 +204,22 @@ func applyMemoryContext(stateDir string, request *workrun.Request) error {
 	}
 	appendRecallStatus(request, "Memories", recallState)
 	var selected []memory.Record
-	request.MemoryContext, selected = memory.RenderSelection(records)
+	profile, err := store.Profile(request.ExcludedKnowledgeIDs)
+	if err != nil {
+		return err
+	}
+	seen := map[string]bool{}
+	combined := append([]memory.Record{}, profile...)
+	for _, record := range profile {
+		seen[record.ID] = true
+	}
+	for _, record := range records {
+		if !seen[record.ID] {
+			combined = append(combined, record)
+			seen[record.ID] = true
+		}
+	}
+	request.MemoryContext, selected = memory.RenderSelection(combined)
 	for _, record := range selected {
 		request.ContextRefs = append(request.ContextRefs, record.ID)
 		request.ContextItems = append(request.ContextItems, workhistory.ContextItem{ID: record.ID, Kind: "memory", Title: record.Kind, Excerpt: boundedContextExcerpt(record.Text), Scope: contextScope(record.GoalID), Source: record.Source, UpdatedAt: record.UpdatedAt})

@@ -70,6 +70,19 @@ func (m Model) updateRecallKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.section = ""
 	case "r":
 		return m, m.recallStatusCommand()
+	case "a":
+		if m.config.ConfigureChatLearning == nil {
+			m.sectionNotice = "Chat learning settings are unavailable."
+			return m, nil
+		}
+		enabled := !m.recall.LearnFromChats
+		if err := m.config.ConfigureChatLearning(enabled); err != nil {
+			m.sectionNotice = err.Error()
+			return m, nil
+		}
+		m.recall.LearnFromChats = enabled
+		m.sectionNotice = "Chat learning updated. Existing saved memories remain available; explicit remember and forget requests still work."
+		return m, m.recallStatusCommand()
 	case "i":
 		m.recallConfirm = "install"
 	case "l":
@@ -133,18 +146,23 @@ func (m Model) recallPanel() uisnapshot.Panel {
 		{Title: "Storage", Collapsible: true, Lines: []string{valueOrDefault(m.recall.Storage, "Memories, notes, transcripts, and Work records are stored in your private Gator state directory on this computer.")}},
 		{Title: "Retrieval", Collapsible: true, Lines: []string{valueOrDefault(m.recall.Retrieval, "Basic word matching works without a model download. Enhanced recall uses local embeddings or your separately selected cloud provider.")}},
 		{Title: "Chat processing", Collapsible: true, Lines: []string{valueOrDefault(m.recall.Chat, "Selected saved context and task sources are supplied to the model chosen in /model. A cloud chat model processes that context remotely even when storage and retrieval are local.")}},
+		{Title: "Across chats", Lines: []string{"Personal memories are shared by chats in this local profile. New chat starts a fresh working context; it keeps your saved memory.", "Useful stable facts and preferences can be saved from your own statements, with their source chat. One-off task details and file/tool instructions are not personal memories.", "Turning chat learning off stops automatic saves. Existing memories remain available; explicit remember/forget requests still work. Earlier chat details can be searched on demand. Devices do not sync automatically."}},
 		{Title: "Your controls", Collapsible: true, Lines: []string{"Browse saved knowledge to correct, forget, or omit it from the next run.", "Feedback ratings are retained for review. They do not automatically retrain your model.", "Local recall can fall back to basic word matching; each result's Context and sources shows the observed route."}},
 	}
 	fallback := "Readiness not available"
 	if m.recallBusy {
 		fallback = "Checking readiness…"
 	}
-	p.Summary = []uisnapshot.Field{{Label: "Recall readiness", Value: valueOrDefault(m.recall.State, fallback)}}
+	learning := "Off"
+	if m.recall.LearnFromChats {
+		learning = "On"
+	}
+	p.Summary = []uisnapshot.Field{{Label: "Recall readiness", Value: valueOrDefault(m.recall.State, fallback)}, {Label: "Learn from chats", Value: learning}}
 	p.Blocks[0].Lines = []string{m.recall.Detail}
 	if m.recallBusy {
 		p.Hints = []uisnapshot.Hint{{Shortcut: "Esc", Action: "cancel download"}}
 	} else {
-		p.Hints = []uisnapshot.Hint{{Shortcut: "I", Action: "install local recall", Group: "more"}, {Shortcut: "L", Action: "use local"}, {Shortcut: "O", Action: "use OpenAI", Group: "more"}, {Shortcut: "G", Action: "use Gemini", Group: "more"}, {Shortcut: "K", Action: "saved knowledge"}, {Shortcut: "C", Action: "chat model", Group: "more"}, {Shortcut: "R", Action: "refresh"}, {Shortcut: "Esc", Action: "back"}}
+		p.Hints = []uisnapshot.Hint{{Shortcut: "A", Action: map[bool]string{true: "turn chat learning off", false: "turn chat learning on"}[m.recall.LearnFromChats]}, {Shortcut: "I", Action: "install local recall", Group: "more"}, {Shortcut: "L", Action: "use local"}, {Shortcut: "O", Action: "use OpenAI", Group: "more"}, {Shortcut: "G", Action: "use Gemini", Group: "more"}, {Shortcut: "K", Action: "saved knowledge"}, {Shortcut: "C", Action: "chat model", Group: "more"}, {Shortcut: "R", Action: "refresh"}, {Shortcut: "Esc", Action: "back"}}
 	}
 	return p
 }

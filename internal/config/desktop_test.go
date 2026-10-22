@@ -34,6 +34,23 @@ func TestDesktopPreferencesSurviveConfigRoundTrip(t *testing.T) {
 	}
 }
 
+func TestChatLearningDefaultsOnAndPersistsOff(t *testing.T) {
+	if !(DesktopSettings{}).LearnsFromChats() {
+		t.Fatal("chat learning should be enabled by default")
+	}
+	store, _ := New(t.TempDir())
+	settings := Default()
+	off := false
+	settings.Desktop.LearnFromChats = &off
+	if err := store.Save(settings); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := store.Load()
+	if err != nil || loaded.Desktop.LearnsFromChats() {
+		t.Fatal("disabled preference lost", err)
+	}
+}
+
 func TestNewChatShortcutPreservesExistingCustomBinding(t *testing.T) {
 	d := DesktopSettings{Shortcuts: map[string]string{"command_search": "Mod+N"}}
 	if err := d.Validate(); err != nil {

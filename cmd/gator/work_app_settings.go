@@ -74,6 +74,27 @@ func (c gatorAppController) prepareSettings(ctx context.Context, change workrun.
 			}
 			return c.Inspect(ctx, workrun.AppQuery{Topic: "settings"})
 		}}, nil
+	case "chat_learning":
+		var next struct {
+			Enabled *bool `json:"enabled"`
+		}
+		if err := workrun.DecodeAppArguments(change.Value, &next); err != nil {
+			return workrun.AppMutation{}, err
+		}
+		if next.Enabled == nil {
+			return workrun.AppMutation{}, errors.New("enabled must be true or false")
+		}
+		enabled := *next.Enabled
+		return workrun.AppMutation{AfterReply: true, Summary: "Chat learning preference saved.", Preview: map[string]any{"before": prior.Desktop.LearnsFromChats(), "after": enabled}, Apply: func(context.Context) (any, error) {
+			err := c.settings.Update(func(current *config.Settings) error {
+				if current.Desktop.LearnsFromChats() != prior.Desktop.LearnsFromChats() {
+					return errors.New("chat learning changed; inspect settings and try again")
+				}
+				current.Desktop.LearnFromChats = &enabled
+				return nil
+			})
+			return map[string]any{"learn_from_chats": enabled}, err
+		}}, nil
 	case "theme":
 		var next struct {
 			Theme string `json:"theme"`
