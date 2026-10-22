@@ -1,6 +1,7 @@
 import { FileText, Paperclip, X } from "lucide-react";
-import { useEffect, useRef, useState, type DragEvent } from "react";
+import { useContext, useEffect, useRef, useState, type DragEvent } from "react";
 import type { UploadedFile } from "./bridge";
+import { FileCard, FileChatContext } from "./FileSurface";
 
 export function useAttachmentPicker(context: string | undefined, files: UploadedFile[], change: (files: UploadedFile[]) => void, disabled: boolean) {
   const [busy, setBusy] = useState(false);
@@ -35,11 +36,12 @@ export function AttachButton({ busy, disabled, choose }: { busy: boolean; disabl
 }
 
 export function PendingAttachments({ files, disabled, remove }: { files: UploadedFile[]; disabled: boolean; remove(id: string): void }) {
+  const chat = useContext(FileChatContext);
   if (!files.length) return null;
-  return <section className="pending-attachments" aria-label="Attachments for your next message"><ul>{files.map((file) => <li key={file.id}><FileText size={17} /><span><strong title={file.name}>{file.name}</strong><small>{file.size < 1024 ? `${file.size} B` : `${Math.ceil(file.size / 1024)} KB`}</small></span><button className="icon-button" aria-label={`Remove attachment ${file.name}`} disabled={disabled} onClick={() => remove(file.id)}><X size={14} /></button></li>)}</ul></section>;
+  return <section className="pending-attachments" aria-label="Attachments for your next message"><ul>{files.map((file,index) => <li key={`${index}:${file.name}`}><FileCard reference={{ kind: "upload", id: file.id }} name={file.name} caption={file.size < 1024 ? `${file.size} B` : `${Math.ceil(file.size / 1024)} KB`} /><button className="icon-button attachment-remove" aria-label={`Remove attachment ${file.name}`} disabled={disabled || chat.dirtyKeys?.has(JSON.stringify({ kind: "upload", id: file.id }))} onClick={() => remove(file.id)}><X size={14} /></button></li>)}</ul></section>;
 }
 
-export function InputFiles({ names }: { names?: string[] }) {
+export function InputFiles({ names, ids }: { names?: string[]; ids?: string[] }) {
   if (!names?.length) return null;
-  return <ul className="message-inputs" aria-label="Attached files">{names.map((name, index) => <li key={index}><Paperclip size={14} /><span title={name}>{name}</span></li>)}</ul>;
+  return <ul className="message-inputs" aria-label="Attached files">{names.map((name, index) => { const id = ids?.find(id => id.split("/").at(-1) === name) ?? ids?.[index]; return <li key={index}>{id ? <FileCard reference={{ kind: "upload", id }} name={name} /> : <><Paperclip size={14} /><span title={name}>{name}</span></>}</li>; })}</ul>;
 }
