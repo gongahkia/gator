@@ -6,6 +6,7 @@ const lifetime = 7 * 24 * 60 * 60 * 1000;
 const limit = 32;
 const textLimit = 128 * 1024;
 const validContext = (value) => typeof value === "string" && /^(conversation|workspace|topic):.+$/.test(value) && value.length <= 8192;
+const canonicalContext = (value) => value.startsWith("topic:") ? `workspace:${value}` : value;
 
 // Unsent text is private local application data, just like saved conversations.
 // The renderer never chooses a filename or writes credentials/form fields here.
@@ -51,14 +52,14 @@ export class DraftStore {
     // Migrate the interim topic: keys on the next ordinary access, atomically.
     const seen = new Set();
     data.drafts = data.enabled ? data.drafts.filter((draft) => validContext(draft.context) && typeof draft.text === "string" && Buffer.byteLength(draft.text) <= textLimit && typeof draft.title === "string" && typeof draft.source === "string" && Number.isFinite(draft.updated) && draft.updated > now - lifetime && draft.updated <= now)
-      .map((draft) => draft.context.startsWith("topic:") ? { ...draft, context: `workspace:${draft.context}` } : draft)
+      .map((draft) => draft.context.startsWith("topic:") ? { ...draft, context: canonicalContext(draft.context) } : draft)
       .filter((draft) => { if (seen.has(draft.context)) return false; seen.add(draft.context); return true; }).slice(0, limit) : [];
     if (request.action === "configure") { data.enabled = request.enabled; if (!data.enabled) data.drafts = []; }
     if (request.action === "clear") data.drafts = [];
     if (["save", "remove"].includes(request.action)) {
-      const context = request.draft?.context ?? request.context;
+      const context = canonicalContext(request.draft?.context ?? request.context);
       data.drafts = data.drafts.filter((draft) => draft.context !== context);
-      if (request.action === "save" && data.enabled && request.draft.text.trim()) data.drafts.unshift({ ...request.draft, updated: now });
+      if (request.action === "save" && data.enabled && request.draft.text.trim()) data.drafts.unshift({ ...request.draft, context, updated: now });
       data.drafts = data.drafts.slice(0, limit);
     }
     if (previous !== JSON.stringify(data) || ["clear", "configure"].includes(request.action)) {
