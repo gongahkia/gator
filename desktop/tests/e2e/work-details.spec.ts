@@ -49,16 +49,14 @@ test("compact work details preserve conversation state and distinguish selection
     await page.screenshot({ path: "test-results/desktop-work-details-expanded.png" });
     const earlierOutput = outputs.getByRole("button", { name: /report.md Checks passed/ });
     await earlierOutput.scrollIntoViewIfNeeded();
-    const listPosition = await rail.locator(".workspace-content").evaluate((element) => element.scrollTop);
     await earlierOutput.click();
-    await expect(rail.getByRole("heading", { name: "Earlier report", exact: true })).toBeVisible();
+    await expect(rail).toHaveCount(0);
+    const inlineFile = page.locator(".result-message").getByRole("button", { name: "Open file report.md", exact: true });
+    await expect(inlineFile).toBeFocused();
+    await expect(page.locator(".result-message").getByRole("heading", { name: "Earlier report", exact: true })).toBeVisible();
     await page.screenshot({ path: "test-results/desktop-work-details-preview.png" });
     await expect(composer).toHaveValue("Keep my unsent follow-up");
-    expect(await rail.locator(".workspace-content").evaluate((element) => element.scrollTop)).toBe(0);
-    expect(await scroll.evaluate((element) => element.scrollTop)).toBe(0);
-    await rail.getByRole("button", { name: "All outputs", exact: true }).click();
-    await expect(outputs.getByRole("button", { name: /report.md Checks passed/ })).toBeFocused();
-    expect(await rail.locator(".workspace-content").evaluate((element) => element.scrollTop)).toBeCloseTo(listPosition, 0);
+    await page.getByRole("button", { name: "Conversation information", exact: true }).click();
     await outputs.getByRole("button", { name: /report.md Needs review/ }).click();
     await expect(rail.getByText("Retained from a failed run.")).toBeVisible();
     await expect(rail.getByText("Showing a shortened preview.")).toBeVisible();
@@ -68,20 +66,22 @@ test("compact work details preserve conversation state and distinguish selection
     expect(await page.evaluate(() => (window as unknown as { previewExecuted?: boolean }).previewExecuted)).toBeUndefined();
     await rail.getByRole("button", { name: "All outputs", exact: true }).click();
     await outputs.getByRole("button", { name: /slides.pdf/ }).click();
-    await expect(rail.getByText("No text preview is available for this file.")).toBeVisible();
-    await rail.getByRole("button", { name: "All outputs", exact: true }).click();
+    await expect(rail).toHaveCount(0);
+    const unavailablePDF = page.locator(".result-message .inline-file").filter({ has: page.getByRole("button", { name: "Open file slides.pdf", exact: true }) });
+    await expect(unavailablePDF.getByRole("alert")).toContainText("Return to the same conversation");
+    await expect(unavailablePDF.getByRole("button", { name: "Edit", exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "Conversation information", exact: true }).click();
     await outputs.getByRole("button", { name: /Change change-one/ }).click();
     await expect(rail.getByText("src/example.ts", { exact: true })).toBeVisible();
     await rail.getByRole("button", { name: "All outputs", exact: true }).click();
     await page.getByRole("button", { name: "Close conversation information", exact: true }).click();
     await expect(page.getByRole("button", { name: "Conversation information", exact: true })).toBeFocused();
-    const inlineFile = page.locator(".result-message").getByRole("button", { name: /^report.md Checks passed/ });
+    await inlineFile.click(); // Collapse the already-open file, without opening another panel.
+    await expect(rail).toHaveCount(0);
+    await expect(inlineFile).toHaveAttribute("aria-expanded", "false");
     await inlineFile.click();
-    await expect(rail.getByRole("region", { name: "Output preview" })).toBeVisible();
-    await expect(rail.getByRole("heading", { name: "Earlier report", exact: true })).toBeVisible();
+    await expect(page.locator(".result-message").getByRole("heading", { name: "Earlier report", exact: true })).toBeVisible();
     await expect(composer).toHaveValue("Keep my unsent follow-up");
-    await page.getByRole("button", { name: "Close conversation information", exact: true }).click();
-    await expect(inlineFile).toBeFocused();
     // Clicking a file near the latest turn scrolls it into view. Move back to
     // earlier messages before testing that an incoming update keeps our place.
     await scroll.evaluate((element) => { element.scrollTop = 0; });

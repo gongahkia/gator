@@ -35,12 +35,10 @@ test("contextual files reuse retained previews and show the exact origin in chat
     await expect(rail.getByRole("button", { name: "Show in chat", exact: true })).toHaveCount(0);
     await rail.getByRole("button", { name: "All files", exact: true }).click();
     await rail.getByRole("button", { name: /report.md Checks passed/ }).click();
-    await expect(rail.getByRole("heading", { name: "Retained report", exact: true })).toBeVisible();
-    await page.evaluate(async () => { await Promise.allSettled(document.getAnimations().filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity).map((animation) => animation.finished)); });
-    await page.screenshot({ path: "test-results/desktop-files-preview.png" });
-    await rail.getByRole("button", { name: "Show in chat", exact: true }).click();
     await expect(rail).toHaveCount(0);
-    const origin = page.locator(".conversation-scroll .output-card");
+    const origin = page.locator(".conversation-scroll .inline-file-card");
+    await expect(page.locator(".conversation-scroll .inline-file").getByRole("heading", { name: "Retained report", exact: true })).toBeVisible();
+    await page.screenshot({ path: "test-results/desktop-files-preview.png" });
     await expect(origin).toBeFocused();
     await expect(origin).toBeInViewport();
     await expect(composer).toHaveValue("Keep my file question");
