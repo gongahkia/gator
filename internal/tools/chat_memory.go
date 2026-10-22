@@ -78,7 +78,7 @@ func (t rememberChat) Execute(_ context.Context, raw json.RawMessage) (agent.Too
 	if !t.available(a.ReplaceID) {
 		return agent.ToolResult{}, errors.New("this memory is excluded from the current run")
 	}
-	record, err := t.Store.RememberChat(memory.ChatInput{Subject: a.Subject, Kind: a.Kind, Quote: a.Quote, GoalID: goalID, ConversationID: t.ConversationID, RunID: t.RunID, ReplaceID: a.ReplaceID, ExpectedUpdated: a.ExpectedUpdated, Explicit: explicit})
+	record, err := t.Store.RememberChat(memory.ChatInput{Subject: a.Subject, Kind: a.Kind, Quote: a.Quote, GoalID: goalID, ConversationID: t.ConversationID, RunID: t.RunID, ReplaceID: a.ReplaceID, ExpectedUpdated: a.ExpectedUpdated, Explicit: explicit, ExcludedIDs: t.ExcludedIDs})
 	if err != nil {
 		return agent.ToolResult{}, err
 	}

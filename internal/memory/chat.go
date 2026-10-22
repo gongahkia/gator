@@ -50,6 +50,7 @@ func (s Store) blockSubject(goalID, subject string) error {
 type ChatInput struct {
 	Subject, Kind, GoalID, Quote, ConversationID, RunID, ReplaceID, ExpectedUpdated string
 	Explicit                                                                        bool
+	ExcludedIDs                                                                     []string
 }
 
 // RememberChat stores the user's exact words. A model cannot manufacture a
@@ -85,6 +86,11 @@ func (s Store) RememberChat(input ChatInput) (Record, error) {
 		}
 	}
 	if current.ID != "" {
+		for _, id := range input.ExcludedIDs {
+			if id == current.ID {
+				return Record{}, errors.New("this memory subject is excluded from the current run")
+			}
+		}
 		if current.Text == strings.TrimSpace(input.Quote) {
 			return current, nil
 		}

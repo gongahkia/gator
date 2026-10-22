@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/gongahkia/gator/internal/knowledge"
+	"github.com/gongahkia/gator/internal/memory"
 	"github.com/gongahkia/gator/internal/workrun"
 )
 
@@ -142,5 +143,32 @@ func TestWorkStartsWithScopedRelevantNoteLeads(t *testing.T) {
 	}
 	if err := applyNoteContext(state, &request); err != nil || request.NoteContext != "" {
 		t.Fatalf("removed note projection = %q, %v", request.NoteContext, err)
+	}
+}
+
+func TestChatProfileCapsuleIsForegroundOnlyAndHonorsExclusions(t *testing.T) {
+	state := t.TempDir()
+	store, err := memory.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := store.RememberChat(memory.ChatInput{Subject: "preference.response_length", Kind: "preference", Quote: "I prefer concise bullet points.", ConversationID: "work-profile", RunID: "run-profile"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct{ foreground, excluded, want bool }{{true, false, true}, {true, true, false}, {false, false, false}} {
+		request := workrun.Request{Objective: "Suggest an outdoor activity.", ForegroundApp: test.foreground}
+		if test.excluded {
+			request.ExcludedKnowledgeIDs = []string{record.ID}
+		}
+		if err := applyMemoryContext(state, &request); err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(request.MemoryContext, record.Text) != test.want {
+			t.Fatal("profile recall crossed foreground/exclusion boundary", request.MemoryContext, test)
+		}
+		if len(request.ContextRefs) != map[bool]int{true: 1, false: 0}[test.want] {
+			t.Fatal("supplied refs differ from actual capsule")
+		}
 	}
 }

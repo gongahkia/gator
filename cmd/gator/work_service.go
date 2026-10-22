@@ -202,12 +202,18 @@ func applyMemoryContext(stateDir string, request *workrun.Request) error {
 	if len(all) == 0 {
 		recallState = "no saved memories in scope"
 	}
-	appendRecallStatus(request, "Memories", recallState)
 	var selected []memory.Record
-	profile, err := store.Profile(request.ExcludedKnowledgeIDs)
-	if err != nil {
-		return err
+	var profile []memory.Record
+	if request.ForegroundApp {
+		profile, err = store.Profile(request.ExcludedKnowledgeIDs)
+		if err != nil {
+			return err
+		}
 	}
+	if len(profile) > 0 {
+		recallState += " + personal profile"
+	}
+	appendRecallStatus(request, "Memories", recallState)
 	seen := map[string]bool{}
 	combined := append([]memory.Record{}, profile...)
 	for _, record := range profile {

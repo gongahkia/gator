@@ -15,6 +15,11 @@ func TestChatMemoryConsolidatesWithProvenanceAndRespectsCorrectionForget(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
+	input.ExcludedIDs = []string{first.ID}
+	if _, err := s.RememberChat(input); err == nil {
+		t.Fatal("an excluded subject could be read or updated through remembering")
+	}
+	input.ExcludedIDs = nil
 	again, err := s.RememberChat(input)
 	if err != nil || again.ID != first.ID {
 		t.Fatal("duplicate memory", err)
@@ -23,6 +28,7 @@ func TestChatMemoryConsolidatesWithProvenanceAndRespectsCorrectionForget(t *test
 	if _, err = s.RememberChat(input); err == nil {
 		t.Fatal("silent conflicting overwrite")
 	}
+	s.now = func() time.Time { return first.UpdatedAt }
 	input.ReplaceID, input.ExpectedUpdated = first.ID, first.UpdatedAt.Format(time.RFC3339Nano)
 	next, err := s.RememberChat(input)
 	if err != nil || next.ID != first.ID || next.Origin.Quote != input.Quote {
