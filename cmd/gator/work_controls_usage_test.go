@@ -46,7 +46,7 @@ func TestUsageDisplayUsesSharedAccountingAndKeepsReviewedPolicy(t *testing.T) {
 	if err != nil || reset.Format("15:04:05Z07:00") != "00:00:00Z" || reset.Format("2006-01-02") <= u.Day {
 		t.Fatalf("invalid UTC reset: %s (%v)", u.ResetAt, err)
 	}
-	if len(u.Categories) != 6 || u.Categories[0].Name != "chat" || u.Categories[0].Requests != 1 || u.Categories[2].Name != "background" || u.Categories[2].Requests != 1 {
+	if len(u.Categories) != 7 || u.Categories[0].Name != "chat" || u.Categories[0].Requests != 1 || u.Categories[2].Name != "background" || u.Categories[2].Requests != 1 || u.Categories[6].Name != "voice" || u.Categories[6].Requests != 0 {
 		t.Fatalf("incorrect category breakdown: %+v", u.Categories)
 	}
 	if len(screen.Actions) != 3 || !screen.Actions[0].Review || !screen.Actions[1].Review {

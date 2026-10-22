@@ -67,4 +67,14 @@ func TestDesktopSpeechKeepsKeysPrivateAndChargesSharedUsage(t *testing.T) {
 	if err := runDesktopSpeech(bytes.NewReader(payload), io.Discard); err == nil || calls != 1 {
 		t.Fatal("recording was uploaded after its selected voice route changed")
 	}
+	if err := ledger.SavePolicy(sharedusage.Policy{Paused: true}); err != nil {
+		t.Fatal(err)
+	}
+	output.Reset()
+	if err := runDesktopSpeech(strings.NewReader(`{"action":"status"}`), &output); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(output.Bytes(), &status); err != nil || status.Ready || status.Issue == "" {
+		t.Fatalf("paused usage allowed microphone setup: %s (%v)", output.String(), err)
+	}
 }

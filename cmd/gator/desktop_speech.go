@@ -79,8 +79,20 @@ func voiceConfiguration(settings config.Settings, stateDir string) (speech.Confi
 		key = os.Getenv(model.APIKeyEnvironment(model.Provider(provider)))
 	}
 	status.Ready = key != ""
+	if status.Ready {
+		ledger, err := sharedusage.Open(stateDir)
+		if err != nil {
+			return speech.Config{}, status, err
+		}
+		if err := ledger.Admission(time.Now()); err != nil {
+			status.Ready = false
+			status.Issue = err.Error()
+		}
+	}
 	if !status.Ready {
-		status.Issue = "Configure the " + provider + " API key in Settings → Models to use dictation."
+		if status.Issue == "" {
+			status.Issue = "Configure the " + provider + " API key in Settings → Models to use dictation."
+		}
 	}
 	return speech.Config{Provider: provider, Model: selected, APIKey: key, BaseURL: settings.ProviderEndpoint(provider)}, status, nil
 }
