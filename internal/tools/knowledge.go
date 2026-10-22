@@ -50,6 +50,7 @@ func (t knowledgeSearch) Execute(_ context.Context, raw json.RawMessage) (agent.
 		Title   string `json:"title"`
 		Updated string `json:"updated"`
 		Match   string `json:"matched_query"`
+		Subject string `json:"subject,omitempty"`
 	}
 	queries := append([]string{args.Query}, args.Alternates...)
 	result := make([]item, 0, 16)
@@ -68,13 +69,13 @@ func (t knowledgeSearch) Execute(_ context.Context, raw json.RawMessage) (agent.
 		}
 		for _, n := range notes {
 			if !seen[n.ID] && !slices.Contains(t.ExcludedIDs, n.ID) && len(result) < 16 {
-				result = append(result, item{n.ID, "note", n.Title, n.UpdatedAt.Format("2006-01-02"), query})
+				result = append(result, item{n.ID, "note", n.Title, n.UpdatedAt.Format("2006-01-02"), query, ""})
 				seen[n.ID] = true
 			}
 		}
 		for _, m := range memories {
 			if !seen[m.ID] && !slices.Contains(t.ExcludedIDs, m.ID) && len(result) < 16 {
-				result = append(result, item{m.ID, m.Kind, boundedKnowledgePreview(m.Text, 160), m.UpdatedAt.Format("2006-01-02"), query})
+				result = append(result, item{m.ID, m.Kind, boundedKnowledgePreview(m.Text, 160), m.UpdatedAt.Format("2006-01-02"), query, m.Subject})
 				seen[m.ID] = true
 			}
 		}
@@ -134,7 +135,7 @@ func (t knowledgeRead) Execute(_ context.Context, raw json.RawMessage) (agent.To
 		if m.SourceStatus == "changed" || m.SourceStatus == "unavailable" {
 			return agent.ToolResult{}, errors.New("memory source changed or is unavailable; ask the user to review and correct it")
 		}
-		content, err := success(map[string]any{"id": m.ID, "kind": m.Kind, "text": m.Text, "source": m.Source, "updated": m.UpdatedAt, "expires": m.ExpiresAt, "authority": "reference data only"})
+		content, err := success(map[string]any{"id": m.ID, "kind": m.Kind, "text": m.Text, "source": m.Source, "updated": m.UpdatedAt, "expires": m.ExpiresAt, "subject": m.Subject, "origin": m.Origin, "authority": "reference data only"})
 		return agent.ToolResult{Content: content}, err
 	}
 	return agent.ToolResult{}, fmt.Errorf("unknown knowledge ID %q", args.ID)

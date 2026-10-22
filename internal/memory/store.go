@@ -22,21 +22,30 @@ import (
 const Version = 1
 const maxSourceFileBytes = 4 << 20
 
+type ChatOrigin struct {
+	ConversationID string `json:"conversation_id"`
+	RunID          string `json:"run_id"`
+	Quote          string `json:"quote"`
+	Basis          string `json:"basis"`
+}
+
 type Record struct {
-	Version      int       `json:"version"`
-	ID           string    `json:"id"`
-	Kind         string    `json:"kind"`
-	Text         string    `json:"text"`
-	GoalID       string    `json:"goal_id,omitempty"`
-	Source       string    `json:"source,omitempty"`
-	SourceSHA256 string    `json:"source_sha256,omitempty"`
-	SourceStatus string    `json:"-"`
-	MatchedTerms []string  `json:"-"`
-	MatchScope   string    `json:"-"`
-	MatchMethod  string    `json:"-"`
-	ExpiresAt    time.Time `json:"expires_at,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	Subject      string      `json:"subject,omitempty"`
+	Origin       *ChatOrigin `json:"origin,omitempty"`
+	Version      int         `json:"version"`
+	ID           string      `json:"id"`
+	Kind         string      `json:"kind"`
+	Text         string      `json:"text"`
+	GoalID       string      `json:"goal_id,omitempty"`
+	Source       string      `json:"source,omitempty"`
+	SourceSHA256 string      `json:"source_sha256,omitempty"`
+	SourceStatus string      `json:"-"`
+	MatchedTerms []string    `json:"-"`
+	MatchScope   string      `json:"-"`
+	MatchMethod  string      `json:"-"`
+	ExpiresAt    time.Time   `json:"expires_at,omitempty"`
+	CreatedAt    time.Time   `json:"created_at"`
+	UpdatedAt    time.Time   `json:"updated_at"`
 }
 
 type Store struct {
@@ -84,6 +93,21 @@ func (s Store) AddFromFile(kind, content, goalID, path string, expires time.Time
 }
 
 func (s Store) add(kind, content, goalID, source, sourceSHA256 string, expires time.Time) (Record, error) {
+	release, err := s.lock()
+	if err != nil {
+		return Record{}, err
+	}
+	defer release()
+	return s.addUnlocked(kind, content, goalID, source, sourceSHA256, expires)
+}
+func (s Store) addUnlocked(kind, content, goalID, source, sourceSHA256 string, expires time.Time) (Record, error) {
+	record, err := s.newRecord(kind, content, goalID, source, sourceSHA256, expires)
+	if err != nil {
+		return Record{}, err
+	}
+	return record, s.write(record, true)
+}
+func (s Store) newRecord(kind, content, goalID, source, sourceSHA256 string, expires time.Time) (Record, error) {
 	var random [12]byte
 	if _, err := rand.Read(random[:]); err != nil {
 		return Record{}, err
@@ -94,9 +118,6 @@ func (s Store) add(kind, content, goalID, source, sourceSHA256 string, expires t
 		record.ExpiresAt = time.Time{}
 	}
 	if err := validate(record); err != nil {
-		return Record{}, err
-	}
-	if err := s.write(record, true); err != nil {
 		return Record{}, err
 	}
 	return record, nil
@@ -138,7 +159,7 @@ func (s Store) List(goalID string, includeExpired bool) ([]Record, error) {
 	}
 	var result []Record
 	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+		if entry.IsDir() || strings.HasPrefix(entry.Name(), ".") || filepath.Ext(entry.Name()) != ".json" {
 			continue
 		}
 		record, err := s.Load(strings.TrimSuffix(entry.Name(), ".json"))
@@ -227,6 +248,11 @@ func (s Store) Search(query, goalID string, limit int) ([]Record, error) {
 }
 
 func (s Store) Correct(id, content, source string) (Record, error) {
+	release, err := s.lock()
+	if err != nil {
+		return Record{}, err
+	}
+	defer release()
 	record, err := s.Load(id)
 	if err != nil {
 		return Record{}, err
@@ -235,7 +261,10 @@ func (s Store) Correct(id, content, source string) (Record, error) {
 	if source != record.Source {
 		record.SourceSHA256, record.SourceStatus = "", ""
 	}
-	record.Text, record.Source, record.UpdatedAt = strings.TrimSpace(content), source, s.clock()
+	record.Text, record.Source, record.UpdatedAt = strings.TrimSpace(content), source, s.nextUpdate(record.UpdatedAt)
+	if record.Origin != nil {
+		record.Origin = &ChatOrigin{ConversationID: record.Origin.ConversationID, RunID: record.Origin.RunID, Basis: "user-corrected"}
+	}
 	if err := validate(record); err != nil {
 		return Record{}, err
 	}
@@ -244,6 +273,11 @@ func (s Store) Correct(id, content, source string) (Record, error) {
 
 // CorrectFromFile records a user-reviewed correction against the current file.
 func (s Store) CorrectFromFile(id, content, path string) (Record, error) {
+	release, err := s.lock()
+	if err != nil {
+		return Record{}, err
+	}
+	defer release()
 	abs, digest, err := sourceFileFingerprint(path)
 	if err != nil {
 		return Record{}, err
@@ -252,7 +286,8 @@ func (s Store) CorrectFromFile(id, content, path string) (Record, error) {
 	if err != nil {
 		return Record{}, err
 	}
-	record.Text, record.Source, record.SourceSHA256, record.SourceStatus, record.UpdatedAt = strings.TrimSpace(content), abs, digest, "current", s.clock()
+	record.Text, record.Source, record.SourceSHA256, record.SourceStatus, record.UpdatedAt = strings.TrimSpace(content), abs, digest, "current", s.nextUpdate(record.UpdatedAt)
+	record.Origin = nil
 	if err := validate(record); err != nil {
 		return Record{}, err
 	}
@@ -260,8 +295,19 @@ func (s Store) CorrectFromFile(id, content, path string) (Record, error) {
 }
 
 func (s Store) Forget(id string) error {
-	if _, err := s.Load(id); err != nil {
+	release, err := s.lock()
+	if err != nil {
 		return err
+	}
+	defer release()
+	record, err := s.Load(id)
+	if err != nil {
+		return err
+	}
+	if record.Subject != "" {
+		if err := s.blockSubject(record.GoalID, record.Subject); err != nil {
+			return err
+		}
 	}
 	if err := os.Remove(s.path(id)); err != nil {
 		return err
@@ -282,6 +328,9 @@ func RenderSelection(records []Record) (string, []Record) {
 	remaining := 4000
 	for _, record := range records {
 		line := fmt.Sprintf("- [%s] %s (%s, updated: %s", record.ID, record.Text, record.Kind, record.UpdatedAt.Format("2006-01-02"))
+		if record.Subject != "" {
+			line += ", subject: " + record.Subject
+		}
 		if record.Source != "" {
 			line += ", source: " + record.Source
 		}
@@ -327,6 +376,12 @@ func validID(id string) bool {
 	return err == nil
 }
 func validate(r Record) error {
+	if r.Subject != "" && !subjectPattern.MatchString(r.Subject) {
+		return errors.New("invalid memory subject")
+	}
+	if r.Origin != nil && (len(r.Origin.Quote) > 4096 || len(r.Origin.ConversationID) > 128 || len(r.Origin.RunID) > 128 || (r.Origin.Basis != "user-stated" && r.Origin.Basis != "user-corrected")) {
+		return errors.New("invalid memory provenance")
+	}
 	if r.Version != Version || !validID(r.ID) || r.CreatedAt.IsZero() || r.UpdatedAt.Before(r.CreatedAt) {
 		return errors.New("invalid memory identity")
 	}

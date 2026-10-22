@@ -16,6 +16,7 @@ import (
 	"github.com/gongahkia/gator/internal/snapshot"
 	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/workhistory"
+	"github.com/gongahkia/gator/internal/worksession"
 )
 
 func writeFixture(t *testing.T, root, path, text string) {
@@ -297,5 +298,51 @@ func TestFileVersionsFollowBackupAndExplicitHistoryDeletion(t *testing.T) {
 	}
 	if entries, err := os.ReadDir(filepath.Join(root, "gator/files")); err != nil || len(entries) != 0 {
 		t.Fatal("history deletion retained private working files", err)
+	}
+}
+
+func TestRetentionPreservesSelectedUnsentChatAndBackupMemorySuppression(t *testing.T) {
+	root := t.TempDir()
+	s, _ := Open(root)
+	sessions, _ := worksession.Open(root)
+	old := time.Now().Add(-60 * 24 * time.Hour)
+	active, _ := sessions.CreateChat(t.TempDir(), old)
+	expired, _ := sessions.CreateChat(t.TempDir(), old)
+	if err := sessions.SetActive(active.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SavePolicy(Policy{HistoryDays: 30}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Maintain(context.Background(), root, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sessions.Load(active.ID); err != nil {
+		t.Fatal("unsent active chat lost", err)
+	}
+	if _, err := sessions.Load(expired.ID); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("expired unselected chat retained", err)
+	}
+	memories, _ := memory.Open(root)
+	record, err := memories.RememberChat(memory.ChatInput{Subject: "profile.name", Kind: "fact", Quote: "My name is Sam.", ConversationID: active.ID, RunID: "run-first"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = memories.Forget(record.ID); err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := s.Export(context.Background(), filepath.Join(t.TempDir(), "backup.tar.gz"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for file := range manifest.Files {
+		if strings.Contains(file, ".write-lock") {
+			t.Fatal("transient lock in backup")
+		}
+		found = found || strings.Contains(file, ".forgotten/")
+	}
+	if !found {
+		t.Fatal("backup lost forgotten-subject suppression")
 	}
 }

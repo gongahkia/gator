@@ -161,6 +161,13 @@ func (s Store) selectRetention(ctx context.Context, now time.Time, p Policy) (Pl
 		if err != nil {
 			return plan, err
 		}
+		active, err := sessions.RetainedActive()
+		if err != nil {
+			return plan, err
+		}
+		if active != "" {
+			protectedConversation[active] = true
+		}
 		conversations, err := sessions.List(0)
 		if err != nil {
 			return plan, err

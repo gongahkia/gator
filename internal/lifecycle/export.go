@@ -261,6 +261,9 @@ func backupContent(name string) bool {
 		return false
 	}
 	rel := strings.TrimPrefix(name, "gator/")
+	if rel == "memory/.write-lock" {
+		return false
+	}
 	if strings.HasPrefix(rel, "work-control/") || strings.HasPrefix(rel, "retrieval/") {
 		return false
 	}
