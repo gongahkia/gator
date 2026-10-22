@@ -7,24 +7,26 @@ export async function temporaryDirectory(prefix: string) {
   return realpath(await mkdtemp(prefix));
 }
 
-// The Node debugger can keep Electron alive after normal app shutdown, and a
-// second context.close() can wait on that inspector. Detach only this test's
-// inspector after the evaluation returns, then use Gator's normal quit path.
+// Let Playwright disconnect its inspector after requesting Gator's normal quit
+// path; do not close its debugger connection from inside the application.
 export async function closeDesktop(application: ElectronApplication) {
   const child = application.process();
   if (child.exitCode !== null || child.signalCode !== null) return;
   let timeout: ReturnType<typeof setTimeout> | undefined;
-  const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
   const deadline = new Promise<never>((_, reject) => {
     timeout = setTimeout(() => {
-      child.kill("SIGKILL");
-      reject(new Error("The isolated Gator test application did not close."));
+      const status = child.exitCode === null ? "main process is still running" : `main process exited with ${child.exitCode}`;
+      // Playwright launches Electron in its own process group on Unix. Include
+      // its Chromium helpers when a failed test has to be stopped.
+      try {
+        if (process.platform !== "win32" && child.pid) process.kill(-child.pid, "SIGKILL");
+        else if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+      } catch { /* The isolated process may already have exited. */ }
+      reject(new Error(`The isolated Gator test application did not close (${status}).`));
     }, 10_000);
   });
   try {
-    const closing = application.evaluate(({ app }) => {
-      setImmediate(() => { process.getBuiltinModule("inspector").close(); app.quit(); });
-    });
-    await Promise.race([Promise.all([closing, exited]), deadline]);
+    await Promise.race([application.close(), deadline]);
+    if (child.exitCode !== 0) throw new Error("The isolated Gator test application exited unsuccessfully.");
   } finally { clearTimeout(timeout); }
 }

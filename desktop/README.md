@@ -154,6 +154,27 @@ GATOR_DESKTOP_TEST_EXECUTABLE="$PWD/desktop/release/mac/Gator.app/Contents/MacOS
   npm run test:e2e --prefix desktop
 ```
 
+### Local Electron test runner note
+
+On 2026-10-23, the memory/restart checks on an Intel Mac running macOS 15.7.7
+and Electron 44.9.2 completed with Node 24.19.0. With Node 26.7.0 on the same
+machine, the runner repeatedly timed out during Electron shutdown after Gator's
+draft/file flushes, runtime stops and native quit event had completed. This is a
+local validation result, not a general Node 26 compatibility verdict. If you
+encounter that shutdown timeout, select Node 24 LTS before rerunning the tests.
+
+From `desktop/`, with `node --version` confirming the selected runner:
+
+```sh
+node node_modules/playwright/cli.js test tests/e2e/shared-chats.spec.ts \
+  --grep 'new chats share grounded personal memory|earlier-chat privacy|saved-memory receipts|memory edits survive'
+```
+
+The fixtures use isolated profiles and local scripted providers. Their normal
+close path must complete before restart; a forced cleanup still fails the test.
+
+### Distribution
+
 `make dist` builds desktop installers. The release workflow produces macOS
 DMG/ZIP, Linux AppImage/DEB, and Windows NSIS/ZIP artifacts with matching runtime architectures.
 Windows is a preview port; see [capabilities and verification](../docs/WINDOWS.md).

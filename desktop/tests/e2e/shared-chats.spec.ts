@@ -15,6 +15,13 @@ const command = (page:Page,text:string) => page.evaluate(text=>window.gator!.sen
 const snapshot = (page:Page) => page.evaluate(async()=>(await window.gator!.snapshot()).state!);
 const composer = (page:Page) => page.getByRole("textbox",{name:"Message Gator",exact:true});
 async function send(page:Page,text:string) { const previous=(await snapshot(page)).messages.filter(m=>m.role==="Gator").length;await composer(page).fill(text);await page.getByRole("button",{name:"Send message",exact:true}).click();await expect.poll(async()=>(await snapshot(page)).messages.filter(m=>m.role==="Gator").length).toBeGreaterThan(previous);await expect(page.getByRole("button",{name:"Stop current work",exact:true})).toHaveCount(0); }
+async function newChat(page:Page) {
+  const previous=(await snapshot(page)).conversation_id;
+  await page.getByRole("button",{name:"New chat",exact:true}).click();
+  await expect.poll(async()=>(await snapshot(page)).conversation_id).not.toBe(previous);
+  await expect.poll(async()=>(await page.evaluate(()=>window.gator!.snapshot())).sessionSwitching).toBe(false);
+  await expect(composer(page)).toBeEnabled();
+}
 async function fixture() {
   const directory=await temporaryDirectory(join(tmpdir(),"gator-shared-chats-")),workspace=join(directory,"workspace");
   await mkdir(workspace);await mkdir(join(directory,"config/gator"),{recursive:true});
@@ -41,7 +48,7 @@ async function fixture() {
   let app:ElectronApplication|undefined;
   const launch=async()=>{const executablePath=process.env.GATOR_DESKTOP_TEST_EXECUTABLE;app=await electron.launch({executablePath,args:executablePath?[]:["."],cwd:resolve("."),env});return app;};
   const memories=async()=>{const path=join(directory,"state/gator/memory");return Promise.all((await readdir(path)).filter(name=>name.endsWith(".json")).map(async name=>JSON.parse(await readFile(join(path,name),"utf8"))));};
-  return {directory,requests,launch,memories,async restart(){await closeDesktop(app!);return launch();},async close(){if(app)await closeDesktop(app);server.closeAllConnections();await new Promise<void>(done=>server.close(()=>done()));await rm(directory,{recursive:true,force:true});}};
+  return {directory,requests,launch,memories,async restart(){const previous=app!;app=undefined;await closeDesktop(previous);return launch();},async close(){const previous=app;app=undefined;try{if(previous)await closeDesktop(previous);}finally{server.closeAllConnections();await new Promise<void>(done=>server.close(()=>done()));await rm(directory,{recursive:true,force:true});}}};
 }
 
 test("new chats share grounded personal memory, keep separate transcripts and reopen the last draft",async()=>{
@@ -50,13 +57,13 @@ test("new chats share grounded personal memory, keep separate transcripts and re
     const first=(await snapshot(page)).conversation_id;expect(first).toBeTruthy();
     await command(page,"/mode inspect");await send(page,quote);
     await expect.poll(async()=>(await f.memories()).length).toBe(1);const memory=(await f.memories())[0];expect(memory.text).toBe(quote);expect(memory.origin.conversation_id).toBe(first);expect(memory.origin.quote).toBe(quote);
-    await page.getByRole("button",{name:"New chat",exact:true}).click();await expect.poll(async()=>(await snapshot(page)).conversation_id).not.toBe(first);const second=(await snapshot(page)).conversation_id;await expect(composer(page)).toBeFocused();
+    await newChat(page);const second=(await snapshot(page)).conversation_id;await expect(composer(page)).toBeFocused();
     expect((await snapshot(page)).messages).toEqual([]);await command(page,"/mode inspect");const before=f.requests.length;await send(page,"Suggest a weekend activity.");
     const fresh=f.requests[before];expect(fresh.messages.filter(m=>m.role==="user").map(textOf).join("\n")).not.toContain(quote);expect(fresh.messages.filter(m=>m.role==="system").map(textOf).join("\n")).toContain(quote);
-    await send(page,"The venue is Birch Hall.");await page.getByRole("button",{name:"New chat",exact:true}).click();await command(page,"/mode inspect");
+    await send(page,"The venue is Birch Hall.");await newChat(page);await command(page,"/mode inspect");
     await send(page,"Find the earlier Birch Hall discussion.");expect(JSON.stringify(f.requests.at(-1))).toContain('historical reference only');expect(JSON.stringify(f.requests.at(-1))).toContain(second!);
     await send(page,"Please forget my reply preference.");await expect.poll(async()=>(await f.memories()).length).toBe(0);
-    await page.getByRole("button",{name:"New chat",exact:true}).click();await command(page,"/mode inspect");const afterForget=f.requests.length;await send(page,"Suggest a weekend activity.");expect(f.requests[afterForget].messages.filter(m=>m.role==="system").map(textOf).join("\n")).not.toContain(quote);
+    await newChat(page);await command(page,"/mode inspect");const afterForget=f.requests.length;await send(page,"Suggest a weekend activity.");expect(f.requests[afterForget].messages.filter(m=>m.role==="system").map(textOf).join("\n")).not.toContain(quote);
     await command(page,"/memory");await expect(page.getByRole("button",{name:/turn chat learning off/i})).toBeVisible();await page.getByRole("button",{name:/turn chat learning off/i}).click();await expect(page.getByRole("button",{name:/turn chat learning on/i})).toBeVisible();await command(page,"/chat");
     await send(page,quote);expect(await f.memories()).toHaveLength(0);
     await send(page,`Remember that ${quote}`);await expect.poll(async()=>(await f.memories()).length).toBe(1);
@@ -134,6 +141,7 @@ test("earlier-chat privacy is independent of learning and persists across restar
     await command(page,"/memory");await expect(page.getByRole("button",{name:/turn earlier-chat retrieval on/i})).toBeVisible();
     await page.getByRole("button",{name:/turn earlier-chat retrieval on/i}).click();
     await page.getByRole("button",{name:"Back to app",exact:true}).click();
+    await command(page,"/mode inspect");
     const restored=f.requests.length;await send(page,"Find the earlier Birch Hall discussion.");
     expect(f.requests[restored].tools?.map(tool=>tool.function.name)).toContain("chat_search");
     expect((await f.memories())[0].text).toBe(quote);
