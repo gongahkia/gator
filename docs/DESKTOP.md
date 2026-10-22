@@ -48,7 +48,7 @@ current live interaction ID; retained cards have no approval authority.
 | Conversation | User bubbles, an assistant reading column, response/code copy controls, typed result cards, streaming progress, stop/steering, and editable queued-message cards |
 | Reviews | Semantic status and exact structured previews, open by default, with request-bound approve/deny buttons; separate confirmation for workflow writes |
 | Native forms | Bounded text/password/multiline fields, desktop action toolbars and keyboard list navigation; existing Go review and save actions |
-| Work details | Deliverables and recurring checks with linked keyboard-accessible tabs; no Context tab or profile footer |
+| Work details | Optional compact sections for outputs, selected sources/connections, local execution details and checks; context capacity is explicitly unmeasured |
 | Usage & limits | Daily request/token meters, shared limit controls, activity breakdown, and expandable accounting details |
 | Commands | Cmd/Ctrl+K, searchable commands, arrow navigation, input-prefilling commands |
 | Transcript search | Cmd/Ctrl+F, literal in-place highlights over rendered prose/results, previous/next matches, Enter/Shift+Enter, and surrounding context preserved |
@@ -388,3 +388,16 @@ and native CI gates are implemented. See [Windows capability and verification
 status](WINDOWS.md). Earlier platform verification entries above remain historical.
 Windows strict process sandboxing, interactive agent terminals and computer
 control remain unavailable; no isolation policy is relaxed by this port.
+
+## Reviewed updates and product direction
+
+Settings and the application menu now expose **About & updates**. Development
+builds use manual updates. Signed macOS apps and Windows NSIS installations can
+explicitly check, download and review a restart; ordinary quit does not install
+an update. Signing account setup and native install/update validation are still
+pending. See [desktop releases](DESKTOP-RELEASES.md).
+
+The [conversation surface proposal](CONVERSATIONAL-SURFACE-PLAN.md) explores
+Gator as a familiar personal agent with secondary Following and Saved views.
+Its prototype uses fictional data. This is a proposed replacement for parts of
+the current navigation/dashboard, not a claim that those new journeys ship yet.

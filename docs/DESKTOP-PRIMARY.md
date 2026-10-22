@@ -92,3 +92,15 @@ an unsigned development build; no new release has been published here.
 The Windows preview port adds a `.exe` private runtime, per-user Windows
 installers and native runtime/platform infrastructure. It retains this desktop
 entry-point decision. See [Windows scope and verification](WINDOWS.md).
+
+## Release and application-model follow-up
+
+The conversation model has moved from `internal/worktui` to `internal/workapp`;
+canonical service callbacks, protocol fields and saved profile formats remain
+compatible. Terminal-only initial repainting was removed from the headless loop.
+Current service/evaluation examples use an explicit developer opt-in, with old
+terminal audits marked historical. See [development](DEVELOPMENT.md).
+
+The later [desktop release work](DESKTOP-RELEASES.md) adds signing/notarization
+configuration and reviewed in-app updates. It supersedes the earlier updater
+scope statement above; account setup and native release verification are pending.

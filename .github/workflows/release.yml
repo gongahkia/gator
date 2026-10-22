@@ -8,6 +8,10 @@ on:
       - .github/workflows/release.yml
       - desktop/package.json
       - desktop/scripts/build-runtime.mjs
+      - desktop/scripts/release-config.cjs
+      - desktop/scripts/verify-release.mjs
+      - desktop/electron-builder.release.cjs
+      - desktop/build/**
   workflow_dispatch:
 
 permissions:
@@ -17,6 +21,28 @@ jobs:
   build:
     name: desktop-${{ matrix.goos }}-${{ matrix.goarch }}
     runs-on: ${{ matrix.runner }}
+    environment: ${{ github.ref_type == 'tag' && 'desktop-release' || 'desktop-preview' }}
+    env:
+      VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '0.0.0-dev' }}
+      COMMIT: ${{ github.sha }}
+      DESKTOP_PLATFORM: ${{ matrix.platform }}
+      DESKTOP_ARCH: ${{ matrix.arch }}
+      CSC_LINK: ${{ github.ref_type == 'tag' && matrix.goos == 'darwin' && secrets.MAC_CSC_LINK || '' }}
+      CSC_KEY_PASSWORD: ${{ github.ref_type == 'tag' && matrix.goos == 'darwin' && secrets.MAC_CSC_KEY_PASSWORD || '' }}
+      GATOR_MAC_IDENTITY: ${{ vars.MAC_SIGNING_IDENTITY }}
+      APPLE_ID: ${{ github.ref_type == 'tag' && matrix.goos == 'darwin' && secrets.APPLE_ID || '' }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ github.ref_type == 'tag' && matrix.goos == 'darwin' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+      APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+      WIN_CSC_LINK: ${{ github.ref_type == 'tag' && matrix.goos == 'windows' && secrets.WINDOWS_CSC_LINK || '' }}
+      WIN_CSC_KEY_PASSWORD: ${{ github.ref_type == 'tag' && matrix.goos == 'windows' && secrets.WINDOWS_CSC_KEY_PASSWORD || '' }}
+      GATOR_WINDOWS_PUBLISHER: ${{ vars.WINDOWS_PUBLISHER }}
+      GATOR_WINDOWS_SIGNING: ${{ vars.WINDOWS_SIGNING_PROVIDER }}
+      AZURE_TENANT_ID: ${{ github.ref_type == 'tag' && matrix.goos == 'windows' && secrets.SIGNING_AZURE_TENANT_ID || '' }}
+      AZURE_CLIENT_ID: ${{ github.ref_type == 'tag' && matrix.goos == 'windows' && secrets.SIGNING_AZURE_CLIENT_ID || '' }}
+      AZURE_CLIENT_SECRET: ${{ github.ref_type == 'tag' && matrix.goos == 'windows' && secrets.SIGNING_AZURE_CLIENT_SECRET || '' }}
+      GATOR_SIGNING_ENDPOINT: ${{ vars.WINDOWS_SIGNING_ENDPOINT }}
+      GATOR_SIGNING_ACCOUNT: ${{ vars.WINDOWS_SIGNING_ACCOUNT }}
+      GATOR_SIGNING_PROFILE: ${{ vars.WINDOWS_SIGNING_PROFILE }}
     strategy:
       fail-fast: false
       matrix:
@@ -67,6 +93,11 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: desktop/package-lock.json
+      - name: Require signing setup for a tagged release
+        if: github.ref_type == 'tag'
+        env:
+          GOOS: ${{ matrix.goos }}
+        run: node desktop/scripts/release-config.cjs
       - name: Check desktop source
         shell: bash
         run: |
@@ -98,22 +129,20 @@ jobs:
           set -euo pipefail
           go test ./... -run '^$'
           go test ./internal/filelock ./internal/privatefs ./internal/usage
-          go test ./cmd/gator -run 'TestWindows|TestDesktopRuntime|TestSupportedPlatforms'
+          go test ./cmd/gator -run 'TestWindows|TestDesktopRuntime|TestDesktopUpdate|TestUIBridgeUpdate|TestSupportedPlatforms'
+          go test ./internal/workapp -run 'TestRestartReadiness'
           go test ./internal/lifecycle -run 'TestPublishProfile|TestProfilePublication|TestRestore|TestEmptyBackup|TestSourceRelink|TestRelink'
           go test ./internal/browser -run 'TestService|TestWindows'
           go test ./internal/localmodel -run 'TestWindows|TestAssess|TestFormatBytes'
           go test ./internal/workspace -run 'TestWindows'
           go test ./internal/sandbox -run 'TestWindows'
-      - name: Build desktop installers with the matching private runtime
+      - name: Build preview installers with the matching private runtime
+        if: github.ref_type != 'tag'
         shell: bash
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: ${{ matrix.cgo }}
-          VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '0.0.0-dev' }}
-          COMMIT: ${{ github.sha }}
-          DESKTOP_PLATFORM: ${{ matrix.platform }}
-          DESKTOP_ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
           export BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -121,6 +150,21 @@ jobs:
           npm version --no-git-tag-version --allow-same-version "${VERSION#v}"
           npm run build
           npx electron-builder --publish never --"$DESKTOP_PLATFORM" --"$DESKTOP_ARCH"
+      - name: Build and verify signed release installers and update feeds
+        if: github.ref_type == 'tag'
+        shell: bash
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: ${{ matrix.cgo }}
+        run: |
+          set -euo pipefail
+          export BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          cd desktop
+          npm version --no-git-tag-version --allow-same-version "${VERSION#v}"
+          npm run build
+          npx electron-builder --config electron-builder.release.cjs --publish never --"$DESKTOP_PLATFORM" --"$DESKTOP_ARCH"
+          node scripts/verify-release.mjs
       - name: Check packaged Windows x64 workflows
         if: matrix.goos == 'windows' && matrix.goarch == 'amd64'
         shell: bash
@@ -137,8 +181,10 @@ jobs:
             desktop/release/Gator-*.AppImage
             desktop/release/Gator-*.deb
             desktop/release/Gator-*.exe
+            desktop/release/Gator-*.blockmap
+            desktop/release/stable-*.yml
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 7
 
   publish:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -156,8 +202,8 @@ jobs:
         run: |
           set -euo pipefail
           cd dist
-          sha256sum Gator-* > checksums.txt
-      - name: Publish desktop release
+          sha256sum Gator-* stable-*.yml > checksums.txt
+      - name: Prepare desktop release for review
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --generate-notes --verify-tag
+        run: gh release create "$GITHUB_REF_NAME" dist/* --draft --generate-notes --verify-tag

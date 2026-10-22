@@ -103,7 +103,8 @@ jobs:
         run: |
           go test ./internal/filelock ./internal/privatefs ./internal/usage ./internal/hostproc
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          go test ./cmd/gator -run 'TestWindows|TestDesktopRuntime|TestSupportedPlatforms'
+          go test ./cmd/gator -run 'TestWindows|TestDesktopRuntime|TestDesktopUpdate|TestUIBridgeUpdate|TestSupportedPlatforms'
+          go test ./internal/workapp -run 'TestRestartReadiness'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           go test ./internal/lifecycle -run 'TestPublishProfile|TestProfilePublication|TestRestore|TestEmptyBackup|TestSourceRelink|TestRelink'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

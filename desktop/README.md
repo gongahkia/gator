@@ -1,5 +1,10 @@
 # Gator desktop
 
+Release signing, notarization, update behavior and the remaining account/native
+setup are documented in [desktop releases](../docs/DESKTOP-RELEASES.md).
+Development builds keep using manual updates; neither signing account is set up
+yet. Current source-checkout commands are in [development](../docs/DEVELOPMENT.md).
+
 Gator's primary and currently supported user interface is this Electron app.
 React DOM and Tailwind render the frontend; the private Go runtime owns
 conversations, tools, model configuration, approvals, goals, usage, and data.

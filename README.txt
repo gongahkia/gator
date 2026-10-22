@@ -25,8 +25,9 @@ On Windows, use `npm start --prefix desktop` instead of `make desktop`. The
 Windows desktop port is a preview; capability limits and native verification
 gates are documented in docs/WINDOWS.md.
 
-Choose a workspace from the app's folder control. A first launch starts in a
-private empty workspace rather than implicitly reading your home directory.
+Start by messaging Gator. Add a source folder from the app's folder control
+when your request needs it. A first launch starts in a private empty workspace
+rather than implicitly reading your home directory.
 Use Settings for models, usage limits, backups, and recovery.
 
 Build with `make build`; create a local application bundle with `make package`.
@@ -34,6 +35,12 @@ Build with `make build`; create a local application bundle with `make package`.
 are unsigned development builds until release signing is configured.
 See desktop/README.md and docs/DESKTOP.md for setup and current boundaries.
 See docs/DESKTOP-PRIMARY.md for the CLI retirement decision.
+See docs/DEVELOPMENT.md for the source-checkout service/evaluation harness.
+See docs/DESKTOP-RELEASES.md for signing setup and reviewed desktop updates.
+
+The conversation-led product proposal and an interactive design prototype are
+in docs/CONVERSATIONAL-SURFACE-PLAN.md. They describe a proposed experience;
+prototype states are fictional and are not new shipped capabilities.
 
 The Go process under desktop/runtime/ is a private app component, not an
 installable command-line product. Reviewed system sign-in or installation
