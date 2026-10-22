@@ -344,11 +344,8 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			return inboxStore.List(false, 20)
 		},
 		Run: func(source, conversationID, prompt string, options workapp.RunOptions) workapp.RunResult {
-			release, err := state.Guard(stateDir, false)
-			if err != nil {
-				return workapp.RunResult{Error: err.Error()}
-			}
-			defer release()
+			// runInteractiveWorkGoal owns the run's data lease and releases it
+			// before reviewed maintenance. Do not wrap it in a second lease.
 			if goalID != "" {
 				currentGoal, loadErr := goalStore.Load(goalID)
 				if loadErr != nil {
@@ -362,6 +359,12 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 				}
 				result := runInteractiveWorkGoal(currentGoal.SourcePath, currentGoal.ConversationID, prompt, stateDir, options, currentGoal)
 				if result.ConversationID != "" {
+					release, guardErr := state.Guard(stateDir, false)
+					if guardErr != nil {
+						result.Error = guardErr.Error()
+						return result
+					}
+					defer release()
 					if _, attachErr := goalStore.AttachConversation(goalID, result.ConversationID); attachErr != nil && result.Error == "" {
 						result.Error = attachErr.Error()
 					}
@@ -481,7 +484,8 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 	if guardErr != nil {
 		return workapp.RunResult{Error: guardErr.Error()}
 	}
-	defer release()
+	releaseProfile := sync.OnceFunc(release)
+	defer releaseProfile()
 	requestedAt := time.Now()
 	ctx := options.Context
 	if ctx == nil {
@@ -509,8 +513,20 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 		}
 	}
 	var appChanges []workrun.AppChange
+	var afterAppRun []struct {
+		change   workrun.AppChange
+		mutation workrun.AppMutation
+	}
 	var appChangesMu sync.Mutex
 	request := workrun.Request{
+		AfterAppRun: func(change workrun.AppChange, mutation workrun.AppMutation) {
+			appChangesMu.Lock()
+			defer appChangesMu.Unlock()
+			afterAppRun = append(afterAppRun, struct {
+				change   workrun.AppChange
+				mutation workrun.AppMutation
+			}{change, mutation})
+		},
 		OnAppChange: func(change workrun.AppChange) {
 			appChangesMu.Lock()
 			defer appChangesMu.Unlock()
@@ -571,6 +587,20 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 		outcome, err = completion.Outcome, completion.Err
 	} else {
 		outcome, err = service.Execute(ctx, request)
+	}
+	if err == nil {
+		releaseProfile()
+		for _, pending := range afterAppRun {
+			if ctx.Err() != nil {
+				err = ctx.Err()
+				break
+			}
+			if _, applyErr := pending.mutation.Apply(ctx); applyErr != nil {
+				err = fmt.Errorf("apply Gator setting: %w", applyErr)
+				break
+			}
+			request.OnAppChange(pending.change)
+		}
 	}
 	appChangesMu.Lock()
 	changes := append([]workrun.AppChange(nil), appChanges...)

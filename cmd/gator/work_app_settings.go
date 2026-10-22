@@ -20,6 +20,10 @@ func (c gatorAppController) prepareSettings(ctx context.Context, change workrun.
 		return workrun.AppMutation{}, err
 	}
 	switch change.Setting {
+	case "usage_limits", "usage_pause":
+		return c.prepareUsage(change)
+	case "retention":
+		return c.prepareRetention(change)
 	case "model":
 		var next config.Defaults
 		if err := workrun.DecodeAppArguments(change.Value, &next); err != nil {
