@@ -10,10 +10,13 @@ import (
 )
 
 type DesktopSettings struct {
+	ReferToChats   *bool             `json:"refer_to_chats,omitempty"`
 	LearnFromChats *bool             `json:"learn_from_chats,omitempty"`
 	Shortcuts      map[string]string `json:"shortcuts,omitempty"`
 	Voice          VoiceSettings     `json:"voice,omitzero"`
 }
+
+func (d DesktopSettings) RefersToChats() bool { return d.ReferToChats == nil || *d.ReferToChats }
 
 func (d DesktopSettings) LearnsFromChats() bool { return d.LearnFromChats == nil || *d.LearnFromChats }
 

@@ -95,6 +95,27 @@ func (c gatorAppController) prepareSettings(ctx context.Context, change workrun.
 			})
 			return map[string]any{"learn_from_chats": enabled}, err
 		}}, nil
+	case "chat_history":
+		var next struct {
+			Enabled *bool `json:"enabled"`
+		}
+		if err := workrun.DecodeAppArguments(change.Value, &next); err != nil {
+			return workrun.AppMutation{}, err
+		}
+		if next.Enabled == nil {
+			return workrun.AppMutation{}, errors.New("enabled must be true or false")
+		}
+		enabled := *next.Enabled
+		return workrun.AppMutation{AfterReply: true, Summary: "Earlier-chat retrieval preference saved for new requests.", Preview: map[string]any{"before": prior.Desktop.RefersToChats(), "after": enabled, "effect": "Controls retrieval from other chats on new requests. Current conversation, saved memories and retained history are kept. Running requests keep their supplied context."}, Apply: func(context.Context) (any, error) {
+			err := c.settings.Update(func(current *config.Settings) error {
+				if current.Desktop.RefersToChats() != prior.Desktop.RefersToChats() {
+					return errors.New("earlier-chat retrieval changed; inspect settings and try again")
+				}
+				current.Desktop.ReferToChats = &enabled
+				return nil
+			})
+			return map[string]any{"refer_to_chats": enabled}, err
+		}}, nil
 	case "theme":
 		var next struct {
 			Theme string `json:"theme"`

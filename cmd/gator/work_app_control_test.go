@@ -20,6 +20,36 @@ func appControllerForTest(t *testing.T) gatorAppController {
 	return gatorAppController{stateDir: t.TempDir(), settings: store, request: &workrun.Request{}}
 }
 
+func TestGatorAppHistoryPreferenceIsIndependentAndRejectsStaleChanges(t *testing.T) {
+	c := appControllerForTest(t)
+	change := workrun.AppChange{Setting: "chat_history", Value: json.RawMessage(`{"enabled":false}`)}
+	prepared, err := c.Prepare(context.Background(), change)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !prepared.AfterReply {
+		t.Fatal("history policy must change after the current reply")
+	}
+	before, _ := c.settings.Load()
+	if !before.Desktop.RefersToChats() {
+		t.Fatal("prepare changed history policy")
+	}
+	if _, err := prepared.Apply(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	after, _ := c.settings.Load()
+	if after.Desktop.RefersToChats() || !after.Desktop.LearnsFromChats() {
+		t.Fatal("history preference changed learning or did not persist")
+	}
+	if _, err := prepared.Apply(context.Background()); err == nil {
+		t.Fatal("stale preference update accepted")
+	}
+	view, err := c.Inspect(context.Background(), workrun.AppQuery{Topic: "settings"})
+	if err != nil || view.(map[string]any)["refer_to_chats"] != false {
+		t.Fatal("inspection omitted history policy", err)
+	}
+}
+
 func TestGatorAppChatRebindsShortcutsAndVoicePreferences(t *testing.T) {
 	c := appControllerForTest(t)
 	for _, change := range []workrun.AppChange{

@@ -83,6 +83,19 @@ func (m Model) updateRecallKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.recall.LearnFromChats = enabled
 		m.sectionNotice = "Chat learning updated. Existing saved memories remain available; explicit remember and forget requests still work."
 		return m, m.recallStatusCommand()
+	case "h":
+		if m.config.ConfigureChatHistory == nil {
+			m.sectionNotice = "Chat history settings are unavailable."
+			return m, nil
+		}
+		enabled := !m.recall.ReferToChats
+		if err := m.config.ConfigureChatHistory(enabled); err != nil {
+			m.sectionNotice = err.Error()
+			return m, nil
+		}
+		m.recall.ReferToChats = enabled
+		m.sectionNotice = "Earlier-chat retrieval updated for new requests. Current chats and saved memories are kept. Requests already running retain their supplied context."
+		return m, m.recallStatusCommand()
 	case "i":
 		m.recallConfirm = "install"
 	case "l":
@@ -125,7 +138,7 @@ func (m Model) startRecallInstall() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) recallPanel() uisnapshot.Panel {
-	p := uisnapshot.Panel{Kind: "memory", Title: "Memory & retrieval", Notice: m.sectionNotice, Subtitle: "Choose how Gator finds saved knowledge. You control what is stored and supplied."}
+	p := uisnapshot.Panel{Kind: "memory", Title: "Memory & privacy", Notice: m.sectionNotice, Subtitle: "Choose how Gator finds saved knowledge. You control what is stored and supplied."}
 	if m.recallConfirm != "" {
 		p.Kind, p.Title = "confirmation", "Review memory setup"
 		lines := []string{}
@@ -146,8 +159,8 @@ func (m Model) recallPanel() uisnapshot.Panel {
 		{Title: "Storage", Collapsible: true, Lines: []string{valueOrDefault(m.recall.Storage, "Memories, notes, transcripts, and Work records are stored in your private Gator state directory on this computer.")}},
 		{Title: "Retrieval", Collapsible: true, Lines: []string{valueOrDefault(m.recall.Retrieval, "Basic word matching works without a model download. Enhanced recall uses local embeddings or your separately selected cloud provider.")}},
 		{Title: "Chat processing", Collapsible: true, Lines: []string{valueOrDefault(m.recall.Chat, "Selected saved context and task sources are supplied to the model chosen in /model. A cloud chat model processes that context remotely even when storage and retrieval are local.")}},
-		{Title: "Across chats", Lines: []string{"Personal memories are shared by chats in this local profile. New chat starts a fresh working context; it keeps your saved memory.", "Useful stable facts and preferences can be saved from your own statements, with their source chat. One-off task details and file/tool instructions are not personal memories.", "Turning chat learning off stops automatic saves. Existing memories remain available; explicit remember/forget requests still work. Earlier chat details can be searched on demand. Devices do not sync automatically."}},
-		{Title: "Your controls", Collapsible: true, Lines: []string{"Browse saved knowledge to correct, forget, or omit it from the next run.", "Feedback ratings are retained for review. They do not automatically retrain your model.", "Local recall can fall back to basic word matching; each result's Context and sources shows the observed route."}},
+		{Title: "Across chats", Lines: []string{"Personal memories are shared by chats in this local profile. New chat starts a fresh working context; it keeps your saved memory.", "Useful stable facts and preferences can be saved from your own statements, with their source chat. One-off task details and file/tool instructions are not personal memories.", "Turning chat learning off stops automatic saves. Existing memories remain available; explicit remember/forget requests still work. Earlier-chat retrieval separately controls whether new requests can search other conversations. Turning it off keeps this conversation and saved memories available. Devices do not sync automatically."}},
+		{Title: "Your controls", Collapsible: true, Lines: []string{"Browse saved knowledge to correct, forget, or omit it from the next run.", "Forgetting a saved memory does not delete old messages or files. Data & backups manages retained data; switching recall off is not deletion.", "Feedback ratings are retained for review. They do not automatically retrain your model.", "Local recall can fall back to basic word matching; each result's Context and sources shows the observed route."}},
 	}
 	fallback := "Readiness not available"
 	if m.recallBusy {
@@ -157,12 +170,16 @@ func (m Model) recallPanel() uisnapshot.Panel {
 	if m.recall.LearnFromChats {
 		learning = "On"
 	}
-	p.Summary = []uisnapshot.Field{{Label: "Recall readiness", Value: valueOrDefault(m.recall.State, fallback)}, {Label: "Learn from chats", Value: learning}}
+	history := "Off"
+	if m.recall.ReferToChats {
+		history = "On"
+	}
+	p.Summary = []uisnapshot.Field{{Label: "Recall readiness", Value: valueOrDefault(m.recall.State, fallback)}, {Label: "Learn from chats", Value: learning}, {Label: "Refer to earlier chats", Value: history}}
 	p.Blocks[0].Lines = []string{m.recall.Detail}
 	if m.recallBusy {
 		p.Hints = []uisnapshot.Hint{{Shortcut: "Esc", Action: "cancel download"}}
 	} else {
-		p.Hints = []uisnapshot.Hint{{Shortcut: "A", Action: map[bool]string{true: "turn chat learning off", false: "turn chat learning on"}[m.recall.LearnFromChats]}, {Shortcut: "I", Action: "install local recall", Group: "more"}, {Shortcut: "L", Action: "use local"}, {Shortcut: "O", Action: "use OpenAI", Group: "more"}, {Shortcut: "G", Action: "use Gemini", Group: "more"}, {Shortcut: "K", Action: "saved knowledge"}, {Shortcut: "C", Action: "chat model", Group: "more"}, {Shortcut: "R", Action: "refresh"}, {Shortcut: "Esc", Action: "back"}}
+		p.Hints = []uisnapshot.Hint{{Shortcut: "A", Action: map[bool]string{true: "turn chat learning off", false: "turn chat learning on"}[m.recall.LearnFromChats]}, {Shortcut: "H", Action: map[bool]string{true: "turn earlier-chat retrieval off", false: "turn earlier-chat retrieval on"}[m.recall.ReferToChats]}, {Shortcut: "I", Action: "install local recall", Group: "more"}, {Shortcut: "L", Action: "use local"}, {Shortcut: "O", Action: "use OpenAI", Group: "more"}, {Shortcut: "G", Action: "use Gemini", Group: "more"}, {Shortcut: "K", Action: "saved knowledge"}, {Shortcut: "C", Action: "chat model", Group: "more"}, {Shortcut: "R", Action: "refresh"}, {Shortcut: "Esc", Action: "back"}}
 	}
 	return p
 }

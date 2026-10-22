@@ -69,6 +69,7 @@ type Request struct {
 	InputIDs                []string
 	ForegroundApp           bool
 	LearnFromChats          bool
+	DisableChatHistory      bool
 	ApproveAppChange        func(context.Context, any) (bool, error)
 	OnAppChange             func(AppChange)
 	AfterAppRun             func(AppChange, AppMutation)

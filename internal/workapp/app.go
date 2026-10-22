@@ -216,6 +216,7 @@ type Config struct {
 	MemoryResult             func(arguments []string) (*uisnapshot.Result, error)
 	RecallStatus             func(context.Context) (RecallStatus, error)
 	ConfigureChatLearning    func(bool) error
+	ConfigureChatHistory     func(bool) error
 	ConfigureRecall          func(provider string, allowUpload bool) error
 	InstallRecall            func(context.Context, func(string)) error
 	ReadContext              func(workID, goalID string) (ContextState, error)

@@ -89,6 +89,27 @@ func TestCloudRecallNeedsExplicitUploadReview(t *testing.T) {
 	}
 }
 
+func TestHistoryControlDoesNotChangeLearningAndReportsFailure(t *testing.T) {
+	calls := 0
+	m := New(Config{ConfigureChatHistory: func(enabled bool) error {
+		calls++
+		if enabled {
+			return errors.New("settings unavailable")
+		}
+		return nil
+	}})
+	m.section = "memory"
+	m.recall = RecallStatus{LearnFromChats: true, ReferToChats: true}
+	m, _ = productKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	if calls != 1 || m.recall.ReferToChats || !m.recall.LearnFromChats {
+		t.Fatal("history control changed unrelated learning")
+	}
+	m, _ = productKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	if calls != 2 || m.recall.ReferToChats || !strings.Contains(m.sectionNotice, "unavailable") {
+		t.Fatal("failed update claimed success")
+	}
+}
+
 func TestRecallInstallCancelsWithoutLeavingBusyState(t *testing.T) {
 	started := make(chan struct{})
 	m := New(Config{InstallRecall: func(ctx context.Context, progress func(string)) error { close(started); <-ctx.Done(); return ctx.Err() }})

@@ -49,9 +49,18 @@ The private vector index contains embeddings and content hashes rather than
 plain text. It updates changed records incrementally and removes forgotten
 records. Saved source text and instructions never grant tool authority.
 
+## Memory and privacy in the desktop
+
+Settings → **Memory & privacy** separates two preferences:
+
+- **Learn from chats** controls automatic saves of enduring facts and preferences. Turning it off keeps existing memories available and still permits an explicit request to remember or forget.
+- **Refer to earlier chats** controls the earlier-conversation search/read tools on new requests. Turning it off retains this conversation and selected saved memories. Requests already running keep the context and tools with which they started.
+
+Neither switch deletes stored messages or trains the model. **Saved** manages saved knowledge; **Data & backups** manages retained data. Forgetting a saved memory blocks silently relearning its canonical subject, but prior messages, files and retained run evidence may still contain the words. A new chat starts a fresh working context within the same local profile; devices do not sync automatically.
+
 ## Notes
 
-In terminal chat, `/memory` opens the readiness and setup panel. It explains
+In the desktop, Memory & privacy (or `/memory` in command search) opens the readiness and setup panel. It explains
 three separate stages: private local storage, retrieval through basic matching
 or the selected embedding provider, and chat processing through `/model`.
 Local retrieval does not prevent selected memories from being sent to a cloud

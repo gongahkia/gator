@@ -350,7 +350,9 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		return outcome, fmt.Errorf("list saved skills: %w", err)
 	}
 	if request.ForegroundApp {
-		surface = append(surface, (tools.ChatHistory{StateDir: request.StateDir, CurrentConversation: conversation.ID, GoalID: request.GoalID}).Tools()...)
+		if !request.DisableChatHistory {
+			surface = append(surface, (tools.ChatHistory{StateDir: request.StateDir, CurrentConversation: conversation.ID, GoalID: request.GoalID}).Tools()...)
+		}
 		surface = append(surface, (tools.ChatMemory{Store: memoryStore, UserMessage: request.Objective, ConversationID: conversation.ID, RunID: request.RunID, GoalID: request.GoalID, Automatic: request.LearnFromChats, ExcludedIDs: request.ExcludedKnowledgeIDs}).Tools()...)
 	}
 	memories, err := memoryStore.List(request.GoalID, false)

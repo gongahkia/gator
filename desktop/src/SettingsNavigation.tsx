@@ -1,7 +1,8 @@
-import { ArrowLeft, Database, Info, Plug, Settings2, ShieldCheck, Wallet } from "lucide-react";
+import { ArrowLeft, Brain, Database, Info, Plug, Settings2, ShieldCheck, Wallet } from "lucide-react";
 
 export const settingsRoutes = [
   { command: "/connections", label: "Connections", name: "Connection settings", icon: Plug },
+  { command: "/memory", label: "Memory & privacy", name: "Memory and privacy settings", icon: Brain },
   { command: "/model", label: "Models", name: "Model settings", icon: Settings2 },
   { command: "/usage", label: "Usage & limits", name: "Usage & limits", icon: Wallet },
   { command: "/data", label: "Data & backups", name: "Data & backups", icon: Database },

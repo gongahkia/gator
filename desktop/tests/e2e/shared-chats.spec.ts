@@ -109,3 +109,30 @@ test("new chat and pasted attachments keep focus and layout across themes and co
     await openCommandSearch(page);const search=page.getByRole("textbox",{name:"Find a command",exact:true});await search.fill("/new");await expect(page.locator(".command-list button")).toHaveCount(1);await search.fill("new chat");await expect(page.locator(".command-list button")).toHaveCount(1);await page.keyboard.press("Escape");expect(f.requests).toHaveLength(0);
   }finally{await f.close();}
 });
+
+test("earlier-chat privacy is independent of learning and persists across restart",async()=>{
+  test.setTimeout(120_000);const f=await fixture();try{
+    let app=await f.launch(),page=await app.firstWindow();await expect(composer(page)).toBeVisible();
+    await command(page,"/mode inspect");await send(page,quote);
+    await page.getByRole("button",{name:"Settings",exact:true}).click();
+    await page.getByRole("button",{name:"Memory and privacy settings",exact:true}).click();
+    await page.getByRole("button",{name:/turn earlier-chat retrieval off/i}).click();
+    await expect(page.getByRole("button",{name:/turn earlier-chat retrieval on/i})).toBeVisible();
+    await expect(page.getByRole("button",{name:/turn chat learning off/i})).toBeVisible();
+    await page.screenshot({path:"test-results/memory-privacy.png"});
+    await page.getByRole("button",{name:"Back to app",exact:true}).click();
+    const first=(await snapshot(page)).conversation_id;await page.getByRole("button",{name:"New chat",exact:true}).click();await expect.poll(async()=>(await snapshot(page)).conversation_id).not.toBe(first);await expect(composer(page)).toBeEnabled();await command(page,"/mode inspect");
+    const before=f.requests.length;await send(page,"What do you know about my reply preferences?");
+    const request=f.requests[before];const names=request.tools?.map(tool=>tool.function.name)??[];
+    expect(names).not.toContain("chat_search");expect(names).not.toContain("chat_read");expect(names).toContain("memory_remember");
+    expect(request.messages.filter(m=>m.role==="system").map(textOf).join("\n")).toContain(quote);
+    await expect.poll(async()=>(await page.evaluate(()=>window.gator!.snapshot())).allChatsBusy).toBe(false);
+    app=await f.restart();page=await app.firstWindow();await expect(composer(page)).toBeVisible();
+    await command(page,"/memory");await expect(page.getByRole("button",{name:/turn earlier-chat retrieval on/i})).toBeVisible();
+    await page.getByRole("button",{name:/turn earlier-chat retrieval on/i}).click();
+    await page.getByRole("button",{name:"Back to app",exact:true}).click();
+    const restored=f.requests.length;await send(page,"Find the earlier Birch Hall discussion.");
+    expect(f.requests[restored].tools?.map(tool=>tool.function.name)).toContain("chat_search");
+    expect((await f.memories())[0].text).toBe(quote);
+  }finally{await f.close();}
+});

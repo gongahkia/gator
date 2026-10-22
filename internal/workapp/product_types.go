@@ -2,6 +2,7 @@ package workapp
 
 type RecallStatus struct {
 	LearnFromChats           bool
+	ReferToChats             bool
 	Provider, State, Detail  string
 	Storage, Retrieval, Chat string
 	Ready                    bool

@@ -290,6 +290,9 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		ConfigureChatLearning: func(enabled bool) error {
 			return settingsStore.Update(func(settings *config.Settings) error { settings.Desktop.LearnFromChats = &enabled; return nil })
 		},
+		ConfigureChatHistory: func(enabled bool) error {
+			return settingsStore.Update(func(settings *config.Settings) error { settings.Desktop.ReferToChats = &enabled; return nil })
+		},
 		InstallRecall: installWorkRecall,
 		ReadContext: func(workID, activeGoal string) (workapp.ContextState, error) {
 			return readWorkContext(stateDir, workID, activeGoal)

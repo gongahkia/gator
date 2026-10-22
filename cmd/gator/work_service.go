@@ -68,6 +68,7 @@ func configuredWorkService(provider, modelName, stateDir string, request *workru
 	request.OTLPEndpoint = os.Getenv("GATOR_OTLP_ENDPOINT")
 	request.Provider = provider + "/" + modelName
 	request.LearnFromChats = request.ForegroundApp && settings.Desktop.LearnsFromChats()
+	request.DisableChatHistory = !settings.Desktop.RefersToChats()
 	request.DisableBrowser = provider == "gator-local"
 	request.StateDir = stateDir
 	if err := applyLearningContext(stateDir, request); err != nil {
