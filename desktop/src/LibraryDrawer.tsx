@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { BookOpen, ChevronRight, Clock3, History, Inbox, ListChecks, MessageSquare, Target, X } from "lucide-react";
 import type { BackendState } from "./protocol";
 import type { PresenceRef } from "./motion";
@@ -9,6 +9,8 @@ import { OutputCards } from "./OutputCards";
 export function LibraryDrawer({ kind, state, open, presenceRef, close, navigate, preview, drafts }: { kind: "following" | "saved"; state: BackendState; open: boolean; presenceRef: PresenceRef; close(): void; navigate(command: string): void; preview(id: string): void; drafts(): void }) {
   const [narrow, setNarrow] = useState(() => matchMedia("(max-width: 960px)").matches);
   const focus = useModalFocus(open && narrow);
+  const content = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => { if (content.current) content.current.scrollTop = 0; }, [kind]);
   useEffect(() => {
     const media = matchMedia("(max-width: 960px)");
     const change = () => setNarrow(media.matches);
@@ -26,7 +28,7 @@ export function LibraryDrawer({ kind, state, open, presenceRef, close, navigate,
       if (narrow && (event.metaKey || event.ctrlKey) && ["n", "k", "f", ","].includes(event.key.toLowerCase())) event.stopPropagation();
     }}>
       <header className="work-details-heading"><h2>{title}</h2><button className="icon-button" aria-label={`Close ${title.toLowerCase()}`} onClick={close}><X size={16} /></button></header>
-      <div className="workspace-content">
+      <div className="workspace-content" ref={content}>
         {kind === "following" ? <>
           <p className="library-intro">Your ongoing goals and configured checks.</p>
           <section className="library-section" aria-label="Ongoing goals"><h3>Ongoing goals</h3>

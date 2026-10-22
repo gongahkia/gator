@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, FileCode2, Files, FileText, Folder, ListChecks, Plug, X } from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, FileCode2, Files, FileText, Folder, Plug, X } from "lucide-react";
 import type { BackendState } from "./protocol";
 import type { PresenceRef } from "./motion";
 import { Markdown } from "./Result";
@@ -7,8 +7,8 @@ import { CopyButton } from "./CopyButton";
 import { useModalFocus } from "./useModalFocus";
 import { bundleOutputs, conversationBundles, outputState } from "./conversationOutputs";
 
-type SectionID = "outputs" | "context" | "connections" | "workspace" | "checks";
-const defaults: Record<SectionID, boolean> = { outputs: true, context: false, connections: false, workspace: false, checks: false };
+type SectionID = "outputs" | "context" | "connections" | "workspace";
+const defaults: Record<SectionID, boolean> = { outputs: true, context: false, connections: false, workspace: false };
 const preferenceKey = "gator:work-details-sections";
 
 function readSections() {
@@ -52,9 +52,10 @@ export function WorkDetails({ state, identity, requestedOutput, open, presenceRe
   const selected = selection?.conversation === identity ? outputs.find((output) => output.id === selection.output) : undefined;
 
   useEffect(() => {
+    if (!open) return;
     if (!requestedOutput) setSelection(undefined);
     else if (requestedOutput.conversation === identity) setSelection({ conversation: identity, output: requestedOutput.output });
-  }, [requestedOutput?.request, identity]);
+  }, [requestedOutput?.request, identity, open]);
 
   useEffect(() => {
     const media = matchMedia("(max-width: 960px)");
@@ -129,9 +130,7 @@ export function WorkDetails({ state, identity, requestedOutput, open, presenceRe
             <div className="work-details-links"><button className="small-button" disabled={blocked} onClick={() => go("/model")}>Model settings<ChevronRight size={13} /></button><button className="small-button" disabled={blocked} onClick={() => void window.gator?.chooseFolder().catch(() => {})}>Choose folder<ChevronRight size={13} /></button></div>
             <p className="work-details-caption">Choosing a different folder starts a separate topic with its own source scope.</p>
           </Section>
-          {!!(state.checks?.length || state.goal_id || state.supervisor_needs_start) && <Section id="checks" title="Follow-up checks" icon={<ListChecks size={16} />} summary={String(state.checks?.length ?? 0)} open={sections.checks} toggle={() => toggle("checks")}>
-            {state.checks?.length ? state.checks.map((check, index) => <div className="work-check" key={index}><strong>{check.title}</strong><span data-tone={check.tone}>{check.state}</span><p>{check.health}</p></div>) : <p className="work-details-empty">No recurring checks attached.</p>}{state.supervisor_needs_start && <p className="work-details-notice" data-tone="warning">The local supervisor needs to start before configured checks can run.</p>}<button className="small-button" disabled={blocked} onClick={() => go("/followup")}>Manage checks<ChevronRight size={13} /></button>
-          </Section>}
+
         </>}
       </div>
     </aside>

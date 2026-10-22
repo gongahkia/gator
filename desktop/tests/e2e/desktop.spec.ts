@@ -330,6 +330,21 @@ test("motion is interruptible, releases dismissed controls, and honors reduced m
     await page.keyboard.press("Escape");
     await expect(page.locator(".modal-backdrop")).toHaveCount(0);
 
+    await page.getByRole("button", { name: "Search commands", exact: true }).click();
+    await page.getByRole("textbox", { name: "Find a command" }).fill("Following");
+    await page.getByRole("textbox", { name: "Find a command" }).press("Enter");
+    await expect(page.getByRole("complementary", { name: "Following", exact: true })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Search commands", exact: true })).toHaveCount(0);
+    await settlePresentation(page);
+    await session.send("Animation.setPlaybackRate", { playbackRate: 0.1 });
+    await page.getByRole("button", { name: "Conversation information", exact: true }).click();
+    await expect(page.locator('.library-drawer[data-open="false"]')).toContainText("Your ongoing goals and configured checks.");
+    await expect(page.locator('.library-drawer[data-open="false"]')).toHaveAttribute("inert", "");
+    await session.send("Animation.setPlaybackRate", { playbackRate: 1 });
+    await expect(page.locator(".library-drawer")).toHaveCount(0);
+    await page.getByRole("button", { name: "Hide conversation information", exact: true }).click();
+    await expect(page.locator(".workspace-panel")).toHaveCount(0);
+
     await page.evaluate(() => {
       const state = window as unknown as { viewAnimations: number };
       state.viewAnimations = 0;
@@ -664,13 +679,13 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     await page.getByRole("textbox", { name: "Message Gator" }).fill("keep my continuation draft");
     await openSurface(page, "Conversations");
     await expect(page.getByRole("button", { name: "Work history", exact: true })).toHaveCount(0);
-    const browser = page.getByRole("navigation", { name: "Conversation views" });
-    await expect(browser.getByRole("button", { name: "Chats", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("heading", { name: "Conversations", exact: true })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Conversation views" })).toHaveCount(0);
     // Two turns belong to a single conversation, with two retained task runs.
     await expect(page.locator(".panel-row")).toHaveCount(1);
     await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-conversations.png" });
-    await browser.getByRole("button", { name: "Task runs", exact: true }).click();
+    await openSurface(page, "Task runs");
     await expect(page.locator(".panel-row")).toHaveCount(2);
     await page.locator(".panel-row").first().focus();
     await page.locator(".panel-row").first().press("ArrowDown");
@@ -687,16 +702,16 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     await page.getByRole("combobox", { name: "Filter task runs" }).selectOption("completed");
     await expect(page.locator(".workflow-heading p")).toContainText("completed");
     await expect(page.locator(".panel-row")).toHaveCount(2);
-    await expect(browser.getByRole("button", { name: "Task runs", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(page.locator(".main-header")).toContainText("Task runs");
     await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
-    await expect(browser.getByRole("button", { name: "Task runs", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(page.locator(".main-header")).toContainText("Task runs");
     await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(800, 600));
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-task-runs-800.png" });
     await page.locator(".panel-row").first().click();
     await expect(page.getByRole("heading", { name: "Artifacts", exact: true })).toBeVisible();
-    await expect(browser.getByRole("button", { name: "Task runs", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(page.locator(".main-header")).toContainText("Task runs");
     await page.getByRole("button", { name: /^conversation C$/i }).click();
     await expect(page.locator(".message-byline", { hasText: "Gator" })).toHaveCount(2);
     await expect(page.getByRole("textbox", { name: "Message Gator" })).toHaveValue("keep my continuation draft");
