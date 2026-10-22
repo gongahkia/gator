@@ -267,3 +267,37 @@ Verification:
 
 **Verdict: Approve for the exercised macOS presentation scope.** Windows/Linux
 execution and assistive-technology checks were not repeated.
+
+## Follow-up: command palette row icons
+
+22 October 2026. Remove the repeated decorative Command/⌘ icon from every
+palette row and its unused import. Existing labels, descriptions, advanced
+badges, chevrons and keyboard hints retain their meaning.
+
+Full scoped review with `make-interfaces-feel-better`, React and native CSS:
+
+| Category | Evidence inspected | Result |
+| --- | --- | --- |
+| Typography | Command names and descriptions | Existing fonts and tokens; text starts at the row's normal padding. |
+| Surfaces | Row layout and selected/hover states | Existing flex layout closes the removed column; row hit areas retained. |
+| Animations | Existing palette/disclosure styles | No motion changed; 10% playback not repeated for an icon removal. |
+| Icons | Palette rows, search header and shortcut hints | Repeated decoration removed; meaningful navigation and shortcut cues retained. |
+| Performance | App icon import and row markup | Remove unused SVG instances and import. |
+
+| Severity | Location | Before | After | Why |
+| --- | --- | --- | --- | --- |
+| LOW | `desktop/src/App.tsx:2`, `App.tsx:320` | Every command began with the same Command icon | Text begins directly at row padding | The repeated symbol adds no distinction and competes with the labels. |
+
+Considered and rejected: replacing these with individual command icons would
+introduce a new visual taxonomy; retaining an empty icon column would leave
+unnecessary indentation. Neither is needed for this removal.
+
+Verification: `npm run check --prefix desktop`, `npm run build:ui --prefix desktop`
+and macOS packaging passed. An isolated packaged-app inspection verified absent
+row icons, initial search focus, arrow navigation, filtering/empty results,
+Enter opening Saved, Escape closing it and preservation of the unsent message.
+The current palette screenshot was inspected. No permanent tests were added
+for this reversible decoration removal.
+
+**Verdict: Approve for this scoped macOS removal.** Windows/Linux and
+assistive-technology checks were not repeated.
