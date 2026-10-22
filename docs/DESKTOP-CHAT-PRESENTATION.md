@@ -183,10 +183,20 @@ Full scoped review with the existing interface skill (React and native CSS):
 | Severity | Location | Before | After | Why |
 | --- | --- | --- | --- | --- |
 | MEDIUM | `desktop/src/App.tsx:74`, `DesktopHelp.tsx:20`, `styles.css:119` | New topic button, shortcut and reset command advertised alongside the main chat | Remove the duplicate entry points, shortcut help, unused icon and spacing | Keep the main conversation as the clear starting point. |
-| LOW | `desktop/src/App.tsx:257`, `useDrafts.ts:52` | An alternate blank-chat introduction and New topic draft label | Common Gator introduction and neutral Conversation draft label | Match the simplified conversation model. |
+| LOW | `desktop/src/App.tsx:256`, `useDrafts.ts:52` | An alternate blank-chat introduction and New topic draft label | Common Gator introduction and neutral Conversation draft label | Match the simplified conversation model. |
 
 Considered and rejected: deleting retained topics or source-reset infrastructure
 would lose existing scope boundaries; repurposing Cmd/Ctrl+N to reset the main
 chat would undermine continuity. Neither is part of this presentation change.
 
-Verification for this follow-up is recorded after the scoped packaged checks.
+Verification: `npm run check --prefix desktop`, the UI build and the macOS
+package build passed. The three scoped packaged Electron tests passed
+(recent conversations/drafts, queued messages, and real Go state/restart).
+They exercise the retired shortcut and palette command, saved-topic draft
+isolation, queue-switch confirmation, main-conversation restoration and native
+800/1024/1440 px layouts. The current home screenshot was inspected and the
+New topic button is absent. No new inference provider or real user profile was
+used. Windows/Linux execution and assistive-technology checks were not repeated.
+
+The implementation is retained in the existing atomic commit `d59484280`.
+**Verdict: Approve for this scoped macOS removal.**
