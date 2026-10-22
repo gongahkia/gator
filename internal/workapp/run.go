@@ -38,6 +38,9 @@ func (m Model) workElapsed() string {
 }
 
 func (m Model) startWork(source, conversation, prompt string, options RunOptions) (tea.Model, tea.Cmd) {
+	if len(m.messages) > 0 && m.messages[len(m.messages)-1].role == "You" {
+		m.messages[len(m.messages)-1].inputs = uploadNames(options.Uploads)
+	}
 	m.lastWorkID = ""
 	m.runStarted = time.Now()
 	m.activity = workactivity.New(m.runStarted)

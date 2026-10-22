@@ -77,6 +77,7 @@ type CandidateSummary struct {
 // prose, so historical artifact cards retain the same trust boundary as new
 // cards produced in this application session.
 type TranscriptMessage struct {
+	Inputs   []string
 	Activity *workactivity.Trace
 	Role     string
 	Text     string
@@ -116,6 +117,7 @@ type RunOptions struct {
 	OnOperation             func(*workrun.Operation)
 	MaxSteps                int
 	Attachments             []string
+	Uploads                 []string
 	Mode                    string
 	Artifacts               []string
 	PreviousArtifacts       []string
@@ -153,6 +155,7 @@ type ModelStatus struct {
 type GoalState struct{ Title, SourcePath, ConversationID string }
 
 type Config struct {
+	ValidateUploads         func(source string, paths, uploads []string) error
 	Models                  func() (ModelPanel, error)
 	SelectedModel           func() (provider, model string, err error)
 	ModelStatus             func() (ModelStatus, error)
@@ -254,6 +257,7 @@ type entry struct {
 	advanced                                   bool
 }
 type message struct {
+	inputs   []string
 	activity *workactivity.Trace
 	role     string
 	text     string
@@ -350,6 +354,7 @@ type Model struct {
 	activity               *workactivity.Trace
 	modelStatus            ModelStatus
 	bridgeNotice           string
+	bridgeUploadResult     *BridgeUploadResult
 	bridgeRecentIssue      string
 	bridgeFollowingIssue   string
 	checksIssue            string

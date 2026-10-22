@@ -633,7 +633,15 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	outcome.Activity = activity.Clone()
 	configuration, _ := json.Marshal(effectiveConfiguration(request))
 	replay := sanitizeComputerReplay(result.Messages, request.DesktopSession != "")
+	var inputNames []string
+	for _, image := range request.Images {
+		inputNames = append(inputNames, image.Name)
+	}
+	for _, document := range request.Attachments {
+		inputNames = append(inputNames, document.Name)
+	}
 	if _, err := sessions.AddRevision(conversation.ID, worksession.Revision{
+		InputNames:   inputNames,
 		Activity:     outcome.Activity,
 		AcceptedCode: integration.accepted,
 		Project:      request.Project,

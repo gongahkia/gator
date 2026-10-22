@@ -63,6 +63,20 @@ export class Backend extends EventEmitter {
     this.#write({ version: 1, type: "external_done", error });
   }
 
+  submitUpload(frame) {
+    return new Promise((resolve, reject) => {
+      const finish = (error) => {
+        clearTimeout(timer); this.off("state", changed); this.off("closed", closed);
+        error ? reject(new Error(error)) : resolve();
+      };
+      const changed = (state) => { if (state.upload_result?.request_id === frame.upload.request_id) finish(state.upload_result.error); };
+      const closed = () => finish("Gator disconnected before confirming the message. Your draft is kept.");
+      const timer = setTimeout(() => finish("Gator has not confirmed this message. Check the conversation before sending again."), 20000);
+      this.on("state", changed); this.once("closed", closed);
+      try { this.send(frame); } catch (error) { finish(error.message); }
+    });
+  }
+
   prepareUpdate() {
     if (this.closed || this.#updateNonce) return Promise.reject(new Error("Gator cannot prepare to restart right now."));
     return new Promise((resolve, reject) => {

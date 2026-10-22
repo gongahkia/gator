@@ -4,7 +4,8 @@ export type UpdateState = { phase: "manual" | "idle" | "checking" | "current" | 
 export type UpdateRequest = { action: "open" | "close" | "check" | "download" | "install" | "releases" };
 export type DesktopSnapshot = { state?: BackendState; error?: string; connection?: "starting" | "connected" | "disconnected"; sessionID?: string; terminalBusy?: boolean; fullScreen?: boolean; updates?: UpdateState; updatesOpen?: boolean; updatePreparing?: boolean };
 export type DesktopFrame = Omit<Frame, "version">;
-export type SavedDraft = { context: string; text: string; title: string; source: string; updated: number };
+export type UploadedFile = { id: string; name: string; size: number };
+export type SavedDraft = { context: string; text: string; title: string; source: string; updated: number; uploads?: UploadedFile[] };
 export type DraftSnapshot = { enabled: boolean; drafts: SavedDraft[] };
 export type DraftRequest = { action: "list" | "clear" } | { action: "remove"; context: string } | { action: "configure"; enabled: boolean } | { action: "save"; draft: Omit<SavedDraft, "updated"> };
 
@@ -16,6 +17,8 @@ declare global {
       subscribe(callback: (snapshot: DesktopSnapshot) => void): () => void;
       send(frame: DesktopFrame): Promise<void>;
       chooseFolder(): Promise<string | null>;
+      chooseFiles(context: string): Promise<UploadedFile[]>;
+      dropFiles(files: File[], context: string): Promise<UploadedFile[]>;
       choosePath(request: { panel_id: string; kind: string }): Promise<string | null>;
       openLink(url: string): Promise<void>;
       continueInTerminal(): Promise<void>;

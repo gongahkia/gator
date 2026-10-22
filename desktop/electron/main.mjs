@@ -5,7 +5,8 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createHash, randomUUID } from "node:crypto";
 import { Backend } from "./backend.mjs";
-import { APP_URL, assetPath, externalURL } from "./policy.mjs";
+import { APP_URL, assetPath, externalURL, validateFrame } from "./policy.mjs";
+import { UploadStore, uploadContext, uploadExtensions } from "./uploads.mjs";
 import { terminalHandoff } from "./terminal.mjs";
 import { DraftStore } from "./drafts.mjs";
 import { runtimeName, stateDirectory } from "./platform.mjs";
@@ -20,6 +21,7 @@ if (process.platform === "win32") app.setAppUserModelId("com.gongahkia.gator");
 // Allows isolated development/test profiles without changing Gator's state.
 if (process.env.GATOR_DESKTOP_USER_DATA) app.setPath("userData", resolve(process.env.GATOR_DESKTOP_USER_DATA));
 const stateRoot = stateDirectory();
+const uploads = new UploadStore(join(stateRoot, "gator", "uploads"));
 const drafts = new DraftStore(join(app.getPath("userData"), "drafts", `${createHash("sha256").update(stateRoot).digest("hex")}.json`));
 protocol.registerSchemesAsPrivileged([{ scheme: "gator", privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 
@@ -36,7 +38,7 @@ let updatePreparing = false;
 const runtimeBinary = () => process.env.GATOR_DESKTOP_BINARY || (app.isPackaged ? join(process.resourcesPath, "runtime", runtimeName()) : join(here, "../runtime", runtimeName()));
 const runtimeWorkspace = () => process.env.GATOR_DESKTOP_WORKSPACE || join(app.getPath("userData"), "workspace");
 function runtimeEnvironment() {
-  const environment = { ...process.env, GATOR_DESKTOP_DRAFT_DIR: join(app.getPath("userData"), "drafts") };
+  const environment = { ...process.env, GATOR_DESKTOP_DRAFT_DIR: join(app.getPath("userData"), "drafts"), GATOR_DESKTOP_UPLOAD_DIR: uploads.root };
   // Preserve existing Unix workspace-relative overrides. The Windows port
   // already resolves its profile overrides in the host before changing cwd.
   if (process.platform === "win32") {
@@ -174,7 +176,35 @@ else {
       if (request.action === "releases") { await shell.openExternal(releaseURL); return updates.snapshot(); }
       return updates.request(request);
     });
-    ipcMain.handle("gator:send", (event, frame) => { mutable(event); if (backend?.state?.external) throw new Error("Finish the current step in Terminal first"); backend.send(frame); });
+    ipcMain.handle("gator:send", async (event, frame) => {
+      mutable(event);
+      if (backend?.state?.external) throw new Error("Finish the current step in Terminal first");
+      validateFrame(frame);
+      if (frame.type !== "upload_submit") return backend.send(frame);
+      const owner = backend;
+      await uploads.check(frame.upload.files);
+      mutable(event);
+      if (backend !== owner || owner.closed || uploadContext(owner.state) !== frame.upload.context) throw new Error("The conversation changed. Review your attachments before sending.");
+      return owner.submitUpload(frame);
+    });
+    const importFiles = async (event, context, select) => {
+      mutable(event);
+      const owner = backend;
+      const current = () => backend === owner && !owner.closed && !owner.state?.panel && !owner.state?.external && uploadContext(owner.state) === context;
+      if (typeof context !== "string" || !context || !current()) throw new Error("Return to your conversation before attaching files.");
+      const paths = await select();
+      if (!paths.length) return [];
+      mutable(event);
+      if (!current()) throw new Error("The conversation changed. Attach these files again in the intended conversation.");
+      const files = await uploads.import(paths);
+      if (!current()) throw new Error("The conversation changed. Attach these files again in the intended conversation.");
+      return files;
+    };
+    ipcMain.handle("gator:files", (event, context) => importFiles(event, context, async () => {
+      const result = await dialog.showOpenDialog(window, { title: "Attach files to your message", buttonLabel: "Attach", properties: ["openFile", "multiSelections"], filters: [{ name: "Documents, text and images", extensions: uploadExtensions }, { name: "All files", extensions: ["*"] }] });
+      return result.canceled ? [] : result.filePaths;
+    }));
+    ipcMain.handle("gator:drop-files", (event, context, paths) => importFiles(event, context, async () => paths));
     ipcMain.handle("gator:folder", async (event) => {
       mutable(event);
       if (backend?.state?.running || backend?.state?.panel) return null;
@@ -209,6 +239,7 @@ else {
       try { failure = await terminalHandoff(job); } catch (error) { failure = `Could not complete the terminal action: ${error.message}`; }
       finally { terminalBusy = false; owner.finishExternal(failure); update(); }
     });
+    await uploads.prune();
     await startBackend();
     createWindow();
   }).catch((error) => { console.error("Gator could not start:", error.message); dialog.showErrorBox("Gator could not start", error.message); app.exit(1); });

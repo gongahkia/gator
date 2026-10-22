@@ -51,3 +51,29 @@ func TestAttachmentFlagsAndSummary(t *testing.T) {
 		t.Fatalf("attachment summary = %q", got)
 	}
 }
+
+func TestDesktopUploadsShareTheWorkspaceInputLimits(t *testing.T) {
+	source, uploads := t.TempDir(), t.TempDir()
+	t.Setenv("GATOR_DESKTOP_UPLOAD_DIR", uploads)
+	id := strings.Repeat("a", 32) + "/uploaded.txt"
+	if err := os.MkdirAll(filepath.Dir(filepath.Join(uploads, id)), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(uploads, id), []byte("Private uploaded text"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var paths []string
+	for _, name := range []string{"one.txt", "two.txt", "three.txt", "four.txt"} {
+		if err := os.WriteFile(filepath.Join(source, name), []byte("Workspace text"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		paths = append(paths, name)
+	}
+	_, documents, err := loadWorkPromptAttachments(source, paths[:1], []string{id})
+	if err != nil || len(documents) != 2 || documents[1].Name != "uploaded.txt" {
+		t.Fatalf("merged documents = %#v, %v", documents, err)
+	}
+	if _, _, err := loadWorkPromptAttachments(source, paths, []string{id}); err == nil {
+		t.Fatal("accepted more than four combined inputs")
+	}
+}

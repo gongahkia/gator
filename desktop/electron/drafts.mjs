@@ -1,12 +1,14 @@
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
+import { validUpload, uploadLimits } from "./uploads.mjs";
 
 const lifetime = 7 * 24 * 60 * 60 * 1000;
 const limit = 32;
 const textLimit = 128 * 1024;
 const validContext = (value) => typeof value === "string" && /^(conversation|workspace|topic):.+$/.test(value) && value.length <= 8192;
 const canonicalContext = (value) => value.startsWith("topic:") ? `workspace:${value}` : value;
+const validUploads = (value) => value === undefined || Array.isArray(value) && value.length <= uploadLimits.count && value.every(validUpload) && new Set(value.map((file) => file.id)).size === value.length && value.reduce((sum, file) => sum + file.size, 0) <= uploadLimits.total;
 
 // Unsent text is private local application data, just like saved conversations.
 // The renderer never chooses a filename or writes credentials/form fields here.
@@ -30,7 +32,7 @@ export class DraftStore {
     if (!allowed || Object.keys(request).some((key) => !allowed.includes(key))) throw new Error("Invalid draft action");
     if (request.action === "save") {
       const draft = request.draft;
-      if (!draft || typeof draft !== "object" || Array.isArray(draft) || Object.keys(draft).some((key) => !["context", "text", "title", "source"].includes(key)) || !validContext(draft.context) || typeof draft.text !== "string" || Buffer.byteLength(draft.text) > textLimit || typeof draft.title !== "string" || draft.title.length > 512 || typeof draft.source !== "string" || draft.source.length > 8192) throw new Error("Invalid draft");
+      if (!draft || typeof draft !== "object" || Array.isArray(draft) || Object.keys(draft).some((key) => !["context", "text", "title", "source", "uploads"].includes(key)) || !validUploads(draft.uploads) || !validContext(draft.context) || typeof draft.text !== "string" || Buffer.byteLength(draft.text) > textLimit || typeof draft.title !== "string" || draft.title.length > 512 || typeof draft.source !== "string" || draft.source.length > 8192) throw new Error("Invalid draft");
     }
     if (request.action === "remove" && !validContext(request.context)) throw new Error("Invalid draft identity");
     if (request.action === "configure" && typeof request.enabled !== "boolean") throw new Error("Invalid draft preference");
@@ -52,14 +54,14 @@ export class DraftStore {
     // Migrate the interim topic: keys on the next ordinary access, atomically.
     const seen = new Set();
     data.drafts = data.enabled ? data.drafts.filter((draft) => validContext(draft.context) && typeof draft.text === "string" && Buffer.byteLength(draft.text) <= textLimit && typeof draft.title === "string" && typeof draft.source === "string" && Number.isFinite(draft.updated) && draft.updated > now - lifetime && draft.updated <= now)
-      .map((draft) => draft.context.startsWith("topic:") ? { ...draft, context: canonicalContext(draft.context) } : draft)
+      .map((draft) => ({ ...draft, context: canonicalContext(draft.context), ...(validUploads(draft.uploads) ? {} : { uploads: [] }) }))
       .filter((draft) => { if (seen.has(draft.context)) return false; seen.add(draft.context); return true; }).slice(0, limit) : [];
     if (request.action === "configure") { data.enabled = request.enabled; if (!data.enabled) data.drafts = []; }
     if (request.action === "clear") data.drafts = [];
     if (["save", "remove"].includes(request.action)) {
       const context = canonicalContext(request.draft?.context ?? request.context);
       data.drafts = data.drafts.filter((draft) => draft.context !== context);
-      if (request.action === "save" && data.enabled && request.draft.text.trim()) data.drafts.unshift({ ...request.draft, context, updated: now });
+      if (request.action === "save" && data.enabled && (request.draft.text.trim() || request.draft.uploads?.length)) data.drafts.unshift({ ...request.draft, context, updated: now });
       data.drafts = data.drafts.slice(0, limit);
     }
     if (previous !== JSON.stringify(data) || ["clear", "configure"].includes(request.action)) {

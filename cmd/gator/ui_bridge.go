@@ -25,6 +25,7 @@ type uiFrame struct {
 	Height        int                               `json:"height,omitempty"`
 	Panel         *workapp.BridgePanelAction        `json:"panel,omitempty"`
 	Queue         *workapp.BridgeQueueAction        `json:"queue,omitempty"`
+	Upload        *workapp.BridgeUploadSubmission   `json:"upload,omitempty"`
 	Conversation  *workapp.BridgeConversationAction `json:"conversation,omitempty"`
 	InteractionID int                               `json:"interaction_id,omitempty"`
 	Approved      bool                              `json:"approved,omitempty"`
@@ -66,6 +67,11 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "submit":
 			next, command = m.model.SubmitText(frame.Text)
+		case "upload_submit":
+			if frame.Upload == nil {
+				return m, nil
+			}
+			next, command = m.model.SubmitBridgeUploads(*frame.Upload)
 		case "navigate":
 			next, command = m.model.NavigateBridge(frame.Text)
 		case "key":

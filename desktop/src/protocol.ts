@@ -34,8 +34,8 @@ export type Overview = {
 export type BackendCommand = { name: string; description: string; advanced: boolean; needs_input: boolean };
 export type ActivityEntry = { id: string; kind: "text" | "tool" | "status"; text?: string; tool?: string; state: "running" | "completed" | "failed" | "stopped"; started_at: string; finished_at?: string };
 export type BackendActivity = { started_at: string; finished_at?: string; state: "running" | "completed" | "failed" | "stopped"; entries: ActivityEntry[]; truncated?: boolean };
-export type BackendMessage = { activity?: BackendActivity; role: string; text: string; bundle?: BackendBundle; result?: BackendResult };
-export type QueuedMessage = { id: string; text: string };
+export type BackendMessage = { activity?: BackendActivity; inputs?: string[]; role: string; text: string; bundle?: BackendBundle; result?: BackendResult };
+export type QueuedMessage = { id: string; text: string; inputs?: string[] };
 export type QueueAction = {
   request_id: string; id: string; action: "edit" | "remove" | "earlier" | "later" | "move" | "run" | "guide"; text?: string;
   target_id?: string; placement?: "before" | "after";
@@ -138,7 +138,8 @@ export type PanelAction = {
 };
 export type Frame = {
   version: 1;
-  type: "submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "conversation";
+  type: "submit" | "upload_submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "conversation";
+  upload?: { request_id: string; context: string; text: string; files: string[] };
   text?: string; key?: string; error?: string; width?: number; height?: number;
   panel?: PanelAction; interaction_id?: number; approved?: boolean;
   queue?: QueueAction;

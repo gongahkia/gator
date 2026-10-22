@@ -1345,6 +1345,7 @@ func (m Model) queueStatus() string {
 func cloneRunOptions(options RunOptions) RunOptions {
 	result := options
 	result.Attachments = append([]string(nil), options.Attachments...)
+	result.Uploads = append([]string(nil), options.Uploads...)
 	result.Artifacts = append([]string(nil), options.Artifacts...)
 	result.PreviousArtifacts = append([]string(nil), options.PreviousArtifacts...)
 	result.ConnectorIDs = append([]string(nil), options.ConnectorIDs...)

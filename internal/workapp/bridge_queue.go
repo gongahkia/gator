@@ -9,8 +9,9 @@ import (
 )
 
 type BridgeQueuedRun struct {
-	ID   string `json:"id"`
-	Text string `json:"text"`
+	Inputs []string `json:"inputs,omitempty"`
+	ID     string   `json:"id"`
+	Text   string   `json:"text"`
 }
 
 type BridgeQueueAction struct {

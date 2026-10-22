@@ -755,6 +755,7 @@ func (m Model) submitRunningInput() (tea.Model, tea.Cmd) {
 	m.queue = append(m.queue, queuedRun{id: m.queueSequence, prompt: prompt, options: cloneRunOptions(m.options)})
 	m.recordPrompt(prompt)
 	m.options.Attachments = nil
+	m.options.Uploads = nil
 	m.options.ExcludedKnowledgeIDs = nil
 	m.options.RefreshSource = false
 	m.status = fmt.Sprintf("Working from an immutable snapshot… · %d queued", len(m.queue))
@@ -829,6 +830,7 @@ func (m Model) submitComposerInput() (tea.Model, tea.Cmd) {
 	options := cloneRunOptions(m.options)
 	options.PreviousArtifacts = m.previousArtifactPaths()
 	m.options.Attachments = nil
+	m.options.Uploads = nil
 	m.options.ExcludedKnowledgeIDs = nil
 	m.options.RefreshSource = false
 	return m.startWork(source, conversation, prompt, options)

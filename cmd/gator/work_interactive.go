@@ -17,7 +17,6 @@ import (
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
-	"github.com/gongahkia/gator/internal/attachment"
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/delivery"
 	"github.com/gongahkia/gator/internal/followup"
@@ -301,6 +300,10 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			return command
 		},
 		BundleAction: workTUIBundleAction(stateDir),
+		ValidateUploads: func(source string, paths, uploads []string) error {
+			_, _, err := loadWorkPromptAttachments(source, paths, uploads)
+			return err
+		},
 		ReviewBundle: func(path string) (*uisnapshot.Result, error) { return workReviewResult(stateDir, path) },
 		ListConversations: func() ([]worksession.Conversation, error) {
 			return sessions.List(50)
@@ -541,15 +544,7 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 	if len(request.Code.Verification) == 0 {
 		request.Code.Verification = parseSuggestedVerification(suggestedVerificationCommands(source))
 	}
-	var images, documents attachmentFlags
-	for _, path := range options.Attachments {
-		if attachment.IsImage(path) {
-			images = append(images, path)
-		} else {
-			documents = append(documents, path)
-		}
-	}
-	request.Images, request.Attachments, err = loadPromptAttachments(source, images, documents)
+	request.Images, request.Attachments, err = loadWorkPromptAttachments(source, options.Attachments, options.Uploads)
 	if err != nil {
 		return workapp.RunResult{Error: err.Error()}
 	}
@@ -974,7 +969,7 @@ func loadWorkTUIConversation(store worksession.Store, conversationID string) (wo
 	}
 	state.Messages = make([]workapp.TranscriptMessage, 0, len(lineage)*3)
 	for _, revision := range lineage {
-		state.Messages = append(state.Messages, workapp.TranscriptMessage{Role: "You", Text: revision.Objective})
+		state.Messages = append(state.Messages, workapp.TranscriptMessage{Role: "You", Text: revision.Objective, Inputs: append([]string(nil), revision.InputNames...)})
 		activity := revision.Activity.Clone()
 		if strings.TrimSpace(revision.FinalText) != "" {
 			state.Messages = append(state.Messages, workapp.TranscriptMessage{Activity: activity, Role: "Gator", Text: revision.FinalText})

@@ -17,6 +17,7 @@ import (
 // BridgeState is a display-only projection for the desktop.
 // The Go model remains the sole owner of commands, runs, approvals and history.
 type BridgeState struct {
+	UploadResult          *BridgeUploadResult   `json:"upload_result,omitempty"`
 	Mode                  string                `json:"mode"`
 	Panel                 *uisnapshot.Panel     `json:"panel,omitempty"`
 	Activity              *workactivity.Trace   `json:"activity,omitempty"`
@@ -91,6 +92,7 @@ func bridgeExternal(kind, action, id string, command *exec.Cmd) *BridgeExternal 
 }
 
 type BridgeMessage struct {
+	Inputs   []string            `json:"inputs,omitempty"`
 	Activity *workactivity.Trace `json:"activity,omitempty"`
 	Role     string              `json:"role"`
 	Text     string              `json:"text"`
@@ -131,6 +133,7 @@ type BridgeWorkDetails struct {
 
 func (m Model) BridgeState() BridgeState {
 	state := BridgeState{
+		UploadResult:          m.bridgeUploadResult,
 		Mode:                  "chat",
 		Activity:              m.activity.Clone(),
 		Messages:              make([]BridgeMessage, 0, len(m.messages)),
@@ -162,7 +165,7 @@ func (m Model) BridgeState() BridgeState {
 		Notice:                m.bridgeNotice,
 	}
 	for _, item := range m.queue {
-		state.Queue = append(state.Queue, BridgeQueuedRun{ID: bridgeQueuedRunID(item), Text: item.prompt})
+		state.Queue = append(state.Queue, BridgeQueuedRun{Inputs: uploadNames(item.options.Uploads), ID: bridgeQueuedRunID(item), Text: item.prompt})
 	}
 	state.GuidanceID = m.bridgeGuidanceID()
 	state.WorkDetails = BridgeWorkDetails{
@@ -202,7 +205,7 @@ func (m Model) BridgeState() BridgeState {
 		}
 	}
 	for _, item := range m.messages {
-		state.Messages = append(state.Messages, BridgeMessage{Activity: item.activity.Clone(), Role: item.role, Text: item.text, Bundle: cloneBundlePointer(item.bundle), Result: item.result})
+		state.Messages = append(state.Messages, BridgeMessage{Inputs: append([]string(nil), item.inputs...), Activity: item.activity.Clone(), Role: item.role, Text: item.text, Bundle: cloneBundlePointer(item.bundle), Result: item.result})
 	}
 	for _, item := range m.availableCommandEntries() {
 		state.Commands = append(state.Commands, BridgeCommand{

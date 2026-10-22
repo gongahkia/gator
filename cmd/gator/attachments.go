@@ -4,12 +4,37 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/attachment"
 	"github.com/gongahkia/gator/internal/workspace"
 )
+
+func loadWorkPromptAttachments(source string, paths, uploads []string) ([]agent.Image, []agent.Attachment, error) {
+	var images, documents []string
+	for _, path := range paths {
+		if attachment.IsImage(path) {
+			images = append(images, path)
+		} else {
+			documents = append(documents, path)
+		}
+	}
+	visual, text, err := loadPromptAttachments(source, images, documents)
+	if err != nil {
+		return nil, nil, err
+	}
+	addedImages, addedDocuments, err := attachment.LoadUploads(os.Getenv("GATOR_DESKTOP_UPLOAD_DIR"), uploads)
+	if err != nil {
+		return nil, nil, err
+	}
+	visual, text = append(visual, addedImages...), append(text, addedDocuments...)
+	if err := attachment.ValidateLoaded(visual, text); err != nil {
+		return nil, nil, err
+	}
+	return visual, text, nil
+}
 
 // attachmentFlags accepts one explicit repository-relative path per flag.
 // Separate --image and --attach flags keep CLI consent and media handling
