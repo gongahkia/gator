@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -111,7 +111,7 @@ func TestServiceRejectsInvalidToken(t *testing.T) {
 	done := make(chan error, 1)
 	go func() { done <- service.Run(ctx) }()
 	waitForBrowserSocket(t, socketPath(store, session.ID))
-	connection, err := net.Dial("unix", socketPath(store, session.ID))
+	connection, err := dialController(context.Background(), socketPath(store, session.ID))
 	if err != nil {
 		t.Fatalf("Dial: %v", err)
 	}
@@ -133,7 +133,7 @@ func waitForBrowserSocket(t *testing.T, path string) {
 	t.Helper()
 	deadline := time.Now().Add(time.Second)
 	for time.Now().Before(deadline) {
-		if info, err := os.Stat(path); err == nil && info.Mode().Perm() == 0o600 {
+		if info, err := os.Stat(path); err == nil && (info.Mode().Perm() == 0o600 || runtime.GOOS == "windows") {
 			return
 		}
 		time.Sleep(10 * time.Millisecond)

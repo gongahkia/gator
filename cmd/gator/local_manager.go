@@ -15,6 +15,7 @@ import (
 
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/dependency"
+	"github.com/gongahkia/gator/internal/hostproc"
 	"github.com/gongahkia/gator/internal/localmodel"
 	"github.com/gongahkia/gator/internal/modelcatalog"
 )
@@ -172,7 +173,7 @@ func (manager *localModelManager) Install(ctx context.Context, report func(model
 	if !plan.RefreshAfter {
 		return errors.New("this platform uses Ollama's graphical installer; open the official download page instead")
 	}
-	command := exec.CommandContext(ctx, plan.Command, plan.Arguments...)
+	command := hostproc.CommandContext(ctx, plan.Command, plan.Arguments...)
 	return streamOllamaInstaller(command, ctx, report)
 }
 
@@ -263,8 +264,17 @@ func ollamaInstallationPlan(osName string) (modelcatalog.LocalInstallationPlan, 
 			Arguments:      []string{"https://ollama.com/download/mac"},
 			RefreshAfter:   false,
 		}, nil
+	case "windows":
+		return modelcatalog.LocalInstallationPlan{
+			Title:          "Open Ollama's official Windows download page?",
+			Detail:         "Complete the system installer, then restart Gator to refresh the executable path.",
+			DisplayCommand: "https://ollama.com/download/windows",
+			Command:        "powershell.exe",
+			Arguments:      []string{"-NoProfile", "-NonInteractive", "-Command", "Start-Process -FilePath 'https://ollama.com/download/windows'"},
+			RefreshAfter:   false,
+		}, nil
 	default:
-		return modelcatalog.LocalInstallationPlan{}, fmt.Errorf("Gator's reviewed local-model catalog currently supports Linux and macOS; install Ollama from https://ollama.com/download for %s", osName)
+		return modelcatalog.LocalInstallationPlan{}, fmt.Errorf("Gator's reviewed local-model catalog does not support %s; see https://ollama.com/download", osName)
 	}
 }
 

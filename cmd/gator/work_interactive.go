@@ -22,6 +22,7 @@ import (
 	"github.com/gongahkia/gator/internal/delivery"
 	"github.com/gongahkia/gator/internal/followup"
 	"github.com/gongahkia/gator/internal/goal"
+	"github.com/gongahkia/gator/internal/hostproc"
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/learning"
@@ -451,7 +452,7 @@ func workTUIJobAction(arguments []string) (string, error) {
 }
 
 func workTUIConnectorCommand(arguments []string) *exec.Cmd {
-	command := exec.Command(os.Args[0], append([]string{"provider", "connector"}, arguments...)...)
+	command := hostproc.Command(os.Args[0], append([]string{"provider", "connector"}, arguments...)...)
 	command.Stdin = os.Stdin
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr

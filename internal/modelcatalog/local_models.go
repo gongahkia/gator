@@ -2,10 +2,11 @@ package modelcatalog
 
 import (
 	"context"
-	"os/exec"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/gongahkia/gator/internal/hostproc"
 )
 
 func (m Model) openModelCatalog() (tea.Model, tea.Cmd) {
@@ -335,7 +336,7 @@ func (m Model) updateLocalModelConfirmation(message tea.KeyMsg) (tea.Model, tea.
 			}
 			if plan.RefreshAfter {
 				if plan.RequiresElevation {
-					return m, tea.ExecProcess(exec.Command("sudo", "-v"), func(err error) tea.Msg {
+					return m, tea.ExecProcess(hostproc.Command("sudo", "-v"), func(err error) tea.Msg {
 						return localInstallerAuthorizationDoneMsg{err: err}
 					})
 				}
@@ -349,7 +350,7 @@ func (m Model) updateLocalModelConfirmation(message tea.KeyMsg) (tea.Model, tea.
 				return m.beginLocalInstallation(installer)
 			}
 			m.localModels.installation = nil
-			command := exec.Command(plan.Command, plan.Arguments...)
+			command := hostproc.Command(plan.Command, plan.Arguments...)
 			return m, tea.ExecProcess(command, func(err error) tea.Msg {
 				return localInstallationDoneMsg{plan: *plan, err: err}
 			})

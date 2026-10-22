@@ -9,8 +9,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/gongahkia/gator/internal/hostproc"
 )
 
 const playwrightVersion = "1.56.1"
@@ -121,7 +124,18 @@ func InstallRuntime(ctx context.Context, store *Store) (RuntimeStatus, error) {
 			return RuntimeStatus{}, fmt.Errorf("write pinned browser runtime %s: %w", file.name, err)
 		}
 	}
-	if err := runRuntimeCommand(ctx, directory, npm, []string{"ci", "--ignore-scripts", "--omit=dev"}, nil); err != nil {
+	npmArgs := []string{"ci", "--ignore-scripts", "--omit=dev"}
+	if runtime.GOOS == "windows" {
+		// Execute npm's JS entry point directly. cmd.exe would reinterpret
+		// paths and arguments, and CreateProcess cannot execute npm.cmd.
+		cli := filepath.Join(filepath.Dir(npm), "node_modules", "npm", "bin", "npm-cli.js")
+		if info, err := os.Stat(cli); err != nil || !info.Mode().IsRegular() {
+			return RuntimeStatus{}, errors.New("npm's JavaScript entry point was not found; install the standard Node.js distribution")
+		}
+		npm = node
+		npmArgs = append([]string{cli}, npmArgs...)
+	}
+	if err := runRuntimeCommand(ctx, directory, npm, npmArgs, nil); err != nil {
 		return RuntimeStatus{}, fmt.Errorf("install pinned Playwright package: %w", err)
 	}
 	browsers := filepath.Join(directory, "browsers")
@@ -139,7 +153,7 @@ func InstallRuntime(ctx context.Context, store *Store) (RuntimeStatus, error) {
 }
 
 func validateNodeVersion(node string) error {
-	contents, err := exec.Command(node, "--version").Output()
+	contents, err := hostproc.Command(node, "--version").Output()
 	if err != nil {
 		return fmt.Errorf("inspect Node.js version: %w", err)
 	}
@@ -153,7 +167,7 @@ func validateNodeVersion(node string) error {
 }
 
 func runRuntimeCommand(ctx context.Context, directory, executable string, arguments, extraEnvironment []string) error {
-	command := exec.CommandContext(ctx, executable, arguments...)
+	command := hostproc.CommandContext(ctx, executable, arguments...)
 	command.Dir = directory
 	command.Env = append(os.Environ(), extraEnvironment...)
 	output, err := command.CombinedOutput()

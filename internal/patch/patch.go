@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/gongahkia/gator/internal/hostproc"
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
@@ -243,13 +244,13 @@ func patchPath(value string) (string, error) {
 }
 
 func gitDiffNoIndex(ctx context.Context, directory, relative string) ([]byte, int, error) {
-	command := exec.CommandContext(ctx, "git", "diff", "--no-index", "--binary", "--", "/dev/null", relative)
+	command := hostproc.CommandContext(ctx, "git", "diff", "--no-index", "--binary", "--", "/dev/null", relative)
 	command.Dir = directory
 	return runCommand(command)
 }
 
 func gitOutput(ctx context.Context, directory string, arguments ...string) ([]byte, error) {
-	command := exec.CommandContext(ctx, "git", arguments...)
+	command := hostproc.CommandContext(ctx, "git", arguments...)
 	command.Dir = directory
 	output, exitCode, err := runCommand(command)
 	if err != nil {
@@ -266,7 +267,7 @@ func applyPatch(ctx context.Context, directory string, patch []byte, checkOnly b
 	if checkOnly {
 		arguments = append(arguments, "--check")
 	}
-	command := exec.CommandContext(ctx, "git", arguments...)
+	command := hostproc.CommandContext(ctx, "git", arguments...)
 	command.Dir = directory
 	command.Stdin = bytes.NewReader(patch)
 	output, _, err := runCommand(command)

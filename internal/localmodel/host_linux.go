@@ -5,7 +5,6 @@ package localmodel
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -59,25 +58,4 @@ func unixAvailableDisk(directory string) (uint64, string) {
 		return 0, fmt.Sprintf("stat filesystem for %s: %v", directory, err)
 	}
 	return uint64(statistics.Bavail) * uint64(statistics.Bsize), ""
-}
-
-func existingDirectory(path string) (string, error) {
-	path = filepath.Clean(path)
-	if path == "." || path == "" {
-		return "", fmt.Errorf("Ollama model directory is unknown")
-	}
-	for {
-		info, err := os.Stat(path)
-		if err == nil && info.IsDir() {
-			return path, nil
-		}
-		if err != nil && !os.IsNotExist(err) {
-			return "", fmt.Errorf("inspect Ollama model directory %s: %v", path, err)
-		}
-		parent := filepath.Dir(path)
-		if parent == path {
-			return "", fmt.Errorf("no existing parent for Ollama model directory %s", path)
-		}
-		path = parent
-	}
 }

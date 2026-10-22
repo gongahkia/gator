@@ -188,8 +188,8 @@ func TestWorkRejectsRetiredCodePolicyFlags(t *testing.T) {
 	}
 }
 
-func TestSupportedPlatformAllowsOnlyLinuxAndMacOS(t *testing.T) {
-	for _, goos := range []string{"linux", "darwin"} {
+func TestSupportedPlatforms(t *testing.T) {
+	for _, goos := range []string{"linux", "darwin", "windows"} {
 		if !supportedPlatform(goos) {
 			t.Fatalf("supported platform rejected: %s", goos)
 		}

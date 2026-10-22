@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"path/filepath"
 	"sync/atomic"
@@ -339,8 +338,7 @@ func (client *Client) call(ctx context.Context, method string, parameters any, t
 		return fmt.Errorf("encode browser controller request: %w", err)
 	}
 	request := rpcRequest{ID: client.sequence.Add(1), Token: token, Method: method, Params: payload}
-	dialer := net.Dialer{Timeout: 5 * time.Second}
-	connection, err := dialer.DialContext(ctx, "unix", client.socket)
+	connection, err := dialController(ctx, client.socket)
 	if err != nil {
 		return ErrUnavailable
 	}

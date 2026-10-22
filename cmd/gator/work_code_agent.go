@@ -9,13 +9,13 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/browser"
 	"github.com/gongahkia/gator/internal/codeexec"
+	"github.com/gongahkia/gator/internal/hostproc"
 	"github.com/gongahkia/gator/internal/instructions"
 	"github.com/gongahkia/gator/internal/patch"
 	"github.com/gongahkia/gator/internal/projectcapture"
@@ -42,7 +42,7 @@ func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 			return workrun.CodeResult{}, err
 		}
 
-		originalCommand := exec.CommandContext(ctx, "git", "rev-parse", "HEAD")
+		originalCommand := hostproc.CommandContext(ctx, "git", "rev-parse", "HEAD")
 		originalCommand.Dir = repository
 		original, err := originalCommand.Output()
 		if err != nil {
@@ -53,14 +53,14 @@ func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 				return workrun.CodeResult{}, err
 			}
 			for _, args := range [][]string{{"add", "--all"}, {"-c", "user.name=Gator", "-c", "user.email=gator@invalid", "commit", "--quiet", "--allow-empty", "-m", "selected staged candidate"}} {
-				command := exec.CommandContext(ctx, "git", args...)
+				command := hostproc.CommandContext(ctx, "git", args...)
 				command.Dir = repository
 				if output, err := command.CombinedOutput(); err != nil {
 					return workrun.CodeResult{}, fmt.Errorf("stage baseline: %w: %s", err, output)
 				}
 			}
 		}
-		baselineCommand := exec.CommandContext(ctx, "git", "rev-parse", "HEAD^{tree}")
+		baselineCommand := hostproc.CommandContext(ctx, "git", "rev-parse", "HEAD^{tree}")
 		baselineCommand.Dir = repository
 		baselineTree, err := baselineCommand.Output()
 		if err != nil {
@@ -227,7 +227,7 @@ func prepareCodeSnapshotRepository(ctx context.Context, source, scratch, id stri
 		{"add", "--all", "--force"},
 		{"-c", "user.name=Gator", "-c", "user.email=gator@invalid", "commit", "--quiet", "--allow-empty", "--message", "frozen Work source"},
 	} {
-		command := exec.CommandContext(ctx, "git", arguments...)
+		command := hostproc.CommandContext(ctx, "git", arguments...)
 		command.Dir = repository
 		output, err := command.CombinedOutput()
 		if err != nil {

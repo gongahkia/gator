@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/gongahkia/gator/internal/hostproc"
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
@@ -128,7 +129,7 @@ func create(ctx context.Context, repositoryPath, runID, revisionSpec string) (Wo
 		return Worktree{}, fmt.Errorf("inspect Gator worktree path: %w", err)
 	}
 
-	command := exec.CommandContext(ctx, "git", "worktree", "add", "--detach", path, revisionSpec)
+	command := hostproc.CommandContext(ctx, "git", "worktree", "add", "--detach", path, revisionSpec)
 	command.Dir = repository
 	output, err := command.CombinedOutput()
 	if err != nil {
@@ -156,7 +157,7 @@ func OpenExisting(ctx context.Context, repository, path, runID string) (Worktree
 	if err != nil {
 		return Worktree{}, fmt.Errorf("open retained worktree: %w", err)
 	}
-	command := exec.CommandContext(ctx, "git", "rev-parse", "--is-inside-work-tree")
+	command := hostproc.CommandContext(ctx, "git", "rev-parse", "--is-inside-work-tree")
 	command.Dir = root.Path()
 	output, err := command.CombinedOutput()
 	if err != nil || strings.TrimSpace(string(output)) != "true" {
@@ -173,7 +174,7 @@ func OpenExisting(ctx context.Context, repository, path, runID string) (Worktree
 }
 
 func revision(ctx context.Context, directory string) (string, error) {
-	command := exec.CommandContext(ctx, "git", "rev-parse", "HEAD")
+	command := hostproc.CommandContext(ctx, "git", "rev-parse", "HEAD")
 	command.Dir = directory
 	output, err := command.CombinedOutput()
 	if err != nil {
@@ -190,7 +191,7 @@ func repositoryRoot(ctx context.Context, path string) (string, error) {
 	if strings.TrimSpace(path) == "" {
 		return "", errors.New("repository path is required")
 	}
-	command := exec.CommandContext(ctx, "git", "rev-parse", "--show-toplevel")
+	command := hostproc.CommandContext(ctx, "git", "rev-parse", "--show-toplevel")
 	command.Dir = path
 	output, err := command.CombinedOutput()
 	if err != nil {
@@ -212,7 +213,7 @@ func resolveRevision(ctx context.Context, repository, reference string) (string,
 	if reference == "" || strings.ContainsAny(reference, "\x00\r\n") {
 		return "", fmt.Errorf("invalid worktree base reference %q", reference)
 	}
-	command := exec.CommandContext(ctx, "git", "rev-parse", "--verify", "--end-of-options", reference+"^{commit}")
+	command := hostproc.CommandContext(ctx, "git", "rev-parse", "--verify", "--end-of-options", reference+"^{commit}")
 	command.Dir = repository
 	output, err := command.CombinedOutput()
 	if err != nil {
@@ -281,7 +282,7 @@ func ignoredFileSetup(ctx context.Context, repository string) ([]ignoredFile, er
 }
 
 func requireTrackedSetupFile(ctx context.Context, repository string) error {
-	command := exec.CommandContext(ctx, "git", "ls-files", "--error-unmatch", "--", worktreeIncludePath)
+	command := hostproc.CommandContext(ctx, "git", "ls-files", "--error-unmatch", "--", worktreeIncludePath)
 	command.Dir = repository
 	if output, err := command.CombinedOutput(); err != nil {
 		return commandError("require tracked "+worktreeIncludePath, err, output)
@@ -290,7 +291,7 @@ func requireTrackedSetupFile(ctx context.Context, repository string) error {
 }
 
 func requireIgnored(ctx context.Context, repository, relative string) error {
-	command := exec.CommandContext(ctx, "git", "check-ignore", "-q", "--", relative)
+	command := hostproc.CommandContext(ctx, "git", "check-ignore", "-q", "--", relative)
 	command.Dir = repository
 	if output, err := command.CombinedOutput(); err != nil {
 		if exit, ok := err.(*exec.ExitError); ok && exit.ExitCode() == 1 {

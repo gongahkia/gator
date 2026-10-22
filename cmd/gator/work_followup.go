@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -14,6 +13,7 @@ import (
 	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/followup"
 	"github.com/gongahkia/gator/internal/goal"
+	"github.com/gongahkia/gator/internal/hostproc"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/workhome"
@@ -200,7 +200,7 @@ func startLocalSupervisor(stateDir string) error {
 	if err := log.Chmod(0600); err != nil {
 		return err
 	}
-	command := exec.Command(binary, "job", "supervisor")
+	command := hostproc.Command(binary, "job", "supervisor")
 	command.Env = append(os.Environ(), "GATOR_STATE_DIR="+stateDir)
 	command.Stdout, command.Stderr = log, log
 	configureDetached(command, true)

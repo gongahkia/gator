@@ -276,8 +276,12 @@ func TestOllamaInstallationPlansUseOfficialPlatformActions(t *testing.T) {
 	if err != nil || mac.Command != "open" || mac.Arguments[0] != "https://ollama.com/download/mac" || mac.RefreshAfter {
 		t.Fatalf("macOS installation plan = %#v, err=%v", mac, err)
 	}
-	if _, err := ollamaInstallationPlan("windows"); err == nil || !strings.Contains(err.Error(), "Linux and macOS") {
-		t.Fatalf("unsupported platform plan error = %v", err)
+	windows, err := ollamaInstallationPlan("windows")
+	if err != nil || windows.Command != "powershell.exe" || windows.RefreshAfter || !strings.Contains(windows.DisplayCommand, "https://ollama.com/download/windows") {
+		t.Fatalf("Windows plan: %#v, %v", windows, err)
+	}
+	if _, err := ollamaInstallationPlan("plan9"); err == nil {
+		t.Fatal("accepted unsupported platform")
 	}
 }
 

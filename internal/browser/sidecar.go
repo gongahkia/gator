@@ -11,6 +11,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sync"
+
+	"github.com/gongahkia/gator/internal/hostproc"
 )
 
 const maxSidecarResponseBytes = 4 * 1024 * 1024
@@ -50,7 +52,7 @@ func StartSidecar(ctx context.Context, config SidecarConfig) (Driver, error) {
 	if !status.Installed {
 		return nil, errors.New(status.Error)
 	}
-	command := exec.CommandContext(ctx, status.Node, filepath.Join(status.Directory, "driver.mjs"))
+	command := hostproc.CommandContext(ctx, status.Node, filepath.Join(status.Directory, "driver.mjs"))
 	command.Dir = status.Directory
 	command.Env = append(os.Environ(), "PLAYWRIGHT_BROWSERS_PATH="+filepath.Join(status.Directory, "browsers"))
 	input, err := command.StdinPipe()

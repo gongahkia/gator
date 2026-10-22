@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -107,15 +108,11 @@ func (service *Service) Run(ctx context.Context) error {
 		return fmt.Errorf("protect browser socket directory: %w", err)
 	}
 	_ = os.Remove(service.socket)
-	listener, err := net.Listen("unix", service.socket)
+	listener, err := listenController(service.socket)
 	if err != nil {
 		return fmt.Errorf("listen on browser socket: %w", err)
 	}
 	service.listener = listener
-	if err := os.Chmod(service.socket, 0o600); err != nil {
-		_ = listener.Close()
-		return fmt.Errorf("protect browser socket: %w", err)
-	}
 	defer func() {
 		_ = listener.Close()
 		_ = os.Remove(service.socket)
@@ -493,6 +490,9 @@ func safeArtifactName(value string) string {
 
 func socketPath(store *Store, sessionID string) string {
 	digest := sha256.Sum256([]byte(sessionID))
+	if runtime.GOOS == "windows" {
+		return filepath.Join(store.Directory(), "runtime", hex.EncodeToString(digest[:12])+".endpoint")
+	}
 	// Unix-domain socket paths are capped at roughly 104 bytes on macOS and
 	// 108 bytes on Linux. Gator state directories can legitimately be much
 	// longer (for example a test or managed-home path), so use a short,

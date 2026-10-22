@@ -16,6 +16,8 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+
+	"github.com/gongahkia/gator/internal/hostproc"
 )
 
 // Mode controls whether a command must use an operating-system sandbox.
@@ -223,7 +225,7 @@ func Prepare(ctx context.Context, request Request) (Prepared, error) {
 		return Prepared{}, err
 	}
 	if policy.Mode == Off {
-		command := exec.CommandContext(ctx, request.Argv[0], request.Argv[1:]...)
+		command := hostproc.CommandContext(ctx, request.Argv[0], request.Argv[1:]...)
 		command.Dir = root
 		command.Env = environment
 		return Prepared{Command: command, Cleanup: cleanup}, nil
@@ -244,6 +246,9 @@ func Prepare(ctx context.Context, request Request) (Prepared, error) {
 			return Prepared{}, err
 		}
 		return Prepared{Command: command, Cleanup: cleanup}, nil
+	case "windows":
+		cleanup()
+		return Prepared{}, errors.New("strict process sandboxing is unavailable in the Windows preview; this tool cannot run with the default policy")
 	default:
 		cleanup()
 		return Prepared{}, fmt.Errorf("strict sandbox is unavailable on %s; use sandbox mode off only when you intentionally accept host access", runtime.GOOS)
@@ -265,6 +270,8 @@ func StrictAvailability() (string, error) {
 			return "", errors.New("bubblewrap (bwrap) is unavailable")
 		}
 		return "Bubblewrap", nil
+	case "windows":
+		return "", errors.New("strict process sandboxing is not implemented in the Windows preview")
 	default:
 		return "", fmt.Errorf("strict sandbox is unavailable on %s", runtime.GOOS)
 	}
@@ -293,6 +300,16 @@ func processEnvironment(policy Policy) ([]string, string, func(), error) {
 		"LANG":    safeEnvironment("LANG"),
 		"LC_ALL":  safeEnvironment("LC_ALL"),
 		"TERM":    safeEnvironment("TERM"),
+	}
+	if runtime.GOOS == "windows" {
+		// Windows runtimes need their system directory even for explicitly
+		// approved sandbox-off commands. User caches remain in scratch.
+		for _, key := range []string{"SystemRoot", "SystemDrive", "WINDIR", "PATHEXT"} {
+			values[key] = os.Getenv(key)
+		}
+		values["USERPROFILE"] = scratch
+		values["APPDATA"] = filepath.Join(scratch, "AppData", "Roaming")
+		values["LOCALAPPDATA"] = filepath.Join(scratch, "AppData", "Local")
 	}
 	if moduleCache := goModuleCache(); moduleCache != "" {
 		values["GOMODCACHE"] = moduleCache

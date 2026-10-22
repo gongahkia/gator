@@ -2,9 +2,10 @@ package main
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/gongahkia/gator/internal/hostproc"
 )
 
 func suggestedVerificationCommands(directory string) []string {
@@ -30,7 +31,7 @@ func fileExists(directory, name string) bool {
 }
 
 func gitRepositoryRoot(directory string) (string, error) {
-	command := exec.Command("git", "-C", directory, "rev-parse", "--show-toplevel")
+	command := hostproc.Command("git", "-C", directory, "rev-parse", "--show-toplevel")
 	output, err := command.Output()
 	if err != nil {
 		return "", err

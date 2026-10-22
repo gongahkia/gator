@@ -1,6 +1,7 @@
 package localmodel
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -42,13 +43,34 @@ func ollamaModelDirectory(osName string) (string, string, error) {
 	case "linux":
 		// This is Ollama's documented path for its standard Linux installer.
 		return "/usr/share/ollama/.ollama/models", "Ollama Linux default", nil
-	case "darwin":
+	case "darwin", "windows":
 		home, err := os.UserHomeDir()
 		if err != nil {
-			return "", "Ollama macOS default", err
+			return "", "Ollama user default", err
 		}
-		return filepath.Join(home, ".ollama", "models"), "Ollama macOS default", nil
+		return filepath.Join(home, ".ollama", "models"), "Ollama user default", nil
 	default:
 		return "", "unknown", nil
+	}
+}
+
+func existingDirectory(path string) (string, error) {
+	path = filepath.Clean(path)
+	if path == "." || path == "" {
+		return "", fmt.Errorf("Ollama model directory is unknown")
+	}
+	for {
+		info, err := os.Stat(path)
+		if err == nil && info.IsDir() {
+			return path, nil
+		}
+		if err != nil && !os.IsNotExist(err) {
+			return "", fmt.Errorf("inspect Ollama model directory %s: %v", path, err)
+		}
+		parent := filepath.Dir(path)
+		if parent == path {
+			return "", fmt.Errorf("no existing parent for Ollama model directory %s", path)
+		}
+		path = parent
 	}
 }

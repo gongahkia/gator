@@ -341,15 +341,17 @@ func (r *Reservation) Finish(tokens int64, reported, failed bool, cost *float64)
 	if r == nil || r.lease == nil {
 		return nil
 	}
+	defer func() {
+		if r.releaseData != nil {
+			r.releaseData()
+			r.releaseData = nil
+		}
+	}()
 	closeLease := func() {
 		if r.lease != nil {
 			_ = filelock.Unlock(r.lease)
 			_ = r.lease.Close()
 			r.lease = nil
-		}
-		if r.releaseData != nil {
-			r.releaseData()
-			r.releaseData = nil
 		}
 	}
 	defer closeLease()

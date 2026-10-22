@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/hostproc"
 	"github.com/gongahkia/gator/internal/privatefs"
 	sharedusage "github.com/gongahkia/gator/internal/usage"
 	"github.com/gongahkia/gator/internal/workrun"
@@ -85,6 +86,8 @@ func jobCommand(arguments []string, out io.Writer) error {
 		return jobLaunchAgent(arguments[1:], out)
 	case "systemd":
 		return jobSystemd(arguments[1:], out)
+	case "windows":
+		return jobWindows(arguments[1:], out)
 	case "status":
 		return jobSupervisorRequest("health", out)
 	case "stop":
@@ -139,8 +142,8 @@ func jobLaunchAgent(arguments []string, out io.Writer) error {
 		}
 		// bootstrap reports an existing label rather than replacing it. Remove
 		// only this exact per-user label before reloading the freshly-written file.
-		_ = exec.Command("launchctl", "bootout", "gui/"+uid+"/"+label).Run()
-		if output, err := exec.Command("launchctl", "bootstrap", "gui/"+uid, path).CombinedOutput(); err != nil {
+		_ = hostproc.Command("launchctl", "bootout", "gui/"+uid+"/"+label).Run()
+		if output, err := hostproc.Command("launchctl", "bootstrap", "gui/"+uid, path).CombinedOutput(); err != nil {
 			return fmt.Errorf("load job LaunchAgent: %w (%s)", err, strings.TrimSpace(string(output)))
 		}
 		_, err = fmt.Fprintf(out, "Installed local LaunchAgent %s\n  plist: %s\n  logs: %s\nIt runs the foreground local supervisor while this Mac is on and you are signed in. Desktop/CUA sessions are never scheduled.\n", label, path, logPath)
@@ -149,7 +152,7 @@ func jobLaunchAgent(arguments []string, out io.Writer) error {
 		if len(arguments) != 1 {
 			return errors.New("usage: gator job launchagent status")
 		}
-		output, err := exec.Command("launchctl", "print", "gui/"+uid+"/"+label).CombinedOutput()
+		output, err := hostproc.Command("launchctl", "print", "gui/"+uid+"/"+label).CombinedOutput()
 		if err != nil {
 			return fmt.Errorf("LaunchAgent is not running: %s", strings.TrimSpace(string(output)))
 		}
@@ -159,7 +162,7 @@ func jobLaunchAgent(arguments []string, out io.Writer) error {
 		if len(arguments) != 2 || arguments[1] != "--yes" {
 			return errors.New("usage: gator job launchagent remove --yes")
 		}
-		_ = exec.Command("launchctl", "bootout", "gui/"+uid+"/"+label).Run()
+		_ = hostproc.Command("launchctl", "bootout", "gui/"+uid+"/"+label).Run()
 		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
@@ -701,18 +704,43 @@ func runJobProcessWith(ctx context.Context, definition jobs.Definition, stateDir
 }
 
 func runJobSupervisor(arguments []string, out io.Writer) error {
-	settings, err := loadSettings()
-	if err != nil {
-		return err
-	}
 	flags := flag.NewFlagSet("job supervisor", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
-	notify := flags.Bool("notify", settings.Notifications.Desktop, "emit desktop notifications when available")
+	notify := flags.Bool("notify", false, "emit desktop notifications when available")
+	loginProfile := flags.Bool("login-profile", false, "use the reviewed Windows start-at-login profile")
+	stop := flags.Bool("stop", false, "stop this profile's app-owned supervisor")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
 	if len(flags.Args()) != 0 {
 		return errors.New("usage: gator job supervisor [--notify=true|false]")
+	}
+	if *loginProfile {
+		if err := loadLoginProfile(); err != nil {
+			return err
+		}
+	}
+	if *stop {
+		return jobSupervisorRequest("stop", out)
+	}
+	if err := preparePlatformProfile(); err != nil {
+		return err
+	}
+	if err := maintainRuntimeProfile(); err != nil {
+		return err
+	}
+	settings, err := loadSettings()
+	if err != nil {
+		return err
+	}
+	notifySet := false
+	flags.Visit(func(f *flag.Flag) {
+		if f.Name == "notify" {
+			notifySet = true
+		}
+	})
+	if !notifySet {
+		*notify = settings.Notifications.Desktop
 	}
 	store, stateDir, err := jobStore()
 	if err != nil {
@@ -1219,12 +1247,12 @@ func writePrivateFileAtomic(path string, contents []byte) error {
 
 func desktopNotification(name, status string) {
 	if runtime.GOOS == "darwin" {
-		_ = exec.Command("osascript", "-e", fmt.Sprintf(`display notification %q with title "Gator: %s"`, name, status)).Run()
+		_ = hostproc.Command("osascript", "-e", fmt.Sprintf(`display notification %q with title "Gator: %s"`, name, status)).Run()
 		return
 	}
 	if runtime.GOOS == "linux" {
 		if _, err := exec.LookPath("notify-send"); err == nil {
-			_ = exec.Command("notify-send", "Gator: "+status, name).Run()
+			_ = hostproc.Command("notify-send", "Gator: "+status, name).Run()
 		}
 	}
 }

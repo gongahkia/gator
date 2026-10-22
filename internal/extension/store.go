@@ -9,11 +9,12 @@ import (
 	"io/fs"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/gongahkia/gator/internal/hostproc"
 )
 
 // Store owns installed extension bundles below one data directory.
@@ -166,7 +167,7 @@ func (s Store) InstallSource(ctx context.Context, source string, replace bool) (
 	}
 	defer os.RemoveAll(temporary)
 	checkout := filepath.Join(temporary, "source")
-	command := exec.CommandContext(ctx, "git", "clone", "--depth", "1", "--", source, checkout)
+	command := hostproc.CommandContext(ctx, "git", "clone", "--depth", "1", "--", source, checkout)
 	output, err := command.CombinedOutput()
 	if err != nil {
 		message := strings.TrimSpace(string(output))
@@ -286,7 +287,7 @@ func (s Store) materializeSource(ctx context.Context, source, staging string) (s
 		return "", errors.New("extension source must be a local directory or an https, ssh, or git@ repository URL")
 	}
 	checkout := filepath.Join(staging, "checkout")
-	command := exec.CommandContext(ctx, "git", "clone", "--depth", "1", "--", source, checkout)
+	command := hostproc.CommandContext(ctx, "git", "clone", "--depth", "1", "--", source, checkout)
 	if output, err := command.CombinedOutput(); err != nil {
 		if message := strings.TrimSpace(string(output)); message != "" {
 			return "", fmt.Errorf("clone extension source: %s", message)

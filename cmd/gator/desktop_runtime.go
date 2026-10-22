@@ -36,7 +36,7 @@ func runDesktopRuntime(args []string, out io.Writer) error {
 	if !desktop && !supervisor && !internal {
 		return errors.New(desktopOnlyMessage)
 	}
-	if desktop {
+	if desktop || supervisor {
 		previous, present := os.LookupEnv("GATOR_INTERNAL_COMMANDS")
 		if err := os.Setenv("GATOR_INTERNAL_COMMANDS", "1"); err != nil {
 			return err
@@ -49,9 +49,21 @@ func runDesktopRuntime(args []string, out io.Writer) error {
 			}
 		}()
 	}
+	// A login supervisor selects its profile before opening configuration or
+	// maintenance. Its own workers use the same private command routing.
+	if supervisor {
+		return run(args, out)
+	}
 	if err := preparePlatformProfile(); err != nil {
 		return err
 	}
+	if err := maintainRuntimeProfile(); err != nil {
+		return err
+	}
+	return run(args, out)
+}
+
+func maintainRuntimeProfile() error {
 	if root, err := state.ResolveDir(""); err == nil {
 		if _, err := lifecycle.Maintain(context.Background(), root, time.Now()); err != nil && !errors.Is(err, state.ErrBusy) {
 			if errors.Is(err, lifecycle.ErrRecovery) {
@@ -60,5 +72,5 @@ func runDesktopRuntime(args []string, out io.Writer) error {
 			fmt.Fprintln(os.Stderr, "Gator: retention cleanup deferred:", err)
 		}
 	}
-	return run(args, out)
+	return nil
 }

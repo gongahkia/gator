@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os/exec"
 	"strings"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/hostproc"
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
@@ -43,7 +43,7 @@ func (t ApplyPatch) Execute(ctx context.Context, raw json.RawMessage) (agent.Too
 		return agent.ToolResult{}, fmt.Errorf("patch exceeds the %d-byte limit", maxPatchBytes)
 	}
 	if len(t.AllowedPaths) > 0 {
-		command := exec.CommandContext(ctx, "git", "apply", "--numstat", "-z", "-")
+		command := hostproc.CommandContext(ctx, "git", "apply", "--numstat", "-z", "-")
 		command.Dir = t.Root.Path()
 		command.Stdin = strings.NewReader(arguments.Patch)
 		data, err := command.Output()
@@ -91,7 +91,7 @@ func runGitApply(ctx context.Context, directory, mode, patch string) error {
 		arguments = append(arguments, "--check")
 	}
 	arguments = append(arguments, "-")
-	command := exec.CommandContext(ctx, "git", arguments...)
+	command := hostproc.CommandContext(ctx, "git", arguments...)
 	command.Dir = directory
 	command.Stdin = strings.NewReader(patch)
 	output, err := command.CombinedOutput()

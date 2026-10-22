@@ -11,6 +11,7 @@ import (
 	"hash"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -309,6 +310,9 @@ func New(config Config) *Manager {
 func (m *Manager) Start(ctx context.Context, argv []string) (Task, error) {
 	if len(argv) == 0 || strings.TrimSpace(argv[0]) == "" {
 		return Task{}, errors.New("terminal task argv is required")
+	}
+	if runtime.GOOS == "windows" {
+		return Task{}, errors.New("interactive terminal tools are not implemented in the Windows preview")
 	}
 	if m.root.Path() == "" {
 		return Task{}, errors.New("terminal task workspace root is required")

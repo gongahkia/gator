@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -18,12 +17,16 @@ import (
 
 	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/connector"
+	"github.com/gongahkia/gator/internal/hostproc"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/uisnapshot"
 	"github.com/gongahkia/gator/internal/worktui"
 )
 
 func recoveryServicePath() (string, error) {
+	if runtime.GOOS == "windows" {
+		return windowsRunPath, nil
+	}
 	if runtime.GOOS == "darwin" {
 		home, err := os.UserHomeDir()
 		return filepath.Join(home, "Library", "LaunchAgents", "com.gator.work-supervisor.plist"), err
@@ -36,7 +39,7 @@ func managedJobCommand(ctx context.Context, stateDir string, args ...string) (st
 	if err != nil {
 		return "", err
 	}
-	command := exec.CommandContext(ctx, binary, append([]string{"job"}, args...)...)
+	command := hostproc.CommandContext(ctx, binary, append([]string{"job"}, args...)...)
 	command.Env = append(os.Environ(), "GATOR_STATE_DIR="+stateDir)
 	output, err := command.CombinedOutput()
 	if err != nil {
@@ -79,11 +82,16 @@ func recoveryControlWith(ctx context.Context, stateDir, action string, args []st
 		if runtime.GOOS == "darwin" {
 			service = "launchagent"
 		}
+		if runtime.GOOS == "windows" {
+			service = "windows"
+		}
 		if action == "install" {
 			_, _ = command(ctx, stateDir, "stop")
 		}
 		serviceArgs := []string{service, action}
-		if action == "remove" {
+		if runtime.GOOS == "windows" {
+			serviceArgs = append(serviceArgs, "--expected", serviceDigest)
+		} else if action == "remove" {
 			serviceArgs = append(serviceArgs, "--yes")
 		}
 		output, err := command(ctx, stateDir, serviceArgs...)
@@ -276,6 +284,9 @@ func recoveryControlWith(ctx context.Context, stateDir, action string, args []st
 // recoveryServiceReview recognizes Gator's generated service configuration.
 // Unknown or ambiguous configurations are never offered for removal.
 func recoveryServiceReview(filename, stateDir, platform string) (installed, owns bool, digest string, err error) {
+	if platform == "windows" {
+		return reviewWindowsLogin(stateDir)
+	}
 	data, err := os.ReadFile(filename)
 	if errors.Is(err, os.ErrNotExist) {
 		return false, false, "absent", nil

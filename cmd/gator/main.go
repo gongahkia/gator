@@ -35,7 +35,7 @@ func main() {
 
 func run(args []string, out io.Writer) error {
 	if !supportedPlatform(runtime.GOOS) {
-		return fmt.Errorf("Gator supports only Linux and macOS; %s is not supported", runtime.GOOS)
+		return fmt.Errorf("Gator supports Linux, macOS, and Windows; %s is not supported", runtime.GOOS)
 	}
 	if len(args) == 0 {
 		return errors.New(desktopOnlyMessage)
@@ -159,7 +159,7 @@ func isQuotedWorkRequest(args []string) bool {
 }
 
 func supportedPlatform(goos string) bool {
-	return goos == "linux" || goos == "darwin"
+	return goos == "linux" || goos == "darwin" || goos == "windows"
 }
 
 func isHelpArgument(value string) bool {

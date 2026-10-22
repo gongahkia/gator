@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/config"
+	"github.com/gongahkia/gator/internal/hostproc"
 	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/uisnapshot"
 	"github.com/gongahkia/gator/internal/workhome"
@@ -204,7 +205,7 @@ func overviewTerminalCommand(root string, args []string) *exec.Cmd {
 	if err != nil {
 		return nil
 	}
-	command := exec.Command(binary, args...)
+	command := hostproc.Command(binary, args...)
 	command.Env = append(os.Environ(), "GATOR_STATE_DIR="+root)
 	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return command

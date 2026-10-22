@@ -3,12 +3,12 @@ package main
 import (
 	"fmt"
 	"io"
-	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
 
 	"github.com/gongahkia/gator/internal/dependency"
+	"github.com/gongahkia/gator/internal/hostproc"
 )
 
 // writeDependencyDoctor reports checked-in installation guidance. It does not
@@ -57,7 +57,7 @@ func writeDependencyDoctor(out io.Writer, statuses []dependency.Status) error {
 
 // External Node is optional tooling; Electron supplies its own application runtime.
 func supportedNodeTools(node string) bool {
-	version, err := exec.Command(node, "--version").Output()
+	version, err := hostproc.Command(node, "--version").Output()
 	if err != nil {
 		return false
 	}

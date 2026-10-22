@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/gongahkia/gator/internal/hostproc"
 )
 
 const jobSystemdUnitName = "gator-work-supervisor.service"
@@ -33,7 +34,7 @@ func jobSystemd(arguments []string, out io.Writer) error {
 	}
 	unitPath := filepath.Join(configDir, "systemd", "user", jobSystemdUnitName)
 	command := func(args ...string) ([]byte, error) {
-		return exec.Command("systemctl", append([]string{"--user"}, args...)...).CombinedOutput()
+		return hostproc.Command("systemctl", append([]string{"--user"}, args...)...).CombinedOutput()
 	}
 	switch arguments[0] {
 	case "install":

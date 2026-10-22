@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"sort"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	gatorbrowser "github.com/gongahkia/gator/internal/browser"
+	"github.com/gongahkia/gator/internal/hostproc"
 	"github.com/gongahkia/gator/internal/state"
 )
 
@@ -230,7 +230,7 @@ func launchBrowserDaemon(store *gatorbrowser.Store, stateDir string, session gat
 	if err != nil {
 		return fmt.Errorf("open browser daemon log: %w", err)
 	}
-	command := exec.Command(os.Args[0], arguments...)
+	command := hostproc.Command(os.Args[0], arguments...)
 	command.Stdout = logFile
 	command.Stderr = logFile
 	configureDetached(command, false)

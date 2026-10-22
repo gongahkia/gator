@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/hostproc"
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
@@ -178,7 +179,7 @@ func untrackedFiles(ctx context.Context, root workspace.Root) ([]string, error) 
 }
 
 func runGitCommand(ctx context.Context, directory string, arguments ...string) (string, bool, int, error) {
-	command := exec.CommandContext(ctx, "git", arguments...)
+	command := hostproc.CommandContext(ctx, "git", arguments...)
 	command.Dir = directory
 	output := &limitedBuffer{limit: maxGitOutputBytes}
 	command.Stdout = output

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -197,6 +198,11 @@ func (s Store) readAll() (map[string]Credential, error) {
 	}
 	if !info.Mode().IsRegular() {
 		return nil, errors.New("credential file is not a regular file")
+	}
+	if runtime.GOOS == "windows" {
+		if err := privatefs.Check(s.path); err != nil {
+			return nil, fmt.Errorf("credential file is not private: %w", err)
+		}
 	}
 	if info.Size() > 1024*1024 {
 		return nil, errors.New("credential file exceeds 1 MiB")

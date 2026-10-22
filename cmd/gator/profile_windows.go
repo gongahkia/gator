@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
 
 	"github.com/gongahkia/gator/internal/config"
@@ -20,5 +21,11 @@ func preparePlatformProfile() error {
 	if err != nil {
 		return err
 	}
-	return privatefs.MkdirAll(filepath.Join(configuration, "gator"))
+	if err := privatefs.MkdirAll(filepath.Join(configuration, "gator")); err != nil {
+		return err
+	}
+	if drafts := os.Getenv("GATOR_DESKTOP_DRAFT_DIR"); drafts != "" {
+		return privatefs.MkdirAll(drafts)
+	}
+	return nil
 }
