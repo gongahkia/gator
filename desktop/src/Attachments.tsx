@@ -1,7 +1,6 @@
-import { FileText, LoaderCircle, Paperclip, X } from "lucide-react";
+import { FileText, Paperclip, X } from "lucide-react";
 import { useEffect, useRef, useState, type DragEvent } from "react";
 import type { UploadedFile } from "./bridge";
-import { IconSwap } from "./motion";
 
 export function useAttachmentPicker(context: string | undefined, files: UploadedFile[], change: (files: UploadedFile[]) => void, disabled: boolean) {
   const [busy, setBusy] = useState(false);
@@ -32,7 +31,7 @@ export function useAttachmentPicker(context: string | undefined, files: Uploaded
 }
 
 export function AttachButton({ busy, disabled, choose }: { busy: boolean; disabled: boolean; choose(): void }) {
-  return <button className="icon-button attach-button" aria-label="Attach files" title="Attach documents, text or images · up to 4 files, 4 MiB each, 8 MiB total" disabled={disabled || busy} aria-busy={busy} onClick={choose}><IconSwap active={busy} on={<LoaderCircle size={17} className="spin" />} off={<Paperclip size={17} />} /></button>;
+  return <button className="icon-button attach-button" aria-label="Attach files" title="Attach documents, text or images · up to 4 files, 4 MiB each, 8 MiB total" disabled={disabled || busy} aria-busy={busy} onClick={choose}><Paperclip size={17} /></button>;
 }
 
 export function PendingAttachments({ files, disabled, remove }: { files: UploadedFile[]; disabled: boolean; remove(id: string): void }) {

@@ -291,7 +291,6 @@ export function App() {
             {state.running && <button className="send-button stop" aria-label="Stop current work" disabled={state.cancelling} onClick={() => attempt({ type: "key", key: "esc" })}><Square size={13} fill="currentColor" /></button>}
             <button className="send-button" aria-label={state.running ? "Queue message" : "Send message"} title={queueFull ? "Queue is full (16 messages)" : state.running ? "Queue for after this task (Enter)" : "Send message"} aria-busy={sending} disabled={(!draft.trim() && !drafts.uploads.length) || !drafts.ready || sending || modelBusy || voiceBusy || attachments.busy || queueAction.busy || queueFull || !!error || !!state.external} onClick={() => void submit()}><IconSwap active={sending} on={<LoaderCircle size={18} className="spin" />} off={state.running ? <ListPlus size={18} /> : <ArrowUp size={18} />} /></button>
           </div></div></div>
-          {attachments.busy && <p className="attachment-status" role="status">Preparing files…</p>}
           {attachments.dragging && <p className="attachment-status" role="status">Drop files to attach to this message</p>}
           {(draftError || attachments.issue) && <p className="composer-error" role="alert">{draftError || attachments.issue}</p>}
           {queueFull && <p className="composer-error" role="status">Queue full. Edit or remove a message to make room.</p>}
