@@ -53,20 +53,21 @@ async function fixture() {
   let application: ElectronApplication | undefined;
   return {
     directory, payloads, voiceRequests: () => voiceRequests,
-    async launch() { application = await electron.launch({ args: ["."], cwd: resolve("."), env }); return application; },
+    async launch() { const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE; application = await electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env }); return application; },
     async close() { try { if (application) await closeDesktop(application); } finally { server.closeAllConnections(); await new Promise<void>(done => server.close(() => done())); await rm(directory, { recursive: true, force: true }); } },
   };
 }
 
 const state = (page: Page) => page.evaluate(async () => (await window.gator!.snapshot()).state!);
 async function ask(page: Page, question: string, review?: boolean) {
+  await expect.poll(async () => Boolean(await state(page))).toBe(true);
   const before = (await state(page)).messages.length;
   const composer = page.getByRole("textbox", { name: "Message Gator", exact: true });
   await composer.fill(question); await composer.press("Enter");
   await expect.poll(async () => (await state(page)).messages.length).toBeGreaterThan(before);
   if (review !== undefined) await page.getByRole("button", { name: review ? "Approve this action" : "Deny", exact: true }).click();
   await expect.poll(async () => (await state(page)).running, { timeout: 30000 }).toBe(false);
-  await expect(page.getByText("Work failed", { exact: true })).toHaveCount(0);
+  expect((await state(page)).messages.filter(message => message.result?.title === "Work failed").map(message => message.result?.summary)).toEqual([]);
 }
 
 test("chat changes shortcuts, model selection, limits, retention and selected connections", async () => {
@@ -129,6 +130,7 @@ test("dictation preserves the draft, records voice usage and reads only new repl
     await composer.fill("Keep my existing draft.");
     await page.getByRole("button", { name: "Voice dictation", exact: true }).click();
     await expect(page.getByText("Audio is sent to Gemini", { exact: false })).toBeVisible();
+    await page.screenshot({ path: "test-results/voice-controls-open.png" });
     await page.getByRole("button", { name: "Start recording", exact: true }).click();
     await expect(page.getByRole("button", { name: "Stop & transcribe", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Send message", exact: true })).toBeDisabled();
