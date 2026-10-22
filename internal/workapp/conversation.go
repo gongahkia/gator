@@ -1,6 +1,8 @@
 package workapp
 
 import (
+	"github.com/gongahkia/gator/internal/worksession"
+	"path/filepath"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -44,19 +46,39 @@ func (m *Model) rememberChat() {
 		}
 	}
 }
-func (m *Model) createChat() {
-	if m.config.CreateConversation == nil {
-		return
+func (m *Model) createChat() { m.beginChat(m.primarySource) }
+
+// Persist the identity before replacing visible state, so a failed creation
+// leaves the user's current chat intact. Folder changes use the same reset.
+func (m *Model) beginChat(source string) bool {
+	var conversation worksession.Conversation
+	if m.config.CreateConversation != nil {
+		var err error
+		conversation, err = m.config.CreateConversation(source)
+		if err != nil {
+			m.bridgeNotice = "Couldn't create a new chat: " + err.Error()
+			return false
+		}
 	}
-	conversation, err := m.config.CreateConversation(m.primarySource)
-	if err != nil {
-		m.bridgeNotice = "Couldn't create a new chat: " + err.Error()
-		return
+	if m.config.ClearGoal != nil {
+		m.config.ClearGoal()
 	}
-	m.conversation, m.source, m.title, m.primary, m.home = conversation.ID, conversation.SourcePath, conversation.Title, false, true
+	m.primary, m.home, m.goalID = false, true, ""
+	m.conversation, m.source, m.title = conversation.ID, source, "Work in "+filepath.Base(source)
+	if conversation.ID != "" {
+		m.title = conversation.Title
+	}
+	m.section, m.paletteQuery, m.launcherMode = "", "", ""
 	m.revision, m.snapshot = "", ""
+	m.clearPromptHistory()
+	m.messages, m.activity, m.queue = nil, nil, nil
+	m.input, m.status, m.lastOutput, m.lastWorkID = "", "", "", ""
+	m.lastBundle = BundleSummary{}
+	m.pendingBundleAction = nil
+	m.options = RunOptions{MaxSteps: 24, Mode: "auto", Code: CodeOptions{MaxSteps: 16, Sandbox: "strict", Network: "deny"}}
 	m.rememberChat()
 	m.refreshBridgeConversations()
+	return true
 }
 
 // restoreConversation replaces all revision-dependent UI state with the

@@ -452,21 +452,13 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 			err = fmt.Errorf("usage: /help [advanced]")
 		}
 	case "/new":
-		m.primary = false
-		if m.config.ClearGoal != nil {
-			m.config.ClearGoal()
+		source := m.config.CurrentFolder
+		if m.config.CreateConversation != nil {
+			source = m.primarySource
 		}
-		m.home, m.conversation, m.goalID = true, "", ""
-		m.section, m.paletteQuery, m.launcherMode = "", "", ""
-		m.source = m.config.CurrentFolder
-		m.title = "Work in " + filepath.Base(m.source)
-		m.revision, m.snapshot = "", ""
-		m.clearPromptHistory()
-		m.messages, m.status, m.queue = nil, "", nil
-		m.lastOutput, m.lastBundle = "", BundleSummary{}
-		m.options = RunOptions{MaxSteps: 24, Mode: "auto", Code: CodeOptions{MaxSteps: 16, Sandbox: "strict", Network: "deny"}}
-		m.createChat()
-		m.refreshAttention()
+		if m.beginChat(source) {
+			m.refreshAttention()
+		}
 		return m, nil
 	case "/model", "/models":
 		if len(fields) != 1 {
@@ -561,19 +553,18 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		var resolved string
 		resolved, err = m.config.ResolveSource(value)
 		if err == nil {
-			if m.config.ClearGoal != nil {
-				m.config.ClearGoal()
-			}
-			m.goalID = ""
 			if m.source != resolved {
-				m.primary = false
-				m.conversation = ""
-				m.revision = ""
-				m.messages = nil
+				if !m.beginChat(resolved) {
+					return m, nil
+				}
+				m.refreshAttention()
+			} else {
+				if m.config.ClearGoal != nil {
+					m.config.ClearGoal()
+				}
+				m.goalID = ""
 			}
-			m.source = resolved
-			m.title = "Work in " + filepath.Base(resolved)
-			m.options.RefreshSource = m.conversation != ""
+			m.options.RefreshSource = m.revision != "" || m.snapshot != ""
 			result = "Workspace set to " + resolved + ". It remains read-only during Work."
 			if m.options.RefreshSource {
 				result += "\nThe next turn will capture a new immutable snapshot."
