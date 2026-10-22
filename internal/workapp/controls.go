@@ -316,6 +316,7 @@ func controlReviewLabel(action, fallback string) string {
 func (m *Model) clearRemovedData(screen ControlScreen) {
 	for _, move := range screen.SourceMoves {
 		m.source = moveSourcePath(m.source, move.From, move.To)
+		m.primarySource = moveSourcePath(m.primarySource, move.From, move.To)
 		m.options.RefreshSource = true
 		m.snapshot = ""
 		m.contextState = ContextState{}
@@ -375,6 +376,7 @@ func (m *Model) clearRemovedData(screen ControlScreen) {
 				m.sectionNotice = "Data removed; choose a workspace with /source: " + err.Error()
 			} else {
 				m.source, m.title = fresh.SourcePath, fresh.Title
+				m.primarySource = fresh.SourcePath
 			}
 		}
 	}

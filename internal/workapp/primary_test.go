@@ -74,3 +74,13 @@ func TestMainConversationDoesNotBypassActiveWorkOrAdoptExistingTopics(t *testing
 		t.Fatal("main navigation bypassed current work")
 	}
 }
+
+func TestMainConversationUsesResetPrivateFolderAfterDataRemoval(t *testing.T) {
+	m := New(Config{CurrentFolder: "/old-private", PrimaryConversation: func() (string, error) { return "", nil }, ResetPrivateState: func() (GoalState, error) { return GoalState{SourcePath: "/fresh-private", Title: "Fresh"}, nil }})
+	m.clearRemovedData(ControlScreen{ResetConversation: true, ClearGoal: true})
+	next, _ := m.NavigateBridge("/gator")
+	m = next.(Model)
+	if !m.primary || m.source != "/fresh-private" || m.conversation != "" {
+		t.Fatal("main conversation returned to a removed source")
+	}
+}
