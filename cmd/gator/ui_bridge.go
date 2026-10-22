@@ -28,6 +28,7 @@ type uiFrame struct {
 	Conversation  *workapp.BridgeConversationAction `json:"conversation,omitempty"`
 	InteractionID int                               `json:"interaction_id,omitempty"`
 	Approved      bool                              `json:"approved,omitempty"`
+	Nonce         string                            `json:"nonce,omitempty"`
 }
 
 type uiBridgeModel struct {
@@ -47,6 +48,22 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 	switch frame := value.(type) {
 	case uiFrame:
 		switch frame.Type {
+		case "prepare_update":
+			if frame.Nonce == "" || len(frame.Nonce) > 128 {
+				return m, nil
+			}
+			reason := m.model.RestartBlockReason()
+			_ = m.out.Encode(struct {
+				Version int    `json:"version"`
+				Type    string `json:"type"`
+				Nonce   string `json:"nonce"`
+				Ready   bool   `json:"ready"`
+				Reason  string `json:"reason,omitempty"`
+			}{1, "update_ready", frame.Nonce, reason == "", reason})
+			if reason == "" {
+				return m, tea.Quit
+			}
+			return m, nil
 		case "submit":
 			next, command = m.model.SubmitText(frame.Text)
 		case "navigate":

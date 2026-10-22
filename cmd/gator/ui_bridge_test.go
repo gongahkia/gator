@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"os"
@@ -11,6 +12,26 @@ import (
 	"github.com/gongahkia/gator/internal/modelcatalog"
 	"github.com/gongahkia/gator/internal/workapp"
 )
+
+func TestUIBridgeUpdateReadinessAcknowledgesBeforeQuitting(t *testing.T) {
+	var out bytes.Buffer
+	bridge := &uiBridgeModel{model: workapp.New(workapp.Config{CurrentFolder: t.TempDir()}), out: json.NewEncoder(&out)}
+	_, command := bridge.Update(uiFrame{Type: "prepare_update", Nonce: "reviewed-update"})
+	var response struct {
+		Type  string
+		Nonce string
+		Ready bool
+	}
+	if err := json.Unmarshal(bytes.TrimSpace(out.Bytes()), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Type != "update_ready" || response.Nonce != "reviewed-update" || !response.Ready || command == nil {
+		t.Fatalf("update response: %s", out.String())
+	}
+	if _, ok := command().(tea.QuitMsg); !ok {
+		t.Fatal("idle acknowledgement did not quit")
+	}
+}
 
 func TestBridgeKeyMapsTerminalControls(t *testing.T) {
 	for name, want := range map[string]tea.KeyType{"esc": tea.KeyEsc, "enter": tea.KeyEnter, "ctrl+c": tea.KeyCtrlC, "up": tea.KeyUp, "shift+tab": tea.KeyShiftTab} {

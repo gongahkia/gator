@@ -13,12 +13,13 @@ export class DraftStore {
   #file;
   #pending = Promise.resolve();
   #now;
+  #failure;
   constructor(file, now = Date.now) { this.#file = file; this.#now = now; }
-  flush() { return this.#pending; }
+  async flush() { await this.#pending; if (this.#failure) throw this.#failure; }
 
   request(request) {
     const operation = this.#pending.then(() => this.#request(request));
-    this.#pending = operation.catch(() => {});
+    this.#pending = operation.then(() => { this.#failure = undefined; }, (error) => { this.#failure = error; });
     return operation;
   }
 

@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { validateFrame } from "./policy.mjs";
 
 // The host owns one Go session. No HTTP listener, browser credential storage,
@@ -11,6 +12,7 @@ export class Backend extends EventEmitter {
   #child;
   #buffer = "";
   #diagnostics = "";
+  #updateNonce;
 
   constructor(binary, cwd, env = process.env, args = ["ui-backend", "", ""]) {
     super();
@@ -36,6 +38,10 @@ export class Backend extends EventEmitter {
       this.#buffer = this.#buffer.slice(newline + 1);
       try {
         const frame = JSON.parse(line);
+        if (frame.version === 1 && frame.type === "update_ready") {
+          if (frame.nonce === this.#updateNonce) this.emit("update-ready", frame);
+          continue;
+        }
         if (frame.version !== 1 || frame.type !== "state" || !frame.state || typeof frame.state !== "object") throw new Error("Invalid state frame");
         this.state = frame.state;
         this.emit("state", this.state);
@@ -55,6 +61,24 @@ export class Backend extends EventEmitter {
 
   finishExternal(error = "") {
     this.#write({ version: 1, type: "external_done", error });
+  }
+
+  prepareUpdate() {
+    if (this.closed || this.#updateNonce) return Promise.reject(new Error("Gator cannot prepare to restart right now."));
+    return new Promise((resolve, reject) => {
+      const nonce = randomUUID();
+      this.#updateNonce = nonce;
+      let accepted = false;
+      const finish = (error) => {
+        clearTimeout(timer); this.off("update-ready", ready); this.off("closed", closed); this.#updateNonce = undefined;
+        error ? reject(error) : resolve();
+      };
+      const ready = (frame) => { if (frame.ready === true) accepted = true; else finish(new Error(frame.reason || "Finish the current work first.")); };
+      const closed = () => finish(accepted ? undefined : new Error("Gator disconnected before update preparation completed."));
+      const timer = setTimeout(() => finish(new Error("Gator did not confirm an idle session. No work was forcibly stopped.")), 8000);
+      this.on("update-ready", ready); this.once("closed", closed);
+      this.#write({ version: 1, type: "prepare_update", nonce });
+    });
   }
 
   #write(frame) {

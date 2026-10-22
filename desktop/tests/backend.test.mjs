@@ -23,3 +23,17 @@ test("host streams Go state and closes its child on exit", async () => {
     assert.throws(() => backend.send({ type: "submit", text: "too late" }));
   } finally { await backend.stop(); await rm(directory, { recursive: true, force: true }); }
 });
+
+test("restart preparation waits for the canonical application and never forces a busy child to exit", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "gator-update-bridge-"));
+  const executable = join(directory, "fixture.cjs");
+  await writeFile(executable, `const readline = require('node:readline'); let busy = true; process.stdout.write(JSON.stringify({version:1,type:'state',state:{running:false,messages:[]}})+'\\n'); readline.createInterface({input:process.stdin}).on('line', line => { const f=JSON.parse(line); if(f.type==='prepare_update'){ process.stdout.write(JSON.stringify({version:1,type:'update_ready',nonce:f.nonce,ready:!busy,reason:'Actual work is busy'})+'\\n'); if(!busy) process.exit(0); } else if(f.type==='submit'){busy=false; process.stdout.write(JSON.stringify({version:1,type:'state',state:{title:'idle',messages:[]}})+'\\n');} else if(f.type==='exit') process.exit(0); });`);
+  const backend = new Backend(process.execPath, directory, process.env, [executable]);
+  try {
+    await once(backend, "state");
+    await assert.rejects(backend.prepareUpdate(), /Actual work is busy/);
+    assert.equal(backend.closed, false);
+    const idle = once(backend, "state"); backend.send({ type: "submit", text: "finish" }); await idle;
+    await backend.prepareUpdate(); assert.equal(backend.closed, true);
+  } finally { await backend.stop(); await rm(directory, { recursive: true, force: true }); }
+});

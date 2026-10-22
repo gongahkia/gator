@@ -5,6 +5,19 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DraftStore } from "../electron/drafts.mjs";
 
+test("pending draft failures remain visible to update and shutdown preparation", async () => {
+  const root = await mkdtemp(join(tmpdir(), "gator-draft-flush-"));
+  try {
+    const file = join(root, "drafts.json");
+    await writeFile(file, "{broken");
+    const store = new DraftStore(file);
+    await assert.rejects(store.request({ action: "list" }));
+    await assert.rejects(store.flush());
+    await store.request({ action: "clear" });
+    await store.flush();
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
 test("drafts survive restart, stay scoped, and save serially with private permissions", async () => {
   const root = await mkdtemp(join(tmpdir(), "gator-drafts-"));
   try {
