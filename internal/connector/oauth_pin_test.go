@@ -138,3 +138,31 @@ func TestGoogleAccountPinAllowsSameAccountReauthorizationButRejectsSwitchAtReque
 		t.Fatalf("changed connector identity crossed read boundary: %v, reads=%d", err, reads)
 	}
 }
+
+func TestGoogleAccountOnlyDisplaysVerifiedEmail(t *testing.T) {
+	for _, test := range []struct{ name, profile, email string }{
+		{"verified", `{"sub":"account","email":"person@example.com","email_verified":true}`, "person@example.com"},
+		{"unverified", `{"sub":"account","email":"person@example.com","email_verified":false}`, ""},
+		{"missing assurance", `{"sub":"account","email":"person@example.com"}`, ""},
+		{"invalid display", `{"sub":"account","email":"person@example.com\nspoof","email_verified":true}`, ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/oauth2/v3/userinfo" || r.Header.Get("Authorization") != "Bearer access" {
+					t.Error("incorrect identity request")
+				}
+				_, _ = w.Write([]byte(test.profile))
+			}))
+			defer server.Close()
+			d := Descriptor{ID: "google", Resource: server.URL, OAuthClientID: "client"}
+			identity, err := (Runtime{HTTPClient: server.Client()}).googleAccountWithToken(context.Background(), d, "access")
+			if err != nil || identity.Email != test.email || identity.Pin != GoogleAccountPin(d, "account") {
+				t.Fatalf("identity = %#v, %v", identity, err)
+			}
+			encoded, _ := json.Marshal(identity)
+			if strings.Contains(string(encoded), identity.Pin) {
+				t.Fatal("private account pin projected")
+			}
+		})
+	}
+}

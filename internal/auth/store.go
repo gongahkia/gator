@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"time"
@@ -144,6 +145,35 @@ func (s Store) Put(provider string, credential Credential) error {
 	return s.withLock(func(credentials map[string]Credential) (bool, error) {
 		credentials[provider] = cloneCredential(credential)
 		return true, nil
+	})
+}
+
+var ErrCredentialChanged = errors.New("credentials changed during this operation; refresh and try again")
+
+// ReplaceReviewed prevents a delayed sign-in or refresh from replacing a newer
+// credential or resurrecting a disconnected account. Nil means absent/delete.
+// Expected and replacement stay in the host; callers must not send them to UI.
+func (s Store) ReplaceReviewed(provider string, expected, replacement *Credential) error {
+	provider, err := validProvider(provider)
+	if err != nil {
+		return err
+	}
+	if replacement != nil {
+		if err := validateCredential(*replacement); err != nil {
+			return err
+		}
+	}
+	return s.withLock(func(credentials map[string]Credential) (bool, error) {
+		current, found := credentials[provider]
+		if (expected == nil && found) || (expected != nil && (!found || !reflect.DeepEqual(current, *expected))) {
+			return false, ErrCredentialChanged
+		}
+		if replacement == nil {
+			delete(credentials, provider)
+		} else {
+			credentials[provider] = cloneCredential(*replacement)
+		}
+		return found || replacement != nil, nil
 	})
 }
 
