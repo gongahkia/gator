@@ -41,7 +41,7 @@ type ReplayState struct {
 }
 
 type Revision struct {
-	Activity         *workactivity.Trace    `json:"activity,omitempty"`
+	Activity         *workactivity.Trace    `json:"-"`
 	AcceptedCode     map[string]string      `json:"accepted_code,omitempty"`
 	Project          *projectcapture.Bundle `json:"project_configuration,omitempty"`
 	Replay           *ReplayState           `json:"replay,omitempty"`
@@ -166,6 +166,11 @@ func (s Store) AddRevision(conversationID string, revision Revision) (Conversati
 	if err := writeJSON(path, revision); err != nil {
 		return Conversation{}, err
 	}
+	// Display history is optional and must not alter the revision schema or
+	// make an otherwise retained result fail. Older releases ignore this sidecar.
+	if revision.Activity != nil {
+		_ = writeJSON(s.activityPath(conversationID, revision.ID), revision.Activity)
+	}
 	conversation.SourceRefreshRequired = false
 	conversation.HeadRevision = revision.ID
 	conversation.SnapshotID = revision.SnapshotID
@@ -190,6 +195,7 @@ func (s Store) LoadRevision(conversationID, revisionID string) (Revision, error)
 	if err := validateRevision(revision); err != nil || revision.ID != revisionID || revision.ConversationID != conversationID {
 		return Revision{}, errors.New("revision metadata is invalid")
 	}
+	revision.Activity = s.readActivity(conversationID, revisionID)
 	return revision, nil
 }
 
