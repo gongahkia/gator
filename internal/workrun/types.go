@@ -64,6 +64,7 @@ func (p CodePolicy) HasCapability(name string) bool {
 
 // Request describes one bounded local work session.
 type Request struct {
+	InputIDs []string
 	ForegroundApp           bool
 	ApproveAppChange        func(context.Context, any) (bool, error)
 	OnAppChange             func(AppChange)

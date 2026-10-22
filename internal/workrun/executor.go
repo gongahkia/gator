@@ -668,6 +668,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		inputNames = append(inputNames, document.Name)
 	}
 	if _, err := sessions.AddRevision(conversation.ID, worksession.Revision{
+		InputIDs: append([]string(nil), request.InputIDs...),
 		InputNames:   inputNames,
 		Activity:     outcome.Activity,
 		AcceptedCode: integration.accepted,

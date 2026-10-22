@@ -61,6 +61,7 @@ type ConnectionUse struct {
 }
 
 type ArtifactSummary struct {
+	SHA256 string
 	Path        string
 	MediaType   string
 	Bytes       int64
@@ -82,6 +83,7 @@ type CandidateSummary struct {
 // prose, so historical artifact cards retain the same trust boundary as new
 // cards produced in this application session.
 type TranscriptMessage struct {
+	InputIDs []string
 	Inputs   []string
 	Activity *workactivity.Trace
 	Role     string
@@ -267,6 +269,7 @@ type entry struct {
 	advanced                                   bool
 }
 type message struct {
+	inputIDs []string
 	inputs   []string
 	activity *workactivity.Trace
 	role     string

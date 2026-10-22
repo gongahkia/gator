@@ -82,7 +82,7 @@ func (m *Model) applyConversationState(conversationID string, state Conversation
 	m.messages = make([]message, 0, len(state.Messages))
 	for _, item := range state.Messages {
 		m.messages = append(m.messages, message{
-			inputs: append([]string(nil), item.Inputs...), activity: item.Activity.Clone(), role: item.Role, text: item.Text, bundle: cloneBundlePointer(item.Bundle),
+			inputIDs: append([]string(nil), item.InputIDs...), inputs: append([]string(nil), item.Inputs...), activity: item.Activity.Clone(), role: item.Role, text: item.Text, bundle: cloneBundlePointer(item.Bundle),
 		})
 	}
 	m.rebuildPromptHistory()

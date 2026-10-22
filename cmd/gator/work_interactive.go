@@ -588,6 +588,7 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 	if len(request.Code.Verification) == 0 {
 		request.Code.Verification = parseSuggestedVerification(suggestedVerificationCommands(source))
 	}
+	request.InputIDs = append([]string(nil), options.Uploads...)
 	request.Images, request.Attachments, err = loadWorkPromptAttachments(source, options.Attachments, options.Uploads)
 	if err != nil {
 		return workapp.RunResult{Error: err.Error()}
@@ -1054,7 +1055,7 @@ func loadWorkTUIConversation(store worksession.Store, conversationID string) (wo
 	}
 	state.Messages = make([]workapp.TranscriptMessage, 0, len(lineage)*3)
 	for _, revision := range lineage {
-		state.Messages = append(state.Messages, workapp.TranscriptMessage{Role: "You", Text: revision.Objective, Inputs: append([]string(nil), revision.InputNames...)})
+		state.Messages = append(state.Messages, workapp.TranscriptMessage{Role: "You", Text: revision.Objective, InputIDs: append([]string(nil), revision.InputIDs...), Inputs: append([]string(nil), revision.InputNames...)})
 		activity := revision.Activity.Clone()
 		if strings.TrimSpace(revision.FinalText) != "" {
 			state.Messages = append(state.Messages, workapp.TranscriptMessage{Activity: activity, Role: "Gator", Text: revision.FinalText})

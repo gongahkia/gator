@@ -22,8 +22,11 @@
     "dist": "npm run build && electron-builder --publish never"
   },
   "dependencies": {
+    "@xmldom/xmldom": "0.9.12",
     "electron-updater": "6.8.9",
+    "fflate": "0.8.3",
     "lucide-react": "1.60.0",
+    "pdfjs-dist": "6.4.299",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-markdown": "10.1.0",
