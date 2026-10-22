@@ -1,5 +1,10 @@
 # Compact work details
 
+**22 October follow-up:** the inspector is now also accessible through a
+contextual Files view, with filename search and Show in chat. The current
+chat, search and activity decisions are recorded in
+[chat presentation](DESKTOP-CHAT-PRESENTATION.md).
+
 Decision: adopt a compact, optional inspector beside the desktop conversation.
 Recent conversations stay in the left navigation; the transcript and exact
 approval requests stay in the center. This is a presentation change and

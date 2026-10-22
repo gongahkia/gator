@@ -13,6 +13,8 @@ neutral palette, sidebar, spacious conversation area, command menu, and
 optional right detail panel. The main conversation is now the front door, with
 recent topics and secondary Following and Saved drawers. The implementation
 and retained capabilities are mapped in [the conversational review](DESKTOP-CONVERSATIONAL-IMPLEMENTATION.md).
+The selected Tide background, hybrid activity, dated chat search and contextual
+Files view are described in [chat presentation](DESKTOP-CHAT-PRESENTATION.md).
 
 ## Ownership
 
@@ -43,12 +45,13 @@ current live interaction ID; retained cards have no approval authority.
 
 | Surface | Behavior |
 | --- | --- |
-| Home | Continuing main conversation; a brief introduction and composer before its first message; model setup preserves the unsent request |
+| Home | Continuing main conversation; a brief introduction and composer before its first message; model setup preserves the unsent request; ambient sage Tide sits behind the introduction |
 | Navigation | Talk with Gator, Search, recent topics, Following and Saved; one Settings entry retains models, usage, data/backups, recovery and About & updates |
-| Conversations | Recent topics prioritize titles, with optional folder grouping; Saved provides separate conversation and task-run archives, without duplicate tabs |
-| Conversation | Bubbles for both speakers, response/code copy, typed results and exact reviews; contextual file cards open retained previews; progress, stop/guidance and editable queues remain functional |
+| Conversations | Dated recent topics, highlighted title/folder filtering and keyboard navigation; optional folder grouping; the saved chat browser searches up to 50 recent conversations, separately from task runs |
+| Conversation | Bubbles for both speakers, response/code copy, typed results and exact reviews; public narration and tools interleave during work and fold above the final answer; contextual file cards open retained previews; stop/guidance and editable queues remain functional |
 | Reviews | Semantic status and exact structured previews, open by default, with request-bound approve/deny buttons; separate confirmation for workflow writes |
 | Native forms | Bounded text/password/multiline fields, desktop action toolbars and keyboard list navigation; existing Go review and save actions |
+| Files | Contextual header button, filename filtering, retained previews and Show in chat for exact loaded output cards; same rail adapts to a modal drawer in narrow windows |
 | Conversation information | Hidden by default; retained file previews, selected sources, saved context, connection provenance, model and local execution details; no placeholder context meter |
 | Usage & limits | Daily request/token meters, shared limit controls, activity breakdown, and expandable accounting details |
 | Commands | Cmd/Ctrl+K, searchable commands, arrow navigation, input-prefilling commands |

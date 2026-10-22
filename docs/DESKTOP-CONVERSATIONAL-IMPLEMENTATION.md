@@ -173,6 +173,10 @@ was used in these isolated desktop journeys.
 
 ## Home ASCII waves — October 22, 2026
 
+**Later decision:** the small concentric ornament described below was replaced
+with the user-selected Tide field. See [chat presentation](DESKTOP-CHAT-PRESENTATION.md)
+for the current implementation and verification. Click effects remain disabled.
+
 Full polish review scoped to the empty home introduction. React and the existing
 plain CSS tokens remain the implementation and styling system. The home keeps
 multiple ambient waves; the click-triggered ripple trial was removed at the

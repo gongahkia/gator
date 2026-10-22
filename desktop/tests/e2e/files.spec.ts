@@ -36,6 +36,7 @@ test("contextual files reuse retained previews and show the exact origin in chat
     await rail.getByRole("button", { name: "All files", exact: true }).click();
     await rail.getByRole("button", { name: /report.md Checks passed/ }).click();
     await expect(rail.getByRole("heading", { name: "Retained report", exact: true })).toBeVisible();
+    await page.evaluate(async () => { await Promise.allSettled(document.getAnimations().filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity).map((animation) => animation.finished)); });
     await page.screenshot({ path: "test-results/desktop-files-preview.png" });
     await rail.getByRole("button", { name: "Show in chat", exact: true }).click();
     await expect(rail).toHaveCount(0);
@@ -51,6 +52,7 @@ test("contextual files reuse retained previews and show the exact origin in chat
     await trigger.click();
     const modal = page.getByRole("dialog", { name: "Files", exact: true });
     await expect(modal).toHaveAttribute("aria-modal", "true");
+    await page.evaluate(async () => { await Promise.allSettled(document.getAnimations().filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity).map((animation) => animation.finished)); });
     await page.screenshot({ path: "test-results/desktop-files-narrow.png" });
     await page.keyboard.press("Escape");
     await expect(modal).toHaveCount(0);
