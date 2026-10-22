@@ -45,6 +45,35 @@ async function atomic(path, bytes) {
   finally { await rm(temporary, { force: true }); }
 }
 
+async function acquireSaveLock(directory) {
+  const path = join(directory, "saving.lock");
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const lock = await open(path, "wx", 0o600);
+      try { await lock.writeFile(JSON.stringify({ pid: process.pid })); }
+      catch (error) { await lock.close(); await rm(path, { force: true }); throw error; }
+      return lock;
+    } catch (error) {
+      if (error.code !== "EEXIST") throw error;
+      let abandoned = false;
+      try {
+        const bytes = await readBoundedFile(directory, "saving.lock", 1024);
+        if (!bytes.length) abandoned = (await lstat(path)).mtimeMs < Date.now() - 30000;
+        else {
+          const owner = JSON.parse(bytes.toString());
+          if (Number.isInteger(owner.pid) && owner.pid > 0) {
+            try { process.kill(owner.pid, 0); }
+            catch (error) { abandoned = error.code === "ESRCH"; }
+          }
+        }
+      } catch (error) { if (error.code === "ENOENT") continue; throw error; }
+      if (!abandoned) break;
+      await rm(path, { force: true });
+    }
+  }
+  throw new Error("Another editor is saving this file. Try again shortly; your edits are kept.");
+}
+
 export class FileStore {
   constructor(root) { this.root = resolve(root); this.pending = new Map(); this.aliases = new Map(); }
   sourceIdentity(value) {
@@ -120,7 +149,7 @@ export class FileStore {
     let metadata = await this.retain(ref, descriptor.name, original);
     if (request.action === "open") return this.view(ref, metadata, request.version);
     if (["export", "attach"].includes(request.action)) return { name: metadata.name, path: join(directory, `${request.version || metadata.current}.bin`), bytes: await this.contents(ref, metadata, request.version) };
-    let lock; try { lock = await open(join(directory, "saving.lock"), "wx", 0o600); } catch (error) { if (error.code === "EEXIST") throw new Error("Another editor is saving this file. Try again shortly; your edits are kept."); throw error; }
+    const lock = await acquireSaveLock(directory);
     try {
       metadata = JSON.parse((await readBoundedFile(directory, "file.json", 1024 * 1024)).toString());
       if (request.action === "discard") {

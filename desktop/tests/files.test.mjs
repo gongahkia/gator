@@ -88,3 +88,19 @@ test("output working versions keep their identity after restoring a profile into
     assert.equal(restored.text, "My edited report"); assert.equal(restored.versions.length, 2);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+test("saving recovers an abandoned process lock but respects an active editor", async () => {
+  const root = await mkdtemp(join(tmpdir(), "gator-file-crash-"));
+  try {
+    const { spawnSync } = await import("node:child_process");
+    const exited = spawnSync(process.execPath, ["-e", "" ]);
+    const store = new FileStore(root), ref = { kind: "upload", id: `${"e".repeat(32)}/notes.txt` }, request = { context: "one", ref };
+    const source = async () => ({ name: "notes.txt", bytes: Buffer.from("Original") });
+    const first = await store.request({ ...request, action: "open" }, source), lock = join(store.directory(ref), "saving.lock");
+    await writeFile(lock, JSON.stringify({ pid: process.pid }));
+    await assert.rejects(store.request({ ...request, action: "save", expected: first.current, edit: { text: "Blocked" } }, source), /Another editor/);
+    await writeFile(lock, JSON.stringify({ pid: exited.pid }));
+    const saved = await store.request({ ...request, action: "save", expected: first.current, edit: { text: "Recovered after crash" } }, source);
+    assert.equal(saved.text, "Recovered after crash");
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
