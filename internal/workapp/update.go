@@ -110,6 +110,7 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case checksTick:
 		m.refreshBridgeConversations()
+		m.refreshBridgeFollowing()
 		if m.config.ReadChecks == nil {
 			return m, nil
 		}
@@ -256,6 +257,14 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 	}
 	if value.ConversationID != "" {
 		m.conversation = value.ConversationID
+		if m.primary && m.primaryID == "" && m.config.BindPrimaryConversation != nil {
+			if err := m.config.BindPrimaryConversation(value.ConversationID); err != nil {
+				m.primary = false
+				m.bridgeNotice = "Your conversation is saved, but couldn't become the main conversation: " + err.Error()
+			} else {
+				m.primaryID = value.ConversationID
+			}
+		}
 	}
 	if value.RevisionID != "" {
 		m.revision = value.RevisionID
@@ -910,11 +919,13 @@ func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.home = false
 			m.source = selected.source
 			m.conversation = selected.id
+			m.primary = selected.id == m.primaryID
 			m.goalID = m.goalForConversation(selected.id)
 			m.title = selected.title
 			m.restoreConversation(selected.id, "")
 			m.scroll = 0
 		case "goal":
+			m.primary = false
 			if m.running {
 				m.status = "Finish the current task before switching goals"
 				return m, nil

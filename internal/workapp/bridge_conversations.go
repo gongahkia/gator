@@ -56,6 +56,18 @@ func (m *Model) refreshBridgeConversations() {
 	m.config.Conversations, m.bridgeRecentIssue = items, ""
 }
 
+func (m *Model) refreshBridgeFollowing() {
+	if !m.config.BridgeMode || m.config.ListGoals == nil {
+		return
+	}
+	items, err := m.config.ListGoals()
+	if err != nil {
+		m.bridgeFollowingIssue = "Ongoing goals are unavailable. Open goals to retry."
+		return
+	}
+	m.config.Goals, m.bridgeFollowingIssue = items, ""
+}
+
 // OpenBridgeConversation reuses the existing conversation picker restore path.
 // A stale sidebar click cannot select a different row or bypass active work.
 func (m Model) OpenBridgeConversation(action BridgeConversationAction) (tea.Model, tea.Cmd) {

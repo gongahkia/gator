@@ -312,7 +312,16 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			return loadWorkTUIConversationOptions(sessions, conversationID)
 		},
 		StartConversationID: startConversationID,
-		FirstRun:            settings.Defaults.Provider == "" && len(conversations) == 0,
+		PrimaryConversation: sessions.Primary,
+		BindPrimaryConversation: func(id string) error {
+			release, err := state.Guard(stateDir, false)
+			if err != nil {
+				return err
+			}
+			defer release()
+			return sessions.BindPrimary(id)
+		},
+		FirstRun: settings.Defaults.Provider == "" && len(conversations) == 0,
 		JobAction: func(arguments []string) (string, error) {
 			release, err := state.Guard(stateDir, false)
 			if err != nil {

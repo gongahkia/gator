@@ -1,6 +1,35 @@
 package workapp
 
-import "strings"
+import (
+	"strings"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
+
+func (m Model) openPrimaryConversation() (tea.Model, tea.Cmd) {
+	if m.config.PrimaryConversation == nil {
+		m.bridgeNotice = "The main conversation is unavailable. Your saved topics remain available."
+		return m, nil
+	}
+	id, err := m.config.PrimaryConversation()
+	if err != nil {
+		m.bridgeNotice = "Couldn't open your main conversation: " + err.Error()
+		return m, nil
+	}
+	if id != "" && id == m.conversation {
+		m.primary, m.primaryID = true, id
+		return m, nil
+	}
+	next, _ := m.runLocalCommand("/new")
+	m = next.(Model)
+	m.primary, m.primaryID = true, id
+	m.source, m.title = m.primarySource, "Gator"
+	if id != "" {
+		m.home = false
+		m.restoreConversation(id, "")
+	}
+	return m, nil
+}
 
 // restoreConversation replaces all revision-dependent UI state with the
 // selected durable head. It is used for an initial resume, picker selection,

@@ -336,6 +336,9 @@ func (m *Model) clearRemovedData(screen ControlScreen) {
 	m.overviewBusy = false
 	m.messages = nil
 	m.conversation = ""
+	if m.primary {
+		m.primaryID = ""
+	}
 	m.revision = ""
 	m.snapshot = ""
 	m.lastWorkID = ""

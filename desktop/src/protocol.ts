@@ -86,6 +86,8 @@ export type BackendState = {
   title: string;
   source: string;
   conversation_id?: string;
+  primary?: boolean;
+  primary_conversation_id?: string;
   recent_conversations?: { id: string; title: string; source: string; updated_at: string }[];
   recent_id?: string;
   recent_issue?: string;
@@ -97,7 +99,9 @@ export type BackendState = {
     connector_ids: string[];
     latest_bundle?: BackendBundle;
   };
-  checks?: { title: string; health: string; state: string; tone?: ResultTone }[];
+  checks?: { goal_id?: string; title: string; health: string; state: string; tone?: ResultTone }[];
+  following_goals?: { id: string; title: string; status: string }[];
+  following_issue?: string;
   provider?: string;
   model?: string;
   theme: string;

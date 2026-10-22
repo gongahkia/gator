@@ -168,6 +168,8 @@ type Config struct {
 	LoadConversationOptions func(conversationID string) (RunOptions, error)
 	Conversations           []worksession.Conversation
 	StartConversationID     string
+	PrimaryConversation     func() (string, error)
+	BindPrimaryConversation func(string) error
 	Jobs                    []jobs.Definition
 	SupervisorRunning       bool
 	Inbox                   []inbox.Entry
@@ -344,6 +346,7 @@ type Model struct {
 	modelStatus            ModelStatus
 	bridgeNotice           string
 	bridgeRecentIssue      string
+	bridgeFollowingIssue   string
 	statusLine             []string
 	statusLineConfigured   bool
 	statusLineEnabled      bool
@@ -387,6 +390,9 @@ type Model struct {
 	contextConfirm         bool
 	contextWorkID          string
 	lastWorkID             string
+	primary                bool
+	primaryID              string
+	primarySource          string
 }
 
 func New(config Config) Model {
@@ -422,6 +428,20 @@ func New(config Config) Model {
 	model.statusLine, model.statusLineConfigured = resolveStatusLine(config.StatusLine)
 	model.statusLineEnabled = config.StatusLineEnabled
 	model.refreshModelStatus()
+	model.primarySource = config.CurrentFolder
+	if config.PrimaryConversation != nil {
+		id, err := config.PrimaryConversation()
+		model.primaryID = id
+		if err != nil {
+			model.bridgeNotice = "Couldn't open your main conversation: " + err.Error()
+		} else if config.StartConversationID == "" && config.GoalID == "" {
+			model.primary = true
+			model.title = "Gator"
+			config.StartConversationID = id
+		} else {
+			model.primary = id != "" && config.StartConversationID == id && config.GoalID == ""
+		}
+	}
 	if config.StartConversationID != "" {
 		found := false
 		for _, conversation := range config.Conversations {

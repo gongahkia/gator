@@ -57,6 +57,7 @@ func (m *Model) openGoalPicker() {
 			m.status = "List goals: " + err.Error()
 		} else {
 			m.config.Goals = goals
+			m.bridgeFollowingIssue = ""
 		}
 	}
 	m.launcher = true
@@ -451,6 +452,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 			err = fmt.Errorf("usage: /help [advanced]")
 		}
 	case "/new":
+		m.primary = false
 		if m.config.ClearGoal != nil {
 			m.config.ClearGoal()
 		}
@@ -572,6 +574,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 			}
 			m.goalID = ""
 			if m.source != resolved {
+				m.primary = false
 				m.conversation = ""
 				m.revision = ""
 				m.messages = nil

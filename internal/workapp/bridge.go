@@ -16,44 +16,48 @@ import (
 // BridgeState is a display-only projection for the desktop.
 // The Go model remains the sole owner of commands, runs, approvals and history.
 type BridgeState struct {
-	Mode                 string               `json:"mode"`
-	Panel                *uisnapshot.Panel    `json:"panel,omitempty"`
-	Messages             []BridgeMessage      `json:"messages"`
-	Commands             []BridgeCommand      `json:"commands"`
-	Actions              []workhome.Action    `json:"actions"`
-	Title                string               `json:"title"`
-	Source               string               `json:"source"`
-	ConversationID       string               `json:"conversation_id,omitempty"`
-	RecentConversations  []BridgeConversation `json:"recent_conversations,omitempty"`
-	RecentID             string               `json:"recent_id,omitempty"`
-	RecentIssue          string               `json:"recent_issue,omitempty"`
-	GoalID               string               `json:"goal_id,omitempty"`
-	WorkDetails          BridgeWorkDetails    `json:"work_details"`
-	Provider             string               `json:"provider,omitempty"`
-	Model                string               `json:"model,omitempty"`
-	Theme                string               `json:"theme"`
-	Status               string               `json:"status,omitempty"`
-	StatusLine           []string             `json:"status_line"`
-	StatusLineEnabled    bool                 `json:"status_line_enabled"`
-	Input                string               `json:"input,omitempty"`
-	Running              bool                 `json:"running"`
-	Cancelling           bool                 `json:"cancelling"`
-	Elapsed              string               `json:"elapsed,omitempty"`
-	LoadingFrame         int                  `json:"loading_frame"`
-	Queued               int                  `json:"queued"`
-	Queue                []BridgeQueuedRun    `json:"queue"`
-	QueueResult          *BridgeQueueResult   `json:"queue_result,omitempty"`
-	GuidanceID           string               `json:"guidance_id,omitempty"`
-	Home                 bool                 `json:"home"`
-	FirstRun             bool                 `json:"first_run"`
-	SupervisorNeedsStart bool                 `json:"supervisor_needs_start"`
-	Checks               []BridgeCheck        `json:"checks,omitempty"`
-	Overview             *workhome.Overview   `json:"overview,omitempty"`
-	OverviewIssue        string               `json:"overview_issue,omitempty"`
-	External             *BridgeExternal      `json:"external,omitempty"`
-	PendingApproval      *BridgeApproval      `json:"pending_approval,omitempty"`
-	Notice               string               `json:"notice,omitempty"`
-	Destination          string               `json:"destination,omitempty"`
+	Mode                  string                `json:"mode"`
+	Panel                 *uisnapshot.Panel     `json:"panel,omitempty"`
+	Messages              []BridgeMessage       `json:"messages"`
+	Commands              []BridgeCommand       `json:"commands"`
+	Actions               []workhome.Action     `json:"actions"`
+	Title                 string                `json:"title"`
+	Source                string                `json:"source"`
+	ConversationID        string                `json:"conversation_id,omitempty"`
+	Primary               bool                  `json:"primary"`
+	PrimaryConversationID string                `json:"primary_conversation_id,omitempty"`
+	RecentConversations   []BridgeConversation  `json:"recent_conversations,omitempty"`
+	RecentID              string                `json:"recent_id,omitempty"`
+	RecentIssue           string                `json:"recent_issue,omitempty"`
+	GoalID                string                `json:"goal_id,omitempty"`
+	WorkDetails           BridgeWorkDetails     `json:"work_details"`
+	Provider              string                `json:"provider,omitempty"`
+	Model                 string                `json:"model,omitempty"`
+	Theme                 string                `json:"theme"`
+	Status                string                `json:"status,omitempty"`
+	StatusLine            []string              `json:"status_line"`
+	StatusLineEnabled     bool                  `json:"status_line_enabled"`
+	Input                 string                `json:"input,omitempty"`
+	Running               bool                  `json:"running"`
+	Cancelling            bool                  `json:"cancelling"`
+	Elapsed               string                `json:"elapsed,omitempty"`
+	LoadingFrame          int                   `json:"loading_frame"`
+	Queued                int                   `json:"queued"`
+	Queue                 []BridgeQueuedRun     `json:"queue"`
+	QueueResult           *BridgeQueueResult    `json:"queue_result,omitempty"`
+	GuidanceID            string                `json:"guidance_id,omitempty"`
+	Home                  bool                  `json:"home"`
+	FirstRun              bool                  `json:"first_run"`
+	SupervisorNeedsStart  bool                  `json:"supervisor_needs_start"`
+	Checks                []BridgeCheck         `json:"checks,omitempty"`
+	FollowingGoals        []BridgeFollowingGoal `json:"following_goals,omitempty"`
+	FollowingIssue        string                `json:"following_issue,omitempty"`
+	Overview              *workhome.Overview    `json:"overview,omitempty"`
+	OverviewIssue         string                `json:"overview_issue,omitempty"`
+	External              *BridgeExternal       `json:"external,omitempty"`
+	PendingApproval       *BridgeApproval       `json:"pending_approval,omitempty"`
+	Notice                string                `json:"notice,omitempty"`
+	Destination           string                `json:"destination,omitempty"`
 }
 
 type BridgeApproval struct {
@@ -97,10 +101,17 @@ type BridgeCommand struct {
 	NeedsInput  bool   `json:"needs_input"`
 }
 type BridgeCheck struct {
+	GoalID string `json:"goal_id,omitempty"`
 	Title  string `json:"title"`
 	Health string `json:"health"`
 	State  string `json:"state"`
 	Tone   string `json:"tone"`
+}
+
+type BridgeFollowingGoal struct {
+	ID     string `json:"id"`
+	Title  string `json:"title"`
+	Status string `json:"status"`
 }
 
 // BridgeWorkDetails contains selections for new requests and the latest
@@ -116,32 +127,34 @@ type BridgeWorkDetails struct {
 
 func (m Model) BridgeState() BridgeState {
 	state := BridgeState{
-		Mode:              "chat",
-		Messages:          make([]BridgeMessage, 0, len(m.messages)),
-		Commands:          make([]BridgeCommand, 0),
-		Actions:           m.config.Attention.Next(),
-		Title:             m.title,
-		Source:            m.source,
-		ConversationID:    m.conversation,
-		GoalID:            m.goalID,
-		Provider:          m.modelStatus.Provider,
-		Model:             m.modelStatus.Model,
-		Theme:             m.theme,
-		Status:            m.status,
-		StatusLine:        m.statusLineItems(),
-		StatusLineEnabled: m.statusLineEnabled,
-		Input:             m.input,
-		Running:           m.running,
-		Cancelling:        m.cancelling,
-		Elapsed:           m.workElapsed(),
-		LoadingFrame:      m.loadingFrame,
-		Queued:            len(m.queue),
-		Queue:             make([]BridgeQueuedRun, 0, len(m.queue)),
-		QueueResult:       m.bridgeQueueResult,
-		Home:              m.home,
-		FirstRun:          m.firstRun,
-		External:          m.bridgeExternal,
-		Notice:            m.bridgeNotice,
+		Mode:                  "chat",
+		Messages:              make([]BridgeMessage, 0, len(m.messages)),
+		Commands:              make([]BridgeCommand, 0),
+		Actions:               m.config.Attention.Next(),
+		Title:                 m.title,
+		Source:                m.source,
+		ConversationID:        m.conversation,
+		Primary:               m.primary,
+		PrimaryConversationID: m.primaryID,
+		GoalID:                m.goalID,
+		Provider:              m.modelStatus.Provider,
+		Model:                 m.modelStatus.Model,
+		Theme:                 m.theme,
+		Status:                m.status,
+		StatusLine:            m.statusLineItems(),
+		StatusLineEnabled:     m.statusLineEnabled,
+		Input:                 m.input,
+		Running:               m.running,
+		Cancelling:            m.cancelling,
+		Elapsed:               m.workElapsed(),
+		LoadingFrame:          m.loadingFrame,
+		Queued:                len(m.queue),
+		Queue:                 make([]BridgeQueuedRun, 0, len(m.queue)),
+		QueueResult:           m.bridgeQueueResult,
+		Home:                  m.home,
+		FirstRun:              m.firstRun,
+		External:              m.bridgeExternal,
+		Notice:                m.bridgeNotice,
 	}
 	for _, item := range m.queue {
 		state.Queue = append(state.Queue, BridgeQueuedRun{ID: bridgeQueuedRunID(item), Text: item.prompt})
@@ -158,13 +171,21 @@ func (m Model) BridgeState() BridgeState {
 	}
 	state.RecentConversations, state.RecentID = m.bridgeRecentConversations()
 	state.RecentIssue = m.bridgeRecentIssue
+	state.FollowingIssue = m.bridgeFollowingIssue
+	if m.bridgeFollowingIssue == "" {
+		for _, record := range m.config.Goals {
+			if record.Status == "active" || record.Status == "paused" {
+				state.FollowingGoals = append(state.FollowingGoals, BridgeFollowingGoal{ID: record.ID, Title: singleLine(record.Title), Status: string(record.Status)})
+			}
+		}
+	}
 	if !m.overview.At.IsZero() {
 		copy := m.overview
 		state.Overview = &copy
 	}
 	state.OverviewIssue = m.overviewIssue
 	for _, check := range m.checks {
-		state.Checks = append(state.Checks, BridgeCheck{Title: singleLine(check.Title), Health: check.HealthLine(), State: check.State, Tone: checkTone(check.State)})
+		state.Checks = append(state.Checks, BridgeCheck{GoalID: check.GoalID, Title: singleLine(check.Title), Health: check.HealthLine(), State: check.State, Tone: checkTone(check.State)})
 	}
 	if !m.config.SupervisorRunning {
 		for _, job := range m.config.Jobs {
@@ -235,7 +256,7 @@ func (m Model) RespondBridgeApproval(id int, approved bool) (tea.Model, tea.Cmd)
 func (m Model) NavigateBridge(command string) (tea.Model, tea.Cmd) {
 	m.bridgeNotice = ""
 	switch command {
-	case "/chat", "/knowledge", "/new", "/overview", "/goals", "/conversations", "/inbox", "/followup", "/history", "/memory", "/context", "/usage", "/data", "/recovery", "/model", "/settings", "/help":
+	case "/gator", "/chat", "/knowledge", "/new", "/overview", "/goals", "/conversations", "/inbox", "/followup", "/history", "/memory", "/context", "/usage", "/data", "/recovery", "/model", "/settings", "/help":
 	default:
 		known := false
 		for _, entry := range m.availableCommandEntries() {
@@ -262,6 +283,9 @@ func (m Model) NavigateBridge(command string) (tea.Model, tea.Cmd) {
 	m.recallConfirm = ""
 	if command == "/chat" {
 		return m, nil
+	}
+	if command == "/gator" {
+		return m.openPrimaryConversation()
 	}
 	if command == "/conversations" {
 		m.openConversationPicker()
