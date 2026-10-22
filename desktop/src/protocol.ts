@@ -35,7 +35,8 @@ export type BackendCommand = { name: string; description: string; advanced: bool
 export type BackendMessage = { role: string; text: string; bundle?: BackendBundle; result?: BackendResult };
 export type QueuedMessage = { id: string; text: string };
 export type QueueAction = {
-  request_id: string; id: string; action: "edit" | "remove" | "earlier" | "later" | "run" | "guide"; text?: string;
+  request_id: string; id: string; action: "edit" | "remove" | "earlier" | "later" | "move" | "run" | "guide"; text?: string;
+  target_id?: string; placement?: "before" | "after";
 };
 export type BackendPanel = {
   id?: string;

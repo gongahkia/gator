@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, CornerDownLeft, ListOrdered, Pencil, X } from "lucide-react";
+import { useCallback, useEffect, useId, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
+import { CornerDownLeft, GripVertical, ListOrdered, Pencil, X } from "lucide-react";
 import type { BackendState, QueueAction, QueuedMessage } from "./protocol";
 import type { DesktopFrame } from "./bridge";
 
 export type QueueChange = Omit<QueueAction, "request_id">;
+type QueueDrag = { id: string; signature: string; keyboard: boolean; position: number; target?: string; placement?: "before" | "after" };
 
 // IPC delivery alone is not acceptance: a queued message may have started, or
 // the active run may have ended, before Go receives the action.
@@ -43,8 +44,28 @@ export function MessageQueue({ items, running, busy, act, onUseDraft, onEditingC
 }) {
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
   const [error, setError] = useState("");
+  const [drag, setDrag] = useState<QueueDrag | null>(null);
+  const [announcement, setAnnouncement] = useState("");
+  const instructions = useId();
   const editor = useRef<HTMLTextAreaElement>(null);
   const region = useRef<HTMLElement>(null);
+  const latestItems = useRef(items);
+  latestItems.current = items;
+  const signature = items.map((item) => item.id).join(":");
+  useEffect(() => {
+    if (drag && (drag.signature !== signature || busy || editing)) {
+      setDrag(null); setAnnouncement("The queue changed. Choose a message to reorder again.");
+    }
+  }, [signature, busy, !!editing, drag?.signature]);
+  useEffect(() => {
+    if (!drag) return;
+    const cancel = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault(); event.stopPropagation(); setDrag(null); setAnnouncement("Reordering cancelled.");
+    };
+    window.addEventListener("keydown", cancel, true);
+    return () => window.removeEventListener("keydown", cancel, true);
+  }, [!!drag]);
   useEffect(() => { onEditingChange(!!editing); return () => onEditingChange(false); }, [!!editing, onEditingChange]);
   useEffect(() => { if (editing) editor.current?.focus(); }, [editing?.id]);
   const change = async (action: QueueChange) => {
@@ -56,14 +77,81 @@ export function MessageQueue({ items, running, busy, act, onUseDraft, onEditingC
       requestAnimationFrame(() => { if (document.activeElement === document.body) region.current?.focus(); });
     } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
   };
-  if (!items.length && !editing) return null;
+  const focusHandle = (id: string) => requestAnimationFrame(() => {
+    const row = [...(region.current?.querySelectorAll<HTMLElement>("[data-queue-id]") ?? [])].find((element) => element.dataset.queueId === id);
+    const handle = row?.querySelector<HTMLButtonElement>(".queue-drag-handle");
+    (handle ?? region.current)?.focus({ preventScroll: true });
+  });
+  const reorder = async (id: string, target: string, placement: "before" | "after") => {
+    setDrag(null); setError("");
+    const sourceIndex = items.findIndex((item) => item.id === id), targetIndex = items.findIndex((item) => item.id === target);
+    if (sourceIndex >= 0 && targetIndex >= 0 && (id === target || sourceIndex === targetIndex + (placement === "after" ? 1 : -1))) { setAnnouncement("Queue order unchanged."); focusHandle(id); return; }
+    try {
+      await act({ id, action: "move", target_id: target, placement });
+      const position = latestItems.current.findIndex((item) => item.id === id);
+      setAnnouncement(position < 0 ? "Queue updated. The message has left the queue." : `Message moved to position ${position + 1} of ${latestItems.current.length}.`);
+    } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
+    focusHandle(id);
+  };
+  const pickUp = (item: QueuedMessage, index: number, keyboard: boolean) => {
+    setError(""); setDrag({ id: item.id, signature, keyboard, position: index });
+    setAnnouncement(`Picked up message ${index + 1} of ${items.length}. Use the up and down arrow keys to choose a position, Enter to drop, or Escape to cancel.`);
+  };
+  const keyboardDrag = (event: KeyboardEvent<HTMLButtonElement>, item: QueuedMessage, index: number) => {
+    if (busy || editing) return;
+    if (event.key === "Escape" && drag?.keyboard) { event.preventDefault(); event.stopPropagation(); setDrag(null); setAnnouncement("Reordering cancelled."); return; }
+    if (event.key === " " || event.key === "Enter") {
+      event.preventDefault();
+      if (drag?.keyboard && drag.id === item.id) {
+        if (drag.target && drag.placement) void reorder(item.id, drag.target, drag.placement);
+        else { setDrag(null); setAnnouncement("Queue order unchanged."); }
+      } else pickUp(item, index, true);
+      return;
+    }
+    if (!drag?.keyboard || drag.id !== item.id || !["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
+    event.preventDefault(); event.stopPropagation();
+    const position = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : Math.max(0, Math.min(items.length - 1, drag.position + (event.key === "ArrowUp" ? -1 : 1)));
+    const others = items.filter((value) => value.id !== item.id);
+    const target = others[Math.min(position, others.length - 1)];
+    setDrag({ ...drag, position, target: target.id, placement: position === others.length ? "after" : "before" });
+    setAnnouncement(`Position ${position + 1} of ${items.length}. Press Enter to move this message here.`);
+  };
+  const dropPosition = (event: DragEvent<HTMLLIElement>) => event.clientY < event.currentTarget.getBoundingClientRect().top + event.currentTarget.offsetHeight / 2 ? "before" as const : "after" as const;
+  if (!items.length && !editing && !error) return null;
   const stale = editing && !items.some((item) => item.id === editing.id);
-  return <section className="message-queue" aria-label="Queued messages" tabIndex={-1} ref={region}>
-    <div className="queue-heading"><ListOrdered size={14} /><span role="status">{items.length ? `${items.length} queued` : "Unsent edits"}</span>{!running && items.length > 0 && <span className="queue-paused">Paused</span>}</div>
-    <ol className="queue-list">{items.map((item, index) => <li className="queued-message" key={item.id} data-editing={editing?.id === item.id}>
+  return <section className="message-queue" aria-label="Queued messages" tabIndex={-1} ref={region} onBlur={(event) => { if (drag?.keyboard && !event.currentTarget.contains(event.relatedTarget as Node | null)) { setDrag(null); setAnnouncement("Reordering cancelled."); } }}>
+    <div className="queue-heading"><ListOrdered size={14} /><span role="status">{items.length ? `${items.length} queued` : editing ? "Unsent edits" : "Queue changed"}</span>{!running && items.length > 0 && <span className="queue-paused">Paused</span>}</div>
+    <p id={instructions} className="sr-only">Drag to reorder. With the keyboard, press Space or Enter to pick up a message, use arrow keys to choose a position, then Enter to drop. Escape cancels.</p>
+    <p className="sr-only" role="status" aria-live="polite">{announcement}</p>
+    <ol className="queue-list" onDragOver={(event) => {
+      if (!drag || busy || editing) return;
+      event.preventDefault();
+      const rect = event.currentTarget.getBoundingClientRect();
+      if (event.clientY < rect.top + 28) event.currentTarget.scrollTop -= 18;
+      else if (event.clientY > rect.bottom - 28) event.currentTarget.scrollTop += 18;
+    }}>{items.map((item, index) => <li className="queued-message" key={item.id} data-queue-id={item.id} data-editing={editing?.id === item.id} data-dragging={drag?.id === item.id} data-drop-edge={drag?.target === item.id && drag.id !== item.id ? drag.placement : undefined} onDragOver={(event) => {
+      if (!drag || drag.keyboard || busy || editing) return;
+      event.preventDefault(); event.dataTransfer.dropEffect = "move";
+      const placement = dropPosition(event);
+      setDrag((current) => current && (current.target !== item.id || current.placement !== placement) ? { ...current, target: item.id, placement } : current);
+    }} onDrop={(event) => {
+      if (!drag || drag.keyboard || busy || editing) return;
+      event.preventDefault(); event.stopPropagation();
+      void reorder(drag.id, item.id, dropPosition(event));
+    }}>
+      {items.length > 1 && <button className="icon-button queue-drag-handle" draggable={!busy && !editing} aria-label={`Reorder queued message ${index + 1}`} aria-describedby={instructions} aria-pressed={drag?.id === item.id} title="Drag to reorder" disabled={busy || !!editing} onClick={() => {
+        if (drag?.keyboard && drag.id === item.id && drag.target && drag.placement) void reorder(item.id, drag.target, drag.placement);
+        else if (drag?.keyboard && drag.id === item.id) { setDrag(null); setAnnouncement("Queue order unchanged."); }
+        else pickUp(item, index, true);
+      }} onKeyDown={(event) => keyboardDrag(event, item, index)} onDragStart={(event) => {
+        if (busy || editing) { event.preventDefault(); return; }
+        pickUp(item, index, false);
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("application/x-gator-queued-message", item.id);
+        event.dataTransfer.setDragImage(event.currentTarget.closest("li")!, 20, 20);
+      }} onDragEnd={() => setDrag(null)}><GripVertical size={16} /></button>}
       <span className="queue-position" aria-hidden="true">{index + 1}</span><p className="queue-preview">{item.text}</p>
       <div className="queue-actions">
-        {items.length > 1 && <><button className="icon-button" aria-label={`Move queued message ${index + 1} up`} title="Move up" disabled={busy || index === 0} onClick={() => void change({ id: item.id, action: "earlier" })}><ArrowUp size={14} /></button><button className="icon-button" aria-label={`Move queued message ${index + 1} down`} title="Move down" disabled={busy || index === items.length - 1} onClick={() => void change({ id: item.id, action: "later" })}><ArrowDown size={14} /></button></>}
         {!running && <button className="icon-button" aria-label={`Send queued message ${index + 1} now`} title="Send now" disabled={busy} onClick={() => void change({ id: item.id, action: "run" })}><CornerDownLeft size={15} /></button>}
         <button className="icon-button" aria-label={`Edit queued message ${index + 1}`} title="Edit message" disabled={busy || !!editing} onClick={() => { setError(""); setEditing({ ...item }); }}><Pencil size={14} /></button>
         <button className="icon-button" aria-label={`Remove queued message ${index + 1}`} title="Remove message" disabled={busy} onClick={() => void change({ id: item.id, action: "remove" })}><X size={15} /></button>
@@ -76,6 +164,6 @@ export function MessageQueue({ items, running, busy, act, onUseDraft, onEditingC
       {stale && <p className="queue-edit-notice">This message has left the queue. Your edits are kept here.</p>}
       <div className="queue-edit-actions"><button className="small-button" disabled={busy} onClick={() => { setEditing(null); setError(""); region.current?.focus(); }}>Cancel</button>{stale ? <button className="small-button" disabled={busy || !editing.text.trim()} onClick={() => { onUseDraft(editing.text); setEditing(null); setError(""); }}>Keep as new draft</button> : <button className="button" disabled={busy || !editing.text.trim()} onClick={() => void change({ id: editing.id, action: "edit", text: editing.text })}>{busy ? "Saving…" : "Save changes"}</button>}</div>
     </div>}
-    {error && <p className="queue-error" role="alert">{error}</p>}
+    {error && <div className="queue-error" role="alert"><span>{error}</span><button className="icon-button" aria-label="Dismiss queue error" onClick={() => setError("")}><X size={14} /></button></div>}
   </section>;
 }

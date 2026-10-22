@@ -38,9 +38,10 @@ export function validateFrame(frame) {
   if (frame.type === "approval" && (!Number.isSafeInteger(frame.interaction_id) || frame.interaction_id < 1 || typeof frame.approved !== "boolean")) throw new Error("Invalid approval");
   if (frame.type === "queue") {
     const queue = frame.queue;
-    if (!queue || typeof queue !== "object" || Array.isArray(queue) || Object.keys(queue).some((key) => !["request_id", "id", "action", "text"].includes(key))) throw new Error("Invalid queue action");
+    if (!queue || typeof queue !== "object" || Array.isArray(queue) || Object.keys(queue).some((key) => !["request_id", "id", "action", "text", "target_id", "placement"].includes(key))) throw new Error("Invalid queue action");
     if (typeof queue.request_id !== "string" || !/^[a-zA-Z0-9-]{1,64}$/.test(queue.request_id) || typeof queue.id !== "string" || !/^[a-f0-9]{64}$/.test(queue.id)) throw new Error("Invalid queue identity");
-    if (!["edit", "remove", "earlier", "later", "run", "guide"].includes(queue.action)) throw new Error("Invalid queue action");
+    if (!["edit", "remove", "earlier", "later", "move", "run", "guide"].includes(queue.action)) throw new Error("Invalid queue action");
+    if (queue.action === "move" ? typeof queue.target_id !== "string" || !/^[a-f0-9]{64}$/.test(queue.target_id) || !["before", "after"].includes(queue.placement) : queue.target_id !== undefined || queue.placement !== undefined) throw new Error("Invalid queue destination");
     if (["edit", "guide"].includes(queue.action) ? typeof queue.text !== "string" || !queue.text.trim() || Buffer.byteLength(queue.text, "utf8") > (queue.action === "guide" ? 64 : 128) * 1024 : queue.text !== undefined) throw new Error("Invalid queued message");
   }
   if (frame.type === "conversation") {

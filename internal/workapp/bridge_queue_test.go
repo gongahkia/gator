@@ -84,3 +84,50 @@ func TestBridgeQueueRejectsInvalidEditsAndLateGuidance(t *testing.T) {
 		}
 	}
 }
+
+func TestBridgeQueueDropMovesCapturedRequestAtomically(t *testing.T) {
+	m := New(Config{CurrentFolder: t.TempDir()})
+	m.running = true
+	for _, text := range []string{"one", "two", "three", "four"} {
+		m.options.Attachments = []string{text + ".md"}
+		next, _ := m.SubmitText(text)
+		m = next.(Model)
+	}
+	initial := m.BridgeState().Queue
+	move := func(id, target, placement string) {
+		t.Helper()
+		next, cmd := m.ApplyBridgeQueue(BridgeQueueAction{RequestID: "drop", ID: id, Action: "move", TargetID: target, Placement: placement})
+		m = next.(Model)
+		if cmd != nil || m.bridgeQueueResult.Error != "" {
+			t.Fatalf("drop failed: %+v", m.bridgeQueueResult)
+		}
+	}
+	move(initial[3].ID, initial[0].ID, "before")
+	move(initial[0].ID, initial[2].ID, "after")
+	move(initial[1].ID, initial[2].ID, "after")
+	move(initial[1].ID, initial[1].ID, "before")
+	var order []string
+	for _, item := range m.queue {
+		order = append(order, item.prompt)
+		if !reflect.DeepEqual(item.options.Attachments, []string{item.prompt + ".md"}) {
+			t.Fatal("drop changed captured request options")
+		}
+	}
+	if !reflect.DeepEqual(order, []string{"four", "three", "two", "one"}) {
+		t.Fatalf("wrong order: %v", order)
+	}
+	// A target may be edited, removed or consumed during a drag. No partial
+	// adjacent moves may happen before the whole destination is validated.
+	for _, action := range []BridgeQueueAction{
+		{RequestID: "stale-source", ID: strings.Repeat("0", 64), Action: "move", TargetID: initial[1].ID, Placement: "before"},
+		{RequestID: "stale-target", ID: initial[0].ID, Action: "move", TargetID: strings.Repeat("0", 64), Placement: "after"},
+		{RequestID: "invalid-place", ID: initial[0].ID, Action: "move", TargetID: initial[1].ID, Placement: "middle"},
+	} {
+		before := append([]BridgeQueuedRun(nil), m.BridgeState().Queue...)
+		next, _ := m.ApplyBridgeQueue(action)
+		m = next.(Model)
+		if m.bridgeQueueResult.Error == "" || !reflect.DeepEqual(before, m.BridgeState().Queue) {
+			t.Fatalf("stale drop changed the queue: %+v", action)
+		}
+	}
+}

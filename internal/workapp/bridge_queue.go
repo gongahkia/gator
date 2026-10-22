@@ -18,6 +18,8 @@ type BridgeQueueAction struct {
 	ID        string `json:"id"`
 	Action    string `json:"action"`
 	Text      string `json:"text,omitempty"`
+	TargetID  string `json:"target_id,omitempty"`
+	Placement string `json:"placement,omitempty"`
 }
 
 // Acknowledgements let the desktop retain an edit or guidance draft until Go
@@ -48,6 +50,13 @@ func (m Model) ApplyBridgeQueue(action BridgeQueueAction) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if action.RequestID == "" || len(action.RequestID) > 64 || len(action.ID) != 64 {
+		return fail("Invalid queue action.")
+	}
+	if action.Action == "move" {
+		if len(action.TargetID) != 64 || (action.Placement != "before" && action.Placement != "after") || action.Text != "" {
+			return fail("Invalid queue destination.")
+		}
+	} else if action.TargetID != "" || action.Placement != "" {
 		return fail("Invalid queue action.")
 	}
 	if m.models != nil || m.launcher || m.section != "" || m.bridgeExternal != nil || m.pendingBundleAction != nil {
@@ -91,6 +100,33 @@ func (m Model) ApplyBridgeQueue(action BridgeQueueAction) (tea.Model, tea.Cmd) {
 		if index+1 < len(m.queue) {
 			m.queue[index+1], m.queue[index] = m.queue[index], m.queue[index+1]
 		}
+	case "move":
+		target := -1
+		for i, item := range m.queue {
+			if bridgeQueuedRunID(item) == action.TargetID {
+				target = i
+				break
+			}
+		}
+		if target < 0 {
+			return fail("The queue changed while you were moving this message. Choose its position again.")
+		}
+		if target == index {
+			return m, nil
+		}
+		// Move the whole captured request atomically in the model's event loop.
+		// A drop never changes source/options or moves a different row by index.
+		item := m.queue[index]
+		m.queue = append(m.queue[:index], m.queue[index+1:]...)
+		if index < target {
+			target--
+		}
+		if action.Placement == "after" {
+			target++
+		}
+		m.queue = append(m.queue, queuedRun{})
+		copy(m.queue[target+1:], m.queue[target:])
+		m.queue[target] = item
 	case "run":
 		if m.running || m.cancelling || m.config.Run == nil {
 			return fail("Wait for the current task to stop before sending this message.")
