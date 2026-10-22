@@ -8,3 +8,6 @@ Start Gator, choose a model, and open `/followup new`. The form, review, and
 health panel guide the same workflow used for a real bounded project. Copy one
 future version to the workspace's `project.md` at each replay step. Review
 drafts, quiet outcomes, and source support before recording human judgments.
+
+For a repeatable sequential developer replay with retained attempts and explicit
+event-based metrics, see [Temporal replay](TEMPORAL_REPLAY.md).

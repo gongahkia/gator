@@ -1,0 +1,183 @@
+{
+  "version": 1,
+  "id": "project-followup-temporal-v1",
+  "outcome": "Track the Arbor offsite commitments and recommend the next useful action.",
+  "alert_when": "Notify when a deadline, owner, venue capacity or accessibility commitment changes. Stay quiet for formatting changes.",
+  "events": [
+    {
+      "id": "deadline-earlier",
+      "description": "Deadline moved from 6 November to 3 November.",
+      "available_second": 500,
+      "deadline_second": 900
+    },
+    {
+      "id": "owner-reassigned",
+      "description": "Arun replaced Mina as reply owner.",
+      "available_second": 1400,
+      "deadline_second": 1800
+    },
+    {
+      "id": "access-confirmed",
+      "description": "The venue confirmed step-free access.",
+      "available_second": 2000,
+      "deadline_second": 2400
+    },
+    {
+      "id": "capacity-reduced",
+      "description": "Venue capacity dropped from 90 to 70.",
+      "available_second": 2600,
+      "deadline_second": 3000
+    }
+  ],
+  "episodes": [
+    {
+      "id": "initial",
+      "at_second": 0,
+      "source_file": "episodes/initial.md",
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "read-current",
+              "name": "read_file",
+              "arguments": {
+                "path": "source/project.md"
+              }
+            }
+          ]
+        },
+        {
+          "text": "{\"attention\": false, \"urgent\": false, \"summary\": \"Initial baseline: deadline 6 November, Mina owns the reply.\", \"rationale\": \"Compared the current project note with the previous observation.\", \"evidence\": [], \"change_ids\": []}"
+        }
+      ]
+    },
+    {
+      "id": "deadline",
+      "at_second": 600,
+      "source_file": "episodes/deadline.md",
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "read-current",
+              "name": "read_file",
+              "arguments": {
+                "path": "source/project.md"
+              }
+            }
+          ]
+        },
+        {
+          "text": "{\"attention\": true, \"urgent\": false, \"summary\": \"The reply deadline moved to 3 November.\", \"rationale\": \"Compared the current project note with the previous observation.\", \"evidence\": [\"source/project.md:2\"], \"change_ids\": [], \"next_step\": \"Mina should confirm the reply before 3 November.\"}"
+        }
+      ]
+    },
+    {
+      "id": "unchanged",
+      "at_second": 900,
+      "source_file": "episodes/deadline.md"
+    },
+    {
+      "id": "noise",
+      "at_second": 1200,
+      "source_file": "episodes/noise.md",
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "read-current",
+              "name": "read_file",
+              "arguments": {
+                "path": "source/project.md"
+              }
+            }
+          ]
+        },
+        {
+          "text": "{\"attention\": false, \"urgent\": false, \"summary\": \"Only the document heading changed; commitments are unchanged.\", \"rationale\": \"Compared the current project note with the previous observation.\", \"evidence\": [], \"change_ids\": []}"
+        }
+      ]
+    },
+    {
+      "id": "provider-failure",
+      "at_second": 1500,
+      "source_file": "episodes/owner.md",
+      "fault": "provider"
+    },
+    {
+      "id": "provider-recovery",
+      "at_second": 1800,
+      "source_file": "episodes/owner.md",
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "read-current",
+              "name": "read_file",
+              "arguments": {
+                "path": "source/project.md"
+              }
+            }
+          ]
+        },
+        {
+          "text": "{\"attention\": true, \"urgent\": false, \"summary\": \"Arun replaced Mina as the reply owner.\", \"rationale\": \"Compared the current project note with the previous observation.\", \"evidence\": [\"source/project.md:2\"], \"change_ids\": [], \"next_step\": \"Confirm that Arun will send the reply by 3 November.\"}"
+        }
+      ]
+    },
+    {
+      "id": "source-failure",
+      "at_second": 2100,
+      "source_file": "episodes/access.md",
+      "fault": "source"
+    },
+    {
+      "id": "source-recovery",
+      "at_second": 2400,
+      "source_file": "episodes/access.md",
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "read-current",
+              "name": "read_file",
+              "arguments": {
+                "path": "source/project.md"
+              }
+            }
+          ]
+        },
+        {
+          "text": "{\"attention\": true, \"urgent\": false, \"summary\": \"The venue confirmed step-free access.\", \"rationale\": \"Compared the current project note with the previous observation.\", \"evidence\": [\"source/project.md:3\"], \"change_ids\": [], \"next_step\": \"Arun can include the accessibility confirmation in the reply.\"}"
+        }
+      ]
+    },
+    {
+      "id": "tool-failure",
+      "at_second": 2700,
+      "source_file": "episodes/capacity.md",
+      "fault": "tool"
+    },
+    {
+      "id": "tool-recovery",
+      "at_second": 3000,
+      "source_file": "episodes/capacity.md",
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "read-current",
+              "name": "read_file",
+              "arguments": {
+                "path": "source/project.md"
+              }
+            }
+          ]
+        },
+        {
+          "text": "{\"attention\": true, \"urgent\": false, \"summary\": \"Venue capacity dropped to 70 people.\", \"rationale\": \"Compared the current project note with the previous observation.\", \"evidence\": [\"source/project.md:3\"], \"change_ids\": [], \"next_step\": \"Arun should reconcile the attendee count with the 70-person capacity.\"}"
+        }
+      ]
+    }
+  ]
+}
