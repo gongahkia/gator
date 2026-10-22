@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Gator · Conversation concept</title><link rel="stylesheet" href="style.css"></head>
+<body>
+  <div class="prototype-bar"><span>Gator · Design prototype</span><span>Fictional data · No real actions</span><label class="sr-only" for="scenario">Example scenario</label><select id="scenario"><option value="returning">Returning to Gator</option><option value="first">First conversation</option><option value="working">While Gator works</option><option value="asleep">Computer was asleep</option></select><button id="theme" aria-label="Switch to dark appearance">◐</button></div>
+  <div class="app">
+    <aside class="sidebar" aria-label="Main navigation"><a class="brand" href="#" data-topic="main"><span aria-hidden="true">🐊</span>Gator</a>
+      <button class="nav primary" data-topic="main"><span data-icon="chat"></span>Talk with Gator</button>
+      <button class="nav" data-drawer="search"><span data-icon="search"></span>Find a conversation</button>
+      <div class="nav-pair"><button class="nav" data-drawer="following"><span data-icon="follow"></span>Following</button><button class="nav" data-drawer="saved"><span data-icon="file"></span>Saved</button></div>
+      <div class="recent-heading">Recent conversations</div><nav id="topics" aria-label="Recent conversations"></nav>
+      <button class="nav new-topic" id="new-topic"><span data-icon="plus"></span>New topic</button>
+      <div class="sidebar-footer"><span class="local-dot"></span><span>On this computer</span><button class="icon-button" data-drawer="settings" aria-label="Settings"><span data-icon="settings"></span></button></div>
+    </aside>
+    <main><header class="chat-header"><div><h1 id="topic-title">Gator</h1><p id="topic-subtitle">A conversation you can come back to.</p></div><div class="header-actions"><button id="updates-button" class="quiet-button" data-drawer="updates"><span class="attention-dot"></span>2 updates</button><button class="icon-button" data-drawer="info" aria-label="About this conversation"><span data-icon="info"></span></button></div></header>
+      <div id="transcript" class="transcript" aria-label="Conversation"><div id="messages" class="messages"></div></div>
+      <div class="compose-wrap"><div id="queue" class="queue" hidden><span>Next message</span><p></p><button class="quiet-button" id="edit-queued">Edit</button><button class="icon-button" id="remove-queued" aria-label="Remove queued message"><span data-icon="close"></span></button></div><div id="composer-note" class="composer-note" role="status"></div><form id="composer" class="composer"><label class="sr-only" for="message">Message Gator</label><textarea id="message" placeholder="Message Gator…" rows="2"></textarea><div class="composer-tools"><button type="button" class="icon-button" data-drawer="attachments" aria-label="Share a file"><span data-icon="plus"></span></button><span id="draft-status"></span><div class="spacer"></div><button id="guide" type="button" class="quiet-button" hidden>Guide current work</button><button class="send" aria-label="Send message"><span data-icon="arrow"></span></button></div></form><p class="local-caption" id="local-caption">Your conversation stays on this device.</p></div>
+    </main>
+    <aside class="drawer" id="drawer" aria-label="Conversation details" hidden><header><h2 id="drawer-title"></h2><button class="icon-button" id="close-drawer" aria-label="Close details"><span data-icon="close"></span></button></header><div id="drawer-content"></div></aside>
+  </div>
+  <dialog id="review"><form method="dialog"><header><h2>Review the email</h2><button class="icon-button" value="cancel" aria-label="Close review"><span data-icon="close"></span></button></header><p class="muted">Example only · This prototype cannot send email.</p><dl><div><dt>To</dt><dd>Jamie · jamie@venue.example</dd></div><div><dt>Subject</dt><dd>Offsite options for 18 November</dd></div></dl><label for="email-body">Message</label><textarea id="email-body" rows="6">Hi Jamie,
+
+Could you confirm whether the garden room is available on 18 November for 12 people? Our total budget is $2,000. Please include any room hire and service charges.
+
+Thanks!</textarea><footer><button value="cancel" class="quiet-button">Keep as draft</button><button id="confirm-email" type="button" class="button">Simulate sending this email</button></footer></form></dialog>
+  <div id="toast" class="toast" role="status" hidden></div><script src="app.js"></script>
+</body></html>
