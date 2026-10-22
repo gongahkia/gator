@@ -135,6 +135,7 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case checksTick:
 		m.refreshChatUpdates()
+		m.refreshChatMemories()
 		m.refreshBridgeConversations()
 		m.refreshBridgeFollowing()
 		if m.config.ReadChecks == nil {
@@ -346,7 +347,9 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 	}
 	if responseIndex < len(m.messages) {
 		m.messages[responseIndex].activity = activity
+		m.messages[responseIndex].runID = value.WorkID
 	}
+	m.refreshChatMemories()
 	m.lastOutput = value.OutputPath
 	m.lastBundle = value.Bundle
 	if m.lastWorkID != "" {

@@ -65,3 +65,10 @@ test("recent conversation selection requires the exact projected list and a boun
   assert.equal(validateFrame({ type: "conversation", conversation }).version, 1);
   for (const change of [{ id: "../other" }, { id: "" }, { list_id: "" }, { program: "sh" }]) assert.throws(() => validateFrame({ type: "conversation", conversation: { ...conversation, ...change } }));
 });
+
+test("memory review accepts bounded exact revisions and rejects supplied scope", () => {
+  const memory = {conversation_id:"work-chat",id:"mem-"+"a".repeat(24),updated:"2026-10-23T00:00:00.123456789Z",action:"correct",text:"Detailed answers",request_id:"edit-1"};
+  assert.equal(validateFrame({type:"memory",memory}).version,1);
+  for(const change of [{id:"../memory"},{updated:"unknown"},{action:"create"},{goal_id:"other"},{text:"x".repeat(4097)},{action:"undo"},{request_id:""}]) assert.throws(()=>validateFrame({type:"memory",memory:{...memory,...change}}));
+  const {text,...undo}=memory;assert.equal(validateFrame({type:"memory",memory:{...undo,action:"undo"}}).version,1);
+});

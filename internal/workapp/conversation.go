@@ -79,6 +79,7 @@ func (m *Model) beginChat(source string) bool {
 	m.restoreRequests()
 	m.rememberChat()
 	m.refreshChatUpdates()
+	m.refreshChatMemories()
 	m.refreshBridgeConversations()
 	return true
 }
@@ -123,6 +124,7 @@ func (m *Model) restoreConversation(conversationID, announcement string) {
 	m.restoreRequests()
 	m.rememberChat()
 	m.refreshChatUpdates()
+	m.refreshChatMemories()
 	m.status = joinConversationStatus(announcement, m.revisionStatus())
 }
 
@@ -141,7 +143,7 @@ func (m *Model) applyConversationState(conversationID string, state Conversation
 	m.messages = make([]message, 0, len(state.Messages))
 	for _, item := range state.Messages {
 		m.messages = append(m.messages, message{
-			createdAt: item.CreatedAt, replyToUpdateID: item.ReplyToUpdateID,
+			runID: item.RunID, createdAt: item.CreatedAt, replyToUpdateID: item.ReplyToUpdateID,
 			inputIDs: append([]string(nil), item.InputIDs...), inputs: append([]string(nil), item.Inputs...), activity: item.Activity.Clone(), role: item.Role, text: item.Text, bundle: cloneBundlePointer(item.Bundle),
 		})
 	}

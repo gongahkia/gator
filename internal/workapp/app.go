@@ -83,6 +83,7 @@ type CandidateSummary struct {
 // prose, so historical artifact cards retain the same trust boundary as new
 // cards produced in this application session.
 type TranscriptMessage struct {
+	RunID           string
 	CreatedAt       time.Time
 	ReplyToUpdateID string
 	InputIDs        []string
@@ -214,6 +215,8 @@ type Config struct {
 	ClearGoal                func()
 	MemoryAction             func(arguments []string) (string, error)
 	MemoryResult             func(arguments []string) (*uisnapshot.Result, error)
+	ReadChatMemories         ReadChatMemories
+	ReviewChatMemory         func(ChatMemoryAction, string) error
 	RecallStatus             func(context.Context) (RecallStatus, error)
 	ConfigureChatLearning    func(bool) error
 	ConfigureChatHistory     func(bool) error
@@ -285,6 +288,7 @@ type entry struct {
 	advanced                                   bool
 }
 type message struct {
+	runID           string
 	createdAt       time.Time
 	replyToUpdateID string
 	inputIDs        []string
@@ -444,6 +448,10 @@ type Model struct {
 	followupSaving         bool
 	checks                 []workhome.Check
 	checkDetail            *workhome.Check
+	chatMemories           []ChatMemoryReceipt
+	chatMemoriesOwner      string
+	chatMemoryResult       *ChatMemoryResult
+	chatMemoryIssue        string
 	recall                 RecallStatus
 	recallBusy             bool
 	recallCancel           context.CancelFunc
@@ -548,6 +556,7 @@ func New(config Config) Model {
 		model.title = config.InitialTitle
 	}
 	model.refreshChatUpdates()
+	model.refreshChatMemories()
 	return model
 }
 

@@ -139,3 +139,52 @@ test("earlier-chat privacy is independent of learning and persists across restar
     expect((await f.memories())[0].text).toBe(quote);
   }finally{await f.close();}
 });
+
+test("saved-memory receipts support guarded edits, restart and forgetting inline",async()=>{
+  test.setTimeout(120_000);const f=await fixture();try{
+    let app=await f.launch(),page=await app.firstWindow();await expect(composer(page)).toBeVisible();
+    await command(page,"/mode inspect");await send(page,quote);
+    const receipt=()=>page.locator(".chat-memory-receipt");
+    await expect(receipt()).toHaveCount(1);await expect(receipt().locator("summary")).toHaveText("Saved to memory");
+    await receipt().locator("summary").click();await expect(receipt()).toContainText(quote);
+    await receipt().getByRole("button",{name:"Edit memory",exact:true}).click();
+    const corrected="I prefer detailed answers when reviewing a proposal.";
+    await page.getByRole("textbox",{name:"Edit saved memory",exact:true}).fill(corrected);
+    await page.getByRole("button",{name:"New chat",exact:true}).click();
+    await expect(page.getByRole("alertdialog")).toBeVisible();await page.getByRole("button",{name:"Keep editing",exact:true}).click();
+    await receipt().getByRole("button",{name:"Save memory",exact:true}).click();await expect(receipt()).toContainText("Memory edited");
+    expect((await f.memories())[0].text).toBe(corrected);
+    await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setSize(900,680));await receipt().scrollIntoViewIfNeeded();await page.screenshot({path:"test-results/chat-memory-receipt.png"});
+    await expect.poll(async()=>(await page.evaluate(()=>window.gator!.snapshot())).allChatsBusy).toBe(false);
+    app=await f.restart();page=await app.firstWindow();await expect(receipt()).toHaveCount(1);
+    await receipt().locator("summary").click();await expect(receipt()).toContainText(corrected);
+    await receipt().getByRole("button",{name:"Forget memory",exact:true}).click();
+    await receipt().getByRole("button",{name:"Forget saved memory",exact:true}).click();await expect(receipt()).toHaveCount(0);expect(await f.memories()).toHaveLength(0);
+    await send(page,"Remember: "+quote);await expect(receipt()).toHaveCount(1);await receipt().locator("summary").click();
+    await receipt().getByRole("button",{name:"Undo memory save",exact:true}).click();await expect(receipt()).toHaveCount(0);expect(await f.memories()).toHaveLength(0);
+  }finally{await f.close();}
+});
+
+test("memory edits survive concurrent updates and removal without overwriting saved facts",async()=>{
+  test.setTimeout(120_000);const f=await fixture();try{
+    const app=await f.launch(),page=await app.firstWindow();await expect(composer(page)).toBeVisible();
+    await command(page,"/mode inspect");await send(page,quote);
+    const receipt=page.locator(".chat-memory-receipt");await expect(receipt).toHaveCount(1);
+    await receipt.locator("summary").click();await receipt.getByRole("button",{name:"Edit memory",exact:true}).click();
+    const editor=page.getByRole("textbox",{name:"Edit saved memory",exact:true});
+    const draft="Keep this unsaved preference while another chat changes memory.";await editor.fill(draft);
+    const memory=(await f.memories())[0],path=join(f.directory,"state/gator/memory",`${memory.id}.json`);
+    const changed="I prefer longer explanations for technical work.";
+    await writeFile(path,JSON.stringify({...memory,text:changed,updated_at:new Date(Date.now()+1000).toISOString()}),{mode:0o600});
+    await expect(receipt.getByText("This memory changed elsewhere.",{exact:false})).toBeVisible({timeout:30_000});
+    await expect(editor).toHaveValue(draft);await expect(receipt.getByRole("button",{name:"Save memory",exact:true})).toBeDisabled();
+    expect((await f.memories())[0].text).toBe(changed);
+    await receipt.getByRole("button",{name:"Load saved version",exact:true}).click();await expect(editor).toHaveValue(changed);
+    await editor.fill(draft);await rm(path);
+    await expect(receipt.getByText("This memory was removed or moved to another chat.",{exact:false})).toBeVisible({timeout:30_000});
+    await expect(editor).toHaveValue(draft);await expect(receipt.getByRole("button",{name:"Save memory",exact:true})).toBeDisabled();
+    await page.getByRole("button",{name:"New chat",exact:true}).click();await expect(page.getByRole("alertdialog")).toBeVisible();
+    await page.getByRole("button",{name:"Keep editing",exact:true}).click();await expect(editor).toHaveValue(draft);
+    await receipt.getByRole("button",{name:"Cancel",exact:true}).click();await expect(receipt).toHaveCount(0);expect(await f.memories()).toHaveLength(0);
+  }finally{await f.close();}
+});

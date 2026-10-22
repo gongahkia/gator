@@ -58,6 +58,8 @@ Settings → **Memory & privacy** separates two preferences:
 
 Neither switch deletes stored messages or trains the model. **Saved** manages saved knowledge; **Data & backups** manages retained data. Forgetting a saved memory blocks silently relearning its canonical subject, but prior messages, files and retained run evidence may still contain the words. A new chat starts a fresh working context within the same local profile; devices do not sync automatically.
 
+A collapsed **Saved to memory** receipt beneath an answer opens the current saved fact and its scope. Edit it there, undo an unchanged new save, or review forgetting an edited fact. The Saved screen uses the same version checks: another chat's correction cannot be silently overwritten. If a memory changes or disappears while you edit, your draft stays open until you load the current version or cancel. Historical messages and context already supplied to running work are kept.
+
 ## Notes
 
 In the desktop, Memory & privacy (or `/memory` in command search) opens the readiness and setup panel. It explains

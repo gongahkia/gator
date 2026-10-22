@@ -34,7 +34,7 @@ export type Overview = {
 export type BackendCommand = { name: string; description: string; advanced: boolean; needs_input: boolean };
 export type ActivityEntry = { id: string; kind: "text" | "tool" | "status"; text?: string; tool?: string; state: "running" | "completed" | "failed" | "stopped"; started_at: string; finished_at?: string };
 export type BackendActivity = { started_at: string; finished_at?: string; state: "running" | "completed" | "failed" | "stopped"; entries: ActivityEntry[]; truncated?: boolean };
-export type BackendMessage = { created_at?: string; reply_to_update_id?: string; activity?: BackendActivity; inputs?: string[]; input_ids?: string[]; role: string; text: string; bundle?: BackendBundle; result?: BackendResult };
+export type BackendMessage = { run_id?: string; created_at?: string; reply_to_update_id?: string; activity?: BackendActivity; inputs?: string[]; input_ids?: string[]; role: string; text: string; bundle?: BackendBundle; result?: BackendResult };
 export type QueuedMessage = { reply_to_update_id?: string; id: string; text: string; inputs?: string[]; interrupted?: boolean };
 export type QueueAction = {
   request_id: string; id: string; action: "edit" | "remove" | "earlier" | "later" | "move" | "run" | "guide"; text?: string;
@@ -86,7 +86,10 @@ export type ComposerModel = { provider: string; model: string; label: string; un
 export type ComposerSettings = { id: string; effort: "low" | "standard" | "high"; models: ComposerModel[]; issue?: string; disabled?: string };
 export type ComposerAction = { id: string; request_id: string } & ({ action: "model"; provider: string; model: string } | { action: "effort"; effort: "low" | "standard" | "high" });
 export type ChatUpdate = { next_step?: string; evidence?: string[]; id: string; title: string; summary: string; status: string; job_id?: string; goal_id?: string; created_at: string; delivered: boolean; read: boolean; resolved: boolean; version: number };
+export type ChatMemoryReceipt = {id: string; run_id: string; text: string; quote?: string; updated: string; scope: string; corrected?: boolean; can_undo?: boolean};
+export type ChatMemoryAction = {conversation_id: string; id: string; updated: string; action: "correct"|"forget"|"undo"; text?: string; request_id: string};
 export type BackendState = {
+  chat_memories?: ChatMemoryReceipt[]; chat_memory_issue?: string; chat_memory_result?: {request_id: string; error?: string};
   pending_connection?: string;
   chat_updates?: ChatUpdate[]; chat_updates_issue?: string; chat_updates_total?: number; updates_have_older?: boolean; updates_have_newer?: boolean;
   composer?: ComposerSettings;
@@ -151,7 +154,8 @@ export type PanelAction = {
 };
 export type Frame = {
   version: 1;
-  type: "update" | "submit" | "upload_submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "conversation" | "composer";
+  type: "memory" | "update" | "submit" | "upload_submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "conversation" | "composer";
+  memory?: ChatMemoryAction;
   update?: { conversation_id: string; id: string; action: "delivered" | "read" | "resolve" | "reopen" | "older" | "newer"; version: number };
   upload?: { request_id: string; context: string; text: string; files: string[]; reply_to_update_id?: string };
   text?: string; key?: string; error?: string; width?: number; height?: number;

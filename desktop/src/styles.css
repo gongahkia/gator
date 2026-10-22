@@ -960,3 +960,17 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
   .home-onboarding .first-task-model { order: -1; margin-bottom: 12px; padding: 12px; }
   .home-onboarding .first-task-ideas { margin-bottom: 0; }
 }
+
+.chat-memory-receipts { display: grid; gap: 5px; margin-top: 10px; }
+.chat-memory-receipt { font-size: var(--text-xs); color: var(--color-muted); }
+.chat-memory-receipt summary { list-style: none; display: flex; align-items: center; gap: 6px; cursor: pointer; width: fit-content; min-height: 32px; }
+.chat-memory-detail { margin-top: 5px; padding: 12px 14px; border: 1px solid var(--color-line); border-radius: var(--radius-md); background: var(--color-surface); }
+.chat-memory-detail > .literal { color: var(--color-contrast); line-height: 1.6; margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.chat-memory-scope { font-size: var(--text-xs); line-height: 1.6; color: var(--color-muted); margin: 6px 0; }
+.chat-memory-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-block: 7px; }
+.chat-memory-actions .small-button { font-size: var(--text-xs); }
+.chat-memory-detail textarea { width: 100%; min-height: 90px; resize: vertical; padding: 10px; border: 1px solid var(--color-line); border-radius: var(--radius-sm); background: var(--color-base); color: var(--color-contrast); }
+
+.chat-memory-receipt summary::-webkit-details-marker { display: none; }
+.chat-memory-receipt summary > svg:last-child { transition: transform 150ms ease; }
+.chat-memory-receipt[open] summary > svg:last-child { transform: rotate(180deg); }

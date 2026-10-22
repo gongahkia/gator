@@ -33,6 +33,7 @@ export function validateFrame(frame) {
     conversation: ["type", "conversation"],
     upload_submit: ["type", "upload"],
     update: ["type", "update"],
+    memory: ["type", "memory"],
   }[frame.type];
   if (!allowed || Object.keys(frame).some((key) => !allowed.includes(key))) throw new Error("Unsupported desktop action");
   if (JSON.stringify(frame).length > 256 * 1024) throw new Error("Desktop action is too large");
@@ -44,6 +45,10 @@ export function validateFrame(frame) {
   if (frame.type === "update") {
     const value = frame.update;
     if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some(key => !["conversation_id", "id", "action", "version"].includes(key)) || typeof value.conversation_id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/.test(value.conversation_id) || typeof value.id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(value.id) || !["delivered", "read", "resolve", "reopen", "older", "newer"].includes(value.action) || !Number.isSafeInteger(value.version) || value.version < 0) throw new Error("Invalid update receipt");
+  }
+  if (frame.type === "memory") {
+    const v = frame.memory;
+    if (!v || typeof v !== "object" || Array.isArray(v) || Object.keys(v).some(key => !["conversation_id", "id", "updated", "action", "text", "request_id"].includes(key)) || typeof v.conversation_id !== "string" || !/^[a-zA-Z0-9-]{1,128}$/.test(v.conversation_id) || typeof v.id !== "string" || !/^mem-[a-f0-9]{24}$/.test(v.id) || typeof v.updated !== "string" || v.updated.length > 64 || !Number.isFinite(Date.parse(v.updated)) || typeof v.request_id !== "string" || !/^[a-zA-Z0-9-]{1,64}$/.test(v.request_id) || !["correct", "forget", "undo"].includes(v.action) || (v.action === "correct" ? typeof v.text !== "string" || !v.text.trim() || Buffer.byteLength(v.text)>4096 : v.text !== undefined)) throw new Error("Invalid memory review");
   }
   if (frame.type === "navigate" && (typeof frame.text !== "string" || frame.text.length > 4096 || !/^\/[a-z][a-z0-9-]*(?: [a-z][a-z0-9-]*)*$/.test(frame.text) || ["/approve", "/deny", "/quit", "/exit"].includes(frame.text))) throw new Error("Invalid destination");
   if (frame.type === "key" && !["esc", "ctrl+o", "ctrl+p", "ctrl+x", "ctrl+b"].includes(frame.key)) throw new Error("Unsupported shortcut");

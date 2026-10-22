@@ -20,6 +20,9 @@ import (
 // BridgeState is a display-only projection for the desktop.
 // The Go model remains the sole owner of commands, runs, approvals and history.
 type BridgeState struct {
+	ChatMemories          []ChatMemoryReceipt        `json:"chat_memories,omitempty"`
+	ChatMemoryIssue       string                     `json:"chat_memory_issue,omitempty"`
+	ChatMemoryResult      *ChatMemoryResult          `json:"chat_memory_result,omitempty"`
 	PendingConnection     string                     `json:"pending_connection,omitempty"`
 	UpdatesHaveOlder      bool                       `json:"updates_have_older,omitempty"`
 	UpdatesHaveNewer      bool                       `json:"updates_have_newer,omitempty"`
@@ -111,6 +114,7 @@ func bridgeExternal(kind, action, id string, command *exec.Cmd) *BridgeExternal 
 }
 
 type BridgeMessage struct {
+	RunID           string              `json:"run_id,omitempty"`
 	CreatedAt       time.Time           `json:"created_at,omitempty"`
 	ReplyToUpdateID string              `json:"reply_to_update_id,omitempty"`
 	InputIDs        []string            `json:"input_ids,omitempty"`
@@ -157,6 +161,7 @@ func (m Model) BridgeState() BridgeState {
 	desktop := m.desktop
 	desktop.Shortcuts = m.desktop.ResolvedShortcuts()
 	state := BridgeState{
+		ChatMemories: append([]ChatMemoryReceipt(nil), m.chatMemories...), ChatMemoryIssue: m.chatMemoryIssue, ChatMemoryResult: m.chatMemoryResult,
 		PendingConnection: m.pendingConnection(),
 		UpdatesHaveOlder:  m.updatesHaveOlder, UpdatesHaveNewer: len(m.updatePageAnchors) > 0,
 		UpdateConversations: append([]BridgeUpdateConversation(nil), m.updateConversations...),
@@ -240,7 +245,7 @@ func (m Model) BridgeState() BridgeState {
 		}
 	}
 	for _, item := range m.messages {
-		state.Messages = append(state.Messages, BridgeMessage{CreatedAt: item.createdAt, ReplyToUpdateID: item.replyToUpdateID, InputIDs: append([]string(nil), item.inputIDs...), Inputs: append([]string(nil), item.inputs...), Activity: item.activity.Clone(), Role: item.role, Text: item.text, Bundle: cloneBundlePointer(item.bundle), Result: item.result})
+		state.Messages = append(state.Messages, BridgeMessage{RunID: item.runID, CreatedAt: item.createdAt, ReplyToUpdateID: item.replyToUpdateID, InputIDs: append([]string(nil), item.inputIDs...), Inputs: append([]string(nil), item.inputs...), Activity: item.activity.Clone(), Role: item.role, Text: item.text, Bundle: cloneBundlePointer(item.bundle), Result: item.result})
 	}
 	for _, item := range m.availableCommandEntries() {
 		state.Commands = append(state.Commands, BridgeCommand{

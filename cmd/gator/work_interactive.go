@@ -26,6 +26,7 @@ import (
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/learning"
+	"github.com/gongahkia/gator/internal/memory"
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/uisnapshot"
@@ -285,6 +286,35 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		MemoryResult: func(arguments []string) (*uisnapshot.Result, error) {
 			return workMemoryResult(stateDir, goalID, arguments)
 		},
+		ReadChatMemories: func(conversationID, activeGoal string) ([]memory.Record, error) {
+			store, err := memory.Open(stateDir)
+			if err != nil {
+				return nil, err
+			}
+			records, err := store.List(activeGoal, false)
+			if err != nil {
+				return nil, err
+			}
+			var owned []memory.Record
+			for _, record := range records {
+				if record.Origin != nil && record.Origin.ConversationID == conversationID {
+					owned = append(owned, record)
+				}
+			}
+			return owned, nil
+		},
+		ReviewChatMemory: func(a workapp.ChatMemoryAction, activeGoal string) error {
+			release, err := state.Guard(stateDir, false)
+			if err != nil {
+				return err
+			}
+			defer release()
+			store, err := memory.Open(stateDir)
+			if err != nil {
+				return err
+			}
+			return store.ReviewChat(a.ID, a.ConversationID, activeGoal, a.Updated, a.Action, a.Text)
+		},
 		RecallStatus:    func(ctx context.Context) (workapp.RecallStatus, error) { return workRecallStatus(ctx, stateDir) },
 		ConfigureRecall: configureWorkRecall,
 		ConfigureChatLearning: func(enabled bool) error {
@@ -302,7 +332,6 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		},
 		SaveFollowup:       func(draft followup.Draft) (goal.Record, jobs.Definition, error) { return saveFollowup(stateDir, draft) },
 		ReadChecks:         func() ([]workhome.Check, bool, error) { return readFollowupChecks(stateDir) },
-		InboxStore:         &inboxStore,
 		StartSupervisor:    func() error { return startLocalSupervisor(stateDir) },
 		PilotAction:        workPilotResult,
 		Controls:           workControlsWithConnections(stateDir, connections),
@@ -1119,10 +1148,10 @@ func loadWorkTUIConversation(store worksession.Store, conversationID string) (wo
 		state.Messages = append(state.Messages, workapp.TranscriptMessage{CreatedAt: started, ReplyToUpdateID: revision.ReplyToUpdateID, Role: "You", Text: revision.Objective, InputIDs: append([]string(nil), revision.InputIDs...), Inputs: append([]string(nil), revision.InputNames...)})
 		activity := revision.Activity.Clone()
 		if strings.TrimSpace(revision.FinalText) != "" {
-			state.Messages = append(state.Messages, workapp.TranscriptMessage{Activity: activity, Role: "Gator", Text: revision.FinalText})
+			state.Messages = append(state.Messages, workapp.TranscriptMessage{RunID: filepath.Base(revision.BundlePath), Activity: activity, Role: "Gator", Text: revision.FinalText})
 		} else if revision.Status != string(artifact.Completed) {
 			state.Messages = append(state.Messages, workapp.TranscriptMessage{
-				Activity: activity, Role: "Gator", Text: "This retained Work revision ended with status " + revision.Status + ".",
+				RunID: filepath.Base(revision.BundlePath), Activity: activity, Role: "Gator", Text: "This retained Work revision ended with status " + revision.Status + ".",
 			})
 		}
 		bundle, bundleErr := summarizeWorkBundle(revision.BundlePath)
