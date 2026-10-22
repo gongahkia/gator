@@ -49,11 +49,16 @@ topic and shows an explanation. A deleted conversation makes its designation
 unavailable; corrupt metadata produces a visible problem instead of silently
 choosing a different topic. Restoring the main conversation never replays a run,
 queued message, steering channel or approval.
+The first retained identity is also saved when a run ends during normal close.
+Data recovery keeps the empty main conversation's default source aligned with
+the fresh private folder.
 
 Existing `workspace:` unsent drafts remain recoverable in the empty main
-conversation. Empty side topics use a separate `topic:` namespace; retained
+conversation. Empty side topics use separate `workspace:topic:SOURCE` keys inside
+the existing accepted namespace, so older builds preserve them on rollback; retained
 conversations continue using `conversation:ID`. Promotion to a durable ID keeps
-the existing acknowledged-copy-before-remove behavior. No histories are merged.
+the existing acknowledged-copy-before-remove behavior. Interim `topic:` keys
+migrate on ordinary access without losing their text. No histories are merged.
 
 Before model setup, pressing Send opens the existing setup screen and keeps
 the unsent request. Returning from setup does not submit it automatically.
@@ -131,4 +136,37 @@ change. Native Windows/Linux hardware and new-user usability remain boundaries.
 
 ### Verification
 
-Verification results are recorded below after the packaged desktop checks.
+- `npm run check --prefix desktop`: passed.
+- `npm test --prefix desktop`: 27 passed, one Windows-native handoff test skipped
+  on macOS. Includes rollback-compatible draft migration and strict drop payloads.
+- `go test -p 1 ./internal/worksession ./internal/workapp -count=1`: passed.
+  Additional focused tests cover retaining the first main identity during close,
+  recovery source changes, stale drop targets and captured request options.
+- `go vet ./internal/worksession ./internal/workapp ./cmd/gator`: passed.
+- `GOOS=windows GOARCH=amd64 go test -p 1 -exec /usr/bin/true
+  ./internal/worksession ./internal/workapp ./cmd/gator`: passed compilation.
+  This does not execute Windows binaries or verify native Windows interaction.
+- `npm run pack --prefix desktop`: produced the unsigned macOS development app.
+  Its bundled UI, host policy/draft store and private runtime matched the built
+  assets byte for byte.
+- `GATOR_DESKTOP_TEST_EXECUTABLE="$PWD/desktop/release/mac/Gator.app/Contents/MacOS/Gator"
+  npm run test:e2e --prefix desktop -- --reporter=line`: **17 passed**. Covers
+  persisted main identity across an actual app restart, source/draft separation,
+  setup handoff, native pointer queue drops, keyboard move/cancel, edits and
+  retained FIFO execution, exact approvals, knowledge/inbox/forms/usage, palette,
+  file previews, reading position, responsive layouts and reduced motion.
+  Sidebar/drawer/dialog transitions were exercised at 10% playback, including
+  reversal and an outgoing drawer retaining its content.
+
+After the shutdown identity fix, the rebuilt package passed the three affected
+desktop journeys again: About & updates with an unsent draft, queued-message
+editing/dragging/keyboard reordering and execution, and real Go conversation
+continuation across restart (**3 passed**). The final package's assets and private
+runtime matched the built files. Go store/model tests, vet, TypeScript and host
+tests also passed after the final changes.
+
+**Verdict: Approve for the reviewed conversational slice.** Unverified:
+native Windows/Linux UI and install/update cycles, destructive data operations,
+new-user usability, and the future application contracts listed above. These
+checks do not establish those capabilities. No paid inference or external action
+was used in these isolated desktop journeys.

@@ -29,7 +29,8 @@ and Saved. Following groups goals, configured checks and updates.
 
 Before a main conversation exists, Gator starts in a private empty workspace.
 Conversation information → This conversation provides the folder picker. Choosing
-a different folder starts a separate topic. To choose a starting folder during development:
+a different folder starts a separate topic. To choose a starting folder during
+development:
 
 ```sh
 GATOR_DESKTOP_WORKSPACE=/absolute/path/to/notes make desktop

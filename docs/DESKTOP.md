@@ -170,7 +170,8 @@ the existing separate review and confirmation, including stale-policy checks.
 
 Before a main conversation exists, the desktop starts with a private empty
 folder rather than capturing the user's home directory. Later launches restore
-the designated main conversation and its retained scope, without replaying work. Choose a workspace with the native folder picker, set
+the designated main conversation and its retained scope, without replaying work.
+Choose a workspace with the native folder picker, set
 `GATOR_DESKTOP_WORKSPACE`, or resume existing work. Nothing in the sibling
 reference repository is required at build or runtime.
 
@@ -207,7 +208,7 @@ they do not reinstate the retired frontend or distribution paths.
 
 The desktop's Electron integration test uses a real built Go backend and an
 isolated profile with a local fake inference endpoint. It exercises home,
-secondary navigation, scoped draft preservation, contextual file previews, native follow-up edits
+secondary navigation, scoped drafts, contextual file previews, native follow-up edits
 and review, conversation continuation, and multiple window sizes. It also
 checks empty and populated Saved knowledge, interruptible sidebar/drawer motion and
 reduced motion, real usage counters, and reviewed usage changes. It does not
