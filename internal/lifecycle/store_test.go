@@ -267,3 +267,35 @@ func TestRetentionDefaultsKeepDataAndProtectOngoingGoals(t *testing.T) {
 		t.Fatal("ongoing goal knowledge removed", err)
 	}
 }
+
+func TestFileVersionsFollowBackupAndExplicitHistoryDeletion(t *testing.T) {
+	root := t.TempDir()
+	s, err := Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"files/identity/file.json", "files/identity/version.bin", "files/identity/draft.json", "files/alias/link.json", "files/identity/saving.lock", "files/identity/interrupted.tmp"} {
+		writeFixture(t, root, path, "retained file content")
+	}
+	output := filepath.Join(t.TempDir(), "backup.tar.gz")
+	manifest, err := s.Export(context.Background(), output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(manifest.Files) != 4 {
+		t.Fatalf("backup should retain versions and drafts, excluding transient locks: %#v", manifest.Files)
+	}
+	if _, err := VerifyBackup(context.Background(), output); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := s.PreviewDelete(context.Background(), "history")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Apply(context.Background(), plan.ID); err != nil {
+		t.Fatal(err)
+	}
+	if entries, err := os.ReadDir(filepath.Join(root, "gator/files")); err != nil || len(entries) != 0 {
+		t.Fatal("history deletion retained private working files", err)
+	}
+}

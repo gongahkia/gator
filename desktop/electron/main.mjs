@@ -145,7 +145,7 @@ function createWindow() {
     try { await drafts.flush(); await files.flush(); }
     catch {
       closing = false;
-      const answer = await dialog.showMessageBox(window, { type: "warning", message: "Your message draft could not be saved.", detail: "Keep Gator open to copy your unsent text, or close without saving that draft.", buttons: ["Keep Gator open", "Close without saving"], defaultId: 0, cancelId: 0 });
+      const answer = await dialog.showMessageBox(window, { type: "warning", message: "Your unsent work could not be saved.", detail: "Keep Gator open to copy your message and file edits, or close without saving those changes.", buttons: ["Keep Gator open", "Close without saving"], defaultId: 0, cancelId: 0 });
       if (answer.response !== 1) return;
       closing = true;
     }

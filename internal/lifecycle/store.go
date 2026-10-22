@@ -24,7 +24,7 @@ import (
 // of saved knowledge. Removing the latter alone cannot erase earlier inputs.
 var content = map[string][]string{
 	"knowledge": {"memory", "knowledge", "learnings", "observations", "retrieval"},
-	"history":   {"conversations", "work-history", "workspaces", "work-control", "traces", "interactions", "tasks", "candidates", "delivery", "suggestions", "inbox", "pilot", "jobs/history", "observations", "migrations"},
+	"history":   {"conversations", "work-history", "workspaces", "work-control", "traces", "interactions", "tasks", "candidates", "delivery", "suggestions", "inbox", "pilot", "jobs/history", "observations", "migrations", "files"},
 	"snapshots": {"snapshots"},
 	"goals":     {"goals", "jobs/definitions", "empty-workspace"},
 }
@@ -343,7 +343,7 @@ func (s Store) PreviewDelete(ctx context.Context, scope string) (Plan, error) {
 		p.Notes = append(p.Notes, "Prior transcripts, Work outputs, suggestions and retained excerpts can still contain this knowledge. Choose all private content to remove those local copies too.")
 	}
 	if scope == "history" {
-		p.Notes = append(p.Notes, "Saved facts and source snapshots remain. Goal and job conversation links will be cleared so future work starts a fresh conversation.")
+		p.Notes = append(p.Notes, "Saved facts and source snapshots remain. Goal and job conversation links will be cleared so future work starts a fresh conversation. Retained attachment copies, file versions and file edit drafts are deleted too; original local files and external exports remain.")
 	}
 	if scope == "snapshots" {
 		p.Notes = append(p.Notes, "Referenced snapshots are protected. Use all private content to delete snapshots and the retained Work that refers to them.")

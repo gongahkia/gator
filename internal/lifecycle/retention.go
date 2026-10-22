@@ -69,6 +69,7 @@ func timeField(object map[string]json.RawMessage, key string) time.Time {
 }
 func (s Store) selectRetention(ctx context.Context, now time.Time, p Policy) (Plan, error) {
 	plan := Plan{Scope: "retention", CreatedAt: now.UTC(), Notes: []string{"Retention uses last modification of saved facts and notes, and last activity of completed Work and conversations.", "Ongoing goals, their conversations, the latest successful check per job, pending suggestions, and referenced source snapshots are protected.", "Expired canonical knowledge can still appear in retained historical inputs until history is removed. Skills and learnings are kept until explicitly deleted.", "External projects, credentials, exports, and shared usage counters are preserved."}}
+	plan.Notes = append(plan.Notes, "File working versions and edit drafts are kept until you explicitly delete history or all private content; automatic age retention does not remove them.")
 	var selected []string
 	goals, err := goal.Open(s.stateDir)
 	if err != nil {

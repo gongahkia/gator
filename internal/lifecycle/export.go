@@ -267,6 +267,9 @@ func backupContent(name string) bool {
 	if (strings.HasPrefix(rel, "work-history/") || strings.HasPrefix(rel, "goals/plans/")) && strings.HasSuffix(rel, ".lock") {
 		return false
 	}
+	if strings.HasPrefix(rel, "files/") && (strings.HasSuffix(rel, ".lock") || strings.HasSuffix(rel, ".tmp")) {
+		return false
+	}
 	roots, _ := roots("all")
 	for _, root := range roots {
 		root = filepath.ToSlash(root)

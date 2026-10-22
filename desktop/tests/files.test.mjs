@@ -59,3 +59,32 @@ test("CSV edits preserve quoting and CRLF, while invalid JSON cannot replace sav
   assert.equal(inspectContent("view.html", Buffer.from("<script>danger()</script>")).kind, "text");
   assert.throws(() => inspectContent("bad.png", Buffer.from("not an image")), /does not match/);
 });
+
+test("a stale editor can discard its changes without deleting another editor's draft", async () => {
+  const root = await mkdtemp(join(tmpdir(), "gator-file-conflict-"));
+  try {
+    const store = new FileStore(root), ref = { kind: "upload", id: `${"d".repeat(32)}/notes.md` }, source = async () => ({ name: "notes.md", bytes: Buffer.from("Original") });
+    const request = { context: "one", ref }, first = await store.request({ ...request, action: "open" }, source);
+    const saved = await store.request({ ...request, action: "save", expected: first.current, edit: { text: "A newer version" } }, source);
+    await store.request({ ...request, action: "draft", expected: saved.current, edit: { text: "Another editor's new draft" } }, source);
+    const latest = await store.request({ ...request, action: "discard", expected: first.current }, source);
+    assert.equal(latest.current, saved.current); assert.equal(latest.draft.text, "Another editor's new draft");
+    await store.request({ ...request, action: "discard", expected: saved.current }, source);
+    assert.equal((await store.request({ ...request, action: "open" }, source)).draft, undefined);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("output working versions keep their identity after restoring a profile into another folder", async () => {
+  const root = await mkdtemp(join(tmpdir(), "gator-file-restore-"));
+  try {
+    const { cp } = await import("node:fs/promises");
+    const originalRoot = join(root, "old/gator"), newRoot = join(root, "restored/gator");
+    const ref = { kind: "output", bundle: join(originalRoot, "workspaces/run-one"), path: "report.md" };
+    const store = new FileStore(join(originalRoot, "files")), source = async () => ({ name: "report.md", bytes: Buffer.from("Original report") });
+    const first = await store.request({ action: "open", context: "one", ref }, source);
+    await store.request({ action: "save", context: "one", ref, expected: first.current, edit: { text: "My edited report" } }, source);
+    await cp(originalRoot, newRoot, { recursive: true });
+    const restored = await new FileStore(join(newRoot, "files")).request({ action: "open", context: "one", ref: { ...ref, bundle: join(newRoot, "workspaces/run-one") } }, source);
+    assert.equal(restored.text, "My edited report"); assert.equal(restored.versions.length, 2);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});

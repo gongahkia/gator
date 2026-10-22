@@ -1,6 +1,6 @@
 import { mkdir, open, lstat, readFile, rename, rm } from "node:fs/promises";
 import { constants } from "node:fs";
-import { basename, dirname, join, resolve, relative, sep } from "node:path";
+import { basename, dirname, join, resolve, relative, sep, isAbsolute } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { applyContent, inspectContent, fileLimit } from "./file-content.mjs";
 import { validUploadID } from "./uploads.mjs";
@@ -47,7 +47,18 @@ async function atomic(path, bytes) {
 
 export class FileStore {
   constructor(root) { this.root = resolve(root); this.pending = new Map(); this.aliases = new Map(); }
-  sourceIdentity(ref) { return digest(JSON.stringify(fileReference(ref))); }
+  sourceIdentity(value) {
+    const ref = fileReference(value);
+    if (ref.kind === "output") {
+      // Bundle paths change when a private profile is restored elsewhere. Bind
+      // versions to the bundle's stable location inside that profile instead.
+      const portable = relative(dirname(this.root), ref.bundle);
+      if (portable && portable !== ".." && !portable.startsWith(`..${sep}`) && !isAbsolute(portable)) {
+        ref.bundle = portable.split(sep).join("/");
+      }
+    }
+    return digest(JSON.stringify(ref));
+  }
   identity(ref) { const source = this.sourceIdentity(ref); return this.aliases.get(source)?.target ?? source; }
   directory(ref) { return join(this.root, this.identity(ref)); }
   async lookup(ref) {
@@ -68,7 +79,9 @@ export class FileStore {
     await this.lookup(ref);
     const metadata = JSON.parse((await readBoundedFile(this.directory(ref), "file.json", 1024 * 1024)).toString());
     const hash = this.aliases.get(this.sourceIdentity(ref))?.hash;
-    return this.contents(ref, metadata, (hash ? metadata.versions.find(version => version.hash === hash) : metadata.versions[0])?.id);
+    const version = hash ? metadata.versions.find(version => version.hash === hash) : metadata.versions[0];
+    if (!version) throw new Error("The attached version is unavailable. Reattach the file to continue.");
+    return this.contents(ref, metadata, version.id);
   }
   async flush() { await Promise.all([...this.pending.values()]); }
   async retain(ref, name, bytes) {
@@ -90,7 +103,7 @@ export class FileStore {
   async view(ref, metadata, version) {
     const selected = version || metadata.current, bytes = await this.contents(ref, metadata, selected);
     let draft; try { draft = JSON.parse((await readBoundedFile(this.directory(ref), "draft.json")).toString()); } catch (error) { if (error.code !== "ENOENT") throw error; }
-    return { id: this.identity(ref), name: metadata.name, current: metadata.current, revision: selected, versions: metadata.versions, ...inspectContent(metadata.name, bytes), draft: draft?.revision === metadata.current && selected === metadata.current ? draft.edit : undefined, staleDraft: !!draft && draft.revision !== metadata.current };
+    return { id: this.identity(ref), name: metadata.name, current: metadata.current, revision: selected, versions: metadata.versions, ...inspectContent(metadata.name, bytes), draft: draft?.revision === metadata.current && selected === metadata.current ? draft.edit : undefined, staleDraft: draft && draft.revision !== metadata.current ? draft.revision : undefined };
   }
   request(request, source) {
     validateFileRequest(request); const id = this.identity(request.ref);
@@ -110,8 +123,15 @@ export class FileStore {
     let lock; try { lock = await open(join(directory, "saving.lock"), "wx", 0o600); } catch (error) { if (error.code === "EEXIST") throw new Error("Another editor is saving this file. Try again shortly; your edits are kept."); throw error; }
     try {
       metadata = JSON.parse((await readBoundedFile(directory, "file.json", 1024 * 1024)).toString());
-      if (metadata.current !== request.expected) throw new Error("A newer version was saved. Your edits are kept; open the latest version before saving again.");
-      if (request.action === "discard") { await rm(join(directory, "draft.json"), { force: true }); return this.view(ref, metadata); }
+      if (request.action === "discard") {
+        // A stale editor may discard its own draft and reload the latest file,
+        // but must never remove another editor's newer draft.
+        let draft;
+        try { draft = JSON.parse((await readBoundedFile(directory, "draft.json")).toString()); } catch (error) { if (error.code !== "ENOENT") throw error; }
+        if (draft?.revision === request.expected) await rm(join(directory, "draft.json"), { force: true });
+        return this.view(ref, metadata);
+      }
+      if (metadata.current !== request.expected) throw new Error("A newer version was saved. Copy the edits you want to keep, then Discard to reload the latest version. Your edits remain here until you decide.");
       if (request.action === "draft") { await atomic(join(directory, "draft.json"), JSON.stringify({ revision: request.expected, edit: request.edit })); return { retained: true }; }
       const previous = await this.contents(ref, metadata);
       const bytes = request.action === "restore" ? await this.contents(ref, metadata, request.version) : applyContent(metadata.name, previous, request.edit);
