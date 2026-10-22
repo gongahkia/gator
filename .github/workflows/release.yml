@@ -45,6 +45,18 @@ jobs:
             platform: linux
             runner: ubuntu-latest
             cgo: "0"
+          - goos: windows
+            goarch: amd64
+            arch: x64
+            platform: win
+            runner: windows-latest
+            cgo: "0"
+          - goos: windows
+            goarch: arm64
+            arch: arm64
+            platform: win
+            runner: windows-latest
+            cgo: "0"
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
@@ -56,10 +68,22 @@ jobs:
           cache: npm
           cache-dependency-path: desktop/package-lock.json
       - name: Check desktop source
+        shell: bash
         run: |
+          set -euo pipefail
           npm ci --prefix desktop
           npm run check --prefix desktop
           npm test --prefix desktop
+      - name: Use canonical Windows temporary paths for native fixtures
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $directory = Join-Path $env:RUNNER_TEMP 'gator-native-tests'
+          New-Item -ItemType Directory -Force -Path $directory | Out-Null
+          $canonical = node -e "process.stdout.write(require('node:fs').realpathSync.native(process.argv[1]))" $directory
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "TEMP=$canonical" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "TMP=$canonical" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Test release source on macOS
         if: runner.os == 'macOS'
         run: go test ./...
@@ -67,6 +91,19 @@ jobs:
       - name: Compile release tests on Linux
         if: runner.os == 'Linux'
         run: go test ./... -run '^$'
+      - name: Test Windows runtime boundaries
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test ./... -run '^$'
+          go test ./internal/filelock ./internal/privatefs ./internal/usage
+          go test ./cmd/gator -run 'TestWindows|TestDesktopRuntime|TestSupportedPlatforms'
+          go test ./internal/lifecycle -run 'TestPublishProfile|TestProfilePublication|TestRestore|TestEmptyBackup|TestSourceRelink|TestRelink'
+          go test ./internal/browser -run 'TestService|TestWindows'
+          go test ./internal/localmodel -run 'TestWindows|TestAssess|TestFormatBytes'
+          go test ./internal/workspace -run 'TestWindows'
+          go test ./internal/sandbox -run 'TestWindows'
       - name: Build desktop installers with the matching private runtime
         shell: bash
         env:
@@ -84,6 +121,13 @@ jobs:
           npm version --no-git-tag-version --allow-same-version "${VERSION#v}"
           npm run build
           npx electron-builder --publish never --"$DESKTOP_PLATFORM" --"$DESKTOP_ARCH"
+      - name: Check packaged Windows x64 workflows
+        if: matrix.goos == 'windows' && matrix.goarch == 'amd64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GATOR_DESKTOP_TEST_EXECUTABLE="$(cygpath -w "$PWD/desktop/release/win-unpacked/Gator.exe")"
+          npm run test:e2e --prefix desktop
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.goos }}-${{ matrix.goarch }}
@@ -92,6 +136,7 @@ jobs:
             desktop/release/Gator-*.zip
             desktop/release/Gator-*.AppImage
             desktop/release/Gator-*.deb
+            desktop/release/Gator-*.exe
           if-no-files-found: error
           retention-days: 1
 

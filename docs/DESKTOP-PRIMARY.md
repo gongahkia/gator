@@ -82,3 +82,10 @@ or external action approval was performed.
 Remote release jobs, Linux Electron installers, signing, notarization and
 publication were not executed by this repository edit. The local package is
 an unsigned development build; no new release has been published here.
+
+
+## Windows follow-up
+
+The Windows preview port adds a `.exe` private runtime, per-user Windows
+installers and native runtime/platform infrastructure. It retains this desktop
+entry-point decision. See [Windows scope and verification](WINDOWS.md).

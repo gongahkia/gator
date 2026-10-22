@@ -14,7 +14,8 @@ npm ci --prefix desktop
 make desktop
 ```
 
-This builds the private runtime and frontend, then opens Gator. Installed apps
+On Windows, use `npm start --prefix desktop` in place of `make desktop`;
+Make is optional. This builds the private runtime and frontend, then opens Gator. Installed apps
 bundle Electron's Node runtime; users do not need Node or a Gator CLI on PATH.
 
 The app uses the existing local Gator profile. A launch starts in a private
@@ -39,7 +40,8 @@ make build
 make package
 ```
 
-`make build` builds the frontend and private `desktop/runtime/gator-runtime`.
+`make build` builds the frontend and private `desktop/runtime/gator-runtime`
+(`gator-runtime.exe` on Windows).
 `make package` creates an unpacked native app under `desktop/release/`.
 On macOS, it is `desktop/release/mac/Gator.app`. To exercise that package:
 
@@ -49,7 +51,8 @@ GATOR_DESKTOP_TEST_EXECUTABLE="$PWD/desktop/release/mac/Gator.app/Contents/MacOS
 ```
 
 `make dist` builds desktop installers. The release workflow produces macOS
-DMG/ZIP and Linux AppImage/DEB artifacts with matching runtime architectures.
+DMG/ZIP, Linux AppImage/DEB, and Windows NSIS/ZIP artifacts with matching runtime architectures.
+Windows is a preview port; see [capabilities and verification](../docs/WINDOWS.md).
 macOS builds are unsigned development builds until signing and notarization
 are configured. No standalone CLI archives are built or installed.
 

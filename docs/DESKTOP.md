@@ -379,3 +379,12 @@ with reduced motion. Exact commands and packaged results are recorded in the
 local verification section above. No paid provider calls or background
 services are used. Linux runtime and live external accounts remain unverified.
 Verdict: Approve for this scope, subject to those platform boundaries.
+
+
+## Windows preview port — 22 October 2026
+
+Windows native runtime, host integration, NSIS/ZIP packaging, x64/ARM64 targets,
+and native CI gates are implemented. See [Windows capability and verification
+status](WINDOWS.md). Earlier platform verification entries above remain historical.
+Windows strict process sandboxing, interactive agent terminals and computer
+control remain unavailable; no isolation policy is relaxed by this port.

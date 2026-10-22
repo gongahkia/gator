@@ -21,6 +21,10 @@ For local development, install Go 1.25.13 and Node.js 22.12 or newer, then run:
   npm ci --prefix desktop
   make desktop
 
+On Windows, use `npm start --prefix desktop` instead of `make desktop`. The
+Windows desktop port is a preview; capability limits and native verification
+gates are documented in docs/WINDOWS.md.
+
 Choose a workspace from the app's folder control. A first launch starts in a
 private empty workspace rather than implicitly reading your home directory.
 Use Settings for models, usage limits, backups, and recovery.
