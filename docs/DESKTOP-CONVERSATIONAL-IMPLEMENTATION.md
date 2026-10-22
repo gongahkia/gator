@@ -174,21 +174,24 @@ was used in these isolated desktop journeys.
 ## Home ASCII waves — October 22, 2026
 
 Full polish review scoped to the empty home introduction. React and the existing
-plain CSS tokens remain the implementation and styling system.
+plain CSS tokens remain the implementation and styling system. The home keeps
+multiple ambient waves; the click-triggered ripple trial was removed at the
+user's request.
 
 | Category | Evidence inspected | Result |
 | --- | --- | --- |
 | Typography | Fixed 93 × 23 character field, existing greeting and composer | Monospaced ASCII uses the existing font token; frames do not shift text or controls. |
-| Surfaces | Home with setup callout and a configured-provider presentation, 800/1024/1440px windows | Sage ripples surround the alligator; shorter windows compact the art and retain the setup button above the composer. |
-| Animations | Native pulse clock at 10% playback, live reduced-motion changes, navigation away and back | Gentle outward ripples; reduced motion displays a static frame and cancels the loop. |
-| Icons | Existing home alligator and composer icons | Existing branding, sizes and interactions retained. The ASCII decoration is hidden from assistive technology and accepts no input. |
-| Performance | Component lifecycle, bounded frame generation and visibility handler | Glyph updates capped at 12fps outside React rendering; animation and frame requests are canceled on unmount and paused on document visibility changes. |
+| Surfaces | Home with setup callout and a configured-provider presentation, 800/1024/1440px windows | Multiple sage waves surround the alligator; shorter windows compact the art and retain the setup button above the composer. |
+| Animations | Native pulse clock at 10% playback, live reduced-motion changes, navigation away and back | Gentle outward waves; reduced motion displays a static frame and cancels the loop. Background clicks do not create additional waves. |
+| Icons | Existing home alligator and composer icons | Existing branding, sizes and interactions retained. Decoration is hidden from assistive technology, accepts no focus and does not intercept pointer events. |
+| Performance | Component lifecycle, bounded frame generation and visibility handler | Glyph updates capped at 12fps outside React rendering; animation and frame requests are canceled on unmount and paused on document visibility changes. No background click listener or pointer-ripple lifecycle remains. |
 
 ### Changes
 
 | Severity | Location | Before | After | Why |
 | --- | --- | --- | --- | --- |
 | LOW | `desktop/src/AsciiWaves.tsx:25`, `desktop/src/App.tsx:247`, `desktop/src/styles.css:148` | Static home mascot | Soft ASCII ripples with a slow opacity pulse, fixed layout, static reduced-motion frame and short-window sizing | Add the requested personality while preserving the introduction and composer as the primary content. |
+| LOW | `desktop/src/AsciiWaves.tsx:16`, `desktop/src/styles.css:150` | Widely spaced rings faded into a single visible wave | Closer wave spacing and a broader soft mask | Keep multiple ambient waves visible together at the user's request. |
 
 ### Considered but rejected
 
@@ -196,6 +199,7 @@ plain CSS tokens remain the implementation and styling system.
 | --- | --- | --- |
 | Home artwork | Canvas/WebGL or an animation dependency | A small text field and the browser animation clock provide the requested ASCII effect with the existing stack. |
 | Transcript | Keep the wave visible during conversation or use it as an activity indicator | The request concerns the landing page; the existing progress indicator already communicates actual work. |
+| Home background | Create additional ripples on click | Removed at the user's request; keep the ambient waves only. |
 
 ### Verification
 

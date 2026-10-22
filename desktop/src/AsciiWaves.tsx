@@ -13,7 +13,7 @@ const distances = Array.from({ length: rows }, (_, row) => Array.from({ length: 
 function waveFrame(seconds: number) {
   const swell = 1 + Math.sin(seconds * .55) * .06;
   return distances.map((line) => line.map((distance) => {
-    const crest = (Math.cos(distance / swell * 1.12 - seconds * .75) + 1) / 2;
+    const crest = (Math.cos(distance / swell * 1.9 - seconds * .9) + 1) / 2;
     return glyphs[Math.min(glyphs.length - 1, Math.floor(crest ** 6 * glyphs.length))];
   }).join("")).join("\n");
 }
