@@ -119,6 +119,16 @@ several runs, and some runs have no retained conversation. Saved exposes both
 archives. Task runs includes failed and stale runs and retains its link back to
 the originating conversation. Existing command/deep-link routes remain available.
 
+### Message attachments
+
+Use the composer paperclip to select documents, text files or PNG/JPEG/WebP
+images, or drop files onto the composer. Removable filename/size chips show
+what will accompany the next message. Selection stays local until Send.
+Attachments remain with their draft and queued message. Files-only messages
+are supported. Limits are four files, 4 MiB each, 8 MiB total, shared with
+workspace attachments. [Attachment behavior and delivery boundary](DESKTOP-ATTACHMENTS.md)
+describe supported formats, retention and validation.
+
 ### Queued messages
 
 Queued follow-ups appear as a compact list above the composer, following the

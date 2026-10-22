@@ -2,6 +2,7 @@ package attachment
 
 import (
 	"errors"
+	"fmt"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -27,7 +28,7 @@ func LoadUploads(directory string, ids []string) ([]agent.Image, []agent.Attachm
 	}
 	root, err := workspace.Open(directory)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.New("selected files are no longer available; remove them and attach them again")
 	}
 	inputs := make([]Input, 0, len(ids))
 	for _, id := range ids {
@@ -41,6 +42,14 @@ func LoadUploads(directory string, ids []string) ([]agent.Image, []agent.Attachm
 		inputs = append(inputs, Input{Path: id, Kind: kind})
 	}
 	images, documents, err := LoadInputs(root, inputs)
+	if err != nil {
+		message := err.Error()
+		for _, id := range ids {
+			message = strings.ReplaceAll(message, "@"+id, fmt.Sprintf("%q", filepath.Base(id)))
+			message = strings.ReplaceAll(message, id, filepath.Base(id))
+		}
+		return nil, nil, errors.New(message)
+	}
 	for i := range images {
 		images[i].Name = filepath.Base(images[i].Name)
 	}

@@ -23,6 +23,7 @@ import { DesktopHelp } from "./DesktopHelp";
 import { UpdateDialog } from "./UpdateDialog";
 import { AsciiWaves } from "./AsciiWaves";
 import { ActivityHistory, LiveActivity } from "./ActivityTimeline";
+import { AttachButton, InputFiles, PendingAttachments, useAttachmentPicker } from "./Attachments";
 
 type Navigation = { command: string; draft?: string } | { conversation: NonNullable<DesktopFrame["conversation"]> };
 
@@ -46,7 +47,7 @@ function useBackend() {
   }, []);
   const send = useCallback(async (frame: DesktopFrame) => {
     try { await window.gator?.send(frame); setError(""); }
-    catch (err) { setError(err instanceof Error ? err.message : String(err)); throw err; }
+    catch (err) { if (frame.type !== "upload_submit") setError(err instanceof Error ? err.message : String(err)); throw err; }
   }, []);
   const reconnect = async () => {
     if (reconnecting) return;
@@ -68,11 +69,12 @@ const Message = memo(function Message({ message, pending, onApproval, commands, 
   const approval = result?.kind === "approval" && result.fields?.some((field) => field.label === "Request" && field.value === String(pending)) ? pending : undefined;
   return <article className={`message ${user ? "user-message" : message.role === "Gator" ? "assistant-message" : "result-message"}`} aria-label={user ? "Your message" : `${message.role} message`}>
     <div className="message-content">{message.activity && <ActivityHistory trace={message.activity} />}<div className="message-byline">{user ? "You" : message.role === "Gator" ? "Gator" : message.bundle ? "Files & changes" : message.role}</div>
+      {user && <InputFiles names={message.inputs} />}
       {commands && navigate && result?.title === "Gator commands" && result.kind === "report" ? <DesktopHelp commands={commands} navigate={navigate} disabled={!!disabled} /> : result ? <Result result={result} approval={approval} onApproval={onApproval} /> : message.bundle ? <OutputCards outputs={outputs} preview={preview} /> : message.role === "Gator" ? <div className="assistant-speech"><Markdown text={message.text} /></div> : <div className="literal prose-text">{message.text}</div>}
       {!result && message.role === "Gator" && message.text && <div className="message-actions"><CopyButton text={message.text} label="Copy response" compact /></div>}
     </div>
   </article>;
-}, (before, after) => JSON.stringify(before.message.activity) === JSON.stringify(after.message.activity) && before.pending === after.pending && before.message.role === after.message.role && before.message.text === after.message.text && JSON.stringify(before.message.result ?? before.message.bundle) === JSON.stringify(after.message.result ?? after.message.bundle) && before.onApproval === after.onApproval && before.disabled === after.disabled && before.commands === after.commands && before.navigate === after.navigate && before.preview === after.preview);
+}, (before, after) => JSON.stringify(before.message.inputs) === JSON.stringify(after.message.inputs) && JSON.stringify(before.message.activity) === JSON.stringify(after.message.activity) && before.pending === after.pending && before.message.role === after.message.role && before.message.text === after.message.text && JSON.stringify(before.message.result ?? before.message.bundle) === JSON.stringify(after.message.result ?? after.message.bundle) && before.onApproval === after.onApproval && before.disabled === after.disabled && before.commands === after.commands && before.navigate === after.navigate && before.preview === after.preview);
 
 export function App() {
   const { state, error, connection, sessionID, terminalBusy, fullScreen, updates, updatesOpen, updatePreparing, reconnecting, reconnect, send, clearError } = useBackend();
@@ -98,6 +100,7 @@ export function App() {
   const [draftError, setDraftError] = useState("");
   const [queueEditing, setQueueEditing] = useState(false);
   const queueAction = useQueueAction(state, send, error);
+  const attachments = useAttachmentPicker(drafts.context, drafts.uploads, (files) => { drafts.setUploads(files); setDraftError(""); }, sending || queueAction.busy || !!error || !!state?.external || !!updatePreparing || !drafts.ready);
   const composer = useRef<HTMLTextAreaElement>(null);
   const detailsTrigger = useRef<HTMLButtonElement>(null);
   const closeDetails = () => { setDetails(false); (drawerReturn.current?.isConnected ? drawerReturn.current : detailsTrigger.current)?.focus({ preventScroll: true }); };
@@ -205,20 +208,25 @@ export function App() {
     catch {} finally { setApprovalBusy(false); }
   }, [state?.pending_approval?.id, approvalBusy, send]);
 
-  const updateDialog = <Presence open={!!updatesOpen && !!updates}>{(open, presenceRef) => <UpdateDialog open={open} presenceRef={presenceRef} state={updates!} blocked={drafts.saving ? "Wait for your message draft to finish saving." : drafts.issue ? "Save or copy your unsent message before restarting." : draft.trim() && (!drafts.saved.enabled || drafts.saved.drafts.find((item) => item.context === drafts.context)?.text !== draft) ? "Your unsent message is not saved. Copy or clear it before restarting." : hasUnsavedView ? "Save or close the form or queue editor before restarting." : state?.running || state?.queued || state?.pending_approval || state?.external || terminalBusy ? "Finish the current work and queued messages before restarting." : connection !== "connected" ? "Reconnect before restarting for an update." : ""} close={() => void window.gator?.updates({ action: "close" })} />}</Presence>;
+  const retainedDraft = drafts.saved.drafts.find((item) => item.context === drafts.context);
+  const unsavedComposer = (draft.trim() || drafts.uploads.length) && (!drafts.saved.enabled || retainedDraft?.text !== draft || JSON.stringify(retainedDraft?.uploads ?? []) !== JSON.stringify(drafts.uploads));
+  const updateDialog = <Presence open={!!updatesOpen && !!updates}>{(open, presenceRef) => <UpdateDialog open={open} presenceRef={presenceRef} state={updates!} blocked={attachments.busy ? "Wait for attachments to finish preparing." : drafts.saving ? "Wait for your message draft to finish saving." : drafts.issue ? "Save or copy your unsent message before restarting." : unsavedComposer ? "Your unsent message or attachments are not saved. Save or clear them before restarting." : hasUnsavedView ? "Save or close the form or queue editor before restarting." : state?.running || state?.queued || state?.pending_approval || state?.external || terminalBusy ? "Finish the current work and queued messages before restarting." : connection !== "connected" ? "Reconnect before restarting for an update." : ""} close={() => void window.gator?.updates({ action: "close" })} />}</Presence>;
 
   if (!state) return <><main className="boot-screen"><Logo /><h1>{reconnecting ? "Reconnecting to Gator…" : error ? "Gator could not connect" : "Getting your workspace ready"}</h1><p>{error || "Opening your local Gator profile. No messages will be submitted."}</p>{(!error || reconnecting) && <LoaderCircle className="spin accent" size={20} />}{error && window.gator && <button className="button" disabled={reconnecting} onClick={() => void reconnect()}>{reconnecting ? "Reconnecting…" : "Reconnect"}</button>}</main>{updateDialog}</>;
 
   const queueFull = state.running && state.queued >= 16 && !draft.trimStart().startsWith("/");
   const submit = async (guide = false) => {
-    if (!draft.trim() || !drafts.ready || sending || queueAction.busy || panel || error || state.external || (guide ? !state.guidance_id : queueFull)) return;
+    if ((!draft.trim() && !drafts.uploads.length) || !drafts.ready || sending || attachments.busy || queueAction.busy || panel || error || state.external || (guide ? !state.guidance_id : queueFull)) return;
+    if (drafts.uploads.length && (guide || draft.trimStart().startsWith("/"))) { setDraftError("Send attachments with a message or queued follow-up."); return; }
     if (!state.running && !state.provider && !draft.trimStart().startsWith("/")) { navigate("/model"); return; }
     setSending(true);
     setDraftError("");
+    const files = drafts.uploads, context = drafts.context!;
     try {
       if (guide) await queueAction.act({ id: state.guidance_id!, action: "guide", text: draft });
+      else if (files.length) await send({ type: "upload_submit", upload: { request_id: crypto.randomUUID(), context, text: draft, files: files.map((file) => file.id) } });
       else await send({ type: "submit", text: draft });
-      setDraft(""); setShowCommands(false); atBottom.current = true;
+      drafts.clearSent(context, files); setShowCommands(false); atBottom.current = true;
     } catch (err) { setDraftError(err instanceof Error ? err.message : String(err)); }
     finally { setSending(false); composer.current?.focus(); }
   };
@@ -266,18 +274,20 @@ export function App() {
           {!!slash.length && <div className="slash-suggestions" aria-label="Command suggestions">{slash.map((command) => <button key={command.name} onClick={() => { setDraft(`/${command.name}${command.needs_input ? " " : ""}`); composer.current?.focus(); }}><span>/{command.name}</span><span>{command.description}</span></button>)}</div>}
           <MessageQueue items={state.queue ?? []} running={state.running} busy={queueAction.busy || sending || !!error || !!state.external} act={queueAction.act} onEditingChange={setQueueEditing} onUseDraft={(text) => { setDraft((current) => current ? `${current}\n\n${text}` : text); composer.current?.focus(); }} />
           {(drafts.recovered || drafts.issue) && <p className="draft-recovery" role="status">{drafts.issue || "Draft recovered. Review it before sending."}</p>}
-          <div className="composer"><textarea ref={composer} value={draft} onChange={(event) => { setDraft(event.target.value); setDraftError(""); }} onKeyDown={composerKeys} placeholder={state.running ? "Add a follow-up…" : "Message Gator…"} aria-label="Message Gator" disabled={sending || !!state.external} rows={2} /><div className="composer-toolbar"><button className="icon-button composer-options" aria-label="Conversation options" title="Conversation options" onClick={() => openDetails("info")}><SlidersHorizontal size={17} /></button><button className="icon-button draft-trigger" aria-label="Saved drafts" title={drafts.saving ? "Saving draft…" : "Saved drafts and local retention"} onClick={() => { setShowDrafts(true); void drafts.manage({ action: "list" }).catch(() => {}); }}><Clock3 size={16} /></button><div className="composer-actions">
-            {state.running && <button className="small-button guide-button" title={`Guide the current task (${window.gator?.platform === "darwin" ? "⌘" : "Ctrl"}+Enter)`} disabled={!draft.trim() || sending || queueAction.busy || !state.guidance_id || !!error || !!state.external} onClick={() => void submit(true)}>Guide now</button>}
+          <div className="composer" data-file-drop={attachments.dragging} {...attachments.drop}><PendingAttachments files={drafts.uploads} disabled={sending || attachments.busy} remove={(id) => { drafts.setUploads(drafts.uploads.filter((file) => file.id !== id)); setDraftError(""); composer.current?.focus(); }} /><textarea ref={composer} value={draft} onChange={(event) => { setDraft(event.target.value); setDraftError(""); }} onKeyDown={composerKeys} placeholder={state.running ? "Add a follow-up…" : "Message Gator…"} aria-label="Message Gator" disabled={sending || !!state.external} rows={2} /><div className="composer-toolbar"><AttachButton busy={attachments.busy} disabled={sending || queueAction.busy || !!error || !!state.external || !!updatePreparing || !drafts.ready || drafts.uploads.length >= 4} choose={() => void attachments.choose().then(() => composer.current?.focus())} /><button className="icon-button composer-options" aria-label="Conversation options" title="Conversation options" onClick={() => openDetails("info")}><SlidersHorizontal size={17} /></button><button className="icon-button draft-trigger" aria-label="Saved drafts" title={drafts.saving ? "Saving draft…" : "Saved drafts and local retention"} onClick={() => { setShowDrafts(true); void drafts.manage({ action: "list" }).catch(() => {}); }}><Clock3 size={16} /></button><div className="composer-actions">
+            {state.running && <button className="small-button guide-button" title={drafts.uploads.length ? "Files will be sent with a queued follow-up" : `Guide the current task (${window.gator?.platform === "darwin" ? "⌘" : "Ctrl"}+Enter)`} disabled={!draft.trim() || !!drafts.uploads.length || sending || attachments.busy || queueAction.busy || !state.guidance_id || !!error || !!state.external} onClick={() => void submit(true)}>Guide now</button>}
             {state.running && <button className="send-button stop" aria-label="Stop current work" disabled={state.cancelling} onClick={() => attempt({ type: "key", key: "esc" })}><Square size={13} fill="currentColor" /></button>}
-            <button className="send-button" aria-label={state.running ? "Queue message" : "Send message"} title={queueFull ? "Queue is full (16 messages)" : state.running ? "Queue for after this task (Enter)" : "Send message"} aria-busy={sending} disabled={!draft.trim() || !drafts.ready || sending || queueAction.busy || queueFull || !!error || !!state.external} onClick={() => void submit()}><IconSwap active={sending} on={<LoaderCircle size={18} className="spin" />} off={state.running ? <ListPlus size={18} /> : <ArrowUp size={18} />} /></button>
+            <button className="send-button" aria-label={state.running ? "Queue message" : "Send message"} title={queueFull ? "Queue is full (16 messages)" : state.running ? "Queue for after this task (Enter)" : "Send message"} aria-busy={sending} disabled={(!draft.trim() && !drafts.uploads.length) || !drafts.ready || sending || attachments.busy || queueAction.busy || queueFull || !!error || !!state.external} onClick={() => void submit()}><IconSwap active={sending} on={<LoaderCircle size={18} className="spin" />} off={state.running ? <ListPlus size={18} /> : <ArrowUp size={18} />} /></button>
           </div></div></div>
-          {draftError && <p className="composer-error" role="alert">{draftError}</p>}
+          {attachments.busy && <p className="attachment-status" role="status">Preparing files…</p>}
+          {attachments.dragging && <p className="attachment-status" role="status">Drop files to attach to this message</p>}
+          {(draftError || attachments.issue) && <p className="composer-error" role="alert">{draftError || attachments.issue}</p>}
           {queueFull && <p className="composer-error" role="status">Queue full. Edit or remove a message to make room.</p>}
         </div>
       </>}
       </div>
     </main>
-    <Presence open={details && detailKind === "info"}>{(open, presenceRef) => <WorkDetails filesOnly={filesOnly} showInChat={showOutputInChat} state={state} identity={conversationIdentity} requestedOutput={requestedOutput} open={open} presenceRef={presenceRef} close={closeDetails} navigate={navigate} />}</Presence>
+    <Presence open={details && detailKind === "info"}>{(open, presenceRef) => <WorkDetails pendingFiles={drafts.uploads.map((file) => file.name)} filesOnly={filesOnly} showInChat={showOutputInChat} state={state} identity={conversationIdentity} requestedOutput={requestedOutput} open={open} presenceRef={presenceRef} close={closeDetails} navigate={navigate} />}</Presence>
     <Presence open={details && detailKind !== "info"}>{(open, presenceRef) => <LibraryDrawer kind={libraryKind.current} state={state} open={open} presenceRef={presenceRef} close={closeDetails} navigate={navigate} preview={openOutput} drafts={() => { closeDetails(); setShowDrafts(true); void drafts.manage({ action: "list" }).catch(() => {}); }} />}</Presence>
     {updateDialog}
     {panel && <div className="panel-draft-anchor"><MessageSquare size={14} /><span>{draft ? "Your message draft is kept while you’re here." : "Return to the conversation to write a message."}</span><button className="small-button" onClick={() => attempt({ type: "panel", key: "esc", panel: { id: panel.id!, action: "key" } })}>Back<kbd>Esc</kbd></button></div>}
@@ -288,7 +298,7 @@ export function App() {
       else if (needsInput) navigate("/chat", `/${name} `);
       else navigate(`/${name}`);
     }} />}</Presence>
-    <Presence open={showDrafts}>{(open, presenceRef) => <DraftManager open={open} presenceRef={presenceRef} saved={drafts.saved} issue={drafts.issue} manage={drafts.manage} close={() => setShowDrafts(false)} restore={(retained) => { setDraft((current) => !current ? retained.text : current === retained.text ? current : `${current}\n\n${retained.text}`); composer.current?.focus(); }} />}</Presence>
+    <Presence open={showDrafts}>{(open, presenceRef) => <DraftManager open={open} presenceRef={presenceRef} saved={drafts.saved} issue={drafts.issue} manage={drafts.manage} close={() => setShowDrafts(false)} restore={(retained) => { try { drafts.setUploads([...new Map([...drafts.uploads, ...(retained.uploads ?? [])].map((file) => [file.id, file])).values()]); setDraft((current) => !current ? retained.text : current === retained.text ? current : `${current}\n\n${retained.text}`); } catch (error) { setDraftError(error instanceof Error ? error.message : "Couldn’t restore attachments."); } composer.current?.focus(); }} />}</Presence>
     <Presence open={!!navigation}>{(open, presenceRef) => <DiscardDialog open={open} presenceRef={presenceRef} queued={navigation?.queued ?? false} cancel={() => setNavigation(null)} confirm={() => { if (!navigation) return; performNavigation(navigation.target); setNavigation(null); }} />}</Presence>
   </div>;
 }

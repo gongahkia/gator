@@ -1,12 +1,17 @@
 const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
+async function attachmentRequest(channel, ...args) {
+  try { return await ipcRenderer.invoke(channel, ...args); }
+  catch (error) { throw new Error(error.message.replace(/^Error invoking remote method '[^']+':\s*(?:Error:\s*)?/, "")); }
+}
+
 contextBridge.exposeInMainWorld("gator", {
   platform: process.platform,
   snapshot: () => ipcRenderer.invoke("gator:snapshot"),
-  send: (frame) => ipcRenderer.invoke("gator:send", frame),
+  send: (frame) => frame?.type === "upload_submit" ? attachmentRequest("gator:send", frame) : ipcRenderer.invoke("gator:send", frame),
   chooseFolder: () => ipcRenderer.invoke("gator:folder"),
-  chooseFiles: (context) => ipcRenderer.invoke("gator:files", context),
-  dropFiles: (files, context) => ipcRenderer.invoke("gator:drop-files", context, files.map((file) => webUtils.getPathForFile(file))),
+  chooseFiles: (context) => attachmentRequest("gator:files", context),
+  dropFiles: (files, context) => attachmentRequest("gator:drop-files", context, files.map((file) => webUtils.getPathForFile(file))),
   choosePath: (request) => ipcRenderer.invoke("gator:pick-path", request),
   openLink: (url) => ipcRenderer.invoke("gator:link", url),
   continueInTerminal: () => ipcRenderer.invoke("gator:terminal"),

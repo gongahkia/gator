@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState, type DragEvent, type K
 import { CornerDownLeft, GripVertical, ListOrdered, Pencil, X } from "lucide-react";
 import type { BackendState, QueueAction, QueuedMessage } from "./protocol";
 import type { DesktopFrame } from "./bridge";
+import { InputFiles } from "./Attachments";
 
 export type QueueChange = Omit<QueueAction, "request_id">;
 type QueueDrag = { id: string; signature: string; keyboard: boolean; position: number; target?: string; placement?: "before" | "after" };
@@ -150,7 +151,7 @@ export function MessageQueue({ items, running, busy, act, onUseDraft, onEditingC
         event.dataTransfer.setData("application/x-gator-queued-message", item.id);
         event.dataTransfer.setDragImage(event.currentTarget.closest("li")!, 20, 20);
       }} onDragEnd={() => setDrag(null)}><GripVertical size={16} /></button>}
-      <span className="queue-position" aria-hidden="true">{index + 1}</span><p className="queue-preview">{item.text}</p>
+      <span className="queue-position" aria-hidden="true">{index + 1}</span><div className="queue-message"><p className="queue-preview">{item.text}</p><InputFiles names={item.inputs} /></div>
       <div className="queue-actions">
         {!running && <button className="icon-button" aria-label={`Send queued message ${index + 1} now`} title="Send now" disabled={busy} onClick={() => void change({ id: item.id, action: "run" })}><CornerDownLeft size={15} /></button>}
         <button className="icon-button" aria-label={`Edit queued message ${index + 1}`} title="Edit message" disabled={busy || !!editing} onClick={() => { setError(""); setEditing({ ...item }); }}><Pencil size={14} /></button>

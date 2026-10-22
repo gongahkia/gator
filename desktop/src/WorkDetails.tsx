@@ -35,7 +35,7 @@ function timestamp(value?: string) {
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(value));
 }
 
-export function WorkDetails({ state, identity, requestedOutput, open, presenceRef, close, navigate, filesOnly = false, showInChat }: { state: BackendState; identity: string; requestedOutput?: { conversation: string; output: string; request: number }; open: boolean; presenceRef: PresenceRef; close(): void; navigate(command: string): void; filesOnly?: boolean; showInChat(id: string): void }) {
+export function WorkDetails({ state, identity, requestedOutput, open, presenceRef, close, navigate, filesOnly = false, showInChat, pendingFiles = [] }: { state: BackendState; identity: string; requestedOutput?: { conversation: string; output: string; request: number }; open: boolean; presenceRef: PresenceRef; close(): void; navigate(command: string): void; filesOnly?: boolean; showInChat(id: string): void; pendingFiles?: string[] }) {
   const [query, setQuery] = useState("");
   const [sections, setSections] = useState(readSections);
   const [narrow, setNarrow] = useState(() => matchMedia("(max-width: 960px)").matches);
@@ -92,6 +92,7 @@ export function WorkDetails({ state, identity, requestedOutput, open, presenceRe
   };
   const back = () => { returnToOutput.current = selected?.id; setSelection(undefined); };
   const selectedIDs = details?.connector_ids ?? [];
+  const selectedFiles = [...(details?.attachments ?? []), ...pendingFiles];
   const used = latest?.Connections ?? [];
   const title = selected?.file?.Path ?? (selected?.candidate ? `Change ${selected.candidate.ID}` : "");
   const blocked = state.running || !!state.external || state.mode === "panel";
@@ -128,8 +129,8 @@ export function WorkDetails({ state, identity, requestedOutput, open, presenceRe
           {filesOnly ? <section className="files-list-view" aria-label="Files and changes"><p className="work-details-caption">{outputs.length} retained {outputs.length === 1 ? "output" : "outputs"}</p>{outputList}</section> : <Section id="outputs" title="Outputs" icon={<Files size={16} />} summary={String(outputs.length)} open={sections.outputs} toggle={() => toggle("outputs")}>{outputList}</Section>}
           {!filesOnly && <>
           <Section id="context" title="Sources & memory" icon={<BookOpen size={16} />} open={sections.context} toggle={() => toggle("context")}>
-            {!details?.attachments.length && !latest?.Sources?.length && <p className="work-details-empty">No selected files or retained source references in this conversation yet.</p>}
-            {!!details?.attachments.length && <><h3 className="work-details-label">Selected for new requests</h3><ul className="work-details-list">{details.attachments.map((path) => <li key={path}>{path}</li>)}</ul></>}
+            {!selectedFiles.length && !latest?.Sources?.length && <p className="work-details-empty">No selected files or retained source references in this conversation yet.</p>}
+            {!!selectedFiles.length && <><h3 className="work-details-label">Selected for your next message</h3><ul className="work-details-list">{selectedFiles.map((path, index) => <li key={index}>{path}</li>)}</ul></>}
             {!!latest?.Sources?.length && <><h3 className="work-details-label">Sources retained in latest result</h3><ul className="work-details-list">{latest.Sources.map((source, index) => <li key={index}>{source}</li>)}</ul><p className="work-details-caption">Recorded references are not a list of everything currently in the model’s context.</p></>}
             <div className="work-details-links"><button className="small-button" disabled={blocked} onClick={() => go(latest ? "/context" : "/knowledge")}>Inspect saved context<ChevronRight size={13} /></button><button className="small-button" disabled={blocked} onClick={() => go("/usage")}>Usage &amp; limits<ChevronRight size={13} /></button></div>
           </Section>

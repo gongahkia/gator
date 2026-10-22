@@ -32,8 +32,8 @@ func TestUploadsStayWithinPrivateRootAndUseExistingValidation(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, bad), []byte("not an image"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := LoadUploads(root, []string{bad}); err == nil {
-		t.Fatal("accepted forged image bytes")
+	if _, _, err := LoadUploads(root, []string{bad}); err == nil || strings.Contains(err.Error(), strings.Repeat("a", 32)) || !strings.Contains(err.Error(), "fake.png") {
+		t.Fatalf("invalid image must report its filename without staging identifiers: %v", err)
 	}
 	if _, _, err := LoadUploads("", []string{id}); err == nil {
 		t.Fatal("accepted missing host root")

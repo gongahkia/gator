@@ -56,7 +56,7 @@ export class UploadStore {
     if (!Array.isArray(ids) || !ids.length || ids.length > uploadLimits.count || new Set(ids).size !== ids.length || ids.some((id) => !validUploadID(id))) throw new Error("Invalid attachment selection.");
     let total = 0;
     for (const id of ids) {
-      const info = await stat(join(this.root, id));
+      const info = await stat(join(this.root, id)).catch(() => { throw new Error(`${id.split("/")[1]} is no longer available. Remove it and attach it again.`); });
       if (!info.isFile() || info.size <= 0 || info.size > uploadLimits.file) throw new Error("An attachment is unavailable. Remove it and attach it again.");
       total += info.size;
     }
