@@ -435,3 +435,88 @@ Verification:
 **Verdict: Approve for the exercised macOS scope.** Windows/Linux execution and
 screen-reader testing were not repeated. No additional InvestmentGini UI port
 is authorized by this work.
+
+## Inline dictation and attachment feedback
+
+22 October 2026. The user requested the compact recording treatment shown in
+their ChatGPT screenshot and removal of the paperclip spinner and “Preparing
+files…” label. Full scoped review using `make-interfaces-feel-better`, covering
+the React composer, native CSS, Lucide icons, voice lifecycle presentation and
+attachment-picker feedback. Backend transcription, permissions, limits and
+attachment validation remain on their existing paths.
+
+The voice menu retains provider/language setup and the explicit Start recording
+action. Active capture replaces that menu with a rounded pill beside the model
+picker: cancel, nine microphone-responsive bars, elapsed time and a square
+finish control. The bars sample the existing stream locally through Web Audio,
+without another recording request, audio output or a waveform dependency.
+Opening the microphone and transcribing have short inline status labels and a
+cancel control. Finish appends editable text to the existing draft. Cancel or
+Escape discards the recording and returns focus; capture errors reopen setup
+with the error focused. The compact window hides the timer and temporarily
+gives the recording controls the model pill's space. Reduced motion uses a
+static recording mark.
+
+The attachment button keeps its paperclip while the native file chooser is
+open or files are being staged. Duplicate-action and send guards, accessible
+busy state, file chips, drop feedback and errors remain available. Removing
+the preparation label also avoids moving the composer for a native dialog.
+
+Reference: the user's screenshot supplies the visual direction. Official
+[ChatGPT dictation guidance](https://learn.chatgpt.com/docs/prompting) confirms
+the speech-to-editable-composer interaction; the implementation uses Gator's
+existing transcription services.
+
+| Category | Evidence inspected | Result |
+| --- | --- | --- |
+| Typography | Inline opening/transcribing labels, errors, elapsed timer, setup menu | Existing type scale and theme tokens; tabular time; no repeated preparation label |
+| Surfaces | Idle, recording, silence, transcribing, capture error, native picker pending, 800×650 layout; Normal/Contrast/Mono screenshots | Compact pill, 40 px button targets and visible structural border; no clipping in the exercised window |
+| Animations | Actual pill opacity/transform transitions paused at their midpoint at 10% playback; microphone level rise/fall; reduced motion | Restrained entrance; waveform responds to sound, settles in silence and becomes static for reduced motion |
+| Icons | Paperclip, microphone, cancel, finish and spoken-reply controls | Existing Lucide system; steady paperclip; filled square differentiates finish within the recording group |
+| Performance | Local analyser, nine transform updates at about 16 Hz, cleanup and canceled captures | No added dependency or extra media capture; no React state update per audio frame; analyser/context cleaned up when recording ends |
+
+Resolved findings:
+
+| Severity | Location | Before | After | Why |
+| --- | --- | --- | --- | --- |
+| MEDIUM | `desktop/src/VoiceControls.tsx`, `desktop/src/App.tsx` | A large settings panel remained open during recording | Active recording pill next to the model control, with finish/cancel and inline progress; setup remains in the idle menu | Keep attention on the message and make recording state visible in its destination |
+| MEDIUM | `desktop/src/DictationWaveform.tsx` | No visible input-level feedback | Locally sampled audio bars with silence and reduced-motion states | Show actual microphone activity rather than implying activity through a decorative loop |
+| MEDIUM | `desktop/src/VoiceControls.tsx` | Moving controls could lose focus on completion/cancellation/errors | Phase-appropriate focus, Escape cancellation, microphone focus return and focused capture error | Keyboard users need a clear continuation after each state change |
+| MEDIUM | `desktop/src/Attachments.tsx`, `desktop/src/App.tsx` | Opening the native file chooser immediately showed a spinner and “Preparing files…” | Steady paperclip and no preparation label; pending actions remain guarded | Avoid claiming preparation before a file is even selected |
+| LOW | `desktop/src/styles.css` | A widened recording control could crowd a narrow toolbar | Compact timer/model treatment at 1000 px and below; right-aligned voice menu | Preserve reachable controls and keep the menu within the window |
+
+Considered and rejected:
+
+| Candidate | Reason |
+| --- | --- |
+| Simulated continuously bouncing bars | They would suggest microphone activity during silence; use measured input instead |
+| Automatic microphone start while opening setup | Keep the existing explicit start action and provider disclosure |
+| A second recording modal or new transcription service | The requested change is presentation; the current permission/transcription path already supplies it |
+
+Verification:
+
+- `npm run check --prefix desktop` and `npm run build:ui --prefix desktop` passed.
+- `node --test desktop/tests/voice.test.mjs desktop/tests/uploads.test.mjs`
+  passed all five checks.
+- The updated Electron dictation scenario passed against the rebuilt packaged
+  macOS app: measured sound/silence, finish-to-draft, blocked Send, spoken replies,
+  cancel during capture/opening/transcription, late microphone release, capture
+  error and retry, keyboard focus, draft preservation and narrow reduced-motion
+  placement. Audio and permissions use isolated fixtures, not a physical mic.
+- The attachment cancellation/removal/validation Electron scenario passed.
+- A separate isolated packaged-app inspection checked recording hover/focus,
+  10% entrance transitions (two actual CSS transitions), Contrast and Mono,
+  the paperclip while a native-picker request was pending, and cancellation
+  preserving the draft. Screenshots were inspected; zero renderer errors.
+- The model-picker regression check exposed a timing assumption: its label can
+  change before the acknowledgement returns to the effort view. The test now
+  waits for that view before checking Escape, rather than treating the earlier
+  label update as completion. Its outside-click check uses an uncovered part
+  of the textarea now that the control sits farther left. The updated scenario
+  passed against the completed packaged app (one check, 4.7 seconds).
+- `npm run pack --prefix desktop` rebuilt the local macOS app. An early test
+  launch overlapped packaging and failed before the executable was available;
+  subsequent tests use the completed bundle.
+
+**Verdict: Approve for the exercised macOS presentation scope.** Windows/Linux,
+physical-microphone accuracy and screen-reader execution were not repeated.

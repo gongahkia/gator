@@ -42,6 +42,13 @@ raise limits when Gator cannot make another model request.
 4. Review the text added to your existing draft, then send it normally. Cancel,
    navigation, permission denial, and transcription failures preserve the draft.
 
+Recording replaces the voice menu with a compact pill beside the model picker.
+Its bars respond to the microphone locally. The square finishes recording;
+the × button or Escape cancels it. Opening the microphone and transcribing use
+short inline labels with a cancel button. Provider and language settings stay
+in the voice menu. The elapsed timer and waveform motion are reduced in compact
+windows and when reduced motion is enabled, respectively.
+
 The speaker button enables optional playback of new replies using a locally
 installed system voice. It also stops current playback. Existing conversation
 history is not replayed when playback is enabled. Code blocks are skipped and
