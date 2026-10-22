@@ -217,3 +217,26 @@ test("the desktop starts without a standalone Node or Gator CLI on PATH", async 
     await capture(page, "desktop-without-cli-or-node");
   } finally { await closeDesktop(app); await rm(p.directory, { recursive: true, force: true }); }
 });
+
+test("text fields use quiet focus across search, forms and inline editors", async () => {
+  const p=await profile(),{app,page}=await launch(p.env);
+  try {
+    const composer=page.getByRole("textbox",{name:"Message Gator",exact:true});
+    const recent=page.getByRole("searchbox",{name:"Filter recent conversations",exact:true});
+    const settle=()=>page.evaluate(()=>document.getAnimations().filter(animation=>animation.effect?.getComputedTiming().iterations!==Infinity).forEach(animation=>animation.finish()));
+    const quiet=async(field: ReturnType<Page["locator"]>)=>{await field.focus();await settle();await expect(field).toBeFocused();await expect(field).toHaveCSS("outline-style","none");};
+    await expect(page.getByRole("complementary",{name:"Main navigation"}).getByRole("button",{name:"Search commands",exact:true})).toHaveCount(0);
+    for(const theme of ["gator","contrast","mono"]){
+      await navigate(page,"/chat");await page.evaluate(text=>window.gator!.send({type:"submit",text}),`/theme ${theme}`);await expect(page.locator(".app-shell")).toHaveAttribute("data-theme",theme);
+      await quiet(recent);const shadow=await page.locator(".composer").evaluate(element=>getComputedStyle(element).boxShadow);
+      await quiet(composer);await expect(page.locator(".composer")).toHaveCSS("box-shadow",shadow);
+      await quiet(recent);await openCommandSearch(page);const command=page.getByRole("textbox",{name:"Find a command",exact:true});await quiet(command);await page.keyboard.press("Escape");await expect(recent).toBeFocused();
+      await navigate(page,"/knowledge");const filter=page.getByRole("searchbox",{name:"Filter loaded knowledge",exact:true});await quiet(filter);await expect(page.locator(".panel-filter .panel-search")).toHaveCSS("box-shadow","none");
+      await capture(page,`quiet-knowledge-${theme}`);
+    }
+    await navigate(page,"/followup");await page.getByRole("button",{name:/new check/i}).click();await quiet(page.getByRole("textbox",{name:"Title",exact:true}));await capture(page,"quiet-native-form");
+    await navigate(page,"/chat");await app.evaluate(({dialog},file)=>{dialog.showOpenDialog=async()=>({canceled:false,filePaths:[file]});},join(p.workspace,"project.md"));await page.getByRole("button",{name:"Attach files",exact:true}).click();
+    const pending=page.getByRole("region",{name:"Attachments for your next message"});await pending.getByRole("button",{name:"Open file project.md",exact:true}).click();await pending.getByRole("button",{name:"Edit",exact:true}).click();await quiet(pending.getByRole("textbox",{name:"Edit project.md",exact:true}));
+    await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setSize(800,700));await page.emulateMedia({reducedMotion:"reduce"});await capture(page,"quiet-inline-editor-800");
+  } finally {await closeDesktop(app);await rm(p.directory,{recursive:true,force:true});}
+});

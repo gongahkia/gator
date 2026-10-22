@@ -69,6 +69,7 @@ test("Word Excel PowerPoint and CSV edit inline and export native files with unc
       const card=pending.locator(".inline-file").filter({has:page.getByRole("button",{name:`Open file ${name}`,exact:true})});
       await card.getByRole("button",{name:`Open file ${name}`,exact:true}).click();await card.getByRole("button",{name:"Edit",exact:true}).click();
       await card.getByRole("textbox",{name:label,exact:true}).fill(value);
+      await expect(card.getByRole("textbox",{name:label,exact:true})).toHaveCSS("outline-style","none");
       if (name === "budget.xlsx") {
         await card.getByRole("textbox",{name:"Budget cell C1",exact:true}).click();
         await card.getByRole("textbox",{name:"Cell value or formula",exact:true}).fill("=B1*3");
