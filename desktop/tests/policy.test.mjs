@@ -3,6 +3,15 @@ import assert from "node:assert/strict";
 import { assetPath, externalURL, shellQuote, validateFrame } from "../electron/policy.mjs";
 import { resolve, join } from "node:path";
 
+test("composer choices carry only bounded identities and canonical work effort", () => {
+  const composer = { id: "a".repeat(64), request_id: "picker-1", action: "model", provider: "fixture", model: "model-one" };
+  assert.equal(validateFrame({ type: "composer", composer }).version, 1);
+  for (const change of [{ id: "old" }, { request_id: "" }, { model: "\nsecret" }, { action: "execute" }, { effort: "high" }, { endpoint: "https://example.com" }]) assert.throws(() => validateFrame({ type: "composer", composer: { ...composer, ...change } }));
+  const effort = { id: composer.id, request_id: "effort-1", action: "effort", effort: "high" };
+  assert.equal(validateFrame({ type: "composer", composer: effort }).version, 1);
+  for (const change of [{ effort: "max" }, { provider: "openai" }, { model: "unlisted" }]) assert.throws(() => validateFrame({ type: "composer", composer: { ...effort, ...change } }));
+});
+
 test("renderer cannot launch processes, acknowledge handoffs, or inject transport fields", () => {
   for (const frame of [{ type: "external_done" }, { type: "exit" }, { type: "submit", text: "ok", program: "sh" }, { type: "key", key: "ctrl+g" }, { type: "navigate", text: "/approve" }]) assert.throws(() => validateFrame(frame));
   assert.deepEqual(validateFrame({ type: "navigate", text: "/overview" }), { version: 1, type: "navigate", text: "/overview" });

@@ -29,6 +29,7 @@ export function validateFrame(frame) {
     submit: ["type", "text"], navigate: ["type", "text"], key: ["type", "key", "text"],
     panel: ["type", "key", "panel"], approval: ["type", "interaction_id", "approval_token", "approved"],
     queue: ["type", "queue"],
+    composer: ["type", "composer"],
     conversation: ["type", "conversation"],
     upload_submit: ["type", "upload"],
   }[frame.type];
@@ -49,6 +50,15 @@ export function validateFrame(frame) {
     if (!["edit", "remove", "earlier", "later", "move", "run", "guide"].includes(queue.action)) throw new Error("Invalid queue action");
     if (queue.action === "move" ? typeof queue.target_id !== "string" || !/^[a-f0-9]{64}$/.test(queue.target_id) || !["before", "after"].includes(queue.placement) : queue.target_id !== undefined || queue.placement !== undefined) throw new Error("Invalid queue destination");
     if (["edit", "guide"].includes(queue.action) ? typeof queue.text !== "string" || !queue.text.trim() || Buffer.byteLength(queue.text, "utf8") > (queue.action === "guide" ? 64 : 128) * 1024 : queue.text !== undefined) throw new Error("Invalid queued message");
+  }
+  if (frame.type === "composer") {
+    const value = frame.composer;
+    if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some(key => !["id", "request_id", "action", "provider", "model", "effort"].includes(key)) || typeof value.id !== "string" || !/^[a-f0-9]{64}$/.test(value.id) || typeof value.request_id !== "string" || !/^[a-zA-Z0-9-]{1,64}$/.test(value.request_id)) throw new Error("Invalid composer settings");
+    if (value.action === "model") {
+      if (typeof value.provider !== "string" || !/^[a-z][a-z0-9-]{0,127}$/.test(value.provider) || typeof value.model !== "string" || !value.model.trim() || value.model.length > 512 || /[\r\n\0]/.test(value.model) || value.effort !== undefined) throw new Error("Invalid model selection");
+    } else if (value.action === "effort") {
+      if (!["low", "standard", "high"].includes(value.effort) || value.provider !== undefined || value.model !== undefined) throw new Error("Invalid work effort");
+    } else throw new Error("Invalid composer action");
   }
   if (frame.type === "conversation") {
     const value = frame.conversation;

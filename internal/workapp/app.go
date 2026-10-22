@@ -165,6 +165,8 @@ type Config struct {
 	ReadDesktop             func() (appconfig.DesktopSettings, error)
 	ValidateUploads         func(source string, paths, uploads []string) error
 	Models                  func() (ModelPanel, error)
+	ComposerModels          func() ([]ComposerModel, error)
+	SelectComposerModel     func(string, string) error
 	SelectedModel           func() (provider, model string, err error)
 	ModelStatus             func() (ModelStatus, error)
 	Live                    bool
@@ -362,6 +364,9 @@ type Model struct {
 	runStarted             time.Time
 	activity               *workactivity.Trace
 	modelStatus            ModelStatus
+	composerModels         []ComposerModel
+	composerModelsIssue    string
+	composerResult         *ComposerResult
 	bridgeNotice           string
 	bridgeUploadResult     *BridgeUploadResult
 	bridgeRecentIssue      string

@@ -170,7 +170,9 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			current, err := settingsStore.Load()
 			return current.Desktop, err
 		},
-		Models: workModelPanel(settingsStore, stateDir, localModels),
+		Models:              workModelPanel(settingsStore, stateDir, localModels),
+		ComposerModels:      func() ([]workapp.ComposerModel, error) { return workComposerModels(settingsStore, stateDir) },
+		SelectComposerModel: workModelDefaults{settings: settingsStore}.SetDefaults,
 		SelectedModel: func() (string, string, error) {
 			current, err := settingsStore.Load()
 			return current.Defaults.Provider, current.Defaults.Model, err

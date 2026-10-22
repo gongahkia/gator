@@ -55,6 +55,13 @@ func (m *Model) refreshModelStatus() {
 		status.Access = "status unavailable: " + singleLine(err.Error())
 	}
 	m.modelStatus = status
+	if m.config.ComposerModels != nil {
+		m.composerModels, err = m.config.ComposerModels()
+		m.composerModelsIssue = ""
+		if err != nil {
+			m.composerModelsIssue = "Models could not load. Open Manage models to try again."
+		}
+	}
 }
 
 func (m Model) statusLineItems() []string {

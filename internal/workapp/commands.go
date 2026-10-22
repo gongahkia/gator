@@ -487,16 +487,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 			err = fmt.Errorf("usage: /effort low|standard|high")
 			break
 		}
-		switch strings.ToLower(fields[1]) {
-		case "low":
-			m.options.MaxSteps, m.options.Code.MaxSteps = 12, 8
-		case "standard":
-			m.options.MaxSteps, m.options.Code.MaxSteps = 24, 16
-		case "high":
-			m.options.MaxSteps, m.options.Code.MaxSteps = 48, 32
-		default:
-			err = fmt.Errorf("unknown effort %q; use low, standard, or high", fields[1])
-		}
+		err = m.setWorkEffort(fields[1])
 		if err == nil {
 			result = "Effort set to " + effortName(m.options.MaxSteps) + "."
 		}

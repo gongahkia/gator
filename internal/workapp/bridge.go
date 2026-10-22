@@ -19,6 +19,8 @@ import (
 // BridgeState is a display-only projection for the desktop.
 // The Go model remains the sole owner of commands, runs, approvals and history.
 type BridgeState struct {
+	Composer              ComposerSettings          `json:"composer"`
+	ComposerResult        *ComposerResult           `json:"composer_result,omitempty"`
 	Desktop               appconfig.DesktopSettings `json:"desktop"`
 	UploadResult          *BridgeUploadResult       `json:"upload_result,omitempty"`
 	Mode                  string                    `json:"mode"`
@@ -154,6 +156,8 @@ func (m Model) BridgeState() BridgeState {
 		PrimaryConversationID: m.primaryID,
 		GoalID:                m.goalID,
 		Provider:              m.modelStatus.Provider,
+		Composer:              m.composerSettings(),
+		ComposerResult:        m.composerResult,
 		Model:                 m.modelStatus.Model,
 		Theme:                 m.theme,
 		Status:                m.status,

@@ -80,7 +80,12 @@ export type Usage = {
   known_cost_usd?: number;
 };
 export type ExternalCommand = { kind: string; program: string; args: string[]; dir?: string; env?: string[] };
+export type ComposerModel = { provider: string; model: string; label: string; unavailable?: string };
+export type ComposerSettings = { id: string; effort: "low" | "standard" | "high"; models: ComposerModel[]; issue?: string; disabled?: string };
+export type ComposerAction = { id: string; request_id: string } & ({ action: "model"; provider: string; model: string } | { action: "effort"; effort: "low" | "standard" | "high" });
 export type BackendState = {
+  composer?: ComposerSettings;
+  composer_result?: { request_id: string; error?: string };
 	 desktop?: { shortcuts: Record<string,string>; voice?: { spoken_replies: boolean; provider?: string; model?: string; language?: string; rate?: number } };
   mode: "chat" | "panel";
   panel?: BackendPanel;
@@ -139,9 +144,10 @@ export type PanelAction = {
 };
 export type Frame = {
   version: 1;
-  type: "submit" | "upload_submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "conversation";
+  type: "submit" | "upload_submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "conversation" | "composer";
   upload?: { request_id: string; context: string; text: string; files: string[] };
   text?: string; key?: string; error?: string; width?: number; height?: number;
+  composer?: ComposerAction;
   panel?: PanelAction; interaction_id?: number; approval_token?: string; approved?: boolean;
   queue?: QueueAction;
   conversation?: { id: string; list_id: string };

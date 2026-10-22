@@ -16,6 +16,7 @@ import (
 )
 
 type uiFrame struct {
+	Composer      *workapp.ComposerAction           `json:"composer,omitempty"`
 	Version       int                               `json:"version"`
 	Type          string                            `json:"type"`
 	Text          string                            `json:"text,omitempty"`
@@ -106,6 +107,11 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			next, command = m.model.ApplyBridgeQueue(*frame.Queue)
+		case "composer":
+			if frame.Composer == nil {
+				return m, nil
+			}
+			next, command = m.model.ApplyComposerSettings(*frame.Composer)
 		case "conversation":
 			if frame.Conversation == nil {
 				return m, nil

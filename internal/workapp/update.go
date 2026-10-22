@@ -563,8 +563,7 @@ func (m Model) updateSectionKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.selected++
 			}
 		case "enter":
-			levels := [][2]int{{12, 8}, {24, 16}, {48, 32}}
-			m.options.MaxSteps, m.options.Code.MaxSteps = levels[m.selected][0], levels[m.selected][1]
+			_ = m.setWorkEffort([]string{"low", "standard", "high"}[m.selected])
 			m.section = ""
 			m.messages = append(m.messages, message{role: "Gator", text: "Effort set to " + effortName(m.options.MaxSteps) + ".", result: &uisnapshot.Result{Kind: "notice", Title: "Effort", Tone: "success", Summary: "Set to " + effortName(m.options.MaxSteps)}})
 		}
