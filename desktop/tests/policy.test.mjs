@@ -16,6 +16,8 @@ test("panel actions require a view identity and bounded typed values", () => {
   for (const change of [{ id: "" }, { row: -1 }, { action: "execute" }, { fields: { "-1": "bad" } }, { fields: { 0: false } }, { program: "sh" }]) assert.throws(() => validateFrame({ ...frame, panel: { ...frame.panel, ...change } }));
   assert.throws(() => validateFrame({ type: "approval", interaction_id: 0, approved: true }));
   assert.throws(() => validateFrame({ type: "approval", interaction_id: 1, approved: "true" }));
+  assert.throws(() => validateFrame({ type: "approval", interaction_id: 1, approved: true }));
+  assert.equal(validateFrame({ type: "approval", interaction_id: 1, approval_token: "a".repeat(64), approved: true }).version, 1);
 });
 
 test("app resources stay inside the compiled assets and links stay web-only", () => {

@@ -13,6 +13,7 @@ import (
 	"github.com/gongahkia/gator/internal/uisnapshot"
 	"github.com/gongahkia/gator/internal/workactivity"
 	"github.com/gongahkia/gator/internal/workhome"
+	"github.com/gongahkia/gator/internal/workrun"
 )
 
 // BridgeState is a display-only projection for the desktop.
@@ -67,7 +68,9 @@ type BridgeState struct {
 }
 
 type BridgeApproval struct {
-	ID int `json:"id"`
+	ID           int    `json:"id"`
+	Token        string `json:"token"`
+	MessageIndex int    `json:"message_index"`
 }
 
 // BridgeExternal asks the frontend to give the terminal to a process. The
@@ -237,7 +240,15 @@ func (m Model) BridgeState() BridgeState {
 		}
 	}
 	if m.interaction != nil {
-		state.PendingApproval = &BridgeApproval{ID: m.interaction.ID}
+		index := -1
+		for i := len(m.messages) - 1; i >= 0; i-- {
+			result := m.messages[i].result
+			if result != nil && result.Kind == "approval" && len(result.Fields) > 0 && result.Fields[0].Value == fmt.Sprint(m.interaction.ID) {
+				index = i
+				break
+			}
+		}
+		state.PendingApproval = &BridgeApproval{ID: m.interaction.ID, Token: m.bridgeApprovalToken(), MessageIndex: index}
 	}
 	return state
 }
@@ -248,11 +259,19 @@ func bridgePanelID(panel uisnapshot.Panel) string {
 	return fmt.Sprintf("%x", sha256.Sum256(data))
 }
 
-// RespondBridgeApproval binds a desktop decision to the exact live request.
-// A retained transcript card can never approve a later request.
-func (m Model) RespondBridgeApproval(id int, approved bool) (tea.Model, tea.Cmd) {
+func (m Model) bridgeApprovalToken() string {
+	if m.interaction == nil {
+		return ""
+	}
+	digest, _ := workrun.InteractionDigest(*m.interaction)
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("%s:%d:%s", m.bridgeGuidanceID(), m.loadingRun, digest))))
+}
+
+// RespondBridgeApproval binds the decision to its run and exact preview, even
+// when a later run reuses the same numeric interaction ID.
+func (m Model) RespondBridgeApproval(id int, token string, approved bool) (tea.Model, tea.Cmd) {
 	m.bridgeNotice = ""
-	if m.interaction == nil || m.interaction.ID != id {
+	if m.interaction == nil || m.interaction.ID != id || token == "" || token != m.bridgeApprovalToken() {
 		m.status = "This approval is no longer pending."
 		m.bridgeNotice = m.status
 		return m, nil

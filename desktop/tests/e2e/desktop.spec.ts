@@ -891,8 +891,8 @@ test("review presentation preserves exact previews and only the live approval ac
       ipcMain.removeHandler("gator:send");
       ipcMain.handle("gator:send", (_event, frame) => { frames.push(frame); });
       BrowserWindow.getAllWindows()[0].webContents.send("gator:update", { state });
-    }, { ...base, first_run: false, home: false, running: true, pending_approval: { id: 17 }, messages: [
-      { role: "Gator", text: "", result: { kind: "approval", title: "Previous file write", tone: "success", fields: [{ label: "Request", value: "16" }], footer: "Approved" } },
+    }, { ...base, first_run: false, home: false, running: true, pending_approval: { id: 17, token: "a".repeat(64), message_index: 1 }, messages: [
+      { role: "Gator", text: "", result: { kind: "approval", title: "Previous file write", tone: "success", fields: [{ label: "Request", value: "17" }], footer: "Approved" } },
       { role: "Gator", text: "", result: { kind: "approval", title: "Review proposed file write", tone: "warning", summary: "Write the proposed plan.", fields: [{ label: "Request", value: "17" }], preview } },
       { role: "Context", text: "", result: { kind: "notice", title: "Context and sources", tone: "warning", summary: "Some source references could not be retained.", footer: "/context work-review" } },
     ] } as typeof base);
@@ -907,7 +907,7 @@ test("review presentation preserves exact previews and only the live approval ac
     await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-approval-review.png" });
     await current.getByRole("button", { name: "Approve this action", exact: true }).click();
-    expect(await application.evaluate(() => (globalThis as unknown as { __reviewFrames: unknown[] }).__reviewFrames)).toEqual([{ type: "approval", interaction_id: 17, approved: true }]);
+    expect(await application.evaluate(() => (globalThis as unknown as { __reviewFrames: unknown[] }).__reviewFrames)).toEqual([{ type: "approval", interaction_id: 17, approval_token: "a".repeat(64), approved: true }]);
   } finally {
     await closeDesktop(application);
     await rm(directory, { recursive: true, force: true });

@@ -92,10 +92,21 @@ func TestDesktopApprovalCannotRespondToAnotherLiveRequest(t *testing.T) {
 	if m.BridgeState().PendingApproval.ID != 17 {
 		t.Fatal("live request identity was not projected")
 	}
-	next, command := m.RespondBridgeApproval(16, true)
+	token := m.BridgeState().PendingApproval.Token
+	next, command := m.RespondBridgeApproval(16, token, true)
 	m = next.(Model)
 	if command != nil || m.interaction.ID != 17 || !strings.Contains(m.status, "no longer pending") {
 		t.Fatal("stale approval reached the live request")
+	}
+	m.loadingRun++
+	m.messages = append(m.messages, approvalMessage(*m.interaction), approvalMessage(*m.interaction))
+	current := m.BridgeState().PendingApproval
+	if current.Token == token || current.MessageIndex != len(m.messages)-1 {
+		t.Fatal("a later run reused an old review or activated historical cards")
+	}
+	next, command = m.RespondBridgeApproval(17, token, true)
+	if command != nil || next.(Model).interaction == nil || !strings.Contains(next.(Model).status, "no longer pending") {
+		t.Fatal("old review token approved a later run with the same request number")
 	}
 }
 

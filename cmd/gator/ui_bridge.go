@@ -28,6 +28,7 @@ type uiFrame struct {
 	Upload        *workapp.BridgeUploadSubmission   `json:"upload,omitempty"`
 	Conversation  *workapp.BridgeConversationAction `json:"conversation,omitempty"`
 	InteractionID int                               `json:"interaction_id,omitempty"`
+	ApprovalToken string                            `json:"approval_token,omitempty"`
 	Approved      bool                              `json:"approved,omitempty"`
 	Nonce         string                            `json:"nonce,omitempty"`
 }
@@ -99,7 +100,7 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			next, command = m.model.ApplyBridgePanel(*frame.Panel, key)
 		case "approval":
-			next, command = m.model.RespondBridgeApproval(frame.InteractionID, frame.Approved)
+			next, command = m.model.RespondBridgeApproval(frame.InteractionID, frame.ApprovalToken, frame.Approved)
 		case "queue":
 			if frame.Queue == nil {
 				return m, nil

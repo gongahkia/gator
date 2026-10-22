@@ -129,7 +129,7 @@ export type BackendState = {
   overview?: Overview;
   overview_issue?: string;
   external?: ExternalCommand;
-  pending_approval?: { id: number };
+  pending_approval?: { id: number; token: string; message_index: number };
   notice?: string;
   destination?: string;
 };
@@ -142,7 +142,7 @@ export type Frame = {
   type: "submit" | "upload_submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "conversation";
   upload?: { request_id: string; context: string; text: string; files: string[] };
   text?: string; key?: string; error?: string; width?: number; height?: number;
-  panel?: PanelAction; interaction_id?: number; approved?: boolean;
+  panel?: PanelAction; interaction_id?: number; approval_token?: string; approved?: boolean;
   queue?: QueueAction;
   conversation?: { id: string; list_id: string };
 };
