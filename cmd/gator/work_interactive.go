@@ -508,6 +508,7 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 		}
 	}
 	request := workrun.Request{
+		ForegroundApp:      true,
 		RequestedAt:        requestedAt,
 		PreparationContext: ctx,
 		SourcePath:         source, ConversationID: conversationID, Objective: prompt,
