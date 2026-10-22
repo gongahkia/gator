@@ -926,6 +926,7 @@ func artifactPathOK(value string) error {
 }
 
 func (m *Model) configureConnectors(fields []string) (string, error) {
+	previous := append([]string{}, m.options.ConnectorIDs...)
 	if len(fields) == 1 || fields[1] == "list" {
 		available := []string(nil)
 		if m.config.ConnectorChoices != nil {
@@ -1006,6 +1007,12 @@ func (m *Model) configureConnectors(fields []string) (string, error) {
 			return "", fmt.Errorf("connector %q is not configured", fields[1])
 		}
 		m.options.ConnectorIDs = appendUnique(m.options.ConnectorIDs, fields[1])
+	}
+	if m.conversation != "" && m.config.SaveConnections != nil {
+		if err := m.config.SaveConnections(m.conversation, m.options.ConnectorIDs); err != nil {
+			m.options.ConnectorIDs = previous
+			return "", err
+		}
 	}
 	return "Selected connectors: " + valueOrNone(strings.Join(m.options.ConnectorIDs, ", ")), nil
 }

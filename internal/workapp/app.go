@@ -26,16 +26,19 @@ import (
 )
 
 type RunResult struct {
-	AppChanges     []workrun.AppChange
-	Activity       *workactivity.Trace
-	WorkID         string
-	ConversationID string
-	RevisionID     string
-	SnapshotID     string
-	FinalText      string
-	OutputPath     string
-	Bundle         BundleSummary
-	Error          string
+	AppScreen       *ControlScreen
+	AppScreenFamily string
+	AppScreenAction string
+	AppChanges      []workrun.AppChange
+	Activity        *workactivity.Trace
+	WorkID          string
+	ConversationID  string
+	RevisionID      string
+	SnapshotID      string
+	FinalText       string
+	OutputPath      string
+	Bundle          BundleSummary
+	Error           string
 }
 
 // BundleSummary is the display-safe, verified projection of a retained Work
@@ -157,6 +160,7 @@ type ModelStatus struct {
 type GoalState struct{ Title, SourcePath, ConversationID string }
 
 type Config struct {
+	SaveConnections         func(string, []string) error
 	Desktop                 appconfig.DesktopSettings
 	ReadDesktop             func() (appconfig.DesktopSettings, error)
 	ValidateUploads         func(source string, paths, uploads []string) error

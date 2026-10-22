@@ -519,6 +519,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	}
 	defer closeSpecialists()
 	surface = append(surface, delegationSurface...)
+	request.ConversationID = conversation.ID
 	var afterReply []struct {
 		change   AppChange
 		mutation AppMutation

@@ -20,6 +20,8 @@ func (c gatorAppController) prepareSettings(ctx context.Context, change workrun.
 		return workrun.AppMutation{}, err
 	}
 	switch change.Setting {
+	case "connections", "data_action", "recovery", "output_action":
+		return c.prepareManagement(ctx, change)
 	case "shortcuts", "voice":
 		return c.prepareDesktopPreferences(change)
 	case "usage_limits", "usage_pause":

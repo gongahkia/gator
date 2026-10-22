@@ -19,16 +19,20 @@ type AppController interface {
 }
 
 type AppQuery struct {
-	Topic string `json:"topic"`
-	ID    string `json:"id,omitempty"`
+	ConversationID string `json:"-"`
+	Topic          string `json:"topic"`
+	ID             string `json:"id,omitempty"`
 }
 
 type AppChange struct {
-	Setting string          `json:"setting"`
-	Value   json.RawMessage `json:"value"`
+	ConversationID string          `json:"-"`
+	Summary        string          `json:"-"`
+	Setting        string          `json:"setting"`
+	Value          json.RawMessage `json:"value"`
 }
 
 type AppMutation struct {
+	Summary    string
 	Preview    any
 	Review     bool
 	AfterReply bool
@@ -54,7 +58,7 @@ func (t appTool) Definition() agent.ToolDefinition {
 	if !t.write {
 		return agent.ToolDefinition{Name: "gator_app_inspect", Description: "Read Gator's actual settings, available models, usage, data/retention, recovery, connections, outputs, shortcuts or voice preferences. Use before answering current-state questions or preparing changes. No secrets are returned. Optional id selects a retained output run.", Parameters: json.RawMessage(`{"type":"object","properties":{"topic":{"type":"string","enum":["settings","models","usage","data","recovery","connections","outputs","shortcuts","voice"]},"id":{"type":"string","maxLength":128}},"required":["topic"],"additionalProperties":false}`)}
 	}
-	return agent.ToolDefinition{Name: "gator_app_update", Description: "Change a Gator-owned setting only when the user asks. Inspect first; use exact existing provider/model or connection IDs. setting/value: model {provider,model}; theme {theme}; usage_limits {daily_requests,daily_tokens,concurrent_requests}; usage_pause {paused}; retention {history_days,knowledge_days,snapshot_days}; connections {ids:[...]}; shortcuts {action,shortcut}; voice {spoken_replies,provider,model,language}; recovery {action}; data_action {action,path}; output_action {action,id,path}. Higher-impact changes pause for the user's review. Changes affect subsequent requests, not this run's permissions. Never use to modify credentials or to grant unrequested capabilities.", Parameters: json.RawMessage(`{"type":"object","properties":{"setting":{"type":"string","enum":["model","theme","usage_limits","usage_pause","retention","connections","shortcuts","voice","recovery","data_action","output_action"]},"value":{"type":"object"}},"required":["setting","value"],"additionalProperties":false}`)}
+	return agent.ToolDefinition{Name: "gator_app_update", Description: "Change a Gator-owned setting only when the user asks. Inspect first; use exact existing provider/model or connection IDs. setting/value: model {provider,model}; theme {theme}; usage_limits {daily_requests,daily_tokens,concurrent_requests}; usage_pause {paused}; retention {history_days,knowledge_days,snapshot_days}; connections {ids:[...]}; shortcuts {action,shortcut}; voice {spoken_replies,provider,model,language,rate}; recovery {action}; data_action {action,path,scope}; output_action {action,id,path}. Higher-impact changes pause for the user's review. Changes affect subsequent requests, not this run's permissions. Never use to modify credentials or to grant unrequested capabilities.", Parameters: json.RawMessage(`{"type":"object","properties":{"setting":{"type":"string","enum":["model","theme","usage_limits","usage_pause","retention","connections","shortcuts","voice","recovery","data_action","output_action"]},"value":{"type":"object"}},"required":["setting","value"],"additionalProperties":false}`)}
 }
 
 // DecodeAppArguments also protects adapters from unknown keys and trailing
@@ -85,12 +89,14 @@ func (t appTool) Execute(ctx context.Context, args json.RawMessage) (agent.ToolR
 		if err = DecodeAppArguments(args, &query); err != nil {
 			return agent.ToolResult{}, err
 		}
+		query.ConversationID = t.request.ConversationID
 		result, err = t.controller.Inspect(ctx, query)
 	} else {
 		var change AppChange
 		if err = DecodeAppArguments(args, &change); err != nil {
 			return agent.ToolResult{}, err
 		}
+		change.ConversationID = t.request.ConversationID
 		prepared, prepareErr := t.controller.Prepare(ctx, change)
 		if prepareErr != nil {
 			return agent.ToolResult{}, prepareErr
@@ -98,6 +104,7 @@ func (t appTool) Execute(ctx context.Context, args json.RawMessage) (agent.ToolR
 		if prepared.Apply == nil {
 			return agent.ToolResult{}, errors.New("app change has no validated operation")
 		}
+		change.Summary = prepared.Summary
 		if prepared.Review {
 			if t.request.ApproveAppChange == nil {
 				return agent.ToolResult{}, errors.New("this change requires review in the foreground Gator app")

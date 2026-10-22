@@ -273,7 +273,11 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 				m.options.ConnectorIDs = append([]string{}, v.IDs...)
 			}
 		}
-		m.messages = append(m.messages, reportMessage("Gator settings updated", "Saved "+change.Setting+". The change applies to new requests.", "success"))
+		text := change.Summary
+		if text == "" {
+			text = "Saved " + strings.ReplaceAll(change.Setting, "_", " ") + ". The change applies to new requests."
+		}
+		m.messages = append(m.messages, reportMessage("Gator app updated", text, "success"))
 	}
 	if len(value.AppChanges) > 0 {
 		m.refreshModelStatus()
@@ -348,6 +352,30 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 		m.status = "Run stopped"
 	}
 	m.scroll = 0
+	if value.AppScreen != nil {
+		m.section = "controls"
+		m.home = false
+		m.controlFamily = value.AppScreenFamily
+		m.controlScreen = *value.AppScreen
+		m.controlForm = nil
+		m.controlReview = false
+		m.controlBusy = false
+		m.controlBackground = false
+		m.controlRootArgs = nil
+		m.selected = 0
+		if value.AppScreenAction != "" {
+			for _, action := range m.controlScreen.Actions {
+				if action.Action == value.AppScreenAction {
+					copy := action
+					copy.Fields = append([]ControlField{}, action.Fields...)
+					m.controlForm = &copy
+					m.controlField = 0
+					break
+				}
+			}
+		}
+		return m, nil
+	}
 	if value.Error == "" && !wasCancelling && len(m.queue) > 0 && m.config.Run != nil {
 		next := m.queue[0]
 		m.queue = m.queue[1:]

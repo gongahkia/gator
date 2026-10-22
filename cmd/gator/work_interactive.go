@@ -156,6 +156,15 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 	localModels := newLocalModelManager(settingsStore)
 	defer localModels.Close()
 	application := workapp.New(workapp.Config{
+		SaveConnections: func(id string, ids []string) error {
+			release, err := state.Guard(stateDir, false)
+			if err != nil {
+				return err
+			}
+			defer release()
+			selected := append([]string{}, ids...)
+			return sessions.SavePreferences(id, worksession.Preferences{ConnectorIDs: &selected}, nil)
+		},
 		Desktop: settings.Desktop,
 		ReadDesktop: func() (config.DesktopSettings, error) {
 			current, err := settingsStore.Load()
@@ -518,6 +527,9 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 		}
 	}
 	var appChanges []workrun.AppChange
+	var appScreen *workapp.ControlScreen
+	var appScreenFamily string
+	var appScreenAction string
 	var afterAppRun []struct {
 		change   workrun.AppChange
 		mutation workrun.AppMutation
@@ -600,9 +612,16 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 				err = ctx.Err()
 				break
 			}
-			if _, applyErr := pending.mutation.Apply(ctx); applyErr != nil {
+			applied, applyErr := pending.mutation.Apply(ctx)
+			if applyErr != nil {
 				err = fmt.Errorf("apply Gator setting: %w", applyErr)
 				break
+			}
+			if review, ok := applied.(appScreenResult); ok {
+				screen := review.Screen
+				appScreen = &screen
+				appScreenFamily = review.Family
+				appScreenAction = review.FormAction
 			}
 			request.OnAppChange(pending.change)
 		}
@@ -610,7 +629,7 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 	appChangesMu.Lock()
 	changes := append([]workrun.AppChange(nil), appChanges...)
 	appChangesMu.Unlock()
-	result := workapp.RunResult{AppChanges: changes, Activity: outcome.Activity, WorkID: outcome.Manifest.RunID, ConversationID: outcome.ConversationID, RevisionID: outcome.RevisionID, SnapshotID: outcome.SnapshotID, FinalText: outcome.Result.FinalText}
+	result := workapp.RunResult{AppScreen: appScreen, AppScreenFamily: appScreenFamily, AppScreenAction: appScreenAction, AppChanges: changes, Activity: outcome.Activity, WorkID: outcome.Manifest.RunID, ConversationID: outcome.ConversationID, RevisionID: outcome.RevisionID, SnapshotID: outcome.SnapshotID, FinalText: outcome.Result.FinalText}
 	if outcome.Work.Path != "" {
 		result.OutputPath = outcome.Work.Output.Path()
 		if summary, summaryErr := summarizeWorkBundle(outcome.Work.Path); summaryErr == nil {
@@ -940,15 +959,27 @@ func formatApplyPlan(title string, plan artifact.ApplyPlan) string {
 	return strings.Join(lines, "\n")
 }
 
-func loadWorkTUIConversationOptions(store worksession.Store, conversationID string) (workapp.RunOptions, error) {
+func loadWorkTUIConversationOptions(store worksession.Store, conversationID string) (options workapp.RunOptions, resultErr error) {
 	conversation, err := store.Load(conversationID)
 	if err != nil {
 		return workapp.RunOptions{}, err
 	}
-	options := workapp.RunOptions{
+	options = workapp.RunOptions{
 		Mode: "auto", MaxSteps: 24,
 		Code: workapp.CodeOptions{MaxSteps: 16, Sandbox: "strict", Network: "deny"},
 	}
+	defer func() {
+		if resultErr == nil {
+			preferences, err := store.LoadPreferences(conversationID)
+			if err != nil {
+				resultErr = err
+				return
+			}
+			if preferences.ConnectorIDs != nil {
+				options.ConnectorIDs = append([]string{}, (*preferences.ConnectorIDs)...)
+			}
+		}
+	}()
 	if conversation.HeadRevision == "" {
 		return options, nil
 	}
