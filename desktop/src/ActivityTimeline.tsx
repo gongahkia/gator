@@ -63,7 +63,9 @@ export function ActivityHistory({ trace }: { trace: BackendActivity }) {
   const elapsed = duration(trace);
   const failed = trace.entries.filter((entry) => entry.state === "failed").length;
   const label = trace.state === "stopped" ? "Stopped" : trace.state === "failed" ? "Work ended" : "Worked";
-  return <Disclosure className="activity-history" icon={<Indicator state={trace.state === "completed" ? "completed" : trace.state === "failed" ? "failed" : "stopped"} />} tone={trace.state === "failed" ? "warning" : undefined} label={<>{label}{elapsed ? ` for ${elapsed}` : ""}{failed > 0 && <small>{failed} failed {failed === 1 ? "tool" : "tools"}</small>}</>}><Entries trace={trace} /></Disclosure>;
+  const summary = <>{label}{elapsed ? `${trace.state === "completed" ? " for" : " after"} ${elapsed}` : ""}{failed > 0 && <small>{failed} failed {failed === 1 ? "tool" : "tools"}</small>}</>;
+  if (!trace.entries.some((entry) => entry.kind !== "text" || entry.text?.trim()) && !trace.truncated) return <p className="activity-summary"><Indicator state={trace.state} /><span>{summary}</span></p>;
+  return <Disclosure className="activity-history" icon={<Indicator state={trace.state === "completed" ? "completed" : trace.state === "failed" ? "failed" : "stopped"} />} tone={trace.state === "failed" ? "warning" : undefined} label={summary}><Entries trace={trace} /></Disclosure>;
 }
 
 export function LiveActivity({ trace, status, elapsed, attention }: { trace?: BackendActivity; status: string; elapsed?: string; attention: boolean }) {

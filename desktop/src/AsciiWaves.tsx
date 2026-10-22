@@ -83,8 +83,11 @@ export const AsciiWaves = memo(function AsciiWaves() {
     const resize = new ResizeObserver(layout);
     resize.observe(canvas);
     layout(); visibility();
+    const theme = new MutationObserver(draw);
+    theme.observe(canvas.closest("[data-theme]") || document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    window.addEventListener("resize", layout);
     document.addEventListener("visibilitychange", visibility);
-    return () => { cancelAnimationFrame(frame); clock?.cancel(); resize.disconnect(); document.removeEventListener("visibilitychange", visibility); };
+    return () => { cancelAnimationFrame(frame); clock?.cancel(); resize.disconnect(); theme.disconnect(); window.removeEventListener("resize", layout); document.removeEventListener("visibilitychange", visibility); };
   }, [reduced]);
 
   return <canvas ref={surface} className="ascii-waves" aria-hidden="true" />;

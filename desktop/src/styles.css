@@ -717,3 +717,7 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .file-search > svg { flex-shrink: 0; }
 .show-in-chat { display: inline-flex; gap: 8px; align-items: center; margin: 16px 0 4px; }
 
+.activity-summary { display: flex; align-items: center; gap: 9px; min-height: 40px; margin-bottom: 12px; font-size: var(--text-sm); color: var(--color-muted); }
+.activity-tool-list li[data-tone="warning"] { color: var(--color-warning); }
+@media (forced-colors: active) { .activity-shimmer { background: none; -webkit-text-fill-color: currentColor; } }
+
