@@ -12,9 +12,9 @@ export class Backend extends EventEmitter {
   #buffer = "";
   #diagnostics = "";
 
-  constructor(binary, cwd, env = process.env) {
+  constructor(binary, cwd, env = process.env, args = ["ui-backend", "", ""]) {
     super();
-    this.#child = spawn(binary, ["ui-backend", "", ""], { cwd, env: { ...env, GATOR_UI_BACKEND: "1" }, stdio: ["pipe", "pipe", "pipe"] });
+    this.#child = spawn(binary, args, { cwd, env: { ...env, GATOR_UI_BACKEND: "1" }, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
     this.#child.stdout.setEncoding("utf8");
     this.#child.stdout.on("data", (chunk) => this.#consume(chunk));
     this.#child.stderr.on("data", (chunk) => { this.#diagnostics = (this.#diagnostics + chunk.toString()).slice(-4000); });

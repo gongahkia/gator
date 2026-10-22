@@ -3,20 +3,21 @@ import { mkdir, access } from "node:fs/promises";
 import { constants } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { homedir } from "node:os";
 import { createHash, randomUUID } from "node:crypto";
 import { Backend } from "./backend.mjs";
 import { APP_URL, assetPath, externalURL } from "./policy.mjs";
 import { terminalHandoff } from "./terminal.mjs";
 import { DraftStore } from "./drafts.mjs";
+import { runtimeName, stateDirectory } from "./platform.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const assets = resolve(here, "../dist");
 const appIcon = resolve(here, "../assets/icon.png");
 app.setName("Gator");
+if (process.platform === "win32") app.setAppUserModelId("com.gongahkia.gator");
 // Allows isolated development/test profiles without changing Gator's state.
 if (process.env.GATOR_DESKTOP_USER_DATA) app.setPath("userData", resolve(process.env.GATOR_DESKTOP_USER_DATA));
-const stateRoot = resolve(process.env.GATOR_STATE_DIR?.trim() || process.env.XDG_STATE_HOME?.trim() || join(homedir(), ".local/state"));
+const stateRoot = stateDirectory();
 const drafts = new DraftStore(join(app.getPath("userData"), "drafts", `${createHash("sha256").update(stateRoot).digest("hex")}.json`));
 protocol.registerSchemesAsPrivileged([{ scheme: "gator", privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 
@@ -40,12 +41,21 @@ async function startBackend() {
   if (starting) return starting;
   starting = (async () => {
     if (backend && !backend.closed) await backend.stop();
-    const binary = process.env.GATOR_DESKTOP_BINARY || (app.isPackaged ? join(process.resourcesPath, "runtime/gator-runtime") : join(here, "../runtime/gator-runtime"));
+    const binary = process.env.GATOR_DESKTOP_BINARY || (app.isPackaged ? join(process.resourcesPath, "runtime", runtimeName()) : join(here, "../runtime", runtimeName()));
     await access(binary, constants.X_OK);
     // A desktop launch never implicitly captures the user's home directory.
     const workspace = process.env.GATOR_DESKTOP_WORKSPACE || join(app.getPath("userData"), "workspace");
     if (!process.env.GATOR_DESKTOP_WORKSPACE) await mkdir(workspace, { recursive: true, mode: 0o700 });
-    backend = new Backend(binary, workspace);
+    const environment = { ...process.env, GATOR_DESKTOP_DRAFT_DIR: join(app.getPath("userData"), "drafts") };
+    if (process.platform === "win32") {
+      // The runtime starts in the workspace. Resolve profile overrides in the
+      // host first so relative values agree with the draft profile identity.
+      environment.GATOR_STATE_DIR = stateRoot;
+      for (const key of ["GATOR_CONFIG_DIR", "XDG_CONFIG_HOME"]) {
+        if (environment[key]?.trim()) environment[key] = resolve(environment[key]);
+      }
+    }
+    backend = new Backend(binary, workspace, environment);
     sessionID = randomUUID();
     backend.on("state", update);
     backend.on("closed", update);
@@ -143,7 +153,7 @@ else {
     });
     await startBackend();
     createWindow();
-  }).catch((error) => { dialog.showErrorBox("Gator could not start", error.message); app.exit(1); });
+  }).catch((error) => { console.error("Gator could not start:", error.message); dialog.showErrorBox("Gator could not start", error.message); app.exit(1); });
   app.on("before-quit", (event) => { if (!closing && window && !window.isDestroyed()) { event.preventDefault(); window.close(); } });
   app.on("window-all-closed", () => app.quit());
   app.on("activate", () => window?.show());

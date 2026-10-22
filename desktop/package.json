@@ -7,7 +7,9 @@
   "private": true,
   "type": "module",
   "main": "electron/main.mjs",
-  "engines": { "node": ">=22.12.0" },
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "build:runtime": "node scripts/build-runtime.mjs",
     "build:ui": "node scripts/collect-licenses.mjs && vite build",
@@ -42,10 +44,58 @@
     "appId": "com.gongahkia.gator",
     "asar": true,
     "artifactName": "Gator-${version}-${os}-${arch}.${ext}",
-    "directories": { "output": "release" },
-    "files": ["dist/**/*", "electron/**/*", "assets/**/*", "licenses/**/*", "package.json", "!**/*.test.mjs"],
-    "extraResources": [{ "from": "runtime/gator-runtime", "to": "runtime/gator-runtime" }],
-    "mac": { "icon": "assets/icon.icns", "category": "public.app-category.productivity", "identity": null, "target": ["dmg", "zip"] },
-    "linux": { "icon": "assets/icon.png", "category": "Utility", "target": ["AppImage", "deb"] }
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "assets/**/*",
+      "licenses/**/*",
+      "package.json",
+      "!**/*.test.mjs"
+    ],
+    "extraResources": [
+      {
+        "from": "runtime",
+        "to": "runtime",
+        "filter": [
+          "gator-runtime",
+          "gator-runtime.exe"
+        ]
+      }
+    ],
+    "mac": {
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.productivity",
+      "identity": null,
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "linux": {
+      "icon": "assets/icon.png",
+      "category": "Utility",
+      "target": [
+        "AppImage",
+        "deb"
+      ]
+    },
+    "beforePack": "./scripts/check-runtime.cjs",
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "deleteAppDataOnUninstall": false,
+      "createDesktopShortcut": false,
+      "include": "build/installer.nsh"
+    }
   }
 }

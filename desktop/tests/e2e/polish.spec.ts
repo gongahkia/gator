@@ -11,7 +11,7 @@ async function profile() {
   await mkdir(workspace, { recursive: true });
   await writeFile(join(workspace, "project.md"), "# Offsite\nReview the venue shortlist and budget.\n");
   const env = Object.fromEntries(Object.entries({ ...process.env, GATOR_INTERNAL_COMMANDS: "1", GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop"), GATOR_DESKTOP_WORKSPACE: workspace }).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
-  const cli = (...args: string[]) => execFileSync(resolve("runtime/gator-runtime"), args, { env, encoding: "utf8" }).trim();
+  const cli = (...args: string[]) => execFileSync(resolve("runtime", process.platform === "win32" ? "gator-runtime.exe" : "gator-runtime"), args, { env, encoding: "utf8" }).trim();
   return { directory, workspace, env, cli };
 }
 async function launch(env: Record<string, string>) {
@@ -131,7 +131,7 @@ test("native follow-up fields review exact values and path selection never switc
     await page.getByRole("spinbutton", { name: "Checks per UTC day", exact: true }).fill("6");
     await capture(page, "followup-native-form");
     await page.getByRole("textbox", { name: "Title", exact: true }).focus();
-    await page.keyboard.press("Meta+Enter");
+    await page.keyboard.press(`${process.platform === "darwin" ? "Meta" : "Control"}+Enter`);
     await expect(page.locator(".workflow[data-kind='confirmation']")).toBeVisible();
     const review = (await snapshot(page)).panel!;
     const facts = JSON.stringify(review);

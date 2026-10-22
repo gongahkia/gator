@@ -8,9 +8,9 @@ import { Backend } from "../electron/backend.mjs";
 
 test("host streams Go state and closes its child on exit", async () => {
   const directory = await mkdtemp(join(tmpdir(), "gator-desktop-bridge-test-"));
-  const executable = join(directory, "fixture");
+  const executable = join(directory, "fixture.cjs");
   await writeFile(executable, `#!/usr/bin/env node\nconst readline = require('node:readline');\nconst send = (text) => process.stdout.write(JSON.stringify({ version: 1, type: 'state', state: { title: text, messages: [] } }) + '\\n');\nsend('🐊 connected');\nreadline.createInterface({ input: process.stdin }).on('line', line => { const frame = JSON.parse(line); if (frame.type === 'exit') process.exit(0); send(frame.text); });\n`, { mode: 0o700 });
-  const backend = new Backend(executable, directory);
+  const backend = new Backend(process.execPath, directory, process.env, [executable]);
   try {
     const [initial] = await once(backend, "state");
     assert.equal(initial.title, "🐊 connected");

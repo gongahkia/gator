@@ -13,7 +13,8 @@ test("drafts survive restart, stay scoped, and save serially with private permis
     await Promise.all(["one", "two"].map((id) => store.request({ action: "save", draft: { context: `conversation:${id}`, text: `Unsent ${id} 🐊`, title: id, source: "/project" } })));
     assert.equal((await new DraftStore(file).request({ action: "list" })).drafts.length, 2);
     assert.equal((await new DraftStore(join(root, "profile-b.json")).request({ action: "list" })).drafts.length, 0);
-    assert.equal((await stat(file)).mode & 0o777, 0o600);
+    // Windows privacy is enforced by the native DACL bootstrap and tested in Go.
+    if (process.platform !== "win32") assert.equal((await stat(file)).mode & 0o777, 0o600);
     await store.request({ action: "remove", context: "conversation:one" });
     assert.deepEqual((await store.request({ action: "list" })).drafts.map((item) => item.context), ["conversation:two"]);
   } finally { await rm(root, { recursive: true, force: true }); }

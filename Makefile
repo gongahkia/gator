@@ -11,8 +11,7 @@ build:
 	npm run build --prefix desktop
 
 runtime:
-	mkdir -p desktop/runtime
-	go build -trimpath -ldflags "$(LDFLAGS)" -o desktop/runtime/gator-runtime ./cmd/gator
+	npm run build:runtime --prefix desktop
 
 desktop:
 	npm start --prefix desktop

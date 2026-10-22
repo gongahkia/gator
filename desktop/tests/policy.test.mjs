@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { assetPath, externalURL, shellQuote, validateFrame } from "../electron/policy.mjs";
+import { resolve, join } from "node:path";
 
 test("renderer cannot launch processes, acknowledge handoffs, or inject transport fields", () => {
   for (const frame of [{ type: "external_done" }, { type: "exit" }, { type: "submit", text: "ok", program: "sh" }, { type: "key", key: "ctrl+g" }, { type: "navigate", text: "/approve" }]) assert.throws(() => validateFrame(frame));
@@ -18,7 +19,8 @@ test("panel actions require a view identity and bounded typed values", () => {
 });
 
 test("app resources stay inside the compiled assets and links stay web-only", () => {
-  assert.equal(assetPath("gator://app/assets/main.js", "/tmp/gator-ui"), "/tmp/gator-ui/assets/main.js");
+  const root = resolve("test-ui");
+  assert.equal(assetPath("gator://app/assets/main.js", root), join(root, "assets/main.js"));
   for (const url of ["file:///etc/passwd", "gator://other/index.html", "gator://app/%2f..%2fprivate", "gator://app/%00", "gator://app/%5c..%5cprivate"]) assert.equal(assetPath(url, "/tmp/gator-ui"), null);
   for (const url of ["javascript:alert(1)", "file:///etc/passwd", "https://user:pass@example.com", "gator://app/index.html"]) assert.equal(externalURL(url), null);
   assert.equal(externalURL("https://example.com/docs"), "https://example.com/docs");

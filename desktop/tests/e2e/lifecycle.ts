@@ -1,4 +1,11 @@
 import type { ElectronApplication } from "@playwright/test";
+import { mkdtemp, realpath } from "node:fs/promises";
+
+// Match Go's canonical workspace paths, including Windows 8.3 aliases and
+// macOS /var -> /private/var, before asserting a projected source identity.
+export async function temporaryDirectory(prefix: string) {
+  return realpath(await mkdtemp(prefix));
+}
 
 // The Node debugger can keep Electron alive after normal app shutdown, and a
 // second context.close() can wait on that inspector. Detach only this test's

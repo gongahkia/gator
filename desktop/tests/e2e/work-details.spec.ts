@@ -1,6 +1,6 @@
 import { _electron as electron, test, expect } from "@playwright/test";
-import { closeDesktop } from "./lifecycle";
-import { mkdtemp, rm } from "node:fs/promises";
+import { closeDesktop, temporaryDirectory as mkdtemp } from "./lifecycle";
+import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import type { BackendState, BackendBundle, BackendMessage } from "../../src/protocol";

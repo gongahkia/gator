@@ -1,6 +1,6 @@
 import { _electron as electron, test, expect, type Page } from "@playwright/test";
-import { closeDesktop } from "./lifecycle";
-import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { closeDesktop, temporaryDirectory as mkdtemp } from "./lifecycle";
+import { mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -92,7 +92,7 @@ test("long conversations retain context while searching and signal activity with
     await application.evaluate(({ BrowserWindow }, value) => BrowserWindow.getAllWindows()[0].webContents.send("gator:update", value), { ...snapshot, state: updated });
     await expect(page.getByRole("button", { name: "New activity. Jump to latest", exact: true })).toBeVisible();
     expect(await scroll.evaluate((element) => element.scrollTop)).toBe(0);
-    await page.keyboard.press("Meta+f");
+    await page.keyboard.press(`${process.platform === "darwin" ? "Meta" : "Control"}+f`);
     const search = page.getByRole("textbox", { name: "Search conversation" });
     await search.fill("needle in context");
     await expect(page.locator(".search-count")).toHaveText("1 of 2");
@@ -253,7 +253,7 @@ test("motion is interruptible, releases dismissed controls, and honors reduced m
     await expect(page.locator('.modal-backdrop[data-open="false"]')).toHaveAttribute("inert", "");
     await expect(page.getByRole("button", { name: "Search commands", exact: true })).toBeFocused();
     // Reopen while its exit is still running; no stale completion may remove it.
-    await page.keyboard.press("Meta+k");
+    await page.keyboard.press(`${process.platform === "darwin" ? "Meta" : "Control"}+k`);
     await expect(page.getByRole("textbox", { name: "Find a command" })).toBeFocused();
     await session.send("Animation.setPlaybackRate", { playbackRate: 1 });
     await page.keyboard.press("Escape");
@@ -344,7 +344,7 @@ test("queued messages can be edited, reordered, removed, and resumed without los
   await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
   const address = server.address() as { port: number };
   const env = { ...process.env, GATOR_INTERNAL_COMMANDS: "1", GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop"), GATOR_DESKTOP_WORKSPACE: workspace };
-  const cli = (args: string[]) => execFileSync(resolve("runtime/gator-runtime"), args, { env, encoding: "utf8" });
+  const cli = (args: string[]) => execFileSync(resolve("runtime", process.platform === "win32" ? "gator-runtime.exe" : "gator-runtime"), args, { env, encoding: "utf8" });
   cli(["provider", "add", "queue-fixture", "--base-url", `http://127.0.0.1:${address.port}/v1/chat/completions`, "--model", "fixture-model"]);
   cli(["config", "set", "default-provider", "queue-fixture"]);
   const application = await launchDesktop(env);
@@ -471,7 +471,7 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
   await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
   const address = server.address() as { port: number };
   const env = { ...process.env, GATOR_INTERNAL_COMMANDS: "1", GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop"), GATOR_DESKTOP_WORKSPACE: workspace };
-  const binary = resolve("runtime/gator-runtime");
+  const binary = resolve("runtime", process.platform === "win32" ? "gator-runtime.exe" : "gator-runtime");
   const cli = (args: string[]) => execFileSync(binary, args, { env, encoding: "utf8" });
   cli(["provider", "add", "desktop-fixture", "--base-url", `http://127.0.0.1:${address.port}/v1/chat/completions`, "--model", "fixture-model"]);
   cli(["config", "set", "default-provider", "desktop-fixture"]);
@@ -662,7 +662,7 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
 test("dashboard scroll respects interaction and reduced motion; usage controls keep the Go review flow", async () => {
   const directory = await mkdtemp(join(tmpdir(), "gator-desktop-dashboard-e2e-"));
   const env = { ...process.env, GATOR_INTERNAL_COMMANDS: "1", GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") };
-  const binary = resolve("runtime/gator-runtime");
+  const binary = resolve("runtime", process.platform === "win32" ? "gator-runtime.exe" : "gator-runtime");
   const cli = (args: string[]) => execFileSync(binary, args, { env, encoding: "utf8" });
   const application = await launchDesktop(env);
   try {
