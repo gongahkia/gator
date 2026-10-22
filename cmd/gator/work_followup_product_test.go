@@ -13,22 +13,45 @@ import (
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/followup"
 	"github.com/gongahkia/gator/internal/goal"
+	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workhome"
 	"github.com/gongahkia/gator/internal/workrun"
+	"github.com/gongahkia/gator/internal/worksession"
 )
 
 func TestReviewedFollowupPersistsScopeLimitsAndSurvivesSchedulerUpdates(t *testing.T) {
 	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
 	state, source := t.TempDir(), t.TempDir()
+	sessions, _ := worksession.Open(state)
+	chat, err := sessions.Create("Plan the offsite", source, "snap-origin", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
 	draft, err := followup.New(source, "")
 	if err != nil {
 		t.Fatal(err)
 	}
+	draft.OriginConversationID = chat.ID
 	record, definition, err := saveFollowup(state, draft)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if definition.OriginConversationID != chat.ID {
+		t.Fatal("follow-up lost requesting conversation")
+	}
+	update, err := recordJobInbox(state, definition, jobs.Attempt{ID: "attempt-origin", Conversation: "chat-job", Status: "failed", Error: "No connection"})
+	if err != nil || update.OriginConversationID != chat.ID || update.ConversationID != "chat-job" || update.AttemptID != "attempt-origin" {
+		t.Fatalf("origin/execution mixup: %+v, %v", update, err)
+	}
+	mailbox, _ := inbox.Open(state)
+	if err := mailbox.MarkRead(update.ID, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	again, err := recordJobInbox(state, definition, jobs.Attempt{ID: "attempt-origin", Conversation: "chat-job", Status: "failed", Error: "No connection"})
+	if err != nil || again.ID != update.ID || again.ReadAt.IsZero() {
+		t.Fatalf("retry duplicated notification: %+v, %v", again, err)
 	}
 	if definition.Mode != action.Draft || definition.Contract.ExternalActions != action.Forbid || definition.PollMinutes != 15 || definition.MaxChecksPerDay != 24 || definition.AlertWhen != draft.AlertWhen {
 		t.Fatalf("reviewed agreement changed: %#v", definition)
@@ -49,6 +72,11 @@ func TestReviewedFollowupPersistsScopeLimitsAndSurvivesSchedulerUpdates(t *testi
 	}
 	if _, _, err := saveFollowup(state, draft); err == nil {
 		t.Fatal("stale review overwrote a newer agreement")
+	}
+	draft.ExpectedDigest, _ = edited.PolicyDigest()
+	draft.OriginConversationID = ""
+	if _, _, err := saveFollowup(state, draft); err == nil {
+		t.Fatal("editing detached update routing")
 	}
 	checks, err := workhome.ReadChecks(state, false, time.Now())
 	if err != nil {

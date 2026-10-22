@@ -61,6 +61,10 @@ func (m *Model) newFollowup() {
 	if m.goalID != "" {
 		draft.Title = m.title
 	}
+	draft.OriginConversationID = m.conversation
+	if draft.OriginConversationID == "" {
+		draft.OriginConversationID = m.config.ViewOriginConversationID
+	}
 	m.followupForm = &followupForm{Draft: draft}
 	m.section, m.sectionNotice = "followup", ""
 }
@@ -80,6 +84,7 @@ func (m *Model) editFollowup() {
 		return
 	}
 	draft.Enabled = definition.Enabled
+	draft.OriginConversationID = definition.OriginConversationID
 	draft.JobID, draft.Title, draft.Outcome = definition.ID, definition.Name, definition.Objective
 	draft.ExpectedDigest, _ = definition.PolicyDigest()
 	draft.ConnectorIDs, draft.AlertWhen, draft.Mode = append([]string(nil), definition.ConnectorIDs...), definition.AlertWhen, definition.Mode

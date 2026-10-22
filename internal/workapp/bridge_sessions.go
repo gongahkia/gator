@@ -5,15 +5,22 @@ package workapp
 // the renderer cannot construct this host-only request or select executables.
 // Each process retains its own run, approval tokens, queue and conversation.
 type BridgeSessionRequest struct {
-	Sequence       uint64 `json:"sequence"`
-	ConversationID string `json:"conversation_id,omitempty"`
-	Goal           bool   `json:"goal,omitempty"`
-	New            bool   `json:"new,omitempty"`
-	View           string `json:"view,omitempty"`
-	Source         string `json:"source,omitempty"`
+	Sequence             uint64 `json:"sequence"`
+	ConversationID       string `json:"conversation_id,omitempty"`
+	Goal                 bool   `json:"goal,omitempty"`
+	New                  bool   `json:"new,omitempty"`
+	View                 string `json:"view,omitempty"`
+	Source               string `json:"source,omitempty"`
+	OriginConversationID string `json:"origin_conversation_id,omitempty"`
 }
 
 func (m *Model) requestSession(request BridgeSessionRequest) {
+	if request.View != "" {
+		request.OriginConversationID = m.conversation
+		if request.OriginConversationID == "" {
+			request.OriginConversationID = m.config.ViewOriginConversationID
+		}
+	}
 	m.sessionSequence++
 	request.Sequence = m.sessionSequence
 	m.sessionRequest = &request

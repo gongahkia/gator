@@ -17,6 +17,7 @@ import (
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/workhome"
+	"github.com/gongahkia/gator/internal/worksession"
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
@@ -28,6 +29,15 @@ func saveFollowup(stateDir string, draft followup.Draft) (goal.Record, jobs.Defi
 	defer release()
 	if err := draft.Validate(); err != nil {
 		return goal.Record{}, jobs.Definition{}, err
+	}
+	if draft.OriginConversationID != "" {
+		sessions, err := worksession.Open(stateDir)
+		if err != nil {
+			return goal.Record{}, jobs.Definition{}, err
+		}
+		if _, err := sessions.Load(draft.OriginConversationID); err != nil {
+			return goal.Record{}, jobs.Definition{}, fmt.Errorf("the requesting conversation is unavailable: %w", err)
+		}
 	}
 	root, err := workspace.Open(draft.SourcePath)
 	if err != nil {
@@ -141,7 +151,7 @@ func saveFollowup(stateDir string, draft followup.Draft) (goal.Record, jobs.Defi
 			return record, definition, loadErr
 		}
 		digest, _ := prior.PolicyDigest()
-		if draft.ExpectedDigest == "" || digest != draft.ExpectedDigest || prior.GoalID != goalID {
+		if draft.ExpectedDigest == "" || digest != draft.ExpectedDigest || prior.GoalID != goalID || prior.OriginConversationID != draft.OriginConversationID {
 			return record, definition, errors.New("this check changed while you edited it; refresh and review it again")
 		}
 		definition.CreatedAt, definition.LastScheduledAt = prior.CreatedAt, prior.LastScheduledAt

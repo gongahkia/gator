@@ -73,11 +73,11 @@ func TestGoalUrgentOnlyDesktopSettingKeepsRoutineResultsInInbox(t *testing.T) {
 		t.Fatal("urgent-only policy did not distinguish routine from urgent")
 	}
 	definition := jobs.Definition{ID: "job-offsite", Name: "Offsite", GoalID: record.ID}
-	entry, err := recordJobInbox(stateDir, definition, jobs.Attempt{Status: "completed", Summary: "Routine update", ResultSHA256: "routine"})
+	entry, err := recordJobInbox(stateDir, definition, jobs.Attempt{ID: "attempt-routine", Status: "completed", Summary: "Routine update", ResultSHA256: "routine"})
 	if err != nil || entry.ID == "" || entry.Urgent {
 		t.Fatalf("routine result = %#v, %v", entry, err)
 	}
-	failure, err := recordJobInbox(stateDir, definition, jobs.Attempt{Status: "failed", Error: "provider unavailable"})
+	failure, err := recordJobInbox(stateDir, definition, jobs.Attempt{ID: "attempt-failed", Status: "failed", Error: "provider unavailable"})
 	if err != nil || failure.ID == "" || !failure.Urgent {
 		t.Fatalf("failed result = %#v, %v", failure, err)
 	}

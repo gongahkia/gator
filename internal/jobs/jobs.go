@@ -29,42 +29,43 @@ import (
 const Version = 2
 
 type Definition struct {
-	Limits              agent.Limits           `json:"limits"`
-	WebOrigins          []string               `json:"web_origins,omitempty"`
-	Project             *projectcapture.Bundle `json:"project_configuration,omitempty"`
-	SnapshotID          string                 `json:"snapshot_id,omitempty"`
-	Code                workrun.CodePolicy     `json:"code_policy,omitempty"`
-	EnableCode          bool                   `json:"enable_code,omitempty"`
-	Version             int                    `json:"version"`
-	ID                  string                 `json:"id"`
-	Name                string                 `json:"name"`
-	GoalID              string                 `json:"goal_id,omitempty"`
-	Enabled             bool                   `json:"enabled"`
-	Schedule            string                 `json:"schedule"`
-	Timezone            string                 `json:"timezone"`
-	Missed              string                 `json:"missed"`
-	SourcePath          string                 `json:"source_path"`
-	RefreshSnapshot     bool                   `json:"refresh_snapshot"`
-	ChangeOnly          bool                   `json:"change_only,omitempty"`
-	GoalWatch           bool                   `json:"goal_watch,omitempty"`
-	PollMinutes         int                    `json:"poll_minutes,omitempty"`
-	AlertWhen           string                 `json:"alert_when,omitempty"`
-	MaxChecksPerDay     int                    `json:"max_checks_per_day,omitempty"`
-	WatchSources        []WatchSource          `json:"watch_sources,omitempty"`
-	RuntimeWatchChanges []WatchChange          `json:"-"`
-	RuntimeWatchItems   []WatchItem            `json:"-"`
-	Objective           string                 `json:"objective"`
-	Provider            string                 `json:"provider,omitempty"`
-	Model               string                 `json:"model,omitempty"`
-	Mode                action.Mode            `json:"mode"`
-	Contract            artifact.Contract      `json:"contract"`
-	ConnectorIDs        []string               `json:"connector_ids,omitempty"`
-	OAuthRefreshPins    map[string]string      `json:"oauth_refresh_pins,omitempty"`
-	OAuthAccountPins    map[string]string      `json:"oauth_account_pins,omitempty"`
-	MaxSteps            int                    `json:"max_steps"`
-	CreatedAt           time.Time              `json:"created_at"`
-	UpdatedAt           time.Time              `json:"updated_at"`
-	LastScheduledAt     time.Time              `json:"last_scheduled_at,omitempty"`
+	OriginConversationID string                 `json:"origin_conversation_id,omitempty"`
+	Limits               agent.Limits           `json:"limits"`
+	WebOrigins           []string               `json:"web_origins,omitempty"`
+	Project              *projectcapture.Bundle `json:"project_configuration,omitempty"`
+	SnapshotID           string                 `json:"snapshot_id,omitempty"`
+	Code                 workrun.CodePolicy     `json:"code_policy,omitempty"`
+	EnableCode           bool                   `json:"enable_code,omitempty"`
+	Version              int                    `json:"version"`
+	ID                   string                 `json:"id"`
+	Name                 string                 `json:"name"`
+	GoalID               string                 `json:"goal_id,omitempty"`
+	Enabled              bool                   `json:"enabled"`
+	Schedule             string                 `json:"schedule"`
+	Timezone             string                 `json:"timezone"`
+	Missed               string                 `json:"missed"`
+	SourcePath           string                 `json:"source_path"`
+	RefreshSnapshot      bool                   `json:"refresh_snapshot"`
+	ChangeOnly           bool                   `json:"change_only,omitempty"`
+	GoalWatch            bool                   `json:"goal_watch,omitempty"`
+	PollMinutes          int                    `json:"poll_minutes,omitempty"`
+	AlertWhen            string                 `json:"alert_when,omitempty"`
+	MaxChecksPerDay      int                    `json:"max_checks_per_day,omitempty"`
+	WatchSources         []WatchSource          `json:"watch_sources,omitempty"`
+	RuntimeWatchChanges  []WatchChange          `json:"-"`
+	RuntimeWatchItems    []WatchItem            `json:"-"`
+	Objective            string                 `json:"objective"`
+	Provider             string                 `json:"provider,omitempty"`
+	Model                string                 `json:"model,omitempty"`
+	Mode                 action.Mode            `json:"mode"`
+	Contract             artifact.Contract      `json:"contract"`
+	ConnectorIDs         []string               `json:"connector_ids,omitempty"`
+	OAuthRefreshPins     map[string]string      `json:"oauth_refresh_pins,omitempty"`
+	OAuthAccountPins     map[string]string      `json:"oauth_account_pins,omitempty"`
+	MaxSteps             int                    `json:"max_steps"`
+	CreatedAt            time.Time              `json:"created_at"`
+	UpdatedAt            time.Time              `json:"updated_at"`
+	LastScheduledAt      time.Time              `json:"last_scheduled_at,omitempty"`
 }
 
 // WatchSource is a user-selected read surface for a polled goal watch. It
@@ -287,6 +288,9 @@ func (s Store) save(definition Definition) (Definition, error) {
 }
 
 func (d Definition) Validate() error {
+	if d.OriginConversationID != "" && (len(d.OriginConversationID) > 96 || invalidID(d.OriginConversationID)) {
+		return errors.New("invalid job originating conversation")
+	}
 	if (d.Version != 1 && d.Version != Version) || invalidID(d.ID) || strings.TrimSpace(d.Name) == "" || len(d.Name) > 128 || strings.ContainsAny(d.Name, "\x00\r\n") || strings.TrimSpace(d.SourcePath) == "" || !filepath.IsAbs(d.SourcePath) || filepath.Clean(d.SourcePath) != d.SourcePath || strings.ContainsRune(d.SourcePath, 0) || strings.TrimSpace(d.Objective) == "" || len(d.Objective) > 64*1024 || strings.ContainsRune(d.Objective, 0) {
 		return errors.New("job identity is invalid")
 	}

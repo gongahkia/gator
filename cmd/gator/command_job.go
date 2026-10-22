@@ -961,7 +961,7 @@ func recordJobInbox(stateDir string, definition jobs.Definition, attempt jobs.At
 	if attempt.Status != "completed" {
 		summary = "Scheduled Work needs attention: " + attempt.Error
 	}
-	return store.Add(inbox.Entry{Kind: "job", Title: definition.Name, Summary: boundedJobError(summary), JobID: definition.ID, GoalID: definition.GoalID, ConversationID: attempt.Conversation, RevisionID: attempt.Revision, Status: attempt.Status, Urgent: attempt.Urgent || attempt.Status != "completed"})
+	return store.Add(inbox.Entry{ID: inbox.JobUpdateID(definition.ID, attempt.ID), Kind: "job", Title: definition.Name, Summary: boundedJobError(summary), JobID: definition.ID, GoalID: definition.GoalID, OriginConversationID: definition.OriginConversationID, AttemptID: attempt.ID, ConversationID: attempt.Conversation, RevisionID: attempt.Revision, Status: attempt.Status, Urgent: attempt.Urgent || attempt.Status != "completed"})
 }
 
 func summarizeJobResult(finalText string, artifacts []artifact.File) string {

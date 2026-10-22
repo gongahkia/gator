@@ -194,14 +194,15 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		ModelStatus: func() (workapp.ModelStatus, error) {
 			return currentWorkModelStatus(settingsStore, stateDir)
 		},
-		Live:            true,
-		BridgeMode:      backend,
-		ManagedSessions: os.Getenv("GATOR_UI_SESSION_HOST") == "1",
-		StartNew:        os.Getenv("GATOR_UI_BOOT_MODE") == "new",
-		StartView:       os.Getenv("GATOR_UI_BOOT_MODE") == "view",
-		InitialTitle:    goalTitle,
-		GoalID:          goalID,
-		CurrentFolder:   workingDirectory, Conversations: conversations, Jobs: definitions, SupervisorRunning: supervisorRunning, Inbox: inboxEntries, Goals: goals, Attention: attention,
+		Live:                     true,
+		BridgeMode:               backend,
+		ManagedSessions:          os.Getenv("GATOR_UI_SESSION_HOST") == "1",
+		StartNew:                 os.Getenv("GATOR_UI_BOOT_MODE") == "new",
+		StartView:                os.Getenv("GATOR_UI_BOOT_MODE") == "view",
+		ViewOriginConversationID: os.Getenv("GATOR_UI_VIEW_ORIGIN"),
+		InitialTitle:             goalTitle,
+		GoalID:                   goalID,
+		CurrentFolder:            workingDirectory, Conversations: conversations, Jobs: definitions, SupervisorRunning: supervisorRunning, Inbox: inboxEntries, Goals: goals, Attention: attention,
 		RefreshAttention: func() (workhome.Attention, error) {
 			freshGoals, err := goalStore.List()
 			if err != nil {

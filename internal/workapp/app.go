@@ -164,75 +164,76 @@ type ModelStatus struct {
 type GoalState struct{ Title, SourcePath, ConversationID string }
 
 type Config struct {
-	SaveConnections         func(string, []string) error
-	Desktop                 appconfig.DesktopSettings
-	ReadDesktop             func() (appconfig.DesktopSettings, error)
-	ValidateUploads         func(source string, paths, uploads []string) error
-	Models                  func() (ModelPanel, error)
-	ComposerModels          func() ([]ComposerModel, error)
-	SelectComposerModel     func(string, string) error
-	SelectedModel           func() (provider, model string, err error)
-	ModelStatus             func() (ModelStatus, error)
-	Live                    bool
-	BridgeMode              bool
-	ManagedSessions         bool
-	StartNew                bool
-	StartView               bool
-	CurrentFolder           string
-	GoalID                  string
-	InitialTitle            string
-	ResolveSource           func(path string) (string, error)
-	ConnectorChoices        func() []string
-	ConnectorAction         func(arguments []string) (string, error)
-	ConnectorCommand        func(arguments []string) *exec.Cmd
-	BundleAction            func(BundleActionRequest) (string, error)
-	ListConversations       func() ([]worksession.Conversation, error)
-	LoadConversation        func(conversationID string) (ConversationState, error)
-	LoadConversationOptions func(conversationID string) (RunOptions, error)
-	Conversations           []worksession.Conversation
-	StartConversationID     string
-	LastConversation        func() (string, error)
-	RememberConversation    func(string) error
-	CreateConversation      func(string) (worksession.Conversation, error)
-	PrimaryConversation     func() (string, error)
-	BindPrimaryConversation func(string) error
-	Jobs                    []jobs.Definition
-	SupervisorRunning       bool
-	Inbox                   []inbox.Entry
-	Goals                   []goal.Record
-	Attention               workhome.Attention
-	RefreshAttention        func() (workhome.Attention, error)
-	ReadOverview            func(context.Context) (workhome.Overview, error)
-	ControlCommand          func([]string) *exec.Cmd
-	ListGoals               func() ([]goal.Record, error)
-	SelectGoal              func(id string) (GoalState, error)
-	ClearGoal               func()
-	MemoryAction            func(arguments []string) (string, error)
-	MemoryResult            func(arguments []string) (*uisnapshot.Result, error)
-	RecallStatus            func(context.Context) (RecallStatus, error)
-	ConfigureChatLearning   func(bool) error
-	ConfigureRecall         func(provider string, allowUpload bool) error
-	InstallRecall           func(context.Context, func(string)) error
-	ReadContext             func(workID, goalID string) (ContextState, error)
-	ChangeKnowledge         func(id, action, text, goalID string) error
-	SaveFollowup            func(followup.Draft) (goal.Record, jobs.Definition, error)
-	ReadChecks              func() ([]workhome.Check, bool, error)
-	StartSupervisor         func() error
-	Controls                func(context.Context, string, string, []string) (ControlScreen, error)
-	BeforeLocalCommand      func() (func(), error)
-	ResetPrivateState       func() (GoalState, error)
-	PilotAction             func(workID string, arguments []string) (*uisnapshot.Result, error)
-	PlanAction              func(command string) (string, error)
-	PlanResult              func(command string) (*uisnapshot.Result, error)
-	ActivityAction          func() (string, error)
-	ActivityResult          func() (*uisnapshot.Result, error)
-	NotificationAction      func(arguments []string) (string, error)
-	SuggestionAction        func(arguments []string) (string, error)
-	NoteAction              func(command string) (string, error)
-	NoteResult              func(command string) (*uisnapshot.Result, error)
-	SkillAction             func(command string) (string, error)
-	SkillResult             func(command string) (*uisnapshot.Result, error)
-	ReviewBundle            func(bundlePath string) (*uisnapshot.Result, error)
+	SaveConnections          func(string, []string) error
+	Desktop                  appconfig.DesktopSettings
+	ReadDesktop              func() (appconfig.DesktopSettings, error)
+	ValidateUploads          func(source string, paths, uploads []string) error
+	Models                   func() (ModelPanel, error)
+	ComposerModels           func() ([]ComposerModel, error)
+	SelectComposerModel      func(string, string) error
+	SelectedModel            func() (provider, model string, err error)
+	ModelStatus              func() (ModelStatus, error)
+	Live                     bool
+	BridgeMode               bool
+	ManagedSessions          bool
+	StartNew                 bool
+	StartView                bool
+	ViewOriginConversationID string
+	CurrentFolder            string
+	GoalID                   string
+	InitialTitle             string
+	ResolveSource            func(path string) (string, error)
+	ConnectorChoices         func() []string
+	ConnectorAction          func(arguments []string) (string, error)
+	ConnectorCommand         func(arguments []string) *exec.Cmd
+	BundleAction             func(BundleActionRequest) (string, error)
+	ListConversations        func() ([]worksession.Conversation, error)
+	LoadConversation         func(conversationID string) (ConversationState, error)
+	LoadConversationOptions  func(conversationID string) (RunOptions, error)
+	Conversations            []worksession.Conversation
+	StartConversationID      string
+	LastConversation         func() (string, error)
+	RememberConversation     func(string) error
+	CreateConversation       func(string) (worksession.Conversation, error)
+	PrimaryConversation      func() (string, error)
+	BindPrimaryConversation  func(string) error
+	Jobs                     []jobs.Definition
+	SupervisorRunning        bool
+	Inbox                    []inbox.Entry
+	Goals                    []goal.Record
+	Attention                workhome.Attention
+	RefreshAttention         func() (workhome.Attention, error)
+	ReadOverview             func(context.Context) (workhome.Overview, error)
+	ControlCommand           func([]string) *exec.Cmd
+	ListGoals                func() ([]goal.Record, error)
+	SelectGoal               func(id string) (GoalState, error)
+	ClearGoal                func()
+	MemoryAction             func(arguments []string) (string, error)
+	MemoryResult             func(arguments []string) (*uisnapshot.Result, error)
+	RecallStatus             func(context.Context) (RecallStatus, error)
+	ConfigureChatLearning    func(bool) error
+	ConfigureRecall          func(provider string, allowUpload bool) error
+	InstallRecall            func(context.Context, func(string)) error
+	ReadContext              func(workID, goalID string) (ContextState, error)
+	ChangeKnowledge          func(id, action, text, goalID string) error
+	SaveFollowup             func(followup.Draft) (goal.Record, jobs.Definition, error)
+	ReadChecks               func() ([]workhome.Check, bool, error)
+	StartSupervisor          func() error
+	Controls                 func(context.Context, string, string, []string) (ControlScreen, error)
+	BeforeLocalCommand       func() (func(), error)
+	ResetPrivateState        func() (GoalState, error)
+	PilotAction              func(workID string, arguments []string) (*uisnapshot.Result, error)
+	PlanAction               func(command string) (string, error)
+	PlanResult               func(command string) (*uisnapshot.Result, error)
+	ActivityAction           func() (string, error)
+	ActivityResult           func() (*uisnapshot.Result, error)
+	NotificationAction       func(arguments []string) (string, error)
+	SuggestionAction         func(arguments []string) (string, error)
+	NoteAction               func(command string) (string, error)
+	NoteResult               func(command string) (*uisnapshot.Result, error)
+	SkillAction              func(command string) (string, error)
+	SkillResult              func(command string) (*uisnapshot.Result, error)
+	ReviewBundle             func(bundlePath string) (*uisnapshot.Result, error)
 	// JobAction uses the canonical local Job service. It keeps scheduling
 	// as repeatable Work rather than creating a second interface-specific runtime.
 	JobAction      func(arguments []string) (string, error)

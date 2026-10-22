@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/gongahkia/gator/internal/action"
@@ -17,6 +18,7 @@ import (
 )
 
 type Draft struct {
+	OriginConversationID                     string
 	Enabled                                  bool
 	ID, GoalID, JobID, ExpectedDigest        string
 	Title, Outcome, SourcePath, AlertWhen    string
@@ -41,6 +43,9 @@ func New(source, goalID string) (Draft, error) {
 }
 
 func (d Draft) Validate() error {
+	if d.OriginConversationID != "" && !regexp.MustCompile(`\A[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}\z`).MatchString(d.OriginConversationID) {
+		return errors.New("invalid originating conversation")
+	}
 	if len(d.ID) != 24 {
 		return errors.New("invalid follow-up draft identity")
 	}
@@ -84,7 +89,7 @@ func (d Draft) Definition(goalID string, sources []jobs.WatchSource) (jobs.Defin
 	if id == "" {
 		id = "job-" + d.ID
 	}
-	return jobs.Definition{ID: id, Name: d.Title, GoalID: goalID, Enabled: d.Enabled, GoalWatch: true, ChangeOnly: true,
+	return jobs.Definition{ID: id, Name: d.Title, GoalID: goalID, OriginConversationID: d.OriginConversationID, Enabled: d.Enabled, GoalWatch: true, ChangeOnly: true,
 		RefreshSnapshot: true, SourcePath: d.SourcePath, Objective: d.Outcome, AlertWhen: d.AlertWhen,
 		Schedule: schedule, PollMinutes: d.IntervalMinutes, Timezone: "UTC", Missed: "run_once", Mode: d.Mode,
 		Contract: contract, ConnectorIDs: append([]string(nil), d.ConnectorIDs...), WatchSources: sources,
@@ -103,6 +108,9 @@ func (d Draft) ReviewLines() []string {
 	lines := []string{"Outcome: " + d.Outcome, "Sources: " + sources, fmt.Sprintf("When: every %d minutes while this computer and the supervisor are running", d.IntervalMinutes), "Notify when: " + d.AlertWhen, "Permitted actions: " + permission, "Sending and publishing require a separate foreground approval.", fmt.Sprintf("Limits: %d Work checks/day; per try %d requests, %d tokens, %ds", d.MaxChecksPerDay, d.MaxRequests, d.MaxTokens, d.MaxSeconds), "Transient failures may retry up to 3 times per check. Cost estimate unavailable; usage is recorded."}
 	if d.GmailQuery != "" {
 		lines = append(lines, "Mail selection: "+d.GmailQuery)
+	}
+	if d.OriginConversationID != "" {
+		lines = append(lines, "Updates return to the conversation where you requested this check.")
 	}
 	if d.CalendarDays > 0 {
 		lines = append(lines, fmt.Sprintf("Calendar selection: next %d days", d.CalendarDays))

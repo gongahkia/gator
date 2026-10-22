@@ -79,7 +79,7 @@ async function startBackend() {
     const workspace = runtimeWorkspace();
     if (!process.env.GATOR_DESKTOP_WORKSPACE) await mkdir(workspace, { recursive: true, mode: 0o700 });
     if (!sessions) {
-      sessions = new Sessions(request => new Backend(binary, workspace, { ...runtimeEnvironment(), GATOR_UI_SESSION_HOST: "1", GATOR_UI_BOOT_MODE: request.new ? "new" : request.view ? "view" : "", GATOR_UI_START_SOURCE: request.source || (request.new || request.view ? sessions?.current?.state?.source || "" : "") }, ["ui-backend", request.goal ? "" : request.conversation_id || "", request.goal ? request.conversation_id : ""]));
+      sessions = new Sessions(request => new Backend(binary, workspace, { ...runtimeEnvironment(), GATOR_UI_SESSION_HOST: "1", GATOR_UI_VIEW_ORIGIN: request.view ? request.origin_conversation_id || "" : "", GATOR_UI_BOOT_MODE: request.new ? "new" : request.view ? "view" : "", GATOR_UI_START_SOURCE: request.source || (request.new || request.view ? sessions?.current?.state?.source || "" : "") }, ["ui-backend", request.goal ? "" : request.conversation_id || "", request.goal ? request.conversation_id : ""]));
       sessions.on("change", () => { backend = sessions.current; update(); });
       await sessions.open();
     } else await sessions.restart();

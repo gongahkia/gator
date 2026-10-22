@@ -12,6 +12,10 @@ func TestManagedChatNavigationKeepsExecutionAndLastOpenedOwnership(t *testing.T)
 	config.LastConversation, config.RememberConversation = store.Active, store.SetActive
 	m := New(config).FocusBridgeSession(true)
 	id := m.conversation
+	m.requestSession(BridgeSessionRequest{View: "/followup"})
+	if m.sessionRequest.OriginConversationID != id {
+		t.Fatal("view navigation lost originating chat")
+	}
 	next, run := m.SubmitText("Keep working here")
 	m = next.(Model)
 	next, _ = m.NavigateBridge("/new")
@@ -48,8 +52,14 @@ func TestManagedReadOnlyViewDoesNotCreateChatsAndSubmissionCapturesModel(t *test
 		return RunResult{FinalText: "done"}
 	})
 	config.ManagedSessions, config.StartView = true, true
+	config.ViewOriginConversationID = "work-requesting-chat"
 	config.SelectedModel = func() (string, string, error) { return "chosen-provider", "chosen-model", nil }
 	m := New(config).FocusBridgeSession(true)
+	m.newFollowup()
+	if m.followupForm.Draft.OriginConversationID != config.ViewOriginConversationID {
+		t.Fatal("follow-up from a view lost its origin")
+	}
+	m.followupForm, m.section = nil, ""
 	chats, err := store.List(50)
 	if err != nil || len(chats) != 0 || m.conversation != "" {
 		t.Fatal("browsing created an empty chat")
