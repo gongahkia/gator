@@ -39,6 +39,7 @@ func (m Model) FocusBridgeSession(foreground bool) Model {
 			m.refreshModelStatus()
 		}
 		m.refreshBridgeConversations()
+		m.refreshChatUpdates()
 		m.rememberChat()
 	}
 	return m
@@ -46,6 +47,7 @@ func (m Model) FocusBridgeSession(foreground bool) Model {
 
 func (m Model) submissionOptions() RunOptions {
 	options := cloneRunOptions(m.options)
+	options.ReplyToUpdateID = m.submissionReply
 	options.ModelProvider, options.ModelName = m.modelStatus.Provider, m.modelStatus.Model
 	return options
 }

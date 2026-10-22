@@ -41,9 +41,9 @@ export function useQueueAction(state: BackendState | undefined, send: (frame: De
 }
 
 export function MessageQueue({ items, running, busy, recovered, issue, act, onUseDraft, onEditingChange }: {
-  items: QueuedMessage[]; running: boolean; busy: boolean; recovered?: boolean; issue?: string; act(change: QueueChange): Promise<void>; onUseDraft(text: string): void; onEditingChange(editing: boolean): void;
+  items: QueuedMessage[]; running: boolean; busy: boolean; recovered?: boolean; issue?: string; act(change: QueueChange): Promise<void>; onUseDraft(text: string, replyToUpdateID?: string): void; onEditingChange(editing: boolean): void;
 }) {
-  const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
+  const [editing, setEditing] = useState<{ id: string; text: string; reply_to_update_id?: string } | null>(null);
   const [error, setError] = useState("");
   const [drag, setDrag] = useState<QueueDrag | null>(null);
   const [announcement, setAnnouncement] = useState("");
@@ -153,7 +153,7 @@ export function MessageQueue({ items, running, busy, recovered, issue, act, onUs
         event.dataTransfer.setData("application/x-gator-queued-message", item.id);
         event.dataTransfer.setDragImage(event.currentTarget.closest("li")!, 20, 20);
       }} onDragEnd={() => setDrag(null)}><GripVertical size={16} /></button>}
-      <span className="queue-position" aria-hidden="true">{index + 1}</span><div className="queue-message"><p className="queue-preview">{item.text}</p><InputFiles names={item.inputs} />{item.interrupted && <p className="queue-interrupted">Interrupted · Check retained work before sending again. Some actions may already have completed.</p>}</div>
+      <span className="queue-position" aria-hidden="true">{index + 1}</span><div className="queue-message">{item.reply_to_update_id && <span className="message-reply-label">Reply to a follow-up</span>}<p className="queue-preview">{item.text}</p><InputFiles names={item.inputs} />{item.interrupted && <p className="queue-interrupted">Interrupted · Check retained work before sending again. Some actions may already have completed.</p>}</div>
       <div className="queue-actions">
         {!running && <button className="icon-button" aria-label={item.interrupted ? `Retry interrupted message ${index + 1}` : `Send queued message ${index + 1} now`} title={item.interrupted ? "Send again as a new attempt" : "Send now"} disabled={busy || !!issue} onClick={() => void change({ id: item.id, action: "run" })}><CornerDownLeft size={15} /></button>}
         <button className="icon-button" aria-label={`Edit queued message ${index + 1}`} title="Edit message" disabled={busy || !!editing} onClick={() => { setError(""); setEditing({ ...item }); }}><Pencil size={14} /></button>
@@ -165,7 +165,7 @@ export function MessageQueue({ items, running, busy, recovered, issue, act, onUs
       if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.nativeEvent.isComposing && !stale && editing.text.trim()) { event.preventDefault(); void change({ id: editing.id, action: "edit", text: editing.text }); }
     }} rows={3} />
       {stale && <p className="queue-edit-notice">This message has left the queue. Your edits are kept here.</p>}
-      <div className="queue-edit-actions"><button className="small-button" disabled={busy} onClick={() => { setEditing(null); setError(""); region.current?.focus(); }}>Cancel</button>{stale ? <button className="small-button" disabled={busy || !editing.text.trim()} onClick={() => { onUseDraft(editing.text); setEditing(null); setError(""); }}>Keep as new draft</button> : <button className="button" disabled={busy || !editing.text.trim()} onClick={() => void change({ id: editing.id, action: "edit", text: editing.text })}>{busy ? "Saving…" : "Save changes"}</button>}</div>
+      <div className="queue-edit-actions"><button className="small-button" disabled={busy} onClick={() => { setEditing(null); setError(""); region.current?.focus(); }}>Cancel</button>{stale ? <button className="small-button" disabled={busy || !editing.text.trim()} onClick={() => { onUseDraft(editing.text, editing.reply_to_update_id); setEditing(null); setError(""); }}>Keep as new draft</button> : <button className="button" disabled={busy || !editing.text.trim()} onClick={() => void change({ id: editing.id, action: "edit", text: editing.text })}>{busy ? "Saving…" : "Save changes"}</button>}</div>
     </div>}
     {error && <div className="queue-error" role="alert"><span>{error}</span><button className="icon-button" aria-label="Dismiss queue error" onClick={() => setError("")}><X size={14} /></button></div>}
   </section>;

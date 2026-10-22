@@ -3,6 +3,16 @@ import assert from "node:assert/strict";
 import { assetPath, externalURL, shellQuote, validateFrame } from "../electron/policy.mjs";
 import { resolve, join } from "node:path";
 
+test("update receipts and replies accept identities but never renderer-supplied authority", () => {
+  const update = { conversation_id: "work-one", id: "inbox-one", action: "read", version: 0 };
+  assert.equal(validateFrame({ type: "update", update }).version, 1);
+  for (const change of [{ conversation_id: "../other" }, { action: "approve" }, { version: -1 }, { version: 0.5 }, { summary: "replacement" }, { job_id: "different-job" }]) assert.throws(() => validateFrame({ type: "update", update: { ...update, ...change } }));
+  const upload = { request_id: "reply-one", context: "conversation:work-one", text: "Use option two", files: [], reply_to_update_id: "inbox-one" };
+  assert.equal(validateFrame({ type: "upload_submit", upload }).version, 1);
+  assert.throws(() => validateFrame({ type: "upload_submit", upload: { ...upload, reply_to_update_id: "../other" } }));
+  assert.throws(() => validateFrame({ type: "upload_submit", upload: { ...upload, goal_id: "other" } }));
+});
+
 test("composer choices carry only bounded identities and canonical work effort", () => {
   const composer = { id: "a".repeat(64), request_id: "picker-1", action: "model", provider: "fixture", model: "model-one" };
   assert.equal(validateFrame({ type: "composer", composer }).version, 1);

@@ -106,15 +106,18 @@ func (m Model) updateContextKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "esc":
 			m.contextDetail = nil
 		case "e":
-			if m.contextDetail.Available {
+			if m.contextDetail.Available && m.contextDetail.Kind != "update" {
 				m.contextEditing = true
 				m.contextEdit = m.contextDetail.CurrentText
 			}
 		case "f":
-			if m.contextDetail.Available {
+			if m.contextDetail.Available && m.contextDetail.Kind != "update" {
 				m.contextConfirm = true
 			}
 		case "o":
+			if m.contextDetail.Kind == "update" {
+				return m, nil
+			}
 			id := m.contextDetail.ID
 			if sliceContains(m.options.ExcludedKnowledgeIDs, id) {
 				m.options.ExcludedKnowledgeIDs = removeString(m.options.ExcludedKnowledgeIDs, id)
@@ -174,7 +177,7 @@ func (m Model) contextPanel() uisnapshot.Panel {
 			p.Hints = []uisnapshot.Hint{{Shortcut: "Enter", Action: "forget saved knowledge", Tone: "error"}, {Shortcut: "Esc", Action: "cancel"}}
 		} else {
 			p.Hints = []uisnapshot.Hint{{Shortcut: "E", Action: "correct"}, {Shortcut: "F", Action: "forget"}, {Shortcut: "O", Action: "omit/include next run"}, {Shortcut: "Esc", Action: "back"}}
-			if !item.Available {
+			if !item.Available || item.Kind == "update" {
 				p.Hints = []uisnapshot.Hint{{Shortcut: "Esc", Action: "back"}}
 			}
 		}

@@ -9,10 +9,11 @@ import (
 )
 
 type BridgeQueuedRun struct {
-	Interrupted bool     `json:"interrupted,omitempty"`
-	Inputs      []string `json:"inputs,omitempty"`
-	ID          string   `json:"id"`
-	Text        string   `json:"text"`
+	ReplyToUpdateID string   `json:"reply_to_update_id,omitempty"`
+	Interrupted     bool     `json:"interrupted,omitempty"`
+	Inputs          []string `json:"inputs,omitempty"`
+	ID              string   `json:"id"`
+	Text            string   `json:"text"`
 }
 
 type BridgeQueueAction struct {

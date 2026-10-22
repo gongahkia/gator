@@ -20,11 +20,14 @@ export class Sessions extends EventEmitter {
   settled() { return this.#transition; }
   activity() {
     const rows = new Map(this.#unread);
+    for (const update of this.current?.state?.update_conversations ?? []) {
+      rows.set(update.id, { id: update.id, title: update.title, status: update.count === 1 ? "New update" : `${update.count} updates`, running: false });
+    }
     for (const worker of this.workers) {
       if (this.#retiring.has(worker)) continue;
       const state = worker.state;
       if (!state?.conversation_id) continue;
-      const status = worker.closed ? "Disconnected" : state.pending_approval ? "Needs review" : state.running ? state.cancelling ? "Stopping" : "Working" : state.queued ? "Paused" : this.#unread.get(state.conversation_id)?.status;
+      const status = worker.closed ? "Disconnected" : state.pending_approval ? "Needs review" : state.running ? state.cancelling ? "Stopping" : "Working" : state.queued ? "Paused" : rows.get(state.conversation_id)?.status;
       if (status) rows.set(state.conversation_id, { id: state.conversation_id, title: state.title, status, running: !!state.running });
     }
     return [...rows.values()];

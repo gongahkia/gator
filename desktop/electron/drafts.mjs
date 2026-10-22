@@ -7,6 +7,7 @@ const lifetime = 7 * 24 * 60 * 60 * 1000;
 const limit = 32;
 const textLimit = 128 * 1024;
 const validContext = (value) => typeof value === "string" && /^(conversation|workspace|topic):.+$/.test(value) && value.length <= 8192;
+const validReply = value => value === undefined || typeof value === "string" && /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(value);
 const canonicalContext = (value) => value.startsWith("topic:") ? `workspace:${value}` : value;
 const validUploads = (value) => value === undefined || Array.isArray(value) && value.length <= uploadLimits.count && value.every(validUpload) && new Set(value.map((file) => file.id)).size === value.length && value.reduce((sum, file) => sum + file.size, 0) <= uploadLimits.total;
 
@@ -32,7 +33,7 @@ export class DraftStore {
     if (!allowed || Object.keys(request).some((key) => !allowed.includes(key))) throw new Error("Invalid draft action");
     if (request.action === "save") {
       const draft = request.draft;
-      if (!draft || typeof draft !== "object" || Array.isArray(draft) || Object.keys(draft).some((key) => !["context", "text", "title", "source", "uploads"].includes(key)) || !validUploads(draft.uploads) || !validContext(draft.context) || typeof draft.text !== "string" || Buffer.byteLength(draft.text) > textLimit || typeof draft.title !== "string" || draft.title.length > 512 || typeof draft.source !== "string" || draft.source.length > 8192) throw new Error("Invalid draft");
+      if (!draft || typeof draft !== "object" || Array.isArray(draft) || Object.keys(draft).some((key) => !["context", "text", "title", "source", "uploads", "reply_to_update_id"].includes(key)) || !validUploads(draft.uploads) || !validReply(draft.reply_to_update_id) || !validContext(draft.context) || typeof draft.text !== "string" || Buffer.byteLength(draft.text) > textLimit || typeof draft.title !== "string" || draft.title.length > 512 || typeof draft.source !== "string" || draft.source.length > 8192) throw new Error("Invalid draft");
     }
     if (request.action === "remove" && !validContext(request.context)) throw new Error("Invalid draft identity");
     if (request.action === "configure" && typeof request.enabled !== "boolean") throw new Error("Invalid draft preference");
@@ -53,7 +54,7 @@ export class DraftStore {
     // builds retain these records too, so a code rollback cannot prune drafts.
     // Migrate the interim topic: keys on the next ordinary access, atomically.
     const seen = new Set();
-    data.drafts = data.enabled ? data.drafts.filter((draft) => validContext(draft.context) && typeof draft.text === "string" && Buffer.byteLength(draft.text) <= textLimit && typeof draft.title === "string" && typeof draft.source === "string" && Number.isFinite(draft.updated) && draft.updated > now - lifetime && draft.updated <= now)
+    data.drafts = data.enabled ? data.drafts.filter((draft) => validContext(draft.context) && validReply(draft.reply_to_update_id) && typeof draft.text === "string" && Buffer.byteLength(draft.text) <= textLimit && typeof draft.title === "string" && typeof draft.source === "string" && Number.isFinite(draft.updated) && draft.updated > now - lifetime && draft.updated <= now)
       .map((draft) => ({ ...draft, context: canonicalContext(draft.context), ...(validUploads(draft.uploads) ? {} : { uploads: [] }) }))
       .filter((draft) => { if (seen.has(draft.context)) return false; seen.add(draft.context); return true; }).slice(0, limit) : [];
     if (request.action === "configure") { data.enabled = request.enabled; if (!data.enabled) data.drafts = []; }
@@ -61,7 +62,7 @@ export class DraftStore {
     if (["save", "remove"].includes(request.action)) {
       const context = canonicalContext(request.draft?.context ?? request.context);
       data.drafts = data.drafts.filter((draft) => draft.context !== context);
-      if (request.action === "save" && data.enabled && (request.draft.text.trim() || request.draft.uploads?.length)) data.drafts.unshift({ ...request.draft, context, updated: now });
+      if (request.action === "save" && data.enabled && (request.draft.text.trim() || request.draft.uploads?.length || request.draft.reply_to_update_id)) data.drafts.unshift({ ...request.draft, context, updated: now });
       data.drafts = data.drafts.slice(0, limit);
     }
     if (previous !== JSON.stringify(data) || ["clear", "configure"].includes(request.action)) {

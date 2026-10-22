@@ -298,6 +298,7 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		},
 		SaveFollowup:       func(draft followup.Draft) (goal.Record, jobs.Definition, error) { return saveFollowup(stateDir, draft) },
 		ReadChecks:         func() ([]workhome.Check, bool, error) { return readFollowupChecks(stateDir) },
+		InboxStore:         &inboxStore,
 		StartSupervisor:    func() error { return startLocalSupervisor(stateDir) },
 		PilotAction:        workPilotResult,
 		Controls:           workControls(stateDir),
@@ -582,6 +583,7 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 	}
 	var appChangesMu sync.Mutex
 	request := workrun.Request{
+		ReplyToUpdateID: options.ReplyToUpdateID,
 		AfterAppRun: func(change workrun.AppChange, mutation workrun.AppMutation) {
 			appChangesMu.Lock()
 			defer appChangesMu.Unlock()
@@ -1105,7 +1107,11 @@ func loadWorkTUIConversation(store worksession.Store, conversationID string) (wo
 	}
 	state.Messages = make([]workapp.TranscriptMessage, 0, len(lineage)*3)
 	for _, revision := range lineage {
-		state.Messages = append(state.Messages, workapp.TranscriptMessage{Role: "You", Text: revision.Objective, InputIDs: append([]string(nil), revision.InputIDs...), Inputs: append([]string(nil), revision.InputNames...)})
+		started := revision.CreatedAt
+		if revision.Activity != nil && !revision.Activity.StartedAt.IsZero() {
+			started = revision.Activity.StartedAt
+		}
+		state.Messages = append(state.Messages, workapp.TranscriptMessage{CreatedAt: started, ReplyToUpdateID: revision.ReplyToUpdateID, Role: "You", Text: revision.Objective, InputIDs: append([]string(nil), revision.InputIDs...), Inputs: append([]string(nil), revision.InputNames...)})
 		activity := revision.Activity.Clone()
 		if strings.TrimSpace(revision.FinalText) != "" {
 			state.Messages = append(state.Messages, workapp.TranscriptMessage{Activity: activity, Role: "Gator", Text: revision.FinalText})

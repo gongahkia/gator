@@ -41,6 +41,7 @@ type ReplayState struct {
 }
 
 type Revision struct {
+	ReplyToUpdateID  string                 `json:"reply_to_update_id,omitempty"`
 	InputIDs         []string               `json:"-"`
 	InputNames       []string               `json:"-"`
 	Activity         *workactivity.Trace    `json:"-"`
@@ -317,6 +318,9 @@ func (s Store) writeConversation(conversation Conversation) error {
 func (s Store) revisionsPath(id string) string { return filepath.Join(s.root, id, "revisions") }
 
 func validateRevision(revision Revision) error {
+	if revision.ReplyToUpdateID != "" && validID(revision.ReplyToUpdateID) != nil {
+		return errors.New("invalid update reply identity")
+	}
 	if (revision.Version != 1 && revision.Version != Version) || validID(revision.ID) != nil || validID(revision.ConversationID) != nil || !strings.HasPrefix(revision.SnapshotID, "snap-") || strings.TrimSpace(revision.Objective) == "" || strings.TrimSpace(revision.BundlePath) == "" || strings.TrimSpace(revision.Status) == "" {
 		return errors.New("revision metadata is invalid")
 	}

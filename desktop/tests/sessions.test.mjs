@@ -20,6 +20,20 @@ const setup = () => {
   return new Sessions(request => new Worker(request.conversation_id || `chat-${++count}`));
 };
 
+test("durable update badges include unopened chats and clear from fresh receipts", async () => {
+  const sessions = setup(); await sessions.open();
+  sessions.current.change({ update_conversations: [{ id: "unopened-chat", title: "Offsite", count: 2 }] });
+  assert.deepEqual(sessions.activity(), [{ id: "unopened-chat", title: "Offsite", status: "2 updates", running: false }]);
+  const worker = sessions.current;
+  await sessions.open({ conversation_id: "unopened-chat" });
+  assert.equal(sessions.current.state.conversation_id, "unopened-chat");
+  assert.equal(sessions.current.frames.length, 0);
+  assert.deepEqual(sessions.activity(), []);
+  worker.change({ update_conversations: [{ id: "unopened-chat", title: "Offsite", count: 2 }] });
+  assert.deepEqual(sessions.activity(), []); // A stale background projection cannot restore a read badge.
+  await sessions.stop();
+});
+
 test("chat navigation retains original execution, approvals and unread results", async () => {
   const sessions = setup(); await sessions.open(); const first = sessions.current;
   first.change({ running: true, pending_approval: { id: 8, token: "first-only" }, queued: 2 });

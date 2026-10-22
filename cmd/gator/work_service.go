@@ -74,6 +74,9 @@ func configuredWorkService(provider, modelName, stateDir string, request *workru
 		return workrun.Service{}, err
 	}
 	request.ContextRefs, request.ContextItems, request.RecallStatus = nil, nil, ""
+	if err := applyUpdateContext(stateDir, request); err != nil {
+		return workrun.Service{}, err
+	}
 	if err := applyMemoryContext(stateDir, request); err != nil {
 		return workrun.Service{}, err
 	}

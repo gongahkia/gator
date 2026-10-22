@@ -32,13 +32,18 @@ export function validateFrame(frame) {
     composer: ["type", "composer"],
     conversation: ["type", "conversation"],
     upload_submit: ["type", "upload"],
+    update: ["type", "update"],
   }[frame.type];
   if (!allowed || Object.keys(frame).some((key) => !allowed.includes(key))) throw new Error("Unsupported desktop action");
   if (JSON.stringify(frame).length > 256 * 1024) throw new Error("Desktop action is too large");
   if (frame.type === "submit" && (typeof frame.text !== "string" || frame.text.length > 128 * 1024)) throw new Error("Invalid request");
   if (frame.type === "upload_submit") {
     const value = frame.upload;
-    if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some((key) => !["request_id", "context", "text", "files"].includes(key)) || typeof value.request_id !== "string" || !/^[a-zA-Z0-9-]{1,64}$/.test(value.request_id) || typeof value.context !== "string" || value.context.length > 8192 || typeof value.text !== "string" || Buffer.byteLength(value.text) > 128 * 1024 || !Array.isArray(value.files) || (!value.files.length && !value.text.trim()) || value.files.length > 4 || new Set(value.files).size !== value.files.length || value.files.some((id) => !validUploadID(id))) throw new Error("Invalid attachment request");
+    if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some((key) => !["request_id", "context", "text", "files", "reply_to_update_id"].includes(key)) || (value.reply_to_update_id !== undefined && (typeof value.reply_to_update_id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(value.reply_to_update_id))) || typeof value.request_id !== "string" || !/^[a-zA-Z0-9-]{1,64}$/.test(value.request_id) || typeof value.context !== "string" || value.context.length > 8192 || typeof value.text !== "string" || Buffer.byteLength(value.text) > 128 * 1024 || !Array.isArray(value.files) || (!value.files.length && !value.text.trim()) || value.files.length > 4 || new Set(value.files).size !== value.files.length || value.files.some((id) => !validUploadID(id))) throw new Error("Invalid attachment request");
+  }
+  if (frame.type === "update") {
+    const value = frame.update;
+    if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some(key => !["conversation_id", "id", "action", "version"].includes(key)) || typeof value.conversation_id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/.test(value.conversation_id) || typeof value.id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(value.id) || !["delivered", "read", "resolve", "reopen", "older", "newer"].includes(value.action) || !Number.isSafeInteger(value.version) || value.version < 0) throw new Error("Invalid update receipt");
   }
   if (frame.type === "navigate" && (typeof frame.text !== "string" || frame.text.length > 4096 || !/^\/[a-z][a-z0-9-]*(?: [a-z][a-z0-9-]*)*$/.test(frame.text) || ["/approve", "/deny", "/quit", "/exit"].includes(frame.text))) throw new Error("Invalid destination");
   if (frame.type === "key" && !["esc", "ctrl+o", "ctrl+p", "ctrl+x", "ctrl+b"].includes(frame.key)) throw new Error("Unsupported shortcut");

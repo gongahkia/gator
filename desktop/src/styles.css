@@ -63,6 +63,23 @@ button:active:not(:disabled) { scale: .96; }
 .icon-swap-on, .icon-swap[data-active="true"] .icon-swap-off { opacity: 0; scale: .25; filter: blur(4px); }
 .icon-swap-off, .icon-swap[data-active="true"] .icon-swap-on { opacity: 1; scale: 1; filter: blur(0); }
 .muted { color: var(--color-muted); }
+.chat-update { margin: 24px 0; max-width: 620px; padding: 16px 18px 8px; background: var(--color-surface); border-radius: var(--radius-lg); box-shadow: inset 0 0 0 1px var(--color-line); overflow-wrap: anywhere; }
+.chat-update header, .chat-update footer, .chat-update-state { display: flex; align-items: center; gap: 8px; }
+.chat-update header { justify-content: space-between; flex-wrap: wrap; color: var(--color-muted); font-size: var(--text-xs); }
+.chat-update time { font-variant-numeric: tabular-nums; }
+.chat-update h3 { font-size: var(--text-ui); font-weight: 600; margin: 8px 0; }
+.chat-update > p, .chat-update-details { font-size: var(--text-sm); color: var(--color-secondary); }
+.chat-update summary { width: fit-content; min-height: 40px; padding-block: 10px; cursor: pointer; color: var(--color-muted); font-size: var(--text-xs); }
+.chat-update-details dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 12px; margin: 12px 0; font-size: var(--text-xs); }
+.chat-update-details dt { color: var(--color-muted); }
+.chat-update-details dd { margin: 0; }
+.chat-update footer { flex-wrap: wrap; margin-left: -8px; }
+.chat-update[data-resolved="true"] { background: transparent; }
+.update-reply-chip { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 8px 0 14px; margin-bottom: 8px; border-left: 2px solid var(--color-muted); color: var(--color-muted); font-size: var(--text-sm); }
+.update-reply-chip span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.update-reply-chip strong { font-weight: 500; color: var(--color-contrast); }
+.message-reply-label { display: block; font-size: var(--text-xs); color: var(--color-muted); margin-bottom: 8px; }
+.update-pages { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; color: var(--color-muted); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
 .literal { white-space: pre-wrap; overflow-wrap: anywhere; }
 .keep-together { white-space: nowrap; }
 .eyebrow { color: var(--color-muted); font-size: var(--text-sm); font-weight: 500; letter-spacing: .04em; }

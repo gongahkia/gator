@@ -267,7 +267,7 @@ func (m Model) runQueued(index int) (tea.Model, tea.Cmd) {
 		m.queue = append(m.queue[:index], m.queue[index+1:]...)
 	}
 	m.home = false
-	m.messages = append(m.messages, message{role: "You", text: next.prompt})
+	m.messages = append(m.messages, message{role: "You", text: next.prompt, createdAt: time.Now().UTC(), replyToUpdateID: next.options.ReplyToUpdateID})
 	m.running = true
 	m.status = "Working…"
 	next.options.PreviousArtifacts = m.previousArtifactPaths()

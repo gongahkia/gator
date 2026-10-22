@@ -679,7 +679,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		Project:      request.Project,
 		Replay:       &worksession.ReplayState{Version: 1, Provider: request.Provider, Messages: replay, Configuration: configuration, CompactionVersion: 1, Summary: summary},
 		ID:           request.RunID, ParentRevisionID: request.ParentRevisionID, SnapshotID: sourceSnapshot.ID,
-		Objective: request.Objective, BundlePath: work.Path, Status: string(manifest.Status), FinalText: result.FinalText, CreatedAt: now(),
+		Objective: request.Objective, ReplyToUpdateID: request.ReplyToUpdateID, BundlePath: work.Path, Status: string(manifest.Status), FinalText: result.FinalText, CreatedAt: now(),
 	}); err != nil {
 		if runErr != nil {
 			return outcome, fmt.Errorf("work execution failed: %v; retain revision: %w", runErr, err)

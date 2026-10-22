@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -25,6 +26,8 @@ const Version = 1
 var idPattern = regexp.MustCompile(`\A[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}\z`)
 
 type Entry struct {
+	NextStep             string    `json:"next_step,omitempty"`
+	Evidence             []string  `json:"evidence,omitempty"`
 	OriginConversationID string    `json:"origin_conversation_id,omitempty"`
 	AttemptID            string    `json:"attempt_id,omitempty"`
 	DeliveredAt          time.Time `json:"delivered_at,omitempty"`
@@ -278,6 +281,14 @@ func (s Store) RatingsForGoal(goalID string) (RatingSummary, error) {
 }
 
 func validateEntry(entry Entry) error {
+	if len(entry.NextStep) > 1024 || len(entry.Evidence) > 8 {
+		return errors.New("update evidence is too large")
+	}
+	for _, reference := range entry.Evidence {
+		if len(reference) > 512 || strings.ContainsRune(reference, 0) {
+			return errors.New("invalid update evidence reference")
+		}
+	}
 	for _, id := range []string{entry.OriginConversationID, entry.AttemptID, entry.ConversationID, entry.RevisionID, entry.JobID} {
 		if id != "" && !idPattern.MatchString(id) {
 			return errors.New("invalid update reference")
@@ -306,7 +317,7 @@ func eventDigest(text string) string {
 }
 
 func sameEvent(a, b Entry) bool {
-	return a.Kind == b.Kind && a.Title == b.Title && a.Summary == b.Summary && a.JobID == b.JobID && a.GoalID == b.GoalID && a.OriginConversationID == b.OriginConversationID && a.AttemptID == b.AttemptID && a.ConversationID == b.ConversationID && a.RevisionID == b.RevisionID && a.Status == b.Status && a.Urgent == b.Urgent
+	return a.Kind == b.Kind && a.Title == b.Title && a.Summary == b.Summary && a.NextStep == b.NextStep && slices.Equal(a.Evidence, b.Evidence) && a.JobID == b.JobID && a.GoalID == b.GoalID && a.OriginConversationID == b.OriginConversationID && a.AttemptID == b.AttemptID && a.ConversationID == b.ConversationID && a.RevisionID == b.RevisionID && a.Status == b.Status && a.Urgent == b.Urgent
 }
 
 var inboxMu sync.Mutex

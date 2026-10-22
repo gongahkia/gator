@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/knowledge"
 	"github.com/gongahkia/gator/internal/memory"
 	"github.com/gongahkia/gator/internal/state"
@@ -43,6 +44,12 @@ func readWorkContext(stateDir, workID, goalID string) (workapp.ContextState, err
 					}
 				}
 				item.Updated = r.UpdatedAt.Local().Format("Jan 2 15:04")
+			}
+		} else if strings.HasPrefix(id, "inbox-") {
+			if store, err := inbox.Open(stateDir); err == nil {
+				if entry, err := store.Load(id); err == nil {
+					item.Kind, item.Title, item.Text, item.CurrentText, item.Scope, item.Source, item.Available = "update", entry.Title, entry.Summary, entry.Summary, "conversation", entry.JobID, true
+				}
 			}
 		} else if strings.HasPrefix(id, "note-") {
 			if r, err := notes.LoadNote(id); err == nil && (r.GoalID == "" || r.GoalID == result.GoalID) {

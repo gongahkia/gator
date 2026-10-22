@@ -5,6 +5,20 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DraftStore } from "../electron/drafts.mjs";
 
+test("update reply drafts retain their referent independently of text across restart", async () => {
+  const root = await mkdtemp(join(tmpdir(), "gator-reply-drafts-"));
+  try {
+    const file = join(root, "drafts.json"), store = new DraftStore(file);
+    const draft = { context: "conversation:one", text: "", title: "One", source: "/project", reply_to_update_id: "inbox-one" };
+    await store.request({ action: "save", draft });
+    const retained = await new DraftStore(file).request({ action: "list" });
+    assert.equal(retained.drafts[0].reply_to_update_id, "inbox-one");
+    await assert.rejects(store.request({ action: "save", draft: { ...draft, reply_to_update_id: "../other" } }));
+    await store.request({ action: "configure", enabled: false });
+    assert.equal((await new DraftStore(file).request({ action: "list" })).drafts.length, 0);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
 test("pending draft failures remain visible to update and shutdown preparation", async () => {
   const root = await mkdtemp(join(tmpdir(), "gator-draft-flush-"));
   try {

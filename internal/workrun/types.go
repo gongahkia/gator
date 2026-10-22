@@ -64,6 +64,8 @@ func (p CodePolicy) HasCapability(name string) bool {
 
 // Request describes one bounded local work session.
 type Request struct {
+	ReplyToUpdateID         string
+	UpdateContext           string
 	InputIDs                []string
 	ForegroundApp           bool
 	LearnFromChats          bool

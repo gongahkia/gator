@@ -113,6 +113,7 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case checksTick:
+		m.refreshChatUpdates()
 		m.refreshBridgeConversations()
 		m.refreshBridgeFollowing()
 		if m.config.ReadChecks == nil {
@@ -882,7 +883,7 @@ func (m Model) submitComposerInput() (tea.Model, tea.Cmd) {
 		}
 		m.options = options
 	}
-	m.messages = append(m.messages, message{role: "You", text: prompt})
+	m.messages = append(m.messages, message{role: "You", text: prompt, createdAt: time.Now().UTC(), replyToUpdateID: m.submissionReply})
 	m.recordPrompt(prompt)
 	m.home = false
 	m.running = true

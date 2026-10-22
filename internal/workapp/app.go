@@ -83,12 +83,14 @@ type CandidateSummary struct {
 // prose, so historical artifact cards retain the same trust boundary as new
 // cards produced in this application session.
 type TranscriptMessage struct {
-	InputIDs []string
-	Inputs   []string
-	Activity *workactivity.Trace
-	Role     string
-	Text     string
-	Bundle   *BundleSummary
+	CreatedAt       time.Time
+	ReplyToUpdateID string
+	InputIDs        []string
+	Inputs          []string
+	Activity        *workactivity.Trace
+	Role            string
+	Text            string
+	Bundle          *BundleSummary
 }
 
 // ConversationState is the projection the application needs to reopen one selected
@@ -118,6 +120,7 @@ type BundleActionRequest struct {
 // one prompt. They configure Gator and bound its internal Code specialist;
 // they are never editable by the manager model itself.
 type RunOptions struct {
+	ReplyToUpdateID         string
 	ModelProvider           string
 	ModelName               string
 	Context                 context.Context          `json:"-"`
@@ -200,6 +203,7 @@ type Config struct {
 	Jobs                     []jobs.Definition
 	SupervisorRunning        bool
 	Inbox                    []inbox.Entry
+	InboxStore               *inbox.Store
 	Goals                    []goal.Record
 	Attention                workhome.Attention
 	RefreshAttention         func() (workhome.Attention, error)
@@ -279,13 +283,15 @@ type entry struct {
 	advanced                                   bool
 }
 type message struct {
-	inputIDs []string
-	inputs   []string
-	activity *workactivity.Trace
-	role     string
-	text     string
-	bundle   *BundleSummary
-	result   *uisnapshot.Result
+	createdAt       time.Time
+	replyToUpdateID string
+	inputIDs        []string
+	inputs          []string
+	activity        *workactivity.Trace
+	role            string
+	text            string
+	bundle          *BundleSummary
+	result          *uisnapshot.Result
 }
 type runDone RunResult
 type bundleActionDone struct {
@@ -322,6 +328,14 @@ type pendingBundleAction struct {
 }
 
 type Model struct {
+	chatUpdates            []inbox.Entry
+	chatUpdatesIssue       string
+	chatUpdatesTotal       int
+	updateConversations    []BridgeUpdateConversation
+	updatePageChat         string
+	updatePageAnchors      []string
+	updatesHaveOlder       bool
+	submissionReply        string
 	background             bool
 	sessionRequest         *BridgeSessionRequest
 	sessionSequence        uint64
@@ -530,6 +544,7 @@ func New(config Config) Model {
 		model.home = false
 		model.title = config.InitialTitle
 	}
+	model.refreshChatUpdates()
 	return model
 }
 

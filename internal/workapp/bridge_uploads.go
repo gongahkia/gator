@@ -12,10 +12,11 @@ import (
 )
 
 type BridgeUploadSubmission struct {
-	RequestID string   `json:"request_id"`
-	Context   string   `json:"context"`
-	Text      string   `json:"text"`
-	Files     []string `json:"files"`
+	ReplyToUpdateID string   `json:"reply_to_update_id,omitempty"`
+	RequestID       string   `json:"request_id"`
+	Context         string   `json:"context"`
+	Text            string   `json:"text"`
+	Files           []string `json:"files"`
 }
 type BridgeUploadResult struct {
 	RequestID string `json:"request_id"`
@@ -56,7 +57,7 @@ func (m Model) SubmitBridgeUploads(request BridgeUploadSubmission) (tea.Model, t
 			continue
 		}
 		var options RunOptions
-		if json.Unmarshal(retained.Options, &options) != nil || retained.Text != text || !slices.Equal(options.Uploads, request.Files) {
+		if json.Unmarshal(retained.Options, &options) != nil || retained.Text != text || options.ReplyToUpdateID != request.ReplyToUpdateID || !slices.Equal(options.Uploads, request.Files) {
 			return fail("This message identity was already used. Review the retained request before sending a different message.")
 		}
 		return m, nil
@@ -65,6 +66,9 @@ func (m Model) SubmitBridgeUploads(request BridgeUploadSubmission) (tea.Model, t
 		return fail("The queue is full. Remove a message before adding another.")
 	}
 	seen := map[string]bool{}
+	if err := m.validateUpdateReply(request.ReplyToUpdateID); err != nil {
+		return fail(err.Error())
+	}
 	for _, id := range request.Files {
 		if !attachment.ValidUploadID(id) || seen[id] {
 			return fail("Invalid attachment selection.")
@@ -81,9 +85,11 @@ func (m Model) SubmitBridgeUploads(request BridgeUploadSubmission) (tea.Model, t
 	}
 	m.options.Uploads = append([]string(nil), request.Files...)
 	m.submissionID = request.RequestID
+	m.submissionReply = request.ReplyToUpdateID
 	next, command := m.SubmitText(text)
 	m = next.(Model)
 	m.submissionID = ""
+	m.submissionReply = ""
 	return m, command
 }
 

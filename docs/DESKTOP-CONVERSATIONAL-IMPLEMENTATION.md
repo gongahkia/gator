@@ -156,14 +156,17 @@ the unsent request. Returning from setup does not submit it automatically.
   before/after placement. Go validates both and moves the whole captured request
   in one event-loop action. A consumed/edited target rejects the drop without a
   partial move. The renderer has no separate execution queue.
-- **Conversation delivery while work runs remains separate application work.**
-  Enter still queues a follow-up; Guide now still requires the live steering
-  channel and acknowledgment. Replacing these controls with messaging claims
-  would misrepresent the current single foreground loop. A future delivery layer
-  needs durable message identities, task routing and accepted corrections.
-- Origin-linked cross-topic updates, conversational responsibility setup, a
-  cross-topic file index, attachment intake, preferred-topic launch settings and
-  richer memory editing remain opportunities. The prototype's example outcomes,
+- Independent chats now retain their own local tasks, admission journals,
+  queues and approvals. Enter queues within the selected chat; Guide now targets
+  that chat's live task. Switching chats keeps the original task running.
+- Reviewed checks now retain their requesting chat separately from their
+  execution conversation. Immutable updates appear there, with durable shown,
+  read and done receipts. Reply binds a saved/queued message to that update;
+  neither reading nor resolving it approves an external action. Updates paginate
+  in bounded batches, and unread badges survive restart. Legacy unlinked results
+  remain in Updates rather than being assigned to a guessed chat.
+- Conversational responsibility setup, a cross-chat file index and richer
+  memory controls remain opportunities. The prototype's example outcomes,
   unread counts, access grants and send confirmations are not production data.
 
 ## Interface review

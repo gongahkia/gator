@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	appconfig "github.com/gongahkia/gator/internal/config"
@@ -19,58 +20,64 @@ import (
 // BridgeState is a display-only projection for the desktop.
 // The Go model remains the sole owner of commands, runs, approvals and history.
 type BridgeState struct {
-	Foreground            bool                      `json:"foreground"`
-	SessionRequest        *BridgeSessionRequest     `json:"session_request,omitempty"`
-	RequestsRecovered     bool                      `json:"requests_recovered,omitempty"`
-	RequestsIssue         string                    `json:"requests_issue,omitempty"`
-	Composer              ComposerSettings          `json:"composer"`
-	ComposerResult        *ComposerResult           `json:"composer_result,omitempty"`
-	Desktop               appconfig.DesktopSettings `json:"desktop"`
-	UploadResult          *BridgeUploadResult       `json:"upload_result,omitempty"`
-	Mode                  string                    `json:"mode"`
-	Panel                 *uisnapshot.Panel         `json:"panel,omitempty"`
-	Activity              *workactivity.Trace       `json:"activity,omitempty"`
-	Messages              []BridgeMessage           `json:"messages"`
-	Commands              []BridgeCommand           `json:"commands"`
-	Actions               []workhome.Action         `json:"actions"`
-	Title                 string                    `json:"title"`
-	Source                string                    `json:"source"`
-	ConversationID        string                    `json:"conversation_id,omitempty"`
-	Primary               bool                      `json:"primary"`
-	PrimaryConversationID string                    `json:"primary_conversation_id,omitempty"`
-	RecentConversations   []BridgeConversation      `json:"recent_conversations,omitempty"`
-	RecentID              string                    `json:"recent_id,omitempty"`
-	RecentIssue           string                    `json:"recent_issue,omitempty"`
-	GoalID                string                    `json:"goal_id,omitempty"`
-	WorkDetails           BridgeWorkDetails         `json:"work_details"`
-	Provider              string                    `json:"provider,omitempty"`
-	Model                 string                    `json:"model,omitempty"`
-	Theme                 string                    `json:"theme"`
-	Status                string                    `json:"status,omitempty"`
-	StatusLine            []string                  `json:"status_line"`
-	StatusLineEnabled     bool                      `json:"status_line_enabled"`
-	Input                 string                    `json:"input,omitempty"`
-	Running               bool                      `json:"running"`
-	Cancelling            bool                      `json:"cancelling"`
-	Elapsed               string                    `json:"elapsed,omitempty"`
-	LoadingFrame          int                       `json:"loading_frame"`
-	Queued                int                       `json:"queued"`
-	Queue                 []BridgeQueuedRun         `json:"queue"`
-	QueueResult           *BridgeQueueResult        `json:"queue_result,omitempty"`
-	GuidanceID            string                    `json:"guidance_id,omitempty"`
-	Home                  bool                      `json:"home"`
-	FirstRun              bool                      `json:"first_run"`
-	SupervisorNeedsStart  bool                      `json:"supervisor_needs_start"`
-	Checks                []BridgeCheck             `json:"checks,omitempty"`
-	ChecksIssue           string                    `json:"checks_issue,omitempty"`
-	FollowingGoals        []BridgeFollowingGoal     `json:"following_goals,omitempty"`
-	FollowingIssue        string                    `json:"following_issue,omitempty"`
-	Overview              *workhome.Overview        `json:"overview,omitempty"`
-	OverviewIssue         string                    `json:"overview_issue,omitempty"`
-	External              *BridgeExternal           `json:"external,omitempty"`
-	PendingApproval       *BridgeApproval           `json:"pending_approval,omitempty"`
-	Notice                string                    `json:"notice,omitempty"`
-	Destination           string                    `json:"destination,omitempty"`
+	UpdatesHaveOlder      bool                       `json:"updates_have_older,omitempty"`
+	UpdatesHaveNewer      bool                       `json:"updates_have_newer,omitempty"`
+	UpdateConversations   []BridgeUpdateConversation `json:"update_conversations,omitempty"`
+	ChatUpdates           []BridgeChatUpdate         `json:"chat_updates,omitempty"`
+	ChatUpdatesIssue      string                     `json:"chat_updates_issue,omitempty"`
+	ChatUpdatesTotal      int                        `json:"chat_updates_total,omitempty"`
+	Foreground            bool                       `json:"foreground"`
+	SessionRequest        *BridgeSessionRequest      `json:"session_request,omitempty"`
+	RequestsRecovered     bool                       `json:"requests_recovered,omitempty"`
+	RequestsIssue         string                     `json:"requests_issue,omitempty"`
+	Composer              ComposerSettings           `json:"composer"`
+	ComposerResult        *ComposerResult            `json:"composer_result,omitempty"`
+	Desktop               appconfig.DesktopSettings  `json:"desktop"`
+	UploadResult          *BridgeUploadResult        `json:"upload_result,omitempty"`
+	Mode                  string                     `json:"mode"`
+	Panel                 *uisnapshot.Panel          `json:"panel,omitempty"`
+	Activity              *workactivity.Trace        `json:"activity,omitempty"`
+	Messages              []BridgeMessage            `json:"messages"`
+	Commands              []BridgeCommand            `json:"commands"`
+	Actions               []workhome.Action          `json:"actions"`
+	Title                 string                     `json:"title"`
+	Source                string                     `json:"source"`
+	ConversationID        string                     `json:"conversation_id,omitempty"`
+	Primary               bool                       `json:"primary"`
+	PrimaryConversationID string                     `json:"primary_conversation_id,omitempty"`
+	RecentConversations   []BridgeConversation       `json:"recent_conversations,omitempty"`
+	RecentID              string                     `json:"recent_id,omitempty"`
+	RecentIssue           string                     `json:"recent_issue,omitempty"`
+	GoalID                string                     `json:"goal_id,omitempty"`
+	WorkDetails           BridgeWorkDetails          `json:"work_details"`
+	Provider              string                     `json:"provider,omitempty"`
+	Model                 string                     `json:"model,omitempty"`
+	Theme                 string                     `json:"theme"`
+	Status                string                     `json:"status,omitempty"`
+	StatusLine            []string                   `json:"status_line"`
+	StatusLineEnabled     bool                       `json:"status_line_enabled"`
+	Input                 string                     `json:"input,omitempty"`
+	Running               bool                       `json:"running"`
+	Cancelling            bool                       `json:"cancelling"`
+	Elapsed               string                     `json:"elapsed,omitempty"`
+	LoadingFrame          int                        `json:"loading_frame"`
+	Queued                int                        `json:"queued"`
+	Queue                 []BridgeQueuedRun          `json:"queue"`
+	QueueResult           *BridgeQueueResult         `json:"queue_result,omitempty"`
+	GuidanceID            string                     `json:"guidance_id,omitempty"`
+	Home                  bool                       `json:"home"`
+	FirstRun              bool                       `json:"first_run"`
+	SupervisorNeedsStart  bool                       `json:"supervisor_needs_start"`
+	Checks                []BridgeCheck              `json:"checks,omitempty"`
+	ChecksIssue           string                     `json:"checks_issue,omitempty"`
+	FollowingGoals        []BridgeFollowingGoal      `json:"following_goals,omitempty"`
+	FollowingIssue        string                     `json:"following_issue,omitempty"`
+	Overview              *workhome.Overview         `json:"overview,omitempty"`
+	OverviewIssue         string                     `json:"overview_issue,omitempty"`
+	External              *BridgeExternal            `json:"external,omitempty"`
+	PendingApproval       *BridgeApproval            `json:"pending_approval,omitempty"`
+	Notice                string                     `json:"notice,omitempty"`
+	Destination           string                     `json:"destination,omitempty"`
 }
 
 type BridgeApproval struct {
@@ -103,13 +110,15 @@ func bridgeExternal(kind, action, id string, command *exec.Cmd) *BridgeExternal 
 }
 
 type BridgeMessage struct {
-	InputIDs []string            `json:"input_ids,omitempty"`
-	Inputs   []string            `json:"inputs,omitempty"`
-	Activity *workactivity.Trace `json:"activity,omitempty"`
-	Role     string              `json:"role"`
-	Text     string              `json:"text"`
-	Bundle   *BundleSummary      `json:"bundle,omitempty"`
-	Result   *uisnapshot.Result  `json:"result,omitempty"`
+	CreatedAt       time.Time           `json:"created_at,omitempty"`
+	ReplyToUpdateID string              `json:"reply_to_update_id,omitempty"`
+	InputIDs        []string            `json:"input_ids,omitempty"`
+	Inputs          []string            `json:"inputs,omitempty"`
+	Activity        *workactivity.Trace `json:"activity,omitempty"`
+	Role            string              `json:"role"`
+	Text            string              `json:"text"`
+	Bundle          *BundleSummary      `json:"bundle,omitempty"`
+	Result          *uisnapshot.Result  `json:"result,omitempty"`
 }
 
 type BridgeCommand struct {
@@ -147,6 +156,9 @@ func (m Model) BridgeState() BridgeState {
 	desktop := m.desktop
 	desktop.Shortcuts = m.desktop.ResolvedShortcuts()
 	state := BridgeState{
+		UpdatesHaveOlder: m.updatesHaveOlder, UpdatesHaveNewer: len(m.updatePageAnchors) > 0,
+		UpdateConversations: append([]BridgeUpdateConversation(nil), m.updateConversations...),
+		ChatUpdates:         m.bridgeChatUpdates(), ChatUpdatesIssue: m.chatUpdatesIssue, ChatUpdatesTotal: m.chatUpdatesTotal,
 		Foreground:            !m.background,
 		SessionRequest:        m.sessionRequest,
 		RequestsRecovered:     m.requestsRecovered,
@@ -186,7 +198,7 @@ func (m Model) BridgeState() BridgeState {
 		Notice:                m.bridgeNotice,
 	}
 	for _, item := range m.queue {
-		state.Queue = append(state.Queue, BridgeQueuedRun{Interrupted: item.interrupted, Inputs: uploadNames(item.options.Uploads), ID: bridgeQueuedRunID(item), Text: item.prompt})
+		state.Queue = append(state.Queue, BridgeQueuedRun{ReplyToUpdateID: item.options.ReplyToUpdateID, Interrupted: item.interrupted, Inputs: uploadNames(item.options.Uploads), ID: bridgeQueuedRunID(item), Text: item.prompt})
 	}
 	state.GuidanceID = m.bridgeGuidanceID()
 	state.WorkDetails = BridgeWorkDetails{
@@ -226,7 +238,7 @@ func (m Model) BridgeState() BridgeState {
 		}
 	}
 	for _, item := range m.messages {
-		state.Messages = append(state.Messages, BridgeMessage{InputIDs: append([]string(nil), item.inputIDs...), Inputs: append([]string(nil), item.inputs...), Activity: item.activity.Clone(), Role: item.role, Text: item.text, Bundle: cloneBundlePointer(item.bundle), Result: item.result})
+		state.Messages = append(state.Messages, BridgeMessage{CreatedAt: item.createdAt, ReplyToUpdateID: item.replyToUpdateID, InputIDs: append([]string(nil), item.inputIDs...), Inputs: append([]string(nil), item.inputs...), Activity: item.activity.Clone(), Role: item.role, Text: item.text, Bundle: cloneBundlePointer(item.bundle), Result: item.result})
 	}
 	for _, item := range m.availableCommandEntries() {
 		state.Commands = append(state.Commands, BridgeCommand{
