@@ -95,7 +95,7 @@ export function MessageQueue({ items, running, busy, act, onUseDraft, onEditingC
   };
   const pickUp = (item: QueuedMessage, index: number, keyboard: boolean) => {
     setError(""); setDrag({ id: item.id, signature, keyboard, position: index });
-    setAnnouncement(`Picked up message ${index + 1} of ${items.length}. Use the up and down arrow keys to choose a position, Enter to drop, or Escape to cancel.`);
+    setAnnouncement(keyboard ? `Picked up message ${index + 1} of ${items.length}. Use the up and down arrow keys to choose a position, Enter to drop, or Escape to cancel.` : `Moving message ${index + 1} of ${items.length}. Drop it before or after another queued message.`);
   };
   const keyboardDrag = (event: KeyboardEvent<HTMLButtonElement>, item: QueuedMessage, index: number) => {
     if (busy || editing) return;
