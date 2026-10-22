@@ -23,7 +23,7 @@ action reviews, accounting and delivery services.
 | Talk with Gator / brand | Returns to the current chat; launch reopens the last selected chat with its durable head and source/options. | Conversation IDs, revision ancestry, independent sources and existing history. |
 | Saved conversations / folder selection | New chat / Cmd/Ctrl+N creates a separate working context. Reopen an older chat or choose a different source folder for another independent chat. | Per-conversation drafts, prompt history, source snapshots, run options and existing saved topics. |
 | Recent chats | Titles first; flat by default, optional folder grouping; filter and expand controls. | Exact list identity validation, current-run attention, disambiguated folder names and full conversation picker. |
-| Search / Cmd/Ctrl+K | Existing palette, with added entries for Talk with Gator, Following and Saved. | Advanced commands, keyboard selection, input-prefilling commands and focus return. |
+| Cmd/Ctrl+K | Keyboard-only command palette, including Talk with Gator, Following and Saved. No Search button in the sidebar. | Advanced commands, keyboard selection, input-prefilling commands and focus return. |
 | Following | Read-only saved-goal and actual check summaries; links to Open goals, Manage checks, Updates and Activity & attention. | Goal editor, plans, scheduler scope/timing, inbox read/rating controls, overview and canonical reviews. |
 | Saved | Current conversation's files and changes, What Gator remembers, All conversations, Task runs and Unsent drafts. | Knowledge filtering/correction/deletion, retained run evidence, conversation continuation and draft retention. |
 | File card in chat / Saved | Opens the exact retained file inside its chat message, with supported preview/edit controls. | Checked/needs-review/proposal states, failed-run origin, text/Markdown previews, shortened-preview notice, source-only HTML and retained locations. |
@@ -35,6 +35,21 @@ The default home dashboard, rotating starter strip, duplicated conversation/run
 tabs and placeholder context-capacity disclosure are retired. Their services
 and retained records remain available through the routes above. Detailed screens
 keep the existing polished layouts and native fields.
+
+## What the sections mean
+
+| Term | Meaning | Example |
+| --- | --- | --- |
+| Following | Ongoing goals and configured recurring checks, with their updates and requests for attention. A saved goal alone does not start background work. | A release-readiness goal, with an optional scheduled check. |
+| Saved | The library of retained information and work: personal memory/notes, chats, task results, drafts, and the current conversation's files. | A response preference, a planning note, or a generated report. |
+| Workspace | A local source folder used by a conversation's file tools. Source reads use the existing snapshots; selecting a folder does not mean all its files were read. | The Gator repository or a folder of travel documents. |
+| Conversation | One message thread with its own transcript, draft, sources and task/connection selections. Several conversations can use the same workspace. | Separate threads for a sidebar fix and release planning, both using the same repository. |
+
+Workspace is a folder/source concept, like a project directory. Conversation is
+a chat/thread concept. Neither is a separate personal-memory profile: useful
+personal memories are shared across chats in the same local Gator profile.
+Everyday conversation can use the private empty workspace without choosing a
+project folder.
 
 ## Durable state and migration
 

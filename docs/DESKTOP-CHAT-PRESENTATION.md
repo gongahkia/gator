@@ -632,3 +632,58 @@ context and tool paths; it does not establish recall accuracy for every model.
 Roll back dependent application/UI commits before their memory/chat-store
 infrastructure. Legacy primary designations and existing conversation IDs remain
 intact; no transcript merge or destructive migration was performed.
+
+## Follow-up: quieter focus, keyboard-only command search and aligned chat rows
+
+22 October 2026. Implements the user's three screenshot corrections. Command
+search remains available through its configured shortcut (Cmd/Ctrl+K by default).
+The sidebar entry is removed, including its obsolete focus-return target and
+spacing rule. Text fields no longer draw green outlines or duplicate frames.
+Native forms retain quiet neutral border feedback; text editing keeps its caret.
+
+### Full scoped review
+
+React 19 with the existing CSS tokens/utilities and Lucide icons. Scope:
+conversation list rows, command discovery/focus return, all text inputs,
+textareas/selects/contenteditable editors and their existing containers. No
+backend, memory, workspace or scheduling behavior is changed.
+
+| Category | Evidence inspected | Result |
+| --- | --- | --- |
+| Typography | Wrapped conversation titles, source ellipsis and tabular dates at 1440/800 px | Clear; title/source and trailing date retain their existing typography. |
+| Surfaces | Shared input rule, search/composer/queue containers, native forms, Word/Excel/PowerPoint/CSV and Markdown editing | Remove the shared and specialized green frames; neutral structural borders remain. |
+| Animations | Existing palette/sidebar transitions at 10% playback, reversals and reduced motion | No new animation; removing the sidebar entry preserves keyboard focus and modal exit behavior. |
+| Icons | Conversation chevron layout and removed sidebar Search icon | Date and chevron share one normal-flow, vertically centered group; existing Lucide/currentColor convention retained. |
+| Performance | CSS layout/selectors and command-return ref | No dependency, measurement loop, model call or backend work added. Geometry is measured only by the regression test. |
+
+| Severity | Location | Before | After | Why |
+| --- | --- | --- | --- | --- |
+| MEDIUM | `desktop/src/ConversationsPanel.tsx:51`, `desktop/src/styles.css:768` | An absolutely positioned chevron centered on the whole row, above the date | Flexible title/source column plus an inline date/chevron group | Optical alignment stays consistent for long titles, differing dates and narrow windows. |
+| MEDIUM | `desktop/src/App.tsx:226`, `desktop/src/styles.css:118` | Sidebar Search row with keyboard focus returned to that button | Shortcut-only palette; return to the original control and retain intentional group spacing | Honor the requested navigation simplification without a removed or invisible focus target. |
+| MEDIUM | `desktop/src/styles.css:44`, `:162`, `:255`, `:451`, `:491` and file editor rules | Green text-field outlines, container underlines/shadows and an Office-specific green outline | No text-field outline, neutral form/search borders, neutral queue/drop frames and existing text caret | One consistent focus treatment covers the full request, including nested and light document surfaces. |
+
+Considered but rejected:
+
+| Location | Candidate | Rejected because |
+| --- | --- | --- |
+| Conversation rows | Move the absolute chevron by a few pixels | A fixed nudge would still depend on row height and title wrapping. |
+| Sidebar | Hide Search while keeping its button for focus return | That would leave a misleading invisible control; focus should return to the real originating element. |
+| Text fields | Patch only the Saved knowledge filter | The shared outline and specialized composer/Office rules caused the same issue on other screens. |
+
+Verification results follow. Native screen-reader and Windows/Linux checks
+are outside this scoped macOS review.
+
+### Verification and verdict
+
+- `npm run check --prefix desktop` and `npm run build:ui --prefix desktop`: passed.
+- `npm run test:e2e --prefix desktop -- chat-search.spec.ts polish.spec.ts desktop.spec.ts inline-files.spec.ts --grep 'dated chat search|text fields use quiet|motion is interruptible|Word Excel' --reporter=line`: four source-app scenarios passed. They cover row geometry at 1440/800 px, keyboard discovery and focus return, quiet focus in Gator/contrast/mono, native forms, Markdown and native Office/CSV editing, plus 10% motion reversal/reduced motion.
+- `npm run pack --prefix desktop`: built the unsigned macOS app. Compared 21 Electron/UI files and the runtime with the packaged bytes; all matched.
+- `GATOR_DESKTOP_TEST_EXECUTABLE="$PWD/desktop/release/mac/Gator.app/Contents/MacOS/Gator" npm run test:e2e --prefix desktop -- chat-search.spec.ts polish.spec.ts --grep 'dated chat search|text fields use quiet' --reporter=line`: two packaged scenarios passed.
+- Visually inspected aligned rows with wrapped titles at 800 px, focused Saved knowledge/native form fields, the compact inline editor and the 10% sidebar midpoint. Search is absent from sidebar navigation. Text fields have no green outline or duplicate frame; normal structural borders, caret and responsive layout remain clear.
+
+**Verdict: Approve for the scoped macOS changes.** Not verified: native
+Windows/Linux execution and native screen-reader interaction. Backend behavior
+is unchanged; checks used isolated temporary profiles.
+
+Atomic UI commits: `ee464aede` (chat row alignment), `4a3c2af5c`
+(shortcut-only command search), and `21aa22a01` (shared quiet text-field focus).
