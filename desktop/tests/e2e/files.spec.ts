@@ -1,0 +1,59 @@
+import { _electron as electron, test, expect } from "@playwright/test";
+import { join, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { rm } from "node:fs/promises";
+import { closeDesktop, temporaryDirectory } from "./lifecycle";
+import type { BackendBundle, BackendState } from "../../src/protocol";
+
+test("contextual files reuse retained previews and show the exact origin in chat", async () => {
+  const directory = await temporaryDirectory(join(tmpdir(), "gator-files-e2e-"));
+  const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
+  const app = await electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env: { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") } });
+  try {
+    const page = await app.firstWindow();
+    const composer = page.getByRole("textbox", { name: "Message Gator", exact: true });
+    await expect(composer).toBeVisible();
+    const snapshot = await page.evaluate(() => window.gator!.snapshot());
+    const bundle: BackendBundle = { Path: "/retained/earlier", Status: "completed", Artifacts: [{ Path: "report.md", MediaType: "text/markdown", Valid: true, PreviewKind: "markdown", Preview: "# Retained report\n\nExact retained text." }], Candidates: null };
+    const latest: BackendBundle = { Path: "/retained/latest", Status: "failed", Artifacts: [{ Path: "report.md", MediaType: "text/markdown", Valid: false, PreviewKind: "text", Preview: "A later failed version" }], Candidates: null };
+    const messages = [{ role: "Deliverables", text: "", bundle }, ...Array.from({ length: 30 }, (_, i) => ({ role: i % 2 ? "Gator" : "You", text: `Other message ${i}.\n\nKeep the earlier report reachable.` }))];
+    const state: BackendState = { ...snapshot.state!, home: false, conversation_id: "files-display", messages, work_details: { mode: "auto", attachments: [], connector_ids: [], latest_bundle: latest } };
+    await app.evaluate(({ BrowserWindow }, snapshot) => BrowserWindow.getAllWindows()[0].webContents.send("gator:update", snapshot), { ...snapshot, state });
+    const trigger = page.getByRole("button", { name: "Files in this conversation (2)", exact: true });
+    await expect(trigger).toBeVisible();
+    await composer.fill("Keep my file question");
+    await trigger.click();
+    const rail = page.getByRole("complementary", { name: "Files", exact: true });
+    await expect(rail).toBeVisible();
+    await expect(rail.getByRole("button", { name: /^Sources & memory/ })).toHaveCount(0);
+    const search = rail.getByRole("searchbox", { name: "Find files in this conversation" });
+    await search.fill("missing");
+    await expect(rail.getByText("No matching files. Try another filename.")).toBeVisible();
+    await search.press("Escape");
+    await rail.getByRole("button", { name: /report.md Needs review/ }).click();
+    await expect(rail.getByText("A later failed version", { exact: true })).toBeVisible();
+    await expect(rail.getByRole("button", { name: "Show in chat", exact: true })).toHaveCount(0);
+    await rail.getByRole("button", { name: "All files", exact: true }).click();
+    await rail.getByRole("button", { name: /report.md Checks passed/ }).click();
+    await expect(rail.getByRole("heading", { name: "Retained report", exact: true })).toBeVisible();
+    await page.screenshot({ path: "test-results/desktop-files-preview.png" });
+    await rail.getByRole("button", { name: "Show in chat", exact: true }).click();
+    await expect(rail).toHaveCount(0);
+    const origin = page.locator(".conversation-scroll .output-card");
+    await expect(origin).toBeFocused();
+    await expect(origin).toBeInViewport();
+    await expect(composer).toHaveValue("Keep my file question");
+    await trigger.click();
+    await page.getByRole("button", { name: "Close files", exact: true }).click();
+    await expect(trigger).toBeFocused();
+    // The same rail becomes a modal overlay at a narrow native window size.
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(800, 700));
+    await trigger.click();
+    const modal = page.getByRole("dialog", { name: "Files", exact: true });
+    await expect(modal).toHaveAttribute("aria-modal", "true");
+    await page.screenshot({ path: "test-results/desktop-files-narrow.png" });
+    await page.keyboard.press("Escape");
+    await expect(modal).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  } finally { await closeDesktop(app); await rm(directory, { recursive: true, force: true }); }
+});

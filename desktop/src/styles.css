@@ -708,3 +708,12 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .chat-search-row time { flex-shrink: 0; }
 .chat-browser mark, .recent-work mark, .work-output mark { background: var(--color-selected-fill); color: var(--color-accent); border-radius: 2px; }
 
+.files-trigger { display: inline-flex; align-items: center; gap: 7px; }
+.files-trigger small { font-size: var(--text-xs); color: var(--color-muted); font-variant-numeric: tabular-nums; }
+.files-trigger[aria-expanded="true"] { background: var(--color-selected-fill); color: var(--color-accent); }
+.file-search { display: flex; align-items: center; gap: 8px; min-height: 40px; margin: 10px 0; padding-left: 10px; color: var(--color-muted); border-radius: var(--radius-sm); box-shadow: inset 0 0 0 1px var(--color-line); }
+.file-search input { width: 100%; min-width: 0; border: 0; background: transparent; color: var(--color-contrast); font-size: var(--text-sm); padding: 10px 0; }
+.file-search input::-webkit-search-cancel-button { display: none; }
+.file-search > svg { flex-shrink: 0; }
+.show-in-chat { display: inline-flex; gap: 8px; align-items: center; margin: 16px 0 4px; }
+

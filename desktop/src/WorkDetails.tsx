@@ -1,11 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, FileCode2, Files, FileText, Folder, Plug, X } from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, FileCode2, Files, FileText, Folder, MessageSquare, Plug, Search, X } from "lucide-react";
 import type { BackendState } from "./protocol";
 import type { PresenceRef } from "./motion";
 import { Markdown } from "./Result";
 import { CopyButton } from "./CopyButton";
 import { useModalFocus } from "./useModalFocus";
 import { bundleOutputs, conversationBundles, outputState } from "./conversationOutputs";
+import { Highlight } from "./chatPresentation";
 
 type SectionID = "outputs" | "context" | "connections" | "workspace";
 const defaults: Record<SectionID, boolean> = { outputs: true, context: false, connections: false, workspace: false };
@@ -34,7 +35,8 @@ function timestamp(value?: string) {
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(value));
 }
 
-export function WorkDetails({ state, identity, requestedOutput, open, presenceRef, close, navigate }: { state: BackendState; identity: string; requestedOutput?: { conversation: string; output: string; request: number }; open: boolean; presenceRef: PresenceRef; close(): void; navigate(command: string): void }) {
+export function WorkDetails({ state, identity, requestedOutput, open, presenceRef, close, navigate, filesOnly = false, showInChat }: { state: BackendState; identity: string; requestedOutput?: { conversation: string; output: string; request: number }; open: boolean; presenceRef: PresenceRef; close(): void; navigate(command: string): void; filesOnly?: boolean; showInChat(id: string): void }) {
+  const [query, setQuery] = useState("");
   const [sections, setSections] = useState(readSections);
   const [narrow, setNarrow] = useState(() => matchMedia("(max-width: 960px)").matches);
   const [selection, setSelection] = useState<{ conversation: string; output: string }>();
@@ -49,7 +51,13 @@ export function WorkDetails({ state, identity, requestedOutput, open, presenceRe
   const bundles = useMemo(() => conversationBundles(state), [state.messages, details?.latest_bundle]);
   const latest = details?.latest_bundle ?? bundles.at(-1);
   const outputs = useMemo(() => bundles.flatMap((bundle, index) => bundleOutputs(bundle, index + 1)).reverse(), [bundles]);
+  const term = query.trim().toLocaleLowerCase();
+  const filtered = outputs.filter((output) => !term || `${output.file?.Path || ""} ${output.candidate?.ID || ""} ${output.candidate?.ChangedPaths.join(" ") || ""}`.toLocaleLowerCase().includes(term));
+  const inChat = new Set(state.messages.flatMap((message) => message.bundle ? bundleOutputs(message.bundle).map((output) => output.id) : []));
+  const railTitle = filesOnly ? "Files" : "Conversation information";
   const selected = selection?.conversation === identity ? outputs.find((output) => output.id === selection.output) : undefined;
+
+  useEffect(() => { setQuery(""); }, [identity]);
 
   useEffect(() => {
     if (!open) return;
@@ -89,16 +97,23 @@ export function WorkDetails({ state, identity, requestedOutput, open, presenceRe
   const blocked = state.running || !!state.external || state.mode === "panel";
   const go = (command: string) => { close(); navigate(command); };
 
+  const outputList = <>
+    {(filesOnly || outputs.length > 5) && <div className="file-search" role="search"><Search size={14} /><input type="search" aria-label="Find files in this conversation" placeholder="Find a file…" value={query} maxLength={256} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape" && query) { event.preventDefault(); event.stopPropagation(); setQuery(""); } }} />{query && <button className="icon-button" aria-label="Clear file search" onClick={() => setQuery("")}><X size={14} /></button>}</div>}
+            {filtered.length ? <div className="work-output-list">{filtered.map((output) => <button key={output.id} data-output-id={output.id} className="work-output" onClick={() => { listPosition.current = content.current?.scrollTop ?? 0; setSelection({ conversation: identity, output: output.id }); }}>
+              {output.candidate ? <FileCode2 size={17} /> : <FileText size={17} />}<span><strong><Highlight text={output.file?.Path || `Change ${output.candidate?.ID}`} query={query} /></strong><small data-tone={output.bundle.Status === "failed" || (output.file && !output.file.Valid) ? "warning" : undefined}>{outputState(output)}{output.bundle.Status === "failed" ? " · failed run" : ""}{bundles.length > 1 && <> · <span className="keep-together">Result {output.group}</span></>}</small></span><ChevronRight size={14} />
+            </button>)}</div> : <p className="work-details-empty">{term ? "No matching files. Try another filename." : "Files and proposed changes appear here when a task produces them."}</p>}
+  </>;
+
   return <>
     {narrow && open && <div className="work-details-scrim" aria-hidden="true" onClick={close} />}
-    <aside ref={(element) => { root.current = element; focus.current = element; presenceRef(element); }} id="work-details-panel" className="workspace-panel" aria-label="Conversation information" role={narrow ? "dialog" : undefined} aria-modal={narrow && open ? true : undefined} data-open={open} inert={!open} aria-hidden={!open} onKeyDown={(event) => {
+    <aside ref={(element) => { root.current = element; focus.current = element; presenceRef(element); }} id="work-details-panel" className="workspace-panel" aria-label={railTitle} role={narrow ? "dialog" : undefined} aria-modal={narrow && open ? true : undefined} data-open={open} inert={!open} aria-hidden={!open} onKeyDown={(event) => {
       if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); if (selected) back(); else close(); }
       if (narrow && (event.metaKey || event.ctrlKey) && ["n", "k", "f", ","].includes(event.key.toLowerCase())) event.stopPropagation();
     }}>
-      <header className="work-details-heading"><h2>Conversation information</h2><button className="icon-button" aria-label="Close conversation information" onClick={close}><X size={16} /></button></header>
+      <header className="work-details-heading"><h2>{railTitle}</h2><button className="icon-button" aria-label={`Close ${railTitle.toLowerCase()}`} onClick={close}><X size={16} /></button></header>
       <div ref={content} className="workspace-content">
         {selected ? <section className="output-preview" aria-label="Output preview">
-          <button className="small-button output-back" onClick={back}><ArrowLeft size={15} />All outputs</button>
+          <button className="small-button output-back" onClick={back}><ArrowLeft size={15} />{filesOnly ? "All files" : "All outputs"}</button>
           <h3 ref={previewHeading} tabIndex={-1}>{title}</h3>
           <div className="output-preview-meta"><span data-tone={selected.file && !selected.file.Valid ? "warning" : undefined}>{outputState(selected)}</span><span>{selected.file?.MediaType || "Proposed file changes"}</span>{selected.file?.Bytes !== undefined && <span>{bytes(selected.file.Bytes)}</span>}</div>
           {selected.bundle.Status === "failed" && <p className="work-details-notice" data-tone="warning">Retained from a failed run.</p>}
@@ -107,13 +122,11 @@ export function WorkDetails({ state, identity, requestedOutput, open, presenceRe
             {selected.file.Preview ? <><div className="output-preview-toolbar"><span>Retained preview</span><CopyButton text={selected.file.Preview} label="Copy preview" /></div>{selected.file.PreviewKind === "markdown" ? <Markdown text={selected.file.Preview} /> : <pre className="output-source">{selected.file.Preview}</pre>}{selected.file.Truncated && <p className="work-details-caption">Showing a shortened preview.</p>}</> : <p className="work-details-empty">No text preview is available for this file.</p>}
             <p className="work-details-caption">File checks do not confirm external delivery.</p>
           </> : <><p className="work-details-caption">Proposed changes; this view does not apply them.</p><ul className="work-details-list">{(selected.candidate?.ChangedPaths ?? []).map((path) => <li key={path}>{path}</li>)}</ul></>}
+          {inChat.has(selected.id) && <button className="small-button show-in-chat" onClick={() => showInChat(selected.id)}><MessageSquare size={15} />Show in chat</button>}
           <details className="output-location"><summary>Retained location<ChevronDown size={14} /></summary><p>{selected.bundle.Path}</p>{selected.candidate?.PatchPath && <p>{selected.candidate.PatchPath}</p>}</details>
         </section> : <>
-          <Section id="outputs" title="Outputs" icon={<Files size={16} />} summary={String(outputs.length)} open={sections.outputs} toggle={() => toggle("outputs")}>
-            {outputs.length ? <div className="work-output-list">{outputs.map((output) => <button key={output.id} data-output-id={output.id} className="work-output" onClick={() => { listPosition.current = content.current?.scrollTop ?? 0; setSelection({ conversation: identity, output: output.id }); }}>
-              {output.candidate ? <FileCode2 size={17} /> : <FileText size={17} />}<span><strong>{output.file?.Path || `Change ${output.candidate?.ID}`}</strong><small data-tone={output.bundle.Status === "failed" || (output.file && !output.file.Valid) ? "warning" : undefined}>{outputState(output)}{output.bundle.Status === "failed" ? " · failed run" : ""}{bundles.length > 1 && <> · <span className="keep-together">Result {output.group}</span></>}</small></span><ChevronRight size={14} />
-            </button>)}</div> : <p className="work-details-empty">Files and proposed changes appear here when a task produces them.</p>}
-          </Section>
+          {filesOnly ? <section className="files-list-view" aria-label="Files and changes"><p className="work-details-caption">{outputs.length} retained {outputs.length === 1 ? "output" : "outputs"}</p>{outputList}</section> : <Section id="outputs" title="Outputs" icon={<Files size={16} />} summary={String(outputs.length)} open={sections.outputs} toggle={() => toggle("outputs")}>{outputList}</Section>}
+          {!filesOnly && <>
           <Section id="context" title="Sources & memory" icon={<BookOpen size={16} />} open={sections.context} toggle={() => toggle("context")}>
             {!details?.attachments.length && !latest?.Sources?.length && <p className="work-details-empty">No selected files or retained source references in this conversation yet.</p>}
             {!!details?.attachments.length && <><h3 className="work-details-label">Selected for new requests</h3><ul className="work-details-list">{details.attachments.map((path) => <li key={path}>{path}</li>)}</ul></>}
@@ -130,7 +143,7 @@ export function WorkDetails({ state, identity, requestedOutput, open, presenceRe
             <div className="work-details-links"><button className="small-button" disabled={blocked} onClick={() => go("/model")}>Model settings<ChevronRight size={13} /></button><button className="small-button" disabled={blocked} onClick={() => void window.gator?.chooseFolder().catch(() => {})}>Choose folder<ChevronRight size={13} /></button></div>
             <p className="work-details-caption">Choosing a different folder starts a separate topic with its own source scope.</p>
           </Section>
-
+          </>}
         </>}
       </div>
     </aside>

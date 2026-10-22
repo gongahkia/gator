@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, Bookmark, ChevronRight, Clock3, Command, Info, ListPlus, LoaderCircle, MessageSquare, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings2, ShieldCheck, SlidersHorizontal, Square, Target, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Bookmark, ChevronRight, Clock3, Command, Files, Info, ListPlus, LoaderCircle, MessageSquare, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings2, ShieldCheck, SlidersHorizontal, Square, Target, X } from "lucide-react";
 import type { BackendMessage, BackendState } from "./protocol";
 import type { DesktopFrame, DesktopSnapshot } from "./bridge";
 import { Panel } from "./Panel";
@@ -18,7 +18,7 @@ import { RecentConversations } from "./RecentConversations";
 import { WorkDetails } from "./WorkDetails";
 import { LibraryDrawer } from "./LibraryDrawer";
 import { OutputCards } from "./OutputCards";
-import { bundleOutputs } from "./conversationOutputs";
+import { bundleOutputs, conversationBundles } from "./conversationOutputs";
 import { DesktopHelp } from "./DesktopHelp";
 import { UpdateDialog } from "./UpdateDialog";
 import { AsciiWaves } from "./AsciiWaves";
@@ -73,6 +73,7 @@ export function App() {
   const { state, error, connection, sessionID, terminalBusy, fullScreen, updates, updatesOpen, updatePreparing, reconnecting, reconnect, send, clearError } = useBackend();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("gator:sidebar-collapsed") === "true");
   const [details, setDetails] = useState(false);
+  const [filesOnly, setFilesOnly] = useState(false);
   const [detailKind, setDetailKind] = useState<"info" | "following" | "saved">("info");
   const libraryKind = useRef<"following" | "saved">("saved");
   if (detailKind !== "info") libraryKind.current = detailKind;
@@ -94,7 +95,7 @@ export function App() {
   const composer = useRef<HTMLTextAreaElement>(null);
   const detailsTrigger = useRef<HTMLButtonElement>(null);
   const closeDetails = () => { setDetails(false); (drawerReturn.current?.isConnected ? drawerReturn.current : detailsTrigger.current)?.focus({ preventScroll: true }); };
-  const openDetails = (kind: typeof detailKind) => { drawerReturn.current = document.activeElement as HTMLElement; setRequestedOutput(undefined); setDetailKind(kind); setDetails(!(details && detailKind === kind)); };
+  const openDetails = (kind: typeof detailKind) => { drawerReturn.current = document.activeElement as HTMLElement; setRequestedOutput(undefined); setDetailKind(kind); setFilesOnly(false); setDetails(!(details && detailKind === kind && !filesOnly)); };
   const transcript = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
   const [atLatest, setAtLatest] = useState(true);
@@ -106,7 +107,14 @@ export function App() {
   const view = useRef<HTMLDivElement>(null);
   const panel = state?.panel;
   const conversationIdentity = state?.conversation_id || `${state?.primary ? "primary" : "topic"}:${state?.source || ""}`;
-  const openOutput = useCallback((output: string) => { drawerReturn.current = document.activeElement as HTMLElement; setRequestedOutput({ conversation: conversationIdentity, output, request: Date.now() }); setDetailKind("info"); setDetails(true); }, [conversationIdentity]);
+  const openOutput = useCallback((output: string) => { drawerReturn.current = document.activeElement as HTMLElement; setRequestedOutput({ conversation: conversationIdentity, output, request: Date.now() }); setDetailKind("info"); setFilesOnly(false); setDetails(true); }, [conversationIdentity]);
+  const openFiles = () => { drawerReturn.current = document.activeElement as HTMLElement; setRequestedOutput(undefined); setDetailKind("info"); setFilesOnly(true); setDetails(!(details && detailKind === "info" && filesOnly)); };
+  const showOutputInChat = (output: string) => {
+    const button = [...(transcript.current?.querySelectorAll<HTMLButtonElement>("[data-chat-output]") ?? [])].find((button) => button.dataset.chatOutput === output);
+    if (!button) return;
+    setSearch(null); setDetails(false);
+    requestAnimationFrame(() => { button.focus({ preventScroll: true }); button.scrollIntoView({ block: "center" }); });
+  };
   const conversationSearch = useConversationSearch(transcript, search, conversationIdentity, !panel);
   const settingsPage = settingsRoutes.some((route) => route.command === state?.destination);
   const modifier = window.gator?.platform === "darwin" ? "⌘" : "Ctrl+";
@@ -214,6 +222,7 @@ export function App() {
     if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void submit(); }
   };
   const home = state.home && !state.messages.length && !panel;
+  const fileCount = conversationBundles(state).reduce((count, bundle) => count + bundleOutputs(bundle).length, 0);
   const conversationBrowser = state.destination === "/conversations" || state.destination === "/history";
   const messages = state.messages;
   const jumpToLatest = () => { setSearch(null); atBottom.current = true; setAtLatest(true); setNewActivity(false); transcript.current?.scrollTo({ top: transcript.current.scrollHeight }); composer.current?.focus({ preventScroll: true }); };
@@ -235,7 +244,7 @@ export function App() {
       </>}
     </aside>
     <main className="main-area">
-      <header className="main-header"><div className="breadcrumbs">{settingsPage && <><span>Settings</span><ChevronRight size={13} /></>}<strong title={headerTitle}>{headerTitle}</strong></div><div className="header-actions">{!settingsPage && <button ref={detailsTrigger} className="icon-button" aria-controls="work-details-panel" aria-label={details && detailKind === "info" ? "Hide conversation information" : "Conversation information"} aria-expanded={details && detailKind === "info"} onClick={() => openDetails("info")}><Info size={18} /></button>}</div></header>
+      <header className="main-header"><div className="breadcrumbs">{settingsPage && <><span>Settings</span><ChevronRight size={13} /></>}<strong title={headerTitle}>{headerTitle}</strong></div><div className="header-actions">{!panel && fileCount > 0 && <button className="small-button files-trigger" aria-label={`Files in this conversation (${fileCount})`} aria-controls="work-details-panel" aria-expanded={details && detailKind === "info" && filesOnly} onClick={openFiles}><Files size={16} /><span>Files</span><small>{fileCount}</small></button>}{!settingsPage && <button ref={detailsTrigger} className="icon-button" aria-controls="work-details-panel" aria-label={details && detailKind === "info" && !filesOnly ? "Hide conversation information" : "Conversation information"} aria-expanded={details && detailKind === "info" && !filesOnly} onClick={() => openDetails("info")}><Info size={18} /></button>}</div></header>
       {error && <div className="connection-error" role="alert"><div><strong>{connection === "disconnected" ? "Connection lost" : "Action could not complete"}</strong><p>{connection === "disconnected" ? "This view may be out of date. Reconnecting opens a new local session and does not resume or resubmit work." : error}</p>{connection === "disconnected" && <details><summary>Technical details</summary><p>{error}</p></details>}</div>{connection === "disconnected" ? <button className="button" disabled={reconnecting} aria-busy={reconnecting} onClick={() => void reconnect()}>{reconnecting ? "Reconnecting…" : "Reconnect"}</button> : <button className="icon-button" aria-label="Dismiss action error" onClick={clearError}><X size={16} /></button>}</div>}
       {sessionChanged && !error && <div className="session-notice" role="status"><span>A new local session is ready. Previous work was not resumed. Saved conversations and drafts remain available.</span><button className="icon-button" aria-label="Dismiss session notice" onClick={() => setSessionChanged(false)}><X size={16} /></button></div>}
       {state.notice && <div className="view-status" role="status">{state.notice}</div>}
@@ -264,7 +273,7 @@ export function App() {
       </>}
       </div>
     </main>
-    <Presence open={details && detailKind === "info"}>{(open, presenceRef) => <WorkDetails state={state} identity={conversationIdentity} requestedOutput={requestedOutput} open={open} presenceRef={presenceRef} close={closeDetails} navigate={navigate} />}</Presence>
+    <Presence open={details && detailKind === "info"}>{(open, presenceRef) => <WorkDetails filesOnly={filesOnly} showInChat={showOutputInChat} state={state} identity={conversationIdentity} requestedOutput={requestedOutput} open={open} presenceRef={presenceRef} close={closeDetails} navigate={navigate} />}</Presence>
     <Presence open={details && detailKind !== "info"}>{(open, presenceRef) => <LibraryDrawer kind={libraryKind.current} state={state} open={open} presenceRef={presenceRef} close={closeDetails} navigate={navigate} preview={openOutput} drafts={() => { closeDetails(); setShowDrafts(true); void drafts.manage({ action: "list" }).catch(() => {}); }} />}</Presence>
     {updateDialog}
     {panel && <div className="panel-draft-anchor"><MessageSquare size={14} /><span>{draft ? "Your message draft is kept while you’re here." : "Return to the conversation to write a message."}</span><button className="small-button" onClick={() => attempt({ type: "panel", key: "esc", panel: { id: panel.id!, action: "key" } })}>Back<kbd>Esc</kbd></button></div>}
