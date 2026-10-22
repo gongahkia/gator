@@ -116,7 +116,6 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .primary-chat { margin-bottom: 4px; color: var(--color-contrast); }
 .personal-navigation { margin-bottom: 22px; }
 .personal-navigation .nav-button[aria-expanded="true"] { background: var(--color-soft-fill); color: var(--color-contrast); }
-.new-topic { margin: 0 0 18px; }
 .recent-heading { display: flex; align-items: center; justify-content: space-between; }
 .recent-heading .nav-group-label { padding-bottom: 0; }
 .recent-heading .icon-button[aria-pressed="true"] { color: var(--color-accent); }

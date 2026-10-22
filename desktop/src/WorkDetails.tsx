@@ -108,7 +108,7 @@ export function WorkDetails({ state, identity, requestedOutput, open, presenceRe
     {narrow && open && <div className="work-details-scrim" aria-hidden="true" onClick={close} />}
     <aside ref={(element) => { root.current = element; focus.current = element; presenceRef(element); }} id="work-details-panel" className="workspace-panel" aria-label={railTitle} role={narrow ? "dialog" : undefined} aria-modal={narrow && open ? true : undefined} data-open={open} inert={!open} aria-hidden={!open} onKeyDown={(event) => {
       if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); if (selected) back(); else close(); }
-      if (narrow && (event.metaKey || event.ctrlKey) && ["n", "k", "f", ","].includes(event.key.toLowerCase())) event.stopPropagation();
+      if (narrow && (event.metaKey || event.ctrlKey) && ["k", "f", ","].includes(event.key.toLowerCase())) event.stopPropagation();
     }}>
       <header className="work-details-heading"><h2>{railTitle}</h2><button className="icon-button" aria-label={`Close ${railTitle.toLowerCase()}`} onClick={close}><X size={16} /></button></header>
       <div ref={content} className="workspace-content">

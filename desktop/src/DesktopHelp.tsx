@@ -17,7 +17,7 @@ const pages = [
 
 export function DesktopHelp({ commands, navigate, disabled }: { commands: BackendCommand[]; navigate(route: string): void; disabled: boolean }) {
   const modifier = window.gator?.platform === "darwin" ? "⌘" : "Ctrl+";
-  const shortcuts = [[`${modifier}N`, "New conversation"], [`${modifier}K`, "Find a command"], [`${modifier}F`, "Find in conversation"], [`${modifier},`, "Open settings"], ["Enter", "Send message"], ["Shift+Enter", "Add a line"], [`${modifier}Enter`, "Review a form or guide current work"]];
+  const shortcuts = [[`${modifier}K`, "Find a command"], [`${modifier}F`, "Find in conversation"], [`${modifier},`, "Open settings"], ["Enter", "Send message"], ["Shift+Enter", "Add a line"], [`${modifier}Enter`, "Review a form or guide current work"]];
   return <section className="desktop-help" aria-label="Gator desktop help"><header><h3>Using Gator</h3><p>Write a request to get started. Open a page to manage ongoing work, saved knowledge, or settings.</p></header>
     <div className="help-pages">{pages.filter((page) => commands.some((command) => command.name === page.name)).map((page) => <button key={page.name} disabled={disabled} onClick={() => navigate(page.route)}><span>{page.label}</span><ArrowUpRight size={15} /></button>)}</div>
     <section className="help-shortcuts"><h4><Keyboard size={16} />Desktop shortcuts</h4><dl>{shortcuts.map(([key, label]) => <div key={key}><dt>{label}</dt><dd><kbd>{key}</kbd></dd></div>)}</dl></section>

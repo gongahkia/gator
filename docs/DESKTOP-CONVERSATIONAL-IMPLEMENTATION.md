@@ -20,7 +20,7 @@ memory retrieval, action reviews, accounting or delivery services.
 | Entry | Working behavior | Existing capabilities retained |
 | --- | --- | --- |
 | Talk with Gator / brand | Opens the designated main conversation; later launches restore its selected durable head and source/options. | Conversation IDs, revision ancestry, independent sources and existing history. |
-| New topic / Cmd/Ctrl+N | Starts a separate topic. Choosing a different folder also starts a separate source scope. | Per-topic drafts, prompt history, source snapshots, run options. |
+| Saved conversations / folder selection | Reopen an existing topic or select a different source folder. The standalone New topic entry and Cmd/Ctrl+N were retired in the subsequent chat simplification. | Per-conversation drafts, prompt history, source snapshots, run options and existing saved topics. |
 | Recent topics | Titles first; flat by default, optional folder grouping; filter and expand controls. | Exact list identity validation, current-run attention, disambiguated folder names and full conversation picker. |
 | Search / Cmd/Ctrl+K | Existing palette, with added entries for Talk with Gator, Following and Saved. | Advanced commands, keyboard selection, input-prefilling commands and focus return. |
 | Following | Read-only saved-goal and actual check summaries; links to Open goals, Manage checks, Updates and Activity & attention. | Goal editor, plans, scheduler scope/timing, inbox read/rating controls, overview and canonical reviews. |

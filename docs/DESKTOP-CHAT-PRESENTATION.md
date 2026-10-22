@@ -158,3 +158,35 @@ The activity UI depends on the display contract; Files shares the literal
 highlight helper with chat search. Revert dependent UI changes before their
 shared infrastructure. Optional display sidecars can remain when rolling back;
 the canonical revision JSON is unchanged.
+
+
+## Follow-up: one primary chat entry
+
+22 October 2026. The user removed the standalone **New topic** entry because it
+competed with the continuing main chat. Retire its sidebar button, Cmd/Ctrl+N,
+command-palette entry, slash suggestions and help references together. Empty
+conversation greetings now use Gator's common introduction. Existing saved
+conversations and their independent drafts remain accessible. Folder changes
+retain their existing source boundaries; the runtime reset path remains an
+internal service.
+
+Full scoped review with the existing interface skill (React and native CSS):
+
+| Category | Evidence inspected | Result |
+| --- | --- | --- |
+| Typography | Empty-chat heading, subtitle, help and draft titles | Common Gator introduction and existing tokens. |
+| Surfaces | Sidebar, saved-conversation navigation and help | Remove the redundant control and its unused margin. |
+| Animations | Sidebar layout and disclosure guards | No motion added or changed; 10% playback not repeated for this removal. |
+| Icons | Sidebar imports and surviving navigation | Remove the unused Plus icon; retain the existing icon system. |
+| Performance | Command discovery in App, Help and slash suggestions | One memoized presentation filter shared by all command surfaces. |
+
+| Severity | Location | Before | After | Why |
+| --- | --- | --- | --- | --- |
+| MEDIUM | `desktop/src/App.tsx:74`, `DesktopHelp.tsx:20`, `styles.css:119` | New topic button, shortcut and reset command advertised alongside the main chat | Remove the duplicate entry points, shortcut help, unused icon and spacing | Keep the main conversation as the clear starting point. |
+| LOW | `desktop/src/App.tsx:257`, `useDrafts.ts:52` | An alternate blank-chat introduction and New topic draft label | Common Gator introduction and neutral Conversation draft label | Match the simplified conversation model. |
+
+Considered and rejected: deleting retained topics or source-reset infrastructure
+would lose existing scope boundaries; repurposing Cmd/Ctrl+N to reset the main
+chat would undermine continuity. Neither is part of this presentation change.
+
+Verification for this follow-up is recorded after the scoped packaged checks.

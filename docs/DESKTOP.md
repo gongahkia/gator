@@ -15,6 +15,8 @@ recent topics and secondary Following and Saved drawers. The implementation
 and retained capabilities are mapped in [the conversational review](DESKTOP-CONVERSATIONAL-IMPLEMENTATION.md).
 The selected Tide background, hybrid activity, dated chat search and contextual
 Files view are described in [chat presentation](DESKTOP-CHAT-PRESENTATION.md).
+The standalone New topic entry and Cmd/Ctrl+N are retired; Talk with Gator
+returns to the main chat, and saved conversations remain available.
 
 ## Ownership
 
@@ -59,8 +61,7 @@ current live interaction ID; retained cards have no approval authority.
 | Drafts | Local recovery per profile/conversation (or selected workspace before a conversation exists); saved-draft manager with clear/disable controls; unsaved forms and paused queues prompt before leaving |
 | Terminal handoff | Reviewed system sign-in, installation, and action steps open the system terminal and return their status |
 
-Enter sends and Shift+Enter inserts a line. Cmd/Ctrl+N starts a separate topic
-in the selected workspace. During work, Enter queues a follow-up and
+Enter sends and Shift+Enter inserts a line. During work, Enter queues a follow-up and
 Cmd/Ctrl+Enter (or Guide now) sends guidance to the current task. Shift+Enter
 keeps inserting a line. Escape closes a view/menu/search or stops active
 work; Escape inside a queue editor cancels that edit. Modal focus stays inside
