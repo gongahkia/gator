@@ -3,6 +3,7 @@ package inbox
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -11,8 +12,10 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/gongahkia/gator/internal/filelock"
 	"github.com/gongahkia/gator/internal/privatefs"
 	"github.com/gongahkia/gator/internal/workspace"
 )
@@ -22,21 +25,26 @@ const Version = 1
 var idPattern = regexp.MustCompile(`\A[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}\z`)
 
 type Entry struct {
-	Version        int       `json:"version"`
-	ID             string    `json:"id"`
-	Kind           string    `json:"kind"`
-	Title          string    `json:"title"`
-	Summary        string    `json:"summary"`
-	JobID          string    `json:"job_id,omitempty"`
-	GoalID         string    `json:"goal_id,omitempty"`
-	ConversationID string    `json:"conversation_id,omitempty"`
-	RevisionID     string    `json:"revision_id,omitempty"`
-	Status         string    `json:"status"`
-	Urgent         bool      `json:"urgent,omitempty"`
-	CreatedAt      time.Time `json:"created_at"`
-	ReadAt         time.Time `json:"read_at,omitempty"`
-	Rating         string    `json:"rating,omitempty"`
-	RatedAt        time.Time `json:"rated_at,omitempty"`
+	OriginConversationID string    `json:"origin_conversation_id,omitempty"`
+	AttemptID            string    `json:"attempt_id,omitempty"`
+	DeliveredAt          time.Time `json:"delivered_at,omitempty"`
+	ResolvedAt           time.Time `json:"resolved_at,omitempty"`
+	ResolutionVersion    uint64    `json:"resolution_version,omitempty"`
+	Version              int       `json:"version"`
+	ID                   string    `json:"id"`
+	Kind                 string    `json:"kind"`
+	Title                string    `json:"title"`
+	Summary              string    `json:"summary"`
+	JobID                string    `json:"job_id,omitempty"`
+	GoalID               string    `json:"goal_id,omitempty"`
+	ConversationID       string    `json:"conversation_id,omitempty"`
+	RevisionID           string    `json:"revision_id,omitempty"`
+	Status               string    `json:"status"`
+	Urgent               bool      `json:"urgent,omitempty"`
+	CreatedAt            time.Time `json:"created_at"`
+	ReadAt               time.Time `json:"read_at,omitempty"`
+	Rating               string    `json:"rating,omitempty"`
+	RatedAt              time.Time `json:"rated_at,omitempty"`
 }
 
 type RatingSummary struct {
@@ -61,6 +69,11 @@ func Open(stateDir string) (Store, error) {
 }
 
 func (s Store) Add(entry Entry) (Entry, error) {
+	unlock, err := s.lock()
+	if err != nil {
+		return Entry{}, err
+	}
+	defer unlock()
 	if entry.Version == 0 {
 		entry.Version = Version
 	}
@@ -73,9 +86,29 @@ func (s Store) Add(entry Entry) (Entry, error) {
 	if err := validateEntry(entry); err != nil {
 		return Entry{}, err
 	}
+	prior, err := s.Load(entry.ID)
+	if err == nil {
+		if !sameEvent(prior, entry) {
+			return Entry{}, errors.New("this update identity already belongs to a different result")
+		}
+		return prior, nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return Entry{}, err
+	}
+	return s.write(entry)
+}
+
+func (s Store) write(entry Entry) (Entry, error) {
+	if err := validateEntry(entry); err != nil {
+		return Entry{}, err
+	}
 	payload, err := json.MarshalIndent(entry, "", "  ")
 	if err != nil {
 		return Entry{}, err
+	}
+	if len(payload) >= 16*1024 {
+		return Entry{}, errors.New("inbox entry is too large")
 	}
 	temporary, err := os.CreateTemp(s.root, ".inbox-*")
 	if err != nil {
@@ -164,12 +197,22 @@ func (s Store) Load(entryID string) (Entry, error) {
 }
 
 func (s Store) MarkRead(entryID string, now time.Time) error {
+	unlock, err := s.lock()
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	entry, err := s.Load(entryID)
 	if err != nil {
 		return err
 	}
-	entry.ReadAt = now.UTC()
-	_, err = s.Add(entry)
+	if now.IsZero() {
+		return errors.New("read time is required")
+	}
+	if entry.ReadAt.IsZero() {
+		entry.ReadAt = now.UTC()
+	}
+	_, err = s.write(entry)
 	return err
 }
 
@@ -182,6 +225,11 @@ func (s Store) Rate(entryID, rating string, now time.Time) (Entry, error) {
 	if now.IsZero() {
 		return Entry{}, errors.New("rating time is required")
 	}
+	unlock, err := s.lock()
+	if err != nil {
+		return Entry{}, err
+	}
+	defer unlock()
 	entry, err := s.Load(entryID)
 	if err != nil {
 		return Entry{}, err
@@ -196,7 +244,7 @@ func (s Store) Rate(entryID, rating string, now time.Time) (Entry, error) {
 		entry.Rating = rating
 		entry.RatedAt = now.UTC()
 	}
-	return s.Add(entry)
+	return s.write(entry)
 }
 
 // RatingsForGoal counts explicitly rated job alerts for one goal. Unrated
@@ -230,6 +278,11 @@ func (s Store) RatingsForGoal(goalID string) (RatingSummary, error) {
 }
 
 func validateEntry(entry Entry) error {
+	for _, id := range []string{entry.OriginConversationID, entry.AttemptID, entry.ConversationID, entry.RevisionID, entry.JobID} {
+		if id != "" && !idPattern.MatchString(id) {
+			return errors.New("invalid update reference")
+		}
+	}
 	if entry.Version != Version || !idPattern.MatchString(entry.ID) || (entry.GoalID != "" && (!strings.HasPrefix(entry.GoalID, "goal-") || len(entry.GoalID) != 29)) || strings.TrimSpace(entry.Title) == "" || len(entry.Title) > 256 || strings.TrimSpace(entry.Status) == "" || len(entry.Status) > 64 || len(entry.Summary) > 4096 || strings.ContainsRune(entry.Summary, 0) {
 		return errors.New("inbox entry is invalid")
 	}
@@ -239,6 +292,44 @@ func validateEntry(entry Entry) error {
 		return errors.New("inbox rating is invalid")
 	}
 	return nil
+}
+
+// JobUpdateID makes retrying notification delivery idempotent without merging
+// different attempts or erasing the user's read/resolution receipts.
+func JobUpdateID(jobID, attemptID string) string {
+	return "inbox-job-" + eventDigest(jobID+"\x00"+attemptID)
+}
+
+func eventDigest(text string) string {
+	sum := sha256.Sum256([]byte(text))
+	return hex.EncodeToString(sum[:])
+}
+
+func sameEvent(a, b Entry) bool {
+	return a.Kind == b.Kind && a.Title == b.Title && a.Summary == b.Summary && a.JobID == b.JobID && a.GoalID == b.GoalID && a.OriginConversationID == b.OriginConversationID && a.AttemptID == b.AttemptID && a.ConversationID == b.ConversationID && a.RevisionID == b.RevisionID && a.Status == b.Status && a.Urgent == b.Urgent
+}
+
+var inboxMu sync.Mutex
+
+func (s Store) lock() (func(), error) {
+	inboxMu.Lock()
+	root, err := os.OpenRoot(s.root)
+	if err != nil {
+		inboxMu.Unlock()
+		return nil, err
+	}
+	defer root.Close()
+	file, err := filelock.OpenRootFile(root, ".inbox.lock", os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		inboxMu.Unlock()
+		return nil, err
+	}
+	if err := filelock.Lock(file, filelock.Exclusive); err != nil {
+		file.Close()
+		inboxMu.Unlock()
+		return nil, err
+	}
+	return func() { _ = file.Close(); inboxMu.Unlock() }, nil
 }
 
 // Has checks a durable entry by exact ID without scanning or truncating the
