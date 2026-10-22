@@ -210,7 +210,7 @@ test("the desktop starts without a standalone Node or Gator CLI on PATH", async 
   await mkdir(emptyPath);
   const { app, page } = await launch({ ...p.env, PATH: emptyPath });
   try {
-    await expect(page.getByRole("heading", { name: "What’s on your mind?", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Hi. I’m Gator.", exact: true })).toBeVisible();
     await expect(page.getByRole("textbox", { name: "Message Gator", exact: true })).toBeVisible();
     expect((await snapshot(page)).commands?.some((command) => command.name === "statusline")).toBe(false);
     await capture(page, "desktop-without-cli-or-node");

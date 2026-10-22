@@ -30,6 +30,9 @@ test("drafts survive restart, stay scoped, and save serially with private permis
     if (process.platform !== "win32") assert.equal((await stat(file)).mode & 0o777, 0o600);
     await store.request({ action: "remove", context: "conversation:one" });
     assert.deepEqual((await store.request({ action: "list" })).drafts.map((item) => item.context), ["conversation:two"]);
+    // An unsent main message and a new topic in the same folder are separate.
+    for (const context of ["workspace:/project", "topic:/project"]) await store.request({ action: "save", draft: { context, text: context, title: "Unsent", source: "/project" } });
+    assert.deepEqual((await new DraftStore(file).request({ action: "list" })).drafts.map((item) => item.context), ["topic:/project", "workspace:/project", "conversation:two"]);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 

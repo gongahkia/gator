@@ -1,11 +1,10 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, BookOpen, Check, ChevronDown, ChevronRight, Clock3, Command, Folder, Inbox, LayoutDashboard, ListChecks, ListPlus, LoaderCircle, MessageSquare, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Search, Settings2, ShieldCheck, Square, Target, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Bookmark, ChevronRight, Clock3, Command, Info, ListPlus, LoaderCircle, MessageSquare, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings2, ShieldCheck, SlidersHorizontal, Square, Target, X } from "lucide-react";
 import type { BackendMessage, BackendState } from "./protocol";
 import type { DesktopFrame, DesktopSnapshot } from "./bridge";
 import { Panel } from "./Panel";
 import { Markdown, Result, bundleResult } from "./Result";
 import { useModalFocus } from "./useModalFocus";
-import { StarterDashboard } from "./StarterDashboard";
 import { UsagePanel } from "./UsagePanel";
 import { ConversationsPanel } from "./ConversationsPanel";
 import { IconSwap, Presence, useViewMotion, type PresenceRef } from "./motion";
@@ -17,26 +16,13 @@ import { DraftManager } from "./DraftManager";
 import { useConversationSearch } from "./useConversationSearch";
 import { RecentConversations } from "./RecentConversations";
 import { WorkDetails } from "./WorkDetails";
+import { LibraryDrawer } from "./LibraryDrawer";
+import { OutputCards } from "./OutputCards";
+import { bundleOutputs } from "./conversationOutputs";
 import { DesktopHelp } from "./DesktopHelp";
 import { UpdateDialog } from "./UpdateDialog";
 
 type Navigation = { command: string; draft?: string } | { conversation: NonNullable<DesktopFrame["conversation"]> };
-
-const destinations = [
-  { command: "/overview", label: "Overview", icon: LayoutDashboard, group: "work" },
-  { command: "/goals", label: "Ongoing goals", icon: Target, group: "work" },
-  { command: "/conversations", label: "Conversations", icon: MessageSquare, group: "work" },
-  { command: "/inbox", label: "Inbox", icon: Inbox, group: "work" },
-  { command: "/followup", label: "Follow-up checks", icon: ListChecks, group: "work" },
-  { command: "/knowledge", label: "Saved knowledge", icon: BookOpen, group: "library" },
-] as const;
-
-const overviewCopy: Record<string, { label: string; empty: string; icon: typeof Check }> = {
-  changed: { label: "What changed", empty: "You're up to date", icon: Clock3 },
-  needs: { label: "Needs you", empty: "Nothing waiting on you", icon: Inbox },
-  next: { label: "Up next", empty: "Room for your next step", icon: ArrowUp },
-  blocked: { label: "Blocked", empty: "Nothing blocked", icon: ShieldCheck },
-};
 
 function Logo({ small = false }: { small?: boolean }) {
   return <span className={`gator-logo ${small ? "small" : ""}`} aria-hidden="true">🐊</span>;
@@ -69,35 +55,25 @@ function useBackend() {
   return { ...snapshot, error: error || reconnectError || snapshot.error, reconnecting, reconnect, send, clearError: () => { setError(""); setReconnectError(""); } };
 }
 
-const Message = memo(function Message({ message, pending, onApproval, commands, navigate, disabled }: { message: BackendMessage; pending?: number; onApproval(approved: boolean): void; commands?: BackendState["commands"]; navigate?(route: string): void; disabled?: boolean }) {
+const Message = memo(function Message({ message, pending, onApproval, commands, navigate, disabled, preview }: { message: BackendMessage; pending?: number; onApproval(approved: boolean): void; commands?: BackendState["commands"]; navigate?(route: string): void; disabled?: boolean; preview(id: string): void }) {
   const user = message.role === "You";
   const result = message.result ?? (message.bundle ? bundleResult(message.bundle) : undefined);
   const approval = result?.kind === "approval" && result.fields?.some((field) => field.label === "Request" && field.value === String(pending)) ? pending : undefined;
   return <article className={`message ${user ? "user-message" : message.role === "Gator" ? "assistant-message" : "result-message"}`} aria-label={user ? "Your message" : `${message.role} message`}>
-    <div className="message-content"><div className="message-byline">{user ? "You" : message.role === "Gator" ? "Gator" : message.role}</div>
-      {commands && navigate && result?.title === "Gator commands" && result.kind === "report" ? <DesktopHelp commands={commands} navigate={navigate} disabled={!!disabled} /> : result ? <Result result={result} approval={approval} onApproval={onApproval} /> : message.role === "Gator" ? <Markdown text={message.text} /> : <div className="literal prose-text">{message.text}</div>}
+    <div className="message-content"><div className="message-byline">{user ? "You" : message.role === "Gator" ? "Gator" : message.bundle ? "Files & changes" : message.role}</div>
+      {commands && navigate && result?.title === "Gator commands" && result.kind === "report" ? <DesktopHelp commands={commands} navigate={navigate} disabled={!!disabled} /> : message.bundle ? <><OutputCards outputs={bundleOutputs(message.bundle)} preview={preview} /><details className="message-result-details"><summary>Result details</summary><Result result={result!} /></details></> : result ? <Result result={result} approval={approval} onApproval={onApproval} /> : message.role === "Gator" ? <div className="assistant-speech"><Markdown text={message.text} /></div> : <div className="literal prose-text">{message.text}</div>}
       {!result && message.role === "Gator" && message.text && <div className="message-actions"><CopyButton text={message.text} label="Copy response" compact /></div>}
     </div>
   </article>;
-}, (before, after) => before.pending === after.pending && before.message.role === after.message.role && before.message.text === after.message.text && JSON.stringify(before.message.result ?? before.message.bundle) === JSON.stringify(after.message.result ?? after.message.bundle) && before.onApproval === after.onApproval && before.disabled === after.disabled && before.commands === after.commands && before.navigate === after.navigate);
-
-function OverviewCards({ state, navigate }: { state: BackendState; navigate(command: string): void }) {
-  return <section className="overview-grid" aria-label="Everyday overview">{["changed", "needs", "next", "blocked"].map((id) => {
-    const section = state.overview?.sections.find((item) => item.id === id);
-    const item = overviewCopy[id];
-    const Icon = item.icon;
-    return <button className="overview-card" key={id} onClick={() => navigate("/overview")}>
-      <div className="overview-card-label"><Icon size={16} /><span>{item.label}</span>{section && <span className="overview-count" data-attention={(id === "needs" || id === "blocked") && section.total > 0}>{section.total}</span>}</div>
-      <p>{state.overview_issue ? "Open overview to retry" : !section ? "Reading your overview…" : section.summary || item.empty}</p>
-      <ChevronRight className="card-chevron" size={14} />
-    </button>;
-  })}</section>;
-}
+}, (before, after) => before.pending === after.pending && before.message.role === after.message.role && before.message.text === after.message.text && JSON.stringify(before.message.result ?? before.message.bundle) === JSON.stringify(after.message.result ?? after.message.bundle) && before.onApproval === after.onApproval && before.disabled === after.disabled && before.commands === after.commands && before.navigate === after.navigate && before.preview === after.preview);
 
 export function App() {
   const { state, error, connection, sessionID, terminalBusy, fullScreen, updates, updatesOpen, updatePreparing, reconnecting, reconnect, send, clearError } = useBackend();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("gator:sidebar-collapsed") === "true");
   const [details, setDetails] = useState(false);
+  const [detailKind, setDetailKind] = useState<"info" | "following" | "saved">("info");
+  const [requestedOutput, setRequestedOutput] = useState<{ conversation: string; output: string; request: number }>();
+  const drawerReturn = useRef<HTMLElement | null>(null);
   const drafts = useDrafts(state);
   const draft = drafts.text, setDraft = drafts.setText;
   const [showDrafts, setShowDrafts] = useState(false);
@@ -113,7 +89,8 @@ export function App() {
   const queueAction = useQueueAction(state, send, error);
   const composer = useRef<HTMLTextAreaElement>(null);
   const detailsTrigger = useRef<HTMLButtonElement>(null);
-  const closeDetails = () => { setDetails(false); detailsTrigger.current?.focus({ preventScroll: true }); };
+  const closeDetails = () => { setDetails(false); (drawerReturn.current?.isConnected ? drawerReturn.current : detailsTrigger.current)?.focus({ preventScroll: true }); };
+  const openDetails = (kind: typeof detailKind) => { drawerReturn.current = document.activeElement as HTMLElement; setRequestedOutput(undefined); setDetailKind(kind); setDetails(!(details && detailKind === kind)); };
   const transcript = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
   const [atLatest, setAtLatest] = useState(true);
@@ -124,7 +101,8 @@ export function App() {
   const backendInput = useRef<string | undefined>(undefined);
   const view = useRef<HTMLDivElement>(null);
   const panel = state?.panel;
-  const conversationIdentity = state?.conversation_id || state?.source || "";
+  const conversationIdentity = state?.conversation_id || `${state?.primary ? "primary" : "topic"}:${state?.source || ""}`;
+  const openOutput = useCallback((output: string) => { drawerReturn.current = document.activeElement as HTMLElement; setRequestedOutput({ conversation: conversationIdentity, output, request: Date.now() }); setDetailKind("info"); setDetails(true); }, [conversationIdentity]);
   const conversationSearch = useConversationSearch(transcript, search, conversationIdentity, !panel);
   const settingsPage = settingsRoutes.some((route) => route.command === state?.destination);
   const modifier = window.gator?.platform === "darwin" ? "⌘" : "Ctrl+";
@@ -146,8 +124,8 @@ export function App() {
     const content = JSON.stringify(state.messages);
     const changed = previousTranscript.current.identity !== conversationIdentity;
     if (changed) {
-      const promoted = previousTranscript.current.identity === state.source && state.conversation_id && previousTranscript.current.running;
-      const position = transcriptPositions.current.get(promoted ? state.source : conversationIdentity);
+      const promoted = previousTranscript.current.identity === `${state.primary ? "primary" : "topic"}:${state.source}` && state.conversation_id && previousTranscript.current.running;
+      const position = transcriptPositions.current.get(promoted ? previousTranscript.current.identity : conversationIdentity);
       atBottom.current = position?.latest ?? true; setAtLatest(atBottom.current); setNewActivity(false);
       if (!atBottom.current && position) transcript.current?.scrollTo({ top: position.top });
     } else if (returningToTranscript.current && !atBottom.current) {
@@ -162,14 +140,14 @@ export function App() {
 
   const attempt = useCallback((frame: DesktopFrame) => { void send(frame).catch(() => {}); }, [send]);
   const performNavigation = (target: Navigation) => {
-    setSearch(null); setShowCommands(false);
+    setSearch(null); setShowCommands(false); setDetails(false);
     if ("conversation" in target) { attempt({ type: "conversation", conversation: target.conversation }); return; }
     if (settingsRoutes.some((route) => route.command === target.command)) setDetails(false);
     attempt({ type: "navigate", text: target.command });
     if (target.draft !== undefined) setDraft(target.draft);
   };
   const requestNavigation = (target: Navigation) => {
-    const queued = !!state?.queued && ("conversation" in target || target.command === "/new");
+    const queued = !!state?.queued && ("conversation" in target || ["/new", "/gator"].includes(target.command));
     if (hasUnsavedView || queued) { setNavigation({ target, queued }); return; }
     performNavigation(target);
   };
@@ -193,6 +171,7 @@ export function App() {
         if (navigation) setNavigation(null);
         else if (showCommands) setShowCommands(false);
         else if (search !== null) setSearch(null);
+        else if (details) { closeDetails(); return; }
         else if (panel?.id) attempt({ type: "panel", key: "esc", panel: { id: panel.id, action: "key" } });
         else if (state?.running) attempt({ type: "key", key: "esc" });
         composer.current?.focus();
@@ -216,6 +195,7 @@ export function App() {
   const queueFull = state.running && state.queued >= 16 && !draft.trimStart().startsWith("/");
   const submit = async (guide = false) => {
     if (!draft.trim() || !drafts.ready || sending || queueAction.busy || panel || error || state.external || (guide ? !state.guidance_id : queueFull)) return;
+    if (!state.running && !state.provider && !draft.trimStart().startsWith("/")) { navigate("/model"); return; }
     setSending(true);
     setDraftError("");
     try {
@@ -231,28 +211,27 @@ export function App() {
   };
   const home = state.home && !state.messages.length && !panel;
   const conversationBrowser = state.destination === "/conversations" || state.destination === "/history";
-  const activeDestination = state.destination === "/history" ? "/conversations" : state.destination;
   const messages = state.messages;
   const jumpToLatest = () => { setSearch(null); atBottom.current = true; setAtLatest(true); setNewActivity(false); transcript.current?.scrollTo({ top: transcript.current.scrollHeight }); composer.current?.focus({ preventScroll: true }); };
   const slash = draft.startsWith("/") && !draft.includes(" ") ? state.commands.filter((command) => command.name.startsWith(draft.slice(1))).slice(0, 7) : [];
-  const sourceName = state.source.split("/").at(-1) || "Workspace";
-  const headerTitle = home ? "New conversation" : panel ? conversationBrowser ? "Conversations" : panel.title : state.title;
+  const headerTitle = panel ? conversationBrowser ? "Conversations" : panel.title : state.primary ? "Gator" : home ? "New topic" : state.title;
 
   return <div className={`app-shell ${collapsed ? "sidebar-collapsed" : ""} ${details ? "details-open" : ""}`} data-theme={state.theme} data-platform={window.gator?.platform} data-fullscreen={fullScreen}>
     <div className="titlebar" aria-hidden="true"><span>Gator</span></div>
     <aside className="sidebar" aria-label="Main navigation">
-      <div className="sidebar-brand"><button className="brand-button" onClick={() => navigate("/new")} aria-label="Gator home"><Logo /><span>Gator</span></button><button className="icon-button collapse-button" onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}><IconSwap active={collapsed} size={17} on={<PanelLeftOpen size={17} />} off={<PanelLeftClose size={17} />} /></button></div>
+      <div className="sidebar-brand"><button className="brand-button" onClick={() => navigate("/gator")} aria-label="Gator home"><Logo /><span>Gator</span></button><button className="icon-button collapse-button" onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}><IconSwap active={collapsed} size={17} on={<PanelLeftOpen size={17} />} off={<PanelLeftClose size={17} />} /></button></div>
       {settingsPage ? <SettingsNavigation destination={state.destination} collapsed={collapsed} navigate={navigate} about={() => void window.gator?.updates({ action: "open" })} /> : <>
-      <button className="nav-button new-chat" aria-label="New conversation" onClick={() => navigate("/new")} disabled={state.running}><Plus size={18} /><span>New conversation</span><kbd>{modifier}N</kbd></button>
-      <button className="nav-button command-trigger" aria-label="Search commands" onClick={() => setShowCommands(true)} title="Search commands"><Search size={17} /><span>Search commands</span><kbd>{modifier}K</kbd></button>
-      <div className="sidebar-scroll">{["work", "library"].map((group) => <div className="nav-group" key={group}><div className="nav-group-label">{group === "work" ? "Your workspace" : "Library"}</div><nav aria-label={group}>{destinations.filter((destination) => destination.group === group).map(({ command, label, icon: Icon }) => <button className="nav-button" key={command} aria-label={label} aria-current={activeDestination === command ? "page" : undefined} onClick={() => navigate(command)} disabled={state.running} title={collapsed ? label : undefined}><Icon size={18} /><span>{label}</span></button>)}</nav></div>)}
+      <button className="nav-button primary-chat" aria-label="Talk with Gator" aria-current={state.primary && !panel ? "page" : undefined} onClick={() => navigate(state.primary ? "/chat" : "/gator")} disabled={state.running && !state.primary}><MessageSquare size={18} /><span>Talk with Gator</span></button>
+      <button className="nav-button command-trigger" aria-label="Search commands" onClick={() => setShowCommands(true)} title="Search commands"><Search size={17} /><span>Search</span><kbd>{modifier}K</kbd></button>
+      <div className="sidebar-scroll"><nav className="personal-navigation" aria-label="Your Gator"><button className="nav-button" aria-label="Following" aria-expanded={details && detailKind === "following"} aria-controls="library-panel" onClick={() => openDetails("following")} title={collapsed ? "Following" : undefined}><Target size={18} /><span>Following</span></button><button className="nav-button" aria-label="Saved" aria-expanded={details && detailKind === "saved"} aria-controls="library-panel" onClick={() => openDetails("saved")} title={collapsed ? "Saved" : undefined}><Bookmark size={18} /><span>Saved</span></button></nav>
       <RecentConversations state={state} disabled={state.running || !!error} open={openRecent} browse={() => navigate("/conversations")} />
+      <button className="nav-button new-topic" aria-label="New topic" onClick={() => navigate("/new")} disabled={state.running} title={collapsed ? "New topic" : undefined}><Plus size={18} /><span>New topic</span><kbd>{modifier}N</kbd></button>
       </div>
       <div className="sidebar-bottom"><button className="nav-button" aria-label="Settings" title={collapsed ? "Settings" : `Settings (${modifier},)`} onClick={() => navigate("/model")} disabled={state.running}><Settings2 size={17} /><span>Settings</span><kbd>{modifier},</kbd></button></div>
       </>}
     </aside>
     <main className="main-area">
-      <header className="main-header"><div className="breadcrumbs"><span>{settingsPage ? "Settings" : sourceName}</span><ChevronRight size={13} /><strong title={headerTitle}>{headerTitle}</strong></div><div className="header-actions">{!settingsPage && <><button className="header-workspace" aria-label="Choose workspace folder" onClick={() => void window.gator?.chooseFolder().catch(() => {})} disabled={state.running || !!panel} title={state.source}><Folder size={15} /><span>{sourceName}</span><ChevronDown size={13} /></button><button ref={detailsTrigger} className="icon-button" aria-controls="work-details-panel" aria-label={details ? "Hide work details" : "Show work details"} aria-expanded={details} onClick={() => setDetails(!details)}><IconSwap active={details} on={<PanelRightClose size={18} />} off={<PanelRightOpen size={18} />} /></button></>}</div></header>
+      <header className="main-header"><div className="breadcrumbs">{settingsPage && <><span>Settings</span><ChevronRight size={13} /></>}<strong title={headerTitle}>{headerTitle}</strong></div><div className="header-actions">{!settingsPage && <button ref={detailsTrigger} className="icon-button" aria-controls="work-details-panel" aria-label={details && detailKind === "info" ? "Hide conversation information" : "Conversation information"} aria-expanded={details && detailKind === "info"} onClick={() => openDetails("info")}><Info size={18} /></button>}</div></header>
       {error && <div className="connection-error" role="alert"><div><strong>{connection === "disconnected" ? "Connection lost" : "Action could not complete"}</strong><p>{connection === "disconnected" ? "This view may be out of date. Reconnecting opens a new local session and does not resume or resubmit work." : error}</p>{connection === "disconnected" && <details><summary>Technical details</summary><p>{error}</p></details>}</div>{connection === "disconnected" ? <button className="button" disabled={reconnecting} aria-busy={reconnecting} onClick={() => void reconnect()}>{reconnecting ? "Reconnecting…" : "Reconnect"}</button> : <button className="icon-button" aria-label="Dismiss action error" onClick={clearError}><X size={16} /></button>}</div>}
       {sessionChanged && !error && <div className="session-notice" role="status"><span>A new local session is ready. Previous work was not resumed. Saved conversations and drafts remain available.</span><button className="icon-button" aria-label="Dismiss session notice" onClick={() => setSessionChanged(false)}><X size={16} /></button></div>}
       {state.notice && <div className="view-status" role="status">{state.notice}</div>}
@@ -262,15 +241,15 @@ export function App() {
       {panel ? conversationBrowser ? <ConversationsPanel panel={panel} send={send} navigate={navigate} /> : panel.kind === "usage" && panel.usage ? <UsagePanel panel={panel} usage={panel.usage} send={send} /> : <Panel panel={panel} send={send} /> : <>
         {search !== null && <div className="transcript-search" role="search" aria-label="Find in conversation"><Search size={16} /><input autoFocus aria-label="Search conversation" maxLength={256} value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); conversationSearch.move(event.shiftKey ? -1 : 1); } }} placeholder="Find in this conversation…" /><span className="search-count" role="status">{!search ? "Find text" : !conversationSearch.count ? "No matches" : `${conversationSearch.active + 1} of ${conversationSearch.count}${conversationSearch.capped ? "+" : ""}`}</span><button className="icon-button" aria-label="Previous match" title="Previous match (Shift+Enter)" disabled={!conversationSearch.count} onClick={() => conversationSearch.move(-1)}><ArrowUp size={16} /></button><button className="icon-button" aria-label="Next match" title="Next match (Enter)" disabled={!conversationSearch.count} onClick={() => conversationSearch.move(1)}><ArrowDown size={16} /></button><button className="icon-button" aria-label="Close search" onClick={() => { setSearch(null); composer.current?.focus(); }}><X size={16} /></button></div>}
         <div className={`transcript-stage ${home ? "home-stage" : ""}`}><div className={`conversation-scroll ${home ? "home-scroll" : ""}`} ref={transcript} onScroll={(event) => { const el = event.currentTarget; const near = el.scrollHeight - el.scrollTop - el.clientHeight < 100; atBottom.current = near; setAtLatest(near); if (near) setNewActivity(false); transcriptPositions.current.delete(conversationIdentity); transcriptPositions.current.set(conversationIdentity, { top: el.scrollTop, latest: near }); if (transcriptPositions.current.size > 32) transcriptPositions.current.delete(transcriptPositions.current.keys().next().value!); }}>
-          {home ? <div className="home-content"><h1>What’s on your mind?</h1>
-            {state.first_run && <div className="setup-callout"><div><Settings2 size={18} /><div><strong>Make Gator yours</strong><p>Choose a cloud or local model to start your first conversation.</p></div></div><button className="button" onClick={() => navigate("/model")}>Choose a model<ChevronRight size={15} /></button></div>}
-            </div> : <div className="transcript-content" aria-label="Conversation">{messages.map((message, index) => <Message key={`${conversationIdentity}:${index}`} message={message} pending={approvalBusy ? undefined : state.pending_approval?.id} onApproval={approve} commands={message.result?.title === "Gator commands" ? state.commands : undefined} navigate={message.result?.title === "Gator commands" ? navigate : undefined} disabled={message.result?.title === "Gator commands" ? state.running || !!error : undefined} />)}{state.running && <div className="run-progress" role="status"><LoaderCircle size={16} className="spin" /><span>{state.cancelling ? "Stopping…" : state.pending_approval ? "Waiting for your approval" : state.status || "Gator is working…"}</span><span className="elapsed">{state.elapsed}</span></div>}</div>}
+          {home ? <div className="home-content"><Logo /><h1>{state.primary ? "Hi. I’m Gator." : "A fresh place to talk."}</h1><p>{state.primary ? "Bring a question, a plan, or something you’d like a hand with." : "Keep this topic separate from your main conversation."}</p>
+            {!state.provider && <div className="setup-callout"><div><Settings2 size={18} /><div><strong>Set up Gator</strong><p>Choose a cloud or local model so Gator can reply. Your unsent message is kept while you set up.</p></div></div><button className="button" onClick={() => navigate("/model")}>Choose a model<ChevronRight size={15} /></button></div>}
+            </div> : <div className="transcript-content" aria-label="Conversation">{messages.map((message, index) => <Message key={`${conversationIdentity}:${index}`} message={message} preview={openOutput} pending={approvalBusy ? undefined : state.pending_approval?.id} onApproval={approve} commands={message.result?.title === "Gator commands" ? state.commands : undefined} navigate={message.result?.title === "Gator commands" ? navigate : undefined} disabled={message.result?.title === "Gator commands" ? state.running || !!error : undefined} />)}{state.running && <div className="run-progress" role="status"><LoaderCircle size={16} className="spin" /><span>{state.cancelling ? "Stopping…" : state.pending_approval ? "Waiting for your approval" : state.status || "Gator is working…"}</span><span className="elapsed">{state.elapsed}</span></div>}</div>}
         </div>{!home && !atLatest && <button className="jump-latest" aria-label={newActivity ? "New activity. Jump to latest" : "Jump to latest"} onClick={jumpToLatest}><ArrowDown size={16} />{newActivity && <span>New activity</span>}</button>}</div>
         <div className="composer-area">{state.pending_approval && <div className="approval-reminder"><ShieldCheck size={16} /><span>An action is waiting for your review.</span><button className="small-button" onClick={jumpToLatest}>View request<ArrowDown size={13} /></button></div>}
           {!!slash.length && <div className="slash-suggestions" aria-label="Command suggestions">{slash.map((command) => <button key={command.name} onClick={() => { setDraft(`/${command.name}${command.needs_input ? " " : ""}`); composer.current?.focus(); }}><span>/{command.name}</span><span>{command.description}</span></button>)}</div>}
           <MessageQueue items={state.queue ?? []} running={state.running} busy={queueAction.busy || sending || !!error || !!state.external} act={queueAction.act} onEditingChange={setQueueEditing} onUseDraft={(text) => { setDraft((current) => current ? `${current}\n\n${text}` : text); composer.current?.focus(); }} />
           {(drafts.recovered || drafts.issue) && <p className="draft-recovery" role="status">{drafts.issue || "Draft recovered. Review it before sending."}</p>}
-          <div className="composer"><textarea ref={composer} value={draft} onChange={(event) => { setDraft(event.target.value); setDraftError(""); }} onKeyDown={composerKeys} placeholder={state.running ? "Add a follow-up…" : "Ask Gator, or / for commands…"} aria-label="Message Gator" disabled={sending || !!state.external} rows={2} /><div className="composer-toolbar"><button className="composer-model" disabled={state.running || !!error} onClick={() => navigate("/model")}><span className="status-dot" /><span>{state.model || "Choose a model"}</span><ChevronDown size={12} /></button><button className="icon-button draft-trigger" aria-label="Saved drafts" title={drafts.saving ? "Saving draft…" : "Saved drafts and local retention"} onClick={() => { setShowDrafts(true); void drafts.manage({ action: "list" }).catch(() => {}); }}><Clock3 size={16} /></button><div className="composer-actions">
+          <div className="composer"><textarea ref={composer} value={draft} onChange={(event) => { setDraft(event.target.value); setDraftError(""); }} onKeyDown={composerKeys} placeholder={state.running ? "Add a follow-up…" : "Message Gator…"} aria-label="Message Gator" disabled={sending || !!state.external} rows={2} /><div className="composer-toolbar"><button className="icon-button composer-options" aria-label="Conversation options" title="Conversation options" onClick={() => openDetails("info")}><SlidersHorizontal size={17} /></button><button className="icon-button draft-trigger" aria-label="Saved drafts" title={drafts.saving ? "Saving draft…" : "Saved drafts and local retention"} onClick={() => { setShowDrafts(true); void drafts.manage({ action: "list" }).catch(() => {}); }}><Clock3 size={16} /></button><div className="composer-actions">
             {state.running && <button className="small-button guide-button" title={`Guide the current task (${window.gator?.platform === "darwin" ? "⌘" : "Ctrl"}+Enter)`} disabled={!draft.trim() || sending || queueAction.busy || !state.guidance_id || !!error || !!state.external} onClick={() => void submit(true)}>Guide now</button>}
             {state.running && <button className="send-button stop" aria-label="Stop current work" disabled={state.cancelling} onClick={() => attempt({ type: "key", key: "esc" })}><Square size={13} fill="currentColor" /></button>}
             <button className="send-button" aria-label={state.running ? "Queue message" : "Send message"} title={queueFull ? "Queue is full (16 messages)" : state.running ? "Queue for after this task (Enter)" : "Send message"} aria-busy={sending} disabled={!draft.trim() || !drafts.ready || sending || queueAction.busy || queueFull || !!error || !!state.external} onClick={() => void submit()}><IconSwap active={sending} on={<LoaderCircle size={18} className="spin" />} off={state.running ? <ListPlus size={18} /> : <ArrowUp size={18} />} /></button>
@@ -278,14 +257,20 @@ export function App() {
           {draftError && <p className="composer-error" role="alert">{draftError}</p>}
           {queueFull && <p className="composer-error" role="status">Queue full. Edit or remove a message to make room.</p>}
         </div>
-        {home && <div className="home-dashboard"><OverviewCards state={state} navigate={navigate} /><StarterDashboard navigate={navigate} /></div>}
       </>}
       </div>
     </main>
-    <Presence open={details}>{(open, presenceRef) => <WorkDetails state={state} open={open} presenceRef={presenceRef} close={closeDetails} navigate={navigate} />}</Presence>
+    <Presence open={details && detailKind === "info"}>{(open, presenceRef) => <WorkDetails state={state} identity={conversationIdentity} requestedOutput={requestedOutput} open={open} presenceRef={presenceRef} close={closeDetails} navigate={navigate} />}</Presence>
+    <Presence open={details && detailKind !== "info"}>{(open, presenceRef) => <LibraryDrawer kind={detailKind === "following" ? "following" : "saved"} state={state} open={open} presenceRef={presenceRef} close={closeDetails} navigate={navigate} preview={openOutput} drafts={() => { closeDetails(); setShowDrafts(true); void drafts.manage({ action: "list" }).catch(() => {}); }} />}</Presence>
     {updateDialog}
     {panel && <div className="panel-draft-anchor"><MessageSquare size={14} /><span>{draft ? "Your message draft is kept while you’re here." : "Return to the conversation to write a message."}</span><button className="small-button" onClick={() => attempt({ type: "panel", key: "esc", panel: { id: panel.id!, action: "key" } })}>Back<kbd>Esc</kbd></button></div>}
-    <Presence open={showCommands}>{(open, presenceRef) => <CommandMenu open={open} presenceRef={presenceRef} commands={state.commands} close={() => setShowCommands(false)} select={(name, needsInput) => { setShowCommands(false); if (needsInput) navigate("/chat", `/${name} `); else navigate(`/${name}`); }} />}</Presence>
+    <Presence open={showCommands}>{(open, presenceRef) => <CommandMenu open={open} presenceRef={presenceRef} commands={state.commands} close={() => setShowCommands(false)} select={(name, needsInput) => {
+      setShowCommands(false);
+      if (name === "@following" || name === "@saved") { drawerReturn.current = document.querySelector<HTMLElement>(".command-trigger"); setRequestedOutput(undefined); setDetailKind(name === "@following" ? "following" : "saved"); setDetails(true); }
+      else if (name === "@gator") navigate(state.primary ? "/chat" : "/gator");
+      else if (needsInput) navigate("/chat", `/${name} `);
+      else navigate(`/${name}`);
+    }} />}</Presence>
     <Presence open={showDrafts}>{(open, presenceRef) => <DraftManager open={open} presenceRef={presenceRef} saved={drafts.saved} issue={drafts.issue} manage={drafts.manage} close={() => setShowDrafts(false)} restore={(retained) => { setDraft((current) => !current ? retained.text : current === retained.text ? current : `${current}\n\n${retained.text}`); composer.current?.focus(); }} />}</Presence>
     <Presence open={!!navigation}>{(open, presenceRef) => <DiscardDialog open={open} presenceRef={presenceRef} queued={navigation?.queued ?? false} cancel={() => setNavigation(null)} confirm={() => { if (!navigation) return; performNavigation(navigation.target); setNavigation(null); }} />}</Presence>
   </div>;
@@ -295,11 +280,17 @@ function CommandMenu({ commands, open, presenceRef, close, select }: { commands:
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
   const focus = useModalFocus(open);
-  const shown = commands.filter((command) => `${command.name} ${command.description}`.toLowerCase().includes(query.toLowerCase()));
+  const choices: (BackendState["commands"][number] & { label?: string })[] = [
+    { name: "@gator", label: "Talk with Gator", description: "Return to your main conversation", advanced: false, needs_input: false },
+    { name: "@following", label: "Following", description: "Ongoing goals, configured checks and updates", advanced: false, needs_input: false },
+    { name: "@saved", label: "Saved", description: "Knowledge, files, conversations and task runs", advanced: false, needs_input: false },
+    ...commands,
+  ];
+  const shown = choices.filter((command) => `${command.name} ${command.label || ""} ${command.description}`.toLowerCase().includes(query.toLowerCase()));
   return <div ref={presenceRef} className="modal-backdrop" data-open={open} inert={!open} aria-hidden={!open} onClick={close}><section ref={focus} className="command-menu" role="dialog" aria-modal="true" aria-label="Search commands" onClick={(event) => event.stopPropagation()}><div className="command-search"><Search size={18} /><input autoFocus placeholder="Find a command…" aria-label="Find a command" value={query} onChange={(event) => { setQuery(event.target.value); setSelected(0); }} onKeyDown={(event) => {
     if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); const next = Math.max(0, Math.min(shown.length - 1, selected + (event.key === "ArrowDown" ? 1 : -1))); setSelected(next); focus.current?.querySelectorAll(".command-list button")[next]?.scrollIntoView({ block: "nearest" }); }
     if (event.key === "Enter" && shown[selected]) { event.preventDefault(); select(shown[selected].name, shown[selected].needs_input); }
-  }} /><button className="icon-button" aria-label="Close commands" onClick={close}><X size={16} /></button></div><div className="command-list">{shown.map((command, index) => <button key={command.name} data-selected={index === selected} onClick={() => select(command.name, command.needs_input)}><Command size={16} /><div><strong>/{command.name}</strong><p>{command.description}</p></div>{command.advanced && <span className="badge">Advanced</span>}<ChevronRight size={15} /></button>)}{!shown.length && <p className="empty-hint">No commands match “{query}”.</p>}</div><footer><span>↑↓ choose · Enter run · Tab move focus</span><kbd>Esc</kbd></footer></section></div>;
+  }} /><button className="icon-button" aria-label="Close commands" onClick={close}><X size={16} /></button></div><div className="command-list">{shown.map((command, index) => <button key={command.name} data-selected={index === selected} onClick={() => select(command.name, command.needs_input)}><Command size={16} /><div><strong>{command.label || `/${command.name}`}</strong><p>{command.description}</p></div>{command.advanced && <span className="badge">Advanced</span>}<ChevronRight size={15} /></button>)}{!shown.length && <p className="empty-hint">No commands match “{query}”.</p>}</div><footer><span>↑↓ choose · Enter open · Tab move focus</span><kbd>Esc</kbd></footer></section></div>;
 }
 
 function DiscardDialog({ open, presenceRef, queued, cancel, confirm }: { open: boolean; presenceRef: PresenceRef; queued: boolean; cancel(): void; confirm(): void }) {

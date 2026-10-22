@@ -1,13 +1,13 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, ChartNoAxesCombined, ChevronDown, ChevronRight, FileCode2, Files, FileText, Folder, ListChecks, Plug, X } from "lucide-react";
-import type { BackendBundle, BackendState } from "./protocol";
+import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, FileCode2, Files, FileText, Folder, ListChecks, Plug, X } from "lucide-react";
+import type { BackendState } from "./protocol";
 import type { PresenceRef } from "./motion";
 import { Markdown } from "./Result";
 import { CopyButton } from "./CopyButton";
 import { useModalFocus } from "./useModalFocus";
+import { bundleOutputs, conversationBundles, outputState } from "./conversationOutputs";
 
 type SectionID = "outputs" | "context" | "connections" | "workspace" | "checks";
-type Output = { id: string; bundle: BackendBundle; group: number; file?: NonNullable<BackendBundle["Artifacts"]>[number]; candidate?: NonNullable<BackendBundle["Candidates"]>[number] };
 const defaults: Record<SectionID, boolean> = { outputs: true, context: false, connections: false, workspace: false, checks: false };
 const preferenceKey = "gator:work-details-sections";
 
@@ -25,11 +25,6 @@ function Section({ id, title, icon, summary, open, toggle, children }: { id: Sec
   </section>;
 }
 
-function outputState(output: Output) {
-  if (output.candidate) return `Proposal · ${output.candidate.Status || "unreported checks"}`;
-  return output.file?.Valid ? "Checks passed" : "Needs review";
-}
-
 function bytes(value: number) {
   return value < 1024 ? `${value} B` : value < 1024 * 1024 ? `${(value / 1024).toFixed(1)} KB` : `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
@@ -39,11 +34,10 @@ function timestamp(value?: string) {
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(value));
 }
 
-export function WorkDetails({ state, open, presenceRef, close, navigate }: { state: BackendState; open: boolean; presenceRef: PresenceRef; close(): void; navigate(command: string): void }) {
+export function WorkDetails({ state, identity, requestedOutput, open, presenceRef, close, navigate }: { state: BackendState; identity: string; requestedOutput?: { conversation: string; output: string; request: number }; open: boolean; presenceRef: PresenceRef; close(): void; navigate(command: string): void }) {
   const [sections, setSections] = useState(readSections);
   const [narrow, setNarrow] = useState(() => matchMedia("(max-width: 960px)").matches);
   const [selection, setSelection] = useState<{ conversation: string; output: string }>();
-  const identity = state.conversation_id || state.source;
   const focus = useModalFocus(open && narrow);
   const root = useRef<HTMLElement | null>(null);
   const previewHeading = useRef<HTMLHeadingElement>(null);
@@ -52,18 +46,15 @@ export function WorkDetails({ state, open, presenceRef, close, navigate }: { sta
   const listPosition = useRef(0);
   const previousIdentity = useRef(identity);
   const details = state.work_details;
-  const bundles = useMemo(() => {
-    const values = new Map<string, BackendBundle>();
-    for (const message of state.messages) if (message.bundle?.Path) values.set(message.bundle.Path, message.bundle);
-    if (details?.latest_bundle?.Path) values.set(details.latest_bundle.Path, details.latest_bundle);
-    return [...values.values()];
-  }, [state.messages, details?.latest_bundle]);
+  const bundles = useMemo(() => conversationBundles(state), [state.messages, details?.latest_bundle]);
   const latest = details?.latest_bundle ?? bundles.at(-1);
-  const outputs = useMemo(() => bundles.flatMap((bundle, index) => [
-    ...(bundle.Artifacts ?? []).map((file) => ({ id: JSON.stringify([bundle.Path, "file", file.Path]), bundle, group: index + 1, file })),
-    ...(bundle.Candidates ?? []).map((candidate) => ({ id: JSON.stringify([bundle.Path, "change", candidate.ID]), bundle, group: index + 1, candidate })),
-  ] as Output[]).reverse(), [bundles]);
+  const outputs = useMemo(() => bundles.flatMap((bundle, index) => bundleOutputs(bundle, index + 1)).reverse(), [bundles]);
   const selected = selection?.conversation === identity ? outputs.find((output) => output.id === selection.output) : undefined;
+
+  useEffect(() => {
+    if (!requestedOutput) setSelection(undefined);
+    else if (requestedOutput.conversation === identity) setSelection({ conversation: identity, output: requestedOutput.output });
+  }, [requestedOutput?.request, identity]);
 
   useEffect(() => {
     const media = matchMedia("(max-width: 960px)");
@@ -99,11 +90,11 @@ export function WorkDetails({ state, open, presenceRef, close, navigate }: { sta
 
   return <>
     {narrow && open && <div className="work-details-scrim" aria-hidden="true" onClick={close} />}
-    <aside ref={(element) => { root.current = element; focus.current = element; presenceRef(element); }} id="work-details-panel" className="workspace-panel" aria-label="Work details" role={narrow ? "dialog" : undefined} aria-modal={narrow && open ? true : undefined} data-open={open} inert={!open} aria-hidden={!open} onKeyDown={(event) => {
+    <aside ref={(element) => { root.current = element; focus.current = element; presenceRef(element); }} id="work-details-panel" className="workspace-panel" aria-label="Conversation information" role={narrow ? "dialog" : undefined} aria-modal={narrow && open ? true : undefined} data-open={open} inert={!open} aria-hidden={!open} onKeyDown={(event) => {
       if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); if (selected) back(); else close(); }
       if (narrow && (event.metaKey || event.ctrlKey) && ["n", "k", "f", ","].includes(event.key.toLowerCase())) event.stopPropagation();
     }}>
-      <header className="work-details-heading"><h2>Work details</h2><button className="icon-button" aria-label="Close work details" onClick={close}><X size={16} /></button></header>
+      <header className="work-details-heading"><h2>Conversation information</h2><button className="icon-button" aria-label="Close conversation information" onClick={close}><X size={16} /></button></header>
       <div ref={content} className="workspace-content">
         {selected ? <section className="output-preview" aria-label="Output preview">
           <button className="small-button output-back" onClick={back}><ArrowLeft size={15} />All outputs</button>
@@ -122,8 +113,8 @@ export function WorkDetails({ state, open, presenceRef, close, navigate }: { sta
               {output.candidate ? <FileCode2 size={17} /> : <FileText size={17} />}<span><strong>{output.file?.Path || `Change ${output.candidate?.ID}`}</strong><small data-tone={output.bundle.Status === "failed" || (output.file && !output.file.Valid) ? "warning" : undefined}>{outputState(output)}{output.bundle.Status === "failed" ? " · failed run" : ""}{bundles.length > 1 && <> · <span className="keep-together">Result {output.group}</span></>}</small></span><ChevronRight size={14} />
             </button>)}</div> : <p className="work-details-empty">Files and proposed changes appear here when a task produces them.</p>}
           </Section>
-          <Section id="context" title="Context" icon={<ChartNoAxesCombined size={16} />} summary="Not measured" open={sections.context} toggle={() => toggle("context")}>
-            <p className="work-details-copy">Context capacity isn’t measured yet. Daily token usage is tracked separately.</p>
+          <Section id="context" title="Sources & memory" icon={<BookOpen size={16} />} open={sections.context} toggle={() => toggle("context")}>
+            {!details?.attachments.length && !latest?.Sources?.length && <p className="work-details-empty">No selected files or retained source references in this conversation yet.</p>}
             {!!details?.attachments.length && <><h3 className="work-details-label">Selected for new requests</h3><ul className="work-details-list">{details.attachments.map((path) => <li key={path}>{path}</li>)}</ul></>}
             {!!latest?.Sources?.length && <><h3 className="work-details-label">Sources retained in latest result</h3><ul className="work-details-list">{latest.Sources.map((source, index) => <li key={index}>{source}</li>)}</ul><p className="work-details-caption">Recorded references are not a list of everything currently in the model’s context.</p></>}
             <div className="work-details-links"><button className="small-button" disabled={blocked} onClick={() => go(latest ? "/context" : "/knowledge")}>Inspect saved context<ChevronRight size={13} /></button><button className="small-button" disabled={blocked} onClick={() => go("/usage")}>Usage &amp; limits<ChevronRight size={13} /></button></div>
@@ -133,8 +124,10 @@ export function WorkDetails({ state, open, presenceRef, close, navigate }: { sta
             <p className="work-details-caption">Selection does not verify sign-in or approve an action. Queued requests keep their original selections.</p>
             <h3 className="work-details-label">Retained connection sources</h3>{used.length ? <ul className="work-connections">{used.map((connection) => <li key={connection.ID}><strong>{connection.ID}</strong><span>{connection.Operations.join(", ")}</span></li>)}</ul> : <p className="work-details-empty">No retained connection sources{latest ? " in this result" : " yet"}.</p>}{!!used.length && <p className="work-details-caption">Records can include sources carried over from earlier turns.</p>}
           </Section>
-          <Section id="workspace" title="Workspace" icon={<Folder size={16} />} summary={state.source.split(/[\\/]/).filter(Boolean).at(-1) || "Local"} open={sections.workspace} toggle={() => toggle("workspace")}>
+          <Section id="workspace" title="This conversation" icon={<Folder size={16} />} summary={state.source.split(/[\\/]/).filter(Boolean).at(-1) || "Local"} open={sections.workspace} toggle={() => toggle("workspace")}>
             <dl className="work-details-fields"><div><dt>Runs on</dt><dd>This computer</dd></div><div><dt>Folder</dt><dd>{state.source || "Not selected"}</dd></div>{state.model && <div><dt>Model</dt><dd>{state.model}</dd></div>}{state.provider && <div><dt>Provider</dt><dd>{state.provider}</dd></div>}{state.goal_id && <div><dt>Ongoing goal</dt><dd>{state.goal_id}</dd></div>}<div><dt>New requests</dt><dd>{{ auto: "Automatic · chosen per request", inspect: "Inspect", draft: "Draft", act: "Act · approval required" }[details?.mode || ""] || "Not reported"}</dd></div>{details?.snapshot_id && <div><dt>Snapshot</dt><dd>{details.snapshot_id}</dd></div>}</dl>
+            <div className="work-details-links"><button className="small-button" disabled={blocked} onClick={() => go("/model")}>Model settings<ChevronRight size={13} /></button><button className="small-button" disabled={blocked} onClick={() => void window.gator?.chooseFolder().catch(() => {})}>Choose folder<ChevronRight size={13} /></button></div>
+            <p className="work-details-caption">Choosing a different folder starts a separate topic with its own source scope.</p>
           </Section>
           {!!(state.checks?.length || state.goal_id || state.supervisor_needs_start) && <Section id="checks" title="Follow-up checks" icon={<ListChecks size={16} />} summary={String(state.checks?.length ?? 0)} open={sections.checks} toggle={() => toggle("checks")}>
             {state.checks?.length ? state.checks.map((check, index) => <div className="work-check" key={index}><strong>{check.title}</strong><span data-tone={check.tone}>{check.state}</span><p>{check.health}</p></div>) : <p className="work-details-empty">No recurring checks attached.</p>}{state.supervisor_needs_start && <p className="work-details-notice" data-tone="warning">The local supervisor needs to start before configured checks can run.</p>}<button className="small-button" disabled={blocked} onClick={() => go("/followup")}>Manage checks<ChevronRight size={13} /></button>

@@ -1,4 +1,5 @@
 import { _electron as electron, test, expect, type Page } from "@playwright/test";
+import { openSurface } from "./navigation";
 import { closeDesktop, temporaryDirectory as mkdtemp } from "./lifecycle";
 import { mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -188,7 +189,7 @@ test("long conversations retain context while searching and signal activity with
   } finally { await closeDesktop(application); await rm(directory, { recursive: true, force: true }); }
 });
 
-test("recent work groups real saved conversations by workspace and isolates their drafts", async () => {
+test("recent topics default to a flat list, offer folder grouping, and isolate drafts", async () => {
   const directory = await mkdtemp(join(tmpdir(), "gator-desktop-recents-e2e-"));
   const first = join(directory, "area-a/shared"), second = join(directory, "area-b/shared");
   await mkdir(first, { recursive: true }); await mkdir(second, { recursive: true });
@@ -201,8 +202,11 @@ test("recent work groups real saved conversations by workspace and isolates thei
   const application = await launchDesktop(env);
   try {
     const page = await application.firstWindow();
-    const recent = page.getByRole("region", { name: "Recent work", exact: true });
+    const recent = page.getByRole("region", { name: "Recent conversations", exact: true });
     await expect(recent).toBeVisible();
+    await expect(recent.locator(".recent-workspace")).toHaveCount(0);
+    await expect(recent.getByRole("button", { name: "Open conversation: Plan 4", exact: true })).toBeVisible();
+    await recent.getByRole("button", { name: "Group topics by folder", exact: true }).click();
     await expect(recent.getByRole("button", { name: "area-a/shared", exact: true })).toBeVisible();
     await expect(recent.getByRole("button", { name: "area-b/shared", exact: true })).toBeVisible();
     await recent.getByRole("button", { name: "Show 1 more", exact: true }).click();
@@ -225,6 +229,13 @@ test("recent work groups real saved conversations by workspace and isolates thei
     await expect(recent.getByRole("button", { name: "Open conversation: Plan 4", exact: true })).toHaveCount(0);
     const composer = page.getByRole("textbox", { name: "Message Gator", exact: true });
     const open = async (index: number) => { await recent.getByRole("button", { name: `Open conversation: Plan ${index}`, exact: true }).click(); await expect.poll(() => page.evaluate(async () => (await window.gator!.snapshot()).state?.conversation_id)).toBe(`work-test-${index}`); };
+    await composer.fill("An unsent message for Gator");
+    await page.getByRole("button", { name: "New topic", exact: true }).click();
+    await expect(composer).toHaveValue("");
+    await composer.fill("A separate topic in the same folder");
+    await page.getByRole("button", { name: "Talk with Gator", exact: true }).click();
+    await expect(composer).toHaveValue("An unsent message for Gator");
+    expect((await page.evaluate(() => window.gator!.snapshot())).state!.conversation_id).toBeUndefined();
     await open(0); await composer.fill("Draft for the first project");
     await open(5); await expect(composer).toHaveValue(""); await composer.fill("Draft for the second project");
     await open(0); await expect(composer).toHaveValue("Draft for the first project");
@@ -235,7 +246,7 @@ test("recent work groups real saved conversations by workspace and isolates thei
     await expect(recent.getByText("Needs review", { exact: true })).toBeVisible();
     await expect(recent.getByRole("button", { name: "Open conversation: Plan 0", exact: true })).toBeDisabled();
     await application.evaluate(({ BrowserWindow }, snapshot) => BrowserWindow.getAllWindows()[0].webContents.send("gator:update", snapshot), current);
-    await page.getByRole("button", { name: "Follow-up checks", exact: true }).click();
+    await openSurface(page, "Follow-up checks");
     await page.getByRole("button", { name: /new check/i }).click();
     await page.getByRole("textbox", { name: "Title", exact: true }).fill("Keep my form edit");
     await recent.getByRole("button", { name: "Open conversation: Plan 5", exact: true }).click();
@@ -268,8 +279,7 @@ test("motion is interruptible, releases dismissed controls, and honors reduced m
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.emulateMedia({ reducedMotion: "no-preference" });
-    await expect(page.getByRole("heading", { name: "What’s on your mind?" })).toBeVisible();
-    await page.getByRole("button", { name: "Pause dashboard scrolling", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Hi. I’m Gator." })).toBeVisible();
     const shell = page.locator(".app-shell");
     const sidebar = page.getByRole("complementary", { name: "Main navigation" });
     const width = () => sidebar.evaluate((element) => element.getBoundingClientRect().width);
@@ -297,11 +307,11 @@ test("motion is interruptible, releases dismissed controls, and honors reduced m
     await expect.poll(width).toBeCloseTo(240, 0);
 
     await session.send("Animation.setPlaybackRate", { playbackRate: 0.1 });
-    await page.getByRole("button", { name: "Show work details" }).click();
-    await expect(page.getByRole("complementary", { name: "Work details" })).toBeVisible();
-    await page.getByRole("button", { name: "Hide work details" }).click();
+    await page.getByRole("button", { name: "Conversation information" }).click();
+    await expect(page.getByRole("complementary", { name: "Conversation information" })).toBeVisible();
+    await page.getByRole("button", { name: "Hide conversation information" }).click();
     await expect(page.locator('.workspace-panel[data-open="false"]')).toHaveAttribute("inert", "");
-    await expect(page.getByRole("complementary", { name: "Work details" })).toHaveCount(0);
+    await expect(page.getByRole("complementary", { name: "Conversation information" })).toHaveCount(0);
     await session.send("Animation.setPlaybackRate", { playbackRate: 1 });
     await expect(page.locator(".workspace-panel")).toHaveCount(0);
 
@@ -330,12 +340,12 @@ test("motion is interruptible, releases dismissed controls, and honors reduced m
       };
     });
     const entrances = () => page.evaluate(() => (window as unknown as { viewAnimations: number }).viewAnimations);
-    await page.getByRole("button", { name: "Saved knowledge", exact: true }).click();
+    await openSurface(page, "Saved knowledge");
     await expect(page.getByRole("heading", { name: "Saved knowledge", exact: true })).toBeVisible();
     expect(await entrances()).toBe(1);
     await page.getByRole("button", { name: /^refresh$/i }).click();
     expect(await entrances()).toBe(1);
-    await page.getByRole("button", { name: "Follow-up checks", exact: true }).click();
+    await openSurface(page, "Follow-up checks");
     await page.getByRole("button", { name: /new check/i }).click();
     const title = page.getByRole("textbox", { name: "Title", exact: true });
     await expect(title).toBeVisible();
@@ -356,13 +366,13 @@ test("motion is interruptible, releases dismissed controls, and honors reduced m
     await expect(page.locator(".modal-backdrop")).toHaveCount(0);
     await page.getByRole("button", { name: "Gator home" }).click();
     await page.getByRole("button", { name: "Leave view" }).click();
-    await page.getByRole("button", { name: "Saved knowledge", exact: true }).click();
+    await openSurface(page, "Saved knowledge");
     await expect(page.getByRole("heading", { name: "Saved knowledge", exact: true })).toBeVisible();
     expect(await entrances()).toBe(beforeTyping);
     expect(await page.locator(".view-content").evaluate((element) => element.getAnimations().length)).toBe(0);
     for (const size of [{ width: 1024, panelWidth: 275 }, { width: 800, panelWidth: 300 }]) {
       await application.evaluate(({ BrowserWindow }, value) => BrowserWindow.getAllWindows()[0].setSize(value, 768), size.width);
-      await page.getByRole("button", { name: "Show work details" }).click();
+      await page.getByRole("button", { name: "Conversation information" }).click();
       await expect.poll(width).toBeCloseTo(68, 0);
       await expect.poll(() => page.locator(".workspace-panel").evaluate((element) => element.getBoundingClientRect().width)).toBeCloseTo(size.panelWidth, 0);
       await page.screenshot({ path: `test-results/desktop-motion-details-${size.width}.png` });
@@ -371,7 +381,7 @@ test("motion is interruptible, releases dismissed controls, and honors reduced m
         expect(await page.locator(".workspace-panel").evaluate((element) => element.getBoundingClientRect().top)).toBe(0);
         await page.evaluate(() => { document.querySelector<HTMLElement>(".app-shell")!.dataset.fullscreen = "false"; });
       }
-      await page.getByRole("button", { name: "Close work details" }).click();
+      await page.getByRole("button", { name: "Close conversation information" }).click();
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect(errors).toEqual([]);
@@ -481,7 +491,7 @@ test("queued messages can be edited, reordered, removed, and resumed without los
     await expect(queue.getByText("Paused", { exact: true })).toBeVisible();
     await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-message-queue-paused.png" });
-    await page.getByRole("button", { name: "New conversation", exact: true }).click();
+    await page.getByRole("button", { name: "New topic", exact: true }).click();
     await expect(page.getByRole("alertdialog", { name: "Leave queued messages?" })).toBeVisible();
     await page.getByRole("button", { name: "Keep working", exact: true }).click();
     await expect(queue.locator(".queued-message")).toHaveCount(1);
@@ -536,26 +546,26 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
   const cli = (args: string[]) => execFileSync(binary, args, { env, encoding: "utf8" });
   cli(["provider", "add", "desktop-fixture", "--base-url", `http://127.0.0.1:${address.port}/v1/chat/completions`, "--model", "fixture-model"]);
   cli(["config", "set", "default-provider", "desktop-fixture"]);
-  const application = await launchDesktop(env);
+  let application = await launchDesktop(env);
   try {
     const page = await application.firstWindow();
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
-    await expect(page.getByRole("heading", { name: "What’s on your mind?" })).toBeVisible();
-    await expect(page.getByRole("region", { name: "Everyday overview" })).toBeVisible();
-    await expect(page.locator(".composer-model")).toContainText("fixture-model");
+    await expect(page.getByRole("heading", { name: "Hi. I’m Gator." })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Everyday overview" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Talk with Gator", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("button", { name: "Conversation options", exact: true })).toBeVisible();
     const homeLayout = await page.evaluate(() => ({
       heading: document.querySelector(".home-content h1")!.getBoundingClientRect().bottom,
       composerTop: document.querySelector(".composer")!.getBoundingClientRect().top,
       composerBottom: document.querySelector(".composer")!.getBoundingClientRect().bottom,
-      overview: document.querySelector(".overview-grid")!.getBoundingClientRect().top,
     }));
     expect(homeLayout.heading).toBeLessThan(homeLayout.composerTop);
-    expect(homeLayout.composerBottom).toBeLessThan(homeLayout.overview);
+    expect(homeLayout.composerBottom).toBeLessThanOrEqual(await page.evaluate(() => innerHeight));
     await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-home.png" });
     await page.getByRole("textbox", { name: "Message Gator" }).fill("keep my draft 🐊");
-    await page.getByRole("button", { name: "Saved knowledge", exact: true }).click();
+    await openSurface(page, "Saved knowledge");
     await expect(page.getByRole("heading", { name: "Saved knowledge", exact: true })).toBeVisible();
     await expect(page.getByText("Gator’s view could not load.")).toHaveCount(0);
     await expect(page.getByText("No saved knowledge yet.")).toBeVisible();
@@ -581,20 +591,21 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     // on a developer's local Ollama service or create embedding reservations.
     cli(["note", "remove", noteID, "--yes"]);
     await page.getByRole("button", { name: "Gator home" }).click();
-    await page.getByRole("button", { name: "Overview", exact: true }).click();
+    await openSurface(page, "Overview");
     await expect(page.getByRole("heading", { name: /overview/i }).first()).toBeVisible();
     await page.getByRole("button", { name: "Back to conversation" }).click();
     await expect(page.getByRole("textbox", { name: "Message Gator" })).toHaveValue("keep my draft 🐊");
-    await page.getByRole("button", { name: "Show work details" }).click();
-    await expect(page.getByRole("complementary", { name: "Work details" })).toBeVisible();
-    const workDetails = page.getByRole("complementary", { name: "Work details" });
+    await page.getByRole("button", { name: "Conversation information" }).click();
+    await expect(page.getByRole("complementary", { name: "Conversation information" })).toBeVisible();
+    const workDetails = page.getByRole("complementary", { name: "Conversation information" });
     await expect(workDetails.getByRole("button", { name: /^Outputs/ })).toHaveAttribute("aria-expanded", "true");
     await expect(workDetails.getByText("Files and proposed changes appear here when a task produces them.")).toBeVisible();
-    await workDetails.getByRole("button", { name: /^Context/ }).press("Enter");
-    await expect(workDetails.getByText("Context capacity isn’t measured yet. Daily token usage is tracked separately.")).toBeVisible();
+    await workDetails.getByRole("button", { name: /^Sources & memory/ }).press("Enter");
+    await expect(workDetails.getByText("Context capacity isn’t measured yet. Daily token usage is tracked separately.")).toHaveCount(0);
+    await expect(workDetails.getByRole("button", { name: /^Inspect saved context/ })).toBeVisible();
     await expect(workDetails.getByRole("progressbar")).toHaveCount(0);
-    await page.getByRole("button", { name: "Hide work details" }).click();
-    await page.getByRole("button", { name: "Follow-up checks", exact: true }).click();
+    await page.getByRole("button", { name: "Hide conversation information" }).click();
+    await openSurface(page, "Follow-up checks");
     await page.getByRole("button", { name: /new check/i }).click();
     await expect(page.getByRole("textbox", { name: "Desired outcome", exact: true })).toBeVisible();
     await page.getByRole("textbox", { name: "Title", exact: true }).fill("Watch my project");
@@ -651,7 +662,7 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     await page.screenshot({ path: "test-results/desktop-usage-with-activity.png" });
     await page.getByRole("button", { name: "Back to conversation" }).click();
     await page.getByRole("textbox", { name: "Message Gator" }).fill("keep my continuation draft");
-    await page.getByRole("button", { name: "Conversations", exact: true }).click();
+    await openSurface(page, "Conversations");
     await expect(page.getByRole("button", { name: "Work history", exact: true })).toHaveCount(0);
     const browser = page.getByRole("navigation", { name: "Conversation views" });
     await expect(browser.getByRole("button", { name: "Chats", exact: true })).toHaveAttribute("aria-current", "page");
@@ -665,8 +676,10 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     await page.locator(".panel-row").first().press("ArrowDown");
     await expect(page.locator(".panel-row").last()).toBeFocused();
     await expect.poll(async () => (await page.evaluate(async () => (await window.gator!.snapshot()).state?.panel?.selected))).toBe(1);
+    await expect(page.locator(".workflow")).toHaveAttribute("aria-busy", "false");
     await page.locator(".panel-row").last().press("Home");
     await expect(page.locator(".panel-row").first()).toBeFocused();
+    await expect(page.locator(".workflow")).toHaveAttribute("aria-busy", "false");
     await page.locator(".panel-row").first().press("f");
     await expect(page.locator(".workflow-heading p")).toContainText("running");
     await expect(page.locator(".panel-row")).toHaveCount(0);
@@ -674,9 +687,9 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     await page.getByRole("combobox", { name: "Filter task runs" }).selectOption("completed");
     await expect(page.locator(".workflow-heading p")).toContainText("completed");
     await expect(page.locator(".panel-row")).toHaveCount(2);
-    await expect(page.getByRole("button", { name: "Conversations", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(browser.getByRole("button", { name: "Task runs", exact: true })).toHaveAttribute("aria-current", "page");
     await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Conversations", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(browser.getByRole("button", { name: "Task runs", exact: true })).toHaveAttribute("aria-current", "page");
     await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(800, 600));
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await settlePresentation(page);
@@ -695,11 +708,11 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
       await settlePresentation(page);
     await page.screenshot({ path: `test-results/desktop-${size.width}.png` });
     }
-    await page.getByRole("button", { name: "Show work details" }).click();
-    await expect(page.getByRole("dialog", { name: "Work details" })).toBeVisible();
+    await page.getByRole("button", { name: "Conversation information" }).click();
+    await expect(page.getByRole("dialog", { name: "Conversation information" })).toBeVisible();
     await settlePresentation(page);
     await page.screenshot({ path: "test-results/desktop-details-800.png" });
-    await page.getByRole("button", { name: "Close work details" }).click();
+    await page.getByRole("button", { name: "Close conversation information" }).click();
     await page.getByRole("button", { name: "Search commands" }).click();
     await page.getByRole("textbox", { name: "Find a command" }).fill("help");
     await page.getByRole("textbox", { name: "Find a command" }).press("Enter");
@@ -713,6 +726,25 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     expect(await page.locator(".main-area").evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThan(300);
     expect(errors).toEqual([]);
     expect(await page.evaluate(() => typeof (window as unknown as { require?: unknown }).require)).toBe("undefined");
+    const mainID = (await page.evaluate(() => window.gator!.snapshot())).state!.conversation_id;
+    expect(mainID).toBeTruthy();
+    await page.getByRole("button", { name: "New topic", exact: true }).click();
+    await expect(page.locator(".assistant-message")).toHaveCount(0);
+    await page.getByRole("textbox", { name: "Message Gator", exact: true }).fill("Separate topic draft");
+    await page.getByRole("button", { name: "Talk with Gator", exact: true }).click();
+    await expect(page.getByRole("textbox", { name: "Message Gator", exact: true })).toHaveValue("keep my continuation draft");
+    const beforeRestart = requests;
+    await closeDesktop(application);
+    application = await launchDesktop(env);
+    const reopened = await application.firstWindow();
+    await expect.poll(() => reopened.evaluate(async () => (await window.gator!.snapshot()).state?.conversation_id)).toBe(mainID);
+    await expect(reopened.getByRole("button", { name: "Talk with Gator", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(reopened.locator(".assistant-message")).toHaveCount(2);
+    await expect(reopened.getByRole("textbox", { name: "Message Gator", exact: true })).toHaveValue("keep my continuation draft");
+    expect(requests).toBe(beforeRestart);
+    await reopened.getByRole("button", { name: "New topic", exact: true }).click();
+    await expect(reopened.getByRole("textbox", { name: "Message Gator", exact: true })).toHaveValue("Separate topic draft");
+
   } finally {
     await closeDesktop(application);
     await new Promise<void>((done) => server.close(() => done()));
@@ -720,7 +752,7 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
   }
 });
 
-test("dashboard scroll respects interaction and reduced motion; usage controls keep the Go review flow", async () => {
+test("the conversational home has no dashboard and usage controls keep the Go review flow", async () => {
   const directory = await mkdtemp(join(tmpdir(), "gator-desktop-dashboard-e2e-"));
   const env = { ...process.env, GATOR_INTERNAL_COMMANDS: "1", GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") };
   const binary = resolve("runtime", process.platform === "win32" ? "gator-runtime.exe" : "gator-runtime");
@@ -728,44 +760,18 @@ test("dashboard scroll respects interaction and reduced motion; usage controls k
   const application = await launchDesktop(env);
   try {
     const page = await application.firstWindow();
-    await expect(page.getByRole("heading", { name: "What’s on your mind?" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Hi. I’m Gator." })).toBeVisible();
     await page.emulateMedia({ reducedMotion: "no-preference" });
     for (const copy of ["Refreshes quietly every 15 seconds", "Your work stays connected. You choose what happens next.", "↵ send", "Same Gator profile as your terminal", "A little more continuity", "A good place to start", "Built around your ongoing work", "Personal workspace", "Local Gator profile"]) {
       await expect(page.getByText(copy, { exact: false })).toHaveCount(0);
     }
-    const track = page.locator(".starter-track");
-    await page.mouse.move(1, 1);
-    // Inspect browser-managed state transitions with motion slowed to 10%.
-    // Native scroll timing remains owned by Chromium.
-    const session = await page.context().newCDPSession(page);
-    await session.send("Animation.setPlaybackRate", { playbackRate: 0.1 });
-    await expect.poll(() => track.evaluate((element) => element.scrollLeft), { timeout: 10_000 }).toBeGreaterThan(20);
-    await session.send("Animation.setPlaybackRate", { playbackRate: 1 });
-    await page.getByRole("button", { name: "Pause dashboard scrolling", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Resume dashboard scrolling", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Previous dashboard cards" }).click();
-    await expect.poll(() => track.evaluate((element) => element.scrollLeft)).toBeLessThan(5);
-    await page.clock.install();
-    await page.getByRole("button", { name: "Resume dashboard scrolling", exact: true }).click();
-    await page.mouse.move(1, 1);
-    // Focus inside the carousel pauses it, even when the pointer leaves.
-    await page.clock.runFor(6500);
-    expect(await track.evaluate((element) => element.scrollLeft)).toBeLessThan(5);
-    await page.getByRole("textbox", { name: "Message Gator" }).focus();
-    await track.hover();
-    await page.clock.runFor(6500);
-    expect(await track.evaluate((element) => element.scrollLeft)).toBeLessThan(5);
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    await expect(page.getByRole("button", { name: "Resume dashboard scrolling", exact: true })).toBeDisabled();
-    await page.mouse.move(1, 1);
-    await page.clock.runFor(6500);
-    expect(await track.evaluate((element) => element.scrollLeft)).toBeLessThan(5);
-    await page.clock.resume();
-    // Manual navigation remains available with reduced motion.
-    await page.getByRole("button", { name: "Next dashboard cards" }).click();
-    expect(await track.evaluate((element) => element.scrollLeft)).toBeGreaterThan(20);
-    await page.getByRole("button", { name: /Find what you’ve saved/ }).click();
-    await expect(page.getByRole("heading", { name: "Saved knowledge", exact: true })).toBeVisible();
+    await expect(page.locator(".starter-track, .overview-grid")).toHaveCount(0);
+    await page.getByRole("textbox", { name: "Message Gator", exact: true }).fill("Keep my question while I set up");
+    await page.getByRole("button", { name: "Send message", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Models", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Back to app", exact: true }).click();
+    await expect(page.getByRole("textbox", { name: "Message Gator", exact: true })).toHaveValue("Keep my question while I set up");
+    expect((await page.evaluate(() => window.gator!.snapshot())).state!.messages).toEqual([]);
     await openSettingsCategory(page, "Usage & limits");
     await expect(page.getByRole("heading", { name: "Usage & limits", exact: true })).toBeVisible();
     await expect(page.getByText("Uncapped", { exact: true })).toHaveCount(3);
@@ -812,7 +818,7 @@ test("review presentation preserves exact previews and only the live approval ac
   const application = await launchDesktop(env);
   try {
     const page = await application.firstWindow();
-    await expect(page.getByRole("heading", { name: "What’s on your mind?" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Hi. I’m Gator." })).toBeVisible();
     const base = await page.evaluate(async () => (await window.gator!.snapshot()).state!);
     const preview = { action: "write_file", path: "plan.txt", content: "A change you must review first." };
     await application.evaluate(({ BrowserWindow, ipcMain }, state) => {
@@ -849,7 +855,7 @@ test("first-run model setup uses native fields and keeps credentials out of disp
   const application = await launchDesktop(env);
   try {
     const page = await application.firstWindow();
-    await expect(page.getByRole("heading", { name: "What’s on your mind?" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Hi. I’m Gator." })).toBeVisible();
     await openSettingsCategory(page, "Model settings");
     await page.getByRole("button", { name: /^Cloud API key/ }).click();
     await expect(page.getByRole("heading", { name: "Cloud models", exact: true })).toBeVisible();
@@ -869,7 +875,7 @@ test("first-run model setup uses native fields and keeps credentials out of disp
     await expect(key).toHaveValue("isolated-test-value");
     await page.getByRole("button", { name: "Gator home" }).click();
     await page.getByRole("button", { name: "Leave view" }).click();
-    await expect(page.getByRole("heading", { name: "What’s on your mind?" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Hi. I’m Gator." })).toBeVisible();
     expect(await page.evaluate(async () => JSON.stringify(await window.gator!.snapshot()))).not.toContain("isolated-test-value");
   } finally { await closeDesktop(application); await rm(directory, { recursive: true, force: true }); }
 });

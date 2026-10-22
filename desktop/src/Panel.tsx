@@ -107,7 +107,7 @@ export function Panel({ panel, send, title = panel.title, subtitle = panel.subti
     return () => window.removeEventListener("keydown", shortcut);
   });
 
-  return <section className="workflow" data-kind={panel.kind} aria-label={title}>
+  return <section className="workflow" data-kind={panel.kind} aria-label={title} aria-busy={busy}>
     <div className="workflow-heading"><button className="icon-button" aria-label={panel.back_label || "Back to conversation"} disabled={busy} onClick={() => keyAction("esc")}><ArrowLeft size={18} /></button><div><h1>{title}</h1>{subtitle && <p>{panel.kind === "learnings" && panel.filter ? "Preferences, facts, and procedures for future work." : subtitle}</p>}</div>{panel.kind === "confirmation" && <span className="badge" data-tone="warning">Review</span>}</div>
     {navigation}
     {panel.filter && <label className="collection-filter"><span>Status</span><select aria-label={panel.kind === "history" ? "Filter task runs" : "Filter saved guidance"} value={panel.filter.value} disabled={busy} onChange={(event) => void action({ action: "filter", text: event.target.value })}>{panel.filter.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>}

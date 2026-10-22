@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 const lifetime = 7 * 24 * 60 * 60 * 1000;
 const limit = 32;
 const textLimit = 128 * 1024;
-const validContext = (value) => typeof value === "string" && /^(conversation|workspace):.+$/.test(value) && value.length <= 8192;
+const validContext = (value) => typeof value === "string" && /^(conversation|workspace|topic):.+$/.test(value) && value.length <= 8192;
 
 // Unsent text is private local application data, just like saved conversations.
 // The renderer never chooses a filename or writes credentials/form fields here.

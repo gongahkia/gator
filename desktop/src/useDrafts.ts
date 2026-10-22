@@ -3,7 +3,7 @@ import type { BackendState } from "./protocol";
 import type { DraftRequest, DraftSnapshot, SavedDraft } from "./bridge";
 
 export function useDrafts(state?: BackendState) {
-  const context = state ? state.conversation_id ? `conversation:${state.conversation_id}` : `workspace:${state.source}` : undefined;
+  const context = state ? state.conversation_id ? `conversation:${state.conversation_id}` : `${state.primary === false ? "topic" : "workspace"}:${state.source}` : undefined;
   const identity = useRef<Omit<SavedDraft, "text" | "updated"> | undefined>(undefined);
   const values = useRef(new Map<string, string>());
   const current = useRef("");
@@ -45,11 +45,11 @@ export function useDrafts(state?: BackendState) {
     if (!state || !context) return;
     let active = true;
     const before = identity.current;
-    const promoted = before && before.context.startsWith("workspace:") && state.conversation_id && before.source === state.source && previousRunning.current;
+    const promoted = before && (before.context.startsWith("workspace:") || before.context.startsWith("topic:")) && state.conversation_id && before.source === state.source && previousRunning.current;
     if (promoted) {
       remember(context, current.current);
     }
-    identity.current = { context, source: state.source, title: state.conversation_id ? state.title : "New conversation" };
+    identity.current = { context, source: state.source, title: state.primary ? "Gator" : state.conversation_id ? state.title : "New topic" };
     const cached = values.current.get(context);
     current.current = cached ?? ""; renderText(current.current); setRecovered(false); setReady(false);
     const owner = identity.current;
@@ -68,7 +68,7 @@ export function useDrafts(state?: BackendState) {
   }, [context, request]);
   useLayoutEffect(() => {
     previousRunning.current = state?.running ?? false;
-    if (identity.current && state) { identity.current.source = state.source; identity.current.title = state.conversation_id ? state.title : "New conversation"; }
+    if (identity.current && state) { identity.current.source = state.source; identity.current.title = state.primary ? "Gator" : state.conversation_id ? state.title : "New topic"; }
   });
 
   const manage = async (action: DraftRequest) => {
