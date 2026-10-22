@@ -1,5 +1,7 @@
 # Recovery, shared usage, and private data
 
+**Interface status:** Gator is a desktop app. Shell examples below are source-checkout developer operations with an explicit internal opt-in; see [development instructions](DEVELOPMENT.md). They do not install or enable a public CLI.
+
 These controls use the existing Claude Code Kit terminal pickers, forms, and
 confirmation screens. Open them from chat or the command palette. Tab moves
 between fields, Ctrl+U clears a field, Ctrl+R reviews an edit, Enter confirms,
@@ -57,10 +59,10 @@ deletion so deletion cannot reset a shared daily allowance.
 CLI equivalents:
 
 ```sh
-gator usage status
-gator usage limits --requests 100 --tokens 1000000 --concurrent 2
-gator usage pause
-gator usage resume
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator usage status
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator usage limits --requests 100 --tokens 1000000 --concurrent 2
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator usage pause
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator usage resume
 ```
 
 ## Private data: /data
@@ -115,14 +117,14 @@ The archive retains content rather than credentials or installation settings.
 CLI equivalents:
 
 ```sh
-gator data status
-gator data retention --history-days 90 --knowledge-days 0 --snapshot-days 30
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator data status
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator data retention --history-days 90 --knowledge-days 0 --snapshot-days 30
 # Review the printed policy before repeating with --yes.
-gator data cleanup
-gator data preview history
-gator data apply REVIEW_ID --yes
-gator data export /private/path/new-backup.tar.gz
-gator data verify /private/path/new-backup.tar.gz
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator data cleanup
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator data preview history
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator data apply REVIEW_ID --yes
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator data export /private/path/new-backup.tar.gz
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator data verify /private/path/new-backup.tar.gz
 ```
 
 ## Verification boundaries

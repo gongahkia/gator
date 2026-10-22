@@ -1,5 +1,7 @@
 # Trusted local LSP
 
+**Interface status:** Gator is a desktop app. Shell examples below are source-checkout developer operations with an explicit internal opt-in; see [development instructions](DEVELOPMENT.md). They do not install or enable a public CLI.
+
 Gator can expose bounded read-only inspection from a repository-local Language
 Server Protocol (LSP) server to an Execute-mode native agent. For one existing
 workspace source file it supports pull diagnostics, hover, completion, code
@@ -41,8 +43,8 @@ symlinks escaping the worktree, or remote LSP endpoints.
 Review the file and executable, then activate it from the checkout:
 
 ```sh
-gator lsp status
-gator lsp trust
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator lsp status
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator lsp trust
 ```
 
 Gator stores a canonical-repository trust record containing a SHA-256 hash of

@@ -1,5 +1,7 @@
 # Release evidence
 
+**Interface status:** Gator is a desktop app. Shell examples below are source-checkout developer operations with an explicit internal opt-in; see [development instructions](DEVELOPMENT.md). They do not install or enable a public CLI.
+
 Recorded verification for the Work depth iteration: [PRODUCT_DEPTH_VERIFICATION.md](PRODUCT_DEPTH_VERIFICATION.md).
 
 This is the acceptance record for calling a Gator build useful for daily
@@ -33,8 +35,8 @@ Evaluation runner checks:
 
 ```sh
 go test ./internal/eval
-gator work eval run internal/eval/testdata/work-v1/dataset.json --id release-development --attempts 3 --report-dir DIR/reports/release-development
-gator work eval run internal/eval/testdata/work-v1/dataset.json --id release-held-out --split held-out --attempts 3 --report-dir DIR/reports/release-held-out
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval run internal/eval/testdata/work-v1/dataset.json --id release-development --attempts 3 --report-dir DIR/reports/release-development
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval run internal/eval/testdata/work-v1/dataset.json --id release-held-out --split held-out --attempts 3 --report-dir DIR/reports/release-held-out
 ```
 
 Use a new `--id` and `--report-dir` for every experiment. Reusing either

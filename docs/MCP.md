@@ -1,12 +1,14 @@
 # Trusted MCP servers
 
+**Interface status:** Gator is a desktop app. Shell examples below are source-checkout developer operations with an explicit internal opt-in; see [development instructions](DEVELOPMENT.md). They do not install or enable a public CLI.
+
 Gator exposes trusted Model Context Protocol (MCP) tools from a repository
 configuration at `.gator/mcp.json`. The configuration is inert until the
 developer reviews and explicitly pins it:
 
 ```sh
-gator mcp status
-gator mcp trust
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator mcp status
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator mcp trust
 ```
 
 `gator mcp status` shows the hash trust state and, for each configured remote
@@ -50,10 +52,10 @@ If a Streamable HTTP server returns `401 Unauthorized`, authenticate the
 trusted server explicitly:
 
 ```sh
-gator mcp login github
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator mcp login github
 # If the authorization server requires an existing public client:
-gator mcp login --client-id YOUR_PUBLIC_CLIENT_ID --redirect-url http://127.0.0.1:3000/callback github
-gator mcp logout github
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator mcp login --client-id YOUR_PUBLIC_CLIENT_ID --redirect-url http://127.0.0.1:3000/callback github
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator mcp logout github
 ```
 
 Gator follows the MCP HTTP authorization flow: it discovers protected-resource

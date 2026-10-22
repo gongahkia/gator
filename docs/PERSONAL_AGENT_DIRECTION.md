@@ -1,5 +1,7 @@
 # Gator as a desktop personal agent
 
+**Interface status:** Gator is a desktop app. Shell examples below are source-checkout developer operations with an explicit internal opt-in; see [development instructions](DEVELOPMENT.md). They do not install or enable a public CLI.
+
 **Interface decision, 22 October 2026:** desktop is the primary supported
 interface; the standalone CLI and React terminal renderer are retired. See
 [Desktop as the primary interface](DESKTOP-PRIMARY.md). Command-line examples
@@ -85,12 +87,12 @@ A goal watch can also poll up to four explicitly selected connected read surface
 `gator goal` now stores an explicit user-owned goal with a title, optional background context, status, and one retained conversation. Without `--source`, it creates a private empty workspace; with `--source`, it follows a selected local directory. `gator goal chat ID` opens the existing terminal UI bound to that goal. `gator work --goal ID "..."` loads the same context, resumes the goal's conversation, and refreshes the source capture each time. A goal chat defaults to inspect mode so a question does not force a `report.md`; `--artifact` or an explicit Work mode can request a deliverable or action. The context is data, not a permission grant. Paused and completed goals cannot run until resumed.
 
 ```sh
-gator goal add --context 'Compare venues and decide by Friday' 'Plan the offsite'
-gator goal chat GOAL_ID
-gator work --goal GOAL_ID 'What decision is still open?'
-gator goal context GOAL_ID 'Venue A is unavailable; decide between B and C by Monday'
-gator work --goal GOAL_ID 'What changed, and what should I do next?'
-gator work --goal GOAL_ID --artifact decision-brief.md 'Draft the decision brief'
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator goal add --context 'Compare venues and decide by Friday' 'Plan the offsite'
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator goal chat GOAL_ID
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work --goal GOAL_ID 'What decision is still open?'
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator goal context GOAL_ID 'Venue A is unavailable; decide between B and C by Monday'
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work --goal GOAL_ID 'What changed, and what should I do next?'
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work --goal GOAL_ID --artifact decision-brief.md 'Draft the decision brief'
 ```
 
 The terminal home lists active goals and unread follow-up results. `/goals` opens a goal picker; `/memory` explains recall readiness and data destinations; `/context` reviews saved inputs and supports corrections, forgetting, and one-run omission. `gator memory search` finds saved knowledge, while `correct`, `forget`, and `--expires` let the user maintain it. Global memories may be retrieved for any Work turn; goal memories stay within their goal. Work combines bounded semantic and lexical retrieval when embeddings are available, with lexical fallback when they are not. Relevant items can still be missed. Stored memories are reference data, never tool authority.
@@ -108,11 +110,11 @@ The knowledge base now stores inspectable Markdown notes and skills under the pr
 A goal also has a structured plan with an outcome, up to 32 steps, status, deadlines, evidence references, and review times. Plan edits use revision checks so a stale conversation cannot overwrite a later correction. The plan is included as bounded reference context in goal-linked Work and goal reviews. For example:
 
 ```sh
-gator goal plan GOAL_ID outcome 'Choose a venue and confirm the budget'
-gator goal plan GOAL_ID add --title 'Confirm room capacity' --due 2026-10-20T09:00:00+08:00 --evidence 'venues.md:12'
-gator goal plan GOAL_ID
-gator goal plan GOAL_ID step STEP_ID done --evidence 'user-confirmed: room holds 90'
-gator goal plan GOAL_ID review-at 2026-10-21T09:00:00+08:00
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator goal plan GOAL_ID outcome 'Choose a venue and confirm the budget'
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator goal plan GOAL_ID add --title 'Confirm room capacity' --due 2026-10-20T09:00:00+08:00 --evidence 'venues.md:12'
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator goal plan GOAL_ID
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator goal plan GOAL_ID step STEP_ID done --evidence 'user-confirmed: room holds 90'
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator goal plan GOAL_ID review-at 2026-10-21T09:00:00+08:00
 ```
 
 Inside a goal chat, `/plan` shows that plan. `/plan outcome TEXT`, `/plan add TITLE | RFC3339_DUE | EVIDENCE`, `/plan step STEP_ID done | EVIDENCE`, and `/plan review-at RFC3339` make common edits in place; `/plan help` shows the syntax. `/activity` (or `gator goal activity ID`) brings together open steps, the last and next scheduled checks, supervisor status, unread follow-ups, pending goal suggestions, and commands to pause or resume. `gator goal access ID` makes bounded live reads of up to eight selected watch sources and reports whether each read succeeds, needs login, or lacks permission; it does not retain response bodies or update watch fingerprints. A successful probe confirms access at that moment, not future reachability or relevance. `gator goal notifications ID --quiet 22:00-08:00 --timezone Asia/Singapore` (or `/notifications` inside its chat) suppresses desktop interruptions for that goal during quiet hours; `--desktop off` mutes its desktop interruptions entirely. These settings narrow an enabled global desktop notification setting. The inbox always retains results and failures. `gator job inbox rate ENTRY_ID useful|noise|wrong|clear` records explicit feedback on shown job alerts, and goal activity counts those ratings; quiet checks and missed changes are outside that count. The activity view reads retained state and makes no claim that a scheduled check will run while the host is off.

@@ -1,5 +1,7 @@
 # Local Work capability matrix
 
+**Interface status:** Gator is a desktop app. Shell examples below are source-checkout developer operations with an explicit internal opt-in; see [development instructions](DEVELOPMENT.md). They do not install or enable a public CLI.
+
 Gator Work is local-first. A Work run writes only to its staged output until a
 separate review/publish boundary is used. It is not a hosted workstation or a
 cloud continuation product.
@@ -33,13 +35,13 @@ or an embedded object it does not understand.
 ## Practical start
 
 ```sh
-gator browser install
-gator browser start --visual-capture
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator browser install
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator browser start --visual-capture
 # Select its tab and approve the needed origin, then:
-gator work --browser-session BROWSER_SESSION --artifact brief.pptx "Create a product brief deck"
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work --browser-session BROWSER_SESSION --artifact brief.pptx "Create a product brief deck"
 
-gator desktop start --app com.microsoft.Powerpoint --retain-provider-state
-gator work --provider openai --desktop-session DESKTOP_SESSION --artifact review.md "Review the approved presentation window"
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator desktop start --app com.microsoft.Powerpoint --retain-provider-state
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work --provider openai --desktop-session DESKTOP_SESSION --artifact review.md "Review the approved presentation window"
 ```
 
 The desktop command requires macOS Accessibility permission. Screenshot access

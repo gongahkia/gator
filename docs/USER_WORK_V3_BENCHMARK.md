@@ -1,5 +1,7 @@
 # User Work benchmark, thirty-task corpus
 
+**Interface status:** Gator is a desktop app. Shell examples below are source-checkout developer operations with an explicit internal opt-in; see [development instructions](DEVELOPMENT.md). They do not install or enable a public CLI.
+
 Recorded 2026-10-16. [Version 3](../internal/eval/testdata/user-work-v3/dataset.json) preserves the 21-case [version 2 corpus](USER_WORK_V2_BENCHMARK.md) and adds nine tasks for a terminal-based knowledge worker. The prior live reports remain version 2 results; they are not scores for this new manifest. The new fixtures are synthetic and local. They exercise decisions and deliverables from source material, not live web retrieval or connected apps.
 
 | New case | Split | New user job and failure mode |
@@ -23,10 +25,10 @@ All 30 cases pass `TestUserWorkV3CorpusThroughProductService`; scripted runs val
 ## Run after provider quota resets
 
 ```sh
-gator work eval validate internal/eval/testdata/user-work-v3/dataset.json
-gator work eval run internal/eval/testdata/user-work-v3/dataset.json \
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval validate internal/eval/testdata/user-work-v3/dataset.json
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval run internal/eval/testdata/user-work-v3/dataset.json \
   --id user-work-v3-scripted --split all --report-dir /tmp/gator-user-work-v3-scripted
-gator work eval run internal/eval/testdata/user-work-v3/dataset.json \
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval run internal/eval/testdata/user-work-v3/dataset.json \
   --id user-work-v3-live-development --split development --live \
   --provider PROVIDER --model MODEL --max-model-requests 900 \
   --timeout-seconds 3600 --report-dir /tmp/gator-user-work-v3-live-development

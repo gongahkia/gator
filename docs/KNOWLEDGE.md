@@ -1,5 +1,7 @@
 # Personal knowledge and skills
 
+**Interface status:** Gator is a desktop app. Shell examples below are source-checkout developer operations with an explicit internal opt-in; see [development instructions](DEVELOPMENT.md). They do not install or enable a public CLI.
+
 Gator keeps short facts and decisions in `gator memory`. Longer Markdown notes
 and reusable procedures live in a private filesystem knowledge base under the
 resolved state directory:
@@ -70,15 +72,15 @@ reasoning or proof that a source supports an answer's claim. Feedback ratings
 are retained for review and do not automatically retrain the selected model.
 
 ```sh
-gator note add --title 'Venue decision' --goal GOAL_ID --source-ref 'source/venue-email.md:12' --body 'Venue B is preferred; verify capacity by Friday.'
-gator note add --title 'Meeting notes' --file ./meeting.md
-gator note search --goal GOAL_ID 'venue capacity'
-gator note show NOTE_ID
-gator note edit NOTE_ID --file ./revised-meeting.md
-gator note edit NOTE_ID --source-ref 'source/revised-venue.md:4'
-gator note edit NOTE_ID --clear-source-refs
-gator note path NOTE_ID
-gator note remove NOTE_ID --yes
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator note add --title 'Venue decision' --goal GOAL_ID --source-ref 'source/venue-email.md:12' --body 'Venue B is preferred; verify capacity by Friday.'
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator note add --title 'Meeting notes' --file ./meeting.md
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator note search --goal GOAL_ID 'venue capacity'
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator note show NOTE_ID
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator note edit NOTE_ID --file ./revised-meeting.md
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator note edit NOTE_ID --source-ref 'source/revised-venue.md:4'
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator note edit NOTE_ID --clear-source-refs
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator note path NOTE_ID
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator note remove NOTE_ID --yes
 ```
 
 A note is either global or attached to one goal. Goal-scoped notes are never
@@ -111,13 +113,13 @@ larger files and full metadata options.
 ## Skills
 
 ```sh
-gator skill create daily-brief --description 'Use for morning briefings' --file ./SKILL.md
-gator skill list
-gator skill show daily-brief
-gator skill edit daily-brief --description 'Use for daily briefings' --file ./revised-SKILL.md
-gator skill disable daily-brief
-gator skill enable daily-brief
-gator skill remove daily-brief --yes
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator skill create daily-brief --description 'Use for morning briefings' --file ./SKILL.md
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator skill list
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator skill show daily-brief
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator skill edit daily-brief --description 'Use for daily briefings' --file ./revised-SKILL.md
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator skill disable daily-brief
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator skill enable daily-brief
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator skill remove daily-brief --yes
 ```
 
 In the TUI, `/skill create NAME | WHEN_TO_USE | BODY` and
@@ -152,10 +154,10 @@ candidate records its source Work ID and is not used as knowledge until you
 accept it. Review from the terminal UI with `/suggestions` or from the shell:
 
 ```sh
-gator suggestion list
-gator suggestion show SUGGESTION_ID
-gator suggestion accept SUGGESTION_ID
-gator suggestion reject SUGGESTION_ID
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator suggestion list
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator suggestion show SUGGESTION_ID
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator suggestion accept SUGGESTION_ID
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator suggestion reject SUGGESTION_ID
 ```
 
 `gator suggestion show` includes `reference_integrity` for note source references

@@ -1,5 +1,7 @@
 # Personal agent continuity benchmark
 
+**Interface status:** Gator is a desktop app. Shell examples below are source-checkout developer operations with an explicit internal opt-in; see [development instructions](DEVELOPMENT.md). They do not install or enable a public CLI.
+
 This corpus tests whether Gator can resume an ongoing goal after facts or user
 direction change. It is separate from the deliverable-focused Work corpus.
 There are 25 two-turn cases: 20 replace a local source document between turns;
@@ -17,16 +19,16 @@ human review is still needed for usefulness, nuance, and safety.
 ## Run it
 
 ```sh
-gator work eval validate internal/eval/testdata/personal-continuity-v1/dataset.json
-gator work eval run internal/eval/testdata/personal-continuity-v1/dataset.json \
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval validate internal/eval/testdata/personal-continuity-v1/dataset.json
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval run internal/eval/testdata/personal-continuity-v1/dataset.json \
   --report-dir /tmp/gator-continuity-agent --id continuity-agent \
   --split development --live --provider gemini --model gemini-3.5-flash \
   --max-model-requests 500 --timeout-seconds 7200
-gator work eval run internal/eval/testdata/personal-continuity-v1/dataset.json \
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval run internal/eval/testdata/personal-continuity-v1/dataset.json \
   --report-dir /tmp/gator-continuity-baseline --id continuity-baseline \
   --split development --live --provider gemini --model gemini-3.5-flash \
   --baseline-no-goal --max-model-requests 500 --timeout-seconds 7200
-gator work eval compare /tmp/gator-continuity-baseline/experiment.json \
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval compare /tmp/gator-continuity-baseline/experiment.json \
   /tmp/gator-continuity-agent/experiment.json
 ```
 
@@ -92,15 +94,15 @@ evaluation can run without a cloud API quota. For a small smoke run, replace
 `qwen3:4b` below with the exact installed model tag if needed:
 
 ```sh
-gator work eval run internal/eval/testdata/personal-continuity-v1/smoke-dataset.json \
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval run internal/eval/testdata/personal-continuity-v1/smoke-dataset.json \
   --report-dir /tmp/gator-continuity-local-agent --id continuity-local-agent \
   --split development --live --provider gator-local --model qwen3:4b \
   --max-model-requests 80 --timeout-seconds 1200
-gator work eval run internal/eval/testdata/personal-continuity-v1/smoke-dataset.json \
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval run internal/eval/testdata/personal-continuity-v1/smoke-dataset.json \
   --report-dir /tmp/gator-continuity-local-baseline --id continuity-local-baseline \
   --split development --live --provider gator-local --model qwen3:4b \
   --baseline-no-goal --max-model-requests 80 --timeout-seconds 1200
-gator work eval compare /tmp/gator-continuity-local-baseline/experiment.json \
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval compare /tmp/gator-continuity-local-baseline/experiment.json \
   /tmp/gator-continuity-local-agent/experiment.json
 ```
 

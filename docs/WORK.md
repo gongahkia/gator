@@ -1,40 +1,37 @@
 # Gator Work architecture
 
+**Interface status:** Gator is a desktop app. Shell examples below are source-checkout developer operations with an explicit internal opt-in; see [development instructions](DEVELOPMENT.md). They do not install or enable a public CLI.
+
 Current execution, continuity, evidence, Code candidates and bounds: [WORK_DEPTH.md](WORK_DEPTH.md).
 
 Current local browser, desktop, PPTX, and scheduling boundaries: [WORK_CAPABILITIES.md](WORK_CAPABILITIES.md).
 
 ## Product contract
 
-Gator is a terminal-native, local-first work agent. A work run accepts a clear
+Gator is a desktop personal agent with a local-first Work service. A work run accepts a clear
 objective and an explicit set of sources, performs bounded work through approved
 capabilities, and returns a reviewable artifact bundle. It does not silently
 overwrite source material or perform an external action merely because a model
 requested it.
 
 The product is designed for technical operators, founders, researchers,
-analysts, and developers who already use terminals and want automation that is
+analysts, and developers who want assistance that is
 composable, inspectable, and provider-independent.
 
-The interactive TUI is conversation-first. Starting `gator` selects the current
-directory as a read-only workspace. Questions use inspection mode automatically;
-requests to create work use draft mode and infer a conservative deliverable name.
-Use `/mode` and `/artifact` when the automatic choice is not the intended
-contract. `/source`, `/connector`, and `/web-origin` are visible session controls,
-not hidden model permissions.
+The desktop is conversation-first. A first launch uses a private empty folder;
+users explicitly select local sources or connections when their work needs them.
+Questions use inspection mode automatically; requests to create work use draft
+mode and infer a conservative deliverable name. Session controls and reviewed
+forms remain available when the automatic contract needs changing.
 
-The interactive conversation screen requires Node.js 22 or newer and uses a
-bundled React terminal renderer. Its Go backend owns Work runs, retained
-conversation state, commands, approvals, and evidence. Pickers, model setup,
-inbox, history, learnings, and confirmations render as React panels from Go
-workflow state. If Node.js is missing or too old, interactive startup exits
-with an installation message; headless commands still work. `gator doctor`
-uses the same Node frontend and also requires Node.js 22 or newer. The TypeScript
-source and build instructions are in `ui/`; the generated bundle is embedded
-in the Go binary.
+The Electron app bundles the Go runtime. React displays native desktop panels
+from the Go application's display-safe state. Conversation ownership, approvals,
+commands and evidence stay in Go. Packaged users do not install Node.js, a
+terminal renderer or a public CLI. See [desktop setup](DESKTOP.md) and
+[developer/service instructions](DEVELOPMENT.md).
 
 Completed files appear in the conversation as a verified deliverable card.
-`/review` previews them without leaving the TUI. `/save [DIRECTORY]` preflights
+`/review` previews them inside the desktop app. `/save [DIRECTORY]` preflights
 and saves ordinary artifacts after one explicit confirmation; `/apply` does the
 same for a verified Code candidate. Both paths recheck retained evidence and
 target state at execution time. The selected source remains immutable during the
@@ -260,15 +257,15 @@ never approve external actions. See [Durable jobs](JOBS.md).
 The command hierarchy is:
 
 ```text
-gator work [DIRECTORY] TASK       run a general local work task
-gator work inspect [DIRECTORY] TASK produce analysis without artifacts
-gator work review RUN             inspect artifacts, evidence, and actions
-gator work export RUN             export a sealed artifact bundle
-gator work apply RUN              copy reviewed artifacts to explicit targets
-gator provider connector ...      manage connected sources and authentication
-gator job ...                     manage scheduled work and its supervisor
-gator job inbox                   inspect completed and attention-needed jobs
-gator work snapshot ...           inspect or collect unreferenced snapshots
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work [DIRECTORY] TASK       run a general local work task
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work inspect [DIRECTORY] TASK produce analysis without artifacts
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work review RUN             inspect artifacts, evidence, and actions
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work export RUN             export a sealed artifact bundle
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work apply RUN              copy reviewed artifacts to explicit targets
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator provider connector ...      manage connected sources and authentication
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job ...                     manage scheduled work and its supervisor
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job inbox                   inspect completed and attention-needed jobs
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work snapshot ...           inspect or collect unreferenced snapshots
 ```
 
 Gator exposes one conversation-first Work entry point. Direct Code and ACP

@@ -1,5 +1,7 @@
 # User Work benchmark, first iteration
 
+**Interface status:** Gator is a desktop app. Shell examples below are source-checkout developer operations with an explicit internal opt-in; see [development instructions](DEVELOPMENT.md). They do not install or enable a public CLI.
+
 Recorded 2026-10-15. The corpus is
 [`internal/eval/testdata/user-work-v1/dataset.json`](../internal/eval/testdata/user-work-v1/dataset.json).
 It tests ordinary non-coding requests through the same `work.v1` service as
@@ -125,10 +127,10 @@ market advantage.
 ## Running the corpus
 
 ```sh
-gator work eval validate internal/eval/testdata/user-work-v1/dataset.json
-gator work eval run internal/eval/testdata/user-work-v1/dataset.json \
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval validate internal/eval/testdata/user-work-v1/dataset.json
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval run internal/eval/testdata/user-work-v1/dataset.json \
   --id scripted-user-work --split all --report-dir /tmp/gator-scripted-user-work
-gator work eval run internal/eval/testdata/user-work-v1/dataset.json \
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval run internal/eval/testdata/user-work-v1/dataset.json \
   --id live-user-work --split all --live --provider PROVIDER --model MODEL \
   --max-model-requests 100 --timeout-seconds 1200 \
   --report-dir /tmp/gator-live-user-work

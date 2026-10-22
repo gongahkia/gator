@@ -1,5 +1,7 @@
 # Everyday overview, restore, and migration
 
+**Interface status:** Gator is a desktop app. Shell examples below are source-checkout developer operations with an explicit internal opt-in; see [development instructions](DEVELOPMENT.md). They do not install or enable a public CLI.
+
 ## Product decision
 
 The everyday overview answers four questions together:
@@ -42,9 +44,9 @@ healthy empty states. Deleting history through the current session invalidates
 cached overview content so a delayed async response cannot bring it back.
 
 ```sh
-gator overview
-gator overview --json
-gator overview seen
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator overview
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator overview --json
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator overview seen
 ```
 
 ## Restore into a fresh profile
@@ -55,9 +57,9 @@ archive and produces a second, exact restore agreement. Only confirmation of
 that agreement creates the profile.
 
 ```sh
-gator data restore /private/backup.tar.gz --to /private/gator-restored
-gator data restore /private/backup.tar.gz --to /private/gator-restored --map-source /old/project=/new/project
-gator data restore-apply REVIEW_ID --yes
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator data restore /private/backup.tar.gz --to /private/gator-restored
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator data restore /private/backup.tar.gz --to /private/gator-restored --map-source /old/project=/new/project
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator data restore-apply REVIEW_ID --yes
 ```
 
 Source mappings are repeatable and their destinations must exist. The review
@@ -128,8 +130,8 @@ available folders. Original project directories are outside the backup.
 folder, review affected metadata, then confirm.
 
 ```sh
-gator data relink /old/project /new/project
-gator data relink-apply REVIEW_ID --yes
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator data relink /old/project /new/project
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator data relink-apply REVIEW_ID --yes
 ```
 
 Relinking updates matching source references, pauses affected checks, and

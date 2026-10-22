@@ -1,5 +1,7 @@
 # Durable jobs design
 
+**Interface status:** Gator is a desktop app. Shell examples below are source-checkout developer operations with an explicit internal opt-in; see [development instructions](DEVELOPMENT.md). They do not install or enable a public CLI.
+
 ## Implemented boundary
 
 Gator does not turn the process-local terminal registry, TUI queue, or app
@@ -254,33 +256,33 @@ written to scheduler lifecycle events.
 ## CLI
 
 ```text
-gator job add NAME --schedule '0 9 * * 1' --timezone Asia/Singapore \
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job add NAME --schedule '0 9 * * 1' --timezone Asia/Singapore \
   --source ./briefing --artifact brief.docx -- 'Prepare the weekly brief'
-gator job list
-gator job show ID
-gator job edit ID --schedule '30 9 * * 1'
-gator job enable|disable ID
-gator job run ID
-gator job history ID
-gator job supervisor [--notify=false]
-gator job status
-gator job stop
-gator job inbox [--unread]
-gator job inbox show ENTRY_ID
-gator job inbox read ENTRY_ID
-gator job inbox rate ENTRY_ID useful|noise|wrong|clear
-gator job inbox report GOAL_ID
-gator job quiet-audit JOB_ID
-gator job quiet-audit JOB_ID ATTEMPT_ID missed --note 'The deadline changed'
-gator job quiet-audit JOB_ID ATTEMPT_ID correct
-gator job quiet-audit JOB_ID ATTEMPT_ID clear
-gator job remove ID --yes        # keeps immutable history by default
-gator job launchagent install    # macOS, opt-in per-user supervisor
-gator job launchagent status
-gator job launchagent remove --yes
-gator job systemd install        # Linux, opt-in per-user supervisor
-gator job systemd status
-gator job systemd remove --yes
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job list
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job show ID
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job edit ID --schedule '30 9 * * 1'
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job enable|disable ID
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job run ID
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job history ID
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job supervisor [--notify=false]
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job status
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job stop
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job inbox [--unread]
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job inbox show ENTRY_ID
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job inbox read ENTRY_ID
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job inbox rate ENTRY_ID useful|noise|wrong|clear
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job inbox report GOAL_ID
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job quiet-audit JOB_ID
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job quiet-audit JOB_ID ATTEMPT_ID missed --note 'The deadline changed'
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job quiet-audit JOB_ID ATTEMPT_ID correct
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job quiet-audit JOB_ID ATTEMPT_ID clear
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job remove ID --yes        # keeps immutable history by default
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job launchagent install    # macOS, opt-in per-user supervisor
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job launchagent status
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job launchagent remove --yes
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job systemd install        # Linux, opt-in per-user supervisor
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job systemd status
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job systemd remove --yes
 ```
 
 Cron uses five fields and an explicit IANA timezone. `skip` is the default

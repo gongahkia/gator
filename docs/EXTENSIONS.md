@@ -1,15 +1,17 @@
 # Extensions
 
+**Interface status:** Gator is a desktop app. Shell examples below are source-checkout developer operations with an explicit internal opt-in; see [development instructions](DEVELOPMENT.md). They do not install or enable a public CLI.
+
 Gator extensions add reusable prompt guidance, skills, and optional executable
 tools to native Gator runs. There is one lifecycle:
 
 ```sh
-gator extension install /path/to/extension
-gator extension install https://github.com/example/review-helper.git
-gator extension list
-gator extension disable extension-id
-gator extension enable extension-id
-gator extension remove extension-id --yes
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator extension install /path/to/extension
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator extension install https://github.com/example/review-helper.git
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator extension list
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator extension disable extension-id
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator extension enable extension-id
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator extension remove extension-id --yes
 ```
 
 Installed bundles live below `$XDG_DATA_HOME/gator/extensions/` (or

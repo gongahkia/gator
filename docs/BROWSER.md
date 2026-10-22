@@ -1,5 +1,7 @@
 # Local controlled browser sessions
 
+**Interface status:** Gator is a desktop app. Shell examples below are source-checkout developer operations with an explicit internal opt-in; see [development instructions](DEVELOPMENT.md). They do not install or enable a public CLI.
+
 Gator can control a real local Chromium session for browser-based development
 and visual verification. It is not a hosted browser, a remote executor, or a
 general computer-use surface. A browser is available to an agent only when the
@@ -13,10 +15,10 @@ Install the pinned Playwright package and Chromium explicitly. Gator never
 downloads a browser while starting a run or opening the TUI:
 
 ```sh
-gator browser install
-gator browser start --visual-capture
-gator browser origins SESSION_ID add http://127.0.0.1:3000
-gator work --browser-session SESSION_ID --artifact review.md 'Test the approved local UI flow'
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator browser install
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator browser start --visual-capture
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator browser origins SESSION_ID add http://127.0.0.1:3000
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work --browser-session SESSION_ID --artifact review.md 'Test the approved local UI flow'
 ```
 
 `browser start` creates a headed Chromium window by default with a new,
@@ -27,9 +29,9 @@ To use an existing Chromium-family browser, start it yourself with a literal
 loopback remote-debugging address, then attach and select tabs deliberately:
 
 ```sh
-gator browser attach --cdp http://127.0.0.1:9222
-gator browser tabs SESSION_ID
-gator browser select SESSION_ID TAB_ID [TAB_ID...]
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator browser attach --cdp http://127.0.0.1:9222
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator browser tabs SESSION_ID
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator browser select SESSION_ID TAB_ID [TAB_ID...]
 ```
 
 Attached sessions never expose candidate tabs to the model. The CLI lists them

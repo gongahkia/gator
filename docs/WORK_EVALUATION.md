@@ -1,5 +1,7 @@
 # Full Work evaluation
 
+**Interface status:** Gator is a desktop app. Shell examples below are source-checkout developer operations with an explicit internal opt-in; see [development instructions](DEVELOPMENT.md). They do not install or enable a public CLI.
+
 `gator work eval` evaluates target `work.v1` through the actual Work service,
 manager, supervisor, Code adapter, tools, contracts, history, and delivery
 store. It is Gator's only product evaluation runtime.
@@ -7,15 +9,15 @@ store. It is Gator's only product evaluation runtime.
 ## Local experiments
 
 ```sh
-gator work eval validate internal/eval/testdata/work-v1/dataset.json
-gator work eval run internal/eval/testdata/work-v1/dataset.json \
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval validate internal/eval/testdata/work-v1/dataset.json
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval run internal/eval/testdata/work-v1/dataset.json \
   --id enabled --attempts 2 --report-dir /tmp/gator-enabled
-gator work eval run internal/eval/testdata/work-v1/dataset.json \
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval run internal/eval/testdata/work-v1/dataset.json \
   --id holdout --split held-out --attempts 2 --report-dir /tmp/gator-holdout
-gator work eval run internal/eval/testdata/work-v1/dataset.json \
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval run internal/eval/testdata/work-v1/dataset.json \
   --id disabled --attempts 2 --delegation=false --report-dir /tmp/gator-disabled
-gator work eval compare /tmp/gator-disabled/experiment.json /tmp/gator-enabled/experiment.json
-gator work eval show /tmp/gator-enabled/experiment.json
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval compare /tmp/gator-disabled/experiment.json /tmp/gator-enabled/experiment.json
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval show /tmp/gator-enabled/experiment.json
 ```
 
 Use a new report directory for each experiment. For example,
@@ -106,7 +108,7 @@ entailment and cost are not inferred from those counters.
 ## Budgeted live execution
 
 ```sh
-gator work eval run internal/eval/testdata/work-v1/dataset.json \
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval run internal/eval/testdata/work-v1/dataset.json \
   --id live-baseline --live --provider PROVIDER --model MODEL \
   --max-model-requests 256 --timeout-seconds 1800 --attempts 2 \
   --report-dir /tmp/gator-live-baseline
@@ -129,11 +131,11 @@ and evidence, not the producing agent's private transcript. Nonzero scores must
 cite text actually present in the judging input.
 
 ```sh
-gator work eval judge-rubric /tmp/gator-live-baseline/experiment.json \
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval judge-rubric /tmp/gator-live-baseline/experiment.json \
   --live --rubric internal/eval/testdata/work-v1/synthesis-rubric.json \
   --provider JUDGE_PROVIDER --model JUDGE_MODEL \
   --max-model-requests 32 --timeout-seconds 300 --output /tmp/judgements.json
-gator work eval calibrate-rubric /tmp/judgements.json /tmp/human-scores.json
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval calibrate-rubric /tmp/judgements.json /tmp/human-scores.json
 ```
 
 `judge-rubric --live` explicitly sends retained textual artifact/evidence content
@@ -155,7 +157,7 @@ explicit. The OTLP endpoint can target a compatible collector, including a
 Langfuse pipeline, without another custom runtime.
 
 ```sh
-gator work eval export-langsmith /tmp/gator-enabled/experiment.json
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval export-langsmith /tmp/gator-enabled/experiment.json
 ```
 
 This command requires `LANGSMITH_API_KEY`; `LANGSMITH_ENDPOINT` can override the

@@ -1,5 +1,7 @@
 # Review surfaces
 
+**Interface status:** Gator is a desktop app. Shell examples below are source-checkout developer operations with an explicit internal opt-in; see [development instructions](DEVELOPMENT.md). They do not install or enable a public CLI.
+
 Current Work candidate review and explicit code application: [WORK_DEPTH.md](WORK_DEPTH.md).
 
 Gator reviews only a retained run worktree. Staging, feedback, and browser
@@ -56,8 +58,8 @@ protocol.
 Use a separate foreground local server for a retained run:
 
 ```sh
-gator work review RUN_RECORD_PATH --listen 127.0.0.1:0
-gator work review RUN_RECORD_PATH --open
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work review RUN_RECORD_PATH --listen 127.0.0.1:0
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work review RUN_RECORD_PATH --open
 ```
 
 The command prints a one-use URL. Opening it exchanges the URL credential for a
@@ -88,8 +90,8 @@ Code candidates, their baseline tree and patches, changed paths, and aggregate
 verification results. Failed integration evidence remains visible.
 
 ```sh
-gator work apply RUN_ID --code-patch code/SELECTED.patch --to ./target --check
-gator work apply RUN_ID --code-patch code/SELECTED.patch --to ./target
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work apply RUN_ID --code-patch code/SELECTED.patch --to ./target --check
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work apply RUN_ID --code-patch code/SELECTED.patch --to ./target
 ```
 
 Only the explicitly selected verified candidate is applied. Preflight checks the

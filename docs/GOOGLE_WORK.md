@@ -1,5 +1,7 @@
 # Google Workspace in Gator
 
+**Interface status:** Gator is a desktop app. Shell examples below are source-checkout developer operations with an explicit internal opt-in; see [development instructions](DEVELOPMENT.md). They do not install or enable a public CLI.
+
 Gator's Google Workspace connector provides Google Drive, Docs, Sheets,
 Calendar event reads, and Gmail message reads to Gator Work. This supports a
 daily brief that combines local notes, today's calendar, and selected inbox
@@ -57,8 +59,8 @@ Create or select a **Desktop** OAuth client in your Google Cloud project, then
 enable the Google Drive, Docs, Sheets, Calendar, and Gmail APIs:
 
 ```sh
-gator provider connector add google-work --kind google --oauth-client-id YOUR_CLIENT_ID --daily-context
-gator provider connector login google-work --oauth-client-secret-from-env GOOGLE_OAUTH_CLIENT_SECRET
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator provider connector add google-work --kind google --oauth-client-id YOUR_CLIENT_ID --daily-context
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator provider connector login google-work --oauth-client-secret-from-env GOOGLE_OAUTH_CLIENT_SECRET
 ```
 
 The client secret is optional for public clients. When supplied, it is retained
@@ -143,7 +145,7 @@ uncertainty and does not retry automatically. For an action marked `unknown`,
 use the IDs shown by `gator work review WORK_ID` to check Sent:
 
 ```sh
-gator work reconcile WORK_ID CORRELATION_ID
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work reconcile WORK_ID CORRELATION_ID
 ```
 
 This read-only check searches the same Google connector's Sent mailbox, opens

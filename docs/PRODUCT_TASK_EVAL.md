@@ -1,5 +1,7 @@
 # Product task comparison: brief, email, and deck
 
+**Interface status:** Gator is a desktop app. Shell examples below are source-checkout developer operations with an explicit internal opt-in; see [development instructions](DEVELOPMENT.md). They do not install or enable a public CLI.
+
 This is a **live-model evaluation plan and attempt log**, not a product-quality score. The three selected cases in `internal/eval/testdata/user-work-v4/dataset.json` use synthetic but task-shaped source folders. They cover a recovered incident versus open work, a customer-safe email versus internal notes, and a slide deck with a measurement caveat. These are useful smoke tasks; actual user material and independent reviewers are still needed for a market claim.
 
 ## Matched procedure
@@ -8,8 +10,8 @@ Use the same provider and model for both arms. Run Gator's Work service first an
 
 ```sh
 DATASET=internal/eval/testdata/user-work-v4/dataset.json
-go run ./cmd/gator work eval run "$DATASET" --live --provider gemini --model gemini-3.5-flash --split all --case morning-ops-brief --case customer-escalation-email --case weekly-metrics-deck --max-model-requests 40 --timeout-seconds 900 --report-dir /tmp/gator-product-work-1 --id product-work-1
-go run ./cmd/gator work eval baseline "$DATASET" --provider gemini --model gemini-3.5-flash --case morning-ops-brief --case customer-escalation-email --case weekly-metrics-deck --timeout-seconds 900 --report-dir /tmp/gator-product-direct-1
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval run "$DATASET" --live --provider gemini --model gemini-3.5-flash --split all --case morning-ops-brief --case customer-escalation-email --case weekly-metrics-deck --max-model-requests 40 --timeout-seconds 900 --report-dir /tmp/gator-product-work-1 --id product-work-1
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval baseline "$DATASET" --provider gemini --model gemini-3.5-flash --case morning-ops-brief --case customer-escalation-email --case weekly-metrics-deck --timeout-seconds 900 --report-dir /tmp/gator-product-direct-1
 ```
 
 If the provider has a small quota, run each `--case` separately and retain the case ID and requested model in the report. Do not treat provider 429 or 503 as a task-quality failure. A completion score requires both arms to receive model responses. The configured Gemini model name may resolve to a different provider model ID; record the actual ID from any provider error or response metadata before making cost or model-specific claims.

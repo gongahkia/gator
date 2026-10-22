@@ -1,5 +1,7 @@
 # CLI architecture audit
 
+**Historical record.** The standalone CLI and terminal renderer were retired on 22 October 2026. See [the desktop decision](DESKTOP-PRIMARY.md) and [current development instructions](DEVELOPMENT.md). Original observations below are retained.
+
 Recorded 2026-10-18. The question is whether Gator should keep its Go Work
 engine but move the user-facing CLI and terminal UI to Rust, Python, or another
 language. The product target is an efficient, persistent personal agent in the

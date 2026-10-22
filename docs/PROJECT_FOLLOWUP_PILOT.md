@@ -1,5 +1,7 @@
 # Project follow-up pilot
 
+**Interface status:** Gator is a desktop app. Shell examples below are source-checkout developer operations with an explicit internal opt-in; see [development instructions](DEVELOPMENT.md). They do not install or enable a public CLI.
+
 Gator's first guided workflow is: **watch selected project changes, identify the
 next useful step, and prepare a response for review**. The target participant
 uses a terminal and manages a project across local notes and, optionally,
@@ -67,9 +69,9 @@ leave quality comparisons unscored when an arm never received a model response.
 For each retained Work run, review content against the actual source truth:
 
 ```sh
-gator pilot record --work WORK_ID --reviewer participant-1 --draft light-edits --corrections 2 --followup useful --recovery succeeded --setup-seconds 90 --resume-seconds 15 --repair-seconds 30 --unassisted true --note 'Corrected the owner and shortened the reply.'
-gator pilot report --goal GOAL_ID
-gator pilot report --goal GOAL_ID --json
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator pilot record --work WORK_ID --reviewer participant-1 --draft light-edits --corrections 2 --followup useful --recovery succeeded --setup-seconds 90 --resume-seconds 15 --repair-seconds 30 --unassisted true --note 'Corrected the owner and shortened the reply.'
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator pilot report --goal GOAL_ID
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator pilot report --goal GOAL_ID --json
 ```
 
 The correction count is required, including an explicit zero. Draft judgment is

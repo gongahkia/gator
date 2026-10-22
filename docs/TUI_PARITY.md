@@ -1,5 +1,7 @@
 # Historical Code TUI capability map
 
+**Historical record.** The standalone CLI and terminal renderer were retired on 22 October 2026. See [the desktop decision](DESKTOP-PRIMARY.md) and [current development instructions](DEVELOPMENT.md). Original observations below are retained.
+
 > This document records the retired standalone Code interface for migration
 > and regression archaeology. It is not a current product contract. Gator's
 > active terminal surface is `internal/worktui`; see

@@ -1,5 +1,7 @@
 # Terminal UI audit — 18 October 2026
 
+**Historical record.** The standalone CLI and terminal renderer were retired on 22 October 2026. See [the desktop decision](DESKTOP-PRIMARY.md) and [current development instructions](DEVELOPMENT.md). Original observations below are retained.
+
 ## Scope and reference
 
 This audit covers every interactive screen projected by `worktui.BridgeState`,

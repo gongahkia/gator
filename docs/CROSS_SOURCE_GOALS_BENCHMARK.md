@@ -1,5 +1,7 @@
 # Cross-source goal benchmark
 
+**Interface status:** Gator is a desktop app. Shell examples below are source-checkout developer operations with an explicit internal opt-in; see [development instructions](DEVELOPMENT.md). They do not install or enable a public CLI.
+
 `internal/eval/testdata/cross-source-goals-v1/dataset.json` contains eight
 two-turn goal tasks. Each begins with selected mail, calendar, and notes files;
 the second turn changes one source and asks Gator to refresh a reviewable
@@ -17,16 +19,16 @@ scripted server.
 ## Run a matched comparison
 
 ```sh
-gator work eval validate internal/eval/testdata/cross-source-goals-v1/dataset.json
-gator work eval run internal/eval/testdata/cross-source-goals-v1/dataset.json \
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval validate internal/eval/testdata/cross-source-goals-v1/dataset.json
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval run internal/eval/testdata/cross-source-goals-v1/dataset.json \
   --report-dir /tmp/gator-cross-source-agent --id cross-source-agent \
   --split development --live --provider PROVIDER --model MODEL \
   --max-model-requests 400 --timeout-seconds 3600
-gator work eval run internal/eval/testdata/cross-source-goals-v1/dataset.json \
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval run internal/eval/testdata/cross-source-goals-v1/dataset.json \
   --report-dir /tmp/gator-cross-source-baseline --id cross-source-baseline \
   --split development --live --provider PROVIDER --model MODEL \
   --baseline-no-goal --max-model-requests 400 --timeout-seconds 3600
-gator work eval compare /tmp/gator-cross-source-baseline/experiment.json \
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval compare /tmp/gator-cross-source-baseline/experiment.json \
   /tmp/gator-cross-source-agent/experiment.json
 ```
 

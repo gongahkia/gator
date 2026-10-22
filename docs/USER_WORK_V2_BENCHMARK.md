@@ -1,5 +1,7 @@
 # User Work benchmark, twenty-one-task corpus
 
+**Interface status:** Gator is a desktop app. Shell examples below are source-checkout developer operations with an explicit internal opt-in; see [development instructions](DEVELOPMENT.md). They do not install or enable a public CLI.
+
 Recorded 2026-10-15. The product target for this iteration is a terminal-comfortable knowledge worker who wants to prepare a daily brief, a presentation, or an email draft from local files and saved web material. The primary interaction is an ongoing terminal conversation. Connected apps are a later benchmark layer. Coding is not a user job in this corpus.
 
 The [dataset](../internal/eval/testdata/user-work-v2/dataset.json) has twenty-one tasks: the eight development probes from `user-work-v1`, nine new development tasks, and four held-out tasks. Every case uses a fixed local source folder so runs can be compared. The new source folders are synthetic and small; this corpus tests task coverage and specific failure modes, not production-scale document quality. The saved web pages test source interpretation, while live web retrieval remains a separate untested capability.
@@ -44,10 +46,10 @@ Two live plan-revision trials still failed after retry guidance alone. Gator now
 ## Commands
 
 ```sh
-gator work eval validate internal/eval/testdata/user-work-v2/dataset.json
-gator work eval run internal/eval/testdata/user-work-v2/dataset.json \
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval validate internal/eval/testdata/user-work-v2/dataset.json
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval run internal/eval/testdata/user-work-v2/dataset.json \
   --id user-work-v2-scripted --split all --report-dir /tmp/gator-user-work-v2-scripted
-gator work eval run internal/eval/testdata/user-work-v2/dataset.json \
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval run internal/eval/testdata/user-work-v2/dataset.json \
   --id user-work-v2-live-development --split development --live \
   --provider PROVIDER --model MODEL --max-model-requests 650 \
   --timeout-seconds 2400 --report-dir /tmp/gator-user-work-v2-live

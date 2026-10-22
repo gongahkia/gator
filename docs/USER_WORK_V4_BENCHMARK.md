@@ -1,5 +1,7 @@
 # User Work benchmark, fifty-task corpus
 
+**Interface status:** Gator is a desktop app. Shell examples below are source-checkout developer operations with an explicit internal opt-in; see [development instructions](DEVELOPMENT.md). They do not install or enable a public CLI.
+
 Recorded 2026-10-16. [Version 4](../internal/eval/testdata/user-work-v4/dataset.json) preserves the 30 version 3 cases and adds 20 jobs across documents, design, spreadsheets, presentations, research, and file organization. The new cases have 14 development and 6 held-out tasks. The full corpus has 37 development and 13 held-out tasks. The four inherited version 2 held-out cases were inspected in earlier live work; they are no longer unseen.
 
 The added range follows [Anthropic's Cowork examples](https://support.claude.com/en/articles/13345190-get-started-with-claude-cowork), which include organizing files, synthesizing research, producing reports and documents, creating formula-driven spreadsheets and charts, and making presentations. Anthropic's [product guide](https://claude.com/resources/guides/claude-cowork-product-guide/product-overview) also describes cross-file knowledge work, while its [Cowork use-case library](https://academy.claude.com/cowork/use-cases) includes branded content and design specs. These sources informed task selection; they are not a claim that Gator matches Cowork's breadth or quality.
@@ -43,10 +45,10 @@ The corpus exposed two product defects during calibration: new workbook creation
 
 ```sh
 go run ./scripts/generate_user_work_v4_fixtures.go
-gator work eval validate internal/eval/testdata/user-work-v4/dataset.json
-gator work eval run internal/eval/testdata/user-work-v4/dataset.json \
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval validate internal/eval/testdata/user-work-v4/dataset.json
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval run internal/eval/testdata/user-work-v4/dataset.json \
   --id user-work-v4-scripted --split all --report-dir /tmp/gator-user-work-v4-scripted
-gator work eval run internal/eval/testdata/user-work-v4/dataset.json \
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work eval run internal/eval/testdata/user-work-v4/dataset.json \
   --id user-work-v4-live-development --split development --live \
   --provider PROVIDER --model MODEL --max-model-requests 500 \
   --timeout-seconds 3600 --report-dir /tmp/gator-user-work-v4-live-development

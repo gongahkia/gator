@@ -22,6 +22,9 @@ This is one reversible repository change, committed atomically.
 - Retain the private UI transport, app-owned background supervisor, and existing
   canonical command handlers used for app workflows, tests and maintenance.
   `cmd/gator` remains the internal implementation location, not a CLI product.
+- The shared conversation model now lives in `internal/workapp`, with
+  display-safe projections for the desktop. Bubble Tea provides its headless
+  message scheduling; there is no terminal renderer. See [development](DEVELOPMENT.md).
 - Use `make desktop` to launch, `make build` to build, `make package` for a
   local app bundle, and `make dist` for installers. `make runtime` is an
   internal development build and does not install anything on PATH.

@@ -1,5 +1,7 @@
 # Custom providers and local endpoints
 
+**Interface status:** Gator is a desktop app. Shell examples below are source-checkout developer operations with an explicit internal opt-in; see [development instructions](DEVELOPMENT.md). They do not install or enable a public CLI.
+
 For Gator's reviewed Ollama Work and coding-model catalog, use the **Local**
 section of [`/model`](LOCAL_MODELS.md). It downloads a selected package with
 explicit confirmation and binds it to every native Gator interface without
@@ -15,12 +17,12 @@ Create the provider once:
 
 ```sh
 # A manually operated Ollama, LM Studio, or vLLM endpoint.
-gator provider add local-llm \
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator provider add local-llm \
   --base-url http://127.0.0.1:11434/v1/chat/completions \
   --model qwen3-coder
 
 # A compatible endpoint that requires a key held in the process environment.
-gator provider add team-gateway \
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator provider add team-gateway \
   --base-url https://models.example.com/v1/chat/completions \
   --api-key-env TEAM_GATEWAY_API_KEY \
   --model coding-large --model coding-small
@@ -30,12 +32,12 @@ The first `--model` is the default; subsequent model flags add selectable
 models. Use the configured ID everywhere a built-in provider would appear:
 
 ```sh
-gator work --provider local-llm 'Summarize the current project and open questions'
-gator config set default-provider local-llm
-gator provider list
-gator provider discover local-llm
-gator provider discover local-llm --apply
-gator provider remove local-llm --yes
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator work --provider local-llm 'Summarize the current project and open questions'
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator config set default-provider local-llm
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator provider list
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator provider discover local-llm
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator provider discover local-llm --apply
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator provider remove local-llm --yes
 ```
 
 The terminal picker and JSONL RPC validate the same catalog. In `/model`, `n`
