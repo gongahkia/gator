@@ -302,27 +302,25 @@ for this reversible decoration removal.
 **Verdict: Approve for this scoped macOS removal.** Windows/Linux and
 assistive-technology checks were not repeated.
 
-## InvestmentGini reference preview and cleanup reminder
+## InvestmentGini reference work closed
 
-22 October 2026. Use InvestmentGini's frontend as a reference for further Gator
-presentation work. Preserve Gator's existing palette, typography, Lucide icons,
-command palette and conversation model. Select the specific surface with the
-user before making another visual change; the Tide and hybrid activity decisions
-above are already implemented.
+22 October 2026. The user ended the reference exploration and declined further
+ports except the composer model and reasoning picker recorded below. The Tide
+and hybrid activity features above were already implemented; this decision
+does not remove existing Gator functionality.
 
-On the current development Mac:
+Cleanup completed on the development Mac:
 
-- Reference checkout: `~/Desktop/temasek-repos/invgini/invgini-core-web`, branch
-  `develop`. Its working tree was clean and its HEAD matched `origin/develop`
-  when the preview was verified. No InvestmentGini commits or pushes were made.
-- Preview launcher: `~/Desktop/temasek-repos/invgini-local-preview/run.mjs`.
-  Run it with Node, then open `https://localhost:3002`. It injects sample API
-  responses into Vite's served modules; it does not edit the reference source.
-  Its separate origin isolates preview preferences from normal development.
-- The preview exercises real frontend components with synthetic data. Its
-  sample activity is not evidence of live reasoning, integrations, file upload,
-  persistence or model execution. The separate experimental Studio branch is
-  outside this preview's scope.
+- Stopped the separate sample-data previews on ports 3002 and 3003 and removed
+  their external launcher, caches, temporary logs and screenshots.
+- Removed the temporary detached Cowork worktree. The original frontend stays
+  on `develop` at `850826f4c`, matching its saved `origin/develop` reference.
+- Restored the backend's exact original local `.env` and removed the empty
+  database and auth tables created by the setup attempt. Original local
+  containers are stopped. Existing dependency directories remain installed;
+  they are ignored development artifacts.
+- InvestmentGini's original frontend, backend and auth-proxy working trees are
+  clean. No InvestmentGini commits or pushes were made.
 
 Reference locations inspected:
 
@@ -333,9 +331,23 @@ Reference locations inspected:
 | Composer controls and attachments | `src/components/Chat/HomePageChatInput/HomePageChatInput.tsx` and adjacent source/attachment components | Existing composer in `desktop/src/App.tsx` and `desktop/src/Attachments.tsx` |
 | Motion | `src/themes/FramerMotion.ts` | `desktop/src/motion.tsx` and shared CSS; preserve reduced-motion behavior and the existing stack |
 
-**Pending cleanup after the reference work:** stop the separate launcher and
-remove `~/Desktop/temasek-repos/invgini-local-preview` when it is no longer
-needed. Normal frontend development still uses `npm run dev` in the reference
-checkout. There is no frontend source patch to reverse. Recheck `git status`
-before cleanup and preserve any subsequent user changes; do not use a blanket
-reset or clean. This is a recorded reminder, not a scheduled notification.
+These locations remain reference history, not a backlog of additional UI ports.
+
+## Pending decision: composer model and reasoning picker
+
+22 October 2026. The user selected InvestmentGini's compact model picker as a
+reference for Gator's chat composer, using two supplied screenshots:
+
+- A composer pill shows the selected model and reasoning effort. Opening it
+  shows the effort label, a model dropdown, a discrete effort slider, and a
+  reset control.
+- Choosing the model opens a second view in the same popover, with a back
+  control, models grouped by provider, and a clear selected-row checkmark.
+- Adapt the pattern to Gator's existing palette, typography and icons. Use
+  Gator's actual configured models and supported reasoning levels; the sample
+  provider/model names and available effort stops are reference content.
+- Reference InvestmentGini's frontend implementation as needed.
+
+**Deferred at the user's request:** this is the only pending InvestmentGini UI
+port. Wait for the user to explicitly say implementation can start. No other
+ports or model-picker implementation are authorized by this note alone.
