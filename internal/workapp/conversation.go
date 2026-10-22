@@ -44,6 +44,7 @@ func (m *Model) restoreConversation(conversationID, announcement string) {
 	m.lastWorkID = ""
 	m.lastBundle = BundleSummary{}
 	m.messages = nil
+	m.activity = nil
 	m.revision = ""
 	m.snapshot = ""
 
@@ -81,7 +82,7 @@ func (m *Model) applyConversationState(conversationID string, state Conversation
 	m.messages = make([]message, 0, len(state.Messages))
 	for _, item := range state.Messages {
 		m.messages = append(m.messages, message{
-			role: item.Role, text: item.Text, bundle: cloneBundlePointer(item.Bundle),
+			activity: item.Activity.Clone(), role: item.Role, text: item.Text, bundle: cloneBundlePointer(item.Bundle),
 		})
 	}
 	m.rebuildPromptHistory()

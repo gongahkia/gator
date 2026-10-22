@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/rattles"
+	"github.com/gongahkia/gator/internal/workactivity"
 	"github.com/gongahkia/gator/internal/workrun"
 )
 
@@ -39,6 +40,7 @@ func (m Model) workElapsed() string {
 func (m Model) startWork(source, conversation, prompt string, options RunOptions) (tea.Model, tea.Cmd) {
 	m.lastWorkID = ""
 	m.runStarted = time.Now()
+	m.activity = workactivity.New(m.runStarted)
 	m.cancelling = false
 	if !m.config.Live {
 		return m, func() tea.Msg { return runDone(m.config.Run(source, conversation, prompt, options)) }

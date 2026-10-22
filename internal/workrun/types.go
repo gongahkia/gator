@@ -19,6 +19,7 @@ import (
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/snapshot"
 	"github.com/gongahkia/gator/internal/tools"
+	"github.com/gongahkia/gator/internal/workactivity"
 	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workspace"
 )
@@ -160,6 +161,7 @@ func (r Request) codeEnabled() bool { return r.EnableCode || r.RequireCode }
 // Outcome retains staged files and trusted evidence even when model execution
 // fails. Source is never modified by the executor.
 type Outcome struct {
+	Activity         *workactivity.Trace
 	Work             workspace.Work
 	Manifest         artifact.Manifest
 	Result           agent.Result

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/projectcapture"
+	"github.com/gongahkia/gator/internal/workactivity"
 	"os"
 	"path/filepath"
 	"sort"
@@ -40,6 +41,7 @@ type ReplayState struct {
 }
 
 type Revision struct {
+	Activity         *workactivity.Trace    `json:"activity,omitempty"`
 	AcceptedCode     map[string]string      `json:"accepted_code,omitempty"`
 	Project          *projectcapture.Bundle `json:"project_configuration,omitempty"`
 	Replay           *ReplayState           `json:"replay,omitempty"`

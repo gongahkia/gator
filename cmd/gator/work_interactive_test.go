@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/workactivity"
 	"github.com/gongahkia/gator/internal/workapp"
 	"github.com/gongahkia/gator/internal/worksession"
 )
@@ -117,11 +119,14 @@ func TestLoadWorkTUIConversationRestoresOnlySelectedRevisionLineage(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
+	activity := workactivity.New(now)
+	activity.Record(agent.Event{Kind: agent.EventText, Text: "Checked the original source", At: now})
+	activity.Finish(now.Add(time.Second), "completed", "Initial report ready.")
 	rootBundle := createCLIWorkBundle(t, stateDir, "rev-root")
 	selectedBundle := createCLIWorkBundle(t, stateDir, "rev-selected")
 	siblingBundle := createCLIWorkBundle(t, stateDir, "rev-sibling")
 	for _, revision := range []worksession.Revision{
-		{ID: "rev-root", SnapshotID: "snap-one", Objective: "Draft the report", BundlePath: rootBundle.Path, Status: "completed", FinalText: "Initial report ready.", CreatedAt: now},
+		{Activity: activity, ID: "rev-root", SnapshotID: "snap-one", Objective: "Draft the report", BundlePath: rootBundle.Path, Status: "completed", FinalText: "Initial report ready.", CreatedAt: now},
 		{ID: "rev-selected", ParentRevisionID: "rev-root", SnapshotID: "snap-one", Objective: "Revise the report", BundlePath: selectedBundle.Path, Status: "completed", FinalText: "Revised report ready.", CreatedAt: now.Add(time.Minute)},
 		{ID: "rev-sibling", ParentRevisionID: "rev-root", SnapshotID: "snap-one", Objective: "Take another direction", BundlePath: siblingBundle.Path, Status: "completed", FinalText: "Sibling report ready.", CreatedAt: now.Add(2 * time.Minute)},
 	} {
@@ -135,6 +140,9 @@ func TestLoadWorkTUIConversationRestoresOnlySelectedRevisionLineage(t *testing.T
 	state, err := loadWorkTUIConversation(store, conversation.ID)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if state.Messages[1].Activity == nil || state.Messages[1].Activity.Entries[0].Text != "Checked the original source" {
+		t.Fatal("retained activity was not restored with its answer")
 	}
 	var transcript string
 	cardCount := 0

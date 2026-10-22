@@ -568,7 +568,7 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 	} else {
 		outcome, err = service.Execute(ctx, request)
 	}
-	result := workapp.RunResult{WorkID: outcome.Manifest.RunID, ConversationID: outcome.ConversationID, RevisionID: outcome.RevisionID, SnapshotID: outcome.SnapshotID, FinalText: outcome.Result.FinalText}
+	result := workapp.RunResult{Activity: outcome.Activity, WorkID: outcome.Manifest.RunID, ConversationID: outcome.ConversationID, RevisionID: outcome.RevisionID, SnapshotID: outcome.SnapshotID, FinalText: outcome.Result.FinalText}
 	if outcome.Work.Path != "" {
 		result.OutputPath = outcome.Work.Output.Path()
 		if summary, summaryErr := summarizeWorkBundle(outcome.Work.Path); summaryErr == nil {
@@ -975,11 +975,12 @@ func loadWorkTUIConversation(store worksession.Store, conversationID string) (wo
 	state.Messages = make([]workapp.TranscriptMessage, 0, len(lineage)*3)
 	for _, revision := range lineage {
 		state.Messages = append(state.Messages, workapp.TranscriptMessage{Role: "You", Text: revision.Objective})
+		activity := revision.Activity.Clone()
 		if strings.TrimSpace(revision.FinalText) != "" {
-			state.Messages = append(state.Messages, workapp.TranscriptMessage{Role: "Gator", Text: revision.FinalText})
+			state.Messages = append(state.Messages, workapp.TranscriptMessage{Activity: activity, Role: "Gator", Text: revision.FinalText})
 		} else if revision.Status != string(artifact.Completed) {
 			state.Messages = append(state.Messages, workapp.TranscriptMessage{
-				Role: "Gator", Text: "This retained Work revision ended with status " + revision.Status + ".",
+				Activity: activity, Role: "Gator", Text: "This retained Work revision ended with status " + revision.Status + ".",
 			})
 		}
 		bundle, bundleErr := summarizeWorkBundle(revision.BundlePath)

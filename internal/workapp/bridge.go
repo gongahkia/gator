@@ -10,6 +10,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/uisnapshot"
+	"github.com/gongahkia/gator/internal/workactivity"
 	"github.com/gongahkia/gator/internal/workhome"
 )
 
@@ -18,6 +19,7 @@ import (
 type BridgeState struct {
 	Mode                  string                `json:"mode"`
 	Panel                 *uisnapshot.Panel     `json:"panel,omitempty"`
+	Activity              *workactivity.Trace   `json:"activity,omitempty"`
 	Messages              []BridgeMessage       `json:"messages"`
 	Commands              []BridgeCommand       `json:"commands"`
 	Actions               []workhome.Action     `json:"actions"`
@@ -89,10 +91,11 @@ func bridgeExternal(kind, action, id string, command *exec.Cmd) *BridgeExternal 
 }
 
 type BridgeMessage struct {
-	Role   string             `json:"role"`
-	Text   string             `json:"text"`
-	Bundle *BundleSummary     `json:"bundle,omitempty"`
-	Result *uisnapshot.Result `json:"result,omitempty"`
+	Activity *workactivity.Trace `json:"activity,omitempty"`
+	Role     string              `json:"role"`
+	Text     string              `json:"text"`
+	Bundle   *BundleSummary      `json:"bundle,omitempty"`
+	Result   *uisnapshot.Result  `json:"result,omitempty"`
 }
 
 type BridgeCommand struct {
@@ -129,6 +132,7 @@ type BridgeWorkDetails struct {
 func (m Model) BridgeState() BridgeState {
 	state := BridgeState{
 		Mode:                  "chat",
+		Activity:              m.activity.Clone(),
 		Messages:              make([]BridgeMessage, 0, len(m.messages)),
 		Commands:              make([]BridgeCommand, 0),
 		Actions:               m.config.Attention.Next(),
@@ -198,7 +202,7 @@ func (m Model) BridgeState() BridgeState {
 		}
 	}
 	for _, item := range m.messages {
-		state.Messages = append(state.Messages, BridgeMessage{Role: item.role, Text: item.text, Bundle: cloneBundlePointer(item.bundle), Result: item.result})
+		state.Messages = append(state.Messages, BridgeMessage{Activity: item.activity.Clone(), Role: item.role, Text: item.text, Bundle: cloneBundlePointer(item.bundle), Result: item.result})
 	}
 	for _, item := range m.availableCommandEntries() {
 		state.Commands = append(state.Commands, BridgeCommand{

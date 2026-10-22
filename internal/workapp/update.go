@@ -207,6 +207,7 @@ func (m Model) updateAgentEvent(value agent.Event) (tea.Model, tea.Cmd) {
 	if m.cancelling {
 		return m, waitWorkEvent(m.live)
 	}
+	m.activity.Record(value)
 	if value.Kind == agent.EventSubagent && value.TaskID != "" {
 		var task struct{ ID, Role, Status, Error string }
 		if json.Unmarshal([]byte(value.Text), &task) == nil {
@@ -255,6 +256,19 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 	m.pendingInteractions = nil
 	m.live = nil
 	m.running = false
+	activity := m.activity
+	activityState := "completed"
+	if value.Error != "" {
+		activityState = "failed"
+	}
+	if wasCancelling {
+		activityState = "stopped"
+	}
+	activity.Finish(time.Now(), activityState, value.FinalText)
+	if value.Activity != nil {
+		activity = value.Activity.Clone()
+	}
+	m.activity = nil
 	m.runStarted = time.Time{}
 	if value.ConversationID != "" {
 		m.conversation = value.ConversationID
@@ -276,6 +290,7 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 	if value.SnapshotID != "" {
 		m.snapshot = value.SnapshotID
 	}
+	responseIndex := len(m.messages)
 	if wasCancelling && value.Error != "" && strings.Contains(strings.ToLower(value.Error), "cancel") {
 		m.messages = append(m.messages, noticeMessage("Work interrupted", "Review any retained work in /history.", "warning"))
 	} else if value.Error != "" {
@@ -290,6 +305,9 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 			bundle := cloneBundleSummary(value.Bundle)
 			m.messages = append(m.messages, message{role: "Deliverables", bundle: &bundle})
 		}
+	}
+	if responseIndex < len(m.messages) {
+		m.messages[responseIndex].activity = activity
 	}
 	m.lastOutput = value.OutputPath
 	m.lastBundle = value.Bundle

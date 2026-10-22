@@ -31,6 +31,7 @@ import (
 	"github.com/gongahkia/gator/internal/telemetry"
 	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/usage"
+	"github.com/gongahkia/gator/internal/workactivity"
 	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/worksession"
 	"github.com/gongahkia/gator/internal/workspace"
@@ -445,11 +446,13 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		return outcome, err
 	}
 	request.researchTools = append(request.researchTools, connectedReads...)
+	activity := workactivity.New(startedAt)
 	events := make([]agent.Event, 0, 32)
 	emit := func(event agent.Event) {
 		eventMu.Lock()
 		defer eventMu.Unlock()
 		trace.Record(event)
+		activity.Record(event)
 		if event.Kind != agent.EventTextDelta {
 			events = append(events, event)
 		}
@@ -619,9 +622,19 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		}
 		return outcome, fmt.Errorf("write work manifest: %w", err)
 	}
+	activityState := "completed"
+	if runErr != nil || manifest.Status != artifact.Completed {
+		activityState = "failed"
+	}
+	if ctx.Err() != nil {
+		activityState = "stopped"
+	}
+	activity.Finish(now(), activityState, result.FinalText)
+	outcome.Activity = activity.Clone()
 	configuration, _ := json.Marshal(effectiveConfiguration(request))
 	replay := sanitizeComputerReplay(result.Messages, request.DesktopSession != "")
 	if _, err := sessions.AddRevision(conversation.ID, worksession.Revision{
+		Activity:     outcome.Activity,
 		AcceptedCode: integration.accepted,
 		Project:      request.Project,
 		Replay:       &worksession.ReplayState{Version: 1, Provider: request.Provider, Messages: replay, Configuration: configuration, CompactionVersion: 1, Summary: summary},

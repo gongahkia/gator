@@ -32,7 +32,9 @@ export type Overview = {
   sections: { id: string; title: string; summary: string; total: number }[];
 };
 export type BackendCommand = { name: string; description: string; advanced: boolean; needs_input: boolean };
-export type BackendMessage = { role: string; text: string; bundle?: BackendBundle; result?: BackendResult };
+export type ActivityEntry = { id: string; kind: "text" | "tool" | "status"; text?: string; tool?: string; state: "running" | "completed" | "failed" | "stopped"; started_at: string; finished_at?: string };
+export type BackendActivity = { started_at: string; finished_at?: string; state: "running" | "completed" | "failed" | "stopped"; entries: ActivityEntry[]; truncated?: boolean };
+export type BackendMessage = { activity?: BackendActivity; role: string; text: string; bundle?: BackendBundle; result?: BackendResult };
 export type QueuedMessage = { id: string; text: string };
 export type QueueAction = {
   request_id: string; id: string; action: "edit" | "remove" | "earlier" | "later" | "move" | "run" | "guide"; text?: string;
@@ -111,6 +113,7 @@ export type BackendState = {
   status_line: string[];
   status_line_enabled: boolean;
   input?: string;
+  activity?: BackendActivity;
   running: boolean;
   cancelling: boolean;
   elapsed?: string;

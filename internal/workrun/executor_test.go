@@ -24,6 +24,7 @@ import (
 	"github.com/gongahkia/gator/internal/learning"
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/workhistory"
+	"github.com/gongahkia/gator/internal/worksession"
 )
 
 type textOnlyScriptedModel struct{ *scriptedModel }
@@ -79,6 +80,17 @@ func TestOrdinaryWorkCannotDelegateCodeForArtifactTask(t *testing.T) {
 	}
 	if _, err := outcome.Work.Output.ReadRegularFile("clean.csv", 1024); err != nil {
 		t.Fatalf("ordinary artifact was not produced: %v", err)
+	}
+	sessions, err := worksession.Open(stateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	revision, err := sessions.LoadRevision(outcome.ConversationID, outcome.RevisionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if revision.Activity == nil || revision.Activity.State != "completed" || len(revision.Activity.Entries) < 2 {
+		t.Fatal("public activity was not retained with the revision")
 	}
 	history, err := workhistory.Open(stateDir)
 	if err != nil {

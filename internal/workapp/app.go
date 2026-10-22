@@ -17,6 +17,7 @@ import (
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/learning"
 	"github.com/gongahkia/gator/internal/uisnapshot"
+	"github.com/gongahkia/gator/internal/workactivity"
 	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workhome"
 	"github.com/gongahkia/gator/internal/workrun"
@@ -24,6 +25,7 @@ import (
 )
 
 type RunResult struct {
+	Activity       *workactivity.Trace
 	WorkID         string
 	ConversationID string
 	RevisionID     string
@@ -75,9 +77,10 @@ type CandidateSummary struct {
 // prose, so historical artifact cards retain the same trust boundary as new
 // cards produced in this application session.
 type TranscriptMessage struct {
-	Role   string
-	Text   string
-	Bundle *BundleSummary
+	Activity *workactivity.Trace
+	Role     string
+	Text     string
+	Bundle   *BundleSummary
 }
 
 // ConversationState is the projection the application needs to reopen one selected
@@ -251,10 +254,11 @@ type entry struct {
 	advanced                                   bool
 }
 type message struct {
-	role   string
-	text   string
-	bundle *BundleSummary
-	result *uisnapshot.Result
+	activity *workactivity.Trace
+	role     string
+	text     string
+	bundle   *BundleSummary
+	result   *uisnapshot.Result
 }
 type runDone RunResult
 type bundleActionDone struct {
@@ -343,6 +347,7 @@ type Model struct {
 	loadingFrame           int
 	loadingRun             uint64
 	runStarted             time.Time
+	activity               *workactivity.Trace
 	modelStatus            ModelStatus
 	bridgeNotice           string
 	bridgeRecentIssue      string
