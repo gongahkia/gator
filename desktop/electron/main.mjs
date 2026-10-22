@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session, shell, systemPreferences } from "electron";
-import { mkdir, access, readFile } from "node:fs/promises";
+import { mkdir, access, readFile, writeFile } from "node:fs/promises";
 import { constants, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -13,6 +13,8 @@ import { runtimeName, stateDirectory } from "./platform.mjs";
 import { Updates, releaseURL, updateBlockReason } from "./updates.mjs";
 import { acquireUpdateGuard } from "./update-guard.mjs";
 import { microphoneAllowed, runSpeechRequest, validateVoiceRequest } from "./voice.mjs";
+import { FileStore, readBoundedFile, validateFileRequest } from "./files.mjs";
+import { selectedFileSource } from "./file-sources.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const assets = resolve(here, "../dist");
@@ -23,6 +25,8 @@ if (process.platform === "win32") app.setAppUserModelId("com.gongahkia.gator");
 if (process.env.GATOR_DESKTOP_USER_DATA) app.setPath("userData", resolve(process.env.GATOR_DESKTOP_USER_DATA));
 const stateRoot = stateDirectory();
 const uploads = new UploadStore(join(stateRoot, "gator", "uploads"));
+const files = new FileStore(join(stateRoot, "gator", "files"));
+const importedFiles = new Map();
 const drafts = new DraftStore(join(app.getPath("userData"), "drafts", `${createHash("sha256").update(stateRoot).digest("hex")}.json`));
 protocol.registerSchemesAsPrivileged([{ scheme: "gator", privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 
@@ -93,7 +97,7 @@ async function configureUpdates() {
     prepare: async () => {
       updatePreparing = true; update();
       try {
-        await drafts.flush();
+        await drafts.flush(); await files.flush();
         await backend.prepareUpdate();
         const guard = await acquireUpdateGuard(runtimeBinary(), runtimeWorkspace(), runtimeEnvironment());
         await guard.release();
@@ -138,7 +142,7 @@ function createWindow() {
       if (answer.response !== 1) return;
     }
     closing = true;
-    try { await drafts.flush(); }
+    try { await drafts.flush(); await files.flush(); }
     catch {
       closing = false;
       const answer = await dialog.showMessageBox(window, { type: "warning", message: "Your message draft could not be saved.", detail: "Keep Gator open to copy your unsent text, or close without saving that draft.", buttons: ["Keep Gator open", "Close without saving"], defaultId: 0, cancelId: 0 });
@@ -173,6 +177,30 @@ else {
       { label: "Help", submenu: [{ label: "About & updates…", click: showUpdates }, { label: "Release notes", click: () => void shell.openExternal(releaseURL) }] },
     ]));
     ipcMain.handle("gator:snapshot", (event) => { trusted(event); return snapshot(); });
+    ipcMain.handle("gator:file", async (event, request) => {
+      mutable(event); validateFileRequest(request);
+      const owner = backend, context = request.context;
+      const current = () => backend === owner && !owner?.closed && !owner?.state?.external && uploadContext(owner?.state) === context;
+      if (!current()) throw new Error("Return to the same conversation before opening or editing this file.");
+      const result = await files.request(request, async ref => {
+        const saved = await drafts.request({ action: "list" });
+        const source = await selectedFileSource(ref, { state: owner.state, context, drafts: saved, imported: importedFiles, uploads, files });
+        if (!current()) throw new Error("The conversation changed. Your file edits are retained.");
+        return source;
+      });
+      if (!current()) throw new Error("The conversation changed. Your file edits are retained.");
+      if (request.action === "attach") {
+        const uploaded = await uploads.importContent(result.name, result.bytes); importedFiles.set(uploaded.id, context);
+        await files.link({ kind: "upload", id: uploaded.id }, request.ref, result.bytes); return uploaded;
+      }
+      if (request.action === "export") {
+        const selected = await dialog.showSaveDialog(window, { title: "Save a copy", defaultPath: result.name });
+        if (selected.canceled || !selected.filePath) return { exported: false };
+        if (!current()) throw new Error("The conversation changed before export. Try again in the intended conversation.");
+        await writeFile(selected.filePath, result.bytes, { mode: 0o600 }); return { exported: true };
+      }
+      return result;
+    });
     ipcMain.handle("gator:voice", async (event, value) => {
       mutable(event);
       const request = validateVoiceRequest(value);
@@ -231,9 +259,13 @@ else {
       if (!paths.length) return [];
       mutable(event);
       if (!current()) throw new Error("The conversation changed. Attach these files again in the intended conversation.");
-      const files = await uploads.import(paths);
+      const selected = await uploads.import(paths);
       if (!current()) throw new Error("The conversation changed. Attach these files again in the intended conversation.");
-      return files;
+      for (const file of selected) {
+        importedFiles.set(file.id, context);
+        await files.retain({ kind: "upload", id: file.id }, file.name, await readBoundedFile(uploads.root, file.id));
+      }
+      return selected;
     };
     ipcMain.handle("gator:files", (event, context) => importFiles(event, context, async () => {
       const result = await dialog.showOpenDialog(window, { title: "Attach files to your message", buttonLabel: "Attach", properties: ["openFile", "multiSelections"], filters: [{ name: "Documents, text and images", extensions: uploadExtensions }, { name: "All files", extensions: ["*"] }] });

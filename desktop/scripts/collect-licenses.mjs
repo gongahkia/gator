@@ -8,7 +8,9 @@ const notices = ["Gator desktop bundled JavaScript dependency notices.\nGenerate
 for (const [path, entry] of Object.entries(lock.packages).sort(([a], [b]) => a.localeCompare(b))) {
   if (!path || entry.dev) continue;
   const directory = join(root, path);
-  const metadata = JSON.parse(await readFile(join(directory, "package.json"), "utf8"));
+  let metadata;
+  try { metadata = JSON.parse(await readFile(join(directory, "package.json"), "utf8")); }
+  catch (error) { if (entry.optional && error.code === "ENOENT") continue; throw error; }
   const licenses = (await readdir(directory)).filter((name) => /^licen[sc]e(?:[.-]|$)|^copying(?:[.-]|$)/i.test(name));
   notices.push(`\n${"=".repeat(72)}\n${metadata.name}@${metadata.version}\nLicense: ${metadata.license ?? entry.license ?? "See package metadata"}\n`);
   for (const name of licenses) notices.push(`\n${name}\n${await readFile(join(directory, name), "utf8")}\n`);

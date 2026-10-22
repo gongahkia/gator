@@ -206,7 +206,7 @@ func ValidateLoaded(images []agent.Image, attachments []agent.Attachment) error 
 // @ references retain their existing inspect-in-workspace behavior.
 func IsSupported(path string) bool {
 	switch strings.ToLower(filepath.Ext(path)) {
-	case ".pdf", ".docx", ".odt", ".xlsx", ".pptx", ".txt", ".md", ".markdown", ".rst", ".csv", ".tsv", ".json", ".jsonl", ".yaml", ".yml", ".toml", ".xml", ".html", ".htm", ".log", ".ini", ".cfg", ".conf":
+	case ".pdf", ".docx", ".odt", ".xlsx", ".pptx", ".txt", ".md", ".markdown", ".rst", ".csv", ".tsv", ".json", ".jsonl", ".yaml", ".yml", ".toml", ".xml", ".html", ".htm", ".log", ".ini", ".cfg", ".conf", ".js", ".jsx", ".ts", ".tsx", ".py", ".go", ".rs", ".java", ".c", ".h", ".cpp", ".hpp", ".css", ".scss", ".sh", ".bash", ".zsh", ".sql", ".rb", ".swift", ".kt", ".vue", ".svelte", ".tex", ".r":
 		return true
 	default:
 		return false

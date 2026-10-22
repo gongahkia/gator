@@ -4,7 +4,7 @@ import { constants } from "node:fs";
 import { randomBytes } from "node:crypto";
 
 export const uploadLimits = { count: 4, file: 4 * 1024 * 1024, total: 8 * 1024 * 1024 };
-export const uploadExtensions = "png jpg jpeg webp pdf docx odt xlsx pptx txt md markdown rst csv tsv json jsonl yaml yml toml xml html htm log ini cfg conf".split(" ");
+export const uploadExtensions = "png jpg jpeg webp pdf docx odt xlsx pptx txt md markdown rst csv tsv json jsonl yaml yml toml xml html htm log ini cfg conf js jsx ts tsx py go rs java c h cpp hpp css scss sh bash zsh sql rb swift kt vue svelte tex r".split(" ");
 export const validUploadID = (id) => typeof id === "string" && /^[a-f0-9]{32}\/[^/\\\x00-\x1f]{1,200}$/.test(id) && ![".", ".."].includes(id.split("/")[1]);
 export const validUpload = (file) => file && typeof file === "object" && !Array.isArray(file) && Object.keys(file).every((key) => ["id", "name", "size"].includes(key)) && validUploadID(file.id) && file.name === file.id.split("/")[1] && Number.isSafeInteger(file.size) && file.size > 0 && file.size <= uploadLimits.file;
 export const uploadContext = (state) => state?.conversation_id ? `conversation:${state.conversation_id}` : state?.source ? `workspace:${state.primary === false ? "topic:" : ""}${state.source}` : "";
@@ -13,6 +13,13 @@ export const uploadContext = (state) => state?.conversation_id ? `conversation:$
 // filesystem reader or writer. Originals and project folders stay untouched.
 export class UploadStore {
   constructor(root) { this.root = root; }
+  async importContent(name, bytes) {
+    const id = `${randomBytes(16).toString("hex")}/${name}`;
+    if (!validUploadID(id) || !uploadExtensions.includes(extname(name).slice(1).toLowerCase()) || !bytes.length || bytes.length > uploadLimits.file) throw new Error("The saved file can be exported, but chat attachments must be supported files up to 4 MiB.");
+    await mkdir(join(this.root, id.split("/")[0]), { recursive: true, mode: 0o700 });
+    await writeFile(join(this.root, id), bytes, { mode: 0o600, flag: "wx" });
+    return { id, name, size: bytes.length };
+  }
   async import(paths) {
     if (!Array.isArray(paths) || !paths.length || paths.length > uploadLimits.count) throw new Error("Choose up to four files per message.");
     const imported = [];

@@ -1,4 +1,5 @@
 import type { BackendState, Frame } from "./protocol";
+import type { FileRequest, FileView } from "./fileProtocol";
 
 export type UpdateState = { phase: "manual" | "idle" | "checking" | "current" | "available" | "downloading" | "ready" | "installing" | "error"; installed: string; version?: string; reason?: string; percent?: number; checkedAt?: string };
 export type UpdateRequest = { action: "open" | "close" | "check" | "download" | "install" | "releases" };
@@ -22,6 +23,7 @@ declare global {
       chooseFolder(): Promise<string | null>;
       chooseFiles(context: string): Promise<UploadedFile[]>;
       dropFiles(files: File[], context: string): Promise<UploadedFile[]>;
+      files<T = FileView>(request: FileRequest): Promise<T>;
       choosePath(request: { panel_id: string; kind: string }): Promise<string | null>;
       openLink(url: string): Promise<void>;
       continueInTerminal(): Promise<void>;
