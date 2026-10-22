@@ -67,6 +67,7 @@ type Request struct {
 	ForegroundApp           bool
 	ApproveAppChange        func(context.Context, any) (bool, error)
 	OnAppChange             func(AppChange)
+	queueAppChange          func(AppChange, AppMutation)
 	DisabledRoles           []string
 	RoleConfiguration       map[string]orchestrator.RoleConfiguration
 	OnSupervisor            func(*orchestrator.Supervisor)

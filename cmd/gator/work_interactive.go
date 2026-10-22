@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/atotto/clipboard"
@@ -507,7 +508,14 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 			return workapp.RunResult{Error: err.Error()}
 		}
 	}
+	var appChanges []workrun.AppChange
+	var appChangesMu sync.Mutex
 	request := workrun.Request{
+		OnAppChange: func(change workrun.AppChange) {
+			appChangesMu.Lock()
+			defer appChangesMu.Unlock()
+			appChanges = append(appChanges, change)
+		},
 		ForegroundApp:      true,
 		RequestedAt:        requestedAt,
 		PreparationContext: ctx,
@@ -564,7 +572,10 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 	} else {
 		outcome, err = service.Execute(ctx, request)
 	}
-	result := workapp.RunResult{Activity: outcome.Activity, WorkID: outcome.Manifest.RunID, ConversationID: outcome.ConversationID, RevisionID: outcome.RevisionID, SnapshotID: outcome.SnapshotID, FinalText: outcome.Result.FinalText}
+	appChangesMu.Lock()
+	changes := append([]workrun.AppChange(nil), appChanges...)
+	appChangesMu.Unlock()
+	result := workapp.RunResult{AppChanges: changes, Activity: outcome.Activity, WorkID: outcome.Manifest.RunID, ConversationID: outcome.ConversationID, RevisionID: outcome.RevisionID, SnapshotID: outcome.SnapshotID, FinalText: outcome.Result.FinalText}
 	if outcome.Work.Path != "" {
 		result.OutputPath = outcome.Work.Output.Path()
 		if summary, summaryErr := summarizeWorkBundle(outcome.Work.Path); summaryErr == nil {

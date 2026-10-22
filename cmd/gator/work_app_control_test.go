@@ -20,6 +20,43 @@ func appControllerForTest(t *testing.T) gatorAppController {
 	return gatorAppController{stateDir: t.TempDir(), settings: store, request: &workrun.Request{}}
 }
 
+func TestGatorAppModelAndThemeChangesStayWithinKnownSettings(t *testing.T) {
+	c := appControllerForTest(t)
+	settings := config.Default()
+	settings.Defaults = config.Defaults{Provider: "fixture", Model: "old"}
+	settings.CustomProviders = []config.CustomProvider{{ID: "fixture", BaseURL: "http://127.0.0.1:11434/v1/chat/completions", Models: []string{"old", "new"}, DefaultModel: "old"}}
+	if err := c.settings.Save(settings); err != nil {
+		t.Fatal(err)
+	}
+	c.request.Provider = "fixture/old"
+	change := workrun.AppChange{Setting: "model", Value: json.RawMessage(`{"provider":"fixture","model":"new"}`)}
+	mutation, err := c.Prepare(context.Background(), change)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := mutation.Apply(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	saved, _ := c.settings.Load()
+	if saved.Defaults.Model != "new" || c.request.Provider != "fixture/old" {
+		t.Fatal("model selection did not affect only future requests")
+	}
+	change.Value = json.RawMessage(`{"provider":"fixture","model":"unconfigured"}`)
+	if _, err := c.Prepare(context.Background(), change); err == nil {
+		t.Fatal("unconfigured model accepted")
+	}
+	mutation, err = c.Prepare(context.Background(), workrun.AppChange{Setting: "theme", Value: json.RawMessage(`{"theme":"mono"}`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.settings.Update(func(s *config.Settings) error { s.Theme = "contrast"; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := mutation.Apply(context.Background()); err == nil {
+		t.Fatal("stale change overwrote a newer UI edit")
+	}
+}
+
 func TestGatorAppInspectionReadsUsageAndOmitsEndpointSecrets(t *testing.T) {
 	c := appControllerForTest(t)
 	settings := config.Default()

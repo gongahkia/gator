@@ -519,6 +519,16 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	}
 	defer closeSpecialists()
 	surface = append(surface, delegationSurface...)
+	var afterReply []struct {
+		change   AppChange
+		mutation AppMutation
+	}
+	request.queueAppChange = func(change AppChange, mutation AppMutation) {
+		afterReply = append(afterReply, struct {
+			change   AppChange
+			mutation AppMutation
+		}{change, mutation})
+	}
 	surface = append(surface, applicationTools(e.App, request)...)
 	runner := agent.Runner{Model: e.Model, Tools: surface, Now: now}
 	var malformedCallFallback []string
@@ -589,6 +599,21 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		MalformedCallFallback: malformedCallFallback,
 	})
 	closeSpecialists()
+	if runErr == nil {
+		for _, pending := range afterReply {
+			if err := ctx.Err(); err != nil {
+				runErr = err
+				break
+			}
+			if _, err := pending.mutation.Apply(ctx); err != nil {
+				runErr = fmt.Errorf("apply Gator setting after reply: %w", err)
+				break
+			}
+			if request.OnAppChange != nil {
+				request.OnAppChange(pending.change)
+			}
+		}
+	}
 	outcome.Result = result
 	outcome.Events = append([]agent.Event(nil), events...)
 

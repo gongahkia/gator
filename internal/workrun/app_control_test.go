@@ -3,23 +3,63 @@ package workrun
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
+
+	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/artifact"
 )
 
 type appControllerFixture struct {
-	review  bool
-	applied int
+	afterReply bool
+	review     bool
+	applied    int
 }
 
 func (f *appControllerFixture) Inspect(context.Context, AppQuery) (any, error) {
 	return map[string]string{"model": "fixture"}, nil
 }
 func (f *appControllerFixture) Prepare(context.Context, AppChange) (AppMutation, error) {
-	return AppMutation{Review: f.review, Preview: map[string]string{"setting": "theme", "after": "mono"}, Apply: func(context.Context) (any, error) {
+	return AppMutation{AfterReply: f.afterReply, Review: f.review, Preview: map[string]string{"setting": "theme", "after": "mono"}, Apply: func(context.Context) (any, error) {
 		f.applied++
 		return "saved", nil
 	}}, nil
+}
+
+type appReplyModel struct {
+	fixture *appControllerFixture
+	calls   int
+	fail    bool
+}
+
+func (m *appReplyModel) Complete(context.Context, agent.TurnRequest) (agent.Turn, error) {
+	m.calls++
+	if m.calls == 1 {
+		return agent.Turn{ToolCalls: []agent.ToolCall{{ID: "app-edit", Name: "gator_app_update", Arguments: json.RawMessage(`{"setting":"theme","value":{"theme":"mono"}}`)}}}, nil
+	}
+	if m.fixture.applied != 0 {
+		return agent.Turn{}, errors.New("change applied before the final reply")
+	}
+	if m.fail {
+		return agent.Turn{}, errors.New("reply failed")
+	}
+	return agent.Turn{Text: "The change is scheduled after this reply."}, nil
+}
+
+func TestAppChangesAfterReplyRequireSuccessfulCompletion(t *testing.T) {
+	for _, fail := range []bool{false, true} {
+		fixture := &appControllerFixture{afterReply: true}
+		model := &appReplyModel{fixture: fixture, fail: fail}
+		_, err := (Executor{App: fixture, Model: model, StateDir: t.TempDir()}).Execute(context.Background(), Request{ForegroundApp: true, SourcePath: t.TempDir(), Objective: "Update a Gator setting", Mode: action.Inspect, Contract: artifact.InspectionContract()})
+		if fail && (err == nil || fixture.applied != 0) {
+			t.Fatalf("failed reply applied a change: %v, %d", err, fixture.applied)
+		}
+		if !fail && (err != nil || fixture.applied != 1) {
+			t.Fatalf("completed reply did not apply exactly once: %v, %d", err, fixture.applied)
+		}
+	}
 }
 
 func TestAppToolsAreForegroundOnly(t *testing.T) {

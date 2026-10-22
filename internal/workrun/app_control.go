@@ -29,8 +29,9 @@ type AppChange struct {
 }
 
 type AppMutation struct {
-	Preview any
-	Review  bool
+	Preview    any
+	Review     bool
+	AfterReply bool
 	// Apply revalidates any settings or targets captured by Prepare.
 	Apply func(context.Context) (any, error)
 }
@@ -110,6 +111,13 @@ func (t appTool) Execute(ctx context.Context, args json.RawMessage) (agent.ToolR
 		}
 		if err = ctx.Err(); err != nil {
 			return agent.ToolResult{}, err
+		}
+		if prepared.AfterReply {
+			if t.request.queueAppChange == nil {
+				return agent.ToolResult{}, errors.New("this change requires a foreground reply lifecycle")
+			}
+			t.request.queueAppChange(change, prepared)
+			return appResult(map[string]any{"status": "scheduled_after_reply", "setting": change.Setting, "preview": prepared.Preview, "note": "The host will apply this only after this response completes successfully. Do not claim it is already saved."})
 		}
 		result, err = prepared.Apply(ctx)
 		if err == nil {

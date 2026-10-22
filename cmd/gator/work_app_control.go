@@ -101,8 +101,8 @@ func (c gatorAppController) inspectOutputs(id string) (any, error) {
 	return map[string]any{"runs": items, "limit": 20}, nil
 }
 
-func (c gatorAppController) Prepare(context.Context, workrun.AppChange) (workrun.AppMutation, error) {
-	return workrun.AppMutation{}, errors.New("this app setting cannot be changed through chat yet")
+func (c gatorAppController) Prepare(ctx context.Context, change workrun.AppChange) (workrun.AppMutation, error) {
+	return c.prepareSettings(ctx, change)
 }
 
 var _ workrun.AppController = gatorAppController{}

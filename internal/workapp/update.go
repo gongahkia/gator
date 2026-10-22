@@ -256,6 +256,28 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 	m.pendingInteractions = nil
 	m.live = nil
 	m.running = false
+	for _, change := range value.AppChanges {
+		switch change.Setting {
+		case "theme":
+			var v struct {
+				Theme string `json:"theme"`
+			}
+			if json.Unmarshal(change.Value, &v) == nil {
+				m.theme = normalizeTheme(v.Theme)
+			}
+		case "connections":
+			var v struct {
+				IDs []string `json:"ids"`
+			}
+			if json.Unmarshal(change.Value, &v) == nil {
+				m.options.ConnectorIDs = append([]string{}, v.IDs...)
+			}
+		}
+		m.messages = append(m.messages, reportMessage("Gator settings updated", "Saved "+change.Setting+". The change applies to new requests.", "success"))
+	}
+	if len(value.AppChanges) > 0 {
+		m.refreshModelStatus()
+	}
 	activity := m.activity
 	activityState := "completed"
 	if value.Error != "" {

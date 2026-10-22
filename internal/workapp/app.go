@@ -25,6 +25,7 @@ import (
 )
 
 type RunResult struct {
+	AppChanges     []workrun.AppChange
 	Activity       *workactivity.Trace
 	WorkID         string
 	ConversationID string

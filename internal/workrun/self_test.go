@@ -116,7 +116,7 @@ func TestConversationReceivesCurrentAppKnowledgeAfterModelChange(t *testing.T) {
 	if currentState["snapshot_id"] != first.SnapshotID || currentState["effective_mode"] != "inspect" || currentState["external_actions"] != "forbid" {
 		t.Fatalf("app state did not reflect the actual run: %v", currentState)
 	}
-	for _, guide := range []string{"desktop personal agent", "Settings (the bottom-left sliders icon) → Models", "send /model in Gator's message box", "Correct earlier assistant replies", "ordinary chat tools cannot switch the active model", "available tools"} {
+	for _, guide := range []string{"desktop personal agent", "Settings (the bottom-left sliders icon) → Models", "send /model in Gator's message box", "Correct earlier assistant replies", "Use gator_app_update", "available tools"} {
 		if !strings.Contains(current.System, guide) {
 			t.Errorf("conversation omitted app guidance %q", guide)
 		}
