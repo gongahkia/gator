@@ -6,6 +6,7 @@ services as the desktop screens, with tool results confirming actual changes.
 | Example request | Behavior |
 | --- | --- |
 | “Which model are you using? Switch to …” | Inspects configured choices and selects an existing provider/model for subsequent messages. API keys and new local downloads use Models. |
+| “Stop learning from chats.” | Turns automatic chat-memory saves off after the reply; existing saved memory, explicit remember requests and forgetting remain available. |
 | “Use local retrieval” or “use Gemini for saved recall.” | Reviews the retrieval provider separately from chat. Cloud retrieval explicitly reviews uploading eligible saved text and search queries. Local retrieval does not install a model automatically. |
 | “How much have I used today?” | Reads current requests, tokens, limits, and activity counts. Incomplete provider cost data is not presented as a complete bill. |
 | “Limit me to 100 requests a day.” | Shows the exact limits for review, then applies them after the reply. Zero means uncapped. |
@@ -66,6 +67,19 @@ The implementation uses [OpenAI file transcription](https://developers.openai.co
 and [Gemini inline media input](https://ai.google.dev/api/generate-content#Part).
 Provider model availability, billing, and retention are governed by the selected
 provider; Gator's local audio lifecycle does not establish the provider's policy.
+
+## Chats and personal memory
+
+**New chat** (Cmd/Ctrl+N) starts an independent conversation. Launch restores the
+last selected chat. Personal saved memory is shared across chats in the same
+local profile; transcripts, file access, task settings and selected connections
+remain per chat. Ask Gator to remember an enduring fact or preference, inspect
+what it saved in Saved, or correct/forget it. Forgetting a memory keeps the
+historical message until you separately delete that chat/history.
+
+Copied screenshots and PNG/JPEG/WebP images can be pasted into the composer.
+They are staged for preview and Send; paste never sends a message automatically.
+See [chat and memory boundaries](DESKTOP-CONVERSATIONAL-IMPLEMENTATION.md#shared-memory-and-earlier-chat-retrieval).
 
 ## Files in the conversation
 

@@ -11,21 +11,22 @@ the neutral dark palette, sage accent, system typography, Lucide icons, native
 forms, command palette, restrained motion and precise review controls. The
 conversation becomes the front door. Detailed controls remain ordinary screens.
 
-This changes presentation and adds the state necessary to return to one main
-conversation. It does not replace the agent loop, scheduler, model providers,
-memory retrieval, action reviews, accounting or delivery services.
+The current decision is **one Gator identity with multiple independent chats**.
+The approved follow-up restores New chat and shares durable personal memory
+across chats. It retains the existing agent loop, scheduler, model providers,
+action reviews, accounting and delivery services.
 
 ## Where everything lives
 
 | Entry | Working behavior | Existing capabilities retained |
 | --- | --- | --- |
-| Talk with Gator / brand | Opens the designated main conversation; later launches restore its selected durable head and source/options. | Conversation IDs, revision ancestry, independent sources and existing history. |
-| Saved conversations / folder selection | Reopen an existing topic or select a different source folder. The standalone New topic entry and Cmd/Ctrl+N were retired in the subsequent chat simplification. | Per-conversation drafts, prompt history, source snapshots, run options and existing saved topics. |
-| Recent topics | Titles first; flat by default, optional folder grouping; filter and expand controls. | Exact list identity validation, current-run attention, disambiguated folder names and full conversation picker. |
+| Talk with Gator / brand | Returns to the current chat; launch reopens the last selected chat with its durable head and source/options. | Conversation IDs, revision ancestry, independent sources and existing history. |
+| Saved conversations / folder selection | New chat / Cmd/Ctrl+N creates a separate working context. Reopen an older chat or choose a different source folder for another independent chat. | Per-conversation drafts, prompt history, source snapshots, run options and existing saved topics. |
+| Recent chats | Titles first; flat by default, optional folder grouping; filter and expand controls. | Exact list identity validation, current-run attention, disambiguated folder names and full conversation picker. |
 | Search / Cmd/Ctrl+K | Existing palette, with added entries for Talk with Gator, Following and Saved. | Advanced commands, keyboard selection, input-prefilling commands and focus return. |
 | Following | Read-only saved-goal and actual check summaries; links to Open goals, Manage checks, Updates and Activity & attention. | Goal editor, plans, scheduler scope/timing, inbox read/rating controls, overview and canonical reviews. |
 | Saved | Current conversation's files and changes, What Gator remembers, All conversations, Task runs and Unsent drafts. | Knowledge filtering/correction/deletion, retained run evidence, conversation continuation and draft retention. |
-| File card in chat / Saved | Opens the exact retained file or proposed change in the optional preview rail. | Checked/needs-review/proposal states, failed-run origin, text/Markdown previews, shortened-preview notice, source-only HTML and retained locations. |
+| File card in chat / Saved | Opens the exact retained file inside its chat message, with supported preview/edit controls. | Checked/needs-review/proposal states, failed-run origin, text/Markdown previews, shortened-preview notice, source-only HTML and retained locations. |
 | Conversation information | Outputs, Sources & memory, Connections and This conversation; closed by default. | Selected sources, retained references, connection provenance, model settings, folder picker, request mode and usage access. |
 | Settings / Cmd/Ctrl+, | Existing model, usage, data/backups, recovery and About & updates screens. | Native controls, provider credential handling, exact reviews and reviewed restart checks. |
 | Queue above composer | Drag a handle and drop before/after another queued message; keyboard pickup/move/drop is also available. | Edit/remove, paused send, captured run options, live guidance, acknowledgments and FIFO execution after reordering. |
@@ -37,28 +38,89 @@ keep the existing polished layouts and native fields.
 
 ## Durable state and migration
 
-`internal/worksession/primary.go` stores one versioned designation under the
-existing profile's `gator/conversations/primary.json`. The first retained run in
-the main conversation establishes that identity. Opening the app does not
-create a synthetic revision or adopt an unrelated existing topic. Existing
-conversations appear as separate topics and keep their original IDs and scope.
+`internal/worksession/active.go` stores the last selected conversation in
+`gator/conversations/active.json`. A new unsent chat already has a durable ID;
+opening one creates no model request, source snapshot, synthetic revision or
+permission grant. Its title becomes the first real request. A failed creation
+keeps the previous chat intact. Folder-created chats use the same state reset.
 
-A process lease prevents two initially empty windows from overwriting each
-other's designation. A losing window keeps its completed work as an independent
-topic and shows an explanation. A deleted conversation makes its designation
-unavailable; corrupt metadata produces a visible problem instead of silently
-choosing a different topic. Restoring the main conversation never replays a run,
-queued message, steering channel or approval.
-The first retained identity is also saved when a run ends during normal close.
-Data recovery keeps the empty main conversation's default source aligned with
-the fresh private folder.
+On upgrade, an existing legacy `primary.json` is used as the initial selection
+without merging or rewriting any conversation. When no selection or designation
+exists, the most recent chat is used. Deleted selections can fall back to a
+retained chat; corrupt metadata shows a visible problem. Existing source/options,
+revision ancestry and per-chat drafts are restored. Runtime goal binding follows
+the restored conversation, including its existing active/paused checks.
 
-Existing `workspace:` unsent drafts remain recoverable in the empty main
-conversation. Empty side topics use separate `workspace:topic:SOURCE` keys inside
-the existing accepted namespace, so older builds preserve them on rollback; retained
-conversations continue using `conversation:ID`. Promotion to a durable ID keeps
-the existing acknowledged-copy-before-remove behavior. Interim `topic:` keys
-migrate on ordinary access without losing their text. No histories are merged.
+Automatic history retention protects an explicitly selected chat, including an
+unsent one. Explicit history/all-content deletion still uses the existing scope
+review. Restoring never replays a model request, queued message, steering channel
+or approval.
+
+Composer drafts now use `conversation:ID` even before the first message. Existing
+`workspace:` draft records remain available through Saved drafts → Add to current
+message; they are not silently discarded or submitted. No histories are merged.
+
+## Shared memory and earlier-chat retrieval
+
+Personal facts and preferences live in the existing `gator/memory` store, shared
+by chats in one local profile. Goal decisions remain scoped to their current
+goal. New chat resets the active transcript and task options, with a fresh
+working context. It does not delete personal memory, train the provider model,
+synchronize devices, or promise lossless recall of every historical detail.
+
+- Foreground `memory_remember` selects useful stable information during the
+  normal model/tool loop. There is no separate automatic extraction request.
+  The host requires an exact quote from the current user's message and stores
+  that quote with the source conversation/run. The model selects what is useful;
+  quotation checks establish provenance, not the truth of a claim. Routine
+  chatter, one-off tasks, third-party statements, hypotheticals and secrets are
+  excluded by the memory policy. File/tool/old-chat text cannot supply the
+  current-message evidence.
+- Canonical subjects consolidate repeated preferences. A changed quote requires
+  the existing record ID and exact updated timestamp; stale inspections cannot
+  overwrite a user's newer correction. User edits are marked as corrected and
+  no longer presented as the original quote. Advisory locks serialize changes.
+- A bounded capsule contains up to four global preferences/basic profile facts;
+  other memory is selected through the existing lexical/optional embedding
+  retrieval. The combined rendered memory remains bounded to 4,000 bytes with
+  exact supplied-context references. Goal memory and excluded records do not
+  enter the global capsule.
+- `chat_search` and `chat_read` retrieve bounded pages of earlier chat text when
+  needed. Search follows retained selected ancestry and reports scan coverage,
+  older-turn cursors and unavailable history. Retrieved text is historical
+  reference; it carries no old file, connection or action permission. Current
+  and other-goal chats are excluded. No bulk transcript mining is added.
+- Saved knowledge keeps its existing inspect/correct/forget controls. Explicit
+  `memory_forget` removes a saved memory; a hash of its scope/subject suppresses
+  automatic relearning until a new explicit remember request. It stores no
+  forgotten quote. The original chat still exists until separately deleted.
+  This suppression survives backup/restore; transient write locks are excluded.
+- **Memory & retrieval → Turn chat learning off/on** controls automatic saves.
+  Existing memory can still be recalled, and explicit remember/forget requests
+  still work. The same preference is inspectable/changeable through app tools.
+  Background jobs and specialists receive no chat-memory mutation tools.
+
+This follows the application-owned storage pattern in Anthropic's
+[memory tool documentation](https://platform.claude.com/docs/en/agents-and-tools/tool-use/memory-tool).
+[Prompt caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)
+reuses repeated prompt processing; it does not replace persistent memory or
+increase a model's context limit. Gator retains its existing context compaction.
+A new chat omits the previous transcript from its working replay; it does not
+force a provider to invalidate reusable cached prefixes.
+
+## Image paste in the composer
+
+A paste event with PNG/JPEG/WebP file bytes stages an ordinary attachment for
+preview and Send. Accompanying text is inserted at the selection; plain-text
+paste follows the browser's normal behavior. No automatic send, clipboard
+polling, HTML execution, filesystem path authority or remote rendering is added.
+The trusted Electron host decodes valid images to PNG, rejects excessive pixel
+counts and applies the existing four-file / 4 MiB each / 8 MiB total bounds
+before and after decoding. Staged copies use the existing private upload,
+versioning, draft, expiry and message attachment paths.
+
+The event payload follows the [Clipboard API](https://www.w3.org/TR/clipboard-apis/).
+Host decoding uses Electron's [nativeImage](https://www.electronjs.org/docs/latest/api/native-image).
 
 Before model setup, pressing Send opens the existing setup screen and keeps
 the unsent request. Returning from setup does not submit it automatically.

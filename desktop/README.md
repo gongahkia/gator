@@ -24,13 +24,15 @@ On Windows or without Make, run `npm ci --prefix desktop` followed by
 `npm start --prefix desktop`. Installed apps
 bundle Electron's Node runtime; users do not need Node or a Gator CLI on PATH.
 
-The app uses the existing local Gator profile and opens your continuing main
-conversation. Existing topics remain separate and are available in the sidebar
-and Saved. Following groups goals, configured checks and updates.
+The app uses the existing local Gator profile and reopens your last selected
+chat. **New chat** (Cmd/Ctrl+N) starts a separate transcript and working context.
+Saved personal memories carry across chats; file and connection selections keep
+their conversation scope. Recent chats and Saved provide access to earlier work.
+Following groups goals, configured checks and updates.
 
-Before a main conversation exists, Gator starts in a private empty workspace.
+Before any chat exists, Gator starts in a private empty workspace.
 Conversation information → This conversation provides the folder picker. Choosing
-a different folder starts a separate topic. To choose a starting folder during
+a different folder starts a separate chat. To choose a starting folder during
 development:
 
 ```sh
@@ -41,6 +43,21 @@ GATOR_DESKTOP_WORKSPACE=/absolute/path/to/notes make desktop
 `GATOR_DESKTOP_USER_DATA` selects Electron's separate preferences/drafts directory.
 `GATOR_DESKTOP_BINARY` can select a separately built private runtime during
 development. These overrides are useful for isolated testing.
+
+## Shared memory and image paste
+
+Useful stable facts and preferences from your own messages can be saved with a
+source chat. Browse Saved to inspect, correct or forget them. **Memory & retrieval**
+controls automatic learning; turning it off keeps existing memory and explicit
+remember/forget requests available. Earlier chat details can be retrieved on
+demand. New chat refreshes the working context without deleting saved memory.
+This is local profile memory, with no automatic device synchronization or model
+retraining. See [the implemented boundaries](../docs/DESKTOP-CONVERSATIONAL-IMPLEMENTATION.md#shared-memory-and-earlier-chat-retrieval).
+
+Paste screenshots or copied PNG/JPEG/WebP images into the message box with
+Cmd/Ctrl+V. They become previewable attachments; nothing is sent until Send.
+Text paste remains ordinary text. The existing limits apply: four attachments,
+4 MiB per file and 8 MiB per message. Image decoding happens on this computer.
 
 ## Composer model picker
 

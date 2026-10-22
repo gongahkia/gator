@@ -160,7 +160,12 @@ shared infrastructure. Optional display sidecars can remain when rolling back;
 the canonical revision JSON is unchanged.
 
 
-## Follow-up: one primary chat entry
+## Historical follow-up: one primary chat entry (superseded)
+
+The later shared-memory decision restores New chat / Cmd/Ctrl+N and replaces the
+privileged primary chat with last-active reopening. See the current
+[implementation and memory boundaries](DESKTOP-CONVERSATIONAL-IMPLEMENTATION.md).
+The following records the earlier removal for rollback context.
 
 22 October 2026. The user removed the standalone **New topic** entry because it
 competed with the continuing main chat. Retire its sidebar button, Cmd/Ctrl+N,
@@ -561,3 +566,69 @@ resize redraw; comparing after layout settled passed. Screenshots were inspected
 **Verdict: Approve for this macOS scope.** Windows/Linux and screen-reader
 execution were not repeated. File preview/editing remains a separate proposal
 in [Files inside Gator chat](INLINE-FILES-RESEARCH.md), pending user verification.
+
+## Follow-up: independent chats with shared personal memory
+
+22 October 2026. The approved product model is one Gator identity across several
+chats. New chat and Cmd/Ctrl+N return, launch reopens the last selected chat,
+and a fresh working context keeps access to shared personal memory. Existing
+chat styles, command palette, files, queue and progressive disclosure remain.
+Image paste stages an ordinary previewable attachment without sending it.
+The [implementation note](DESKTOP-CONVERSATIONAL-IMPLEMENTATION.md) defines the
+memory, provenance, retrieval and local-profile boundaries.
+
+### Scoped interface review
+
+Full mode using `make-interfaces-feel-better`: React 19, the existing native CSS
+variables/utilities and Lucide icons. Scope is new-chat navigation, recents,
+composer paste/recovery, command discovery and memory controls. This is not a
+new audit of every settings page or a native Windows/Linux review.
+
+| Category | Evidence inspected | Result |
+| --- | --- | --- |
+| Typography | `App.tsx`, `RecentConversations.tsx`, memory panel summaries, pending image names; normal/compact layouts | Reuse the system font, existing text sizes, truncation and clear chat labels. |
+| Surfaces | Existing `.nav-button`, `.composer`, `.inline-file`, panel summary/toolbar styles; empty, populated, failure, hover and focus states | New chat keeps the 40 px target; pasted images use existing preview/remove cards and inline errors. |
+| Animations | Existing sidebar, details and palette transitions; 10% playback and reversal in the motion test | No new per-message or per-paste motion; existing interruptible transitions and reduced-motion behavior retained. |
+| Icons | Plus, paperclip, image/file cards and memory/history activity labels | One Lucide/currentColor system, existing 1.5 px regular stroke; no new icon library or image asset. |
+| Performance | Draft identity/readiness, ClipboardEvent payload, bounded native decode and selected memory capsule | Independent drafts; no clipboard polling or extra background extraction call. Counts/bytes checked before reading pasted images. |
+
+| Severity | Location | Before | After | Why |
+| --- | --- | --- | --- | --- |
+| MEDIUM | `desktop/src/App.tsx:296`, `desktop/src/RecentConversations.tsx:41`, `desktop/src/useDrafts.ts:6` | A privileged main chat with separate topics and no New chat | Last-active reopening, explicit New chat and recent chats with independent draft identities/titles | Match the approved mental model and preserve context while changing conversations. |
+| HIGH | `desktop/src/App.tsx:176`, composer textarea | Typing could race asynchronous draft restoration | Wait for draft readiness; focus the ready composer after New chat | Prevent an immediately typed message from being overwritten and maintain keyboard continuity. |
+| MEDIUM | `desktop/src/App.tsx:289` | Empty retained chats displayed the generic New chat header | Use the retained conversation title | Stable labels make saved-chat navigation understandable. |
+| MEDIUM | `desktop/src/App.tsx:360` | A raw reset command, with slash-prefixed palette queries producing no match | New chat label; accept both `/new` and `new chat` search | Visible command syntax and actual discovery should agree. |
+| MEDIUM | `desktop/src/Attachments.tsx:31`, composer paste handler | Copying a screenshot could not attach its image bytes | Paste stages the image in the existing preview/remove workflow; errors retain the text and attachments | Make clipboard intake predictable, reviewable and consistent with chosen files. |
+| MEDIUM | `internal/workapp/recall.go:149`, `cmd/gator/work_context.go:37` | Retrieval configuration without automatic-learning status or chat provenance | Learn from chats On/Off, a reversible control and source-chat/corrected labels | Users can understand and change what carries across chats without another dashboard. |
+
+Considered but rejected:
+
+| Location | Candidate | Rejected because |
+| --- | --- | --- |
+| Navigation | Keep a special forever main chat alongside New chat | The approved model makes continuity a memory property; last-active reopening is sufficient. |
+| Composer image cards | Add another preview rail or always expand every pasted image | The existing inline file preview already provides inspection while keeping the composer compact. |
+| Paste/New chat | Add staged entrance effects or another loading spinner | These are frequent actions; existing state, focus, disabled controls and error text provide useful feedback. |
+| Memory | Add a permanent dashboard/counter in the chat | Saved and Memory & retrieval already provide the controls; no truthful context-capacity metric is needed for this feature. |
+
+Verification results follow. Native assistive-technology and Windows/Linux
+execution are outside this scoped review.
+
+### Verification and verdict
+
+- `go test ./internal/workapp ./internal/workrun ./internal/lifecycle ./internal/config ./internal/memory ./internal/tools ./internal/worksession -timeout 120s`: passed.
+- `go test ./cmd/gator -timeout 180s`: passed. Subsequent foreground-capsule/exclusion changes passed `go test ./cmd/gator -run 'Test.*Memory|TestChatProfile' -timeout 90s` and `go test ./internal/memory ./internal/tools -timeout 90s`.
+- `npm run check --prefix desktop`: passed. `npm test --prefix desktop`: 44 passed, with the Windows-native handoff test skipped on macOS.
+- `npm run pack --prefix desktop`: built the unsigned macOS app. Independently compared 21 packaged Electron/UI files and the bundled Go runtime with their build inputs; all bytes matched.
+- Source desktop regressions passed for attachment/queue ownership, cancellation/errors, inline text/version recovery, native Office edits, shared memory and native paste. Two navigation findings from the regression pass (slash search and empty-chat titles) were fixed and passed in the package.
+- Packaged Electron checks passed for recent-chat/draft navigation, real Go state/forms/restart, interruptible motion, cross-chat memory and forgetting/learning controls, native image paste/preview/send/restart, and Gator/contrast/mono themes at 1440/800 px with reduced motion and collapsed navigation. The memory restart fixture was rerun successfully after waiting for the new conversation ID before recording it; this corrected an asynchronous test race.
+- Native Cmd/Ctrl+V used a generated PNG. Prior OS clipboard contents stayed inside the test main process and were restored immediately. No real provider credentials or user profiles were used. Plain accompanying text and unsupported-image errors preserved the draft; send carried the staged PNG bytes through the actual Go runtime.
+- Visually inspected the normal/narrow paste screenshots, contrast/monochrome compact screens and 10% sidebar-transition midpoint. Existing focus indicators, 40 px New chat target, restrained disclosure and responsive layout remain consistent.
+
+**Verdict: Approve for the scoped macOS implementation.** Not verified: native
+Windows/Linux execution, OS assistive-technology navigation and live-provider
+memory-selection quality. The deterministic provider verifies the real storage,
+context and tool paths; it does not establish recall accuracy for every model.
+
+Roll back dependent application/UI commits before their memory/chat-store
+infrastructure. Legacy primary designations and existing conversation IDs remain
+intact; no transcript merge or destructive migration was performed.
