@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/gongahkia/gator/internal/worktui"
+	"github.com/gongahkia/gator/internal/workapp"
 )
 
 type uiFrame struct {
@@ -23,15 +23,15 @@ type uiFrame struct {
 	Error         string                            `json:"error,omitempty"`
 	Width         int                               `json:"width,omitempty"`
 	Height        int                               `json:"height,omitempty"`
-	Panel         *worktui.BridgePanelAction        `json:"panel,omitempty"`
-	Queue         *worktui.BridgeQueueAction        `json:"queue,omitempty"`
-	Conversation  *worktui.BridgeConversationAction `json:"conversation,omitempty"`
+	Panel         *workapp.BridgePanelAction        `json:"panel,omitempty"`
+	Queue         *workapp.BridgeQueueAction        `json:"queue,omitempty"`
+	Conversation  *workapp.BridgeConversationAction `json:"conversation,omitempty"`
 	InteractionID int                               `json:"interaction_id,omitempty"`
 	Approved      bool                              `json:"approved,omitempty"`
 }
 
 type uiBridgeModel struct {
-	model worktui.Model
+	model workapp.Model
 	out   *json.Encoder
 	last  []byte
 }
@@ -91,7 +91,7 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 	default:
 		next, command = m.model.Update(value)
 	}
-	m.model = next.(worktui.Model)
+	m.model = next.(workapp.Model)
 	m.sendState()
 	return m, command
 }
@@ -134,7 +134,7 @@ func bridgeKey(name string) (tea.KeyMsg, bool) {
 	return tea.KeyMsg{}, false
 }
 
-func runUIBridge(application worktui.Model) error {
+func runUIBridge(application workapp.Model) error {
 	// The renderer handles Ctrl+C in chat. During an external terminal handoff,
 	// the editor or login process receives SIGINT; keep the backend session alive.
 	signal.Ignore(os.Interrupt)
@@ -142,7 +142,7 @@ func runUIBridge(application worktui.Model) error {
 	return runUIBridgeWithIO(application, os.Stdin, os.Stdout)
 }
 
-func runUIBridgeWithIO(application worktui.Model, in io.Reader, out io.Writer) error {
+func runUIBridgeWithIO(application workapp.Model, in io.Reader, out io.Writer) error {
 	program := tea.NewProgram(&uiBridgeModel{model: application, out: json.NewEncoder(out)}, tea.WithoutRenderer(), tea.WithInput(nil), tea.WithoutSignalHandler())
 	inputDone := make(chan error, 1)
 	go func() {

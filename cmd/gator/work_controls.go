@@ -13,13 +13,13 @@ import (
 	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/uisnapshot"
 	sharedusage "github.com/gongahkia/gator/internal/usage"
-	"github.com/gongahkia/gator/internal/worktui"
+	"github.com/gongahkia/gator/internal/workapp"
 )
 
-func workControls(stateDir string) func(context.Context, string, string, []string) (worktui.ControlScreen, error) {
-	return func(ctx context.Context, family, action string, args []string) (worktui.ControlScreen, error) {
+func workControls(stateDir string) func(context.Context, string, string, []string) (workapp.ControlScreen, error) {
+	return func(ctx context.Context, family, action string, args []string) (workapp.ControlScreen, error) {
 		if err := ctx.Err(); err != nil {
-			return worktui.ControlScreen{}, err
+			return workapp.ControlScreen{}, err
 		}
 		switch family {
 		case "overview":
@@ -31,52 +31,52 @@ func workControls(stateDir string) func(context.Context, string, string, []strin
 		case "usage":
 			return usageControl(stateDir, action, args)
 		default:
-			return worktui.ControlScreen{}, fmt.Errorf("%s controls are not available yet", family)
+			return workapp.ControlScreen{}, fmt.Errorf("%s controls are not available yet", family)
 		}
 	}
 }
-func usageControl(stateDir, action string, args []string) (worktui.ControlScreen, error) {
+func usageControl(stateDir, action string, args []string) (workapp.ControlScreen, error) {
 	s, err := sharedusage.Open(stateDir)
 	if err != nil {
-		return worktui.ControlScreen{}, err
+		return workapp.ControlScreen{}, err
 	}
 	if action == "limits" || action == "pause" {
 		if len(args) < 1 {
-			return worktui.ControlScreen{}, errors.New("refresh the shared limits before editing")
+			return workapp.ControlScreen{}, errors.New("refresh the shared limits before editing")
 		}
 		var prior sharedusage.Policy
 		if err = json.Unmarshal([]byte(args[0]), &prior); err != nil {
-			return worktui.ControlScreen{}, err
+			return workapp.ControlScreen{}, err
 		}
 		next := prior
 		if action == "pause" {
 			next.Paused = !next.Paused
 		} else {
 			if len(args) != 4 {
-				return worktui.ControlScreen{}, errors.New("provide daily requests, daily tokens, and concurrent requests")
+				return workapp.ControlScreen{}, errors.New("provide daily requests, daily tokens, and concurrent requests")
 			}
 			var parseErr error
 			next.DailyRequests, parseErr = strconv.Atoi(args[1])
 			if parseErr != nil {
-				return worktui.ControlScreen{}, parseErr
+				return workapp.ControlScreen{}, parseErr
 			}
 			next.DailyTokens, parseErr = strconv.ParseInt(args[2], 10, 64)
 			if parseErr != nil {
-				return worktui.ControlScreen{}, parseErr
+				return workapp.ControlScreen{}, parseErr
 			}
 			next.ConcurrentRequests, parseErr = strconv.Atoi(args[3])
 			if parseErr != nil {
-				return worktui.ControlScreen{}, parseErr
+				return workapp.ControlScreen{}, parseErr
 			}
 		}
 		if err = s.SaveReviewedPolicy(next, prior); err != nil {
-			return worktui.ControlScreen{}, err
+			return workapp.ControlScreen{}, err
 		}
 	}
 	now := time.Now().UTC()
 	view, err := s.Snapshot(now)
 	if err != nil {
-		return worktui.ControlScreen{}, err
+		return workapp.ControlScreen{}, err
 	}
 	p := view.Policy
 	usage := &uisnapshot.Usage{
@@ -99,13 +99,13 @@ func usageControl(stateDir, action string, args []string) (worktui.ControlScreen
 		lines = append(lines, fmt.Sprintf("%s: %d requests", category, view.Categories[category]))
 		usage.Categories = append(usage.Categories, uisnapshot.UsageCategory{Name: category, Requests: view.Categories[category]})
 	}
-	screen := worktui.ControlScreen{Panel: uisnapshot.Panel{Kind: "usage", Title: "Shared usage and limits", Usage: usage, Blocks: []uisnapshot.Block{{Title: "All work on this computer", Lines: lines}}}}
+	screen := workapp.ControlScreen{Panel: uisnapshot.Panel{Kind: "usage", Title: "Shared usage and limits", Usage: usage, Blocks: []uisnapshot.Block{{Title: "All work on this computer", Lines: lines}}}}
 	pauseLabel := "Pause provider requests"
 	if p.Paused {
 		pauseLabel = "Resume provider requests"
 	}
-	screen.Actions = []worktui.ControlAction{
-		{Key: "E", Label: "Edit shared limits", Action: "limits", Args: []string{string(previous)}, Description: "These limits apply across foreground and background requests. Zero means uncapped. Daily counters reset at 00:00 UTC; existing per-run limits still apply.", Fields: []worktui.ControlField{{Label: "Provider requests per day (0 uncapped)", Kind: "number", Value: strconv.Itoa(p.DailyRequests)}, {Label: "Tokens per day (0 uncapped)", Kind: "number", Value: strconv.FormatInt(p.DailyTokens, 10)}, {Label: "Concurrent requests (0 uncapped)", Kind: "number", Value: strconv.Itoa(p.ConcurrentRequests)}}, Review: true},
+	screen.Actions = []workapp.ControlAction{
+		{Key: "E", Label: "Edit shared limits", Action: "limits", Args: []string{string(previous)}, Description: "These limits apply across foreground and background requests. Zero means uncapped. Daily counters reset at 00:00 UTC; existing per-run limits still apply.", Fields: []workapp.ControlField{{Label: "Provider requests per day (0 uncapped)", Kind: "number", Value: strconv.Itoa(p.DailyRequests)}, {Label: "Tokens per day (0 uncapped)", Kind: "number", Value: strconv.FormatInt(p.DailyTokens, 10)}, {Label: "Concurrent requests (0 uncapped)", Kind: "number", Value: strconv.Itoa(p.ConcurrentRequests)}}, Review: true},
 		{Key: "P", Label: pauseLabel, Action: "pause", Args: []string{string(previous)}, Description: "Pause or resume new requests across chat, routing, retrieval, specialists, and jobs. An in-flight provider request may finish. This does not change saved schedules.", Review: true},
 		{Key: "R", Label: "Refresh", Action: "status"},
 	}

@@ -5,12 +5,12 @@ import (
 	"unicode/utf8"
 
 	"github.com/gongahkia/gator/internal/artifact"
-	"github.com/gongahkia/gator/internal/worktui"
+	"github.com/gongahkia/gator/internal/workapp"
 )
 
 // Enrich already verified metadata once at the existing run/restore boundary,
 // never in the streaming BridgeState path. Previews are inert snapshot text.
-func projectWorkBundleDetails(bundle artifact.Bundle, summary *worktui.BundleSummary) {
+func projectWorkBundleDetails(bundle artifact.Bundle, summary *workapp.BundleSummary) {
 	summary.RunID = bundle.Manifest.RunID
 	if !bundle.Manifest.FinishedAt.IsZero() {
 		summary.FinishedAt = bundle.Manifest.FinishedAt.Format(time.RFC3339)
@@ -33,7 +33,7 @@ func projectWorkBundleDetails(bundle artifact.Bundle, summary *worktui.BundleSum
 			if len(summary.Connections) == 16 {
 				continue
 			}
-			summary.Connections = append(summary.Connections, worktui.ConnectionUse{ID: source.ConnectorID})
+			summary.Connections = append(summary.Connections, workapp.ConnectionUse{ID: source.ConnectorID})
 			index = len(summary.Connections) - 1
 		}
 		operations := summary.Connections[index].Operations
@@ -65,7 +65,7 @@ func projectWorkBundleDetails(bundle artifact.Bundle, summary *worktui.BundleSum
 		if remaining == 0 {
 			break
 		}
-		var file *worktui.ArtifactSummary
+		var file *workapp.ArtifactSummary
 		for index := range summary.Artifacts {
 			if summary.Artifacts[index].Path == preview.Path {
 				file = &summary.Artifacts[index]

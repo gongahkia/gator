@@ -30,12 +30,12 @@ import (
 	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/uisnapshot"
 	sharedusage "github.com/gongahkia/gator/internal/usage"
+	"github.com/gongahkia/gator/internal/workapp"
 	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workhome"
 	"github.com/gongahkia/gator/internal/workrun"
 	"github.com/gongahkia/gator/internal/worksession"
 	"github.com/gongahkia/gator/internal/workspace"
-	"github.com/gongahkia/gator/internal/worktui"
 )
 
 func workInteractive() error {
@@ -155,13 +155,13 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 	}
 	localModels := newLocalModelManager(settingsStore)
 	defer localModels.Close()
-	application := worktui.New(worktui.Config{
+	application := workapp.New(workapp.Config{
 		Models: workModelPanel(settingsStore, stateDir, localModels),
 		SelectedModel: func() (string, string, error) {
 			current, err := settingsStore.Load()
 			return current.Defaults.Provider, current.Defaults.Model, err
 		},
-		ModelStatus: func() (worktui.ModelStatus, error) {
+		ModelStatus: func() (workapp.ModelStatus, error) {
 			return currentWorkModelStatus(settingsStore, stateDir)
 		},
 		Live:          true,
@@ -181,28 +181,28 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			return workhome.Read(stateDir, freshGoals, freshInbox)
 		},
 		ListGoals: goalStore.List,
-		SelectGoal: func(id string) (worktui.GoalState, error) {
+		SelectGoal: func(id string) (workapp.GoalState, error) {
 			record, err := goalStore.Load(id)
 			if err != nil {
-				return worktui.GoalState{}, err
+				return workapp.GoalState{}, err
 			}
 			if record.Status != goal.Active {
-				return worktui.GoalState{}, fmt.Errorf("goal %s is %s", id, record.Status)
+				return workapp.GoalState{}, fmt.Errorf("goal %s is %s", id, record.Status)
 			}
 			goalID = id
-			return worktui.GoalState{Title: record.Title, SourcePath: record.SourcePath, ConversationID: record.ConversationID}, nil
+			return workapp.GoalState{Title: record.Title, SourcePath: record.SourcePath, ConversationID: record.ConversationID}, nil
 		},
 		ClearGoal: func() { goalID = "" },
-		ResetPrivateState: func() (worktui.GoalState, error) {
+		ResetPrivateState: func() (workapp.GoalState, error) {
 			goalID = ""
 			source := originalWorkingDirectory
 			if info, err := os.Stat(source); err != nil || !info.IsDir() {
 				source = filepath.Join(stateDir, "gator", "empty-workspace")
 				if err = os.MkdirAll(source, 0700); err != nil {
-					return worktui.GoalState{}, err
+					return workapp.GoalState{}, err
 				}
 			}
-			return worktui.GoalState{SourcePath: source, Title: "Work in " + filepath.Base(source)}, nil
+			return workapp.GoalState{SourcePath: source, Title: "Work in " + filepath.Base(source)}, nil
 		},
 		PlanAction: func(command string) (string, error) {
 			if goalID == "" {
@@ -250,10 +250,10 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		MemoryResult: func(arguments []string) (*uisnapshot.Result, error) {
 			return workMemoryResult(stateDir, goalID, arguments)
 		},
-		RecallStatus:    func(ctx context.Context) (worktui.RecallStatus, error) { return workRecallStatus(ctx, stateDir) },
+		RecallStatus:    func(ctx context.Context) (workapp.RecallStatus, error) { return workRecallStatus(ctx, stateDir) },
 		ConfigureRecall: configureWorkRecall,
 		InstallRecall:   installWorkRecall,
-		ReadContext: func(workID, activeGoal string) (worktui.ContextState, error) {
+		ReadContext: func(workID, activeGoal string) (workapp.ContextState, error) {
 			return readWorkContext(stateDir, workID, activeGoal)
 		},
 		ChangeKnowledge: func(id, action, text, activeGoal string) error {
@@ -305,10 +305,10 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		ListConversations: func() ([]worksession.Conversation, error) {
 			return sessions.List(50)
 		},
-		LoadConversation: func(conversationID string) (worktui.ConversationState, error) {
+		LoadConversation: func(conversationID string) (workapp.ConversationState, error) {
 			return loadWorkTUIConversation(sessions, conversationID)
 		},
-		LoadConversationOptions: func(conversationID string) (worktui.RunOptions, error) {
+		LoadConversationOptions: func(conversationID string) (workapp.RunOptions, error) {
 			return loadWorkTUIConversationOptions(sessions, conversationID)
 		},
 		StartConversationID: startConversationID,
@@ -330,22 +330,22 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		RefreshInbox: func() ([]inbox.Entry, error) {
 			return inboxStore.List(false, 20)
 		},
-		Run: func(source, conversationID, prompt string, options worktui.RunOptions) worktui.RunResult {
+		Run: func(source, conversationID, prompt string, options workapp.RunOptions) workapp.RunResult {
 			release, err := state.Guard(stateDir, false)
 			if err != nil {
-				return worktui.RunResult{Error: err.Error()}
+				return workapp.RunResult{Error: err.Error()}
 			}
 			defer release()
 			if goalID != "" {
 				currentGoal, loadErr := goalStore.Load(goalID)
 				if loadErr != nil {
-					return worktui.RunResult{Error: loadErr.Error()}
+					return workapp.RunResult{Error: loadErr.Error()}
 				}
 				if currentGoal.Status != goal.Active {
-					return worktui.RunResult{Error: fmt.Sprintf("goal %s is %s", goalID, currentGoal.Status)}
+					return workapp.RunResult{Error: fmt.Sprintf("goal %s is %s", goalID, currentGoal.Status)}
 				}
 				if source != currentGoal.SourcePath || (conversationID != "" && currentGoal.ConversationID != "" && conversationID != currentGoal.ConversationID) {
-					return worktui.RunResult{Error: "this chat is bound to its goal workspace and conversation; use gator to work elsewhere"}
+					return workapp.RunResult{Error: "this chat is bound to its goal workspace and conversation; use gator to work elsewhere"}
 				}
 				result := runInteractiveWorkGoal(currentGoal.SourcePath, currentGoal.ConversationID, prompt, stateDir, options, currentGoal)
 				if result.ConversationID != "" {
@@ -459,14 +459,14 @@ func workTUIConnectorCommand(arguments []string) *exec.Cmd {
 	return command
 }
 
-func runInteractiveWork(source, conversationID, prompt, stateDir string, options worktui.RunOptions) worktui.RunResult {
+func runInteractiveWork(source, conversationID, prompt, stateDir string, options workapp.RunOptions) workapp.RunResult {
 	return runInteractiveWorkGoal(source, conversationID, prompt, stateDir, options, goal.Record{})
 }
 
-func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, options worktui.RunOptions, currentGoal goal.Record) worktui.RunResult {
+func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, options workapp.RunOptions, currentGoal goal.Record) workapp.RunResult {
 	release, guardErr := state.Guard(stateDir, false)
 	if guardErr != nil {
-		return worktui.RunResult{Error: guardErr.Error()}
+		return workapp.RunResult{Error: guardErr.Error()}
 	}
 	defer release()
 	requestedAt := time.Now()
@@ -477,7 +477,7 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 	ctx = sharedusage.WithState(sharedusage.WithCategory(ctx, "chat"), stateDir)
 	mode, paths, decisionOrigin, decisionReason, err := resolveInteractiveWork(ctx, prompt, options)
 	if err != nil {
-		return worktui.RunResult{Error: err.Error()}
+		return workapp.RunResult{Error: err.Error()}
 	}
 	disposition := action.Forbid
 	if mode == action.Draft {
@@ -492,7 +492,7 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 	} else {
 		contract, err = workContract(mode, disposition, artifactFlags(paths), nil)
 		if err != nil {
-			return worktui.RunResult{Error: err.Error()}
+			return workapp.RunResult{Error: err.Error()}
 		}
 	}
 	request := workrun.Request{
@@ -526,7 +526,7 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 	}{{options.Code.Verification, &request.Code.Verification}, {options.Code.Setup, &request.Code.Setup}, {options.Code.AllowedCommands, &request.Code.AllowedCommands}, {options.Code.AllowedCommandPrefixes, &request.Code.AllowedCommandPrefixes}} {
 		*pair.target, err = parse(pair.values)
 		if err != nil {
-			return worktui.RunResult{Error: err.Error()}
+			return workapp.RunResult{Error: err.Error()}
 		}
 	}
 	if len(request.Code.Verification) == 0 {
@@ -542,11 +542,11 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 	}
 	request.Images, request.Attachments, err = loadPromptAttachments(source, images, documents)
 	if err != nil {
-		return worktui.RunResult{Error: err.Error()}
+		return workapp.RunResult{Error: err.Error()}
 	}
 	service, err := configuredWorkService("", "", stateDir, &request)
 	if err != nil {
-		return worktui.RunResult{Error: err.Error()}
+		return workapp.RunResult{Error: err.Error()}
 	}
 	var outcome workrun.Outcome
 	if options.OnOperation != nil {
@@ -559,7 +559,7 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 	} else {
 		outcome, err = service.Execute(ctx, request)
 	}
-	result := worktui.RunResult{WorkID: outcome.Manifest.RunID, ConversationID: outcome.ConversationID, RevisionID: outcome.RevisionID, SnapshotID: outcome.SnapshotID, FinalText: outcome.Result.FinalText}
+	result := workapp.RunResult{WorkID: outcome.Manifest.RunID, ConversationID: outcome.ConversationID, RevisionID: outcome.RevisionID, SnapshotID: outcome.SnapshotID, FinalText: outcome.Result.FinalText}
 	if outcome.Work.Path != "" {
 		result.OutputPath = outcome.Work.Output.Path()
 		if summary, summaryErr := summarizeWorkBundle(outcome.Work.Path); summaryErr == nil {
@@ -577,7 +577,7 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 // resolveInteractiveWork spends one model request only when explicit controls
 // and clear language leave the desired output uncertain. A failed classifier
 // degrades to inspection; it cannot select act or connected capabilities.
-func resolveInteractiveWork(ctx context.Context, prompt string, options worktui.RunOptions) (action.Mode, []string, string, string, error) {
+func resolveInteractiveWork(ctx context.Context, prompt string, options workapp.RunOptions) (action.Mode, []string, string, string, error) {
 	mode, paths, err := inferInteractiveWork(prompt, options)
 	if err != nil {
 		return "", nil, "", "", err
@@ -627,7 +627,7 @@ func resolveInteractiveWork(ctx context.Context, prompt string, options worktui.
 	return action.Draft, []string{path}, "model", "Ambiguous request classified as a deliverable.", nil
 }
 
-func ambiguousInteractivePrompt(prompt string, options worktui.RunOptions) bool {
+func ambiguousInteractivePrompt(prompt string, options workapp.RunOptions) bool {
 	if options.Mode != "" && options.Mode != "auto" || len(options.Artifacts) > 0 {
 		return false
 	}
@@ -641,7 +641,7 @@ func ambiguousInteractivePrompt(prompt string, options worktui.RunOptions) bool 
 	return !containsAny(lower, "what ", "why ", "how ", "when ", "where ", "who ", "explain ", "summarize ")
 }
 
-func inferInteractiveWork(prompt string, options worktui.RunOptions) (action.Mode, []string, error) {
+func inferInteractiveWork(prompt string, options workapp.RunOptions) (action.Mode, []string, error) {
 	modeName := strings.ToLower(strings.TrimSpace(options.Mode))
 	if modeName == "" {
 		modeName = "auto"
@@ -726,13 +726,13 @@ func inferArtifactPaths(prompt string) []string {
 	}
 }
 
-func summarizeWorkBundle(path string) (worktui.BundleSummary, error) {
+func summarizeWorkBundle(path string) (workapp.BundleSummary, error) {
 	bundle, err := artifact.OpenBundle(path)
 	if err != nil {
-		return worktui.BundleSummary{}, err
+		return workapp.BundleSummary{}, err
 	}
 	if err := artifact.VerifyBundle(bundle); err != nil {
-		return worktui.BundleSummary{}, err
+		return workapp.BundleSummary{}, err
 	}
 	valid := map[string]bool{}
 	for _, file := range bundle.Manifest.Artifacts {
@@ -743,14 +743,14 @@ func summarizeWorkBundle(path string) (worktui.BundleSummary, error) {
 			valid[validation.Path] = false
 		}
 	}
-	summary := worktui.BundleSummary{Path: bundle.Path, Status: string(bundle.Manifest.Status)}
+	summary := workapp.BundleSummary{Path: bundle.Path, Status: string(bundle.Manifest.Status)}
 	for _, file := range bundle.Manifest.Artifacts {
-		summary.Artifacts = append(summary.Artifacts, worktui.ArtifactSummary{
+		summary.Artifacts = append(summary.Artifacts, workapp.ArtifactSummary{
 			Path: file.Path, MediaType: file.MediaType, Bytes: file.Bytes, Valid: valid[file.Path],
 		})
 	}
 	for _, candidate := range bundle.Manifest.Candidates {
-		summary.Candidates = append(summary.Candidates, worktui.CandidateSummary{
+		summary.Candidates = append(summary.Candidates, workapp.CandidateSummary{
 			ID: candidate.ID, PatchPath: candidate.PatchPath, Status: candidate.Status,
 			ChangedPaths: append([]string(nil), candidate.ChangedPaths...),
 		})
@@ -759,8 +759,8 @@ func summarizeWorkBundle(path string) (worktui.BundleSummary, error) {
 	return summary, nil
 }
 
-func workTUIBundleAction(stateDir string) func(worktui.BundleActionRequest) (string, error) {
-	return func(request worktui.BundleActionRequest) (string, error) {
+func workTUIBundleAction(stateDir string) func(workapp.BundleActionRequest) (string, error) {
+	return func(request workapp.BundleActionRequest) (string, error) {
 		bundle, err := artifact.OpenBundle(request.BundlePath)
 		if err != nil {
 			return "", err
@@ -889,21 +889,21 @@ func formatApplyPlan(title string, plan artifact.ApplyPlan) string {
 	return strings.Join(lines, "\n")
 }
 
-func loadWorkTUIConversationOptions(store worksession.Store, conversationID string) (worktui.RunOptions, error) {
+func loadWorkTUIConversationOptions(store worksession.Store, conversationID string) (workapp.RunOptions, error) {
 	conversation, err := store.Load(conversationID)
 	if err != nil {
-		return worktui.RunOptions{}, err
+		return workapp.RunOptions{}, err
 	}
-	options := worktui.RunOptions{
+	options := workapp.RunOptions{
 		Mode: "auto", MaxSteps: 24,
-		Code: worktui.CodeOptions{MaxSteps: 16, Sandbox: "strict", Network: "deny"},
+		Code: workapp.CodeOptions{MaxSteps: 16, Sandbox: "strict", Network: "deny"},
 	}
 	if conversation.HeadRevision == "" {
 		return options, nil
 	}
 	revision, err := store.LoadRevision(conversationID, conversation.HeadRevision)
 	if err != nil {
-		return worktui.RunOptions{}, err
+		return workapp.RunOptions{}, err
 	}
 	if revision.Replay == nil || len(revision.Replay.Configuration) == 0 {
 		return options, nil
@@ -918,7 +918,7 @@ func loadWorkTUIConversationOptions(store worksession.Store, conversationID stri
 		MaxSteps            int
 	}
 	if err := json.Unmarshal(revision.Replay.Configuration, &configuration); err != nil {
-		return worktui.RunOptions{}, fmt.Errorf("decode retained Work settings: %w", err)
+		return workapp.RunOptions{}, fmt.Errorf("decode retained Work settings: %w", err)
 	}
 	if configuration.MaxSteps > 0 {
 		options.MaxSteps = configuration.MaxSteps
@@ -945,12 +945,12 @@ func loadWorkTUIConversationOptions(store worksession.Store, conversationID stri
 // conversation's selected head. Revision siblings remain available through
 // history navigation, but never leak into the active branch's transcript.
 // Bundle cards are created only from a freshly verified manifest.
-func loadWorkTUIConversation(store worksession.Store, conversationID string) (worktui.ConversationState, error) {
+func loadWorkTUIConversation(store worksession.Store, conversationID string) (workapp.ConversationState, error) {
 	conversation, err := store.Load(conversationID)
 	if err != nil {
-		return worktui.ConversationState{}, err
+		return workapp.ConversationState{}, err
 	}
-	state := worktui.ConversationState{
+	state := workapp.ConversationState{
 		Title:      conversation.Title,
 		SourcePath: conversation.SourcePath,
 		RevisionID: conversation.HeadRevision,
@@ -961,15 +961,15 @@ func loadWorkTUIConversation(store worksession.Store, conversationID string) (wo
 	}
 	lineage, err := store.Lineage(conversationID, conversation.HeadRevision)
 	if err != nil {
-		return worktui.ConversationState{}, err
+		return workapp.ConversationState{}, err
 	}
-	state.Messages = make([]worktui.TranscriptMessage, 0, len(lineage)*3)
+	state.Messages = make([]workapp.TranscriptMessage, 0, len(lineage)*3)
 	for _, revision := range lineage {
-		state.Messages = append(state.Messages, worktui.TranscriptMessage{Role: "You", Text: revision.Objective})
+		state.Messages = append(state.Messages, workapp.TranscriptMessage{Role: "You", Text: revision.Objective})
 		if strings.TrimSpace(revision.FinalText) != "" {
-			state.Messages = append(state.Messages, worktui.TranscriptMessage{Role: "Gator", Text: revision.FinalText})
+			state.Messages = append(state.Messages, workapp.TranscriptMessage{Role: "Gator", Text: revision.FinalText})
 		} else if revision.Status != string(artifact.Completed) {
-			state.Messages = append(state.Messages, worktui.TranscriptMessage{
+			state.Messages = append(state.Messages, workapp.TranscriptMessage{
 				Role: "Gator", Text: "This retained Work revision ended with status " + revision.Status + ".",
 			})
 		}
@@ -977,12 +977,12 @@ func loadWorkTUIConversation(store worksession.Store, conversationID string) (wo
 		if bundleErr != nil {
 			// Keep restoration usable when an older bundle has been removed or no
 			// longer verifies, while making the missing review evidence explicit.
-			state.Messages = append(state.Messages, worktui.TranscriptMessage{
+			state.Messages = append(state.Messages, workapp.TranscriptMessage{
 				Role: "Gator", Text: "The retained deliverables for revision " + revision.ID + " cannot be displayed: " + bundleErr.Error(),
 			})
 			continue
 		}
-		state.Messages = append(state.Messages, worktui.TranscriptMessage{Role: "Deliverables", Bundle: &bundle})
+		state.Messages = append(state.Messages, workapp.TranscriptMessage{Role: "Deliverables", Bundle: &bundle})
 		if revision.ID == conversation.HeadRevision {
 			state.LastBundle = bundle
 			state.OutputPath = filepath.Join(bundle.Path, "output")

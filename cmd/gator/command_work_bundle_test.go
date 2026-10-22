@@ -14,8 +14,8 @@ import (
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/delivery"
+	"github.com/gongahkia/gator/internal/workapp"
 	"github.com/gongahkia/gator/internal/workspace"
-	"github.com/gongahkia/gator/internal/worktui"
 )
 
 func TestReviewCommandResolvesVerifiedWorkByID(t *testing.T) {
@@ -227,10 +227,10 @@ func TestCLIAndTUIBundleDeliveryUseTheSharedDeliveryStore(t *testing.T) {
 
 	tuiTarget := t.TempDir()
 	tuiAction := workTUIBundleAction(stateDir)
-	if _, err := tuiAction(worktui.BundleActionRequest{Action: "save", BundlePath: work.Path, Target: tuiTarget}); err != nil {
+	if _, err := tuiAction(workapp.BundleActionRequest{Action: "save", BundlePath: work.Path, Target: tuiTarget}); err != nil {
 		t.Fatal(err)
 	}
-	tuiOutput, err := tuiAction(worktui.BundleActionRequest{Action: "save", BundlePath: work.Path, Target: tuiTarget, Execute: true})
+	tuiOutput, err := tuiAction(workapp.BundleActionRequest{Action: "save", BundlePath: work.Path, Target: tuiTarget, Execute: true})
 	if err != nil || !strings.Contains(tuiOutput, "Delivery:") || !strings.Contains(tuiOutput, "report.md · applied") {
 		t.Fatalf("TUI delivery output = %q, %v", tuiOutput, err)
 	}

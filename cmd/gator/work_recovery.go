@@ -20,7 +20,7 @@ import (
 	"github.com/gongahkia/gator/internal/hostproc"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/uisnapshot"
-	"github.com/gongahkia/gator/internal/worktui"
+	"github.com/gongahkia/gator/internal/workapp"
 )
 
 func recoveryServicePath() (string, error) {
@@ -47,18 +47,18 @@ func managedJobCommand(ctx context.Context, stateDir string, args ...string) (st
 	}
 	return string(output), nil
 }
-func recoveryControl(ctx context.Context, stateDir, action string, args []string) (worktui.ControlScreen, error) {
+func recoveryControl(ctx context.Context, stateDir, action string, args []string) (workapp.ControlScreen, error) {
 	return recoveryControlWith(ctx, stateDir, action, args, managedJobCommand)
 }
 
-func recoveryControlWith(ctx context.Context, stateDir, action string, args []string, command func(context.Context, string, ...string) (string, error)) (worktui.ControlScreen, error) {
+func recoveryControlWith(ctx context.Context, stateDir, action string, args []string, command func(context.Context, string, ...string) (string, error)) (workapp.ControlScreen, error) {
 	servicePath, err := recoveryServicePath()
 	if err != nil {
-		return worktui.ControlScreen{}, err
+		return workapp.ControlScreen{}, err
 	}
 	installed, ownsService, serviceDigest, err := recoveryServiceReview(servicePath, stateDir, runtime.GOOS)
 	if err != nil {
-		return worktui.ControlScreen{}, err
+		return workapp.ControlScreen{}, err
 	}
 	jobID := ""
 	if len(args) > 0 {
@@ -68,15 +68,15 @@ func recoveryControlWith(ctx context.Context, stateDir, action string, args []st
 	switch action {
 	case "start":
 		if err := startLocalSupervisor(stateDir); err != nil {
-			return worktui.ControlScreen{}, err
+			return workapp.ControlScreen{}, err
 		}
 		notice = "Supervisor started. It runs while this computer is on."
 	case "install", "remove":
 		if len(args) != 2 || args[1] != serviceDigest {
-			return worktui.ControlScreen{}, errors.New("background service changed during review; refresh recovery before changing it")
+			return workapp.ControlScreen{}, errors.New("background service changed during review; refresh recovery before changing it")
 		}
 		if installed && !ownsService {
-			return worktui.ControlScreen{}, errors.New("the installed Gator service belongs to another state directory; manage it from that profile before enabling this one")
+			return workapp.ControlScreen{}, errors.New("the installed Gator service belongs to another state directory; manage it from that profile before enabling this one")
 		}
 		service := "systemd"
 		if runtime.GOOS == "darwin" {
@@ -96,40 +96,40 @@ func recoveryControlWith(ctx context.Context, stateDir, action string, args []st
 		}
 		output, err := command(ctx, stateDir, serviceArgs...)
 		if err != nil {
-			return worktui.ControlScreen{}, err
+			return workapp.ControlScreen{}, err
 		}
 		notice = strings.TrimSpace(output)
 	case "retry":
 		if jobID == "" {
-			return worktui.ControlScreen{}, errors.New("choose a check to retry")
+			return workapp.ControlScreen{}, errors.New("choose a check to retry")
 		}
 		output, err := command(ctx, stateDir, "run", jobID)
 		if err != nil {
-			return worktui.ControlScreen{}, err
+			return workapp.ControlScreen{}, err
 		}
 		notice = strings.TrimSpace(output)
 	case "token":
 		if len(args) != 4 {
-			return worktui.ControlScreen{}, errors.New("choose the check, connector, and new credential")
+			return workapp.ControlScreen{}, errors.New("choose the check, connector, and new credential")
 		}
 		descriptor, _, err := configuredConnector(args[1])
 		if err != nil {
-			return worktui.ControlScreen{}, err
+			return workapp.ControlScreen{}, err
 		}
 		if descriptor.CredentialRef() != args[2] {
-			return worktui.ControlScreen{}, errors.New("connector resource changed during review; reconnect from a fresh recovery screen")
+			return workapp.ControlScreen{}, errors.New("connector resource changed during review; reconnect from a fresh recovery screen")
 		}
 		credentials, err := auth.New(stateDir)
 		if err != nil {
-			return worktui.ControlScreen{}, err
+			return workapp.ControlScreen{}, err
 		}
 		store, err := jobs.Open(stateDir)
 		if err != nil {
-			return worktui.ControlScreen{}, err
+			return workapp.ControlScreen{}, err
 		}
 		definition, err := store.Load(jobID)
 		if err != nil {
-			return worktui.ControlScreen{}, err
+			return workapp.ControlScreen{}, err
 		}
 		selected := false
 		for _, id := range definition.ConnectorIDs {
@@ -138,26 +138,26 @@ func recoveryControlWith(ctx context.Context, stateDir, action string, args []st
 			}
 		}
 		if !selected || descriptor.Authentication != connector.AuthBearer {
-			return worktui.ControlScreen{}, errors.New("this check does not select that bearer connector")
+			return workapp.ControlScreen{}, errors.New("this check does not select that bearer connector")
 		}
 		credential, err := auth.NewBearerToken(args[3], time.Time{})
 		if err != nil {
-			return worktui.ControlScreen{}, err
+			return workapp.ControlScreen{}, err
 		}
 		if err = credentials.Put(descriptor.CredentialRef(), credential); err != nil {
-			return worktui.ControlScreen{}, err
+			return workapp.ControlScreen{}, err
 		}
 		notice = "Credential replaced for " + descriptor.Name + ". Retry the check to verify access."
 	}
 	store, err := jobs.Open(stateDir)
 	if err != nil {
-		return worktui.ControlScreen{}, err
+		return workapp.ControlScreen{}, err
 	}
 	checks, running, err := readFollowupChecks(stateDir)
 	if err != nil {
-		return worktui.ControlScreen{}, err
+		return workapp.ControlScreen{}, err
 	}
-	screen := worktui.ControlScreen{Panel: uisnapshot.Panel{Kind: "recovery", Title: "Recovery", Notice: notice}}
+	screen := workapp.ControlScreen{Panel: uisnapshot.Panel{Kind: "recovery", Title: "Recovery", Notice: notice}}
 	serviceState := "Not configured"
 	if installed {
 		serviceState = "Configuration installed; supervisor health is checked separately"
@@ -215,7 +215,7 @@ func recoveryControlWith(ctx context.Context, stateDir, action string, args []st
 		screen.Panel.Blocks = append(screen.Panel.Blocks, uisnapshot.Block{Title: check.Title, Collapsible: jobID == "", Lines: []string{check.HealthLine(), check.Issue, "Next action: " + check.NextAction}})
 		if jobID == "" {
 			if len(screen.Actions) < 9 {
-				screen.Actions = append(screen.Actions, worktui.ControlAction{Key: strconv.Itoa(len(screen.Actions) + 1), Label: "Recover " + check.Title, Action: "select", Args: []string{check.ID}})
+				screen.Actions = append(screen.Actions, workapp.ControlAction{Key: strconv.Itoa(len(screen.Actions) + 1), Label: "Recover " + check.Title, Action: "select", Args: []string{check.ID}})
 			}
 			continue
 		}
@@ -232,7 +232,7 @@ func recoveryControlWith(ctx context.Context, stateDir, action string, args []st
 		}
 		screen.Panel.Blocks = append(screen.Panel.Blocks, uisnapshot.Block{Title: "Recent checks and catch-up", Collapsible: true, Lines: attempts})
 		if check.Enabled && check.State != "goal paused" {
-			screen.Actions = append(screen.Actions, worktui.ControlAction{Key: "X", Label: "Retry this check now", Action: "retry", Args: []string{jobID}})
+			screen.Actions = append(screen.Actions, workapp.ControlAction{Key: "X", Label: "Retry this check now", Action: "retry", Args: []string{jobID}})
 		}
 		for index, id := range check.Definition.ConnectorIDs {
 			if index >= 8 {
@@ -252,20 +252,20 @@ func recoveryControlWith(ctx context.Context, stateDir, action string, args []st
 				return screen, err
 			}
 			screen.Panel.Blocks = append(screen.Panel.Blocks, uisnapshot.Block{Title: descriptor.Name, Lines: []string{status, "Resource: " + descriptor.Resource, "Existing OAuth scopes: " + descriptor.OAuthScopes, "Reconnect preserves this connector configuration and the check's permissions. An account change needs a reviewed agreement edit through /followup."}})
-			control := worktui.ControlAction{Key: strconv.Itoa(index + 1), Label: "Reconnect " + descriptor.Name, Action: "token", Args: []string{jobID, id, descriptor.CredentialRef()}, Description: "Replace credentials only for " + descriptor.ID + " at " + descriptor.Resource + ". Existing OAuth scopes: " + descriptor.OAuthScopes + ". Reconnecting does not authorize new operations.", Review: true}
+			control := workapp.ControlAction{Key: strconv.Itoa(index + 1), Label: "Reconnect " + descriptor.Name, Action: "token", Args: []string{jobID, id, descriptor.CredentialRef()}, Description: "Replace credentials only for " + descriptor.ID + " at " + descriptor.Resource + ". Existing OAuth scopes: " + descriptor.OAuthScopes + ". Reconnecting does not authorize new operations.", Review: true}
 			if descriptor.Authentication == connector.AuthOAuth {
 				control.ConnectorID = id
 				control.ConnectorReview = connectorLoginReview(descriptor)
 			} else if descriptor.Authentication == connector.AuthBearer {
-				control.Fields = []worktui.ControlField{{Label: "New bearer token", Secret: true}}
+				control.Fields = []workapp.ControlField{{Label: "New bearer token", Secret: true}}
 			} else {
 				continue
 			}
 			screen.Actions = append(screen.Actions, control)
 		}
 	}
-	screen.Actions = append(screen.Actions, worktui.ControlAction{Key: "S", Label: "Start supervisor now", Action: "start", Args: []string{jobID}})
-	autostart := worktui.ControlAction{Key: "A", Label: "Enable start at login", Action: "install", Args: []string{jobID, serviceDigest}, Review: true, Description: "Install Gator's per-user background service at " + servicePath + ". It uses this state directory and the current Gator executable. This may replace an existing Gator service configuration. Checks run only while this host and user session are active."}
+	screen.Actions = append(screen.Actions, workapp.ControlAction{Key: "S", Label: "Start supervisor now", Action: "start", Args: []string{jobID}})
+	autostart := workapp.ControlAction{Key: "A", Label: "Enable start at login", Action: "install", Args: []string{jobID, serviceDigest}, Review: true, Description: "Install Gator's per-user background service at " + servicePath + ". It uses this state directory and the current Gator executable. This may replace an existing Gator service configuration. Checks run only while this host and user session are active."}
 	if installed {
 		autostart.Label = "Disable start at login"
 		autostart.Action = "remove"
@@ -274,7 +274,7 @@ func recoveryControlWith(ctx context.Context, stateDir, action string, args []st
 	if !installed || ownsService {
 		screen.Actions = append(screen.Actions, autostart)
 	}
-	screen.Actions = append(screen.Actions, worktui.ControlAction{Key: "R", Label: "Refresh", Action: "status", Args: []string{jobID}})
+	screen.Actions = append(screen.Actions, workapp.ControlAction{Key: "R", Label: "Refresh", Action: "status", Args: []string{jobID}})
 	if notice != "" {
 		screen.Panel.Blocks = append([]uisnapshot.Block{{Title: "Action result", Lines: strings.Split(notice, "\n")}}, screen.Panel.Blocks...)
 	}

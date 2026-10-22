@@ -8,8 +8,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/learning"
+	"github.com/gongahkia/gator/internal/workapp"
 	"github.com/gongahkia/gator/internal/workrun"
-	"github.com/gongahkia/gator/internal/worktui"
 )
 
 func TestLearningCLIProvidesUserControlOverSharedStore(t *testing.T) {
@@ -99,20 +99,20 @@ func TestLearningTUIAndCLIImmediatelyShareCanonicalState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	model := worktui.New(worktui.Config{CurrentFolder: project, LearningStore: &store})
+	model := workapp.New(workapp.Config{CurrentFolder: project, LearningStore: &store})
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlP})
-	model = updated.(worktui.Model)
+	model = updated.(workapp.Model)
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("learnings")})
-	model = updated.(worktui.Model)
+	model = updated.(workapp.Model)
 	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if command != nil {
 		t.Fatal("opening Learnings scheduled external work")
 	}
-	model = updated.(worktui.Model)
+	model = updated.(workapp.Model)
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	model = updated.(worktui.Model)
+	model = updated.(workapp.Model)
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
-	model = updated.(worktui.Model)
+	model = updated.(workapp.Model)
 	if !strings.Contains(bridgeStateText(model.BridgeState()), "Status\nactive") {
 		t.Fatalf("TUI approval did not update learning detail:\n%s", bridgeStateText(model.BridgeState()))
 	}
@@ -124,11 +124,11 @@ func TestLearningTUIAndCLIImmediatelyShareCanonicalState(t *testing.T) {
 		t.Fatal(err)
 	}
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
-	model = updated.(worktui.Model)
+	model = updated.(workapp.Model)
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
-	model = updated.(worktui.Model)
+	model = updated.(workapp.Model)
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	model = updated.(worktui.Model)
+	model = updated.(workapp.Model)
 	if !strings.Contains(bridgeStateText(model.BridgeState()), "Status\ndisabled") {
 		t.Fatalf("TUI did not observe CLI mutation:\n%s", bridgeStateText(model.BridgeState()))
 	}

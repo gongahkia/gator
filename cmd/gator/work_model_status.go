@@ -10,18 +10,18 @@ import (
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/localmodel"
 	"github.com/gongahkia/gator/internal/model"
-	"github.com/gongahkia/gator/internal/worktui"
+	"github.com/gongahkia/gator/internal/workapp"
 )
 
 // currentWorkModelStatus resolves only display-safe readiness metadata. It
 // never returns credential values or reads credential stores owned by another
 // application.
-func currentWorkModelStatus(settingsStore config.Store, stateDir string) (worktui.ModelStatus, error) {
+func currentWorkModelStatus(settingsStore config.Store, stateDir string) (workapp.ModelStatus, error) {
 	settings, err := settingsStore.Load()
 	if err != nil {
-		return worktui.ModelStatus{}, err
+		return workapp.ModelStatus{}, err
 	}
-	status := worktui.ModelStatus{
+	status := workapp.ModelStatus{
 		Provider: strings.TrimSpace(settings.Defaults.Provider),
 		Model:    strings.TrimSpace(settings.Defaults.Model),
 	}

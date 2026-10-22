@@ -14,7 +14,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/config"
-	"github.com/gongahkia/gator/internal/worktui"
+	"github.com/gongahkia/gator/internal/workapp"
 )
 
 type modelViewProbe chan string
@@ -22,7 +22,7 @@ type probedWorkModel struct{ tea.Model }
 
 func (m probedWorkModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	if probe, ok := message.(modelViewProbe); ok {
-		probe <- bridgeStateText(m.Model.(worktui.Model).BridgeState())
+		probe <- bridgeStateText(m.Model.(workapp.Model).BridgeState())
 		return m, nil
 	}
 	next, command := m.Model.Update(message)
@@ -102,17 +102,17 @@ func TestWorkTUIManagesLocalModelsAndUsesSelectionThroughService(t *testing.T) {
 	}
 	manager := &localModelManager{store: store, runtimeURL: server.URL, host: generousLocalModelHost}
 	defer manager.Close()
-	application := worktui.New(worktui.Config{
+	application := workapp.New(workapp.Config{
 		CurrentFolder: source, FirstRun: true, Live: true,
 		Models: workModelPanel(store, state, manager),
 		SelectedModel: func() (string, string, error) {
 			s, err := store.Load()
 			return s.Defaults.Provider, s.Defaults.Model, err
 		},
-		ModelStatus: func() (worktui.ModelStatus, error) {
+		ModelStatus: func() (workapp.ModelStatus, error) {
 			return currentWorkModelStatus(store, state)
 		},
-		Run: func(source, conversation, prompt string, options worktui.RunOptions) worktui.RunResult {
+		Run: func(source, conversation, prompt string, options workapp.RunOptions) workapp.RunResult {
 			return runInteractiveWork(source, conversation, prompt, state, options)
 		},
 	})
@@ -127,7 +127,7 @@ func TestWorkTUIManagesLocalModelsAndUsesSelectionThroughService(t *testing.T) {
 			t.Error(err)
 		}
 		if m, ok := final.(probedWorkModel); ok {
-			m.Model.(worktui.Model).Close()
+			m.Model.(workapp.Model).Close()
 		}
 	}()
 	t.Cleanup(func() { program.Quit(); <-stopped })

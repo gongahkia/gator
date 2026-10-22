@@ -11,9 +11,9 @@ import (
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/delivery"
 	"github.com/gongahkia/gator/internal/learning"
+	"github.com/gongahkia/gator/internal/workapp"
 	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/worksession"
-	"github.com/gongahkia/gator/internal/worktui"
 )
 
 func TestWorkHistoryAndShowDistinguishActiveFromStaleRun(t *testing.T) {
@@ -98,16 +98,16 @@ func TestWorkCLIAndTUIHistoryReadTheSameGlobalWorkRecords(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	model := worktui.New(worktui.Config{CurrentFolder: project, HistoryStore: &history, DeliveryStore: &deliveries, LearningStore: &learnings, SessionStore: &sessions})
+	model := workapp.New(workapp.Config{CurrentFolder: project, HistoryStore: &history, DeliveryStore: &deliveries, LearningStore: &learnings, SessionStore: &sessions})
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlP})
-	model = updated.(worktui.Model)
+	model = updated.(workapp.Model)
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("history")})
-	model = updated.(worktui.Model)
+	model = updated.(workapp.Model)
 	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if command != nil {
 		t.Fatal("global History unexpectedly scheduled external work")
 	}
-	view := bridgeStateText(updated.(worktui.Model).BridgeState())
+	view := bridgeStateText(updated.(workapp.Model).BridgeState())
 	for _, objective := range []string{"Inspect retained history", "Prepare global history"} {
 		if !strings.Contains(cli.String(), objective) || !strings.Contains(view, objective) {
 			t.Fatalf("CLI/TUI history differs for %q:\nCLI=%s\nTUI=%s", objective, cli.String(), view)

@@ -10,12 +10,12 @@ import (
 	"github.com/gongahkia/gator/internal/knowledge"
 	"github.com/gongahkia/gator/internal/memory"
 	"github.com/gongahkia/gator/internal/state"
+	"github.com/gongahkia/gator/internal/workapp"
 	"github.com/gongahkia/gator/internal/workhistory"
-	"github.com/gongahkia/gator/internal/worktui"
 )
 
-func readWorkContext(stateDir, workID, goalID string) (worktui.ContextState, error) {
-	result := worktui.ContextState{WorkID: workID, GoalID: goalID}
+func readWorkContext(stateDir, workID, goalID string) (workapp.ContextState, error) {
+	result := workapp.ContextState{WorkID: workID, GoalID: goalID}
 	memories, err := memory.Open(stateDir)
 	if err != nil {
 		return result, err
@@ -24,8 +24,8 @@ func readWorkContext(stateDir, workID, goalID string) (worktui.ContextState, err
 	if err != nil {
 		return result, err
 	}
-	load := func(id string) worktui.KnowledgeItem {
-		item := worktui.KnowledgeItem{ID: id, Title: id, Text: "This item is no longer saved.", Scope: "unknown"}
+	load := func(id string) workapp.KnowledgeItem {
+		item := workapp.KnowledgeItem{ID: id, Title: id, Text: "This item is no longer saved.", Scope: "unknown"}
 		if strings.HasPrefix(id, "mem-") {
 			if r, err := memories.Load(id); err == nil && (r.GoalID == "" || r.GoalID == result.GoalID) {
 				item.Kind, item.Title, item.Text, item.CurrentText, item.Scope, item.Source, item.Available = "memory", r.Kind, r.Text, r.Text, contextScope(r.GoalID), r.Source, true

@@ -8,19 +8,19 @@ import (
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/localmodel"
 	"github.com/gongahkia/gator/internal/retrieval"
-	"github.com/gongahkia/gator/internal/worktui"
+	"github.com/gongahkia/gator/internal/workapp"
 )
 
-func workRecallStatus(ctx context.Context, stateDir string) (worktui.RecallStatus, error) {
+func workRecallStatus(ctx context.Context, stateDir string) (workapp.RecallStatus, error) {
 	settings, err := loadSettings()
 	if err != nil {
-		return worktui.RecallStatus{}, err
+		return workapp.RecallStatus{}, err
 	}
 	provider := settings.Embeddings.Provider
 	if provider == "" {
 		provider = "ollama"
 	}
-	status := worktui.RecallStatus{Provider: provider, State: "Basic recall available", Storage: "Saved memories, notes, transcripts, and Work records stay in the private local Gator state directory on this computer. Forgetting removes an item from future recall; prior transcripts and retained Work evidence may still contain it."}
+	status := workapp.RecallStatus{Provider: provider, State: "Basic recall available", Storage: "Saved memories, notes, transcripts, and Work records stay in the private local Gator state directory on this computer. Forgetting removes an item from future recall; prior transcripts and retained Work evidence may still contain it."}
 	status.Retrieval = "Basic word matching works without a download. Enhanced recall uses " + provider + "; unavailable embeddings fall back to basic matching."
 	status.Chat = "Selected saved context and task sources are supplied to the chat model chosen in /model."
 	if settings.Defaults.Provider == localmodel.ProviderID {

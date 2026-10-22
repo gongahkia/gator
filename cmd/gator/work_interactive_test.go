@@ -9,15 +9,15 @@ import (
 
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/workapp"
 	"github.com/gongahkia/gator/internal/worksession"
-	"github.com/gongahkia/gator/internal/worktui"
 )
 
 func TestInferInteractiveWorkKeepsConversationNatural(t *testing.T) {
 	tests := []struct {
 		name   string
 		prompt string
-		opts   worktui.RunOptions
+		opts   workapp.RunOptions
 		mode   action.Mode
 		paths  []string
 	}{
@@ -31,7 +31,7 @@ func TestInferInteractiveWorkKeepsConversationNatural(t *testing.T) {
 		{name: "named svg", prompt: "Create poster.svg", mode: action.Draft, paths: []string{"poster.svg"}},
 		{name: "table workflow", prompt: "Reconcile these invoices", mode: action.Draft, paths: []string{"checked.xlsx", "memo.md"}},
 		{name: "code without fake report", prompt: "Implement the missing parser", mode: action.Draft},
-		{name: "continued artifact", prompt: "Tighten it", opts: worktui.RunOptions{PreviousArtifacts: []string{"memo.md"}}, mode: action.Draft, paths: []string{"memo.md"}},
+		{name: "continued artifact", prompt: "Tighten it", opts: workapp.RunOptions{PreviousArtifacts: []string{"memo.md"}}, mode: action.Draft, paths: []string{"memo.md"}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -44,7 +44,7 @@ func TestInferInteractiveWorkKeepsConversationNatural(t *testing.T) {
 }
 
 func TestInferInteractiveWorkHonorsExplicitInspection(t *testing.T) {
-	_, _, err := inferInteractiveWork("write it", worktui.RunOptions{Mode: "inspect", Artifacts: []string{"report.md"}})
+	_, _, err := inferInteractiveWork("write it", workapp.RunOptions{Mode: "inspect", Artifacts: []string{"report.md"}})
 	if err == nil {
 		t.Fatal("inspection accepted an artifact contract")
 	}

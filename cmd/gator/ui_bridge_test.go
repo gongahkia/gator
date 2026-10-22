@@ -9,7 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/modelcatalog"
-	"github.com/gongahkia/gator/internal/worktui"
+	"github.com/gongahkia/gator/internal/workapp"
 )
 
 func TestBridgeKeyMapsTerminalControls(t *testing.T) {
@@ -33,19 +33,19 @@ func TestUIBridgeRoutesCommandAndPublishesState(t *testing.T) {
 	defer receive.Close()
 	finished := make(chan error, 1)
 	go func() {
-		finished <- runUIBridgeWithIO(worktui.New(worktui.Config{CurrentFolder: t.TempDir(), Models: func() (worktui.ModelPanel, error) {
+		finished <- runUIBridgeWithIO(workapp.New(workapp.Config{CurrentFolder: t.TempDir(), Models: func() (workapp.ModelPanel, error) {
 			return modelcatalog.NewModelCatalogPanel(modelcatalog.Config{}), nil
 		}}), input, receive)
 		receive.Close()
 	}()
-	frames := make(chan worktui.BridgeState, 4)
+	frames := make(chan workapp.BridgeState, 4)
 	go func() {
 		decoder := json.NewDecoder(output)
 		for {
 			var frame struct {
 				Version int                 `json:"version"`
 				Type    string              `json:"type"`
-				State   worktui.BridgeState `json:"state"`
+				State   workapp.BridgeState `json:"state"`
 			}
 			if decoder.Decode(&frame) != nil {
 				return
@@ -53,14 +53,14 @@ func TestUIBridgeRoutesCommandAndPublishesState(t *testing.T) {
 			frames <- frame.State
 		}
 	}()
-	waitState := func() worktui.BridgeState {
+	waitState := func() workapp.BridgeState {
 		t.Helper()
 		select {
 		case state := <-frames:
 			return state
 		case <-time.After(5 * time.Second):
 			t.Fatal("timed out waiting for UI state")
-			return worktui.BridgeState{}
+			return workapp.BridgeState{}
 		}
 	}
 	if initial := waitState(); !initial.Home || initial.Mode != "chat" {
@@ -101,14 +101,14 @@ func TestUIBridgeHandsEditorToFrontendAndRestoresDraft(t *testing.T) {
 	defer receive.Close()
 	finished := make(chan error, 1)
 	go func() {
-		finished <- runUIBridgeWithIO(worktui.New(worktui.Config{CurrentFolder: t.TempDir(), BridgeMode: true}), input, receive)
+		finished <- runUIBridgeWithIO(workapp.New(workapp.Config{CurrentFolder: t.TempDir(), BridgeMode: true}), input, receive)
 		receive.Close()
 	}()
 	decoder := json.NewDecoder(output)
-	readState := func() worktui.BridgeState {
+	readState := func() workapp.BridgeState {
 		t.Helper()
 		var frame struct {
-			State worktui.BridgeState `json:"state"`
+			State workapp.BridgeState `json:"state"`
 		}
 		if err := decoder.Decode(&frame); err != nil {
 			t.Fatal(err)

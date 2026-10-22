@@ -16,8 +16,8 @@ import (
 	"github.com/gongahkia/gator/internal/hostproc"
 	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/uisnapshot"
+	"github.com/gongahkia/gator/internal/workapp"
 	"github.com/gongahkia/gator/internal/workhome"
-	"github.com/gongahkia/gator/internal/worktui"
 )
 
 func readEverydayOverview(ctx context.Context, root string) (workhome.Overview, error) {
@@ -51,40 +51,40 @@ func readEverydayOverview(ctx context.Context, root string) (workhome.Overview, 
 	}
 	return view, nil
 }
-func overviewControl(ctx context.Context, root, action string, args []string) (worktui.ControlScreen, error) {
+func overviewControl(ctx context.Context, root, action string, args []string) (workapp.ControlScreen, error) {
 	if action == "seen" {
 		if len(args) != 1 {
-			return worktui.ControlScreen{}, errors.New("refresh the overview before marking it reviewed")
+			return workapp.ControlScreen{}, errors.New("refresh the overview before marking it reviewed")
 		}
 		at, err := time.Parse(time.RFC3339Nano, args[0])
 		if err != nil {
-			return worktui.ControlScreen{}, err
+			return workapp.ControlScreen{}, err
 		}
 		release, err := state.Guard(root, false)
 		if err != nil {
-			return worktui.ControlScreen{}, err
+			return workapp.ControlScreen{}, err
 		}
 		err = workhome.MarkOverviewSeen(root, at)
 		release()
 		if err != nil {
-			return worktui.ControlScreen{}, err
+			return workapp.ControlScreen{}, err
 		}
 		args = nil
 	}
 	view, err := readEverydayOverview(ctx, root)
 	if err != nil {
-		return worktui.ControlScreen{}, err
+		return workapp.ControlScreen{}, err
 	}
-	screen := worktui.ControlScreen{Location: strings.Join(args, "\x00"), Panel: uisnapshot.Panel{Kind: "overview", Title: "Everyday overview", Subtitle: "Retained facts · choose an item to act"}}
+	screen := workapp.ControlScreen{Location: strings.Join(args, "\x00"), Panel: uisnapshot.Panel{Kind: "overview", Title: "Everyday overview", Subtitle: "Retained facts · choose an item to act"}}
 	if len(args) == 0 {
 		screen.Panel.Title, screen.Panel.Subtitle = "Overview", "Changes from the last 24 hours"
 		if view.Reviewed {
 			screen.Panel.Subtitle = "Changes since " + view.Since.Local().Format("Jan 2 15:04")
 		}
 		for index, section := range view.Sections {
-			screen.Actions = append(screen.Actions, worktui.ControlAction{Key: strconv.Itoa(index + 1), Label: section.Title, Detail: section.Summary, Action: "section", Args: []string{section.ID}})
+			screen.Actions = append(screen.Actions, workapp.ControlAction{Key: strconv.Itoa(index + 1), Label: section.Title, Detail: section.Summary, Action: "section", Args: []string{section.ID}})
 		}
-		screen.Actions = append(screen.Actions, worktui.ControlAction{Key: "M", Label: "Mark current changes reviewed", Action: "seen", Args: []string{view.At.Format(time.RFC3339Nano)}})
+		screen.Actions = append(screen.Actions, workapp.ControlAction{Key: "M", Label: "Mark current changes reviewed", Action: "seen", Args: []string{view.At.Format(time.RFC3339Nano)}})
 		screen.Panel.Footer = "Changes since " + view.Since.Local().Format(time.RFC1123) + ". Reviewing changes does not mark inbox results read or approve anything."
 	} else {
 		var selected *workhome.OverviewSection
@@ -108,7 +108,7 @@ func overviewControl(ctx context.Context, root, action string, args []string) (w
 				if index < 9 {
 					key = strconv.Itoa(index + 1)
 				}
-				screen.Actions = append(screen.Actions, worktui.ControlAction{Key: key, Label: item.Title, Detail: detail, Action: "item", Args: []string{selected.ID, item.ID}})
+				screen.Actions = append(screen.Actions, workapp.ControlAction{Key: key, Label: item.Title, Detail: detail, Action: "item", Args: []string{selected.ID, item.ID}})
 			}
 			if len(selected.Items) == 0 {
 				screen.Panel.Blocks = []uisnapshot.Block{{Lines: []string{selected.Summary}}}
@@ -133,12 +133,12 @@ func overviewControl(ctx context.Context, root, action string, args []string) (w
 					lines = append(lines, item.At.Local().Format(time.RFC1123))
 				}
 				screen.Panel.Blocks = []uisnapshot.Block{{Title: selected.Title, Lines: lines}}
-				open := worktui.ControlAction{Key: "Enter", Label: "Open", Action: "navigate"}
+				open := workapp.ControlAction{Key: "Enter", Label: "Open", Action: "navigate"}
 				switch item.Kind {
 				case "inbox":
 					open.Label = "Read retained result"
 					open.Command = "/inbox show " + item.Target
-					screen.Actions = append(screen.Actions, worktui.ControlAction{Key: "D", Label: "Mark result read", Command: "/inbox read " + item.Target})
+					screen.Actions = append(screen.Actions, workapp.ControlAction{Key: "D", Label: "Mark result read", Command: "/inbox read " + item.Target})
 				case "suggestion":
 					open.Label = "Inspect proposed change"
 					open.Command = "/suggestions show " + item.Target
@@ -160,7 +160,7 @@ func overviewControl(ctx context.Context, root, action string, args []string) (w
 				case "decision":
 					open.Label = "Inspect Work"
 					open.WorkID = item.Target
-					screen.Actions = append(screen.Actions, worktui.ControlAction{Key: "A", Label: "Open exact pending review", External: []string{"work", "answer", item.Target, strconv.Itoa(item.DecisionID)}, Review: true, Description: "Hand the terminal to the existing Work decision review for this live run. Inspect the full action and choose an explicit response there. Opening the review does not approve it."})
+					screen.Actions = append(screen.Actions, workapp.ControlAction{Key: "A", Label: "Open exact pending review", External: []string{"work", "answer", item.Target, strconv.Itoa(item.DecisionID)}, Review: true, Description: "Hand the terminal to the existing Work decision review for this live run. Inspect the full action and choose an explicit response there. Opening the review does not approve it."})
 				case "check":
 					open.Label = "Recover or retry this check"
 					open.Command = "/recovery " + item.Target
@@ -180,10 +180,10 @@ func overviewControl(ctx context.Context, root, action string, args []string) (w
 					open.Label = "Refresh overview"
 					open.Command = "/overview"
 				}
-				screen.Actions = append([]worktui.ControlAction{open}, screen.Actions...)
+				screen.Actions = append([]workapp.ControlAction{open}, screen.Actions...)
 			}
 		}
-		screen.Actions = append(screen.Actions, worktui.ControlAction{Key: "B", Label: "All four sections", Action: "status"})
+		screen.Actions = append(screen.Actions, workapp.ControlAction{Key: "B", Label: "All four sections", Action: "status"})
 	}
 	refreshed := "Refreshed " + view.At.Local().Format("15:04:05")
 	if screen.Panel.Footer != "" {
@@ -194,7 +194,7 @@ func overviewControl(ctx context.Context, root, action string, args []string) (w
 		screen.Panel.Blocks = append(screen.Panel.Blocks, uisnapshot.Block{Title: "About this overview", Collapsible: true, Lines: []string{screen.Panel.Footer, "This view reads retained activity without making a model request."}})
 		screen.Panel.Footer = ""
 	}
-	screen.Actions = append(screen.Actions, worktui.ControlAction{Key: "R", Label: "Refresh", Action: "status", Args: append([]string(nil), args...)})
+	screen.Actions = append(screen.Actions, workapp.ControlAction{Key: "R", Label: "Refresh", Action: "status", Args: append([]string(nil), args...)})
 	return screen, nil
 }
 func overviewTerminalCommand(root string, args []string) *exec.Cmd {

@@ -10,8 +10,8 @@ import (
 
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/connector"
+	"github.com/gongahkia/gator/internal/workapp"
 	"github.com/gongahkia/gator/internal/workspace"
-	"github.com/gongahkia/gator/internal/worktui"
 )
 
 func TestWorkBundleDetailsPreviewIsVerifiedAndRetained(t *testing.T) {
@@ -37,7 +37,7 @@ func TestWorkBundleDetailsBoundsAndDeduplicatesProvenance(t *testing.T) {
 		bundle.Manifest.Evidence = append(bundle.Manifest.Evidence, artifact.Evidence{Locator: "recorded-source"})
 		bundle.Manifest.ConnectedSources = append(bundle.Manifest.ConnectedSources, connector.Provenance{ConnectorID: "drive", Operation: "fetch"})
 	}
-	var summary worktui.BundleSummary
+	var summary workapp.BundleSummary
 	projectWorkBundleDetails(bundle, &summary)
 	if len(summary.Sources) != 16 || len(summary.Connections) != 1 || len(summary.Connections[0].Operations) != 1 {
 		t.Fatalf("provenance projection = %#v", summary)

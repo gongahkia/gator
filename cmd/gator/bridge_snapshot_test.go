@@ -3,10 +3,10 @@ package main
 import (
 	"strings"
 
-	"github.com/gongahkia/gator/internal/worktui"
+	"github.com/gongahkia/gator/internal/workapp"
 )
 
-func bridgeStateText(state worktui.BridgeState) string {
+func bridgeStateText(state workapp.BridgeState) string {
 	parts := []string{state.Title, state.Source, state.Status, state.Input}
 	if state.StatusLineEnabled {
 		parts = append(parts, state.StatusLine...)

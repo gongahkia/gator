@@ -8,11 +8,11 @@ import (
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/model"
 	"github.com/gongahkia/gator/internal/modelcatalog"
-	"github.com/gongahkia/gator/internal/worktui"
+	"github.com/gongahkia/gator/internal/workapp"
 )
 
-func workModelPanel(store config.Store, stateDir string, local modelcatalog.LocalManager) func() (worktui.ModelPanel, error) {
-	return func() (worktui.ModelPanel, error) {
+func workModelPanel(store config.Store, stateDir string, local modelcatalog.LocalManager) func() (workapp.ModelPanel, error) {
+	return func() (workapp.ModelPanel, error) {
 		settings, err := store.Load()
 		if err != nil {
 			return nil, err
