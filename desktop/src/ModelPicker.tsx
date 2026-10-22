@@ -68,6 +68,14 @@ export function ModelPicker({ state, disabled, send, manage, onBusyChange }: Pro
     const focus = view === "models" ? (popup.current?.querySelector<HTMLElement>('input[type="search"], [role="option"][aria-selected="true"]:not(:disabled)') ?? popup.current?.querySelector<HTMLElement>('[role="option"]:not(:disabled)') ?? popup.current?.querySelector<HTMLElement>('.picker-heading button')) : popup.current?.querySelector<HTMLElement>(".picker-model-select");
     focus?.focus({ preventScroll: true });
   }, [open, view]);
+  useLayoutEffect(() => {
+    if (open && issue && !pending) {
+      // A failed save can blur a temporarily disabled control. Keep keyboard
+      // users inside the picker so they can review the error and retry.
+      const target = view === "models" ? popup.current?.querySelector<HTMLElement>('input[type="search"], [role="option"][aria-selected="true"]:not(:disabled)') : popup.current?.querySelector<HTMLElement>(".picker-model-select");
+      target?.focus({ preventScroll: true });
+    }
+  }, [open, issue, pending, view]);
   useEffect(() => {
     if (!open) return;
     const inside = (target: EventTarget | null) => target instanceof Node && (root.current?.contains(target) || popup.current?.contains(target));

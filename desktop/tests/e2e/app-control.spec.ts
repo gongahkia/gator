@@ -1,6 +1,6 @@
 import { _electron as electron, test, expect, type ElectronApplication, type Page } from "@playwright/test";
 import { createServer } from "node:http";
-import { mkdir, readFile, writeFile, rm } from "node:fs/promises";
+import { chmod, mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { closeDesktop, temporaryDirectory } from "./lifecycle";
@@ -188,7 +188,19 @@ test("composer model picker preserves drafts, changes actual defaults and honors
     await expect(dialog.getByRole("option", { name: /unavailable-model/ })).toBeDisabled();
     await page.screenshot({ path: "test-results/model-picker-models.png" });
     const filter = dialog.getByRole("searchbox", { name: "Find a model" });
-    await filter.fill("Careful"); await filter.press("ArrowDown"); await page.keyboard.press("Enter");
+    await filter.fill("Careful");
+    if (process.platform !== "win32") {
+      const configDirectory = join(f.directory, "config/gator");
+      await chmod(configDirectory, 0o500);
+      try {
+        await dialog.getByRole("option", { name: "Careful model" }).click();
+        await expect(dialog.getByRole("alert")).toContainText("Could not select model:");
+        await expect(filter).toBeFocused();
+        await expect(page.locator(".connection-error")).toHaveCount(0);
+        expect(JSON.parse(await readFile(configFile, "utf8")).defaults.model).toBe("model-one");
+      } finally { await chmod(configDirectory, 0o700); }
+    }
+    await filter.press("ArrowDown"); await page.keyboard.press("Enter");
     await expect(trigger).toHaveAccessibleName(/Careful model, Standard/);
     expect(JSON.parse(await readFile(configFile, "utf8")).defaults.model).toBe("model-two");
     await page.keyboard.press("Escape");
