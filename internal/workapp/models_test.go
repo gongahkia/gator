@@ -1,12 +1,46 @@
 package workapp
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/uisnapshot"
 )
+
+func TestDesktopModelSetupExitReconcilesReadinessWithoutSending(t *testing.T) {
+	for _, destination := range []string{"/chat", "/conversations"} {
+		for _, configured := range []bool{false, true} {
+			t.Run(destination+"/"+map[bool]string{false: "unconfigured", true: "configured"}[configured], func(t *testing.T) {
+				provider := ""
+				panel := &testModelPanel{}
+				m := New(Config{FirstRun: true, CurrentFolder: "/work", Models: func() (ModelPanel, error) { return panel, nil },
+					SelectedModel: func() (string, string, error) { return provider, "fixture", nil },
+					Run:           func(_, _, _ string, _ RunOptions) RunResult { t.Fatal("setup sent a request"); return RunResult{} },
+				})
+				next, _ := m.openModels()
+				m = next.(Model)
+				m.pendingPrompt = "understand this file"
+				if configured {
+					provider = "fixture"
+				}
+				next, _ = m.NavigateBridge(destination)
+				m = next.(Model)
+				if m.firstRun == configured || m.models != nil || !panel.closed || m.input != "understand this file" || m.pendingPrompt != "" || m.running {
+					t.Fatalf("setup exit lost readiness or draft: %#v", m)
+				}
+			})
+		}
+	}
+	panel := &testModelPanel{}
+	m := New(Config{FirstRun: true, SelectedModel: func() (string, string, error) { return "", "", errors.New("unavailable") }})
+	m.models = panel
+	next, _ := m.NavigateBridge("/chat")
+	if !next.(Model).firstRun {
+		t.Fatal("failed selection read marked setup complete")
+	}
+}
 
 func TestModelManagementCannotOpenDuringWork(t *testing.T) {
 	m := New(Config{Models: func() (ModelPanel, error) {

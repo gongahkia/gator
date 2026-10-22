@@ -24,8 +24,8 @@ func (p *ModelCatalogPanel) UISnapshot() uisnapshot.Panel {
 	if p.model.screen == chooseModelScreen {
 		panel.Subtitle = "Choose how Gator runs models"
 		panel.Rows = []uisnapshot.Row{
-			{Label: "Cloud API key", Detail: "Choose a cloud model and configure its API key."},
-			{Label: "Local model", Detail: "Browse reviewed Ollama models on this machine."},
+			{Label: "Cloud API key", Detail: "Use your own provider account. Requests are sent to that provider and billed under its API plan."},
+			{Label: "Local model", Detail: "Download a reviewed model with Ollama. Chat processing runs here and uses this computer’s memory and storage."},
 		}
 		panel.Blocks = []uisnapshot.Block{
 			{Title: "Storage", Lines: []string{"Memories, notes, and Work records are saved in private local Gator storage."}},

@@ -45,27 +45,25 @@ func (defaults workModelDefaults) SetDefaults(provider, modelName string) error 
 	if len(modelName) > 512 || strings.ContainsAny(modelName, "\r\n") {
 		return errors.New("default model is invalid")
 	}
-	settings, err := defaults.settings.Load()
-	if err != nil {
-		return err
-	}
-	if custom, found := configuredCustomProvider(settings, provider); found {
-		if modelName == "" {
-			modelName = custom.DefaultModel
+	return defaults.settings.Update(func(settings *config.Settings) error {
+		if custom, found := configuredCustomProvider(*settings, provider); found {
+			if modelName == "" {
+				modelName = custom.DefaultModel
+			}
+			if !customProviderSupportsModel(custom, modelName) {
+				return fmt.Errorf("model %q is not configured for custom provider %q", modelName, custom.ID)
+			}
+			provider = custom.ID
+		} else {
+			parsed, err := model.ParseProvider(provider)
+			if err != nil {
+				return err
+			}
+			provider = string(parsed)
+			modelName = model.EffectiveModel(parsed, modelName)
 		}
-		if !customProviderSupportsModel(custom, modelName) {
-			return fmt.Errorf("model %q is not configured for custom provider %q", modelName, custom.ID)
-		}
-		provider = custom.ID
-	} else {
-		parsed, err := model.ParseProvider(provider)
-		if err != nil {
-			return err
-		}
-		provider = string(parsed)
-		modelName = model.EffectiveModel(parsed, modelName)
-	}
-	settings.Defaults.Provider = provider
-	settings.Defaults.Model = modelName
-	return defaults.settings.Save(settings)
+		settings.Defaults.Provider = provider
+		settings.Defaults.Model = modelName
+		return nil
+	})
 }

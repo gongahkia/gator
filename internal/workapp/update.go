@@ -193,24 +193,7 @@ func (m Model) updateModelPanel(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 	if !m.models.Closed() {
 		return m, command
 	}
-	m.models.Close()
-	m.models = nil
-	if m.config.SelectedModel != nil {
-		provider, model, err := m.config.SelectedModel()
-		if err != nil {
-			m.status = "Read model selection: " + err.Error()
-		} else {
-			m.firstRun = provider == ""
-			m.status = "Selected model: " + provider + " / " + model
-			if m.firstRun {
-				m.status = "Choose a model with /model before starting work."
-			}
-		}
-	}
-	m.refreshModelStatus()
-	if m.pendingPrompt != "" {
-		m.input, m.pendingPrompt = m.pendingPrompt, ""
-	}
+	m.closeModelPanel()
 	if m.section == "memory" {
 		return m, tea.Batch(tea.ClearScreen, m.recallStatusCommand())
 	}

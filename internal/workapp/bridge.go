@@ -340,8 +340,7 @@ func (m Model) NavigateBridge(command string) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if m.models != nil {
-		m.models.Close()
-		m.models = nil
+		m.closeModelPanel()
 	}
 	m.cancelControlBackground()
 	m.controlForm, m.followupForm, m.learningForm = nil, nil, nil
