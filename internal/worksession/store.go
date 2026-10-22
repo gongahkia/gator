@@ -80,11 +80,15 @@ func Open(stateDir string) (Store, error) {
 }
 
 func (s Store) Create(title, sourcePath, snapshotID string, now time.Time) (Conversation, error) {
+	return s.create(title, sourcePath, snapshotID, now, false)
+}
+
+func (s Store) create(title, sourcePath, snapshotID string, now time.Time, draft bool) (Conversation, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {
 		title = "New work"
 	}
-	if len(title) > 256 || strings.TrimSpace(sourcePath) == "" || !strings.HasPrefix(snapshotID, "snap-") {
+	if len(title) > 256 || strings.TrimSpace(sourcePath) == "" || (!strings.HasPrefix(snapshotID, "snap-") && !(draft && snapshotID == "")) {
 		return Conversation{}, errors.New("conversation identity is invalid")
 	}
 	if now.IsZero() {
@@ -178,6 +182,15 @@ func (s Store) AddRevision(conversationID string, revision Revision) (Conversati
 	}
 	if len(revision.InputNames) > 0 {
 		_ = writeJSON(s.inputNamesPath(conversationID, revision.ID), revision.InputNames)
+	}
+	if conversation.HeadRevision == "" && conversation.Title == "New chat" {
+		title := []rune(strings.Join(strings.Fields(revision.Objective), " "))
+		if len(title) > 80 {
+			title = append(title[:77], '.', '.', '.')
+		}
+		if len(title) > 0 {
+			conversation.Title = string(title)
+		}
 	}
 	conversation.SourceRefreshRequired = false
 	conversation.HeadRevision = revision.ID
