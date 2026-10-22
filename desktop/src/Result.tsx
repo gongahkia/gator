@@ -36,7 +36,7 @@ export function Result({ result, approval, onApproval }: { result: BackendResult
     <div className="result-heading"><h3><Icon size={18} />{result.title}</h3>{approval !== undefined && <span className="badge" data-tone="warning">Needs review</span>}</div>
     {result.summary && <p>{result.summary}</p>}
     <Content {...result} />
-    {result.sections?.map((section, i) => <section className="result-section" key={i}><h4>{section.title}</h4>{section.summary && <p>{section.summary}</p>}<Content {...section} /></section>)}
+    {result.sections?.map((section, i) => section.collapsible ? <details className="result-action-details" key={i}><summary>{section.title}<ChevronDown size={16} aria-hidden="true" /></summary>{section.summary && <p>{section.summary}</p>}<Content {...section} /></details> : <section className="result-section" key={i}><h4>{section.title}</h4>{section.summary && <p>{section.summary}</p>}<Content {...section} /></section>)}
     {result.preview !== undefined && <details className="result-action-details" open><summary>{result.kind === "approval" ? "Exact action details" : "Preview details"}<ChevronDown size={16} aria-hidden="true" /></summary><pre className="preview">{JSON.stringify(result.preview, null, 2)}</pre></details>}
     {result.footer && <p className="result-footer literal">{result.footer}</p>}
     {approval !== undefined && onApproval && <div className="flex flex-wrap gap-2 mt-4"><button className="button" onClick={() => onApproval(false)}>Deny</button><button className="button primary" onClick={() => onApproval(true)}>Approve this action</button></div>}

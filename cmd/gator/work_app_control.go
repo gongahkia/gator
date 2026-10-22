@@ -14,9 +14,10 @@ import (
 )
 
 type gatorAppController struct {
-	stateDir string
-	settings config.Store
-	request  *workrun.Request
+	stateDir        string
+	settings        config.Store
+	request         *workrun.Request
+	startSupervisor func(string) error
 }
 
 func (c gatorAppController) Inspect(ctx context.Context, query workrun.AppQuery) (any, error) {
@@ -28,6 +29,8 @@ func (c gatorAppController) Inspect(ctx context.Context, query workrun.AppQuery)
 		return nil, err
 	}
 	switch query.Topic {
+	case "followups":
+		return c.inspectFollowups(query)
 	case "settings":
 		selected, err := currentWorkModelStatus(c.settings, c.stateDir)
 		return map[string]any{"model": selected, "theme": settings.Theme, "retrieval": settings.Embeddings, "learn_from_chats": settings.Desktop.LearnsFromChats(), "storage": "Private Gator content is stored locally. Cloud retrieval uploads eligible saved text and queries; cloud chat processes supplied context remotely.", "settings_pages": []string{"Models", "Usage & limits", "Data & backups", "Recovery", "About & updates"}}, err
@@ -109,6 +112,9 @@ func (c gatorAppController) inspectOutputs(id string) (any, error) {
 }
 
 func (c gatorAppController) Prepare(ctx context.Context, change workrun.AppChange) (workrun.AppMutation, error) {
+	if change.Setting == "followup" {
+		return c.prepareFollowup(ctx, change)
+	}
 	return c.prepareSettings(ctx, change)
 }
 

@@ -78,44 +78,10 @@ func (m *Model) editFollowup() {
 		m.sectionNotice = "This schedule uses advanced settings. Edit it with /jobs edit " + definition.ID + " or create a reviewed project check with N."
 		return
 	}
-	draft, err := followup.New(definition.SourcePath, definition.GoalID)
+	draft, err := followup.FromDefinition(definition)
 	if err != nil {
 		m.sectionNotice = err.Error()
 		return
-	}
-	draft.Enabled = definition.Enabled
-	draft.OriginConversationID = definition.OriginConversationID
-	draft.JobID, draft.Title, draft.Outcome = definition.ID, definition.Name, definition.Objective
-	if !definition.EndsAt.IsZero() {
-		draft.EndsAt = definition.EndsAt.Format(time.RFC3339)
-	}
-	draft.ExpectedDigest, _ = definition.PolicyDigest()
-	draft.ConnectorIDs, draft.AlertWhen, draft.Mode = append([]string(nil), definition.ConnectorIDs...), definition.AlertWhen, definition.Mode
-	if draft.AlertWhen == "" {
-		draft.AlertWhen = "Material changes and due steps requiring review"
-	}
-	if definition.PollMinutes != 0 {
-		draft.IntervalMinutes = definition.PollMinutes
-	}
-	if definition.Limits.ModelRequests > 0 {
-		draft.MaxRequests = definition.Limits.ModelRequests
-	}
-	if definition.Limits.WallSeconds > 0 {
-		draft.MaxSeconds = definition.Limits.WallSeconds
-	}
-	if definition.Limits.Tokens > 0 {
-		draft.MaxTokens = definition.Limits.Tokens
-	}
-	if definition.MaxChecksPerDay > 0 {
-		draft.MaxChecksPerDay = definition.MaxChecksPerDay
-	}
-	for _, source := range definition.WatchSources {
-		if source.Operation == "gmail_list" {
-			draft.GmailQuery = source.Query
-		}
-		if source.Operation == "calendar_events" {
-			draft.CalendarDays = source.Days
-		}
 	}
 	m.followupForm, m.sectionNotice = &followupForm{Draft: draft}, ""
 }

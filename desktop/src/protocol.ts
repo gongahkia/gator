@@ -2,7 +2,7 @@
 export type ResultTone = "success" | "warning" | "error" | "muted" | "";
 export type ResultField = { label: string; value: string; tone?: ResultTone };
 export type ResultItem = { label: string; detail?: string; state?: string; tone?: ResultTone };
-export type ResultSection = { title: string; summary?: string; fields?: ResultField[]; items?: ResultItem[]; lines?: string[]; markdown?: string };
+export type ResultSection = { title: string; collapsible?: boolean; summary?: string; fields?: ResultField[]; items?: ResultItem[]; lines?: string[]; markdown?: string };
 export type BackendResult = {
   kind: "notice" | "details" | "list" | "report" | "preview" | "approval";
   title: string;

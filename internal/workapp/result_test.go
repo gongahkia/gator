@@ -71,3 +71,10 @@ func TestApprovalPreviewIsStructuredAndRetainsExactData(t *testing.T) {
 		t.Fatalf("bridge lost structured approval: %s", encoded)
 	}
 }
+
+func TestFollowupApprovalShowsAgreementAndKeepsLimitsExpandable(t *testing.T) {
+	m := approvalMessage(workrun.Interaction{ID: 7, Kind: "app_change", Preview: workrun.AppAgreement{Title: "Venue", Action: "create", Lines: []string{"Outcome: Track replies", "Ends: Friday 18:00 +08:00", "Limits: 24 checks per day", "Updates return here."}}})
+	if m.result.Title != "Review follow-up" || m.result.Preview != nil || len(m.result.Fields) != 3 || len(m.result.Sections) != 1 || !m.result.Sections[0].Collapsible || len(m.result.Sections[0].Fields) != 1 {
+		t.Fatalf("agreement review lost content: %+v", m.result)
+	}
+}

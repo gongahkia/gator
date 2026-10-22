@@ -33,10 +33,11 @@ type ResultItem struct {
 }
 
 type ResultSection struct {
-	Title    string       `json:"title"`
-	Summary  string       `json:"summary,omitempty"`
-	Fields   []Field      `json:"fields,omitempty"`
-	Items    []ResultItem `json:"items,omitempty"`
-	Lines    []string     `json:"lines,omitempty"`
-	Markdown string       `json:"markdown,omitempty"`
+	Collapsible bool         `json:"collapsible,omitempty"`
+	Title       string       `json:"title"`
+	Summary     string       `json:"summary,omitempty"`
+	Fields      []Field      `json:"fields,omitempty"`
+	Items       []ResultItem `json:"items,omitempty"`
+	Lines       []string     `json:"lines,omitempty"`
+	Markdown    string       `json:"markdown,omitempty"`
 }

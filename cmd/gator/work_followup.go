@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -22,6 +24,10 @@ import (
 )
 
 func saveFollowup(stateDir string, draft followup.Draft) (goal.Record, jobs.Definition, error) {
+	return saveFollowupReviewed(stateDir, draft, "")
+}
+
+func saveFollowupReviewed(stateDir string, draft followup.Draft, expectedAuthority string) (goal.Record, jobs.Definition, error) {
 	release, guardErr := state.Guard(stateDir, false)
 	if guardErr != nil {
 		return goal.Record{}, jobs.Definition{}, guardErr
@@ -47,69 +53,12 @@ func saveFollowup(stateDir string, draft followup.Draft) (goal.Record, jobs.Defi
 		return goal.Record{}, jobs.Definition{}, err
 	}
 	draft.SourcePath = root.Path()
-	settings, err := loadSettings()
+	sources, pins, authority, err := followupSources(draft)
 	if err != nil {
 		return goal.Record{}, jobs.Definition{}, err
 	}
-	registry, err := connector.NewRegistry(settings.Connectors)
-	if err != nil {
-		return goal.Record{}, jobs.Definition{}, err
-	}
-	var sources []jobs.WatchSource
-	hasGoogle := false
-	seen := map[string]bool{}
-	for _, id := range draft.ConnectorIDs {
-		if seen[id] {
-			return goal.Record{}, jobs.Definition{}, errors.New("a connected source is selected twice")
-		}
-		seen[id] = true
-		descriptor, found := registry.Get(id)
-		if !found {
-			return goal.Record{}, jobs.Definition{}, fmt.Errorf("source %s is no longer configured", id)
-		}
-		switch descriptor.Kind {
-		case connector.KindHTTPJSON:
-			sources = append(sources, jobs.WatchSource{ConnectorID: id, Operation: "fetch"})
-		case connector.KindGoogle:
-			hasGoogle = true
-			if draft.GmailQuery == "" && draft.CalendarDays == 0 {
-				return goal.Record{}, jobs.Definition{}, errors.New("select a mail query or calendar window for Google")
-			}
-			if draft.GmailQuery != "" {
-				sources = append(sources, jobs.WatchSource{ConnectorID: id, Operation: "gmail_list", Query: draft.GmailQuery})
-			}
-			if draft.CalendarDays > 0 {
-				sources = append(sources, jobs.WatchSource{ConnectorID: id, Operation: "calendar_events", Days: draft.CalendarDays})
-			}
-		default:
-			return goal.Record{}, jobs.Definition{}, fmt.Errorf("%s has no bounded follow-up reader", id)
-		}
-	}
-	if !hasGoogle && (draft.GmailQuery != "" || draft.CalendarDays != 0) {
-		return goal.Record{}, jobs.Definition{}, errors.New("mail and calendar selections require a Google connector")
-	}
-	if len(sources) > 4 {
-		return goal.Record{}, jobs.Definition{}, errors.New("select at most four connected read surfaces")
-	}
-	permissions := connector.PermissionSet(settings.ConnectorPermissions)
-	for _, source := range sources {
-		operations := []string{source.Operation}
-		if source.Operation == "gmail_list" {
-			operations = append(operations, "gmail_get")
-		}
-		for _, name := range operations {
-			_, operation, err := registry.Operation(source.ConnectorID, name)
-			if err != nil {
-				return goal.Record{}, jobs.Definition{}, err
-			}
-			if permissions.Resolve(source.ConnectorID, name, operation.Capability) != connector.PermissionAllow {
-				return goal.Record{}, jobs.Definition{}, fmt.Errorf("%s %s needs unattended read permission; configure /connector first", source.ConnectorID, name)
-			}
-		}
-	}
-	pins, err := captureConfiguredGoalOAuthAccountPins(context.Background(), draft.ConnectorIDs)
-	if err != nil {
-		return goal.Record{}, jobs.Definition{}, err
+	if expectedAuthority != "" && expectedAuthority != authority {
+		return goal.Record{}, jobs.Definition{}, errors.New("connected sources or accounts changed; review this check again")
 	}
 	goals, err := goal.Open(stateDir)
 	if err != nil {
@@ -235,4 +184,89 @@ func followupObjective(definition jobs.Definition) string {
 		return ""
 	}
 	return "\nUser's notification conditions: " + definition.AlertWhen + "\nEvaluate materiality against these conditions; a failed read is not evidence of no change."
+}
+
+// The review binds the chosen connector descriptors, permissions and account
+// identities. Recheck them before writing any goal or job; never retarget a
+// reviewed check to a replacement account silently.
+func followupSources(draft followup.Draft) ([]jobs.WatchSource, map[string]string, string, error) {
+	settings, err := loadSettings()
+	if err != nil {
+		return nil, nil, "", err
+	}
+	registry, err := connector.NewRegistry(settings.Connectors)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	var sources []jobs.WatchSource
+	hasGoogle := false
+	seen := map[string]bool{}
+	for _, id := range draft.ConnectorIDs {
+		if seen[id] {
+			return nil, nil, "", errors.New("a connected source is selected twice")
+		}
+		seen[id] = true
+		descriptor, found := registry.Get(id)
+		if !found {
+			return nil, nil, "", fmt.Errorf("source %s is no longer configured", id)
+		}
+		switch descriptor.Kind {
+		case connector.KindHTTPJSON:
+			sources = append(sources, jobs.WatchSource{ConnectorID: id, Operation: "fetch"})
+		case connector.KindGoogle:
+			hasGoogle = true
+			if draft.GmailQuery == "" && draft.CalendarDays == 0 {
+				return nil, nil, "", errors.New("select a mail query or calendar window for Google")
+			}
+			if draft.GmailQuery != "" {
+				sources = append(sources, jobs.WatchSource{ConnectorID: id, Operation: "gmail_list", Query: draft.GmailQuery})
+			}
+			if draft.CalendarDays > 0 {
+				sources = append(sources, jobs.WatchSource{ConnectorID: id, Operation: "calendar_events", Days: draft.CalendarDays})
+			}
+		default:
+			return nil, nil, "", fmt.Errorf("%s has no bounded follow-up reader", id)
+		}
+	}
+	if !hasGoogle && (draft.GmailQuery != "" || draft.CalendarDays != 0) {
+		return nil, nil, "", errors.New("mail and calendar selections require a Google connector")
+	}
+	if len(sources) > 4 {
+		return nil, nil, "", errors.New("select at most four connected read surfaces")
+	}
+	permissions := connector.PermissionSet(settings.ConnectorPermissions)
+	for _, source := range sources {
+		operations := []string{source.Operation}
+		if source.Operation == "gmail_list" {
+			operations = append(operations, "gmail_get")
+		}
+		for _, name := range operations {
+			_, operation, err := registry.Operation(source.ConnectorID, name)
+			if err != nil {
+				return nil, nil, "", err
+			}
+			if permissions.Resolve(source.ConnectorID, name, operation.Capability) != connector.PermissionAllow {
+				return nil, nil, "", fmt.Errorf("%s %s needs unattended read permission; configure /connector first", source.ConnectorID, name)
+			}
+		}
+	}
+	pins, err := captureConfiguredGoalOAuthAccountPins(context.Background(), draft.ConnectorIDs)
+	if err != nil {
+		return nil, nil, "", err
+	}
+
+	selected := []connector.Descriptor{}
+	for _, id := range draft.ConnectorIDs {
+		descriptor, _ := registry.Get(id)
+		selected = append(selected, descriptor)
+	}
+	data, err := json.Marshal(struct {
+		Sources     []connector.Descriptor
+		Permissions []connector.PermissionRule
+		Pins        map[string]string
+	}{selected, settings.ConnectorPermissions, pins})
+	if err != nil {
+		return nil, nil, "", err
+	}
+	return sources, pins, fmt.Sprintf("%x", sha256.Sum256(data)), nil
 }
