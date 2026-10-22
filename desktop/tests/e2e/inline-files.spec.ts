@@ -2,14 +2,18 @@ import { _electron as electron, test, expect, type ElectronApplication } from "@
 import { mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import { join, resolve } from "node:path"; import { tmpdir } from "node:os";
+import { unzipSync, strFromU8 } from "fflate";
 import { wordFixture, workbookFixture, slidesFixture } from "../office-fixtures.mjs";
 import { closeDesktop, temporaryDirectory } from "./lifecycle";
 
-async function fixture() {
+async function fixture(generated = false) {
   const directory=await temporaryDirectory(join(tmpdir(),"gator-inline-files-")), workspace=join(directory,"workspace");
   await mkdir(workspace);await mkdir(join(directory,"config/gator"),{recursive:true});
-  const requests: unknown[]=[];
-  const server=createServer((request,response)=>{let body="";request.on("data",chunk=>body+=chunk);request.on("end",()=>{requests.push(JSON.parse(body));response.writeHead(200,{"Content-Type":"application/json"});response.end(JSON.stringify({choices:[{message:{role:"assistant",content:"I received the current file."},finish_reason:"stop"}],usage:{prompt_tokens:10,completion_tokens:10,total_tokens:20}}));});});
+  const requests: unknown[]=[]; let wroteReport = false;
+  const server=createServer((request,response)=>{let body="";request.on("data",chunk=>body+=chunk);request.on("end",()=>{requests.push(JSON.parse(body));response.writeHead(200,{"Content-Type":"application/json"});
+    const write = generated && !wroteReport; wroteReport = wroteReport || write;
+    const message = write ? { role: "assistant", content: null, tool_calls: [{ id: "write-inline-report", type: "function", function: { name: "write_artifact", arguments: JSON.stringify({ path: "report.md", content: "# A generated report\n\nOriginal sealed output." }) } }] } : { role: "assistant", content: "I received the current file." };
+    response.end(JSON.stringify({choices:[{message,finish_reason:write ? "tool_calls" : "stop"}],usage:{prompt_tokens:10,completion_tokens:10,total_tokens:20}}));});});
   await new Promise<void>(resolve=>server.listen(0,"127.0.0.1",resolve));const port=(server.address() as {port:number}).port;
   await writeFile(join(directory,"config/gator/config.json"),JSON.stringify({version:4,defaults:{provider:"file-editor-fixture",model:"fixture-model"},custom_providers:[{id:"file-editor-fixture",base_url:`http://127.0.0.1:${port}/v1/chat/completions`,models:["fixture-model"],default_model:"fixture-model"}]}),{mode:0o600});
   const env={...process.env,GATOR_STATE_DIR:join(directory,"state"),GATOR_CONFIG_DIR:join(directory,"config"),GATOR_DESKTOP_USER_DATA:join(directory,"desktop"),GATOR_DESKTOP_WORKSPACE:workspace};
@@ -60,15 +64,86 @@ test("Word Excel PowerPoint and CSV edit inline and export native files with unc
     for(const [index,name,label,value] of [[0,"brief.docx","Document paragraph 0","Hello from the edited Word document."],[1,"budget.xlsx","Budget cell B1","125"],[2,"review.pptx","Slide 1 text 0","An edited PowerPoint title"],[3,"people.csv","Table cell B2","Product designer"]] as const){
       const card=pending.locator(".inline-file").filter({has:page.getByRole("button",{name:`Open file ${name}`,exact:true})});
       await card.getByRole("button",{name:`Open file ${name}`,exact:true}).click();await card.getByRole("button",{name:"Edit",exact:true}).click();
-      await card.getByRole("textbox",{name:label,exact:true}).fill(value);await page.screenshot({path:`test-results/inline-file-${name}.png`});
+      await card.getByRole("textbox",{name:label,exact:true}).fill(value);
+      if (name === "budget.xlsx") {
+        await card.getByRole("textbox",{name:"Budget cell C1",exact:true}).click();
+        await card.getByRole("textbox",{name:"Cell value or formula",exact:true}).fill("=B1*3");
+        await card.getByRole("button",{name:"Row",exact:true}).click();
+        await card.getByRole("textbox",{name:"Budget cell B2",exact:true}).fill("33");
+        await card.getByRole("button",{name:"Column",exact:true}).click();
+        await card.getByRole("textbox",{name:"Budget cell D1",exact:true}).fill("Notes");
+      }
+      const send = await page.getByRole("button",{name:"Send message",exact:true}).boundingBox();
+      expect(send!.y + send!.height).toBeLessThanOrEqual(await page.evaluate(()=>innerHeight));
+      await expect(page.getByRole("button",{name:"Send message",exact:true})).toBeDisabled();
+      await page.screenshot({path:`test-results/inline-file-${name}.png`});
       await card.getByRole("button",{name:"Save",exact:true}).click();await expect(card.getByText("Saved · included in your next message",{exact:true})).toBeVisible();
       const exported=join(f.directory,`edited-${name}`);await app.evaluate(({dialog},filePath)=>{dialog.showSaveDialog=async()=>({canceled:false,filePath});},exported);
       await card.getByRole("button",{name:`Export ${name}`,exact:true}).click();await expect.poll(async()=>readFile(exported).then(bytes=>bytes.length).catch(()=>0)).toBeGreaterThan(0);
       expect(await readFile(paths[index])).toEqual(originals[index]);expect(await readFile(exported)).not.toEqual(originals[index]);
+      const bytes = await readFile(exported);
+      if (name.endsWith("csv")) expect(bytes.toString()).toContain(value);
+      else {
+        const parts = unzipSync(bytes), part = name.endsWith("docx") ? "word/document.xml" : name.endsWith("xlsx") ? "xl/worksheets/sheet1.xml" : "ppt/slides/slide1.xml";
+        expect(strFromU8(parts[part]).replace(/<[^>]+>/g,"" )).toContain(value);
+        if (name.endsWith("xlsx")) { expect(strFromU8(parts[part])).not.toContain("<v>8</v>"); expect(strFromU8(parts[part])).toContain("<f>B1*3</f>"); expect(strFromU8(parts[part])).toContain("Notes"); expect(strFromU8(parts[part])).toContain("<v>33</v>"); }
+      }
       await card.getByRole("button",{name:`Close file ${name}`,exact:true}).click();
     }
     await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setSize(800,650));await page.emulateMedia({reducedMotion:"reduce"});
     await pending.getByRole("button",{name:"Open file brief.docx",exact:true}).click();await expect(pending.getByText("Hello from the edited Word document.",{exact:true})).toBeVisible();
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:"test-results/inline-file-office-narrow.png"});expect(f.requests).toHaveLength(0);expect(errors).toEqual([]);
+  }finally{await f.close();}
+});
+
+function pdfFixture() {
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 180] /Resources << /Font << /F1 7 0 R >> >> /Contents 4 0 R >>',
+    '<< /Length 48 >>\nstream\nBT /F1 18 Tf 20 100 Td (A real PDF preview) Tj ET\nendstream',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 180] /Resources << /Font << /F1 7 0 R >> >> /Contents 6 0 R >>',
+    '<< /Length 48 >>\nstream\nBT /F1 18 Tf 20 100 Td (Second PDF page) Tj ET\nendstream',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  let data = '%PDF-1.4\n', offsets = [0];
+  for (const [index, object] of objects.entries()) { offsets.push(Buffer.byteLength(data)); data += `${index + 1} 0 obj\n${object}\nendobj\n`; }
+  const xref = Buffer.byteLength(data);
+  data += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.slice(1).map(offset=>`${String(offset).padStart(10,'0')} 00000 n \n`).join('')}trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return data;
+}
+
+test("PDF pages and images render inline without enabling edits or network requests", async()=>{
+  const f=await fixture();try{
+    const pdf=join(f.directory,"pages.pdf"),image=join(f.directory,"pixel.png");
+    await writeFile(pdf,pdfFixture());await writeFile(image,Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jL1sAAAAASUVORK5CYII=","base64"));
+    const app=await f.launch(),page=await app.firstWindow(),errors:string[]=[],requests:string[]=[];
+    page.on("pageerror",error=>errors.push(error.message));page.on("request",request=>{if(/^https?:/.test(request.url()))requests.push(request.url());});
+    await expect(page.getByRole("textbox",{name:"Message Gator",exact:true})).toBeVisible();await pick(app,[pdf,image]);await page.getByRole("button",{name:"Attach files",exact:true}).click();
+    const pending=page.getByRole("region",{name:"Attachments for your next message"});
+    const card=pending.locator(".inline-file").filter({has:page.getByRole("button",{name:"Open file pages.pdf",exact:true})});
+    await card.getByRole("button",{name:"Open file pages.pdf",exact:true}).click();await expect(card.getByText("Page 1 of 2",{exact:true})).toBeVisible();
+    await expect.poll(()=>card.locator("canvas").evaluate((canvas:HTMLCanvasElement)=>{const ctx=canvas.getContext("2d")!;if(canvas.width<100)return false;const pixels=ctx.getImageData(0,0,canvas.width,canvas.height).data;let dark=0;for(let i=0;i<pixels.length;i+=4)if(pixels[i]<100 && pixels[i+3])dark++;return dark>100;})).toBe(true);
+    await card.getByRole("button",{name:"Next PDF page",exact:true}).click();await expect(card.getByText("Page 2 of 2",{exact:true})).toBeVisible();
+    await expect(card.getByRole("button",{name:"Edit",exact:true})).toHaveCount(0);await page.screenshot({path:"test-results/inline-file-pdf.png"});await card.getByRole("button",{name:"Close file pages.pdf",exact:true}).click();
+    await pending.getByRole("button",{name:"Open file pixel.png",exact:true}).click();await expect.poll(()=>pending.getByRole("img",{name:"pixel.png",exact:true}).evaluate((img:HTMLImageElement)=>img.naturalWidth)).toBe(1);
+    expect(f.requests).toHaveLength(0);expect(requests).toEqual([]);expect(errors).toEqual([]);
+  }finally{await f.close();}
+});
+
+test("generated outputs edit in their message and send the working version without changing sealed output",async()=>{
+  const f=await fixture(true);try{
+    const app=await f.launch(),page=await app.firstWindow(),errors:string[]=[];page.on("pageerror",error=>errors.push(error.message));
+    const composer=page.getByRole("textbox",{name:"Message Gator",exact:true});await expect(composer).toBeVisible();
+    await page.evaluate(()=>window.gator!.send({type:"submit",text:"/mode draft"}));await page.evaluate(()=>window.gator!.send({type:"submit",text:"/artifact report.md"}));await composer.fill("Create report.md as the inline report fixture.");await page.getByRole("button",{name:"Send message",exact:true}).click();
+    const card=page.locator(".conversation-scroll .inline-file").filter({has:page.getByRole("button",{name:"Open file report.md",exact:true})}).first();
+    await expect(card).toBeVisible();await expect(page.getByRole("button",{name:"Send message",exact:true})).toBeVisible();
+    const bundle=await page.evaluate(async()=>(await window.gator!.snapshot()).state!.messages.flatMap(message=>message.bundle?[message.bundle]:[]).find(bundle=>bundle.Artifacts?.some(file=>file.Path==="report.md")));
+    expect(bundle?.Artifacts?.find(file=>file.Path==="report.md")?.SHA256).toMatch(/^[a-f0-9]{64}$/);
+    const originalPath=join(bundle!.Path,"output/report.md"),original=await readFile(originalPath,"utf8");
+    await card.getByRole("button",{name:"Open file report.md",exact:true}).click();await card.getByRole("button",{name:"Edit",exact:true}).click();await card.getByRole("textbox",{name:"Edit report.md",exact:true}).fill("# A generated report\n\nEdited output: silver otter.");
+    await card.getByRole("button",{name:"Save",exact:true}).click();await expect(card.getByText("Saved · included in your next message",{exact:true})).toBeVisible();expect(await readFile(originalPath,"utf8")).toBe(original);
+    await card.getByRole("button",{name:"Ask Gator",exact:true}).click();await card.getByRole("textbox",{name:"Request changes to report.md",exact:true}).fill("Please review my edits.");await card.getByRole("button",{name:"Add to message",exact:true}).click();
+    await expect(composer).toHaveValue(/Please review my edits/);await page.evaluate(()=>window.gator!.send({type:"submit",text:"/artifact clear"}));await page.evaluate(()=>window.gator!.send({type:"submit",text:"/mode inspect"}));const count=f.requests.length;await page.getByRole("button",{name:"Send message",exact:true}).click();await expect.poll(()=>f.requests.length).toBeGreaterThan(count);expect(JSON.stringify(f.requests.slice(count))).toContain("Edited output: silver otter.");expect(await readFile(originalPath,"utf8")).toBe(original);expect(errors).toEqual([]);
   }finally{await f.close();}
 });
