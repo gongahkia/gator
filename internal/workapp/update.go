@@ -256,9 +256,6 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 	m.live = nil
 	m.running = false
 	m.runStarted = time.Time{}
-	if m.quitting {
-		return m, tea.Quit
-	}
 	if value.ConversationID != "" {
 		m.conversation = value.ConversationID
 		if m.primary && m.primaryID == "" && m.config.BindPrimaryConversation != nil {
@@ -269,6 +266,9 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 				m.primaryID = value.ConversationID
 			}
 		}
+	}
+	if m.quitting {
+		return m, tea.Quit
 	}
 	if value.RevisionID != "" {
 		m.revision = value.RevisionID

@@ -84,3 +84,14 @@ func TestMainConversationUsesResetPrivateFolderAfterDataRemoval(t *testing.T) {
 		t.Fatal("main conversation returned to a removed source")
 	}
 }
+
+func TestClosingRetainsTheFirstMainIdentityWithoutResumingWork(t *testing.T) {
+	var bound string
+	m := New(Config{CurrentFolder: t.TempDir(), PrimaryConversation: func() (string, error) { return "", nil }, BindPrimaryConversation: func(id string) error { bound = id; return nil }})
+	m.running, m.quitting = true, true
+	next, quit := m.updateRunDone(runDone{ConversationID: "work-retained-before-close", Error: "cancelled"})
+	m = next.(Model)
+	if bound != "work-retained-before-close" || m.running || quit == nil {
+		t.Fatal("close lost the retained main identity or continued execution")
+	}
+}
