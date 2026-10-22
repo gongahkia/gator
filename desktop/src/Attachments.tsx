@@ -1,5 +1,5 @@
 import { Paperclip, X } from "lucide-react";
-import { useContext, useEffect, useRef, useState, type DragEvent } from "react";
+import { useContext, useEffect, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
 import type { UploadedFile } from "./bridge";
 import { FileCard, FileChatContext } from "./FileSurface";
 
@@ -11,12 +11,13 @@ export function useAttachmentPicker(context: string | undefined, files: Uploaded
   const owner = useRef({ context, files, change, disabled });
   owner.current = { context, files, change, disabled };
   useEffect(() => { setIssue(""); setDragging(false); }, [context]);
-  const add = async (dropped?: File[]) => {
+  const add = async (dropped?: File[], pasted = false) => {
     const original = owner.current;
     if (!original.context || original.disabled || pending.current) return;
     pending.current = true; setBusy(true); setIssue("");
     try {
-      const added = await (dropped ? window.gator!.dropFiles(dropped, original.context) : window.gator!.chooseFiles(original.context));
+      if (dropped && (original.files.length + dropped.length > 4 || dropped.some(file => file.size > 4 * 1024 * 1024) || [...original.files,...dropped].reduce((sum,file)=>sum+file.size,0) > 8 * 1024 * 1024)) throw new Error("Attach up to four files, no larger than 4 MiB each and 8 MiB total.");
+      const added = await (pasted && dropped ? window.gator!.pasteImages(await Promise.all(dropped.map(async file => ({ type: file.type, data: new Uint8Array(await file.arrayBuffer()) }))), original.context) : dropped ? window.gator!.dropFiles(dropped, original.context) : window.gator!.chooseFiles(original.context));
       if (!added.length) return;
       if (owner.current.context !== original.context) throw new Error("The conversation changed. Attach these files again in the intended conversation.");
       owner.current.change([...owner.current.files, ...added]);
@@ -24,7 +25,16 @@ export function useAttachmentPicker(context: string | undefined, files: Uploaded
     finally { pending.current = false; setBusy(false); }
   };
   const fileDrag = (event: DragEvent) => event.dataTransfer.types.includes("Files");
-  return { busy, issue, choose: () => add(), dragging, drop: {
+  const paste = (event: ClipboardEvent<HTMLTextAreaElement>, text: (value: string) => void) => {
+    const images = [...event.clipboardData.items].filter(item => item.kind === "file" && item.type.startsWith("image/")).map(item => item.getAsFile()).filter((file): file is File => !!file);
+    if (!images.length) return;
+    event.preventDefault();
+    if (owner.current.disabled || pending.current) return;
+    const plain = event.clipboardData.getData("text/plain");
+    if (plain) { event.currentTarget.setRangeText(plain, event.currentTarget.selectionStart, event.currentTarget.selectionEnd, "end"); text(event.currentTarget.value); }
+    void add(images, true);
+  };
+  return { busy, issue, choose: () => add(), paste, dragging, drop: {
     onDragOver: (event: DragEvent) => { if (fileDrag(event)) { event.preventDefault(); event.dataTransfer.dropEffect = disabled || busy ? "none" : "copy"; setDragging(!disabled && !busy); } },
     onDragLeave: (event: DragEvent<HTMLElement>) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false); },
     onDrop: (event: DragEvent) => { if (!fileDrag(event)) return; event.preventDefault(); setDragging(false); void add([...event.dataTransfer.files]); },

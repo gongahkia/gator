@@ -23,6 +23,7 @@ declare global {
       chooseFolder(): Promise<string | null>;
       chooseFiles(context: string): Promise<UploadedFile[]>;
       dropFiles(files: File[], context: string): Promise<UploadedFile[]>;
+      pasteImages(images: { type: string; data: Uint8Array }[], context: string): Promise<UploadedFile[]>;
       files<T = FileView>(request: FileRequest): Promise<T>;
       choosePath(request: { panel_id: string; kind: string }): Promise<string | null>;
       openLink(url: string): Promise<void>;

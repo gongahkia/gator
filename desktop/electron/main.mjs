@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session, shell, systemPreferences } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, net, protocol, session, shell, systemPreferences } from "electron";
 import { mkdir, access, readFile, writeFile } from "node:fs/promises";
 import { constants, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -15,6 +15,7 @@ import { acquireUpdateGuard } from "./update-guard.mjs";
 import { microphoneAllowed, runSpeechRequest, validateVoiceRequest } from "./voice.mjs";
 import { FileStore, readBoundedFile, validateFileRequest } from "./files.mjs";
 import { selectedFileSource } from "./file-sources.mjs";
+import { importPastedImages, validatePastedImages } from "./pasted-images.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const assets = resolve(here, "../dist");
@@ -267,6 +268,23 @@ else {
       }
       return selected;
     };
+    ipcMain.handle("gator:paste-images", async (event, context, images) => {
+      mutable(event); validatePastedImages(images);
+      const owner = backend;
+      const current = () => backend === owner && !owner?.closed && !owner.state?.panel && !owner.state?.external && uploadContext(owner.state) === context;
+      if (typeof context !== "string" || !current()) throw new Error("Return to the same chat before pasting images.");
+      const selected = await importPastedImages(uploads, images, bytes => {
+        const image = nativeImage.createFromBuffer(bytes), size = image.getSize();
+        if (image.isEmpty() || !size.width || !size.height || size.width * size.height > 32000000) throw new Error("This image could not be pasted. Use a valid image up to 32 million pixels.");
+        return image.toPNG();
+      });
+      if (!current()) throw new Error("The chat changed. Paste these images again in the intended chat.");
+      for (const file of selected) {
+        importedFiles.set(file.id, context);
+        await files.retain({ kind: "upload", id: file.id }, file.name, await readBoundedFile(uploads.root, file.id));
+      }
+      return selected;
+    });
     ipcMain.handle("gator:files", (event, context) => importFiles(event, context, async () => {
       const result = await dialog.showOpenDialog(window, { title: "Attach files to your message", buttonLabel: "Attach", properties: ["openFile", "multiSelections"], filters: [{ name: "Documents, text and images", extensions: uploadExtensions }, { name: "All files", extensions: ["*"] }] });
       return result.canceled ? [] : result.filePaths;
