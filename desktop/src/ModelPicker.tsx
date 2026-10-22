@@ -31,7 +31,7 @@ export function ModelPicker({ state, disabled, send, manage, onBusyChange }: Pro
   const filtered = choices.filter(choice => `${choice.label} ${choice.model} ${providerLabel(choice.provider)}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
   const groups = [...new Set(filtered.map(choice => choice.provider))];
   useViewMotion(open ? view : undefined, body);
-  useEffect(() => { if (!dragging.current) setPosition(effort); }, [effort, open]);
+  useEffect(() => { if (!dragging.current && !pending) setPosition(effort); }, [effort, open, pending]);
   useEffect(() => { onBusyChange(!!pending); }, [pending, onBusyChange]);
   useEffect(() => () => onBusyChange(false), [onBusyChange]);
   useEffect(() => { setOpen(false); setIssue(""); }, [state.source, state.conversation_id]);
@@ -63,7 +63,7 @@ export function ModelPicker({ state, disabled, send, manage, onBusyChange }: Pro
   }, [open]);
   useLayoutEffect(() => {
     if (!open) return;
-    const focus = view === "models" ? popup.current?.querySelector<HTMLElement>('[role="option"][aria-selected="true"]:not(:disabled), input[type="search"]') : popup.current?.querySelector<HTMLElement>(".picker-model-select");
+    const focus = view === "models" ? (popup.current?.querySelector<HTMLElement>('input[type="search"], [role="option"][aria-selected="true"]:not(:disabled)') ?? popup.current?.querySelector<HTMLElement>('[role="option"]:not(:disabled), .picker-heading button')) : popup.current?.querySelector<HTMLElement>(".picker-model-select");
     focus?.focus({ preventScroll: true });
   }, [open, view]);
   useEffect(() => {
