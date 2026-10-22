@@ -911,3 +911,5 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .file-formula-bar input { width: 100%; min-width: 0; height: 36px; padding-inline: 8px; border-radius: 6px; border: 1px solid var(--color-line); background: var(--color-base); color: var(--color-secondary); font: 12px var(--font-mono); }
 .file-grid footer { flex-wrap: wrap; }
 @media (max-width: 900px) { .file-markdown-tools span { display: none; } }
+
+.view-content[data-home="true"]:has(.pending-attachments .inline-file[data-expanded="true"]) .home-content { display: none; }
