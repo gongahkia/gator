@@ -23,9 +23,13 @@ On Windows, use `npm start --prefix desktop` in place of `make desktop`;
 Make is optional. This builds the private runtime and frontend, then opens Gator. Installed apps
 bundle Electron's Node runtime; users do not need Node or a Gator CLI on PATH.
 
-The app uses the existing local Gator profile. A launch starts in a private
-empty workspace; choose a folder from the top-right control, or resume a saved
-goal or conversation. To choose a starting folder during development:
+The app uses the existing local Gator profile and opens your continuing main
+conversation. Existing topics remain separate and are available in the sidebar
+and Saved. Following groups goals, configured checks and updates.
+
+Before a main conversation exists, Gator starts in a private empty workspace.
+Conversation information → This conversation provides the folder picker. Choosing
+a different folder starts a separate topic. To choose a starting folder during development:
 
 ```sh
 GATOR_DESKTOP_WORKSPACE=/absolute/path/to/notes make desktop
@@ -71,3 +75,6 @@ For developer-only fixtures and maintenance, `GATOR_INTERNAL_COMMANDS=1`
 explicitly enables the existing runtime command handlers. This is not a
 supported user interface or a security boundary. Never substitute it for
 an action review. See [the retirement decision](../docs/DESKTOP-PRIMARY.md).
+
+The live surface mapping and remaining application work are documented in
+[the conversational implementation](../docs/DESKTOP-CONVERSATIONAL-IMPLEMENTATION.md).

@@ -25,8 +25,9 @@ On Windows, use `npm start --prefix desktop` instead of `make desktop`. The
 Windows desktop port is a preview; capability limits and native verification
 gates are documented in docs/WINDOWS.md.
 
-Start by messaging Gator. Add a source folder from the app's folder control
-when your request needs it. A first launch starts in a private empty workspace
+Start by messaging Gator. Return to the same main conversation, or open a
+separate topic. Following holds goals, checks and updates; Saved holds knowledge
+and archives. Add a source folder through Conversation information when needed. A first launch starts in a private empty workspace
 rather than implicitly reading your home directory.
 Use Settings for models, usage limits, backups, and recovery.
 
@@ -39,8 +40,9 @@ See docs/DEVELOPMENT.md for the source-checkout service/evaluation harness.
 See docs/DESKTOP-RELEASES.md for signing setup and reviewed desktop updates.
 
 The conversation-led product proposal and an interactive design prototype are
-in docs/CONVERSATIONAL-SURFACE-PLAN.md. They describe a proposed experience;
-prototype states are fictional and are not new shipped capabilities.
+in docs/CONVERSATIONAL-SURFACE-PLAN.md. The live implementation and remaining
+application work are mapped in docs/DESKTOP-CONVERSATIONAL-IMPLEMENTATION.md.
+Prototype states remain fictional.
 
 The Go process under desktop/runtime/ is a private app component, not an
 installable command-line product. Reviewed system sign-in or installation

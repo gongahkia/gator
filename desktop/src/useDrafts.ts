@@ -3,7 +3,7 @@ import type { BackendState } from "./protocol";
 import type { DraftRequest, DraftSnapshot, SavedDraft } from "./bridge";
 
 export function useDrafts(state?: BackendState) {
-  const context = state ? state.conversation_id ? `conversation:${state.conversation_id}` : `${state.primary === false ? "topic" : "workspace"}:${state.source}` : undefined;
+  const context = state ? state.conversation_id ? `conversation:${state.conversation_id}` : `workspace:${state.primary === false ? "topic:" : ""}${state.source}` : undefined;
   const identity = useRef<Omit<SavedDraft, "text" | "updated"> | undefined>(undefined);
   const values = useRef(new Map<string, string>());
   const current = useRef("");

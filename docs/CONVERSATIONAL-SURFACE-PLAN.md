@@ -1,6 +1,8 @@
 # Product surfaces for a personal Gator
 
-Proposal, 22 October 2026. Builds on the first-party
+Direction, 22 October 2026. The initial live implementation is recorded in the
+[desktop implementation review](DESKTOP-CONVERSATIONAL-IMPLEMENTATION.md). This
+plan also describes application work beyond that shipped slice. Builds on the first-party
 [research note](CONVERSATIONAL-PRODUCT-DIRECTION.md). The
 [clickable prototype](prototypes/conversation/index.html) uses fictional data and
 local interactions; it does not execute agent work or represent shipped features.

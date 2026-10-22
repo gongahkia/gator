@@ -46,7 +46,13 @@ export class DraftStore {
     }
     const previous = JSON.stringify(data);
     const now = this.#now();
-    data.drafts = data.enabled ? data.drafts.filter((draft) => validContext(draft.context) && typeof draft.text === "string" && Buffer.byteLength(draft.text) <= textLimit && typeof draft.title === "string" && typeof draft.source === "string" && Number.isFinite(draft.updated) && draft.updated > now - lifetime && draft.updated <= now).slice(0, limit) : [];
+    // Keep side-topic keys inside the established workspace namespace. Earlier
+    // builds retain these records too, so a code rollback cannot prune drafts.
+    // Migrate the interim topic: keys on the next ordinary access, atomically.
+    const seen = new Set();
+    data.drafts = data.enabled ? data.drafts.filter((draft) => validContext(draft.context) && typeof draft.text === "string" && Buffer.byteLength(draft.text) <= textLimit && typeof draft.title === "string" && typeof draft.source === "string" && Number.isFinite(draft.updated) && draft.updated > now - lifetime && draft.updated <= now)
+      .map((draft) => draft.context.startsWith("topic:") ? { ...draft, context: `workspace:${draft.context}` } : draft)
+      .filter((draft) => { if (seen.has(draft.context)) return false; seen.add(draft.context); return true; }).slice(0, limit) : [];
     if (request.action === "configure") { data.enabled = request.enabled; if (!data.enabled) data.drafts = []; }
     if (request.action === "clear") data.drafts = [];
     if (["save", "remove"].includes(request.action)) {

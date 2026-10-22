@@ -31,8 +31,17 @@ test("drafts survive restart, stay scoped, and save serially with private permis
     await store.request({ action: "remove", context: "conversation:one" });
     assert.deepEqual((await store.request({ action: "list" })).drafts.map((item) => item.context), ["conversation:two"]);
     // An unsent main message and a new topic in the same folder are separate.
-    for (const context of ["workspace:/project", "topic:/project"]) await store.request({ action: "save", draft: { context, text: context, title: "Unsent", source: "/project" } });
-    assert.deepEqual((await new DraftStore(file).request({ action: "list" })).drafts.map((item) => item.context), ["topic:/project", "workspace:/project", "conversation:two"]);
+    for (const context of ["workspace:/project", "workspace:topic:/project"]) await store.request({ action: "save", draft: { context, text: context, title: "Unsent", source: "/project" } });
+    assert.deepEqual((await new DraftStore(file).request({ action: "list" })).drafts.map((item) => item.context), ["workspace:topic:/project", "workspace:/project", "conversation:two"]);
+    const interim = JSON.parse(await readFile(file, "utf8"));
+    interim.drafts[0].context = "topic:/project";
+    await writeFile(file, JSON.stringify(interim));
+    const migrated = await new DraftStore(file).request({ action: "list" });
+    assert.equal(migrated.drafts[0].context, "workspace:topic:/project");
+    assert.equal(migrated.drafts[0].text, "workspace:topic:/project");
+    // This is the pre-conversational store's accepted identity contract.
+    assert(migrated.drafts.every((draft) => /^(conversation|workspace):.+$/.test(draft.context)));
+    assert.equal(JSON.parse(await readFile(file, "utf8")).drafts[0].context, "workspace:topic:/project");
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 

@@ -10,8 +10,9 @@ retired. This supersedes the earlier decision to ship both interfaces; see
 The sibling `Referene` directory contains OpenHands Agent Canvas 1.29.0, a
 React DOM / Tailwind web app with an Electron desktop shell. Gator adapts its
 neutral palette, sidebar, spacious conversation area, command menu, and
-optional right detail panel. Product navigation follows Gator's ongoing
-goals, inbox, reviewed follow-ups, saved knowledge, and deliverables.
+optional right detail panel. The main conversation is now the front door, with
+recent topics and secondary Following and Saved drawers. The implementation
+and retained capabilities are mapped in [the conversational review](DESKTOP-CONVERSATIONAL-IMPLEMENTATION.md).
 
 ## Ownership
 
@@ -42,20 +43,20 @@ current live interaction ID; retained cards have no approval authority.
 
 | Surface | Behavior |
 | --- | --- |
-| Home | Centered starting question/composer, followed by four live overview summaries and an automatically scrolling strip of workspace actions |
-| Navigation | Goals, conversations, inbox, follow-ups, and knowledge; one Settings entry opens categories for models, usage, data/backups, and recovery |
-| Conversations | One sidebar entry with Chats and Task runs views; saved chats reopen the transcript, while runs retain outcomes, verification, delivery, and review controls |
-| Conversation | User bubbles, an assistant reading column, response/code copy controls, typed result cards, streaming progress, stop/steering, and editable queued-message cards |
+| Home | Continuing main conversation; a brief introduction and composer before its first message; model setup preserves the unsent request |
+| Navigation | Talk with Gator, Search, recent topics, Following and Saved; one Settings entry retains models, usage, data/backups, recovery and About & updates |
+| Conversations | Recent topics prioritize titles, with optional folder grouping; Saved provides separate conversation and task-run archives, without duplicate tabs |
+| Conversation | Bubbles for both speakers, response/code copy, typed results and exact reviews; contextual file cards open retained previews; progress, stop/guidance and editable queues remain functional |
 | Reviews | Semantic status and exact structured previews, open by default, with request-bound approve/deny buttons; separate confirmation for workflow writes |
 | Native forms | Bounded text/password/multiline fields, desktop action toolbars and keyboard list navigation; existing Go review and save actions |
-| Work details | Optional compact sections for outputs, selected sources/connections, local execution details and checks; context capacity is explicitly unmeasured |
+| Conversation information | Hidden by default; retained file previews, selected sources, saved context, connection provenance, model and local execution details; no placeholder context meter |
 | Usage & limits | Daily request/token meters, shared limit controls, activity breakdown, and expandable accounting details |
 | Commands | Cmd/Ctrl+K, searchable commands, arrow navigation, input-prefilling commands |
 | Transcript search | Cmd/Ctrl+F, literal in-place highlights over rendered prose/results, previous/next matches, Enter/Shift+Enter, and surrounding context preserved |
 | Drafts | Local recovery per profile/conversation (or selected workspace before a conversation exists); saved-draft manager with clear/disable controls; unsaved forms and paused queues prompt before leaving |
 | Terminal handoff | Reviewed system sign-in, installation, and action steps open the system terminal and return their status |
 
-Enter sends and Shift+Enter inserts a line. Cmd/Ctrl+N starts a conversation
+Enter sends and Shift+Enter inserts a line. Cmd/Ctrl+N starts a separate topic
 in the selected workspace. During work, Enter queues a follow-up and
 Cmd/Ctrl+Enter (or Guide now) sends guidance to the current task. Shift+Enter
 keeps inserting a line. Escape closes a view/menu/search or stops active
@@ -68,13 +69,13 @@ keyboard legends use disclosures. Review details and warnings remain visible.
 See the [Codex presentation audit](DESKTOP-CODEX-AUDIT.md) for the comparison,
 intentional differences, per-change commits, and current verification record.
 
-Recent work groups up to 24 recent saved conversations by workspace, with four
-initially shown per group and an All conversations route to the full picker.
-Folder names that collide show their parent folder too. Go projects metadata
-and validates the exact recent-list identity; selection uses the existing
-restore path and preserves retained run options. Sidebar metadata refreshes
-after runs/control changes and on the existing 15-second UI refresh. A failed
-read is shown as unavailable, and the full picker can retry it.
+Recent topics show up to 24 saved conversations, excluding the designated main
+conversation. Eight are initially shown in the flat list. Optional folder grouping
+shows four per group; colliding folder names include their parent folder. Search,
+expand/collapse and All conversations remain available. Go validates the exact
+recent-list identity and restores the selected conversation's retained source,
+options and revision lineage. Metadata refreshes after runs/control changes and
+on the existing 15-second refresh. Failed reads are shown as unavailable.
 
 Reading position is kept in memory for up to 32 conversations. Updates do not
 move someone reading older messages; a new-activity cue returns to the latest
@@ -96,7 +97,7 @@ At most 32 drafts of 128 KiB each are retained. Entries expire seven days after
 their last edit and are pruned on the next draft-store access; a closed app
 does not run a deletion service. Writes are serialized, and a normal window
 close awaits pending writes. When a new conversation receives its durable ID,
-the new draft copy is acknowledged before the old workspace copy is removed.
+the new draft copy is acknowledged before the old workspace/topic copy is removed.
 Recovered text is never submitted automatically. Adding another saved draft
 appends to existing composer text. Save failures leave the current text editable
 and explain that it could not be saved on this device.
@@ -104,27 +105,24 @@ and explain that it could not be saved on this device.
 These desktop-only unsent copies are separate from Go's conversation backup
 and deletion controls; clear them through Saved drafts. Backend reconnect
 opens a new foreground session and does not resume/replay a task or queued
-message. Existing saved conversations remain available through Recent work
-and Conversations.
+message. The designated main conversation and retained history are restored;
+other topics remain available through Recent topics and Saved.
 
-The home dashboard advances every six seconds and pauses on hover, keyboard
-focus, or manual interaction. Previous/next and pause/resume controls remain
-available. Reduced-motion preferences disable automatic movement while keeping
-manual navigation. Profile tiles, promotional headings, refresh timestamps,
-composer footnotes, and the idle send shortcut have been removed.
-
-Conversations and run history are distinct records: one conversation can
-contain several task runs, and some runs may have no retained conversation.
-The desktop groups both under Conversations rather than presenting separate
-sidebar destinations. Task runs remains a global list, including failed and
-stale runs; opening a run retains its existing link back to its conversation.
-The `/history` command and all retained records remain available.
+The former home dashboard and rotating starter strip are retired. Their real
+attention data remains accessible through Following → Activity & attention.
+Conversations and task runs remain distinct records: one conversation can contain
+several runs, and some runs have no retained conversation. Saved exposes both
+archives. Task runs includes failed and stale runs and retains its link back to
+the originating conversation. Existing command/deep-link routes remain available.
 
 ### Queued messages
 
 Queued follow-ups appear as a compact list above the composer, following the
 [documented ChatGPT desktop pattern](https://learn.chatgpt.com/docs/prompting).
-Each message can be edited in place, moved earlier/later, or removed. The
+Each message can be edited in place, dragged before/after another message, or
+removed. Drag handles replace the separate up/down buttons. Keyboard users can
+press Space/Enter to pick up, use arrows/Home/End to choose a position, press
+Enter to drop, or Escape to cancel without stopping the active task. The
 composer draft stays separate from queue edits. Stop and failure retain the
 queue with a Paused label; Send now starts a selected paused message. Remaining
 messages continue in order after a successful run, as before. Guide now uses
@@ -133,7 +131,8 @@ operation is ready. It does not interrupt the task.
 
 Go still owns the existing bounded queue and captured run options. The bridge
 projects message identities/text and accepts narrow actions against the exact
-message revision or active operation. Edits and guidance clear only after Go
+message revision or active operation. A drop validates both message IDs and
+moves the captured request atomically. Edits and guidance clear only after Go
 acknowledges acceptance. A message that starts during editing leaves its edits
 available as a new draft; an existing composer draft is preserved. Navigating
 away from unfinished queue edits uses the existing discard confirmation.
@@ -162,15 +161,16 @@ Navigation transitions keep the existing DOM and local form values. Their key
 uses the view identity rather than snapshot IDs, so typing, provider deltas,
 counter refreshes, and saved-knowledge refreshes do not replay the entrance.
 Initial page load is static. Reduced-motion preferences remove transitions,
-movement, and automatic dashboard scrolling. Motion does not delay Go actions.
+movement and icon cross-fades. Motion does not delay Go actions.
 
 Usage is structured display data from Go's shared accounting store. Uncapped
 limits stay explicitly uncapped; the desktop does not invent billing estimates
 or provider subscription quotas. Limit edits and pause/resume actions retain
 the existing separate review and confirmation, including stale-policy checks.
 
-The desktop starts with a private empty folder rather than capturing the
-user's home directory. Choose a workspace with the native folder picker, set
+Before a main conversation exists, the desktop starts with a private empty
+folder rather than capturing the user's home directory. Later launches restore
+the designated main conversation and its retained scope, without replaying work. Choose a workspace with the native folder picker, set
 `GATOR_DESKTOP_WORKSPACE`, or resume existing work. Nothing in the sibling
 reference repository is required at build or runtime.
 
@@ -207,9 +207,9 @@ they do not reinstate the retired frontend or distribution paths.
 
 The desktop's Electron integration test uses a real built Go backend and an
 isolated profile with a local fake inference endpoint. It exercises home,
-overview navigation, draft preservation, detail tabs, native follow-up edits
+secondary navigation, scoped draft preservation, contextual file previews, native follow-up edits
 and review, conversation continuation, and multiple window sizes. It also
-checks empty and populated Saved knowledge, dashboard motion controls and
+checks empty and populated Saved knowledge, interruptible sidebar/drawer motion and
 reduced motion, real usage counters, and reviewed usage changes. It does not
 call paid providers or enable background services. Go tests cover stale view
 actions, atomic field validation, secret redaction, reviewed mutations, live
@@ -397,7 +397,8 @@ explicitly check, download and review a restart; ordinary quit does not install
 an update. Signing account setup and native install/update validation are still
 pending. See [desktop releases](DESKTOP-RELEASES.md).
 
-The [conversation surface proposal](CONVERSATIONAL-SURFACE-PLAN.md) explores
-Gator as a familiar personal agent with secondary Following and Saved views.
-Its prototype uses fictional data. This is a proposed replacement for parts of
-the current navigation/dashboard, not a claim that those new journeys ship yet.
+The [conversation surface proposal](CONVERSATIONAL-SURFACE-PLAN.md) is the product
+direction. Its shell now ships with the existing Gator style and controls;
+[the implementation review](DESKTOP-CONVERSATIONAL-IMPLEMENTATION.md) distinguishes
+working capabilities from the remaining application contracts. The prototype
+continues to use fictional data.
