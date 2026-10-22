@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { closeDesktop, temporaryDirectory } from "./lifecycle";
 
-async function fixture(waitForReply?: Promise<void>) {
+async function fixture(waitForReply?: Promise<void>, waitForVoice?: Promise<void>) {
   const directory = await temporaryDirectory(join(tmpdir(), "gator-app-control-"));
   const workspace = join(directory, "workspace"), configRoot = join(directory, "config/gator");
   await mkdir(workspace); await mkdir(configRoot, { recursive: true });
@@ -17,6 +17,7 @@ async function fixture(waitForReply?: Promise<void>) {
       res.writeHead(200, { "Content-Type": "application/json" });
       if (req.url?.includes(":generateContent")) {
         voiceRequests++;
+        if (waitForVoice) await waitForVoice;
         const payload = JSON.parse(body);
         expect(payload.contents[0].parts[0].inlineData.data.length).toBeGreaterThan(0);
         res.end(JSON.stringify({ candidates: [{ content: { parts: [{ text: "What is my usage?" }] } }], usageMetadata: { totalTokenCount: 25 } })); return;
@@ -116,14 +117,16 @@ test("chat opens a data deletion review without deleting content", async () => {
 
 test("dictation preserves the draft, records voice usage and reads only new replies", async () => {
   test.setTimeout(90000);
-  const f = await fixture();
+  let releaseVoice = () => {};
+  const voiceGate = new Promise<void>(resolve => { releaseVoice = resolve; });
+  const f = await fixture(undefined, voiceGate);
   try {
     const app = await f.launch(), page = await app.firstWindow();
     await app.evaluate(({ systemPreferences }) => { systemPreferences.askForMediaAccess = async () => true; });
     await page.evaluate(() => {
-      const view = window as unknown as { voiceSpoken: string[]; testTracks: MediaStreamTrack[] };
+      const view = window as unknown as { voiceSpoken: string[]; testTracks: MediaStreamTrack[]; testGain: GainNode; rejectMicrophone?: boolean };
       view.voiceSpoken = []; view.testTracks = [];
-      Object.defineProperty(navigator.mediaDevices, "getUserMedia", { configurable: true, value: async () => { const audio = new AudioContext(); const oscillator = audio.createOscillator(), destination = audio.createMediaStreamDestination(); oscillator.connect(destination); oscillator.start(); view.testTracks.push(...destination.stream.getTracks()); return destination.stream; } });
+      Object.defineProperty(navigator.mediaDevices, "getUserMedia", { configurable: true, value: async () => { if (view.rejectMicrophone) throw new Error("Microphone unavailable for this recording."); const audio = new AudioContext(); const oscillator = audio.createOscillator(), destination = audio.createMediaStreamDestination(), gain = audio.createGain(); oscillator.connect(gain); gain.connect(destination); oscillator.start(); view.testGain = gain; view.testTracks.push(...destination.stream.getTracks()); return destination.stream; } });
       Object.defineProperty(window, "SpeechSynthesisUtterance", { configurable: true, value: class { text: string; constructor(text: string) { this.text = text; } } });
       Object.defineProperty(window, "speechSynthesis", { configurable: true, value: { getVoices: () => [{ name: "Local fixture", localService: true, lang: "en-US" }], cancel: () => {}, speak: (utterance: { text: string; onstart?: () => void }) => { view.voiceSpoken.push(utterance.text); utterance.onstart?.(); } } });
     });
@@ -133,10 +136,21 @@ test("dictation preserves the draft, records voice usage and reads only new repl
     await expect(page.getByText("Audio is sent to Gemini", { exact: false })).toBeVisible();
     await page.screenshot({ path: "test-results/voice-controls-open.png" });
     await page.getByRole("button", { name: "Start recording", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Stop & transcribe", exact: true })).toBeVisible();
+    const finish = page.getByRole("button", { name: "Stop & transcribe", exact: true });
+    await expect(finish).toBeFocused();
+    await expect(page.getByRole("dialog", { name: "Voice dictation", exact: true })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Send message", exact: true })).toBeDisabled();
-    await page.waitForTimeout(350);
-    await page.getByRole("button", { name: "Stop & transcribe", exact: true }).click();
+    const heights = () => page.locator(".dictation-waveform > span").evaluateAll(bars => bars.map(bar => Number((bar as HTMLElement).style.transform.match(/scaleY\((.+)\)/)?.[1] ?? 0)));
+    await expect.poll(async () => Math.max(...await heights())).toBeGreaterThan(.5);
+    await page.screenshot({ path: "test-results/voice-recording-inline.png" });
+    await page.evaluate(() => { (window as unknown as { testGain: GainNode }).testGain.gain.value = 0; });
+    await expect.poll(async () => Math.max(...await heights())).toBeLessThan(.2);
+    await finish.click();
+    await expect(page.getByText("Transcribing…", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Cancel transcription", exact: true })).toBeFocused();
+    await expect(composer).toHaveValue("Keep my existing draft.");
+    await page.screenshot({ path: "test-results/voice-transcribing-inline.png" });
+    releaseVoice();
     await expect(composer).toHaveValue("Keep my existing draft. What is my usage?", { timeout: 20000 });
     expect(f.voiceRequests()).toBe(1); expect(f.payloads).toHaveLength(0);
     expect(await page.evaluate(() => (window as unknown as { testTracks: MediaStreamTrack[] }).testTracks.every(track => track.readyState === "ended"))).toBe(true);
@@ -148,11 +162,35 @@ test("dictation preserves the draft, records voice usage and reads only new repl
     await page.getByRole("button", { name: "Voice dictation", exact: true }).click();
     await page.getByRole("button", { name: "Start recording", exact: true }).click();
     await expect(page.getByRole("button", { name: "Stop & transcribe", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Close voice controls", exact: true }).click();
+    await page.getByRole("button", { name: "Cancel recording", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Voice dictation", exact: true })).toBeFocused();
+    expect(f.voiceRequests()).toBe(1);
+    expect(await page.evaluate(() => (window as unknown as { testTracks: MediaStreamTrack[] }).testTracks.every(track => track.readyState === "ended"))).toBe(true);
+    // Capture failures reopen the settings and leave the draft available to retry.
+    await composer.fill("Keep this draft too.");
+    await page.evaluate(() => { (window as unknown as { rejectMicrophone: boolean }).rejectMicrophone = true; });
+    await page.getByRole("button", { name: "Voice dictation", exact: true }).click();
+    await page.getByRole("button", { name: "Start recording", exact: true }).click();
+    await expect(page.getByRole("alert")).toContainText("Microphone unavailable for this recording.");
+    await expect(composer).toHaveValue("Keep this draft too.");
+    await expect(page.locator(".dictation-pill")).toHaveCount(0);
+    await page.screenshot({ path: "test-results/voice-capture-error.png" });
+    await page.evaluate(() => { (window as unknown as { rejectMicrophone: boolean }).rejectMicrophone = false; });
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(800, 650));
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.getByRole("button", { name: "Start recording", exact: true }).click();
+    await expect(finish).toBeVisible();
+    await page.screenshot({ path: "test-results/voice-recording-narrow.png" });
+    const pill = await page.locator(".dictation-pill").boundingBox();
+    expect(pill!.x).toBeGreaterThanOrEqual(0); expect(pill!.x + pill!.width).toBeLessThanOrEqual(800);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("button", { name: "Voice dictation", exact: true })).toBeFocused();
+    await expect(composer).toHaveValue("Keep this draft too.");
     expect(f.voiceRequests()).toBe(1);
     expect(await page.evaluate(() => (window as unknown as { testTracks: MediaStreamTrack[] }).testTracks.every(track => track.readyState === "ended"))).toBe(true);
     await page.screenshot({ path: "test-results/voice-dictation-and-replies.png" });
-  } finally { await f.close(); }
+  } finally { releaseVoice(); await f.close(); }
 });
 
 
