@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { closeDesktop, temporaryDirectory } from "./lifecycle";
 
-async function fixture(waitForReply?: Promise<void>, waitForVoice?: Promise<void>) {
+async function fixture(waitForReply?: Promise<void>, waitForVoice?: () => Promise<void>) {
   const directory = await temporaryDirectory(join(tmpdir(), "gator-app-control-"));
   const workspace = join(directory, "workspace"), configRoot = join(directory, "config/gator");
   await mkdir(workspace); await mkdir(configRoot, { recursive: true });
@@ -17,7 +17,7 @@ async function fixture(waitForReply?: Promise<void>, waitForVoice?: Promise<void
       res.writeHead(200, { "Content-Type": "application/json" });
       if (req.url?.includes(":generateContent")) {
         voiceRequests++;
-        if (waitForVoice) await waitForVoice;
+        if (waitForVoice) await waitForVoice();
         const payload = JSON.parse(body);
         expect(payload.contents[0].parts[0].inlineData.data.length).toBeGreaterThan(0);
         res.end(JSON.stringify({ candidates: [{ content: { parts: [{ text: "What is my usage?" }] } }], usageMetadata: { totalTokenCount: 25 } })); return;
@@ -118,15 +118,15 @@ test("chat opens a data deletion review without deleting content", async () => {
 test("dictation preserves the draft, records voice usage and reads only new replies", async () => {
   test.setTimeout(90000);
   let releaseVoice = () => {};
-  const voiceGate = new Promise<void>(resolve => { releaseVoice = resolve; });
-  const f = await fixture(undefined, voiceGate);
+  let voiceGate = new Promise<void>(resolve => { releaseVoice = resolve; });
+  const f = await fixture(undefined, () => voiceGate);
   try {
     const app = await f.launch(), page = await app.firstWindow();
     await app.evaluate(({ systemPreferences }) => { systemPreferences.askForMediaAccess = async () => true; });
     await page.evaluate(() => {
-      const view = window as unknown as { voiceSpoken: string[]; testTracks: MediaStreamTrack[]; testGain: GainNode; rejectMicrophone?: boolean };
+      const view = window as unknown as { voiceSpoken: string[]; testTracks: MediaStreamTrack[]; testGain: GainNode; rejectMicrophone?: boolean; holdMicrophone?: boolean; releaseMicrophone?: () => void };
       view.voiceSpoken = []; view.testTracks = [];
-      Object.defineProperty(navigator.mediaDevices, "getUserMedia", { configurable: true, value: async () => { if (view.rejectMicrophone) throw new Error("Microphone unavailable for this recording."); const audio = new AudioContext(); const oscillator = audio.createOscillator(), destination = audio.createMediaStreamDestination(), gain = audio.createGain(); oscillator.connect(gain); gain.connect(destination); oscillator.start(); view.testGain = gain; view.testTracks.push(...destination.stream.getTracks()); return destination.stream; } });
+      Object.defineProperty(navigator.mediaDevices, "getUserMedia", { configurable: true, value: async () => { if (view.rejectMicrophone) throw new Error("Microphone unavailable for this recording."); const audio = new AudioContext(); const oscillator = audio.createOscillator(), destination = audio.createMediaStreamDestination(), gain = audio.createGain(); oscillator.connect(gain); gain.connect(destination); oscillator.start(); view.testGain = gain; view.testTracks.push(...destination.stream.getTracks()); if (view.holdMicrophone) await new Promise<void>(resolve => { view.releaseMicrophone = resolve; }); return destination.stream; } });
       Object.defineProperty(window, "SpeechSynthesisUtterance", { configurable: true, value: class { text: string; constructor(text: string) { this.text = text; } } });
       Object.defineProperty(window, "speechSynthesis", { configurable: true, value: { getVoices: () => [{ name: "Local fixture", localService: true, lang: "en-US" }], cancel: () => {}, speak: (utterance: { text: string; onstart?: () => void }) => { view.voiceSpoken.push(utterance.text); utterance.onstart?.(); } } });
     });
@@ -172,6 +172,7 @@ test("dictation preserves the draft, records voice usage and reads only new repl
     await page.getByRole("button", { name: "Voice dictation", exact: true }).click();
     await page.getByRole("button", { name: "Start recording", exact: true }).click();
     await expect(page.getByRole("alert")).toContainText("Microphone unavailable for this recording.");
+    await expect(page.getByRole("alert")).toBeFocused();
     await expect(composer).toHaveValue("Keep this draft too.");
     await expect(page.locator(".dictation-pill")).toHaveCount(0);
     await page.screenshot({ path: "test-results/voice-capture-error.png" });
@@ -189,6 +190,28 @@ test("dictation preserves the draft, records voice usage and reads only new repl
     await expect(composer).toHaveValue("Keep this draft too.");
     expect(f.voiceRequests()).toBe(1);
     expect(await page.evaluate(() => (window as unknown as { testTracks: MediaStreamTrack[] }).testTracks.every(track => track.readyState === "ended"))).toBe(true);
+    // Cancel while the microphone opens, then discard a late stream grant.
+    await page.evaluate(() => { (window as unknown as { holdMicrophone: boolean }).holdMicrophone = true; });
+    await page.getByRole("button", { name: "Voice dictation", exact: true }).click();
+    await page.getByRole("button", { name: "Start recording", exact: true }).click();
+    await expect(page.getByText("Opening mic…", { exact: true })).toBeVisible();
+    await expect.poll(() => page.evaluate(() => typeof (window as unknown as { releaseMicrophone?: () => void }).releaseMicrophone)).toBe("function");
+    await page.getByRole("button", { name: "Cancel recording", exact: true }).click();
+    await page.evaluate(() => { const view = window as unknown as { releaseMicrophone: () => void; holdMicrophone: boolean }; view.holdMicrophone = false; view.releaseMicrophone(); });
+    await expect.poll(() => page.evaluate(() => (window as unknown as { testTracks: MediaStreamTrack[] }).testTracks.every(track => track.readyState === "ended"))).toBe(true);
+    // Cancel transcription without appending its eventual response or sending chat.
+    voiceGate = new Promise<void>(resolve => { releaseVoice = resolve; });
+    await page.getByRole("button", { name: "Voice dictation", exact: true }).click();
+    await page.getByRole("button", { name: "Start recording", exact: true }).click();
+    await expect(page.locator(".dictation-time")).toHaveText("0:01");
+    await finish.click();
+    await expect(page.getByText("Transcribing…", { exact: true })).toBeVisible();
+    await expect.poll(() => f.voiceRequests()).toBe(2);
+    await page.getByRole("button", { name: "Cancel transcription", exact: true }).click();
+    releaseVoice();
+    await expect(page.getByRole("button", { name: "Voice dictation", exact: true })).toBeFocused();
+    await expect(composer).toHaveValue("Keep this draft too.");
+    await expect(page.locator(".dictation-pill")).toHaveCount(0);
     await page.screenshot({ path: "test-results/voice-dictation-and-replies.png" });
   } finally { releaseVoice(); await f.close(); }
 });
@@ -241,12 +264,14 @@ test("composer model picker preserves drafts, changes actual defaults and honors
     await filter.press("ArrowDown"); await page.keyboard.press("Enter");
     await expect(trigger).toHaveAccessibleName(/Careful model, Standard/);
     expect(JSON.parse(await readFile(configFile, "utf8")).defaults.model).toBe("model-two");
+    // The default can arrive before the acknowledgement switches popover views.
+    await expect(slider).toBeEnabled();
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0); await expect(trigger).toBeFocused();
     await expect(composer).toHaveValue("Keep my unsent draft.");
     const after = (await page.evaluate(() => window.gator!.snapshot())).state!;
     expect(after.source).toBe(before.source); expect(after.conversation_id).toBe(before.conversation_id); expect(after.messages).toEqual(before.messages);
-    await trigger.click(); await composer.click(); await expect(dialog).toHaveCount(0);
+    await trigger.click(); await composer.click({ position: { x: 12, y: 12 } }); await expect(dialog).toHaveCount(0);
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(800, 650));
     await page.emulateMedia({ reducedMotion: "reduce" });
     await trigger.click();

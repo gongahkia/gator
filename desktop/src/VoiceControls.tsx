@@ -54,6 +54,9 @@ export function VoiceControls(props: Props) {
   useEffect(() => {
     if (phase !== "idle") root.current?.querySelector<HTMLButtonElement>(phase === "recording" ? ".dictation-finish" : ".dictation-cancel")?.focus({ preventScroll: true });
   }, [phase]);
+  useEffect(() => {
+    if (phase === "idle" && open && issue) root.current?.querySelector<HTMLElement>(".voice-issue")?.focus({ preventScroll: true });
+  }, [phase, open, issue]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -161,7 +164,7 @@ export function VoiceControls(props: Props) {
       <label>Dictation provider<select aria-label="Dictation provider" value={status?.preferences.provider || ""} disabled={saving || phase !== "idle"} onChange={event => void configure({ provider: event.target.value, model: "" })}><option value="">Use chat provider</option><option value="gemini">Gemini</option><option value="openai">OpenAI</option></select></label>
       <label>Language<select aria-label="Dictation language" value={status?.preferences.language || ""} disabled={saving || phase !== "idle"} onChange={event => void configure({ language: event.target.value })}><option value="">Automatic</option><option value="en">English</option><option value="en-SG">English (Singapore)</option><option value="zh">Chinese</option><option value="ms">Malay</option><option value="ta">Tamil</option>{status?.preferences.language && !["en", "en-SG", "zh", "ms", "ta"].includes(status.preferences.language) && <option value={status.preferences.language}>{status.preferences.language}</option>}</select></label>
       <label className="voice-toggle"><input type="checkbox" checked={preferences.spoken_replies} disabled={saving} onChange={event => void configure({ spoken_replies: event.target.checked })} />Read new replies aloud using a system voice</label>
-      {(issue || status?.issue) && <p className="voice-issue" role="alert">{issue || status?.issue}</p>}
+      {(issue || status?.issue) && <p className="voice-issue" role="alert" tabIndex={-1}>{issue || status?.issue}</p>}
       <footer><button className="button" disabled={props.disabled || loading || saving || !status?.ready} onClick={() => void start()}><Mic size={16} />{loading ? "Loading…" : "Start recording"}</button></footer>
     </section>}
   </div>;
