@@ -8,6 +8,6 @@ export type FileSlide = { id: number; shapes: { id: string; x: number; y: number
 export type FileView = {
   id: string; name: string; revision: string; current: string; versions: { id: string; hash: string; bytes: number; at: string; author: string }[];
   kind: "text" | "markdown" | "table" | "word" | "workbook" | "slides" | "image" | "pdf" | "unsupported";
-  editable: boolean; notice?: string; draft?: FileEdit; staleDraft?: boolean; text?: string; language?: string; rows?: string[][];
+  editable: boolean; notice?: string; draft?: FileEdit; staleDraft?: string; text?: string; language?: string; rows?: string[][];
   blocks?: WordBlock[]; sheets?: FileSheet[]; slides?: FileSlide[]; width?: number; height?: number; data?: string;
 };

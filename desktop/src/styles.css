@@ -903,3 +903,11 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .file-paragraph[contenteditable="plaintext-only"]:focus-visible { outline: 2px solid #427948; outline-offset: 3px; }
 @media (max-width: 960px) { .file-document-page { padding: 22px; } .file-save-state { display: none; } .file-view-switch { margin-right: auto; } .file-version-list button { flex-wrap: wrap; } }
 @media (prefers-reduced-motion: reduce) { .inline-file-card > svg:last-child { transition: none; } }
+.file-markdown-tools { display: flex; align-items: center; gap: 2px; padding: 4px 8px; border-bottom: 1px solid var(--color-line); background: var(--color-raised); }
+.file-markdown-tools span { margin-left: 8px; color: var(--color-muted); font-size: var(--text-xs); }
+.file-paragraph-block > img { display: block; max-width: 100%; height: auto; margin-block: 12px; }
+.file-formula-bar { display: flex; align-items: center; gap: 8px; padding: 0 12px 8px; }
+.file-formula-bar > span { min-width: 32px; color: var(--color-muted); font: italic 13px Georgia, serif; }
+.file-formula-bar input { width: 100%; min-width: 0; height: 36px; padding-inline: 8px; border-radius: 6px; border: 1px solid var(--color-line); background: var(--color-base); color: var(--color-secondary); font: 12px var(--font-mono); }
+.file-grid footer { flex-wrap: wrap; }
+@media (max-width: 900px) { .file-markdown-tools span { display: none; } }

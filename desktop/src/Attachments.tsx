@@ -1,4 +1,4 @@
-import { FileText, Paperclip, X } from "lucide-react";
+import { Paperclip, X } from "lucide-react";
 import { useContext, useEffect, useRef, useState, type DragEvent } from "react";
 import type { UploadedFile } from "./bridge";
 import { FileCard, FileChatContext } from "./FileSurface";
@@ -43,5 +43,5 @@ export function PendingAttachments({ files, disabled, remove }: { files: Uploade
 
 export function InputFiles({ names, ids }: { names?: string[]; ids?: string[] }) {
   if (!names?.length) return null;
-  return <ul className="message-inputs" aria-label="Attached files">{names.map((name, index) => { const id = ids?.find(id => id.split("/").at(-1) === name) ?? ids?.[index]; return <li key={index}>{id ? <FileCard reference={{ kind: "upload", id }} name={name} /> : <><Paperclip size={14} /><span title={name}>{name}</span></>}</li>; })}</ul>;
+  return <ul className="message-inputs" aria-label="Attached files">{names.map((name, index) => { const sameNameIndex = names.slice(0,index).filter(value => value === name).length; const id = ids?.filter(id => id.split("/").at(-1) === name)[sameNameIndex] ?? ids?.[index]; return <li key={index}>{id ? <FileCard reference={{ kind: "upload", id }} name={name} /> : <><Paperclip size={14} /><span title={name}>{name}</span></>}</li>; })}</ul>;
 }
