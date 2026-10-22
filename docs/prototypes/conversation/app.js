@@ -5,27 +5,30 @@ function decorate() { document.querySelectorAll('[data-icon]').forEach((el) => {
 const escape = (text) => String(text).replace(/[&<>"']/g,(c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const topics=[{id:'offsite',title:'Our November offsite',attention:'Needs you'},{id:'portfolio',title:'Getting the portfolio out',attention:'Draft ready'},{id:'running',title:'Making time to run',attention:''}];
 const drafts=new Map(), extras=new Map();
-let current='offsite',scenario='returning',queued='',sent=false,drawerTrigger,toastTimer;
+let current='main',scenario='returning',sent=false,drawerTrigger,toastTimer;
 let memoryBudget='Keep the offsite under $2,000 in total.', memoryForgotten=false, checkPaused=false;
 const user=(text) => '<article class="message user"><div class="message-body">'+escape(text)+'</div></article>';
-const agent=(body,source='') => '<article class="message"><div class="byline"><span class="mini-gator">🐊</span>Gator</div><div class="message-body">'+body+'</div>'+(source?'<p class="source">'+source+'</p>':'')+'</article>';
+const agent=(body,source='') => {
+  const boundary=body.search(/<(?:button|section) class="card/);
+  const speech=boundary<0?body:body.slice(0,boundary),cards=boundary<0?'':body.slice(boundary);
+  return '<article class="message"><div class="byline"><span class="mini-gator">🐊</span>Gator</div><div class="message-body"><div class="speech">'+speech+'</div>'+cards+'</div>'+(source?'<p class="source">'+source+'</p>':'')+'</article>';
+};
 const file=() => '<button class="card file-card" data-drawer="preview"><span class="file-mark">'+icon('file')+'</span><span><strong>Venue comparison</strong><small>Draft · Three options, with costs and trade-offs</small></span>'+icon('right')+'</button>';
 const request=() => sent?'<div class="card"><strong>Example email marked as sent</strong><small>Prototype only. No email was sent.</small></div>':'<section class="card"><div class="request-label">Your decision</div><strong>Ask Jamie about the garden room?</strong><p class="request-copy">I’ve drafted an availability request for 12 people, within your $2,000 budget.</p><div class="request-actions"><button class="button" data-review>Review email</button><button class="quiet-button" data-keep>Keep as draft</button></div></section>';
 function notify(text) { clearTimeout(toastTimer); $('#toast').textContent=text; $('#toast').hidden=false; toastTimer=setTimeout(()=>$('#toast').hidden=true,4200); }
-function renderTopics() { $('#topics').innerHTML=topics.map(t=>'<button class="topic" data-topic="'+t.id+'" data-attention="'+Boolean(t.attention)+'" '+(t.id===current?'aria-current="page"':'')+'><span>'+escape(t.title)+'</span>'+(t.attention?'<small>'+escape(t.attention)+'</small>':'')+'</button>').join(''); }
+function renderTopics() { document.querySelector('.nav.primary').setAttribute('aria-current',current==='main'?'page':'false'); $('#topics').innerHTML=topics.map(t=>'<button class="topic" data-topic="'+t.id+'" data-attention="'+Boolean(t.attention)+'" '+(t.id===current?'aria-current="page"':'')+'><span>'+escape(t.title)+'</span>'+(t.attention?'<small>'+escape(t.attention)+'</small>':'')+'</button>').join(''); }
 function render() {
   renderTopics();
   const topic=topics.find(t=>t.id===current);
   $('#topic-title').textContent=current==='main'?'Gator':topic?.title||'New topic';
   $('#topic-subtitle').textContent=scenario==='first'?'Your own personal agent.':'A conversation you can come back to.';
-  $('#updates-button').hidden=scenario==='first'; $('#guide').hidden=scenario!=='working';
+  $('#updates-button').hidden=scenario==='first';
   $('#message').value=drafts.get(current)||''; $('#draft-status').textContent='';
   $('#local-caption').textContent='Design example · This prototype stores no conversations after you close it.';
   let body='<p class="day">Today</p>';
-  if(scenario==='first') body='<section class="first-intro"><div class="hello" aria-hidden="true">🐊</div><h2>Hi. I’m Gator.</h2><p>Bring me a question, a half-formed plan, or something you’d like a hand with.</p><button class="quiet-button" data-drawer="setup">Choose how Gator thinks '+icon('right')+'</button><p class="muted">In the app, model setup is required before Gator can reply. Your first message would be kept while you set up.</p></section>';
+  if(scenario==='first') body='<section class="first-intro"><div class="hello" aria-hidden="true">🐊</div><h2>Hi. I’m Gator.</h2><p>Bring me a question, a half-formed plan, or something you’d like a hand with.</p><button class="quiet-button" data-start>Help me get a project unstuck</button><br><button class="quiet-button" data-drawer="setup">Set up Gator '+icon('right')+'</button><p class="muted">In the app, model setup is required before Gator can reply. Your first message would be kept while you set up.</p></section>';
   else if(current==='portfolio') body+=user('Can you help me get my portfolio ready for Friday?')+agent('Yes. The project descriptions are the part I’d tackle first. I’ve pulled your rough notes into a draft you can revise.','Example · Based on the files you selected.')+'<button class="card file-card" data-drawer="portfolio"><span class="file-mark">'+icon('file')+'</span><span><strong>Portfolio project descriptions</strong><small>Draft · Three projects</small></span>'+icon('right')+'</button>';
   else if(current==='running') body+=user('I keep planning to run, then work gets in the way.')+agent('Let’s make the plan easier to keep. Which two days usually have a little breathing room?');
-  else if(current==='main') body+=agent('What would you like a hand with?')+'<button class="card file-card" data-topic="offsite"><span class="file-mark">'+icon('follow')+'</span><span><strong>Pick up the November offsite</strong><small>One example decision waiting for you</small></span>'+icon('right')+'</button>';
   else if(current==='new') body+=agent('What’s on your mind?');
   else {
     body+=user('Help me keep the November offsite moving. We’ll be 12 people, and I’d like to stay under $2,000.');
@@ -34,9 +37,9 @@ function render() {
     else if(scenario==='working') body+='<div class="working" role="status"><span></span><span>Comparing the three venue options</span></div>';
     else body+=agent('Quick update: the garden room looks like the best fit. Its quoted cost leaves room in the budget, but availability still needs confirming.'+file()+request(),'Example · Checked the three venue notes at 9:12 AM.');
   }
-  $('#messages').innerHTML=body+(extras.get(current)||''); decorate(); $('#transcript').scrollTop=$('#transcript').scrollHeight; renderQueue();
+  $('#messages').innerHTML=body+(extras.get(current)||''); decorate(); $('#transcript').scrollTop=$('#transcript').scrollHeight; renderWorkNote();
 }
-function renderQueue() { $('#queue').hidden=!queued; $('#queue p').textContent=queued; $('#composer-note').textContent=scenario==='working'?'Send to queue a separate request, or guide the work already in progress.':''; }
+function renderWorkNote() { $('#composer-note').textContent=scenario==='working'?'You can keep talking to Gator while the comparison is in progress.':''; }
 const detail=(title,text,action='',target='') => '<section class="detail-item"><strong>'+title+'</strong><p>'+text+'</p>'+(action?'<button class="quiet-button" data-drawer="'+target+'">'+action+' '+icon('right')+'</button>':'')+'</section>';
 function openDrawer(kind,trigger) {
   drawerTrigger=trigger||document.activeElement; const drawer=$('#drawer'); drawer.hidden=false;
@@ -66,6 +69,7 @@ document.addEventListener('click',(event)=>{
   const el=event.target.closest('button,a'); if(!el) return;
   if(el.dataset.topic) { event.preventDefault(); closeDrawer(); switchTopic(el.dataset.topic); }
   if(el.dataset.drawer) openDrawer(el.dataset.drawer,el);
+  if(el.hasAttribute('data-start')) { $('#message').value='Help me get a project unstuck.'; $('#message').dispatchEvent(new Event('input')); $('#message').focus(); }
   if(el.hasAttribute('data-review')) $('#review').showModal();
   if(el.hasAttribute('data-keep')) notify('Example draft kept. Nothing was sent.');
   if(el.hasAttribute('data-check')) openDrawer('check',el);
@@ -78,13 +82,10 @@ document.addEventListener('click',(event)=>{
 $('#close-drawer').onclick=closeDrawer;
 document.addEventListener('keydown',(event)=>{ if(event.key==='Escape'&&!$('#drawer').hidden&&!$('#review').open) closeDrawer(); });
 $('#theme').onclick=()=>{ document.body.classList.toggle('dark'); $('#theme').setAttribute('aria-label',document.body.classList.contains('dark')?'Switch to light appearance':'Switch to dark appearance'); };
-$('#scenario').onchange=(event)=>{ drafts.set(current,$('#message').value); scenario=event.target.value; current='offsite'; queued=''; sent=false; extras.clear(); closeDrawer(); render(); };
+$('#scenario').onchange=(event)=>{ drafts.set(current,$('#message').value); scenario=event.target.value; current='main'; sent=false; extras.clear(); closeDrawer(); render(); };
 $('#new-topic').onclick=()=>switchTopic('new');
 $('#message').oninput=()=>{ drafts.set(current,$('#message').value); $('#draft-status').textContent=$('#message').value?'Kept while you explore this prototype':''; };
 $('#message').onkeydown=(event)=>{ if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing) { event.preventDefault(); $('#composer').requestSubmit(); } };
-$('#composer').onsubmit=(event)=>{ event.preventDefault(); const text=$('#message').value.trim(); if(!text) return; if(scenario==='first') { openDrawer('setup'); return; } if(scenario==='working') { if(queued) { notify('This example supports one queued message. Edit or remove it first.'); return; } queued=text; } else extras.set(current,(extras.get(current)||'')+user(text)+agent('Prototype only: this is where Gator’s real response would appear. No message was sent to a model.')); drafts.delete(current); render(); $('#message').focus(); };
-$('#guide').onclick=()=>{ const text=$('#message').value.trim(); if(!text) { $('#message').focus(); return; } extras.set(current,(extras.get(current)||'')+user(text)+agent('Example: your guidance would be routed to the current task. This prototype has no running agent.')); drafts.delete(current); render(); };
-$('#edit-queued').onclick=()=>{ if($('#message').value.trim()) { notify('Keep or clear your current draft before editing this message.'); return; } $('#message').value=queued; drafts.set(current,queued); queued=''; renderQueue(); $('#message').focus(); };
-$('#remove-queued').onclick=()=>{ queued=''; renderQueue(); notify('Example queued message removed.'); };
+$('#composer').onsubmit=(event)=>{ event.preventDefault(); const text=$('#message').value.trim(); if(!text) return; if(scenario==='first') { openDrawer('setup'); return; } const response=scenario==='working'?'Example only: Gator would answer here while the comparison continues, applying a clear correction or asking if you mean a separate request. No agent is actually running.':'Prototype only: this is where Gator’s real response would appear. No message was sent to a model.'; extras.set(current,(extras.get(current)||'')+user(text)+agent(response)); drafts.delete(current); render(); $('#message').focus(); };
 $('#confirm-email').onclick=()=>{ sent=true; $('#review').close(); render(); notify('Prototype confirmation only. No email was sent.'); };
 render();

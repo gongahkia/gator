@@ -1,5 +1,9 @@
 # Conversation concept
 
+![Gator conversation concept](preview.png)
+
+[Dark appearance](preview-dark.png)
+
 Open `index.html` in a browser. There are no dependencies, network requests,
 provider calls, file reads, persistent storage or real approvals. All figures,
 files, messages, schedules and availability states are fictional examples.
@@ -21,7 +25,7 @@ prototype. This is not a new production styling system.
 | --- | --- | --- |
 | Typography | Light/dark returning and first-visit screenshots; narrow layout | Reading column, wrapping and hierarchy inspected; small supporting text needs user testing |
 | Surfaces | Composer, file card, review dialog, details drawer | Distinct structure, contained review, subdued elevation |
-| Animations | Drawer entrance and reduced-motion CSS | Restrained 180 ms entrance; no message/keystroke animation; reduced motion disables movement |
+| Animations | Drawer entrance replayed at 10% speed and reduced-motion CSS | Restrained 180 ms entrance; no message/keystroke animation; reduced motion disables movement |
 | Icons | Shared inline outline SVGs, alligator identity | One stroke convention and currentColor; no external asset dependency |
 | Performance | Local static assets; Chrome page errors during interactions | No page errors; no network/model work or continuous animation |
 
@@ -35,11 +39,14 @@ prototype. This is not a new production styling system.
 | Persistent context meter/environment panel | Rejected: the ordinary conversation does not need diagnostic accounting |
 | Voice and upload controls that pretend to work | Rejected: voice is absent; file intake explains its prototype boundary |
 | One merged history for every topic | Rejected: a familiar agent identity does not justify crossing conversation/source boundaries |
+| “Queue” versus “Guide” as an ordinary composer choice | Replaced with continued conversation; real message routing needs application support |
 
 Verification: exercised with headless Chrome through Playwright. Checked draft
 continuity across topics, exact email review, file preview, theme switching,
-queued-message editing, unavailable-check copy, first-request preservation
-through setup, reduced motion and 390 px overflow. Inspected screenshots at
+continued messaging during the working example, unavailable-check copy, first-request preservation
+through setup, corrected-memory continuity, reduced motion and 390 px overflow.
+The default now opens a persistent Gator conversation, with separate topics
+available on request. Inspected screenshots at
 1440×1000 and 800×600. No production or competitor app runtime was inspected.
 
 Verdict: **Needs changes before production**. Native platform behavior, real
