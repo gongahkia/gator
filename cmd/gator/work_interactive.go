@@ -297,8 +297,8 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		ReadContext: func(workID, activeGoal string) (workapp.ContextState, error) {
 			return readWorkContext(stateDir, workID, activeGoal)
 		},
-		ChangeKnowledge: func(id, action, text, activeGoal string) error {
-			return changeWorkKnowledge(stateDir, id, action, text, activeGoal)
+		ChangeKnowledge: func(id, action, text, activeGoal, revision string) (string, error) {
+			return changeWorkKnowledge(stateDir, id, action, text, activeGoal, revision)
 		},
 		SaveFollowup:       func(draft followup.Draft) (goal.Record, jobs.Definition, error) { return saveFollowup(stateDir, draft) },
 		ReadChecks:         func() ([]workhome.Check, bool, error) { return readFollowupChecks(stateDir) },

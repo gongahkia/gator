@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/inbox"
@@ -44,6 +45,7 @@ func readWorkContext(stateDir, workID, goalID string) (workapp.ContextState, err
 					}
 				}
 				item.Updated = r.UpdatedAt.Local().Format("Jan 2 15:04")
+				item.Revision = r.UpdatedAt.Format(time.RFC3339Nano)
 			}
 		} else if strings.HasPrefix(id, "inbox-") {
 			if store, err := inbox.Open(stateDir); err == nil {
@@ -55,6 +57,7 @@ func readWorkContext(stateDir, workID, goalID string) (workapp.ContextState, err
 			if r, err := notes.LoadNote(id); err == nil && (r.GoalID == "" || r.GoalID == result.GoalID) {
 				item.Kind, item.Title, item.Text, item.CurrentText, item.Scope, item.Source, item.Available = "note", r.Title, r.Body, r.Body, contextScope(r.GoalID), strings.Join(r.SourceRefs, ", "), true
 				item.Updated = r.UpdatedAt.Local().Format("Jan 2 15:04")
+				item.Revision = r.Revision()
 			}
 		}
 		return item
@@ -125,50 +128,44 @@ func readWorkContext(stateDir, workID, goalID string) (workapp.ContextState, err
 	return result, nil
 }
 
-func changeWorkKnowledge(stateDir, id, action, text, goalID string) error {
+func changeWorkKnowledge(stateDir, id, action, text, goalID, revision string) (string, error) {
 	release, guardErr := state.Guard(stateDir, false)
 	if guardErr != nil {
-		return guardErr
+		return "", guardErr
 	}
 	defer release()
 	if strings.HasPrefix(id, "mem-") {
 		store, err := memory.Open(stateDir)
 		if err != nil {
-			return err
+			return "", err
 		}
 		r, err := store.Load(id)
 		if err != nil {
-			return err
+			return "", err
 		}
 		if r.GoalID != "" && r.GoalID != goalID {
-			return errors.New("saved memory is outside this goal")
+			return "", errors.New("saved memory is outside this goal")
 		}
 		if action == "forget" {
-			return store.Forget(id)
+			return "", store.ForgetReviewed(id, revision)
 		}
 		if action == "correct" {
-			_, err = store.Correct(id, text, r.Source)
-			return err
+			corrected, err := store.CorrectReviewed(id, text, r.Source, revision)
+			if err != nil {
+				return "", err
+			}
+			return corrected.UpdatedAt.Format(time.RFC3339Nano), nil
 		}
 	} else if strings.HasPrefix(id, "note-") {
 		store, err := knowledge.Open(stateDir)
 		if err != nil {
-			return err
+			return "", err
 		}
-		r, err := store.LoadNote(id)
+		updated, err := store.ReviewNote(id, goalID, revision, action, text)
 		if err != nil {
-			return err
+			return "", err
 		}
-		if r.GoalID != "" && r.GoalID != goalID {
-			return errors.New("saved note is outside this goal")
-		}
-		if action == "forget" {
-			return store.RemoveNote(id)
-		}
-		if action == "correct" {
-			_, err = store.UpdateNote(id, r.Title, text)
-			return err
-		}
+		return updated.Revision(), nil
 	}
-	return errors.New("unsupported saved knowledge action")
+	return "", errors.New("unsupported saved knowledge action")
 }

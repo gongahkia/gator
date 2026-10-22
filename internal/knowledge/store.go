@@ -114,6 +114,11 @@ func (s Store) AddNoteWithID(id, title, body, goalID string) (Document, error) {
 }
 
 func (s Store) AddNoteWithIDAndRefs(id, title, body, goalID string, refs []string) (Document, error) {
+	release, err := s.lock(false)
+	if err != nil {
+		return Document{}, err
+	}
+	defer release()
 	now := s.clock()
 	d := Document{Version: Version, ID: id, Kind: "note", Title: strings.TrimSpace(title), GoalID: strings.TrimSpace(goalID), SourceRefs: append([]string(nil), refs...), CreatedAt: now, UpdatedAt: now, Body: strings.TrimSpace(body)}
 	if err := validate(d); err != nil {
@@ -131,10 +136,22 @@ func (s Store) AddSkill(id, description, body string) (Document, error) {
 	return d, s.create(d)
 }
 
-func (s Store) LoadNote(id string) (Document, error)  { return s.load("note", id) }
+func (s Store) LoadNote(id string) (Document, error) {
+	release, err := s.lock(true)
+	if err != nil {
+		return Document{}, err
+	}
+	defer release()
+	return s.load("note", id)
+}
 func (s Store) LoadSkill(id string) (Document, error) { return s.load("skill", id) }
 
 func (s Store) ListNotes(goalID string) ([]Document, error) {
+	release, err := s.lock(true)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	if goalID != "" && !goalIDPattern.MatchString(goalID) {
 		return nil, errors.New("invalid goal ID")
 	}
@@ -250,19 +267,27 @@ func noteMatchExcerpt(body string, terms []string, maxRunes int) string {
 }
 
 func (s Store) UpdateNote(id, title, body string) (Document, error) {
-	d, err := s.LoadNote(id)
-	if err != nil {
-		return Document{}, err
-	}
-	return s.UpdateNoteWithRefs(id, title, body, d.SourceRefs)
+	return s.updateNote(id, title, body, nil, false)
 }
 
 func (s Store) UpdateNoteWithRefs(id, title, body string, refs []string) (Document, error) {
-	d, err := s.LoadNote(id)
+	return s.updateNote(id, title, body, refs, true)
+}
+
+func (s Store) updateNote(id, title, body string, refs []string, replaceRefs bool) (Document, error) {
+	release, err := s.lock(false)
 	if err != nil {
 		return Document{}, err
 	}
-	d.Title, d.Body, d.SourceRefs, d.UpdatedAt = strings.TrimSpace(title), strings.TrimSpace(body), append([]string(nil), refs...), s.clock()
+	defer release()
+	d, err := s.load("note", id)
+	if err != nil {
+		return Document{}, err
+	}
+	d.Title, d.Body, d.UpdatedAt = strings.TrimSpace(title), strings.TrimSpace(body), s.nextUpdate(d.UpdatedAt)
+	if replaceRefs {
+		d.SourceRefs = append([]string(nil), refs...)
+	}
 	if err := validate(d); err != nil {
 		return Document{}, err
 	}
@@ -294,6 +319,11 @@ func (s Store) SetSkillEnabled(id string, enabled bool) (Document, error) {
 }
 
 func (s Store) RemoveNote(id string) error {
+	release, err := s.lock(false)
+	if err != nil {
+		return err
+	}
+	defer release()
 	if err := s.remove("note", id); err != nil {
 		return err
 	}

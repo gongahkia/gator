@@ -45,7 +45,8 @@ func TestContextRetainsSuppliedExcerptAfterCorrectionAndForgetting(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := changeWorkKnowledge(state, record.ID, "correct", "Use the detailed reply.", ""); err != nil {
+	revision, err := changeWorkKnowledge(state, record.ID, "correct", "Use the detailed reply.", "", record.UpdatedAt.Format(time.RFC3339Nano))
+	if err != nil {
 		t.Fatal(err)
 	}
 	stateView, err := readWorkContext(state, "work-context-test", "")
@@ -55,7 +56,10 @@ func TestContextRetainsSuppliedExcerptAfterCorrectionAndForgetting(t *testing.T)
 	if stateView.Items[0].Text != "Use the short reply." || stateView.Items[0].CurrentText != "Use the detailed reply." {
 		t.Fatalf("earlier context was rewritten: %#v", stateView.Items)
 	}
-	if err := changeWorkKnowledge(state, record.ID, "forget", "", ""); err != nil {
+	if stateView.Items[0].Revision != revision {
+		t.Fatal("earlier excerpt replaced the current saved revision")
+	}
+	if _, err := changeWorkKnowledge(state, record.ID, "forget", "", "", revision); err != nil {
 		t.Fatal(err)
 	}
 	stateView, err = readWorkContext(state, "work-context-test", "")
@@ -77,5 +81,51 @@ func TestMemorySetupExplainsStorageRetrievalAndChatSeparately(t *testing.T) {
 	}
 	if !strings.Contains(status.Storage, "local") || !strings.Contains(status.Retrieval, "Ollama") || !strings.Contains(status.Chat, "remotely") {
 		t.Fatalf("missing processing distinctions: %#v", status)
+	}
+}
+
+func TestSavedKnowledgeMutationsUseDisplayedRevision(t *testing.T) {
+	for _, kind := range []string{"memory", "note"} {
+		t.Run(kind, func(t *testing.T) {
+			state := t.TempDir()
+			memories, _ := memory.Open(state)
+			notes, _ := knowledge.Open(state)
+			var id string
+			if kind == "memory" {
+				r, err := memories.Add("preference", "Original", "", "user", time.Time{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				id = r.ID
+			} else {
+				r, err := notes.AddNote("Plan", "Original", "")
+				if err != nil {
+					t.Fatal(err)
+				}
+				id = r.ID
+			}
+			view, err := readWorkContext(state, "", "")
+			if err != nil || len(view.Items) != 1 || view.Items[0].Revision == "" {
+				t.Fatalf("missing displayed revision: %#v %v", view, err)
+			}
+			shown := view.Items[0].Revision
+			if kind == "memory" {
+				_, err = memories.Correct(id, "Changed elsewhere", "user")
+			} else {
+				_, err = notes.UpdateNote(id, "Plan", "Changed elsewhere")
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, action := range []string{"correct", "forget"} {
+				if _, err := changeWorkKnowledge(state, id, action, "Stale edit", "", shown); err == nil || !strings.Contains(err.Error(), "changed") {
+					t.Fatalf("%s accepted stale display: %v", action, err)
+				}
+			}
+			view, _ = readWorkContext(state, "", "")
+			if view.Items[0].Text != "Changed elsewhere" {
+				t.Fatal("stale UI mutation overwrote newer data")
+			}
+		})
 	}
 }

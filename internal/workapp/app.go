@@ -220,7 +220,7 @@ type Config struct {
 	ConfigureRecall          func(provider string, allowUpload bool) error
 	InstallRecall            func(context.Context, func(string)) error
 	ReadContext              func(workID, goalID string) (ContextState, error)
-	ChangeKnowledge          func(id, action, text, goalID string) error
+	ChangeKnowledge          func(id, action, text, goalID, revision string) (string, error)
 	SaveFollowup             func(followup.Draft) (goal.Record, jobs.Definition, error)
 	ReadChecks               func() ([]workhome.Check, bool, error)
 	StartSupervisor          func() error

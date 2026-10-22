@@ -248,6 +248,18 @@ func (s Store) Search(query, goalID string, limit int) ([]Record, error) {
 }
 
 func (s Store) Correct(id, content, source string) (Record, error) {
+	return s.correct(id, content, source, "")
+}
+
+// CorrectReviewed refuses to overwrite a newer memory than the one displayed.
+func (s Store) CorrectReviewed(id, content, source, updated string) (Record, error) {
+	if updated == "" {
+		return Record{}, errors.New("memory revision is required")
+	}
+	return s.correct(id, content, source, updated)
+}
+
+func (s Store) correct(id, content, source, updated string) (Record, error) {
 	release, err := s.lock()
 	if err != nil {
 		return Record{}, err
@@ -256,6 +268,9 @@ func (s Store) Correct(id, content, source string) (Record, error) {
 	record, err := s.Load(id)
 	if err != nil {
 		return Record{}, err
+	}
+	if updated != "" && record.UpdatedAt.Format(time.RFC3339Nano) != updated {
+		return Record{}, errors.New("this memory changed; reopen its current saved version before editing")
 	}
 	source = strings.TrimSpace(source)
 	if source != record.Source {
@@ -294,7 +309,16 @@ func (s Store) CorrectFromFile(id, content, path string) (Record, error) {
 	return record, s.write(record, false)
 }
 
-func (s Store) Forget(id string) error {
+func (s Store) Forget(id string) error { return s.forget(id, "") }
+
+// ForgetReviewed refuses to delete a newer memory than the one inspected.
+func (s Store) ForgetReviewed(id, updated string) error {
+	if updated == "" {
+		return errors.New("memory revision is required")
+	}
+	return s.forget(id, updated)
+}
+func (s Store) forget(id, updated string) error {
 	release, err := s.lock()
 	if err != nil {
 		return err
@@ -303,6 +327,9 @@ func (s Store) Forget(id string) error {
 	record, err := s.Load(id)
 	if err != nil {
 		return err
+	}
+	if updated != "" && record.UpdatedAt.Format(time.RFC3339Nano) != updated {
+		return errors.New("this memory changed; inspect it before forgetting")
 	}
 	if record.Subject != "" {
 		if err := s.blockSubject(record.GoalID, record.Subject); err != nil {

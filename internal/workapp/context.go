@@ -47,19 +47,24 @@ func (m Model) updateContextKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if m.config.ChangeKnowledge == nil {
 				return m, nil
 			}
-			if err := m.config.ChangeKnowledge(m.contextDetail.ID, "correct", m.contextEdit, m.contextState.GoalID); err != nil {
+			revision, err := m.config.ChangeKnowledge(m.contextDetail.ID, "correct", m.contextEdit, m.contextState.GoalID, m.contextDetail.Revision)
+			if err != nil {
 				m.sectionNotice = err.Error()
 				return m, nil
 			}
 			m.contextEditing = false
-			m.contextDetail.CurrentText = m.contextEdit
+			m.contextEdit = strings.TrimSpace(m.contextEdit)
+			m.contextDetail.CurrentText, m.contextDetail.Revision = m.contextEdit, revision
 			if m.contextWorkID == "" {
 				m.contextDetail.Text = m.contextEdit
-				for i := range m.contextState.Items {
-					if m.contextState.Items[i].ID == m.contextDetail.ID {
+			}
+			for i := range m.contextState.Items {
+				if m.contextState.Items[i].ID == m.contextDetail.ID {
+					if m.contextWorkID == "" {
 						m.contextState.Items[i].Text = m.contextEdit
-						m.contextState.Items[i].CurrentText = m.contextEdit
 					}
+					m.contextState.Items[i].CurrentText = m.contextEdit
+					m.contextState.Items[i].Revision = revision
 				}
 			}
 			m.sectionNotice = "Correction saved for future recall. The retained excerpt describes the earlier run."
@@ -79,12 +84,17 @@ func (m Model) updateContextKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if m.config.ChangeKnowledge == nil {
 				return m, nil
 			}
-			if err := m.config.ChangeKnowledge(m.contextDetail.ID, "forget", "", m.contextState.GoalID); err != nil {
+			if _, err := m.config.ChangeKnowledge(m.contextDetail.ID, "forget", "", m.contextState.GoalID, m.contextDetail.Revision); err != nil {
 				m.sectionNotice = err.Error()
 				return m, nil
 			}
 			m.contextConfirm = false
 			m.contextDetail.Available = false
+			for i := range m.contextState.Items {
+				if m.contextState.Items[i].ID == m.contextDetail.ID {
+					m.contextState.Items[i].Available = false
+				}
+			}
 			m.sectionNotice = "Forgotten from future recall. Prior transcripts and retained Work evidence remain."
 			if m.contextWorkID == "" {
 				id := m.contextDetail.ID

@@ -9,9 +9,9 @@ type RecallStatus struct {
 }
 
 type KnowledgeItem struct {
-	SourceReviewNeeded                                         bool
-	ID, Kind, Title, Text, Scope, Source, Updated, CurrentText string
-	Available                                                  bool
+	SourceReviewNeeded                                                   bool
+	ID, Kind, Title, Text, Scope, Source, Updated, CurrentText, Revision string
+	Available                                                            bool
 }
 
 type ContextState struct {
