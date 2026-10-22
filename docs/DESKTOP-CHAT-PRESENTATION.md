@@ -333,7 +333,7 @@ Reference locations inspected:
 
 These locations remain reference history, not a backlog of additional UI ports.
 
-## Pending decision: composer model and reasoning picker
+## Composer model and work-effort picker
 
 22 October 2026. The user selected InvestmentGini's compact model picker as a
 reference for Gator's chat composer, using two supplied screenshots:
@@ -348,6 +348,90 @@ reference for Gator's chat composer, using two supplied screenshots:
   provider/model names and available effort stops are reference content.
 - Reference InvestmentGini's frontend implementation as needed.
 
-**Deferred at the user's request:** this is the only pending InvestmentGini UI
-port. Wait for the user to explicitly say implementation can start. No other
-ports or model-picker implementation are authorized by this note alone.
+**Authorized and implemented on 22 October 2026.** This is the only additional
+InvestmentGini UI port selected by the user. Other proposed ports remain declined.
+The implementation uses Gator's real work-effort settings rather than presenting
+unsupported provider thinking levels.
+
+
+### Implementation and review
+
+The composer pill opens a compact popover with Low, Standard and High work
+effort, a model dropdown and Reset. The second view groups configured models by
+provider, marks the current selection and offers local filtering for longer
+lists. Manage models opens the existing setup screen. Display aliases preserve
+raw model identity. Reset restores Standard work effort and keeps the selected
+model. Model defaults persist for subsequent requests; effort retains its
+existing conversation/session semantics. No provider API reasoning parameters
+were introduced.
+
+Go supplies the choices and acknowledges each change. Fresh configuration,
+current view identity and idle-state checks prevent stale or active-work
+changes. Current and queued work must finish first. Changes preserve draft,
+attachments, workspace and conversation, and add no transcript notices. The
+bridge projection holds up to 256 choices and retains the selected model when
+shortened; the UI labels that limit. Opening the picker performs no network
+requests, downloads or credential writes. Credential material and endpoint
+configuration are excluded from its display contract.
+
+Full scoped review using `make-interfaces-feel-better`: React, Lucide and the
+existing native CSS/theme tokens. This covers the new picker, its composer
+integration and the supporting display/action contract, not a new app-wide audit.
+
+| Category | Evidence inspected | Result |
+| --- | --- | --- |
+| Typography | Model aliases, long labels, group headings, slider labels and unavailable explanations | Existing UI fonts; wrapped model names, truncated trigger and explicit work-effort meaning |
+| Surfaces | Both popover views, search, selected/disabled rows, viewport placement, 800×650 window | Bounded 304 px width / 420 px height, scrolling list, theme tokens and 40–44 px controls |
+| Animations | Open/close at 10% playback, nested view changes, reduced motion | Interruptible restrained transitions; slider thumb/fill update together without a trailing fill animation |
+| Icons | Trigger, model rows, checkmark, reset, back and setup link | Existing Lucide set and shared 1.5 px strokes |
+| Performance | Cached choices, bounded bridge projection, native range and local filtering | No provider lookup in the streaming projection and no added UI dependencies |
+
+Resolved findings:
+
+| Severity | Location | Before | After | Why |
+| --- | --- | --- | --- | --- |
+| MEDIUM | `desktop/src/App.tsx:287`, `desktop/src/ModelPicker.tsx:13` | Choosing a model required leaving the composer | Compact model/effort pill with setup link, canonical acknowledgement and inline errors | Keep the draft and task context in place |
+| MEDIUM | `desktop/src/ModelPicker.tsx:101`, `desktop/src/styles.css:197` | A long choice list could consume the entire area above the composer | Viewport placement and a 420 px height cap with scrolling and filtering | Preserve the compact presentation and readable rows |
+| MEDIUM | `desktop/src/ModelPicker.tsx:92` | Nested model view needed explicit focus and dismissal handling | Roving option focus, arrow/Home/End selection navigation, Escape back/close, outside dismissal and focus return after failed saves | Keyboard access must not navigate or cancel unrelated work; failed saves must remain retryable |
+| MEDIUM | `desktop/src/styles.css:201` | Generic disabled-button opacity made setup explanations faint | Readable disabled labels and explanatory text with unavailable controls disabled | Communicate availability without relying on opacity alone |
+| LOW | `desktop/src/styles.css:183`, `styles.css:216` | Small trigger and independently animated fill | 40 px trigger and immediate native-slider/fill updates | Preserve hit areas and keep the indicator synchronized |
+
+Considered and rejected:
+
+| Candidate | Reason |
+| --- | --- |
+| Copy InvestmentGini's provider thinking labels/levels | Gator exposes work budgets, not those provider parameters; presenting them would misstate the behavior |
+| Import its Chakra/Framer styling or provider-logo system | Gator already has native CSS, theme tokens, Lucide and motion helpers |
+| Continuously animate particles in the effort bar | Repeated decorative motion adds attention cost to a frequently used control |
+
+Verification:
+
+- `go test ./internal/workapp ./cmd/gator -count=1` passed.
+- Targeted composer tests cover budgets, reset, draft preservation, persisted
+  model callbacks, rejected stale/busy/unavailable requests, save failures,
+  display aliases, private metadata exclusion and bounded choices.
+- `go test ./internal/workrun -run 'TestApplicationContext|TestConversationReceivesCurrentAppKnowledge' -count=1` passed after updating the bundled app guide.
+- `node --test desktop/tests/policy.test.mjs` passed (six checks), including
+  rejection of unsupported fields, invented effort levels and invalid IDs.
+- `npm run check --prefix desktop` and `npm run build --prefix desktop` passed.
+- `npm run test:e2e -- app-control.spec.ts --reporter=line` from `desktop`
+  passed all four checks, including existing chat controls and voice behavior.
+- The new Electron scenario verifies the selected model in an actual local
+  inference request, persisted defaults, keyboard effort/reset, alias filtering,
+  unavailable rows, draft/conversation preservation, outside dismissal, Escape
+  focus return, active-work locking and reduced-motion placement at 800×650.
+  On macOS, a real filesystem permission failure also verifies the inline save
+  error, unchanged defaults, retained keyboard focus and successful retry.
+- Isolated manual Electron review inspected 10% popover motion, nested Escape,
+  long labels and Contrast/Mono themes with zero renderer errors. Screenshots
+  for both views and the narrow window were inspected. Normal theme was covered
+  by the end-to-end scenario.
+- `npm run pack --prefix desktop` rebuilt the local macOS app; the existing
+  highlight/Lucide and bundle-size notices remain build warnings.
+- The final picker scenario also passed against the rebuilt packaged
+  `desktop/release/mac/Gator.app` (one check, 9.7 seconds), including the real
+  save-failure and retry path.
+
+**Verdict: Approve for the exercised macOS scope.** Windows/Linux execution and
+screen-reader testing were not repeated. No additional InvestmentGini UI port
+is authorized by this work.

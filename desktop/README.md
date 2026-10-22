@@ -42,6 +42,19 @@ GATOR_DESKTOP_WORKSPACE=/absolute/path/to/notes make desktop
 `GATOR_DESKTOP_BINARY` can select a separately built private runtime during
 development. These overrides are useful for isolated testing.
 
+## Composer model picker
+
+The model pill beside Send opens a compact Work effort control. Use its model
+dropdown to choose a configured cloud or local model, grouped by provider.
+Manage models opens the existing setup screen for credentials, downloads and
+other model administration. Model display aliases retain their original model IDs.
+
+Low, Standard and High reuse Gator's existing task budgets; they do not change
+provider thinking settings. Reset restores Standard effort without switching the
+model. Model selection is saved for subsequent requests; effort keeps the existing
+conversation/session behavior. Current and queued work must finish before either
+setting changes. Drafts and attachments stay in the composer.
+
 ## Ask Gator about the app
 
 You can ask questions such as “Where do I change the model?”, “Which model are
