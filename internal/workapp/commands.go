@@ -465,6 +465,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		m.messages, m.status, m.queue = nil, "", nil
 		m.lastOutput, m.lastBundle = "", BundleSummary{}
 		m.options = RunOptions{MaxSteps: 24, Mode: "auto", Code: CodeOptions{MaxSteps: 16, Sandbox: "strict", Network: "deny"}}
+		m.createChat()
 		m.refreshAttention()
 		return m, nil
 	case "/model", "/models":

@@ -7,6 +7,12 @@ import (
 )
 
 func (m Model) openPrimaryConversation() (tea.Model, tea.Cmd) {
+	if m.config.LastConversation != nil {
+		if m.conversation == "" {
+			m.createChat()
+		}
+		return m, nil
+	}
 	if m.config.PrimaryConversation == nil {
 		m.bridgeNotice = "The main conversation is unavailable. Your saved topics remain available."
 		return m, nil
@@ -29,6 +35,28 @@ func (m Model) openPrimaryConversation() (tea.Model, tea.Cmd) {
 		m.restoreConversation(id, "")
 	}
 	return m, nil
+}
+
+func (m *Model) rememberChat() {
+	if m.conversation != "" && m.config.RememberConversation != nil {
+		if err := m.config.RememberConversation(m.conversation); err != nil {
+			m.bridgeNotice = "Your chat is saved, but its last-opened position could not be retained: " + err.Error()
+		}
+	}
+}
+func (m *Model) createChat() {
+	if m.config.CreateConversation == nil {
+		return
+	}
+	conversation, err := m.config.CreateConversation(m.primarySource)
+	if err != nil {
+		m.bridgeNotice = "Couldn't create a new chat: " + err.Error()
+		return
+	}
+	m.conversation, m.source, m.title, m.primary, m.home = conversation.ID, conversation.SourcePath, conversation.Title, false, true
+	m.revision, m.snapshot = "", ""
+	m.rememberChat()
+	m.refreshBridgeConversations()
 }
 
 // restoreConversation replaces all revision-dependent UI state with the
@@ -55,6 +83,7 @@ func (m *Model) restoreConversation(conversationID, announcement string) {
 			return
 		}
 		m.applyConversationState(conversationID, state)
+		m.goalID = m.goalForConversation(conversationID)
 	}
 	if m.config.LoadConversationOptions != nil {
 		options, err := m.config.LoadConversationOptions(conversationID)
@@ -64,6 +93,10 @@ func (m *Model) restoreConversation(conversationID, announcement string) {
 		}
 		m.options = retainedRunOptions(options)
 	}
+	if m.config.CreateConversation != nil {
+		m.home = len(m.messages) == 0
+	}
+	m.rememberChat()
 	m.status = joinConversationStatus(announcement, m.revisionStatus())
 }
 

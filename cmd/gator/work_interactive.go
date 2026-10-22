@@ -326,20 +326,43 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			return sessions.List(50)
 		},
 		LoadConversation: func(conversationID string) (workapp.ConversationState, error) {
-			return loadWorkTUIConversation(sessions, conversationID)
+			restored, err := loadWorkTUIConversation(sessions, conversationID)
+			if err != nil {
+				return restored, err
+			}
+			currentGoals, err := goalStore.List()
+			if err != nil {
+				return workapp.ConversationState{}, err
+			}
+			goalID = ""
+			for _, record := range currentGoals {
+				if record.ConversationID == conversationID {
+					goalID = record.ID
+					break
+				}
+			}
+			return restored, nil
 		},
 		LoadConversationOptions: func(conversationID string) (workapp.RunOptions, error) {
 			return loadWorkTUIConversationOptions(sessions, conversationID)
 		},
 		StartConversationID: startConversationID,
-		PrimaryConversation: sessions.Primary,
-		BindPrimaryConversation: func(id string) error {
+		LastConversation:    sessions.Active,
+		RememberConversation: func(id string) error {
 			release, err := state.Guard(stateDir, false)
 			if err != nil {
 				return err
 			}
 			defer release()
-			return sessions.BindPrimary(id)
+			return sessions.SetActive(id)
+		},
+		CreateConversation: func(source string) (worksession.Conversation, error) {
+			release, err := state.Guard(stateDir, false)
+			if err != nil {
+				return worksession.Conversation{}, err
+			}
+			defer release()
+			return sessions.CreateChat(source, time.Now())
 		},
 		FirstRun: settings.Defaults.Provider == "" && len(conversations) == 0,
 		JobAction: func(arguments []string) (string, error) {

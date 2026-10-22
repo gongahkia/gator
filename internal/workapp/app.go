@@ -186,6 +186,9 @@ type Config struct {
 	LoadConversationOptions func(conversationID string) (RunOptions, error)
 	Conversations           []worksession.Conversation
 	StartConversationID     string
+	LastConversation        func() (string, error)
+	RememberConversation    func(string) error
+	CreateConversation      func(string) (worksession.Conversation, error)
 	PrimaryConversation     func() (string, error)
 	BindPrimaryConversation func(string) error
 	Jobs                    []jobs.Definition
@@ -202,6 +205,7 @@ type Config struct {
 	MemoryAction            func(arguments []string) (string, error)
 	MemoryResult            func(arguments []string) (*uisnapshot.Result, error)
 	RecallStatus            func(context.Context) (RecallStatus, error)
+	ConfigureChatLearning   func(bool) error
 	ConfigureRecall         func(provider string, allowUpload bool) error
 	InstallRecall           func(context.Context, func(string)) error
 	ReadContext             func(workID, goalID string) (ContextState, error)
@@ -458,6 +462,14 @@ func New(config Config) Model {
 	model.statusLineEnabled = config.StatusLineEnabled
 	model.refreshModelStatus()
 	model.primarySource = config.CurrentFolder
+	if config.LastConversation != nil && config.StartConversationID == "" && config.GoalID == "" {
+		id, err := config.LastConversation()
+		if err != nil {
+			model.bridgeNotice = "Couldn't reopen your last chat: " + err.Error()
+		} else {
+			config.StartConversationID = id
+		}
+	}
 	if config.PrimaryConversation != nil {
 		id, err := config.PrimaryConversation()
 		model.primaryID = id
@@ -492,6 +504,9 @@ func New(config Config) Model {
 			model.title = "Restoring conversation"
 			model.restoreConversation(config.StartConversationID, "")
 		}
+	}
+	if model.conversation == "" && config.GoalID == "" && config.CreateConversation != nil && model.bridgeNotice == "" {
+		model.createChat()
 	}
 	if config.InitialTitle != "" {
 		model.home = false

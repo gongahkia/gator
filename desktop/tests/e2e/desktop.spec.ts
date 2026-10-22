@@ -13,7 +13,7 @@ const launchDesktop = (env: Record<string, string | undefined>) => {
   return electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env: { ...definedEnv, GATOR_INTERNAL_COMMANDS: "" } });
 };
 
-// Existing saved conversations remain supported after retiring New topic.
+// Existing saved conversations remain available alongside new independent chats.
 const seedConversation = async (directory: string, source: string, title: string) => {
   const id = "work-saved-topic", root = join(directory, "state/gator/conversations", id);
   await mkdir(root, { recursive: true });
@@ -197,7 +197,7 @@ test("long conversations retain context while searching and signal activity with
   } finally { await closeDesktop(application); await rm(directory, { recursive: true, force: true }); }
 });
 
-test("recent topics default to a flat list, offer folder grouping, and isolate drafts", async () => {
+test("recent chats default to a flat list, offer folder grouping, and isolate drafts", async () => {
   const directory = await mkdtemp(join(tmpdir(), "gator-desktop-recents-e2e-"));
   const first = join(directory, "area-a/shared"), second = join(directory, "area-b/shared");
   await mkdir(first, { recursive: true }); await mkdir(second, { recursive: true });
@@ -214,7 +214,7 @@ test("recent topics default to a flat list, offer folder grouping, and isolate d
     await expect(recent).toBeVisible();
     await expect(recent.locator(".recent-workspace")).toHaveCount(0);
     await expect(recent.getByRole("button", { name: "Open conversation: Plan 4", exact: true })).toBeVisible();
-    await recent.getByRole("button", { name: "Group topics by folder", exact: true }).click();
+    await recent.getByRole("button", { name: "Group chats by folder", exact: true }).click();
     await expect(recent.getByRole("button", { name: "area-a/shared", exact: true })).toBeVisible();
     await expect(recent.getByRole("button", { name: "area-b/shared", exact: true })).toBeVisible();
     await recent.getByRole("button", { name: "Show 1 more", exact: true }).click();
@@ -238,19 +238,19 @@ test("recent topics default to a flat list, offer folder grouping, and isolate d
     const composer = page.getByRole("textbox", { name: "Message Gator", exact: true });
     const open = async (index: number) => { await recent.getByRole("button", { name: `Open conversation: Plan ${index}`, exact: true }).click(); await expect(recent.getByRole("button", { name: `Open conversation: Plan ${index}`, exact: true })).toHaveAttribute("aria-current", "page"); };
     await composer.fill("An unsent message for Gator");
-    await expect(page.getByRole("button", { name: "New topic", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "New chat", exact: true })).toBeVisible();
     await page.keyboard.press(`${process.platform === "darwin" ? "Meta" : "Control"}+n`);
-    await expect(composer).toHaveValue("An unsent message for Gator");
+    await expect(composer).toHaveValue("");
     await page.getByRole("button", { name: "Search commands", exact: true }).click();
     await page.getByRole("textbox", { name: "Find a command", exact: true }).fill("/new");
-    await expect(page.locator(".command-list button")).toHaveCount(0);
+    await expect(page.locator(".command-list button")).toHaveCount(1);
     await page.keyboard.press("Escape");
     await open(0);
-    await expect(composer).toHaveValue("");
+    await expect(composer).toHaveValue("An unsent message for Gator");
     await composer.fill("A saved topic in the same folder");
     await page.getByRole("button", { name: "Talk with Gator", exact: true }).click();
-    await expect(composer).toHaveValue("An unsent message for Gator");
-    expect((await page.evaluate(() => window.gator!.snapshot())).state!.conversation_id).toBeUndefined();
+    await expect(composer).toHaveValue("A saved topic in the same folder");
+    expect((await page.evaluate(() => window.gator!.snapshot())).state!.conversation_id).toBe("work-test-0");
     await open(0); await composer.fill("Draft for the first project");
     await open(5); await expect(composer).toHaveValue(""); await composer.fill("Draft for the second project");
     await open(0); await expect(composer).toHaveValue("Draft for the first project");
@@ -794,17 +794,20 @@ test("desktop uses real Go state, preserves drafts, edits native forms, and cont
     await expect(page.locator(".assistant-message")).toHaveCount(0);
     await page.getByRole("textbox", { name: "Message Gator", exact: true }).fill("Saved topic draft");
     await page.getByRole("button", { name: "Talk with Gator", exact: true }).click();
-    await expect(page.getByRole("textbox", { name: "Message Gator", exact: true })).toHaveValue("keep my continuation draft");
+    await expect(page.getByRole("textbox", { name: "Message Gator", exact: true })).toHaveValue("Saved topic draft");
     const beforeRestart = requests;
     await closeDesktop(application);
     application = await launchDesktop(env);
     const reopened = await application.firstWindow();
-    await expect.poll(() => reopened.evaluate(async () => (await window.gator!.snapshot()).state?.conversation_id)).toBe(mainID);
+    await expect.poll(() => reopened.evaluate(async () => (await window.gator!.snapshot()).state?.conversation_id)).toBe("work-saved-topic");
     await expect(reopened.getByRole("button", { name: "Talk with Gator", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(reopened.locator(".assistant-message")).toHaveCount(0);
+    await expect(reopened.getByRole("textbox", { name: "Message Gator", exact: true })).toHaveValue("Saved topic draft");
+    expect(requests).toBe(beforeRestart);
+    await expect(reopened.getByRole("button", { name: "New chat", exact: true })).toBeVisible();
+    await reopened.evaluate(async id => {const state=(await window.gator!.snapshot()).state!;return window.gator!.send({ type: "conversation", conversation:{id,list_id:state.recent_id!} });},mainID!);
     await expect(reopened.locator(".assistant-message")).toHaveCount(2);
     await expect(reopened.getByRole("textbox", { name: "Message Gator", exact: true })).toHaveValue("keep my continuation draft");
-    expect(requests).toBe(beforeRestart);
-    await expect(reopened.getByRole("button", { name: "New topic", exact: true })).toHaveCount(0);
     await reopened.getByRole("button", { name: "Open conversation: Saved topic", exact: true }).click();
     await expect(reopened.getByRole("textbox", { name: "Message Gator", exact: true })).toHaveValue("Saved topic draft");
 

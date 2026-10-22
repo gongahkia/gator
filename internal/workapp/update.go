@@ -303,6 +303,7 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 	m.runStarted = time.Time{}
 	if value.ConversationID != "" {
 		m.conversation = value.ConversationID
+		m.rememberChat()
 		if m.primary && m.primaryID == "" && m.config.BindPrimaryConversation != nil {
 			if err := m.config.BindPrimaryConversation(value.ConversationID); err != nil {
 				m.primary = false

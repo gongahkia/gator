@@ -33,3 +33,18 @@ func TestDesktopPreferencesSurviveConfigRoundTrip(t *testing.T) {
 		t.Fatalf("preferences lost: %#v %v", loaded.Desktop, err)
 	}
 }
+
+func TestNewChatShortcutPreservesExistingCustomBinding(t *testing.T) {
+	d := DesktopSettings{Shortcuts: map[string]string{"command_search": "Mod+N"}}
+	if err := d.Validate(); err != nil {
+		t.Fatal("adding new chat invalidated an older profile", err)
+	}
+	r := d.ResolvedShortcuts()
+	if r["command_search"] != "Mod+N" || r["new_chat"] != "Mod+Shift+N" {
+		t.Fatal(r)
+	}
+	d.Shortcuts["new_chat"] = "Mod+N"
+	if d.Validate() == nil {
+		t.Fatal("explicit conflicting shortcuts accepted")
+	}
+}

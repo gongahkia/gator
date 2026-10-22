@@ -49,7 +49,7 @@ export function LibraryDrawer({ kind, state, open, presenceRef, close, navigate,
           </section>
           <section className="library-section" aria-label="Saved library">
             {link("What Gator remembers", "Saved notes, decisions and source references", "/knowledge", BookOpen)}
-            {link("All conversations", "Find and continue a separate topic", "/conversations", MessageSquare)}
+            {link("All conversations", "Find and continue a chat", "/conversations", MessageSquare)}
             {link("Task runs", "Retained results and individual run details", "/history", History)}
             <button className="library-link" onClick={drafts}><Clock3 size={17} /><span><strong>Unsent drafts</strong><small>Review local drafts and retention</small></span><ChevronRight size={14} /></button>
           </section>

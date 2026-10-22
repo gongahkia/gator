@@ -13,13 +13,13 @@ export function RecentConversations({ state, disabled, open, browse }: { state: 
   const term = query.trim().toLocaleLowerCase();
   const groups = useMemo(() => {
     const grouped = new Map<string, NonNullable<BackendState["recent_conversations"]>>();
-    for (const item of state.recent_conversations ?? []) { if (item.id === state.primary_conversation_id) continue; const items = grouped.get(item.source) ?? []; items.push(item); grouped.set(item.source, items); }
+    for (const item of state.recent_conversations ?? []) { const items = grouped.get(item.source) ?? []; items.push(item); grouped.set(item.source, items); }
     const names = [...grouped.keys()].map((source) => source.split(/[\\/]/).filter(Boolean).at(-1));
     return [...grouped].map(([source, items]) => {
       const parts = source.split(/[\\/]/).filter(Boolean), name = parts.at(-1) || source || "Workspace";
       return { source, items, name: names.filter((item) => item === name).length > 1 ? parts.slice(-2).join("/") : name };
     });
-  }, [state.recent_conversations, state.primary_conversation_id]);
+  }, [state.recent_conversations]);
   if (!groups.length && !state.recent_issue) return null;
   const matchesTopic = (item: NonNullable<BackendState["recent_conversations"]>[number]) => !term || `${item.title}\n${item.source}`.toLocaleLowerCase().includes(term);
   const matches = groups.map((group) => ({ ...group, visible: group.items.filter(matchesTopic) })).filter((group) => group.visible.length);
@@ -27,7 +27,7 @@ export function RecentConversations({ state, disabled, open, browse }: { state: 
   const toggle = (source: string, current: Set<string>, set: (next: Set<string>) => void) => { const next = new Set(current); if (next.has(source)) next.delete(source); else next.add(source); set(next); };
   const row = (item: NonNullable<BackendState["recent_conversations"]>[number]) => {
     const activity = item.id === state.conversation_id && state.running ? state.cancelling ? "Stopping" : state.pending_approval ? "Needs review" : "Working" : undefined;
-    return <button key={item.id} className="recent-chat" aria-label={`Open conversation: ${item.title}`} aria-describedby={activity ? `${prefix}-${item.id}-activity` : undefined} aria-current={state.conversation_id === item.id && !state.panel && !state.primary ? "page" : undefined} title={`${item.title}\n${item.source}\n${new Date(item.updated_at).toLocaleString()}`} disabled={disabled} onKeyDown={(event) => {
+    return <button key={item.id} className="recent-chat" aria-label={`Open conversation: ${item.title}`} aria-describedby={activity ? `${prefix}-${item.id}-activity` : undefined} aria-current={state.conversation_id === item.id && !state.panel ? "page" : undefined} title={`${item.title}\n${item.source}\n${new Date(item.updated_at).toLocaleString()}`} disabled={disabled} onKeyDown={(event) => {
       if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
       event.preventDefault();
       const buttons = [...(event.currentTarget.closest(".recent-work")?.querySelectorAll<HTMLButtonElement>(".recent-chat:not(:disabled)") ?? [])].filter((button) => button.getClientRects().length);
@@ -36,11 +36,11 @@ export function RecentConversations({ state, disabled, open, browse }: { state: 
       buttons[next]?.focus();
     }} onClick={() => open(item.id)}><span><Highlight text={item.title || "Untitled conversation"} query={query} />{term && item.source.toLocaleLowerCase().includes(term) && <small className="recent-chat-source"><Highlight text={item.source} query={query} /></small>}</span>{activity && <small id={`${prefix}-${item.id}-activity`} className="recent-chat-activity" data-attention={!!state.pending_approval}>{activity}</small>}</button>;
   };
-  const flat = (state.recent_conversations ?? []).filter((item) => item.id !== state.primary_conversation_id && matchesTopic(item));
+  const flat = (state.recent_conversations ?? []).filter((item) => matchesTopic(item));
   const shown = all || term ? flat : flat.slice(0, 8);
   const active = flat.find((item) => item.id === state.conversation_id);
   if (!all && !term && active && !shown.includes(active)) shown[shown.length - 1] = active;
-  return <section className="recent-work" aria-label="Recent conversations"><div className="recent-heading"><div className="nav-group-label">Recent topics</div><button className="icon-button" aria-label="Group topics by folder" aria-pressed={grouped} title={grouped ? "Show topics without folder groups" : "Group topics by folder"} onClick={() => { const next = !grouped; setGrouped(next); try { localStorage.setItem("gator:group-topics-by-folder", String(next)); } catch {} }}><Folder size={14} /></button></div>
+  return <section className="recent-work" aria-label="Recent conversations"><div className="recent-heading"><div className="nav-group-label">Recent chats</div><button className="icon-button" aria-label="Group chats by folder" aria-pressed={grouped} title={grouped ? "Show chats without folder groups" : "Group chats by folder"} onClick={() => { const next = !grouped; setGrouped(next); try { localStorage.setItem("gator:group-topics-by-folder", String(next)); } catch {} }}><Folder size={14} /></button></div>
     {state.recent_issue && <p className="recent-issue" role="status">{state.recent_issue}</p>}
     {!!groups.length && <div className="recent-filter"><Search size={14} aria-hidden="true" /><input type="search" aria-label="Filter recent conversations" placeholder="Filter recent chats" maxLength={128} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (!event.nativeEvent.isComposing && ["ArrowDown", "ArrowUp", "Enter"].includes(event.key)) {
       const buttons = [...(event.currentTarget.closest(".recent-work")?.querySelectorAll<HTMLButtonElement>(".recent-chat:not(:disabled)") ?? [])].filter((button) => button.getClientRects().length);

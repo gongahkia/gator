@@ -63,7 +63,7 @@ export function useDrafts(state?: BackendState) {
     if (promoted) {
       remember(context, current.current);
     }
-    identity.current = { context, source: state.source, title: state.primary ? "Gator" : state.conversation_id ? state.title : "Conversation" };
+    identity.current = { context, source: state.source, title: state.conversation_id ? state.title : "Conversation" };
     const cached = values.current.get(context);
     current.current = cached?.text ?? ""; currentUploads.current = cached?.uploads ?? []; renderUploads(currentUploads.current); renderText(current.current); setRecovered(false); setReady(false);
     const owner = identity.current;
@@ -82,7 +82,7 @@ export function useDrafts(state?: BackendState) {
   }, [context, request]);
   useLayoutEffect(() => {
     previousRunning.current = state?.running ?? false;
-    if (identity.current && state) { identity.current.source = state.source; identity.current.title = state.primary ? "Gator" : state.conversation_id ? state.title : "Conversation"; }
+    if (identity.current && state) { identity.current.source = state.source; identity.current.title = state.conversation_id ? state.title : "Conversation"; }
   });
 
   const manage = async (action: DraftRequest) => {

@@ -18,7 +18,7 @@ const pages = [
 ];
 
 export function DesktopHelp({ commands, navigate, disabled, shortcuts: bindings }: { shortcuts?: Record<string,string>; commands: BackendCommand[]; navigate(route: string): void; disabled: boolean }) {
-  const actions: [ShortcutAction, string][] = [["command_search", "Find a command"], ["conversation_search", "Find in conversation"], ["settings", "Open settings"], ["send_message", "Send message"], ["newline", "Add a line"], ["guide_work", "Guide current work"], ["voice_input", "Start or stop dictation"], ["help", "Open help"]];
+  const actions: [ShortcutAction, string][] = [["new_chat", "New chat"], ["command_search", "Find a command"], ["conversation_search", "Find in conversation"], ["settings", "Open settings"], ["send_message", "Send message"], ["newline", "Add a line"], ["guide_work", "Guide current work"], ["voice_input", "Start or stop dictation"], ["help", "Open help"]];
   const shortcuts = actions.map(([action, label]) => [shortcutLabel(action, bindings), label]);
   return <section className="desktop-help" aria-label="Gator desktop help"><header><h3>Using Gator</h3><p>Write a request to get started. You can also ask Gator to inspect settings, change a model, or rebind a shortcut.</p></header>
     <div className="help-pages">{pages.filter((page) => commands.some((command) => command.name === page.name)).map((page) => <button key={page.name} disabled={disabled} onClick={() => navigate(page.route)}><span>{page.label}</span><ArrowUpRight size={15} /></button>)}</div>

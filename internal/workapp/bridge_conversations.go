@@ -54,6 +54,14 @@ func (m *Model) refreshBridgeConversations() {
 		return
 	}
 	m.config.Conversations, m.bridgeRecentIssue = items, ""
+	if m.config.LastConversation != nil && m.title == "New chat" {
+		for _, item := range items {
+			if item.ID == m.conversation {
+				m.title = item.Title
+				break
+			}
+		}
+	}
 }
 
 func (m *Model) refreshBridgeFollowing() {

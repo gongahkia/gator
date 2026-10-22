@@ -23,7 +23,7 @@ type VoiceSettings struct {
 }
 
 var DefaultShortcuts = map[string]string{
-	"command_search": "Mod+K", "conversation_search": "Mod+F", "settings": "Mod+,",
+	"new_chat": "Mod+N", "command_search": "Mod+K", "conversation_search": "Mod+F", "settings": "Mod+,",
 	"send_message": "Enter", "newline": "Shift+Enter", "guide_work": "Mod+Enter",
 	"voice_input": "Mod+Shift+V", "help": "F1",
 }
@@ -35,6 +35,24 @@ func (d DesktopSettings) ResolvedShortcuts() map[string]string {
 	}
 	for action, shortcut := range d.Shortcuts {
 		result[action] = shortcut
+	}
+	// Existing profiles may already use Mod+N for another action. Preserve
+	// that binding and choose an available default for the newly added action.
+	if _, custom := d.Shortcuts["new_chat"]; !custom {
+		occupied := map[string]bool{}
+		for action, binding := range result {
+			if action != "new_chat" {
+				if canonical, err := NormalizeShortcut(binding); err == nil {
+					occupied[physicalShortcut(canonical)] = true
+				}
+			}
+		}
+		for _, candidate := range []string{"Mod+N", "Mod+Shift+N", "Mod+Alt+N", "Mod+Alt+Shift+N", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"} {
+			if !occupied[physicalShortcut(candidate)] {
+				result["new_chat"] = candidate
+				break
+			}
+		}
 	}
 	return result
 }

@@ -1,5 +1,5 @@
 export const defaultShortcuts = {
-  command_search: "Mod+K", conversation_search: "Mod+F", settings: "Mod+,",
+  new_chat: "Mod+N", command_search: "Mod+K", conversation_search: "Mod+F", settings: "Mod+,",
   send_message: "Enter", newline: "Shift+Enter", guide_work: "Mod+Enter",
   voice_input: "Mod+Shift+V", help: "F1",
 } as const;

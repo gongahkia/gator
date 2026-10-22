@@ -44,6 +44,7 @@ test("attachments stay with drafts and queued messages and reach the real model 
     let page = await app.firstWindow();
     let composer = page.getByRole("textbox", { name: "Message Gator", exact: true });
     await expect(composer).toBeVisible();
+    await page.getByRole("button", { name: "New chat", exact: true }).click();
     await page.evaluate(() => window.gator!.send({ type: "submit", text: "/mode inspect" }));
     await pick(app, [brief]); await page.getByRole("button", { name: "Attach files", exact: true }).click();
     let pending = page.getByRole("region", { name: "Attachments for your next message", exact: true });
@@ -62,7 +63,7 @@ test("attachments stay with drafts and queued messages and reach the real model 
     await pick(app, [followup]); await page.getByRole("button", { name: "Attach files", exact: true }).click();
     await expect(pending.getByText("follow-up.csv", { exact: true })).toBeVisible();
     await composer.fill("A separate unsent message");
-    const main = page.getByRole("button", { name: "Talk with Gator", exact: true });
+    const main = page.getByRole("button", { name: "Open conversation: New chat", exact: true });
     await main.click(); await expect(main).toHaveAttribute("aria-current", "page");
     await expect(composer).toHaveValue("Read my chosen brief.");
     await expect(pending.getByText("brief.txt", { exact: true })).toBeVisible();
