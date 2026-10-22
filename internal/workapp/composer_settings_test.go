@@ -2,8 +2,24 @@ package workapp
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 )
+
+func TestComposerBoundsLargeCatalogAndKeepsCurrentChoice(t *testing.T) {
+	choices := make([]ComposerModel, 300)
+	for i := range choices {
+		choices[i] = ComposerModel{Provider: "fixture", Model: fmt.Sprintf("model-%d", i)}
+	}
+	m := New(Config{SelectedModel: func() (string, string, error) { return "fixture", "model-299", nil }, ComposerModels: func() ([]ComposerModel, error) { return choices, nil }})
+	state := m.composerSettings()
+	if len(state.Models) != 256 || state.Models[255].Model != "model-299" || state.Issue == "" {
+		t.Fatal("large model catalog was not bounded with the active selection retained")
+	}
+	if choices[255].Model != "model-255" {
+		t.Fatal("projection mutated the catalog owner's slice")
+	}
+}
 
 func TestComposerUsesExistingSelectionAndBudgetsWithoutChangingDraft(t *testing.T) {
 	provider, name := "custom", "first"

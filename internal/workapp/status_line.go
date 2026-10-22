@@ -60,6 +60,20 @@ func (m *Model) refreshModelStatus() {
 		m.composerModelsIssue = ""
 		if err != nil {
 			m.composerModelsIssue = "Models could not load. Open Manage models to try again."
+		} else if len(m.composerModels) > 256 {
+			// Bound the repeated bridge projection and keep the current model
+			// visible even when it is beyond the first page of configured choices.
+			bounded := append([]ComposerModel(nil), m.composerModels[:256]...)
+			for index, choice := range m.composerModels {
+				if choice.Provider == status.Provider && choice.Model == status.Model {
+					if index >= 256 {
+						bounded[255] = choice
+					}
+					break
+				}
+			}
+			m.composerModels = bounded
+			m.composerModelsIssue = "Showing up to 256 configured models. Open Manage models for the full catalog."
 		}
 	}
 }
