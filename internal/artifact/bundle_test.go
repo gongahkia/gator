@@ -1,6 +1,8 @@
 package artifact
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"strings"
@@ -94,4 +96,38 @@ func sealedBundleFixture(t *testing.T) (string, string) {
 		t.Fatal(err)
 	}
 	return bundlePath, sourcePath
+}
+
+func TestOpenedBundleBindsExactManifestVersion(t *testing.T) {
+	path, _ := sealedBundleFixture(t)
+	bundle, err := OpenBundle(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contents, err := os.ReadFile(filepath.Join(path, "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := sha256.Sum256(contents)
+	if bundle.ManifestSHA256 != hex.EncodeToString(digest[:]) {
+		t.Fatal("digest is not bound to parsed bytes")
+	}
+	// Even a whitespace-only replacement must not silently acquire the old
+	// parsed value's approval/receipt identity.
+	if err := os.WriteFile(filepath.Join(path, "manifest.json"), append(contents, '\n'), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := VerifyBundle(bundle); err == nil || !strings.Contains(err.Error(), "manifest changed") {
+		t.Fatalf("stale manifest accepted: %v", err)
+	}
+	reopened, err := OpenBundle(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := VerifyBundle(reopened); err != nil {
+		t.Fatal(err)
+	}
+	if reopened.ManifestSHA256 == bundle.ManifestSHA256 {
+		t.Fatal("replacement retained old receipt identity")
+	}
 }

@@ -24,6 +24,8 @@ type Bundle struct {
 	Root     workspace.Root
 	Output   workspace.Root
 	Manifest Manifest
+	// ManifestSHA256 binds the parsed value to the exact bytes read by OpenBundle.
+	ManifestSHA256 string `json:"-"`
 }
 
 // OpenBundle strictly loads a retained or exported artifact bundle. Call
@@ -63,12 +65,23 @@ func OpenBundle(path string) (Bundle, error) {
 	if err != nil {
 		return Bundle{}, fmt.Errorf("open artifact output: %w", err)
 	}
-	return Bundle{Path: root.Path(), Root: root, Output: output, Manifest: manifest}, nil
+	digest := sha256.Sum256(contents)
+	return Bundle{Path: root.Path(), Root: root, Output: output, Manifest: manifest, ManifestSHA256: hex.EncodeToString(digest[:])}, nil
 }
 
 // VerifyBundle re-runs the embedded contract and requires every observed
 // digest and validation result to match the sealed evidence exactly.
 func VerifyBundle(bundle Bundle) error {
+	if bundle.ManifestSHA256 != "" {
+		contents, err := bundle.Root.ReadRegularFile("manifest.json", maxManifestBytes)
+		if err != nil {
+			return err
+		}
+		digest := sha256.Sum256(contents)
+		if hex.EncodeToString(digest[:]) != bundle.ManifestSHA256 {
+			return errors.New("artifact manifest changed since it was opened")
+		}
+	}
 	if err := bundle.Manifest.Validate(); err != nil {
 		return err
 	}
