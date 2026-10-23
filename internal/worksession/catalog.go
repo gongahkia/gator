@@ -36,10 +36,11 @@ type ConversationQuery struct {
 	Limit   int
 }
 type ConversationPage struct {
-	Items      []ConversationItem `json:"items"`
-	Next       string             `json:"next,omitempty"`
-	Incomplete bool               `json:"incomplete,omitempty"`
-	Skipped    int                `json:"skipped,omitempty"`
+	Items         []ConversationItem `json:"items"`
+	Next          string             `json:"next,omitempty"`
+	Incomplete    bool               `json:"incomplete,omitempty"`
+	Skipped       int                `json:"skipped,omitempty"`
+	IndexFallback bool               `json:"index_fallback,omitempty"`
 }
 type ConversationItem struct {
 	ID        string    `json:"id"`
@@ -102,7 +103,7 @@ func cursorFor(c Conversation) catalogCursor {
 
 // PageConversations does bounded local reads, never starts work or gives a
 // renderer replay state. The anchor is stable as newer chats arrive above it.
-func (s Store) PageConversations(query ConversationQuery) (ConversationPage, error) {
+func (s Store) pageConversationFiles(query ConversationQuery) (ConversationPage, error) {
 	q, err := normalizeConversationQuery(query)
 	if err != nil {
 		return ConversationPage{}, err

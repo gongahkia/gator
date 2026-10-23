@@ -278,6 +278,8 @@ func TestFileVersionsFollowBackupAndExplicitHistoryDeletion(t *testing.T) {
 	for _, path := range []string{"files/identity/file.json", "files/identity/version.bin", "files/identity/draft.json", "files/alias/link.json", "files/identity/saving.lock", "files/identity/interrupted.tmp"} {
 		writeFixture(t, root, path, "retained file content")
 	}
+	writeFixture(t, root, "cache/conversations-v1.sqlite", "derived private excerpts")
+	writeFixture(t, root, "cache/conversations-v1.sqlite-wal", "derived private excerpts")
 	output := filepath.Join(t.TempDir(), "backup.tar.gz")
 	manifest, err := s.Export(context.Background(), output)
 	if err != nil {
@@ -299,6 +301,9 @@ func TestFileVersionsFollowBackupAndExplicitHistoryDeletion(t *testing.T) {
 	if entries, err := os.ReadDir(filepath.Join(root, "gator/files")); err != nil || len(entries) != 0 {
 		t.Fatal("history deletion retained private working files", err)
 	}
+	if entries, err := os.ReadDir(filepath.Join(root, "gator/cache")); err != nil || len(entries) != 0 {
+		t.Fatal("history deletion retained searchable excerpts", entries, err)
+	}
 }
 
 func TestRetentionPreservesSelectedUnsentChatAndBackupMemorySuppression(t *testing.T) {
@@ -314,8 +319,15 @@ func TestRetentionPreservesSelectedUnsentChatAndBackupMemorySuppression(t *testi
 	if err := s.SavePolicy(Policy{HistoryDays: 30}); err != nil {
 		t.Fatal(err)
 	}
+	page, err := sessions.PageConversations(worksession.ConversationQuery{})
+	if err != nil || page.IndexFallback || len(page.Items) != 2 {
+		t.Fatal("index fixture", page, err)
+	}
 	if _, err := Maintain(context.Background(), root, time.Now()); err != nil {
 		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "gator/cache/conversations-v1.sqlite")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("retention kept expired excerpts", err)
 	}
 	if _, err := sessions.Load(active.ID); err != nil {
 		t.Fatal("unsent active chat lost", err)

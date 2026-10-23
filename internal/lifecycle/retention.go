@@ -266,6 +266,11 @@ func (s Store) selectRetention(ctx context.Context, now time.Time, p Policy) (Pl
 			selected = append(selected, "retrieval")
 		}
 	}
+	// Rebuildable chat indexes contain excerpts from retained history. Remove
+	// them in the same reviewed plan whenever that history is being expired.
+	if len(removedConversations) > 0 {
+		selected = append(selected, "cache")
+	}
 	items, err := s.walk(ctx, selected, true)
 	if err != nil {
 		return plan, err

@@ -42,7 +42,7 @@ func (r cancelReader) Read(p []byte) (int, error) {
 // capabilities, credentials, provider configuration and browser profiles are
 // excluded. Source snapshots and transcripts can still contain private data.
 func (s Store) Export(ctx context.Context, destination string) (BackupManifest, error) {
-	manifest := BackupManifest{Version: 1, CreatedAt: time.Now().UTC(), StateDir: s.stateDir, Files: map[string]string{}, Excluded: []string{"credentials and provider configuration", "browser/desktop profiles", "runtime access tokens and leases", "rebuildable retrieval indexes", "shared usage counters", "original external project directories"}}
+	manifest := BackupManifest{Version: 1, CreatedAt: time.Now().UTC(), StateDir: s.stateDir, Files: map[string]string{}, Excluded: []string{"credentials and provider configuration", "browser/desktop profiles", "runtime access tokens and leases", "rebuildable retrieval and conversation indexes", "shared usage counters", "original external project directories"}}
 	absolute, err := filepath.Abs(destination)
 	if err != nil {
 		return manifest, err
@@ -264,7 +264,7 @@ func backupContent(name string) bool {
 	if rel == "memory/.write-lock" {
 		return false
 	}
-	if strings.HasPrefix(rel, "work-control/") || strings.HasPrefix(rel, "retrieval/") {
+	if strings.HasPrefix(rel, "work-control/") || strings.HasPrefix(rel, "retrieval/") || strings.HasPrefix(rel, "cache/") {
 		return false
 	}
 	if (strings.HasPrefix(rel, "work-history/") || strings.HasPrefix(rel, "goals/plans/")) && strings.HasSuffix(rel, ".lock") {
