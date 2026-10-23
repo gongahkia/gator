@@ -76,9 +76,13 @@ func (r Root) WriteRegularFileAtomic(path string, contents []byte, maxBytes int6
 		return fmt.Errorf("replace %q: %w", path, err)
 	}
 	keepTemporary = false
-	if directory, err := root.Open(parent); err == nil {
-		_ = privatefs.SyncDir(directory)
-		_ = directory.Close()
+	directory, err := root.Open(parent)
+	if err != nil {
+		return fmt.Errorf("open directory after replacing %q: %w", path, err)
+	}
+	defer directory.Close()
+	if err := privatefs.SyncDir(directory); err != nil {
+		return fmt.Errorf("sync directory after replacing %q: %w", path, err)
 	}
 	return nil
 }
