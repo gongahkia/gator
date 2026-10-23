@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/workhistory"
 )
 
@@ -34,5 +35,23 @@ func TestPilotCommandRetainsOnlyObservedUsability(t *testing.T) {
 	}
 	if err := pilotCommand([]string{"record", "--work", "work-pilot-command", "--draft", "usable"}, &out); err == nil {
 		t.Fatal("missing correction count was silently accepted")
+	}
+}
+
+func TestPilotHealthNoticesStaySeparateFromAlertRatings(t *testing.T) {
+	state := t.TempDir()
+	goalID := "goal-aaaaaaaaaaaaaaaaaaaaaaaa"
+	store, err := inbox.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, status := range []string{"completed", "failed", "interrupted"} {
+		if _, err := store.Add(inbox.Entry{Kind: "job", GoalID: goalID, Title: "Project", Status: status}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	report, err := readPilotReport(state, goalID)
+	if err != nil || report.Alerts.Total != 1 || report.Alerts.Unrated != 1 || report.Alerts.HealthNotices != 2 {
+		t.Fatalf("inaccurate alert report: %+v %v", report.Alerts, err)
 	}
 }

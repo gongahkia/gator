@@ -352,6 +352,7 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			_, err = store.ReviewQuietWatchReviewed(jobID, attemptID, verdict, note, revision, time.Now())
 			return err
 		},
+		InboxStore:         &inboxStore,
 		StartSupervisor:    func() error { return startLocalSupervisor(stateDir) },
 		PilotAction:        workPilotResult,
 		Controls:           workControlsWithConnections(stateDir, connections),

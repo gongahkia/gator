@@ -1,3 +1,6 @@
 .chat-update-state[data-check-issue="true"] { color: var(--color-warning); flex-wrap: wrap; }
 .chat-update-handled { color: var(--color-muted); }
 .chat-update > .chat-update-status-note { margin-top: 8px; color: var(--color-muted); font-size: var(--text-xs); }
+.chat-update-feedback { padding: 8px 0; color: var(--color-muted); font-size: var(--text-xs); }
+.chat-update-feedback-choices { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
+.chat-update-feedback-choices [aria-pressed="true"] { color: var(--color-accent); background: var(--color-selected-fill); box-shadow: inset 0 0 0 1px var(--color-line); }

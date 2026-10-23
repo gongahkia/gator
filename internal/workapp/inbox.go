@@ -3,6 +3,7 @@ package workapp
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/inbox"
@@ -58,13 +59,22 @@ func (m Model) updateInboxKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "m":
 		args, message = []string{"read", entry.ID}, "Marked as read."
 	case "u", "n", "w", "c":
+		if !entry.CanRate() {
+			return m, nil
+		}
 		rating := map[string]string{"u": "useful", "n": "noise", "w": "wrong", "c": "clear"}[key.String()]
 		args, message = []string{"rate", entry.ID, rating}, "Rating saved."
 	default:
 		return m, nil
 	}
-	if _, err := m.config.InboxAction(args); err != nil {
-		m.sectionNotice = "Could not update this result: " + err.Error()
+	var actionErr error
+	if len(args) == 3 && args[0] == "rate" && m.config.InboxStore != nil {
+		_, actionErr = m.config.InboxStore.RateReviewed(entry.ID, args[2], entry.RatingVersion, time.Now())
+	} else {
+		_, actionErr = m.config.InboxAction(args)
+	}
+	if actionErr != nil {
+		m.sectionNotice = "Could not update this result: " + actionErr.Error()
 		return m, nil
 	}
 	m.sectionNotice = message
@@ -83,6 +93,7 @@ func (m Model) inboxDetailPanel() uisnapshot.Panel {
 		p.Notice = "This result is no longer in the current Inbox. Go back and refresh the list."
 		return p
 	}
+	p.ActionIdentity = fmt.Sprintf("%s:%d", entry.ID, entry.RatingVersion)
 	p.Title = safeInboxText(entry.Title)
 	p.Subtitle = strings.Join([]string{safeInboxText(entry.Status), entry.CreatedAt.Local().Format("2 Jan, 15:04")}, " · ")
 	read := "Unread"
@@ -98,10 +109,12 @@ func (m Model) inboxDetailPanel() uisnapshot.Panel {
 		if entry.ReadAt.IsZero() {
 			p.Hints = append(p.Hints, uisnapshot.Hint{Shortcut: "M", Action: "mark as read"})
 		}
-		p.Hints = append(p.Hints, uisnapshot.Hint{Shortcut: "U", Action: "useful"},
-			uisnapshot.Hint{Shortcut: "N", Action: "noise"}, uisnapshot.Hint{Shortcut: "W", Action: "wrong"})
-		if entry.Rating != "" {
-			p.Hints = append(p.Hints, uisnapshot.Hint{Shortcut: "C", Action: "clear rating"})
+		if entry.CanRate() {
+			p.Hints = append(p.Hints, uisnapshot.Hint{Shortcut: "U", Action: "useful"},
+				uisnapshot.Hint{Shortcut: "N", Action: "noise"}, uisnapshot.Hint{Shortcut: "W", Action: "wrong"})
+			if entry.Rating != "" {
+				p.Hints = append(p.Hints, uisnapshot.Hint{Shortcut: "C", Action: "clear rating"})
+			}
 		}
 	}
 	return p

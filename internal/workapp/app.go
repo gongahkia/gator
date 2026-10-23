@@ -454,6 +454,7 @@ type Model struct {
 	chatMemories           []ChatMemoryReceipt
 	chatMemoriesOwner      string
 	chatMemoryResult       *ChatMemoryResult
+	chatUpdateResult       *BridgeUpdateResult
 	chatMemoryIssue        string
 	recall                 RecallStatus
 	recallBusy             bool

@@ -10,7 +10,7 @@ import (
 )
 
 func TestInboxOpeningIsReadOnlyAndExplicitActionsUseCurrentView(t *testing.T) {
-	entry := inbox.Entry{ID: "result-one", Title: "Project update", Summary: "An exact retained update.", Status: "completed", CreatedAt: time.Now()}
+	entry := inbox.Entry{Kind: "job", ID: "result-one", Title: "Project update", Summary: "An exact retained update.", Status: "completed", CreatedAt: time.Now()}
 	var calls []string
 	m := New(Config{Inbox: []inbox.Entry{entry}, RefreshInbox: func() ([]inbox.Entry, error) { return []inbox.Entry{entry}, nil },
 		InboxAction: func(args []string) (string, error) {
@@ -49,5 +49,22 @@ func TestInboxOpeningIsReadOnlyAndExplicitActionsUseCurrentView(t *testing.T) {
 	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	if next.(Model).section != "inbox" || next.(Model).inboxDetail != "" {
 		t.Fatal("back did not return to Inbox")
+	}
+}
+
+func TestInboxFeedbackViewBindsRevisionEvenWhenAssessmentLooksIdentical(t *testing.T) {
+	entry := inbox.Entry{ID: "result-one", Kind: "job", Title: "Update", Status: "completed", CreatedAt: time.Now()}
+	calls := 0
+	m := New(Config{Inbox: []inbox.Entry{entry}, InboxAction: func([]string) (string, error) { calls++; return "saved", nil }})
+	m.section, m.inboxDetail = "inbox", entry.ID
+	old := m.BridgeState().Panel.ID
+	m.config.Inbox[0].RatingVersion = 2
+	if m.BridgeState().Panel.ID == old {
+		t.Fatal("feedback revision absent from view identity")
+	}
+	next, _ := m.ApplyBridgePanel(BridgePanelAction{ID: old, Action: "key"}, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("u")})
+	_ = next
+	if calls != 0 {
+		t.Fatal("stale assessment changed feedback")
 	}
 }

@@ -44,7 +44,8 @@ export function validateFrame(frame) {
   }
   if (frame.type === "update") {
     const value = frame.update;
-    if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some(key => !["conversation_id", "id", "action", "version"].includes(key)) || typeof value.conversation_id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/.test(value.conversation_id) || typeof value.id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(value.id) || !["delivered", "read", "resolve", "reopen", "older", "newer"].includes(value.action) || !Number.isSafeInteger(value.version) || value.version < 0) throw new Error("Invalid update receipt");
+    if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some(key => !["conversation_id", "id", "action", "version", "rating", "rating_version", "request_id"].includes(key)) || typeof value.conversation_id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/.test(value.conversation_id) || typeof value.id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(value.id) || !["delivered", "read", "resolve", "reopen", "older", "newer", "rate"].includes(value.action) || !Number.isSafeInteger(value.version) || value.version < 0) throw new Error("Invalid update receipt");
+    if (value.action === "rate" ? !["useful", "noise", "wrong", "clear"].includes(value.rating) || !Number.isSafeInteger(value.rating_version) || value.rating_version < 0 || typeof value.request_id !== "string" || !/^[a-zA-Z0-9-]{1,64}$/.test(value.request_id) : value.rating !== undefined || value.rating_version !== undefined || value.request_id !== undefined) throw new Error("Invalid update feedback");
   }
   if (frame.type === "memory") {
     const v = frame.memory;

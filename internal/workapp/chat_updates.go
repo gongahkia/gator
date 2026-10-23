@@ -6,26 +6,37 @@ import (
 )
 
 type BridgeChatUpdate struct {
-	NextStep  string    `json:"next_step,omitempty"`
-	Evidence  []string  `json:"evidence,omitempty"`
-	ID        string    `json:"id"`
-	Title     string    `json:"title"`
-	Summary   string    `json:"summary"`
-	Status    string    `json:"status"`
-	JobID     string    `json:"job_id,omitempty"`
-	GoalID    string    `json:"goal_id,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
-	Delivered bool      `json:"delivered"`
-	Read      bool      `json:"read"`
-	Resolved  bool      `json:"resolved"`
-	Version   uint64    `json:"version"`
+	CanRate       bool      `json:"can_rate"`
+	Rating        string    `json:"rating,omitempty"`
+	RatingVersion uint64    `json:"rating_version"`
+	NextStep      string    `json:"next_step,omitempty"`
+	Evidence      []string  `json:"evidence,omitempty"`
+	ID            string    `json:"id"`
+	Title         string    `json:"title"`
+	Summary       string    `json:"summary"`
+	Status        string    `json:"status"`
+	JobID         string    `json:"job_id,omitempty"`
+	GoalID        string    `json:"goal_id,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+	Delivered     bool      `json:"delivered"`
+	Read          bool      `json:"read"`
+	Resolved      bool      `json:"resolved"`
+	Version       uint64    `json:"version"`
 }
 
 type BridgeUpdateAction struct {
+	Rating         string `json:"rating,omitempty"`
+	RatingVersion  uint64 `json:"rating_version,omitempty"`
+	RequestID      string `json:"request_id,omitempty"`
 	ConversationID string `json:"conversation_id"`
 	ID             string `json:"id"`
 	Action         string `json:"action"`
 	Version        uint64 `json:"version"`
+}
+
+type BridgeUpdateResult struct {
+	RequestID string `json:"request_id"`
+	Error     string `json:"error,omitempty"`
 }
 
 type BridgeUpdateConversation struct {
@@ -94,12 +105,27 @@ func (m Model) bridgeChatUpdates() []BridgeChatUpdate {
 	result := make([]BridgeChatUpdate, 0, len(m.chatUpdates))
 	for i := len(m.chatUpdates) - 1; i >= 0; i-- {
 		e := m.chatUpdates[i]
-		result = append(result, BridgeChatUpdate{ID: e.ID, Title: e.Title, Summary: e.Summary, NextStep: e.NextStep, Evidence: append([]string(nil), e.Evidence...), Status: e.Status, JobID: e.JobID, GoalID: e.GoalID, CreatedAt: e.CreatedAt, Delivered: !e.DeliveredAt.IsZero(), Read: !e.ReadAt.IsZero(), Resolved: !e.ResolvedAt.IsZero(), Version: e.ResolutionVersion})
+		// Only completed results accept alert-quality feedback. A failed check
+		// cannot establish whether a material change happened.
+		result = append(result, BridgeChatUpdate{CanRate: e.CanRate(), Rating: e.Rating, RatingVersion: e.RatingVersion, ID: e.ID, Title: e.Title, Summary: e.Summary, NextStep: e.NextStep, Evidence: append([]string(nil), e.Evidence...), Status: e.Status, JobID: e.JobID, GoalID: e.GoalID, CreatedAt: e.CreatedAt, Delivered: !e.DeliveredAt.IsZero(), Read: !e.ReadAt.IsZero(), Resolved: !e.ResolvedAt.IsZero(), Version: e.ResolutionVersion})
 	}
 	return result
 }
 
 func (m Model) ApplyBridgeUpdate(action BridgeUpdateAction) Model {
+	if action.Action == "rate" {
+		m.chatUpdateResult = &BridgeUpdateResult{RequestID: action.RequestID}
+		if action.RequestID == "" || len(action.RequestID) > 64 || m.config.InboxStore == nil || m.conversation == "" || action.ConversationID != m.conversation {
+			m.chatUpdateResult.Error = "Return to the update’s conversation before reviewing it."
+			return m
+		}
+		_, err := m.config.InboxStore.RateForConversation(m.conversation, action.ID, action.Rating, action.RatingVersion, time.Now())
+		if err != nil {
+			m.chatUpdateResult.Error = err.Error()
+		}
+		m.refreshChatUpdates()
+		return m
+	}
 	if m.config.InboxStore == nil || m.conversation == "" || action.ConversationID != m.conversation {
 		m.chatUpdatesIssue = "Return to the update’s conversation before changing it."
 		return m

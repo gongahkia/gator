@@ -48,14 +48,16 @@ type Entry struct {
 	ReadAt               time.Time `json:"read_at,omitempty"`
 	Rating               string    `json:"rating,omitempty"`
 	RatedAt              time.Time `json:"rated_at,omitempty"`
+	RatingVersion        uint64    `json:"rating_version,omitempty"`
 }
 
 type RatingSummary struct {
-	Total   int `json:"total"`
-	Useful  int `json:"useful"`
-	Noise   int `json:"noise"`
-	Wrong   int `json:"wrong"`
-	Unrated int `json:"unrated"`
+	HealthNotices int `json:"health_notices"`
+	Total         int `json:"total"`
+	Useful        int `json:"useful"`
+	Noise         int `json:"noise"`
+	Wrong         int `json:"wrong"`
+	Unrated       int `json:"unrated"`
 }
 
 type Store struct{ root string }
@@ -222,6 +224,26 @@ func (s Store) MarkRead(entryID string, now time.Time) error {
 // Rate records explicit feedback about a surfaced job alert. It does not infer
 // that reading or dismissing an alert means the alert was noise.
 func (s Store) Rate(entryID, rating string, now time.Time) (Entry, error) {
+	return s.rate(entryID, rating, "", nil, now)
+}
+
+// RateReviewed protects an assessment shown in the inbox from later edits.
+func (s Store) RateReviewed(entryID, rating string, version uint64, now time.Time) (Entry, error) {
+	return s.rate(entryID, rating, "", &version, now)
+}
+
+// RateForConversation checks chat ownership and the displayed feedback version
+// under the same lock as the write. Feedback never changes attention receipts.
+func (s Store) RateForConversation(conversationID, entryID, rating string, version uint64, now time.Time) (Entry, error) {
+	if !idPattern.MatchString(conversationID) {
+		return Entry{}, errors.New("a valid conversation is required")
+	}
+	return s.rate(entryID, rating, conversationID, &version, now)
+}
+
+func (e Entry) CanRate() bool { return e.Kind == "job" && e.Status == "completed" }
+
+func (s Store) rate(entryID, rating, conversationID string, version *uint64, now time.Time) (Entry, error) {
 	if rating != "useful" && rating != "noise" && rating != "wrong" && rating != "clear" {
 		return Entry{}, errors.New("rating must be useful, noise, wrong, or clear")
 	}
@@ -237,9 +259,19 @@ func (s Store) Rate(entryID, rating string, now time.Time) (Entry, error) {
 	if err != nil {
 		return Entry{}, err
 	}
-	if entry.Kind != "job" {
-		return Entry{}, errors.New("only job alerts can be rated")
+	if conversationID != "" && entry.OriginConversationID != conversationID {
+		return Entry{}, errors.New("this update belongs to another conversation")
 	}
+	if !entry.CanRate() {
+		return Entry{}, errors.New("only completed job alerts can be rated; failed checks are health notices")
+	}
+	if version != nil && entry.RatingVersion != *version {
+		return Entry{}, errors.New("feedback changed; review the latest assessment before changing it")
+	}
+	if entry.RatingVersion == ^uint64(0) {
+		return Entry{}, errors.New("feedback version exhausted")
+	}
+	entry.RatingVersion++
 	if rating == "clear" {
 		entry.Rating = ""
 		entry.RatedAt = time.Time{}
@@ -263,6 +295,10 @@ func (s Store) RatingsForGoal(goalID string) (RatingSummary, error) {
 	var result RatingSummary
 	for _, entry := range entries {
 		if entry.GoalID != goalID || entry.Kind != "job" {
+			continue
+		}
+		if !entry.CanRate() {
+			result.HealthNotices++
 			continue
 		}
 		result.Total++

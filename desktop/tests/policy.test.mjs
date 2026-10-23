@@ -13,6 +13,12 @@ test("update receipts and replies accept identities but never renderer-supplied 
   assert.throws(() => validateFrame({ type: "upload_submit", upload: { ...upload, goal_id: "other" } }));
 });
 
+test("update feedback requires a bounded nonce and independent reviewed version", () => {
+  const update = { conversation_id: "work-one", id: "inbox-one", action: "rate", version: 0, rating: "useful", rating_version: 2, request_id: "feedback-1" };
+  assert.equal(validateFrame({ type: "update", update }).version, 1);
+  for (const change of [{ rating: "good" }, { rating_version: undefined }, { rating_version: -1 }, { rating_version: 1.5 }, { request_id: "" }, { request_id: "a".repeat(65) }, { action: "read" }]) assert.throws(() => validateFrame({ type: "update", update: { ...update, ...change } }));
+});
+
 test("composer choices carry only bounded identities and canonical work effort", () => {
   const composer = { id: "a".repeat(64), request_id: "picker-1", action: "model", provider: "fixture", model: "model-one" };
   assert.equal(validateFrame({ type: "composer", composer }).version, 1);

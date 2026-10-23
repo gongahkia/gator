@@ -27,6 +27,7 @@ type BridgeState struct {
 	UpdatesHaveOlder      bool                       `json:"updates_have_older,omitempty"`
 	UpdatesHaveNewer      bool                       `json:"updates_have_newer,omitempty"`
 	UpdateConversations   []BridgeUpdateConversation `json:"update_conversations,omitempty"`
+	ChatUpdateResult      *BridgeUpdateResult        `json:"chat_update_result,omitempty"`
 	ChatUpdates           []BridgeChatUpdate         `json:"chat_updates,omitempty"`
 	ChatUpdatesIssue      string                     `json:"chat_updates_issue,omitempty"`
 	ChatUpdatesTotal      int                        `json:"chat_updates_total,omitempty"`
@@ -165,7 +166,7 @@ func (m Model) BridgeState() BridgeState {
 		PendingConnection: m.pendingConnection(),
 		UpdatesHaveOlder:  m.updatesHaveOlder, UpdatesHaveNewer: len(m.updatePageAnchors) > 0,
 		UpdateConversations: append([]BridgeUpdateConversation(nil), m.updateConversations...),
-		ChatUpdates:         m.bridgeChatUpdates(), ChatUpdatesIssue: m.chatUpdatesIssue, ChatUpdatesTotal: m.chatUpdatesTotal,
+		ChatUpdateResult:    m.chatUpdateResult, ChatUpdates: m.bridgeChatUpdates(), ChatUpdatesIssue: m.chatUpdatesIssue, ChatUpdatesTotal: m.chatUpdatesTotal,
 		Foreground:            !m.background,
 		SessionRequest:        m.sessionRequest,
 		RequestsRecovered:     m.requestsRecovered,

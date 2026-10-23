@@ -9,6 +9,44 @@ import (
 	"github.com/gongahkia/gator/internal/inbox"
 )
 
+func TestChatFeedbackReturnsOwnedAcknowledgementAndCurrentAssessment(t *testing.T) {
+	store, err := inbox.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	e, err := store.Add(inbox.Entry{Kind: "job", Title: "Changed deadline", Status: "completed", OriginConversationID: "chat"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := New(Config{InboxStore: &store})
+	m.conversation = "chat"
+	m.refreshChatUpdates()
+	if p := m.bridgeChatUpdates()[0]; !p.CanRate || p.RatingVersion != 0 {
+		t.Fatal("initial feedback unavailable", p)
+	}
+	action := BridgeUpdateAction{ConversationID: "chat", ID: e.ID, Action: "rate", Rating: "useful", RequestID: "review-1"}
+	m = m.ApplyBridgeUpdate(action)
+	if r := m.BridgeState().ChatUpdateResult; r == nil || r.RequestID != "review-1" || r.Error != "" {
+		t.Fatal("missing success acknowledgement", r)
+	}
+	if p := m.bridgeChatUpdates()[0]; p.Rating != "useful" || p.RatingVersion != 1 || p.Read || p.Resolved {
+		t.Fatal("feedback projection wrong", p)
+	}
+	action.RequestID, action.Rating = "review-2", "wrong"
+	m = m.ApplyBridgeUpdate(action)
+	if r := m.BridgeState().ChatUpdateResult; r.RequestID != "review-2" || r.Error == "" {
+		t.Fatal("stale action claimed success", r)
+	}
+	if m.bridgeChatUpdates()[0].Rating != "useful" {
+		t.Fatal("stale action changed feedback")
+	}
+	action.ConversationID, action.RatingVersion = "other", 1
+	m = m.ApplyBridgeUpdate(action)
+	if m.chatUpdateResult.Error == "" {
+		t.Fatal("cross-chat frame accepted")
+	}
+}
+
 func TestChatUpdatePagesStayBoundedAndAnchoredAsNewResultsArrive(t *testing.T) {
 	store, err := inbox.Open(t.TempDir())
 	if err != nil {

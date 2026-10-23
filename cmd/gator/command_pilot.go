@@ -116,7 +116,7 @@ func pilotCommand(args []string, out io.Writer) error {
 	if *asJSON {
 		return json.NewEncoder(out).Encode(report)
 	}
-	_, err = fmt.Fprintf(out, "Human reviews: %d across %d Work runs\nDrafts: %d usable, %d light edits, %d rewrite, %d failed; %d corrections\nFollow-ups: %d useful, %d unhelpful (others unreviewed)\nRecovery: %d succeeded, %d failed (others unreviewed)\nShown alerts: %d useful, %d noise, %d wrong, %d unrated\nQuiet decisions: %d reviewed correct, %d reviewed missed, %d unreviewed\nObserved run time: %.1fs; %d reported model requests; %d reported tokens\n", len(report.Reviews), report.UniqueRuns, report.Usable, report.LightEdits, report.Rewrite, report.Failed, report.Corrections, report.UsefulFollowups, report.UnhelpfulFollowups, report.RecoverySuccesses, report.RecoveryFailures, report.Alerts.Useful, report.Alerts.Noise, report.Alerts.Wrong, report.Alerts.Unrated, report.QuietReviewedCorrect, report.QuietReviewedMissed, report.QuietUnreviewed, report.ElapsedSeconds, report.ModelRequests, report.Tokens)
+	_, err = fmt.Fprintf(out, "Human reviews: %d across %d Work runs\nDrafts: %d usable, %d light edits, %d rewrite, %d failed; %d corrections\nFollow-ups: %d useful, %d unhelpful (others unreviewed)\nRecovery: %d succeeded, %d failed (others unreviewed)\nShown alerts: %d useful, %d noise, %d wrong, %d unrated\nHealth notices: %d (excluded from alert ratings)\nQuiet decisions: %d reviewed correct, %d reviewed missed, %d unreviewed\nObserved run time: %.1fs; %d reported model requests; %d reported tokens\n", len(report.Reviews), report.UniqueRuns, report.Usable, report.LightEdits, report.Rewrite, report.Failed, report.Corrections, report.UsefulFollowups, report.UnhelpfulFollowups, report.RecoverySuccesses, report.RecoveryFailures, report.Alerts.Useful, report.Alerts.Noise, report.Alerts.Wrong, report.Alerts.Unrated, report.Alerts.HealthNotices, report.QuietReviewedCorrect, report.QuietReviewedMissed, report.QuietUnreviewed, report.ElapsedSeconds, report.ModelRequests, report.Tokens)
 	if err != nil {
 		return err
 	}
@@ -160,6 +160,7 @@ func readPilotReport(stateDir, goalID string) (pilotReport, error) {
 		if err != nil {
 			return result, err
 		}
+		result.Alerts.HealthNotices += ratings.HealthNotices
 		result.Alerts.Total += ratings.Total
 		result.Alerts.Useful += ratings.Useful
 		result.Alerts.Noise += ratings.Noise

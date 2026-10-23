@@ -61,6 +61,100 @@ test("failed and interrupted checks remain explicit after reading or marking don
   }
 });
 
+test("update feedback waits for host acknowledgement, rejects stale edits and survives restart", async () => {
+  test.setTimeout(100_000);
+  const root = await temporaryDirectory(join(tmpdir(), "gator-update-feedback-"));
+  const workspace = join(root, "workspace"); await mkdir(workspace);
+  const config = join(root, "config", "gator"); await mkdir(config, { recursive: true });
+  await writeFile(join(config, "config.json"), JSON.stringify({ version: 4, defaults: { provider: "feedback-fixture", model: "fixture" }, custom_providers: [{ id: "feedback-fixture", base_url: "http://127.0.0.1:9/v1/chat/completions", models: ["fixture"], default_model: "fixture" }] }), { mode: 0o600 });
+  const env = { ...process.env, GATOR_STATE_DIR: join(root, "state"), GATOR_CONFIG_DIR: join(root, "config"), GATOR_DESKTOP_USER_DATA: join(root, "desktop"), GATOR_DESKTOP_WORKSPACE: workspace };
+  const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
+  const launch = () => electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env });
+  let app = await launch();
+  // Delay only renderer notification delivery. The real Go write and IPC send
+  // complete, proving that the UI waits for the matching durable result.
+  const holdAcknowledgements = () => app.evaluate(({ BrowserWindow }) => {
+    const contents = BrowserWindow.getAllWindows()[0].webContents;
+    const hold: { original: typeof contents.send; last?: unknown[] } = { original: contents.send.bind(contents) };
+    Reflect.set(contents, "gatorFeedbackTestHold", hold);
+    contents.send = (channel: string, ...args: unknown[]) => {
+      const packet = args[0] as { state?: { chat_update_result?: unknown } } | undefined;
+      if (channel === "gator:update" && packet?.state?.chat_update_result) { hold.last = args; return; }
+      hold.original(channel, ...args);
+    };
+  });
+  const releaseAcknowledgements = () => app.evaluate(({ BrowserWindow }) => {
+    const contents = BrowserWindow.getAllWindows()[0].webContents;
+    const hold = Reflect.get(contents, "gatorFeedbackTestHold");
+    if (!hold) return;
+    contents.send = hold.original;
+    Reflect.deleteProperty(contents, "gatorFeedbackTestHold");
+    if (hold.last) hold.original("gator:update", ...hold.last);
+  });
+  try {
+    let page = await app.firstWindow();
+    await expect(page.getByRole("textbox", { name: "Message Gator", exact: true })).toBeVisible();
+    const origin = await page.evaluate(async () => (await window.gator!.snapshot()).state!.conversation_id!);
+    const inbox = join(env.GATOR_STATE_DIR, "gator", "inbox"); await mkdir(inbox, { recursive: true });
+    const entry = { version: 1, id: "inbox-rate-venue", kind: "job", title: "Venue changed", summary: "The venue moved the meeting to the garden.", status: "completed", job_id: "job-venue", origin_conversation_id: origin, created_at: new Date().toISOString() };
+    const file = join(inbox, `${entry.id}.json`);
+    await writeFile(file, JSON.stringify(entry));
+    await writeFile(join(inbox, "inbox-rate-failed.json"), JSON.stringify({ ...entry, id: "inbox-rate-failed", title: "Calendar unavailable", status: "failed" }));
+    const card = () => page.getByRole("article", { name: "Follow-up: Venue changed", exact: true });
+    const selection = (name: string) => card().getByRole("button", { name, exact: true });
+    const read = async () => JSON.parse(await readFile(file, "utf8"));
+    await expect(card().getByRole("button", { name: "Feedback", exact: true })).toBeVisible({ timeout: 25_000 });
+    await expect(card().getByRole("region", { name: "Update feedback" })).toHaveCount(0);
+    await expect(page.getByRole("article", { name: "Follow-up: Calendar unavailable", exact: true }).getByRole("button", { name: /Feedback/ })).toHaveCount(0);
+    expect((await read()).rating).toBeFalsy();
+    await card().getByRole("button", { name: "Mark read", exact: true }).click();
+    await expect(card().getByRole("button", { name: "Mark read", exact: true })).toHaveCount(0);
+    expect((await read()).rating).toBeFalsy();
+    await card().getByRole("button", { name: "Feedback", exact: true }).click();
+    await expect(card().getByText(/doesn’t change your checks automatically/)).toBeVisible();
+    await holdAcknowledgements();
+    await selection("Useful").click();
+    await expect.poll(async () => (await read()).rating).toBe("useful");
+    await expect(card().getByText("Saving feedback…", { exact: true })).toBeVisible();
+    await expect(card().getByText("Feedback saved.", { exact: true })).toHaveCount(0);
+    await expect(selection("Useful")).toHaveAttribute("aria-pressed", "false");
+    await expect(page.getByRole("button", { name: "New chat", exact: true })).toBeDisabled();
+    await releaseAcknowledgements();
+    await expect(card().getByText("Feedback saved.", { exact: true })).toBeVisible();
+    await expect(selection("Useful")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "New chat", exact: true })).toBeEnabled();
+    // Another client rates the same retained update while this renderer still
+    // shows its older version. The old visible selection must not win silently.
+    await holdAcknowledgements();
+    await page.evaluate(({ origin, id }) => window.gator!.send({ type: "update", update: { conversation_id: origin, id, action: "rate", version: 0, rating: "wrong", rating_version: 1, request_id: "another-client-rating" } }), { origin, id: entry.id });
+    await expect.poll(async () => (await read()).rating_version).toBe(2);
+    await selection("Unnecessary").click();
+    await expect.poll(async () => page.evaluate(async () => (await window.gator!.snapshot()).state!.chat_update_result?.error)).toContain("feedback changed");
+    await releaseAcknowledgements();
+    await expect(card().getByRole("alert")).toContainText("feedback changed");
+    await expect(selection("Incorrect")).toHaveAttribute("aria-pressed", "true");
+    expect((await read()).rating).toBe("wrong");
+    await selection("Clear feedback").click();
+    await expect(card().getByText("Feedback cleared.", { exact: true })).toBeVisible();
+    expect((await read()).rating).toBeFalsy();
+    await selection("Unnecessary").click();
+    await expect(selection("Unnecessary")).toHaveAttribute("aria-pressed", "true");
+    const rated = await read(); expect(rated.rating).toBe("noise"); expect(rated.resolved_at).toBe("0001-01-01T00:00:00Z");
+    await closeDesktop(app); app = await launch(); page = await app.firstWindow();
+    await expect(card().getByRole("button", { name: "Feedback · Unnecessary", exact: true })).toBeVisible();
+    await card().getByRole("button", { name: "Feedback · Unnecessary", exact: true }).click();
+    await expect(selection("Unnecessary")).toHaveAttribute("aria-pressed", "true");
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(760, 560));
+    await card().scrollIntoViewIfNeeded();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: "test-results/chat-update-feedback.png" });
+  } finally {
+    await releaseAcknowledgements().catch(() => {});
+    try { await closeDesktop(app); }
+    finally { await rm(root, { recursive: true, force: true }); }
+  }
+});
+
 test("durable follow-up cards return to their chat and retain explicit reply ownership", async () => {
   test.setTimeout(100_000);
   const root = await temporaryDirectory(join(tmpdir(), "gator-chat-updates-"));
