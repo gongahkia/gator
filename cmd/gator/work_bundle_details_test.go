@@ -8,6 +8,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"encoding/json"
+	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/workapp"
@@ -91,5 +93,30 @@ func TestWorkBundleDetailsBoundsPreviewReadsAndMatchesSelectedPaths(t *testing.T
 	}
 	if len(summary.Artifacts) != 10 || previews != 8 || total > 32*1024 {
 		t.Fatalf("preview envelope: artifacts=%d previews=%d bytes=%d", len(summary.Artifacts), previews, total)
+	}
+}
+
+func TestWorkBundleDetailsProjectsBoundedReceiptsWithoutSendBody(t *testing.T) {
+	var bundle artifact.Bundle
+	for i := 0; i < 129; i++ {
+		preview, _ := json.Marshal(map[string]string{"to": "person@example.com", "subject": strings.Repeat("界", 100), "body": "private message body"})
+		bundle.Manifest.Actions = append(bundle.Manifest.Actions, action.Record{Proposal: action.Proposal{ID: "action-one", ConnectorID: "google", Operation: "gmail_send", Preview: string(preview)}, Status: action.Unknown, Error: strings.Repeat("界", 120)})
+	}
+	bundle.Manifest.Actions[1] = action.Record{Proposal: action.Proposal{ID: "batch-one", ConnectorID: "docs", Operation: "batch"}, Status: action.Unknown, BatchSteps: []action.BatchStep{{Operation: "document_create", Status: action.Executed, ProviderResourceID: "doc-one"}, {Operation: "document_update", Status: action.Unknown}}}
+	var summary workapp.BundleSummary
+	projectWorkBundleDetails(bundle, &summary)
+	if len(summary.Actions) != 128 || !summary.ActionsTruncated {
+		t.Fatal("unbounded action projection")
+	}
+	first := summary.Actions[0]
+	if first.Recipient != "person@example.com" || len(first.Subject) > 200 || len(first.Error) > 240 || !utf8.ValidString(first.Subject+first.Error) {
+		t.Fatal("invalid summary", first)
+	}
+	data, _ := json.Marshal(summary.Actions)
+	if strings.Contains(string(data), "private message body") {
+		t.Fatal("receipt projection leaked unneeded send body")
+	}
+	if steps := summary.Actions[1].Steps; len(steps) != 2 || steps[0].ProviderResourceID != "doc-one" || steps[1].Status != "unknown" {
+		t.Fatal("partial batch receipt erased", steps)
 	}
 }

@@ -44,14 +44,17 @@ type RunResult struct {
 // BundleSummary is the display-safe, verified projection of a retained Work
 // bundle. The application never trusts model prose to describe produced files.
 type BundleSummary struct {
-	Path        string
-	Status      string
-	Artifacts   []ArtifactSummary
-	Candidates  []CandidateSummary
-	RunID       string
-	FinishedAt  string
-	Sources     []string
-	Connections []ConnectionUse
+	Actions          []ActionReceipt
+	ActionsTruncated bool
+	ManifestSHA256   string
+	Path             string
+	Status           string
+	Artifacts        []ArtifactSummary
+	Candidates       []CandidateSummary
+	RunID            string
+	FinishedAt       string
+	Sources          []string
+	Connections      []ConnectionUse
 }
 
 // ConnectionUse describes retained provenance, never current authorization.
@@ -245,6 +248,7 @@ type Config struct {
 	SkillAction              func(command string) (string, error)
 	SkillResult              func(command string) (*uisnapshot.Result, error)
 	ReviewBundle             func(bundlePath string) (*uisnapshot.Result, error)
+	CheckReceipt             func(context.Context, ReceiptRequest) (ReceiptCheck, error)
 	// JobAction uses the canonical local Job service. It keeps scheduling
 	// as repeatable Work rather than creating a second interface-specific runtime.
 	JobAction      func(arguments []string) (string, error)
@@ -455,6 +459,9 @@ type Model struct {
 	chatMemoriesOwner      string
 	chatMemoryResult       *ChatMemoryResult
 	chatUpdateResult       *BridgeUpdateResult
+	receiptBusy            bool
+	receiptPendingID       string
+	receiptResult          *ReceiptResult
 	chatMemoryIssue        string
 	recall                 RecallStatus
 	recallBusy             bool

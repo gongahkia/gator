@@ -1,0 +1,14 @@
+.connected-receipts { margin-top: 8px; color: var(--color-muted); font-size: var(--text-xs); overflow-wrap: anywhere; }
+.connected-receipt > summary { display: flex; align-items: center; gap: 7px; min-height: 40px; cursor: pointer; list-style: none; }
+.connected-receipt > summary::-webkit-details-marker { display: none; }
+.connected-receipt[data-tone="warning"] > summary { color: var(--color-warning); }
+.connected-receipt-body { padding: 4px 0 8px 21px; }
+.connected-receipt-body p { margin: 6px 0; text-wrap: pretty; }
+.connected-receipt-body dl { display: grid; grid-template-columns: max-content minmax(0,1fr); gap: 4px 12px; }
+.connected-receipt-body dd { margin: 0; color: var(--color-secondary); }
+.connected-receipt-body summary { cursor: pointer; min-height: 40px; padding-block: 10px; }
+.receipt-sent-check { border-top: 1px solid var(--color-line); margin-top: 8px; padding-top: 8px; }
+.receipt-check-time { font-variant-numeric: tabular-nums; }
+
+.connected-receipt > summary .receipt-chevron { margin-left: auto; flex: none; }
+.connected-receipt[open] > summary .receipt-chevron { transform: rotate(180deg); }

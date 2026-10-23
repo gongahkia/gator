@@ -16,6 +16,7 @@ import (
 )
 
 type uiFrame struct {
+	Receipt       *workapp.ReceiptAction            `json:"receipt,omitempty"`
 	Memory        *workapp.ChatMemoryAction         `json:"memory,omitempty"`
 	Update        *workapp.BridgeUpdateAction       `json:"update,omitempty"`
 	Foreground    bool                              `json:"foreground,omitempty"`
@@ -121,6 +122,10 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 		case "memory":
 			if frame.Memory != nil {
 				next = m.model.ApplyChatMemory(*frame.Memory)
+			}
+		case "receipt":
+			if frame.Receipt != nil {
+				next, command = m.model.ApplyReceiptAction(*frame.Receipt)
 			}
 		case "composer":
 			if frame.Composer == nil {

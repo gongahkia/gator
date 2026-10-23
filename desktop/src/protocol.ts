@@ -16,7 +16,10 @@ export type BackendResult = {
   preview?: unknown;
   footer?: string;
 };
+export type ActionReceipt = { Steps?: {Operation: string; Target: string; Status: string; ProviderResourceID?: string}[] | null; ID: string; ConnectorID: string; Operation: string; Target: string; Status: string; Recipient?: string; Subject?: string; Error?: string; CorrelationID?: string; ReceiptID?: string; ProviderResourceID?: string };
+export type ReceiptCheck = {status: "not_checked" | "found" | "ambiguous" | "unconfirmed"; provider_id?: string; checked_at?: string};
 export type BackendBundle = {
+  Actions?: ActionReceipt[] | null; ActionsTruncated?: boolean; ManifestSHA256?: string;
   Path: string;
   Status: string;
   Artifacts: { Path: string; MediaType: string; SHA256?: string; Valid: boolean; Bytes?: number; Preview?: string; PreviewKind?: string; Truncated?: boolean }[] | null;
@@ -89,6 +92,7 @@ export type ChatUpdate = { can_rate: boolean; rating?: "useful" | "noise" | "wro
 export type ChatMemoryReceipt = {id: string; run_id: string; text: string; quote?: string; updated: string; scope: string; corrected?: boolean; can_undo?: boolean};
 export type ChatMemoryAction = {conversation_id: string; id: string; updated: string; action: "correct"|"forget"|"undo"; text?: string; request_id: string};
 export type BackendState = {
+  receipt_busy?: boolean; receipt_result?: {request_id: string; check?: ReceiptCheck; error?: string};
   chat_checks?: { id: string; title: string; state: string; issue?: string; next_action: string; last_success?: string; next_due?: string; gap_from?: string; gap_to?: string; unsuccessful: number }[];
   chat_checks_issue?: string;
   chat_update_result?: {request_id: string; error?: string};
@@ -157,8 +161,9 @@ export type PanelAction = {
 };
 export type Frame = {
   version: 1;
-  type: "memory" | "update" | "submit" | "upload_submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "conversation" | "composer";
+  type: "receipt" | "memory" | "update" | "submit" | "upload_submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "conversation" | "composer";
   memory?: ChatMemoryAction;
+  receipt?: {conversation_id: string; run_id: string; action_id: string; correlation_id: string; manifest_sha256: string; action: "inspect" | "check_sent"; request_id: string};
   update?: { conversation_id: string; id: string; action: "delivered" | "read" | "resolve" | "reopen" | "older" | "newer" | "rate"; version: number; rating?: "useful" | "noise" | "wrong" | "clear"; rating_version?: number; request_id?: string };
   upload?: { request_id: string; context: string; text: string; files: string[]; reply_to_update_id?: string };
   text?: string; key?: string; error?: string; width?: number; height?: number;

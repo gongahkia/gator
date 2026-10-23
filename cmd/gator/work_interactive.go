@@ -399,6 +399,7 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			return err
 		},
 		ReviewBundle: func(path string) (*uisnapshot.Result, error) { return workReviewResult(stateDir, path) },
+		CheckReceipt: workReceiptChecker(stateDir),
 		ListConversations: func() ([]worksession.Conversation, error) {
 			return sessions.List(50)
 		},
@@ -929,6 +930,7 @@ func summarizeWorkBundle(path string) (workapp.BundleSummary, error) {
 		}
 	}
 	summary := workapp.BundleSummary{Path: bundle.Path, Status: string(bundle.Manifest.Status)}
+	summary.ManifestSHA256 = bundle.ManifestSHA256
 	for _, file := range bundle.Manifest.Artifacts {
 		summary.Artifacts = append(summary.Artifacts, workapp.ArtifactSummary{
 			SHA256: file.SHA256, Path: file.Path, MediaType: file.MediaType, Bytes: file.Bytes, Valid: valid[file.Path],

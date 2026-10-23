@@ -191,3 +191,19 @@ Gator neither reads nor writes its former `STATE_DIR/gator/google-work/`
 SQLite mirror. It does not delete that old local state automatically. There is
 no offline Google browse mode, mutation queue, Hot Cross Buns migration path,
 or credential reuse.
+
+
+### Chat receipts and uncertain sends
+
+A completed task shows connected-action receipts only when it retained an actual
+request. Expand a receipt for its original outcome and provider identifiers.
+“Gmail accepted the message” means the provider returned a message receipt; it is
+not a recipient delivery confirmation.
+
+For an unconfirmed Gmail send, **Check Sent** searches the currently connected
+account for that request's unique message ID. It requires allowed Gmail list and
+detail reads and the corresponding read scope. It never sends or retries mail.
+A matching Sent copy is reported separately from the immutable original outcome.
+No match remains unconfirmed because indexing can lag; multiple matches require
+manual inspection. The saved check is bound to the original task manifest and
+can be reopened locally after restart, including when account access is offline.

@@ -5,6 +5,7 @@ export const releaseURL = "https://github.com/gongahkia/gator/releases";
 export function updateBlockReason(snapshot) {
   const state = snapshot?.state;
   if (!state || snapshot.connection !== "connected") return "Reconnect to Gator before restarting for an update.";
+  if (state.receipt_busy) return "Wait for the receipt check before restarting.";
   if (snapshot.terminalBusy || state.external) return "Finish the current sign-in or reviewed action first.";
   if (snapshot.sessionSwitching) return "Wait for this chat to open before restarting.";
   if (snapshot.allChatsBusy || state.running || state.cancelling || state.pending_approval) return "Finish or stop work in all chats before restarting.";

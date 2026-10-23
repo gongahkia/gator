@@ -94,7 +94,7 @@ test("download failure never becomes an installable update", async () => {
 test("host restart blockers cover live work, queue, approvals, external steps and editable forms", () => {
   const idle = { connection: "connected", state: {} };
   assert.equal(updateBlockReason(idle), "");
-  for (const state of [{ running: true }, { cancelling: true }, { pending_approval: { id: 1 } }, { queued: 1 }, { queue: [{}] }, { external: {} }, { panel: { kind: "confirmation" } }, { panel: { rows: [{ input: {} }] } }]) assert.ok(updateBlockReason({ ...idle, state }));
+  for (const state of [{ receipt_busy: true }, { running: true }, { cancelling: true }, { pending_approval: { id: 1 } }, { queued: 1 }, { queue: [{}] }, { external: {} }, { panel: { kind: "confirmation" } }, { panel: { rows: [{ input: {} }] } }]) assert.ok(updateBlockReason({ ...idle, state }));
   assert.ok(updateBlockReason({ ...idle, terminalBusy: true }));
   assert.ok(updateBlockReason({ ...idle, connection: "disconnected" }));
 });

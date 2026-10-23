@@ -78,3 +78,11 @@ test("memory review accepts bounded exact revisions and rejects supplied scope",
   for(const change of [{id:"../memory"},{updated:"unknown"},{action:"create"},{goal_id:"other"},{text:"x".repeat(4097)},{action:"undo"},{request_id:""}]) assert.throws(()=>validateFrame({type:"memory",memory:{...memory,...change}}));
   const {text,...undo}=memory;assert.equal(validateFrame({type:"memory",memory:{...undo,action:"undo"}}).version,1);
 });
+
+
+test("receipt inspection only accepts exact retained identities and read-only actions", () => {
+  const receipt = {conversation_id:"work_chat",run_id:"work-one",action_id:"action-"+"a".repeat(16),correlation_id:"b".repeat(32),manifest_sha256:"c".repeat(64),action:"check_sent",request_id:"check-1"};
+  assert.equal(validateFrame({type:"receipt",receipt}).version,1);
+  assert.equal(validateFrame({type:"receipt",receipt:{...receipt,action:"inspect"}}).version,1);
+  for(const change of [{conversation_id:"../chat"},{run_id:"../../run"},{action_id:"action-other"},{correlation_id:"x".repeat(32)},{manifest_sha256:"c".repeat(63)},{action:"resend"},{request_id:""},{request_id:"x".repeat(65)},{payload:{to:"other@example.com"}},{bundle_path:"/private/run"},{credentials:"token"},{query:"in:anywhere"}]) assert.throws(()=>validateFrame({type:"receipt",receipt:{...receipt,...change}}));
+});

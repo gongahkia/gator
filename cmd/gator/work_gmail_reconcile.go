@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -41,8 +42,22 @@ func reconcileGmailSend(ctx context.Context, stateDir, workID, correlationID str
 	if !found {
 		return errors.New("retained Work run not found")
 	}
+	return reconcileGmailBundle(ctx, stateDir, bundle, "", correlationID, out)
+}
+
+func reconcileGmailBundle(ctx context.Context, stateDir string, bundle artifact.Bundle, expectedManifest, correlationID string, out io.Writer) error {
+	if expectedManifest != "" && bundle.ManifestSHA256 != expectedManifest {
+		return errors.New("the retained request changed; reopen its receipt")
+	}
 	if err := artifact.VerifyBundle(bundle); err != nil {
 		return fmt.Errorf("verify Work run before reconciliation: %w", err)
+	}
+	before, err := bundle.Root.ReadRegularFile("manifest.json", 8*1024*1024)
+	if err != nil {
+		return err
+	}
+	if fmt.Sprintf("%x", sha256.Sum256(before)) != bundle.ManifestSHA256 {
+		return errors.New("the retained request changed before the Sent lookup; reopen its receipt")
 	}
 	var selected *action.Record
 	for index := range bundle.Manifest.Actions {
@@ -98,6 +113,9 @@ func reconcileGmailSend(ctx context.Context, stateDir, workID, correlationID str
 		return err
 	}
 	digest := sha256.Sum256(manifest)
+	if !bytes.Equal(before, manifest) {
+		return errors.New("the retained request changed during the Sent lookup; reopen its receipt")
+	}
 	check := gmailReconciliation{
 		Version: 1, WorkID: bundle.Manifest.RunID, ManifestSHA256: hex.EncodeToString(digest[:]),
 		CorrelationID: correlationID, Status: status, GmailID: gmailID, CheckedAt: time.Now().UTC(),

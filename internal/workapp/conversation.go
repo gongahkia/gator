@@ -191,6 +191,10 @@ func cloneBundlePointer(value *BundleSummary) *BundleSummary {
 
 func cloneBundleSummary(value BundleSummary) BundleSummary {
 	copy := value
+	copy.Actions = append([]ActionReceipt(nil), value.Actions...)
+	for i := range copy.Actions {
+		copy.Actions[i].Steps = append([]ReceiptStep(nil), value.Actions[i].Steps...)
+	}
 	copy.Artifacts = append([]ArtifactSummary(nil), value.Artifacts...)
 	copy.Sources = append([]string(nil), value.Sources...)
 	copy.Connections = make([]ConnectionUse, len(value.Connections))

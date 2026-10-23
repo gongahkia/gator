@@ -17,6 +17,16 @@ import (
 
 func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 	switch value := messageValue.(type) {
+	case receiptChecked:
+		if value.Result.RequestID != m.receiptPendingID {
+			return m, nil
+		}
+		m.receiptBusy = false
+		m.receiptPendingID = ""
+		if value.ConversationID == m.conversation {
+			m.receiptResult = &value.Result
+		}
+		return m, nil
 	case overviewRefreshed:
 		if value.Generation != m.overviewGeneration {
 			return m, nil
