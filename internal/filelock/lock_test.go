@@ -5,8 +5,42 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"testing"
 )
+
+func TestConcurrentRootLockCreation(t *testing.T) {
+	root, err := os.OpenRoot(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+	failures := make(chan error, 24)
+	for i := 0; i < 24; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			file, err := OpenRootFile(root, ".metadata.lock", os.O_CREATE|os.O_RDWR, 0600)
+			if err != nil {
+				failures <- err
+				return
+			}
+			defer file.Close()
+			if err := Lock(file, Exclusive); err != nil {
+				failures <- err
+			}
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(failures)
+	for err := range failures {
+		t.Error(err)
+	}
+}
 
 func TestProcessLease(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "lease")
