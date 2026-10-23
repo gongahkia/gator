@@ -152,7 +152,7 @@ type WatchObservation struct {
 func (o WatchObservation) OutputDigest() string {
 	payload, _ := json.Marshal(struct {
 		Attempt       jobs.Attempt
-		Recovery      string
+		Recovery      string `json:"Recovery,omitempty"`
 		Inbox         string
 		Alert, Health bool
 	}{o.Attempt, o.RecoveryInboxID, o.InboxID, o.Alert, o.HealthNotice})

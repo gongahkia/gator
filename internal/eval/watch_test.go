@@ -1,12 +1,32 @@
 package eval
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/gongahkia/gator/internal/jobs"
 )
+
+func TestWatchDigestPreservesReportsWithoutRecoveryNotices(t *testing.T) {
+	o := WatchObservation{Attempt: jobs.Attempt{ID: "attempt-one", Status: "completed"}, InboxID: "inbox-one", Alert: true}
+	prior, _ := json.Marshal(struct {
+		Attempt       jobs.Attempt
+		Inbox         string
+		Alert, Health bool
+	}{o.Attempt, o.InboxID, o.Alert, o.HealthNotice})
+	digest := sha256.Sum256(prior)
+	if o.OutputDigest() != hex.EncodeToString(digest[:]) {
+		t.Fatal("prior retained reports became unscorable")
+	}
+	o.RecoveryInboxID = "inbox-recovery"
+	if o.OutputDigest() == hex.EncodeToString(digest[:]) {
+		t.Fatal("recovery delivery was not bound to the review digest")
+	}
+}
 
 func watchBool(v bool) *bool { return &v }
 
