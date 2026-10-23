@@ -22,6 +22,15 @@ func indexedPage(t *testing.T, s Store, query ConversationQuery) ConversationPag
 	return page
 }
 
+func TestCatalogFileURIPreservesUnixAndWindowsPaths(t *testing.T) {
+	for _, test := range []struct{ path, want string }{{"/tmp/a file?#.sqlite", "file:///tmp/a%20file%3F%23.sqlite"}, {"C:/Users/Ada Lovelace/Gator/cache.sqlite", "file:///C:/Users/Ada%20Lovelace/Gator/cache.sqlite"}} {
+		uri := catalogURL(test.path)
+		if uri.String() != test.want || uri.Host != "" || uri.RawQuery != "" {
+			t.Fatal("cache path became an authority or query", uri.String(), test.want)
+		}
+	}
+}
+
 func TestSQLiteCatalogReconcilesHistoryWithoutIndexingPrivateReplay(t *testing.T) {
 	s, id, dir := requestTestStore(t)
 	c, err := s.AddRevision(id, Revision{ID: "rev-index", SnapshotID: "snap-test", Objective: "Find a bird", BundlePath: "/retained/result", Status: "completed", FinalText: "The JADE heron, 保留这个决定, chose a *literal* 100% plan and said \"hello\".", Replay: &ReplayState{Version: Version, Provider: "private-provider-marker", Configuration: json.RawMessage(`{"system":"private-config-marker"}`)}, CreatedAt: time.Now()})
@@ -225,6 +234,29 @@ func TestSQLiteCatalogConcurrentReadersAndOrganization(t *testing.T) {
 	}
 	if page := indexedPage(t, s, ConversationQuery{}); len(page.Items) != 1 || page.Items[0].Title != "Topic 3" {
 		t.Fatal("last canonical organization not indexed", page)
+	}
+}
+
+func TestSQLiteCatalogConcurrentColdOpenInitializesOneUsableCache(t *testing.T) {
+	s, _, _ := requestTestStore(t)
+	var wg sync.WaitGroup
+	failures := make(chan error, 6)
+	for i := 0; i < 6; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			page, err := s.PageConversations(ConversationQuery{})
+			if err != nil {
+				failures <- err
+			} else if page.IndexFallback || len(page.Items) != 1 {
+				failures <- fmt.Errorf("cold cache query: %+v", page)
+			}
+		}()
+	}
+	wg.Wait()
+	close(failures)
+	for err := range failures {
+		t.Error(err)
 	}
 }
 

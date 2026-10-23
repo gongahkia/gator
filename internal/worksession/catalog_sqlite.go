@@ -143,7 +143,7 @@ func (s Store) openCatalogIndex(ctx context.Context) (*sql.DB, func(), error) {
 	if err = root.Chmod("cache", 0700); err != nil {
 		return nil, nil, err
 	}
-	lock, err := root.OpenFile("cache/.conversations.lock", os.O_CREATE|os.O_RDWR, 0600)
+	lock, err := filelock.OpenRootFile(root, "cache/.conversations.lock", os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -188,7 +188,7 @@ func (s Store) openCatalogIndex(ctx context.Context) (*sql.DB, func(), error) {
 		release()
 		return nil, nil, err
 	}
-	u := url.URL{Scheme: "file", Path: filepath.ToSlash(path)}
+	u := catalogURL(path)
 	values := url.Values{}
 	for _, pragma := range []string{"busy_timeout(1000)", "journal_mode(WAL)", "synchronous(NORMAL)", "cache_size(-2048)", "temp_store(MEMORY)", "trusted_schema(OFF)", "secure_delete(ON)", "max_page_count(131072)"} {
 		values.Add("_pragma", pragma)
@@ -230,6 +230,16 @@ func (s Store) openCatalogIndex(ctx context.Context) (*sql.DB, func(), error) {
 		return nil, nil, err
 	}
 	return db, func() { _ = db.Close(); release() }, nil
+}
+
+func catalogURL(path string) url.URL {
+	path = filepath.ToSlash(path)
+	// SQLite's Windows drive URI is file:///C:/..., not file://C:/...
+	// (which interprets the drive as an authority). Unix paths already have /.
+	if len(path) > 1 && path[1] == ':' && !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	return url.URL{Scheme: "file", Path: path}
 }
 
 func initializeCatalog(ctx context.Context, db *sql.DB) error {
