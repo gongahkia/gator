@@ -119,3 +119,22 @@ func TestReceiptInspectionReportsReadFailureAndOwnsProjectionCopies(t *testing.T
 		t.Fatal("receipt projection aliases retained state")
 	}
 }
+
+func TestFailedAndStoppedRunsKeepOwnedReceiptBundles(t *testing.T) {
+	for _, stopped := range []bool{false, true} {
+		m, a, _, _ := receiptModel(t)
+		bundle := *m.messages[0].bundle
+		m.messages = nil
+		m.running = true
+		m.cancelling = stopped
+		next, _ := m.Update(runDone(RunResult{WorkID: a.RunID, ConversationID: a.ConversationID, Bundle: bundle, Error: "context canceled after external dispatch"}))
+		m = next.(Model)
+		_, cmd := m.ApplyReceiptAction(a)
+		if cmd == nil {
+			t.Fatal("failed/stopped task lost its inspectable receipt", stopped, m.BridgeState())
+		}
+		if len(m.messages) != 3 || m.messages[1].bundle == nil || m.messages[1].bundle.ManifestSHA256 != a.ManifestSHA256 {
+			t.Fatal("verified evidence was dropped or detached from the turn", stopped, m.messages)
+		}
+	}
+}

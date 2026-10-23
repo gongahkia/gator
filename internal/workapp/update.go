@@ -350,10 +350,13 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 			text = "Finished the Work revision."
 		}
 		m.messages = append(m.messages, message{role: "Gator", text: text})
-		if value.Bundle.Path != "" {
-			bundle := cloneBundleSummary(value.Bundle)
-			m.messages = append(m.messages, message{role: "Deliverables", bundle: &bundle})
-		}
+	}
+	// A failed or stopped task can still have verified partial files and
+	// external request evidence. Keep that bundle attached to its owning turn
+	// so an uncertain send can be inspected without becoming an orphan receipt.
+	if value.Bundle.Path != "" {
+		bundle := cloneBundleSummary(value.Bundle)
+		m.messages = append(m.messages, message{role: "Deliverables", bundle: &bundle})
 	}
 	if responseIndex < len(m.messages) {
 		m.messages[responseIndex].activity = activity
