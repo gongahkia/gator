@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/actionlog"
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/snapshot"
@@ -90,6 +92,21 @@ func (s Store) selectRetention(ctx context.Context, now time.Time, p Policy) (Pl
 			}
 		}
 	}
+	journal, err := actionlog.Open(s.stateDir)
+	if err != nil {
+		return plan, err
+	}
+	effects, err := journal.List("")
+	if err != nil {
+		return plan, err
+	}
+	for _, effect := range effects {
+		if effect.Phase == "executing" || effect.Action.Status == action.Unknown {
+			protectedWork[effect.RunID] = true
+			protectedConversation[effect.ConversationID] = true
+		}
+	}
+	plan.Notes = append(plan.Notes, "Unconfirmed external requests and their chats are protected from automatic age retention. Explicit history deletion removes their receipts without undoing any external effect.")
 	jobStore, err := jobs.Open(s.stateDir)
 	if err != nil {
 		return plan, err
@@ -190,7 +207,7 @@ func (s Store) selectRetention(ctx context.Context, now time.Time, p Policy) (Pl
 			}
 			removedWork[run.ID] = true
 			selected = append(selected, filepath.Join("work-history", run.ID+".json"), filepath.Join("work-history", run.ID+".lock"))
-			for _, base := range []string{"traces", "interactions", "tasks", "candidates", "delivery", "work-control"} {
+			for _, base := range []string{"traces", "interactions", "tasks", "candidates", "delivery", "external-actions", "reconciliations", "work-control"} {
 				selected = append(selected, filepath.Join(base, run.ID))
 			}
 			if run.Evidence.ArtifactManifestPath != "" {

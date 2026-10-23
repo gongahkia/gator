@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/actionlog"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/attachment"
@@ -419,6 +420,17 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	connectorPolicy := tools.ConnectorPolicy{
 		Mode: request.Mode, ExternalActions: request.Contract.ExternalActions, Approve: request.ApproveAction, ApproveRead: request.ApproveConnectorRead,
 		Permissions: request.ConnectorPermissions,
+		BeginAction: func(proposal action.Proposal) (tools.ActionAttempt, error) {
+			journal, err := actionlog.Open(request.StateDir)
+			if err != nil {
+				return nil, err
+			}
+			attempt, err := journal.Begin(conversation.ID, request.RunID, proposal, now())
+			if err != nil {
+				return nil, err
+			}
+			return attempt, nil
+		},
 		OnContent: func(result connector.Result) error {
 			source, err := persistConnectedSnapshot(work.Path, result)
 			if err != nil {

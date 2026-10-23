@@ -26,7 +26,15 @@ type ConnectorPolicy struct {
 	OnSource        func(connector.Provenance)
 	OnContent       func(connector.Result) error
 	OnAction        func(action.Record)
-	Permissions     connector.PermissionSet
+	// BeginAction flushes an uncertain receipt before the first mutation.
+	// It is invoked only after the broker obtains fresh approval.
+	BeginAction func(action.Proposal) (ActionAttempt, error)
+	Permissions connector.PermissionSet
+}
+
+type ActionAttempt interface {
+	Finish(action.Record) error
+	Close() error
 }
 
 // ConnectorTools exposes only the connectors explicitly selected for one run.
@@ -144,9 +152,25 @@ func (t connectorTool) executeAction(ctx context.Context, arguments json.RawMess
 		disposition = action.Propose
 	}
 	var evidence connector.ExecutionEvidence
+	var attempt ActionAttempt
+	defer func() {
+		if attempt != nil {
+			_ = attempt.Close()
+		}
+	}()
 	record, err := (action.Broker{Approve: t.policy.Approve}).Resolve(
 		ctx, t.policy.Mode, disposition, prepared.Proposal,
 		func(executionContext context.Context) error {
+			if t.policy.BeginAction != nil {
+				opened, beginErr := t.policy.BeginAction(prepared.Proposal)
+				if beginErr != nil {
+					return fmt.Errorf("retain approved request before dispatch: %w", beginErr)
+				}
+				attempt = opened
+				if attempt == nil {
+					return errors.New("approved request has no durable execution receipt")
+				}
+			}
 			var executeErr error
 			evidence, executeErr = t.runtime.ExecutePreparedWithEvidence(executionContext, t.policy.Mode, prepared)
 			return executeErr
@@ -164,6 +188,14 @@ func (t connectorTool) executeAction(ctx context.Context, arguments json.RawMess
 	// Batch steps are useful even when a later request fails or has an
 	// uncertain outcome. The broker's parent status remains authoritative.
 	record.BatchSteps = evidence.BatchSteps
+	if attempt != nil {
+		if finishErr := attempt.Finish(record); finishErr != nil {
+			// The provider may already have acted. Retaining the in-progress
+			// journal is safer than reporting a failed send that can be retried.
+			// A later bundle seal can still retain this explicit uncertainty.
+			record = action.Record{Proposal: prepared.Proposal, Status: action.Unknown, Error: "The provider request finished, but its durable outcome could not be confirmed. Verify the service before retrying."}
+		}
+	}
 	if t.policy.OnAction != nil {
 		t.policy.OnAction(record)
 	}
