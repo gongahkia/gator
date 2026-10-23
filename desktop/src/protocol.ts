@@ -44,6 +44,7 @@ export type QueueAction = {
   target_id?: string; placement?: "before" | "after";
 };
 export type BackendPanel = {
+	 catalog?: { loading?: boolean; page: number; has_next?: boolean; has_previous?: boolean; can_organize?: boolean };
   links?: { label: string; url: string }[];
   id?: string;
   kind: string;
@@ -53,7 +54,7 @@ export type BackendPanel = {
   query?: string;
   rows?: {
     label: string; group?: string; detail?: string; state?: string; state_label?: string; affordance?: string; tone?: ResultTone; checked?: boolean; position?: number;
-    source?: string; updated_at?: string; metadata?: ResultField[];
+    source?: string; updated_at?: string; metadata?: ResultField[]; pinned?: boolean; archived?: boolean; identity?: string;
     input?: { value?: string; placeholder?: string; secret?: boolean; multiline?: boolean; limit: number;
       kind?: string; help?: string; options?: { value: string; label: string }[];
       parts?: { label: string; min: number; max: number }[]; min?: number; max?: number; read_only?: boolean };
@@ -92,6 +93,7 @@ export type ChatUpdate = { can_rate: boolean; rating?: "useful" | "noise" | "wro
 export type ChatMemoryReceipt = {id: string; run_id: string; text: string; quote?: string; updated: string; scope: string; corrected?: boolean; can_undo?: boolean};
 export type ChatMemoryAction = {conversation_id: string; id: string; updated: string; action: "correct"|"forget"|"undo"; text?: string; request_id: string};
 export type BackendState = {
+	 catalog_busy?: boolean;
   action_recoveries?: {id: string; run_id: string; at: string; live: boolean; receipt: ActionReceipt}[]; action_recovery_issue?: string; action_recovery_truncated?: boolean;
   receipt_busy?: boolean; receipt_result?: {request_id: string; check?: ReceiptCheck; error?: string};
   chat_checks?: { id: string; title: string; state: string; issue?: string; next_action: string; last_success?: string; next_due?: string; gap_from?: string; gap_to?: string; unsuccessful: number }[];
@@ -113,7 +115,7 @@ export type BackendState = {
   conversation_id?: string;
   primary?: boolean;
   primary_conversation_id?: string;
-  recent_conversations?: { id: string; title: string; source: string; updated_at: string }[];
+  recent_conversations?: { id: string; title: string; source: string; updated_at: string; pinned?: boolean }[];
   recent_id?: string;
   recent_issue?: string;
   goal_id?: string;
@@ -157,7 +159,7 @@ export type BackendState = {
   destination?: string;
 };
 export type PanelAction = {
-  id: string; action: "select" | "activate" | "key" | "query" | "filter";
+  id: string; action: "select" | "activate" | "key" | "query" | "filter" | "next" | "previous" | "refresh" | "rename" | "pin" | "unpin" | "archive" | "restore";
   row?: number; fields?: Record<number, string>; text?: string;
 };
 export type Frame = {

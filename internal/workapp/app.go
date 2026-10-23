@@ -196,6 +196,8 @@ type Config struct {
 	ConnectorCommand         func(arguments []string) *exec.Cmd
 	BundleAction             func(BundleActionRequest) (string, error)
 	ListConversations        func() ([]worksession.Conversation, error)
+	QueryConversations       func(context.Context, worksession.ConversationQuery) (worksession.ConversationPage, error)
+	OrganizeConversation     func(worksession.ConversationChange) (worksession.Conversation, error)
 	LoadConversation         func(conversationID string) (ConversationState, error)
 	LoadConversationOptions  func(conversationID string) (RunOptions, error)
 	Conversations            []worksession.Conversation
@@ -343,6 +345,10 @@ type pendingBundleAction struct {
 }
 
 type Model struct {
+	catalog                *conversationCatalog
+	catalogSequence        uint64
+	catalogSaving          uint64
+	catalogCancel          context.CancelFunc
 	chatUpdates            []inbox.Entry
 	chatUpdatesIssue       string
 	chatUpdatesTotal       int

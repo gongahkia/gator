@@ -36,6 +36,9 @@ func (m Model) ApplyBridgePanel(event BridgePanelAction, key tea.KeyMsg) (tea.Mo
 		m.bridgeNotice = m.status
 		return m, nil
 	}
+	if m.launcher && m.launcherMode == "conversations" && m.catalog != nil && event.Action != "select" && event.Action != "activate" && event.Action != "key" {
+		return m.applyCatalogPanel(event)
+	}
 	if event.Action != "select" && event.Action != "activate" && event.Action != "key" && event.Action != "query" && event.Action != "filter" {
 		return m, nil
 	}

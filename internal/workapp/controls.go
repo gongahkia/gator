@@ -86,6 +86,7 @@ func (m *Model) refreshControlBackground() tea.Cmd {
 }
 
 func (m *Model) cancelControlBackground() {
+	m.cancelCatalog()
 	if !m.controlBackground {
 		return
 	}

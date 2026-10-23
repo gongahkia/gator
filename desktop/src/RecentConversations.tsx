@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Folder, Search, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Folder, Pin, Search, X } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import type { BackendState } from "./protocol";
 import type { ChatActivity } from "./bridge";
@@ -49,7 +49,7 @@ export function RecentConversations({ state, activity: activityRows, disabled, o
     }
     if (event.key === "Escape" && query) { event.preventDefault(); event.stopPropagation(); setQuery(""); } }} />{query && <button className="icon-button" aria-label="Clear recent filter" onClick={(event) => { setQuery(""); event.currentTarget.parentElement?.querySelector("input")?.focus(); }}><X size={13} /></button>}</div>}
     {term && <p className="recent-filter-status" role="status">{total ? `${total} recent ${total === 1 ? "conversation" : "conversations"}` : "No matching recent conversations"}</p>}
-    {!grouped ? <div className="recent-flat">{datedChats(shown, (item) => item.updated_at).map(([label, items]) => <div className="recent-date-group" key={label}><h3>{label}</h3>{items.map(row)}</div>)}{!term && flat.length > 8 && <button className="recent-more" onClick={() => setAll(!all)}>{all ? "Show fewer" : "Show more"}<ChevronDown size={12} /></button>}</div> : matches.map(({ source, name, items, visible }, index) => {
+    {!grouped ? <div className="recent-flat">{shown.some(item => item.pinned) && <div className="recent-date-group"><h3><Pin size={11} /> Pinned</h3>{shown.filter(item => item.pinned).map(row)}</div>}{datedChats(shown.filter(item => !item.pinned), (item) => item.updated_at).map(([label, items]) => <div className="recent-date-group" key={label}><h3>{label}</h3>{items.map(row)}</div>)}{!term && flat.length > 8 && <button className="recent-more" onClick={() => setAll(!all)}>{all ? "Show fewer" : "Show more"}<ChevronDown size={12} /></button>}</div> : matches.map(({ source, name, items, visible }, index) => {
       const expandedGroup = !!term || expanded.has(source);
       const shown = expandedGroup ? visible : visible.slice(0, 4);
       const active = visible.find((item) => item.id === state.conversation_id);

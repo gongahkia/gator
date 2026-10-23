@@ -54,6 +54,16 @@ test("app resources stay inside the compiled assets and links stay web-only", ()
   assert.equal(shellQuote("folder's $(touch /tmp/nope)"), "'folder'\\''s $(touch /tmp/nope)'");
 });
 
+test("conversation organization carries only a reviewed row and bounded title", () => {
+  const panel = { id: "a".repeat(64), action: "rename", row: 3, text: "A chosen title" };
+  assert.equal(validateFrame({ type: "panel", panel }).version, 1);
+  for (const change of [{ row: undefined }, { text: " " }, { text: "🐊".repeat(65) }, { text: "first\nsecond" }, { conversation_id: "other-chat" }, { version: "forged" }, { action: "delete" }]) assert.throws(() => validateFrame({ type: "panel", panel: { ...panel, ...change } }));
+  for (const action of ["pin", "unpin", "archive", "restore"]) {
+    assert.equal(validateFrame({ type: "panel", panel: { id: panel.id, action, row: 1 } }).version, 1);
+    assert.throws(() => validateFrame({ type: "panel", panel: { id: panel.id, action } }));
+  }
+});
+
 test("queue actions bind to a message or active run and accept bounded text only", () => {
   const queue = { request_id: "request-1", id: "a".repeat(64), action: "edit", text: "Updated request" };
   assert.equal(validateFrame({ type: "queue", queue }).version, 1);

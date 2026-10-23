@@ -18,6 +18,7 @@ type BridgeConversation struct {
 	Title     string    `json:"title"`
 	Source    string    `json:"source"`
 	UpdatedAt time.Time `json:"updated_at"`
+	Pinned    bool      `json:"pinned,omitempty"`
 }
 type BridgeConversationAction struct {
 	ID     string `json:"id"`
@@ -28,8 +29,16 @@ func (m Model) bridgeRecentConversations() ([]BridgeConversation, string) {
 	if m.bridgeRecentIssue != "" {
 		return nil, ""
 	}
-	items := append([]worksession.Conversation(nil), m.config.Conversations...)
+	var items []worksession.Conversation
+	for _, item := range m.config.Conversations {
+		if !item.Archived {
+			items = append(items, item)
+		}
+	}
 	sort.Slice(items, func(i, j int) bool {
+		if items[i].Pinned != items[j].Pinned {
+			return items[i].Pinned
+		}
 		if items[i].UpdatedAt.Equal(items[j].UpdatedAt) {
 			return items[i].ID < items[j].ID
 		}
@@ -38,7 +47,7 @@ func (m Model) bridgeRecentConversations() ([]BridgeConversation, string) {
 	items = items[:min(len(items), 24)]
 	recent := make([]BridgeConversation, 0, len(items))
 	for _, item := range items {
-		recent = append(recent, BridgeConversation{ID: item.ID, Title: truncate(singleLine(item.Title), 256), Source: item.SourcePath, UpdatedAt: item.UpdatedAt})
+		recent = append(recent, BridgeConversation{ID: item.ID, Title: truncate(singleLine(item.Title), 256), Source: item.SourcePath, UpdatedAt: item.UpdatedAt, Pinned: item.Pinned})
 	}
 	encoded, _ := json.Marshal(recent)
 	return recent, fmt.Sprintf("%x", sha256.Sum256(encoded))
@@ -101,6 +110,16 @@ func (m Model) OpenBridgeConversation(action BridgeConversationAction) (tea.Mode
 	if m.config.ManagedSessions {
 		m.requestSession(BridgeSessionRequest{ConversationID: action.ID})
 		return m, nil
+	}
+	if m.config.QueryConversations != nil {
+		for _, item := range items {
+			if item.ID == action.ID {
+				m.cancelCatalog()
+				m.launcher, m.launcherMode, m.paletteQuery, m.selected = true, "conversations", "", 0
+				m.entries = []entry{{kind: "conversation", id: item.ID, title: item.Title, source: item.Source, subtitle: item.Source}}
+				return m.updateLauncher(tea.KeyMsg{Type: tea.KeyEnter})
+			}
+		}
 	}
 	next, _ := m.NavigateBridge("/conversations")
 	model := next.(Model)

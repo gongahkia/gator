@@ -7,24 +7,35 @@ type Panel struct {
 	// It is included in the bridge action hash, never in the display projection.
 	ActionIdentity string `json:"-"`
 
-	Links      []Link  `json:"links,omitempty"`
-	ID         string  `json:"id,omitempty"`
-	Kind       string  `json:"kind"`
-	Title      string  `json:"title"`
-	Subtitle   string  `json:"subtitle,omitempty"`
-	BackLabel  string  `json:"back_label,omitempty"`
-	Query      string  `json:"query,omitempty"`
-	Rows       []Row   `json:"rows,omitempty"`
-	Blocks     []Block `json:"blocks,omitempty"`
-	Selected   int     `json:"selected,omitempty"`
-	NoticeTone string  `json:"notice_tone,omitempty"`
-	Notice     string  `json:"notice,omitempty"`
-	Footer     string  `json:"footer,omitempty"`
-	Hints      []Hint  `json:"hints,omitempty"`
-	Usage      *Usage  `json:"usage,omitempty"`
-	Filter     *Filter `json:"filter,omitempty"`
-	Toggle     *Toggle `json:"toggle,omitempty"`
-	Summary    []Field `json:"summary,omitempty"`
+	Links      []Link   `json:"links,omitempty"`
+	ID         string   `json:"id,omitempty"`
+	Kind       string   `json:"kind"`
+	Title      string   `json:"title"`
+	Subtitle   string   `json:"subtitle,omitempty"`
+	BackLabel  string   `json:"back_label,omitempty"`
+	Query      string   `json:"query,omitempty"`
+	Rows       []Row    `json:"rows,omitempty"`
+	Blocks     []Block  `json:"blocks,omitempty"`
+	Selected   int      `json:"selected,omitempty"`
+	NoticeTone string   `json:"notice_tone,omitempty"`
+	Notice     string   `json:"notice,omitempty"`
+	Footer     string   `json:"footer,omitempty"`
+	Hints      []Hint   `json:"hints,omitempty"`
+	Usage      *Usage   `json:"usage,omitempty"`
+	Filter     *Filter  `json:"filter,omitempty"`
+	Toggle     *Toggle  `json:"toggle,omitempty"`
+	Summary    []Field  `json:"summary,omitempty"`
+	Catalog    *Catalog `json:"catalog,omitempty"`
+}
+
+// Catalog exposes bounded browsing controls; cursors and mutation versions stay
+// in the owning application and are bound into the panel action identity.
+type Catalog struct {
+	Loading     bool `json:"loading,omitempty"`
+	Page        int  `json:"page"`
+	HasNext     bool `json:"has_next,omitempty"`
+	HasPrevious bool `json:"has_previous,omitempty"`
+	CanOrganize bool `json:"can_organize,omitempty"`
 }
 
 type Link struct {
@@ -52,6 +63,7 @@ type Hint struct {
 }
 
 type Row struct {
+	Identity   string  `json:"identity,omitempty"`
 	Label      string  `json:"label"`
 	Group      string  `json:"group,omitempty"`
 	Checked    bool    `json:"checked,omitempty"`
@@ -65,6 +77,8 @@ type Row struct {
 	Affordance string  `json:"affordance,omitempty"`
 	Tone       string  `json:"tone,omitempty"`
 	Input      *Input  `json:"input,omitempty"`
+	Pinned     bool    `json:"pinned,omitempty"`
+	Archived   bool    `json:"archived,omitempty"`
 }
 
 // Input describes an editable field without exposing secrets. Value is empty

@@ -106,6 +106,9 @@ func (m Model) bridgeBackLabel(panel uisnapshot.Panel) string {
 }
 
 func (m Model) bridgeLauncherPanel() uisnapshot.Panel {
+	if m.launcherMode == "conversations" && m.catalog != nil {
+		return m.catalogPanel()
+	}
 	if m.launcherMode == "status-line" {
 		panel := uisnapshot.Panel{Kind: "status-line", Title: "Terminal status line", Selected: m.selected,
 			Footer: "V show or hide · Space toggle · ←/→ reorder · R defaults · Enter save · Esc cancel"}

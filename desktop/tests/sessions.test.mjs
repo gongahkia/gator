@@ -119,16 +119,16 @@ test("profile maintenance closes idle cached chats and refuses pending backgroun
 });
 
 
-test("receipt reads retain their runtime and block profile maintenance and restart", async () => {
+for (const busyFlag of ["receipt_busy", "catalog_busy"]) test(`${busyFlag} retains its runtime and blocks profile maintenance and restart`, async () => {
  const sessions=setup();await sessions.open();const owner=sessions.current;
- owner.change({receipt_busy:true});assert.equal(sessions.busy,true);
+ owner.change({[busyFlag]:true});assert.equal(sessions.busy,true);
  await assert.rejects(sessions.restart(),/current operation/);
- await assert.rejects(sessions.prepareProfileAction({type:"navigate",text:"/data"}),/receipt check/);
+ await assert.rejects(sessions.prepareProfileAction({type:"navigate",text:"/data"}),/current local operation/);
  await sessions.open({new:true});
  await assert.rejects(sessions.prepareProfileAction({type:"navigate",text:"/recovery"}),/other chats/);
  await assert.rejects(sessions.prepareUpdate(),/all chats/);
  for(let i=0;i<5;i++)await sessions.open({new:true});
  assert.equal(owner.closed,false);
- owner.change({receipt_busy:false});assert.equal(sessions.busy,false);
+ owner.change({[busyFlag]:false});assert.equal(sessions.busy,false);
  await sessions.stop();
 });

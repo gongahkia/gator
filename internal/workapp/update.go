@@ -17,6 +17,8 @@ import (
 
 func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 	switch value := messageValue.(type) {
+	case catalogLoaded:
+		return m.finishCatalog(value)
 	case receiptChecked:
 		if value.Result.RequestID != m.receiptPendingID {
 			return m, nil
@@ -505,8 +507,8 @@ func (m Model) updateKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if value.Type == tea.KeyCtrlX && !m.running {
-		m.openConversationPicker()
-		return m, nil
+		cmd := m.openConversationPicker()
+		return m, cmd
 	}
 	// Tab and Ctrl+I share a terminal key code. Forms own Tab; the workspace
 	// shortcut is available only from the chat composer.
@@ -965,6 +967,9 @@ func (m Model) updateHome(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.launcherMode == "conversations" && m.catalog != nil && key.Type == tea.KeyEsc {
+		m.cancelCatalog()
+	}
 	if m.launcherMode == "status-line" {
 		return m.updateStatusLineEditor(key)
 	}

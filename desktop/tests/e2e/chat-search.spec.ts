@@ -38,12 +38,8 @@ test("dated chat search highlights literal matches and opens the intended topic 
     await recent.getByRole("button", { name: "All conversations", exact: true }).click();
     const browser = page.getByRole("region", { name: "Conversations", exact: true });
     await expect(browser.getByRole("heading", { name: "Yesterday", exact: true })).toBeVisible();
-    await expect(browser.getByText("Titles and folders · up to 50 recent saved conversations", { exact: true })).toBeVisible();
-    const snapshot = await page.evaluate(() => window.gator!.snapshot());
-    await app.evaluate(({ BrowserWindow }, value) => BrowserWindow.getAllWindows()[0].webContents.send("gator:update", value), { ...snapshot, state: { ...snapshot.state!, recent_issue: "List unavailable" } });
-    await expect(browser.getByText(/The conversation list couldn’t refresh/)).toBeVisible();
-    await browser.getByRole("button", { name: "Try again", exact: true }).click();
-    await expect(browser.getByText(/The conversation list couldn’t refresh/)).toHaveCount(0);
+    await expect(browser.getByText("Titles, folders and retained messages · up to 50 chats per page", { exact: true })).toBeVisible();
+    await expect(browser.getByRole("button", {name:"Refresh conversations"})).toBeEnabled();
     for (const width of [1440, 800]) {
       await app.evaluate(({BrowserWindow},width)=>BrowserWindow.getAllWindows()[0].setSize(width,800),width);
       const positions=await browser.locator(".chat-search-row").evaluateAll(rows=>rows.map(row=>{

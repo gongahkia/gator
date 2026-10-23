@@ -419,7 +419,27 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			return owned, nil
 		},
 		ListConversations: func() ([]worksession.Conversation, error) {
-			return sessions.List(50)
+			page, err := sessions.PageConversations(worksession.ConversationQuery{})
+			if err != nil {
+				return nil, err
+			}
+			if page.Incomplete || page.Skipped > 0 {
+				return nil, errors.New("some conversations could not be read; open Conversations to inspect the available history")
+			}
+			items := make([]worksession.Conversation, 0, len(page.Items))
+			for _, item := range page.Items {
+				items = append(items, worksession.Conversation{ID: item.ID, Title: item.Title, SourcePath: item.Source, UpdatedAt: item.UpdatedAt, Pinned: item.Pinned, Archived: item.Archived})
+			}
+			return items, nil
+		},
+		QueryConversations: sessions.PageConversationsContext,
+		OrganizeConversation: func(change worksession.ConversationChange) (worksession.Conversation, error) {
+			release, err := state.Guard(stateDir, false)
+			if err != nil {
+				return worksession.Conversation{}, err
+			}
+			defer release()
+			return sessions.OrganizeConversation(change)
 		},
 		LoadConversation: func(conversationID string) (workapp.ConversationState, error) {
 			restored, err := loadWorkTUIConversation(sessions, conversationID)

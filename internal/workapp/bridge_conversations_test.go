@@ -65,3 +65,11 @@ func TestBridgeRecentsRefreshFailureDoesNotInventEmptySuccess(t *testing.T) {
 		t.Fatalf("failed list = %#v", state)
 	}
 }
+
+func TestBridgeRecentsKeepPinnedChatsFirstAndArchivedChatsOut(t *testing.T) {
+	m := New(Config{Conversations: []worksession.Conversation{{ID: "work-recent", UpdatedAt: time.Unix(3, 0)}, {ID: "work-pinned", Pinned: true, UpdatedAt: time.Unix(1, 0)}, {ID: "work-archived", Pinned: true, Archived: true, UpdatedAt: time.Unix(4, 0)}}})
+	items, _ := m.bridgeRecentConversations()
+	if len(items) != 2 || items[0].ID != "work-pinned" || !items[0].Pinned || items[1].ID != "work-recent" {
+		t.Fatal(items)
+	}
+}

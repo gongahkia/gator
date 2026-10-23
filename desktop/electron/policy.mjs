@@ -84,10 +84,12 @@ export function validateFrame(frame) {
     const panel = frame.panel;
     if (!panel || typeof panel !== "object" || Array.isArray(panel) || !/^[a-f0-9]{64}$/.test(panel.id)) throw new Error("Invalid view");
     if (Object.keys(panel).some((key) => !["id", "action", "row", "fields", "text"].includes(key))) throw new Error("Invalid view action");
-    if (!["select", "activate", "key", "query", "filter"].includes(panel.action)) throw new Error("Invalid view action");
+    if (!["select", "activate", "key", "query", "filter", "next", "previous", "refresh", "rename", "pin", "unpin", "archive", "restore"].includes(panel.action)) throw new Error("Invalid view action");
     if (panel.row !== undefined && (!Number.isSafeInteger(panel.row) || panel.row < 0 || panel.row > 10000)) throw new Error("Invalid row");
     if (panel.action === "key" && (typeof frame.key !== "string" || !/^(enter|esc|up|down|left|right|tab|shift\+tab|space|ctrl\+[ru]|f1|[a-z0-9])$/.test(frame.key))) throw new Error("Invalid view key");
     if (["query", "filter"].includes(panel.action) && (typeof panel.text !== "string" || panel.text.length > 4096)) throw new Error("Invalid search");
+	 if (["rename", "pin", "unpin", "archive", "restore"].includes(panel.action) && panel.row === undefined) throw new Error("Choose a conversation");
+	 if (panel.action === "rename" && (typeof panel.text !== "string" || !panel.text.trim() || Buffer.byteLength(panel.text, "utf8") > 256 || /[\r\n\0]/.test(panel.text))) throw new Error("Invalid conversation title");
     if (panel.fields !== undefined && (!panel.fields || Array.isArray(panel.fields) || typeof panel.fields !== "object" || Object.entries(panel.fields).some(([key, value]) => !/^\d{1,5}$/.test(key) || typeof value !== "string" || value.length > 64 * 1024))) throw new Error("Invalid form");
   }
   return { ...frame, version: 1 };

@@ -11,6 +11,7 @@ import (
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/instructions"
 	"github.com/gongahkia/gator/internal/jobs"
+	"github.com/gongahkia/gator/internal/worksession"
 )
 
 func (m *Model) openCommandPalette() {
@@ -26,7 +27,12 @@ func (m *Model) openSlashPalette() {
 	m.launcherMode = "slash"
 }
 
-func (m *Model) openConversationPicker() {
+func (m *Model) openConversationPicker() tea.Cmd {
+	if m.config.QueryConversations != nil {
+		m.launcher, m.launcherMode, m.paletteQuery, m.selected = true, "conversations", "", 0
+		m.catalog = &conversationCatalog{Query: worksession.ConversationQuery{Scope: "active", Content: true}}
+		return m.queryCatalog()
+	}
 	if m.config.ListConversations != nil {
 		conversations, err := m.config.ListConversations()
 		if err != nil {
@@ -48,6 +54,7 @@ func (m *Model) openConversationPicker() {
 	}
 	m.paletteQuery = ""
 	m.selected = 0
+	return nil
 }
 
 func (m *Model) openGoalPicker() {
@@ -154,6 +161,9 @@ func (m Model) copySelection(id string) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) filteredEntries() []entry {
+	if m.launcherMode == "conversations" && m.catalog != nil {
+		return m.entries
+	}
 	query := strings.ToLower(strings.TrimSpace(m.paletteQuery))
 	entries := m.entries
 	if m.launcherMode == "commands" || m.launcherMode == "slash" {

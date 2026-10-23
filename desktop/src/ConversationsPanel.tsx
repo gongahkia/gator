@@ -5,11 +5,12 @@ import type { DesktopFrame } from "./bridge";
 import { Panel } from "./Panel";
 import { datedChats, Highlight } from "./chatPresentation";
 import { shortDate, workspaceName } from "./presentation";
+import { ConversationCatalog } from "./ConversationCatalog";
 
 export function ConversationsPanel({ panel, send, issue }: { panel: BackendPanel; send(frame: DesktopFrame): Promise<void>; issue?: string }) {
   const runs = panel.kind === "history";
   const detail = runs && !!panel.blocks?.length;
-  return runs ? <Panel panel={panel} send={send} title={detail ? panel.subtitle || "Task run" : "Task runs"} subtitle={detail ? "Task run details" : `Individual task runs · ${panel.subtitle || "all"}`} /> : <ChatBrowser panel={panel} send={send} issue={issue} />;
+  return runs ? <Panel panel={panel} send={send} title={detail ? panel.subtitle || "Task run" : "Task runs"} subtitle={detail ? "Task run details" : `Individual task runs · ${panel.subtitle || "all"}`} /> : panel.catalog ? <ConversationCatalog panel={panel} send={send} /> : <ChatBrowser panel={panel} send={send} issue={issue} />;
 }
 
 function ChatBrowser({ panel, send, issue }: { panel: BackendPanel; send(frame: DesktopFrame): Promise<void>; issue?: string }) {
