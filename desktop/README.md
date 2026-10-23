@@ -59,8 +59,8 @@ retraining. See [the implemented boundaries](../docs/DESKTOP-CONVERSATIONAL-IMPL
 
 Paste screenshots or copied PNG/JPEG/WebP images into the message box with
 Cmd/Ctrl+V. They become previewable attachments; nothing is sent until Send.
-Text paste remains ordinary text. The existing limits apply: four attachments,
-4 MiB per file and 8 MiB per message. Image decoding happens on this computer.
+Text paste remains ordinary text. The existing limits apply: up to 12 attachments,
+8 MiB per document, 4 MiB per image and 16 MiB per message. Image decoding happens on this computer.
 
 ## Composer model picker
 

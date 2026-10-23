@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { uploadLimits, attachmentLimit, attachmentLimitsError } from "../electron/attachment-limits.mjs";
 import type { BackendState } from "./protocol";
 import type { DraftRequest, DraftSnapshot, SavedDraft, UploadedFile } from "./bridge";
 
@@ -45,7 +46,7 @@ export function useDrafts(state?: BackendState) {
     }).finally(() => { if (live.current && version === generation.current) setSaving(false); });
   }, [request]);
   const setUploads = useCallback((next: UploadedFile[]) => {
-    if (next.length > 4 || next.reduce((sum, file) => sum + file.size, 0) > 8 * 1024 * 1024) throw new Error("Attach up to four files, totaling no more than 8 MiB.");
+    if (next.length > uploadLimits.count || next.some(file => file.size > attachmentLimit(file.name)) || next.reduce((sum, file) => sum + file.size, 0) > uploadLimits.total) throw new Error(attachmentLimitsError);
     currentUploads.current = next; renderUploads(next); setText(current.current);
   }, [setText]);
   const setReplyToUpdateID = useCallback((id?: string) => { currentReply.current = id; renderReply(id); setText(current.current); }, [setText]);

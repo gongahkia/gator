@@ -2,6 +2,7 @@ import { Paperclip, X } from "lucide-react";
 import { useContext, useEffect, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
 import type { UploadedFile } from "./bridge";
 import { FileCard, FileChatContext } from "./FileSurface";
+import { uploadLimits, attachmentLimit, attachmentLimitsHint, attachmentLimitsError } from "../electron/attachment-limits.mjs";
 
 export function useAttachmentPicker(context: string | undefined, files: UploadedFile[], change: (files: UploadedFile[]) => void, disabled: boolean) {
   const [busy, setBusy] = useState(false);
@@ -16,7 +17,7 @@ export function useAttachmentPicker(context: string | undefined, files: Uploaded
     if (!original.context || original.disabled || pending.current) return;
     pending.current = true; setBusy(true); setIssue("");
     try {
-      if (dropped && (original.files.length + dropped.length > 4 || dropped.some(file => file.size > 4 * 1024 * 1024) || [...original.files,...dropped].reduce((sum,file)=>sum+file.size,0) > 8 * 1024 * 1024)) throw new Error("Attach up to four files, no larger than 4 MiB each and 8 MiB total.");
+      if (dropped && (original.files.length + dropped.length > uploadLimits.count || dropped.some(file => file.size > attachmentLimit(file.name)) || [...original.files,...dropped].reduce((sum,file)=>sum+file.size,0) > uploadLimits.total)) throw new Error(attachmentLimitsError);
       const added = await (pasted && dropped ? window.gator!.pasteImages(await Promise.all(dropped.map(async file => ({ type: file.type, data: new Uint8Array(await file.arrayBuffer()) }))), original.context) : dropped ? window.gator!.dropFiles(dropped, original.context) : window.gator!.chooseFiles(original.context));
       if (!added.length) return;
       if (owner.current.context !== original.context) throw new Error("The conversation changed. Attach these files again in the intended conversation.");
@@ -42,7 +43,7 @@ export function useAttachmentPicker(context: string | undefined, files: Uploaded
 }
 
 export function AttachButton({ busy, disabled, choose }: { busy: boolean; disabled: boolean; choose(): void }) {
-  return <button className="icon-button attach-button" aria-label="Attach files" title="Attach documents, text or images · up to 4 files, 4 MiB each, 8 MiB total" disabled={disabled || busy} aria-busy={busy} onClick={choose}><Paperclip size={17} /></button>;
+  return <button className="icon-button attach-button" aria-label="Attach files" title={attachmentLimitsHint} disabled={disabled || busy} aria-busy={busy} onClick={choose}><Paperclip size={17} /></button>;
 }
 
 export function PendingAttachments({ files, disabled, remove }: { files: UploadedFile[]; disabled: boolean; remove(id: string): void }) {

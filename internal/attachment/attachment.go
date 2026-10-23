@@ -24,13 +24,13 @@ const PDFMediaType = "application/pdf"
 const (
 	// MaxInputs is the maximum number of developer-supplied images and
 	// documents that a single prompt may include.
-	MaxInputs = 4
+	MaxInputs = 12
 	// MaxImageBytes and MaxDocumentBytes bound one input before it reaches a
 	// provider. Extracted Office text is bounded by MaxDocumentBytes too.
 	MaxImageBytes    = 4 * 1024 * 1024
-	MaxDocumentBytes = 4 * 1024 * 1024
+	MaxDocumentBytes = 8 * 1024 * 1024
 	// MaxTotalBytes bounds the provider-visible bytes across all inputs.
-	MaxTotalBytes = 8 * 1024 * 1024
+	MaxTotalBytes = 16 * 1024 * 1024
 
 	maxArchiveEntries     = 4_096
 	maxSpreadsheetSheets  = 128

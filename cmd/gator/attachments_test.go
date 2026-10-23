@@ -2,12 +2,14 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/attachment"
 )
 
 func TestLoadPromptAttachmentsRequiresRepositoryLocalSupportedFiles(t *testing.T) {
@@ -63,7 +65,8 @@ func TestDesktopUploadsShareTheWorkspaceInputLimits(t *testing.T) {
 		t.Fatal(err)
 	}
 	var paths []string
-	for _, name := range []string{"one.txt", "two.txt", "three.txt", "four.txt"} {
+	for i := 0; i < attachment.MaxInputs; i++ {
+		name := fmt.Sprintf("file-%d.txt", i)
 		if err := os.WriteFile(filepath.Join(source, name), []byte("Workspace text"), 0600); err != nil {
 			t.Fatal(err)
 		}
@@ -74,6 +77,6 @@ func TestDesktopUploadsShareTheWorkspaceInputLimits(t *testing.T) {
 		t.Fatalf("merged documents = %#v, %v", documents, err)
 	}
 	if _, _, err := loadWorkPromptAttachments(source, paths, []string{id}); err == nil {
-		t.Fatal("accepted more than four combined inputs")
+		t.Fatal("accepted more than the combined input limit")
 	}
 }

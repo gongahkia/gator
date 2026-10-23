@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -248,5 +249,42 @@ func writeArchive(t *testing.T, path string, files map[string]string) {
 	}
 	if err := file.Close(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestLargerDocumentAndCombinedInputBoundaries(t *testing.T) {
+	root, err := workspace.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := bytes.Repeat([]byte("a"), 5*1024*1024)
+	if err := os.WriteFile(filepath.Join(root.Path(), "large.txt"), text, 0600); err != nil {
+		t.Fatal(err)
+	}
+	_, docs, err := LoadInputs(root, []Input{{Path: "large.txt", Kind: DocumentInput}})
+	if err != nil || len(docs) != 1 || len(docs[0].Data) != len(text) {
+		t.Fatal("larger document was rejected or truncated", err)
+	}
+	inputs := make([]agent.Attachment, MaxInputs)
+	for i := range inputs {
+		inputs[i] = agent.Attachment{Name: fmt.Sprintf("part-%d.txt", i), MediaType: "text/plain", Data: []byte("part")}
+	}
+	if err := ValidateLoaded(nil, inputs); err != nil {
+		t.Fatal(err)
+	}
+	inputs = append(inputs, agent.Attachment{Name: "extra.txt", MediaType: "text/plain", Data: []byte("extra")})
+	if err := ValidateLoaded(nil, inputs); err == nil {
+		t.Fatal("accepted too many attachments")
+	}
+	large := bytes.Repeat([]byte("a"), 6*1024*1024)
+	inputs = inputs[:3]
+	for i := range inputs {
+		inputs[i].Data = large
+	}
+	if err := ValidateLoaded(nil, inputs); err == nil {
+		t.Fatal("accepted attachments over the shared byte budget")
+	}
+	if err := ValidateLoaded([]agent.Image{{Name: "large.png", MediaType: "image/png", Data: make([]byte, MaxImageBytes+1)}}, nil); err == nil {
+		t.Fatal("document limit widened the image limit")
 	}
 }

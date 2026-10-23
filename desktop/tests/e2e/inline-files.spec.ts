@@ -201,3 +201,40 @@ test("saved file versions compare inline and export the exact chosen bytes witho
     expect(await readFile(path, "utf8")).toBe(original); expect(f.requests).toHaveLength(0); expect(errors).toEqual([]);
   } finally { await f.close(); }
 });
+
+
+test("larger attachment selections survive reload, reject overflow and reach the local model intact", async () => {
+  test.setTimeout(90000);
+  const f = await fixture();
+  try {
+    const paths = Array.from({ length: 12 }, (_, i) => join(f.directory, `document-${i}.txt`));
+    const large = "Larger attachment marker: amber heron.\n" + "a".repeat(5 * 1024 * 1024);
+    await Promise.all(paths.map((path, i) => writeFile(path, i === 0 ? large : `Selected document ${i}`)));
+    const app = await f.launch(), page = await app.firstWindow(), composer = page.getByRole("textbox", { name: "Message Gator", exact: true });
+    await expect(composer).toBeVisible(); await composer.fill("Read the selected documents.");
+    await pick(app, paths); await page.getByRole("button", { name: "Attach files", exact: true }).click();
+    const pending = page.getByRole("region", { name: "Attachments for your next message" });
+    await expect(pending.locator(".inline-file-card")).toHaveCount(12);
+    await expect(page.getByRole("button", { name: "Attach files", exact: true })).toBeDisabled();
+    await composer.evaluate(element => {
+      const transfer = new DataTransfer(); transfer.items.add(new File(["extra"], "extra.txt", { type: "text/plain" }));
+      element.closest(".composer")!.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    });
+    await expect(page.locator(".composer-error")).toContainText("Attach up to 12 files");
+    await expect(composer).toHaveValue("Read the selected documents.");
+    await page.reload(); await expect(pending.locator(".inline-file-card")).toHaveCount(12);
+    await expect(composer).toHaveValue("Read the selected documents.");
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(760, 560));
+    await expect(page.getByRole("button", { name: "Send message", exact: true })).toBeInViewport();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: "test-results/larger-attachment-selection.png", animations: "disabled" });
+    expect(f.requests).toHaveLength(0);
+    await page.evaluate(() => window.gator!.send({ type: "submit", text: "/mode inspect" }));
+    await page.getByRole("button", { name: "Send message", exact: true }).click();
+    await expect(page.locator(".assistant-message").getByText("I received the current file.", { exact: true })).toBeVisible({ timeout: 30000 });
+    const payload = JSON.stringify(f.requests);
+    expect(payload).toContain("amber heron"); expect(payload).toContain("Selected document 11");
+    await expect(page.locator(".user-message .inline-file-card")).toHaveCount(12);
+    expect(await readFile(paths[0], "utf8")).toBe(large);
+  } finally { await f.close(); }
+});
