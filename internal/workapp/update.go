@@ -340,7 +340,13 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 		m.snapshot = value.SnapshotID
 	}
 	responseIndex := len(m.messages)
-	if wasCancelling && value.Error != "" && strings.Contains(strings.ToLower(value.Error), "cancel") {
+	uncertainRequest := false
+	for _, receipt := range value.Bundle.Actions {
+		uncertainRequest = uncertainRequest || receipt.Status == "unknown"
+	}
+	if value.Error != "" && uncertainRequest {
+		m.messages = append(m.messages, noticeMessage("Request outcome unconfirmed", "The service may already have acted. Check the saved request receipt before trying again.", "warning"))
+	} else if wasCancelling && value.Error != "" && strings.Contains(strings.ToLower(value.Error), "cancel") {
 		m.messages = append(m.messages, noticeMessage("Work interrupted", "Review any retained work in /history.", "warning"))
 	} else if value.Error != "" {
 		m.messages = append(m.messages, noticeMessage("Work failed", explainRunFailure(value.Error, m.modelStatus), "error"))

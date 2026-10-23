@@ -129,6 +129,9 @@ func TestFailedAndStoppedRunsKeepOwnedReceiptBundles(t *testing.T) {
 		m.cancelling = stopped
 		next, _ := m.Update(runDone(RunResult{WorkID: a.RunID, ConversationID: a.ConversationID, Bundle: bundle, Error: "context canceled after external dispatch"}))
 		m = next.(Model)
+		if m.messages[0].result == nil || m.messages[0].result.Title != "Request outcome unconfirmed" || m.messages[0].result.Tone != "warning" {
+			t.Fatal("uncertain dispatch was described as a failed send", m.messages)
+		}
 		_, cmd := m.ApplyReceiptAction(a)
 		if cmd == nil {
 			t.Fatal("failed/stopped task lost its inspectable receipt", stopped, m.BridgeState())
