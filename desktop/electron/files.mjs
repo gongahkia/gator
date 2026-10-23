@@ -4,6 +4,7 @@ import { basename, dirname, join, resolve, relative, sep, isAbsolute } from "nod
 import { createHash, randomUUID } from "node:crypto";
 import { applyContent, inspectContent, fileLimit } from "./file-content.mjs";
 import { validUploadID } from "./uploads.mjs";
+import { compareFileContent } from "./file-comparison.mjs";
 
 const digest = bytes => createHash("sha256").update(bytes).digest("hex");
 const revisionID = value => typeof value === "string" && /^[a-f0-9-]{36}$/.test(value);
@@ -14,10 +15,12 @@ export function fileReference(value) {
   throw new Error("Invalid file selection.");
 }
 export function validateFileRequest(request) {
-  if (!request || typeof request !== "object" || Array.isArray(request) || !["open", "save", "draft", "discard", "restore", "attach", "export"].includes(request.action) || typeof request.context !== "string" || !request.context || request.context.length > 8192 || Object.keys(request).some(key => !["action", "context", "ref", "expected", "version", "edit"].includes(key))) throw new Error("Invalid file request.");
+  if (!request || typeof request !== "object" || Array.isArray(request) || !["open", "compare", "save", "draft", "discard", "restore", "attach", "export"].includes(request.action) || typeof request.context !== "string" || !request.context || request.context.length > 8192 || Object.keys(request).some(key => !["action", "context", "ref", "expected", "version", "base", "edit"].includes(key))) throw new Error("Invalid file request.");
   fileReference(request.ref);
   if (["save", "draft", "discard", "restore"].includes(request.action) && !revisionID(request.expected)) throw new Error("Reopen this file before changing it.");
   if (request.version !== undefined && !revisionID(request.version)) throw new Error("Invalid file version.");
+  if (request.base !== undefined && (!revisionID(request.base) || request.action !== "compare")) throw new Error("Invalid comparison version.");
+  if (request.action === "compare" && (!revisionID(request.base) || !revisionID(request.version) || request.edit !== undefined)) throw new Error("Choose two saved versions to compare.");
   if (["save", "draft"].includes(request.action) && (!request.edit || typeof request.edit !== "object" || Array.isArray(request.edit) || Buffer.byteLength(JSON.stringify(request.edit)) > fileLimit)) throw new Error("These changes exceed the file editor's limit.");
   return request;
 }
@@ -148,6 +151,11 @@ export class FileStore {
     if (descriptor.sha256 && digest(original) !== descriptor.sha256) throw new Error("This output no longer matches its retained version. Your original is kept.");
     let metadata = await this.retain(ref, descriptor.name, original);
     if (request.action === "open") return this.view(ref, metadata, request.version);
+    if (request.action === "compare") {
+      const before = await this.contents(ref, metadata, request.base), after = await this.contents(ref, metadata, request.version);
+      const version = id => { const index = metadata.versions.findIndex(item => item.id === id); return { ...metadata.versions[index], number: index + 1 }; };
+      return { from: version(request.base), to: version(request.version), ...compareFileContent(metadata.name, before, after) };
+    }
     if (["export", "attach"].includes(request.action)) return { name: metadata.name, path: join(directory, `${request.version || metadata.current}.bin`), bytes: await this.contents(ref, metadata, request.version) };
     const lock = await acquireSaveLock(directory);
     try {
