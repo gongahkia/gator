@@ -890,8 +890,16 @@ func (e Executor) normalizeAndValidate(request Request) (Request, error) {
 		if request.RequireCode {
 			return Request{}, errors.New("a required Code implementation is unavailable in inspect mode")
 		}
-	} else if len(request.Contract.Artifacts) == 0 && !(request.Mode == action.Draft && request.Contract.AllowOptionalArtifacts) {
-		return Request{}, errors.New("draft and act modes require at least one artifact")
+	} else if len(request.Contract.Artifacts) == 0 {
+		optionalDraft := request.Mode == action.Draft && request.Contract.AllowOptionalArtifacts
+		// A reviewed connected request can be the entire user outcome (for
+		// example, sending a message). Do not invent a file requirement for it.
+		// This does not grant authority: the selected connector, permission
+		// rules and fresh per-action approval still constrain dispatch.
+		connectedAction := request.Mode == action.Act && request.Contract.ExternalActions == action.Approve && len(request.ConnectorIDs) > 0 && !request.RequireCode
+		if !optionalDraft && !connectedAction {
+			return Request{}, errors.New("draft and act modes require an artifact, optional draft output, or a reviewed connected request")
+		}
 	}
 	if request.Mode == action.Draft && request.Contract.ExternalActions == action.Approve {
 		return Request{}, errors.New("draft mode cannot approve external actions")

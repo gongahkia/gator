@@ -733,3 +733,37 @@ func containsEvent(events []agent.Event, kind agent.EventKind) bool {
 	}
 	return false
 }
+
+func TestExecutorConnectedRequestNeedsNoInventedOutputFile(t *testing.T) {
+	for _, decision := range []action.Decision{action.Allow, action.Deny} {
+		t.Run(string(decision), func(t *testing.T) {
+			var requests atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { requests.Add(1); w.WriteHeader(http.StatusNoContent) }))
+			defer server.Close()
+			registry, err := connector.NewRegistry([]connector.Descriptor{{Version: 1, ID: "release", Name: "Release", Kind: connector.KindHTTPWebhook, Resource: server.URL, Authentication: connector.AuthNone}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			contract := artifact.InspectionContract()
+			contract.ExternalActions = action.Approve
+			model := &scriptedModel{turns: []agent.Turn{{ToolCalls: []agent.ToolCall{{ID: "send", Name: "connector_release_publish", Arguments: json.RawMessage(`{"payload":{"version":"v1"}}`)}}}, {Text: "The reviewed request has been handled."}}}
+			approvals := 0
+			outcome, runErr := (Executor{Model: model, StateDir: t.TempDir(), Connectors: connector.Runtime{Registry: registry, HTTPClient: server.Client()}}).Execute(context.Background(), Request{RunID: "standalone-action", SourcePath: t.TempDir(), Objective: "Publish reviewed release", Mode: action.Act, Contract: contract, ConnectorIDs: []string{"release"}, MaxSteps: 3, ApproveAction: func(context.Context, action.Proposal) (action.Decision, error) { approvals++; return decision, nil }})
+			if approvals != 1 || len(outcome.Manifest.Actions) != 1 || len(outcome.Manifest.Artifacts) != 0 {
+				t.Fatal("connected request lost its review or required a file", outcome.Manifest, runErr)
+			}
+			expected := int32(0)
+			status := action.Denied
+			if decision == action.Allow {
+				expected = 1
+				status = action.Executed
+				if runErr != nil || outcome.Manifest.Status != artifact.Completed {
+					t.Fatal("approved standalone request failed", runErr)
+				}
+			}
+			if requests.Load() != expected || outcome.Manifest.Actions[0].Status != status {
+				t.Fatal("request bypassed its review", requests.Load(), outcome.Manifest.Actions)
+			}
+		})
+	}
+}
