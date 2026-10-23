@@ -3,6 +3,7 @@ import { ChevronDown, ChevronLeft, ChevronRight, Download, FileText, History, Me
 import { Markdown } from "./Result";
 import { FileGrid } from "./FileGrid";
 import { TextFileEditor } from "./TextFileEditor";
+import { FileVersionComparison } from "./FileVersionComparison";
 import type { FileEdit, FileParagraph, FileReference, FileRequest, FileView, WordBlock } from "./fileProtocol";
 import type { UploadedFile } from "./bridge";
 
@@ -14,6 +15,7 @@ const empty = (edit: FileEdit) => edit.text === undefined && !Object.keys(edit.c
 
 export function FileCard({ reference, name, caption, fallback }: { reference: FileReference; name: string; caption?: string; fallback?: string }) {
   const chat = useContext(FileChatContext), [open, setOpen] = useState(false), [view, setView] = useState<FileView>(), [edit, setEdit] = useState<FileEdit>({}), [mode, setMode] = useState<"preview" | "edit">("preview");
+  const [comparing, setComparing] = useState(false);
   const [busy, setBusy] = useState(false), [issue, setIssue] = useState(""), [status, setStatus] = useState(""), [selection, setSelection] = useState(""), [prompt, setPrompt] = useState(""), [asking, setAsking] = useState(false), [history, setHistory] = useState(false);
   const body = useRef<HTMLDivElement>(null), trigger = useRef<HTMLButtonElement>(null), epoch = useRef(0), owner = useRef(chat), draftWrite = useRef(Promise.resolve());
   owner.current = chat;
@@ -56,7 +58,7 @@ export function FileCard({ reference, name, caption, fallback }: { reference: Fi
     try { await draftWrite.current; const next = await request("discard", { expected: view.staleDraft ?? view.current }); setView(next); setEdit(next.draft ?? {}); setMode("preview"); trigger.current?.focus({ preventScroll: true }); setStatus("Edits discarded."); }
     catch (error) { setIssue(errorText(error)); } finally { setBusy(false); }
   };
-  const exportFile = async () => { setBusy(true); setIssue(""); try { await request("export", { version: view?.revision }); } catch (error) { setIssue(errorText(error)); } finally { setBusy(false); } };
+  const exportFile = async (version?: string) => { setBusy(true); setIssue(""); try { await request("export", { version: version ?? view?.revision }); } catch (error) { setIssue(errorText(error)); } finally { setBusy(false); } };
   const ask = async () => {
     if (!view || !prompt.trim() || dirty || busy) return; setBusy(true); setIssue("");
     try { await attach(view.revision, `For ${view.name} (version ${view.versions.findIndex(version => version.id === view.revision) + 1})${selection ? `, focus on:\n${selection.slice(0,4000)}\n` : ":\n"}${prompt.trim()}`); setAsking(false); setPrompt(""); setStatus("File and request added to your message. Review before sending."); }
@@ -73,24 +75,24 @@ export function FileCard({ reference, name, caption, fallback }: { reference: Fi
       <FileText size={18} /><span><strong>{name}</strong><small>{caption || "Attached file"}</small></span><ChevronDown size={16} />
     </button>
     {open && <div className="inline-file-expanded" onKeyDown={event => {
-      if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); if (asking) setAsking(false); else if (history) setHistory(false); else close(); }
+      if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); if (asking) setAsking(false); else if (comparing) setComparing(false); else if (history) setHistory(false); else close(); }
       else if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") { event.preventDefault(); event.stopPropagation(); if (dirty) void save(); }
     }}>
       <header className="inline-file-toolbar">
-        <div className="file-view-switch" aria-label="File view"><button aria-pressed={mode === "preview"} onClick={() => setMode("preview")}>Preview</button>{view?.editable && !historical && <button aria-pressed={mode === "edit"} disabled={busy || chat.blocked} onClick={() => setMode("edit")}>Edit</button>}</div>
+        <div className="file-view-switch" aria-label="File view"><button aria-pressed={mode === "preview" && !comparing} onClick={() => { setMode("preview"); setComparing(false); }}>Preview</button>{view?.editable && !historical && <button aria-pressed={mode === "edit" && !comparing} disabled={busy || chat.blocked} onClick={() => { setMode("edit"); setComparing(false); }}>Edit</button>}{view && view.versions.length > 1 && <button aria-label={`Compare versions of ${name}`} aria-pressed={comparing} disabled={busy || dirty} onClick={() => { setComparing(value => !value); setHistory(false); setAsking(false); }}>Compare</button>}</div>
         <span className="file-save-state">{dirty ? "Unsaved edits" : historical ? "Previous version" : view ? `Version ${view.versions.length}` : busy ? "Opening…" : ""}</span>
-        {view && <button className="icon-button" aria-label={`Version history for ${name}`} title="Version history" aria-expanded={history} disabled={busy || dirty} onClick={() => setHistory(value => !value)}><History size={16} /></button>}
-        <button className="icon-button" aria-label={`Export ${name}`} title="Save a copy" disabled={busy} onClick={() => void exportFile()}><Download size={16} /></button>
+        {view && <button className="icon-button" aria-label={`Version history for ${name}`} title="Version history" aria-expanded={history} disabled={busy || dirty} onClick={() => { setHistory(value => !value); setComparing(false); }}><History size={16} /></button>}
+        <button className="icon-button" aria-label={`Export ${name}`} title="Save a copy" disabled={busy || comparing} onClick={() => void exportFile()}><Download size={16} /></button>
         <button className="icon-button" aria-label={`Close file ${name}`} title="Collapse file" onClick={close}><X size={16} /></button>
       </header>
       {history && view && <div className="file-version-list" aria-label="File versions">{[...view.versions].reverse().map((version, index) => <button key={version.id} aria-current={version.id === view.revision ? "true" : undefined} onClick={() => { void load(version.id); setHistory(false); }}><span>Version {view.versions.length - index} · {version.author}</span><time>{new Date(version.at).toLocaleString()}</time></button>)}</div>}
       {busy && !view && <p className="file-feedback" role="status">Opening file…</p>}
       {!view && fallback && <div className="file-body">{/\.(?:md|markdown|mdown)$/i.test(name) ? <Markdown text={fallback} /> : <pre>{fallback}</pre>}<p className="file-feedback">Retained excerpt · full content is unavailable</p></div>}
-      {view && <><div ref={body} className={`file-body file-kind-${view.kind}`} aria-label={`${name} ${mode}`} onMouseUp={() => { const selected = window.getSelection(); if (selected?.anchorNode && body.current?.contains(selected.anchorNode)) setSelection(selected.toString().slice(0,4000)); }}>
+      {comparing && view && chat.context ? <FileVersionComparison key={`${key}:${view.revision}`} view={view} reference={reference} context={chat.context} busy={busy} exportVersion={version => void exportFile(version)} /> : view && <><div ref={body} className={`file-body file-kind-${view.kind}`} aria-label={`${name} ${mode}`} onMouseUp={() => { const selected = window.getSelection(); if (selected?.anchorNode && body.current?.contains(selected.anchorNode)) setSelection(selected.toString().slice(0,4000)); }}>
         {view.kind === "image" ? <img className="file-image" src={view.data} alt={name} /> : view.kind === "pdf" ? <Suspense fallback={<p className="file-feedback">Opening PDF…</p>}><PDFPreview data={view.data!} /></Suspense> : view.kind === "word" ? <WordDocument blocks={view.blocks!} edits={edit.paragraphs ?? {}} editable={mode === "edit" && !busy} revision={`${view.revision}:${mode}`} change={paragraph} /> : view.kind === "workbook" || view.kind === "table" ? <FileGrid key={view.revision} view={view} edits={edit.cells ?? {}} editable={mode === "edit" && !busy} change={cell} select={setSelection} /> : view.kind === "slides" ? <SlideDocument key={view.revision} view={view} edits={edit.paragraphs ?? {}} editable={mode === "edit" && !busy} revision={`${view.revision}:${mode}`} change={paragraph} /> : view.kind === "unsupported" ? <p className="file-feedback">{view.notice}</p> : mode === "edit" ? <TextFileEditor name={name} markdown={view.kind === "markdown"} value={edit.text ?? view.text ?? ""} change={changeText} select={setSelection} /> : view.kind === "markdown" ? <Markdown text={edit.text ?? view.text ?? ""} /> : <pre className="file-source">{edit.text ?? view.text}</pre>}
       </div>{view.notice && view.kind !== "unsupported" && <details className="file-format-note"><summary>Format support</summary><p>{view.notice}</p></details>}{view.staleDraft && <p className="file-feedback" role="status">An earlier edit draft belongs to a previous version. The latest saved file is shown.</p>}{view.staleDraft && <button className="small-button" disabled={busy} onClick={() => void discard()}>Discard earlier draft</button>}</>}
       {issue && <p className="file-feedback file-error" role="alert">{issue}</p>}{status && <p className="file-feedback" role="status">{status}</p>}
-      <footer className="inline-file-footer">{view && <button className="small-button" disabled={busy || dirty || chat.blocked} onClick={() => setAsking(value => !value)}><MessageSquare size={15} />{selection ? "Ask Gator about selection" : "Ask Gator"}</button>}<div>{historical ? <button className="button" disabled={busy || chat.blocked} onClick={() => void restore()}>Restore this version</button> : dirty && <><button className="small-button" disabled={busy} onClick={() => void discard()}>Discard</button><button className="button file-save-button" disabled={busy || chat.blocked} onClick={() => void save()}><Save size={15} />{busy ? "Saving…" : "Save"}</button></>}</div></footer>
+      <footer className="inline-file-footer">{view && <button className="small-button" disabled={busy || dirty || chat.blocked || comparing} onClick={() => setAsking(value => !value)}><MessageSquare size={15} />{selection ? "Ask Gator about selection" : "Ask Gator"}</button>}<div>{historical ? <button className="button" disabled={busy || chat.blocked || comparing} onClick={() => void restore()}>Restore this version</button> : dirty && <><button className="small-button" disabled={busy} onClick={() => void discard()}>Discard</button><button className="button file-save-button" disabled={busy || chat.blocked} onClick={() => void save()}><Save size={15} />{busy ? "Saving…" : "Save"}</button></>}</div></footer>
       {asking && <div className="file-revision-request">{selection && <blockquote>{selection.slice(0,500)}</blockquote>}<textarea autoFocus aria-label={`Request changes to ${name}`} placeholder="What would you like Gator to change?" value={prompt} onChange={event => setPrompt(event.target.value)} /><button className="button" disabled={busy || !prompt.trim() || dirty || chat.blocked} onClick={() => void ask()}>Add to message</button></div>}
     </div>}
   </section>;

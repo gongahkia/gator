@@ -1,0 +1,17 @@
+.file-comparison { border-block: 1px solid var(--color-line); color: var(--color-secondary); font-size: var(--text-xs); }
+.file-comparison-choices { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; padding: 12px; }
+.file-comparison-choices > div { min-width: 0; display: grid; grid-template-columns: minmax(0,1fr) 40px; gap: 4px; align-items: end; }
+.file-comparison-choices label { display: block; color: var(--color-muted); }
+.file-comparison-choices select { display: block; width: 100%; min-width: 0; min-height: 40px; margin-top: 4px; padding: 6px 8px; background: var(--color-surface); border: 1px solid var(--color-line); border-radius: var(--radius-sm); color: var(--color-contrast); }
+.file-comparison-choices .icon-button { min-height: 40px; }
+.file-comparison-body { max-height: min(400px,45vh); overflow: auto; overscroll-behavior: contain; padding: 0 12px 12px; }
+.pending-attachments .file-comparison-body { max-height: none; overflow: visible; }
+.file-comparison-status { font-weight: 500; color: var(--color-contrast); margin-bottom: 8px; }
+.file-comparison-notice { margin-bottom: 8px; color: var(--color-muted); line-height: 1.6; }
+.file-change { border-top: 1px solid var(--color-line); margin-top: 12px; padding-top: 12px; }
+.file-change h4 { font-weight: 500; font-variant-numeric: tabular-nums; margin-bottom: 8px; }
+.file-change > div { padding: 8px 10px; border-radius: 4px; margin-top: 6px; }
+.file-change [data-change="before"] { background: color-mix(in srgb,var(--color-danger) 7%,transparent); }
+.file-change [data-change="after"] { background: var(--color-selected-fill); }
+.file-change strong { display: block; font-weight: 500; font-variant-numeric: tabular-nums; margin-bottom: 4px; }
+.file-change pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.65; }

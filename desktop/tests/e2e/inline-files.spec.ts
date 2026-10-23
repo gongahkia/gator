@@ -152,3 +152,52 @@ test("generated outputs edit in their message and send the working version witho
     await expect(composer).toHaveValue(/Please review my edits/);await page.evaluate(()=>window.gator!.send({type:"submit",text:"/artifact clear"}));await page.evaluate(()=>window.gator!.send({type:"submit",text:"/mode inspect"}));const count=f.requests.length;await page.getByRole("button",{name:"Send message",exact:true}).click();await expect.poll(()=>f.requests.length).toBeGreaterThan(count);expect(JSON.stringify(f.requests.slice(count))).toContain("Edited output: silver otter.");expect(await readFile(originalPath,"utf8")).toBe(original);expect(errors).toEqual([]);
   }finally{await f.close();}
 });
+
+
+test("saved file versions compare inline and export the exact chosen bytes without a model call", async () => {
+  const f = await fixture();
+  try {
+    const path = join(f.directory, "comparison.md"), original = "# Decision\n\nBudget: 100\nKeep this line.\n", edited = "# Decision\n\nBudget: 125\nKeep this line.\nApproved next step.\n";
+    await writeFile(path, original);
+    const app = await f.launch(), page = await app.firstWindow(), errors: string[] = [];
+    page.on("pageerror", error => errors.push(error.message));
+    const composer = page.getByRole("textbox", { name: "Message Gator", exact: true });
+    await composer.fill("Keep this unsent question.");
+    await pick(app, [path]); await page.getByRole("button", { name: "Attach files", exact: true }).click();
+    const card = page.locator(".pending-attachments .inline-file");
+    await card.getByRole("button", { name: "Open file comparison.md", exact: true }).click();
+    await card.getByRole("button", { name: "Edit", exact: true }).click();
+    await card.getByRole("textbox", { name: "Edit comparison.md", exact: true }).fill(edited);
+    await expect(card.getByRole("button", { name: "Compare versions of comparison.md", exact: true })).toHaveCount(0);
+    await card.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(card.getByText("Saved · included in your next message", { exact: true })).toBeVisible();
+    await card.getByRole("button", { name: "Compare versions of comparison.md", exact: true }).click();
+    let comparison = card.getByRole("region", { name: "Compare versions of comparison.md", exact: true });
+    await expect(comparison.getByText("2 changed sections", { exact: true })).toBeVisible();
+    await expect(comparison.getByText("Budget: 100", { exact: true })).toBeVisible();
+    await expect(comparison.getByText("Budget: 125", { exact: true })).toBeVisible();
+    await expect(composer).toHaveValue("Keep this unsent question.");
+    for (const [label, text, name] of [["Export before version", original, "before.md"], ["Export after version", edited, "after.md"]]) {
+      const filePath = join(f.directory, name);
+      await app.evaluate(({ dialog }, filePath) => { dialog.showSaveDialog = async () => ({ canceled: false, filePath }); }, filePath);
+      await comparison.getByRole("button", { name: label, exact: true }).click();
+      await expect.poll(async () => readFile(filePath, "utf8").catch(() => "")).toBe(text);
+    }
+    const to = await comparison.getByRole("combobox", { name: "Compare to version" }).inputValue();
+    await comparison.getByRole("combobox", { name: "Compare from version" }).selectOption(to);
+    await expect(comparison.getByText("The file bytes are identical.", { exact: true })).toBeVisible();
+    await page.reload(); await card.getByRole("button", { name: "Open file comparison.md", exact: true }).click();
+    await card.getByRole("button", { name: "Compare versions of comparison.md", exact: true }).click();
+    comparison = card.getByRole("region", { name: "Compare versions of comparison.md", exact: true });
+    await expect(comparison.getByText("2 changed sections", { exact: true })).toBeVisible();
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(760, 560));
+    await expect(page.getByRole("button", { name: "Send message", exact: true })).toBeInViewport();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await comparison.getByText("Budget: 125", { exact: true }).scrollIntoViewIfNeeded();
+    await page.screenshot({ path: "test-results/file-comparison-dark.png", animations: "disabled" });
+    await page.evaluate(() => window.gator!.send({ type: "submit", text: "/theme light" }));
+    await expect(page.locator(".app-shell")).toHaveAttribute("data-theme", "light");
+    await page.screenshot({ path: "test-results/file-comparison-light.png", animations: "disabled" });
+    expect(await readFile(path, "utf8")).toBe(original); expect(f.requests).toHaveLength(0); expect(errors).toEqual([]);
+  } finally { await f.close(); }
+});
