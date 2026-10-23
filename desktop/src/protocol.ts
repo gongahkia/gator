@@ -92,6 +92,7 @@ export type ChatUpdate = { can_rate: boolean; rating?: "useful" | "noise" | "wro
 export type ChatMemoryReceipt = {id: string; run_id: string; text: string; quote?: string; updated: string; scope: string; corrected?: boolean; can_undo?: boolean};
 export type ChatMemoryAction = {conversation_id: string; id: string; updated: string; action: "correct"|"forget"|"undo"; text?: string; request_id: string};
 export type BackendState = {
+  action_recoveries?: {id: string; run_id: string; at: string; live: boolean; receipt: ActionReceipt}[]; action_recovery_issue?: string; action_recovery_truncated?: boolean;
   receipt_busy?: boolean; receipt_result?: {request_id: string; check?: ReceiptCheck; error?: string};
   chat_checks?: { id: string; title: string; state: string; issue?: string; next_action: string; last_success?: string; next_due?: string; gap_from?: string; gap_to?: string; unsuccessful: number }[];
   chat_checks_issue?: string;

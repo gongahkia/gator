@@ -16,6 +16,7 @@ import (
 
 	"github.com/atotto/clipboard"
 	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/actionlog"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/config"
@@ -400,6 +401,23 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		},
 		ReviewBundle: func(path string) (*uisnapshot.Result, error) { return workReviewResult(stateDir, path) },
 		CheckReceipt: workReceiptChecker(stateDir),
+		ReadActionRecoveries: func(owner string) ([]actionlog.Entry, error) {
+			journal, err := actionlog.Open(stateDir)
+			if err != nil {
+				return nil, err
+			}
+			entries, err := journal.List("")
+			if err != nil {
+				return nil, err
+			}
+			var owned []actionlog.Entry
+			for _, entry := range entries {
+				if entry.ConversationID == owner {
+					owned = append(owned, entry)
+				}
+			}
+			return owned, nil
+		},
 		ListConversations: func() ([]worksession.Conversation, error) {
 			return sessions.List(50)
 		},

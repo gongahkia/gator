@@ -20,6 +20,10 @@ import (
 // BridgeState is a display-only projection for the desktop.
 // The Go model remains the sole owner of commands, runs, approvals and history.
 type BridgeState struct {
+	ActionRecoveries        []RecoveredAction `json:"action_recoveries,omitempty"`
+	ActionRecoveryIssue     string            `json:"action_recovery_issue,omitempty"`
+	ActionRecoveryTruncated bool              `json:"action_recovery_truncated,omitempty"`
+
 	ReceiptBusy           bool                       `json:"receipt_busy,omitempty"`
 	ReceiptResult         *ReceiptResult             `json:"receipt_result,omitempty"`
 	ChatMemories          []ChatMemoryReceipt        `json:"chat_memories,omitempty"`
@@ -167,6 +171,7 @@ func (m Model) BridgeState() BridgeState {
 	desktop.Shortcuts = m.desktop.ResolvedShortcuts()
 	state := BridgeState{
 		ReceiptBusy: m.receiptBusy, ReceiptResult: m.receiptResult,
+		ActionRecoveries: m.actionRecoveries, ActionRecoveryIssue: m.actionRecoveryIssue, ActionRecoveryTruncated: m.actionRecoveryTruncated,
 		ChatMemories: append([]ChatMemoryReceipt(nil), m.chatMemories...), ChatMemoryIssue: m.chatMemoryIssue, ChatMemoryResult: m.chatMemoryResult,
 		PendingConnection: m.pendingConnection(),
 		UpdatesHaveOlder:  m.updatesHaveOlder, UpdatesHaveNewer: len(m.updatePageAnchors) > 0,

@@ -41,6 +41,7 @@ func (m Model) FocusBridgeSession(foreground bool) Model {
 		m.refreshBridgeConversations()
 		m.refreshChatUpdates()
 		m.refreshChatMemories()
+		m.refreshActionRecoveries()
 		m.rememberChat()
 	}
 	return m

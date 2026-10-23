@@ -80,6 +80,7 @@ func (m *Model) beginChat(source string) bool {
 	m.rememberChat()
 	m.refreshChatUpdates()
 	m.refreshChatMemories()
+	m.refreshActionRecoveries()
 	m.refreshBridgeConversations()
 	return true
 }
@@ -125,6 +126,7 @@ func (m *Model) restoreConversation(conversationID, announcement string) {
 	m.rememberChat()
 	m.refreshChatUpdates()
 	m.refreshChatMemories()
+	m.refreshActionRecoveries()
 	m.status = joinConversationStatus(announcement, m.revisionStatus())
 }
 

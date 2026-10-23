@@ -81,3 +81,22 @@ function Receipt({bundle,receipt:r,inspect,busy,disabled}:{bundle:BackendBundle;
     </div>
   </details>;
 }
+
+
+export function RecoveredRequests({state,inspect,busy,disabled}:{state:BackendState;inspect:InspectReceipt;busy:boolean;disabled:boolean}) {
+  const recovered=state.action_recoveries??[];
+  if(!recovered.length&&!state.action_recovery_issue)return null;
+  return <details className="request-recovery">
+    <summary><CircleAlert size={14} aria-hidden="true" /><span>Saved request receipts{recovered.length?` · ${recovered.length}`:""}</span><ChevronDown size={13} aria-hidden="true" /></summary>
+    <div>
+      <p>These requests were retained before the task finished. Reopening them does not retry an action.</p>
+      {state.action_recovery_issue&&<p role="status">{state.action_recovery_issue}</p>}
+      {recovered.map(item=><section key={item.id} aria-label="Recovered request">
+        <p className="receipt-check-time">{new Date(item.at).toLocaleString()}{item.live?" · Its owner was still working when checked":""}</p>
+        <ConnectedReceipts bundle={{Path:"",Status:item.receipt.Status,RunID:item.run_id,Artifacts:null,Candidates:null,Actions:[item.receipt]}} inspect={inspect} busy={busy} disabled={disabled} />
+      </section>)}
+      {state.action_recovery_truncated&&<p>Showing the latest 32 request receipts. Earlier receipts remain in retained history.</p>}
+      <p>For unconfirmed outcomes, inspect the connected service before approving another attempt.</p>
+    </div>
+  </details>;
+}

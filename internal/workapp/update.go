@@ -360,6 +360,7 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 		m.messages[responseIndex].runID = value.WorkID
 	}
 	m.refreshChatMemories()
+	m.refreshActionRecoveries()
 	m.lastOutput = value.OutputPath
 	m.lastBundle = value.Bundle
 	if m.lastWorkID != "" {

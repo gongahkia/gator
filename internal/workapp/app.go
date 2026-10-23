@@ -9,6 +9,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/gongahkia/gator/internal/actionlog"
 	"github.com/gongahkia/gator/internal/agent"
 	appconfig "github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/delivery"
@@ -248,6 +249,7 @@ type Config struct {
 	SkillAction              func(command string) (string, error)
 	SkillResult              func(command string) (*uisnapshot.Result, error)
 	ReviewBundle             func(bundlePath string) (*uisnapshot.Result, error)
+	ReadActionRecoveries     func(string) ([]actionlog.Entry, error)
 	CheckReceipt             func(context.Context, ReceiptRequest) (ReceiptCheck, error)
 	// JobAction uses the canonical local Job service. It keeps scheduling
 	// as repeatable Work rather than creating a second interface-specific runtime.
@@ -459,25 +461,31 @@ type Model struct {
 	chatMemoriesOwner      string
 	chatMemoryResult       *ChatMemoryResult
 	chatUpdateResult       *BridgeUpdateResult
-	receiptBusy            bool
-	receiptPendingID       string
-	receiptResult          *ReceiptResult
-	chatMemoryIssue        string
-	recall                 RecallStatus
-	recallBusy             bool
-	recallCancel           context.CancelFunc
-	recallEvents           <-chan tea.Msg
-	recallConfirm          string
-	contextState           ContextState
-	contextDetail          *KnowledgeItem
-	contextEdit            string
-	contextEditing         bool
-	contextConfirm         bool
-	contextWorkID          string
-	lastWorkID             string
-	primary                bool
-	primaryID              string
-	primarySource          string
+
+	actionRecoveries        []RecoveredAction
+	actionRecoveryOwner     string
+	actionRecoveryIssue     string
+	actionRecoveryTruncated bool
+
+	receiptBusy      bool
+	receiptPendingID string
+	receiptResult    *ReceiptResult
+	chatMemoryIssue  string
+	recall           RecallStatus
+	recallBusy       bool
+	recallCancel     context.CancelFunc
+	recallEvents     <-chan tea.Msg
+	recallConfirm    string
+	contextState     ContextState
+	contextDetail    *KnowledgeItem
+	contextEdit      string
+	contextEditing   bool
+	contextConfirm   bool
+	contextWorkID    string
+	lastWorkID       string
+	primary          bool
+	primaryID        string
+	primarySource    string
 }
 
 func New(config Config) Model {
@@ -568,6 +576,7 @@ func New(config Config) Model {
 	}
 	model.refreshChatUpdates()
 	model.refreshChatMemories()
+	model.refreshActionRecoveries()
 	return model
 }
 
