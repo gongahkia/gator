@@ -226,6 +226,8 @@ type Config struct {
 	ChangeKnowledge          func(id, action, text, goalID, revision string) (string, error)
 	SaveFollowup             func(followup.Draft) (goal.Record, jobs.Definition, error)
 	ReadChecks               func() ([]workhome.Check, bool, error)
+	ReadQuietChecks          func(jobID string) (jobs.QuietAudit, error)
+	ReviewQuietCheck         func(jobID, attemptID, verdict, note, revision string) error
 	StartSupervisor          func() error
 	Controls                 func(context.Context, string, string, []string) (ControlScreen, error)
 	PendingConnection        func() string
@@ -448,6 +450,7 @@ type Model struct {
 	followupSaving         bool
 	checks                 []workhome.Check
 	checkDetail            *workhome.Check
+	quietChecks            *quietChecksView
 	chatMemories           []ChatMemoryReceipt
 	chatMemoriesOwner      string
 	chatMemoryResult       *ChatMemoryResult

@@ -117,7 +117,11 @@ func TestQuietWatchAuditLabelsMissedChecksWithoutCountingUnchangedOrAlerts(t *te
 	if err := os.WriteFile(outside, []byte(`{"version":1}`), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink(outside, filepath.Join(store.Root(), "history", jobID, quietIDs[0], "quiet-review.json")); err != nil {
+	reviewPath := filepath.Join(store.Root(), "history", jobID, quietIDs[0], "quiet-review.json")
+	if err := os.Remove(reviewPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, reviewPath); err != nil {
 		t.Fatal(err)
 	}
 	if err := quietAuditCommand([]string{jobID}, &output); err == nil {

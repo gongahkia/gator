@@ -3,6 +3,10 @@ package uisnapshot
 // Panel carries display-independent state from a Go workflow to its frontends.
 // Workflow actions remain owned by the Go application that produced it.
 type Panel struct {
+	// ActionIdentity binds identical-looking views to their exact workflow target.
+	// It is included in the bridge action hash, never in the display projection.
+	ActionIdentity string `json:"-"`
+
 	Links      []Link  `json:"links,omitempty"`
 	ID         string  `json:"id,omitempty"`
 	Kind       string  `json:"kind"`

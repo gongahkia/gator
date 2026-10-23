@@ -288,6 +288,9 @@ func (m Model) BridgeState() BridgeState {
 func bridgePanelID(panel uisnapshot.Panel) string {
 	panel.ID = ""
 	data, _ := json.Marshal(panel)
+	if panel.ActionIdentity != "" {
+		data = append(data, []byte("\x00"+panel.ActionIdentity)...)
+	}
 	return fmt.Sprintf("%x", sha256.Sum256(data))
 }
 

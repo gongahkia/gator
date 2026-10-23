@@ -135,6 +135,10 @@ func (m *Model) selectBridgeRow(index int) {
 
 func (m *Model) setBridgeField(index int, value string) {
 	switch {
+	case m.section == "followup" && m.quietChecks != nil && m.quietChecks.Editing:
+		if index == 0 {
+			m.quietChecks.Note = value
+		}
 	case m.models != nil:
 		if fields, ok := m.models.(bridgeModelFields); ok {
 			fields.SetBridgeField(index, value)

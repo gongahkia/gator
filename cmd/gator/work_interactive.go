@@ -330,8 +330,28 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		ChangeKnowledge: func(id, action, text, activeGoal, revision string) (string, error) {
 			return changeWorkKnowledge(stateDir, id, action, text, activeGoal, revision)
 		},
-		SaveFollowup:       func(draft followup.Draft) (goal.Record, jobs.Definition, error) { return saveFollowup(stateDir, draft) },
-		ReadChecks:         func() ([]workhome.Check, bool, error) { return readFollowupChecks(stateDir) },
+		SaveFollowup: func(draft followup.Draft) (goal.Record, jobs.Definition, error) { return saveFollowup(stateDir, draft) },
+		ReadChecks:   func() ([]workhome.Check, bool, error) { return readFollowupChecks(stateDir) },
+		ReadQuietChecks: func(jobID string) (jobs.QuietAudit, error) {
+			store, err := jobs.Open(stateDir)
+			if err != nil {
+				return jobs.QuietAudit{}, err
+			}
+			return store.QuietWatchAudit(jobID, 50)
+		},
+		ReviewQuietCheck: func(jobID, attemptID, verdict, note, revision string) error {
+			release, err := state.Guard(stateDir, false)
+			if err != nil {
+				return err
+			}
+			defer release()
+			store, err := jobs.Open(stateDir)
+			if err != nil {
+				return err
+			}
+			_, err = store.ReviewQuietWatchReviewed(jobID, attemptID, verdict, note, revision, time.Now())
+			return err
+		},
 		StartSupervisor:    func() error { return startLocalSupervisor(stateDir) },
 		PilotAction:        workPilotResult,
 		Controls:           workControlsWithConnections(stateDir, connections),

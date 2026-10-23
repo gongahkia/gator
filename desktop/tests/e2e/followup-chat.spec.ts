@@ -59,14 +59,61 @@ test("chat reviews, saves, edits and pauses an origin-linked responsibility", as
   expect((await saved())[0].enabled).toBe(false);expect(await saved()).toHaveLength(1);
   await page.evaluate(()=>window.gator!.send({type:"navigate",text:"/followup"}));
   await expect(page.getByText("Venue replies",{exact:true}).first()).toBeVisible();expect((await state(page)).panel?.rows?.[0].state).toBe("paused");
+  // Retain completed quiet/unchanged/failed checks using this reviewed fixture agreement.
+  const checkedAt=new Date(Date.now()-300000).toISOString();
+  const attempts=[{id:`attempt-${"a".repeat(24)}`,status:"completed"},{id:`attempt-${"b".repeat(24)}`,status:"unchanged"},{id:`attempt-${"c".repeat(24)}`,status:"failed"}];
+  for(const attempt of attempts){
+   const path=join(directory,"state/gator/jobs/history",original.id,attempt.id);await mkdir(path,{recursive:true});
+   await writeFile(join(path,"intent.json"),JSON.stringify({version:1,execution_id:attempt.id,definition:original}));
+   await writeFile(join(path,"result.json"),JSON.stringify({version:1,id:attempt.id,job_id:original.id,status:attempt.status,started_at:checkedAt,finished_at:checkedAt,summary:"No material change",watch_decision:{status:"quiet",summary:"The venue deadline is unchanged",rationale:"The source still says Friday",evidence:["source/project.md"]}}));
+  }
+  await page.locator(".panel-row").filter({hasText:"Venue replies"}).first().click();
+  await page.locator(".panel-more summary").click();await page.getByRole("button",{name:/review quiet checks/i}).click();
+  await expect(page.getByRole("heading",{name:"Quiet checks",exact:true})).toBeVisible();
+  await expect(page.locator(".panel-row")).toHaveCount(1);await page.locator(".panel-row").click();
+  await expect(page.getByText("The venue deadline is unchanged",{exact:true})).toBeVisible();
+  await page.getByRole("button",{name:/missed a change/i}).click();
+  await page.getByRole("textbox",{name:"Change that should have been reported",exact:true}).fill("The venue moved the deadline to Thursday.");
+  await page.getByRole("button",{name:/save feedback/i}).click();
+  await expect(page.getByText("Feedback saved. It does not change the agreement or send an alert.",{exact:true})).toBeVisible();
+  const reviewPath=join(directory,"state/gator/jobs/history",original.id,attempts[0].id,"quiet-review.json");
+  expect(JSON.parse(await readFile(reviewPath,"utf8")).verdict).toBe("missed");
+  expect(JSON.parse(await readFile(reviewPath,"utf8")).note).toBe("The venue moved the deadline to Thursday.");
+  await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setSize(900,720));await page.screenshot({path:"test-results/followup-quiet-review.png"});
+  await page.getByRole("button",{name:/correctly stayed quiet/i}).click();
+  await expect.poll(async()=>JSON.parse(await readFile(reviewPath,"utf8")).verdict).toBe("correct");
+  await page.getByRole("button",{name:/missed a change/i}).click();
+  const feedback=page.getByRole("textbox",{name:"Change that should have been reported",exact:true});
+  const unsaved="A new note that must survive a conflicting assessment.";await feedback.fill(unsaved);
+  const concurrent=JSON.parse(await readFile(reviewPath,"utf8"));
+  await writeFile(reviewPath,JSON.stringify({...concurrent,version:2,sequence:concurrent.sequence+1,rated_at:new Date().toISOString()}));
+  await page.getByRole("button",{name:/save feedback/i}).click();
+  await expect(page.getByText("feedback changed; refresh this check before reviewing it again",{exact:true})).toBeVisible();
+  await expect(feedback).toHaveValue(unsaved);
+  await page.getByRole("button",{name:"New chat",exact:true}).click();await expect(page.getByRole("alertdialog")).toBeVisible();
+  await page.getByRole("button",{name:"Keep editing",exact:true}).click();await expect(feedback).toHaveValue(unsaved);
+  await page.getByRole("button",{name:/^Cancel/i}).click();
+  await page.getByRole("button",{name:"Refresh",exact:true}).click();
+  await expect(page.locator(".panel-row")).toHaveCount(1);await expect(page.locator(".panel-row")).toContainText("The venue deadline is unchanged");
+  await page.locator(".panel-row").click();await page.locator(".panel-more summary").click();
+  await page.getByRole("button",{name:/clear feedback/i}).click();
+  await expect.poll(async()=>JSON.parse(await readFile(reviewPath,"utf8")).verdict).toBe("");
+  expect(JSON.parse(await readFile(reviewPath,"utf8")).sequence).toBeGreaterThan(concurrent.sequence+1);
+  await page.getByRole("button",{name:"Refresh",exact:true}).click();
+  await expect(page.locator(".workflow-content")).toContainText("1 quiet checks · 0 reviewed · 0 marked missed");
+  expect((await saved())[0].alert_when).toBe("Only a price changes");expect((await saved())[0].enabled).toBe(false);
+  await page.evaluate(()=>window.gator!.send({type:"navigate",text:"/followup"}));
   await page.getByRole("button",{name:/new check/i}).click();
   await page.getByLabel("End date (optional)",{exact:true}).fill("2030-10-25T18:30");
   await page.getByRole("button",{name:/^review/i}).click();
   await expect.poll(async()=>(await state(page)).panel?.title).toBe("Review ongoing check");
   expect((await state(page)).panel?.blocks?.[0].fields?.find(field=>field.label==="Ends")?.value).toContain("25 Oct 2030");
-  await closeDesktop(app);
  } finally {
-  await app.evaluate(({dialog})=>{dialog.showMessageBox=async()=>({response:0,checkboxChecked:false});}).catch(()=>{});
-  await closeDesktop(app).catch(()=>{});server.closeAllConnections();await new Promise<void>(done=>server.close(()=>done()));await rm(directory,{recursive:true,force:true});
+  try {
+   await app.evaluate(({dialog})=>{dialog.showMessageBox=async()=>({response:0,checkboxChecked:false});}).catch(()=>{});
+   await closeDesktop(app);
+  } finally {
+   server.closeAllConnections();await new Promise<void>(done=>server.close(()=>done()));await rm(directory,{recursive:true,force:true});
+  }
  }
 });

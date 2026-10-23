@@ -48,6 +48,7 @@ func (m Model) refreshChecksCommand() tea.Cmd {
 func (m *Model) openFollowup() tea.Cmd {
 	m.section, m.launcher, m.home = "followup", false, false
 	m.checkDetail, m.followupForm, m.sectionNotice = nil, nil, ""
+	m.quietChecks = nil
 	m.selected = 0
 	return m.refreshChecksCommand()
 }
@@ -87,6 +88,9 @@ func (m *Model) editFollowup() {
 }
 
 func (m Model) updateFollowupKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.quietChecks != nil {
+		return m.updateQuietChecks(key)
+	}
 	if m.followupForm != nil {
 		return m.updateFollowupForm(key)
 	}
@@ -122,6 +126,8 @@ func (m Model) updateFollowupKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	if m.checkDetail != nil {
 		switch key.String() {
+		case "q":
+			m.openQuietChecks()
 		case "e":
 			m.editFollowup()
 		case "p":
@@ -343,6 +349,9 @@ func editFormText(text *string, key tea.KeyMsg, limit int) {
 }
 
 func (m Model) followupPanel() uisnapshot.Panel {
+	if m.quietChecks != nil {
+		return m.quietChecksPanel()
+	}
 	p := uisnapshot.Panel{Kind: "followup", Title: "Follow-up checks", Selected: m.selected, Notice: m.sectionNotice}
 	if f := m.followupForm; f != nil {
 		if f.Review {
@@ -457,6 +466,9 @@ func (m Model) followupPanel() uisnapshot.Panel {
 		p.Hints = []uisnapshot.Hint{{Shortcut: "P", Action: pause}, {Shortcut: "X", Action: "check now", Group: "more"}, {Shortcut: "H", Action: "recovery and offline history", Group: "more"}, {Shortcut: "R", Action: "refresh"}, {Shortcut: "Esc", Action: "back"}}
 		if c.Definition.GoalWatch {
 			p.Hints = append(p.Hints, uisnapshot.Hint{Shortcut: "E", Action: "edit agreement"})
+			if m.config.ReadQuietChecks != nil {
+				p.Hints = append(p.Hints, uisnapshot.Hint{Shortcut: "Q", Action: "review quiet checks", Group: "more"})
+			}
 		}
 		if !m.config.SupervisorRunning {
 			p.Hints = append(p.Hints, uisnapshot.Hint{Shortcut: "S", Action: "start supervisor", Group: "more"})
