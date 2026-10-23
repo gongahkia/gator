@@ -58,3 +58,26 @@ func TestCoverageGapsAreObservedAndBoundToCheckLifetime(t *testing.T) {
 		t.Fatal("unrelated old gap projected", gap)
 	}
 }
+
+func TestSharedAdmissionHoldsStayQuietWithoutHidingUnsuccessfulCoverage(t *testing.T) {
+	now := time.Now().UTC()
+	first := Attempt{ID: "hold-one", JobID: "job-watch", Status: "limited", LimitReason: "shared", StartedAt: now}
+	second := first
+	second.ID = "hold-two"
+	second.StartedAt = now.Add(time.Minute)
+	history := []Attempt{second, first}
+	if h := ReduceWatchHealth(history, second); h.First.ID != "" {
+		t.Fatal("shared pause created an inbox incident", h)
+	}
+	if count := ConsecutiveUnsuccessfulChecks(history, second); count != 2 {
+		t.Fatal("shared pause hid missed coverage", count)
+	}
+	recovered := Attempt{ID: "quiet", JobID: first.JobID, Status: "unchanged", StartedAt: now.Add(2 * time.Minute)}
+	if h := ReduceWatchHealth(history, recovered); h.First.ID != "" {
+		t.Fatal("resuming shared requests fabricated a recovery incident", h)
+	}
+	failed := Attempt{ID: "failure", JobID: first.JobID, Status: "failed", StartedAt: now.Add(3 * time.Minute)}
+	if h := ReduceWatchHealth(history, failed); h.First.ID != failed.ID || h.Attempts != 1 {
+		t.Fatal("real failure was hidden by earlier admission holds", h)
+	}
+}

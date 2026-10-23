@@ -31,6 +31,13 @@ func ConsecutiveUnsuccessfulChecks(history []Attempt, current Attempt) int {
 }
 
 func reduceWatchHealth(history []Attempt, current Attempt, separateLimits bool) WatchHealth {
+	// Shared admission holds are already exposed by chat health and Usage.
+	// They never create inbox incidents or recovery alerts, including when the
+	// user deliberately pauses requests. Keep counting them for coverage health.
+	sharedHold := func(a Attempt) bool { return a.Status == "limited" && a.LimitReason == "shared" }
+	if separateLimits && sharedHold(current) {
+		return WatchHealth{}
+	}
 	if current.ID == "" || current.StartedAt.IsZero() || (!unsuccessfulCheck(current.Status) && current.Status != "completed" && current.Status != "unchanged") {
 		return WatchHealth{}
 	}
@@ -52,6 +59,9 @@ func reduceWatchHealth(history []Attempt, current Attempt, separateLimits bool) 
 	})
 	h := WatchHealth{Recovered: !unsuccessfulCheck(current.Status)}
 	for _, item := range items {
+		if separateLimits && sharedHold(item) {
+			continue
+		}
 		if item.Status == "running" || item.ID == current.ID && h.Recovered {
 			continue
 		}
