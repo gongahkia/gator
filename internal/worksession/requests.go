@@ -215,7 +215,7 @@ func (s Store) nameAdmittedChat(id string, first Request) error {
 	}
 	defer lock.Close()
 	conversation, err := s.Load(id)
-	if err != nil || conversation.Title != "New chat" || conversation.HeadRevision != "" {
+	if err != nil || conversation.Title != "New chat" || conversation.HeadRevision != "" || conversation.TitleEdited {
 		return err
 	}
 	if title := chatRequestTitle(first.Text); title != "" {

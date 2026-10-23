@@ -20,6 +20,12 @@ import (
 const Version = 2
 
 type Conversation struct {
+	// Optional presentation metadata is retained in display.json so older
+	// releases can still read the canonical conversation/revision schemas.
+	Pinned                bool      `json:"-"`
+	Archived              bool      `json:"-"`
+	TitleEdited           bool      `json:"-"`
+	MetadataRevision      uint64    `json:"-"`
 	SourceRefreshRequired bool      `json:"source_refresh_required,omitempty"`
 	Version               int       `json:"version"`
 	ID                    string    `json:"id"`
@@ -116,6 +122,9 @@ func (s Store) Load(id string) (Conversation, error) {
 	if (conversation.Version != 1 && conversation.Version != Version) || conversation.ID != id {
 		return Conversation{}, errors.New("conversation metadata is invalid")
 	}
+	if _, err := s.loadConversationDisplay(&conversation); err != nil {
+		return Conversation{}, err
+	}
 	return conversation, nil
 }
 
@@ -189,7 +198,7 @@ func (s Store) AddRevision(conversationID string, revision Revision) (Conversati
 	if len(revision.InputNames) > 0 {
 		_ = writeJSON(s.inputNamesPath(conversationID, revision.ID), revision.InputNames)
 	}
-	if conversation.HeadRevision == "" && conversation.Title == "New chat" {
+	if conversation.HeadRevision == "" && conversation.Title == "New chat" && !conversation.TitleEdited {
 		if title := chatRequestTitle(revision.Objective); title != "" {
 			conversation.Title = title
 		}
