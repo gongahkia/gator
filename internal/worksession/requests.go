@@ -184,7 +184,48 @@ func (s Store) SaveRequests(id string, next RequestJournal) (RequestJournal, err
 	if err := writeJSON(filepath.Join(s.root, id, "requests.json"), next); err != nil {
 		return RequestJournal{}, err
 	}
+	// Naming is a display convenience after admission has succeeded. It must
+	// never turn an already retained request into a rejected submission.
+	if len(next.Requests) > 0 {
+		_ = s.nameAdmittedChat(id, next.Requests[0])
+	}
 	return next, nil
+}
+
+func chatRequestTitle(text string) string {
+	runes := []rune(strings.Join(strings.Fields(text), " "))
+	shortened := len(runes) > 80
+	if shortened {
+		runes = runes[:77]
+	}
+	for len(string(runes)) > 253 {
+		runes = runes[:len(runes)-1]
+		shortened = true
+	}
+	if shortened {
+		runes = append(runes, '.', '.', '.')
+	}
+	return string(runes)
+}
+
+func (s Store) nameAdmittedChat(id string, first Request) error {
+	lock, err := s.requestLock(id, ".metadata.lock", false)
+	if err != nil {
+		return err
+	}
+	defer lock.Close()
+	conversation, err := s.Load(id)
+	if err != nil || conversation.Title != "New chat" || conversation.HeadRevision != "" {
+		return err
+	}
+	if title := chatRequestTitle(first.Text); title != "" {
+		conversation.Title = title
+		if first.CreatedAt.After(conversation.UpdatedAt) {
+			conversation.UpdatedAt = first.CreatedAt
+		}
+		return s.writeConversation(conversation)
+	}
+	return nil
 }
 
 // AcquireExecution is held for the actual run, not just its dispatch. Process

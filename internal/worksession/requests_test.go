@@ -201,3 +201,34 @@ func TestRequestOwnerChild(t *testing.T) {
 		runtime.KeepAlive(lease)
 	}
 }
+
+func TestAdmittedRequestNamesChatBeforeAnyCompletedRevision(t *testing.T) {
+	s, id, dir := requestTestStore(t)
+	request := retainedRequest(t, "  Send the reviewed\nvenue update  ")
+	journal, err := s.SaveRequests(id, RequestJournal{Version: 1, Requests: []Request{request}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chat, err := reopened.Load(id)
+	if err != nil || chat.Title != "Send the reviewed venue update" || chat.HeadRevision != "" {
+		t.Fatal("interrupted first task is indistinguishable from an empty chat", chat, err)
+	}
+	journal.Requests[0].Text = "A later edit must not rename the chat"
+	if _, err = s.SaveRequests(id, journal); err != nil {
+		t.Fatal(err)
+	}
+	chat, err = s.Load(id)
+	if err != nil || chat.Title != "Send the reviewed venue update" {
+		t.Fatal("later queue edit replaced the name", chat, err)
+	}
+	for _, text := range []string{strings.Repeat("界", 200), strings.Repeat("🐊", 200), strings.Repeat("a", 100)} {
+		title := chatRequestTitle(text)
+		if len(title) > 256 || len([]rune(title)) > 80 || !strings.HasSuffix(title, "...") {
+			t.Fatal("unbounded chat title", title)
+		}
+	}
+}

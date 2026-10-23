@@ -143,6 +143,11 @@ func (s Store) List(limit int) ([]Conversation, error) {
 
 // AddRevision publishes an immutable revision and advances the movable head.
 func (s Store) AddRevision(conversationID string, revision Revision) (Conversation, error) {
+	lock, err := s.requestLock(conversationID, ".metadata.lock", false)
+	if err != nil {
+		return Conversation{}, err
+	}
+	defer lock.Close()
 	conversation, err := s.Load(conversationID)
 	if err != nil {
 		return Conversation{}, err
@@ -185,12 +190,8 @@ func (s Store) AddRevision(conversationID string, revision Revision) (Conversati
 		_ = writeJSON(s.inputNamesPath(conversationID, revision.ID), revision.InputNames)
 	}
 	if conversation.HeadRevision == "" && conversation.Title == "New chat" {
-		title := []rune(strings.Join(strings.Fields(revision.Objective), " "))
-		if len(title) > 80 {
-			title = append(title[:77], '.', '.', '.')
-		}
-		if len(title) > 0 {
-			conversation.Title = string(title)
+		if title := chatRequestTitle(revision.Objective); title != "" {
+			conversation.Title = title
 		}
 	}
 	conversation.SourceRefreshRequired = false
@@ -291,6 +292,11 @@ func (s Store) Lineage(conversationID, revisionID string) ([]Revision, error) {
 }
 
 func (s Store) MoveHead(conversationID, revisionID string) (Conversation, error) {
+	lock, err := s.requestLock(conversationID, ".metadata.lock", false)
+	if err != nil {
+		return Conversation{}, err
+	}
+	defer lock.Close()
 	conversation, err := s.Load(conversationID)
 	if err != nil {
 		return Conversation{}, err
