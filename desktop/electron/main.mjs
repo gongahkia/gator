@@ -1,10 +1,11 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, net, protocol, session, shell, systemPreferences } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, net, protocol, session, shell, systemPreferences } from "electron";
 import { mkdir, access, readFile, writeFile } from "node:fs/promises";
 import { constants, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createHash, randomUUID } from "node:crypto";
 import { Backend } from "./backend.mjs";
+import { nativeAppearance } from "./appearance.mjs";
 import { Sessions } from "./sessions.mjs";
 import { APP_URL, assetPath, externalURL, validateFrame } from "./policy.mjs";
 import { UploadStore, uploadContext, uploadExtensions } from "./uploads.mjs";
@@ -33,6 +34,7 @@ const importedFiles = new Map();
 const drafts = new DraftStore(join(app.getPath("userData"), "drafts", `${createHash("sha256").update(stateRoot).digest("hex")}.json`));
 protocol.registerSchemesAsPrivileged([{ scheme: "gator", privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 
+let appearanceTheme;
 let window;
 let backend;
 let sessions;
@@ -61,6 +63,12 @@ function runtimeEnvironment() {
 }
 
 function update() {
+  if (backend?.state?.theme && backend.state.theme !== appearanceTheme) {
+    appearanceTheme = backend.state.theme;
+    const colors = nativeAppearance(appearanceTheme);
+    nativeTheme.themeSource = colors.themeSource;
+    if (window && !window.isDestroyed()) window.setBackgroundColor(colors.background);
+  }
   if (window && !window.isDestroyed()) window.webContents.send("gator:update", snapshot());
 }
 function snapshot() {

@@ -123,8 +123,8 @@ func (c gatorAppController) prepareSettings(ctx context.Context, change workrun.
 		if err := workrun.DecodeAppArguments(change.Value, &next); err != nil {
 			return workrun.AppMutation{}, err
 		}
-		if !slices.Contains([]string{"gator", "mono", "contrast"}, next.Theme) {
-			return workrun.AppMutation{}, errors.New("theme must be gator, mono or contrast")
+		if !slices.Contains([]string{"gator", "light", "mono", "contrast"}, next.Theme) {
+			return workrun.AppMutation{}, errors.New("theme must be gator, light, mono or contrast")
 		}
 		return workrun.AppMutation{Preview: map[string]any{"setting": "theme", "before": prior.Theme, "after": next.Theme}, Apply: func(context.Context) (any, error) {
 			err := c.settings.Update(func(current *config.Settings) error {

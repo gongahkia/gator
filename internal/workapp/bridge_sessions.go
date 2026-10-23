@@ -35,6 +35,11 @@ func (m Model) FocusBridgeSession(foreground bool) Model {
 	m.background = !foreground
 	m.sessionRequest = nil
 	if foreground {
+		if m.config.ReadTheme != nil {
+			if name, err := m.config.ReadTheme(); err == nil {
+				m.theme = normalizeTheme(name)
+			}
+		}
 		if !m.running && len(m.queue) == 0 {
 			m.refreshModelStatus()
 		}

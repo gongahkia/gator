@@ -341,7 +341,7 @@ func validate(settings Settings) error {
 	if len(settings.Defaults.Provider) > 128 || len(settings.Defaults.Model) > 512 {
 		return errors.New("configuration default exceeds its size limit")
 	}
-	if settings.Theme != "" && settings.Theme != "gator" && settings.Theme != "contrast" && settings.Theme != "mono" {
+	if settings.Theme != "" && settings.Theme != "gator" && settings.Theme != "contrast" && settings.Theme != "mono" && settings.Theme != "light" {
 		return fmt.Errorf("unknown theme %q", settings.Theme)
 	}
 	if settings.TUI.StatusLine != nil {

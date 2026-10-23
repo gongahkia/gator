@@ -181,6 +181,11 @@ export function App() {
   const hasUnsavedView = memoryEditing.size > 0 || dirtyFiles.size > 0 || queueEditing || panel?.rows?.some((row) => row.input) || panel?.kind === "confirmation" || panel?.kind === "status-line";
   const navigationBusy = navigationPending || !!sessionSwitching || sending || queueAction.busy || memoryAction.busy || updateFeedback.busy || receiptInspection.busy || !!state?.receipt_busy || voiceBusy || attachments.busy;
 
+  useLayoutEffect(() => {
+    if (!state?.theme) return;
+    document.documentElement.dataset.theme = state.theme;
+    try { localStorage.setItem("gator:theme", state.theme); } catch { /* The Go profile still retains this preference. */ }
+  }, [state?.theme]);
   useEffect(() => { localStorage.setItem("gator:sidebar-collapsed", String(collapsed)); }, [collapsed]);
   useEffect(() => { if (sessionID) { if (originalSession.current && originalSession.current !== sessionID) setSessionChanged(true); originalSession.current = sessionID; } }, [sessionID]);
   useEffect(() => {

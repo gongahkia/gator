@@ -6,7 +6,7 @@ import (
 
 func normalizeCatalogTheme(name string) string {
 	switch strings.ToLower(strings.TrimSpace(name)) {
-	case "contrast", "mono":
+	case "contrast", "mono", "light":
 		return strings.ToLower(strings.TrimSpace(name))
 	default:
 		return "gator"

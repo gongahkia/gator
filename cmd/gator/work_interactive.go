@@ -583,6 +583,7 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		Copy:              clipboard.WriteAll,
 		Theme:             settings.Theme,
 		SetTheme:          saveTheme,
+		ReadTheme:         func() (string, error) { current, err := loadSettings(); return current.Theme, err },
 		StatusLine:        settings.TUI.StatusLine,
 		StatusLineEnabled: settings.TUI.StatusLineEnabled,
 		SetStatusLine:     saveWorkStatusLine(settingsStore),

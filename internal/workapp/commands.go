@@ -186,7 +186,8 @@ func commandPaletteEntries() []entry {
 		{title: "/detach", subtitle: "Remove a pending attachment", kind: "command-input", command: "/detach"},
 		{title: "/status", subtitle: "Show current model, workspace, and run", kind: "command", command: "/status"},
 		{title: "/settings", subtitle: "Inspect Gator settings", kind: "command", command: "/settings"},
-		{title: "/theme", subtitle: "Choose gator (green), contrast, or mono", kind: "command-input", command: "/theme"},
+		{title: "/appearance", subtitle: "Change the color theme", kind: "command", command: "/appearance"},
+		{title: "/theme", subtitle: "Choose dark, light, high contrast, or monochrome", kind: "command-input", command: "/theme"},
 		{title: "/doctor", subtitle: "Check setup and device readiness", kind: "command", command: "/doctor"},
 		{title: "/history", subtitle: "Browse retained work", kind: "command", command: "/history"},
 		{title: "/jobs", subtitle: "Choose when Gator works: schedule and review checks", kind: "command-input", command: "/jobs"},
@@ -296,7 +297,7 @@ func (m Model) commandAvailable(command string) bool {
 		return len(m.options.Attachments) > 0
 	case "/settings", "/doctor", "/agents":
 		return m.config.Inspect != nil
-	case "/theme":
+	case "/theme", "/appearance":
 		return m.config.SetTheme != nil
 	case "/statusline":
 		return m.config.SetStatusLine != nil
@@ -622,14 +623,28 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		} else {
 			result, err = m.config.Inspect(strings.TrimPrefix(fields[0], "/"))
 		}
+	case "/appearance":
+		if len(fields) != 1 || m.config.SetTheme == nil {
+			err = errorsUnavailable("appearance")
+			break
+		}
+		m.section = "appearance"
+		m.selected = 0
+		m.sectionNotice = ""
+		for i, theme := range appearanceThemes {
+			if theme.id == m.theme {
+				m.selected = i
+			}
+		}
+		return m, nil
 	case "/theme":
 		if len(fields) != 2 || m.config.SetTheme == nil {
-			err = fmt.Errorf("usage: /theme gator|contrast|mono")
+			err = fmt.Errorf("usage: /theme gator|light|contrast|mono")
 			break
 		}
 		name := normalizeTheme(fields[1])
 		if name != strings.ToLower(fields[1]) {
-			err = fmt.Errorf("usage: /theme gator|contrast|mono")
+			err = fmt.Errorf("usage: /theme gator|light|contrast|mono")
 			break
 		}
 		err = m.config.SetTheme(name)

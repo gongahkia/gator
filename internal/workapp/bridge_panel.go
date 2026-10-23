@@ -177,6 +177,8 @@ func (m Model) bridgeSectionPanel() uisnapshot.Panel {
 		return m.recallPanel()
 	case "context":
 		return m.contextPanel()
+	case "appearance":
+		return m.appearancePanel()
 	case "effort":
 		panel.Title = "Choose effort"
 		panel.Subtitle = "How much time Gator may spend on a request."

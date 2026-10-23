@@ -564,6 +564,8 @@ func (m Model) updateSectionKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.updateContextKey(value)
 	case "inbox":
 		return m.updateInboxKey(value)
+	case "appearance":
+		return m.updateAppearanceKey(value)
 	case "effort":
 		switch value.String() {
 		case "esc":
