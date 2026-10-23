@@ -80,8 +80,12 @@ func Open(stateDir string) (Store, error) {
 		return Store{}, err
 	}
 	// This is private application state, never a selected source directory.
- parentPath:=filepath.Dir(base)
- if info,err:=os.Lstat(parentPath);err==nil&&(!info.IsDir()||info.Mode()&os.ModeSymlink!=0){return Store{},errors.New("private Gator state must be an ordinary directory")}else if err!=nil&&!errors.Is(err,os.ErrNotExist){return Store{},err}
+	parentPath := filepath.Dir(base)
+	if info, err := os.Lstat(parentPath); err == nil && (!info.IsDir() || info.Mode()&os.ModeSymlink != 0) {
+		return Store{}, errors.New("private Gator state must be an ordinary directory")
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return Store{}, err
+	}
 	if info, err := os.Lstat(base); err == nil && (!info.IsDir() || info.Mode()&os.ModeSymlink != 0) {
 		return Store{}, errors.New("external request store must be an ordinary directory")
 	} else if err != nil && !errors.Is(err, os.ErrNotExist) {

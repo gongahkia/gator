@@ -28,8 +28,10 @@ func TestExecutorDispatchCrashHelper(t *testing.T) {
 		t.Fatal(err)
 	}
 	source := os.Getenv("GATOR_TEST_DISPATCH_SOURCE")
- if err:=os.MkdirAll(source,0700);err!=nil{t.Fatal(err)}
- contract := artifact.DefaultContract("receipt.md")
+	if err := os.MkdirAll(source, 0700); err != nil {
+		t.Fatal(err)
+	}
+	contract := artifact.DefaultContract("receipt.md")
 	contract.ExternalActions = action.Approve
 	model := &scriptedModel{turns: []agent.Turn{{ToolCalls: []agent.ToolCall{{ID: "send-one", Name: "connector_hook_publish", Arguments: json.RawMessage(`{"payload":{"release":"v1"}}`)}}}}}
 	_, err = (Executor{Model: model, StateDir: stateDir, Connectors: connector.Runtime{Registry: registry}}).Execute(context.Background(), Request{RunID: "crash-dispatch", SourcePath: source, Objective: "Publish reviewed update", Mode: action.Act, Contract: contract, ConnectorIDs: []string{"hook"}, MaxSteps: 2, ApproveAction: func(context.Context, action.Proposal) (action.Decision, error) { return action.Allow, nil }})
@@ -39,7 +41,7 @@ func TestExecutorDispatchCrashHelper(t *testing.T) {
 }
 func TestExecutorCrashDuringExternalDispatchRetainsOutcomeAndNeverReplaysOnRead(t *testing.T) {
 	stateDir := t.TempDir()
-source := t.TempDir()
+	source := t.TempDir()
 	received := make(chan struct{}, 1)
 	release := make(chan struct{})
 	var calls atomic.Int32
@@ -57,7 +59,7 @@ source := t.TempDir()
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	child := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestExecutorDispatchCrashHelper$")
-	child.Env = append(os.Environ(), "GATOR_TEST_DISPATCH_STATE="+stateDir, "GATOR_TEST_DISPATCH_ENDPOINT="+server.URL,"GATOR_TEST_DISPATCH_SOURCE="+source)
+	child.Env = append(os.Environ(), "GATOR_TEST_DISPATCH_STATE="+stateDir, "GATOR_TEST_DISPATCH_ENDPOINT="+server.URL, "GATOR_TEST_DISPATCH_SOURCE="+source)
 	if err := child.Start(); err != nil {
 		t.Fatal(err)
 	}

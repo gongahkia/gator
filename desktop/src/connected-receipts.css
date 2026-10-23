@@ -18,6 +18,6 @@
 .request-recovery > summary::-webkit-details-marker { display: none; }
 .request-recovery > summary > svg:last-child { margin-left: auto; }
 .request-recovery[open] > summary > svg:last-child { transform: rotate(180deg); }
-.request-recovery > div { max-height: min(260px,35vh); overflow-y: auto; overscroll-behavior: contain; overflow-wrap: anywhere; padding-right: 4px; }
+.request-recovery > div { overflow-wrap: anywhere; padding-right: 4px; }
 .request-recovery section { border-top: 1px solid var(--color-line); padding-top: 4px; }
 .request-recovery p { margin: 6px 0; }

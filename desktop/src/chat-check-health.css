@@ -1,7 +1,7 @@
 .chat-check-health { width: 100%; margin: 0 auto 8px; color: var(--color-muted); font-size: var(--text-xs); }
 .chat-check-health > summary { display: flex; align-items: center; gap: 7px; min-height: 40px; cursor: pointer; list-style: none; }
 .chat-check-health > summary::-webkit-details-marker { display: none; }
-.chat-check-health-content { max-height: 260px; overflow: auto; padding: 0 4px 8px; }
+.chat-check-health-content { padding: 0 4px 8px; }
 .chat-check-health-content ul { list-style: none; margin: 0; padding: 0; }
 .chat-check-health-content li { border-top: 1px solid var(--color-line); padding: 10px 0; }
 .chat-check-health-content li > div { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
