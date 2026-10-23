@@ -20,6 +20,7 @@ import (
 	"github.com/gongahkia/gator/internal/eval"
 	"github.com/gongahkia/gator/internal/followup"
 	"github.com/gongahkia/gator/internal/goal"
+	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/workrun"
 )
@@ -272,9 +273,25 @@ func runWatchReplay(ctx context.Context, datasetPath string, dataset eval.WatchD
 		if err != nil {
 			return report, err
 		}
-		observation.Attempt, observation.InboxID = attempt, entry.ID
-		observation.Alert = entry.ID != "" && attempt.Status == "completed"
-		observation.HealthNotice = entry.ID != "" && attempt.Status != "completed"
+		observation.Attempt = attempt
+		if entry.Kind != "job_health" {
+			observation.InboxID = entry.ID
+		}
+		mailbox, err := inbox.Open(state)
+		if err != nil {
+			return report, err
+		}
+		delivered, err := mailbox.ForConversation(report.ID, 0)
+		if err != nil {
+			return report, err
+		}
+		for _, notice := range delivered {
+			if notice.Kind == "job_health" && notice.AttemptID == attempt.ID {
+				observation.RecoveryInboxID = notice.ID
+			}
+		}
+		observation.Alert = observation.InboxID != "" && attempt.Status == "completed"
+		observation.HealthNotice = observation.InboxID != "" && attempt.Status != "completed"
 		observation.ModelCalls, observation.ProviderErrors, observation.ToolErrors = int(modelCalls.Load()), int(providerErrors.Load()), int(toolErrors.Load())
 		if attempt.Status != "completed" && attempt.Status != "unchanged" {
 			switch {

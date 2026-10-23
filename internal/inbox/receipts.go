@@ -5,6 +5,29 @@ import (
 	"time"
 )
 
+// ClaimDesktopNotification records an at-most-once OS handoff. If the process
+// stops during that handoff, the durable in-app update remains available.
+func (s Store) ClaimDesktopNotification(entryID string, now time.Time) (bool, error) {
+	if now.IsZero() {
+		return false, errors.New("notification time is required")
+	}
+	unlock, err := s.lock()
+	if err != nil {
+		return false, err
+	}
+	defer unlock()
+	entry, err := s.Load(entryID)
+	if err != nil {
+		return false, err
+	}
+	if !entry.DesktopNotifiedAt.IsZero() {
+		return false, nil
+	}
+	entry.DesktopNotifiedAt = now.UTC()
+	_, err = s.write(entry)
+	return err == nil, err
+}
+
 // ForConversation selects by the requesting chat, never by the separate
 // conversation used to execute a scheduled job. Older unlinked entries remain
 // available in the inbox; they are not assigned to a guessed chat.

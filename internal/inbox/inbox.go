@@ -49,6 +49,7 @@ type Entry struct {
 	Rating               string    `json:"rating,omitempty"`
 	RatedAt              time.Time `json:"rated_at,omitempty"`
 	RatingVersion        uint64    `json:"rating_version,omitempty"`
+	DesktopNotifiedAt    time.Time `json:"desktop_notified_at,omitempty"`
 }
 
 type RatingSummary struct {
@@ -294,7 +295,7 @@ func (s Store) RatingsForGoal(goalID string) (RatingSummary, error) {
 	}
 	var result RatingSummary
 	for _, entry := range entries {
-		if entry.GoalID != goalID || entry.Kind != "job" {
+		if entry.GoalID != goalID || entry.Kind != "job" && entry.Kind != "job_health" {
 			continue
 		}
 		if !entry.CanRate() {

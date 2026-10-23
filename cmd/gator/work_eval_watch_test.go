@@ -89,8 +89,8 @@ func TestWatchReplayRunsRealAttemptsAndSeparatesFaultsFromQuality(t *testing.T) 
 	}
 	mailbox, _ := inbox.Open(state)
 	entries, err := mailbox.List(false, 0)
-	if err != nil || len(entries) != 7 {
-		t.Fatalf("expected four alerts and three health notices: %d %v", len(entries), err)
+	if err != nil || len(entries) != 10 {
+		t.Fatalf("expected four alerts, three health notices and three recovery notices: %d %v", len(entries), err)
 	}
 	for _, entry := range entries {
 		if entry.OriginConversationID != report.ID {
@@ -102,7 +102,7 @@ func TestWatchReplayRunsRealAttemptsAndSeparatesFaultsFromQuality(t *testing.T) 
 		t.Fatalf("future sources/ground truth leaked into workspace: %v %v", files, err)
 	}
 	score, err := eval.ScoreWatch(report, eval.WatchReviews{})
-	if err != nil || score.Alerts != 4 || score.HealthNotices != 3 || score.UsefulAlertPrecision.Value != nil || len(score.UnassessedMaterialEvents) != 4 {
+	if err != nil || score.Alerts != 4 || score.HealthNotices != 3 || score.RecoveryNotices != 3 || score.UsefulAlertPrecision.Value != nil || len(score.UnassessedMaterialEvents) != 4 {
 		t.Fatalf("unreviewed scripted outputs claimed quality: %+v %v", score, err)
 	}
 	reviews := eval.WatchReviews{Version: 1, ReportID: report.ID, Evidence: "scripted_fixture", Reviewer: "test"}

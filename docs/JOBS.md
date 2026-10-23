@@ -318,3 +318,20 @@ transient provider failures are retried (at most three attempts); policy, task,
 validation and cancellation failures are not blindly retried. Completed or
 interrupted attempts remain in history and inbox. See [state recovery and
 migration](WORK_DEPTH_MIGRATIONS.md) for the crash boundary and old-state semantics.
+
+### Health in the requesting chat
+
+A check created from chat reports its current availability above that chat's
+composer. Expand it to inspect the last successful check for the current
+settings, request limits, unsuccessful attempts and observed supervisor gaps.
+A heartbeat gap describes the background engine's availability; it cannot
+reconstruct source changes during that interval.
+
+Repeated unsuccessful polls share one saved health incident. A limit changing
+to an execution failure, or the reverse, starts a different notice. Recovery is
+saved even when the next successful check stays quiet. These health notices are
+separate from alert-quality feedback, and recovery does not mark earlier notices
+read or done. All individual attempts remain available for inspection.
+
+OS notifications use an at-most-once handoff claim. A process stopping during
+the OS handoff may omit a toast; the saved in-app update remains available.

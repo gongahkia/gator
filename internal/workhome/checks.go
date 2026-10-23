@@ -13,6 +13,8 @@ import (
 // Check is a read-only projection of a schedule and its observed execution.
 // NextDue is a schedule time, never a promise that an offline host will run it.
 type Check struct {
+	CoverageGap                                          jobs.CoverageGap
+	Unsuccessful                                         int
 	ID, GoalID, Title, Outcome, State, Issue, NextAction string
 	LastSuccess, LastAttempt, NextDue                    time.Time
 	Enabled                                              bool
@@ -35,10 +37,15 @@ func ReadChecks(stateDir string, supervisor bool, now time.Time) ([]Check, error
 	if err != nil {
 		return nil, err
 	}
+	availability, err := store.Availability()
+	if err != nil {
+		return nil, err
+	}
 	checks := make([]Check, 0, len(definitions))
 	for _, definition := range definitions {
 		policy, _ := definition.PolicyDigest()
 		check := Check{ID: definition.ID, GoalID: definition.GoalID, Title: definition.Name, Outcome: definition.Objective, Enabled: definition.Enabled, Definition: definition, State: "waiting for first check", NextAction: "Review results in /inbox"}
+		check.CoverageGap = jobs.LatestCoverageGap(availability, definition.CreatedAt)
 		active := true
 		if definition.GoalID != "" {
 			record, loadErr := goals.Load(definition.GoalID)
@@ -51,6 +58,9 @@ func ReadChecks(stateDir string, supervisor bool, now time.Time) ([]Check, error
 		history, historyErr := store.History(definition.ID, 0)
 		if historyErr != nil {
 			return nil, historyErr
+		}
+		if len(history) > 0 {
+			check.Unsuccessful = jobs.ConsecutiveUnsuccessfulChecks(history, history[0])
 		}
 		for i, attempt := range history {
 			if i == 0 {

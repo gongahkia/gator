@@ -133,6 +133,7 @@ func ReadWatchSource(datasetPath string, episode WatchEpisode) ([]byte, error) {
 }
 
 type WatchObservation struct {
+	RecoveryInboxID string       `json:"recovery_inbox_id,omitempty"`
 	EpisodeID       string       `json:"episode_id"`
 	AtSecond        int          `json:"at_second"`
 	SourceSHA256    string       `json:"source_sha256"`
@@ -151,9 +152,10 @@ type WatchObservation struct {
 func (o WatchObservation) OutputDigest() string {
 	payload, _ := json.Marshal(struct {
 		Attempt       jobs.Attempt
+		Recovery      string
 		Inbox         string
 		Alert, Health bool
-	}{o.Attempt, o.InboxID, o.Alert, o.HealthNotice})
+	}{o.Attempt, o.RecoveryInboxID, o.InboxID, o.Alert, o.HealthNotice})
 	hash := sha256.Sum256(payload)
 	return hex.EncodeToString(hash[:])
 }
@@ -213,6 +215,7 @@ type WatchScore struct {
 	ReplayComplete           bool           `json:"replay_complete"`
 	Completed                int            `json:"completed"`
 	Unchanged                int            `json:"unchanged"`
+	RecoveryNotices          int            `json:"recovery_notices"`
 	HealthNotices            int            `json:"health_notices"`
 	Alerts                   int            `json:"alerts"`
 	ReviewedAlerts           int            `json:"reviewed_alerts"`
@@ -254,6 +257,9 @@ func ScoreWatch(report WatchReport, reviews WatchReviews) (WatchScore, error) {
 		}
 		if o.Alert != (o.InboxID != "" && o.Attempt.Status == "completed") || o.HealthNotice != (o.InboxID != "" && o.Attempt.Status != "completed") || o.ModelCalls < 0 || o.ProviderErrors < 0 || o.ToolErrors < 0 || (o.Attempt.Status == "completed" || o.Attempt.Status == "unchanged") && o.FailureCategory != "" {
 			return score, errors.New("watch observation has inconsistent execution or delivery state")
+		}
+		if o.RecoveryInboxID != "" && (o.Attempt.Status != "completed" && o.Attempt.Status != "unchanged" || o.RecoveryInboxID == o.InboxID) {
+			return score, errors.New("inconsistent recovery notice")
 		}
 		byEpisode[o.EpisodeID] = o
 	}
@@ -303,6 +309,9 @@ func ScoreWatch(report WatchReport, reviews WatchReviews) (WatchScore, error) {
 	}
 	for _, o := range report.Observations {
 		score.Episodes++
+		if o.RecoveryInboxID != "" {
+			score.RecoveryNotices++
+		}
 		score.ProviderErrors += o.ProviderErrors
 		score.ToolErrors += o.ToolErrors
 		score.ModelCalls += o.ModelCalls

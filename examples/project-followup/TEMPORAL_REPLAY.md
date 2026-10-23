@@ -25,7 +25,7 @@ Fault injection remains explicit in both scripted and live modes. These cases
 test recovery wiring; they do not measure real provider failure frequency.
 Every scheduled attempt, including an unchanged skip or injected failure, is
 retained under the report's `state/gator/jobs` directory. The aggregate report
-records each durable inbox ID; its retained inbox entry links to the replay's
+records each primary inbox ID and any linked recovery notice; its retained inbox entry links to the replay's
 originating conversation, identified by the report ID.
 
 ## Run without a provider
@@ -122,8 +122,8 @@ produces `null`. A material-event window is unassessed when all observations
 failed, its alert outputs remain unreviewed, or the replay ended before its
 deadline. A completed quiet decision or unchanged skip can establish a miss
 against the dataset's explicit ground truth. A late notification remains a
-deadline miss and contributes its actual delay. Health notices are excluded
-from alert-quality denominators. Provider, tool, source, limit and other
+deadline miss and contributes its actual delay. Health notices and recovery notices are counted separately and excluded
+from alert-quality denominators. A recovery notice does not claim coverage during the failed interval. Provider, tool, source, limit and other
 execution failures are counted separately, including recovered tool/provider
 error counts.
 

@@ -31,6 +31,8 @@ type BridgeState struct {
 	ChatUpdates           []BridgeChatUpdate         `json:"chat_updates,omitempty"`
 	ChatUpdatesIssue      string                     `json:"chat_updates_issue,omitempty"`
 	ChatUpdatesTotal      int                        `json:"chat_updates_total,omitempty"`
+	ChatChecks            []BridgeChatCheck          `json:"chat_checks,omitempty"`
+	ChatChecksIssue       string                     `json:"chat_checks_issue,omitempty"`
 	Foreground            bool                       `json:"foreground"`
 	SessionRequest        *BridgeSessionRequest      `json:"session_request,omitempty"`
 	RequestsRecovered     bool                       `json:"requests_recovered,omitempty"`
@@ -236,6 +238,23 @@ func (m Model) BridgeState() BridgeState {
 	state.OverviewIssue = m.overviewIssue
 	for _, check := range m.checks {
 		state.Checks = append(state.Checks, BridgeCheck{GoalID: check.GoalID, Title: singleLine(check.Title), Health: check.HealthLine(), State: check.State, Tone: checkTone(check.State)})
+		if m.conversation != "" && check.Definition.OriginConversationID == m.conversation {
+			state.ChatChecks = append(state.ChatChecks, BridgeChatCheck{ID: check.ID, Title: singleLine(check.Title), State: check.State, Issue: check.Issue, NextAction: check.NextAction, LastSuccess: bridgeCheckTime(check.LastSuccess), NextDue: bridgeCheckTime(check.NextDue), GapFrom: bridgeCheckTime(check.CoverageGap.From), GapTo: bridgeCheckTime(check.CoverageGap.To), Unsuccessful: check.Unsuccessful})
+		}
+	}
+	if m.checksIssue != "" {
+		owned := len(state.ChatChecks) > 0
+		if !owned && m.conversation != "" {
+			for _, job := range m.config.Jobs {
+				if job.OriginConversationID == m.conversation {
+					owned = true
+					break
+				}
+			}
+		}
+		if owned {
+			state.ChatChecksIssue = "Check health could not refresh. Displayed states may be out of date."
+		}
 	}
 	if !m.config.SupervisorRunning {
 		for _, job := range m.config.Jobs {

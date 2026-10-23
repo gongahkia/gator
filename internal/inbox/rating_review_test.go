@@ -85,3 +85,51 @@ func TestHealthNoticesCannotDistortAlertRatings(t *testing.T) {
 		t.Fatalf("health notices counted as alerts: %+v %v", summary, err)
 	}
 }
+
+func TestDesktopNotificationClaimsSurviveRestartWithoutChangingReceipts(t *testing.T) {
+	root := t.TempDir()
+	s, err := Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e, err := s.Add(Entry{Kind: "job", Title: "Failed check", Status: "failed", OriginConversationID: "chat"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wg sync.WaitGroup
+	results := make(chan bool, 8)
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			claimed, err := s.ClaimDesktopNotification(e.ID, time.Now())
+			if err != nil {
+				t.Error(err)
+			}
+			results <- claimed
+		}()
+	}
+	wg.Wait()
+	close(results)
+	count := 0
+	for claimed := range results {
+		if claimed {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("notification claimed %d times", count)
+	}
+	s, err = Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	claimed, err := s.ClaimDesktopNotification(e.ID, time.Now())
+	if err != nil || claimed {
+		t.Fatal("restart repeated notification", err)
+	}
+	current, err := s.Load(e.ID)
+	if err != nil || !current.DeliveredAt.IsZero() || !current.ReadAt.IsZero() || !current.ResolvedAt.IsZero() {
+		t.Fatal("OS handoff changed attention receipts", current, err)
+	}
+}

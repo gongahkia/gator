@@ -89,6 +89,8 @@ export type ChatUpdate = { can_rate: boolean; rating?: "useful" | "noise" | "wro
 export type ChatMemoryReceipt = {id: string; run_id: string; text: string; quote?: string; updated: string; scope: string; corrected?: boolean; can_undo?: boolean};
 export type ChatMemoryAction = {conversation_id: string; id: string; updated: string; action: "correct"|"forget"|"undo"; text?: string; request_id: string};
 export type BackendState = {
+  chat_checks?: { id: string; title: string; state: string; issue?: string; next_action: string; last_success?: string; next_due?: string; gap_from?: string; gap_to?: string; unsuccessful: number }[];
+  chat_checks_issue?: string;
   chat_update_result?: {request_id: string; error?: string};
   chat_memories?: ChatMemoryReceipt[]; chat_memory_issue?: string; chat_memory_result?: {request_id: string; error?: string};
   pending_connection?: string;

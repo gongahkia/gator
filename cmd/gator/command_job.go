@@ -375,7 +375,7 @@ func manageJob(command, id string, arguments []string, out io.Writer) error {
 		}
 		entry, inboxErr := recordJobInbox(stateDir, definition, attempt)
 		settings, settingsErr := loadSettings()
-		if inboxErr == nil && settingsErr == nil && settings.Notifications.Desktop && entry.ID != "" && goalAllowsDesktopNotification(stateDir, definition.GoalID, time.Now(), entry.Urgent) {
+		if inboxErr == nil && settingsErr == nil && settings.Notifications.Desktop && entry.ID != "" && goalAllowsDesktopNotification(stateDir, definition.GoalID, time.Now(), entry.Urgent) && claimJobNotification(stateDir, entry.ID) {
 			desktopNotification(definition.Name, entry.Summary)
 		}
 		encoder := json.NewEncoder(out)
@@ -926,18 +926,29 @@ func runDueJobsContextWith(ctx context.Context, store jobs.Store, stateDir strin
 			continue
 		}
 		entry, err := recordJobInbox(stateDir, claimed, attempt)
-		if err == nil && notify && entry.ID != "" && goalAllowsDesktopNotification(stateDir, claimed.GoalID, now, entry.Urgent) {
+		if err == nil && notify && entry.ID != "" && goalAllowsDesktopNotification(stateDir, claimed.GoalID, now, entry.Urgent) && claimJobNotification(stateDir, entry.ID) {
 			desktopNotification(claimed.Name, entry.Summary)
 		}
 	}
 }
 
 func recordJobInbox(stateDir string, definition jobs.Definition, attempt jobs.Attempt) (inbox.Entry, error) {
+	var health inbox.Entry
+	if definition.GoalWatch && attempt.ID != "" && !attempt.StartedAt.IsZero() {
+		var err error
+		health, err = recordWatchHealthInbox(stateDir, definition, attempt)
+		if err != nil {
+			return inbox.Entry{}, err
+		}
+		if attempt.Status == "failed" || attempt.Status == "interrupted" || attempt.Status == "limited" {
+			return health, nil
+		}
+	}
 	if attempt.Status == "unchanged" || attempt.Status == "limited" {
-		return inbox.Entry{}, nil
+		return health, nil
 	}
 	if definition.GoalWatch && attempt.Status == "completed" && !attempt.WatchAttention {
-		return inbox.Entry{}, nil
+		return health, nil
 	}
 	if attempt.Status == "completed" && attempt.ResultSHA256 != "" {
 		jobStore, err := jobs.Open(stateDir)
@@ -953,7 +964,7 @@ func recordJobInbox(stateDir string, definition jobs.Definition, attempt jobs.At
 				continue
 			}
 			if previous.Status == "completed" && previous.NotificationPolicySHA256 != "" && previous.NotificationPolicySHA256 == attempt.NotificationPolicySHA256 && previous.ResultSHA256 == attempt.ResultSHA256 {
-				return inbox.Entry{}, nil
+				return health, nil
 			}
 			break
 		}

@@ -186,7 +186,7 @@ func TestDailyFollowupCapSkipsModelWithoutCreatingAnAlert(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if entry.ID != "" {
-		t.Fatal("budget limit became an urgent model alert")
+	if entry.ID == "" || entry.Status != "limited" || entry.Urgent || entry.CanRate() {
+		t.Fatal("budget limit must be a nonurgent health notice, never a model change alert")
 	}
 }
