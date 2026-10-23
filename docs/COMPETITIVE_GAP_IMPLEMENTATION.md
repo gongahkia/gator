@@ -17,7 +17,7 @@ Objective: implement the code changes in the [22 October gap audit](COMPETITIVE_
 | G09 | Durable admission/queue, explicit interrupted states, recovery without replaying external effects; crash-transition tests | In progress: admission, queue and connector crash recovery verified locally; broader effect/checkpoint coverage remains |
 | G10 | Representative Office/file fidelity, precise revisions/version comparison, larger bounded intake; native opening checks | In progress: saved-version comparison and larger intake verified locally; native fidelity remains |
 | G11 | Integrated browser readiness/state/private sign-in/takeover, scoped browsing authority and representative workflow tests | Pending |
-| G12 | Paginated/searchable chats, rename/archive/pin, scoped cross-chat files; retrieval over hundreds of records | Pending |
+| G12 | Paginated/searchable chats, rename/archive/pin, scoped cross-chat files; retrieval over hundreds of records | In progress: bounded catalog and versioned organization service; desktop and indexed search pending |
 | G13 | Release/update lifecycle, supervisor drain/restart and native platform gates; signed distribution requires external accounts | Pending |
 | G14 | Authenticated remote execution option with explicit ownership/availability; client-off completion and local-resource boundaries | Direction chosen: self-hosted companion on an always-on machine |
 | G15 | Authenticated remote conversation/update/decision surface, revocation, offline delivery and deduplication | Pending |
