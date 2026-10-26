@@ -369,3 +369,13 @@ independent installed launch; release packaging and platform matrix.
   run's 42/12 split is not usable as a clean regression baseline.
 - Native CI matrix wiring exists, but no remote run has been requested/performed.
   Linux evidence and cross-compilation do not replace deferred native results.
+
+### Unsaved form navigation
+
+- Typed form edits now require an explicit discard decision before hub/chat
+  navigation, Escape, or the normal Quit action. Cancellation retains fields;
+  backdrop dismissal also resolves the navigation as cancelled. Chat rail/recent
+  navigation uses the same guard. Backend form submission remains explicit.
+- `tests/panel.test.tsx`: **2 pass / 15 assertions**, including cancelled and
+  confirmed keyboard navigation with an unsaved recurring-check form. The prior
+  full run remains **17 pass / 143 assertions**; this adds one focused case.

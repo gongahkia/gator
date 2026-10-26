@@ -17,6 +17,7 @@ export class GatorClient extends EventEmitter {
   fileSelections = new Map<string, string>()
   readingPositions = new Map<string, number>()
   route: "chat" | "following" | "saved" | "settings" = "chat"
+  navigationGuard?: () => Promise<boolean>
   #loads = new Map<string, Promise<void>>()
   #results = new Set<() => void>()
   #admissions = new Map<string, { key: string; request: string }>()
@@ -107,7 +108,11 @@ export class GatorClient extends EventEmitter {
     } finally { this.pending.delete(context); this.emit("change") }
   }
   async send(frame: FrontendFrame) { await this.host.send(frame) }
+  async mayLeave() { return this.navigationGuard ? this.navigationGuard() : true }
+  async openSession(id: string) { if (await this.mayLeave()) await this.host.openSession(id) }
+  async openConversation(id: string, list_id: string) { if (await this.mayLeave()) await this.send({ type: "conversation", conversation: { id, list_id } }) }
   async navigate(text: string) {
+    if (!await this.mayLeave()) return
     if (text === "/chat") { this.route = "chat"; this.emit("change"); return }
     if (text === "/following" || text === "/saved" || text === "/settings") { this.route = text === "/following" ? "following" : text === "/saved" ? "saved" : "settings"; this.emit("change"); return }
     if (/^\/(files|drafts|queue|updates|memories|receipts|about|voice|chats|attach-file)$/.test(text)) { this.emit("action", text.slice(1)); return }

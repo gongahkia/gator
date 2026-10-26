@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createSignal } from "solid-js"
+import { For, Show, createEffect, createSignal, onCleanup } from "solid-js"
 import type { TextareaRenderable } from "@opentui/core"
 import { Keymap } from "../context/keymap"
 import { useKeyboard } from "@opentui/solid"
@@ -11,12 +11,21 @@ import type { BackendPanel, PanelAction } from "@gator/application-host/contract
 import { literal } from "./text"
 import { PathPicker } from "./path-picker"
 import { SecretField } from "./secret-field"
+import { DialogConfirm } from "../ui/dialog-confirm"
 
 export function Panel(props: { panel: BackendPanel }) {
   const client = useClient(), theme = useTheme(), dialog = useDialog()
   const [fields, setFields] = createSignal<Record<number, string>>({}), [busy, setBusy] = createSignal(false)
   let identity = ""
   createEffect(() => { const next = props.panel.kind + props.panel.title + props.panel.rows?.map(r => r.label).join("|"); if (next !== identity) { identity = next; setFields({}) } })
+  const guard = async () => {
+    if (!Object.keys(fields()).length) return true
+    return new Promise<boolean>(resolve => {
+      dialog.replace(() => <DialogConfirm title="Leave this unsaved form?" message="Edited form fields have not been submitted. Keep editing or explicitly discard them before navigating." label={{ confirm: "Discard form edits", cancel: "Keep editing" }} onConfirm={() => { setFields({}); resolve(true) }} onCancel={() => resolve(false)} />, () => resolve(false))
+    })
+  }
+  client.navigationGuard = guard
+  onCleanup(() => { if (client.navigationGuard === guard) client.navigationGuard = undefined })
   async function action(value: Omit<PanelAction, "id">, key?: string) {
     if (!props.panel.id || busy()) return
     setBusy(true)
@@ -83,6 +92,7 @@ export function Panel(props: { panel: BackendPanel }) {
     if (dialog.stack.length || busy()) return
     const name = ({ escape: "esc", return: "enter" }[event.name] ?? event.name)
     const key = event.ctrl ? `ctrl+${name}` : event.shift && name === "tab" ? "shift+tab" : name
+    if (key === "esc" && Object.keys(fields()).length) { event.preventDefault(); void guard().then(leave => { if (leave) void action({ action: "key", fields: undefined }, "esc") }); return }
     if (key === "f2" && props.panel.hints?.some(hint => hint.shortcut.toLowerCase().replaceAll(" ", "").includes("ctrl+enter"))) { event.preventDefault(); void action({ action: "key" }, "ctrl+enter"); return }
     if (key === "enter" && props.panel.rows?.[props.panel.selected ?? 0]?.input) { event.preventDefault(); edit(props.panel.selected ?? 0); return }
     if (key === "ctrl+f" || key === "/") {

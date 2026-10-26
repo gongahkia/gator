@@ -33,7 +33,8 @@ function Shell(props: { quit(): Promise<void> }) {
   const attempt = (operation: Promise<unknown>) => { void operation.catch(error => client.fail(error)) }
   const palette = () => dialog.replace(() => <CommandPaletteDialog />)
   const navigate = (command: string) => attempt(client.navigate(command))
-  const quit = () => {
+  const quit = async () => {
+    if (!await client.mayLeave()) return
     if (data.snapshot.allChatsBusy || data.snapshot.allChatsQueued) dialog.replace(() => <DialogConfirm title="Stop work and close Gator?" message="Tasks in all open chats will stop. Queues remain paused for review after restart." onConfirm={() => attempt(props.quit())} />)
     else attempt(props.quit())
   }

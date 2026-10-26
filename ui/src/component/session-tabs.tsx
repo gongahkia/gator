@@ -14,7 +14,7 @@ export function SessionTabs(props: { width: number; search(): void }) {
     <SessionTabsRailControls width={props.width - 2} tabs={{ search: props.search }} belowHighlighted={false} />
     <For each={[["Chat", "/chat"], ["Chats", "/conversations"], ["Following", "/following"], ["Saved", "/saved"], ["Settings", "/settings"]]}>{([title, command]) => <text fg={theme.text.base} onMouseUp={() => void client.navigate(command).catch(e => client.fail(e))}>{title}</text>}</For>
     <scrollbox flexGrow={1}>
-      <For each={data.snapshot.chatActivity}>{chat => <box marginBottom={1} onMouseUp={() => void client.host.openSession(chat.id).catch(e => client.fail(e))}>
+      <For each={data.snapshot.chatActivity}>{chat => <box marginBottom={1} onMouseUp={() => void client.openSession(chat.id).catch(e => client.fail(e))}>
         <text fg={chat.id === data.state?.conversation_id ? theme.accent : theme.text.base}>{literal(chat.title)}</text><text fg={theme.text.muted}>{literal(chat.status)}</text>
       </box>}</For>
     </scrollbox>
