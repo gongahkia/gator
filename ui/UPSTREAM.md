@@ -14,7 +14,7 @@ review references, excluded from the TypeScript and production build inputs.
 
 | Source | Treatment |
 | --- | --- |
-| ui/dialog, dialog-select, dialog-prompt, dialog-confirm, select-controller | Retained upstream components and selection behavior. |
+| ui/dialog, dialog-select, dialog-prompt, dialog-confirm, select-controller | Retained upstream components and selection behavior. Gator adds opt-in visible disabled choices to dialog-select, with keyboard/mouse activation refused; model availability reasons remain inspectable. |
 | context/keymap, interactivity, clipboard | Retained upstream keymap/mode/selection infrastructure. Plugin keymap types extracted locally; upstream config keybind fallback replaced with Gator's. |
 | ui/layout, border, animation, toast; util/scroll, selection, locale; theme/color | Retained frontend utilities. Gator supplies theme, clipboard, config, and errors. |
 | component/command-palette | Adapted discovery to Gator operations; upstream config/plugin entries excluded. |

@@ -35,6 +35,8 @@ export interface DialogSelectProps<T> {
   emptyView?: JSX.Element
   noMatchView?: JSX.Element
   options: DialogSelectOption<T>[]
+  /** Show unavailable choices and their reasons without allowing activation. */
+  showDisabled?: boolean
   flat?: boolean
   filterThreshold?: number
   ref?: (ref: DialogSelectRef<T>) => void
@@ -208,12 +210,12 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   ])
 
   const filtered = createMemo(() => {
-    if (props.search) return props.search(store.filter).filter((x) => x.disabled !== true)
-    if (props.skipFilter || props.renderFilter === false) return props.options.filter((x) => x.disabled !== true)
+    if (props.search) return props.search(store.filter).filter((x) => props.showDisabled || x.disabled !== true)
+    if (props.skipFilter || props.renderFilter === false) return props.options.filter((x) => props.showDisabled || x.disabled !== true)
     const needle = store.filter.toLowerCase()
     const options = pipe(
       props.options,
-      filter((x) => x.disabled !== true),
+      filter((x) => props.showDisabled || x.disabled !== true),
     )
     if (!needle) return options
 
@@ -465,6 +467,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
     if (props.locked) return
     const option = selected()
     if (!option) return
+    if (option.disabled) return
     option.onSelect?.(dialog)
     props.onSelect?.(option)
   }
@@ -789,7 +792,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
                             moveTo(index)
                           }}
                           onMouseUp={() => {
-                            if (props.locked) return
+                            if (props.locked || option.disabled) return
                             option.onSelect?.(dialog)
                             props.onSelect?.(option)
                           }}

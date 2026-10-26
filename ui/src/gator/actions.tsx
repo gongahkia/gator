@@ -18,7 +18,7 @@ export type Choice = { title: string; key?: string; description?: string; catego
 export function useActions() {
   const client = useClient(), dialog = useDialog(), data = useData()
   const attempt = (operation: unknown) => { if (operation instanceof Promise) void operation.catch(e => client.fail(e)) }
-  const menu = (title: string, choices: Choice[] | (() => Choice[])) => dialog.replace(() => <DialogSelect title={title} options={(typeof choices === "function" ? choices() : choices).map((item, index) => ({
+  const menu = (title: string, choices: Choice[] | (() => Choice[]), showDisabled = false) => dialog.replace(() => <DialogSelect title={title} showDisabled={showDisabled} options={(typeof choices === "function" ? choices() : choices).map((item, index) => ({
     title: literal(item.title), description: literal(item.description), category: literal(item.category), disabled: item.disabled, value: item.key ?? index,
     onSelect: () => { dialog.clear(); try { attempt(item.run()) } catch (error) { client.fail(error) } },
   }))} />)
@@ -110,17 +110,20 @@ export function useActions() {
     ]) })))
   }
   function models() {
-    const composer = client.state?.composer
-    if (!composer) return
-    menu("Model and effort for future messages", [
-      ...composer.models.map(model => ({ title: model.label, description: model.unavailable, disabled: !!composer.disabled || !!model.unavailable, run: async () => {
+    if (!client.state?.composer) return
+    menu("Model and effort for future messages", () => {
+      const composer = data.state?.composer
+      if (!composer) return []
+      return [
+      ...composer.models.map(model => ({ key: `model:${model.provider}:${model.model}`, title: model.label, description: composer.disabled || model.unavailable, disabled: !!composer.disabled || !!model.unavailable, run: async () => {
         const request_id = randomUUID(); await client.result({ type: "composer", composer: { action: "model", id: composer.id, request_id, provider: model.provider, model: model.model } }, request_id, s => s.composer_result)
       } })),
-      ...(["low", "standard", "high"] as const).map(effort => ({ title: `Effort: ${effort}`, disabled: !!composer.disabled, run: async () => {
+      ...(["low", "standard", "high"] as const).map(effort => ({ key: `effort:${effort}`, title: `Effort: ${effort}`, description: composer.disabled, disabled: !!composer.disabled, run: async () => {
         const request_id = randomUUID(); await client.result({ type: "composer", composer: { action: "effort", id: composer.id, request_id, effort } }, request_id, s => s.composer_result)
       } })),
       { title: "Configure providers and local models", run: () => client.navigate("/model") },
-    ])
+      ]
+    }, true)
   }
   function catalog() {
     const panel = client.state?.panel, row = panel?.selected ?? 0, item = panel?.rows?.[row]

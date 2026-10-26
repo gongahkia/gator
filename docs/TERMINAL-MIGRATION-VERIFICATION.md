@@ -136,7 +136,7 @@ assertions to terminal/host/native tests before retiring any Electron suite.
 
 ### `desktop/tests/e2e/first-task.spec.ts`
 
-- [ ] first task keeps a file and draft through model setup and sends only on request
+- [x] first task keeps a file and draft through model setup and sends only on request — `ui/tests/models.test.tsx` with real Go, immutable intake, restart and a local provider.
 
 ### `desktop/tests/e2e/followup-chat.spec.ts`
 
@@ -742,3 +742,21 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
 - The same journey cancels a knowledge-deletion review without removing the note
   and saves a reviewed 30-day history-retention policy. Destructive stale-plan,
   source-mapping/relink, and native platform cases remain separate open checks.
+
+### Model selection and first-task setup
+
+- Gator's model/effort picker now projects current Go state while open, with stable
+  model identities. Disabled model/effort choices show their reason and cannot
+  activate by keyboard or mouse; controls become usable after work completes.
+  The upstream-derived selector keeps its original filtering by default and adds
+  this behavior as an explicit option documented in `ui/UPSTREAM.md`.
+- `tests/models.test.tsx`: **2 pass / 23 assertions**. Alias selection updates the
+  actual provider model ID/default, effort changes preserve the unsent draft,
+  missing credentials remain unavailable, and active-work restrictions release
+  without reopening the picker. A real local request uses the chosen model.
+- First-task setup retains the message and immutable file through choosing a
+  cloud model and restarting. No provider request occurs before explicit send;
+  later mutation of the original file does not alter the admitted attachment.
+- Full Go suite after the empty-chat restore correction passes. Frontend typecheck
+  passes. Provider creation/credential forms and local-model installation remain
+  separate acceptance cases; these two tests do not establish all of P19.

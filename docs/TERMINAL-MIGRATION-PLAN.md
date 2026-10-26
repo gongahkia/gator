@@ -30,6 +30,8 @@ accounting with synthetic audio; native audio hardware acceptance remains open.
 Keyboard backup/verify/restore and retention reviews now have real Go evidence;
 restore also preserves valid unsent chats whose empty directories are omitted
 from backup archives. Remaining private-data edge cases stay open in the ledger.
+Model and effort controls now retain visible availability reasons and refresh
+while open; first-task setup preserves immutable attachments through restart.
 
 Replace the Electron application with Gator's adaptation of **OpenCode's actual
 terminal frontend**, carrying forward Gator's current capabilities. Use an
