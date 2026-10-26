@@ -84,6 +84,8 @@ Saved-knowledge corrections now select their actual form field after opening a
 later list item; real-note keyboard tests cover conflicts, restart and forgetting.
 Revision/source evidence now covers explicit snapshot refresh, backward/forward
 ancestry, retained drafts and reopening from a different launch directory.
+Saved-goal plan controls now have keyboard evidence for outcome, steps, timing,
+evidence, guarded removal and restart without starting recurring checks.
 
 Replace the Electron application with Gator's adaptation of **OpenCode's actual
 terminal frontend**, carrying forward Gator's current capabilities. Use an

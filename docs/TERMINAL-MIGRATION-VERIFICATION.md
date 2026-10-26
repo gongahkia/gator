@@ -1168,3 +1168,30 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   head and draft. The second directory's secret never enters provider requests.
   Revision IDs are verified in Go's durable conversation record; the frontend
   does not invent a revision field or become an additional authority.
+
+### Saved goals, plans and scheduling distinction
+
+- `bun test --cwd ui --preload ./scripts/preload.ts tests/goals.test.tsx`:
+  **1 pass / 24 assertions**; terminal typecheck passes. A fixture goal created
+  with Gator's retained script command opens through the terminal goal picker in
+  its own workspace. Slash plan controls persist outcomes, steps, deadlines,
+  blocked/done state, evidence and review timing through the authoritative Go
+  plan store. Removal without `--yes` is rejected; explicit removal succeeds.
+- Goal draft and plan survive restart; the original ordinary-chat draft remains
+  separate. The check list remains empty and no work starts. Creating a reviewed
+  recurring agreement is covered by the separate followup cases.
+
+### Latest complete regression and packaged runtime
+
+- At `4cbf7db78`, full Go tests (`go test -p 2 ./...`) and vet pass with the
+  knowledge-selection fix. Complete terminal suite: **55 pass / 822 assertions /
+  40 files**. The subsequently added goal test passes separately above. The latest
+  terminal typecheck and production build pass.
+- Fresh `artifact-7`, built with that commit's metadata, passes production
+  dependency/services, the combined real PTY/editor/untrusted-file probe and
+  install/uninstall checks. It contains the corrected Go knowledge projection,
+  shared preference recovery and latest terminal views. Profiles remain separate
+  and no Electron or OpenCode agent/server is needed by the installed product.
+- These Linux results leave the parity gate open. Deferred native platforms,
+  real audio/clipboard permissions, service path migration and remaining acceptance
+  cases still require evidence before making the CLI primary or removing Electron.
