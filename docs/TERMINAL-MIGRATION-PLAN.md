@@ -6,6 +6,8 @@
 Ctrl+P now separates grouped navigation from composer slash completion.
 Command arguments entered through menus preserve the independent message draft;
 keyboard completion and compact-terminal checks are recorded in the ledger.
+Model selection, effort and provider setup have separate menus with back navigation;
+panels display one consolidated hint bar while retaining all advertised keys.
 
 Implemented checkpoints: neutral shared host and contracts; pinned OpenCode
 frontend slice and Gator adapter; keyboard hubs and file workbench; native-service

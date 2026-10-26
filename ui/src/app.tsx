@@ -60,7 +60,9 @@ function Shell(props: { quit(): Promise<void> }) {
     { id: "gator.reconnect", title: "Reconnect selected chat", palette: true, run: () => attempt(client.host.sessions.restart()) },
     ...Object.keys(controls.actions).map(name => ({ id: `gator.local.${name}`, title: name, group: commandGroup(name), palette: true as const, run: () => controls.trigger(name) })),
     ...["following", "saved", "settings"].map(name => ({ id: `gator.${name}`, title: name[0].toUpperCase() + name.slice(1), palette: true as const, run: () => navigate(`/${name}`) })),
-    ...(data.state?.commands ?? []).filter(command => !controls.actions[command.name] && !["following", "saved", "settings", "new", "exit", "cancel", "approve", "deny"].includes(command.name)).map(command => ({ id: `gator.command.${encodeURIComponent(command.name)}`, title: literal(command.description), group: commandGroup(command.name), palette: true as const,
+    // Only collapse known equivalent actions. Go's goal activity and the local
+    // public-work trace share a name but are distinct capabilities.
+    ...(data.state?.commands ?? []).filter(command => !["help", "queue", "following", "saved", "settings", "new", "exit", "cancel", "approve", "deny"].includes(command.name)).map(command => ({ id: `gator.command.${encodeURIComponent(command.name)}`, title: literal(command.description), group: command.name === "activity" ? "Following" : commandGroup(command.name), palette: true as const,
       run: () => {
         if (command.needs_input) controls.prompt(literal(command.description), "", async args => {
           if (!await client.mayLeave()) return

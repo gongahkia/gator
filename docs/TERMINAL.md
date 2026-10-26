@@ -29,6 +29,9 @@ for Ask Gator. Tables page with Ctrl+Up/Down (rows) and Ctrl+Left/Right (columns
 F7 switches worksheets. Returning to chat retains the draft. Exporting to an
 existing file shows a separate replacement review; changed destinations require
 a fresh review. Export outside Gator's private storage.
+Settings → Models and providers (also `/models`) separates model selection,
+effort, and provider/local-model setup. Escape in a model or effort list returns
+to that parent menu. Panels show one consolidated keyboard hint bar.
 In forms, F2 and Ctrl+R perform the displayed save/review action; Enter edits
 the selected field. Ctrl+Enter also works in terminals that distinguish it.
 Provider configuration and model rename forms use their existing Go save action;

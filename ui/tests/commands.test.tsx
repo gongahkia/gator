@@ -12,6 +12,7 @@ test("commands have nested menus and composer completion never sends on paste or
   const host = new FixtureHost({ binary: "/unused", workspace: root, userData: root, env: { GATOR_STATE_DIR: root } })
   host.current.messages = [{ role: "Gator", text: "Ready for menu navigation." }]
   host.current.commands = [
+    { name: "activity", description: "Show checks and work for this goal", needs_input: false, advanced: false },
     { name: "mode", description: "Choose work permissions", needs_input: true, advanced: false },
     { name: "model", description: "Configure cloud or local models", needs_input: false, advanced: false },
     { name: "theme", description: "Choose a color theme", needs_input: true, advanced: false },
@@ -53,6 +54,10 @@ test("commands have nested menus and composer completion never sends on paste or
     expect(setup.captureCharFrame()).toContain("Arguments for /theme")
     await setup.mockInput.typeText("light"); setup.mockInput.pressEnter(); await flush()
     expect(host.sent.at(-1)).toEqual({ type: "submit", text: "/theme light" })
+    expect(client.draft.text).toBe("Keep menu argument draft")
+    setup.mockInput.pressKey("p", { ctrl: true }); await flush(); await setup.mockInput.typeText("Following"); await flush(); setup.mockInput.pressEnter(); await flush()
+    await setup.mockInput.typeText("Show checks and work for this goal"); await flush(); setup.mockInput.pressEnter(); await flush()
+    expect(host.sent.at(-1)).toEqual({ type: "navigate", text: "/activity" })
     expect(client.draft.text).toBe("Keep menu argument draft")
   } finally { await client.close(); await setup.dispose(); await rm(root, { recursive: true, force: true }) }
 })

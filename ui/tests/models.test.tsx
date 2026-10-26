@@ -39,6 +39,10 @@ test("model and effort keyboard choices preserve drafts and respect configured i
     // The open picker must become usable when Go releases the work restriction.
     await choose("Effort: high"); await until(() => client.state?.composer?.effort === "high", "live released model controls")
     expect(client.draft.text).toBe("Independent unsent message"); expect(calls).toHaveLength(1)
+    await client.navigate("/settings"); await flush(); setup.mockInput.pressEnter(); await flush()
+    expect(setup.captureCharFrame()).toContain("Model and effort for future messages")
+    await choose("Configure providers and local models"); await until(() => !!client.state?.panel, "provider setup from settings")
+    expect(client.draft.text).toBe("Independent unsent message"); expect(calls).toHaveLength(1)
   } finally { release(); await client.close(); await setup.dispose(); server.stop(true); await rm(root, { recursive: true, force: true }) }
 }, 45000)
 

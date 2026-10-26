@@ -1241,3 +1241,36 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   wraparound, menu back navigation and separate argument/draft ownership.
   `bun run --cwd ui check` passes. The broader navigation regression is recorded
   with the model-menu change below. Native platform acceptance remains deferred.
+
+### Model hierarchy and consolidated panel controls
+
+- Settings → Models and providers (or `/models`) opens separate model, effort and
+  provider/local-installation choices. Model rows are grouped by provider, identify
+  the current selection and retain live Go availability restrictions. Escape from
+  model/effort lists returns to their parent. Provider setup remains the Go panel.
+- Panel footers merge descriptive controls with any additional advertised hints;
+  matching shortcuts render once. A keyboard regression verifies one selection/use/
+  configure hint and preserves a new-provider key supplied only by the hints list.
+- Focused commands/models/revisions/goals/panel run: **9 pass / 129 assertions**.
+  `bun run --cwd ui check` passes. Model tests cover live work locks, reopening,
+  Settings → provider setup, retained attachment setup/restart and unchanged drafts.
+  Revision navigation now uses readable Files/Chats menu actions; the plan test
+  explicitly accepts completion before submitting its no-argument view.
+- Concurrent user commit `afb610f91` captured the model/hint implementation and
+  initial navigation-test adaptations while verification continued. It is retained.
+- The first broader run reported **55 pass / 4 fail**: old plan/slash-palette
+  expectations, plus update visibility and concurrent catalog-switch timeouts.
+  Updated navigation cases pass. Catalog tests now wait for the acknowledged
+  query and selected result, rather than matching rows from the previous list.
+  Update tests explicitly jump to the latest card and check that an unseen middle
+  card stays undelivered, allowing the saved reading position to be restored.
+  The updates/concurrent rerun passes **3 tests / 73 assertions**.
+  This first run does not establish a complete regression pass or migration parity.
+
+- Go goal/check activity remains available under Following, independently of the
+  local public activity inspector under Chats. Command deduplication now lists
+  known equivalent actions explicitly, so names alone cannot hide a capability.
+- `artifact-8` passes production services, install/uninstall and the combined
+  installed PTY/editor/untrusted-file probe. The PTY now exercises inline Tab
+  completion without execution and nested Files navigation. A final artifact will
+  include the subsequently restored goal-activity menu entry.

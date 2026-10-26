@@ -84,6 +84,12 @@ path.write_text("Editor returned draft 🐊\\nSecond retained line")
 
     try:
         wait_for(lambda: visible("connected"), "connected Go session")
+        os.write(master, b"/mo")
+        wait_for(lambda: visible("Tab complete"), "inline slash completion")
+        os.write(master, b"\t")
+        wait_for(lambda: saved_draft("/mode "), "Tab completes without sending")
+        os.write(master, b"\x15")
+        wait_for(lambda: not saved_draft("/mode "), "clear completed command")
         os.write(master, "\x1b[200~Installed draft 🐊\nRetain across navigation\x1b[201~".encode())
         wait_for(saved_draft, "private persisted draft")
         os.write(master, b"\x10")  # Ctrl+P, independent of desktop key preferences.
@@ -123,6 +129,10 @@ path.write_text("Editor returned draft 🐊\\nSecond retained line")
             os.write(master, b"files")
             time.sleep(0.1)
             os.write(master, b"\r")
+            wait_for(lambda: visible("Gator › Files"), "Files command section")
+            os.write(master, b"files")
+            time.sleep(0.1)
+            os.write(master, b"\r")
             wait_for(lambda: visible("Files in this conversation"), "retained file list")
             os.write(master, b"\r")
             wait_for(lambda: visible("Retained final line"), "complete untrusted file view")
@@ -136,7 +146,7 @@ path.write_text("Editor returned draft 🐊\\nSecond retained line")
         assert child.returncode == 0, child.returncode
         assert saved_draft("Editor returned draft" if args.editor else "Installed draft")
         assert termios.tcgetattr(master) == original_modes, "Terminal modes were not restored on exit"
-        print("PASS: standalone production PTY, Go connection, Unicode/bracketed paste, palette, retained draft, clean exit and terminal mode restoration; no Electron/OpenCode server.")
+        print("PASS: standalone production PTY, Go connection, Unicode/bracketed paste, inline completion, grouped palette, retained draft, clean exit and terminal mode restoration; no Electron/OpenCode server.")
         print("PASS: interactive Go-owned editor, canonical input/echo during handoff, saved text, temporary cleanup and resumed raw composer." if args.editor else "PATH contains Bun only.")
         if args.untrusted_file:
             print("PASS: keyboard file intake/view preserves source bytes and draft; file OSC clipboard/title payloads never become PTY commands.")
