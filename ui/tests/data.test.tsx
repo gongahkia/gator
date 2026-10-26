@@ -9,8 +9,9 @@ import { App } from "../src/app"
 import { GatorClient } from "../src/gator/client"
 
 test("private data keyboard reviews export verify and restore into a separate paused profile", async () => {
-  const root = await mkdtemp(join(tmpdir(), "gator-terminal-data-")), workspace = join(root, "workspace"), backup = join(root, "private.tar.gz"), restored = join(root, "restored")
+  const root = await mkdtemp(join(tmpdir(), "gator-terminal-data-")), workspace = join(root, "workspace"), backup = join(root, "private.tar.gz"), restored = join(root, "restored"), replacement = join(root, "replacement workspace")
   await mkdir(workspace); await writeFile(join(workspace, "original.txt"), "External original is kept.")
+  await mkdir(replacement); await writeFile(join(replacement, "original.txt"), "Replacement source is never overwritten by restore.")
   const binary = process.env.GATOR_TEST_BINARY || resolve(import.meta.dir, "../runtime/" + (process.platform === "win32" ? "gator-runtime.exe" : "gator-runtime")), env = { ...process.env, GATOR_STATE_DIR: join(root, "state"), GATOR_CONFIG_DIR: join(root, "config") }
   const cli = (args: string[], state = env.GATOR_STATE_DIR) => execFileSync(binary, args, { env: { ...env, GATOR_STATE_DIR: state, GATOR_INTERNAL_COMMANDS: "1" }, encoding: "utf8" })
   cli(["note", "add", "--title", "Retained private note", "--body", "The original knowledge survives review."])
@@ -28,6 +29,10 @@ test("private data keyboard reviews export verify and restore into a separate pa
   const review = async () => { const id = client.state?.panel?.id; setup.mockInput.pressKey("F2"); await until(() => !!client.state?.panel && client.state.panel.id !== id, "review form"); await flush() }
   const result = (text: string) => until(() => JSON.stringify(client.state?.panel?.blocks).includes(text), text)
   const exists = async (path: string) => !!await stat(path).catch(() => undefined)
+  const mapping = async () => {
+    await choose("Source folder mappings (optional)"); await setup.mockInput.typeText("Add mapping"); await flush(); setup.mockInput.pressEnter(); await flush()
+    await setup.mockInput.typeText(workspace); setup.mockInput.pressEnter(); await flush(); await setup.mockInput.typeText(replacement); setup.mockInput.pressEnter(); await flush()
+  }
   try {
     await client.start(); await client.edit("Keep private data draft"); const context = client.context
     await client.navigate("/data"); await choose("Export private backup"); await path("New backup file", backup); await review()
@@ -37,14 +42,22 @@ test("private data keyboard reviews export verify and restore into a separate pa
     await choose("Verify a backup"); await path("Existing backup file", backup); await review(); setup.mockInput.pressEnter(); await result("Verified")
     expect(await readFile(backup)).toEqual(bytes)
     await choose("Restore into a new profile"); await path("Existing backup archive", backup); await path("New profile directory", restored)
-    await review(); expect(await exists(restored)).toBe(false)
+    await mapping(); await review(); expect(await exists(restored)).toBe(false)
     setup.mockInput.pressEnter(); await until(() => client.state?.panel?.title === "Review restore into a fresh profile", "restore plan")
-    expect(await exists(restored)).toBe(false); expect(JSON.stringify(client.state?.panel)).toContain(restored)
+    expect(await exists(restored)).toBe(false); expect(JSON.stringify(client.state?.panel)).toContain(restored); expect(JSON.stringify(client.state?.panel)).toContain(replacement)
+    await writeFile(backup, Buffer.concat([bytes, Buffer.from("changed after review")]))
+    setup.mockInput.pressEnter(); await until(() => !!client.state?.panel?.notice, "changed archive refusal")
+    expect(await exists(restored)).toBe(false); expect(client.draft.text).toBe("Keep private data draft")
+    await writeFile(backup, bytes); await client.navigate("/data"); await choose("Restore into a new profile"); await path("Existing backup archive", backup); await path("New profile directory", restored); await mapping(); await review()
+    setup.mockInput.pressEnter(); await until(() => client.state?.panel?.title === "Review restore into a fresh profile", "fresh restore plan")
     setup.mockInput.pressEnter(); await result("Restored a separate profile")
     expect(client.context).toBe(context); expect(client.draft.text).toBe("Keep private data draft")
     expect(JSON.parse(await readFile(join(restored, "gator/usage/policy.json"), "utf8")).paused).toBe(true)
     expect(cli(["note", "list"], restored)).toContain("Retained private note")
     expect(await readFile(join(workspace, "original.txt"), "utf8")).toBe("External original is kept.")
+    expect(await readFile(join(replacement, "original.txt"), "utf8")).toBe("Replacement source is never overwritten by restore.")
+    const restoredConversation = JSON.parse(await readFile(join(restored, "gator/conversations", client.state!.conversation_id!, "conversation.json"), "utf8"))
+    expect(restoredConversation.source_path).toBe(replacement)
     await choose("Choose content to delete"); await choose("Saved knowledge and retrieval cache")
     await until(() => client.state?.panel?.title === "Review private data removal", "deletion review")
     expect(cli(["note", "list"])).toContain("Retained private note")
@@ -60,6 +73,7 @@ test("private data keyboard reviews export verify and restore into a separate pa
     const restoredClient = new GatorClient(new Application({ binary, workspace, userData: join(root, "restored-app"), env: { ...env, GATOR_STATE_DIR: restored, GATOR_CONFIG_DIR: join(restored, "config") } }))
     try {
       await restoredClient.start(); expect(restoredClient.state?.messages).toHaveLength(0)
+      expect(restoredClient.state?.source).toBe(replacement)
       await restoredClient.navigate("/knowledge"); await restoredClient.waitFor(state => !!state.panel?.rows?.some(row => row.label.includes("Retained private note")))
       expect(restoredClient.draft.text).toBe(""); expect(restoredClient.state?.running).toBe(false)
     } finally { await restoredClient.close() }

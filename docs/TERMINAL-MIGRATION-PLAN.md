@@ -86,6 +86,8 @@ Revision/source evidence now covers explicit snapshot refresh, backward/forward
 ancestry, retained drafts and reopening from a different launch directory.
 Saved-goal plan controls now have keyboard evidence for outcome, steps, timing,
 evidence, guarded removal and restart without starting recurring checks.
+Backup restore now has keyboard evidence for source mappings and changed-archive
+rejection; mapped sources remain untouched and restored work stays paused.
 
 Replace the Electron application with Gator's adaptation of **OpenCode's actual
 terminal frontend**, carrying forward Gator's current capabilities. Use an

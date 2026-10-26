@@ -1195,3 +1195,17 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
 - These Linux results leave the parity gate open. Deferred native platforms,
   real audio/clipboard permissions, service path migration and remaining acceptance
   cases still require evidence before making the CLI primary or removing Electron.
+
+### Restore mappings and changed-archive refusal
+
+- Extended `tests/data.test.tsx`: **1 pass / 29 assertions**. The keyboard mapping
+  editor pairs an original workspace with an existing replacement containing
+  different bytes. The restore agreement displays that destination. Changing the
+  archive after review refuses restoration, creates no destination profile and
+  retains the current draft; a new review after restoring the archive succeeds.
+- The separate restored conversation points at the reviewed replacement even
+  when launched from the old directory. Neither source tree is overwritten;
+  restored usage remains paused, the active profile stays selected, the private
+  note survives and the original archive bytes remain intact. This expands the
+  earlier successful export/verify/restore case without claiming native service
+  migration or all private-data failure paths are complete.
