@@ -967,3 +967,17 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   assertions**; terminal typecheck passes. The long transcript adds 60 histories
   and verifies the client subscription count remains unchanged while scrolling,
   search, navigation and expansion still work.
+
+### Conversational recurring-check agreement lifecycle
+
+- `tests/followup-chat.test.tsx`: **1 pass / 22 assertions**, also included in the
+  three-file activity regression run above. Actual Go app tools inspect and
+  create/edit/pause a recurring check using live agreement digests and approvals.
+  The exact preview includes title, end date and offline service state; declining
+  creates nothing, and later edits do not change the saved agreement until
+  separately approved.
+- The resulting check retains its original conversation, read-only mode and exact
+  expiry. Pause is reflected by the terminal management page and survives restart
+  with its draft, without a new provider request or background-service start.
+  Quiet-check feedback, service installation and native scheduling remain
+  separately tracked; this is the agreement portion of the desktop journey.

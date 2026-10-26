@@ -60,6 +60,8 @@ A native zero-height selector failure at 42×14 is fixed with bounded list
 geometry and compact dialog positioning; the failing regression now passes.
 Activity histories share the transcript subscription, with a 60-history regression
 preventing per-message listener growth.
+Conversational recurring checks now have real-tool evidence for decline, create,
+edit and pause reviews, origin/expiry preservation and restart without execution.
 
 Replace the Electron application with Gator's adaptation of **OpenCode's actual
 terminal frontend**, carrying forward Gator's current capabilities. Use an
