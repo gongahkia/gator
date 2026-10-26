@@ -897,3 +897,14 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   Re-enabling retrieval and disabling learning restores those history tools while
   keeping the saved preference and its provenance intact. No request is replayed
   on restart or settings navigation.
+
+### Saved guidance choices and lifecycle
+
+- `tests/guidance.test.tsx`: **1 pass / 12 assertions**; terminal typecheck passes.
+  Keyboard controls create workspace-scoped procedure guidance with a key and
+  complete multiline body, edit its text while type/scope stay read-only, disable
+  it, filter active/disabled records, re-enable it and reopen it after restart.
+  The exact line breaks, scope, original chat and unsent draft remain intact;
+  these management actions submit no model request.
+- This covers the saved-guidance portion of the desktop polish journey. Retired
+  desktop-only presentation assertions are not claimed as terminal evidence.

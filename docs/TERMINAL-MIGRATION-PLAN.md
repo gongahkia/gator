@@ -50,6 +50,8 @@ Native playback now carries language and rate on all three platforms; helper
 contract tests pass, while actual macOS/Windows voice checks remain deferred.
 Cross-chat memory/privacy evidence now verifies real provider context, independent
 learning/history controls, separated transcripts and retained drafts at restart.
+Saved guidance now has keyboard evidence for typed scope/type choices, full text
+edits, status filtering, enable/disable and persistence.
 
 Replace the Electron application with Gator's adaptation of **OpenCode's actual
 terminal frontend**, carrying forward Gator's current capabilities. Use an
