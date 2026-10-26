@@ -7,6 +7,10 @@ Node.js 22.12 or newer, then run from the repository root:
 make run
 ```
 
+The planned return to a terminal application is tracked in the
+[terminal migration plan](TERMINAL-MIGRATION-PLAN.md). Electron remains the current
+interface until the plan's feature parity gate passes.
+
 `make run` installs the pinned desktop dependencies when missing or when the
 package manifests change, builds the runtime and frontend, then opens Gator.
 `make desktop` is an alias for the same command. `make build` builds the
