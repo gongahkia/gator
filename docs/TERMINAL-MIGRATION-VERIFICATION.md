@@ -1154,3 +1154,17 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
 - The recurring-check feedback regression also passed after this fix. These are
   real note-store mutations in an isolated profile; no model is configured or
   called. A refreshed package after this Go/terminal change remains required.
+
+### Revision ancestry and restored workspace ownership
+
+- `bun test --cwd ui --preload ./scripts/preload.ts tests/revisions.test.tsx`:
+  **1 pass / 18 assertions**; terminal typecheck passes. Two actual Go tasks read
+  a workspace file through `read_file`. Explicit `/source-refresh` retains the
+  draft and replaces the source snapshot for the next task; the provider receives
+  the refreshed content.
+- Keyboard revision-back/forward switches both the durable selected head and the
+  displayed ancestry, without a new provider request or lost draft. Reopening
+  from a different launch directory restores the original chat/source, selected
+  head and draft. The second directory's secret never enters provider requests.
+  Revision IDs are verified in Go's durable conversation record; the frontend
+  does not invent a revision field or become an additional authority.
