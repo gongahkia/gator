@@ -20,6 +20,7 @@ export class Application extends EventEmitter {
   pasteImages(images: { type: string; data: Uint8Array }[], decode: (bytes: Uint8Array) => Uint8Array): Promise<UploadedFile[]>
   openSession(id: string): Promise<void>
   version(): Promise<string>
-  runExternal(): Promise<void>
+  prepareComposerEditor(context: string, text: string): Promise<void>
+  runExternal(): Promise<{ context: string; kind: string; input?: string; error: string }>
   close(): Promise<void>
 }

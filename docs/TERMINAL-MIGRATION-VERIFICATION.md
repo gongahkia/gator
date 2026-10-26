@@ -546,3 +546,26 @@ independent installed launch; release packaging and platform matrix.
 - Full shared-host suite: **69 cases / 68 pass / one native Windows skip / 0
   failures**. Terminal and desktop typechecks pass. Native replacement behavior
   remains part of the deferred macOS/Windows verification.
+
+### Owned external editor and acknowledged handoffs
+
+- `external-editor` prepares the existing Go composer-editor workflow through a
+  dedicated host method. Renderer frames still cannot launch arbitrary commands
+  or send `external_done`. Terminal handoffs execute only Go-produced argv and
+  wait for Go's matching completion acknowledgement before restoring the scene.
+- The original chat keeps returned text, attachments and reply ownership even
+  when another chat becomes selected. Concurrent typing is retained alongside
+  editor text with visible explanation. A nonzero editor exit retains its saved
+  text and reports failure. Oversized text stays in an explicit recovery editor
+  until shortened/imported or deliberately dismissed. Closing an unlaunched
+  editor cleans its Go-owned temporary file; closing a running handoff is refused.
+- Native renderer test uses actual terminal setup/suspend/resume and an actual
+  Go-created editor process: success, resumed input, exit status 3, full oversized
+  buffer recovery, chat switch, simultaneous edits, attachment preservation,
+  temporary cleanup and restart without submission. Combined with client cases:
+  **8 pass / 54 assertions**. Typecheck passes. The earlier full UI checkpoint
+  passed **31 cases / 337 assertions** before the final cleanup/recovery additions.
+- Shared host rerun: **69 cases / 68 pass / one Windows skip / 0 failures**;
+  desktop typecheck passes. The editor case explicitly skips Windows because
+  Go's existing editor command requires POSIX `sh`; macOS/Windows actual runtime
+  evidence and real account/install handoffs remain pending.

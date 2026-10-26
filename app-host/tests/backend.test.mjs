@@ -18,6 +18,7 @@ test("host streams Go state and closes its child on exit", async () => {
     backend.send({ type: "submit", text: "next turn" });
     assert.equal((await next)[0].title, "next turn");
     assert.throws(() => backend.send({ type: "external_done" }));
+    assert.throws(() => backend.send({ type: "key", key: "ctrl+g", text: "No renderer launch" }));
     await backend.stop();
     assert.equal(backend.closed, true);
     assert.throws(() => backend.send({ type: "submit", text: "too late" }));

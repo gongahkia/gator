@@ -30,6 +30,11 @@ In reviewable forms, F2 and Ctrl+R review; Ctrl+Enter also works in terminals
 that distinguish it. Unsaved form edits require an explicit discard decision.
 In Conversations, Ctrl+F searches indexed messages, Ctrl+L changes scope,
 Ctrl+Left/Right pages results, F3 manages the selected chat, and Ctrl+R/F5 refreshes.
+Choose `external-editor` in Ctrl+P to edit the idle draft with `$VISUAL`, `$EDITOR`
+or the existing `nvim` fallback. Gator suspends terminal rendering and restores
+text and attachments after exit. The current Go editor command requires POSIX
+`sh`; native Windows editor support remains unverified. `continue-external`
+resumes other Go-reviewed sign-in/install handoffs in the current terminal.
 
 Build and install a local artifact into a new prefix:
 

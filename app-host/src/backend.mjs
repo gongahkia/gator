@@ -67,7 +67,22 @@ export class Backend extends EventEmitter {
   refreshPreferences() { this.#write({ version: 1, type: "refresh_preferences" }); }
 
   apply(frame) {
-    const checked = validateFrame(frame), nonce = randomUUID();
+    return this.#apply(validateFrame(frame));
+  }
+
+  // Host-owned handoffs deliberately stay outside the renderer frame policy.
+  prepareComposerEditor(text) {
+    validateFrame({ type: "submit", text });
+    return this.#apply({ version: 1, type: "key", key: "ctrl+g", text });
+  }
+
+  completeExternal(error = "") {
+    if (!this.state?.external) return Promise.reject(new Error("The external step is no longer current."));
+    return this.#apply({ version: 1, type: "external_done", error });
+  }
+
+  #apply(frame) {
+    const nonce = randomUUID();
     return new Promise((resolve, reject) => {
       if (this.closed) { reject(new Error(this.failure || "Gator is disconnected.")); return; }
       const finish = error => { clearTimeout(timer); this.off("action-applied", applied); this.off("closed", closed); error ? reject(new Error(error)) : resolve(); };
@@ -75,7 +90,7 @@ export class Backend extends EventEmitter {
       const closed = () => finish("Gator disconnected before confirming this action.");
       const timer = setTimeout(() => finish("This action was not confirmed. Check the current view before trying again."), 15000);
       this.on("action-applied", applied); this.once("closed", closed);
-      this.#write({ ...checked, nonce });
+      this.#write({ ...frame, nonce });
     });
   }
 

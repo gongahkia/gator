@@ -12,7 +12,8 @@ remaining behavioral journeys and deferred macOS/Windows runtime checks must pas
 before the terminal becomes primary or Electron is removed.
 Large tables now page bounded row/column windows, file selections resolve
 against the exact saved version chosen for Ask Gator, and exports support guarded
-replacement review. The remaining native handoff journeys still need evidence.
+replacement review. The editor handoff now restores owned drafts after an
+acknowledged Go completion; account/install and native-platform journeys remain.
 
 Replace the Electron application with Gator's adaptation of **OpenCode's actual
 terminal frontend**, carrying forward Gator's current capabilities. Use an

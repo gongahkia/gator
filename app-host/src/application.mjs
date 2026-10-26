@@ -146,8 +146,15 @@ export class Application extends EventEmitter {
     await this.sessions.open({ conversation_id: id });
   }
   async version() { return (await helper(this.binary, ["--version"], { maxBytes: 4096 })).toString("utf8").trim().replace("Gator desktop runtime", "Gator terminal"); }
+  async prepareComposerEditor(context, text) {
+    this.mutable();
+    if (context !== this.context || this.backend.state?.panel || this.backend.state?.running || this.backend.state?.pending_approval) throw new Error("Return to the idle conversation before editing its draft externally.");
+    const owner = this.backend;
+    await owner.prepareComposerEditor(text);
+    if (owner !== this.backend || owner.state?.external?.kind !== "editor") throw new Error(owner.state?.notice || "Gator could not prepare the composer editor. Your draft is kept.");
+  }
   async runExternal() {
-    const owner = this.backend, job = owner?.state?.external;
+    const owner = this.backend, context = this.context, job = owner?.state?.external;
     if (!job || owner.closed || this.terminalBusy || this.sessions.switching) throw new Error("There is no current reviewed external step.");
     this.terminalBusy = true; this.emit("change", this.snapshot());
     let failure = "";
@@ -160,8 +167,15 @@ export class Application extends EventEmitter {
         child.once("close", code => code === 0 ? resolve() : reject(new Error(`The external step ended with status ${code}.`)));
       });
     } catch (error) { failure = error.message; }
-    finally { this.terminalBusy = false; owner.finishExternal(failure); this.emit("change", this.snapshot()); }
-    if (failure) throw new Error(failure);
+    finally {
+      try { await owner.completeExternal(failure); }
+      finally { this.terminalBusy = false; this.emit("change", this.snapshot()); }
+    }
+    return { context, kind: job.kind, input: job.kind === "editor" ? owner.state?.input || "" : undefined, error: failure };
   }
-  async close() { if (this.terminalBusy) throw new Error("Finish or cancel the external step before closing Gator."); await this.drafts.flush(); await this.files.flush(); await this.sessions.stop(); }
+  async close() {
+    if (this.terminalBusy) throw new Error("Finish or cancel the external step before closing Gator.");
+    for (const owner of this.sessions.workers) if (!owner.closed && owner.state?.external?.kind === "editor") await owner.completeExternal("The editor was canceled before launch.");
+    await this.drafts.flush(); await this.files.flush(); await this.sessions.stop();
+  }
 }

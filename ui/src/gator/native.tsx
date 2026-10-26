@@ -40,7 +40,23 @@ export function useNative(controls: { actions: Record<string, () => unknown>; me
     ])
   }
   controls.actions.links = () => controls.menu("Links in the current page", (client.state?.panel?.links ?? []).map(link => ({ title: link.label, description: link.url, run: () => openLink(link.url) })))
-  controls.actions["continue-external"] = async () => { await renderer.suspend(); try { await client.host.runExternal() } finally { await renderer.resume() } }
+  const continueExternal = async () => {
+    const draft = client.draft
+    await renderer.suspend()
+    try {
+      const result = await client.host.runExternal()
+      if (result.kind === "editor" && result.context === draft.context && result.input !== undefined) {
+        try { await client.restoreEditor(draft, result.input) }
+        catch (error) {
+          controls.prompt("Recover returned editor text", result.input, text => client.restoreEditor(draft, text), "The original draft is kept. Shorten this returned text to the composer limit, then explicitly import it.")
+          throw error
+        }
+      }
+      if (result.error) throw new Error(result.error)
+    } finally { await renderer.resume() }
+  }
+  controls.actions["continue-external"] = continueExternal
+  controls.actions["external-editor"] = async () => { const draft = client.draft; await client.host.prepareComposerEditor(draft.context, draft.text); await continueExternal() }
   const releases = () => { void openLink("https://github.com/gongahkia/gator/releases").catch(error => client.fail(error)) }
   client.on("open-releases", releases); onCleanup(() => client.off("open-releases", releases))
   const changed = () => { if (voice.issue) client.fail(new Error(voice.issue)); client.voicePhase = voice.phase === "idle" && voice.playing ? "speaking" : voice.phase; client.emit("change") }

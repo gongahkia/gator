@@ -63,6 +63,16 @@ export class GatorClient extends EventEmitter {
     if (this.context !== context) throw new Error("The conversation changed. Your original draft is kept.")
     await this.appendFiles(files, context)
   }
+  async restoreEditor(before: Draft, text: string) {
+    const current = this.drafts.get(before.context) ?? before
+    const changed = current.text !== before.text
+    const value = changed ? [current.text, text].filter(Boolean).join("\n\n") : text
+    if (Buffer.byteLength(value) > 128 * 1024) throw new Error("The edited draft exceeds 128 KiB. Your previous draft is kept; shorten the editor text before importing it.")
+    const draft = { ...current, text: value }
+    this.drafts.set(before.context, draft); this.emit("change")
+    await this.host.drafts.request({ action: "save", draft })
+    if (changed) this.fail(new Error("The draft changed during the editor handoff. Its edited text was appended so both versions are kept."))
+  }
   async appendFiles(files: UploadedFile[], context = this.context) {
     if (this.context !== context) throw new Error("The conversation changed. Your original draft is kept.")
     await this.edit(this.draft.text, [...this.draft.uploads ?? [], ...files])
