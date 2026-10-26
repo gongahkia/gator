@@ -49,7 +49,7 @@ function Shell(props: { quit(): Promise<void> }) {
     { id: "command.palette.show", title: "Search commands", bind: "ctrl+p", run: palette },
     { id: "gator.sidebar", title: "Toggle navigation", bind: "ctrl+b", palette: true, run: () => { setSidebar(v => !v) } },
     { id: "gator.quit", title: "Quit Gator", bind: "ctrl+q", palette: true, run: quit },
-    { id: "gator.cancel", title: "Stop active work", bind: "ctrl+c", palette: true, run: () => data.state?.running ? attempt(client.send({ type: "key", key: "ctrl+c" })) : quit() },
+    { id: "gator.cancel", title: "Stop active work", bind: "ctrl+c", palette: true, run: () => data.state?.running ? attempt(client.send({ type: "key", key: "esc" })) : quit() },
     { id: "gator.new", title: "New independent chat", bind: "ctrl+n", palette: true, run: () => navigate("/new") },
     { id: "gator.search", title: "Search current transcript", bind: "ctrl+f", palette: true, enabled: !data.state?.panel, run: () => controls.trigger("search") },
     { id: "gator.help", title: "Gator help", bind: "f1", palette: true, enabled: !data.state?.panel, run: () => navigate("/help") },

@@ -429,3 +429,21 @@ independent installed launch; release packaging and platform matrix.
   third original model row and preventing activation after an empty search.
   Typecheck passes. Full acceptance of every knowledge/catalog mutation remains
   separate from these rendering and selection cases.
+
+### Reviewed forms and real control keys
+
+- `tests/pages.test.tsx`: **1 pass / 54 assertions** against Go. Following,
+  Saved, Settings and their model/connection/memory/usage/data/recovery pages keep
+  the unsent draft. Keyboard recurring-check setup covers multiline outcome,
+  directory selection, frequency/mode, a numeric budget, daily limit and UTC end
+  date. Review shows exact values and writes no definition until explicit save.
+  Save links the original chat, intentionally selects the new goal as Go does,
+  and returning restores the original chat's draft and source.
+- Corrected zero-valued omitted `selected` to mean the first row. Corrected the
+  form review fallback to emit canonical **`ctrl+r`**, rather than an unsupported
+  renderer `ctrl+enter` frame. F2 and distinguishable Ctrl+Enter invoke the same
+  review, without weakening shared host validation.
+- Ctrl+C stop now sends canonical **`esc`**, which the existing host permits.
+  `tests/cancellation.test.tsx` proves a real active request stops, the backend
+  stays connected and the unsent draft survives. The earlier renderer-only key
+  assertion did not establish compatibility with the strict Go host boundary.

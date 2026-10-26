@@ -28,7 +28,7 @@ test("credential keyboard and paste buffers paint only masks and preserve explic
     setup.mockInput.pressBackspace(); setup.mockInput.pressEnter(); await flush()
     expect(setup.captureCharFrame()).not.toContain("sk-pasted-secret")
     setup.mockInput.pressKey("F2"); await flush()
-    expect(host.sent.at(-1)?.key).toBe("ctrl+enter")
+    expect(host.sent.at(-1)?.key).toBe("ctrl+r")
     expect(host.sent.at(-1)?.panel?.fields?.[0]).toBe("sk-pasted-secret")
     expect(client.draft.text).toBe("")
   } finally { await client.close(); await setup.dispose(); await rm(root, { recursive: true, force: true }) }

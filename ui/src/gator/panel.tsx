@@ -16,11 +16,13 @@ import { DialogConfirm } from "../ui/dialog-confirm"
 export function Panel(props: { panel: BackendPanel }) {
   const client = useClient(), theme = useTheme(), dialog = useDialog(), renderer = useRenderer()
   const [fields, setFields] = createSignal<Record<number, string>>({}), [busy, setBusy] = createSignal(false), [query, setQuery] = createSignal("")
+  const selectedRow = () => props.panel.selected ?? 0
+  const hasReview = () => props.panel.hints?.some(hint => /ctrl\+(r|enter)/.test(hint.shortcut.toLowerCase().replaceAll(" ", "")))
   const visible = () => (props.panel.rows ?? []).map((row, index) => ({ row, index })).filter(({ row }) => !query() || JSON.stringify([row.label, row.detail, row.metadata, row.source]).toLocaleLowerCase().includes(query().toLocaleLowerCase()))
   let identity = ""
   let scroll: ScrollBoxRenderable | undefined, reveal: (() => void) | undefined
   createEffect(() => {
-    const selected = props.panel.selected, filter = query()
+    const selected = selectedRow(), filter = query()
     if (reveal) renderer.off("frame", reveal)
     reveal = () => { if (scroll && !scroll.isDestroyed && selected !== undefined) scroll.scrollChildIntoView(`panel-row-${selected}`); reveal = undefined }
     renderer.once("frame", reveal)
@@ -102,14 +104,14 @@ export function Panel(props: { panel: BackendPanel }) {
     const name = ({ escape: "esc", return: "enter" }[event.name] ?? event.name)
     const key = event.ctrl ? `ctrl+${name}` : event.shift && name === "tab" ? "shift+tab" : name
     if (key === "esc" && Object.keys(fields()).length) { event.preventDefault(); void guard().then(leave => { if (leave) void action({ action: "key", fields: undefined }, "esc") }); return }
-    if (key === "f2" && props.panel.hints?.some(hint => hint.shortcut.toLowerCase().replaceAll(" ", "").includes("ctrl+enter"))) { event.preventDefault(); void action({ action: "key" }, "ctrl+enter"); return }
+    if (["f2", "ctrl+enter"].includes(key) && hasReview()) { event.preventDefault(); void action({ action: "key" }, "ctrl+r"); return }
     if (["pageup", "pagedown"].includes(key)) {
-      event.preventDefault(); const rows = visible(), current = rows.findIndex(row => row.index === props.panel.selected)
+      event.preventDefault(); const rows = visible(), current = rows.findIndex(row => row.index === selectedRow())
       const selected = rows[Math.max(0, Math.min(rows.length - 1, current + (key === "pagedown" ? 10 : -10)))]
       if (selected) void action({ action: "select", row: selected.index }); return
     }
     if (query() && ["up", "down"].includes(key)) {
-      event.preventDefault(); const rows = visible(), current = rows.findIndex(row => row.index === props.panel.selected)
+      event.preventDefault(); const rows = visible(), current = rows.findIndex(row => row.index === selectedRow())
       const selected = rows[(current + (key === "down" ? 1 : -1) + rows.length) % rows.length]
       if (selected) void action({ action: "select", row: selected.index }); return
     }
@@ -139,8 +141,8 @@ export function Panel(props: { panel: BackendPanel }) {
     <scrollbox ref={node => { scroll = node }} flexGrow={1} minHeight={0}>
       <For each={props.panel.summary}>{field => <text>{literal(field.label)}: {literal(field.value)}</text>}</For>
       <Show when={query() && !visible().length}><text fg={theme.text.muted}>No matching loaded items. Clear the filter to choose an entry.</text></Show>
-      <For each={visible()}>{({ row, index }) => <box id={`panel-row-${index}`} backgroundColor={index === props.panel.selected ? theme.background.raised.high : undefined} paddingY={0} onMouseUp={() => row.input ? edit(index) : void action({ action: "activate", row: index })}>
-        <text fg={index === props.panel.selected ? theme.accent : theme.text.base}>{index === props.panel.selected ? "› " : "  "}{literal(row.label)}{row.state ? ` · ${literal(row.state_label || row.state)}` : ""}{row.input ? `: ${row.input.secret ? "[credential]" : literal(fields()[index] ?? row.input.value)}` : ""}</text>
+      <For each={visible()}>{({ row, index }) => <box id={`panel-row-${index}`} backgroundColor={index === selectedRow() ? theme.background.raised.high : undefined} paddingY={0} onMouseUp={() => row.input ? edit(index) : void action({ action: "activate", row: index })}>
+        <text fg={index === selectedRow() ? theme.accent : theme.text.base}>{index === selectedRow() ? "› " : "  "}{literal(row.label)}{row.state ? ` · ${literal(row.state_label || row.state)}` : ""}{row.input ? `: ${row.input.secret ? "[credential]" : literal(fields()[index] ?? row.input.value)}` : ""}</text>
         <Show when={row.detail}><text fg={theme.text.muted}>  {literal(row.detail)}</text></Show>
         <For each={row.metadata}>{field => <text fg={theme.text.muted}>  {literal(field.label)}: {literal(field.value)}</text>}</For>
         <Show when={row.input?.help}><text fg={theme.text.muted}>  {literal(row.input?.help)}</text></Show>
@@ -152,7 +154,7 @@ export function Panel(props: { panel: BackendPanel }) {
     </scrollbox>
     <text fg={theme.text.muted}>{literal(props.panel.footer) || "↑/↓ select · Enter open/edit · Esc back · Ctrl+F search"}</text>
     <text fg={theme.text.muted}>{props.panel.hints?.map(h => `${literal(h.shortcut)} ${literal(h.action)}`).join(" · ")}</text>
-    <Show when={props.panel.hints?.some(hint => hint.shortcut.toLowerCase().replaceAll(" ", "").includes("ctrl+enter"))}><text fg={theme.text.muted}>F2 also reviews this form when Ctrl+Enter is unavailable.</text></Show>
+    <Show when={hasReview()}><text fg={theme.text.muted}>F2 or Ctrl+R reviews this form; Ctrl+Enter also works in terminals that distinguish it.</text></Show>
   </box>
 }
 
