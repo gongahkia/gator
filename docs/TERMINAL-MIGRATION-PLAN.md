@@ -227,7 +227,7 @@ and remaining gap. Add newly discovered workflows to the inventory.
 - [x] Record implementation HEAD, preserve pre-existing changes, and use isolated
   state/config/draft roots for migration fixtures. Do not test destructive reviews
   or profile conversion against the user's live profile.
-- [ ] Create the verification ledger and expand P01–P25 from current screens,
+- [x] Create the verification ledger and expand P01–P25 from current screens,
   preload/host operations, Go bridge frames, and existing test cases. Record
   current unsupported platform behavior separately from migration regressions.
 - [ ] Run the applicable existing Go, desktop host, and desktop integration checks;
@@ -235,7 +235,7 @@ and remaining gap. Add newly discovered workflows to the inventory.
 - [ ] Capture representative old-terminal layouts and current desktop journeys,
   including first run, long chat, live approval, file edit, concurrent chats, and
   restart recovery. Keep reusable fixture data independent of DOM selectors.
-- [ ] Record the exact OpenCode source revision, package versions, dependency
+- [x] Record the exact OpenCode source revision, package versions, dependency
   closure, licenses, and relevant upstream tests. Inventory imports that reach
   OpenCode client/core/server/config/plugin services and classify each as retained
   frontend support, an adapter target, or code excluded from the Gator build.

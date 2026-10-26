@@ -379,3 +379,19 @@ independent installed launch; release packaging and platform matrix.
 - `tests/panel.test.tsx`: **2 pass / 15 assertions**, including cancelled and
   confirmed keyboard navigation with an unsaved recurring-check form. The prior
   full run remains **17 pass / 143 assertions**; this adds one focused case.
+
+### Existing-profile continuity
+
+- `tests/profiles.test.ts`: **2 pass / 28 assertions** with real Go state. An
+  existing-format Electron draft (including private upload references and disk
+  metadata), file working version and independent file edit draft reopen through
+  the terminal twice without rewriting the draft record. Original source bytes
+  and existing saved knowledge remain intact. No conversion into upstream storage
+  occurs; the frontend uses the established per-profile paths and formats.
+- A second state/config profile sharing the same app user-data directory cannot
+  read the first profile's drafts. Disabled retention keeps current-session input
+  editable while writing no retained draft; restart stays empty and disabled.
+- Relative overrides retain the existing workspace-relative Go interpretation
+  on Unix. The Windows branch is present in the same fixture but remains native
+  verification pending. This test does not establish backup/credential/service
+  executable-path migration or cosmetic Electron-localStorage preference parity.
