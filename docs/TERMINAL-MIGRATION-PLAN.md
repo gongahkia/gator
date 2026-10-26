@@ -34,6 +34,9 @@ Model and effort controls now retain visible availability reasons and refresh
 while open; first-task setup preserves immutable attachments through restart.
 Provider forms now expose their canonical save/review action independently of
 field editing, with keyboard evidence for private credentials and metadata.
+Local-model management now has keyboard evidence for reviewed download, streamed
+progress/cancellation, rename, selection, inference routing and reviewed removal
+against an isolated runtime fixture; native installation remains unverified.
 
 Replace the Electron application with Gator's adaptation of **OpenCode's actual
 terminal frontend**, carrying forward Gator's current capabilities. Use an

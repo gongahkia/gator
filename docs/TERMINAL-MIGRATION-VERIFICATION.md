@@ -777,3 +777,19 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
 - Existing recurring-check, data and connection journeys after this shared form
   change: **3 pass / 92 assertions**. Terminal typecheck passes. Installation,
   local-model management and native device sign-in still need separate evidence.
+
+### Local model lifecycle through the terminal
+
+- `tests/local-models.test.tsx`: **1 pass / 13 assertions**, using the actual Go
+  local-model manager and an isolated loopback Ollama-protocol fixture. Initial
+  download review cancellation makes no pull request. Confirmed download renders
+  streamed progress; Escape aborts its HTTP stream. A second explicit download
+  updates the installed catalog, supports display rename and selects the original
+  provider model ID for one real local HTTP task.
+- Removal requires its own review and sends exactly one DELETE, then removes the
+  managed provider configuration when its final installed model is removed.
+  Setup/rename preserve the draft; setup alone makes no model inference request.
+  No installed system Ollama process or real model weights are modified.
+- This proves the terminal management journey and backend routing, not an actual
+  multi-gigabyte download, privileged installer execution, hardware eligibility on
+  other hosts or native macOS/Windows installation. Those remain explicit gaps.
