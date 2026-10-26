@@ -1116,3 +1116,23 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   only explicit Enter sends them to the real provider boundary. The original file
   and manifest still match afterward. This complements the display fixture's
   origin navigation with actual output authority, persistence and intake evidence.
+
+### Refreshed artifact and incremental terminal redraws
+
+- Built `artifact-6` at `b9e16fec3` with fresh Go build metadata and the latest
+  frontend/shared host. Production dependency/service verification and standalone
+  install/uninstall checks pass. Desktop typecheck and its 7 host cases pass;
+  the shared-host rerun is **75 pass / 1 Windows-only skip / 0 fail**.
+- The combined editor/file PTY probe initially failed to find `relative path` in
+  raw output: incremental redraws reused characters already on screen. This was
+  a harness failure. The probe now interprets the screen with pinned test-only
+  `pyte`/`wcwidth` dependencies and keeps raw bytes for escape-injection assertions.
+- Fresh-artifact combined probe: **pass** for Unicode paste, retained drafts,
+  Go-owned editor canonical input/echo, editor cleanup/raw resume, keyboard file
+  intake/view, OSC clipboard/title containment, clean exit and restored terminal
+  modes. Install command: `pip install -r ui/scripts/requirements-pty.txt` in a
+  private venv; verification command: that venv's `python
+  ui/scripts/verify-package.py artifact-6 --editor --untrusted-file`.
+  Python dependencies are verification-only, absent from Gator's runtime needs.
+- Native macOS/Windows and actual audio/clipboard permissions remain unverified;
+  the package result does not close those removal-gate cases.

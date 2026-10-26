@@ -16,6 +16,7 @@ import subprocess
 import tempfile
 import termios
 import time
+import pyte
 
 parser = argparse.ArgumentParser()
 parser.add_argument("artifact", type=Path)
@@ -53,6 +54,11 @@ path.write_text("Editor returned draft 🐊\\nSecond retained line")
     child = subprocess.Popen([str(artifact / "bin/gator")], cwd=root, env=environment, stdin=slave, stdout=slave, stderr=slave, start_new_session=True)
     os.close(slave)
     output = bytearray()
+    screen = pyte.Screen(110, 32)
+    stream = pyte.ByteStream(screen)
+
+    def visible(text):
+        return text in "\n".join(screen.display)
 
     def wait_for(predicate, label, timeout=15):
         deadline = time.monotonic() + timeout
@@ -61,7 +67,9 @@ path.write_text("Editor returned draft 🐊\\nSecond retained line")
                 raise AssertionError(f"Timed out waiting for {label}; output tail: {output[-2000:]!r}")
             if select.select([master], [], [], 0.05)[0]:
                 try:
-                    output.extend(os.read(master, 65536))
+                    chunk = os.read(master, 65536)
+                    output.extend(chunk)
+                    stream.feed(chunk)
                 except OSError:
                     pass
 
@@ -75,17 +83,17 @@ path.write_text("Editor returned draft 🐊\\nSecond retained line")
         return False
 
     try:
-        wait_for(lambda: b"connected" in output, "connected Go session")
+        wait_for(lambda: visible("connected"), "connected Go session")
         os.write(master, "\x1b[200~Installed draft 🐊\nRetain across navigation\x1b[201~".encode())
         wait_for(saved_draft, "private persisted draft")
         os.write(master, b"\x10")  # Ctrl+P, independent of desktop key preferences.
-        wait_for(lambda: b"Gator commands" in output, "command palette")
+        wait_for(lambda: visible("Gator commands"), "command palette")
         if args.editor:
             os.write(master, b"external-editor")
-            wait_for(lambda: b"external-editor" in output, "editor command")
+            wait_for(lambda: visible("external-editor"), "editor command")
             time.sleep(0.1)
             os.write(master, b"\r")
-            wait_for(lambda: b"GATOR_EDITOR_READY" in output, "interactive editor stdin")
+            wait_for(lambda: visible("GATOR_EDITOR_READY"), "interactive editor stdin")
             os.write(master, b"accept\n")
             wait_for(lambda: saved_draft("Editor returned draft"), "returned editor draft")
             result = json.loads((root / "editor-result.json").read_text())
@@ -99,27 +107,25 @@ path.write_text("Editor returned draft 🐊\\nSecond retained line")
             os.write(master, b"\x1b")
             time.sleep(0.1)
         if args.untrusted_file:
-            start = len(output)
             os.write(master, b"\x10")
-            wait_for(lambda: b"Gator commands" in output[start:], "attachment command palette")
+            wait_for(lambda: visible("Gator commands"), "attachment command palette")
             os.write(master, b"attach-file")
             time.sleep(0.1)
             os.write(master, b"\r")
-            wait_for(lambda: b"Choose file" in output[start:], "file picker")
+            wait_for(lambda: visible("Choose file"), "file picker")
             os.write(master, b"\x0c")
-            wait_for(lambda: b"relative path" in output[start:], "path field")
+            wait_for(lambda: visible("relative path"), "path field")
             os.write(master, b"\x15" + str(root / "untrusted.txt").encode() + b"\r")
-            wait_for(lambda: b"untrusted.txt" in output[start:], "staged untrusted file")
+            wait_for(lambda: visible("untrusted.txt") and not visible("relative path"), "staged untrusted file")
             time.sleep(0.2)
-            start = len(output)
             os.write(master, b"\x10")
-            wait_for(lambda: b"Gator commands" in output[start:], "files command palette")
+            wait_for(lambda: visible("Gator commands"), "files command palette")
             os.write(master, b"files")
             time.sleep(0.1)
             os.write(master, b"\r")
-            wait_for(lambda: b"Files in this conversation" in output[start:], "retained file list")
+            wait_for(lambda: visible("Files in this conversation"), "retained file list")
             os.write(master, b"\r")
-            wait_for(lambda: b"Retained final line" in output[start:], "complete untrusted file view")
+            wait_for(lambda: visible("Retained final line"), "complete untrusted file view")
             assert b"\x1b]52;c;R0FUT1JfUFJJVkFURV9DTElQQk9BUkQ=" not in output, "Untrusted OSC 52 reached terminal output"
             assert b"\x1b]0;GATOR_UNTRUSTED_TITLE" not in output, "Untrusted title command reached terminal output"
             assert (root / "untrusted.txt").read_bytes() == payload, "Viewing changed original file bytes"

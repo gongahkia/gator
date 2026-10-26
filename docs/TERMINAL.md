@@ -105,3 +105,12 @@ Use `work-details` in Ctrl+P to inspect current selections and retained evidence
 when it has no transcript card. File checks and proposal inspection do not apply
 changes or confirm external delivery. `/files` opens complete retained files and
 their working versions; unavailable originals report an error.
+
+The Unix installed-terminal verification uses Python and a pinned terminal
+emulator only for testing:
+
+```sh
+python3 -m venv .pty-venv
+.pty-venv/bin/pip install -r ui/scripts/requirements-pty.txt
+.pty-venv/bin/python ui/scripts/verify-package.py /tmp/gator-terminal-artifact --editor --untrusted-file
+```

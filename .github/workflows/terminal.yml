@@ -48,7 +48,10 @@ jobs:
         run: node ui/scripts/verify-install.mjs terminal-artifact
       - name: Verify native terminal and editor handoff
         if: runner.os != 'Windows'
-        run: python3 ui/scripts/verify-package.py terminal-artifact --editor --untrusted-file
+        run: |
+          python3 -m venv .pty-venv
+          .pty-venv/bin/pip install -r ui/scripts/requirements-pty.txt
+          .pty-venv/bin/python ui/scripts/verify-package.py terminal-artifact --editor --untrusted-file
       - name: Compile additional ARM64 runtime
         if: runner.os != 'macOS'
         shell: bash
