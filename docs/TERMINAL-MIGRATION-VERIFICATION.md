@@ -981,3 +981,42 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   with its draft, without a new provider request or background-service start.
   Quiet-check feedback, service installation and native scheduling remain
   separately tracked; this is the agreement portion of the desktop journey.
+
+### Installed package and Linux process measurements
+
+- Fresh artifact `artifact-5` was built at `9edc858b6` with recorded Go build
+  metadata. Production package verification passes with all dependencies resolved
+  inside the artifact, no desktop tree, and Bun-only child PATH: real Go startup,
+  legacy preferences, distinct rendered PDF pages, native Office/text editing,
+  exports, selected-version attachment and unchanged original files.
+- `python3 ui/scripts/verify-package.py <artifact>` and `--editor`: pass. Real PTY
+  launch/paste/palette/drafts/quit restores terminal modes; editor handoff restores
+  canonical input and echo, imports the returned draft, removes its temporary file
+  and resumes raw input. `node ui/scripts/verify-install.mjs <artifact>`: pass for
+  install, script commands, active-profile uninstall guard and retained user data.
+- Complete terminal suite before the subsequent activity subscription change:
+  **49 pass / 666 assertions / 34 files**. Desktop typecheck passes; its own
+  host tests pass, followed by shared-host **73 pass / 1 Windows-only skip**.
+  New activity/followup checks after that change are recorded above; a final
+  rebuilt package and complete terminal rerun remain required.
+- Added reproducible Linux-only measurement: `python3 ui/scripts/measure-linux.py
+  <artifact> --revisions 0` and the default 150-revision case. Both frontends use
+  isolated copies of the same stored conversation and the exact same Go binary.
+  The sampler sums the complete product process tree's RSS/PSS, excludes Xvfb and
+  the Playwright driver, measures readiness/search and verifies child cleanup.
+  The first harness attempts needed ANSI-aware result recognition and atomic
+  driver status publication; these were harness defects, not product failures.
+- Observed results (one sample each; MiB, not a performance guarantee):
+
+  | Profile | Frontend | Ready | Search | Ready PSS | Sampled peak PSS | Processes | Cleanup |
+  | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
+  | Fresh | Terminal | 987 ms | 160 ms | 135.5 | 145.3 | 2 | Pass |
+  | Fresh | Electron | 2,046 ms | 80 ms | 443.8 | 445.4 | 7 | Pass |
+  | 150 revisions | Terminal | 908 ms | 54 ms | 211.5 | 240.3 | 2 | Pass |
+  | 150 revisions | Electron | 1,551 ms | 70 ms | 504.3 | 504.4 | 7 | Pass |
+
+  Search controls differ (terminal prompt/results versus desktop inline search).
+  OS cache/load were not controlled, and sampling can miss short-lived peaks.
+  [Raw measurements](terminal-measurements/linux-2026-10-26.json) retain byte counts.
+  Both clean exits leave no observed product child process; terminal modes are
+  restored. Native-platform performance remains unmeasured.

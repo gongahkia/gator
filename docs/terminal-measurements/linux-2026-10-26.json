@@ -1,0 +1,57 @@
+{
+  "source_commit": "9edc858b6",
+  "platform": "linux-x64",
+  "terminal_runtime": "Bun 1.4.2",
+  "desktop_runtime": "Electron 44.9.2",
+  "method": "One isolated fresh-profile sample and one isolated 150-revision sample per frontend; Linux /proc complete product-process tree, excluding Xvfb and Playwright driver; same Go binary. Sampled peaks are not exhaustive kernel peaks. Search controls differ; no universal latency claim.",
+  "results": [
+    {
+      "frontend": "terminal",
+      "retained_revisions": 0,
+      "ready_ms": 987.1,
+      "search_ms": 160.4,
+      "ready_tree_rss_bytes": 148201472,
+      "ready_tree_pss_bytes": 142065664,
+      "sampled_peak_tree_rss_bytes": 158535680,
+      "sampled_peak_tree_pss_bytes": 152397824,
+      "max_product_processes": 2,
+      "cleanup": "pass"
+    },
+    {
+      "frontend": "desktop",
+      "retained_revisions": 0,
+      "ready_ms": 2045.7,
+      "search_ms": 79.6,
+      "ready_tree_rss_bytes": 819204096,
+      "ready_tree_pss_bytes": 465357824,
+      "sampled_peak_tree_rss_bytes": 820076544,
+      "sampled_peak_tree_pss_bytes": 467002368,
+      "max_product_processes": 7,
+      "cleanup": "pass"
+    },
+    {
+      "frontend": "terminal",
+      "retained_revisions": 150,
+      "ready_ms": 908.0,
+      "search_ms": 54.4,
+      "ready_tree_rss_bytes": 225484800,
+      "ready_tree_pss_bytes": 221789184,
+      "sampled_peak_tree_rss_bytes": 255705088,
+      "sampled_peak_tree_pss_bytes": 252009472,
+      "max_product_processes": 2,
+      "cleanup": "pass"
+    },
+    {
+      "frontend": "desktop",
+      "retained_revisions": 150,
+      "ready_ms": 1550.9,
+      "search_ms": 69.9,
+      "ready_tree_rss_bytes": 878145536,
+      "ready_tree_pss_bytes": 528835584,
+      "sampled_peak_tree_rss_bytes": 878247936,
+      "sampled_peak_tree_pss_bytes": 528937984,
+      "max_product_processes": 7,
+      "cleanup": "pass"
+    }
+  ]
+}

@@ -62,6 +62,9 @@ Activity histories share the transcript subscription, with a 60-history regressi
 preventing per-message listener growth.
 Conversational recurring checks now have real-tool evidence for decline, create,
 edit and pause reviews, origin/expiry preservation and restart without execution.
+The refreshed standalone package passes production services, PTY/editor and owned
+install/uninstall probes. Linux fresh/150-revision startup, search, complete-tree
+RSS/PSS and cleanup measurements are recorded against the retained Electron app.
 
 Replace the Electron application with Gator's adaptation of **OpenCode's actual
 terminal frontend**, carrying forward Gator's current capabilities. Use an
