@@ -50,7 +50,9 @@ test("keyboard indexed catalog pages, renames, pins and archives by original ide
     await writeFile(displayPath, JSON.stringify({ ...display, revision: display.revision + 1 }))
     setup.mockInput.pressEnter(); await until(() => !!client.issue, "stale title refusal"); await flush()
     expect(setup.captureCharFrame()).toContain("Keep this uncommitted title"); expect(JSON.parse(await readFile(displayPath, "utf8")).title).toBe("Garden plans")
-    setup.mockInput.pressEscape(); await Bun.sleep(75); await flush(); setup.mockInput.pressKey("F5"); await until(loaded, "refresh after conflict"); await flush(); setup.mockInput.pressEnter()
+    setup.mockInput.pressEscape(); await Bun.sleep(75); await flush()
+    const stalePanel = client.state?.panel?.id
+    setup.mockInput.pressKey("F5"); await until(() => loaded() && client.state?.panel?.id !== stalePanel, "acknowledged refresh after conflict"); await flush(); setup.mockInput.pressEnter()
     await until(() => client.state?.conversation_id === oldID && !client.snapshot.sessionSwitching, "open original retained chat")
     expect(JSON.stringify(client.state?.messages)).toContain("jade orchid decision"); expect(client.drafts.get(originalContext)?.text).toBe("Keep the catalog draft")
     await client.close(); await setup.dispose(); client = new GatorClient(new Application(options)); setup = await render(); await client.start(); await client.navigate("/conversations"); await until(loaded, "restart catalog"); await search()

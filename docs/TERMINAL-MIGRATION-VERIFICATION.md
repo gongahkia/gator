@@ -1274,3 +1274,33 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   installed PTY/editor/untrusted-file probe. The PTY now exercises inline Tab
   completion without execution and nested Files navigation. A final artifact will
   include the subsequently restored goal-activity menu entry.
+
+### Final menu build verification
+
+- At product commit `90ec26962`, `bun run --cwd ui check`, frontend production
+  build and Go runtime build pass. `artifact-9` passes production dependency and
+  service verification, the combined PTY/editor/untrusted-file probe and owned
+  install/uninstall verification. These use isolated profiles and no Electron or
+  OpenCode agent/server. The runtime reports `90ec26962`; subsequent changes here
+  only improve a test's refresh synchronization and record results.
+- The final full `bun run --cwd ui test` invocation exercised **59 tests across
+  43 files: 57 passed, 2 failed, 894 assertions**. It was not a clean single run.
+  The local-model download case encountered the real RAM guard: 696.9 MiB was
+  available while the smallest fixture model required 759.1 MiB. Its isolated
+  unchanged rerun passes **1 test / 13 assertions**; no production guard was relaxed.
+- The catalog conflict-recovery test could accept the old loaded panel immediately
+  after pressing F5, before refresh acknowledgement. It now waits for a changed
+  panel identity as well as completed loading. Its focused rerun passes **1 test /
+  12 assertions**, retaining all conflict, original-record, draft, restart and
+  no-model-request assertions. The other 57 cases passed in the full run; these
+  targeted reruns are not represented as a new all-green single-process suite.
+- Commands tested in this closeout: `bun run --cwd ui test`; focused
+  `bun test --cwd ui --preload ./scripts/preload.ts tests/local-models.test.tsx`
+  and `tests/catalog.test.tsx`; `bun run --cwd ui check`; `bun run --cwd ui build`;
+  `node ui/scripts/build-runtime.mjs`; `node ui/scripts/package.mjs <artifact-9>`;
+  the private PTY venv's Python running `ui/scripts/verify-package.py <artifact-9>
+  --editor --untrusted-file`; `node ui/scripts/verify-install.mjs <artifact-9>`.
+  Logs are under `/home/gongahkia/.cache/gator-migration/menu-*.log`.
+- No profile format or data migration changes were required for these menu fixes.
+  The overall migration parity gate remains open, including deferred native
+  macOS/Windows checks. Electron remains functional as the reference.
