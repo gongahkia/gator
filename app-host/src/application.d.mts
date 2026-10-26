@@ -18,6 +18,7 @@ export class Application extends EventEmitter {
   pdf(request: FileRequest, page: number, width?: number): Promise<{ pages: number; page: number; image: Uint8Array }>
   pasteImages(images: { type: string; data: Uint8Array }[], decode: (bytes: Uint8Array) => Uint8Array): Promise<UploadedFile[]>
   openSession(id: string): Promise<void>
+  version(): Promise<string>
   runExternal(): Promise<void>
   close(): Promise<void>
 }

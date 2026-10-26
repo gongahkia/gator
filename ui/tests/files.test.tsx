@@ -14,7 +14,7 @@ const until = async (predicate: () => boolean | Promise<boolean>, label = "file 
 test("terminal files save exact versions, preserve originals and stage a selected version", async () => {
   const root = await mkdtemp(join(tmpdir(), "gator-terminal-files-")), path = join(root, "notes.txt")
   await writeFile(path, "Original file body")
-  const client = new GatorClient(new Application({ binary: process.env.GATOR_TEST_BINARY || resolve(import.meta.dir, "../../desktop/runtime/gator-runtime"), userData: join(root, "app"), workspace: join(root, "workspace"), env: { ...process.env, GATOR_STATE_DIR: join(root, "state"), GATOR_CONFIG_DIR: join(root, "config") } }))
+  const client = new GatorClient(new Application({ binary: process.env.GATOR_TEST_BINARY || resolve(import.meta.dir, "../runtime/" + (process.platform === "win32" ? "gator-runtime.exe" : "gator-runtime")), userData: join(root, "app"), workspace: join(root, "workspace"), env: { ...process.env, GATOR_STATE_DIR: join(root, "state"), GATOR_CONFIG_DIR: join(root, "config") } }))
   const setup = await testRender(() => <App client={client} quit={() => client.close()} clipboard={{ read: async () => ({ data: "", mime: "text/plain" }), write: async () => {} }} />, { width: 120, height: 36 })
   try {
     await client.start(); await client.attach([path]); const original = client.draft.uploads![0]
@@ -41,7 +41,7 @@ test("all native Office content remains accessible through the same file workflo
   const root = await mkdtemp(join(tmpdir(), "gator-terminal-office-"))
   const paths = [join(root, "document.docx"), join(root, "budget.xlsx"), join(root, "slides.pptx")]
   await Promise.all(paths.map((path, index) => writeFile(path, [wordFixture(), workbookFixture(), slidesFixture()][index])))
-  const client = new GatorClient(new Application({ binary: process.env.GATOR_TEST_BINARY || resolve(import.meta.dir, "../../desktop/runtime/gator-runtime"), userData: join(root, "app"), workspace: join(root, "workspace"), env: { ...process.env, GATOR_STATE_DIR: join(root, "state"), GATOR_CONFIG_DIR: join(root, "config") } }))
+  const client = new GatorClient(new Application({ binary: process.env.GATOR_TEST_BINARY || resolve(import.meta.dir, "../runtime/" + (process.platform === "win32" ? "gator-runtime.exe" : "gator-runtime")), userData: join(root, "app"), workspace: join(root, "workspace"), env: { ...process.env, GATOR_STATE_DIR: join(root, "state"), GATOR_CONFIG_DIR: join(root, "config") } }))
   const setup = await testRender(() => <App client={client} quit={() => client.close()} clipboard={{ read: async () => ({ data: "", mime: "text/plain" }), write: async () => {} }} />, { width: 120, height: 36 })
   try {
     await client.start(); await client.attach(paths)

@@ -19,6 +19,7 @@ export class GatorClient extends EventEmitter {
   route: "chat" | "following" | "saved" | "settings" = "chat"
   #loads = new Map<string, Promise<void>>()
   #results = new Set<() => void>()
+  #admissions = new Map<string, { key: string; request: string }>()
   #closing?: Promise<void>
   #closed = false
   #listener = () => { this.snapshot = this.host.snapshot(); this.emit("change"); if (!this.#closed) void this.loadDraft().catch(error => this.fail(error)) }
@@ -64,22 +65,45 @@ export class GatorClient extends EventEmitter {
     await this.edit(this.draft.text, [...this.draft.uploads ?? [], ...files])
   }
   async stage(file: UploadedFile, selection = "") { await this.edit(selection ? [this.draft.text, selection].filter(Boolean).join("\n\n") : this.draft.text, [...this.draft.uploads ?? [], file]) }
+  async clearAdmitted(draft: Draft) {
+    if (this.drafts.get(draft.context) !== draft) return
+    this.drafts.set(draft.context, { ...draft, text: "", uploads: [], reply_to_update_id: undefined })
+    await this.host.drafts.request({ action: "remove", context: draft.context })
+  }
+  async guide() {
+    const draft = this.draft, context = draft.context, id = this.state?.guidance_id
+    if (!id || !this.state?.running) throw new Error("There is no active task to guide.")
+    if (!draft.text.trim() || draft.uploads?.length || draft.reply_to_update_id) throw new Error("Guide active work with text only. Send attachments and update replies as a queued follow-up.")
+    if (this.pending.has(context)) throw new Error("Wait for the current message acknowledgement.")
+    const request_id = randomUUID(); this.pending.add(context); this.emit("change")
+    try {
+      await this.result({ type: "queue", queue: { id, request_id, action: "guide", text: draft.text } }, request_id, s => s.queue_result)
+      await this.clearAdmitted(draft)
+    } finally { this.pending.delete(context); this.emit("change") }
+  }
   async submit() {
     const draft = this.draft, context = draft.context
     if (this.pending.has(context)) throw new Error("This message is awaiting confirmation. Check the conversation before retrying.")
     if (!draft.text.trim() && !draft.uploads?.length) return
+    const command = draft.text.trimStart().startsWith("/")
+    if (command && (draft.uploads?.length || draft.reply_to_update_id)) throw new Error("Send attachments and update replies with a message or queued follow-up.")
+    if (!command && !this.state?.running && !this.state?.provider) { await this.navigate("/model"); return }
     this.pending.add(context); this.issue = ""; this.emit("change")
     try {
-      if (draft.text.startsWith("/") && !draft.uploads?.length) {
-        if (/^\/(following|saved|settings|files|drafts|queue|updates|memories|receipts|about|voice|chats|attach-file)$/.test(draft.text)) await this.navigate(draft.text)
+      if (command) {
+        if (/^\/(following|saved|settings|files|drafts|queue|updates|memories|receipts|about|voice|chats|attach-file)$/.test(draft.text.trim())) await this.navigate(draft.text.trim())
         else await this.send({ type: "submit", text: draft.text })
       }
-      else await this.send({ type: "upload_submit", upload: { request_id: randomUUID(), context, text: draft.text, files: draft.uploads?.map(f => f.id) ?? [], reply_to_update_id: draft.reply_to_update_id } })
-      // An acknowledgement only clears the submitted snapshot, never newer input.
-      if (this.drafts.get(context) === draft) {
-        this.drafts.set(context, { ...draft, text: "", uploads: [], reply_to_update_id: undefined })
-        await this.host.drafts.request({ action: "remove", context })
+      else {
+        const files = draft.uploads?.map(f => f.id) ?? [], key = JSON.stringify([draft.text, files, draft.reply_to_update_id])
+        // An uncertain acknowledgement can be explicitly retried with the same
+        // admission ID. Go's durable request journal prevents duplicate work.
+        if (this.#admissions.get(context)?.key !== key) this.#admissions.set(context, { key, request: randomUUID() })
+        await this.send({ type: "upload_submit", upload: { request_id: this.#admissions.get(context)!.request, context, text: draft.text, files, reply_to_update_id: draft.reply_to_update_id } })
+        this.#admissions.delete(context)
       }
+      // An acknowledgement only clears the submitted snapshot, never newer input.
+      await this.clearAdmitted(draft)
     } finally { this.pending.delete(context); this.emit("change") }
   }
   async send(frame: FrontendFrame) { await this.host.send(frame) }

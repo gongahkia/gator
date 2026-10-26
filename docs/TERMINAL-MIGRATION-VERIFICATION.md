@@ -101,7 +101,7 @@ assertions to terminal/host/native tests before retiring any Electron suite.
 
 ### `desktop/tests/e2e/concurrent-chats.spec.ts`
 
-- [ ] independent chats retain task ownership, drafts and queues while browsing and completing elsewhere
+- [x] independent chats retain task ownership, drafts and queues while browsing and completing elsewhere — `ui/tests/concurrent.test.tsx`; failure/recovery cases remain separate.
 
 ### `desktop/tests/e2e/connected-receipts.spec.ts`
 
@@ -317,3 +317,55 @@ independent installed launch; release packaging and platform matrix.
   **1 pass, 9 assertions**. Both typed and pasted credentials are absent from
   captured character frames; paste submits nothing; the explicit review sends
   the selected field value with the expected backend key.
+
+### Conversation controls and retained reading position
+
+- Replaced the legacy Ctrl+G external-editor request with the current task-bound
+  queue guidance operation. Text clears only after the matching Go acknowledgement;
+  attachments/update replies stay queued-message workflows. An explicitly retried
+  uncertain admission reuses its prior request identity for Go journal deduplication.
+- First-task send opens model setup without losing text/files. Local return from
+  a hub does not send `/chat` to Go. Linked-update reply state is visible and can
+  be explicitly cancelled. About reads the actual bundled runtime build version.
+- Retained evidence now has a read-only scrollable viewer. Transcript search
+  reveals the chosen dated message. Reading positions survive activity and hub
+  navigation; restoration waits for native layout rather than an early timer.
+- `tests/transcript.test.tsx`: **1 pass / 9 assertions** with a 60-message native
+  renderer fixture, keyboard scrolling/search, incoming activity and hub roundtrip.
+- `tests/concurrent.test.tsx`: **1 pass / 21 assertions** using two real Go runtimes
+  and a gated local provider. Covers background execution, separate drafts,
+  keyboard chat/catalog switching, queue ownership, live guidance, completion
+  attention, durable completed journals and restart without repeated model calls.
+- Adapter tests expanded to **7 pass / 35 assertions** for explicit retry identity,
+  guidance acknowledgement, update reply cancellation and first-model setup.
+  Terminal runtime tests now default to `ui/runtime`, with no desktop-tree path.
+- Full frontend validation at this checkpoint: typecheck and production build
+  pass; **17 tests, 143 assertions, 0 failures**. These tests establish the named
+  journeys, not all P01–P25 acceptance groups.
+
+### Independent distribution and baseline reconciliation
+
+- The full workspace-backed `go test -p 2 ./...` rerun and `go vet ./...` pass.
+  No Go source changes have been made. The earlier installer-progress failure
+  did not reproduce in three focused repeats or this complete run.
+- Production artifact `/home/gongahkia/.cache/gator-migration/artifact-2` passed
+  `python3 ui/scripts/verify-package.py ARTIFACT`: actual PTY, fresh cwd outside
+  checkout, PATH containing only Bun, connected Go, literal Unicode/bracketed
+  paste, command palette, retained draft, clean exit. It contains neither the
+  desktop tree, Electron nor OpenCode core/server. This is an earlier checkpoint
+  artifact; rebuild and repeat against final code before claiming final parity.
+- `node ui/scripts/verify-install.mjs ARTIFACT` passes for artifact-2: independent
+  install/version/scripted commands, canonical active-profile guard refusing
+  uninstall, owned uninstall after release, and preserved private note data.
+- Production launch required OpenTUI's Solid resolver preload before importing
+  compiled UI. Added it to the public launcher and proved it through the PTY
+  test. A first harness wait deadlocked on a full PTY; draining while awaiting
+  exit fixed the harness. These were corrected, not counted as passes initially.
+- The post-extraction Electron e2e run reached 52/54 cases before interruption
+  and has **no final suite result**. Ten observed failures include outdated
+  complementary/row selectors against current dialogs/catalogs, first-run and
+  switching/animation/screenshot timing, native clipboard MIME failure under
+  Xvfb, and close timeout. They remain open baseline checks. The initial mixed
+  run's 42/12 split is not usable as a clean regression baseline.
+- Native CI matrix wiring exists, but no remote run has been requested/performed.
+  Linux evidence and cross-compilation do not replace deferred native results.

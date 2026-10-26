@@ -14,6 +14,7 @@ import { validateFrame } from "./policy.mjs";
 import { retainedRequestUploads } from "./request-retention.mjs";
 import { renderPDF } from "./pdf.mjs";
 import { importPastedImages } from "./pasted-images.mjs";
+import { helper } from "./native.mjs";
 
 // Local application services. No renderer, IPC, HTTP server, or second agent.
 export class Application extends EventEmitter {
@@ -137,6 +138,7 @@ export class Application extends EventEmitter {
     if (typeof id !== "string" || !this.sessions.activity().some(row => row.id === id)) throw new Error("This chat is no longer in the open-chat list.");
     await this.sessions.open({ conversation_id: id });
   }
+  async version() { return (await helper(this.binary, ["--version"], { maxBytes: 4096 })).toString("utf8").trim().replace("Gator desktop runtime", "Gator terminal"); }
   async runExternal() {
     const owner = this.backend, job = owner?.state?.external;
     if (!job || owner.closed || this.terminalBusy || this.sessions.switching) throw new Error("There is no current reviewed external step.");

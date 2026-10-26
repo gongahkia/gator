@@ -14,7 +14,7 @@ async function until(predicate: () => boolean, label = "state", timeout = 15000)
 }
 test("real Go chat admits pasted Unicode only on send, restores drafts and closes cleanly", async () => {
   const directory = await mkdtemp(join(tmpdir(), "gator-terminal-app-"))
-  const binary = process.env.GATOR_TEST_BINARY || resolve(import.meta.dir, "../../desktop/runtime/gator-runtime")
+  const binary = process.env.GATOR_TEST_BINARY || resolve(import.meta.dir, "../runtime/" + (process.platform === "win32" ? "gator-runtime.exe" : "gator-runtime"))
   const env = { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config") }
   let requests = 0
   const server = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(request) {
@@ -30,6 +30,7 @@ test("real Go chat admits pasted Unicode only on send, restores drafts and close
   const setup = await testRender(() => <App client={client} quit={() => client.close()} clipboard={{ read: async () => ({ data: copy, mime: "text/plain" }), write: async text => { copy = text } }} />, { width: 110, height: 32 })
   try {
     await client.start(); await setup.flush()
+    expect(await client.host.version()).toContain("Gator terminal")
     await setup.mockInput.pasteBracketedText("Literal /model 🐊\nDo not send on paste")
     await until(() => client.draft.text.includes("Do not send"), "pasted draft"); expect(requests).toBe(0)
     setup.mockInput.pressEnter()

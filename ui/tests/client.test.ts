@@ -2,29 +2,10 @@ import { afterEach, expect, test } from "bun:test"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { Application } from "@gator/application-host/application"
-import type { BackendState } from "@gator/application-host/contracts/protocol"
-import type { DraftSnapshot, FrontendFrame, UploadedFile } from "@gator/application-host/contracts/frontend"
+import type { DraftSnapshot, UploadedFile } from "@gator/application-host/contracts/frontend"
 import { GatorClient } from "../src/gator/client"
+import { FixtureHost, state } from "./fixture"
 
-export function state(id = "first"): BackendState {
-  return { mode: "chat", messages: [], commands: [], actions: [], title: id, source: "topic:" + id, conversation_id: id,
-    theme: "gator", status_line: [], status_line_enabled: false, running: false, cancelling: false, loading_frame: 0,
-    queued: 0, queue: [], home: false, first_run: false, supervisor_needs_start: false }
-}
-export class FixtureHost extends Application {
-  current = state()
-  closeIssue = ""
-  closed = false
-  sent: FrontendFrame[] = []
-  dispatch: (frame: FrontendFrame) => Promise<void> = async () => {}
-  context = "conversation:first"
-  snapshot() { return { ...super.snapshot(), state: this.current, connection: "connected" } }
-  change(next: BackendState) { this.current = next; this.context = "conversation:" + next.conversation_id; this.emit("change") }
-  async start() { this.emit("change"); return this.snapshot() }
-  async send(frame: FrontendFrame) { this.sent.push(frame); await this.dispatch(frame) }
-  async close() { if (this.closeIssue) throw new Error(this.closeIssue); await this.drafts.flush(); this.closed = true }
-}
 const roots: string[] = [], clients: GatorClient[] = []
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), "gator-client-")); roots.push(root)
@@ -98,4 +79,29 @@ test("a refused close keeps subscriptions and allows a later clean shutdown", as
   expect(host.listenerCount("change")).toBe(1)
   host.closeIssue = ""; await Promise.all([client.close(), client.close()])
   expect(host.closed).toBe(true); expect(host.listenerCount("change")).toBe(0)
+})
+
+test("uncertain admissions reuse their identity and guide acknowledges the live task before clearing", async () => {
+  const { host, client } = await fixture(); await client.start(); await client.edit("Unconfirmed input")
+  host.dispatch = async () => { throw new Error("Lost acknowledgement") }
+  await expect(client.submit()).rejects.toThrow("Lost acknowledgement")
+  await expect(client.submit()).rejects.toThrow("Lost acknowledgement")
+  expect(host.sent[0].upload?.request_id).toBe(host.sent[1].upload?.request_id)
+  expect(client.draft.text).toBe("Unconfirmed input")
+  host.dispatch = async frame => { if (frame.queue) host.change({ ...host.current, queue_result: { request_id: frame.queue.request_id } }) }
+  host.change({ ...host.current, running: true, guidance_id: "a".repeat(64) })
+  await client.guide()
+  expect(host.sent.at(-1)?.queue?.action).toBe("guide"); expect(host.sent.at(-1)?.queue?.id).toBe(host.current.guidance_id)
+  expect(client.draft.text).toBe("")
+  await client.edit("Keep linked reply", [], "update-1")
+  await expect(client.guide()).rejects.toThrow("text only")
+  await client.edit(client.draft.text, [], null); expect(client.draft.reply_to_update_id).toBeUndefined()
+})
+
+test("first model setup and local hub navigation preserve drafts and do not submit work", async () => {
+  const { host, client } = await fixture(); await client.start(); host.change({ ...host.current, provider: undefined })
+  await client.edit("First task draft"); await client.submit()
+  expect(host.sent).toEqual([{ type: "navigate", text: "/model" }]); expect(client.draft.text).toBe("First task draft")
+  await client.navigate("/saved"); await client.navigate("/chat")
+  expect(host.sent).toHaveLength(1); expect(client.route).toBe("chat")
 })

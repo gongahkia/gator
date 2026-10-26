@@ -15,7 +15,7 @@ export function Prompt() {
   let textarea: TextareaRenderable | undefined
   createEffect(() => { const text = data.draft.text; if (textarea && textarea.plainText !== text) textarea.setText(text) })
   createEffect(() => { if (dialog.stack.length || data.state?.panel) textarea?.blur(); else textarea?.focus() })
-  const guide = async () => { if (client.state?.running) await client.send({ type: "key", key: "ctrl+g", text: client.draft.text }) }
+  const guide = () => { void client.guide().catch(error => client.fail(error)) }
   Keymap.createLayer(() => ({ priority: 2, enabled: dialog.stack.length === 0, commands: [
     { id: "gator.send", bind: "return", title: "Send or queue message", run: () => { void client.submit().catch(e => client.fail(e)) } },
     { id: "gator.newline", bind: "shift+return", title: "New line", run: () => { textarea?.newLine() } },
@@ -26,6 +26,7 @@ export function Prompt() {
   return <box flexShrink={0} border={["top"]} borderColor={theme.accent} paddingX={1} paddingY={1}>
     <text fg={theme.text.muted}>{literal(data.state?.provider)} / {literal(data.state?.model)} · {data.state?.composer?.effort ?? "standard"} · {data.state?.running ? "Enter queues · Ctrl+G guides · Ctrl+C stops" : "Enter sends · Shift+Enter or Ctrl+J adds a line"}</text>
     <Show when={data.draft.uploads?.length}><text fg={theme.accent}>Attached: {data.draft.uploads?.map(f => literal(f.name)).join(" · ")}</text></Show>
+    <Show when={data.draft.reply_to_update_id}><text fg={theme.accent}>Replying to: {literal(data.state?.chat_updates?.find(update => update.id === data.draft.reply_to_update_id)?.title || data.draft.reply_to_update_id)} · “cancel-update-reply” in commands clears the link.</text></Show>
     <textarea ref={value => { textarea = value }} focused height={3} minHeight={1} maxHeight={8}
       initialValue={data.draft.text} placeholder="Message Gator… / for commands"
       textColor={theme.text.base} focusedTextColor={theme.text.base} backgroundColor={theme.background.base}
