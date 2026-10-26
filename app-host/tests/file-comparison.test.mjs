@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { compareFileContent } from "../electron/file-comparison.mjs";
-import { FileStore, validateFileRequest } from "../electron/files.mjs";
-import { editOffice } from "../electron/office.mjs";
+import { compareFileContent } from "../src/file-comparison.mjs";
+import { FileStore, validateFileRequest } from "../src/files.mjs";
+import { editOffice } from "../src/office.mjs";
 import { wordFixture, workbookFixture, slidesFixture } from "./office-fixtures.mjs";
 const compare = (a, b) => compareFileContent("notes.md", Buffer.from(a), Buffer.from(b));
 

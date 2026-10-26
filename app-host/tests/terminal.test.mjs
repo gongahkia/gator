@@ -4,8 +4,8 @@ import { mkdtemp, writeFile, readFile, rm, access } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
-import { terminalScript, windowsTerminalScript } from "../electron/terminal.mjs";
-import { powershellPath, windowsArguments, runtimeName, stateDirectory } from "../electron/platform.mjs";
+import { terminalScript, windowsTerminalScript } from "../src/terminal.mjs";
+import { powershellPath, windowsArguments, runtimeName, stateDirectory } from "../src/platform.mjs";
 
 test("terminal handoff preserves literal arguments and records success or an early failure", { skip: process.platform === "win32" }, async () => {
   const directory = await mkdtemp(join(tmpdir(), "gator terminal 'test-"));

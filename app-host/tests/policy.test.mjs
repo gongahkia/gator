@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { assetPath, externalURL, shellQuote, validateFrame } from "../electron/policy.mjs";
+import { assetPath, externalURL, shellQuote, validateFrame } from "../src/policy.mjs";
 import { resolve, join } from "node:path";
 
 test("update receipts and replies accept identities but never renderer-supplied authority", () => {

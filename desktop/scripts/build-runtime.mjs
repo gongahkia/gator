@@ -2,7 +2,7 @@ import { mkdirSync, rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
-import { runtimeName } from "../electron/platform.mjs";
+import { runtimeName } from "@gator/application-host/platform";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const runtime = fileURLToPath(new URL("../runtime/", import.meta.url));

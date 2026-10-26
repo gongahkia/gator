@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { uploadLimits, attachmentLimit, attachmentLimitsError } from "../electron/attachment-limits.mjs";
+import { uploadLimits, attachmentLimit, attachmentLimitsError } from "@gator/application-host/attachment-limits";
 import type { BackendState } from "./protocol";
 import type { DraftRequest, DraftSnapshot, SavedDraft, UploadedFile } from "./bridge";
 

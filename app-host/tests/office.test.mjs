@@ -1,5 +1,5 @@
 import test from "node:test"; import assert from "node:assert/strict"; import { unzipSync, strFromU8 } from "fflate";
-import { inspectOffice, editOffice } from "../electron/office.mjs";
+import { inspectOffice, editOffice } from "../src/office.mjs";
 import { wordFixture, workbookFixture, slidesFixture, packageOffice } from "./office-fixtures.mjs";
 
 test("Word text and table edits round-trip without changing styles or embedded graphics", () => {

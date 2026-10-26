@@ -216,7 +216,7 @@ and remaining gap. Add newly discovered workflows to the inventory.
 
 ### Step 0 Capture the current baseline
 
-- [ ] Record implementation HEAD, preserve pre-existing changes, and use isolated
+- [x] Record implementation HEAD, preserve pre-existing changes, and use isolated
   state/config/draft roots for migration fixtures. Do not test destructive reviews
   or profile conversion against the user's live profile.
 - [ ] Create the verification ledger and expand P01–P25 from current screens,
@@ -260,7 +260,7 @@ unresolved parity requirement open rather than silently narrowing the product.
 
 ### Step 2 Extract shared services and implement the frontend adapter
 
-- [ ] Move the current display/action/file contracts to a neutral location and
+- [x] Move the current display/action/file contracts to a neutral location and
   update desktop imports. Account for protocol evolution since the old renderer:
   acknowledgments, approval tokens, upload admission, session requests, receipts,
   memory actions, catalog actions, and current panel field types.
@@ -272,7 +272,7 @@ unresolved parity requirement open rather than silently narrowing the product.
   admission clears drafts, only current tokens resolve approvals, and reconnect
   does not duplicate submissions or resurrect completed work. Add contract tests
   for stale state, duplicate/delayed events, subscription cleanup, and chat changes.
-- [ ] Extract backend transport, session management, drafts, uploads, file storage,
+- [x] Extract backend transport, session management, drafts, uploads, file storage,
   Office transformations, comparisons, and retained-request cleanup. Move their
   tests and dependency/license ownership with them.
 - [ ] Separate host operations from Electron IPC/dialogs. Keep canonical Go

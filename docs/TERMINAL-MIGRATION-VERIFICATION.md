@@ -21,9 +21,9 @@ by evidence yet.** This ledger records observed results, not inferred parity.
 | Command | Result |
 | --- | --- |
 | `npm test --prefix desktop` | 69 cases: 68 pass, 1 native Windows case skipped on Linux; 0 failures. Baseline only. |
-| `go test ./...` | Running; record completion before changing Go. |
-| `npm run check --prefix desktop` | Running. |
-| `npm run build --prefix desktop` | Running after typecheck. |
+| `go test ./...` | Initial run exhausted 2.5 GiB `/tmp`. Rerun with workspace-backed TMPDIR/GOTMPDIR and `-p 2`: all packages except cmd/gator pass; existing installer-progress test failed (see below). |
+| `npm run check --prefix desktop` | Pass before and after service extraction. |
+| `npm run build --prefix desktop` | Pass before extraction; extracted frontend build also passes. |
 
 ## Required acceptance groups
 
@@ -193,3 +193,16 @@ independent installed launch; release packaging and platform matrix.
 - Downloaded the pinned OpenCode snapshot into `/tmp/gator-migration/` for source
   audit. Its actual frontend is Solid/OpenTUI 0.6.8; client/data, configuration,
   plugins, and execution routes require explicit adaptation/exclusion.
+
+### Shared service extraction
+
+- Moved Electron-independent application services, contracts, behavioral tests,
+  and Office fixtures to `app-host/`. Electron consumes a local package dependency;
+  its renderer keeps forwarding type modules to avoid changing its UI behavior.
+- `npm test --prefix desktop`: 7 desktop-only tests pass; 62 shared host cases,
+  61 pass and the native Windows handoff skipped. No failures after fixture move.
+- Desktop typecheck and Vite build pass. Desktop e2e suite is running under Xvfb;
+  initial public activity layout case failed its positive scroll-offset assertion,
+  while actual runner/restart, voice, app-control and model cases pass so far.
+- Baseline Go failure: `TestStreamOllamaInstallerReportsOutputInProgressOrder`
+  observed only the initial installer line. No Go changes have been made.

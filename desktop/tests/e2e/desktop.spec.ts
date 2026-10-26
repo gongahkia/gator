@@ -80,7 +80,7 @@ test("About & updates explains development builds and preserves an unsent messag
       const path = process.getBuiltinModule("path");
       const require = process.getBuiltinModule("module").createRequire(path.join(app.getAppPath(), "package.json"));
       const library = require("electron-updater");
-      const controller = require("./electron/updates.mjs");
+      const controller = require("@gator/application-host/updates");
       const updates = new controller.Updates({ updater: library.autoUpdater, version: app.getVersion(), supported: true, blocked: () => "", confirm: async () => false, prepare: async () => async () => {} });
       return { phase: updates.snapshot().phase, autoDownload: library.autoUpdater.autoDownload, autoInstall: library.autoUpdater.autoInstallOnAppQuit };
     });

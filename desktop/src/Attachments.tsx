@@ -2,7 +2,7 @@ import { Paperclip, X } from "lucide-react";
 import { useContext, useEffect, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
 import type { UploadedFile } from "./bridge";
 import { FileCard, FileChatContext } from "./FileSurface";
-import { uploadLimits, attachmentLimit, attachmentLimitsHint, attachmentLimitsError } from "../electron/attachment-limits.mjs";
+import { uploadLimits, attachmentLimit, attachmentLimitsHint, attachmentLimitsError } from "@gator/application-host/attachment-limits";
 
 export function useAttachmentPicker(context: string | undefined, files: UploadedFile[], change: (files: UploadedFile[]) => void, disabled: boolean) {
   const [busy, setBusy] = useState(false);

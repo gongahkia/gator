@@ -4,7 +4,7 @@ import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { once } from "node:events";
-import { Backend } from "../electron/backend.mjs";
+import { Backend } from "../src/backend.mjs";
 
 test("host streams Go state and closes its child on exit", async () => {
   const directory = await mkdtemp(join(tmpdir(), "gator-desktop-bridge-test-"));

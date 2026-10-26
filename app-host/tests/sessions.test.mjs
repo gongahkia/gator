@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { Sessions } from "../electron/sessions.mjs";
+import { Sessions } from "../src/sessions.mjs";
 
 class Worker extends EventEmitter {
   closed = false;

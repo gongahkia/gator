@@ -32,7 +32,7 @@ import { VoiceControls } from "./VoiceControls";
 import { ChatCheckHealth } from "./ChatCheckHealth";
 import { ConnectedReceipts, RecoveredRequests, useReceiptInspection, type InspectReceipt } from "./ConnectedReceipts";
 import { ChatUpdateCard, chatTimeline, useChatUpdateFeedback } from "./ChatUpdates";
-import { uploadLimits } from "../electron/attachment-limits.mjs";
+import { uploadLimits } from "@gator/application-host/attachment-limits";
 import { ModelPicker } from "./ModelPicker";
 import { FileChatContext } from "./FileSurface";
 import type { UploadedFile } from "./bridge";

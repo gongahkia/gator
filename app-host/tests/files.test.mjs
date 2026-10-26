@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { FileStore, fileReference, readBoundedFile, validateFileRequest } from "../electron/files.mjs";
-import { selectedFileSource } from "../electron/file-sources.mjs";
-import { applyContent, inspectContent, parseTable } from "../electron/file-content.mjs";
+import { FileStore, fileReference, readBoundedFile, validateFileRequest } from "../src/files.mjs";
+import { selectedFileSource } from "../src/file-sources.mjs";
+import { applyContent, inspectContent, parseTable } from "../src/file-content.mjs";
 
 test("files retain full contents, recover drafts, reject stale saves and restore without touching the original", async () => {
   const root = await mkdtemp(join(tmpdir(), "gator-file-store-"));

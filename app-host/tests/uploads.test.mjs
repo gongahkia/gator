@@ -3,10 +3,10 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { UploadStore, validUploadID, uploadContext, uploadLimits } from "../electron/uploads.mjs";
-import { validateFrame } from "../electron/policy.mjs";
-import { DraftStore } from "../electron/drafts.mjs";
-import { retainedRequestUploads } from "../electron/request-retention.mjs";
+import { UploadStore, validUploadID, uploadContext, uploadLimits } from "../src/uploads.mjs";
+import { validateFrame } from "../src/policy.mjs";
+import { DraftStore } from "../src/drafts.mjs";
+import { retainedRequestUploads } from "../src/request-retention.mjs";
 
 test("selected files become private independent copies and attachment-only drafts survive restart", async () => {
   const root = await mkdtemp(join(tmpdir(), "gator-uploads-"));

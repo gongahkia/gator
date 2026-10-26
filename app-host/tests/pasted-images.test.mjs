@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { UploadStore, uploadLimits } from "../electron/uploads.mjs";
-import { importPastedImages, validatePastedImages } from "../electron/pasted-images.mjs";
+import { UploadStore, uploadLimits } from "../src/uploads.mjs";
+import { importPastedImages, validatePastedImages } from "../src/pasted-images.mjs";
 
 test("pasted images are bounded bytes and become independent private uploads", async () => {
   const root = await mkdtemp(join(tmpdir(), "gator-paste-"));

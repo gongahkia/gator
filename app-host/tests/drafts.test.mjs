@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DraftStore } from "../electron/drafts.mjs";
+import { DraftStore } from "../src/drafts.mjs";
 
 test("update reply drafts retain their referent independently of text across restart", async () => {
   const root = await mkdtemp(join(tmpdir(), "gator-reply-drafts-"));

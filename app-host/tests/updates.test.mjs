@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { Updates, updateBlockReason } from "../electron/updates.mjs";
+import { Updates, updateBlockReason } from "../src/updates.mjs";
 
 class FixtureUpdater extends EventEmitter {
   calls = [];

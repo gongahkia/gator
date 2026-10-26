@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { microphoneAllowed, validateVoiceRequest } from "../electron/voice.mjs";
+import { microphoneAllowed, validateVoiceRequest } from "../src/voice.mjs";
 
 test("dictation requests accept audio bytes and reject file paths and extra authority", () => {
   const recording = { action: "transcribe", context: "conversation-one", media_type: "audio/webm;codecs=opus", data: new Uint8Array([1, 2]) };
