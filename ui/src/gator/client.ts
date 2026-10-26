@@ -115,7 +115,7 @@ export class GatorClient extends EventEmitter {
     this.pending.add(context); this.issue = ""; this.emit("change")
     try {
       if (command) {
-        if (/^\/(following|saved|settings|files|drafts|queue|updates|memories|receipts|about|voice|chats|attach-file|help|prompt-history)$/.test(draft.text.trim())) await this.navigate(draft.text.trim())
+        if (/^\/(following|saved|settings|models|files|drafts|queue|updates|memories|receipts|about|voice|chats|attach-file|help|prompt-history)$/.test(draft.text.trim())) await this.navigate(draft.text.trim())
         else await this.send({ type: "submit", text: draft.text })
       }
       else {
@@ -153,7 +153,7 @@ export class GatorClient extends EventEmitter {
     if (!await this.mayLeave()) return
     if (text === "/chat") { if (this.state?.panel) await this.send({ type: "navigate", text: "/chat" }); this.route = "chat"; this.emit("change"); return }
     if (text === "/following" || text === "/saved" || text === "/settings") { this.route = text === "/following" ? "following" : text === "/saved" ? "saved" : "settings"; this.emit("change"); return }
-    if (/^\/(files|drafts|queue|updates|memories|receipts|about|voice|chats|attach-file|help|prompt-history)$/.test(text)) { this.emit("action", text.slice(1)); return }
+    if (/^\/(models|files|drafts|queue|updates|memories|receipts|about|voice|chats|attach-file|help|prompt-history)$/.test(text)) { this.emit("action", text.slice(1)); return }
     this.route = "chat"; this.emit("change"); await this.send({ type: "navigate", text })
   }
   async result<T extends { request_id: string; error?: string }>(frame: FrontendFrame, requestID: string, read: (state: BackendState) => T | undefined): Promise<T> {

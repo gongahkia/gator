@@ -1223,3 +1223,21 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   version. Original bytes remain unchanged and no model request is submitted.
 - Exact selected-version export and generated-file provider intake are verified
   by the separate export and generated-output cases above.
+
+### Hierarchical commands and inline slash completion
+
+- Ctrl+P opens Chats, Following, Saved, Files, Settings and Help/application
+  sections. Go command entries appear as readable actions inside their relevant
+  section, rather than a flat slash list. Search still reaches terminal actions;
+  Escape returns from a section to the root. Go retains command availability and
+  execution authority. Argument dialogs leave the independent composer intact.
+- Typing `/` at the start of a single-line composer opens a bounded inline list.
+  Prefix filtering, arrow selection, Tab completion, Enter selection and Escape
+  dismissal use the existing OpenCode keymap. Commands requiring arguments stay
+  editable; ordinary text, unknown prefixes and argument text do not show the list.
+  Completion does not bypass existing attachment, admission or approval guards.
+- `bun test --cwd ui --preload ./scripts/preload.ts tests/commands.test.tsx`:
+  **1 pass / 29 assertions**, including actual key/paste events, 50×18 layout,
+  wraparound, menu back navigation and separate argument/draft ownership.
+  `bun run --cwd ui check` passes. The broader navigation regression is recorded
+  with the model-menu change below. Native platform acceptance remains deferred.

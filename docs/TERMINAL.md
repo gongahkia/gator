@@ -16,7 +16,10 @@ make terminal-check
 
 `make run` still launches Electron during migration. `make terminal` launches
 the actual OpenCode-derived terminal against Gator's Go runtime. Use Ctrl+P for
-the searchable launcher; `/following`, `/saved`, `/settings`, `/files`, `/queue`,
+grouped menus and searchable terminal actions. Slash commands appear in the
+composer: type `/`, use ↑/↓ to choose, Tab to complete, Enter to select, or Esc
+to dismiss. Commands needing arguments stay editable. The menu sections retain
+the same capabilities without a flat slash-command list. `/following`, `/saved`, `/settings`, `/files`, `/queue`,
 `/chats`, `/drafts`, `/updates`, `/memories`, `/receipts`, and `/voice` expose Gator
 workflows. F1 or `/help` shows terminal help; `/prompt-history` stages retained
 message text without sending it. Ctrl+J adds a line where Shift+Enter is unavailable. F2 opens file

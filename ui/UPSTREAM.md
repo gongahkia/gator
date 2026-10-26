@@ -54,3 +54,10 @@ Short-terminal adaptation: `ui/dialog-select.tsx` clamps the list budget and
 post-ellipsis viewport to positive rows. `ui/dialog.tsx` uses top alignment below
 24 rows and a positive width. The pinned formula produced a native `LayoutLimit`
 at 42×14; `tests/hubs.test.tsx` retains this regression and keyboard reachability.
+
+Command navigation adaptation: the imported command palette/selector now hosts
+Gator menu sections, with a back path to the root. Go's command descriptions are
+menu labels, while its slash names feed a bounded inline composer completion
+list through the existing keymap. Tab completes without executing, Enter selects,
+and argument commands remain editable. `tests/commands.test.tsx` covers keyboard,
+paste, draft ownership and compact geometry. Pristine upstream files are unchanged.

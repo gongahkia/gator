@@ -22,6 +22,7 @@ import { literal } from "./gator/text"
 import { Hub } from "./gator/hub"
 import { useActions } from "./gator/actions"
 import { useNative } from "./gator/native"
+import { commandGroup } from "./gator/command-groups"
 import type { GatorClient } from "./gator/client"
 import type { ClipboardService } from "./context/clipboard"
 
@@ -57,10 +58,17 @@ function Shell(props: { quit(): Promise<void> }) {
     { id: "gator.approve", title: "Review current approval", bind: "ctrl+y", palette: true, run: () => approve(true) },
     { id: "gator.decline", title: "Decline current approval", bind: "ctrl+d", palette: true, run: () => approve(false) },
     { id: "gator.reconnect", title: "Reconnect selected chat", palette: true, run: () => attempt(client.host.sessions.restart()) },
-    ...Object.keys(controls.actions).map(name => ({ id: `gator.local.${name}`, title: name, group: "Gator workspace", palette: true as const, run: () => controls.trigger(name) })),
+    ...Object.keys(controls.actions).map(name => ({ id: `gator.local.${name}`, title: name, group: commandGroup(name), palette: true as const, run: () => controls.trigger(name) })),
     ...["following", "saved", "settings"].map(name => ({ id: `gator.${name}`, title: name[0].toUpperCase() + name.slice(1), palette: true as const, run: () => navigate(`/${name}`) })),
-    ...(data.state?.commands ?? []).map(command => ({ id: `gator.command.${encodeURIComponent(command.name)}`, title: `/${command.name}`, description: literal(command.description), group: "Gator", palette: true as const,
-      run: () => { if (command.needs_input) attempt(client.edit(`/${command.name} `)); else navigate(`/${command.name}`) } })),
+    ...(data.state?.commands ?? []).filter(command => !controls.actions[command.name] && !["following", "saved", "settings", "new", "exit", "cancel", "approve", "deny"].includes(command.name)).map(command => ({ id: `gator.command.${encodeURIComponent(command.name)}`, title: literal(command.description), group: commandGroup(command.name), palette: true as const,
+      run: () => {
+        if (command.needs_input) controls.prompt(literal(command.description), "", async args => {
+          if (!await client.mayLeave()) return
+          await client.navigate("/chat")
+          await client.send({ type: "submit", text: `/${command.name} ${args}` })
+        }, `Arguments for /${command.name}. Your current message stays in the composer.`)
+        else navigate(`/${command.name}`)
+      } })),
   ] }))
   return <box width="100%" height="100%" backgroundColor={theme.background.base}>
     <box height={1} paddingX={1} flexDirection="row" justifyContent="space-between"><text fg={theme.accent}><b>Gator</b> · {literal(data.state?.title) || "Opening chat…"}</text><text fg={theme.text.muted}>{literal(data.snapshot.connection)}</text></box>
