@@ -1209,3 +1209,17 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   note survives and the original archive bytes remain intact. This expands the
   earlier successful export/verify/restore case without claiming native service
   migration or all private-data failure paths are complete.
+
+### Full text, version comparison and stale editor recovery
+
+- `tests/file-recovery.test.tsx`: **1 pass / 16 assertions**. A 300-line document
+  opens in full; keyboard editing saves the full original plus the appended text.
+  Version 1 comparison displays the actual change, and restoring it creates
+  Version 3 without rewriting the original source.
+- Explicitly keeping an independent file edit draft restores its complete buffer
+  after restart alongside the unchanged composer. A concurrent save advances the
+  working version; the stale editor's save is rejected without losing its visible
+  text or overwriting the newer file. Explicit F4 discard reloads the latest saved
+  version. Original bytes remain unchanged and no model request is submitted.
+- Exact selected-version export and generated-file provider intake are verified
+  by the separate export and generated-output cases above.
