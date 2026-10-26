@@ -162,7 +162,7 @@ assertions to terminal/host/native tests before retiring any Electron suite.
 
 ### `desktop/tests/e2e/request-recovery.spec.ts`
 
-- [ ] admitted text and attachments survive session loss and resume only by explicit selection
+- [x] admitted text and attachments survive session loss and resume only by explicit selection — `ui/tests/recovery.test.tsx`.
 - [ ] a rejected admission keeps the composer draft and starts no request
 
 ### `desktop/tests/e2e/shared-chats.spec.ts`
@@ -460,3 +460,14 @@ independent installed launch; release packaging and platform matrix.
   describes original-save undo rather than incorrectly promising correction undo.
 - Full frontend checkpoint: **27 pass / 289 assertions / 0 failures**, with
   typecheck passing. Cases not explicitly mapped in this ledger remain open.
+
+### Interrupted request recovery
+
+- `tests/recovery.test.tsx`: **1 pass / 15 assertions** with an actual blocked
+  Go request and two admitted queued requests. Closing and restarting retains all
+  three paused requests and the independent unsent draft, without a provider call.
+- Deleting the source attachment and aging its private upload does not prune the
+  admitted copy. Keyboard review/resume of only that selected request sends the
+  correct immutable bytes once; the other recovered requests stay paused.
+  Removing the interrupted request and restarting preserves the remaining queue
+  without replay. This is distinct from connected-action reconciliation evidence.
