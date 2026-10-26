@@ -78,7 +78,7 @@ assertions to terminal/host/native tests before retiring any Electron suite.
 
 ### `desktop/tests/e2e/appearance.spec.ts`
 
-- [ ] light appearance covers chat, settings, palette and native chrome across restart and cached chats
+- [x] light appearance covers chat, settings and palette across restart and cached chats — `ui/tests/appearance.test.tsx`; Electron window chrome is replaced by terminal-rendered surfaces. Native terminal application chrome is owned by the user's terminal.
 
 ### `desktop/tests/e2e/attachments.spec.ts`
 
@@ -1054,3 +1054,16 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   independently verify the complete authoritative field value.
 - The desktop journey's typed expiry input is covered by the existing page-form
   test. Native scheduling and actual background-service installation remain open.
+
+### Appearance across cached sessions
+
+- `bun test --cwd ui --preload ./scripts/preload.ts tests/appearance.test.tsx`:
+  **1 pass / 33 assertions**; terminal typecheck passes. The keyboard Appearance
+  page persists light, contrast, monochrome and dark choices in Go configuration.
+  Native renderer cell colors verify actual chat/settings surfaces and the raised
+  command-palette surface at 60×20, rather than checking a theme label alone.
+- Reopening an already cached chat refreshes its global appearance while restoring
+  its draft. Restart retains the light theme, transcript and unsent message. Theme
+  changes and navigation make no additional provider requests. The fixture needed
+  corrections for omitted zero selection, the palette's actual title and raised
+  background; the final assertions pass. OS terminal chrome remains terminal-owned.
