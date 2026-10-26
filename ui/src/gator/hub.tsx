@@ -1,4 +1,4 @@
-import { For, createSignal, createEffect, onCleanup } from "solid-js"
+import { For, Show, createSignal, createEffect, onCleanup } from "solid-js"
 import { useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/solid"
 import type { ScrollBoxRenderable } from "@opentui/core"
 import { useClient } from "../context/client"
@@ -55,7 +55,12 @@ export function Hub() {
   return <box flexGrow={1} minHeight={0} padding={2} gap={1}><text fg={theme.accent}><b>{data.route[0].toUpperCase() + data.route.slice(1)}</b></text>
     <scrollbox id="hub-items" ref={value => { scroll = value }} flexGrow={1} minHeight={0}>
       <For each={items()}>{(item, index) => <box id={`hub-item-${index()}`} paddingY={1} backgroundColor={selected() === index() ? theme.background.raised.high : undefined} onMouseUp={() => open(index())}><text fg={theme.text.base}>{selected() === index() ? "› " : "  "}{item[0]}</text><text fg={theme.text.muted}>  {item[1]}</text></box>}</For>
-      <For each={data.route === "following" ? data.state?.following_goals : []}>{goal => <text fg={theme.text.muted}>{literal(goal.title)} · {literal(goal.status)}</text>}</For>
+      <Show when={data.route === "following"}>
+        <Show when={data.state?.following_issue}><text fg={theme.text.feedback.warning.base}>{literal(data.state?.following_issue)}</text></Show>
+        <Show when={data.state?.checks_issue}><text fg={theme.text.feedback.warning.base}>{literal(data.state?.checks_issue)}</text></Show>
+        <Show when={!data.state?.checks_issue && !data.state?.checks?.length}><text fg={theme.text.muted}>No recurring checks configured.</text></Show>
+      </Show>
+      <For each={data.route === "following" ? data.state?.following_goals : []}>{goal => <text fg={theme.text.muted}>{literal(goal.title)} · {literal(goal.status)}{data.state?.checks?.some(check => check.goal_id === goal.id) ? "" : data.state?.checks_issue ? " · Check status unavailable" : " · No recurring check attached"}</text>}</For>
       <For each={data.route === "following" ? data.state?.checks : []}>{check => <text fg={theme.text.muted}>{literal(check.title)} · {literal(check.state)} · {literal(check.health)}</text>}</For>
     </scrollbox><text fg={theme.text.muted}>↑/↓ select · Enter open · Esc chat · Your message draft is kept.</text>
   </box>

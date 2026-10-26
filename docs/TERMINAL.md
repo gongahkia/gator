@@ -100,3 +100,8 @@ agreed; those checks remain pending and do not count as a passing removal gate.
 Public work activity stays chronological while running and folds above the answer
 when finished. Use `activity` in Ctrl+P to inspect live/retained entries or expand
 a history summary. Transcript search includes narration in expanded history.
+Use `work-details` in Ctrl+P to inspect current selections and retained evidence.
+`outputs` lists retained previews and proposed changes, including the latest result
+when it has no transcript card. File checks and proposal inspection do not apply
+changes or confirm external delivery. `/files` opens complete retained files and
+their working versions; unavailable originals report an error.

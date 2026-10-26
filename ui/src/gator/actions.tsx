@@ -1,4 +1,4 @@
-import { onCleanup } from "solid-js"
+import { createEffect, onCleanup } from "solid-js"
 import { randomUUID } from "node:crypto"
 import { resolve } from "node:path"
 import { useClient } from "../context/client"
@@ -14,10 +14,17 @@ import { Details } from "./details"
 import { ActionPrompt } from "./action-prompt"
 import { useData } from "../context/data"
 import { activityKey, activitySummary, activityText, searchableMessage } from "./activity"
+import { conversationBundles } from "./outputs"
 
 export type Choice = { title: string; key?: string; description?: string; category?: string; disabled?: boolean; run(): unknown }
 export function useActions() {
   const client = useClient(), dialog = useDialog(), data = useData()
+  let previousContext = client.context
+  createEffect(() => {
+    data.snapshot
+    const context = client.context
+    if (context !== previousContext) { previousContext = context; dialog.clear() }
+  })
   const attempt = (operation: unknown) => { if (operation instanceof Promise) void operation.catch(e => client.fail(e)) }
   const menu = (title: string, choices: Choice[] | (() => Choice[]), showDisabled = false) => dialog.replace(() => <DialogSelect title={title} showDisabled={showDisabled} options={(typeof choices === "function" ? choices() : choices).map((item, index) => ({
     title: literal(item.title), description: literal(item.description), category: literal(item.category), disabled: item.disabled, value: item.key ?? index,
@@ -26,6 +33,17 @@ export function useActions() {
   const prompt = (title: string, value: string, save: (text: string) => unknown, description?: string) => { const token = Symbol(title); dialog.replace(() => <ActionPrompt token={token} title={title} value={value} save={save} description={description} />, undefined, { key: token }) }
   const details = (title: string, text: string) => dialog.replace(() => <Details title={title} text={text} />, undefined, { size: "xlarge" })
   const confirm = (title: string, message: string, run: () => unknown) => dialog.replace(() => <DialogConfirm title={title} message={literal(message)} onConfirm={() => { try { attempt(run()) } catch (error) { client.fail(error) } }} />)
+  function outputs() {
+    const context = client.context
+    menu("Retained outputs and proposed changes", () => conversationBundles(data.state).flatMap((bundle, group) => [
+      ...(bundle.Artifacts ?? []).map(file => ({ title: file.Path, description: `${file.Valid ? "Checks passed" : "Needs review"} · ${bundle.Status} run · Result ${group + 1}`, run: () => menu(file.Path, [
+        { title: "Inspect retained preview and checks", run: () => details(file.Path, [file.Valid ? "Checks passed" : "Needs review", `Result ${group + 1} · ${bundle.RunID || bundle.Path}`, `Retained from a ${bundle.Status} run.`, bundle.FinishedAt || "", `${file.MediaType} · ${file.Bytes ?? "Unknown"} bytes`, file.Preview || "No text preview is available for this file.", file.Truncated ? "Showing a shortened preview." : "", "File checks do not confirm external delivery.", `Retained location: ${bundle.Path}`].filter(Boolean).join("\n\n")) },
+        { title: "Open complete file / edit working version", run: () => fileWorkflows.open({ kind: "output", bundle: bundle.Path, path: file.Path }, undefined, context) },
+        ...((client.state?.messages.findIndex(message => message.bundle?.Path === bundle.Path) ?? -1) >= 0 ? [{ title: "Show origin in chat", run: () => { const index = client.state?.messages.findIndex(message => message.bundle?.Path === bundle.Path) ?? -1; if (client.context !== context || index < 0) throw new Error("Return to the original conversation to inspect this result."); client.route = "chat"; client.emit("change"); client.emit("reveal-message", index) } }] : []),
+      ]) })),
+      ...(bundle.Candidates ?? []).map(candidate => ({ title: `Change ${candidate.ID}`, description: `Proposal · ${candidate.Status || "unreported checks"} · Result ${group + 1}`, run: () => details(`Change ${candidate.ID}`, ["Proposed changes; this view does not apply them.", `Checks: ${candidate.Status || "Not reported"}`, `Run: ${bundle.RunID || bundle.Path} · ${bundle.Status}`, ...candidate.ChangedPaths, `Retained location: ${bundle.Path}`, candidate.PatchPath || ""].join("\n\n")) })),
+    ]))
+  }
   async function drafts() {
     const saved = await client.host.drafts.request({ action: "list" })
     menu("Unsent drafts", [
@@ -161,7 +179,7 @@ export function useActions() {
       menu("Public work activity", [
       ...(live ? [{ title: "Inspect live public activity", run: () => details("Live public activity", activityText(client.context === context ? client.state?.activity ?? live : live)) }] : []),
       ...(client.state?.messages ?? []).flatMap((message, index) => message.activity ? [{ title: `${index + 1}. ${activitySummary(message.activity)}`, description: message.text.slice(0, 100), run: () => {
-        const key = activityKey(client.context, message, index), trace = message.activity!
+        const key = activityKey(context, message, index), trace = message.activity!
         menu("Retained public activity", [
           { title: client.activityExpanded.has(key) ? "Collapse in transcript" : "Expand in transcript", run: () => { if (client.activityExpanded.has(key)) client.activityExpanded.delete(key); else client.activityExpanded.add(key); client.emit("change"); client.emit("reveal-message", index) } },
           { title: "Inspect all public entries", run: () => details("Retained public activity", activityText(trace)) },
@@ -189,9 +207,11 @@ export function useActions() {
         { title: "Connections", run: () => client.navigate("/connections") },
         { title: "Choose workspace", run: () => client.navigate("/source") },
         { title: "Files and outputs", run: () => actions.files() },
+        { title: "Retained output previews and proposed changes", run: outputs },
         { title: "Model and effort for future messages", run: models },
       ])
     },
+    outputs,
     "cancel-update-reply": () => client.edit(client.draft.text, client.draft.uploads, null),
     about: () => menu("About Gator terminal", [{ title: "Installed version and runtime", description: "OpenCode-derived Solid/OpenTUI frontend; Gator Go execution and storage", run: async () => details("About Gator terminal", `${await client.host.version()}\nFrontend: OpenCode f669c46c9604ea3d70b8a7ed1f0c10f3a5ac1f61\nOpenTUI 0.6.8 · Solid 1.9.15 · Bun ${Bun.version}\nProfile: ${client.host.stateRoot}\nInstallation updates are explicit; see docs/TERMINAL.md. Existing profiles are retained.`) }, { title: "Release and installation information", run: () => client.emit("open-releases") }]),
   }

@@ -1081,3 +1081,25 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
 - Native CI now runs install/uninstall guards on every runner, plus real PTY,
   editor handoff and untrusted-file probes on Unix. This is configured coverage,
   not evidence of a remote CI or native macOS/Windows pass; no push was performed.
+
+### Retained result details and unavailable check health
+
+- Closed an accessibility gap: `/files` previously enumerated only transcript
+  artifacts. It now also includes the authoritative latest result, deduplicates
+  bundles and shows run/check provenance. Ctrl+P `outputs` exposes retained text
+  previews, shortened/failed-run disclosures, complete-file actions, origin
+  navigation and checked proposed changes without applying them.
+- Conversation changes dismiss the previous chat's dialogs. File-open/reopen
+  callbacks retain the original context and reject changed ownership, including
+  after async loading. Historical activity expansion keys also retain their
+  original context. Following displays health/read errors and distinguishes an
+  unmonitored saved goal from an unavailable check status.
+- `tests/work-details.test.tsx`: **1 pass / 37 assertions** against native renderer
+  keyboard input and isolated display fixtures. Current selections remain distinct
+  from retained sources/connections; previews preserve script text literally;
+  unavailable complete files report errors; proposed changes do not submit work.
+  Draft/reading position survive inspection and old evidence disappears on a chat
+  switch. This fixture does not claim successful loading of its nonexistent files;
+  real file editing is covered separately. Terminal typecheck passes. The complete
+  UI regression run passes **52 tests / 770 assertions / 37 files**, including
+  modal ownership changes, concurrent chats, recovery, activity and file workflows.

@@ -73,6 +73,9 @@ Appearance now has rendered-color evidence across settings, cached chats, compac
 dialogs and restart, including all four supported themes without extra requests.
 Installed PTY checks now open untrusted file escape payloads without emitting
 their clipboard/title commands; native CI includes PTY/editor and install probes.
+Conversation information now includes latest-result-only files and proposed
+changes, retained preview/check disclosures and origin navigation. Following
+surfaces unavailable check health instead of implying there are no checks.
 
 Replace the Electron application with Gator's adaptation of **OpenCode's actual
 terminal frontend**, carrying forward Gator's current capabilities. Use an

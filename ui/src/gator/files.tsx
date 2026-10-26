@@ -13,23 +13,28 @@ import type { Choice } from "./actions"
 import { literal } from "./text"
 import { cellCoordinates, columnName, fileParagraphs, selectedContent, type FileSelection } from "./file-selection"
 import { resolve } from "node:path"
+import { conversationBundles } from "./outputs"
 
 export function useFiles(menu: (title: string, choices: Choice[]) => void, prompt: (title: string, value: string, save: (text: string) => unknown, description?: string) => void) {
   const client = useClient(), dialog = useDialog()
-  async function open(ref: FileReference, version?: string) {
-    const request: FileRequest = { action: "open", context: client.context, ref, version }
+  async function open(ref: FileReference, version?: string, context = client.context) {
+    if (context !== client.context) throw new Error("Return to the original conversation before opening this file.")
+    const request: FileRequest = { action: "open", context, ref, version }
     const view = await client.host.file(request)
-    dialog.replace(() => <FileEditor view={view} request={request} reopen={version => open(ref, version)} menu={menu} prompt={prompt} />, undefined, { size: "xlarge" })
+    if (context !== client.context) throw new Error("The conversation changed before opening this file.")
+    dialog.replace(() => <FileEditor view={view} request={request} reopen={version => open(ref, version, context)} menu={menu} prompt={prompt} />, undefined, { size: "xlarge" })
   }
   function files() {
-    const choices: Choice[] = [], seen = new Set<string>()
-    for (const file of client.draft.uploads ?? []) { seen.add(file.id); choices.push({ title: file.name, description: "Unsent private input", run: () => open({ kind: "upload", id: file.id }) }) }
+    const choices: Choice[] = [], seen = new Set<string>(), context = client.context
+    for (const file of client.draft.uploads ?? []) { seen.add(file.id); choices.push({ title: file.name, description: "Unsent private input", run: () => open({ kind: "upload", id: file.id }, undefined, context) }) }
     for (const message of client.state?.messages ?? []) {
-      for (const [index, id] of (message.input_ids ?? []).entries()) if (!seen.has(id)) { seen.add(id); choices.push({ title: message.inputs?.[index] || id.split("/").at(-1) || id, description: "Retained input", run: () => open({ kind: "upload", id }) }) }
-      for (const file of message.bundle?.Artifacts ?? []) {
-        const bundle = message.bundle!.Path, identity = `${bundle}:${file.Path}`
+      for (const [index, id] of (message.input_ids ?? []).entries()) if (!seen.has(id)) { seen.add(id); choices.push({ title: message.inputs?.[index] || id.split("/").at(-1) || id, description: "Retained input", run: () => open({ kind: "upload", id }, undefined, context) }) }
+    }
+    for (const result of conversationBundles(client.state)) {
+      for (const file of result.Artifacts ?? []) {
+        const bundle = result.Path, identity = JSON.stringify([bundle, file.Path])
         if (seen.has(identity)) continue; seen.add(identity)
-        choices.push({ title: file.Path, description: `Output · ${file.MediaType}`, run: () => open({ kind: "output", bundle, path: file.Path }) })
+        choices.push({ title: file.Path, description: `${file.Valid ? "Checks passed" : "Needs review"} · ${result.Status} run · ${result.RunID || bundle} · ${file.MediaType}`, run: () => open({ kind: "output", bundle, path: file.Path }, undefined, context) })
       }
     }
     menu("Files in this conversation", choices)
