@@ -3,6 +3,14 @@
 26 October 2026. Status: implementation in progress; Electron remains the reference. See the
 [verification ledger](TERMINAL-MIGRATION-VERIFICATION.md) for evidence and open cases.
 
+Implemented checkpoints: neutral shared host and contracts; pinned OpenCode
+frontend slice and Gator adapter; keyboard hubs and file workbench; native-service
+adapters; independent package/install tooling. Adapter contract tests now cover
+draft restoration, delayed imports/results, admission ownership and shutdown.
+These checkpoints are implementation progress, not a passed parity gate. The
+remaining behavioral journeys and deferred macOS/Windows runtime checks must pass
+before the terminal becomes primary or Electron is removed.
+
 Replace the Electron application with Gator's adaptation of **OpenCode's actual
 terminal frontend**, carrying forward Gator's current capabilities. Use an
 OpenCode-derived shell, components, and interaction system, with Gator's identity,

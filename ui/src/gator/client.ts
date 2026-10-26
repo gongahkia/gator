@@ -15,36 +15,53 @@ export class GatorClient extends EventEmitter {
   issue = ""
   voicePhase = "idle"
   fileSelections = new Map<string, string>()
+  readingPositions = new Map<string, number>()
   route: "chat" | "following" | "saved" | "settings" = "chat"
-  #load = 0
-  #listener = () => { this.snapshot = this.host.snapshot(); this.emit("change"); void this.loadDraft().catch(error => this.fail(error)) }
+  #loads = new Map<string, Promise<void>>()
+  #results = new Set<() => void>()
+  #closing?: Promise<void>
+  #closed = false
+  #listener = () => { this.snapshot = this.host.snapshot(); this.emit("change"); if (!this.#closed) void this.loadDraft().catch(error => this.fail(error)) }
   constructor(readonly host: Application) { super(); this.snapshot = host.snapshot(); host.on("change", this.#listener) }
   get state() { return this.snapshot.state }
   get context() { return this.host.context }
   get draft(): Draft { return this.drafts.get(this.context) ?? this.empty() }
-  empty(): Draft { return { context: this.context, title: this.state?.title ?? "", source: this.state?.source ?? "", text: "", uploads: [] } }
+  empty(context = this.context, state = this.state): Draft { return { context, title: state?.title ?? "", source: state?.source ?? "", text: "", uploads: [] } }
   fail(error: unknown) { this.issue = errorMessage(error); this.emit("change") }
   async start() { await this.host.start(); await this.loadDraft() }
   async loadDraft() {
     const context = this.context
-    if (!context || this.drafts.has(context)) return
-    const generation = ++this.#load, saved = await this.host.drafts.request({ action: "list" })
-    if (generation !== this.#load || this.drafts.has(context)) return
-    this.drafts.set(context, saved.drafts.find(d => d.context === context) ?? this.empty())
-    this.emit("change")
+    if (!context || this.drafts.has(context) || this.#closed) return
+    const pending = this.#loads.get(context)
+    if (pending) return pending
+    const empty = this.empty(context), load = (async () => {
+      const saved = await this.host.drafts.request({ action: "list" })
+      if (this.#closed || this.drafts.has(context)) return
+      const draft = saved.drafts.find(d => d.context === context)
+      // `updated` belongs to the disk record, not the editable/save contract.
+      this.drafts.set(context, draft ? { context, title: draft.title, source: draft.source, text: draft.text, uploads: draft.uploads, reply_to_update_id: draft.reply_to_update_id } : empty)
+      this.emit("change")
+    })()
+    this.#loads.set(context, load)
+    try { await load } finally { this.#loads.delete(context) }
   }
-  async edit(text: string, uploads = this.draft.uploads ?? [], reply = this.draft.reply_to_update_id) {
+  async edit(text: string, uploads = this.draft.uploads ?? [], reply: string | null | undefined = this.draft.reply_to_update_id) {
     if (Buffer.byteLength(text) > 128 * 1024 || uploads.length > uploadLimits.count || new Set(uploads.map(f => f.id)).size !== uploads.length || uploads.reduce((n, f) => n + f.size, 0) > uploadLimits.total) throw new Error("Draft exceeds Gator's text or attachment limits.")
-    const draft = { ...this.draft, text, uploads, reply_to_update_id: reply }
+    const current = this.draft
+    const draft = { context: current.context, title: current.title, source: current.source, text, uploads, reply_to_update_id: reply ?? undefined }
     if (!draft.context) throw new Error("Wait for this chat to open before editing.")
     this.drafts.set(draft.context, draft); this.emit("change")
     await this.host.drafts.request({ action: "save", draft })
   }
   async attach(paths: string[]) {
-    const context = this.context, current = this.draft
+    const context = this.context
     const files = await this.host.importFiles(paths, context)
     if (this.context !== context) throw new Error("The conversation changed. Your original draft is kept.")
-    await this.edit(current.text, [...current.uploads ?? [], ...files])
+    await this.appendFiles(files, context)
+  }
+  async appendFiles(files: UploadedFile[], context = this.context) {
+    if (this.context !== context) throw new Error("The conversation changed. Your original draft is kept.")
+    await this.edit(this.draft.text, [...this.draft.uploads ?? [], ...files])
   }
   async stage(file: UploadedFile, selection = "") { await this.edit(selection ? [this.draft.text, selection].filter(Boolean).join("\n\n") : this.draft.text, [...this.draft.uploads ?? [], file]) }
   async submit() {
@@ -67,23 +84,40 @@ export class GatorClient extends EventEmitter {
   }
   async send(frame: FrontendFrame) { await this.host.send(frame) }
   async navigate(text: string) {
+    if (text === "/chat") { this.route = "chat"; this.emit("change"); return }
     if (text === "/following" || text === "/saved" || text === "/settings") { this.route = text === "/following" ? "following" : text === "/saved" ? "saved" : "settings"; this.emit("change"); return }
     if (/^\/(files|drafts|queue|updates|memories|receipts|about|voice|chats|attach-file)$/.test(text)) { this.emit("action", text.slice(1)); return }
     this.route = "chat"; this.emit("change"); await this.send({ type: "navigate", text })
   }
   async result<T extends { request_id: string; error?: string }>(frame: FrontendFrame, requestID: string, read: (state: BackendState) => T | undefined): Promise<T> {
+    if (this.#closed || this.#closing) throw new Error("Gator is closing. Check the saved result after reopening.")
     const owner = this.context
     return new Promise<T>((resolve, reject) => {
-      const finish = (error?: Error, value?: T) => { clearTimeout(timer); this.off("change", changed); if (error) reject(error); else if (value) resolve(value) }
+      let finished = false
+      const finish = (error?: Error, value?: T) => { if (finished) return; finished = true; clearTimeout(timer); this.off("change", changed); this.#results.delete(cancel); if (error) reject(error); else if (value) resolve(value) }
+      const cancel = () => finish(new Error("Gator closed before the action was confirmed. Check its saved state after reopening."))
       const changed = () => {
         if (this.context !== owner || this.snapshot.connection === "disconnected") return finish(new Error("Return to the original chat and check the saved result before retrying."))
         const value = this.state && read(this.state)
         if (value?.request_id === requestID) finish(value.error ? new Error(value.error) : undefined, value)
       }
       const timer = setTimeout(() => finish(new Error("The action was not confirmed. Check its saved state before retrying.")), 30000)
+      this.#results.add(cancel)
       this.on("change", changed)
       void this.send(frame).then(changed).catch(error => finish(error instanceof Error ? error : new Error(String(error))))
     })
   }
-  async close() { this.host.off("change", this.#listener); await this.host.close(); this.removeAllListeners() }
+  async close() {
+    if (this.#closed) return
+    if (this.#closing) return this.#closing
+    this.#closing = (async () => {
+      // A failed draft flush or live external step leaves the UI subscribed.
+      await this.host.close()
+      this.#closed = true
+      this.host.off("change", this.#listener)
+      for (const cancel of this.#results) cancel()
+      this.removeAllListeners()
+    })()
+    try { await this.#closing } finally { this.#closing = undefined }
+  }
 }

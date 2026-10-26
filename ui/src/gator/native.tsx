@@ -10,7 +10,7 @@ export function useNative(controls: { actions: Record<string, () => unknown>; me
   const client = useClient(), renderer = useRenderer(), voice = new VoiceSession(client.host)
   onCleanup(() => voice.close())
   controls.actions["paste-image"] = async () => {
-    const context = client.context, original = client.draft
+    const context = client.context
     const bytes = await clipboardImage()
     if (context !== client.context) throw new Error("Return to the intended chat before pasting an image.")
     const selected = await client.host.pasteImages([{ type: "image/png", data: new Uint8Array(bytes) }], data => {
@@ -18,7 +18,7 @@ export function useNative(controls: { actions: Record<string, () => unknown>; me
       try { const info = image.info(); if (info.format !== "png" || info.width * info.height > 32000000) throw new Error("Clipboard intake requires a valid PNG up to 32 million pixels."); return data } finally { image.dispose() }
     })
     if (context !== client.context) throw new Error("The chat changed before image intake completed.")
-    await client.edit(original.text, [...original.uploads ?? [], ...selected])
+    await client.appendFiles(selected, context)
   }
   controls.actions["paste-text"] = async () => { const context = client.context, text = await clipboardRead(); if (context !== client.context) throw new Error("The chat changed before paste."); await client.edit(client.draft.text + text) }
   controls.actions["copy-message"] = () => controls.menu("Copy message", (client.state?.messages ?? []).map(message => ({ title: message.text.slice(0, 100) || message.role, run: async () => {

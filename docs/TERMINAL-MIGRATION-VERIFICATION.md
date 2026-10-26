@@ -284,3 +284,23 @@ independent installed launch; release packaging and platform matrix.
 - User confirmed macOS/Windows hosts exist and native runtime verification will
   happen later. Continue implementation and Linux evidence; keep those cases and
   Electron removal pending until the parity gate has actual native results.
+
+### Adapter ownership and lifecycle hardening
+
+- Fixed restored draft records carrying disk-only `updated` metadata into the
+  strict save contract. Restored drafts can now be edited and saved again.
+- Attachment and clipboard image intake merge into the latest draft after async
+  import, preserving text typed while intake runs. Per-chat draft loads retain
+  their captured identity and cannot overwrite newer in-memory input.
+- Matching result listeners ignore old/duplicate nonces, reject chat changes,
+  and cancel on shutdown. A refused close (for example, an external step or failed
+  draft flush) retains the live host subscription; concurrent closes share cleanup.
+- `bun test --cwd ui --preload ./scripts/preload.ts tests/client.test.ts`:
+  **5 pass, 0 fail, 22 assertions**. Cases cover retained draft editing, delayed
+  loading/import, newer input during admission, rejected admission, result nonce
+  and owner, duplicate events, refused close and subscription cleanup.
+- Concurrent workspace commit `3ebd27eeb` captured packaging/install/CI work and
+  path/theme/approval followups. Preserved that commit and reconciled its contents.
+  The preceding full UI run passed **7 tests / 68 assertions**, including real Go
+  approval: stale tokens and malicious paste cannot approve, while the explicit
+  live decision sends exactly once. New changes continue to require full checks.
