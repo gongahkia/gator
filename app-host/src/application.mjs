@@ -16,6 +16,7 @@ import { renderPDF } from "./pdf.mjs";
 import { importPastedImages } from "./pasted-images.mjs";
 import { helper } from "./native.mjs";
 import { ExportStore } from "./export.mjs";
+import { FrontendPreferences } from "./preferences.mjs";
 
 // Local application services. No renderer, IPC, HTTP server, or second agent.
 export class Application extends EventEmitter {
@@ -30,6 +31,7 @@ export class Application extends EventEmitter {
     this.uploads = new UploadStore(join(this.stateRoot, "gator", "uploads"));
     this.files = new FileStore(join(this.stateRoot, "gator", "files"));
     this.exports = new ExportStore([join(this.stateRoot, "gator"), this.userData]);
+    this.preferences = new FrontendPreferences(this.userData);
     const draftRoot = join(this.userData, "drafts");
     this.drafts = new DraftStore(join(draftRoot, `${createHash("sha256").update(this.stateRoot).digest("hex")}.json`));
     this.env = { ...env, GATOR_DESKTOP_DRAFT_DIR: draftRoot, GATOR_DESKTOP_UPLOAD_DIR: this.uploads.root };
@@ -176,6 +178,6 @@ export class Application extends EventEmitter {
   async close() {
     if (this.terminalBusy) throw new Error("Finish or cancel the external step before closing Gator.");
     for (const owner of this.sessions.workers) if (!owner.closed && owner.state?.external?.kind === "editor") await owner.completeExternal("The editor was canceled before launch.");
-    await this.drafts.flush(); await this.files.flush(); await this.sessions.stop();
+    await this.drafts.flush(); await this.files.flush(); await this.preferences.flush(); await this.sessions.stop();
   }
 }

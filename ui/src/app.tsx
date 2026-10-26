@@ -1,7 +1,7 @@
 // Composition adapted from pinned OpenCode app.tsx: renderer-scoped providers,
 // keymap, dialogs, toast, responsive session frame and bottom prompt. The Gator
 // client and data contexts replace OpenCode's server/client/plugin composition.
-import { createSignal, Show, For } from "solid-js"
+import { Show, For } from "solid-js"
 import { useRenderer } from "@opentui/solid"
 import { ClientProvider, useClient } from "./context/client"
 import { useData } from "./context/data"
@@ -29,7 +29,6 @@ function Shell(props: { quit(): Promise<void> }) {
   const client = useClient(), data = useData(), theme = useTheme(), dialog = useDialog()
   const controls = useActions()
   const voice = useNative(controls)
-  const [sidebar, setSidebar] = createSignal(true)
   const attempt = (operation: Promise<unknown>) => { void operation.catch(error => client.fail(error)) }
   const palette = () => dialog.replace(() => <CommandPaletteDialog />)
   const navigate = (command: string) => attempt(client.navigate(command))
@@ -47,7 +46,7 @@ function Shell(props: { quit(): Promise<void> }) {
   }
   Keymap.createLayer(() => ({ mode: "global", commands: [
     { id: "command.palette.show", title: "Search commands", bind: "ctrl+p", run: palette },
-    { id: "gator.sidebar", title: "Toggle navigation", bind: "ctrl+b", palette: true, run: () => { setSidebar(v => !v) } },
+    { id: "gator.sidebar", title: "Toggle navigation", bind: "ctrl+b", palette: true, run: () => attempt(client.configurePreferences({ sidebarCollapsed: !client.preferences.sidebarCollapsed })) },
     { id: "gator.quit", title: "Quit Gator", bind: "ctrl+q", palette: true, run: quit },
     { id: "gator.cancel", title: "Stop active work", bind: "ctrl+c", palette: true, run: () => data.state?.running ? attempt(client.send({ type: "key", key: "esc" })) : quit() },
     { id: "gator.new", title: "New independent chat", bind: "ctrl+n", palette: true, run: () => navigate("/new") },
@@ -65,7 +64,7 @@ function Shell(props: { quit(): Promise<void> }) {
   ] }))
   return <box width="100%" height="100%" backgroundColor={theme.background.base}>
     <box height={1} paddingX={1} flexDirection="row" justifyContent="space-between"><text fg={theme.accent}><b>Gator</b> · {literal(data.state?.title) || "Opening chat…"}</text><text fg={theme.text.muted}>{literal(data.snapshot.connection)}</text></box>
-    <SessionFrame sidebar={sidebar()} search={palette}>
+    <SessionFrame sidebar={!data.preferences.sidebarCollapsed} search={palette}>
       <Show when={data.route === "chat"} fallback={<Hub />}><Show when={data.state?.panel} fallback={<><Transcript /><Prompt /></>}>{panel => <Panel panel={panel()} />}</Show></Show>
     </SessionFrame>
     <Show when={data.issue || data.snapshot.error || data.snapshot.sessionIssue}><text fg={theme.text.feedback.error.base}>{literal(data.issue || data.snapshot.error || data.snapshot.sessionIssue)}</text></Show>

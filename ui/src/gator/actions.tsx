@@ -13,12 +13,12 @@ import { PathPicker } from "./path-picker"
 import { Details } from "./details"
 import { ActionPrompt } from "./action-prompt"
 
-export type Choice = { title: string; description?: string; disabled?: boolean; run(): unknown }
+export type Choice = { title: string; description?: string; category?: string; disabled?: boolean; run(): unknown }
 export function useActions() {
   const client = useClient(), dialog = useDialog()
   const attempt = (operation: unknown) => { if (operation instanceof Promise) void operation.catch(e => client.fail(e)) }
   const menu = (title: string, choices: Choice[]) => dialog.replace(() => <DialogSelect title={title} options={choices.map((item, index) => ({
-    title: literal(item.title), description: literal(item.description), disabled: item.disabled, value: index,
+    title: literal(item.title), description: literal(item.description), category: literal(item.category), disabled: item.disabled, value: index,
     onSelect: () => { dialog.clear(); try { attempt(item.run()) } catch (error) { client.fail(error) } },
   }))} />)
   const prompt = (title: string, value: string, save: (text: string) => unknown, description?: string) => { const token = Symbol(title); dialog.replace(() => <ActionPrompt token={token} title={title} value={value} save={save} description={description} />, undefined, { key: token }) }
@@ -137,6 +137,15 @@ export function useActions() {
       { title: item.archived ? "Restore conversation" : "Archive conversation", run: () => confirm(item.archived ? "Restore this conversation?" : "Archive this conversation?", item.label, () => change(item.archived ? "restore" : "archive")) },
     ])
   }
+  function chats() {
+    const grouped = client.preferences.groupChatsByFolder, activity = client.snapshot.chatActivity, recent = client.state?.recent_conversations ?? []
+    menu(grouped ? "Chats grouped by folder" : "Open and recent chats", [
+      { title: grouped ? "Show flat recent chats" : "Group recent chats by folder", run: async () => { await client.configurePreferences({ groupChatsByFolder: !grouped }); chats() } },
+      ...activity.map(chat => ({ title: chat.title, description: chat.status, category: "Activity", run: () => client.openSession(chat.id) })),
+      ...recent.filter(chat => !activity.some(active => active.id === chat.id)).map(chat => ({ title: chat.title, description: `${chat.source} · ${chat.updated_at}`, category: grouped ? chat.source : "Recent chats", run: () => client.openConversation(chat.id, client.state?.recent_id ?? "") })),
+      { title: "Search all retained conversations", run: () => client.navigate("/conversations") },
+    ])
+  }
   const actions: Record<string, () => unknown> = {
     drafts, queue, updates, memories, receipts, models,
     "catalog-actions": catalog,
@@ -149,7 +158,7 @@ export function useActions() {
     ]) }))),
     "attach-file": () => dialog.replace(() => <PathPicker kind="file" choose={path => { dialog.clear(); attempt(client.attach([path])) }} />),
     attachments: () => menu("Draft attachments", (client.draft.uploads ?? []).map(file => ({ title: file.name, run: () => menu(file.name, [{ title: "Remove from draft", run: () => client.edit(client.draft.text, client.draft.uploads?.filter(f => f.id !== file.id)) }]) }))),
-    chats: () => menu("Open and recent chats", [...client.snapshot.chatActivity.map(chat => ({ title: chat.title, description: chat.status, run: () => client.openSession(chat.id) })), ...(client.state?.recent_conversations ?? []).map(chat => ({ title: chat.title, description: chat.source, run: () => client.openConversation(chat.id, client.state?.recent_id ?? "") })), { title: "Search all retained conversations", run: () => client.navigate("/conversations") }]),
+    chats,
     search: () => prompt("Search this transcript", "", text => menu("Transcript matches", (client.state?.messages ?? []).map((message, index) => ({ message, index })).filter(({ message }) => message.text.toLocaleLowerCase().includes(text.toLocaleLowerCase())).map(({ message, index }) => ({ title: `${index + 1}. ${message.text.slice(0, 100)}`, description: [message.role, message.created_at].filter(Boolean).join(" · "), run: () => { client.route = "chat"; client.emit("change"); client.emit("reveal-message", index) } })))),
     "work-details": () => {
       const state = client.state, work = state?.work_details, latest = work?.latest_bundle
