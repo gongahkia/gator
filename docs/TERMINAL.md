@@ -18,9 +18,12 @@ make terminal-check
 the actual OpenCode-derived terminal against Gator's Go runtime. Use Ctrl+P for
 the searchable launcher; `/following`, `/saved`, `/settings`, `/files`, `/queue`,
 `/chats`, `/drafts`, `/updates`, `/memories`, `/receipts`, and `/voice` expose Gator
-workflows. Ctrl+J adds a line where Shift+Enter is unavailable. F2 opens file
+workflows. F1 or `/help` shows terminal help; `/prompt-history` stages retained
+message text without sending it. Ctrl+J adds a line where Shift+Enter is unavailable. F2 opens file
 versions/export/Ask Gator, F3 edits Office/table content, Ctrl+S saves an immutable
 working version, and F4 discards edits. Returning to chat retains the draft.
+In reviewable forms, F2 and Ctrl+R review; Ctrl+Enter also works in terminals
+that distinguish it. Unsaved form edits require an explicit discard decision.
 
 Build and install a local artifact into a new prefix:
 

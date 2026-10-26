@@ -471,3 +471,14 @@ independent installed launch; release packaging and platform matrix.
   correct immutable bytes once; the other recovered requests stay paused.
   Removing the interrupted request and restarting preserves the remaining queue
   without replay. This is distinct from connected-action reconciliation evidence.
+
+### Help, retained prompt text and conversation information
+
+- F1 and `/help` use terminal-specific instructions and current Go commands.
+  `/prompt-history` can inspect, append, or edit previously admitted message text
+  into the current draft without replaying it. Conversation information separates
+  future source/model/connection selections from captured result evidence.
+- `tests/application.test.tsx` passes the real-runtime paste/admission/restart
+  journey with keyboard help, retained text staging, unchanged provider-call count,
+  and conversation-information display. Escape tests wait for the terminal's
+  ambiguous ESC prefix to resolve before sending a subsequent function key.
