@@ -512,3 +512,20 @@ independent installed launch; release packaging and platform matrix.
   cases were rerun: concurrent memory editing passes; work-details fails an old
   complementary-role selector where the current narrow layout uses a dialog.
   These results do not convert the incomplete full desktop run into a pass.
+
+### Saved file selections and large tables
+
+- Table/workbook rendering uses at most 50 rows and 20 columns per page. Keyboard
+  paging retains the per-file position; F7 switches worksheets. F3 can edit cells
+  beyond the existing extent. Display truncation never truncates saved content.
+- F6 selects cells or existing Office paragraphs for Ask Gator, including read-only
+  content. Selections resolve from the chosen immutable version; spreadsheet
+  formulas use that version's formula, rather than an old displayed value.
+  Text quotes carry their revision and reject a different selected version.
+  Unsaved edits must be saved before staging a version, as in the reference.
+- Textarea initialization no longer manufactures an unsaved edit. The new save
+  requirement exposed this issue in the existing text-file keyboard test.
+- `bun run --cwd ui check`: pass. Focused native renderer suite (`files`, `grid`,
+  `office-keyboard`): **4 pass / 39 assertions / 0 failures**. The large-table case
+  pages a 125-by-45 CSV, selects AS125 and stages its actual value without sending;
+  the Office case stages the newly saved formula. Original files remain unchanged.

@@ -5,6 +5,7 @@ import type { HostSnapshot, Draft, UploadedFile, FrontendFrame } from "@gator/ap
 import { errorMessage } from "../util/error"
 import type { BackendState } from "@gator/application-host/contracts/protocol"
 import { uploadLimits } from "@gator/application-host/attachment-limits"
+import type { FileSelection } from "./file-selection"
 
 // All views read this projection. IDs, admission, permissions and persistence
 // remain Gator-owned; there is no upstream client, server or session database.
@@ -14,7 +15,8 @@ export class GatorClient extends EventEmitter {
   pending = new Set<string>()
   issue = ""
   voicePhase = "idle"
-  fileSelections = new Map<string, string>()
+  fileSelections = new Map<string, FileSelection>()
+  filePositions = new Map<string, { sheet: number; row: number; col: number }>()
   readingPositions = new Map<string, number>()
   route: "chat" | "following" | "saved" | "settings" = "chat"
   navigationGuard?: () => Promise<boolean>

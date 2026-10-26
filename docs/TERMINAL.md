@@ -21,7 +21,9 @@ the searchable launcher; `/following`, `/saved`, `/settings`, `/files`, `/queue`
 workflows. F1 or `/help` shows terminal help; `/prompt-history` stages retained
 message text without sending it. Ctrl+J adds a line where Shift+Enter is unavailable. F2 opens file
 versions/export/Ask Gator, F3 edits Office/table content, Ctrl+S saves an immutable
-working version, and F4 discards edits. Returning to chat retains the draft.
+working version, and F4 discards edits. F6 selects saved cell/paragraph content
+for Ask Gator. Tables page with Ctrl+Up/Down (rows) and Ctrl+Left/Right (columns);
+F7 switches worksheets. Returning to chat retains the draft.
 In reviewable forms, F2 and Ctrl+R review; Ctrl+Enter also works in terminals
 that distinguish it. Unsaved form edits require an explicit discard decision.
 In Conversations, Ctrl+F searches indexed messages, Ctrl+L changes scope,

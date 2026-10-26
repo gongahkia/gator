@@ -47,7 +47,14 @@ test("keyboard Office and CSV edits save and export real native content while or
         expect(JSON.stringify(view)).toContain(item.name.endsWith("xlsx") ? "B1*5" : item.value)
       }
       expect(client.state?.messages).toHaveLength(0)
+      if (item.name.endsWith("xlsx")) {
+        await client.navigate("/files"); await flush(); await setup.mockInput.typeText(item.name); await flush(); setup.mockInput.pressEnter(); await flush()
+        setup.mockInput.pressKey("F2"); await flush(); await setup.mockInput.typeText("Version 2"); await flush(); setup.mockInput.pressEnter(); await flush()
+        await setup.mockInput.typeText("Ask Gator"); await flush(); setup.mockInput.pressEnter()
+        await until(async () => (client.draft.uploads?.length ?? 0) === 5, "selected saved formula handoff")
+        expect(client.draft.text).toContain("Budget · C1: =B1*5"); expect(client.draft.text).not.toContain("=B1*2")
+      }
     }
-    expect(client.draft.uploads).toHaveLength(4)
+    expect(client.draft.uploads).toHaveLength(5)
   } finally { await client.close(); await setup.dispose(); await rm(root, { recursive: true, force: true }) }
 }, 60000)

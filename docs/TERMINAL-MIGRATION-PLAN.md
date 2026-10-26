@@ -10,6 +10,9 @@ draft restoration, delayed imports/results, admission ownership and shutdown.
 These checkpoints are implementation progress, not a passed parity gate. The
 remaining behavioral journeys and deferred macOS/Windows runtime checks must pass
 before the terminal becomes primary or Electron is removed.
+Large tables now page bounded row/column windows, and file selections resolve
+against the exact saved version chosen for Ask Gator. Export replacement review
+and the remaining native handoff journeys still need implementation/evidence.
 
 Replace the Electron application with Gator's adaptation of **OpenCode's actual
 terminal frontend**, carrying forward Gator's current capabilities. Use an
