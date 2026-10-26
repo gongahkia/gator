@@ -119,8 +119,25 @@ export function useActions() {
       { title: "Configure providers and local models", run: () => client.navigate("/model") },
     ])
   }
+  function catalog() {
+    const panel = client.state?.panel, row = panel?.selected ?? 0, item = panel?.rows?.[row]
+    if (!panel?.catalog?.can_organize || !panel.id || !item) throw new Error("Open Conversations and select a retained chat first.")
+    const id = panel.id
+    const change = async (action: "rename" | "pin" | "unpin" | "archive" | "restore", text?: string) => {
+      await client.send({ type: "panel", panel: { id, row, action, ...(text === undefined ? {} : { text }) } })
+      await client.waitFor(state => !state.catalog_busy && !state.panel?.catalog?.loading)
+      const state = client.state
+      if (state?.notice || state?.panel?.notice_tone === "error") throw new Error(state.notice || state.panel?.notice || "The conversation changed. Refresh and review before retrying.")
+    }
+    menu(item.label, [
+      { title: "Rename conversation", run: () => prompt("Rename retained conversation", item.label, text => change("rename", text)) },
+      { title: item.pinned ? "Unpin conversation" : "Pin conversation", run: () => change(item.pinned ? "unpin" : "pin") },
+      { title: item.archived ? "Restore conversation" : "Archive conversation", run: () => confirm(item.archived ? "Restore this conversation?" : "Archive this conversation?", item.label, () => change(item.archived ? "restore" : "archive")) },
+    ])
+  }
   const actions: Record<string, () => unknown> = {
     drafts, queue, updates, memories, receipts, models,
+    "catalog-actions": catalog,
     help: () => details("Gator terminal help", ["Ctrl+P commands · Ctrl+B navigation rail · Ctrl+N new independent chat · Ctrl+Q quit", "Enter sends or queues · Shift+Enter/Ctrl+J new line · Ctrl+G guides the live task · Ctrl+C stops work", "Ctrl+F searches the transcript or loaded panel · PgUp/PgDn scroll or move selection", "Ctrl+Y reviews the live approval · Ctrl+D declines · Paste never sends or approves", "/following tracks goals/checks/updates · /saved opens knowledge/history/files · /settings configures Gator", "/chats switches chats · /queue manages retained messages · /drafts recovers drafts · /prompt-history reuses sent text", "/files opens full files · Ctrl+S saves · F3 edits Office/cells · F2 versions/export/Ask Gator", "/voice explicitly records/transcribes or configures new-reply playback · /attach-file selects a private input", "Forms: Enter edits a field · Ctrl+R or displayed review key reviews · F2 falls back for Ctrl+Enter · Esc backs out", "Customized shortcuts are shown in the command palette. Use slash commands and the displayed function-key fallbacks where terminal modifiers overlap.", "", "Gator commands", ...(client.state?.commands ?? []).map(command => `/${command.name} — ${command.description}`)].join("\n")),
     "prompt-history": () => menu("Reuse a retained message", (client.state?.messages ?? []).filter(message => message.role === "You" && message.text).slice().reverse().map(message => ({ title: message.text.slice(0, 100), description: message.created_at, run: () => menu("Stage previous message text", [
       { title: "Append text to current draft", run: () => client.edit([client.draft.text, message.text].filter(Boolean).join("\n\n")) },

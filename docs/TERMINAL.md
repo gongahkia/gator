@@ -24,6 +24,8 @@ versions/export/Ask Gator, F3 edits Office/table content, Ctrl+S saves an immuta
 working version, and F4 discards edits. Returning to chat retains the draft.
 In reviewable forms, F2 and Ctrl+R review; Ctrl+Enter also works in terminals
 that distinguish it. Unsaved form edits require an explicit discard decision.
+In Conversations, Ctrl+F searches indexed messages, Ctrl+L changes scope,
+Ctrl+Left/Right pages results, F3 manages the selected chat, and Ctrl+R/F5 refreshes.
 
 Build and install a local artifact into a new prefix:
 

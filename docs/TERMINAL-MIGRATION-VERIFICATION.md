@@ -40,7 +40,7 @@ keyboard accessibility. Native/manual cases remain pending until exercised.
 | P05 | Transcript and activity | Pending | Stream replies and public work activity; search current/older retained text, inspect artifacts and results, copy content, and keep the reader's position when new activity arrives. |
 | P06 | Admission and recovery | Pending | Preserve text/files until confirmed admission; edit/reorder/remove/resume queues; distinguish rejection, unconfirmed send, interruption, and completion. Restart leaves restored work paused and never automatically repeats an external action. |
 | P07 | Approvals and action receipts | Pending | Show the exact review and bind decisions to the correct live run/token. Inspect connected requests, uncertain sends, reconciliation, and retained receipts without confusing review, read, retry, and approval. |
-| P08 | Conversation catalog | Pending | Search indexed older chats; page results; pin, archive, rename, and organize supported records with current identity/version checks; persist organization across restart. |
+| P08 | Conversation catalog | Pass on Linux; native hosts pending | Search indexed older chats; page results; pin, archive, rename, and organize supported records with current identity/version checks; persist organization across restart. |
 | P09 | Personal memory and saved knowledge | Pending | Browse, filter, inspect, correct, and forget supported memory/notes/guidance; retain provenance, guarded edits, cross-chat recall, learning preferences, and earlier-chat privacy. |
 | P10 | Context and connections | Pending | Inspect sources, supplied memory, outputs, and selected connections; change future selections without changing captured queues or treating historical provenance as current authority. |
 | P11 | Goals and recurring checks | Pending | Create/manage goals and plans, configure/review checks, inspect timing/scope/health, and distinguish a saved goal from a running recurring check. |
@@ -114,7 +114,7 @@ assertions to terminal/host/native tests before retiring any Electron suite.
 
 ### `desktop/tests/e2e/conversation-catalog.spec.ts`
 
-- [ ] indexed history searches old messages and retains reversible organization across restart
+- [x] indexed history searches old messages and retains reversible organization across restart — `ui/tests/catalog.test.tsx` on Linux.
 
 ### `desktop/tests/e2e/desktop.spec.ts`
 
@@ -492,3 +492,23 @@ independent installed launch; release packaging and platform matrix.
   case exercises playback cancellation across all three boundaries using abort
   signals. Frontend typecheck passes after refreshing the local host package.
   Actual speakers, microphone permissions and device behavior remain native cases.
+
+### Indexed catalog organization
+
+- Added F3 catalog actions for rename, pin/unpin and reviewed archive/restore.
+  Requests capture the original Go panel/record identity, wait for the actual
+  catalog mutation, and retain rejected rename text. Ctrl+R/F5 refresh and existing
+  indexed search, scope filter and pagination remain separate operations.
+- Catalog rows show dates, source, pin/archive state and literal highlighted
+  snippets. Shared result observation now also supports cancellable owner-bound
+  completion waits; existing nonce/admission/close contract tests still pass.
+- `tests/catalog.test.tsx`: **1 pass / 12 assertions**, exercising 130 retained
+  chats, three result pages, old-message indexed search, rename/pin/archive/
+  restore, concurrent-version refusal, preserved revisions and restart. No model
+  calls occur; the actual SQLite index is verified. Combined with client tests:
+  **8 pass / 47 assertions**. Frontend typecheck passes.
+- Shared-host full rerun: **67 cases, 66 pass, one native Windows handoff skipped,
+  0 failures**. Desktop typecheck passes. The two previously interrupted desktop
+  cases were rerun: concurrent memory editing passes; work-details fails an old
+  complementary-role selector where the current narrow layout uses a dialog.
+  These results do not convert the incomplete full desktop run into a pass.

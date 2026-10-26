@@ -119,6 +119,15 @@ export class GatorClient extends EventEmitter {
     this.route = "chat"; this.emit("change"); await this.send({ type: "navigate", text })
   }
   async result<T extends { request_id: string; error?: string }>(frame: FrontendFrame, requestID: string, read: (state: BackendState) => T | undefined): Promise<T> {
+    return this.observe(state => {
+      const value = read(state)
+      if (value?.request_id !== requestID) return
+      if (value.error) throw new Error(value.error)
+      return value
+    }, () => this.send(frame))
+  }
+  async waitFor(predicate: (state: BackendState) => boolean) { await this.observe(state => predicate(state) ? true : undefined, async () => {}) }
+  private async observe<T>(read: (state: BackendState) => T | undefined, start: () => Promise<void>): Promise<T> {
     if (this.#closed || this.#closing) throw new Error("Gator is closing. Check the saved result after reopening.")
     const owner = this.context
     return new Promise<T>((resolve, reject) => {
@@ -127,13 +136,13 @@ export class GatorClient extends EventEmitter {
       const cancel = () => finish(new Error("Gator closed before the action was confirmed. Check its saved state after reopening."))
       const changed = () => {
         if (this.context !== owner || this.snapshot.connection === "disconnected") return finish(new Error("Return to the original chat and check the saved result before retrying."))
-        const value = this.state && read(this.state)
-        if (value?.request_id === requestID) finish(value.error ? new Error(value.error) : undefined, value)
+        try { const value = this.state && read(this.state); if (value !== undefined) finish(undefined, value) }
+        catch (error) { finish(error instanceof Error ? error : new Error(String(error))) }
       }
       const timer = setTimeout(() => finish(new Error("The action was not confirmed. Check its saved state before retrying.")), 30000)
       this.#results.add(cancel)
       this.on("change", changed)
-      void this.send(frame).then(changed).catch(error => finish(error instanceof Error ? error : new Error(String(error))))
+      void start().then(changed).catch(error => finish(error instanceof Error ? error : new Error(String(error))))
     })
   }
   async close() {

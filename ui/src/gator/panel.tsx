@@ -3,6 +3,7 @@ import type { TextareaRenderable, ScrollBoxRenderable } from "@opentui/core"
 import { Keymap } from "../context/keymap"
 import { useKeyboard, useRenderer } from "@opentui/solid"
 import { useClient } from "../context/client"
+import { useData } from "../context/data"
 import { useTheme } from "../context/theme"
 import { useDialog } from "../ui/dialog"
 import { DialogPrompt } from "../ui/dialog-prompt"
@@ -12,9 +13,10 @@ import { literal } from "./text"
 import { PathPicker } from "./path-picker"
 import { SecretField } from "./secret-field"
 import { DialogConfirm } from "../ui/dialog-confirm"
+import { Highlight } from "./highlight"
 
 export function Panel(props: { panel: BackendPanel }) {
-  const client = useClient(), theme = useTheme(), dialog = useDialog(), renderer = useRenderer()
+  const client = useClient(), data = useData(), theme = useTheme(), dialog = useDialog(), renderer = useRenderer()
   const [fields, setFields] = createSignal<Record<number, string>>({}), [busy, setBusy] = createSignal(false), [query, setQuery] = createSignal("")
   const selectedRow = () => props.panel.selected ?? 0
   const hasReview = () => props.panel.hints?.some(hint => /ctrl\+(r|enter)/.test(hint.shortcut.toLowerCase().replaceAll(" ", "")))
@@ -103,6 +105,8 @@ export function Panel(props: { panel: BackendPanel }) {
     if (dialog.stack.length || busy()) return
     const name = ({ escape: "esc", return: "enter" }[event.name] ?? event.name)
     const key = event.ctrl ? `ctrl+${name}` : event.shift && name === "tab" ? "shift+tab" : name
+    if (key === "f3" && props.panel.catalog?.can_organize) { event.preventDefault(); client.emit("action", "catalog-actions"); return }
+    if (["ctrl+r", "f5"].includes(key) && props.panel.catalog) { event.preventDefault(); void action({ action: "refresh" }); return }
     if (key === "esc" && Object.keys(fields()).length) { event.preventDefault(); void guard().then(leave => { if (leave) void action({ action: "key", fields: undefined }, "esc") }); return }
     if (["f2", "ctrl+enter"].includes(key) && hasReview()) { event.preventDefault(); void action({ action: "key" }, "ctrl+r"); return }
     if (["pageup", "pagedown"].includes(key)) {
@@ -136,14 +140,16 @@ export function Panel(props: { panel: BackendPanel }) {
     <text fg={theme.accent}><b>{literal(props.panel.title)}</b>{busy() ? " · Saving…" : ""}</text>
     <Show when={props.panel.subtitle}><text fg={theme.text.muted}>{literal(props.panel.subtitle)}</text></Show>
     <Show when={props.panel.filter}><text fg={theme.text.muted}>Filter: {literal(props.panel.filter?.value)} · Ctrl+L changes</text></Show>
-    <Show when={props.panel.catalog}><text fg={theme.text.muted}>Page {props.panel.catalog?.page} · Ctrl+←/→ pages</text></Show>
+    <Show when={props.panel.catalog}><text fg={theme.text.muted}>Page {props.panel.catalog?.page} · Ctrl+←/→ pages · Ctrl+R/F5 refresh{props.panel.catalog?.can_organize ? " · F3 rename/pin/archive" : ""}</text></Show>
+    <Show when={props.panel.catalog && props.panel.query}><text fg={theme.text.muted}>Search retained messages: {literal(props.panel.query)}</text></Show>
     <Show when={query()}><text fg={theme.text.muted}>Filter loaded entries: {literal(query())} · {visible().length} of {props.panel.rows?.length ?? 0} · Ctrl+F changes or clears</text></Show>
     <scrollbox ref={node => { scroll = node }} flexGrow={1} minHeight={0}>
       <For each={props.panel.summary}>{field => <text>{literal(field.label)}: {literal(field.value)}</text>}</For>
       <Show when={query() && !visible().length}><text fg={theme.text.muted}>No matching loaded items. Clear the filter to choose an entry.</text></Show>
       <For each={visible()}>{({ row, index }) => <box id={`panel-row-${index}`} backgroundColor={index === selectedRow() ? theme.background.raised.high : undefined} paddingY={0} onMouseUp={() => row.input ? edit(index) : void action({ action: "activate", row: index })}>
         <text fg={index === selectedRow() ? theme.accent : theme.text.base}>{index === selectedRow() ? "› " : "  "}{literal(row.label)}{row.state ? ` · ${literal(row.state_label || row.state)}` : ""}{row.input ? `: ${row.input.secret ? "[credential]" : literal(fields()[index] ?? row.input.value)}` : ""}</text>
-        <Show when={row.detail}><text fg={theme.text.muted}>  {literal(row.detail)}</text></Show>
+        <Show when={row.detail}><text fg={theme.text.muted}>  <Highlight text={row.detail} query={props.panel.catalog ? props.panel.query : query()} /></text></Show>
+        <Show when={row.source || row.updated_at || row.pinned || row.archived}><text fg={theme.text.muted}>  {[row.pinned ? "Pinned" : "", row.archived ? "Archived" : "", row.updated_at, row.source].filter(Boolean).map(literal).join(" · ")}</text></Show>
         <For each={row.metadata}>{field => <text fg={theme.text.muted}>  {literal(field.label)}: {literal(field.value)}</text>}</For>
         <Show when={row.input?.help}><text fg={theme.text.muted}>  {literal(row.input?.help)}</text></Show>
       </box>}</For>
@@ -154,6 +160,7 @@ export function Panel(props: { panel: BackendPanel }) {
     </scrollbox>
     <text fg={theme.text.muted}>{literal(props.panel.footer) || "↑/↓ select · Enter open/edit · Esc back · Ctrl+F search"}</text>
     <text fg={theme.text.muted}>{props.panel.hints?.map(h => `${literal(h.shortcut)} ${literal(h.action)}`).join(" · ")}</text>
+    <Show when={data.state?.notice}><text fg={theme.text.feedback.warning.base}>{literal(data.state?.notice)}</text></Show>
     <Show when={hasReview()}><text fg={theme.text.muted}>F2 or Ctrl+R reviews this form; Ctrl+Enter also works in terminals that distinguish it.</text></Show>
   </box>
 }
