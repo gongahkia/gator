@@ -105,8 +105,8 @@ assertions to terminal/host/native tests before retiring any Electron suite.
 
 ### `desktop/tests/e2e/connected-receipts.spec.ts`
 
-- [ ] uncertain sends have owned receipts and read-only Sent checks retained across restart
-- [ ] a crashed dispatch reopens only in its own chat and never replays the request
+- [x] uncertain sends have owned receipts and read-only Sent checks retained across restart — `ui/tests/receipts.test.tsx`.
+- [x] a crashed dispatch reopens only in its own chat and never replays the request — `ui/tests/receipts.test.tsx` on Unix; native Windows crash harness remains pending.
 
 ### `desktop/tests/e2e/connections.spec.ts`
 
@@ -611,3 +611,19 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   renderer acknowledgements, restart, durable reply context, deduplicated replay,
   53-update paging, offscreen delivery and owning-chat health. No external service
   or user's profile is used. Following/quiet-check management cases remain open.
+
+### Connected receipts and crash recovery
+
+- Added explicit recovered-receipt discovery in the transcript. `/receipts`
+  inspects the original saved action without retrying it. Read-only Sent checks
+  explain that a matching Sent record does not prove recipient delivery.
+- `bun run --cwd ui check`: pass. `tests/receipts.test.tsx`: **2 pass / 25
+  assertions**, using the real Go Gmail connector against a local HTTP fixture.
+  An approved send with no provider receipt stays unknown. Inspecting its saved
+  check makes no HTTP request; explicit Check Sent performs exactly two GETs,
+  preserves the sealed manifest and survives restart without another send.
+- The crash case kills only the single isolated Go child after its approved POST
+  and executing receipt are proven. Restart exposes a non-live owned receipt and
+  paused request, retains the independent draft, hides it in another chat and
+  never repeats the POST. A receipt without a sealed manifest cannot offer a
+  Sent check. The Unix process probe explicitly skips native Windows.

@@ -92,5 +92,6 @@ export function Transcript() {
     <For each={[data.state?.notice, data.state?.requests_issue, data.state?.action_recovery_issue, data.state?.chat_checks_issue, data.state?.chat_updates_issue, data.state?.chat_memory_issue].filter(Boolean)}>{issue => <text fg={theme.text.feedback.warning.base}>{literal(issue)}</text>}</For>
     <Show when={data.state?.pending_approval}><text fg={theme.text.feedback.warning.base}>Review the exact request above. Ctrl+Y opens the approval decision; Ctrl+D declines.</text></Show>
     <Show when={data.state?.requests_recovered}><text fg={theme.text.feedback.warning.base}>Recovered requests are paused. Review the queue before resuming.</text></Show>
+    <Show when={data.state?.action_recoveries?.length}><text fg={theme.text.feedback.warning.base}>Saved request receipts · {data.state?.action_recoveries?.length}{data.state?.action_recovery_truncated ? "+" : ""} · /receipts inspects them. Reopening does not retry an external action.</text></Show>
   </scrollbox>
 }

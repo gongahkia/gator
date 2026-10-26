@@ -97,7 +97,8 @@ export function useActions() {
       if (!bundle.RunID || !bundle.ManifestSHA256 || !receipt.CorrelationID) throw new Error("This retained receipt has no verifiable manifest for a Sent check. Inspect the connected service before retrying any external action.")
       const request_id = randomUUID()
       const result = await client.result({ type: "receipt", receipt: { conversation_id, run_id: bundle.RunID, action_id: receipt.ID, correlation_id: receipt.CorrelationID, manifest_sha256: bundle.ManifestSHA256, action, request_id } }, request_id, s => s.receipt_result)
-      details("Saved receipt check", JSON.stringify(result.check, null, 2))
+      const meaning = result.check?.status === "found" ? "Found in Sent. This confirms a matching Sent message, not recipient delivery." : result.check?.status === "not_checked" ? "No saved Sent check. Inspecting this record does not contact the provider." : "Sent outcome remains unconfirmed. Verify the connected service before considering a new send."
+      details("Saved receipt check", meaning + "\n\n" + JSON.stringify(result.check, null, 2))
     }
     const rows = bundles.flatMap(bundle => (bundle.Actions ?? []).map(receipt => ({ bundle, receipt })))
     rows.push(...(state.action_recoveries ?? []).map(item => ({ bundle: { Path: "", Status: item.receipt.Status, Artifacts: null, Candidates: null, RunID: item.run_id }, receipt: item.receipt })))
