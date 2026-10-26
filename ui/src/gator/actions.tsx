@@ -57,16 +57,17 @@ export function useActions() {
     const state = client.state
     if (!state?.conversation_id) return
     const conversation_id = state.conversation_id
-    const updateAction = (update: ChatUpdate, action: "read" | "resolve" | "reopen" | "delivered" | "older" | "newer") => client.send({ type: "update", update: { conversation_id, id: update.id, version: update.version, action } })
+    const updateAction = async (update: ChatUpdate, action: "read" | "resolve" | "reopen" | "delivered" | "older" | "newer") => {
+      await client.send({ type: "update", update: { conversation_id, id: update.id, version: update.version, action } })
+      if (client.state?.chat_updates_issue) throw new Error(client.state.chat_updates_issue)
+    }
     menu("This chat's updates", [
       ...(state.chat_updates ?? []).map(update => ({ title: update.title, description: `${update.status} · ${update.read ? "read" : "unread"} · ${update.resolved ? "done" : "open"}`, run: () => menu(update.title, [
         { title: "Inspect update", description: update.summary, run: () => details(update.title, `${update.summary}\n${update.evidence?.join("\n") ?? ""}\n${update.next_step ?? ""}`) },
         { title: "Mark read", disabled: update.read, run: () => updateAction(update, "read") },
         { title: update.resolved ? "Reopen" : "Mark done", run: () => updateAction(update, update.resolved ? "reopen" : "resolve") },
         { title: "Reply in original chat", run: async () => { client.route = "chat"; await client.edit(client.draft.text, client.draft.uploads, update.id) } },
-        ...(["useful", "noise", "wrong", "clear"] as const).map(rating => ({ title: `Feedback: ${rating}`, disabled: !update.can_rate, run: async () => {
-          const request_id = randomUUID(); await client.result({ type: "update", update: { conversation_id, id: update.id, version: update.version, rating_version: update.rating_version, action: "rate", rating, request_id } }, request_id, s => s.chat_update_result)
-        } })),
+        ...(["useful", "noise", "wrong", "clear"] as const).map(rating => ({ title: `Feedback: ${rating}`, description: "Saved for review; this does not change your checks automatically.", disabled: !update.can_rate || !!client.updateFeedback.get(client.context)?.saving, run: () => client.rateUpdate(update, rating) })),
       ]) })),
       ...[state.updates_have_older ? "older" : undefined, state.updates_have_newer ? "newer" : undefined].filter((direction): direction is "older" | "newer" => !!direction).map(direction => ({ title: `${direction} updates`, run: () => {
         const update = direction === "older" ? state.chat_updates?.[0] : state.chat_updates?.at(-1); if (update) return updateAction(update, direction)
@@ -138,6 +139,7 @@ export function useActions() {
   const actions: Record<string, () => unknown> = {
     drafts, queue, updates, memories, receipts, models,
     "catalog-actions": catalog,
+    "check-health": () => details("Check health in this chat", [(client.state?.chat_checks_issue ?? ""), ...(client.state?.chat_checks ?? []).flatMap(check => [check.title + " · " + check.state, check.last_success ? `Last successful check for current settings: ${check.last_success}.` : "No successful check recorded for current settings.", check.next_due ? `Next scheduled: ${check.next_due}.` : "No check is currently scheduled.", check.unsuccessful ? `${check.unsuccessful} consecutive unsuccessful checks. ${check.issue || ""}` : check.issue || "", check.next_action, "Checks depend on this computer being on.", check.gap_from && check.gap_to ? `Observed supervisor gap: ${check.gap_from}–${check.gap_to}. This does not establish what changed while checks were unavailable.` : "", ""])].filter(Boolean).join("\n")),
     help: () => details("Gator terminal help", ["Ctrl+P commands · Ctrl+B navigation rail · Ctrl+N new independent chat · Ctrl+Q quit", "Enter sends or queues · Shift+Enter/Ctrl+J new line · Ctrl+G guides the live task · Ctrl+C stops work", "Ctrl+F searches the transcript or loaded panel · PgUp/PgDn scroll or move selection", "Ctrl+Y reviews the live approval · Ctrl+D declines · Paste never sends or approves", "/following tracks goals/checks/updates · /saved opens knowledge/history/files · /settings configures Gator", "/chats switches chats · /queue manages retained messages · /drafts recovers drafts · /prompt-history reuses sent text", "/files opens full files · Ctrl+S saves · F3 edits Office/cells · F2 versions/export/Ask Gator", "/voice explicitly records/transcribes or configures new-reply playback · /attach-file selects a private input", "Forms: Enter edits a field · Ctrl+R or displayed review key reviews · F2 falls back for Ctrl+Enter · Esc backs out", "Customized shortcuts are shown in the command palette. Use slash commands and the displayed function-key fallbacks where terminal modifiers overlap.", "", "Gator commands", ...(client.state?.commands ?? []).map(command => `/${command.name} — ${command.description}`)].join("\n")),
     "prompt-history": () => menu("Reuse a retained message", (client.state?.messages ?? []).filter(message => message.role === "You" && message.text).slice().reverse().map(message => ({ title: message.text.slice(0, 100), description: message.created_at, run: () => menu("Stage previous message text", [
       { title: "Append text to current draft", run: () => client.edit([client.draft.text, message.text].filter(Boolean).join("\n\n")) },

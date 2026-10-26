@@ -14,6 +14,8 @@ Large tables now page bounded row/column windows, file selections resolve
 against the exact saved version chosen for Ask Gator, and exports support guarded
 replacement review. The editor handoff now restores owned drafts after an
 acknowledged Go completion; account/install and native-platform journeys remain.
+Durable update cards now retain independent visibility/read/done/feedback receipts,
+origin-linked replies and paged health details with real Go integration evidence.
 
 Replace the Electron application with Gator's adaptation of **OpenCode's actual
 terminal frontend**, carrying forward Gator's current capabilities. Use an

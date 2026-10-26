@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto"
 import { Application } from "@gator/application-host/application"
 import type { HostSnapshot, Draft, UploadedFile, FrontendFrame } from "@gator/application-host/contracts/frontend"
 import { errorMessage } from "../util/error"
-import type { BackendState } from "@gator/application-host/contracts/protocol"
+import type { BackendState, ChatUpdate } from "@gator/application-host/contracts/protocol"
 import { uploadLimits } from "@gator/application-host/attachment-limits"
 import type { FileSelection } from "./file-selection"
 
@@ -18,6 +18,7 @@ export class GatorClient extends EventEmitter {
   fileSelections = new Map<string, FileSelection>()
   filePositions = new Map<string, { sheet: number; row: number; col: number }>()
   readingPositions = new Map<string, number>()
+  updateFeedback = new Map<string, { id: string; saving: boolean; message: string }>()
   route: "chat" | "following" | "saved" | "settings" = "chat"
   navigationGuard?: () => Promise<boolean>
   #loads = new Map<string, Promise<void>>()
@@ -120,12 +121,27 @@ export class GatorClient extends EventEmitter {
     } finally { this.pending.delete(context); this.emit("change") }
   }
   async send(frame: FrontendFrame) { await this.host.send(frame) }
-  async mayLeave() { return this.navigationGuard ? this.navigationGuard() : true }
+  async mayLeave() {
+    if (this.updateFeedback.get(this.context)?.saving) { this.fail(new Error("Wait for Gator to confirm this feedback before leaving the chat.")); return false }
+    return this.navigationGuard ? this.navigationGuard() : true
+  }
+  async rateUpdate(update: ChatUpdate, rating: "useful" | "noise" | "wrong" | "clear") {
+    const context = this.context, conversation_id = this.state?.conversation_id
+    if (!conversation_id || !update.can_rate || update.status !== "completed") throw new Error("Only a completed update accepts usefulness feedback.")
+    if (this.updateFeedback.get(context)?.saving) throw new Error("Wait for the previous feedback acknowledgement.")
+    this.updateFeedback.set(context, { id: update.id, saving: true, message: "Saving feedback…" }); this.emit("change")
+    try {
+      const request_id = randomUUID()
+      await this.result({ type: "update", update: { conversation_id, id: update.id, version: update.version, rating_version: update.rating_version, action: "rate", rating, request_id } }, request_id, state => state.chat_update_result)
+      this.updateFeedback.set(context, { id: update.id, saving: false, message: rating === "clear" ? "Feedback cleared." : "Feedback saved." })
+    } catch (error) { this.updateFeedback.set(context, { id: update.id, saving: false, message: errorMessage(error) }); throw error }
+    finally { this.emit("change") }
+  }
   async openSession(id: string) { if (await this.mayLeave()) await this.host.openSession(id) }
   async openConversation(id: string, list_id: string) { if (await this.mayLeave()) await this.send({ type: "conversation", conversation: { id, list_id } }) }
   async navigate(text: string) {
     if (!await this.mayLeave()) return
-    if (text === "/chat") { this.route = "chat"; this.emit("change"); return }
+    if (text === "/chat") { if (this.state?.panel) await this.send({ type: "navigate", text: "/chat" }); this.route = "chat"; this.emit("change"); return }
     if (text === "/following" || text === "/saved" || text === "/settings") { this.route = text === "/following" ? "following" : text === "/saved" ? "saved" : "settings"; this.emit("change"); return }
     if (/^\/(files|drafts|queue|updates|memories|receipts|about|voice|chats|attach-file|help|prompt-history)$/.test(text)) { this.emit("action", text.slice(1)); return }
     this.route = "chat"; this.emit("change"); await this.send({ type: "navigate", text })

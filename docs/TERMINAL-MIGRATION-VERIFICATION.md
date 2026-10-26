@@ -87,7 +87,7 @@ assertions to terminal/host/native tests before retiring any Electron suite.
 
 ### `desktop/tests/e2e/chat-check-health.spec.ts`
 
-- [ ] chat health reports offline checks and observed gaps only in their owning chat
+- [x] chat health reports offline checks and observed gaps only in their owning chat — `ui/tests/updates.test.tsx` on Linux.
 
 ### `desktop/tests/e2e/chat-search.spec.ts`
 
@@ -95,9 +95,9 @@ assertions to terminal/host/native tests before retiring any Electron suite.
 
 ### `desktop/tests/e2e/chat-updates.spec.ts`
 
-- [ ] failed and interrupted checks remain explicit after reading or marking done
-- [ ] update feedback waits for host acknowledgement, rejects stale edits and survives restart
-- [ ] durable follow-up cards return to their chat and retain explicit reply ownership
+- [x] failed and interrupted checks remain explicit after reading or marking done — `ui/tests/updates.test.tsx`.
+- [x] update feedback waits for host acknowledgement, rejects stale edits and survives restart — `ui/tests/updates.test.tsx`.
+- [x] durable follow-up cards return to their chat and retain explicit reply ownership — `ui/tests/updates.test.tsx`.
 
 ### `desktop/tests/e2e/concurrent-chats.spec.ts`
 
@@ -180,9 +180,10 @@ assertions to terminal/host/native tests before retiring any Electron suite.
 
 ## Native adapter and distribution evidence
 
-Pending: image/PDF visual inspection, clipboard image intake, microphone
-permission/capture/cancellation and spoken output on claimed platforms;
-independent installed launch; release packaging and platform matrix.
+Linux native-renderer image/PDF inspection and independent installed launch have
+concrete evidence below. Still pending: actual native clipboard/device permissions,
+microphone capture and spoken output; native macOS/Windows runtime checks and the
+remaining release/platform matrix. A passing fixture does not verify hardware.
 
 ## Work log
 
@@ -586,3 +587,27 @@ independent installed launch; release packaging and platform matrix.
   help/version, a scripted note, active-profile uninstall refusal, owned uninstall
   and retained private data. This checkpoint does not establish the remaining
   page/native parity cases or authorize Electron removal.
+
+### Update attention, feedback, replies and check health
+
+- Ported the reference timeline so durable cards interleave with retained chat
+  messages and precede explicit replies, while keeping original message indexes.
+  Failed/interrupted/limited checks retain their explanation after read/done;
+  check-health details include current-setting success, timing, consecutive
+  failures, supervisor gaps and the limits of those observations.
+- Delivery is recorded only for cards intersecting the rendered viewport after
+  scroll restoration, with no dialog or handoff obscuring them. Opening a hub or
+  Inbox does not read results. An initial-frame ordering issue was caught by the
+  offscreen-card assertion and fixed. Delivery/read/resolution remain independent.
+- Feedback has visible acknowledgement progress and blocks leaving while pending.
+  Its saved selection comes from Go's result; stale feedback and stale resolution
+  changes surface errors. Rating does not modify checks automatically.
+- Returning to Chat from a Go panel now closes that panel through canonical Go
+  navigation, after the unsaved-form guard. Local hub returns still preserve
+  transcript position and drafts without sending a request.
+- `bun run --cwd ui check`: pass. Focused `updates`, `transcript`, `client`:
+  **10 pass / 96 assertions / 0 failures**. Actual Go/local-provider cases cover
+  three result states, owned attention, exact evidence, stale writes, delayed
+  renderer acknowledgements, restart, durable reply context, deduplicated replay,
+  53-update paging, offscreen delivery and owning-chat health. No external service
+  or user's profile is used. Following/quiet-check management cases remain open.
