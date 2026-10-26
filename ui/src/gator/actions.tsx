@@ -13,6 +13,7 @@ import { PathPicker } from "./path-picker"
 import { Details } from "./details"
 import { ActionPrompt } from "./action-prompt"
 import { useData } from "../context/data"
+import { activityKey, activitySummary, activityText, searchableMessage } from "./activity"
 
 export type Choice = { title: string; key?: string; description?: string; category?: string; disabled?: boolean; run(): unknown }
 export function useActions() {
@@ -155,6 +156,16 @@ export function useActions() {
   }
   const actions: Record<string, () => unknown> = {
     drafts, queue, updates, memories, receipts, models,
+    activity: () => menu("Public work activity", [
+      ...(client.state?.activity ? [{ title: "Inspect live public activity", run: () => details("Live public activity", activityText(client.state!.activity!)) }] : []),
+      ...(client.state?.messages ?? []).flatMap((message, index) => message.activity ? [{ title: `${index + 1}. ${activitySummary(message.activity)}`, description: message.text.slice(0, 100), run: () => {
+        const key = activityKey(client.context, message, index), trace = message.activity!
+        menu("Retained public activity", [
+          { title: client.activityExpanded.has(key) ? "Collapse in transcript" : "Expand in transcript", run: () => { if (client.activityExpanded.has(key)) client.activityExpanded.delete(key); else client.activityExpanded.add(key); client.emit("change"); client.emit("reveal-message", index) } },
+          { title: "Inspect all public entries", run: () => details("Retained public activity", activityText(trace)) },
+        ])
+      } }] : []),
+    ]),
     "catalog-actions": catalog,
     "check-health": () => details("Check health in this chat", [(client.state?.chat_checks_issue ?? ""), ...(client.state?.chat_checks ?? []).flatMap(check => [check.title + " · " + check.state, check.last_success ? `Last successful check for current settings: ${check.last_success}.` : "No successful check recorded for current settings.", check.next_due ? `Next scheduled: ${check.next_due}.` : "No check is currently scheduled.", check.unsuccessful ? `${check.unsuccessful} consecutive unsuccessful checks. ${check.issue || ""}` : check.issue || "", check.next_action, "Checks depend on this computer being on.", check.gap_from && check.gap_to ? `Observed supervisor gap: ${check.gap_from}–${check.gap_to}. This does not establish what changed while checks were unavailable.` : "", ""])].filter(Boolean).join("\n")),
     help: () => details("Gator terminal help", ["Ctrl+P commands · Ctrl+B navigation rail · Ctrl+N new independent chat · Ctrl+Q quit", "Enter sends or queues · Shift+Enter/Ctrl+J new line · Ctrl+G guides the live task · Ctrl+C stops work", "Ctrl+F searches the transcript or loaded panel · PgUp/PgDn scroll or move selection", "Ctrl+Y reviews the live approval · Ctrl+D declines · Paste never sends or approves", "/following tracks goals/checks/updates · /saved opens knowledge/history/files · /settings configures Gator", "/chats switches chats · /queue manages retained messages · /drafts recovers drafts · /prompt-history reuses sent text", "/files opens full files · Ctrl+S saves · F3 edits Office/cells · F2 versions/export/Ask Gator", "/voice explicitly records/transcribes or configures new-reply playback · /attach-file selects a private input", "Forms: Enter edits a field · Ctrl+R or displayed review key reviews · F2 falls back for Ctrl+Enter · Esc backs out", "Customized shortcuts are shown in the command palette. Use slash commands and the displayed function-key fallbacks where terminal modifiers overlap.", "", "Gator commands", ...(client.state?.commands ?? []).map(command => `/${command.name} — ${command.description}`)].join("\n")),
@@ -166,7 +177,7 @@ export function useActions() {
     "attach-file": () => dialog.replace(() => <PathPicker kind="file" choose={path => { dialog.clear(); attempt(client.attach([path])) }} />),
     attachments: () => menu("Draft attachments", (client.draft.uploads ?? []).map(file => ({ title: file.name, run: () => menu(file.name, [{ title: "Remove from draft", run: () => client.edit(client.draft.text, client.draft.uploads?.filter(f => f.id !== file.id)) }]) }))),
     chats,
-    search: () => prompt("Search this transcript", "", text => menu("Transcript matches", (client.state?.messages ?? []).map((message, index) => ({ message, index })).filter(({ message }) => message.text.toLocaleLowerCase().includes(text.toLocaleLowerCase())).map(({ message, index }) => ({ title: `${index + 1}. ${message.text.slice(0, 100)}`, description: [message.role, message.created_at].filter(Boolean).join(" · "), run: () => { client.route = "chat"; client.emit("change"); client.emit("reveal-message", index) } })))),
+    search: () => prompt("Search this transcript", "", text => menu("Transcript matches", (client.state?.messages ?? []).map((message, index) => ({ message, index })).filter(({ message, index }) => searchableMessage(message, client.activityExpanded.has(activityKey(client.context, message, index))).toLocaleLowerCase().includes(text.toLocaleLowerCase())).map(({ message, index }) => ({ title: `${index + 1}. ${message.text.slice(0, 100)}`, description: [message.role, message.created_at].filter(Boolean).join(" · "), run: () => { client.route = "chat"; client.emit("change"); client.emit("reveal-message", index) } })))),
     "work-details": () => {
       const state = client.state, work = state?.work_details, latest = work?.latest_bundle
       menu("Conversation information", [

@@ -20,6 +20,7 @@ export class GatorClient extends EventEmitter {
   fileSelections = new Map<string, FileSelection>()
   filePositions = new Map<string, { sheet: number; row: number; col: number }>()
   readingPositions = new Map<string, number>()
+  activityExpanded = new Set<string>()
   updateFeedback = new Map<string, { id: string; saving: boolean; message: string }>()
   route: "chat" | "following" | "saved" | "settings" = "chat"
   navigationGuard?: () => Promise<boolean>
