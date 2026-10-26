@@ -6,7 +6,7 @@ import { errorMessage } from "../util/error"
 import type { BackendState, ChatUpdate } from "@gator/application-host/contracts/protocol"
 import { uploadLimits } from "@gator/application-host/attachment-limits"
 import type { FileSelection } from "./file-selection"
-import { frontendDefaults, type FrontendPreferences } from "@gator/application-host/preferences"
+import { frontendDefaults, type FrontendPreferenceValues } from "@gator/application-host/preferences"
 
 // All views read this projection. IDs, admission, permissions and persistence
 // remain Gator-owned; there is no upstream client, server or session database.
@@ -40,7 +40,7 @@ export class GatorClient extends EventEmitter {
     try { this.preferences = await this.host.preferences.read(); this.emit("change") }
     catch (error) { this.fail(error) }
   }
-  async configurePreferences(patch: Partial<FrontendPreferences>) { this.preferences = await this.host.preferences.configure(patch); this.emit("change") }
+  async configurePreferences(patch: Partial<FrontendPreferenceValues>) { this.preferences = await this.host.preferences.configure(patch); this.emit("change") }
   async loadDraft() {
     const context = this.context
     if (!context || this.drafts.has(context) || this.#closed) return
