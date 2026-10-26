@@ -12,6 +12,7 @@ function Result(props: { value: BackendResult }) {
     <For each={props.value.fields}>{f => <text>{literal(f.label)}: {literal(f.value)}</text>}</For>
     <For each={props.value.items}>{item => <text>{literal(item.label)} · {literal(item.state)} {literal(item.detail)}</text>}</For>
     <For each={props.value.lines}>{line => <text>{literal(line)}</text>}</For><text>{literal(props.value.markdown)}</text>
+    <Show when={props.value.preview !== undefined}><box><text><b>Exact action details</b></text><text>{literal(JSON.stringify(props.value.preview, null, 2))}</text></box></Show>
     <For each={props.value.sections}>{section => <box><text><b>{literal(section.title)}</b></text><text>{literal(section.summary)}</text>
       <For each={section.fields}>{f => <text>{literal(f.label)}: {literal(f.value)}</text>}</For>
       <For each={section.items}>{item => <text>{literal(item.label)} {literal(item.detail)} {literal(item.state)}</text>}</For>

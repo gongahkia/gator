@@ -13,6 +13,8 @@ export class GatorClient extends EventEmitter {
   drafts = new Map<string, Draft>()
   pending = new Set<string>()
   issue = ""
+  voicePhase = "idle"
+  fileSelections = new Map<string, string>()
   route: "chat" | "following" | "saved" | "settings" = "chat"
   #load = 0
   #listener = () => { this.snapshot = this.host.snapshot(); this.emit("change"); void this.loadDraft().catch(error => this.fail(error)) }
@@ -44,7 +46,7 @@ export class GatorClient extends EventEmitter {
     if (this.context !== context) throw new Error("The conversation changed. Your original draft is kept.")
     await this.edit(current.text, [...current.uploads ?? [], ...files])
   }
-  async stage(file: UploadedFile, selection = "") { await this.edit(selection || this.draft.text, [...this.draft.uploads ?? [], file]) }
+  async stage(file: UploadedFile, selection = "") { await this.edit(selection ? [this.draft.text, selection].filter(Boolean).join("\n\n") : this.draft.text, [...this.draft.uploads ?? [], file]) }
   async submit() {
     const draft = this.draft, context = draft.context
     if (this.pending.has(context)) throw new Error("This message is awaiting confirmation. Check the conversation before retrying.")
@@ -65,7 +67,7 @@ export class GatorClient extends EventEmitter {
   }
   async send(frame: FrontendFrame) { await this.host.send(frame) }
   async navigate(text: string) {
-    if (text === "/following" || text === "/saved" || text === "/settings") { this.route = text.slice(1) as "following" | "saved" | "settings"; this.emit("change"); return }
+    if (text === "/following" || text === "/saved" || text === "/settings") { this.route = text === "/following" ? "following" : text === "/saved" ? "saved" : "settings"; this.emit("change"); return }
     if (/^\/(files|drafts|queue|updates|memories|receipts|about|voice|chats|attach-file)$/.test(text)) { this.emit("action", text.slice(1)); return }
     this.route = "chat"; this.emit("change"); await this.send({ type: "navigate", text })
   }

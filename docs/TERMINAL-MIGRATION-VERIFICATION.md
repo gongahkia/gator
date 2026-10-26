@@ -256,3 +256,31 @@ independent installed launch; release packaging and platform matrix.
 - Concurrent workspace commit `3c2bb343b` appeared during implementation. It
   includes the pre-existing notice edit and early hub/client changes. Preserved
   its history and continued from it without resetting or amending it.
+
+### Terminal workspace actions and file workbench
+
+- Added keyboard-accessible Following, Saved and Settings hubs, typed panel
+  controls, model/effort, queue management, draft retention/recovery, guarded
+  memory corrections, update feedback, receipt inspection, and recent/open chats.
+  Async actions wait for the matching request nonce and reject chat/disconnect
+  changes; opening a hub does not submit agent work or acknowledge updates.
+- Added full-buffer text editing, Office paragraph/table/slide and worksheet cell
+  selection, immutable version history/comparison/restoration/export/Ask Gator,
+  actual terminal image/PDF display, clipboard intake, explicit voice controls,
+  and terminal suspend/resume for Go-produced reviewed external steps.
+- Preserved exact approval preview JSON in the transcript. Configured desktop
+  shortcuts are translated to terminal Ctrl equivalents with Ctrl+P, Ctrl+J,
+  slash and function-key fallbacks. Native key/OS permission claims remain pending.
+- `bun run --cwd ui check`: pass. `bun run --cwd ui test`: 6 pass, zero failures,
+  59 assertions. Real-runtime renderer tests now open text and all three Office
+  formats from the keyboard, save a text version, preserve original bytes, and
+  stage the exact selected saved version without sending it. Office native exports
+  are produced through the same shared content services; existing package-part
+  round-trip assertions remain in the host suite.
+- File tests exposed the workbook address delimiter and formula-prefix boundary;
+  corrected the frontend to preserve `sheet!A1` identities and leading `=` when
+  editing existing formulas. Keyboard tests also caught terminal comma binding
+  normalization and asynchronous picker focus handling.
+- User confirmed macOS/Windows hosts exist and native runtime verification will
+  happen later. Continue implementation and Linux evidence; keep those cases and
+  Electron removal pending until the parity gate has actual native results.

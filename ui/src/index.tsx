@@ -5,6 +5,7 @@ import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 import { App } from "./app"
 import { GatorClient } from "./gator/client"
+import { clipboardRead, clipboardWrite } from "@gator/application-host/native"
 
 const userData = process.env.GATOR_TERMINAL_USER_DATA || process.env.GATOR_DESKTOP_USER_DATA || (process.platform === "darwin" ? join(homedir(), "Library/Application Support/Gator") : process.platform === "win32" ? join(process.env.APPDATA || homedir(), "Gator") : join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "Gator"))
 const host = new Application({ binary: process.env.GATOR_TERMINAL_BINARY || resolve(import.meta.dir, "../runtime/" + (process.platform === "win32" ? "gator-runtime.exe" : "gator-runtime")),
@@ -19,5 +20,5 @@ async function quit() {
 }
 process.once("SIGTERM", () => { void quit() }); process.once("SIGHUP", () => { void quit() })
 renderer.once("destroy", () => { if (!closing) void client.close() })
-await render(() => <App client={client} quit={quit} clipboard={{ read: async () => undefined, write: async text => { renderer.copyToClipboardOSC52(text) } }} />, renderer)
+await render(() => <App client={client} quit={quit} clipboard={{ read: async () => ({ data: await clipboardRead(), mime: "text/plain" }), write: async text => { try { await clipboardWrite(text) } catch (error) { if (!renderer.copyToClipboardOSC52(text)) throw error } } }} />, renderer)
 void client.start().catch(error => client.fail(error))
