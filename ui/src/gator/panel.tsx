@@ -10,6 +10,7 @@ import { DialogSelect } from "../ui/dialog-select"
 import type { BackendPanel, PanelAction } from "@gator/application-host/contracts/protocol"
 import { literal } from "./text"
 import { PathPicker } from "./path-picker"
+import { SecretField } from "./secret-field"
 
 export function Panel(props: { panel: BackendPanel }) {
   const client = useClient(), theme = useTheme(), dialog = useDialog()
@@ -63,14 +64,7 @@ export function Panel(props: { panel: BackendPanel }) {
       return
     }
     if (input.secret) {
-      // The native edit buffer never paints credential bytes in terminal output.
-      let value = ""
-      dialog.replace(() => <box paddingX={3} paddingBottom={1} gap={1}><text fg={theme.text.base}>{literal(row.label)}</text>
-        <text fg={theme.text.muted}>{literal(input.help) || "Leave empty to retain the stored credential. Enter saves; Esc cancels."}</text>
-        <input focused maxLength={input.limit} textColor={theme.background.raised.high} focusedTextColor={theme.background.raised.high}
-          backgroundColor={theme.background.raised.high} focusedBackgroundColor={theme.background.raised.high}
-          onInput={text => { value = text }} onSubmit={() => change(value)} />
-      </box>)
+      dialog.replace(() => <SecretField title={row.label} help={input.help} limit={input.limit} save={change} />)
       return
     }
     if (input.multiline) {
@@ -87,7 +81,9 @@ export function Panel(props: { panel: BackendPanel }) {
   }
   useKeyboard(event => {
     if (dialog.stack.length || busy()) return
-    const key = event.ctrl ? `ctrl+${event.name}` : event.shift && event.name === "tab" ? "shift+tab" : ({ escape: "esc", return: "enter" }[event.name] ?? event.name)
+    const name = ({ escape: "esc", return: "enter" }[event.name] ?? event.name)
+    const key = event.ctrl ? `ctrl+${name}` : event.shift && name === "tab" ? "shift+tab" : name
+    if (key === "f2" && props.panel.hints?.some(hint => hint.shortcut.toLowerCase().replaceAll(" ", "").includes("ctrl+enter"))) { event.preventDefault(); void action({ action: "key" }, "ctrl+enter"); return }
     if (key === "enter" && props.panel.rows?.[props.panel.selected ?? 0]?.input) { event.preventDefault(); edit(props.panel.selected ?? 0); return }
     if (key === "ctrl+f" || key === "/") {
       event.preventDefault(); dialog.replace(() => <DialogPrompt title="Search" value={props.panel.query} onConfirm={text => { dialog.clear(); void action({ action: "query", text }) }} />); return
@@ -120,6 +116,7 @@ export function Panel(props: { panel: BackendPanel }) {
     </scrollbox>
     <text fg={theme.text.muted}>{literal(props.panel.footer) || "↑/↓ select · Enter open/edit · Esc back · Ctrl+F search"}</text>
     <text fg={theme.text.muted}>{props.panel.hints?.map(h => `${literal(h.shortcut)} ${literal(h.action)}`).join(" · ")}</text>
+    <Show when={props.panel.hints?.some(hint => hint.shortcut.toLowerCase().replaceAll(" ", "").includes("ctrl+enter"))}><text fg={theme.text.muted}>F2 also reviews this form when Ctrl+Enter is unavailable.</text></Show>
   </box>
 }
 

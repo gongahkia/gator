@@ -304,3 +304,16 @@ independent installed launch; release packaging and platform matrix.
   The preceding full UI run passed **7 tests / 68 assertions**, including real Go
   approval: stale tokens and malicious paste cannot approve, while the explicit
   live decision sends exactly once. New changes continue to require full checks.
+
+### Credential input and form review
+
+- Credentials now stay in a transient backing value; only mask glyphs enter the
+  native renderable buffer. Matching foreground/background colors did not provide
+  this guarantee. Typing, literal bracketed paste, backspace and clearing preserve
+  explicit field confirmation and do not submit the provider form.
+- Normalized modified Enter to Go's `ctrl+enter` identity and added visible **F2**
+  review fallback for terminals that cannot distinguish Ctrl+Enter from Enter.
+- `bun test --cwd ui --preload ./scripts/preload.ts tests/panel.test.tsx`:
+  **1 pass, 9 assertions**. Both typed and pasted credentials are absent from
+  captured character frames; paste submits nothing; the explicit review sends
+  the selected field value with the expected backend key.
