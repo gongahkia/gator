@@ -343,3 +343,89 @@ func TestProfilePublicationCannotReplaceAnExistingEmptyDirectory(t *testing.T) {
 		t.Fatal("publication changed the existing destination", err)
 	}
 }
+
+func TestRestorePreservesUnsentChatWithoutSyntheticRevisions(t *testing.T) {
+	ctx := context.Background()
+	root, source := t.TempDir(), t.TempDir()
+	sessions, err := worksession.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chat, err := sessions.CreateChat(source, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	archive := filepath.Join(t.TempDir(), "unsent.tar.gz")
+	if _, err = store.Export(ctx, archive); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(t.TempDir(), "restored")
+	plan, err := store.PreviewRestore(ctx, archive, target, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = os.Stat(target); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("preview created destination")
+	}
+	if _, err = store.Restore(ctx, plan.ID); err != nil {
+		t.Fatal(err)
+	}
+	restored, err := worksession.Open(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := restored.Load(chat.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.HeadRevision != "" || got.SourcePath != source {
+		t.Fatalf("unsent identity changed: %#v", got)
+	}
+	revisions, err := restored.Revisions(chat.ID)
+	if err != nil || len(revisions) != 0 {
+		t.Fatalf("synthetic revisions: %#v %v", revisions, err)
+	}
+	original, err := sessions.Load(chat.ID)
+	if err != nil || original.HeadRevision != "" {
+		t.Fatalf("original changed: %#v %v", original, err)
+	}
+}
+
+func TestRestoreStillRejectsClaimedMissingRevision(t *testing.T) {
+	root, source := t.TempDir(), t.TempDir()
+	sessions, err := worksession.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chat, err := sessions.CreateChat(source, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	chat.HeadRevision = "rev-missing"
+	bytes, err := json.Marshal(chat)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(root, "gator", "conversations", chat.ID, "conversation.json"), bytes, 0600); err != nil {
+		t.Fatal(err)
+	}
+	store, err := Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	archive := filepath.Join(t.TempDir(), "missing.tar.gz")
+	if _, err = store.Export(context.Background(), archive); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(t.TempDir(), "restored")
+	if _, err = store.PreviewRestore(context.Background(), archive, target, nil); err == nil {
+		t.Fatal("accepted a claimed missing revision")
+	}
+	if _, err = os.Stat(target); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("invalid preview created destination")
+	}
+}

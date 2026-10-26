@@ -723,3 +723,22 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   an in-flight transcription and switching chats preserve draft ownership and
   never submit a chat. Synthetic capture is not microphone hardware/OS permission
   evidence. Native speech language/rate behavior and live audio remain pending.
+
+### Private data backup and restore through terminal controls
+
+- The new keyboard journey exposed a baseline backend defect: file-only backup
+  archives omit empty directories, so an unsent chat lost its empty `revisions`
+  directory and restore rejected an otherwise valid archive. Restore now rebuilds
+  that directory only for chats without a claimed head. Missing referenced
+  revisions remain errors; source profiles and sealed evidence are unchanged.
+- `go test ./internal/lifecycle`: pass, including new empty-chat round-trip and
+  missing-head rejection cases. Rebuilt the private Go runtime before UI checks.
+- `tests/data.test.tsx`: **1 pass / 23 assertions**; terminal typecheck passes.
+  Keyboard controls export only after review, verify unchanged archive bytes,
+  show a separate exact restore plan before creating the destination, and restore
+  a new profile with shared usage paused. The original chat/draft stays selected.
+  A second Go-host client opens restored knowledge without a synthetic revision
+  or submitted task. External project bytes and the backup remain unchanged.
+- The same journey cancels a knowledge-deletion review without removing the note
+  and saves a reviewed 30-day history-retention policy. Destructive stale-plan,
+  source-mapping/relink, and native platform cases remain separate open checks.

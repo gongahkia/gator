@@ -330,6 +330,14 @@ func validateRestoredProfile(ctx context.Context, profile, final string) error {
 		return err
 	}
 	for _, c := range conversations {
+		// Backups retain files, so an unsent chat's empty revisions directory
+		// is absent after extraction. Recreate it only when no head is claimed;
+		// conversations referring to missing revisions must still fail validation.
+		if c.HeadRevision == "" {
+			if err = os.MkdirAll(filepath.Join(profile, "gator", "conversations", c.ID, "revisions"), 0700); err != nil {
+				return err
+			}
+		}
 		revisions, err := sessions.Revisions(c.ID)
 		if err != nil {
 			return err

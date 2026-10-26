@@ -27,6 +27,9 @@ launch is fixture-verified on Linux; native browser/permission checks remain ope
 Dictation now blocks ordinary draft submission until capture/transcription ends.
 Linux keyboard/process tests verify review, cancellation, ownership and Go usage
 accounting with synthetic audio; native audio hardware acceptance remains open.
+Keyboard backup/verify/restore and retention reviews now have real Go evidence;
+restore also preserves valid unsent chats whose empty directories are omitted
+from backup archives. Remaining private-data edge cases stay open in the ledger.
 
 Replace the Electron application with Gator's adaptation of **OpenCode's actual
 terminal frontend**, carrying forward Gator's current capabilities. Use an
