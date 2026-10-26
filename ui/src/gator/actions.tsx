@@ -9,6 +9,7 @@ import { DialogConfirm } from "../ui/dialog-confirm"
 import type { ChatUpdate, BackendBundle, ActionReceipt } from "@gator/application-host/contracts/protocol"
 import { literal } from "./text"
 import { useFiles } from "./files"
+import { PathPicker } from "./path-picker"
 
 export type Choice = { title: string; description?: string; disabled?: boolean; run(): unknown }
 export function useActions() {
@@ -23,7 +24,7 @@ export function useActions() {
   async function drafts() {
     const saved = await client.host.drafts.request({ action: "list" })
     menu("Unsent drafts", [
-      { title: saved.enabled ? "Disable draft retention" : "Enable draft retention", run: () => confirm("Change draft retention?", saved.enabled ? "All retained composer drafts will be cleared. Copy any unsent work first." : "Keep unsent drafts on this device for up to seven days.", async () => { await client.host.drafts.request({ action: "configure", enabled: !saved.enabled }); if (saved.enabled) client.drafts.clear(); client.emit("change") }) },
+      { title: saved.enabled ? "Disable draft retention" : "Enable draft retention", run: () => confirm("Change draft retention?", saved.enabled ? "All retained composer drafts will be cleared from disk. Current unsent input remains editable until this session closes." : "Keep unsent drafts on this device for up to seven days.", async () => { await client.host.drafts.request({ action: "configure", enabled: !saved.enabled }); client.emit("change") }) },
       ...saved.drafts.map(draft => ({ title: draft.title || draft.context, description: draft.text.slice(0, 120) || `${draft.uploads?.length ?? 0} attachments`, run: () => menu("Saved draft", [
         { title: "Recover in original chat", run: async () => {
           if (draft.context.startsWith("conversation:")) await client.host.sessions.open({ conversation_id: draft.context.slice(13) })
@@ -117,7 +118,7 @@ export function useActions() {
   }
   const actions: Record<string, () => unknown> = {
     drafts, queue, updates, memories, receipts, models,
-    "attach-file": () => prompt("Attach a file", "", path => client.attach([resolve(path)]), "Absolute or current-directory relative path; Gator makes a private copy. Limits: 12 files, documents 8 MiB, images 4 MiB, combined 16 MiB."),
+    "attach-file": () => dialog.replace(() => <PathPicker kind="file" choose={path => { dialog.clear(); attempt(client.attach([path])) }} />),
     attachments: () => menu("Draft attachments", (client.draft.uploads ?? []).map(file => ({ title: file.name, run: () => menu(file.name, [{ title: "Remove from draft", run: () => client.edit(client.draft.text, client.draft.uploads?.filter(f => f.id !== file.id)) }]) }))),
     chats: () => menu("Open and recent chats", [...client.snapshot.chatActivity.map(chat => ({ title: chat.title, description: chat.status, run: () => client.host.openSession(chat.id) })), ...(client.state?.recent_conversations ?? []).map(chat => ({ title: chat.title, description: chat.source, run: () => client.send({ type: "conversation", conversation: { id: chat.id, list_id: client.state?.recent_id ?? "" } }) })), { title: "Search all retained conversations", run: () => client.navigate("/conversations") }]),
     search: () => prompt("Search this transcript", "", text => menu("Transcript matches", (client.state?.messages ?? []).map((message, index) => ({ message, index })).filter(({ message }) => message.text.toLocaleLowerCase().includes(text.toLocaleLowerCase())).map(({ message, index }) => ({ title: `${index + 1}. ${message.text.slice(0, 100)}`, description: message.role, run: () => { client.emit("reveal-message", index); prompt("Message (read only)", message.text, () => {}) } })))),

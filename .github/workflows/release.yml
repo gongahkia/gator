@@ -102,6 +102,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          npm ci --prefix app-host
           npm ci --prefix desktop
           npm run check --prefix desktop
           npm test --prefix desktop

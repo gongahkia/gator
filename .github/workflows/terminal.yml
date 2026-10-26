@@ -1,0 +1,57 @@
+name: Terminal migration
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: terminal-${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, macos-15, macos-15-intel, windows-latest]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.25.13"
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: ui/.bun-version
+      - name: Build and test terminal against real Go state
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --prefix app-host
+          npm test --prefix app-host
+          bun install --cwd ui --frozen-lockfile
+          node ui/scripts/build-runtime.mjs
+          bun run --cwd ui check
+          bun run --cwd ui build
+          if [ "$RUNNER_OS" = Windows ]; then
+            export GATOR_TEST_BINARY="$(cygpath -w "$PWD/ui/runtime/gator-runtime.exe")"
+          else
+            export GATOR_TEST_BINARY="$PWD/ui/runtime/gator-runtime"
+          fi
+          bun run --cwd ui test
+      - name: Build independent production artifact
+        run: node ui/scripts/package.mjs terminal-artifact
+      - name: Compile additional ARM64 runtime
+        if: runner.os != 'macOS'
+        shell: bash
+        env:
+          GOARCH: arm64
+          CGO_ENABLED: "0"
+        run: node ui/scripts/build-runtime.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gator-terminal-${{ matrix.runner }}
+          path: terminal-artifact/

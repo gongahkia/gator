@@ -10,9 +10,13 @@ build: setup
 	npm run build --prefix desktop
 
 # Reinstall pinned dependencies after a fresh checkout or a manifest change.
-setup: desktop/node_modules/.package-lock.json
+setup: app-host/node_modules/.package-lock.json desktop/node_modules/.package-lock.json
 
-desktop/node_modules/.package-lock.json: desktop/package.json desktop/package-lock.json
+app-host/node_modules/.package-lock.json: app-host/package.json app-host/package-lock.json
+	npm ci --prefix app-host
+	@touch $@
+
+desktop/node_modules/.package-lock.json: desktop/package.json desktop/package-lock.json app-host/node_modules/.package-lock.json
 	npm ci --prefix desktop
 	@touch $@
 

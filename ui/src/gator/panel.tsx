@@ -9,6 +9,7 @@ import { DialogPrompt } from "../ui/dialog-prompt"
 import { DialogSelect } from "../ui/dialog-select"
 import type { BackendPanel, PanelAction } from "@gator/application-host/contracts/protocol"
 import { literal } from "./text"
+import { PathPicker } from "./path-picker"
 
 export function Panel(props: { panel: BackendPanel }) {
   const client = useClient(), theme = useTheme(), dialog = useDialog()
@@ -26,6 +27,11 @@ export function Panel(props: { panel: BackendPanel }) {
     if (!row || !input || input.read_only) return
     const change = (value: string) => { setFields(values => ({ ...values, [index]: value })); dialog.clear() }
     const value = () => fields()[index] ?? input.value ?? ""
+    if (input.kind === "directory" || input.kind === "file" || input.kind === "save") {
+      const kind = input.kind
+      dialog.replace(() => <PathPicker kind={kind} choose={change} />)
+      return
+    }
     if (input.kind === "budget") {
       dialog.replace(() => <DialogSelect title={literal(row.label)} options={(input.parts ?? []).map((part, position) => ({ title: `${literal(part.label)}: ${value().split(",")[position] ?? ""}`, value: position,
         onSelect: () => dialog.replace(() => <DialogPrompt title={literal(part.label)} value={value().split(",")[position] ?? ""} subtitle={`Whole number, ${part.min}–${part.max}`} onConfirm={text => {

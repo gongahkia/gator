@@ -28,6 +28,7 @@ jobs:
           cache-dependency-path: desktop/package-lock.json
       - name: Check desktop frontend and host
         run: |
+          npm ci --prefix app-host
           npm ci --prefix desktop
           npm run check --prefix desktop
           npm test --prefix desktop
@@ -121,6 +122,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          npm ci --prefix app-host
           npm ci --prefix desktop
           npm run check --prefix desktop
           npm test --prefix desktop
