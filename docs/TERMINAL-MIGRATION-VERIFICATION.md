@@ -395,3 +395,25 @@ independent installed launch; release packaging and platform matrix.
   on Unix. The Windows branch is present in the same fixture but remains native
   verification pending. This test does not establish backup/credential/service
   executable-path migration or cosmetic Electron-localStorage preference parity.
+
+### Native file keyboard and visual evidence
+
+- `tests/previews.test.tsx`: **1 pass / 11 assertions**. Under Bun, actual
+  OpenTUI native images decode PNG pixels and two distinct PDF raster pages;
+  Ctrl+Left/Right changes and restores the page bytes. The renderer exercises its
+  raster-block fallback, not just labels. Returning preserves draft/attachments
+  and creates no messages. Native terminal graphics protocols still need their
+  claimed-terminal/native-host checks. Corrupt image data produces a visible
+  decode error; the test now generates a valid PNG instead of an invalid old
+  one-pixel fixture.
+- PDF render completion is generation-bound so an earlier slow page cannot
+  overwrite the currently selected page. Shared PDF/native focused tests pass
+  **4/4** after extracting reusable fixtures.
+- `tests/office-keyboard.test.tsx`: **1 pass / 13 assertions**. Real renderer
+  keyboard journeys edit DOCX paragraphs, PPTX existing text, XLSX formulas and
+  quoted CSV cells; save immutable versions and export the exact selected bytes.
+  Independent content inspection confirms exports; original source files stay
+  byte-identical. No model message is submitted.
+- Office/cell dialog edits now retain directly through the host instead of
+  scheduling autosave on an already-unmounted editor. Existing protected/signed/
+  macro restrictions and package-preservation checks remain in the shared suite.

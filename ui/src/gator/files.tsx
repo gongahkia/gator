@@ -41,6 +41,7 @@ function FileEditor(props: { view: FileView; request: FileRequest; reopen(versio
   const [page, setPage] = createSignal(1), [image, setImage] = createSignal<Uint8Array>(), [pages, setPages] = createSignal(1), [busy, setBusy] = createSignal(false)
   let textarea: TextareaRenderable | undefined, timer: ReturnType<typeof setTimeout> | undefined
   let active = true
+  let rendering = 0
   const editable = () => props.view.editable && props.view.revision === props.view.current
   const request = (action: FileRequest["action"], extra: Partial<FileRequest> = {}): FileRequest => ({ ...props.request, action, expected: props.view.current, version: props.view.revision, ...extra })
   const attempt = (operation: Promise<unknown>) => { void operation.catch(error => { setNotice(error instanceof Error ? error.message : String(error)); client.fail(error) }) }
@@ -54,8 +55,8 @@ function FileEditor(props: { view: FileView; request: FileRequest; reopen(versio
   createEffect(() => {
     if (props.view.kind === "image" && props.view.data) { const encoded = props.view.data.split(",")[1]; setImage(new Uint8Array(Buffer.from(encoded, "base64"))) }
     if (props.view.kind === "pdf") {
-      const selected = page(); setBusy(true)
-      void client.host.pdf(props.request, selected).then(result => { if (active) { setImage(result.image); setPages(result.pages) } }).catch(error => { if (active) setNotice(String(error)) }).finally(() => { if (active) setBusy(false) })
+      const selected = page(), generation = ++rendering; setBusy(true)
+      void client.host.pdf(props.request, selected).then(result => { if (active && generation === rendering) { setImage(result.image); setPages(result.pages) } }).catch(error => { if (active && generation === rendering) setNotice(String(error)) }).finally(() => { if (active && generation === rendering) setBusy(false) })
     }
   })
   async function save() { clearTimeout(timer); await retain(); await client.host.file(request("save", { edit: edit() })); setDirty(false); await props.reopen() }
@@ -78,7 +79,7 @@ function FileEditor(props: { view: FileView; request: FileRequest; reopen(versio
     if (!editable()) return
     if (["word", "slides"].includes(props.view.kind)) {
       const list = paragraphs()
-      props.menu("Choose existing text content", list.map(paragraph => ({ title: edit().paragraphs?.[paragraph.id] ?? paragraph.text, description: `${paragraph.id} · ${paragraph.runs.map(run => [run.bold ? "bold" : "", run.italic ? "italic" : "", run.size ? `${run.size}pt` : ""].filter(Boolean).join(" ")).filter(Boolean).join(", ")}`, run: () => props.prompt("Edit " + paragraph.id, edit().paragraphs?.[paragraph.id] ?? paragraph.text, async text => { const next = { ...edit(), paragraphs: { ...edit().paragraphs, [paragraph.id]: text } }; change(next); await client.host.file(request("draft", { edit: next })); await props.reopen() }) })))
+      props.menu("Choose existing text content", list.map(paragraph => ({ title: edit().paragraphs?.[paragraph.id] ?? paragraph.text, description: `${paragraph.id} · ${paragraph.runs.map(run => [run.bold ? "bold" : "", run.italic ? "italic" : "", run.size ? `${run.size}pt` : ""].filter(Boolean).join(" ")).filter(Boolean).join(", ")}`, run: () => props.prompt("Edit " + paragraph.id, edit().paragraphs?.[paragraph.id] ?? paragraph.text, async text => { const next = { ...edit(), paragraphs: { ...edit().paragraphs, [paragraph.id]: text } }; await client.host.file(request("draft", { edit: next })); await props.reopen() }) })))
     } else if (props.view.kind === "table" || props.view.kind === "workbook") {
       const sheets = props.view.sheets
       const pickCell = (sheetID?: number) => props.prompt("Cell address", props.view.kind === "table" ? "1:1" : "A1", address => {
@@ -86,7 +87,7 @@ function FileEditor(props: { view: FileView; request: FileRequest; reopen(versio
         const cell = sheets?.find(s => s.id === sheetID)?.cells.find(c => c.address === address.toUpperCase())
         const previous = edit().cells?.[key] ?? (sheetID === undefined ? (() => { const [r, c] = key.split(":").map(Number); return props.view.rows?.[r]?.[c] })() : cell?.formula ? `=${cell.formula}` : cell?.value) ?? ""
         client.fileSelections.set(props.view.id, `Selected cell ${address}${sheetID === undefined ? "" : ` in worksheet ${sheetID + 1}`}: ${previous}`)
-        props.prompt("Edit cell " + address, previous, async value => { const next = { ...edit(), cells: { ...edit().cells, [key]: value } }; change(next); await client.host.file(request("draft", { edit: next })); await props.reopen() }, "Start a spreadsheet formula with =. Existing formulas and styles are preserved; this editor does not recalculate formulas.")
+        props.prompt("Edit cell " + address, previous, async value => { const next = { ...edit(), cells: { ...edit().cells, [key]: value } }; await client.host.file(request("draft", { edit: next })); await props.reopen() }, "Start a spreadsheet formula with =. Existing formulas and styles are preserved; this editor does not recalculate formulas.")
       }, props.view.kind === "table" ? "Use one-based row:column, e.g. 2:3." : "Use an Excel cell address, e.g. B7.")
       if (sheets) props.menu("Choose worksheet", sheets.map(sheet => ({ title: sheet.name, disabled: sheet.protected, run: () => pickCell(sheet.id) })))
       else pickCell()
@@ -123,7 +124,7 @@ function FileEditor(props: { view: FileView; request: FileRequest; reopen(versio
           <For each={props.view.rows}>{(row, index) => <text>{index() + 1}: {row.map((cell, col) => literal(edit().cells?.[`${index()}:${col}`] ?? cell)).join(" │ ")}</text>}</For>
           <For each={props.view.sheets}>{sheet => <box marginBottom={1}><text fg={theme.accent}>{literal(sheet.name)}{sheet.protected ? " · Protected" : ""} · merges {sheet.merges.join(", ")}</text><For each={sheet.cells}>{cell => <text>{cell.address}: {literal(edit().cells?.[`${sheet.id}!${cell.address}`] ?? (cell.formula ? `=${cell.formula}` : cell.value))}</text>}</For></box>}</For>
           <For each={paragraphs()}>{paragraph => <box marginBottom={1}><text fg={theme.text.muted}>{literal(paragraph.id)} · {literal(paragraph.style)}</text><text>{literal(edit().paragraphs?.[paragraph.id] ?? paragraph.text)}</text><For each={paragraph.images}>{image => <image source={image} height={8} width="100%" fit="fit" />}</For></box>}</For>
-        </scrollbox>}>{bytes => <image source={bytes()} flexGrow={1} width="100%" fit="fit" onError={error => setNotice(String(error))} />}</Show>
+        </scrollbox>}>{bytes => <image id="file-visual-preview" source={bytes()} flexGrow={1} width="100%" fit="fit" onError={error => setNotice(String(error))} />}</Show>
       }>
         <textarea id="file-text-editor" ref={node => { textarea = node; if (!editable()) node.traits = { suspend: true } }} focused={editable()} initialValue={edit().text ?? props.view.text ?? ""} flexGrow={1} wrapMode="word" textColor={theme.text.base}
           onContentChange={() => { if (textarea && editable()) change({ text: textarea.plainText }) }} />
