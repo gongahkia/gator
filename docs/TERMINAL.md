@@ -14,6 +14,10 @@ make terminal
 make terminal-check
 ```
 
+The Go build uses a temporary directory under `ui/runtime/` and removes it after
+success or failure, avoiding small RAM-backed `/tmp` filesystems. An explicit
+`GOTMPDIR` overrides that default and remains owned by you.
+
 `make run` still launches Electron during migration. `make terminal` launches
 the actual OpenCode-derived terminal against Gator's Go runtime. Use Ctrl+P for
 grouped menus and searchable terminal actions. Slash commands appear in the

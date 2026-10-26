@@ -1304,3 +1304,17 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
 - No profile format or data migration changes were required for these menu fixes.
   The overall migration parity gate remains open, including deferred native
   macOS/Windows checks. Electron remains functional as the reference.
+
+### Local build with a full temporary filesystem
+
+- Reproduced the reported environment: `/tmp` is a 2.5 GiB tmpfs with only 8.9 MiB
+  available, while the repository filesystem has 855 GiB free. The Go linker was
+  using the constrained temporary filesystem rather than the runtime output disk.
+- `ui/scripts/build-runtime.mjs` now creates a private, unique build scratch directory
+  under the ignored `ui/runtime/`, passes it as `GOTMPDIR`, and removes its own scratch
+  after success/failure. A caller's explicit nonempty `GOTMPDIR` is preserved and is
+  never removed. No user data or unrelated temporary files were deleted.
+- `make terminal-build` passes without a temporary-directory override while `/tmp`
+  remains at 8.9 MiB free. A temporary fake-Go subprocess probe verifies nonzero exit
+  propagation, cleanup after failure, and retention of an explicit caller directory.
+  Build log: `/home/gongahkia/.cache/gator-migration/tmp-build-fix.log`.

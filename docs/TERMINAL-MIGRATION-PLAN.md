@@ -8,6 +8,8 @@ Command arguments entered through menus preserve the independent message draft;
 keyboard completion and compact-terminal checks are recorded in the ledger.
 Model selection, effort and provider setup have separate menus with back navigation;
 panels display one consolidated hint bar while retaining all advertised keys.
+The normal terminal build now places Go linker scratch beside its runtime output,
+so a full RAM-backed `/tmp` does not prevent building on an otherwise spacious disk.
 The final menu build passes standalone production-service, PTY/editor and install
 checks. The full regression run and targeted reruns are distinguished in the ledger.
 
