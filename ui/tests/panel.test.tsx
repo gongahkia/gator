@@ -75,3 +75,23 @@ test("loaded filters keep original record indices and empty results cannot activ
     const count = host.sent.length; setup.mockInput.pressEnter(); await flush(); expect(host.sent).toHaveLength(count)
   } finally { await client.close(); await setup.dispose(); await rm(root, { recursive: true, force: true }) }
 })
+
+test("model controls render once while hints missing from the footer remain reachable", async () => {
+  const root = await mkdtemp(join(tmpdir(), "gator-panel-hints-"))
+  const host = new FixtureHost({ binary: "/unused", workspace: root, userData: root, env: { GATOR_STATE_DIR: root } })
+  host.current.panel = { id: "model-list", kind: "models", title: "Cloud models", selected: 0,
+    rows: [{ label: "fixture / model-one" }], footer: "↑/↓ choose · Enter use · C configure key · Esc back",
+    hints: [{ shortcut: "↑/↓", action: "choose" }, { shortcut: "Enter", action: "use" }, { shortcut: "C", action: "configure" }, { shortcut: "N", action: "new provider" }, { shortcut: "Esc", action: "back" }] }
+  const client = new GatorClient(host)
+  const setup = await testRender(() => <App client={client} quit={() => client.close()} clipboard={{ read: async () => ({ data: "", mime: "text/plain" }), write: async () => {} }} />, { width: 110, height: 32 })
+  try {
+    await client.start(); await setup.flush(); await Bun.sleep(30); await setup.flush()
+    const frame = setup.captureCharFrame()
+    expect(frame.match(/↑\/↓ choose/g)).toHaveLength(1)
+    expect(frame.match(/Enter use/g)).toHaveLength(1)
+    expect(frame.match(/C configure/g)).toHaveLength(1)
+    expect(frame).toContain("N new provider")
+    setup.mockInput.pressKey("n"); await setup.flush(); await Bun.sleep(30)
+    expect(host.sent.at(-1)?.key).toBe("n")
+  } finally { await client.close(); await setup.dispose(); await rm(root, { recursive: true, force: true }) }
+})

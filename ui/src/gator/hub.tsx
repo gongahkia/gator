@@ -35,7 +35,7 @@ export function Hub() {
     ["Memory receipts", "Guarded corrections, forgetting and undo", "/memories"],
     ["Connected request receipts", "Inspect outcomes and uncertain sends", "/receipts"],
   ] : [
-    ["Models and providers", "Credentials, endpoints, local models and installation", "/model"],
+    ["Models and providers", "Choose model, effort, credentials or local installation", "/models"],
     ["Connections", "Sign in, verify, reconnect and disconnect accounts", "/connections"],
     ["Memory and privacy", "Personal memory, learning and earlier-chat recall", "/memory"],
     ["Appearance and shortcuts", "Gator theme, keys and display preferences", "/appearance"],

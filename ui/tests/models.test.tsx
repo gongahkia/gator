@@ -22,17 +22,18 @@ test("model and effort keyboard choices preserve drafts and respect configured i
   const choose = async (label: string) => { setup.mockInput.pressKey("u", { ctrl: true }); await setup.mockInput.typeText(label); await flush(); setup.mockInput.pressEnter(); await flush() }
   try {
     await client.start(); await client.edit("Keep the model selection draft."); const context = client.context
-    await menu(); await choose("Effort: high"); await until(() => client.state?.composer?.effort === "high", "high effort")
-    await menu(); await choose("Effort: standard"); await until(() => client.state?.composer?.effort === "standard", "reset effort")
-    await menu(); await choose("Careful model"); await until(() => client.state?.model === "two", "configured model identity")
+    await menu(); await choose("Choose effort"); await choose("Effort: high"); await until(() => client.state?.composer?.effort === "high", "high effort")
+    await menu(); await choose("Choose effort"); await choose("Effort: standard"); await until(() => client.state?.composer?.effort === "standard", "reset effort")
+    await menu(); await choose("Choose model"); await choose("Careful model"); await until(() => client.state?.model === "two", "configured model identity")
     expect(JSON.parse(await readFile(config, "utf8")).defaults.model).toBe("two")
     expect(client.draft.text).toBe("Keep the model selection draft."); expect(client.context).toBe(context); expect(calls).toHaveLength(0)
     expect(client.state?.composer?.models.find(model => model.provider === "locked")?.unavailable).toBeTruthy()
-    await menu(); await choose("unavailable"); expect(client.state?.model).toBe("two")
+    await menu(); await choose("Choose model"); await choose("unavailable"); expect(client.state?.model).toBe("two")
+    setup.mockInput.pressEscape(); await flush(); expect(setup.captureCharFrame()).toContain("Model and effort for future messages")
     setup.mockInput.pressEscape(); await Bun.sleep(80); await flush()
     await client.send({ type: "submit", text: "/mode inspect" }); await client.submit(); await until(() => calls.length === 1 && !!client.state?.running, "active model request")
     expect(calls[0].model).toBe("two"); await client.edit("Independent unsent message")
-    await menu(); expect(setup.captureCharFrame()).toContain("Available after")
+    await menu(); expect(setup.captureCharFrame()).toContain("Available after"); await choose("Choose effort")
     await choose("Effort: high"); expect(client.state?.composer?.effort).toBe("standard"); expect(client.draft.text).toBe("Independent unsent message")
     release(); await until(() => !client.state?.running, "completed work")
     // The open picker must become usable when Go releases the work restriction.

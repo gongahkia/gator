@@ -10,3 +10,4 @@ node_modules
 /desktop/release/
 /desktop/test-results/
 /desktop/playwright-report/
+/.pty-venv/

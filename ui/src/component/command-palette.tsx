@@ -16,7 +16,7 @@ export function CommandPaletteDialog() {
   }]))
   const roots = () => commandGroups.map(group => ({ title: group, description: "Open menu →", value: `menu:${group}`, onSelect: () => { setQuery(""); setSection(group) } }))
   return <Show when={section()} keyed fallback={<DialogSelect title="Gator commands" searchInTitle titlePlaceholder="Search Gator commands"
-    onFilter={setQuery} options={[...roots(), ...(query().trim() ? options().filter(option => !option.value.startsWith("gator.command.") && !["gator.settings", "gator.following", "gator.saved"].includes(option.value)) : [])]} flat />}>
+    onFilter={setQuery} options={[...roots(), ...(query().trim() ? options().filter(option => !option.value.startsWith("gator.command.") && !commandGroups.some(group => group.toLowerCase() === option.title.toLowerCase())) : [])]} flat />}>
     {group => <DialogSelect title={`Gator › ${group}`} placeholder={`Search ${group.toLowerCase()}`} onCancel={() => { setQuery(""); setSection(undefined) }}
       options={options().filter(option => option.category === group)} flat />}
   </Show>

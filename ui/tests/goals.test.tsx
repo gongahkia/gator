@@ -32,7 +32,9 @@ test("saved goals resume their own workspace and plans retain deadlines, evidenc
     await send(`/plan step ${step} blocked | Waiting for venue reply`); saved = plan(); expect(saved).toContain("blocked"); expect(saved).toContain("Waiting for venue reply")
     await send("/plan review-at 2030-10-26T18:30:00Z"); expect(plan()).toContain("2030-10-26T18:30:00Z")
     await send(`/plan step ${step} done | Confirmed by venue`); expect(plan()).toContain("done"); expect(plan()).toContain("Confirmed by venue")
-    await send("/plan"); expect(setup.captureCharFrame()).toContain("Check capacity"); expect(JSON.stringify(client.state?.messages.at(-1)?.result)).toContain("Goal plan")
+    // Selecting an argument command completes it; a second Enter runs its no-argument view.
+    await client.edit("/plan"); await flush(); setup.mockInput.pressEnter(); await flush(); expect(client.draft.text).toBe("/plan ")
+    setup.mockInput.pressEnter(); await until(() => !client.draft.text, "show plan"); await flush(); expect(setup.captureCharFrame()).toContain("Check capacity"); expect(JSON.stringify(client.state?.messages.at(-1)?.result)).toContain("Goal plan")
     await send(`/plan remove ${step}`); expect(plan()).toContain(step); expect(JSON.stringify(client.state?.messages)).toContain("--yes")
     await client.edit("Keep goal draft"); const goalContext = client.context; await client.close(); await setup.dispose(); client = new GatorClient(new Application(options)); setup = await render(); await client.start(); await selectGoal()
     expect(client.context).toBe(goalContext); expect(client.draft.text).toBe("Keep goal draft"); expect(plan()).toContain(step)

@@ -26,7 +26,7 @@ test("revision navigation preserves ancestry and drafts and reopening from anoth
   let setup = await render()
   const flush = async () => { await setup.flush(); await Bun.sleep(30); await setup.flush() }
   const until = async (predicate: () => boolean, label: string) => { const end = Date.now() + 15000; while (!predicate()) { if (Date.now() > end) throw new Error(label + ": " + client.issue + "\n" + setup.captureCharFrame()); await flush() } }
-  const command = async (name: string) => { setup.mockInput.pressKey("p", { ctrl: true }); await flush(); await setup.mockInput.typeText(name); await flush(); setup.mockInput.pressEnter(); await flush() }
+  const command = async (group: string, label: string) => { setup.mockInput.pressKey("p", { ctrl: true }); await flush(); await setup.mockInput.typeText(group); await flush(); setup.mockInput.pressEnter(); await flush(); await setup.mockInput.typeText(label); await flush(); setup.mockInput.pressEnter(); await flush() }
   try {
     await client.start(); await client.send({ type: "submit", text: "/mode inspect" }); await client.edit("Read the original note."); await client.submit(); await until(() => !client.state?.running && answers === 1, "first revision")
     const id = client.state!.conversation_id!, snapshot = client.state?.work_details?.snapshot_id
@@ -34,13 +34,13 @@ test("revision navigation preserves ancestry and drafts and reopening from anoth
     const first = await selected(); expect(first).toBeTruthy()
     expect(JSON.stringify(requests)).toContain("Original workspace evidence")
     await writeFile(join(workspace, "note.md"), "Explicitly refreshed source evidence")
-    await client.edit("Keep draft during source refresh"); await command("/source-refresh"); expect(client.draft.text).toBe("Keep draft during source refresh")
+    await client.edit("Keep draft during source refresh"); await command("Files", "Refresh workspace snapshot next turn"); expect(client.draft.text).toBe("Keep draft during source refresh")
     await client.edit("Read the updated note."); await client.submit(); await until(() => !client.state?.running && answers === 2, "second revision")
     const second = await selected(); expect(second).not.toBe(first); expect(client.state?.work_details?.snapshot_id).not.toBe(snapshot); expect(JSON.stringify(requests)).toContain("Explicitly refreshed source evidence")
     await client.edit("Keep revision navigation draft"); const count = requests.length
-    await command("/revision-back"); await until(() => JSON.stringify(client.state?.messages).includes("Grounded result 1.") && !JSON.stringify(client.state?.messages).includes("Grounded result 2."), "previous revision")
+    await command("Chats", "Move to the previous conversation revision"); await until(() => JSON.stringify(client.state?.messages).includes("Grounded result 1.") && !JSON.stringify(client.state?.messages).includes("Grounded result 2."), "previous revision")
     expect(JSON.stringify(client.state?.messages)).toContain("Grounded result 1."); expect(JSON.stringify(client.state?.messages)).not.toContain("Grounded result 2."); expect(client.draft.text).toBe("Keep revision navigation draft"); expect(await selected()).toBe(first)
-    await command("/revision-forward"); await until(() => JSON.stringify(client.state?.messages).includes("Grounded result 2."), "next revision"); expect(JSON.stringify(client.state?.messages)).toContain("Grounded result 2."); expect(requests).toHaveLength(count)
+    await command("Chats", "Move to the next conversation revision"); await until(() => JSON.stringify(client.state?.messages).includes("Grounded result 2."), "next revision"); expect(JSON.stringify(client.state?.messages)).toContain("Grounded result 2."); expect(requests).toHaveLength(count)
     await client.close(); await setup.dispose(); client = new GatorClient(new Application({ ...options, workspace: other })); setup = await render(); await client.start(); await flush()
     expect(client.state?.conversation_id).toBe(id); expect(client.state?.source).toBe(workspace); expect(await selected()).toBe(second); expect(client.draft.text).toBe("Keep revision navigation draft"); expect(requests).toHaveLength(count)
     expect(JSON.stringify(requests)).not.toContain("Launch directory secret")

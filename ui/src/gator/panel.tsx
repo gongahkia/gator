@@ -19,6 +19,13 @@ export function Panel(props: { panel: BackendPanel }) {
   const client = useClient(), data = useData(), theme = useTheme(), dialog = useDialog(), renderer = useRenderer()
   const [fields, setFields] = createSignal<Record<number, string>>({}), [busy, setBusy] = createSignal(false), [query, setQuery] = createSignal("")
   const selectedRow = () => Math.max(0, Math.min(props.panel.selected ?? 0, (props.panel.rows?.length ?? 1) - 1))
+  const footer = () => {
+    const parts = (props.panel.footer ?? "").split("·").map(part => part.trim()).filter(Boolean)
+    for (const hint of props.panel.hints ?? []) {
+      if (!parts.some(part => part.toLowerCase().startsWith(hint.shortcut.toLowerCase() + " "))) parts.push(`${hint.shortcut} ${hint.action}`)
+    }
+    return literal(parts.join(" · ")) || "↑/↓ select · Enter open/edit · Esc back · Ctrl+F search"
+  }
   const formSubmit = () => {
     if (props.panel.hints?.some(hint => /ctrl\+(r|enter)/.test(hint.shortcut.toLowerCase().replaceAll(" ", "")))) return { key: "ctrl+r", label: "review" }
     if (!props.panel.rows?.some(row => row.input)) return
@@ -170,8 +177,7 @@ export function Panel(props: { panel: BackendPanel }) {
       <Show when={props.panel.notice}><text fg={props.panel.notice_tone === "error" ? theme.text.feedback.error.base : theme.text.muted}>{literal(props.panel.notice)}</text></Show>
       <Show when={props.panel.usage}><text>{JSON.stringify(props.panel.usage, null, 2)}</text></Show>
     </scrollbox>
-    <text fg={theme.text.muted}>{literal(props.panel.footer) || "↑/↓ select · Enter open/edit · Esc back · Ctrl+F search"}</text>
-    <text fg={theme.text.muted}>{props.panel.hints?.map(h => `${literal(h.shortcut)} ${literal(h.action)}`).join(" · ")}</text>
+    <text fg={theme.text.muted}>{footer()}</text>
     <Show when={data.state?.notice}><text fg={theme.text.feedback.warning.base}>{literal(data.state?.notice)}</text></Show>
     <Show when={formSubmit()}>{submit => <text fg={theme.text.muted}>F2 or Ctrl+R: {submit().label} form · Enter edits the selected field · Ctrl+Enter also works where supported.</text>}</Show>
   </box>

@@ -26,7 +26,7 @@ export function useActions() {
     if (context !== previousContext) { previousContext = context; dialog.clear() }
   })
   const attempt = (operation: unknown) => { if (operation instanceof Promise) void operation.catch(e => client.fail(e)) }
-  const menu = (title: string, choices: Choice[] | (() => Choice[]), showDisabled = false) => dialog.replace(() => <DialogSelect title={title} showDisabled={showDisabled} options={(typeof choices === "function" ? choices() : choices).map((item, index) => ({
+  const menu = (title: string, choices: Choice[] | (() => Choice[]), showDisabled = false, back?: () => void) => dialog.replace(() => <DialogSelect title={title} showDisabled={showDisabled} onCancel={back} options={(typeof choices === "function" ? choices() : choices).map((item, index) => ({
     title: literal(item.title), description: literal(item.description), category: literal(item.category), disabled: item.disabled, value: item.key ?? index,
     onSelect: () => { dialog.clear(); try { attempt(item.run()) } catch (error) { client.fail(error) } },
   }))} />)
@@ -129,20 +129,26 @@ export function useActions() {
     ]) })))
   }
   function models() {
-    if (!client.state?.composer) return
-    menu("Model and effort for future messages", () => {
+    const chooseModel = () => menu("Models › Choose model", () => {
       const composer = data.state?.composer
       if (!composer) return []
-      return [
-      ...composer.models.map(model => ({ key: `model:${model.provider}:${model.model}`, title: model.label, description: composer.disabled || model.unavailable, disabled: !!composer.disabled || !!model.unavailable, run: async () => {
+      return composer.models.map(model => ({ key: `model:${model.provider}:${model.model}`, title: model.label, category: model.provider,
+        description: composer.disabled || model.unavailable || (model.provider === data.state?.provider && model.model === data.state?.model ? "Current model" : undefined), disabled: !!composer.disabled || !!model.unavailable, run: async () => {
         const request_id = randomUUID(); await client.result({ type: "composer", composer: { action: "model", id: composer.id, request_id, provider: model.provider, model: model.model } }, request_id, s => s.composer_result)
-      } })),
-      ...(["low", "standard", "high"] as const).map(effort => ({ key: `effort:${effort}`, title: `Effort: ${effort}`, description: composer.disabled, disabled: !!composer.disabled, run: async () => {
+      } }))
+    }, true, models)
+    const chooseEffort = () => menu("Models › Choose effort", () => {
+      const composer = data.state?.composer
+      if (!composer) return []
+      return (["low", "standard", "high"] as const).map(effort => ({ key: `effort:${effort}`, title: `Effort: ${effort}`, description: composer.disabled || (composer.effort === effort ? "Current effort" : undefined), disabled: !!composer.disabled, run: async () => {
         const request_id = randomUUID(); await client.result({ type: "composer", composer: { action: "effort", id: composer.id, request_id, effort } }, request_id, s => s.composer_result)
-      } })),
+      } }))
+    }, true, models)
+    menu("Model and effort for future messages", () => [
+      { title: "Choose model", description: data.state?.composer?.disabled || `${data.state?.provider || "No provider"} / ${data.state?.model || "Not selected"}`, run: chooseModel },
+      { title: "Choose effort", description: data.state?.composer?.disabled || data.state?.composer?.effort || "standard", run: chooseEffort },
       { title: "Configure providers and local models", run: () => client.navigate("/model") },
-      ]
-    }, true)
+    ])
   }
   function catalog() {
     const panel = client.state?.panel, row = panel?.selected ?? 0, item = panel?.rows?.[row]
