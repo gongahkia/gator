@@ -71,8 +71,8 @@ assertions to terminal/host/native tests before retiring any Electron suite.
 
 ### `desktop/tests/e2e/app-control.spec.ts`
 
-- [ ] chat changes shortcuts, model selection, limits, retention and selected connections
-- [ ] chat opens a data deletion review without deleting content
+- [x] chat changes shortcuts, model selection, limits, retention and selected connections (terminal: `tests/app-control.test.tsx`)
+- [x] chat opens a data deletion review without deleting content (terminal: `tests/app-control.test.tsx`)
 - [ ] dictation preserves the draft, records voice usage and reads only new replies
 - [ ] composer model picker preserves drafts, changes actual defaults and honors active-work locks
 
@@ -808,3 +808,16 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   provider receives terminal guidance without desktop-only controls/CLI denial,
   alongside the existing paste, draft, restart and navigation assertions.
   Terminal typecheck passes.
+
+### Conversational application controls
+
+- `tests/app-control.test.tsx`: **1 pass / 19 assertions**. Actual Go tool calls
+  through a local model fixture change a usable command shortcut, select a model
+  for the next request, and retain selected connections and shortcuts at restart.
+  Usage-limit and retention changes require the exact live approval. Declining a
+  subsequent limit change retains the previous policy.
+- A model request to delete knowledge opens the canonical final deletion review;
+  cancelling leaves the original note intact. No fixture directly writes the
+  resulting application settings. Terminal typecheck passes. This closes the
+  first two mapped desktop app-control journeys; native voice and appearance
+  acceptance remain separately tracked.

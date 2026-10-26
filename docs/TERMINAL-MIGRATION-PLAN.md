@@ -39,6 +39,8 @@ progress/cancellation, rename, selection, inference routing and reviewed removal
 against an isolated runtime fixture; native installation remains unverified.
 Go now supplies terminal-specific in-app help to terminal-hosted runs while
 preserving the desktop reference guide and the same execution authority.
+Conversational app-control evidence now covers persisted shortcuts, future model
+and connection selections, approved limits/retention and cancelled data deletion.
 
 Replace the Electron application with Gator's adaptation of **OpenCode's actual
 terminal frontend**, carrying forward Gator's current capabilities. Use an
