@@ -21,6 +21,9 @@ verify that reopening never retries the external send or rewrites sealed evidenc
 An idempotent preference import now preserves applicable Chromium display choices
 without opening or changing the original database; actual Electron-to-Bun evidence
 is recorded in the ledger. Native-platform import checks remain deferred.
+A real Go connection journey now covers reviewed token setup, access verification,
+disconnect and local OAuth callback completion across chat navigation. Browser
+launch is fixture-verified on Linux; native browser/permission checks remain open.
 
 Replace the Electron application with Gator's adaptation of **OpenCode's actual
 terminal frontend**, carrying forward Gator's current capabilities. Use an

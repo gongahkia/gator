@@ -110,7 +110,7 @@ assertions to terminal/host/native tests before retiring any Electron suite.
 
 ### `desktop/tests/e2e/connections.spec.ts`
 
-- [ ] native account setup reviews credentials, verifies access and returns to browser sign-in
+- [x] native account setup reviews credentials, verifies access and returns to browser sign-in — `ui/tests/connections.test.tsx` on Linux with a local OAuth server and an owned browser-helper fixture; actual native browser permissions remain pending.
 
 ### `desktop/tests/e2e/conversation-catalog.spec.ts`
 
@@ -682,3 +682,23 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
 - Focused `office-keyboard`, `preferences`, `catalog`, `concurrent` rerun:
   **4 pass / 66 assertions / 0 failures**; terminal typecheck passes. A fresh full
   frontend run is in progress; the earlier 33/36 result remains recorded above.
+
+### File readiness and account setup regression checks
+
+- The next full frontend run completed with **33 pass / 3 fail / 408 assertions**.
+  Failures concerned table handoff, Office editor readiness and update visibility;
+  this result does not establish parity. File checks now wait for the actual
+  returned editor and attachment, and the manual renderer drives frames while
+  awaiting durable visibility receipts. Behavioral assertions remain intact.
+- Focused table, Office and update checks: **4 pass**. The new connection journey
+  initially failed because it acted before Go loaded the requested panel, then
+  expected the old account detail after returning to Connections. It now waits
+  for the actual loaded row and acknowledged selection and explicitly reopens
+  the account after returning, matching the reference journey.
+- Final focused `connections` and `grid`: **2 pass / 21 assertions**. Connection
+  setup reviews configuration before saving, masks private tokens, verifies one
+  authenticated read, disconnects, and completes a real local OAuth callback
+  after switching chats. The pending sign-in and both drafts retain ownership;
+  credentials never appear in display state. On Linux an owned `xdg-open` fixture
+  verifies the exact authorization URL; it does not prove native browser UI or
+  OS permissions. Terminal typecheck passes. Full-suite rerun remains pending.
