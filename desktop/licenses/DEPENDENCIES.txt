@@ -64,7 +64,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ========================================================================
-@napi-rs/canvas-darwin-x64@1.0.13
+@napi-rs/canvas-linux-x64-gnu@1.0.13
 License: MIT
 
 ========================================================================
