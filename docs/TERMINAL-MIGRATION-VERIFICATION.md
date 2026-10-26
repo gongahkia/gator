@@ -124,7 +124,7 @@ assertions to terminal/host/native tests before retiring any Electron suite.
 - [ ] long conversations retain context while searching and signal activity without moving the reader
 - [ ] recent chats default to a flat list, offer folder grouping, and isolate drafts
 - [ ] motion is interruptible, releases dismissed controls, and honors reduced motion
-- [ ] queued messages can be edited, reordered, removed, and resumed without losing drafts
+- [x] queued messages can be edited, reordered, removed, and resumed without losing drafts (terminal: `tests/recovery.test.tsx`)
 - [ ] desktop uses real Go state, preserves drafts, edits native forms, and continues saved work
 - [ ] the conversational home has no dashboard and usage controls keep the Go review flow
 - [ ] review presentation preserves exact previews and only the live approval action
@@ -830,3 +830,16 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
 - `tests/client.test.ts` and `tests/voice.test.tsx`: **8 pass / 61 assertions**.
   Both dictation phases reject guidance; idle guidance still receives Go's exact
   acknowledgement before clearing the submitted snapshot.
+
+### Queued-message editing and ordering
+
+- Extended the real Go recovery journey through the keyboard queue menu: edit an
+  attached queued request, move it later and earlier while another request stays
+  in flight, restart, explicitly resume its edited text with the original private
+  attachment, remove the interrupted request, and restart again. The independent
+  unsent composer remains unchanged and no request starts from queue management.
+- `tests/recovery.test.tsx`: **1 pass / 19 assertions**; terminal typecheck passes.
+  The initial fixture incorrectly used Ctrl+A as select-all (it moves to the
+  beginning in this terminal) and treated string input names as objects. Corrected
+  the fixture to the supported Ctrl+U clear-line operation and protocol shape;
+  no queue behavior was relaxed.

@@ -42,6 +42,8 @@ Go now supplies terminal-specific in-app help to terminal-hosted runs while
 preserving the desktop reference guide and the same execution authority.
 Conversational app-control evidence now covers persisted shortcuts, future model
 and connection selections, approved limits/retention and cancelled data deletion.
+Queue keyboard evidence now covers edits, ordering, removal and explicit recovery
+with immutable attachments while retaining the independent composer draft.
 
 Replace the Electron application with Gator's adaptation of **OpenCode's actual
 terminal frontend**, carrying forward Gator's current capabilities. Use an
