@@ -140,7 +140,7 @@ assertions to terminal/host/native tests before retiring any Electron suite.
 
 ### `desktop/tests/e2e/followup-chat.spec.ts`
 
-- [ ] chat reviews, saves, edits and pauses an origin-linked responsibility
+- [x] chat reviews, saves, edits and pauses an origin-linked responsibility — `ui/tests/followup-chat.test.tsx`, including quiet feedback; typed end-date review in `ui/tests/pages.test.tsx`.
 
 ### `desktop/tests/e2e/inline-files.spec.ts`
 
@@ -1038,3 +1038,19 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   **1 pass / 18 assertions**; profile continuity: **2 pass / 28 assertions**;
   terminal typecheck passes. Original Chromium bytes, file drafts/versions, profile
   separation and disabled draft retention are preserved.
+
+### Quiet-check assessment conflicts and recovery
+
+- Extended `bun test --cwd ui --preload ./scripts/preload.ts
+  tests/followup-chat.test.tsx`: **1 pass / 33 assertions**; terminal typecheck
+  passes. Only a completed, evaluated quiet decision appears for feedback; failed
+  and unchanged attempts do not become evaluated decisions.
+- Keyboard actions save a missed-change note, mark the decision correct, reject
+  an assessment changed concurrently, and retain the complete unsaved note when
+  navigation is cancelled. Explicit discard permits refresh; clearing the latest
+  assessment advances its sequence without changing the check agreement, paused
+  state or alert condition. Restart retains the original chat and draft and
+  makes no provider request. Rendering assertions account for wrapped text and
+  independently verify the complete authoritative field value.
+- The desktop journey's typed expiry input is covered by the existing page-form
+  test. Native scheduling and actual background-service installation remain open.
