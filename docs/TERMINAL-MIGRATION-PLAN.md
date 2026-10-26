@@ -46,6 +46,8 @@ Queue keyboard evidence now covers edits, ordering, removal and explicit recover
 with immutable attachments while retaining the independent composer draft.
 Attachment intake now has keyboard evidence for all current byte/count limits,
 visible rejection, clipboard PNG capture, restart and explicit files-only send.
+Native playback now carries language and rate on all three platforms; helper
+contract tests pass, while actual macOS/Windows voice checks remain deferred.
 
 Replace the Electron application with Gator's adaptation of **OpenCode's actual
 terminal frontend**, carrying forward Gator's current capabilities. Use an

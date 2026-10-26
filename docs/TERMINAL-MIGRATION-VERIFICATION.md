@@ -860,3 +860,26 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
 - The helper fixture is not an OS clipboard permission test. Native macOS/Windows
   clipboard checks remain deferred. Terminal path selection is the replacement
   for Electron file dialogs/drag-drop; image viewing has separate pixel evidence.
+
+### Native speech preference routing
+
+- Fixed ignored Windows language/rate and ignored macOS language. Playback now
+  enumerates installed voices, selects the exact locale or matching primary
+  language, and visibly rejects an unavailable language. Reply text travels on
+  stdin rather than command arguments or script interpolation. Cancellation
+  during enumeration prevents playback. Linux keeps its existing helper route.
+- Windows rate maps the stored 0.5–2 preference monotonically around normal 1 to
+  the engine-specific -10–10 scale; this is not a claim of identical speech speed
+  between platforms. The mapping uses Microsoft's documented
+  [Rate](https://learn.microsoft.com/en-us/dotnet/api/system.speech.synthesis.speechsynthesizer.rate)
+  and [installed voice selection](https://learn.microsoft.com/en-us/dotnet/api/system.speech.synthesis.speechsynthesizer.selectvoice).
+  macOS enumerates the existing speech manager's voices through Apple's
+  [voice attributes API](https://developer.apple.com/documentation/appkit/nsspeechsynthesizer/attributes(forvoice:));
+  this API is deprecated but is the same speech engine used by `say`. Its native
+  availability and selected-voice behavior still require Mac acceptance.
+- Native helper suite: **7 pass**; complete shared host: **73 pass / 1 Windows-only
+  skip / 0 fail**. Refreshed the copied Bun host dependency; Linux voice and image
+  intake journeys: **2 pass / 51 assertions**; terminal typecheck passes. These
+  are process-contract and Linux-fixture results, not native audio hardware proof.
+- The preceding complete terminal suite passed **45 tests / 604 assertions across
+  30 files**. Full Go tests and vet also passed with the restore/help changes.

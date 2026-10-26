@@ -86,7 +86,11 @@ Native adapters:
   device name). Audio is transient and transcription is explicitly reviewed in
   its original draft. Configure the provider/key through Models and Voice.
 - Spoken replies use `say` on macOS, System.Speech on Windows, or `espeak-ng` on
-  Linux. They speak only newly received replies when enabled.
+  Linux. They speak only newly received replies when enabled. macOS and Windows
+  choose an installed voice matching the configured language (exact locale first,
+  then the same primary language); missing voices produce a visible error. Speech
+  rate is platform-relative: Windows maps 0.5–2 to its engine-specific -10–10
+  scale, while macOS/Linux use words per minute. Native audio checks are pending.
 - Existing macOS-only computer control and Windows-unavailable strict sandbox/
   interactive agent terminal tools retain their current limits.
 

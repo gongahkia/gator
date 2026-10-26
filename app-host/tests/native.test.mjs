@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { helper, openLink } from "../src/native.mjs";
+import { helper, openLink, speechPlayer } from "../src/native.mjs";
 import { VoiceSession } from "../src/voice-session.mjs";
 import { renderPDF } from "../src/pdf.mjs";
 import { pdfFixture } from "./pdf-fixture.mjs";
@@ -14,6 +14,42 @@ test("native helpers preserve literal argv, bound output and support cancellatio
   const pending = helper(process.execPath, ["-e", "setTimeout(()=>{},10000)"], { signal: abort.signal });
   abort.abort(); await assert.rejects(pending, /abort/i);
   await assert.rejects(openLink("file:///private/credentials"), /Only http/);
+});
+
+test("native playback carries language and rate without exposing reply text in arguments", async () => {
+  const text = 'Literal reply: $(never) `never` " 中文 🐊';
+  for (const platform of ["darwin", "win32", "linux"]) {
+    const calls = [], signal = new AbortController().signal;
+    const speak = speechPlayer({ platform, powershell: () => "powershell-fixture", run: async (program, args, options) => {
+      calls.push({ program, args, options });
+      return Buffer.from(JSON.stringify([{ name: "English", language: "en_US" }, { name: "French Canada", language: "fr_CA" }, { name: "French France", language: "fr-FR" }]));
+    } });
+    await speak(text, { language: "fr-FR", rate: 1.5 }, signal);
+    const playback = calls.at(-1); assert.equal(playback.options.signal, signal);
+    assert.ok(calls.every(call => !call.args.join(" ").includes(text)));
+    if (platform === "darwin") { assert.deepEqual(playback.args, ["-r", "263", "-v", "French France", "-f", "-"]); assert.equal(playback.options.input, text); }
+    if (platform === "win32") { assert.deepEqual(JSON.parse(playback.options.input), { text, voice: "French France", rate: 6 }); assert.ok(playback.args.at(-1).includes("$s.Rate=[int]$p.rate")); }
+    if (platform === "linux") { assert.deepEqual(playback.args, ["--stdin", "-s", "263", "-v", "fr-FR"]); assert.equal(playback.options.input, text); }
+    calls.length = 0; await speak(text, { language: "fr-BE", rate: 0.5 });
+    if (platform !== "linux") assert.ok(JSON.stringify(calls.at(-1)).includes("French Canada"));
+    if (platform === "win32") assert.equal(JSON.parse(calls.at(-1).options.input).rate, -10);
+    calls.length = 0; await speak(text, { rate: 2 }); assert.equal(calls.length, 1);
+    if (platform === "win32") assert.equal(JSON.parse(calls[0].options.input).rate, 10);
+    calls.length = 0;
+    if (platform !== "linux") { await assert.rejects(speak(text, { language: "ja" }), /No installed speech voice/); assert.equal(calls.length, 1); }
+    calls.length = 0;
+    await assert.rejects(speak(text, { language: "en; malicious" }), /Invalid/);
+    await assert.rejects(speak(text, { rate: 3 }), /Invalid/);
+    const aborted = new AbortController(); aborted.abort(); await assert.rejects(speak(text, {}, aborted.signal), /abort/i);
+    assert.equal(calls.length, 0);
+  }
+});
+
+test("cancelling voice enumeration prevents native playback", async () => {
+  const abort = new AbortController(); let calls = 0;
+  const speak = speechPlayer({ platform: "darwin", run: async () => { calls++; abort.abort(); return Buffer.from('[{"name":"English","language":"en"}]'); } });
+  await assert.rejects(speak("Do not play", { language: "en" }, abort.signal), /abort/i);
+  assert.equal(calls, 1);
 });
 
 class App extends EventEmitter {

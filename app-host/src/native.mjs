@@ -63,9 +63,33 @@ export function recordAudio(device = process.env.GATOR_MICROPHONE_DEVICE) {
   void audio.catch(() => {});
   return { audio, stop() { child.stdin.write("q\n"); force = setTimeout(() => child.kill("SIGKILL"), 3000); }, cancel() { cancelled = true; child.kill("SIGTERM"); force = setTimeout(() => child.kill("SIGKILL"), 1500); } };
 }
-export async function speak(text, { language = "", rate = 1 } = {}, signal) {
-  if (typeof text !== "string" || text.length > 128 * 1024 || !Number.isFinite(rate) || rate < 0.5 || rate > 2) throw new Error("Invalid spoken reply.");
-  if (process.platform === "darwin") await helper("/usr/bin/say", ["-r", String(Math.round(175 * rate)), "--", text], { signal });
-  else if (process.platform === "win32") await helper(powershellPath(), ["-NoProfile", "-NonInteractive", "-Command", "Add-Type -AssemblyName System.Speech; [Console]::InputEncoding=[Text.UTF8Encoding]::new($false); $s=[System.Speech.Synthesis.SpeechSynthesizer]::new(); try{$s.Speak([Console]::In.ReadToEnd())}finally{$s.Dispose()}"], { input: text, signal });
-  else await helper("espeak-ng", ["--stdin", "-s", String(Math.round(175 * rate)), ...(language ? ["-v", language] : [])], { input: text, signal });
+// Keep the native process boundary injectable for contract checks on all hosts.
+// Reply content always goes through stdin, never script interpolation or argv.
+export function speechPlayer({ platform = process.platform, run = helper, powershell = powershellPath } = {}) {
+  return async (text, { language = "", rate = 1 } = {}, signal) => {
+    if (typeof text !== "string" || text.length > 128 * 1024 || !Number.isFinite(rate) || rate < 0.5 || rate > 2 || typeof language !== "string" || language.length > 64 || (language && !/^[a-z]{2,8}(?:[-_][a-z0-9]{1,8})*$/i.test(language))) throw new Error("Invalid spoken reply or voice language.");
+    signal?.throwIfAborted();
+    const normalize = value => value.replaceAll("_", "-").toLowerCase();
+    let voice;
+    if (language && ["darwin", "win32"].includes(platform)) {
+      const enumeration = platform === "darwin"
+        ? await run("/usr/bin/osascript", ["-l", "JavaScript", "-e", "ObjC.import('AppKit');var v=$.NSSpeechSynthesizer.availableVoices;var out=[];for(var i=0;i<v.count;i++){var a=$.NSSpeechSynthesizer.attributesForVoice(v.objectAtIndex(i));out.push({name:ObjC.unwrap(a.objectForKey($.NSVoiceName)),language:ObjC.unwrap(a.objectForKey($.NSVoiceLocaleIdentifier))});}JSON.stringify(out);"], { signal, maxBytes: 1024 * 1024 })
+        : await run(powershell(), ["-NoProfile", "-NonInteractive", "-Command", "Add-Type -AssemblyName System.Speech; [Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); $s=[System.Speech.Synthesis.SpeechSynthesizer]::new(); try{ConvertTo-Json -Compress -InputObject @($s.GetInstalledVoices() | Where-Object {$_.Enabled} | ForEach-Object {@{name=$_.VoiceInfo.Name;language=$_.VoiceInfo.Culture.Name}})}finally{$s.Dispose()}"], { signal, maxBytes: 1024 * 1024 });
+      const voices = JSON.parse(enumeration.toString());
+      if (!Array.isArray(voices)) throw new Error("The system could not list installed speech voices.");
+      const valid = voices.filter(item => typeof item?.name === "string" && item.name && typeof item.language === "string");
+      const requested = normalize(language), primary = requested.split("-")[0];
+      voice = (valid.find(item => normalize(item.language) === requested) ?? valid.find(item => normalize(item.language).split("-")[0] === primary))?.name;
+      if (!voice) throw new Error(`No installed speech voice supports ${language}. Install a matching system voice or choose another language in Voice settings.`);
+    }
+    signal?.throwIfAborted();
+    if (platform === "darwin") await run("/usr/bin/say", ["-r", String(Math.round(175 * rate)), ...(voice ? ["-v", voice] : []), "-f", "-"], { input: text, signal });
+    else if (platform === "win32") {
+      // System.Speech uses an engine-specific integer scale (-10..10), with 0
+      // normal. Preserve monotonic slower/faster preferences around rate 1.
+      const input = JSON.stringify({ text, voice, rate: Math.round(10 * Math.log2(rate)) });
+      await run(powershell(), ["-NoProfile", "-NonInteractive", "-Command", "$ErrorActionPreference='Stop'; Add-Type -AssemblyName System.Speech; [Console]::InputEncoding=[Text.UTF8Encoding]::new($false); $p=[Console]::In.ReadToEnd() | ConvertFrom-Json; $s=[System.Speech.Synthesis.SpeechSynthesizer]::new(); try{if($p.voice){$s.SelectVoice([string]$p.voice)}; $s.Rate=[int]$p.rate; $s.Speak([string]$p.text)}finally{$s.Dispose()}"], { input, signal });
+    } else await run("espeak-ng", ["--stdin", "-s", String(Math.round(175 * rate)), ...(language ? ["-v", language] : [])], { input: text, signal });
+  };
 }
+export const speak = speechPlayer();
