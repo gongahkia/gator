@@ -18,6 +18,9 @@ test("long transcript keeps its reading position through hubs and activity; sear
   const transcript = () => { const node = setup.renderer.root.findDescendantById("transcript"); if (!(node instanceof ScrollBoxRenderable)) throw new Error("Transcript not mounted"); return node }
   try {
     await client.start(); await flush()
+    const subscriptions = client.listenerCount("change")
+    host.change({ ...host.current, messages: host.current.messages.map(message => ({ ...message, activity: { state: "completed", started_at: "2026-10-26T00:00:00Z", finished_at: "2026-10-26T00:00:12Z", entries: [{ id: "public-note", kind: "text", text: "Retained public narration", state: "completed", started_at: "2026-10-26T00:00:00Z" }] } })) }); await flush()
+    expect(client.listenerCount("change")).toBe(subscriptions)
     expect(transcript().scrollTop).toBeGreaterThan(10)
     const latest = transcript().scrollTop
     setup.mockInput.pressKey("\x1b[5~"); await flush()

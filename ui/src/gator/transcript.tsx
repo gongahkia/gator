@@ -81,13 +81,13 @@ export function Transcript() {
       <text fg={theme.text.muted}>Use “updates” in Ctrl+P to inspect evidence, read, reply, mark done or give feedback.</text>
     </box> : undefined}>{messageItem => { const { message, index } = messageItem(); return <box id={`message-${index}`} paddingY={1} gap={0} border={revealed() === index ? ["left"] : false} borderColor={revealed() === index ? theme.accent : undefined}>
       <text fg={message.role === "You" ? theme.accent : theme.text.muted}><b>{literal(message.role)}</b> {literal(message.created_at)}</text>
-      <Show when={message.activity}>{trace => <Activity trace={trace()} identity={activityKey(client.context, message, index)} />}</Show>
+      <Show when={message.activity}>{trace => <Activity trace={trace()} identity={activityKey(client.context, message, index)} expanded={data.activityExpanded} />}</Show>
       <Show when={message.text}><text fg={theme.text.base}>{literal(message.text)}</text></Show>
       <Show when={message.result}>{result => <Result value={result()} />}</Show>
       <Show when={message.inputs?.length}><text fg={theme.text.muted}>Inputs: {message.inputs?.map(literal).join(" · ")}</text></Show>
       <For each={message.bundle?.Artifacts}>{artifact => <text fg={theme.accent}>File: {literal(artifact.Path)} · {literal(artifact.MediaType)}</text>}</For>
     </box> }}</Show>}</For>
-    <Show when={data.state?.activity}>{trace => <Activity live trace={trace()} identity={client.context + ":live:" + trace().started_at} />}</Show>
+    <Show when={data.state?.activity}>{trace => <Activity live trace={trace()} identity={client.context + ":live:" + trace().started_at} expanded={data.activityExpanded} />}</Show>
     <Show when={data.state?.running}><text fg={theme.accent}>{data.state?.cancelling ? "Stopping…" : literal(data.state?.status) || "Gator is working…"} {literal(data.state?.elapsed)}</text></Show>
     <Show when={data.state?.chat_checks?.length}><text fg={theme.text.muted}>{data.state?.chat_checks?.length} configured checks · “check-health” in Ctrl+P shows current timing, failures and observed gaps.</text></Show>
     <For each={[data.state?.notice, data.state?.requests_issue, data.state?.action_recovery_issue, data.state?.chat_checks_issue, data.state?.chat_updates_issue, data.state?.chat_memory_issue].filter(Boolean)}>{issue => <text fg={theme.text.feedback.warning.base}>{literal(issue)}</text>}</For>

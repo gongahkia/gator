@@ -1,7 +1,6 @@
 import { For, Show } from "solid-js"
 import type { BackendActivity, BackendMessage, ActivityEntry } from "@gator/application-host/contracts/protocol"
 import { useClient } from "../context/client"
-import { useData } from "../context/data"
 import { useTheme } from "../context/theme"
 import { literal } from "./text"
 
@@ -18,10 +17,10 @@ export function activityText(trace: BackendActivity) {
   return [activitySummary(trace), ...trace.entries.map(entry => entry.kind === "tool" ? `${entry.tool} · ${entry.state === "stopped" ? "unfinished" : entry.state}` : entry.text || ""), trace.truncated ? "Some activity was shortened to keep this conversation responsive." : ""].filter(Boolean).join("\n")
 }
 export function searchableMessage(message: BackendMessage, expanded: boolean) { return [message.text, expanded && message.activity ? activityText(message.activity) : ""].filter(Boolean).join("\n") }
-export function Activity(props: { trace: BackendActivity; identity: string; live?: boolean }) {
-  const client = useClient(), data = useData(), theme = useTheme()
+export function Activity(props: { trace: BackendActivity; identity: string; expanded: ReadonlySet<string>; live?: boolean }) {
+  const client = useClient(), theme = useTheme()
   const hasEntries = () => props.trace.entries.some(entry => entry.kind !== "text" || entry.text?.trim()) || props.trace.truncated
-  const open = () => props.live || data.activityExpanded.has(props.identity)
+  const open = () => props.live || props.expanded.has(props.identity)
   const toggle = (key: string) => { if (client.activityExpanded.has(key)) client.activityExpanded.delete(key); else client.activityExpanded.add(key); client.emit("change") }
   const groups = () => {
     const result: ActivityEntry[][] = []
@@ -36,7 +35,7 @@ export function Activity(props: { trace: BackendActivity; identity: string; live
     <Show when={!props.live}><text fg={theme.text.muted} onMouseUp={() => toggle(props.identity)}>{open() ? "▾ " : "▸ "}{activitySummary(props.trace)}{hasEntries() ? " · activity in Ctrl+P inspects/toggles" : ""}</text></Show>
     <Show when={open()}><For each={groups()}>{entries => <Show when={entries[0].kind === "tool"} fallback={<text fg={theme.text.muted}>{literal(entries[0].text)}</text>}>
       <text fg={theme.text.muted} onMouseUp={() => toggle(props.identity + ":" + entries[0].id)}>{entries.some(entry => entry.state === "running") ? "Using" : "Used"} {entries.length} {entries.length === 1 ? "tool" : "tools"} · {entries.filter(entry => entry.state === "failed").length} failed · activity in Ctrl+P inspects</text>
-      <Show when={data.activityExpanded.has(props.identity + ":" + entries[0].id)}><For each={entries}>{entry => <text fg={entry.state === "failed" ? theme.text.feedback.warning.base : theme.text.muted}>  {literal(entry.tool)} · {entry.state === "stopped" ? "unfinished" : entry.state}</text>}</For></Show>
+      <Show when={props.expanded.has(props.identity + ":" + entries[0].id)}><For each={entries}>{entry => <text fg={entry.state === "failed" ? theme.text.feedback.warning.base : theme.text.muted}>  {literal(entry.tool)} · {entry.state === "stopped" ? "unfinished" : entry.state}</text>}</For></Show>
     </Show>}</For><Show when={props.trace.truncated}><text fg={theme.text.muted}>Some activity was shortened to keep this conversation responsive.</text></Show></Show>
   </box></Show>
 }

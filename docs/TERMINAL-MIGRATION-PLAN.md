@@ -58,6 +58,8 @@ Short terminal hubs now reveal keyboard selection after navigation and resize;
 compact 50×18 and 42×14 tests retain drafts and reach lower destinations.
 A native zero-height selector failure at 42×14 is fixed with bounded list
 geometry and compact dialog positioning; the failing regression now passes.
+Activity histories share the transcript subscription, with a 60-history regression
+preventing per-message listener growth.
 
 Replace the Electron application with Gator's adaptation of **OpenCode's actual
 terminal frontend**, carrying forward Gator's current capabilities. Use an

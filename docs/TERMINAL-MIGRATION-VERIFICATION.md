@@ -955,3 +955,15 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   56 assertions**, including the extended hub case (**11 assertions**); terminal
   typecheck passes. Normal model availability and form masking/navigation guards
   still pass. These changes to imported components are recorded in `UPSTREAM.md`.
+
+### Bounded activity subscriptions
+
+- Recurring-check acceptance exposed an EventEmitter warning from each rendered
+  activity history subscribing separately to the client. Activity now consumes
+  its parent transcript's reactive expansion state; rendering more histories
+  does not add client listeners. This keeps the new presentation bounded without
+  hiding warnings or increasing the listener limit.
+- Activity, long transcript and recurring-check journeys: **3 pass / 50
+  assertions**; terminal typecheck passes. The long transcript adds 60 histories
+  and verifies the client subscription count remains unchanged while scrolling,
+  search, navigation and expansion still work.
