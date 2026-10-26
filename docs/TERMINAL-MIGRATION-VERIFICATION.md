@@ -529,3 +529,20 @@ independent installed launch; release packaging and platform matrix.
   `office-keyboard`): **4 pass / 39 assertions / 0 failures**. The large-table case
   pages a 125-by-45 CSV, selects AS125 and stages its actual value without sending;
   the Office case stages the newly saved formula. Original files remain unchanged.
+
+### Reviewed export replacement
+
+- Export supports an existing destination through a separate review displaying
+  its absolute path, size and modification time. Escape cancels. Replacement
+  grants are single-use, expire after ten minutes and verify the same regular
+  file identity/metadata before writing; a changed destination is left intact.
+  New exports retain exclusive creation. Linked files and Gator's private state/
+  user-data storage are refused to protect retained inputs and sealed outputs.
+- `node --test app-host/tests/export.test.mjs`: **2 pass**, including stale,
+  replayed, wrong-path, changed-chat, linked-file and private-storage refusals.
+- Focused terminal `export`, `files`, `office-keyboard`: **4 pass / 44 assertions**.
+  The keyboard case cancels, refuses a concurrent edit, then exports exact bytes
+  after a fresh review while preserving source, draft and provider-call count.
+- Full shared-host suite: **69 cases / 68 pass / one native Windows skip / 0
+  failures**. Terminal and desktop typechecks pass. Native replacement behavior
+  remains part of the deferred macOS/Windows verification.

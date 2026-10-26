@@ -7,10 +7,12 @@ import { Keymap } from "../context/keymap"
 import { useDialog, DialogHeader, DialogLayout } from "../ui/dialog"
 import { DialogSelect } from "../ui/dialog-select"
 import { DialogPrompt } from "../ui/dialog-prompt"
+import { DialogConfirm } from "../ui/dialog-confirm"
 import type { FileReference, FileView, FileEdit, FileRequest } from "@gator/application-host/contracts/fileProtocol"
 import type { Choice } from "./actions"
 import { literal } from "./text"
 import { cellCoordinates, columnName, fileParagraphs, selectedContent, type FileSelection } from "./file-selection"
+import { resolve } from "node:path"
 
 export function useFiles(menu: (title: string, choices: Choice[]) => void, prompt: (title: string, value: string, save: (text: string) => unknown, description?: string) => void) {
   const client = useClient(), dialog = useDialog()
@@ -134,7 +136,11 @@ function FileEditor(props: { view: FileView; request: FileRequest; reopen(versio
         const comparison = await client.host.file({ ...request("compare"), action: "compare", base: version.id, version: props.view.current })
         dialog.replace(() => <DialogLayout header={<DialogHeader title="Saved version comparison" />}><scrollbox height={Math.max(8, dimensions().height - 15)}><For each={comparison.notices}>{line => <text>{literal(line)}</text>}</For><Show when={comparison.truncated}><text>Partial comparison: retained files remain complete.</text></Show><For each={comparison.changes}>{change => <box><text><b>{literal(change.location)}</b></text><text fg={theme.text.feedback.error.base}>− {literal(change.before)}</text><text fg={theme.accent}>+ {literal(change.after)}</text></box>}</For></scrollbox></DialogLayout>, undefined, { size: "xlarge" })
       } },
-      { title: "Export exact selected bytes", run: () => props.prompt("Export destination (new file)", props.view.name, path => client.host.exportFile(request("export", { version: version.id }), path)) },
+      { title: "Export exact selected bytes", run: () => props.prompt("Export destination", resolve(props.view.name), async path => {
+        const destination = await client.host.reviewExport(path)
+        if (!destination.exists) { await client.host.exportFile(request("export", { version: version.id }), destination.path); return }
+        dialog.replace(() => <DialogConfirm title="Replace existing export?" message={literal(`${destination.path}\n${destination.bytes} bytes · modified ${destination.modified}\n\nReplace this reviewed file with the exact selected saved version?`)} label={{ confirm: "Replace file" }} onConfirm={() => attempt(client.host.exportFile(request("export", { version: version.id }), destination.path, destination.token))} />, undefined, { size: "xlarge" })
+      }, "Choose a file path. Existing files require a separate replacement review.") },
       { title: "Ask Gator about this version", disabled: dirty(), run: async () => {
         const view = await client.host.file(request("open", { version: version.id })), selectedText = selectedContent(view, selected)
         const file = await client.host.file({ ...request("attach", { version: version.id }), action: "attach" }); await client.stage(file, selectedText ? `About ${props.view.name}, selected content:\n${selectedText}` : ""); client.route = "chat"; client.emit("change")

@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { spawn } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { Backend } from "./backend.mjs";
@@ -15,6 +15,7 @@ import { retainedRequestUploads } from "./request-retention.mjs";
 import { renderPDF } from "./pdf.mjs";
 import { importPastedImages } from "./pasted-images.mjs";
 import { helper } from "./native.mjs";
+import { ExportStore } from "./export.mjs";
 
 // Local application services. No renderer, IPC, HTTP server, or second agent.
 export class Application extends EventEmitter {
@@ -28,6 +29,7 @@ export class Application extends EventEmitter {
     this.stateRoot = stateDirectory(env);
     this.uploads = new UploadStore(join(this.stateRoot, "gator", "uploads"));
     this.files = new FileStore(join(this.stateRoot, "gator", "files"));
+    this.exports = new ExportStore([join(this.stateRoot, "gator"), this.userData]);
     const draftRoot = join(this.userData, "drafts");
     this.drafts = new DraftStore(join(draftRoot, `${createHash("sha256").update(this.stateRoot).digest("hex")}.json`));
     this.env = { ...env, GATOR_DESKTOP_DRAFT_DIR: draftRoot, GATOR_DESKTOP_UPLOAD_DIR: this.uploads.root };
@@ -114,9 +116,14 @@ export class Application extends EventEmitter {
     }
     return result;
   }
-  async exportFile(request, destination) {
+  async reviewExport(destination) { this.mutable(); return this.exports.review(destination); }
+  async exportFile(request, destination, review) {
+    const owner = this.backend, context = this.context;
     const result = await this.file({ ...request, action: "export" });
-    await writeFile(destination, result.bytes, { mode: 0o600, flag: "wx" });
+    await this.exports.write(destination, result.bytes, review, () => {
+      this.mutable();
+      if (this.backend !== owner || this.context !== context) throw new Error("Return to the original conversation before exporting this version.");
+    });
   }
   async pdf(request, page, width) {
     const view = await this.file({ ...request, action: "open" });

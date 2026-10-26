@@ -23,7 +23,9 @@ message text without sending it. Ctrl+J adds a line where Shift+Enter is unavail
 versions/export/Ask Gator, F3 edits Office/table content, Ctrl+S saves an immutable
 working version, and F4 discards edits. F6 selects saved cell/paragraph content
 for Ask Gator. Tables page with Ctrl+Up/Down (rows) and Ctrl+Left/Right (columns);
-F7 switches worksheets. Returning to chat retains the draft.
+F7 switches worksheets. Returning to chat retains the draft. Exporting to an
+existing file shows a separate replacement review; changed destinations require
+a fresh review. Export outside Gator's private storage.
 In reviewable forms, F2 and Ctrl+R review; Ctrl+Enter also works in terminals
 that distinguish it. Unsaved form edits require an explicit discard decision.
 In Conversations, Ctrl+F searches indexed messages, Ctrl+L changes scope,
