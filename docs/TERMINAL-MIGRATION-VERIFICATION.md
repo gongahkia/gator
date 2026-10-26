@@ -147,7 +147,7 @@ assertions to terminal/host/native tests before retiring any Electron suite.
 - [ ] inline text editing saves full versions, recovers drafts and sends the edited bytes
 - [ ] Word Excel PowerPoint and CSV edit inline and export native files with unchanged originals
 - [ ] PDF pages and images render inline without enabling edits or network requests
-- [ ] generated outputs edit in their message and send the working version without changing sealed output
+- [x] generated outputs expose their origin, edit through the file workbench and send the working version without changing sealed output — `ui/tests/generated-files.test.tsx` and `ui/tests/work-details.test.tsx`.
 - [ ] saved file versions compare inline and export the exact chosen bytes without a model call
 - [ ] larger attachment selections survive reload, reject overflow and reach the local model intact
 
@@ -1103,3 +1103,16 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   real file editing is covered separately. Terminal typecheck passes. The complete
   UI regression run passes **52 tests / 770 assertions / 37 files**, including
   modal ownership changes, concurrent chats, recovery, activity and file workflows.
+
+### Real generated output editing and handoff
+
+- `bun test --cwd ui --preload ./scripts/preload.ts tests/generated-files.test.tsx`:
+  **1 pass / 15 assertions**; terminal typecheck passes. A local scripted provider
+  invokes the real Go `write_artifact` tool in draft mode. The emitted SHA-256
+  matches the generated file. Keyboard editing creates a separate immutable
+  working version; both the sealed original and manifest remain byte-identical.
+- Restart retains the edited file and independent composer without another
+  provider request. F2 → Version 2 → Ask Gator stages exactly the saved bytes;
+  only explicit Enter sends them to the real provider boundary. The original file
+  and manifest still match afterward. This complements the display fixture's
+  origin navigation with actual output authority, persistence and intake evidence.

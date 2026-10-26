@@ -76,6 +76,8 @@ their clipboard/title commands; native CI includes PTY/editor and install probes
 Conversation information now includes latest-result-only files and proposed
 changes, retained preview/check disclosures and origin navigation. Following
 surfaces unavailable check health instead of implying there are no checks.
+A real Go-generated artifact now has end-to-end editing/restart/Ask Gator evidence;
+its sealed output and manifest remain byte-identical after the edited version sends.
 
 Replace the Electron application with Gator's adaptation of **OpenCode's actual
 terminal frontend**, carrying forward Gator's current capabilities. Use an
