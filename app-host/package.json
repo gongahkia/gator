@@ -26,13 +26,18 @@
     "./update-guard": "./src/update-guard.mjs",
     "./updates": "./src/updates.mjs",
     "./contracts/*": "./contracts/*.ts",
-    "./application": "./src/application.mjs"
+    "./application": "./src/application.mjs",
+    "./native": "./src/native.mjs",
+    "./voice-session": "./src/voice-session.mjs",
+    "./pdf": "./src/pdf.mjs"
   },
   "scripts": {
     "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
+    "@napi-rs/canvas": "1.0.13",
     "@xmldom/xmldom": "0.9.12",
-    "fflate": "0.8.3"
+    "fflate": "0.8.3",
+    "pdfjs-dist": "6.4.299"
   }
 }

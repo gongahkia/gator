@@ -233,3 +233,26 @@ independent installed launch; release packaging and platform matrix.
   One failure resolves an old moved module in cached test code; others include
   switching/timing/layout/native clipboard conditions. Rerun after extraction
   before using those results as parity evidence. Desktop remains available.
+
+### Native services and rendered file pages
+
+- Added shared PDF rasterization with the existing PDF.js/native canvas family,
+  bounded page dimensions and output. Actual two-page PDF fixture renders distinct
+  PNG pages; nonexistent pages are rejected. This proves rendered pixels, not a
+  filename or extracted-text substitute. Terminal image display/native-host checks
+  remain separate acceptance cases.
+- Added bounded native helpers for links, clipboard text/images, PCM microphone
+  recording through ffmpeg, and OS speech. These are explicit operations with
+  literal argv and visible helper/permission errors. Windows/macOS device and OS
+  permission behavior is not yet verified here. No real microphone was activated.
+- Added conversation-bound voice orchestration using the existing Go speech
+  transport/provider route and accounting. Injected capture tests cover explicit
+  start/stop, cancellation on chat change, no historical-reply playback, cleanup,
+  and captured-route transcription. They do not establish hardware parity.
+- `npm test --prefix app-host`: 66 cases, 65 pass, one native Windows handoff
+  skipped, zero failures. Native helper tests exercise real process argv, output
+  limits and cancellation. Existing Office/file/session/approval validation tests
+  remain passing.
+- Concurrent workspace commit `3c2bb343b` appeared during implementation. It
+  includes the pre-existing notice edit and early hub/client changes. Preserved
+  its history and continued from it without resetting or amending it.

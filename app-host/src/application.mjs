@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
@@ -6,11 +7,13 @@ import { Backend } from "./backend.mjs";
 import { Sessions } from "./sessions.mjs";
 import { DraftStore } from "./drafts.mjs";
 import { UploadStore, uploadContext } from "./uploads.mjs";
-import { FileStore, validateFileRequest } from "./files.mjs";
+import { FileStore, readBoundedFile, validateFileRequest } from "./files.mjs";
 import { selectedFileSource } from "./file-sources.mjs";
 import { stateDirectory } from "./platform.mjs";
 import { validateFrame } from "./policy.mjs";
 import { retainedRequestUploads } from "./request-retention.mjs";
+import { renderPDF } from "./pdf.mjs";
+import { importPastedImages } from "./pasted-images.mjs";
 
 // Local application services. No renderer, IPC, HTTP server, or second agent.
 export class Application extends EventEmitter {
@@ -84,7 +87,10 @@ export class Application extends EventEmitter {
     if (context !== this.context) throw new Error("Return to the intended conversation before attaching files.");
     const owner = this.backend, imported = await this.uploads.import(paths);
     if (owner !== this.backend || context !== this.context) throw new Error("The conversation changed before attaching files.");
-    for (const file of imported) this.imported.set(file.id, context);
+    for (const file of imported) {
+      this.imported.set(file.id, context);
+      await this.files.retain({ kind: "upload", id: file.id }, file.name, await readBoundedFile(this.uploads.root, file.id));
+    }
     return imported;
   }
   async file(request) {
@@ -111,9 +117,42 @@ export class Application extends EventEmitter {
     const result = await this.file({ ...request, action: "export" });
     await writeFile(destination, result.bytes, { mode: 0o600, flag: "wx" });
   }
+  async pdf(request, page, width) {
+    const view = await this.file({ ...request, action: "open" });
+    if (view.kind !== "pdf") throw new Error("Choose a PDF file for page preview.");
+    return renderPDF(new Uint8Array(Buffer.from(view.data, "base64")), page, width);
+  }
+  async pasteImages(images, decode) {
+    this.mutable();
+    const context = this.context, owner = this.backend;
+    const selected = await importPastedImages(this.uploads, images, decode);
+    if (this.backend !== owner || this.context !== context) throw new Error("The chat changed before image intake completed.");
+    for (const file of selected) {
+      this.imported.set(file.id, context);
+      await this.files.retain({ kind: "upload", id: file.id }, file.name, await readBoundedFile(this.uploads.root, file.id));
+    }
+    return selected;
+  }
   async openSession(id) {
     if (typeof id !== "string" || !this.sessions.activity().some(row => row.id === id)) throw new Error("This chat is no longer in the open-chat list.");
     await this.sessions.open({ conversation_id: id });
   }
-  async close() { await this.drafts.flush(); await this.files.flush(); await this.sessions.stop(); }
+  async runExternal() {
+    const owner = this.backend, job = owner?.state?.external;
+    if (!job || owner.closed || this.terminalBusy || this.sessions.switching) throw new Error("There is no current reviewed external step.");
+    this.terminalBusy = true; this.emit("change", this.snapshot());
+    let failure = "";
+    try {
+      const environment = { ...this.env, GATOR_INTERNAL_COMMANDS: "1" };
+      for (const entry of job.env ?? []) if (/^(GATOR_STATE_DIR|GATOR_CONFIG_DIR)=/.test(entry)) { const split = entry.indexOf("="); environment[entry.slice(0, split)] = entry.slice(split + 1); }
+      await new Promise((resolve, reject) => {
+        const child = spawn(job.program, job.args ?? [], { cwd: job.dir || this.workspace, env: environment, stdio: "inherit", windowsHide: false });
+        child.once("error", reject);
+        child.once("close", code => code === 0 ? resolve() : reject(new Error(`The external step ended with status ${code}.`)));
+      });
+    } catch (error) { failure = error.message; }
+    finally { this.terminalBusy = false; owner.finishExternal(failure); this.emit("change", this.snapshot()); }
+    if (failure) throw new Error(failure);
+  }
+  async close() { if (this.terminalBusy) throw new Error("Finish or cancel the external step before closing Gator."); await this.drafts.flush(); await this.files.flush(); await this.sessions.stop(); }
 }

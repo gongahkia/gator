@@ -15,6 +15,9 @@ export class Application extends EventEmitter {
   file(request: FileRequest & { action: "compare" }): Promise<FileComparison>
   file(request: FileRequest): Promise<FileView>
   exportFile(request: FileRequest, destination: string): Promise<void>
+  pdf(request: FileRequest, page: number, width?: number): Promise<{ pages: number; page: number; image: Uint8Array }>
+  pasteImages(images: { type: string; data: Uint8Array }[], decode: (bytes: Uint8Array) => Uint8Array): Promise<UploadedFile[]>
   openSession(id: string): Promise<void>
+  runExternal(): Promise<void>
   close(): Promise<void>
 }
