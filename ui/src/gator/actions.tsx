@@ -11,6 +11,7 @@ import { literal } from "./text"
 import { useFiles } from "./files"
 import { PathPicker } from "./path-picker"
 import { Details } from "./details"
+import { ActionPrompt } from "./action-prompt"
 
 export type Choice = { title: string; description?: string; disabled?: boolean; run(): unknown }
 export function useActions() {
@@ -20,7 +21,7 @@ export function useActions() {
     title: literal(item.title), description: literal(item.description), disabled: item.disabled, value: index,
     onSelect: () => { dialog.clear(); try { attempt(item.run()) } catch (error) { client.fail(error) } },
   }))} />)
-  const prompt = (title: string, value: string, save: (text: string) => unknown, description?: string) => dialog.replace(() => <DialogPrompt title={title} value={value} subtitle={description} onConfirm={text => { dialog.clear(); try { attempt(save(text)) } catch (error) { client.fail(error) } }} />)
+  const prompt = (title: string, value: string, save: (text: string) => unknown, description?: string) => { const token = Symbol(title); dialog.replace(() => <ActionPrompt token={token} title={title} value={value} save={save} description={description} />, undefined, { key: token }) }
   const details = (title: string, text: string) => dialog.replace(() => <Details title={title} text={text} />, undefined, { size: "xlarge" })
   const confirm = (title: string, message: string, run: () => unknown) => dialog.replace(() => <DialogConfirm title={title} message={literal(message)} onConfirm={() => { try { attempt(run()) } catch (error) { client.fail(error) } }} />)
   async function drafts() {
@@ -83,7 +84,7 @@ export function useActions() {
         { title: "Inspect source / quote", description: memory.quote || memory.run_id, run: () => details("Memory provenance", `${memory.scope}\n${memory.quote ?? ""}\n${memory.text}`) },
         { title: "Correct", run: () => prompt("Correct saved memory", memory.text, text => act("correct", text)) },
         { title: "Forget", run: () => confirm("Forget this memory?", memory.text, () => act("forget")) },
-        { title: "Undo correction", disabled: !memory.can_undo, run: () => act("undo") },
+        { title: "Undo original memory save", disabled: !memory.can_undo, run: () => act("undo") },
       ])
     } })))
   }

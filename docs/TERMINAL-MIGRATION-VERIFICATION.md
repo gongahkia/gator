@@ -171,7 +171,7 @@ assertions to terminal/host/native tests before retiring any Electron suite.
 - [ ] native image paste stages a preview, retains drafts per chat, and sends only after review
 - [ ] new chat and pasted attachments keep focus and layout across themes and compact windows
 - [ ] earlier-chat privacy is independent of learning and persists across restart
-- [ ] saved-memory receipts support guarded edits, restart and forgetting inline
+- [x] saved-memory receipts support guarded edits, restart and forgetting inline — `ui/tests/memory.test.tsx`, including original-save undo.
 - [ ] memory edits survive concurrent updates and removal without overwriting saved facts
 
 ### `desktop/tests/e2e/work-details.spec.ts`
@@ -447,3 +447,16 @@ independent installed launch; release packaging and platform matrix.
   `tests/cancellation.test.tsx` proves a real active request stops, the backend
   stays connected and the unsent draft survives. The earlier renderer-only key
   assertion did not establish compatibility with the strict Go host boundary.
+
+### Guarded memory edit acknowledgements
+
+- Action prompts keep their buffer and show acknowledgement progress until the
+  original operation succeeds. A rejected/stale save retains the typed correction
+  and visible error. Completion from an old prompt cannot clear a new screen.
+- `tests/memory.test.tsx` passes against the real Go memory tool/store and a local
+  provider: grounded save/provenance, concurrent external correction, stale-write
+  refusal with retained editor text, successful correction, restart without model
+  replay, reviewed forgetting, and undo of a new original save. The label now
+  describes original-save undo rather than incorrectly promising correction undo.
+- Full frontend checkpoint: **27 pass / 289 assertions / 0 failures**, with
+  typecheck passing. Cases not explicitly mapped in this ledger remain open.
