@@ -92,6 +92,7 @@ export class GatorClient extends EventEmitter {
     await this.host.drafts.request({ action: "remove", context: draft.context })
   }
   async guide() {
+    if (["recording", "transcribing"].includes(this.voicePhase)) throw new Error("Finish or cancel dictation before guiding active work.")
     const draft = this.draft, context = draft.context, id = this.state?.guidance_id
     if (!id || !this.state?.running) throw new Error("There is no active task to guide.")
     if (!draft.text.trim() || draft.uploads?.length || draft.reply_to_update_id) throw new Error("Guide active work with text only. Send attachments and update replies as a queued follow-up.")

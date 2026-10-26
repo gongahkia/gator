@@ -24,7 +24,8 @@ is recorded in the ledger. Native-platform import checks remain deferred.
 A real Go connection journey now covers reviewed token setup, access verification,
 disconnect and local OAuth callback completion across chat navigation. Browser
 launch is fixture-verified on Linux; native browser/permission checks remain open.
-Dictation now blocks ordinary draft submission until capture/transcription ends.
+Dictation now blocks ordinary draft submission and live guidance until
+capture/transcription ends.
 Linux keyboard/process tests verify review, cancellation, ownership and Go usage
 accounting with synthetic audio; native audio hardware acceptance remains open.
 Keyboard backup/verify/restore and retention reviews now have real Go evidence;

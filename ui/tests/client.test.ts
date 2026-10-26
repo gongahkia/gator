@@ -90,6 +90,14 @@ test("uncertain admissions reuse their identity and guide acknowledges the live 
   expect(client.draft.text).toBe("Unconfirmed input")
   host.dispatch = async frame => { if (frame.queue) host.change({ ...host.current, queue_result: { request_id: frame.queue.request_id } }) }
   host.change({ ...host.current, running: true, guidance_id: "a".repeat(64) })
+  const sent = host.sent.length
+  for (const phase of ["recording", "transcribing"]) {
+    client.voicePhase = phase
+    await expect(client.guide()).rejects.toThrow("Finish or cancel dictation")
+    expect(host.sent).toHaveLength(sent)
+    expect(client.draft.text).toBe("Unconfirmed input")
+  }
+  client.voicePhase = "idle"
   await client.guide()
   expect(host.sent.at(-1)?.queue?.action).toBe("guide"); expect(host.sent.at(-1)?.queue?.id).toBe(host.current.guidance_id)
   expect(client.draft.text).toBe("")

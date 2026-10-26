@@ -821,3 +821,12 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   resulting application settings. Terminal typecheck passes. This closes the
   first two mapped desktop app-control journeys; native voice and appearance
   acceptance remain separately tracked.
+
+### Dictation also protects live guidance
+
+- The live-task guidance shortcut now refuses to consume the composer while
+  microphone capture or transcription is active, matching ordinary send. The
+  original text remains in its chat and no queue/guidance frame is sent.
+- `tests/client.test.ts` and `tests/voice.test.tsx`: **8 pass / 61 assertions**.
+  Both dictation phases reject guidance; idle guidance still receives Go's exact
+  acknowledgement before clearing the submitted snapshot.
