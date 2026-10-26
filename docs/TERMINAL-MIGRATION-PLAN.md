@@ -52,6 +52,8 @@ Cross-chat memory/privacy evidence now verifies real provider context, independe
 learning/history controls, separated transcripts and retained drafts at restart.
 Saved guidance now has keyboard evidence for typed scope/type choices, full text
 edits, status filtering, enable/disable and persistence.
+Completed public activity now folds above its answer, supports keyboard inspection
+and expanded-history search, with real-runner restart/non-replay evidence.
 
 Replace the Electron application with Gator's adaptation of **OpenCode's actual
 terminal frontend**, carrying forward Gator's current capabilities. Use an

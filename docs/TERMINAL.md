@@ -96,3 +96,7 @@ Native adapters:
 
 Native runtime and permission checks on macOS/Windows will be completed later as
 agreed; those checks remain pending and do not count as a passing removal gate.
+
+Public work activity stays chronological while running and folds above the answer
+when finished. Use `activity` in Ctrl+P to inspect live/retained entries or expand
+a history summary. Transcript search includes narration in expanded history.

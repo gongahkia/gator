@@ -67,7 +67,7 @@ assertions to terminal/host/native tests before retiring any Electron suite.
 ### `desktop/tests/e2e/activity.spec.ts`
 
 - [ ] public activity interleaves, folds above the answer, and preserves the reader
-- [ ] real runner narration and tools survive a desktop restart without replaying work
+- [x] real runner narration and tools survive a desktop restart without replaying work (terminal: `tests/activity.test.tsx`)
 
 ### `desktop/tests/e2e/app-control.spec.ts`
 
@@ -908,3 +908,22 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   these management actions submit no model request.
 - This covers the saved-guidance portion of the desktop polish journey. Retired
   desktop-only presentation assertions are not claimed as terminal evidence.
+
+### Public activity history and keyboard inspection
+
+- Completed activity now folds above its answer, with duration/failure/stopped
+  summaries, chronological narration and grouped tool activity. Ctrl+P `activity`
+  opens live or retained public entries and expands/collapses history. Transcript
+  search includes narration in expanded history; collapsed history stays out of
+  that search. Empty successful work is quiet; incomplete work retains a cue.
+- The user concurrently committed the initial rendering changes in `21ec3adb3`;
+  this follow-up preserves that commit and adds acceptance evidence plus a guard
+  against live activity completing while its inspection menu is open.
+- `tests/activity.test.tsx` and `tests/transcript.test.tsx`: **2 pass / 27
+  assertions**; terminal typecheck passes. A real Go `read_file` task exposes
+  public narration/tool state without the private source body/path. Completion
+  folds the trace before its answer; explicit expansion makes narration
+  searchable. Restart restores history/draft, does not replay either provider
+  request, and retained entries remain inspectable. Existing reading-position
+  regression still passes. Full failure/group update fixture coverage remains
+  separate from this real-runner case.
