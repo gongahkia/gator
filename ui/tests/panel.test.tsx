@@ -53,3 +53,23 @@ test("unsaved typed form fields survive cancelled hub navigation and leave only 
     expect(client.navigationGuard).toBeUndefined()
   } finally { await client.close(); await setup.dispose(); await rm(root, { recursive: true, force: true }) }
 })
+
+test("loaded filters keep original record indices and empty results cannot activate a hidden item", async () => {
+  const root = await mkdtemp(join(tmpdir(), "gator-loaded-filter-"))
+  const host = new FixtureHost({ binary: "/unused", workspace: root, userData: root, env: { GATOR_STATE_DIR: root } })
+  host.current.panel = { id: "models", kind: "models", title: "Models", selected: 0, rows: [{ label: "First provider" }, { label: "Second provider" }, { label: "Anthropic fixture" }] }
+  host.dispatch = async frame => { if (frame.panel?.action === "select" && host.current.panel) host.change({ ...host.current, panel: { ...host.current.panel, selected: frame.panel.row } }) }
+  const client = new GatorClient(host)
+  const setup = await testRender(() => <App client={client} quit={() => client.close()} clipboard={{ read: async () => ({ data: "", mime: "text/plain" }), write: async () => {} }} />, { width: 110, height: 32 })
+  const flush = async () => { await setup.flush(); await Bun.sleep(25); await setup.flush() }
+  try {
+    await client.start(); await flush(); setup.mockInput.pressKey("f", { ctrl: true }); await flush()
+    await setup.mockInput.typeText("Anthropic"); setup.mockInput.pressEnter(); await flush()
+    expect(host.sent.at(-1)?.panel?.row).toBe(2); expect(host.current.panel?.selected).toBe(2)
+    expect(setup.captureCharFrame()).toContain("Anthropic fixture"); expect(setup.captureCharFrame()).not.toContain("First provider")
+    setup.mockInput.pressEnter(); await flush(); expect(host.sent.at(-1)?.panel?.action).toBe("key")
+    setup.mockInput.pressKey("f", { ctrl: true }); await flush(); await setup.mockInput.typeText("has no matches"); setup.mockInput.pressEnter(); await flush()
+    expect(setup.captureCharFrame()).toContain("No matching loaded items")
+    const count = host.sent.length; setup.mockInput.pressEnter(); await flush(); expect(host.sent).toHaveLength(count)
+  } finally { await client.close(); await setup.dispose(); await rm(root, { recursive: true, force: true }) }
+})

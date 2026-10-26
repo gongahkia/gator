@@ -417,3 +417,15 @@ independent installed launch; release packaging and platform matrix.
 - Office/cell dialog edits now retain directly through the host instead of
   scheduling autosave on an already-unmounted editor. Existing protected/signed/
   macro restrictions and package-preservation checks remain in the shared suite.
+
+### Loaded list filters and selection
+
+- Added frontend filters for loaded model/knowledge/picker rows, retaining each
+  original Go row index. Catalog search still uses Go's indexed query path.
+  Empty filtered lists cannot activate a hidden original record. Keyboard arrows
+  and paging select visible original identities; native layout reveals selection
+  in long panels.
+- `tests/panel.test.tsx`: **3 pass / 22 assertions**, including filtering to the
+  third original model row and preventing activation after an empty search.
+  Typecheck passes. Full acceptance of every knowledge/catalog mutation remains
+  separate from these rendering and selection cases.
