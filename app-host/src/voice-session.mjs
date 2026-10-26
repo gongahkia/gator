@@ -5,15 +5,19 @@ import { recordAudio, speak } from "./native.mjs";
 // Binds explicit microphone grants and transient audio to one live chat.
 export class VoiceSession extends EventEmitter {
   phase = "idle";
+  playing = false;
   #recording;
   #abort;
   #generation = 0;
   #seen = new Map();
   #playback;
+  #visibleContext;
   constructor(application, { capture = recordAudio, call = runSpeechRequest, playback = speak } = {}) {
     super(); this.application = application; this.capture = capture; this.call = call; this.playback = playback;
     this.changed = () => {
       const context = application.context, state = application.snapshot().state;
+      if (context !== this.#visibleContext || !state?.desktop?.voice?.spoken_replies) this.stopPlayback();
+      this.#visibleContext = context;
       if (this.context && this.context !== context) this.cancel();
       if (!state || !context) return;
       const count = this.#seen.get(context), messages = state.messages ?? [];
@@ -21,14 +25,14 @@ export class VoiceSession extends EventEmitter {
       if (count === undefined || count >= messages.length || !state.desktop?.voice?.spoken_replies) return;
       const replies = messages.slice(count).filter(message => message.role === "Gator" && message.text && message.result?.kind !== "approval");
       if (!replies.length) return;
-      this.#playback?.abort(); const controller = new AbortController(); this.#playback = controller;
-      void playback(replies.map(message => message.text).join("\n"), state.desktop.voice, controller.signal).catch(error => { if (!controller.signal.aborted) { this.issue = error.message; this.emit("change"); } });
+      this.stopPlayback(); const controller = new AbortController(); this.#playback = controller; this.playing = true; this.emit("change");
+      void playback(replies.map(message => message.text).join("\n"), state.desktop.voice, controller.signal).catch(error => { if (!controller.signal.aborted) { this.issue = error.message; this.emit("change"); } }).finally(() => { if (this.#playback === controller) { this.#playback = undefined; this.playing = false; this.emit("change"); } });
     };
     application.on("change", this.changed);
   }
   async request(request, signal) { return this.call(this.application.binary, this.application.workspace, this.application.env, request, signal); }
   status() { return this.request({ action: "status" }); }
-  async configure(preferences) { const status = await this.request({ action: "configure", preferences }); this.application.backend?.refreshPreferences(); return status; }
+  async configure(preferences) { const status = await this.request({ action: "configure", preferences }); if (preferences.spoken_replies === false) this.stopPlayback(); this.application.backend?.refreshPreferences(); return status; }
   async start() {
     this.application.mutable();
     if (this.phase !== "idle" || this.application.snapshot().state?.panel) throw new Error("Return to the conversation and finish the current dictation first.");
@@ -53,6 +57,7 @@ export class VoiceSession extends EventEmitter {
       return { context: this.context, text: result.text };
     } finally { if (generation === this.#generation) { this.phase = "idle"; this.#recording = undefined; this.#abort = undefined; this.emit("change"); } }
   }
-  cancel() { this.#generation++; this.#recording?.cancel(); this.#abort?.abort(); this.#recording = undefined; this.#abort = undefined; this.context = undefined; this.phase = "idle"; this.emit("change"); }
-  close() { this.cancel(); this.#playback?.abort(); this.application.off("change", this.changed); }
+  stopPlayback() { this.#playback?.abort(); this.#playback = undefined; if (this.playing) { this.playing = false; this.emit("change"); } }
+  cancel() { this.#generation++; this.#recording?.cancel(); this.#abort?.abort(); this.#recording = undefined; this.#abort = undefined; this.context = undefined; this.phase = "idle"; this.stopPlayback(); this.emit("change"); }
+  close() { this.cancel(); this.application.off("change", this.changed); }
 }

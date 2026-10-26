@@ -30,6 +30,7 @@ export function useNative(controls: { actions: Record<string, () => unknown>; me
       { title: "Start dictation", description: status.issue || `${status.provider} / ${status.model}; explicit microphone capture, at most 120 seconds`, disabled: !status.ready || voice.phase !== "idle", run: () => controls.confirm("Start microphone recording?", "Audio is sent to your configured voice provider only when you stop and transcribe. Review the resulting draft before sending. OS microphone permission and ffmpeg are required.", () => voice.start()) },
       { title: "Stop and transcribe into this draft", disabled: voice.phase !== "recording", run: async () => { const result = await voice.stop(); if (result.context !== client.context) throw new Error("The conversation changed during dictation."); await client.edit(client.draft.text + (client.draft.text ? "\n" : "") + result.text) } },
       { title: "Cancel recording / transcription", disabled: voice.phase === "idle", run: () => voice.cancel() },
+      { title: "Stop spoken reply", disabled: !voice.playing, run: () => voice.stopPlayback() },
       { title: status.preferences.spoken_replies ? "Disable spoken replies" : "Enable spoken replies", run: () => voice.configure({ spoken_replies: !status.preferences.spoken_replies }) },
       { title: "Voice provider", run: () => controls.menu("Dictation provider", ["openai", "gemini"].map(provider => ({ title: provider, run: () => voice.configure({ provider }) }))) },
       { title: "Voice model", description: status.model, run: () => controls.prompt("Voice model", status.model, model => voice.configure({ model })) },
@@ -42,7 +43,7 @@ export function useNative(controls: { actions: Record<string, () => unknown>; me
   controls.actions["continue-external"] = async () => { await renderer.suspend(); try { await client.host.runExternal() } finally { await renderer.resume() } }
   const releases = () => { void openLink("https://github.com/gongahkia/gator/releases").catch(error => client.fail(error)) }
   client.on("open-releases", releases); onCleanup(() => client.off("open-releases", releases))
-  const changed = () => { if (voice.issue) client.fail(new Error(voice.issue)); client.voicePhase = voice.phase; client.emit("change") }
+  const changed = () => { if (voice.issue) client.fail(new Error(voice.issue)); client.voicePhase = voice.phase === "idle" && voice.playing ? "speaking" : voice.phase; client.emit("change") }
   voice.on("change", changed); onCleanup(() => voice.off("change", changed))
   return voice
 }

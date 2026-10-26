@@ -48,6 +48,22 @@ test("spoken output ignores retained history, speaks only new replies and aborts
   session.close(); assert.equal(aborted, true);
 });
 
+test("spoken output stops on chat switch, preference disable and explicit playback cancellation", async () => {
+  const application = new App(), signals = [];
+  const session = new VoiceSession(application, { playback: async (_text, _preferences, signal) => { signals.push(signal); await new Promise(resolve => signal.addEventListener("abort", resolve, { once: true })); } });
+  try {
+    application.emit("change"); application.state.messages.push({ role: "Gator", text: "New spoken reply" }); application.emit("change");
+    assert.equal(session.playing, true);
+    application.context = "conversation:b"; application.state.messages = [{ role: "Gator", text: "Other retained history" }]; application.emit("change");
+    assert.equal(signals[0].aborted, true); assert.equal(session.playing, false); assert.equal(signals.length, 1);
+    application.state.messages.push({ role: "Gator", text: "Other new reply" }); application.emit("change");
+    application.state.desktop.voice.spoken_replies = false; application.emit("change");
+    assert.equal(signals[1].aborted, true); assert.equal(session.playing, false);
+    application.state.desktop.voice.spoken_replies = true; application.state.messages.push({ role: "Gator", text: "Explicitly cancellable reply" }); application.emit("change");
+    session.stopPlayback(); assert.equal(signals[2].aborted, true); assert.equal(session.playing, false);
+  } finally { session.close(); }
+});
+
 test("PDF preview renders actual distinct page images and rejects nonexistent pages", async () => {
   const bytes = pdfFixture();
   const first = await renderPDF(bytes, 1, 400), second = await renderPDF(bytes, 2, 400);

@@ -482,3 +482,13 @@ independent installed launch; release packaging and platform matrix.
   journey with keyboard help, retained text staging, unchanged provider-call count,
   and conversation-information display. Escape tests wait for the terminal's
   ambiguous ESC prefix to resolve before sending a subsequent function key.
+
+### Spoken-reply cancellation
+
+- Playback now stops on chat switch, preference disable, explicit stop, or close.
+  Voice controls expose “Stop spoken reply” and a speaking indicator. Historical
+  replies stay silent when returning to a chat.
+- `node --test app-host/tests/native.test.mjs`: **5 pass, 0 failures**; the new
+  case exercises playback cancellation across all three boundaries using abort
+  signals. Frontend typecheck passes after refreshing the local host package.
+  Actual speakers, microphone permissions and device behavior remain native cases.
