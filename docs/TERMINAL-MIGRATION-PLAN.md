@@ -289,7 +289,7 @@ workflows still pass against the extracted services.
 
 ### Step 3 Integrate OpenCode frontend source as the Gator terminal shell
 
-- [ ] Bring in the pinned OpenCode frontend source and required reusable support
+- [x] Bring in the pinned OpenCode frontend source and required reusable support
   packages as a maintained fork or vendored slice. Preserve licenses and useful
   tests; document inherited, adapted, and replaced modules in `UPSTREAM.md`.
 - [ ] Wire the shell, composer, transcript, tabs/sidebar, dialogs, command palette,

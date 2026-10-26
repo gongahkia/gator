@@ -206,3 +206,30 @@ independent installed launch; release packaging and platform matrix.
   while actual runner/restart, voice, app-control and model cases pass so far.
 - Baseline Go failure: `TestStreamOllamaInstallerReportsOutputInProgressOrder`
   observed only the initial installer line. No Go changes have been made.
+
+### OpenCode-derived shell and first runtime journey
+
+- Added `ui/UPSTREAM.md`, pristine upstream source hashes/license, adapted
+  Solid/OpenTUI dialogs, keymap, palette, session frame/rail, composer, and Gator
+  client/data contexts. Upstream execution/server/config/plugin dependencies are
+  excluded. Bun 1.4.2 + OpenTUI 0.6.8 + patched Solid 1.9.15 work on this host.
+- Added Electron-independent `Application` composition and frontend contracts.
+  Host validation, admission, session ownership and native file services remain
+  the same implementations used by the desktop reference.
+- `bun run --cwd ui check`: pass. `bun run --cwd ui build`: pass.
+- `bun run --cwd ui test`: 4 pass, 0 fail, 41 assertions, including actual Go
+  state and a local scripted provider through the native renderer's keyboard
+  harness. Unicode/multiline paste does not send; Enter admits; one user message
+  is retained; the palette and narrow layout work; restart restores the draft
+  and leaves provider request count unchanged. No upstream agent/server runs.
+- Real PTY smoke: startup reaches connected New chat; Ctrl+Q exits zero and
+  restores raw/alternate-screen modes while stopping the owned Go process.
+- `make terminal` is an experimental development entry point. The installed
+  artifact, approval slice, complete pages/files/native adapters and parity gate
+  remain pending. This is not a feature-complete replacement yet.
+- Go installer-progress baseline failure passes three isolated repetitions.
+- Initial Xvfb desktop integration run: 42 pass, 12 fail. It overlapped service
+  extraction, so it cannot distinguish baseline failures from extraction effects.
+  One failure resolves an old moved module in cached test code; others include
+  switching/timing/layout/native clipboard conditions. Rerun after extraction
+  before using those results as parity evidence. Desktop remains available.

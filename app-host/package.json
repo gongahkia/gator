@@ -25,7 +25,8 @@
     "./voice": "./src/voice.mjs",
     "./update-guard": "./src/update-guard.mjs",
     "./updates": "./src/updates.mjs",
-    "./contracts/*": "./contracts/*.ts"
+    "./contracts/*": "./contracts/*.ts",
+    "./application": "./src/application.mjs"
   },
   "scripts": {
     "test": "node --test tests/*.test.mjs"

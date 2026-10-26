@@ -1,4 +1,4 @@
-.PHONY: build setup runtime run desktop package dist check fmt test vet help
+.PHONY: build setup runtime run desktop package dist check fmt test vet help terminal terminal-setup terminal-build terminal-check
 
 VERSION ?= dev
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
@@ -23,6 +23,23 @@ run: desktop
 
 desktop: setup
 	npm start --prefix desktop
+
+# Migration entry points; Electron remains the reference until the parity gate.
+terminal-setup:
+	npm ci --prefix app-host
+	bun install --cwd ui --frozen-lockfile
+
+terminal-build: terminal-setup
+	node ui/scripts/build-runtime.mjs
+	bun run --cwd ui build
+
+terminal: terminal-build
+	bun run --cwd ui start
+
+terminal-check: terminal-build
+	npm test --prefix app-host
+	bun run --cwd ui check
+	GATOR_TEST_BINARY="$(CURDIR)/ui/runtime/gator-runtime" bun run --cwd ui test
 
 package: setup
 	npm run pack --prefix desktop
