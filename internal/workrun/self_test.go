@@ -116,7 +116,7 @@ func TestConversationReceivesCurrentAppKnowledgeAfterModelChange(t *testing.T) {
 	if currentState["snapshot_id"] != first.SnapshotID || currentState["effective_mode"] != "inspect" || currentState["external_actions"] != "forbid" {
 		t.Fatalf("app state did not reflect the actual run: %v", currentState)
 	}
-	for _, guide := range []string{"desktop personal agent", "Settings (the bottom-left sliders icon) → Models", "send /model in Gator's message box", "Correct earlier assistant replies", "Use gator_app_update", "available tools"} {
+	for _, guide := range []string{"personal agent", "Settings (the bottom-left sliders icon) → Models", "send /model in Gator's message box", "Correct earlier assistant replies", "Use gator_app_update", "available tools"} {
 		if !strings.Contains(current.System, guide) {
 			t.Errorf("conversation omitted app guidance %q", guide)
 		}
@@ -126,5 +126,27 @@ func TestConversationReceivesCurrentAppKnowledgeAfterModelChange(t *testing.T) {
 	}
 	if len(current.Messages) != 3 || current.Messages[1].Content != earlierReply {
 		t.Fatal("app knowledge replaced conversation history instead of supplementing it")
+	}
+}
+
+func TestTerminalApplicationContextUsesActualFrontendControls(t *testing.T) {
+	t.Setenv("GATOR_UI_FRONTEND", "terminal")
+	prompt := applicationContext(Request{Provider: "fixture/current"})
+	for _, wanted := range []string{"OpenCode-derived", "Ctrl+P", "/following", "/saved", "F2 or Ctrl+R", "/files", "gator_app_update", "exact live tokens", "gator --help"} {
+		if !strings.Contains(prompt, wanted) {
+			t.Errorf("terminal guide omitted %q", wanted)
+		}
+	}
+	for _, stale := range []string{"Electron", "bottom-left sliders", "paperclip", "microphone button", "no supported standalone"} {
+		if strings.Contains(prompt, stale) {
+			t.Errorf("terminal guide retained %q", stale)
+		}
+	}
+	if got := readApplicationState(t, prompt)["provider_model"]; got != "fixture/current" {
+		t.Fatalf("changed model authority: %v", got)
+	}
+	t.Setenv("GATOR_UI_FRONTEND", "desktop")
+	if !strings.Contains(applicationContext(Request{}), "Electron") {
+		t.Fatal("reference guide lost desktop identity")
 	}
 }

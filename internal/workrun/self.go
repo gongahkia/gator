@@ -2,6 +2,7 @@ package workrun
 
 import (
 	"encoding/json"
+	"os"
 	"runtime"
 	"strings"
 	"time"
@@ -80,5 +81,9 @@ func applicationContext(request Request) string {
 		state.LocalTime = request.RequestedAt.In(time.Local).Format(time.RFC3339)
 	}
 	data, _ := json.MarshalIndent(state, "", "  ")
-	return applicationGuide + "\n\n" + applicationStateHeader + string(data)
+	guide := applicationGuide
+	if os.Getenv("GATOR_UI_FRONTEND") == "terminal" {
+		guide = terminalApplicationGuide
+	}
+	return guide + "\n\n" + applicationStateHeader + string(data)
 }

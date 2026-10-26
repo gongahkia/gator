@@ -15,10 +15,10 @@ async function until(predicate: () => boolean, label = "state", timeout = 15000)
 test("real Go chat admits pasted Unicode only on send, restores drafts and closes cleanly", async () => {
   const directory = await mkdtemp(join(tmpdir(), "gator-terminal-app-"))
   const binary = process.env.GATOR_TEST_BINARY || resolve(import.meta.dir, "../runtime/" + (process.platform === "win32" ? "gator-runtime.exe" : "gator-runtime"))
-  const env = { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config") }
-  let requests = 0
+  const env = { ...process.env, GATOR_UI_FRONTEND: "terminal", GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config") }
+  let requests = 0, payload = ""
   const server = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(request) {
-    await request.json(); requests++
+    payload = await request.text(); requests++
     return Response.json({ id: "terminal-fixture", choices: [{ message: { role: "assistant", content: "Terminal answer 🐊" }, finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 } })
   } })
   const cli = (args: string[]) => execFileSync(binary, args, { env: { ...env, GATOR_INTERNAL_COMMANDS: "1" } })
@@ -36,6 +36,7 @@ test("real Go chat admits pasted Unicode only on send, restores drafts and close
     setup.mockInput.pressEnter()
     await until(() => !!client.state?.messages.some(m => m.text.includes("Terminal answer")), "reply: " + JSON.stringify(client.snapshot))
     await until(() => !client.state?.running, "completed work"); const completedRequests = requests
+    expect(payload).toContain("OpenCode-derived Solid/OpenTUI frontend"); expect(payload).not.toContain("bottom-left sliders icon"); expect(payload).not.toContain("no supported standalone Gator CLI")
     expect(completedRequests).toBeGreaterThan(0); expect(client.state?.messages.filter(m => m.role === "You").length).toBe(1); expect(client.draft.text).toBe("")
     await setup.mockInput.typeText("Keep this unsent draft")
     await until(() => client.draft.text.includes("Keep this"), "typed draft")

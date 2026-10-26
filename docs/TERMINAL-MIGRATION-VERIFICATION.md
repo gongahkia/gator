@@ -793,3 +793,18 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
 - This proves the terminal management journey and backend routing, not an actual
   multi-gigabyte download, privileged installer execution, hardware eligibility on
   other hosts or native macOS/Windows installation. Those remain explicit gaps.
+
+### Assistant knowledge follows the active frontend
+
+- Audit found the Go system guide still described Electron-only controls and
+  denied the existence of a standalone CLI. The terminal entry now identifies its
+  frontend to its own child environment; Go selects bundled terminal guidance
+  with actual commands, file/voice/form controls and current authority boundaries.
+  The retained desktop keeps its existing guide. The shared agent identity is
+  frontend-neutral; this changes help, not tools, models, storage or permissions.
+- `go test ./internal/workrun`: pass, including display-safe state, current model
+  identity and terminal-versus-desktop guidance checks. Rebuilt the Go runtime.
+  `tests/application.test.tsx`: **1 pass / 16 assertions**, verifying the actual
+  provider receives terminal guidance without desktop-only controls/CLI denial,
+  alongside the existing paste, draft, restart and navigation assertions.
+  Terminal typecheck passes.

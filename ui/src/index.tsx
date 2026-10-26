@@ -9,6 +9,7 @@ import { clipboardRead, clipboardWrite } from "@gator/application-host/native"
 
 const userData = process.env.GATOR_TERMINAL_USER_DATA || process.env.GATOR_DESKTOP_USER_DATA || (process.platform === "darwin" ? join(homedir(), "Library/Application Support/Gator") : process.platform === "win32" ? join(process.env.APPDATA || homedir(), "Gator") : join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "Gator"))
 const host = new Application({ binary: process.env.GATOR_TERMINAL_BINARY || resolve(import.meta.dir, "../runtime/" + (process.platform === "win32" ? "gator-runtime.exe" : "gator-runtime")),
+  env: { ...process.env, GATOR_UI_FRONTEND: "terminal" },
   userData, workspace: process.env.GATOR_TERMINAL_WORKSPACE || process.env.GATOR_DESKTOP_WORKSPACE || join(userData, "workspace") })
 const client = new GatorClient(host)
 const renderer = await createCliRenderer({ exitOnCtrlC: false, useKittyKeyboard: {}, openConsoleOnError: false, useMouse: true })
