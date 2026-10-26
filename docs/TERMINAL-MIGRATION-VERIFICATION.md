@@ -83,7 +83,7 @@ assertions to terminal/host/native tests before retiring any Electron suite.
 ### `desktop/tests/e2e/attachments.spec.ts`
 
 - [ ] attachments stay with drafts and queued messages and reach the real model only on send
-- [ ] attachment cancellation, removal and validation failures preserve the unsent message
+- [x] attachment cancellation, removal and validation failures preserve the unsent message (terminal: `tests/attachments.test.tsx`; picker replaces desktop drag/drop)
 
 ### `desktop/tests/e2e/chat-check-health.spec.ts`
 
@@ -843,3 +843,20 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   beginning in this terminal) and treated string input names as objects. Corrected
   the fixture to the supported Ctrl+U clear-line operation and protocol shape;
   no queue behavior was relaxed.
+
+### Attachment intake and clipboard process boundary
+
+- `tests/attachments.test.tsx`: **1 pass / 31 assertions**; terminal typecheck
+  passes. Keyboard file selection/cancellation/removal retains the unsent text.
+  Unsupported files, documents above 8 MiB, images above 4 MiB, a thirteenth
+  attachment and combined content above 16 MiB produce visible errors without
+  replacing the accepted draft. Exactly twelve files and exactly 16 MiB are
+  accepted. No model request occurs during selection or rejected intake.
+- The Linux native clipboard helper is exercised as a child process returning a
+  real PNG decoded by OpenTUI. The image and text file stay with their original
+  chat across switching and restart. Changing both source files later does not
+  alter the private copies: explicit files-only send delivers the retained text
+  and image data to the real Go provider path and clears only admitted inputs.
+- The helper fixture is not an OS clipboard permission test. Native macOS/Windows
+  clipboard checks remain deferred. Terminal path selection is the replacement
+  for Electron file dialogs/drag-drop; image viewing has separate pixel evidence.
