@@ -56,6 +56,8 @@ Completed public activity now folds above its answer, supports keyboard inspecti
 and expanded-history search, with real-runner restart/non-replay evidence.
 Short terminal hubs now reveal keyboard selection after navigation and resize;
 compact 50×18 and 42×14 tests retain drafts and reach lower destinations.
+A native zero-height selector failure at 42×14 is fixed with bounded list
+geometry and compact dialog positioning; the failing regression now passes.
 
 Replace the Electron application with Gator's adaptation of **OpenCode's actual
 terminal frontend**, carrying forward Gator's current capabilities. Use an

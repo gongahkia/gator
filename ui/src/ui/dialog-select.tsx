@@ -261,7 +261,9 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   })
 
   const dimensions = useTerminalDimensions()
-  const limit = createMemo(() => Math.floor(dimensions().height / 2) - 6)
+  // Reserve at least one selectable row after the overflow indicator. The
+  // upstream formula reaches zero/negative native layout heights on short PTYs.
+  const limit = createMemo(() => Math.max(2, Math.floor(dimensions().height / 2) - 6))
   // Under new designs an overflowing list gives its last row to a "…" indicator.
   const overflows = createMemo(() => newDesigns() && rows() > limit())
   // Computed once here so per-row details do not each call useTerminalDimensions(),
@@ -272,7 +274,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   const [moreBelow, setMoreBelow] = createSignal(false)
   // At the bottom of the list the "…" row hands its row back to the list, so the dialog keeps its height.
   const ellipsis = () => overflows() && moreBelow()
-  const height = createMemo(() => Math.min(rows(), limit()) - (ellipsis() ? 1 : 0))
+  const height = createMemo(() => Math.max(1, Math.min(rows(), limit()) - (ellipsis() ? 1 : 0)))
   function updateMoreBelow() {
     if (!scroll || scroll.isDestroyed) return
     setMoreBelow(scroll.scrollTop + scroll.viewport.height < scroll.scrollHeight)

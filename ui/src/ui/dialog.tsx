@@ -64,7 +64,7 @@ export function Dialog(
         justifyContent={props.centered ? "center" : undefined}
         position="absolute"
         zIndex={3000}
-        paddingTop={props.centered ? 0 : dimensions().height / 4}
+        paddingTop={props.centered || dimensions().height < 24 ? 0 : Math.floor(dimensions().height / 4)}
         left={0}
         top={0}
         backgroundColor={RGBA.fromInts(0, 0, 0, 150)}
@@ -78,7 +78,7 @@ export function Dialog(
             e.stopPropagation()
           }}
           width={dialogWidth(props.size ?? "medium")}
-          maxWidth={dimensions().width - 2}
+          maxWidth={Math.max(1, dimensions().width - 2)}
           backgroundColor={theme.background.base}
           paddingTop={1}
         >

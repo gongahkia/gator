@@ -49,3 +49,8 @@ dependency changes, refresh originals/hashes, review local adaptations against
 the old/new originals, then run shared-host, adapter, renderer, actual PTY and
 installed-artifact tests before updating this record. Never import upstream
 execution/config defaults as an incidental dependency update.
+
+Short-terminal adaptation: `ui/dialog-select.tsx` clamps the list budget and
+post-ellipsis viewport to positive rows. `ui/dialog.tsx` uses top alignment below
+24 rows and a positive width. The pinned formula produced a native `LayoutLimit`
+at 42×14; `tests/hubs.test.tsx` retains this regression and keyboard reachability.

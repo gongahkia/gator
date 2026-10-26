@@ -934,8 +934,24 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   visible scroll region on short terminals. Following/Saved/Settings now reveal
   the selected destination after layout and resize, and reset selection when
   changing hubs so an index from a longer page cannot hide the new selection.
-- `tests/hubs.test.tsx`: **1 pass / 11 assertions**; terminal typecheck passes.
+- Initial `tests/hubs.test.tsx`: **1 pass / 10 assertions**; terminal typecheck
+  passed. The additional resize-before-dialog assertion failed after this entry
+  was drafted; the correction and final rerun are recorded below.
   At 50×18 and 42×14, lower Settings/Saved destinations scroll into view, Enter
   opens the selected action, and switching to Following selects its first item.
   Sidebar collapse, draft preservation and absence of accidental submissions
   are verified. Real macOS/Windows terminal behavior remains deferred.
+
+### Short-dialog layout correction
+
+- The new 42×14 resize-before-dialog case exposed the pinned selector's zero-row
+  viewport when its overflow indicator consumed its only row. OpenTUI reported
+  `LayoutLimit`. The prior commit was made before its rerun result was inspected;
+  its claimed 11-assertion pass is corrected above.
+- Selector geometry now reserves at least one usable row after overflow; short
+  dialogs start at the top instead of consuming a quarter of the screen as blank
+  space, and width stays positive. The failing assertion remains in the suite.
+- `tests/hubs.test.tsx`, `tests/models.test.tsx`, `tests/panel.test.tsx`: **6 pass /
+  56 assertions**, including the extended hub case (**11 assertions**); terminal
+  typecheck passes. Normal model availability and form masking/navigation guards
+  still pass. These changes to imported components are recorded in `UPSTREAM.md`.
