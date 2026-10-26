@@ -18,7 +18,7 @@ import { Highlight } from "./highlight"
 export function Panel(props: { panel: BackendPanel }) {
   const client = useClient(), data = useData(), theme = useTheme(), dialog = useDialog(), renderer = useRenderer()
   const [fields, setFields] = createSignal<Record<number, string>>({}), [busy, setBusy] = createSignal(false), [query, setQuery] = createSignal("")
-  const selectedRow = () => props.panel.selected ?? 0
+  const selectedRow = () => Math.max(0, Math.min(props.panel.selected ?? 0, (props.panel.rows?.length ?? 1) - 1))
   const formSubmit = () => {
     if (props.panel.hints?.some(hint => /ctrl\+(r|enter)/.test(hint.shortcut.toLowerCase().replaceAll(" ", "")))) return { key: "ctrl+r", label: "review" }
     if (!props.panel.rows?.some(row => row.input)) return
@@ -132,7 +132,7 @@ export function Panel(props: { panel: BackendPanel }) {
       if (selected) void action({ action: "select", row: selected.index }); return
     }
     if (key === "enter" && query() && !visible().length) { event.preventDefault(); return }
-    if (key === "enter" && props.panel.rows?.[props.panel.selected ?? 0]?.input) { event.preventDefault(); edit(props.panel.selected ?? 0); return }
+    if (key === "enter" && props.panel.rows?.[selectedRow()]?.input) { event.preventDefault(); edit(selectedRow()); return }
     if (key === "ctrl+f" || key === "/") {
       event.preventDefault(); dialog.replace(() => <DialogPrompt title={props.panel.catalog ? "Search retained conversations" : "Filter loaded entries"} value={props.panel.catalog ? props.panel.query : query()} onConfirm={text => {
         dialog.clear()

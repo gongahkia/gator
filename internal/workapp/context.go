@@ -178,6 +178,7 @@ func (m Model) contextPanel() uisnapshot.Panel {
 		}
 		if m.contextEditing {
 			p.Kind, p.Title = "knowledge-form", "Correct saved knowledge"
+			p.Selected = 0 // The list selection does not identify a field in this one-field form.
 			p.Blocks = p.Blocks[1:]
 			p.Rows = []uisnapshot.Row{{Label: "Current saved text", Detail: m.contextEdit, Input: bridgeInput(m.contextEdit, 4096, true)}}
 			p.Hints = []uisnapshot.Hint{{Shortcut: "Ctrl+U", Action: "clear"}, {Shortcut: "Enter", Action: "save correction"}, {Shortcut: "Esc", Action: "cancel"}}

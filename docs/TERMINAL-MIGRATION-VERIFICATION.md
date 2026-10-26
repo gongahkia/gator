@@ -154,7 +154,7 @@ assertions to terminal/host/native tests before retiring any Electron suite.
 ### `desktop/tests/e2e/polish.spec.ts`
 
 - [ ] Inbox opens without acknowledging results, and explicit read and rating actions persist
-- [ ] knowledge and model filters preserve the selected record and original model identity
+- [x] knowledge and model filters preserve the selected record and original model identity — `ui/tests/knowledge.test.tsx`, `ui/tests/panel.test.tsx`, and `ui/tests/providers.test.tsx`.
 - [ ] native follow-up fields review exact values and path selection never switches workspace
 - [ ] saved guidance persists native choices and retired terminal settings are absent
 - [ ] the desktop starts without a standalone Node or Gator CLI on PATH
@@ -1136,3 +1136,21 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   Python dependencies are verification-only, absent from Gator's runtime needs.
 - Native macOS/Windows and actual audio/clipboard permissions remain unverified;
   the package result does not close those removal-gate cases.
+
+### Knowledge correction field selection and guarded note lifecycle
+
+- A real note workflow exposed an invalid display selection: opening correction
+  from the second knowledge row left selection 1 in a one-field form. Enter could
+  save the unchanged record instead of opening its editor. Go now projects field
+  0 while preserving the original list selection; the terminal also bounds its
+  selected field before dispatching editing controls.
+- `go test ./internal/workapp`: pass, including a regression that cancelling the
+  form returns to the original list item. Terminal typecheck passes. Knowledge
+  and panel keyboard suites: **4 pass / 41 assertions**. The note case verifies
+  matching/empty filters, exact record/provenance, omit/include, concurrent-edit
+  rejection with retained unsaved text, correction, cancelled forgetting, restart,
+  explicit forgetting and preservation of an unrelated note and chat draft.
+  The panel regression exercises an out-of-range selection on a credential form.
+- The recurring-check feedback regression also passed after this fix. These are
+  real note-store mutations in an isolated profile; no model is configured or
+  called. A refreshed package after this Go/terminal change remains required.

@@ -56,6 +56,23 @@ func TestSavedKnowledgeKeepsForgetReviewOnConflict(t *testing.T) {
 	}
 }
 
+func TestKnowledgeCorrectionProjectsFirstFieldWithoutLosingListSelection(t *testing.T) {
+	m := New(Config{})
+	m.section, m.selected = "context", 1
+	m.contextState.Items = []KnowledgeItem{{ID: "first"}, {ID: "second", Kind: "note", CurrentText: "Original", Available: true}}
+	m, _ = productKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = productKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
+	panel := m.contextPanel()
+	if panel.Kind != "knowledge-form" || panel.Selected != 0 || len(panel.Rows) != 1 || panel.Rows[0].Input == nil {
+		t.Fatalf("correction form selects no editable field: %#v", panel)
+	}
+	m, _ = productKey(m, tea.KeyMsg{Type: tea.KeyEsc})
+	m, _ = productKey(m, tea.KeyMsg{Type: tea.KeyEsc})
+	if m.selected != 1 || m.contextDetail != nil {
+		t.Fatal("cancelling correction lost original list selection")
+	}
+}
+
 func TestHistoricalContextKeepsExcerptWhileAdvancingSavedRevision(t *testing.T) {
 	m := New(Config{ChangeKnowledge: func(_, _, _, _, _ string) (string, error) { return "revision-2", nil }})
 	m.section, m.contextWorkID = "context", "earlier-run"

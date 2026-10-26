@@ -10,7 +10,9 @@ import { FixtureHost } from "./fixture"
 test("credential keyboard and paste buffers paint only masks and preserve explicit form submission", async () => {
   const root = await mkdtemp(join(tmpdir(), "gator-secret-"))
   const host = new FixtureHost({ binary: "/unused", workspace: root, userData: root, env: { GATOR_STATE_DIR: root } })
-  host.current.panel = { id: "provider-form", kind: "form", title: "Provider credentials", selected: 0,
+  // A form can replace a longer list; old/out-of-range selections must still
+  // open its only field rather than passing Enter through as a save action.
+  host.current.panel = { id: "provider-form", kind: "form", title: "Provider credentials", selected: 3,
     rows: [{ label: "API key", input: { secret: true, limit: 100 } }], hints: [{ shortcut: "ctrl+enter", action: "Review configuration" }] }
   const client = new GatorClient(host)
   const setup = await testRender(() => <App client={client} quit={() => client.close()} clipboard={{ read: async () => ({ data: "", mime: "text/plain" }), write: async () => {} }} />, { width: 110, height: 32 })
