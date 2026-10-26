@@ -12,13 +12,14 @@ import { useFiles } from "./files"
 import { PathPicker } from "./path-picker"
 import { Details } from "./details"
 import { ActionPrompt } from "./action-prompt"
+import { useData } from "../context/data"
 
-export type Choice = { title: string; description?: string; category?: string; disabled?: boolean; run(): unknown }
+export type Choice = { title: string; key?: string; description?: string; category?: string; disabled?: boolean; run(): unknown }
 export function useActions() {
-  const client = useClient(), dialog = useDialog()
+  const client = useClient(), dialog = useDialog(), data = useData()
   const attempt = (operation: unknown) => { if (operation instanceof Promise) void operation.catch(e => client.fail(e)) }
-  const menu = (title: string, choices: Choice[]) => dialog.replace(() => <DialogSelect title={title} options={choices.map((item, index) => ({
-    title: literal(item.title), description: literal(item.description), category: literal(item.category), disabled: item.disabled, value: index,
+  const menu = (title: string, choices: Choice[] | (() => Choice[])) => dialog.replace(() => <DialogSelect title={title} options={(typeof choices === "function" ? choices() : choices).map((item, index) => ({
+    title: literal(item.title), description: literal(item.description), category: literal(item.category), disabled: item.disabled, value: item.key ?? index,
     onSelect: () => { dialog.clear(); try { attempt(item.run()) } catch (error) { client.fail(error) } },
   }))} />)
   const prompt = (title: string, value: string, save: (text: string) => unknown, description?: string) => { const token = Symbol(title); dialog.replace(() => <ActionPrompt token={token} title={title} value={value} save={save} description={description} />, undefined, { key: token }) }
@@ -138,13 +139,16 @@ export function useActions() {
     ])
   }
   function chats() {
-    const grouped = client.preferences.groupChatsByFolder, activity = client.snapshot.chatActivity, recent = client.state?.recent_conversations ?? []
-    menu(grouped ? "Chats grouped by folder" : "Open and recent chats", [
-      { title: grouped ? "Show flat recent chats" : "Group recent chats by folder", run: async () => { await client.configurePreferences({ groupChatsByFolder: !grouped }); chats() } },
-      ...activity.map(chat => ({ title: chat.title, description: chat.status, category: "Activity", run: () => client.openSession(chat.id) })),
-      ...recent.filter(chat => !activity.some(active => active.id === chat.id)).map(chat => ({ title: chat.title, description: `${chat.source} · ${chat.updated_at}`, category: grouped ? chat.source : "Recent chats", run: () => client.openConversation(chat.id, client.state?.recent_id ?? "") })),
-      { title: "Search all retained conversations", run: () => client.navigate("/conversations") },
-    ])
+    const grouped = client.preferences.groupChatsByFolder
+    menu(grouped ? "Chats grouped by folder" : "Open and recent chats", () => {
+      const activity = data.snapshot.chatActivity, recent = data.state?.recent_conversations ?? []
+      return [
+        ...activity.map(chat => ({ key: `chat:${chat.id}`, title: recent.find(item => item.id === chat.id)?.title || chat.title, description: chat.status, category: grouped ? "Activity" : undefined, run: () => client.openSession(chat.id) })),
+        ...recent.filter(chat => !activity.some(active => active.id === chat.id)).map(chat => ({ key: `chat:${chat.id}`, title: chat.title, description: `${chat.source} · ${chat.updated_at}`, category: grouped ? chat.source : undefined, run: () => client.openConversation(chat.id, client.state?.recent_id ?? "") })),
+        { key: "grouping", title: grouped ? "Show flat recent chats" : "Group recent chats by folder", run: async () => { await client.configurePreferences({ groupChatsByFolder: !grouped }); chats() } },
+        { key: "catalog", title: "Search all retained conversations", run: () => client.navigate("/conversations") },
+      ]
+    })
   }
   const actions: Record<string, () => unknown> = {
     drafts, queue, updates, memories, receipts, models,

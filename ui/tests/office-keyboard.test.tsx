@@ -34,7 +34,11 @@ test("keyboard Office and CSV edits save and export real native content while or
       else { if (item.name.endsWith("xlsx")) { setup.mockInput.pressEnter(); await flush() }; await replacePrompt(item.name.endsWith("xlsx") ? "C1" : "2:2") }
       await replacePrompt(item.value)
       await until(async () => { const view = await client.host.file(request); return (view.draft?.paragraphs?.[item.key] ?? view.draft?.cells?.[item.key]) === item.value }, item.name + " retained edit")
-      setup.mockInput.pressKey("s", { ctrl: true }); await until(async () => (await client.host.file(request)).versions.length === 2, item.name + " saved version"); await flush()
+      const retained = await client.host.file(request)
+      await until(async () => { await flush(); return !!setup.renderer.root.findDescendantById(`file-editor-${retained.revision}`) }, item.name + " returned editable view")
+      setup.mockInput.pressKey("s", { ctrl: true }); await until(async () => (await client.host.file(request)).versions.length === 2, item.name + " saved version")
+      const saved = await client.host.file(request)
+      await until(async () => { await flush(); return !!setup.renderer.root.findDescendantById(`file-editor-${saved.revision}`) }, item.name + " saved view")
       setup.mockInput.pressKey("F2"); await flush(); await setup.mockInput.typeText("Version 2"); await flush(); setup.mockInput.pressEnter(); await flush()
       await setup.mockInput.typeText("Export exact selected bytes"); await flush(); setup.mockInput.pressEnter(); await flush()
       const destination = join(root, "export-" + item.name); await replacePrompt(destination)

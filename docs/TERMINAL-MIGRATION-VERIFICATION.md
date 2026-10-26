@@ -668,3 +668,17 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   **72 cases / 71 pass / one Windows skip**. The broad UI run found three failures
   (Office dialog timing, catalog return and concurrent chat selection); these are
   being corrected and are not counted as parity evidence.
+
+### Regression corrections after preference integration
+
+- Live chat choices now retain stable conversation keys, prefer the retained Go
+  catalog title over an active worker's temporary “New chat”, and refresh names/
+  activity while the picker is open. Deduplication no longer hides a running chat
+  under an obsolete title. Grouping controls follow chat entries in the flat list.
+- Office keyboard checks wait for the returned editor of the actual saved
+  revision before issuing Save or version actions; an acknowledged draft write
+  can precede the replacement dialog. Catalog checks allow the terminal's ESC
+  prefix to resolve before F5. Behavioral assertions remain unchanged.
+- Focused `office-keyboard`, `preferences`, `catalog`, `concurrent` rerun:
+  **4 pass / 66 assertions / 0 failures**; terminal typecheck passes. A fresh full
+  frontend run is in progress; the earlier 33/36 result remains recorded above.
