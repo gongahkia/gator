@@ -42,4 +42,6 @@ async function scan(directory) {
 }
 await scan(join(destination, "ui/node_modules"));
 await writeFile(join(destination, "licenses/DEPENDENCIES.txt"), notices.join(""));
+const verification = spawnSync("bun", [join(root, "ui/scripts/verify-package-services.mjs"), destination], { stdio: "inherit", windowsHide: true });
+if (verification.error || verification.status !== 0) throw verification.error || new Error("Production service verification failed. Refresh the local host dependency lock with bun update @gator/application-host from ui/ and rebuild.");
 console.log(destination);

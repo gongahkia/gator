@@ -649,3 +649,22 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   Chromium hashes. `node ui/scripts/verify-preference-migration.mjs` also passes
   against a profile created by the actual retained Electron application. Terminal
   and desktop typechecks pass. Native macOS/Windows import remains unverified.
+
+### Production lazy dependencies and service verification
+
+- Audit found stale Bun local-package metadata: the earlier artifact launched,
+  but its lazy PDF adapter lacked native canvas/PDF.js. The new service probe
+  rejects `artifact-3` with the actual missing-module error. Its earlier PTY and
+  install evidence remains limited to the workflows those checks exercised.
+- Refreshed host metadata in `ui/bun.lock` (captured in user commit `b9c11fb35`).
+  Packaging now resolves every declared host dependency inside the artifact and
+  runs production Go-host services, rather than accepting startup alone.
+- Fresh `artifact-4`: service probe passes for imported Chromium preferences,
+  distinct actual rasterized PDF pages, DOCX/XLSX/PPTX/text save/export and exact
+  selected-version attachment; originals remain unchanged and no model is called.
+  The standalone PTY, interactive-editor PTY and install/uninstall probes all pass.
+- Current Go full suite (`go test -p 2 ./...`) and vet pass with cache-backed
+  TMPDIR/GOTMPDIR. Desktop host tests and desktop typecheck pass; shared host has
+  **72 cases / 71 pass / one Windows skip**. The broad UI run found three failures
+  (Office dialog timing, catalog return and concurrent chat selection); these are
+  being corrected and are not counted as parity evidence.

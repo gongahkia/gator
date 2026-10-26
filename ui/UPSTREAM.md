@@ -37,6 +37,12 @@ to be installed here. Solid 1.9.15 matches upstream despite OpenTUI's narrower
 the patch. `bun.lock` is the frontend lockfile; `app-host/package-lock.json` owns
 shared Node-compatible services and Office dependencies. Native platform evidence
 and final distribution selection remain recorded in the migration ledger.
+Gator's host additionally owns PDF.js/native canvas and classic-level for bounded
+legacy preference import. After changing its manifest, run
+`bun update @gator/application-host` from `ui/` and inspect the lock diff; a forced
+install alone can retain old local-package dependency metadata. Packaging verifies
+the resolved production closure and exercises actual PDF/Office/preferences
+services from the artifact before accepting it.
 
 Update procedure: fetch a deliberate immutable revision, verify licensing and
 dependency changes, refresh originals/hashes, review local adaptations against
