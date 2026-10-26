@@ -760,3 +760,20 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
 - Full Go suite after the empty-chat restore correction passes. Frontend typecheck
   passes. Provider creation/credential forms and local-model installation remain
   separate acceptance cases; these two tests do not establish all of P19.
+
+### Provider form submission and credential reviews
+
+- Acceptance work found an inaccessible action: forms advertising Enter to save
+  or review could only reopen their selected input in the terminal. F2/Ctrl+R
+  now submit the complete form using its advertised Go action and final input
+  row, matching Electron's existing protocol. Enter continues to edit a field;
+  forms with Go Ctrl+R reviews keep that route. No review is bypassed.
+- Provider and panel suite: **4 pass / 33 assertions**. The real Go catalog creates
+  custom endpoint metadata only after its separate review, preserves multiline
+  model IDs, renames the display alias without changing the model identity, and
+  saves a masked API key only into the private auth file. Cancellation retains
+  that credential; explicitly confirming removal deletes it. Config/display state
+  never contains the fixture key, and the unsent draft remains unchanged.
+- Existing recurring-check, data and connection journeys after this shared form
+  change: **3 pass / 92 assertions**. Terminal typecheck passes. Installation,
+  local-model management and native device sign-in still need separate evidence.

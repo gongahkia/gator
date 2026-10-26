@@ -32,6 +32,8 @@ restore also preserves valid unsent chats whose empty directories are omitted
 from backup archives. Remaining private-data edge cases stay open in the ledger.
 Model and effort controls now retain visible availability reasons and refresh
 while open; first-task setup preserves immutable attachments through restart.
+Provider forms now expose their canonical save/review action independently of
+field editing, with keyboard evidence for private credentials and metadata.
 
 Replace the Electron application with Gator's adaptation of **OpenCode's actual
 terminal frontend**, carrying forward Gator's current capabilities. Use an

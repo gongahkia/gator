@@ -26,8 +26,10 @@ for Ask Gator. Tables page with Ctrl+Up/Down (rows) and Ctrl+Left/Right (columns
 F7 switches worksheets. Returning to chat retains the draft. Exporting to an
 existing file shows a separate replacement review; changed destinations require
 a fresh review. Export outside Gator's private storage.
-In reviewable forms, F2 and Ctrl+R review; Ctrl+Enter also works in terminals
-that distinguish it. Unsaved form edits require an explicit discard decision.
+In forms, F2 and Ctrl+R perform the displayed save/review action; Enter edits
+the selected field. Ctrl+Enter also works in terminals that distinguish it.
+Provider configuration and model rename forms use their existing Go save action;
+a custom provider still requires its separate confirmation review. Unsaved form edits require an explicit discard decision.
 In Conversations, Ctrl+F searches indexed messages, Ctrl+L changes scope,
 Ctrl+Left/Right pages results, F3 manages the selected chat, and Ctrl+R/F5 refreshes.
 Choose `external-editor` in Ctrl+P to edit the idle draft with `$VISUAL`, `$EDITOR`
