@@ -65,6 +65,8 @@ edit and pause reviews, origin/expiry preservation and restart without execution
 The refreshed standalone package passes production services, PTY/editor and owned
 install/uninstall probes. Linux fresh/150-revision startup, search, complete-tree
 RSS/PSS and cleanup measurements are recorded against the retained Electron app.
+Preference writes now serialize stale-lock recovery through an OS-backed lock;
+crash/concurrent-writer checks preserve acknowledged updates and profile imports.
 
 Replace the Electron application with Gator's adaptation of **OpenCode's actual
 terminal frontend**, carrying forward Gator's current capabilities. Use an

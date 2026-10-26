@@ -1020,3 +1020,21 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   [Raw measurements](terminal-measurements/linux-2026-10-26.json) retain byte counts.
   Both clean exits leave no observed product child process; terminal modes are
   restored. Native-platform performance remains unmeasured.
+
+### Preference writer crash and concurrency guard
+
+- Preference updates now use the existing LevelDB native exclusive lock before
+  recovering a stale PID lock or reading/writing JSON. Competing recovery cannot
+  unlink a newer writer's lock. The compatibility PID file is hard-linked from a
+  fully written private owner file, eliminating the ordinary empty-owner crash
+  window. JSON remains the same authoritative frontend preference format.
+- A live holder is rejected without writing; killing an isolated holder releases
+  its OS lock, and a subsequent update recovers the stale PID marker while keeping
+  existing settings. Two competing instances preserve every acknowledged patch.
+  Invalid/unknown legacy lock owners remain conservative errors rather than being
+  deleted speculatively. Native filesystem behavior still needs Mac/Windows checks.
+- Preference host suite: **5 pass**. Complete shared host: **75 pass / 1 Windows-only
+  skip / 0 fail**. After refreshing Bun's copied host dependency, preference UI:
+  **1 pass / 18 assertions**; profile continuity: **2 pass / 28 assertions**;
+  terminal typecheck passes. Original Chromium bytes, file drafts/versions, profile
+  separation and disabled draft retention are preserved.

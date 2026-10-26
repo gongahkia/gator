@@ -4,7 +4,8 @@ import { mkdtemp, mkdir, readFile, readdir, writeFile, rm } from "node:fs/promis
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
+import { once } from "node:events";
 import { ClassicLevel } from "classic-level";
 import { FrontendPreferences } from "../src/preferences.mjs";
 
@@ -66,5 +67,41 @@ test("corrupt or interrupted legacy import retains source bytes and leaves no co
     const database = new ClassicLevel(source, { keyEncoding: "buffer", valueEncoding: "buffer" });
     await database.put(key("gator:sidebar-collapsed"), dom("true")); await database.del(key("gator:sidebar-collapsed")); await database.close();
     assert.equal((await store.read()).sidebarCollapsed, false);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("preference writers retain native exclusion until a crashed process exits and then recover", async () => {
+  const root = await mkdtemp(join(tmpdir(), "gator-preference-process-"));
+  let child;
+  try {
+    const store = new FrontendPreferences(root); await store.configure({ sidebarCollapsed: true });
+    const source = `import {ClassicLevel} from ${JSON.stringify(new URL('../node_modules/classic-level/index.js', import.meta.url).href)};
+      import {writeFile} from 'node:fs/promises';
+      const db=new ClassicLevel(${JSON.stringify(join(root, "frontend-preferences-writer"))});await db.open();
+      await writeFile(${JSON.stringify(store.file + ".lock")},String(process.pid));
+      process.stdout.write('ready');setInterval(()=>{},1000);`;
+    child = spawn(process.execPath, ["--input-type=module", "-e", source], { stdio: ["ignore", "pipe", "pipe"] });
+    await Promise.race([once(child.stdout, "data"), once(child, "exit").then(() => { throw new Error("Fixture writer exited before taking the lock"); })]);
+    await assert.rejects(store.configure({ groupChatsByFolder: true }), /Another application/);
+    assert.equal(JSON.parse(await readFile(store.file, "utf8")).preferences.groupChatsByFolder, false);
+    const exited = once(child, "exit"); child.kill("SIGKILL"); await exited;
+    await store.configure({ groupChatsByFolder: true });
+    const recovered = await new FrontendPreferences(root).read(); assert.equal(recovered.sidebarCollapsed, true); assert.equal(recovered.groupChatsByFolder, true);
+    assert.equal(await readFile(store.file + ".lock").catch(error => error.code), "ENOENT");
+  } finally { if (child && child.exitCode === null && child.signalCode === null) { const exited = once(child, "exit"); child.kill("SIGKILL"); await exited; } await rm(root, { recursive: true, force: true }); }
+});
+
+test("concurrent preference instances never lose an acknowledged patch during stale lock recovery", async () => {
+  const root = await mkdtemp(join(tmpdir(), "gator-preference-race-"));
+  try {
+    const first = new FrontendPreferences(root), second = new FrontendPreferences(root);
+    await first.read();
+    const exited = execFileSync(process.execPath, ["-e", "process.stdout.write(String(process.pid))"], { encoding: "utf8" });
+    await writeFile(first.file + ".lock", exited);
+    const operations = [() => first.configure({ sidebarCollapsed: true }), () => second.configure({ groupChatsByFolder: true })];
+    const results = await Promise.allSettled(operations.map(run => run()));
+    for (let index = 0; index < results.length; index++) if (results[index].status === "rejected") { assert.match(results[index].reason.message, /Another application/); await operations[index](); }
+    assert.equal((await first.read()).sidebarCollapsed, true); assert.equal((await second.read()).groupChatsByFolder, true);
+    assert.ok(!(await readdir(root)).some(name => name.endsWith(".tmp")));
   } finally { await rm(root, { recursive: true, force: true }); }
 });

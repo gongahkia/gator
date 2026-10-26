@@ -1,5 +1,5 @@
 import { constants } from "node:fs";
-import { mkdir, mkdtemp, open, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, open, link, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 
@@ -66,19 +66,31 @@ export class FrontendPreferences {
   #queue(patch) { const operation = this.#pending.then(() => this.#update(patch)); this.#pending = operation.catch(() => {}); return operation; }
   async #update(patch) {
     await mkdir(this.userData, { recursive: true, mode: 0o700 });
-    const lock = this.file + ".lock"; let held;
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try { held = await open(lock, "wx", 0o600); break; }
-      catch (error) {
-        if (error.code !== "EEXIST") throw error;
-        const owner = Number(await readFile(lock, "utf8")); let live = true;
-        if (Number.isSafeInteger(owner) && owner > 0) { try { process.kill(owner, 0); } catch (error) { if (error.code === "ESRCH") live = false; } }
-        if (live || attempt) throw new Error("Another application is updating frontend preferences. Retry after it finishes.");
-        await rm(lock);
-      }
-    }
+    // LevelDB's native OS lock serializes stale PID-file recovery as well as
+    // writes, and is released by the OS after a crash. Keep the PID file for
+    // compatibility with earlier terminal builds, publishing it only once its
+    // complete owner is on disk (no empty-file crash window).
+    const { ClassicLevel } = await import("classic-level");
+    const directory = join(this.userData, "frontend-preferences-writer");
+    await mkdir(directory, { recursive: true, mode: 0o700 });
+    const writer = new ClassicLevel(directory);
+    const busy = () => new Error("Another application is updating frontend preferences. Retry after it finishes.");
+    try { await writer.open(); }
+    catch (error) { await writer.close().catch(() => {}); if (error.code === "LEVEL_LOCKED" || error.cause?.code === "LEVEL_LOCKED") throw busy(); throw error; }
+    const lock = this.file + ".lock", ownerFile = lock + "." + randomUUID() + ".tmp";
+    let held = false;
     try {
-      await held.writeFile(String(process.pid));
+      await writeFile(ownerFile, String(process.pid), { mode: 0o600, flag: "wx" });
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try { await link(ownerFile, lock); held = true; break; }
+        catch (error) {
+          if (error.code !== "EEXIST") throw error;
+          const owner = Number(await readFile(lock, "utf8")); let live = true;
+          if (Number.isSafeInteger(owner) && owner > 0) { try { process.kill(owner, 0); } catch (error) { if (error.code === "ESRCH") live = false; } }
+          if (live || attempt) throw busy();
+          await rm(lock);
+        }
+      }
       let data;
       try {
         const raw = await readFile(this.file, "utf8");
@@ -99,6 +111,9 @@ export class FrontendPreferences {
         finally { await rm(temporary, { force: true }); }
       }
       return preferences;
-    } finally { await held.close(); await rm(lock, { force: true }); }
+    } finally {
+      try { if (held) await rm(lock, { force: true }); await rm(ownerFile, { force: true }); }
+      finally { await writer.close(); }
+    }
   }
 }
