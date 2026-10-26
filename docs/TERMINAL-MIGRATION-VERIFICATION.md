@@ -569,3 +569,20 @@ independent installed launch; release packaging and platform matrix.
   desktop typecheck passes. The editor case explicitly skips Windows because
   Go's existing editor command requires POSIX `sh`; macOS/Windows actual runtime
   evidence and real account/install handoffs remain pending.
+
+### Independent artifact and real terminal editor
+
+- Rebuilt Go/runtime and production frontend from `36f747076`; packaged into the
+  fresh workspace-backed `artifact-3` directory. The artifact contains production
+  dependencies and native assets, with no desktop tree or Electron/OpenCode core.
+- `python3 ui/scripts/verify-package.py artifact-3`: pass from an isolated working
+  directory with only Bun on PATH. Actual Go connection, Unicode/bracketed paste,
+  palette, private retained draft and clean exit; original terminal modes restored.
+- The new `--editor` variant passes with Bun and POSIX sh on PATH and a Python
+  fixture editor. It verifies real canonical input and echo during the handoff,
+  actual keyboard input reaching the child, exact returned text, deleted temporary
+  file, resumed raw composer input and final terminal-mode restoration.
+- `node ui/scripts/verify-install.mjs artifact-3`: pass for independent install,
+  help/version, a scripted note, active-profile uninstall refusal, owned uninstall
+  and retained private data. This checkpoint does not establish the remaining
+  page/native parity cases or authorize Electron removal.
