@@ -125,7 +125,7 @@ test("update paging only acknowledges visible cards and check health stays with 
     expect(hasTime((await read(52)).read_at), "Inbox opening does not mark read").toBe(false)
     await client.navigate("/chat"); await flush()
     expect(client.state?.panel).toBeUndefined()
-    await until(async () => hasTime((await read(52)).delivered_at), "visible latest card")
+    await until(async () => { await flush(); return hasTime((await read(52)).delivered_at) }, "visible latest card")
     expect(hasTime((await read(3)).delivered_at), "offscreen oldest page card stays undelivered").toBe(false); expect(hasTime((await read(52)).read_at), "delivery does not mark read").toBe(false)
     await client.navigate("/updates"); await flush(); await choose("older updates")
     expect(client.state?.chat_updates).toHaveLength(3); expect(!!client.state?.updates_have_older).toBe(false); expect(client.state?.updates_have_newer).toBe(true)

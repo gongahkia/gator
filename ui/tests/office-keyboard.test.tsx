@@ -29,6 +29,8 @@ test("keyboard Office and CSV edits save and export real native content while or
       const file = client.draft.uploads!.find(file => file.name === item.name)!, context = client.context
       const request = { action: "open" as const, context, ref: { kind: "upload" as const, id: file.id } }
       await client.navigate("/files"); await flush(); await setup.mockInput.typeText(item.name); await flush(); setup.mockInput.pressEnter(); await flush()
+      const opened = await client.host.file(request)
+      await until(async () => { await flush(); return !!setup.renderer.root.findDescendantById(`file-editor-${opened.revision}`) }, item.name + " opened editor")
       setup.mockInput.pressKey("F3"); await flush()
       if (item.match) { await setup.mockInput.typeText(item.match); await flush(); setup.mockInput.pressEnter(); await flush() }
       else { if (item.name.endsWith("xlsx")) { setup.mockInput.pressEnter(); await flush() }; await replacePrompt(item.name.endsWith("xlsx") ? "C1" : "2:2") }
