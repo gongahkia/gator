@@ -44,6 +44,11 @@ jobs:
           bun run --cwd ui test
       - name: Build independent production artifact
         run: node ui/scripts/package.mjs terminal-artifact
+      - name: Verify installed lifecycle without Electron
+        run: node ui/scripts/verify-install.mjs terminal-artifact
+      - name: Verify native terminal and editor handoff
+        if: runner.os != 'Windows'
+        run: python3 ui/scripts/verify-package.py terminal-artifact --editor --untrusted-file
       - name: Compile additional ARM64 runtime
         if: runner.os != 'macOS'
         shell: bash

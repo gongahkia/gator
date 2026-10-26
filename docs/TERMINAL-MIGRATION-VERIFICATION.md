@@ -1067,3 +1067,17 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   changes and navigation make no additional provider requests. The fixture needed
   corrections for omitted zero selection, the palette's actual title and raised
   background; the final assertions pass. OS terminal chrome remains terminal-owned.
+
+### Installed untrusted-file rendering
+
+- `python3 ui/scripts/verify-package.py artifact-5 --untrusted-file`: **pass** on
+  Linux. Actual keyboard controls import and open a text file containing OSC 52
+  clipboard, OSC title and screen-clear payloads. The complete final line renders;
+  the exact clipboard/title control sequences never appear in raw PTY output.
+  Original file bytes and the unsent composer survive, and clean exit restores
+  terminal modes. PATH contains only Bun; no model, Electron or OpenCode server
+  participates. This verifies the unchanged file editor in the earlier artifact;
+  the final package rerun remains required.
+- Native CI now runs install/uninstall guards on every runner, plus real PTY,
+  editor handoff and untrusted-file probes on Unix. This is configured coverage,
+  not evidence of a remote CI or native macOS/Windows pass; no push was performed.

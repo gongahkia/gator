@@ -20,6 +20,7 @@ import time
 parser = argparse.ArgumentParser()
 parser.add_argument("artifact", type=Path)
 parser.add_argument("--editor", action="store_true", help="Also verify a Go-owned editor handoff and terminal mode restoration")
+parser.add_argument("--untrusted-file", action="store_true", help="Open terminal-control payloads as file content and verify they never reach the PTY as commands")
 args = parser.parse_args()
 artifact = args.artifact.resolve()
 assert not (artifact / "desktop").exists()
@@ -30,6 +31,9 @@ with tempfile.TemporaryDirectory(prefix="gator-installed-pty-") as temporary:
     (root / "path").mkdir()
     (root / "path/bun").symlink_to(shutil.which("bun"))
     environment = dict(os.environ, PATH=str(root / "path"), GATOR_STATE_DIR=str(root / "state"), GATOR_CONFIG_DIR=str(root / "config"), GATOR_TERMINAL_USER_DATA=str(root / "app"))
+    payload = b"Visible file content\n\x1b]52;c;R0FUT1JfUFJJVkFURV9DTElQQk9BUkQ=\x07\x1b]0;GATOR_UNTRUSTED_TITLE\x07\x1b[2J\nRetained final line\n"
+    if args.untrusted_file:
+        (root / "untrusted.txt").write_bytes(payload)
     if args.editor:
         (root / "path/sh").symlink_to(shutil.which("sh"))
         editor = root / "editor.py"
@@ -94,6 +98,33 @@ path.write_text("Editor returned draft 🐊\\nSecond retained line")
         else:
             os.write(master, b"\x1b")
             time.sleep(0.1)
+        if args.untrusted_file:
+            start = len(output)
+            os.write(master, b"\x10")
+            wait_for(lambda: b"Gator commands" in output[start:], "attachment command palette")
+            os.write(master, b"attach-file")
+            time.sleep(0.1)
+            os.write(master, b"\r")
+            wait_for(lambda: b"Choose file" in output[start:], "file picker")
+            os.write(master, b"\x0c")
+            wait_for(lambda: b"relative path" in output[start:], "path field")
+            os.write(master, b"\x15" + str(root / "untrusted.txt").encode() + b"\r")
+            wait_for(lambda: b"untrusted.txt" in output[start:], "staged untrusted file")
+            time.sleep(0.2)
+            start = len(output)
+            os.write(master, b"\x10")
+            wait_for(lambda: b"Gator commands" in output[start:], "files command palette")
+            os.write(master, b"files")
+            time.sleep(0.1)
+            os.write(master, b"\r")
+            wait_for(lambda: b"Files in this conversation" in output[start:], "retained file list")
+            os.write(master, b"\r")
+            wait_for(lambda: b"Retained final line" in output[start:], "complete untrusted file view")
+            assert b"\x1b]52;c;R0FUT1JfUFJJVkFURV9DTElQQk9BUkQ=" not in output, "Untrusted OSC 52 reached terminal output"
+            assert b"\x1b]0;GATOR_UNTRUSTED_TITLE" not in output, "Untrusted title command reached terminal output"
+            assert (root / "untrusted.txt").read_bytes() == payload, "Viewing changed original file bytes"
+            os.write(master, b"\x1b")
+            time.sleep(0.1)
         os.write(master, b"\x11")
         wait_for(lambda: child.poll() is not None, "clean terminal exit", timeout=10)
         assert child.returncode == 0, child.returncode
@@ -101,6 +132,8 @@ path.write_text("Editor returned draft 🐊\\nSecond retained line")
         assert termios.tcgetattr(master) == original_modes, "Terminal modes were not restored on exit"
         print("PASS: standalone production PTY, Go connection, Unicode/bracketed paste, palette, retained draft, clean exit and terminal mode restoration; no Electron/OpenCode server.")
         print("PASS: interactive Go-owned editor, canonical input/echo during handoff, saved text, temporary cleanup and resumed raw composer." if args.editor else "PATH contains Bun only.")
+        if args.untrusted_file:
+            print("PASS: keyboard file intake/view preserves source bytes and draft; file OSC clipboard/title payloads never become PTY commands.")
     finally:
         if child.poll() is None:
             os.killpg(child.pid, signal.SIGKILL)

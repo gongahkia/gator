@@ -71,6 +71,8 @@ Quiet-check feedback now has keyboard evidence for missed/correct assessments,
 stale-edit rejection, unsaved-form recovery and clearing without changing checks.
 Appearance now has rendered-color evidence across settings, cached chats, compact
 dialogs and restart, including all four supported themes without extra requests.
+Installed PTY checks now open untrusted file escape payloads without emitting
+their clipboard/title commands; native CI includes PTY/editor and install probes.
 
 Replace the Electron application with Gator's adaptation of **OpenCode's actual
 terminal frontend**, carrying forward Gator's current capabilities. Use an
