@@ -63,6 +63,12 @@ state/config overrides and existing desktop-named Go preferences remain
 compatible. `GATOR_TERMINAL_USER_DATA` and `GATOR_TERMINAL_WORKSPACE` explicitly
 select alternate roots. No private data is imported into OpenCode storage.
 Uninstall leaves all profiles intact. Tests must use isolated roots.
+On first terminal use, sidebar and recent-chat grouping preferences are imported
+from a private copy of Gator's Chromium Local Storage into
+`frontend-preferences.json`. The original database remains unchanged. Subsequent
+terminal choices take precedence; the Go profile remains authoritative for theme,
+shortcuts and other application settings. Work-details disclosure choices are
+retained, while terminal conversation information uses explicit menus.
 
 Native adapters:
 

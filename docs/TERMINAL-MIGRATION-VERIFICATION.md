@@ -627,3 +627,25 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   paused request, retains the independent draft, hides it in another chat and
   never repeats the POST. A receipt without a sealed manifest cannot offer a
   Sent check. The Unix process probe explicitly skips native Windows.
+
+### Existing Chromium frontend preferences
+
+- Concurrent user commits `724e1bd93` and `b9c11fb35` captured the preference store,
+  terminal wiring, tests and refreshed dependency lock. These commits were kept.
+- First use copies bounded LevelDB files into a private temporary directory and
+  opens only the copy with pinned `classic-level 3.0.0`. Only the three named Gator
+  display preferences are decoded; deleted keys, string encodings and latest
+  values are respected. Original database bytes remain untouched and temporary
+  copies are removed. A failed/corrupt import writes no completed migration file.
+- Sidebar and recent-chat grouping choices apply in the terminal and persist
+  through restart. Work-details disclosure choices remain stored; explicit
+  terminal information menus replace those disclosures. Theme and shortcuts keep
+  their existing Go authority; unrelated origins, keys and credentials are ignored.
+- `app-host/tests/preferences.test.mjs`: **3 pass**, including idempotence,
+  tombstones, extra-authority refusal, patch serialization and abandoned locks.
+  Full host suite: **72 cases / 71 pass / one Windows skip / 0 failures**.
+- Terminal preference test: **1 pass / 18 assertions** under Bun, including
+  keyboard sidebar/grouping changes, separate chat drafts, restart and unchanged
+  Chromium hashes. `node ui/scripts/verify-preference-migration.mjs` also passes
+  against a profile created by the actual retained Electron application. Terminal
+  and desktop typechecks pass. Native macOS/Windows import remains unverified.

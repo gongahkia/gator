@@ -27,7 +27,10 @@ async function legacyPreferences(userData) {
         const metadata = await file.stat({ bigint: true }); total += Number(metadata.size);
         if (!metadata.isFile() || total > 32 * 1024 * 1024) throw new Error("The existing preference database exceeds the 32 MiB import bound.");
         before.set(entry.name, fingerprint(metadata));
-        await writeFile(join(temporary, entry.name), await file.readFile(), { mode: 0o600, flag: "wx" });
+        const expected = Number(metadata.size), bytes = Buffer.alloc(expected + 1); let count = 0;
+        while (count < bytes.length) { const result = await file.read(bytes, count, bytes.length - count, count); if (!result.bytesRead) break; count += result.bytesRead; }
+        if (count !== expected) throw new Error("Preferences changed during import. Close the reference application and retry.");
+        await writeFile(join(temporary, entry.name), bytes.subarray(0, count), { mode: 0o600, flag: "wx" });
       } finally { await file.close(); }
     }
     const after = (await readdir(source)).filter(name => /^(CURRENT|MANIFEST-\d+|\d+\.(log|ldb|sst))$/.test(name));
