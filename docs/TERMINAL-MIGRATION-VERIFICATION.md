@@ -167,10 +167,10 @@ assertions to terminal/host/native tests before retiring any Electron suite.
 
 ### `desktop/tests/e2e/shared-chats.spec.ts`
 
-- [ ] new chats share grounded personal memory, keep separate transcripts and reopen the last draft
+- [x] new chats share grounded personal memory, keep separate transcripts and reopen the last draft (terminal: `tests/memory-privacy.test.tsx`)
 - [ ] native image paste stages a preview, retains drafts per chat, and sends only after review
 - [ ] new chat and pasted attachments keep focus and layout across themes and compact windows
-- [ ] earlier-chat privacy is independent of learning and persists across restart
+- [x] earlier-chat privacy is independent of learning and persists across restart (terminal: `tests/memory-privacy.test.tsx`)
 - [x] saved-memory receipts support guarded edits, restart and forgetting inline — `ui/tests/memory.test.tsx`, including original-save undo.
 - [ ] memory edits survive concurrent updates and removal without overwriting saved facts
 
@@ -883,3 +883,17 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   are process-contract and Linux-fixture results, not native audio hardware proof.
 - The preceding complete terminal suite passed **45 tests / 604 assertions across
   30 files**. Full Go tests and vet also passed with the restore/help changes.
+
+### Cross-chat personal memory and privacy
+
+- `tests/memory-privacy.test.tsx`: **1 pass / 21 assertions**; terminal typecheck
+  passes. The real Go memory tool saves a grounded preference with its original
+  chat provenance. A fresh chat has an empty transcript but receives the saved
+  personal memory in the actual local provider request. Each chat retains its own
+  unsent draft and reopening the original does not merge the second transcript.
+- Keyboard privacy controls disable earlier-chat retrieval without disabling
+  learning: subsequent requests omit `chat_search`/`chat_read` but retain memory
+  tools and saved personal facts. After restart the independent setting persists.
+  Re-enabling retrieval and disabling learning restores those history tools while
+  keeping the saved preference and its provenance intact. No request is replayed
+  on restart or settings navigation.
