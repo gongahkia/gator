@@ -702,3 +702,24 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   credentials never appear in display state. On Linux an owned `xdg-open` fixture
   verifies the exact authorization URL; it does not prove native browser UI or
   OS permissions. Terminal typecheck passes. Full-suite rerun remains pending.
+
+### Complete frontend regression run and dictation ownership
+
+- Full frontend suite after connection/readiness corrections: **37 pass / zero
+  failures / 451 assertions across 23 files** (`bun run --cwd ui test`). This
+  supersedes the failing full-run result for those tested journeys; it does not
+  close acceptance cases absent from the suite.
+- Added the desktop's submission restriction while recording/transcribing: a
+  normal chat submission refuses with a visible instruction to finish or cancel
+  dictation, keeping the current draft. Voice navigation remains available.
+- `bun test --cwd ui --preload ./scripts/preload.ts tests/voice.test.tsx
+  tests/client.test.ts`: **8 pass / 55 assertions**; terminal typecheck passes.
+  The actual Linux native process boundary receives synthetic PCM, then the real
+  Go speech service sends WAV to a local Gemini fixture. Its private usage ledger
+  records one voice request and 25 tokens without retaining transcription text.
+- Keyboard start requires explicit review. Stop retains the original draft while
+  awaiting transcription and appends the returned text for review without a chat
+  call. Capture cancellation, a helper permission-denied error, cancellation of
+  an in-flight transcription and switching chats preserve draft ownership and
+  never submit a chat. Synthetic capture is not microphone hardware/OS permission
+  evidence. Native speech language/rate behavior and live audio remain pending.
