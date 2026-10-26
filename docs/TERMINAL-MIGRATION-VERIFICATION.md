@@ -927,3 +927,15 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   request, and retained entries remain inspectable. Existing reading-position
   regression still passes. Full failure/group update fixture coverage remains
   separate from this real-runner case.
+
+### Compact hub navigation
+
+- Fixed a keyboard accessibility gap: hub selection could move outside the
+  visible scroll region on short terminals. Following/Saved/Settings now reveal
+  the selected destination after layout and resize, and reset selection when
+  changing hubs so an index from a longer page cannot hide the new selection.
+- `tests/hubs.test.tsx`: **1 pass / 11 assertions**; terminal typecheck passes.
+  At 50×18 and 42×14, lower Settings/Saved destinations scroll into view, Enter
+  opens the selected action, and switching to Following selects its first item.
+  Sidebar collapse, draft preservation and absence of accidental submissions
+  are verified. Real macOS/Windows terminal behavior remains deferred.

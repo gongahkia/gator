@@ -1,5 +1,6 @@
-import { For, createSignal } from "solid-js"
-import { useKeyboard } from "@opentui/solid"
+import { For, createSignal, createEffect, onCleanup } from "solid-js"
+import { useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/solid"
+import type { ScrollBoxRenderable } from "@opentui/core"
 import { useClient } from "../context/client"
 import { useData } from "../context/data"
 import { useTheme } from "../context/theme"
@@ -8,6 +9,17 @@ import { literal } from "./text"
 export function Hub() {
   const client = useClient(), data = useData(), theme = useTheme(), dialog = useDialog()
   const [selected, setSelected] = createSignal(0)
+  const renderer = useRenderer(), dimensions = useTerminalDimensions()
+  let scroll: ScrollBoxRenderable | undefined, reveal: (() => void) | undefined, previousRoute = ""
+  createEffect(() => {
+    const route = data.route
+    selected(); dimensions()
+    if (route !== previousRoute) { previousRoute = route; setSelected(0) }
+    if (reveal) renderer.off("frame", reveal)
+    reveal = () => { if (scroll && !scroll.isDestroyed) scroll.scrollChildIntoView(`hub-item-${selected()}`); reveal = undefined }
+    renderer.once("frame", reveal)
+  })
+  onCleanup(() => { if (reveal) renderer.off("frame", reveal) })
   const items = () => data.route === "following" ? [
     ["Ongoing goals", "Saved goals and plans; recurring checks have their own status", "/goals"],
     ["Manage recurring checks", "Sources, timing, permissions and check health", "/followup"],
@@ -41,8 +53,8 @@ export function Hub() {
     if (event.name === "escape") { event.preventDefault(); void client.navigate("/chat") }
   })
   return <box flexGrow={1} minHeight={0} padding={2} gap={1}><text fg={theme.accent}><b>{data.route[0].toUpperCase() + data.route.slice(1)}</b></text>
-    <scrollbox flexGrow={1} minHeight={0}>
-      <For each={items()}>{(item, index) => <box paddingY={1} backgroundColor={selected() === index() ? theme.background.raised.high : undefined} onMouseUp={() => open(index())}><text fg={theme.text.base}>{selected() === index() ? "› " : "  "}{item[0]}</text><text fg={theme.text.muted}>  {item[1]}</text></box>}</For>
+    <scrollbox id="hub-items" ref={value => { scroll = value }} flexGrow={1} minHeight={0}>
+      <For each={items()}>{(item, index) => <box id={`hub-item-${index()}`} paddingY={1} backgroundColor={selected() === index() ? theme.background.raised.high : undefined} onMouseUp={() => open(index())}><text fg={theme.text.base}>{selected() === index() ? "› " : "  "}{item[0]}</text><text fg={theme.text.muted}>  {item[1]}</text></box>}</For>
       <For each={data.route === "following" ? data.state?.following_goals : []}>{goal => <text fg={theme.text.muted}>{literal(goal.title)} · {literal(goal.status)}</text>}</For>
       <For each={data.route === "following" ? data.state?.checks : []}>{check => <text fg={theme.text.muted}>{literal(check.title)} · {literal(check.state)} · {literal(check.health)}</text>}</For>
     </scrollbox><text fg={theme.text.muted}>↑/↓ select · Enter open · Esc chat · Your message draft is kept.</text>
