@@ -48,9 +48,11 @@ ACL and deployment acceptance remain pending.
 ## Open on a phone or browser
 
 Open the configured HTTPS origin on your phone, or `http://127.0.0.1:7341` on
-the host. Enter the host token and an existing conversation ID. IDs come from
-the host's retained conversations; browsing/creating chats from the phone is
-not yet supported. The shell is public; every conversation request requires
+the host. Enter the host token to browse existing conversations. Search titles
+and host folder paths, select active/archived/all chats, and use the page controls
+to reach older records. You can also expand **Open a known conversation** and
+enter its ID. Creating chats from the phone is not yet supported. The shell is
+public; every conversation and catalog request requires
 the token. The token stays in memory and is cleared on disconnect/reload.
 
 The client displays messages, updates, queue state and exact pending approval
@@ -69,6 +71,16 @@ draft; admitted host work remains retained. Disconnect does not delete a draft.
 The client polls while visible and disables actions when disconnected, hidden,
 or refreshing. Token revocation clears the displayed conversation.
 
+**Conversations** returns to the list without stopping admitted work. Switching
+chats retains each chat's draft and any unconfirmed message identity separately.
+Opening a chat does not send its draft or resume interrupted work. Catalog reads
+use Gator's existing bounded local catalog; they do not call a model or create
+a conversation. Search covers titles and folders, not message contents. Partial
+or skipped catalog records are disclosed. Refresh retries the same search after
+a failure. The list is refreshed explicitly and when the page becomes visible;
+an open chat continues polling. Token revocation is enforced on every request
+and clears displayed data when the client next contacts the host.
+
 ## API v1
 
 All API requests need `Authorization: Bearer TOKEN`. Responses are JSON with
@@ -79,6 +91,11 @@ All API requests need `Authorization: Bearer TOKEN`. Responses are JSON with
 - `POST /v1/chats/CONVERSATION_ID/actions`: send a supported frontend frame with
   `Content-Type: application/json`. The body limit is 256 KiB. Response includes
   the latest state; transport acknowledgement alone is not task success.
+- `GET /v1/chats?q=TEXT&scope=active&after=CURSOR`: read up to 50 catalog entries.
+  All parameters are optional; scope is `active`, `archived` or `all`. The response
+  contains `items`, an optional `next` cursor, and any `incomplete`/`skipped`
+  indicators. Cursors belong to their original search. Unknown or repeated
+  parameters are rejected. No host filesystem path can be supplied as a source.
 
 A message uses the durable upload-admission protocol, initially with no files:
 
@@ -100,8 +117,11 @@ Setup, navigation, filesystem selection, external-program handoffs, attachments
 and profile maintenance are not yet exposed by this transport.
 
 The host allows four open conversation processes and at most three executing
-chats. The dispatch queue is bounded. Stop/restart the companion deliberately to
-release these processes; there is no automatic eviction of active or queued work.
+chats. The dispatch queue is bounded. Opening another chat can retire an idle
+process. Running work, queues, approvals, setup panels and local operations are
+never evicted. If all four processes have pending work, finish or review it before
+opening another chat. Crashed processes still require host recovery. Stop/restart
+the companion deliberately to release all its processes.
 Stopping the companion joins/stops its children using the existing backend
 lifecycle. On restart, admitted interrupted work requires explicit recovery.
 
@@ -170,6 +190,14 @@ host fixture to exercise reload after a lost acknowledgement, stable admission
 identity, current approval review/replacement/denial, plain-text untrusted content,
 offline behavior, narrow layouts and revocation. A simulated phone viewport is
 not physical iOS/Android acceptance.
+
+Catalog checks cover real-Go pagination and search without a model call, bounded
+HTTP queries, revocation during a read, and safe idle-process retirement. Browser
+checks cover title/folder search, archived scope, previous/next pages, empty and
+failed results, separate drafts across switches, retained retry identity, keyboard
+selection, 44-pixel controls, and clearing private rows after revocation. Build
+the updated Go runtime together with the companion; older runtimes do not expose
+the internal `companion-catalog` transport.
 
 The opt-in launchd test checks plist validity, startup, authentication after a
 forced listener crash/restart, and asynchronous service removal. It runs a

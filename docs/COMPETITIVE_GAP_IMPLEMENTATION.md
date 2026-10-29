@@ -523,3 +523,71 @@ template dimensions, dense-slide overflow, notes-pane behavior and multilingual
 font/shaping fidelity are not established by these synthetic fixtures. Quick
 Look is useful independent rendering evidence, not native Office certification.
 The CI job is committed locally and has not been remotely executed.
+
+### Companion conversation discovery and switching — 29 October
+
+The phone client no longer requires copying a conversation ID from the host.
+After authentication it lists existing chats, searches titles/folder paths,
+filters active/archived/all records, and pages through the retained catalog.
+Known-ID opening remains available. The internal Go catalog transport uses the
+existing bounded store and profile guard; it does not run a model, create a
+conversation or run profile-retention maintenance. It may refresh the disposable
+catalog index. Search does not expose private replay or search message contents.
+
+Switching preserves each chat's draft and unconfirmed admission identity in the
+tab's session storage. Selecting another chat never submits its draft. A failed
+search can be retried with the same query, and partial/skipped reads are disclosed.
+Tokens remain in memory, catalog responses require authentication, and token
+rotation during a read prevents its private response from being returned.
+Catalog errors do not expose subprocess commands/host paths. Existing messages
+and action requests also recheck revocation before returning their response.
+
+Opening a fifth chat retires only an idle process; running work, queued requests,
+approvals, setup panels and local operations stay with their owning process.
+Crashed workers still require host recovery. This is process retirement, not
+deletion of retained chats. The catalog is explicitly refreshed or reloaded on
+return to a visible page; open chats retain their polling behavior. Revocation
+clears the client when its next request is rejected.
+
+Verification on this Intel Mac:
+
+- `go test -race ./cmd/gator -run 'TestCompanionCatalog|TestDesktopRuntime'
+  -count=1` passes. A 53-chat fixture checks stable pages, exact title search,
+  mismatched-cursor refusal and no newly created conversations.
+- `node --test companion/server.test.mjs`: five pass, including the real Go
+  catalog without a model call, client-disconnect durability, duplicate admission,
+  restart without replay, query bounds, revocation during a read, and retirement
+  of idle workers without stopping pending work.
+- Chromium and WebKit: four browser journeys pass. The catalog journeys cover
+  keyboard opening, failed-search retry, empty results, archived scope, paging,
+  independent drafts, lost acknowledgement followed by switching and retrying
+  the original admission identity, plain-text hostile titles and revocation.
+  The existing exact-approval/reload journeys also pass. After the WebKit control
+  fix, both catalog journeys pass again with actual minimum-height assertions.
+- Screenshots at 390 pixels in dark/light themes were inspected; overflow checks
+  pass at 320, 390 and 760 pixels. Evidence is under ignored
+  `.gator/native-tools/companion-*-catalog*.png`.
+
+Interface review scope: the new catalog and navigation controls, plain DOM and
+the existing CSS tokens. The existing chat/approval layout was exercised by its
+browser tests but not redesigned.
+
+| Category | Evidence | Result |
+| --- | --- | --- |
+| Typography | Dark/light WebKit and Chromium screenshots; long hostile title | Text wraps without horizontal overflow. |
+| Surfaces | Native controls and bounding boxes | WebKit initially ignored the select's minimum height; corrected native appearance and verified at least 44 pixels. |
+| Animation | New catalog code | No motion added; no animation replay applicable. |
+| Icons | Filter chevron in final WebKit screenshot | CSS chevron uses current text color; the semantic select retains keyboard selection. |
+| Performance | Catalog bounds and browser tests | At most 50 rows per page; no periodic list rebuild while browsing. |
+
+Rejected alternatives: adding a new component/styling framework would duplicate
+the existing small client; animated list transitions would add movement to a
+frequent navigation action. No actionable polish issue remains in the inspected
+scope. Verdict: Approve for this scope; physical iOS/Android interaction, actual
+Safari, screen-reader acceptance and deployed remote-host behavior are unverified.
+
+G04 remains open: creating a new chat remotely, device enrollment/per-device
+revocation, file transfer, mobile notifications and a permanently configured
+always-on deployment are not established here. A Mac login service still needs
+the Mac awake, online and logged in. No production service or real account was
+activated, and native Windows execution remains unverified.
