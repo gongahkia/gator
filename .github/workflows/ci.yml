@@ -34,13 +34,14 @@ jobs:
           npm test --prefix desktop
           node --test scripts/google-oauth-build.test.mjs
           node --test companion/server.test.mjs companion/macos-service.test.mjs
-      - name: Check companion browser journeys
+      - name: Check browser journeys and credential forms
         if: runner.os == 'Linux'
         env:
           GATOR_COMPANION_BROWSERS: chromium,webkit
         run: |
           npm exec --prefix desktop -- playwright install --with-deps chromium webkit
           node --test companion/client.test.mjs
+          GATOR_PANEL_BROWSER=1 node --test desktop/tests/panel-secrets.test.mjs
       - name: Check formatting
         shell: bash
         run: |

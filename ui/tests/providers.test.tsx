@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { testRender } from "@opentui/solid"
-import { mkdtemp, readFile, rm } from "node:fs/promises"
+import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import { tmpdir } from "node:os"
 import { Application } from "@gator/application-host/application"
@@ -45,10 +45,26 @@ test("provider forms can review and save explicit metadata and rename without tr
     expect(JSON.stringify(client.state)).not.toContain("sk-terminal-private-fixture")
     const auth = join(root, "state/gator/auth.json")
     expect(await readFile(auth, "utf8").catch(() => "")).not.toContain("sk-terminal-private-fixture")
+    const previousSettings = await readFile(config, "utf8")
+    await writeFile(auth, "{broken credential fixture", { mode: 0o600 })
+    setup.mockInput.pressKey("F2")
+    await until(() => !!client.state?.panel?.notice?.includes("input was cleared"), "failed credential save")
+    await flush()
+    expect(setup.captureCharFrame().replace(/\s+/g, " ")).toContain("input was cleared")
+    expect(await readFile(config, "utf8")).toBe(previousSettings)
+    expect(JSON.stringify(client.state)).not.toContain("sk-terminal-private-fixture")
+    await rm(auth)
+    await flush(); setup.mockInput.pressKey("F2")
+    await until(() => !!client.state?.panel?.notice?.includes("Re-enter the API key before retrying"), "blank retry refused")
+    expect(await readFile(auth, "utf8").catch(() => "")).toBe("")
+    expect(await readFile(config, "utf8")).toBe(previousSettings)
+    await field("API key", "sk-terminal-private-fixture")
     setup.mockInput.pressKey("F2"); await until(async () => (await readFile(auth, "utf8").catch(() => "")).includes("sk-terminal-private-fixture"), "saved private credential")
     expect(JSON.stringify(client.state)).not.toContain("sk-terminal-private-fixture")
     expect(await readFile(config, "utf8")).not.toContain("sk-terminal-private-fixture")
-    await until(() => client.state?.panel?.title === "Cloud models", "credential catalog"); await select(openai)
+    await until(() => client.state?.panel?.title === "Cloud models", "credential catalog")
+    expect(client.state?.panel?.notice).toContain("Provider access has not been tested")
+    await select(openai)
     setup.mockInput.pressKey("d"); await until(() => client.state?.panel?.title === "Remove stored Gator credential?", "credential removal review"); await flush()
     setup.mockInput.pressEscape(); await Bun.sleep(80); await flush()
     expect(await readFile(auth, "utf8")).toContain("sk-terminal-private-fixture")

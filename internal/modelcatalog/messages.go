@@ -10,8 +10,15 @@ func (m Model) updateCloudModelSetupSaved(msg cloudModelSetupSavedMsg) (tea.Mode
 	if msg.err != nil {
 		if m.localModels.cloudSetup != nil {
 			m.localModels.cloudSetup.saving = false
+			m.localModels.cloudSetup.credentialRetryRequired = msg.credentialEntered
+			if msg.credentialEntered {
+				m.localModels.cloudSetup.credential.Placeholder = "re-enter the API key to retry"
+			}
 		}
 		m.notice = notice{text: "Save cloud model configuration: " + msg.err.Error(), kind: noticeError}
+		if msg.credentialEntered {
+			m.notice.text += " Re-enter the API key to retry; the input was cleared."
+		}
 		return m, nil
 	}
 	m.localModels.cloudSetup = nil
@@ -37,7 +44,7 @@ func (m Model) updateCloudModelSetupSaved(msg cloudModelSetupSavedMsg) (tea.Mode
 	m.persistDraft()
 	m.refreshPreflight()
 	m.selectActiveModelCatalogEntry()
-	m.notice = notice{text: "Cloud model configuration saved. The selected model is ready when its provider reports configured.", kind: noticeSuccess}
+	m.notice = notice{text: "Saved locally. Provider access has not been tested.", kind: noticeSuccess}
 	return m, nil
 }
 

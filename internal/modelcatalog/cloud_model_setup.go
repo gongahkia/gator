@@ -27,25 +27,27 @@ const (
 var cloudIdentifierPattern = regexp.MustCompile(`^[A-Za-z0-9._:-]{1,256}$`)
 
 type cloudModelSetupForm struct {
-	provider        string
-	model           textinput.Model
-	credential      textinput.Model
-	endpoint        textinput.Model
-	apiVersion      textinput.Model
-	accountID       textinput.Model
-	gatewayID       textinput.Model
-	gatewayProtocol textinput.Model
-	gateway         textinput.Model
-	focus           cloudSetupField
-	saving          bool
+	provider                string
+	model                   textinput.Model
+	credential              textinput.Model
+	endpoint                textinput.Model
+	apiVersion              textinput.Model
+	accountID               textinput.Model
+	gatewayID               textinput.Model
+	gatewayProtocol         textinput.Model
+	gateway                 textinput.Model
+	focus                   cloudSetupField
+	saving                  bool
+	credentialRetryRequired bool
 }
 
 type cloudModelSetupSavedMsg struct {
-	provider string
-	model    string
-	baseURL  string
-	options  map[string]string
-	err      error
+	provider          string
+	model             string
+	baseURL           string
+	options           map[string]string
+	credentialEntered bool
+	err               error
 }
 
 func (m Model) beginCloudModelSetup() (tea.Model, tea.Cmd) {
@@ -235,6 +237,10 @@ func (m Model) saveCloudModelSetup() (tea.Model, tea.Cmd) {
 		m.notice = notice{text: "Cloud model configuration is unavailable in this TUI session.", kind: noticeError}
 		return m, nil
 	}
+	if form.credentialRetryRequired && strings.TrimSpace(form.credential.Value()) == "" {
+		m.notice = notice{text: "Re-enter the API key before retrying this failed setup, or cancel to keep the previous configuration.", kind: noticeError}
+		return m, nil
+	}
 	setup, err := form.configuration()
 	if err != nil {
 		m.notice = notice{text: err.Error(), kind: noticeError}
@@ -245,11 +251,12 @@ func (m Model) saveCloudModelSetup() (tea.Model, tea.Cmd) {
 	return m, func() tea.Msg {
 		err := m.config.SaveCloudModel(setup)
 		return cloudModelSetupSavedMsg{
-			provider: setup.Provider,
-			model:    setup.Model,
-			baseURL:  setup.BaseURL,
-			options:  cloneProviderOptions(setup.Options),
-			err:      err,
+			provider:          setup.Provider,
+			model:             setup.Model,
+			baseURL:           setup.BaseURL,
+			options:           cloneProviderOptions(setup.Options),
+			credentialEntered: strings.TrimSpace(setup.APIKey) != "",
+			err:               err,
 		}
 	}
 }
@@ -405,6 +412,9 @@ func cloneProviderOptions(options map[string]string) map[string]string {
 }
 
 func (form *cloudModelSetupForm) configurationHint() string {
+	if form.credentialRetryRequired {
+		return "The failed save cleared the API key input. Re-enter the key to retry, or cancel to keep the previous configuration."
+	}
 	return "API keys are masked and saved only in Gator's private auth file. Leaving the field empty preserves any existing stored key."
 }
 
@@ -413,6 +423,9 @@ func (form *cloudModelSetupForm) fieldPresentation(field cloudSetupField) (strin
 	case cloudSetupCredentialField:
 		label := "API key"
 		hint := "Masked. Leave empty to retain the stored credential."
+		if form.credentialRetryRequired {
+			hint = "Re-enter the key after the failed save."
+		}
 		return label, hint, &form.credential
 	case cloudSetupEndpointField:
 		if form.usesAzureFields() {

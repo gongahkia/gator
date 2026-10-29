@@ -2,6 +2,7 @@ package modelcatalog
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -9,6 +10,52 @@ import (
 	"github.com/gongahkia/gator/internal/config"
 	modelprovider "github.com/gongahkia/gator/internal/model"
 )
+
+func TestCloudSetupFailureRequiresReenteringClearedCredential(t *testing.T) {
+	calls := 0
+	panel := NewModelCatalogPanel(Config{LocalModels: &fakeLocalManager{}, SaveCloudModel: func(setup CloudModelSetup) error {
+		calls++
+		if calls == 1 {
+			return errors.New("credential store unavailable")
+		}
+		return nil
+	}})
+	defer panel.Close()
+	panel.model.screen = localModelsScreen
+	form := newCloudModelSetupForm(modelprovider.OpenAI, "test-model", "", nil, 100)
+	form.credential.SetValue("private-initial-key")
+	panel.model.localModels.cloudSetup = &form
+	updated, command := panel.model.saveCloudModelSetup()
+	panel.model = updated.(Model)
+	if command == nil {
+		t.Fatal("save was not scheduled")
+	}
+	panel.Update(command())
+	if panel.model.localModels.cloudSetup.credential.Value() != "" || !strings.Contains(panel.model.notice.text, "Re-enter") {
+		t.Fatal("failure did not clear and explain credential input")
+	}
+	if strings.Contains(panelSnapshotText(panel.UISnapshot()), "private-initial-key") {
+		t.Fatal("failure exposed credential")
+	}
+	if !strings.Contains(panel.UISnapshot().Notice, "input was cleared") {
+		t.Fatal("snapshot truncated the recovery instruction")
+	}
+	updated, command = panel.model.saveCloudModelSetup()
+	panel.model = updated.(Model)
+	if command != nil || calls != 1 {
+		t.Fatal("blank retry silently retained a previous credential")
+	}
+	panel.model.localModels.cloudSetup.credential.SetValue("private-retry-key")
+	updated, command = panel.model.saveCloudModelSetup()
+	panel.model = updated.(Model)
+	if command == nil {
+		t.Fatal("explicit retry was not scheduled")
+	}
+	panel.Update(command())
+	if calls != 2 || panel.model.localModels.cloudSetup != nil || !strings.Contains(panel.model.notice.text, "not been tested") {
+		t.Fatal("saved setup incorrectly claims verified access")
+	}
+}
 
 func TestAzureCloudEndpointExpandsResourceURLs(t *testing.T) {
 	tests := []struct {

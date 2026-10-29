@@ -118,7 +118,9 @@ func (p *ModelCatalogPanel) noticeText() string {
 		strings.HasPrefix(text, "Local runtime is unavailable. Open the Local section") {
 		return ""
 	}
-	return compact(text, p.panelWidth())
+	// The frontend wraps notices. Cutting them to a terminal row can remove
+	// the failure reason or the recovery action from the shared snapshot.
+	return compact(text, 4096)
 }
 
 func (p *ModelCatalogPanel) panelWidth() int {

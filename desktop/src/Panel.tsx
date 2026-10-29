@@ -46,10 +46,19 @@ export function Panel({ panel, send, title = panel.title, subtitle = panel.subti
   const hasInputs = panel.rows?.some((row) => row.input);
   const action = async (value: Omit<PanelAction, "id">, key?: string) => {
     if (!panel.id || busy) return;
+    const secrets = Object.keys(value.fields ?? {}).filter(index => panel.rows?.[Number(index)]?.input?.secret);
     setBusy(true);
     try { await send({ type: "panel", key, panel: { id: panel.id, ...value } }); }
     catch { /* The application presents the transport error. */ }
-    finally { setBusy(false); }
+    finally {
+      // Do not replay a locally retained secret after Go clears a failed form.
+      if (secrets.length) setFields(current => {
+        const retained = { ...current };
+        for (const index of secrets) if (retained[Number(index)] === value.fields?.[Number(index)]) delete retained[Number(index)];
+        return retained;
+      });
+      setBusy(false);
+    }
   };
   const keyAction = (key: string, row?: number) => {
     if (modelCatalog && !displayedRows.length && !["esc", "r", "n", "g", "s", "i", "f1"].includes(key)) return;

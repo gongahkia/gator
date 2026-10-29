@@ -53,9 +53,20 @@ export function Panel(props: { panel: BackendPanel }) {
   onCleanup(() => { if (client.navigationGuard === guard) client.navigationGuard = undefined })
   async function action(value: Omit<PanelAction, "id">, key?: string) {
     if (!props.panel.id || busy()) return
+    const submitted = { id: props.panel.id, fields: fields(), ...value }
+    const secrets = Object.keys(submitted.fields ?? {}).filter(index => props.panel.rows?.[Number(index)]?.input?.secret)
     setBusy(true)
-    try { await client.send({ type: "panel", key, panel: { id: props.panel.id, fields: fields(), ...value } }) }
-    catch (error) { client.fail(error) } finally { setBusy(false) }
+    try { await client.send({ type: "panel", key, panel: submitted }) }
+    catch (error) { client.fail(error) } finally {
+      // The backend owns a submitted secret. Retaining this local copy would
+      // silently resend it after the backend clears a failed setup's input.
+      if (secrets.length) setFields(current => {
+        const retained = { ...current }
+        for (const index of secrets) if (retained[Number(index)] === submitted.fields?.[Number(index)]) delete retained[Number(index)]
+        return retained
+      })
+      setBusy(false)
+    }
   }
   function edit(index: number) {
     const row = props.panel.rows?.[index], input = row?.input
