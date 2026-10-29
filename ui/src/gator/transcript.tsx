@@ -10,6 +10,7 @@ import { useRenderer } from "@opentui/solid"
 import { useDialog } from "../ui/dialog"
 import { chatTimeline, updateStatus, updateWarning } from "./timeline"
 import { Activity, activityKey } from "./activity"
+import { WorkingStatus } from "./working-status"
 
 function Result(props: { value: BackendResult }) {
   return <box gap={1}><text><b>{literal(props.value.title)}</b></text><text>{literal(props.value.summary)}</text>
@@ -88,7 +89,7 @@ export function Transcript() {
       <For each={message.bundle?.Artifacts}>{artifact => <text fg={theme.accent}>File: {literal(artifact.Path)} · {literal(artifact.MediaType)}</text>}</For>
     </box> }}</Show>}</For>
     <Show when={data.state?.activity}>{trace => <Activity live trace={trace()} identity={client.context + ":live:" + trace().started_at} expanded={data.activityExpanded} />}</Show>
-    <Show when={data.state?.running}><text fg={theme.accent}>{data.state?.cancelling ? "Stopping…" : literal(data.state?.status) || "Gator is working…"} {literal(data.state?.elapsed)}</text></Show>
+    <Show when={data.state?.running}><WorkingStatus status={data.state?.status} elapsed={data.state?.elapsed} attention={!!data.state?.pending_approval} cancelling={!!data.state?.cancelling} /></Show>
     <Show when={data.state?.chat_checks?.length}><text fg={theme.text.muted}>{data.state?.chat_checks?.length} configured checks · “check-health” in Ctrl+P shows current timing, failures and observed gaps.</text></Show>
     <For each={[data.state?.notice, data.state?.requests_issue, data.state?.action_recovery_issue, data.state?.chat_checks_issue, data.state?.chat_updates_issue, data.state?.chat_memory_issue].filter(Boolean)}>{issue => <text fg={theme.text.feedback.warning.base}>{literal(issue)}</text>}</For>
     <Show when={data.state?.pending_approval}><text fg={theme.text.feedback.warning.base}>Review the exact request above. Ctrl+Y opens the approval decision; Ctrl+D declines.</text></Show>
