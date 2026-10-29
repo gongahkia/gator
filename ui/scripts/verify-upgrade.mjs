@@ -18,7 +18,7 @@ const installs = prefixes.map(prefix => join(prefix, 'lib/gator-terminal'));
 const workspace = join(root, 'original workspace'), otherWorkspace = join(root, 'different launch directory'), userData = join(root, 'app');
 const env = { ...process.env, PATH: join(root, 'path'), GATOR_STATE_DIR: join(root, 'state'), GATOR_CONFIG_DIR: join(root, 'config'), GATOR_TERMINAL_USER_DATA: userData };
 const runtimeName = process.platform === 'win32' ? 'gator-runtime.exe' : 'gator-runtime';
-let host, requests = 0;
+let host, requests = 0, primaryFailure;
 const model = createServer((req, res) => { requests++; req.resume(); res.writeHead(500); res.end('No model request is allowed in this continuity fixture.'); });
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const run = args => {
@@ -97,7 +97,18 @@ try {
   if (process.argv[4]) await writeFile(resolve(process.argv[4]), JSON.stringify(report, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
   console.log('PASS: installation switch, rollback and old-package removal retain selected chat/source, two drafts, attachment, file versions/edit draft, preferences, notes and configuration; no model requests.');
   console.log(JSON.stringify(report));
+} catch (error) {
+  primaryFailure = error;
+  console.error('Installation continuity failed before cleanup:', error);
+  throw error;
 } finally {
-  await close(); model.closeAllConnections(); await new Promise(resolve => model.close(resolve));
-  await rm(root, { recursive: true, force: true });
+  try {
+    await close(); model.closeAllConnections(); await new Promise(resolve => model.close(resolve));
+    await rm(root, { recursive: true, force: true, maxRetries: 8, retryDelay: 100 });
+  } catch (error) {
+    // Windows can temporarily retain executable handles. Cleanup must not hide
+    // the original assertion or installation failure needed to diagnose it.
+    if (primaryFailure) console.error('Fixture cleanup also failed:', error);
+    else throw error;
+  }
 }

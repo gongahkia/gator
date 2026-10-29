@@ -24,6 +24,9 @@ test.skipIf(process.platform === "win32")("external editor returns owned text an
   const render = () => testRender(() => <App client={client} quit={() => client.close()} clipboard={{ read: async () => ({ data: "", mime: "text/plain" }), write: async () => {} }} />, { width: 120, height: 36 })
   let setup = await render()
   await setup.renderer.setupTerminal()
+  let resumed = 0
+  const resume = setup.renderer.resume.bind(setup.renderer)
+  setup.renderer.resume = async () => { await resume(); resumed++ }
   const flush = async () => { await setup.flush(); await Bun.sleep(40); await setup.flush() }
   const until = async (predicate: () => boolean | Promise<boolean>, label: string) => { const end = Date.now() + 10000; while (!await predicate()) { if (Date.now() > end) throw new Error(`Timed out: ${label}; ${client.issue}; ${client.state?.notice}; ${JSON.stringify(client.state?.external)}; draft=${client.draft.text}`); await Bun.sleep(20) } }
   const invoke = async (command: { text: string; fail?: boolean; block?: boolean }) => {
@@ -33,7 +36,7 @@ test.skipIf(process.platform === "win32")("external editor returns owned text an
   try {
     await client.start(); await client.attach([source]); await client.edit("Before editor")
     const originalContext = client.context
-    await invoke({ text: "Edited λ\nSecond line" }); await until(() => client.draft.text === "Edited λ\nSecond line" && !client.snapshot.terminalBusy, "successful import"); await flush()
+    await invoke({ text: "Edited λ\nSecond line" }); await until(() => client.draft.text === "Edited λ\nSecond line" && !client.snapshot.terminalBusy && resumed > 0, "successful import and terminal resume"); await flush()
     const first = JSON.parse(await readFile(ready, "utf8")); expect(first.original).toBe("Before editor"); expect(await stat(first.path).catch(() => undefined)).toBeUndefined()
     expect(client.draft.uploads).toHaveLength(1); expect(client.state?.messages).toHaveLength(0)
     await setup.mockInput.pasteBracketedText(" typing after return"); await until(() => client.draft.text.includes("typing after return"), "resumed input")
