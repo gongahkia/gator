@@ -20,6 +20,11 @@ try {
   const launcher = join(prefix, "lib/gator-terminal/bin/gator");
   assert.match(run("bun", [launcher, "--version"]).stdout, /gator terminal/);
   run("bun", [launcher, "note", "add", "--title", "Preserved install fixture", "--body", "Private data survives removal."]);
+  const publicLauncher = join(prefix, "bin", process.platform === "win32" ? "gator.cmd" : "gator");
+  await rm(publicLauncher);
+  run("bun", [join(prefix, "lib/gator-terminal/ui/scripts/install.mjs"), "--recover", prefix]);
+  assert.ok(await lstat(publicLauncher));
+  assert.match(run("bun", [launcher, "note", "list"]).stdout, /Preserved install fixture/);
   const binary = join(prefix, "lib/gator-terminal/runtime", process.platform === "win32" ? "gator-runtime.exe" : "gator-runtime");
   const guard = await acquireUpdateGuard(binary, workspace, env);
   const uninstall = resolve("ui/scripts/uninstall.mjs");
@@ -29,5 +34,5 @@ try {
   run("bun", [uninstall, prefix]);
   await assert.rejects(lstat(launcher), { code: "ENOENT" });
   assert.match(run("bun", [join(artifact, "bin/gator"), "note", "list"]).stdout, /Preserved install fixture/);
-  console.log("PASS: independent install/help/version, scripted commands, canonical active-profile uninstall guard, owned uninstall and retained user data.");
+  console.log("PASS: independent install/help/version, launcher recovery, scripted commands, canonical active-profile uninstall guard, owned uninstall and retained user data.");
 } finally { await rm(directory, { recursive: true, force: true }); }
