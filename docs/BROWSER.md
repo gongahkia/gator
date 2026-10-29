@@ -169,6 +169,20 @@ installer. When a Gator update changes the embedded controller or lockfile,
 `gator browser status` requires an explicit `gator browser install` refresh.
 Gator does not currently bundle Node in release archives.
 
+Browser requests have a 30-second controller/driver limit and also honor caller
+cancellation. Stop can interrupt a stalled request. Losing an admitted browser
+operation closes that engine, revokes its session and token, and discards its
+references. Start a fresh private window and review access again; interrupted
+actions are not automatically replayed and may already have affected a website.
+
+Shutdown gives the driver two seconds to close its browser before forcing the
+driver to exit. Profiles and downloads use an owned private scratch directory;
+cleanup removes it even after forced driver termination. A short bounded retry
+handles lingering native file handles; a cleanup failure is returned to the
+daemon log. A host crash or killing the entire daemon bypasses this cleanup and
+can still leave private scratch data. Stopping an attached session disconnects
+it; the separately owned browser profile is retained.
+
 Snapshots are bounded to 32 KiB of visible text and 128 visible actionable
 elements. Screenshot observations are bounded to 2 MiB PNG; retained local
 browser artifacts and downloads are capped at 8 MiB each, while registered

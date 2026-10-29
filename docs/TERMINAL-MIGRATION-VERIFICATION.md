@@ -1385,3 +1385,14 @@ the focused journey was rerun after the final wording/prompt changes.
 Go race suites and TypeScript/terminal build checks pass as recorded in the
 competitive-gap ledger. Desktop-specific interaction, Windows, native device
 permissions, real sign-in and hung-engine recovery remain separate open gates.
+
+Browser recovery follow-up: request cancellation now reaches the engine;
+unconditional Stop bypasses blocked actions, and interrupted sessions are
+revoked rather than replayed. Native macOS tests cover stalled HTTP navigation,
+caller cancellation, Stop, fresh-session startup, frozen-driver termination,
+observed child-process exit and private-profile cleanup. The browser CI matrix
+includes a Windows runner, but no native Windows result for this change is
+available yet. Whole-daemon crash cleanup and real-account sign-in remain open;
+the user deferred sign-in. A terminal control journey rejected a stale view
+under concurrent native-test load; both journeys passed on standalone rerun.
+See the competitive-gap ledger for the exact evidence and remaining limits.

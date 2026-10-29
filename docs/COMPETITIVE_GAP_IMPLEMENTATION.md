@@ -382,3 +382,46 @@ unavailable-controller tests here cover missing transport, not every engine hang
 Attaching a CDP browser, registering uploads and exporting browser artifacts
 remain advanced CLI operations. The phone companion does not yet expose this
 complete panel. See `BROWSER.md` for current behavior.
+
+### Browser interruption and native recovery follow-up
+
+The driver now honors request cancellation, interrupts blocked pipe I/O, bounds
+operations to 30 seconds, and closes instead of reusing an uncertain response
+stream. Cancelling a queued request does not cancel the request already in
+flight. The controller observes caller disconnects and engine exits; it revokes
+the session/token, drains handlers and shuts down. Authenticated unconditional
+Stop bypasses the operation lock. Startup/listen failures also clean up their
+engine and access token. These paths do not automatically retry browser actions.
+
+EOF lets Playwright close Chromium normally. After two seconds, an unresponsive
+driver is killed and reaped. Gator now owns the temporary profile/download
+directory and removes it after either exit path, including forced termination.
+Cleanup errors reach the daemon log. Whole-daemon crashes/forced termination
+remain a distinct recovery gap; this work does not establish crash-safe scratch
+collection or protection against an OS-level unkillable process.
+
+Verification covers real child processes, blocked reads, cancellation while
+queued, stubborn-child termination, startup failure, caller disconnection and
+Stop. Opt-in macOS Chromium tests hold an HTTP navigation open, separately
+cancel and stop it, verify no observed child processes survive, verify token
+revocation and no navigation replay, and launch a fresh blank browser. A further
+test freezes the actual Node driver with SIGSTOP and checks forced termination,
+native child exit and deletion of its actual Chromium profile directory.
+
+The browser CI matrix now includes Windows alongside Linux/macOS. It installs
+the pinned runtime and runs the managed-browser journey plus applicable recovery
+tests. The frozen-process/process-tree assertions are Unix-specific. Local
+Windows cross-compilation is evidence of compilation only; no new native Windows
+run is claimed. Real-account sign-in remains deferred at the user's request.
+
+One terminal browser run under simultaneous native test load hit a stale-view
+selection rejection. The standalone rerun passed both journeys (16 assertions).
+That intermittent selection-test timing issue remains recorded, rather than
+being counted as evidence of consistently passing concurrent UI runs.
+
+Final local checks: the full browser race suite passed with the native Chromium
+integration enabled (17.1 seconds); focused browser-control command race tests
+passed; the Windows amd64 browser test binary cross-compiled; and the Go runtime
+rebuilt. Both terminal browser journeys passed against that final runtime
+(16 assertions, 9.8 seconds). CI YAML parsed successfully with the Windows
+browser entry. The CI change is committed locally, not remotely executed.
