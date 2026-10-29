@@ -17,7 +17,9 @@ p { text-wrap: pretty; overflow-wrap: anywhere; }
 label { display: block; font-weight: 600; margin: 0 0 8px; }
 input, textarea, button, select { font: inherit; }
 input, textarea, select { color: inherit; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 10px; width: 100%; min-height: 44px; }
-#scope { margin-bottom: 4px; }
+select { appearance: none; padding-right: 40px; }
+.select-field { position: relative; margin-bottom: 4px; }
+.select-field::after { content: ''; position: absolute; right: 16px; top: 17px; width: 7px; height: 7px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); pointer-events: none; }
 #search { margin-bottom: 16px; }
 .chat-choice { display: block; width: 100%; text-align: left; margin: 12px 0; overflow-wrap: anywhere; }
 .chat-choice span { display: block; }

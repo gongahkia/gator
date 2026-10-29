@@ -39,6 +39,7 @@ for (const name of (process.env.GATOR_COMPANION_BROWSERS || 'chromium').split(',
       assert.equal(await page.locator('#catalog img').count(), 0);
       assert.equal(await page.evaluate(() => !!window.injected), false);
       assert.equal(await page.locator('#token').inputValue(), '');
+      for (const selector of ['#scope', '#search', '#search-submit', '.chat-choice']) assert.ok((await page.locator(selector).boundingBox()).height >= 44, `${selector} must have a touch-sized control`);
       for (const width of [320, 390, 760]) {
         await page.setViewportSize({ width, height: 844 });
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);

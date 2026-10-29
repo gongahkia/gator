@@ -34,7 +34,7 @@
         <label for="search">Search titles and folders</label>
         <input id="search" type="search" maxlength="512" autocomplete="off">
         <label for="scope">Show</label>
-        <select id="scope"><option value="active">Active chats</option><option value="archived">Archived chats</option><option value="all">All chats</option></select>
+        <div class="select-field"><select id="scope"><option value="active">Active chats</option><option value="archived">Archived chats</option><option value="all">All chats</option></select></div>
         <div class="row"><button id="search-submit" type="submit">Search</button><button id="catalog-refresh" type="button" class="secondary">Refresh list</button><button id="return-chat" type="button" class="secondary" hidden>Back to current chat</button></div>
       </form>
       <p id="catalog-status" role="status"></p>
