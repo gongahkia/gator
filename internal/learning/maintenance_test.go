@@ -2,6 +2,7 @@ package learning
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +10,82 @@ import (
 	"testing"
 	"time"
 )
+
+func TestMaintenanceResumesPastFirstPageAndAccumulatesAcrossRestart(t *testing.T) {
+	state := t.TempDir()
+	s, _ := Open(state)
+	root, _ := s.observationsRoot()
+	// Use ordinary files to construct a large, unrelated synthetic history.
+	for i := 0; i < maintenanceScanLimit*2+40; i++ {
+		observation := Observation{Version: 1, ID: fmt.Sprintf("observation-%06d", i), WorkID: fmt.Sprintf("work-%06d", i), Signal: UserAccepted, Reliability: HighReliability, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+		data, _ := json.Marshal(observation)
+		if err := os.WriteFile(s.observationPath(observation.ID), data, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	directory, _ := os.Open(root)
+	entries, err := directory.ReadDir(-1)
+	directory.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Put one independent failure on each actual filesystem page. Do not
+	// assume APFS, NTFS and ext4 enumerate names in the same order.
+	for _, index := range []int{4, maintenanceScanLimit + 4, maintenanceScanLimit*2 + 4} {
+		path := filepath.Join(root, entries[index].Name())
+		var observation Observation
+		if err := readJSONRecord(path, &observation); err != nil {
+			t.Fatal(err)
+		}
+		observation.Signal = VerificationFailed
+		observation.EvidenceRefs = []string{"gator/work-history/" + observation.WorkID + ".json"}
+		data, _ := json.Marshal(observation)
+		if err := os.WriteFile(path, data, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for pass := 0; pass < 3; pass++ {
+		s, _ = Open(state)
+		report, err := s.Maintain(context.Background())
+		if err != nil || report.Scanned > maintenanceScanLimit {
+			t.Fatal(report, err)
+		}
+		if pass < 2 && (report.NextOffset != (pass+1)*maintenanceScanLimit || len(report.Candidates) != 0 || report.ScanComplete) {
+			t.Fatal("cursor or partial evidence lost", report)
+		}
+		if pass == 2 && (!report.ScanComplete || report.NextOffset != 0 || len(report.Candidates) != 1) {
+			t.Fatal("later page starved", report)
+		}
+	}
+	records, err := s.List()
+	if err != nil || len(records) != 1 || len(records[0].Provenance.WorkIDs) != 3 {
+		t.Fatal(records, err)
+	}
+}
+
+func TestMaintenanceRetainedEvidenceDoesNotOutliveItsSource(t *testing.T) {
+	s, _ := Open(t.TempDir())
+	for i := 0; i < 2; i++ {
+		addFailure(t, s, fmt.Sprintf("work-old-%d", i), nil)
+	}
+	if _, err := s.Maintain(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	observations, _ := s.ListObservations("work-old-0")
+	if err := os.Remove(s.observationPath(observations[0].ID)); err != nil {
+		t.Fatal(err)
+	}
+	addFailure(t, s, "work-new", nil)
+	report, err := s.Maintain(context.Background())
+	if err != nil || len(report.Candidates) != 0 {
+		t.Fatal("removed evidence still counted", report, err)
+	}
+	addFailure(t, s, "work-new-two", nil)
+	report, err = s.Maintain(context.Background())
+	if err != nil || len(report.Candidates) != 1 {
+		t.Fatal(report, err)
+	}
+}
 
 func addFailure(t *testing.T, s Store, work string, scope *Scope) {
 	t.Helper()

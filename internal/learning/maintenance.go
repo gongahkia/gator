@@ -6,10 +6,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 )
@@ -18,23 +16,30 @@ const maintenanceScanLimit = 512
 const maintenanceProposalLimit = 3
 
 type MaintenanceReport struct {
-	Scanned    int       `json:"scanned"`
-	Invalid    int       `json:"invalid"`
-	Truncated  bool      `json:"truncated"`
-	Candidates []string  `json:"candidates"`
-	Existing   int       `json:"existing"`
-	FinishedAt time.Time `json:"finished_at"`
-	Error      string    `json:"error,omitempty"`
+	NextOffset   int       `json:"next_offset"`
+	ScanComplete bool      `json:"scan_complete"`
+	Scanned      int       `json:"scanned"`
+	Invalid      int       `json:"invalid"`
+	Truncated    bool      `json:"truncated"`
+	Candidates   []string  `json:"candidates"`
+	Existing     int       `json:"existing"`
+	FinishedAt   time.Time `json:"finished_at"`
+	Error        string    `json:"error,omitempty"`
 }
 
 // Maintain proposes reviewable process guidance from repeated observed outcomes,
 // never a causal diagnosis. No model, network request or external action runs.
 // A deterministic identity prevents duplicate proposals across restarts and
 // preserves an existing rejection, disable or approval without modifying it.
-// The bounded scan reports incomplete coverage instead of implying exhaustive
-// review. A later indexed scan can extend coverage without changing authority.
+// Each pass resumes its bounded scan and retains source IDs across pages. A
+// completed sweep resets the cursor to catch directory changes on the next pass.
 func (s Store) Maintain(ctx context.Context) (report MaintenanceReport, finalErr error) {
 	report.Candidates = []string{}
+	release, err := s.maintenanceLock(ctx)
+	if err != nil {
+		return report, err
+	}
+	defer release()
 	defer func() {
 		report.FinishedAt = s.clock()().UTC()
 		if finalErr != nil {
@@ -44,6 +49,14 @@ func (s Store) Maintain(ctx context.Context) (report MaintenanceReport, finalErr
 			finalErr = errors.Join(finalErr, err)
 		}
 	}()
+	previous, err := s.MaintenanceStatus()
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return report, err
+	}
+	if previous.NextOffset < 0 {
+		return report, errors.New("invalid memory maintenance cursor")
+	}
+	report.NextOffset = previous.NextOffset
 	if err := ctx.Err(); err != nil {
 		return report, err
 	}
@@ -56,25 +69,24 @@ func (s Store) Maintain(ctx context.Context) (report MaintenanceReport, finalErr
 		return report, err
 	}
 	defer directory.Close()
-	entries, err := directory.ReadDir(maintenanceScanLimit + 1)
-	if err != nil && !errors.Is(err, io.EOF) {
+	entries, err := maintenanceWindow(ctx, directory, report.NextOffset)
+	if err != nil {
 		return report, err
 	}
-	if len(entries) > maintenanceScanLimit {
-		report.Truncated = true
+	hasMore := len(entries) > maintenanceScanLimit
+	if hasMore {
 		entries = entries[:maintenanceScanLimit]
+		report.Truncated = true
 	}
-	type group struct {
-		scope        Scope
-		signal       Signal
-		observations map[string]Observation
-	}
-	groups := map[string]*group{}
+	existing := map[string]bool{}
 	now := s.clock()().UTC()
-	for _, entry := range entries {
+	for index, entry := range entries {
 		if err := ctx.Err(); err != nil {
 			return report, err
 		}
+		// Only advance past an entry after its processing has completed. A
+		// failed/cancelled pass can safely retry its unfinished observation.
+		report.NextOffset = previous.NextOffset + index
 		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
 			continue
 		}
@@ -84,72 +96,54 @@ func (s Store) Maintain(ctx context.Context) (report MaintenanceReport, finalErr
 			report.Invalid++
 			continue
 		}
-		if observation.CreatedAt.Before(now.AddDate(0, 0, -30)) || observation.CreatedAt.After(now) || len(observation.EvidenceRefs) == 0 {
+		if !eligibleObservation(observation, now) {
 			continue
 		}
-		if failureGuidance(observation.Signal) == "" {
-			continue
-		}
-		scope := Scope{Kind: Global}
-		if observation.Scope != nil {
-			scope = *observation.Scope
-		}
-		key := string(observation.Signal) + "\x00" + string(scope.Kind) + "\x00" + scope.Value
-		if groups[key] == nil {
-			groups[key] = &group{scope: scope, signal: observation.Signal, observations: map[string]Observation{}}
-		}
-		// Multiple retries/events from one Work are one piece of evidence.
-		prior, exists := groups[key].observations[observation.WorkID]
-		if !exists || observation.ID < prior.ID {
-			groups[key].observations[observation.WorkID] = observation
-		}
-	}
-	keys := make([]string, 0, len(groups))
-	for key := range groups {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	for _, key := range keys {
-		if err := ctx.Err(); err != nil {
+		key, scope := observationGroup(observation)
+		observations, err := s.accumulateMaintenance(observation, now)
+		if err != nil {
 			return report, err
 		}
-		g := groups[key]
-		if len(g.observations) < 3 {
+		if len(observations) < 3 {
 			continue
 		}
 		digest := sha256.Sum256([]byte("failure-review-v1\x00" + key))
 		id := "learning-" + hex.EncodeToString(digest[:12])
 		if _, err := s.Load(id); err == nil {
-			report.Existing++
+			if !existing[id] {
+				report.Existing++
+				existing[id] = true
+			}
 			continue
 		} else if !errors.Is(err, os.ErrNotExist) {
 			return report, err
 		}
 		if len(report.Candidates) == maintenanceProposalLimit {
 			report.Truncated = true
-			break
+			continue
 		}
-		workIDs := make([]string, 0, len(g.observations))
-		for workID := range g.observations {
-			workIDs = append(workIDs, workID)
+		workIDs, refs := []string{}, []string{}
+		for _, current := range observations {
+			workIDs = append(workIDs, current.WorkID)
+			refs = append(refs, s.observationReference(current.ID))
 		}
-		sort.Strings(workIDs)
-		if len(workIDs) > 16 {
-			workIDs = workIDs[:16]
-		}
-		refs := make([]string, 0, len(workIDs))
-		for _, workID := range workIDs {
-			refs = append(refs, s.observationReference(g.observations[workID].ID))
-		}
-		_, err := s.Create(Create{ID: id, Type: FailurePrevention, Key: "review-" + string(g.signal), Content: failureGuidance(g.signal), Scope: g.scope, Origin: Inferred, Provenance: Provenance{WorkIDs: workIDs, EvidenceRefs: refs}})
+		_, err = s.Create(Create{ID: id, Type: FailurePrevention, Key: "review-" + string(observation.Signal), Content: failureGuidance(observation.Signal), Scope: scope, Origin: Inferred, Provenance: Provenance{WorkIDs: workIDs, EvidenceRefs: refs}})
 		if errors.Is(err, os.ErrExist) {
-			report.Existing++
+			if !existing[id] {
+				report.Existing++
+				existing[id] = true
+			}
 			continue
 		}
 		if err != nil {
 			return report, err
 		}
 		report.Candidates = append(report.Candidates, id)
+	}
+	report.NextOffset = previous.NextOffset + len(entries)
+	if !hasMore {
+		report.NextOffset = 0
+		report.ScanComplete = true
 	}
 	return report, nil
 }

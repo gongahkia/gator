@@ -903,6 +903,9 @@ func runJobSupervisor(arguments []string, out io.Writer) error {
 	runDueJobsContext(ctx, store, stateDir, *notify, time.Now())
 	_, _ = lifecycle.Maintain(ctx, stateDir, time.Now())
 	runDueGoalReviews(stateDir, *notify, time.Now())
+	if _, err := runDueMemoryMaintenance(ctx, stateDir, time.Now()); err != nil {
+		fmt.Fprintln(out, "Memory maintenance deferred:", err)
+	}
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 	for {
@@ -916,6 +919,9 @@ func runJobSupervisor(arguments []string, out io.Writer) error {
 			_, _ = lifecycle.Maintain(ctx, stateDir, now)
 			runDueJobsContext(ctx, store, stateDir, *notify, now)
 			runDueGoalReviews(stateDir, *notify, now)
+			if _, err := runDueMemoryMaintenance(ctx, stateDir, now); err != nil {
+				fmt.Fprintln(out, "Memory maintenance deferred:", err)
+			}
 		}
 	}
 }

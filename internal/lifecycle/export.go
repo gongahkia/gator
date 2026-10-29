@@ -264,6 +264,9 @@ func backupContent(name string) bool {
 	if rel == "memory/.write-lock" {
 		return false
 	}
+	if rel == "learnings/.maintenance-lock" || strings.HasPrefix(rel, "learnings/.maintenance-groups/") {
+		return false
+	}
 	if strings.HasPrefix(rel, "memory/.memory-") || ((strings.HasPrefix(rel, "learnings/") || strings.HasPrefix(rel, "observations/")) && strings.HasPrefix(path.Base(rel), ".learning-") && strings.HasSuffix(rel, ".tmp")) {
 		return false
 	}

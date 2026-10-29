@@ -225,3 +225,28 @@ restart, unknown legacy dates, clock changes, replay, fresh evidence, confirmati
 revision guards, prompt/summary exclusion and restoration after confirmation.
 General subject classification and usefulness of the default interval still
 need broader evaluation.
+
+## Resumable and idle maintenance checkpoint
+
+Maintenance now saves its scan position and accumulates three independent source
+observation IDs across passes. Each pass processes at most 512 directory entries
+and proposes at most three candidates; a completed sweep resets the cursor so
+directory changes are revisited. Metadata skipping and payload processing obey
+the caller's cancellation/time budget. This is bounded file-content processing,
+not a constant-time index lookup for arbitrarily large directories.
+
+Source IDs are revalidated before use: removed, aged or differently scoped
+observations no longer count. A process-held lock serializes concurrent passes;
+deterministic proposal IDs still preserve reviewed decisions. Derived group
+caches and lock files are omitted from backups. Cancellation and incomplete
+coverage remain visible in the maintenance report.
+
+The existing job supervisor now runs due maintenance while idle: hourly, or one
+minute after a pass with remaining coverage. It reloads the chat-learning setting
+each tick and makes no provider requests or external actions. This requires the
+supervisor to be running; it does not silently install or start a new service.
+Tests cover evidence split across three pages/restarts, source deletion,
+concurrency, candidate retention and opt-out before and after a scheduled pass.
+Learning, personalization, lifecycle and workrun race suites and focused CLI/
+supervisor tests pass. Semantic lesson interpretation and live usefulness remain
+unverified.
