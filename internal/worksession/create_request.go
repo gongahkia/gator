@@ -18,10 +18,12 @@ import (
 var creationIdentity = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{15,95}$`)
 
 type chatCreation struct {
-	Version      int          `json:"version"`
-	RequestID    string       `json:"request_id"`
-	Conversation Conversation `json:"conversation"`
-	Publishing   bool         `json:"publishing"`
+	Version        int       `json:"version"`
+	RequestID      string    `json:"request_id"`
+	ConversationID string    `json:"conversation_id"`
+	SourceSHA256   string    `json:"source_sha256"`
+	CreatedAt      time.Time `json:"created_at"`
+	Publishing     bool      `json:"publishing"`
 }
 
 // CreateChatOnce creates an empty chat for a durable client request. The caller
@@ -51,6 +53,8 @@ func (s Store) CreateChatOnce(source, requestID string, now time.Time) (Conversa
 	}
 	sum := sha256.Sum256([]byte(requestID))
 	key := hex.EncodeToString(sum[:])
+	sourceSum := sha256.Sum256([]byte(source))
+	sourceHash := hex.EncodeToString(sourceSum[:])
 	receiptPath, stage := filepath.Join(".creations", key+".json"), filepath.Join(".creations", "stage-"+key)
 	var receipt chatCreation
 	err = readCreationJSON(root, receiptPath, &receipt)
@@ -58,17 +62,19 @@ func (s Store) CreateChatOnce(source, requestID string, now time.Time) (Conversa
 		if now.IsZero() {
 			now = time.Now()
 		}
-		receipt = chatCreation{Version: 1, RequestID: requestID, Conversation: Conversation{Version: Version, ID: newID("work"), Title: "New chat", SourcePath: source, CreatedAt: now.UTC(), UpdatedAt: now.UTC()}}
+		receipt = chatCreation{Version: 1, RequestID: requestID, ConversationID: newID("work"), SourceSHA256: sourceHash, CreatedAt: now.UTC()}
 		if err := writeCreationJSON(root, receiptPath, receipt); err != nil {
 			return Conversation{}, err
 		}
 	} else if err != nil {
 		return Conversation{}, err
 	}
-	c := receipt.Conversation
-	if receipt.Version != 1 || receipt.RequestID != requestID || c.Version != Version || !catalogIdentity.MatchString(c.ID) || c.SourcePath != source || c.CreatedAt.IsZero() || c.SnapshotID != "" || c.HeadRevision != "" {
+	if receipt.Version != 1 || receipt.RequestID != requestID || !catalogIdentity.MatchString(receipt.ConversationID) || receipt.SourceSHA256 != sourceHash || receipt.CreatedAt.IsZero() {
 		return Conversation{}, errors.New("new-chat request changed or its receipt is invalid")
 	}
+	// Keep the durable retry receipt free of source paths and conversation text.
+	// The source is supplied by the configured host and checked against its digest.
+	c := Conversation{Version: Version, ID: receipt.ConversationID, Title: "New chat", SourcePath: source, CreatedAt: receipt.CreatedAt, UpdatedAt: receipt.CreatedAt}
 	if !receipt.Publishing {
 		if _, err := root.Lstat(c.ID); !errors.Is(err, os.ErrNotExist) {
 			return Conversation{}, errors.New("new-chat identity already exists")

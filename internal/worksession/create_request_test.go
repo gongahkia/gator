@@ -97,6 +97,9 @@ func TestCreateChatOnceInterruptedPublicationAndDeletion(t *testing.T) {
 			if err := readJSON(path, &receipt); err != nil {
 				t.Fatal(err)
 			}
+			if data, err := os.ReadFile(path); err != nil || strings.Contains(string(data), source) {
+				t.Fatalf("receipt retained the raw workspace path: %v", err)
+			}
 			receipt.Publishing = publishing
 			if err := writeJSON(path, receipt); err != nil {
 				t.Fatal(err)
