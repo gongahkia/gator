@@ -189,3 +189,26 @@ The setup test verifies unchanged read scopes, no credentials before consent,
 manual fallback, the credential-free sign-in form and changed-endpoint refusal.
 Existing loopback callback tests cover PKCE and credential lifecycle with a local
 server. Real Google sign-in and rendered frontend acceptance remain unverified.
+
+### Companion transport checkpoint
+
+`companion/` now provides a loopback, bearer-authenticated API backed by the
+existing Go UI bridge. Host processes outlive client connections. Message
+admission uses the existing durable journal and exact request IDs; approval and
+receipt frames keep their Go checks. Token rotation revokes subsequent and
+queued requests without canceling already-admitted work. Origin, conversation,
+body and concurrency bounds are enforced. Host setup and the job supervisor
+remain separate; no remote deployment or login service was installed.
+
+The real-runtime integration fixture verifies disconnected-client completion,
+admission deduplication and token revocation. Mobile UI, per-device pairing,
+remote file transfer, native deployment and full connected-action/recovery
+journeys remain pending. This is progress on G14/G15, not their completion.
+See `companion/README.md` for startup and protocol boundaries.
+
+Verification: `node --test companion/server.test.mjs` passes both tests on macOS
+with Go 1.27 and Node 24.19. The expanded real-runtime journey also restarts the
+companion and confirms the saved answer reopens without additional model calls.
+The forced socket-drop fixture reconnects an idempotent GET after an expected
+stale pooled socket reset. Token-file permission, symlink and format tests pass;
+Windows ACL acceptance is not inferred from them. Syntax and diff checks pass.
