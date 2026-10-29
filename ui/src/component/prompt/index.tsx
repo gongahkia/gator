@@ -82,7 +82,7 @@ export function Prompt() {
     <Show when={data.draft.uploads?.length}><text fg={theme.accent}>Attached: {data.draft.uploads?.map(f => literal(f.name)).join(" · ")}</text></Show>
     <Show when={data.draft.reply_to_update_id}><text fg={theme.accent}>Replying to: {literal(data.state?.chat_updates?.find(update => update.id === data.draft.reply_to_update_id)?.title || data.draft.reply_to_update_id)} · “cancel-update-reply” in commands clears the link.</text></Show>
     <textarea ref={value => { textarea = value }} focused height={3} minHeight={1} maxHeight={8}
-      initialValue={data.draft.text} placeholder="Message Gator… / for commands"
+      placeholderColor={theme.text.muted} initialValue={data.draft.text} placeholder="Message Gator… / for commands"
       textColor={theme.text.base} focusedTextColor={theme.text.base} backgroundColor={theme.background.base}
       keyBindings={[{ name: "return", action: "submit" }, { name: "return", shift: true, action: "newline" }, { name: "j", ctrl: true, action: "newline" }]}
       onContentChange={() => { if (textarea && textarea.plainText !== client.draft.text) void client.edit(textarea.plainText).catch(e => client.fail(e)) }}

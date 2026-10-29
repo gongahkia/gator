@@ -5,6 +5,7 @@ import { useClient } from "../context/client"
 import { useTheme } from "../context/theme"
 import { Keymap } from "../context/keymap"
 import { literal } from "./text"
+import { TextAttributes } from "@opentui/core"
 import type { ScrollBoxRenderable, Renderable } from "@opentui/core"
 import { useRenderer } from "@opentui/solid"
 import { useDialog } from "../ui/dialog"
@@ -15,16 +16,17 @@ import { displayDate } from "./display"
 import { WorkingStatus } from "./working-status"
 
 function Result(props: { value: BackendResult }) {
-  return <box gap={1}><text><b>{literal(props.value.title)}</b></text><text>{literal(props.value.summary)}</text>
-    <For each={props.value.fields}>{f => <text>{literal(f.label)}: {literal(f.value)}</text>}</For>
-    <For each={props.value.items}>{item => <text>{literal(item.label)} · {literal(item.state)} {literal(item.detail)}</text>}</For>
-    <For each={props.value.lines}>{line => <text>{literal(line)}</text>}</For><Show when={props.value.markdown}><Markdown text={props.value.markdown} /></Show>
-    <Show when={props.value.preview !== undefined}><box><text><b>Exact action details</b></text><text>{literal(JSON.stringify(props.value.preview, null, 2))}</text></box></Show>
-    <For each={props.value.sections}>{section => <box><text><b>{literal(section.title)}</b></text><text>{literal(section.summary)}</text>
-      <For each={section.fields}>{f => <text>{literal(f.label)}: {literal(f.value)}</text>}</For>
-      <For each={section.items}>{item => <text>{literal(item.label)} {literal(item.detail)} {literal(item.state)}</text>}</For>
-      <For each={section.lines}>{line => <text>{literal(line)}</text>}</For><Show when={section.markdown}><Markdown text={section.markdown} /></Show>
-    </box>}</For><text>{literal(props.value.footer)}</text>
+  const theme = useTheme()
+  return <box gap={1}><text fg={theme.text.base}><b>{literal(props.value.title)}</b></text><text fg={theme.text.base}>{literal(props.value.summary)}</text>
+    <For each={props.value.fields}>{f => <text fg={theme.text.base}>{literal(f.label)}: {literal(f.value)}</text>}</For>
+    <For each={props.value.items}>{item => <text fg={theme.text.base}>{literal(item.label)} · {literal(item.state)} {literal(item.detail)}</text>}</For>
+    <For each={props.value.lines}>{line => <text fg={theme.text.base}>{literal(line)}</text>}</For><Show when={props.value.markdown}><Markdown text={props.value.markdown} /></Show>
+    <Show when={props.value.preview !== undefined}><box><text fg={theme.text.base}><b>Exact action details</b></text><text fg={theme.text.base}>{literal(JSON.stringify(props.value.preview, null, 2))}</text></box></Show>
+    <For each={props.value.sections}>{section => <box><text fg={theme.text.base}><b>{literal(section.title)}</b></text><text fg={theme.text.base}>{literal(section.summary)}</text>
+      <For each={section.fields}>{f => <text fg={theme.text.base}>{literal(f.label)}: {literal(f.value)}</text>}</For>
+      <For each={section.items}>{item => <text fg={theme.text.base}>{literal(item.label)} {literal(item.detail)} {literal(item.state)}</text>}</For>
+      <For each={section.lines}>{line => <text fg={theme.text.base}>{literal(line)}</text>}</For><Show when={section.markdown}><Markdown text={section.markdown} /></Show>
+    </box>}</For><text fg={theme.text.base}>{literal(props.value.footer)}</text>
   </box>
 }
 export function Transcript() {
@@ -77,13 +79,13 @@ export function Transcript() {
       <text fg={theme.text.muted}>Choose a model with /model. Select sources with /source.</text><text fg={theme.text.muted}>Ctrl+P opens commands, Following, Saved and Settings.</text></box></Show>
     <For each={timeline()}>{item => <Show when={item.kind === "message" ? item : undefined} fallback={item.kind === "update" ? <box id={`update-${item.update.id}`} ref={node => { const id = item.update.id; cards.set(id, node); onCleanup(() => { if (cards.get(id) === node) cards.delete(id) }) }} paddingY={1}>
       <text fg={theme.accent}><b>{literal(item.update.title)}</b> · {literal(updateStatus(item.update.status))} · {item.update.read ? "read" : "unread"} · {item.update.resolved ? "done" : "open"}</text>
-      <text>{literal(item.update.summary)}</text>
+      <text fg={theme.text.base}>{literal(item.update.summary)}</text>
       <Show when={updateWarning(item.update.status)}>{warning => <text fg={theme.text.feedback.warning.base}>{warning()} Earlier results don’t confirm that nothing changed.</text>}</Show>
-      <Show when={item.update.rating}><text>Feedback: {item.update.rating}</text></Show>
+      <Show when={item.update.rating}><text fg={theme.text.base}>Feedback: {item.update.rating}</text></Show>
       <Show when={data.updateFeedback?.id === item.update.id}><text fg={theme.text.muted}>{literal(data.updateFeedback?.message)}</text></Show>
       <text fg={theme.text.muted}>Use “updates” in Ctrl+P to inspect evidence, read, reply, mark done or give feedback.</text>
     </box> : undefined}>{messageItem => { const { message, index } = messageItem(); return <box id={`message-${index}`} paddingY={1} gap={0} border={revealed() === index ? ["left"] : false} borderColor={revealed() === index ? theme.accent : undefined}>
-      <text fg={message.role === "You" ? theme.accent : theme.text.muted}><b>{literal(message.role)}</b> {displayDate(message.created_at)}</text>
+      <text fg={message.role === "You" ? theme.accent : theme.text.muted}><b>{literal(message.role)}</b><span style={{ attributes: TextAttributes.DIM }}> {displayDate(message.created_at)}</span></text>
       <Show when={message.activity}>{trace => <Activity trace={trace()} identity={activityKey(client.context, message, index)} expanded={data.activityExpanded} />}</Show>
       <Show when={message.text}><Show when={message.role !== "You"} fallback={<text fg={theme.text.base}>{literal(message.text)}</text>}><Markdown text={message.text} /></Show></Show>
       <Show when={message.result}>{result => <Result value={result()} />}</Show>

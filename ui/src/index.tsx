@@ -1,5 +1,5 @@
 import { render } from "@opentui/solid"
-import { createCliRenderer } from "@opentui/core"
+import { createCliRenderer, RGBA } from "@opentui/core"
 import { Application } from "@gator/application-host/application"
 import { homedir } from "node:os"
 import { join, resolve } from "node:path"
@@ -12,7 +12,7 @@ const host = new Application({ binary: process.env.GATOR_TERMINAL_BINARY || reso
   env: { ...process.env, GATOR_UI_FRONTEND: "terminal" },
   userData, workspace: process.env.GATOR_TERMINAL_WORKSPACE || process.env.GATOR_DESKTOP_WORKSPACE || join(userData, "workspace") })
 const client = new GatorClient(host)
-const renderer = await createCliRenderer({ exitOnCtrlC: false, useKittyKeyboard: {}, openConsoleOnError: false, useMouse: true })
+const renderer = await createCliRenderer({ backgroundColor: RGBA.defaultBackground(), exitOnCtrlC: false, useKittyKeyboard: {}, openConsoleOnError: false, useMouse: true })
 let closing = false
 async function quit() {
   if (closing) return

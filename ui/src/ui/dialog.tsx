@@ -67,7 +67,7 @@ export function Dialog(
         paddingTop={props.centered || dimensions().height < 24 ? 0 : Math.floor(dimensions().height / 4)}
         left={0}
         top={0}
-        backgroundColor={RGBA.fromInts(0, 0, 0, 150)}
+        backgroundColor={theme.background.base}
       >
         <box
           onMouseUp={(e: { stopPropagation(): void }) => {
@@ -80,7 +80,9 @@ export function Dialog(
           width={dialogWidth(props.size ?? "medium")}
           maxWidth={Math.max(1, dimensions().width - 2)}
           backgroundColor={theme.background.base}
-          paddingTop={1}
+          border={["top"]}
+          borderColor={theme.accent}
+          paddingTop={0}
         >
           {props.children}
         </box>
@@ -297,7 +299,7 @@ function DialogFooterItem(props: { action: DialogFooterAction; variant: "primary
         onMouseOut={() => setHovered(false)}
         onMouseUp={trigger}
       >
-        <text>{label(theme.text.faint)}</text>
+        <text fg={theme.text.base}>{label(theme.text.faint)}</text>
       </box>
     </Show>
   )

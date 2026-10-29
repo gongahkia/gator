@@ -139,7 +139,7 @@ function FileEditor(props: { view: FileView; request: FileRequest; reopen(versio
       { title: "Restore as a new working version", run: async () => { await retain(); await client.host.file(request("restore", { version: version.id })); setDirty(false); await props.reopen() } },
       { title: "Compare with current", run: async () => {
         const comparison = await client.host.file({ ...request("compare"), action: "compare", base: version.id, version: props.view.current })
-        dialog.replace(() => <DialogLayout header={<DialogHeader title="Saved version comparison" />}><scrollbox height={Math.max(8, dimensions().height - 15)}><For each={comparison.notices}>{line => <text>{literal(line)}</text>}</For><Show when={comparison.truncated}><text>Partial comparison: retained files remain complete.</text></Show><For each={comparison.changes}>{change => <box><text><b>{literal(change.location)}</b></text><text fg={theme.text.feedback.error.base}>− {literal(change.before)}</text><text fg={theme.accent}>+ {literal(change.after)}</text></box>}</For></scrollbox></DialogLayout>, undefined, { size: "xlarge" })
+        dialog.replace(() => <DialogLayout header={<DialogHeader title="Saved version comparison" />}><scrollbox height={Math.max(8, dimensions().height - 15)}><For each={comparison.notices}>{line => <text fg={theme.text.base}>{literal(line)}</text>}</For><Show when={comparison.truncated}><text fg={theme.text.base}>Partial comparison: retained files remain complete.</text></Show><For each={comparison.changes}>{change => <box><text fg={theme.text.base}><b>{literal(change.location)}</b></text><text fg={theme.text.feedback.error.base}>− {literal(change.before)}</text><text fg={theme.accent}>+ {literal(change.after)}</text></box>}</For></scrollbox></DialogLayout>, undefined, { size: "xlarge" })
       } },
       { title: "Export exact selected bytes", run: () => props.prompt("Export destination", resolve(props.view.name), async path => {
         const destination = await client.host.reviewExport(path)
@@ -172,18 +172,18 @@ function FileEditor(props: { view: FileView; request: FileRequest; reopen(versio
       <Show when={props.view.kind === "text" || props.view.kind === "markdown"} fallback={
         <Show when={image()} fallback={<scrollbox flexGrow={1}>
           <Show when={grid()}><box id="file-grid-page"><text fg={theme.accent}>{literal(sheet()?.name || props.view.name)}{sheet()?.protected ? " · Protected" : ""} · Rows {position().row * 50 + 1}–{Math.min(size().rows, (position().row + 1) * 50)} of {size().rows} · Columns {columnName(position().col * 20)}–{columnName(Math.min(size().cols, (position().col + 1) * 20) - 1)}</text>
-            <Show when={sheet()?.merges.length}><text>Merged cells: {sheet()?.merges.join(", ")}</text></Show>
-            <For each={Array.from({ length: Math.min(50, Math.max(0, size().rows - position().row * 50)) }, (_, offset) => position().row * 50 + offset)}>{row => <text>{row + 1}: {Array.from({ length: Math.min(20, Math.max(0, size().cols - position().col * 20)) }, (_, offset) => { const col = position().col * 20 + offset, value = literal(gridValue(row, col)); return `${columnName(col)}${row + 1}=${value.slice(0, 160)}${value.length > 160 ? "…" : ""}` }).join(" │ ")}</text>}</For>
+            <Show when={sheet()?.merges.length}><text fg={theme.text.base}>Merged cells: {sheet()?.merges.join(", ")}</text></Show>
+            <For each={Array.from({ length: Math.min(50, Math.max(0, size().rows - position().row * 50)) }, (_, offset) => position().row * 50 + offset)}>{row => <text fg={theme.text.base}>{row + 1}: {Array.from({ length: Math.min(20, Math.max(0, size().cols - position().col * 20)) }, (_, offset) => { const col = position().col * 20 + offset, value = literal(gridValue(row, col)); return `${columnName(col)}${row + 1}=${value.slice(0, 160)}${value.length > 160 ? "…" : ""}` }).join(" │ ")}</text>}</For>
             <text fg={theme.text.muted}>Ctrl+↑/↓ rows · Ctrl+←/→ columns · F7 worksheet · F3 edits any cell, including a new row or column.</text>
           </box></Show>
-          <For each={paragraphs()}>{paragraph => <box marginBottom={1}><text fg={theme.text.muted}>{literal(paragraph.id)} · {literal(paragraph.style)}</text><text>{literal(edit().paragraphs?.[paragraph.id] ?? paragraph.text)}</text><For each={paragraph.images}>{image => <image source={image} height={8} width="100%" fit="fit" />}</For></box>}</For>
+          <For each={paragraphs()}>{paragraph => <box marginBottom={1}><text fg={theme.text.muted}>{literal(paragraph.id)} · {literal(paragraph.style)}</text><text fg={theme.text.base}>{literal(edit().paragraphs?.[paragraph.id] ?? paragraph.text)}</text><For each={paragraph.images}>{image => <image source={image} height={8} width="100%" fit="fit" />}</For></box>}</For>
         </scrollbox>}>{bytes => <image id="file-visual-preview" source={bytes()} flexGrow={1} width="100%" fit="fit" onError={error => setNotice(String(error))} />}</Show>
       }>
-        <textarea id="file-text-editor" ref={node => { textarea = node; if (!editable()) node.traits = { suspend: true } }} focused={editable()} initialValue={edit().text ?? props.view.text ?? ""} flexGrow={1} wrapMode="word" textColor={theme.text.base}
+        <textarea id="file-text-editor" ref={node => { textarea = node; if (!editable()) node.traits = { suspend: true } }} focused={editable()} initialValue={edit().text ?? props.view.text ?? ""} flexGrow={1} wrapMode="word" textColor={theme.text.base} focusedTextColor={theme.text.base}
           onContentChange={() => { if (textarea && editable() && textarea.plainText !== (edit().text ?? props.view.text ?? "")) change({ text: textarea.plainText }) }} />
       </Show>
     </box>
-    <Show when={props.view.kind === "pdf"}><text>PDF page {page()} of {pages()}{busy() ? " · Rendering…" : ""} · Ctrl+←/→ pages</text></Show>
+    <Show when={props.view.kind === "pdf"}><text fg={theme.text.base}>PDF page {page()} of {pages()}{busy() ? " · Rendering…" : ""} · Ctrl+←/→ pages</text></Show>
     <text fg={theme.text.muted}>{literal(notice())}</text>
     <text fg={theme.text.muted}>Ctrl+S save · F3 edit Office/cell · F2 versions/export/Ask Gator · F6 select content · F4 discard · Esc close</text>
   </DialogLayout>

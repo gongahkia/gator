@@ -38,7 +38,7 @@ export function Hub() {
     ["Models and providers", "Choose model, effort, credentials or local installation", "/models"],
     ["Connections", "Sign in, verify, reconnect and disconnect accounts", "/connections"],
     ["Memory and privacy", "Personal memory, learning and earlier-chat recall", "/memory"],
-    ["Appearance and shortcuts", "Gator theme, keys and display preferences", "/appearance"],
+    ["Appearance and shortcuts", "Terminal colors follow your terminal; desktop theme presets", "/appearance"],
     ["Voice", "Dictation, spoken replies and provider preferences", "/voice"],
     ["Usage and limits", "Accounting, limits, pause and resume", "/usage"],
     ["Data and backups", "Retention, reviewed deletion, export, restore and relink", "/data"],

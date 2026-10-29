@@ -1,4 +1,5 @@
 import { For, Show, createEffect, createSignal, onCleanup } from "solid-js"
+import { TextAttributes } from "@opentui/core"
 import type { TextareaRenderable, ScrollBoxRenderable } from "@opentui/core"
 import { Keymap } from "../context/keymap"
 import { useKeyboard, useRenderer } from "@opentui/solid"
@@ -174,27 +175,27 @@ export function Panel(props: { panel: BackendPanel }) {
   })
   return <box flexGrow={1} minHeight={0} paddingX={2} gap={1}>
     <text fg={theme.accent}><b>{literal(props.panel.title)}</b>{busy() ? " · Saving…" : ""}</text>
-    <Show when={props.panel.subtitle}><text fg={theme.text.muted}>{literal(props.panel.subtitle)}</text></Show>
+    <Show when={props.panel.kind === "appearance"} fallback={<Show when={props.panel.subtitle}><text fg={theme.text.muted}>{literal(props.panel.subtitle)}</text></Show>}><text fg={theme.text.muted}>Terminal colors and transparency follow your terminal settings. These presets apply to the desktop app.</text></Show>
     <Show when={props.panel.filter && !props.panel.catalog}><text fg={theme.text.muted}>Filter: {literal(props.panel.filter?.value)} · Ctrl+L changes</text></Show>
     <Show when={props.panel.catalog}><text fg={theme.text.muted}>{props.panel.filter?.options.find(option => option.value === props.panel.filter?.value)?.label || "Chats"} · {props.panel.catalog?.loading || busy() ? "Loading…" : `${props.panel.rows?.length ?? 0} chats`}{props.panel.catalog?.has_previous || props.panel.catalog?.has_next ? ` · Page ${props.panel.catalog?.page} · Ctrl+←/→` : ""}</text></Show>
     <Show when={props.panel.catalog && props.panel.query}><text fg={theme.text.muted}>Search retained messages: {literal(props.panel.query)}</text></Show>
     <Show when={query()}><text fg={theme.text.muted}>Filter loaded entries: {literal(query())} · {visible().length} of {props.panel.rows?.length ?? 0} · Ctrl+F changes or clears</text></Show>
     <scrollbox ref={node => { scroll = node }} flexGrow={1} minHeight={0}>
-      <For each={props.panel.summary}>{field => <text>{literal(field.label)}: {literal(field.value)}</text>}</For>
+      <For each={props.panel.summary}>{field => <text fg={theme.text.base}>{literal(field.label)}: {literal(field.value)}</text>}</For>
       <Show when={query() && !visible().length}><text fg={theme.text.muted}>No matching loaded items. Clear the filter to choose an entry.</text></Show>
       <Show when={props.panel.catalog && !props.panel.catalog.loading && !props.panel.rows?.length}><text fg={theme.text.muted}>{props.panel.query ? "No chats match this search. Ctrl+F to change it." : "No chats in this view. Ctrl+L to change the filter."}</text></Show>
       <For each={visible()}>{({ row, index }) => <box id={`panel-row-${index}`} backgroundColor={index === selectedRow() ? theme.background.raised.high : undefined} paddingY={0} onMouseUp={() => row.input ? edit(index) : void action({ action: "activate", row: index })}>
         <text wrapMode={props.panel.catalog ? "none" : "word"} truncate={!!props.panel.catalog} height={props.panel.catalog ? 1 : undefined} fg={index === selectedRow() ? theme.accent : theme.text.base}>{index === selectedRow() ? "› " : "  "}{literal(row.label)}{row.state ? ` · ${literal(row.state_label || row.state)}` : ""}{row.input ? `: ${row.input.secret ? "[credential]" : literal(fields()[index] ?? row.input.value)}` : ""}</text>
-        <Show when={props.panel.catalog}><text height={1} wrapMode="none" truncate fg={theme.text.muted}>  {[row.pinned ? "Pinned" : "", row.archived ? "Archived" : "", displayDate(row.updated_at), folderLabel(row.source)].filter(Boolean).map(literal).join(" · ")}{row.detail ? " · " : ""}<Highlight text={row.detail} query={props.panel.query} /></text></Show>
+        <Show when={props.panel.catalog}><text height={1} wrapMode="none" truncate attributes={TextAttributes.DIM} fg={theme.text.muted}>  {[row.pinned ? "Pinned" : "", row.archived ? "Archived" : "", displayDate(row.updated_at), folderLabel(row.source)].filter(Boolean).map(literal).join(" · ")}{row.detail ? " · " : ""}<Highlight text={row.detail} query={props.panel.query} /></text></Show>
         <Show when={!props.panel.catalog && row.detail}><text fg={theme.text.muted}>  <Highlight text={row.detail} query={props.panel.catalog ? props.panel.query : query()} /></text></Show>
         <Show when={!props.panel.catalog && (row.source || row.updated_at || row.pinned || row.archived)}><text fg={theme.text.muted}>  {[row.pinned ? "Pinned" : "", row.archived ? "Archived" : "", row.updated_at, row.source].filter(Boolean).map(literal).join(" · ")}</text></Show>
         <For each={props.panel.catalog ? [] : row.metadata}>{field => <text fg={theme.text.muted}>  {literal(field.label)}: {literal(field.value)}</text>}</For>
         <Show when={row.input?.help}><text fg={theme.text.muted}>  {literal(row.input?.help)}</text></Show>
       </box>}</For>
-      <For each={props.panel.blocks}>{block => <box marginTop={1}><text fg={theme.accent}>{literal(block.title)}</text><For each={block.fields}>{f => <text>{literal(f.label)}: {literal(f.value)}</text>}</For><For each={block.lines ?? []}>{line => <text>{literal(line)}</text>}</For></box>}</For>
+      <For each={props.panel.blocks}>{block => <box marginTop={1}><text fg={theme.accent}>{literal(block.title)}</text><For each={block.fields}>{f => <text fg={theme.text.base}>{literal(f.label)}: {literal(f.value)}</text>}</For><For each={block.lines ?? []}>{line => <text fg={theme.text.base}>{literal(line)}</text>}</For></box>}</For>
       <For each={props.panel.links}>{link => <text fg={theme.accent}>{literal(link.label)}: {literal(link.url)}</text>}</For>
       <Show when={props.panel.notice}><text fg={props.panel.notice_tone === "error" ? theme.text.feedback.error.base : theme.text.muted}>{literal(props.panel.notice)}</text></Show>
-      <Show when={props.panel.usage}><text>{JSON.stringify(props.panel.usage, null, 2)}</text></Show>
+      <Show when={props.panel.usage}><text fg={theme.text.base}>{JSON.stringify(props.panel.usage, null, 2)}</text></Show>
     </scrollbox>
     <text fg={theme.text.muted}>{footer()}</text>
     <Show when={data.state?.notice}><text fg={theme.text.feedback.warning.base}>{literal(data.state?.notice)}</text></Show>
@@ -205,5 +206,5 @@ export function Panel(props: { panel: BackendPanel }) {
 function MultilineField(props: { title: string; value: string; limit: number; save(value: string): void }) {
   const theme = useTheme(), client = useClient(); let editor: TextareaRenderable | undefined
   Keymap.createLayer(() => ({ mode: "modal", priority: 3, commands: [{ bind: "ctrl+s", title: "Keep field value", run: () => { const value = editor?.plainText ?? ""; if (value.length > props.limit) client.fail(new Error("This value exceeds the field limit.")); else props.save(value) } }] }))
-  return <box padding={3} gap={1}><text fg={theme.accent}>{props.title}</text><textarea ref={value => { editor = value }} focused initialValue={props.value} height={8} wrapMode="word" textColor={theme.text.base} onSubmit={() => { editor?.newLine() }} /><text fg={theme.text.muted}>Enter adds a line · Ctrl+S keeps this field · Esc cancels</text></box>
+  return <box padding={3} gap={1}><text fg={theme.accent}>{props.title}</text><textarea ref={value => { editor = value }} focused initialValue={props.value} height={8} wrapMode="word" textColor={theme.text.base} focusedTextColor={theme.text.base} onSubmit={() => { editor?.newLine() }} /><text fg={theme.text.muted}>Enter adds a line · Ctrl+S keeps this field · Esc cancels</text></box>
 }

@@ -16,6 +16,7 @@ import { DialogSelect } from "./ui/dialog-select"
 import { CommandPaletteDialog } from "./component/command-palette"
 import { SessionFrame } from "./component/session-frame"
 import { Prompt } from "./component/prompt"
+import { ConnectionStatus } from "./gator/connection-status"
 import { Transcript } from "./gator/transcript"
 import { Panel } from "./gator/panel"
 import { literal } from "./gator/text"
@@ -73,7 +74,7 @@ function Shell(props: { quit(): Promise<void> }) {
       } })),
   ] }))
   return <box width="100%" height="100%" backgroundColor={theme.background.base}>
-    <box height={1} paddingX={1} flexDirection="row" justifyContent="space-between"><text fg={theme.accent}><b>Gator</b> · {literal(data.state?.title) || "Opening chat…"}</text><text fg={theme.text.muted}>{literal(data.snapshot.connection)}</text></box>
+    <box height={1} paddingX={1} gap={2} flexDirection="row" justifyContent="space-between"><text flexGrow={1} flexShrink={1} minWidth={0} height={1} wrapMode="none" truncate fg={theme.text.base}><b>🐊 Gator</b> · {literal(data.state?.title) || "Opening chat…"}</text><ConnectionStatus connection={data.snapshot.connection} error={!!data.snapshot.error} /></box>
     <SessionFrame sidebar={!data.preferences.sidebarCollapsed} search={palette}>
       <Show when={data.route === "chat"} fallback={<Hub />}><Show when={data.state?.panel} fallback={<><Transcript /><Prompt /></>}>{panel => <Panel panel={panel()} />}</Show></Show>
     </SessionFrame>
@@ -85,7 +86,7 @@ function Shell(props: { quit(): Promise<void> }) {
 }
 function Themed(props: { client: GatorClient; quit(): Promise<void>; clipboard: ClipboardService }) {
   const data = useData()
-  return <ThemeProvider theme={data.state?.theme ?? "dark"}><ConfigProvider bindings={terminalShortcuts(data.state?.desktop?.shortcuts)}>
+  return <ThemeProvider><ConfigProvider bindings={terminalShortcuts(data.state?.desktop?.shortcuts)}>
     <ClipboardProvider value={props.clipboard}><Keymap.Provider><ToastProvider><DialogProvider><Shell quit={props.quit} /></DialogProvider></ToastProvider></Keymap.Provider></ClipboardProvider>
   </ConfigProvider></ThemeProvider>
 }

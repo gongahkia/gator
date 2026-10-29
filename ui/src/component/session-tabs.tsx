@@ -9,7 +9,7 @@ import { literal } from "../gator/text"
 export type SessionTabsController = { search?: () => void }
 export function SessionTabs(props: { width: number; search(): void }) {
   const data = useData(), client = useClient(), theme = useTheme()
-  return <box width={props.width} flexShrink={0} backgroundColor={theme.background.raised.base} paddingY={1} paddingX={1} gap={1}>
+  return <box width={props.width} flexShrink={0} backgroundColor={theme.background.base} border={["right"]} borderColor={theme.text.muted} paddingY={1} paddingX={1} gap={1}>
     <text fg={theme.accent}><b>GATOR</b></text>
     <SessionTabsRailControls width={props.width - 2} tabs={{ search: props.search }} belowHighlighted={false} />
     <For each={[["Chat", "/chat"], ["Chats", "/conversations"], ["Following", "/following"], ["Saved", "/saved"], ["Settings", "/settings"]]}>{([title, command]) => <text fg={theme.text.base} onMouseUp={() => void client.navigate(command).catch(e => client.fail(e))}>{title}</text>}</For>
