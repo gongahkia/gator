@@ -33,6 +33,9 @@ button.secondary { background: transparent; color: inherit; border-color: var(--
 button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 button:disabled { opacity: .5; cursor: default; }
 pre, .message-text { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
+#updates li { overflow-wrap: anywhere; }
+#updates-count { font-variant-numeric: tabular-nums; }
+#updates article:focus { outline: 2px solid var(--accent); outline-offset: 3px; }
 pre { font-family: "SFMono-Regular", Consolas, monospace; font-size: 13px; }
 .message-text { margin-bottom: 0; }
 summary { min-height: 44px; padding-top: 10px; cursor: pointer; }

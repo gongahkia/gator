@@ -75,7 +75,37 @@ test('real Go work survives a client disconnect, deduplicates admission and revo
     assert.equal((await readdir(join(state, 'gator/conversations'))).filter(name => name.startsWith('work-')).length, 2);
     assert.equal((await get('bad')).status, 401);
     assert.equal((await get(token, { origin: 'https://attacker.example' })).status, 403);
+    await mkdir(join(state, 'gator/inbox'), { recursive: true });
+    for (let index = 0; index < 55; index++) {
+      const entry = { version: 1, id: `inbox-remote-${String(index).padStart(3, '0')}`, kind: 'job', title: `Retained follow-up ${index}`, summary: 'Retained host update.', status: index === 54 ? 'failed' : 'completed', origin_conversation_id: id, created_at: new Date(Date.UTC(2026, 9, 29, 0, index)).toISOString() };
+      await writeFile(join(state, 'gator/inbox', entry.id + '.json'), JSON.stringify(entry), { mode: 0o600 });
+    }
     const first = await (await get()).json(); assert.equal(first.state.conversation_id, id);
+    assert.equal(first.state.chat_updates.length, 50);
+    assert.equal(first.state.chat_updates_total, 55);
+    const updateID = first.state.chat_updates.at(-1).id;
+    const changeUpdate = async (action, version = 0, update = updateID, conversation = id) => {
+      const response = await send({ type: 'update', update: { conversation_id: conversation, id: update, action, version } });
+      return { status: response.status, ...await response.json() };
+    };
+    assert.equal((await changeUpdate('read', 0, updateID, newChat.conversation_id)).status, 400);
+    const read = await changeUpdate('read');
+    assert.equal(read.state.chat_updates.at(-1).read, true);
+    const done = await changeUpdate('resolve');
+    assert.equal(done.state.chat_updates.at(-1).resolved, true);
+    assert.equal(done.state.chat_updates.at(-1).status, 'failed', 'marking done must not rewrite a failed check');
+    const stale = await changeUpdate('reopen');
+    assert.match(stale.state.chat_updates_issue, /changed/);
+    assert.equal(stale.state.chat_updates.at(-1).resolved, true);
+    const reopenedUpdate = await changeUpdate('reopen', 1);
+    assert.equal(reopenedUpdate.state.chat_updates.at(-1).resolved, false);
+    assert.equal((await changeUpdate('resolve', 2)).state.chat_updates.at(-1).version, 3);
+    const older = await changeUpdate('older', 0, first.state.chat_updates[0].id);
+    assert.equal(older.state.chat_updates.length, 5);
+    assert.equal(older.state.updates_have_newer, true);
+    const newer = await changeUpdate('newer', 0, older.state.chat_updates.at(-1).id);
+    assert.equal(newer.state.chat_updates.length, 50);
+    assert.equal(requests, beforeCatalog, 'update receipts and paging must not call a model');
     assert.equal((await send({ type: 'submit', text: '/data' })).status, 400);
     const frame = { type: 'upload_submit', upload: { context: `conversation:${id}`, request_id: 'stable-remote-request', text: 'Answer this remote test question.', files: [] } };
     assert.equal((await send({ ...frame, upload: { ...frame.upload, context: 'conversation:other' } })).status, 400);
@@ -109,6 +139,10 @@ test('real Go work survives a client disconnect, deduplicates admission and revo
     const retainedState = await retained.json();
     assert.equal(retained.status, 200);
     assert.equal(retainedState.state.running, false);
+    const retainedUpdate = retainedState.state.chat_updates.find(update => update.id === updateID);
+    assert.equal(retainedUpdate.read, true);
+    assert.equal(retainedUpdate.resolved, true);
+    assert.equal(retainedUpdate.version, 3, 'follow-up decisions must survive companion restart');
     assert.ok(retainedState.state.messages.some(m => m.text?.includes('Completed on the companion.')));
     assert.equal(requests, before, 'restarting or reading must not replay work');
   } finally {

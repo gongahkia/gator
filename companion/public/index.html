@@ -50,7 +50,14 @@
       <div class="row"><h2 id="chat-title" tabindex="-1">Conversation</h2><button id="refresh" class="secondary" type="button">Refresh</button></div>
       <p id="host-status" class="muted" role="status"></p>
       <p id="host-notice" class="notice" hidden></p>
-      <div id="updates"></div>
+      <section id="followups" aria-labelledby="updates-title">
+        <h2 id="updates-title" tabindex="-1">Follow-up updates</h2>
+        <p class="hint">Marking an update done changes its status here. It does not run a task or fix a failed check.</p>
+        <p id="updates-issue" class="notice" role="alert" hidden></p>
+        <p id="updates-count" class="hint"></p>
+        <div id="updates"></div>
+        <nav class="row" aria-label="Follow-up update pages"><button id="updates-older" class="secondary" type="button" hidden>Earlier updates</button><button id="updates-newer" class="secondary" type="button" hidden>Newer updates</button></nav>
+      </section>
       <div id="messages" aria-label="Conversation messages"></div>
       <section id="approval" class="card" hidden aria-labelledby="approval-title">
         <h2 id="approval-title">Review requested action</h2>

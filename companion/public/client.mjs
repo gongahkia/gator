@@ -1,6 +1,7 @@
 const $ = id => document.getElementById(id);
 let session, generation = 0, timer, busy = false, reading = false, fresh = false;
 let state, pending, approvalKey = '', transcriptKey = '';
+let updatesKey = '', updateIssue = '';
 let browsing = false, catalogQuery = { query: '', scope: 'active', after: '' }, anchors = [], nextPage = '';
 let creationPending = null, creationIssue = '', newChatSource = '';
 const creationKey = 'gator.companion.creation.v1';
@@ -18,6 +19,9 @@ const currentApproval = () => {
 function controls() {
   const active = !!session?.id && !browsing && fresh && !document.hidden && !busy && !reading && !hostSetup();
   $('send').disabled = !active;
+  for (const button of $('updates').querySelectorAll('button')) button.disabled = !active;
+  $('updates-older').disabled = !active || !state?.updates_have_older;
+  $('updates-newer').disabled = !active || !state?.updates_have_newer;
   $('review').disabled = $('deny').disabled = $('confirm').disabled = !active || !currentApproval();
   $('refresh').disabled = !session || busy || reading;
   $('browse').disabled = !session || busy || reading;
@@ -92,9 +96,7 @@ function render(next) {
       return article;
     }));
   }
-  $('updates').replaceChildren(...(state.chat_updates || []).map(update => {
-    const card = node('article', ''); card.append(node('h3', update.title), node('p', update.summary), node('p', `Status: ${update.status}`, 'hint')); return card;
-  }));
+  renderUpdates();
   $('queue').replaceChildren(...(state.queue || []).map(item => node('p', `${item.interrupted ? 'Interrupted · review on host' : 'Queued'}: ${item.text}`)));
   const review = currentApproval(), nextKey = review ? JSON.stringify(review) : '';
   if (nextKey !== approvalKey) { dialog.close(); approvalKey = nextKey; }
@@ -102,6 +104,73 @@ function render(next) {
   $('approval-preview').textContent = review?.preview || '';
   controls();
 }
+function renderUpdates() {
+  const updates = state?.chat_updates || [], key = JSON.stringify(updates);
+  $('updates-issue').textContent = updateIssue || state?.chat_updates_issue || '';
+  $('updates-issue').hidden = !$('updates-issue').textContent;
+  $('updates-count').textContent = updates.length ? `${updates.length} of ${state.chat_updates_total ?? updates.length} updates` : state?.chat_updates_issue ? 'Could not load follow-up updates.' : 'No follow-up updates in this conversation.';
+  $('updates-older').hidden = !state?.updates_have_older;
+  $('updates-newer').hidden = !state?.updates_have_newer;
+  if (key === updatesKey) return;
+  updatesKey = key;
+  const expanded = new Set([...$('updates').querySelectorAll('article')].filter(card => card.querySelector('details')?.open).map(card => card.dataset.update));
+  const focused = document.activeElement?.closest('[data-update]');
+  const focusID = focused?.dataset.update, focusAction = document.activeElement?.dataset.action;
+  $('updates').replaceChildren(...updates.map(update => {
+    const card = node('article', '', 'card'); card.dataset.update = update.id; card.tabIndex = -1;
+    card.setAttribute('aria-label', `Follow-up: ${update.title}`);
+    card.append(node('h3', update.title), node('p', update.summary, 'message-text'));
+    card.append(node('p', `${update.read ? 'Read' : 'Unread'} · ${update.resolved ? 'Marked done' : 'Open'} · Check result: ${update.status}`, 'hint'));
+    if (['failed', 'interrupted', 'limited'].includes(update.status)) card.append(node('p', 'This check did not complete successfully. Earlier results do not confirm that nothing changed.', 'notice'));
+    const details = node('details', ''); details.open = expanded.has(update.id); details.append(node('summary', 'Update details'));
+    if (update.next_step) details.append(node('p', `Next step: ${update.next_step}`, 'message-text'));
+    if (update.evidence?.length) { const list = node('ul', ''); for (const source of update.evidence) list.append(node('li', source)); details.append(list); }
+    details.append(node('p', `Created: ${update.created_at || 'Unavailable'}\nUpdate: ${update.id}`, 'message-text hint')); card.append(details);
+    const actions = node('div', '', 'row');
+    for (const [action, label] of [...(!update.read ? [['read', 'Mark read']] : []), [update.resolved ? 'reopen' : 'resolve', update.resolved ? 'Reopen' : 'Done']]) {
+      const button = node('button', label, 'secondary'); button.type = 'button'; button.dataset.action = action;
+      button.addEventListener('click', () => changeUpdate(update.id, action)); actions.append(button);
+    }
+    card.append(actions); return card;
+  }));
+  if (focusID) {
+    const card = [...$('updates').children].find(card => card.dataset.update === focusID);
+    const button = card && [...card.querySelectorAll('button')].find(button => button.dataset.action === focusAction);
+    (button || card || $('updates-title')).focus();
+  }
+}
+function updateFocus() {
+  const active = document.activeElement, card = active?.closest('[data-update]');
+  return card ? { id: card.dataset.update, action: active.dataset.action } : null;
+}
+function restoreUpdateFocus(focus) {
+  if (!focus || document.hidden || document.activeElement !== document.body) return;
+  const card = [...$('updates').children].find(card => card.dataset.update === focus.id);
+  const button = card && [...card.querySelectorAll('button')].find(button => button.dataset.action === focus.action && !button.disabled);
+  (button || card || $('updates-title')).focus();
+}
+async function changeUpdate(id, action) {
+  if (!session?.id || browsing || document.hidden || !fresh || busy || reading || hostSetup()) return;
+  const update = state?.chat_updates?.find(update => update.id === id);
+  if (!update) return;
+  const owner = session, at = generation, focus = updateFocus();
+  busy = true; dialog.close(); updateIssue = ''; controls();
+  try {
+    const next = await request(owner, { type: 'update', update: { conversation_id: owner.id, id, action, version: update.version } });
+    if (at !== generation) return;
+    updateIssue = next.chat_updates_issue || '';
+    render(next);
+    if (action === 'older' || action === 'newer') $('updates-title').focus();
+  } catch (error) {
+    if (at === generation) {
+      updateIssue = 'The change is unconfirmed. Refresh and check the saved status before trying again.';
+      $('updates-issue').textContent = updateIssue; $('updates-issue').hidden = false;
+      failed(error);
+    }
+  } finally { if (at === generation) { busy = false; controls(); restoreUpdateFocus(focus); } }
+}
+$('updates-older').addEventListener('click', () => { const first = state?.chat_updates?.[0]; if (first) void changeUpdate(first.id, 'older'); });
+$('updates-newer').addEventListener('click', () => { const last = state?.chat_updates?.at(-1); if (last) void changeUpdate(last.id, 'newer'); });
 function failed(error) {
   fresh = false; dialog.close();
   $('connection').textContent = error.unauthorized ? 'Access expired · enter the current host token' : 'Disconnected · the host may still be working';
@@ -111,14 +180,14 @@ function failed(error) {
 async function refresh() {
   if (!session || reading || busy) return;
   if (browsing) return loadCatalog(catalogQuery, anchors);
-  const owner = session, at = generation; reading = true; fresh = false; controls();
+  const owner = session, at = generation, focus = updateFocus(); reading = true; fresh = false; controls();
   try { const next = await request(owner); if (at === generation) { report(''); render(next); } }
   catch (error) { if (at === generation) failed(error); }
-  finally { if (at === generation) { reading = false; controls(); } }
+  finally { if (at === generation) { reading = false; controls(); restoreUpdateFocus(focus); } }
 }
 function disconnect(clear = true) {
   generation++; clearInterval(timer); session = null; state = null; fresh = false; busy = false; reading = false;
-  approvalKey = ''; transcriptKey = ''; dialog.close();
+  approvalKey = ''; transcriptKey = ''; updatesKey = ''; updateIssue = ''; dialog.close();
   browsing = false; anchors = []; nextPage = ''; catalogQuery = { query: '', scope: 'active', after: '' };
   creationPending = null; creationIssue = ''; newChatSource = ''; $('new-chat-controls').hidden = true; $('new-chat-source').textContent = '';
   $('catalog').hidden = $('browse').hidden = true; $('catalog-items').replaceChildren(); $('catalog-status').textContent = '';
@@ -127,6 +196,7 @@ function disconnect(clear = true) {
   $('connect').disabled = false; $('disconnect').hidden = true;
   $('credentials').hidden = $('connect').hidden = false; $('connected-chat').hidden = true; $('connected-chat').textContent = '';
   $('chat').hidden = true; $('messages').replaceChildren(); $('updates').replaceChildren(); $('queue').replaceChildren();
+  $('updates-issue').textContent = $('updates-count').textContent = ''; $('updates-issue').hidden = true;
   $('approval-preview').textContent = $('confirm-preview').textContent = ''; $('message').value = ''; pending = null;
   if (clear) { report(''); $('connection').textContent = 'Disconnected · admitted work stays on the host'; }
   controls();
@@ -185,7 +255,7 @@ async function createNewChat() {
     if (at !== generation) return;
     sessionStorage.removeItem(creationKey); creationPending = null;
     session = owner; browsing = false; pending = draft.pending || null; $('message').value = draft.text;
-    transcriptKey = ''; approvalKey = ''; report(''); render(next); $('message').focus();
+    transcriptKey = ''; approvalKey = ''; updatesKey = ''; updateIssue = ''; report(''); render(next); $('message').focus();
   } catch (error) { if (at === generation) failed(error); }
   finally { if (at === generation) { busy = false; controls(); } }
 }
@@ -204,7 +274,7 @@ async function openChat(id) {
     const draft = readDraft(id), next = await request(owner);
     if (at !== generation) return;
     session = owner; browsing = false; pending = draft.pending || null; $('message').value = draft.text;
-    transcriptKey = ''; approvalKey = ''; report(''); render(next); $('chat-title').focus();
+    transcriptKey = ''; approvalKey = ''; updatesKey = ''; updateIssue = ''; report(''); render(next); $('chat-title').focus();
   } catch (error) { if (at === generation) failed(error); }
   finally { if (at === generation) { busy = false; controls(); } }
 }
