@@ -20,6 +20,7 @@ import (
 // BridgeState is a display-only projection for the desktop.
 // The Go model remains the sole owner of commands, runs, approvals and history.
 type BridgeState struct {
+	PendingOperation        string            `json:"pending_operation,omitempty"`
 	CatalogBusy             bool              `json:"catalog_busy,omitempty"`
 	ActionRecoveries        []RecoveredAction `json:"action_recoveries,omitempty"`
 	ActionRecoveryIssue     string            `json:"action_recovery_issue,omitempty"`
@@ -222,6 +223,16 @@ func (m Model) BridgeState() BridgeState {
 		state.Queue = append(state.Queue, BridgeQueuedRun{ReplyToUpdateID: item.options.ReplyToUpdateID, Interrupted: item.interrupted, Inputs: uploadNames(item.options.Uploads), ID: bridgeQueuedRunID(item), Text: item.prompt})
 	}
 	state.GuidanceID = m.bridgeGuidanceID()
+	switch {
+	case m.recallBusy:
+		state.PendingOperation = "Installing local recall…"
+	case m.followupSaving:
+		state.PendingOperation = "Saving agreement…"
+	case m.recallChecking > 0 && m.section == "memory":
+		state.PendingOperation = "Checking recall readiness…"
+	case m.controlBusy:
+		state.PendingOperation = "Processing request…"
+	}
 	state.WorkDetails = BridgeWorkDetails{
 		BrowserSession: m.options.BrowserSession,
 		Mode:           m.options.Mode, SnapshotID: m.snapshot,

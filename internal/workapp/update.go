@@ -106,6 +106,9 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 	case followupSaved:
 		return m.finishFollowup(value)
 	case recallStatusDone:
+		if m.recallChecking > 0 {
+			m.recallChecking--
+		}
 		if value.Err != nil {
 			m.sectionNotice = "Recall status unavailable: " + value.Err.Error()
 		} else {
@@ -128,7 +131,8 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.sectionNotice = "Local recall model installed."
-		return m, m.recallStatusCommand()
+		command := m.recallStatusCommand()
+		return m, command
 	case checksRefreshed:
 		if value.Err == nil {
 			m.checksIssue = ""
@@ -216,7 +220,8 @@ func (m Model) updateModelPanel(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	m.closeModelPanel()
 	if m.section == "memory" {
-		return m, tea.Batch(tea.ClearScreen, m.recallStatusCommand())
+		command := m.recallStatusCommand()
+		return m, tea.Batch(tea.ClearScreen, command)
 	}
 	return m, tea.ClearScreen
 }

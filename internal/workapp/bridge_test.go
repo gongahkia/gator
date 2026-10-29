@@ -1,6 +1,7 @@
 package workapp
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -119,5 +120,46 @@ func TestBridgeFlagsStoppedSupervisorForEnabledJobs(t *testing.T) {
 	model.config.SupervisorRunning = true
 	if model.BridgeState().SupervisorNeedsStart {
 		t.Fatal("bridge showed stopped supervisor warning while running")
+	}
+}
+
+func TestBridgeReportsOnlyActivePendingOperations(t *testing.T) {
+	model := New(Config{CurrentFolder: t.TempDir()})
+	if model.BridgeState().PendingOperation != "" {
+		t.Fatal("idle model reports progress")
+	}
+	model.controlBusy = true
+	if model.BridgeState().PendingOperation != "Processing request…" {
+		t.Fatal("control operation missing")
+	}
+	model.controlBusy = false
+	model.controlBackground = true
+	if model.BridgeState().PendingOperation != "" {
+		t.Fatal("background polling should not claim foreground work")
+	}
+	model.followupSaving = true
+	if model.BridgeState().PendingOperation != "Saving agreement…" {
+		t.Fatal("agreement save missing")
+	}
+	model.followupSaving = false
+	model.recallBusy = true
+	if model.BridgeState().PendingOperation != "Installing local recall…" {
+		t.Fatal("recall install missing")
+	}
+	model.recallBusy = false
+	if model.BridgeState().PendingOperation != "" {
+		t.Fatal("completed operation still reports progress")
+	}
+}
+
+func TestRecallReadinessProgressEndsWithItsReply(t *testing.T) {
+	model := New(Config{CurrentFolder: t.TempDir(), RecallStatus: func(context.Context) (RecallStatus, error) { return RecallStatus{}, nil }})
+	command := model.openRecall()
+	if model.BridgeState().PendingOperation != "Checking recall readiness…" {
+		t.Fatal("readiness operation missing")
+	}
+	next, _ := model.Update(command())
+	if next.(Model).BridgeState().PendingOperation != "" {
+		t.Fatal("readiness operation did not finish")
 	}
 }

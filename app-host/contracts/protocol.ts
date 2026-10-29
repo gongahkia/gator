@@ -143,6 +143,7 @@ export type BackendState = {
   cancelling: boolean;
   elapsed?: string;
   loading_frame: number;
+  pending_operation?: string;
   queued: number;
   queue: QueuedMessage[];
   requests_recovered?: boolean;

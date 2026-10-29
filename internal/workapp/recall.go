@@ -16,10 +16,11 @@ type recallStatusDone struct {
 type recallProgress string
 type recallInstallDone struct{ Err error }
 
-func (m Model) recallStatusCommand() tea.Cmd {
+func (m *Model) recallStatusCommand() tea.Cmd {
 	if m.config.RecallStatus == nil {
 		return nil
 	}
+	m.recallChecking++
 	read := m.config.RecallStatus
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -61,7 +62,8 @@ func (m Model) updateRecallKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.sectionNotice = "Saved recall selection. Chat processing remains controlled by /model."
-			return m, m.recallStatusCommand()
+			command := m.recallStatusCommand()
+			return m, command
 		}
 		return m, nil
 	}
@@ -69,7 +71,8 @@ func (m Model) updateRecallKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.section = ""
 	case "r":
-		return m, m.recallStatusCommand()
+		command := m.recallStatusCommand()
+		return m, command
 	case "a":
 		if m.config.ConfigureChatLearning == nil {
 			m.sectionNotice = "Chat learning settings are unavailable."
@@ -82,7 +85,8 @@ func (m Model) updateRecallKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.recall.LearnFromChats = enabled
 		m.sectionNotice = "Chat learning updated. Existing saved memories remain available; explicit remember and forget requests still work."
-		return m, m.recallStatusCommand()
+		command := m.recallStatusCommand()
+		return m, command
 	case "h":
 		if m.config.ConfigureChatHistory == nil {
 			m.sectionNotice = "Chat history settings are unavailable."
@@ -95,7 +99,8 @@ func (m Model) updateRecallKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.recall.ReferToChats = enabled
 		m.sectionNotice = "Earlier-chat retrieval updated for new requests. Current chats and saved memories are kept. Requests already running retain their supplied context."
-		return m, m.recallStatusCommand()
+		command := m.recallStatusCommand()
+		return m, command
 	case "i":
 		m.recallConfirm = "install"
 	case "l":

@@ -482,6 +482,7 @@ type Model struct {
 	chatMemoryIssue  string
 	recall           RecallStatus
 	recallBusy       bool
+	recallChecking   int
 	recallCancel     context.CancelFunc
 	recallEvents     <-chan tea.Msg
 	recallConfirm    string
