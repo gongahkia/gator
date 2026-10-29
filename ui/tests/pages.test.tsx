@@ -48,7 +48,7 @@ test("keyboard pages preserve the draft and recurring checks review exact typed 
     expect(await definitions()).toHaveLength(0)
     setup.mockInput.pressKey("F2"); await until(() => client.state?.panel?.title === "Review ongoing check", "exact agreement review"); await flush()
     const review = JSON.stringify(client.state?.panel)
-    for (const text of ["Watch the offsite plan", picked, "every 30 minutes", "6 Work checks/day", "16 requests", "Read and recommend"]) expect(review).toContain(text)
+    for (const text of ["Watch the offsite plan", picked, "every 30 minutes", "6 Work checks/day", "16 requests", "Read and recommend"]) expect(review).toContain(JSON.stringify(text).slice(1, -1))
     expect(await definitions()).toHaveLength(0)
     setup.mockInput.pressEnter(); await until(async () => (await definitions()).length === 1, "explicit save")
     const saved = (await definitions())[0]; expect(saved.source_path).toBe(picked); expect(saved.max_checks_per_day).toBe(6)
@@ -56,7 +56,9 @@ test("keyboard pages preserve the draft and recurring checks review exact typed 
     expect(client.drafts.get(originalContext)?.text).toBe("Keep my unsent page draft")
     // Saving intentionally selects the newly created goal. Return to the origin
     // through the same session host to verify its workspace/draft still exist.
-    await client.host.sessions.open({ conversation_id: originalID }); await client.loadDraft()
+    await until(() => client.state?.source === picked && !client.snapshot.sessionSwitching, "saved check workspace selected")
+    await client.host.sessions.open({ conversation_id: originalID })
+    await until(() => client.state?.conversation_id === originalID && client.state?.source === original, "original chat restored"); await client.loadDraft()
     expect(client.state?.source).toBe(original)
     expect(client.draft.text).toBe("Keep my unsent page draft"); expect(client.state?.messages.some(message => message.role === "You")).toBe(false)
   } finally { await client.close(); await setup.dispose(); await rm(root, { recursive: true, force: true }) }

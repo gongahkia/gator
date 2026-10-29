@@ -36,7 +36,7 @@ test("private data keyboard reviews export verify and restore into a separate pa
   try {
     await client.start(); await client.edit("Keep private data draft"); const context = client.context
     await client.navigate("/data"); await choose("Export private backup"); await path("New backup file", backup); await review()
-    expect(await exists(backup)).toBe(false); expect(JSON.stringify(client.state?.panel)).toContain(backup)
+    expect(await exists(backup)).toBe(false); expect(JSON.stringify(client.state?.panel)).toContain(JSON.stringify(backup).slice(1, -1))
     setup.mockInput.pressEnter(); await result("Exported"); expect(await exists(backup)).toBe(true)
     const bytes = await readFile(backup)
     await choose("Verify a backup"); await path("Existing backup file", backup); await review(); setup.mockInput.pressEnter(); await result("Verified")
@@ -44,7 +44,7 @@ test("private data keyboard reviews export verify and restore into a separate pa
     await choose("Restore into a new profile"); await path("Existing backup archive", backup); await path("New profile directory", restored)
     await mapping(); await review(); expect(await exists(restored)).toBe(false)
     setup.mockInput.pressEnter(); await until(() => client.state?.panel?.title === "Review restore into a fresh profile", "restore plan")
-    expect(await exists(restored)).toBe(false); expect(JSON.stringify(client.state?.panel)).toContain(restored); expect(JSON.stringify(client.state?.panel)).toContain(replacement)
+    expect(await exists(restored)).toBe(false); expect(JSON.stringify(client.state?.panel)).toContain(JSON.stringify(restored).slice(1, -1)); expect(JSON.stringify(client.state?.panel)).toContain(JSON.stringify(replacement).slice(1, -1))
     await writeFile(backup, Buffer.concat([bytes, Buffer.from("changed after review")]))
     setup.mockInput.pressEnter(); await until(() => !!client.state?.panel?.notice, "changed archive refusal")
     expect(await exists(restored)).toBe(false); expect(client.draft.text).toBe("Keep private data draft")

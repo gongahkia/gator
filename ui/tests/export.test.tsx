@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { testRender } from "@opentui/solid"
-import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises"
+import { mkdtemp, writeFile, readFile, rm, realpath } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import { tmpdir } from "node:os"
 import { Application } from "@gator/application-host/application"
@@ -8,7 +8,7 @@ import { App } from "../src/app"
 import { GatorClient } from "../src/gator/client"
 
 test("keyboard export reviews replacements, cancels safely and refuses a changed destination", async () => {
-  const root = await mkdtemp(join(tmpdir(), "gator-terminal-export-")), source = join(root, "notes.txt"), destination = join(root, "copy.txt")
+  const root = await realpath(await mkdtemp(join(tmpdir(), "gator-terminal-export-"))), source = join(root, "notes.txt"), destination = join(root, "copy.txt")
   await writeFile(source, "Exact retained bytes"); await writeFile(destination, "Existing copy")
   const client = new GatorClient(new Application({ binary: process.env.GATOR_TEST_BINARY || resolve(import.meta.dir, "../runtime/" + (process.platform === "win32" ? "gator-runtime.exe" : "gator-runtime")), userData: join(root, "app"), workspace: join(root, "workspace"), env: { ...process.env, GATOR_STATE_DIR: join(root, "state"), GATOR_CONFIG_DIR: join(root, "config") } }))
   const setup = await testRender(() => <App client={client} quit={() => client.close()} clipboard={{ read: async () => ({ data: "", mime: "text/plain" }), write: async () => {} }} />, { width: 120, height: 36 })

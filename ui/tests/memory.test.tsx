@@ -27,7 +27,10 @@ test("personal memory keyboard corrections retain stale edits, preserve concurre
   let setup = await render()
   const flush = async () => { await setup.flush(); await Bun.sleep(40); await setup.flush() }
   const memoryPath = join(env.GATOR_STATE_DIR, "gator/memory")
-  const memories = async () => Promise.all((await readdir(memoryPath).catch(() => [])).filter(name => name.endsWith(".json")).map(async name => JSON.parse(await readFile(join(memoryPath, name), "utf8"))))
+  const memories = async () => (await Promise.all((await readdir(memoryPath).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return []; throw error })).filter(name => name.endsWith(".json")).map(async name => {
+    try { return JSON.parse(await readFile(join(memoryPath, name), "utf8")) }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined; throw error }
+  }))).filter(record => record !== undefined)
   const edit = async () => { await client.navigate("/memories"); await flush(); setup.mockInput.pressEnter(); await flush(); await setup.mockInput.typeText("Correct"); await flush(); setup.mockInput.pressEnter(); await flush() }
   try {
     await client.start(); await client.send({ type: "submit", text: "/mode inspect" }); await client.edit("Remember: " + quote); await client.submit()

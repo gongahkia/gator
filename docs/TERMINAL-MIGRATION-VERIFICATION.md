@@ -1760,3 +1760,21 @@ This verifies bundled-host/data continuity for these artifacts. It is not proof
 of a schema-changing release migration, signed OS installer, automatic updater,
 service relocation or native Windows execution. The existing macOS service-repair
 and PTY journeys are separate evidence. The terminal parity gate remains open.
+
+### Native workflow follow-up — 30 October
+
+Run `40905103701` at `4e6c60e83` completed: Linux passed the full workflow;
+Intel/ARM macOS and Windows failed terminal integration checks. Earlier Windows
+PDF.js slash and Bun filesystem URL fixes passed their formerly failing stages.
+
+The next test corrections preserve assertions while fixing their assumptions:
+Windows path strings are compared in their serialized form, export expectations
+use the canonical destination, and pinned upstream files retain exact bytes on
+Windows checkout. Memory polling accepts only ENOENT when a listed record is
+concurrently forgotten. Guidance, paging and source-switch assertions wait for
+the actual resulting state. Inbox attention allows two 15-second refresh ticks
+instead of timing out at the first tick's exact deadline.
+
+Focused local terminal checks pass (10 tests across seven files, with the pages
+case rerun after correcting its session-opening helper). These changes require
+a fresh native run; local success does not establish Windows or ARM acceptance.

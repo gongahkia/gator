@@ -11,7 +11,7 @@ import { GatorClient } from "../src/gator/client"
 
 const zero = "0001-01-01T00:00:00Z"
 const hasTime = (value?: string) => !!value && value !== zero
-async function until(predicate: () => boolean | Promise<boolean>, label: string) { const end = Date.now() + 15000; while (!await predicate()) { if (Date.now() > end) throw new Error("Timed out: " + label); await Bun.sleep(20) } }
+async function until(predicate: () => boolean | Promise<boolean>, label: string, timeout = 15000) { const end = Date.now() + timeout; while (!await predicate()) { if (Date.now() > end) throw new Error("Timed out: " + label); await Bun.sleep(20) } }
 test("chat updates keep delivery, read, done, acknowledged feedback and retained replies independent", async () => {
   const root = await mkdtemp(join(tmpdir(), "gator-terminal-updates-")), calls: string[] = []
   const server = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(request) { calls.push(await request.text()); return Response.json({ choices: [{ message: { role: "assistant", content: `Retained reply ${calls.length}.` }, finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 10, total_tokens: 20 } }) } })
@@ -39,7 +39,7 @@ test("chat updates keep delivery, read, done, acknowledged feedback and retained
       { id: "inbox-private", title: "Private elsewhere", summary: "PRIVATE OTHER CHAT", status: "completed", origin_conversation_id: "work-private-other" },
     ]
     for (const [index, entry] of entries.entries()) await writeFile(entryPath(entry.id), JSON.stringify({ version: 1, kind: "job", origin_conversation_id: origin, job_id: "job-offsite", created_at: new Date(Date.now() + index).toISOString(), evidence: ["source/offsite.md:12"], ...entry }))
-    await until(() => client.snapshot.chatActivity.some(row => row.id === origin), "owned attention")
+    await until(() => client.snapshot.chatActivity.some(row => row.id === origin), "owned attention", 30000)
     await client.navigate("/following"); await flush()
     expect(hasTime((await read("inbox-offsite")).delivered_at)).toBe(false); expect(client.draft.text).toBe("Other chat draft")
     await client.navigate("/chat"); await client.openSession(origin)
@@ -131,9 +131,9 @@ test("update paging only acknowledges visible cards and check health stays with 
     setup.mockInput.pressKey("\x1b[1;5F"); await flush()
     await until(async () => { await flush(); return hasTime((await read(52)).delivered_at) }, "visible latest card")
     expect(hasTime((await read(25)).delivered_at), "offscreen middle page card stays undelivered").toBe(false); expect(hasTime((await read(52)).read_at), "delivery does not mark read").toBe(false)
-    await client.navigate("/updates"); await flush(); await choose("older updates")
+    await client.navigate("/updates"); await flush(); await choose("older updates"); await until(() => client.state?.chat_updates?.length === 3, "older update page")
     expect(client.state?.chat_updates).toHaveLength(3); expect(!!client.state?.updates_have_older).toBe(false); expect(client.state?.updates_have_newer).toBe(true)
-    await client.navigate("/updates"); await flush(); await choose("newer updates")
+    await client.navigate("/updates"); await flush(); await choose("newer updates"); await until(() => client.state?.chat_updates?.length === 50, "newer update page")
     expect(client.state?.chat_updates).toHaveLength(50)
     setup.mockInput.pressKey("p", { ctrl: true }); await flush(); await choose("check-health")
     const screen = setup.captureCharFrame()

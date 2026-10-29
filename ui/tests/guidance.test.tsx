@@ -42,7 +42,7 @@ test("saved guidance uses typed choices and full text, retains scope on edit, fi
     await filter("Disabled"); await until(() => client.state?.panel?.rows?.length === 1, "disabled filter"); setup.mockInput.pressEnter(); await flush(); setup.mockInput.pressKey("a")
     await until(() => client.state?.panel?.summary?.some(field => field.label === "Status" && field.value === "active") === true, "re-enabled guidance")
     await client.close(); await setup.dispose(); client = new GatorClient(new Application(options)); setup = await render(); await client.start(); await client.navigate("/learnings"); await flush()
-    expect(client.state?.panel?.rows).toHaveLength(1); setup.mockInput.pressEnter(); await flush()
+    expect(client.state?.panel?.rows).toHaveLength(1); setup.mockInput.pressEnter(); await until(() => client.state?.panel?.title === "Guidance details", "restored guidance details"); await flush()
     expect(client.state?.panel?.blocks?.find(block => block.title === "Guidance")?.lines).toEqual([updated])
     expect(client.context).toBe(context); expect(client.draft.text).toBe("Keep my unsent guidance draft"); expect(client.state?.messages).toHaveLength(0)
   } finally { await client.close(); if (!setup.renderer.isDestroyed) await setup.dispose(); await rm(root, { recursive: true, force: true }) }
