@@ -43,7 +43,7 @@ jobs:
           sudo systemctl start "user@$(id -u).service"
           export GATOR_TEST_BINARY="$RUNNER_TEMP/gator-companion-runtime"
           go build -o "$GATOR_TEST_BINARY" ./cmd/gator
-          GATOR_COMPANION_SYSTEMD_TEST=1 node --test companion/linux-service.test.mjs
+          GATOR_COMPANION_SYSTEMD_TEST=1 node --test companion/linux-service.test.mjs companion/linux-monitoring.test.mjs
       - name: Check browser journeys and credential forms
         if: runner.os == 'Linux'
         env:
