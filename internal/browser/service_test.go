@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 )
@@ -252,5 +253,53 @@ func TestPrivateTakeoverBlocksEveryAgentOperationAndFailsClosed(t *testing.T) {
 	}
 	if response := call("tabs", `{}`); response.Error != ErrPaused.Error() {
 		t.Fatal("failed pause did not deny agent access")
+	}
+}
+
+func TestReviewedBrowserPolicyRejectsChangedAuthority(t *testing.T) {
+	store, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := store.Start(StartOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, token, err := CreateToken(store, session.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	driver := &serviceDriver{tabs: []Tab{{ID: "tab-one", URL: "about:blank"}}}
+	service, err := NewService(ServiceConfig{Store: store, SessionID: session.ID, Token: token, Driver: driver, Socket: socketPath(store, session.ID)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- service.Run(ctx) }()
+	t.Cleanup(func() { cancel(); <-done })
+	waitForBrowserSocket(t, socketPath(store, session.ID))
+	client, err := NewClient(store, session.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reviewed := client.Reviewed(PolicyDigest(session))
+	if _, err := reviewed.SetVisualCapture(ctx, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := reviewed.SetPaused(ctx, false); err == nil {
+		t.Fatal("stale review changed browser")
+	}
+	for _, method := range []string{"session", "tabs", "snapshot", "screenshot", "navigate", "click", "fill", "select", "press", "download", "upload", "select_tabs", "add_origin", "remove_origin", "allow_upload", "stop"} {
+		if err := reviewed.call(ctx, method, nil, nil); err == nil || !strings.Contains(err.Error(), "browser access changed") {
+			t.Fatalf("%s accepted stale grant: %v", method, err)
+		}
+	}
+	current, err := client.Session(ctx, session.ID)
+	if err != nil || !current.VisualCapture {
+		t.Fatalf("current: %#v %v", current, err)
+	}
+	if _, err := client.Reviewed(PolicyDigest(current)).SetVisualCapture(ctx, false); err != nil {
+		t.Fatal(err)
 	}
 }

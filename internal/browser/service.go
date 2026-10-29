@@ -162,6 +162,17 @@ func (service *Service) serveConnection(ctx context.Context, connection net.Conn
 
 func (service *Service) handle(ctx context.Context, request rpcRequest) rpcResponse {
 	response := rpcResponse{ID: request.ID}
+	if request.ExpectedPolicy != "" {
+		session, err := service.store.Get(service.sessionID)
+		if err != nil {
+			response.Error = err.Error()
+			return response
+		}
+		if request.ExpectedPolicy != PolicyDigest(session) {
+			response.Error = "browser access changed; review the selected tabs, sites and capture permission again"
+			return response
+		}
+	}
 	// Check under the same controller lock as the actual operation. A request
 	// admitted before a takeover may finish; once pause is acknowledged, no agent
 	// reads/actions can reach the driver until an explicit local resume.

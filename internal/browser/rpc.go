@@ -18,10 +18,11 @@ import (
 const maxRPCBytes = 9 * 1024 * 1024
 
 type rpcRequest struct {
-	ID     uint64          `json:"id"`
-	Token  []byte          `json:"token"`
-	Method string          `json:"method"`
-	Params json.RawMessage `json:"params,omitempty"`
+	ExpectedPolicy string          `json:"expected_policy,omitempty"`
+	ID             uint64          `json:"id"`
+	Token          []byte          `json:"token"`
+	Method         string          `json:"method"`
+	Params         json.RawMessage `json:"params,omitempty"`
 }
 
 type rpcResponse struct {
@@ -77,10 +78,17 @@ func tokenEqual(left, right []byte) bool {
 // pass into an Executor: browser tool calls contain only opaque IDs and the
 // client reads the local per-session capability itself.
 type Client struct {
-	store     *Store
-	sessionID string
-	socket    string
-	sequence  atomic.Uint64
+	expectedPolicy string
+	store          *Store
+	sessionID      string
+	socket         string
+	sequence       atomic.Uint64
+}
+
+// Reviewed returns a separate client pinned to the policy the user inspected.
+// Every operation checks it under the controller lock, including queued work.
+func (client *Client) Reviewed(policy string) *Client {
+	return &Client{store: client.store, sessionID: client.sessionID, socket: client.socket, expectedPolicy: policy}
 }
 
 func NewClient(store *Store, sessionID string) (*Client, error) {
@@ -347,12 +355,14 @@ func (client *Client) call(ctx context.Context, method string, parameters any, t
 	if err != nil {
 		return fmt.Errorf("encode browser controller request: %w", err)
 	}
-	request := rpcRequest{ID: client.sequence.Add(1), Token: token, Method: method, Params: payload}
+	request := rpcRequest{ID: client.sequence.Add(1), Token: token, Method: method, Params: payload, ExpectedPolicy: client.expectedPolicy}
 	connection, err := dialController(ctx, client.socket)
 	if err != nil {
 		return ErrUnavailable
 	}
 	defer connection.Close()
+	stopCancel := context.AfterFunc(ctx, func() { _ = connection.Close() })
+	defer stopCancel()
 	if deadline, found := ctx.Deadline(); found {
 		_ = connection.SetDeadline(deadline)
 	} else {

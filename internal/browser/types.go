@@ -5,11 +5,33 @@
 package browser
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 )
+
+// PolicyDigest binds a reviewed grant to selected tabs, origins, uploads and
+// capture/takeover state. Page text and navigation are not authority changes.
+func PolicyDigest(session Session) string {
+	tabs := make([]string, 0, len(session.SelectedTabs))
+	for _, tab := range session.SelectedTabs {
+		tabs = append(tabs, tab.ID)
+	}
+	data, _ := json.Marshal(struct {
+		ID             string
+		State          SessionState
+		Paused, Visual bool
+		Tabs           []string
+		Origins        []Origin
+		Uploads        []Upload
+	}{session.ID, session.State, session.Paused, session.VisualCapture, tabs, session.Origins, session.AllowedUploads})
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
+}
 
 const (
 	ModeManaged  Mode = "managed"
@@ -69,6 +91,7 @@ type Upload struct {
 
 // StartOptions sets the only user-configurable managed-session behavior.
 type StartOptions struct {
+	Paused        bool
 	Headed        bool
 	VisualCapture bool
 }

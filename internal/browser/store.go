@@ -105,7 +105,7 @@ func (s *Store) Start(options StartOptions) (Session, error) {
 	if err != nil {
 		return Session{}, err
 	}
-	session := Session{ID: id, Mode: ModeManaged, State: StateRunning, Headed: options.Headed, VisualCapture: options.VisualCapture, CreatedAt: s.now().UTC()}
+	session := Session{ID: id, Mode: ModeManaged, State: StateRunning, Headed: options.Headed, Paused: options.Paused, VisualCapture: options.VisualCapture, CreatedAt: s.now().UTC()}
 	record.Sessions = append(record.Sessions, session)
 	if err := s.saveLocked(record); err != nil {
 		return Session{}, err
