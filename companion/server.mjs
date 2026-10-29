@@ -37,8 +37,14 @@ export async function readToken(path) {
 
 export function createCompanion({ binary, workspace, env, tokenFile, origin,
   queryCatalog = async ({ query, scope, after }) => {
-    const { stdout } = await execute(binary, ['companion-catalog', query, scope, after], { cwd: workspace, env: { ...env, GATOR_COMPANION_CATALOG: '1' }, timeout: 20000, maxBuffer: 1024 * 1024, windowsHide: true });
-    return JSON.parse(stdout);
+    try {
+      const { stdout } = await execute(binary, ['companion-catalog', query, scope, after], { cwd: workspace, env: { ...env, GATOR_COMPANION_CATALOG: '1' }, timeout: 20000, maxBuffer: 1024 * 1024, windowsHide: true });
+      return JSON.parse(stdout);
+    } catch {
+      // execFile timeout errors can have a null code and embed the full command.
+      // Keep host paths and diagnostics out of transport errors in every case.
+      throw Object.assign(new Error('Conversation catalog is unavailable.'), { code: 'CATALOG_UNAVAILABLE' });
+    }
   },
   spawnBackend = (id) => new Backend(binary, workspace, { ...env, GATOR_UI_SESSION_HOST: '1', GATOR_UI_FRONTEND: 'companion' }, ['ui-backend', id, '']) }) {
   if (origin && (new URL(origin).origin !== origin || new URL(origin).protocol !== 'https:')) throw new Error('The companion browser origin must be an exact HTTPS origin.');
