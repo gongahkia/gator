@@ -44,6 +44,16 @@ jobs:
           export GATOR_TEST_BINARY="$RUNNER_TEMP/gator-companion-runtime"
           go build -o "$GATOR_TEST_BINARY" ./cmd/gator
           GATOR_COMPANION_SYSTEMD_TEST=1 node --test companion/linux-service.test.mjs companion/linux-monitoring.test.mjs
+      - name: Check unattended companion and supervisor startup
+        if: runner.os == 'Linux'
+        timeout-minutes: 15
+        run: python3 scripts/companion-boot/run.py "$RUNNER_TEMP/gator-companion-runtime" "$RUNNER_TEMP/gator-companion-boot"
+      - uses: actions/upload-artifact@v4
+        if: always() && runner.os == 'Linux'
+        with:
+          name: companion-boot-evidence
+          path: ${{ runner.temp }}/gator-companion-boot/
+          if-no-files-found: ignore
       - name: Check browser journeys and credential forms
         if: runner.os == 'Linux'
         env:
