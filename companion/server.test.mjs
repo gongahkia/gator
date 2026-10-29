@@ -50,6 +50,15 @@ test('real Go work survives a client disconnect, deduplicates admission and revo
       }
     };
     const send = frame => fetch(url + '/actions', { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(frame) });
+    const catalog = `http://127.0.0.1:${address.port}/v1/chats`;
+    const beforeCatalog = requests;
+    assert.equal((await fetch(catalog)).status, 401);
+    const listed = await fetch(catalog, { headers: { authorization: `Bearer ${token}` } });
+    assert.equal(listed.status, 200, 'real Go catalog must be available without opening a chat');
+    const page = await listed.json();
+    assert.deepEqual(page.items.map(item => item.id), [id]);
+    assert.equal(requests, beforeCatalog, 'browsing must not invoke a model');
+    assert.equal((await readdir(join(state, 'gator/conversations'))).filter(name => name.startsWith('work-')).length, 1);
     assert.equal((await get('bad')).status, 401);
     assert.equal((await get(token, { origin: 'https://attacker.example' })).status, 403);
     const first = await (await get()).json(); assert.equal(first.state.conversation_id, id);
@@ -93,6 +102,57 @@ test('real Go work survives a client disconnect, deduplicates admission and revo
     provider.closeAllConnections(); await new Promise(r => provider.close(r));
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test('catalog authorizes reads, bounds parameters and rechecks revocation after a queued read', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'gator-catalog-')), tokenFile = join(root, 'token'), token = 'a'.repeat(64);
+  let companion, release, begin;
+  const started = new Promise(resolve => begin = resolve), gate = new Promise(resolve => release = resolve), queries = [];
+  try {
+    await writeFile(tokenFile, token + '\n', { mode: 0o600 });
+    companion = createCompanion({ tokenFile, spawnBackend() { throw new Error('Catalog must not open a conversation.'); }, queryCatalog: async query => {
+      queries.push(query);
+      if (query.query === 'blocked') { begin(); await gate; }
+      return { items: [{ id: 'work-private', title: 'Private title' }], next: 'cursor', incomplete: true };
+    } });
+    const address = await companion.listen(), url = `http://127.0.0.1:${address.port}/v1/chats`;
+    const headers = { authorization: `Bearer ${token}` };
+    assert.equal((await fetch(url)).status, 401);
+    for (const query of ['?scope=invalid', '?q=a&q=b', '?unknown=true', '?q=' + 'x'.repeat(513), '?after=' + 'x'.repeat(1025)]) assert.equal((await fetch(url + query, { headers })).status, 400);
+    assert.equal(queries.length, 0);
+    const result = await fetch(url + '?q=Budget&scope=archived&after=cursor', { headers });
+    assert.equal(result.status, 200);
+    assert.equal((await result.json()).incomplete, true);
+    assert.deepEqual(queries[0], { query: 'Budget', scope: 'archived', after: 'cursor' });
+    const inflight = fetch(url + '?q=blocked', { headers });
+    await started;
+    await writeFile(tokenFile, 'b'.repeat(64) + '\n'); release();
+    const revoked = await inflight;
+    assert.equal(revoked.status, 401);
+    assert.ok(!(await revoked.text()).includes('Private title'));
+  } finally { release?.(); await companion?.close(); await rm(root, { recursive: true, force: true }); }
+});
+
+test('browsing more chats retires only idle workers and never pending work', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'gator-catalog-workers-')), tokenFile = join(root, 'token'), token = 'a'.repeat(64), workers = new Map();
+  let companion;
+  try {
+    await writeFile(tokenFile, token + '\n', { mode: 0o600 });
+    companion = createCompanion({ tokenFile, spawnBackend: id => {
+      const worker = { state: { conversation_id: id, running: id === 'work-0', queue: id === 'work-1' ? [{ text: 'Queued' }] : [], pending_approval: id === 'work-2' ? { id: 1 } : undefined, pending_connection: id === 'work-3' }, async ready() {}, async stop() { this.closed = true; } };
+      workers.set(id, worker); return worker;
+    } });
+    const address = await companion.listen(), url = `http://127.0.0.1:${address.port}/v1/chats/`, headers = { authorization: `Bearer ${token}` };
+    for (let i = 0; i < 4; i++) assert.equal((await fetch(url + `work-${i}`, { headers })).status, 200);
+    assert.equal((await fetch(url + 'work-4', { headers })).status, 400);
+    assert.ok([...workers.values()].every(worker => !worker.closed));
+    workers.get('work-0').state.running = false;
+    assert.equal((await fetch(url + 'work-4', { headers })).status, 200);
+    assert.equal(workers.get('work-0').closed, true);
+    for (const id of ['work-1', 'work-2', 'work-3']) assert.ok(!workers.get(id).closed);
+    assert.equal((await fetch(url + 'work-0', { headers })).status, 200, 'retired idle chats can reopen');
+    assert.equal(workers.get('work-4').closed, true);
+  } finally { await companion?.close(); await rm(root, { recursive: true, force: true }); }
 });
 
 test('token files reject public permissions, symlinks and malformed values', { skip: process.platform === 'win32' }, async () => {

@@ -2,11 +2,15 @@ import { createServer } from 'node:http';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { open, readFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { Backend } from '../app-host/src/backend.mjs';
 import { validateFrame } from '../app-host/src/policy.mjs';
 
 const identity = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/;
 const hash = text => createHash('sha256').update(text).digest();
+const execute = promisify(execFile);
+const idle = worker => !worker.closed && !['running', 'queued', 'pending_approval', 'pending_connection', 'external', 'panel', 'receipt_busy', 'catalog_busy'].some(key => worker.state?.[key]) && !worker.state?.queue?.length;
 const assets = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
   ['/client.mjs', ['client.mjs', 'text/javascript; charset=utf-8']],
@@ -31,7 +35,12 @@ export async function readToken(path) {
   } finally { await file.close(); }
 }
 
-export function createCompanion({ binary, workspace, env, tokenFile, origin, spawnBackend = (id) => new Backend(binary, workspace, { ...env, GATOR_UI_SESSION_HOST: '1', GATOR_UI_FRONTEND: 'companion' }, ['ui-backend', id, '']) }) {
+export function createCompanion({ binary, workspace, env, tokenFile, origin,
+  queryCatalog = async ({ query, scope, after }) => {
+    const { stdout } = await execute(binary, ['companion-catalog', query, scope, after], { cwd: workspace, env: { ...env, GATOR_COMPANION_CATALOG: '1' }, timeout: 20000, maxBuffer: 1024 * 1024, windowsHide: true });
+    return JSON.parse(stdout);
+  },
+  spawnBackend = (id) => new Backend(binary, workspace, { ...env, GATOR_UI_SESSION_HOST: '1', GATOR_UI_FRONTEND: 'companion' }, ['ui-backend', id, '']) }) {
   if (origin && (new URL(origin).origin !== origin || new URL(origin).protocol !== 'https:')) throw new Error('The companion browser origin must be an exact HTTPS origin.');
   const workers = new Map();
   let sequence = Promise.resolve(), stopping = false, pending = 0;
@@ -47,7 +56,12 @@ export function createCompanion({ binary, workspace, env, tokenFile, origin, spa
     let current = workers.get(id);
     if (current?.closed) throw new Error('The host process stopped. Review this conversation on the host before reopening it.');
     if (!current) {
-      if (workers.size >= 4) throw new Error('Four conversations are open on the companion.');
+      if (workers.size >= 4) {
+        const available = [...workers].find(([, value]) => idle(value));
+        if (!available) throw new Error('Four conversations have pending work. Finish a task or review its queue on the host before opening another.');
+        await available[1].stop();
+        workers.delete(available[0]);
+      }
       current = spawnBackend(id);
       try {
         await current.ready();
@@ -78,6 +92,19 @@ export function createCompanion({ binary, workspace, env, tokenFile, origin, spa
       const token = await readToken(tokenFile);
       if (!timingSafeEqual(hash(supplied), hash(`Bearer ${token}`))) return respond(res, 401, { error: 'Authentication required.' });
       if (stopping) return respond(res, 503, { error: 'Companion is stopping.' });
+      const url = new URL(req.url, localOrigin);
+      if (url.pathname === '/v1/chats' && req.method === 'GET') {
+        const params = url.searchParams;
+        if ([...params.keys()].some(key => !['q', 'scope', 'after'].includes(key) || params.getAll(key).length !== 1)) throw new Error('Unknown or repeated catalog parameter.');
+        const query = params.get('q') || '', scope = params.get('scope') || 'active', after = params.get('after') || '';
+        if (Buffer.byteLength(query) > 512 || /[\x00-\x1f\x7f]/.test(query) || !['active', 'archived', 'all'].includes(scope) || after.length > 1024) throw new Error('Invalid conversation search.');
+        const page = await serial(async () => {
+          if (stopping || token !== await readToken(tokenFile)) throw new Error('Access was revoked.');
+          return queryCatalog({ query, scope, after });
+        });
+        if (token !== await readToken(tokenFile)) return respond(res, 401, { error: 'Authentication required.' });
+        return respond(res, 200, page);
+      }
       const match = /^\/v1\/chats\/([a-zA-Z0-9_-]+)(\/actions)?$/.exec(req.url);
       if (!match || !['GET', 'POST'].includes(req.method) || (req.method === 'POST') !== !!match[2]) return respond(res, 404, { error: 'Unknown operation.' });
       let frame;
@@ -108,6 +135,7 @@ export function createCompanion({ binary, workspace, env, tokenFile, origin, spa
         }
         return { conversation_id: match[1], execution_host: 'companion', state: owner.state, disconnected: owner.closed, error: owner.closed ? owner.failure : undefined };
       });
+      if (token !== await readToken(tokenFile)) return respond(res, 401, { error: 'Authentication required.' });
       respond(res, 200, state);
     } catch (error) {
       // Do not expose filesystem errors or authentication file details.
