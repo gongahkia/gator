@@ -945,3 +945,46 @@ installation. Host reboot/logout behavior, permanent deployment, HTTPS and physi
 phone access remain unverified. The companion still has no global inbox for
 unbound CLI updates. Scheduled reminders and mobile/desktop push delivery are
 separate work; this change routes scheduled-work results into an existing chat.
+
+
+### Individually revocable companion device access — 29 October
+
+The companion now supports host-managed device enrollment with separate bearer
+tokens. `companion/devices.mjs OWNER_TOKEN_FILE add NAME NEW_TOKEN_FILE`, `list`
+and `revoke DEVICE_ID` provide local management. Enrollment writes the secret to
+an exclusive private export file and atomically publishes a complete private
+registry record containing hashes, identity, label and creation time. Concurrent
+enrollments use separate records and do not overwrite each other. Device secrets
+are never printed or retained in plaintext in the registry. The browser's existing
+token field accepts owner and device token formats.
+
+The server revalidates the device and owner-token generation before queued work,
+after worker startup and before returning private data. Revoked work that has not
+been admitted receives HTTP 401; already admitted actions are not undone. Removing
+one device leaves others connected. Owner-token rotation invalidates all enrolled
+tokens without restarting the listener. Private directories, bounded regular-file
+reads, symlink refusal and exact device identities protect registry access on
+macOS/Linux. Existing owner-token access remains compatible.
+
+Validation: ten authentication/HTTP tests pass, including concurrent CLI creation,
+no secret output, overwrite refusal, individual revocation, global rotation,
+malformed/public/linked storage refusal, revocation during worker startup and a
+private response, and access across listener restart. Chromium and WebKit each
+pass a two-device browser journey: both connect, one is revoked and cleared,
+the other remains connected, and no token enters browser persistent/session
+storage. Existing real-Go admission/deduplication coverage also runs with an
+enrolled device token. Native Mac launchd startup/restart/removal passes (two
+tests), and all four Linux service/monitoring tests pass with the new auth module
+copied into the disposable service installations. Workflow YAML and diff checks
+pass. Temporary services and the Linux container were removed; no real accounts,
+production service or remote CI run was used.
+
+Limits: enrollment is a host CLI operation, not interactive QR/device pairing.
+All device tokens grant the same supported owner-profile access and can be copied;
+labels do not bind credentials to hardware or create separate users/roles. The
+browser clears private views on its next request after revocation, not while
+fully offline, and cannot erase information already copied by a client. Exported
+token copies require owner cleanup. Interrupted enrollment and power-loss limits
+are documented; native Windows ACL acceptance remains open. Permanent hosting,
+HTTPS deployment, physical-phone acceptance and mobile notifications are still
+unverified. G14/G15 are not closed by these local tests.

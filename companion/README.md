@@ -6,7 +6,7 @@ client disconnect does not stop admitted work. This does not migrate laptop
 work or make an offline laptop's files accessible.
 
 This checkpoint supplies an authenticated API and a small phone/browser client
-using the existing Go bridge. Device pairing, per-device revocation, file transfer,
+using the existing Go bridge. Interactive device pairing, file transfer,
 automated deployment and remote account onboarding remain unfinished. Keep Electron and
 the terminal available for host setup and recovery. The terminal parity gate is
 unchanged. Do not expose this listener directly to the internet.
@@ -40,15 +40,53 @@ node companion/token.mjs /private/path/gator-companion/access.token --rotate
 ```
 
 Rotation revokes future requests from all previous clients, including requests
-waiting for dispatch. It does not undo actions already admitted. Individual
-device enrollment/revocation is not implemented yet. Keep token directories
+waiting for dispatch. It also revokes every enrolled device token. It does not
+undo actions already admitted. Keep token directories
 private; macOS/Linux permissions and symlink checks are enforced. Native Windows
 ACL and deployment acceptance remain pending.
+
+## Separate access for each device
+
+Enroll devices locally on the host, giving each a unique token. Keep the owner
+token on the host for recovery and global rotation. Create a new private export
+file for each enrollment; existing files are never replaced:
+
+```sh
+node companion/devices.mjs /private/path/gator-companion/access.token \
+  add 'My phone' /private/path/gator-companion/phone.token
+node companion/devices.mjs /private/path/gator-companion/access.token list
+node companion/devices.mjs /private/path/gator-companion/access.token revoke DEVICE_ID
+```
+
+Transfer the exported token privately to that device and paste it into **Host
+access token**. The command prints the device ID and name, never its secret.
+Every device has the same supported access to this owner's profile; labels are
+for management, not separate accounts or restricted roles. Tokens are bearer
+credentials: a copy works on another device too. Enrollment has no remote API,
+QR pairing or approval link yet.
+
+The host retains one private record per device under `access.token.devices/`,
+containing its name, ID, creation time and hashes of the secret and owner-token
+generation. Revocation removes that device's record. It blocks subsequent
+requests and pending actions before dispatch, without disconnecting other
+devices or undoing admitted work. A response whose access was revoked during
+processing is withheld. The browser clears displayed data when its next request
+detects revocation; this cannot erase data a client already copied or cached.
+Remove your exported token copies when no longer needed.
+
+Owner-token rotation invalidates all enrolled tokens, including after a listener
+restart. `list` labels retained old-generation records as revoked; remove them by
+ID and enroll fresh tokens as needed. Keep the registry beside the owner token
+when moving the installation. Moving only the owner token leaves device access
+unavailable. An interrupted enrollment may leave an unusable exported token or a
+private `.enroll-*` staging record; it never publishes a partially written device
+record. Inspect `list` before retrying with a fresh export filename. These file
+operations do not establish power-loss durability.
 
 ## Open on a phone or browser
 
 Open the configured HTTPS origin on your phone, or `http://127.0.0.1:7341` on
-the host. Enter the host token to browse existing conversations. Search titles
+the host. Enter that device's token (or the owner token) to browse conversations. Search titles
 and host folder paths, select active/archived/all chats, and use the page controls
 to reach older records. You can also expand **Open a known conversation** and
 enter its ID. **New chat** creates an empty conversation in the host workspace
@@ -281,7 +319,7 @@ A stopped listener does not stop the separate supervisor.
 From the repository root:
 
 ```sh
-node --test companion/server.test.mjs
+node --test companion/auth.test.mjs companion/server.test.mjs
 node --test companion/linux-service.test.mjs companion/macos-service.test.mjs
 # After installing the desktop dependencies and Playwright browsers:
 GATOR_COMPANION_BROWSERS=chromium,webkit node --test companion/client.test.mjs
