@@ -13,6 +13,7 @@ import (
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/knowledge"
 	"github.com/gongahkia/gator/internal/memory"
+	"github.com/gongahkia/gator/internal/model"
 	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/workrun"
 )
@@ -43,11 +44,16 @@ func TestLiveMemoryEvaluation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	credentials, err := gatorCredentials()
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Provider usage is also recorded in disposable state, not the real profile.
 	t.Setenv("GATOR_STATE_DIR", t.TempDir())
 	budget := &agent.Budget{Limits: agent.Limits{ModelRequests: 48, Tokens: 60000}}
 	type trial struct {
 		Name         string `json:"name"`
+		Status       string `json:"status"`
 		Passed       bool   `json:"passed"`
 		Count        int    `json:"saved_count"`
 		Reviews      int    `json:"review_requests"`
@@ -73,7 +79,19 @@ func TestLiveMemoryEvaluation(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	backend, err := nativeWorkModel(provider, modelName, "")
+	var backend agent.Model
+	if custom, ok := configuredCustomProvider(settings, provider); ok {
+		configured, setupErr := newCustomExecutorConfiguration(settings, custom, modelName, "")
+		err, backend = setupErr, configured.Model
+	} else {
+		selected, parseErr := model.ParseProvider(provider)
+		if parseErr != nil {
+			report.SetupError = parseErr.Error()
+			t.Fatal(parseErr)
+		}
+		configured, setupErr := model.New(model.Config{Provider: selected, Model: modelName, Credentials: &credentials, BaseURL: settings.ProviderEndpoint(provider), ProviderOptions: settings.OptionsForProvider(provider)})
+		err, backend = setupErr, configured.Model
+	}
 	if err != nil {
 		report.SetupError = err.Error()
 		t.Fatal(err)
@@ -133,6 +151,13 @@ func TestLiveMemoryEvaluation(t *testing.T) {
 			text += record.Text + "\n"
 		}
 		current.Passed = runErr == nil && len(records) == scenario.count && (scenario.contains == "" || strings.Contains(text, scenario.contains))
+		current.Status = "behavior_mismatch"
+		if current.Passed {
+			current.Status = "met"
+		}
+		if runErr != nil {
+			current.Status = "execution_error"
+		}
 		report.Trials = append(report.Trials, current)
 		t.Logf("%s: passed=%t saved=%d review=%d steps=%d", current.Name, current.Passed, current.Count, current.Reviews, current.Steps)
 		if !current.Passed {

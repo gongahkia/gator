@@ -279,8 +279,11 @@ provider credential and a new report path:
 GATOR_LIVE_MEMORY_REPORT=/tmp/gator-memory-live-NEW.json go test ./cmd/gator -run '^TestLiveMemoryEvaluation$' -count=1 -v
 ```
 
-The attempted run on 30 October stopped at provider setup: the selected
-`gemini/gemini-3.5-flash` had no available `GEMINI_API_KEY`. **Zero provider
-requests and zero evaluated trials.** Setup failure is recorded in the report;
-live capture accuracy, multilingual behavior and suggestion usefulness are not
-claimed. Real-account browser sign-in remains deferred independently.
+The harness pins the configured credential store before isolating test state,
+so synthetic memory isolation does not hide existing authentication. The corrected
+run on 30 October reached `gemini/gemini-3.5-flash`, but the saved credential was
+rejected with HTTP 401 (invalid API key). It stopped after **one provider request
+and no completed behavior trials**. Execution errors are distinguished from
+behavior mismatches. Live capture accuracy, multilingual behavior and suggestion
+usefulness are not claimed. Real-account browser sign-in remains deferred
+independently.
