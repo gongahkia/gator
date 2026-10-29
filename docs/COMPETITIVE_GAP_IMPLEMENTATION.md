@@ -311,3 +311,28 @@ It uses a local page and isolated state, not a real login. Current controls are
 internal host commands; the integrated frontend lifecycle/task-grant journey
 remains open. `docs/BROWSER.md` corrects a stale claim that the current terminal
 already exposed that journey.
+
+### Memory audit and requested next phase (29 October)
+
+The user confirmed desktop notifications plus a retained CLI inbox, scheduled
+work, and a ChatGPT-style About you summary after the current work. The deeper
+[memory/scheduling audit](MEMORY_AND_SCHEDULING_AUDIT_2026-10-29.md) records existing
+stores, reproduced defects, privacy/reliability gaps, and the ordered follow-up.
+This adds scope; it does not close the current browser/live/native release gates.
+
+Fixed two reproduced defects in separate commits: `48d948298` stops new chat
+memories and corrected knowledge being permanently excluded from semantic
+search; `feca5ef7f` rejects negative save requests even when evidence crops away
+the negation. Memory/knowledge/retrieval/tools/workapp race suites and focused
+command tests pass. Existing erroneous exclusions are repaired when a live
+record is corrected; a migration for untouched records remains open.
+
+The broader learning/jobs/followup/inbox/worksession race suites also pass.
+The lifecycle suite exposed a macOS `/var` versus `/private/var` fixture mismatch;
+canonicalizing the fixture preserves its exact source/no-revision assertions,
+and the full lifecycle race suite passes after that test-only correction.
+
+Further hardening is warranted: subject aliases can evade forgetting, original
+history remains independently retrievable, and exact quotes alone do not filter
+credentials or third-party statements. The personal summary should expose these
+distinctions and evidence; it must not become another independent facts store.
