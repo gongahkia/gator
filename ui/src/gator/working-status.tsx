@@ -1,22 +1,17 @@
-import { createEffect, createSignal, onCleanup } from "solid-js"
-import { useConfig } from "../config"
+import { Show } from "solid-js"
 import { useTheme } from "../context/theme"
-import { tint } from "../theme/color"
+import { Spinner } from "../component/spinner"
 import { literal } from "./text"
 
 export function WorkingStatus(props: { status?: string; elapsed?: string; attention: boolean; cancelling: boolean }) {
-  const theme = useTheme(), config = useConfig().data
-  const [fade, setFade] = createSignal(0)
-  createEffect(() => {
-    setFade(0)
-    if (!config.animations || props.attention || props.cancelling) return
-    const started = performance.now()
-    // Blend readable theme colors, without changing the text or its layout.
-    const timer = setInterval(() => setFade((1 - Math.cos((performance.now() - started) * 2 * Math.PI / 2600)) * 0.425), 50)
-    onCleanup(() => clearInterval(timer))
-  })
-  return <text id="working-status" fg={tint(theme.accent, theme.text.muted, fade())}>
-    {props.cancelling ? "Stopping…" : literal(props.status) || "Gator is working…"}
-    <span style={{ fg: theme.text.muted }}> {literal(props.elapsed)}</span>
-  </text>
+  const theme = useTheme()
+  const label = () => {
+    const status = literal(props.status)
+    return !status || /^Working from an immutable snapshot/.test(status) ? "Thinking…" : status
+  }
+  return <Show when={!props.attention && !props.cancelling} fallback={
+    <text id="working-status" fg={theme.text.feedback.warning.base}>{props.cancelling ? "Stopping…" : "Waiting for approval"}</text>
+  }>
+    <Spinner id="working-status" color={theme.text.base}>{label()}<span style={{ fg: theme.text.muted }}> {literal(props.elapsed)}</span></Spinner>
+  </Show>
 }

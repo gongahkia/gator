@@ -32,6 +32,7 @@ if (result.error || result.status !== 0) throw result.error || new Error("Produc
 const installedHost = join(destination, "ui/node_modules/@gator/application-host");
 await rm(installedHost, { recursive: true, force: true });
 await cp(join(destination, "app-host"), installedHost, { recursive: true, dereference: true });
+await cp(join(root, "ui/licenses"), join(destination, "licenses/spinners"), { recursive: true });
 const metadata = { product: "gator-terminal", version: 1, platform: process.platform, arch: process.arch, upstream: "f669c46c9604ea3d70b8a7ed1f0c10f3a5ac1f61", runtime: "Bun >=1.4.2", electron: false };
 await writeFile(join(destination, "gator-distribution.json"), JSON.stringify(metadata, null, 2) + "\n");
 const notices = ["Gator terminal production JavaScript dependency notices.\nOpenCode's source license is retained separately.\n"];
