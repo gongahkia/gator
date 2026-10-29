@@ -1441,3 +1441,17 @@ not claimed. This is installation recovery, not an automatic upgrade mechanism.
 P25 remains open for the broader release lifecycle, including service executable
 migration, signed/published distribution and native Windows acceptance. The
 Electron removal/parity gate is unchanged.
+
+### Word/Excel compatibility follow-up — 29 October
+
+The Go renderers now emit Word table grids and native text breaks/tabs, and
+normalize Excel font/chart XML sequences rejected by the independent Office
+validator. The full document/workbook race suites pass. All 24 Office fixtures
+pass Open XML SDK validation, including template edits, all four supported chart
+types, a streaming workbook and three shared-editor exports.
+
+After rebuilding the Go runtime, the terminal Office/CSV keyboard journey passes
+again (one test, 15 assertions): real content is saved/exported and originals
+remain intact. Quick Look previews were inspected, with pagination and cropping
+limitations recorded in the competitive-gap ledger. Actual Office applications,
+native Windows and application recalculation remain unverified.

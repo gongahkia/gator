@@ -646,3 +646,48 @@ not rewrite a creation request's original workspace binding. Persisted-boundary
 fixtures are not physical power-loss tests. Physical iOS/Android, permanent
 remote deployment, device enrollment, mobile notifications and file transfer
 remain open; this change does not make a sleeping Mac available.
+
+### Word and Excel package verification — 29 October
+
+The independent Open XML SDK check now covers DOCX and XLSX as well as PPTX.
+Before these fixes, each new Word fixture failed on a missing table grid, and
+each new Excel fixture produced three font/chart child-order errors. The Excel
+failures also appeared with the Office 2019 validation target.
+
+Word now emits a table grid, explicit borders instead of a reference to an
+undefined table style, and native run-level breaks/tabs in paragraphs and cells.
+The structure follows Microsoft's
+[WordprocessingML table documentation](https://learn.microsoft.com/en-us/office/open-xml/word/working-with-wordprocessingml-tables).
+Excel output normalizes font and supported chart-series child ordering after
+Excelize serialization. It removes only unsupported false/default chart flags;
+meaningful unsupported values reject rather than silently losing their meaning.
+The normalizer retains namespace prefixes and child bytes, leaves unrelated ZIP
+parts untouched, and preserves unfamiliar extensions/mixed content unchanged.
+This is a targeted compatibility correction, not a general imported-file repair.
+
+Observed checks on this Mac:
+
+- All 24 generated/edited packages pass Open XML SDK 3.5.1 against Office 2007:
+  nine PPTX, seven DOCX and eight XLSX. Fixtures cover three themes, filled Word
+  templates, column/bar/line/pie charts, edited workbooks retaining charts, a
+  10,001-row streaming workbook, and all three shared-editor round trips.
+- Full document/workbook race suites pass. Regressions check escaped Unicode,
+  CRLF/newline/tab text, table grids, unchanged unrelated workbook parts/chart
+  references, stable repeated normalization and refusal of semantic loss.
+- Shared-editor checks preserve the Word table, multiline/tab/emoji text and
+  Excel formulas with blank caches for later recalculation. The rebuilt runtime
+  is used for the terminal Office keyboard check recorded in the migration ledger.
+- Quick Look thumbnails were generated and inspected. Word shows the paragraph
+  break, tab spacing, table borders and multiline cell. Its thumbnail shows a
+  box at the page-break position instead of establishing pagination. Excel's
+  thumbnail is cropped to the first column; it establishes neither chart layout
+  nor recalculated totals. These are preview limitations, not visual acceptance.
+- CI now generates and independently validates all three formats. Workflow YAML
+  parses and `git diff --check` passes; remote CI has not been run.
+
+G10 remains open for native Word/Excel/PowerPoint acceptance, pagination, dense
+layouts, arbitrary template fidelity and application recalculation. No actual
+Office application was available for these checks. Schema validity alone does
+not establish those outcomes. Local evidence remains under ignored
+`.gator/native-tools/office-format-audit`, `office-formats-fixed` and
+`office-format-previews`.
