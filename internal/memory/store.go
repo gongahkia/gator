@@ -61,12 +61,14 @@ func Open(stateDir string) (Store, error) {
 	if err != nil {
 		return Store{}, err
 	}
-	root := filepath.Join(abs, "gator", "memory")
-	if err := os.MkdirAll(root, 0700); err != nil {
+	if err := os.MkdirAll(abs, 0700); err != nil {
 		return Store{}, err
 	}
-	if err := os.Chmod(root, 0700); err != nil {
-		return Store{}, err
+	root := filepath.Join(abs, "gator", "memory")
+	for _, path := range []string{filepath.Join(abs, "gator"), root} {
+		if err := privateDirectory(path); err != nil {
+			return Store{}, err
+		}
 	}
 	return Store{root: root, now: time.Now}, nil
 }
@@ -480,39 +482,4 @@ func sourceFileStatus(record Record) string {
 		return "changed"
 	}
 	return "current"
-}
-func (s Store) write(r Record, create bool) error {
-	data, err := json.MarshalIndent(r, "", "  ")
-	if err != nil {
-		return err
-	}
-	if create {
-		file, err := os.OpenFile(s.path(r.ID), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
-		if err != nil {
-			return err
-		}
-		_, writeErr := file.Write(data)
-		return errors.Join(writeErr, file.Close())
-	}
-	temp, err := os.CreateTemp(s.root, ".memory-*")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(temp.Name())
-	if err := temp.Chmod(0600); err != nil {
-		_ = temp.Close()
-		return err
-	}
-	if _, err := temp.Write(data); err != nil {
-		_ = temp.Close()
-		return err
-	}
-	if err := temp.Sync(); err != nil {
-		_ = temp.Close()
-		return err
-	}
-	if err := temp.Close(); err != nil {
-		return err
-	}
-	return os.Rename(temp.Name(), s.path(r.ID))
 }
