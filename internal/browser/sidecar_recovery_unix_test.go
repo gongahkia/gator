@@ -4,6 +4,7 @@ package browser
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -89,6 +90,111 @@ func waitForBrowserProcessExit(t *testing.T, pids []int) {
 			t.Fatalf("owned browser processes survived shutdown: %v", live)
 		}
 		time.Sleep(25 * time.Millisecond)
+	}
+}
+
+type daemonCrashRecord struct {
+	Session   string `json:"session"`
+	PID       int    `json:"pid"`
+	Directory string `json:"directory"`
+}
+
+func TestBrowserDaemonCrashHelper(t *testing.T) {
+	stateDir := os.Getenv("GATOR_BROWSER_DAEMON_CRASH_ROOT")
+	if stateDir == "" {
+		return
+	}
+	store, err := Open(stateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, err := StartSidecar(context.Background(), SidecarConfig{Store: store, Mode: ModeManaged})
+	if err != nil {
+		t.Fatal(err)
+	}
+	driver := d.(*sidecar)
+	session, err := store.Start(StartOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, token, err := CreateToken(store, session.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service, err := NewService(ServiceConfig{Store: store, SessionID: session.ID, Token: token, Driver: driver, Socket: socketPath(store, session.ID)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- service.Run(context.Background()) }()
+	waitForBrowserSocket(t, socketPath(store, session.ID))
+	data, err := json.Marshal(daemonCrashRecord{Session: session.ID, PID: driver.process.Process.Pid, Directory: driver.directory})
+	if err != nil {
+		t.Fatal(err)
+	}
+	marker := filepath.Join(stateDir, "daemon-ready.json")
+	if err := os.WriteFile(marker+".tmp", data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(marker+".tmp", marker); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSidecarDaemonCrashRecoveryIntegration(t *testing.T) {
+	store := integrationRecoveryStore(t)
+	stateDir := filepath.Dir(filepath.Dir(store.Directory()))
+	command := exec.Command(os.Args[0], "-test.run=^TestBrowserDaemonCrashHelper$")
+	command.Env = append(os.Environ(), "GATOR_BROWSER_DAEMON_CRASH_ROOT="+stateDir)
+	command.Stderr = os.Stderr
+	if err := command.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = command.Process.Kill(); _ = command.Wait() }()
+	marker := filepath.Join(stateDir, "daemon-ready.json")
+	waitForSidecarAdmission(t, marker)
+	data, err := os.ReadFile(marker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var record daemonCrashRecord
+	if err := json.Unmarshal(data, &record); err != nil {
+		t.Fatal(err)
+	}
+	pids := sidecarDescendants(t, record.PID)
+	if len(pids) < 2 {
+		t.Fatal("no managed browser children observed")
+	}
+	client, err := NewClient(store, record.Session)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if current, err := client.Session(context.Background(), record.Session); err != nil || current.State != StateRunning {
+		t.Fatalf("live owner: %#v, %v", current, err)
+	}
+	if err := command.Process.Kill(); err != nil {
+		t.Fatal(err)
+	}
+	_ = command.Wait()
+	waitForBrowserProcessExit(t, pids)
+	if _, err := os.Stat(record.Directory); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("daemon crash left private profile directory: %v", err)
+	}
+	if _, err := client.Session(context.Background(), record.Session); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("dead controller remains accessible: %v", err)
+	}
+	current, err := store.Get(record.Session)
+	if err != nil || current.State != StateStopped {
+		t.Fatalf("dead session not revoked: %#v, %v", current, err)
+	}
+	if _, err := os.Stat(tokenPath(store, record.Session)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("dead token retained: %v", err)
+	}
+	if _, err := os.Stat(socketPath(store, record.Session)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("dead endpoint retained: %v", err)
 	}
 }
 

@@ -2,10 +2,14 @@ import { chromium } from 'playwright';
 import { createInterface } from 'node:readline';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
+import { rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { basename, resolve } from 'node:path';
 
 const maxTextBytes = 32 * 1024;
 const maxElements = 128;
 const maxArtifactBytes = 8 * 1024 * 1024;
+const scratchDirectory = process.env.GATOR_BROWSER_SCRATCH;
 
 let browser;
 let starting;
@@ -351,11 +355,22 @@ const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
 async function shutdown() {
   if (closing) return;
   closing = true;
+  let exitCode = 0;
   try {
     await starting?.catch(() => {});
     if (browser) await browser.close();
+    // The Go parent also owns cleanup, but may have been killed. Remove only
+    // its explicitly assigned scratch root after closing our browser. Attached
+    // browser profiles live elsewhere and are never removed here.
+    if (scratchDirectory) {
+      if (resolve(scratchDirectory) !== resolve(tmpdir()) || !basename(scratchDirectory).startsWith('.process-')) fail('invalid browser scratch directory');
+      await rm(scratchDirectory, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    }
+  } catch (error) {
+    exitCode = 1;
+    process.stderr.write(`Browser shutdown cleanup failed: ${error instanceof Error ? error.message : 'unknown failure'}\n`);
   } finally {
-    process.exit(0);
+    process.exit(exitCode);
   }
 }
 // The parent closes stdin even when an operation is stuck. Cleanup must not

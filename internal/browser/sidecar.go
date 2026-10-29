@@ -98,7 +98,7 @@ func startSidecarProcess(ctx context.Context, command *exec.Cmd, scratchRoot str
 	}
 	// Playwright normally creates profiles/downloads in the system temp folder.
 	// Own their parent so forced driver termination cannot strand login data.
-	command.Env = append(command.Env, "TMPDIR="+directory, "TMP="+directory, "TEMP="+directory)
+	command.Env = append(command.Env, "TMPDIR="+directory, "TMP="+directory, "TEMP="+directory, "GATOR_BROWSER_SCRATCH="+directory)
 	input, err := command.StdinPipe()
 	if err != nil {
 		return nil, fmt.Errorf("open browser driver input: %w", err)
