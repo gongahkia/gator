@@ -14,13 +14,14 @@ export function acquireUpdateGuard(binary, cwd, env) {
     child.on("close", () => { if (!settled) fail(new Error(diagnostics.trim().replace(/^Gator:\s*/, "") || "Other work is using this profile. Finish it before updating.")); });
     child.stdout.on("data", (chunk) => {
       output += chunk.toString();
-      if (output.length > 256) { fail(new Error("Invalid update preparation response.")); return; }
+      if (output.length > 64 * 1024) { fail(new Error("Invalid update preparation response.")); return; }
       if (!output.includes("\n")) return;
-      try { if (JSON.parse(output).ready !== true) throw new Error(); }
+      let result;
+      try { result = JSON.parse(output); if (result.ready !== true) throw new Error(); }
       catch { fail(new Error("Invalid update preparation response.")); return; }
       if (settled) return;
       settled = true; clearTimeout(timer);
-      resolve({ release: () => new Promise((done, failed) => {
+      resolve({ profilePaths: result.profile_paths, release: () => new Promise((done, failed) => {
         if (child.exitCode !== null || child.signalCode !== null) { failed(new Error("Update preparation ended unexpectedly.")); return; }
         const deadline = setTimeout(() => { child.kill(); failed(new Error("Update preparation could not finish.")); }, 4000);
         child.once("close", (code) => { clearTimeout(deadline); code === 0 ? done() : failed(new Error("Update preparation could not finish.")); });

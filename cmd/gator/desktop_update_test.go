@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -12,6 +13,26 @@ import (
 
 	"github.com/gongahkia/gator/internal/state"
 )
+
+func TestDesktopUpdateGuardReportsResolvedProfileLocations(t *testing.T) {
+	root, configuration := t.TempDir(), t.TempDir()
+	t.Setenv("GATOR_STATE_DIR", root)
+	t.Setenv("GATOR_CONFIG_DIR", configuration)
+	var out bytes.Buffer
+	if err := holdDesktopUpdateGuard(strings.NewReader(""), &out); err != nil {
+		t.Fatal(err)
+	}
+	var result struct {
+		Ready        bool     `json:"ready"`
+		ProfilePaths []string `json:"profile_paths"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if !result.Ready || len(result.ProfilePaths) != 2 || result.ProfilePaths[0] != filepath.Join(root, "gator") || result.ProfilePaths[1] != filepath.Join(configuration, "gator") {
+		t.Fatalf("wrong protected locations: %+v", result)
+	}
+}
 
 func TestDesktopUpdateGuardRefusesActiveWork(t *testing.T) {
 	root := t.TempDir()

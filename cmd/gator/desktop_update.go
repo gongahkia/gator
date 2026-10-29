@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/state"
 )
 
@@ -39,9 +40,14 @@ func holdDesktopUpdateGuard(in io.Reader, out io.Writer) error {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("cannot inspect background checks before updating: %w", err)
 	}
+	configuration, err := config.ResolveDir("")
+	if err != nil {
+		return err
+	}
 	if err := json.NewEncoder(out).Encode(struct {
-		Ready bool `json:"ready"`
-	}{Ready: true}); err != nil {
+		Ready        bool     `json:"ready"`
+		ProfilePaths []string `json:"profile_paths"`
+	}{Ready: true, ProfilePaths: []string{filepath.Join(root, "gator"), filepath.Join(configuration, "gator")}}); err != nil {
 		return err
 	}
 	// EOF releases the lease. No data migrations, worker restarts, scheduling

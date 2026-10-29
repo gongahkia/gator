@@ -42,6 +42,7 @@ jobs:
           else
             export GATOR_TEST_BINARY="$PWD/ui/runtime/gator-runtime"
           fi
+          node --test ui/scripts/uninstall.test.mjs
           bun run --cwd ui test
       - name: Build independent production artifact
         run: node ui/scripts/package.mjs terminal-artifact
