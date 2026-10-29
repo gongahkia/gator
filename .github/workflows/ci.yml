@@ -77,7 +77,7 @@ jobs:
           GATOR_DESKTOP_TEST_EXECUTABLE="$PWD/desktop/release/mac/Gator.app/Contents/MacOS/Gator" npm run test:e2e --prefix desktop
 
   office:
-    name: Office package validation
+    name: Office packages, calculations and layout
     runs-on: ubuntu-latest
     env:
       DOTNET_CLI_TELEMETRY_OPTOUT: "1"
@@ -102,17 +102,26 @@ jobs:
         run: |
           dotnet restore scripts/office-validation/OfficeValidation.csproj --locked-mode
           dotnet run --no-restore --project scripts/office-validation -- .gator/office-fixtures/*.pptx .gator/office-fixtures/*.docx .gator/office-fixtures/*.xlsx
-      - name: Recalculate spreadsheets with LibreOffice Calc
+      - name: Install independent Office renderers
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libreoffice-calc fonts-liberation
-          python3 scripts/office-validation/recalculate.py .gator/office-fixtures .gator/office-calculated
+          sudo apt-get install -y --no-install-recommends libreoffice-calc libreoffice-writer libreoffice-impress poppler-utils fonts-liberation fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji fonts-crosextra-carlito
+      - name: Recalculate spreadsheets with LibreOffice Calc
+        run: python3 scripts/office-validation/recalculate.py .gator/office-fixtures .gator/office-calculated
       - uses: actions/upload-artifact@v4
         with:
           name: office-calculation-evidence
           path: |
             .gator/office-calculated/calculation-report.json
             .gator/office-calculated/*.xlsx
+      - name: Render Word and PowerPoint layouts independently
+        run: python3 scripts/office-validation/render.py .gator/office-fixtures .gator/office-rendered
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: office-layout-evidence
+          path: .gator/office-rendered/
+          if-no-files-found: ignore
 
   browser:
     name: browser-${{ matrix.os }}
