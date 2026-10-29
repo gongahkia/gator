@@ -10,24 +10,26 @@ import { useRenderer } from "@opentui/solid"
 import { useDialog } from "../ui/dialog"
 import { chatTimeline, updateStatus, updateWarning } from "./timeline"
 import { Activity, activityKey } from "./activity"
+import { Markdown } from "./markdown"
+import { displayDate } from "./display"
 import { WorkingStatus } from "./working-status"
 
 function Result(props: { value: BackendResult }) {
   return <box gap={1}><text><b>{literal(props.value.title)}</b></text><text>{literal(props.value.summary)}</text>
     <For each={props.value.fields}>{f => <text>{literal(f.label)}: {literal(f.value)}</text>}</For>
     <For each={props.value.items}>{item => <text>{literal(item.label)} · {literal(item.state)} {literal(item.detail)}</text>}</For>
-    <For each={props.value.lines}>{line => <text>{literal(line)}</text>}</For><text>{literal(props.value.markdown)}</text>
+    <For each={props.value.lines}>{line => <text>{literal(line)}</text>}</For><Show when={props.value.markdown}><Markdown text={props.value.markdown} /></Show>
     <Show when={props.value.preview !== undefined}><box><text><b>Exact action details</b></text><text>{literal(JSON.stringify(props.value.preview, null, 2))}</text></box></Show>
     <For each={props.value.sections}>{section => <box><text><b>{literal(section.title)}</b></text><text>{literal(section.summary)}</text>
       <For each={section.fields}>{f => <text>{literal(f.label)}: {literal(f.value)}</text>}</For>
       <For each={section.items}>{item => <text>{literal(item.label)} {literal(item.detail)} {literal(item.state)}</text>}</For>
-      <For each={section.lines}>{line => <text>{literal(line)}</text>}</For><text>{literal(section.markdown)}</text>
+      <For each={section.lines}>{line => <text>{literal(line)}</text>}</For><Show when={section.markdown}><Markdown text={section.markdown} /></Show>
     </box>}</For><text>{literal(props.value.footer)}</text>
   </box>
 }
 export function Transcript() {
   const data = useData(), client = useClient(), theme = useTheme(), renderer = useRenderer(), dialog = useDialog()
-  const timeline = createMemo(() => chatTimeline(data.state?.messages ?? [], data.state?.chat_updates ?? []))
+  const timeline = createMemo(() => chatTimeline(data.state?.messages ?? [], data.state?.chat_updates ?? []).filter(item => item.kind !== "message" || item.message.role !== "Deliverables" || !!(item.message.text || item.message.result || item.message.activity || item.message.bundle?.Artifacts?.length)))
   const cards = new Map<string, Renderable>(), delivered = new Set<string>()
   let scroll: ScrollBoxRenderable | undefined
   let previous = ""
@@ -81,9 +83,9 @@ export function Transcript() {
       <Show when={data.updateFeedback?.id === item.update.id}><text fg={theme.text.muted}>{literal(data.updateFeedback?.message)}</text></Show>
       <text fg={theme.text.muted}>Use “updates” in Ctrl+P to inspect evidence, read, reply, mark done or give feedback.</text>
     </box> : undefined}>{messageItem => { const { message, index } = messageItem(); return <box id={`message-${index}`} paddingY={1} gap={0} border={revealed() === index ? ["left"] : false} borderColor={revealed() === index ? theme.accent : undefined}>
-      <text fg={message.role === "You" ? theme.accent : theme.text.muted}><b>{literal(message.role)}</b> {literal(message.created_at)}</text>
+      <text fg={message.role === "You" ? theme.accent : theme.text.muted}><b>{literal(message.role)}</b> {displayDate(message.created_at)}</text>
       <Show when={message.activity}>{trace => <Activity trace={trace()} identity={activityKey(client.context, message, index)} expanded={data.activityExpanded} />}</Show>
-      <Show when={message.text}><text fg={theme.text.base}>{literal(message.text)}</text></Show>
+      <Show when={message.text}><Show when={message.role !== "You"} fallback={<text fg={theme.text.base}>{literal(message.text)}</text>}><Markdown text={message.text} /></Show></Show>
       <Show when={message.result}>{result => <Result value={result()} />}</Show>
       <Show when={message.inputs?.length}><text fg={theme.text.muted}>Inputs: {message.inputs?.map(literal).join(" · ")}</text></Show>
       <For each={message.bundle?.Artifacts}>{artifact => <text fg={theme.accent}>File: {literal(artifact.Path)} · {literal(artifact.MediaType)}</text>}</For>
