@@ -712,3 +712,48 @@ the repeatable command are in the terminal migration verification ledger.
 G13 remains open for complete update/drain/uninstall behavior, native Windows,
 signed distribution and release-account work. The repair action is user-reviewed;
 updating the application does not silently migrate or enable background services.
+
+### Cloud setup failure recovery — 29 October
+
+Cloud-model setup used a load/save pair outside the shared settings transaction.
+It could overwrite an unrelated settings edit, and published the new model before
+writing its API key. A failed credential write therefore left the model selection
+changed even though setup reported failure.
+
+The save now participates in the shared settings lock. It writes the credential
+first and restores the prior credential if settings publication fails, using
+compare-and-swap so recovery cannot overwrite a newer credential or resurrect a
+disconnected one. A process-held setup lease prevents overlapping cloud setups
+from restoring each other's temporary keys. Credential changes observed while
+waiting for the settings lock refuse publication. These are coordinated normal
+failure paths, not an atomic transaction across the two files: abrupt process or
+power loss between publications still requires checking the saved configuration.
+
+The terminal journey exposed two additional failures: the snapshot truncated an
+error before its recovery instruction, and the frontend retained and resent the
+key after Go cleared the failed form. Shared model notices now retain bounded
+full text. Both frontends discard submitted secret fields; a failed cloud save
+requires explicit key re-entry, while ordinary non-secret edits remain available.
+Successful setup says it was saved locally and that provider access is untested.
+
+Observed verification:
+
+- Focused Go race checks cover credential-store failure with unchanged settings,
+  settings-validation failure restoring an existing or absent key, concurrent
+  credential replacement, overlapping setups, lock release/retry and preservation
+  of another settings transaction's theme and model alias.
+- Full modelcatalog/config race suites pass, including visible recovery text,
+  cleared secret input, refusal of a blank retry and successful explicit retry.
+- Four terminal journeys pass with 58 assertions: model/effort selection, first
+  task draft and attachment across setup/restart, failed credential save/re-entry,
+  and connection verification/browser-sign-in ownership using local fixtures.
+- A Chromium component journey using the real retained desktop Panel passes:
+  neither a failed save nor a transport failure silently resends the key; other
+  form fields remain. This is a browser component check, not native Electron
+  acceptance. The check is included in the existing Linux browser CI step.
+- Runtime/terminal build, terminal/desktop TypeScript checks, Windows command-test
+  cross-compilation and workflow YAML parsing pass. Remote CI was not run.
+
+G05 remains open for observed novice use, actual provider access and distributor
+Google OAuth registration/verification. No account or paid model was contacted;
+real-account sign-in remains deferred at the user's request.

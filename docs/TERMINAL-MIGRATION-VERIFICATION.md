@@ -1495,3 +1495,25 @@ GATOR_NATIVE_LAUNCHAGENT_BINARY="$PWD/ui/runtime/gator-runtime" \
 
 The test uses a random `com.gator.test.relocation.*` label and temporary profile;
 it does not install the user's production Gator service or use real accounts.
+
+### Model setup failure and secret re-entry — 29 October
+
+The terminal now discards submitted secret fields after a panel action, matching
+the retained desktop frontend. This prevents a failed setup from silently
+resending a key that Go cleared. Cloud setup requires explicit re-entry after a
+failed keyed save. Its hint and complete error explain the retry, and successful
+local saving no longer suggests verified provider access.
+
+Four terminal model/provider/connection journeys pass (58 assertions), including
+an invalid credential store, unchanged model settings, visible recovery guidance,
+a rejected blank retry, explicit re-entry, private key storage, retained drafts
+and first-task attachment continuity. The production terminal build and both
+frontend typechecks pass. Focused command race checks and full modelcatalog/config
+race suites pass. A Chromium check also verifies secret clearing in the retained
+desktop Panel after both save and transport failures.
+
+Normal save failures restore the previous key without undoing concurrent credential
+changes, and shared settings updates preserve unrelated edits. There is no
+cross-file crash journal for settings/auth publication; this does not establish
+power-loss atomicity. Native Windows, live provider access and an independent
+first-use trial remain open. The competitive-gap ledger records full evidence.
