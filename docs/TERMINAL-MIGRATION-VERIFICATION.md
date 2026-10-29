@@ -1622,3 +1622,47 @@ general mixed-direction shaping, transitions/speaker-note presentation, arbitrar
 customer templates, all possible text density, or overall design quality. The
 automated checks do not detect every overlap or missing-glyph appearance; review
 the retained images when layout or font behavior changes.
+
+### Unattended Linux companion and supervisor startup — 29 October
+
+`scripts/companion-boot/run.py` now verifies two complete systemd-container
+restarts using the actual Linux runtime, companion service generator, device
+enrollment, CLI job creation and supervisor installer. The test enables lingering
+for a disposable container user, never the host user. An enabled but stopped
+supervisor has an unexecuted scheduled check waiting before the first restart.
+Neither the verifier nor a login session starts services after restart.
+
+Both restarts pass. Evidence includes fresh `/run` storage and user-manager
+invocation IDs, zero login sessions, active listener/supervisor units, an enrolled
+device's authenticated catalog/chat reads, and 401 for unauthenticated reads.
+The first boot completes the scheduled check and publishes its update to the
+originating chat. Future schedule slots are then disabled. The second boot
+retains the same unread/unresolved update, one attempt and one model request.
+Counts remain unchanged during a 17-second observation, past the scheduler's
+15-second polling interval. This is bounded evidence of no restart replay.
+
+Final local environment: Debian systemd 252.39, Node 24.22.1, Docker 29.7.2 on
+the Mac's Linux VM. The report binds results to the built runtime's SHA-256 and
+records image/tool versions and invocation IDs. The fixture provider is local
+and ordered ready before the supervisor; remote provider startup/network failures
+are not covered by this test. It uses no production profiles or accounts.
+
+Repeat with a Linux runtime matching the Docker engine's architecture:
+
+```sh
+GOOS=linux GOARCH=amd64 go build -o .gator/linux-runtime ./cmd/gator
+python3 scripts/companion-boot/run.py .gator/linux-runtime .gator/companion-boot
+```
+
+Use `GOARCH=arm64` for an ARM64 Docker engine and a fresh result directory for
+each run. Docker must support privileged containers and private cgroup namespaces.
+The harness builds its image, publishes no ports, uses no host mounts and disables
+external network access while testing. It removes its container on success or
+failure; image/build cache remains. Only synthetic test data exists inside it,
+and exported device secrets are not copied into the report. CI retains build logs,
+journal diagnostics and the report even on failure. No remote CI was triggered.
+
+Final ignored evidence: `.gator/native-tools/companion-boot-verified/`. Native
+physical-host reboot, kernel restart, permanent remote deployment, HTTPS/tunnel
+availability and physical iOS/Android use are still unverified. The existing
+listener-crash and offline-supervisor tests remain separate coverage.

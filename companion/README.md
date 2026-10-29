@@ -328,6 +328,9 @@ GATOR_COMPANION_LAUNCHD_TEST=1 node --test companion/macos-service.test.mjs
 # On Linux with an active user manager and a built Linux runtime:
 GATOR_COMPANION_SYSTEMD_TEST=1 GATOR_TEST_BINARY=/path/to/gator-runtime \
   node --test companion/linux-service.test.mjs companion/linux-monitoring.test.mjs
+# With Docker: isolated Linux user-manager boots, including lingering.
+# Supply a Linux runtime matching the Docker engine architecture and a NEW output directory.
+python3 scripts/companion-boot/run.py /path/to/linux/gator-runtime .gator/companion-boot
 ```
 
 Tests build the real Go runtime, use a disposable profile and local model fixture,
@@ -382,6 +385,32 @@ unresolved, and does not appear as an owned update in the execution chat. Restar
 the supervisor and reading again retain the same update without another model
 request. This exercises local service coordination; it does not prove permanent
 host deployment, physical phone access or real-account delivery.
+
+The separate Docker boot check builds a disposable systemd image, copies the real
+runtime/companion into it, enrolls a device and installs the supervisor through
+`job systemd install`. It enables lingering only for the container's test user.
+Two container restarts exercise fresh user managers and runtime directories with
+no login sessions or manual service starts. The first boot executes a previously
+unrun check; the second retains its unread/unresolved update and device access.
+Future scheduled runs are disabled after the first completion. Attempt/model
+counts remain one through a 17-second observation after the second boot, beyond
+the supervisor's 15-second polling interval. Unauthenticated API access remains
+rejected. This is a bounded non-replay check, not an exactly-once guarantee.
+
+This harness requires Docker with privileged-container support. It publishes no
+ports, mounts no host directories, disables external container networking during
+execution, uses a local fixture model and removes its container afterward. It
+does not change the real host's services or lingering policy. The output retains
+build logs, journal diagnostics and a JSON report with runtime hash, tool versions,
+service invocation IDs and results; synthetic token files stay in the removed
+container. CI runs this check on Linux and retains evidence on failure too.
+The image/build cache remains available for later local runs.
+
+A [container restart](https://docs.docker.com/reference/cli/docker/container/restart/)
+does not reboot the machine's kernel or prove a remote host's startup/network
+configuration. Physical-host reboot, real phone access, permanent deployment and
+real-account work remain acceptance steps. Lingering's boot/logout behavior is
+defined by [loginctl](https://www.freedesktop.org/software/systemd/man/latest/loginctl.html).
 
 Follow-up checks cover 55 real-Go retained updates, paging, conversation binding,
 read/done/reopen, stale resolution refusal and receipts across restart, without

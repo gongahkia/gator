@@ -1048,3 +1048,30 @@ for native Office, representative customer documents, arbitrary template fidelit
 general typography/overflow and design quality. Automated text/bounds checks do
 not prove glyph appearance or detect every overlap. The verification ledger
 records the inspected examples, font-dependent limitation and repeat command.
+
+### Unattended companion/supervisor startup — 29 October
+
+The new `scripts/companion-boot` harness exercises the actual companion generator
+and `job systemd install` in a disposable Debian systemd container. An enrolled
+device creates the originating chat; the CLI adds a linked, initially unexecuted
+scheduled check. Both services are enabled, and lingering is enabled only for
+the container's test user. After two container restarts, fresh user-manager
+invocation IDs, cleared runtime-directory markers and zero login sessions prove
+that the test did not merely restart the listener or manually start a supervisor.
+
+Local result: both services automatically start, the first boot completes the
+check, and the second preserves its original unread/unresolved update and device
+access. Unauthenticated catalog requests return 401. After disabling future
+schedule slots, the retained attempt and local model request counts stay at one
+through a 17-second observation after the second boot. This includes more than
+the supervisor's 15-second poll interval; it does not establish an unbounded
+exactly-once guarantee. No production service code change was needed.
+
+The final run used systemd 252.39, Node 24.22.1 and Docker 29.7.2 on this Mac's
+Linux Docker VM. Runtime hash, service/user-manager invocation IDs, counts and
+diagnostics are retained under ignored `.gator/native-tools/companion-boot-verified/`.
+The container was removed; no host mounts, published ports, real accounts or
+external model requests were used. CI now runs the same harness and retains
+evidence on failure; no remote CI was triggered. Syntax, workflow YAML and diff
+checks pass. Physical-host/kernel reboot, remote network/proxy setup, permanent
+deployment and physical phone acceptance remain open.
