@@ -7,7 +7,10 @@ export async function renderPDF(data, pageNumber, width = 1200) {
   const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const require = createRequire(import.meta.url);
   const root = dirname(require.resolve("pdfjs-dist/package.json"));
-  const loading = getDocument({ data: new Uint8Array(data), useSystemFonts: true, disableFontFace: true, useWasm: false, isEvalSupported: false, standardFontDataUrl: join(root, "standard_fonts/") });
+  // PDF.js requires a literal trailing slash, including on Windows. Its Node
+  // loader reads a filesystem path, so do not convert this to a file: URL.
+  const standardFontDataUrl = join(root, "standard_fonts") + "/";
+  const loading = getDocument({ data: new Uint8Array(data), useSystemFonts: true, disableFontFace: true, useWasm: false, isEvalSupported: false, standardFontDataUrl });
   let document;
   try {
     document = await loading.promise;
