@@ -1352,3 +1352,16 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   the observed file view to close fixes the probe. The combined native PTY,
   Go-owned editor, untrusted-file, clean-exit and terminal-mode restoration
   checks now pass with `artifact-macos-2`; no product shutdown guard was relaxed.
+
+- A complete native suite finished with 54 passes, 2 platform skips and 3
+  failures: pages, restore and revision fixtures expected `/var/...` while Go
+  correctly retained macOS's canonical `/private/var/...` path. The fixtures now
+  canonicalize their temporary roots, keeping exact path and source-isolation
+  assertions. The focused pages/restore rerun passes 83 assertions.
+- The fresh complete rerun passes **57 tests, 2 skips, 0 failures, 860
+  assertions across 43 files** in 203.86 seconds. Log:
+  `.gator/native-tools/terminal-macos-full-3.log`. The Linux-only clipboard-image
+  and dictation fixtures remain skipped; native device/permission acceptance is
+  not inferred. This suite used the runtime built before the subsequent DOCX/XLSX
+  changes, which have their own Go regression checks. Windows, device permissions,
+  release signing and the broader parity ledger remain open.

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { testRender } from "@opentui/solid"
-import { mkdtemp, mkdir, writeFile, readFile, readdir, stat, rm } from "node:fs/promises"
+import { mkdtemp, mkdir, writeFile, readFile, readdir, stat, rm, realpath } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import { tmpdir } from "node:os"
 import { execFileSync } from "node:child_process"
@@ -9,7 +9,7 @@ import { App } from "../src/app"
 import { GatorClient } from "../src/gator/client"
 
 test("private data keyboard reviews export verify and restore into a separate paused profile", async () => {
-  const root = await mkdtemp(join(tmpdir(), "gator-terminal-data-")), workspace = join(root, "workspace"), backup = join(root, "private.tar.gz"), restored = join(root, "restored"), replacement = join(root, "replacement workspace")
+  const root = await realpath(await mkdtemp(join(tmpdir(), "gator-terminal-data-"))), workspace = join(root, "workspace"), backup = join(root, "private.tar.gz"), restored = join(root, "restored"), replacement = join(root, "replacement workspace")
   await mkdir(workspace); await writeFile(join(workspace, "original.txt"), "External original is kept.")
   await mkdir(replacement); await writeFile(join(replacement, "original.txt"), "Replacement source is never overwritten by restore.")
   const binary = process.env.GATOR_TEST_BINARY || resolve(import.meta.dir, "../runtime/" + (process.platform === "win32" ? "gator-runtime.exe" : "gator-runtime")), env = { ...process.env, GATOR_STATE_DIR: join(root, "state"), GATOR_CONFIG_DIR: join(root, "config") }

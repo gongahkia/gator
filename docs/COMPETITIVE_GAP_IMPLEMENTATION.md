@@ -266,3 +266,13 @@ the saved XLSX, reject stale caches, independently evaluate the expected `200`
 total and `400` dependent result using Excelize, and check totals through both
 ordinary and 10,001-row streaming paths. This is stronger calculation evidence
 for those fixtures, not native Excel recalculation or general analysis accuracy.
+
+### Native Mac terminal checkpoint
+
+macOS Intel now has a passing full terminal suite (57 pass, 2 platform skips),
+production dependency/service checks, isolated install/uninstall, and real PTY
+editor/file/exit restoration evidence. Fixed macOS local-package symlinks that
+broke installed dependencies; fixture synchronization and canonical temporary
+paths were corrected separately. See `TERMINAL-MIGRATION-VERIFICATION.md` for
+exact scope and remaining native-device/Windows/release gaps. Electron remains
+available; this checkpoint does not close migration parity.

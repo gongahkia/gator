@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { testRender } from "@opentui/solid"
-import { mkdtemp, mkdir, writeFile, readFile, readdir, rm } from "node:fs/promises"
+import { mkdtemp, mkdir, writeFile, readFile, readdir, rm, realpath } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import { tmpdir } from "node:os"
 import { execFileSync } from "node:child_process"
@@ -10,7 +10,7 @@ import { GatorClient } from "../src/gator/client"
 
 async function until(predicate: () => boolean | Promise<boolean>, label: string) { const deadline = Date.now() + 15000; while (!await predicate()) { if (Date.now() > deadline) throw new Error(`Timed out: ${label}`); await Bun.sleep(15) } }
 test("keyboard pages preserve the draft and recurring checks review exact typed sources, budgets and timing before save", async () => {
-  const root = await mkdtemp(join(tmpdir(), "gator-terminal-pages-")), picked = join(root, "chosen source")
+  const root = await realpath(await mkdtemp(join(tmpdir(), "gator-terminal-pages-"))), picked = join(root, "chosen source")
   await mkdir(picked); await writeFile(join(picked, "project.md"), "A saved source, never an implicit workspace switch.")
   const binary = process.env.GATOR_TEST_BINARY || resolve(import.meta.dir, "../runtime/" + (process.platform === "win32" ? "gator-runtime.exe" : "gator-runtime"))
   const env = { ...process.env, GATOR_STATE_DIR: join(root, "state"), GATOR_CONFIG_DIR: join(root, "config") }

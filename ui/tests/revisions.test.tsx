@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { testRender } from "@opentui/solid"
-import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises"
+import { mkdtemp, mkdir, writeFile, readFile, rm, realpath } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import { tmpdir } from "node:os"
 import { Application } from "@gator/application-host/application"
@@ -8,7 +8,7 @@ import { App } from "../src/app"
 import { GatorClient } from "../src/gator/client"
 
 test("revision navigation preserves ancestry and drafts and reopening from another directory keeps original source access", async () => {
-  const root = await mkdtemp(join(tmpdir(), "gator-terminal-revisions-")), workspace = join(root, "original"), other = join(root, "other"), config = join(root, "config/gator")
+  const root = await realpath(await mkdtemp(join(tmpdir(), "gator-terminal-revisions-"))), workspace = join(root, "original"), other = join(root, "other"), config = join(root, "config/gator")
   await mkdir(workspace); await mkdir(other); await mkdir(config, { recursive: true })
   await writeFile(join(workspace, "note.md"), "Original workspace evidence"); await writeFile(join(other, "note.md"), "Launch directory secret must not enter restored chat")
   const requests: { messages: { role: string; content: string }[] }[] = []
