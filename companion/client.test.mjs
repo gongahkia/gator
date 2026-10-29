@@ -9,6 +9,105 @@ import { createCompanion } from './server.mjs';
 // isolated installation without changing this checkout's dependency tree.
 const { chromium, webkit } = await import(process.env.GATOR_PLAYWRIGHT_MODULE || '../desktop/node_modules/playwright/index.mjs');
 for (const name of (process.env.GATOR_COMPANION_BROWSERS || 'chromium').split(',')) {
+  test(`${name}: follow-up status changes survive reconnect and reject stale decisions`, { timeout: 90000 }, async () => {
+    const root = await mkdtemp(join(tmpdir(), 'gator-phone-updates-')), tokenFile = join(root, 'token'), token = 'a'.repeat(64);
+    const actions = [], updates = [
+      { id: 'inbox-new', title: 'Check needs attention <img src=x onerror="window.injected=true">', summary: 'Could not read the selected account.', status: 'failed', next_step: 'Reconnect on the host.', evidence: ['Account check: <script>not executable</script>'], created_at: '2026-10-29T01:00:00Z', read: false, resolved: false, version: 0 },
+      { id: 'inbox-old', title: 'Earlier update', summary: 'An earlier retained result.', status: 'completed', created_at: '2026-10-28T01:00:00Z', read: false, resolved: false, version: 0 },
+    ];
+    let browser, companion, backend, old = false, stale = true, drop = false;
+    const sync = () => Object.assign(backend.state, { chat_updates: [updates[old ? 1 : 0]], chat_updates_total: 2, updates_have_older: !old, updates_have_newer: old });
+    try {
+      await writeFile(tokenFile, token + '\n', { mode: 0o600 });
+      companion = createCompanion({ tokenFile, spawnBackend: id => {
+        backend = { state: { conversation_id: id, title: 'Follow-up chat', messages: [], queue: [], running: false }, async ready() {}, async stop() { this.closed = true; }, async apply(frame) {
+          const action = frame.update; actions.push(structuredClone(action)); this.state.chat_updates_issue = '';
+          assert.equal(action.conversation_id, 'work-updates');
+          if (action.action === 'older' || action.action === 'newer') { old = action.action === 'older'; sync(); return; }
+          const update = updates.find(update => update.id === action.id); assert.ok(update);
+          if (stale && action.action === 'resolve') { stale = false; update.version = 2; }
+          if (action.action === 'read') update.read = true;
+          else if (action.version !== update.version) this.state.chat_updates_issue = 'This update changed; refresh it before changing its status.';
+          else { update.resolved = action.action === 'resolve'; update.version++; }
+          sync();
+        } }; sync(); return backend;
+      } });
+      const address = await companion.listen(), base = `http://127.0.0.1:${address.port}`;
+      browser = await ({ chromium, webkit }[name]).launch({ headless: true, executablePath: process.env[`GATOR_${name.toUpperCase()}_EXECUTABLE`] });
+      const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, colorScheme: 'dark' }), page = await context.newPage(), errors = [];
+      page.on('pageerror', error => errors.push(error.message));
+      await page.goto(base);
+      await page.getByLabel('Host access token', { exact: true }).fill(token);
+      await page.getByText('Open a known conversation', { exact: true }).click();
+      await page.getByLabel('Conversation ID', { exact: true }).fill('work-updates');
+      await page.getByRole('button', { name: 'Connect', exact: true }).click();
+      await page.locator('[data-update="inbox-new"]').waitFor();
+      await page.locator('#message').fill('Keep this independent draft.');
+      await page.getByText('Update details', { exact: true }).click();
+      await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+      await page.waitForFunction(() => !document.querySelector('#refresh').disabled);
+      assert.equal(await page.locator('#updates details').getAttribute('open'), '');
+      assert.equal(actions.length, 0, 'reading/polling must not silently mark read or done');
+      await page.getByRole('button', { name: 'Mark read', exact: true }).focus();
+      await page.keyboard.press('Enter');
+      await page.waitForFunction(() => document.querySelector('#updates').textContent.includes('Read · Open'));
+      assert.equal(await page.evaluate(() => document.activeElement?.dataset.update), 'inbox-new');
+      await page.getByRole('button', { name: 'Done', exact: true }).click();
+      await page.locator('#updates-issue').filter({ hasText: 'This update changed' }).waitFor();
+      assert.equal(updates[0].resolved, false);
+      await page.getByRole('button', { name: 'Done', exact: true }).click();
+      await page.getByRole('button', { name: 'Reopen', exact: true }).waitFor();
+      assert.equal(updates[0].resolved, true);
+      assert.equal(await page.locator('#updates').textContent().then(text => text.includes('Check result: failed')), true);
+      assert.equal(await page.getByText('This check did not complete successfully. Earlier results do not confirm that nothing changed.', { exact: true }).isVisible(), true);
+      await page.route('**/actions', async route => {
+        if (drop) { drop = false; await route.fetch(); await route.abort('connectionfailed'); }
+        else await route.continue();
+      });
+      drop = true;
+      await page.getByRole('button', { name: 'Reopen', exact: true }).click();
+      await page.locator('#updates-issue').filter({ hasText: 'unconfirmed' }).waitFor();
+      const afterDrop = actions.length;
+      await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+      await page.getByRole('button', { name: 'Done', exact: true }).waitFor();
+      assert.equal(updates[0].resolved, false);
+      assert.equal(actions.length, afterDrop, 'refresh must read status without replaying a lost mutation');
+      await page.getByRole('button', { name: 'Earlier updates', exact: true }).click();
+      await page.getByRole('heading', { name: 'Earlier update', exact: true }).waitFor();
+      assert.equal(await page.locator('#updates-title').evaluate(node => node === document.activeElement), true);
+      await page.getByRole('button', { name: 'Newer updates', exact: true }).click();
+      await page.locator('[data-update="inbox-new"]').waitFor();
+      assert.equal(await page.locator('#message').inputValue(), 'Keep this independent draft.');
+      assert.equal(await page.evaluate(() => window.injected), undefined);
+      Object.assign(backend.state, { chat_updates: [], chat_updates_issue: 'Follow-up storage unavailable.', updates_have_older: false, updates_have_newer: false });
+      await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+      await page.getByText('Could not load follow-up updates.', { exact: true }).waitFor();
+      assert.equal(await page.locator('#updates-issue').textContent(), 'Follow-up storage unavailable.');
+      backend.state.chat_updates_issue = ''; sync();
+      await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+      await page.locator('[data-update="inbox-new"]').waitFor();
+      for (const width of [320, 390, 760]) {
+        await page.setViewportSize({ width, height: 844 });
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+        for (const button of await page.locator('#updates button').all()) assert.ok((await button.boundingBox()).height >= 44);
+      }
+      await page.setViewportSize({ width: 390, height: 844 });
+      for (const colorScheme of ['dark', 'light']) {
+        await page.emulateMedia({ colorScheme });
+        if (process.env.GATOR_COMPANION_SCREENSHOT) await page.screenshot({ path: `${process.env.GATOR_COMPANION_SCREENSHOT}-${name}-updates-${colorScheme}.png`, fullPage: true });
+      }
+      await context.setOffline(true);
+      await page.waitForFunction(() => document.querySelector('#updates button').disabled);
+      assert.equal(actions.length, afterDrop + 2);
+      await context.setOffline(false);
+      await page.waitForFunction(() => !document.querySelector('#updates button').disabled);
+      await writeFile(tokenFile, 'b'.repeat(64) + '\n', { mode: 0o600 });
+      await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+      await page.getByText('Access expired · enter the current host token', { exact: true }).waitFor();
+      assert.equal(await page.locator('#updates').textContent(), '');
+      assert.deepEqual(errors, []);
+    } finally { await browser?.close(); await companion?.close(); await rm(root, { recursive: true, force: true }); }
+  });
   test(`${name}: new-chat retries survive reload without duplicates or premature work`, { timeout: 90000 }, async () => {
     const root = await mkdtemp(join(tmpdir(), 'gator-phone-new-')), tokenFile = join(root, 'token'), token = 'a'.repeat(64);
     const creations = new Map(), calls = [], submissions = [];
