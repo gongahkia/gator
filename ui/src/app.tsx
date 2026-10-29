@@ -1,7 +1,7 @@
 // Composition adapted from pinned OpenCode app.tsx: renderer-scoped providers,
 // keymap, dialogs, toast, responsive session frame and bottom prompt. The Gator
 // client and data contexts replace OpenCode's server/client/plugin composition.
-import { Show, For } from "solid-js"
+import { Show, For, onCleanup } from "solid-js"
 import { useRenderer } from "@opentui/solid"
 import { ClientProvider, useClient } from "./context/client"
 import { useData } from "./context/data"
@@ -34,11 +34,17 @@ function Shell(props: { quit(): Promise<void> }) {
   const attempt = (operation: Promise<unknown>) => { void operation.catch(error => client.fail(error)) }
   const palette = () => dialog.replace(() => <CommandPaletteDialog />)
   const navigate = (command: string) => attempt(client.navigate(command))
+  const close = async () => {
+    if (/^\/(exit|quit)$/.test(client.draft.text.trim())) await client.edit("")
+    await props.quit()
+  }
   const quit = async () => {
     if (!await client.mayLeave()) return
-    if (data.snapshot.allChatsBusy || data.snapshot.allChatsQueued) dialog.replace(() => <DialogConfirm title="Stop work and close Gator?" message="Tasks in all open chats will stop. Queues remain paused for review after restart." onConfirm={() => attempt(props.quit())} />)
-    else attempt(props.quit())
+    if (data.snapshot.allChatsBusy || data.snapshot.allChatsQueued) dialog.replace(() => <DialogConfirm title="Stop work and close Gator?" message="Tasks in all open chats will stop. Queues remain paused for review after restart." onConfirm={() => attempt(close())} />)
+    else await close()
   }
+  client.requestQuit = quit
+  onCleanup(() => { if (client.requestQuit === quit) client.requestQuit = undefined })
   function approve(approved: boolean) {
     const pending = client.state?.pending_approval
     if (!pending) return

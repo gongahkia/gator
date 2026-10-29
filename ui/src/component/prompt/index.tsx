@@ -25,7 +25,7 @@ export function Prompt() {
       ["voice", "Dictation and spoken replies"], ["attach-file", "Choose a private attachment"],
       ["updates", "Review this chat's updates"], ["memories", "Review saved memory receipts"],
       ["receipts", "Inspect connected requests"], ["about", "Version and installation"],
-      ["prompt-history", "Reuse a retained message"],
+      ["prompt-history", "Reuse a retained message"], ["exit", "Exit Gator"], ["quit", "Exit Gator"],
     ].map(([name, description]) => ({ name: name!, description: description!, needs_input: false }))
     return [...local, ...(data.state?.commands ?? []).filter(command => !local.some(item => item.name === command.name))]
       .sort((a, b) => a.name.localeCompare(b.name))

@@ -16,5 +16,5 @@ export function SessionTabsRailControls(props: { width: number; tabs: SessionTab
       if (event.button !== 0 || !pressed) return
       pressed = false
       if (props.tabs.search) props.tabs.search(); else keymap.dispatch("session.list")
-    }} onMouseDragEnd={() => { pressed = false }}>⌕ Search</text>
+    }} onMouseDragEnd={() => { pressed = false }}>Search</text>
 }

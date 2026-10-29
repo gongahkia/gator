@@ -23,6 +23,7 @@ export class GatorClient extends EventEmitter {
   activityExpanded = new Set<string>()
   updateFeedback = new Map<string, { id: string; saving: boolean; message: string }>()
   route: "chat" | "following" | "saved" | "settings" = "chat"
+  requestQuit?: () => Promise<void>
   navigationGuard?: () => Promise<boolean>
   #loads = new Map<string, Promise<void>>()
   #results = new Set<() => void>()
@@ -36,8 +37,8 @@ export class GatorClient extends EventEmitter {
   get draft(): Draft { return this.drafts.get(this.context) ?? this.empty() }
   empty(context = this.context, state = this.state): Draft { return { context, title: state?.title ?? "", source: state?.source ?? "", text: "", uploads: [] } }
   fail(error: unknown) { this.issue = errorMessage(error); this.emit("change") }
-  async start() {
-    await this.host.start(); await this.loadDraft()
+  async start(conversationID?: string) {
+    await this.host.start(conversationID ? { conversation_id: conversationID } : undefined); await this.loadDraft()
     try { this.preferences = await this.host.preferences.read(); this.emit("change") }
     catch (error) { this.fail(error) }
   }
@@ -112,6 +113,10 @@ export class GatorClient extends EventEmitter {
     if (!command && ["recording", "transcribing"].includes(this.voicePhase)) throw new Error("Finish or cancel dictation before sending the draft.")
     if (command && (draft.uploads?.length || draft.reply_to_update_id)) throw new Error("Send attachments and update replies with a message or queued follow-up.")
     if (!command && !this.state?.running && !this.state?.provider) { await this.navigate("/model"); return }
+    if (/^\/(exit|quit)$/.test(draft.text.trim())) {
+      if (!this.requestQuit) throw new Error("Quit is not ready yet.")
+      await this.requestQuit(); return
+    }
     this.pending.add(context); this.issue = ""; this.emit("change")
     try {
       if (command) {
@@ -150,6 +155,7 @@ export class GatorClient extends EventEmitter {
   async openSession(id: string) { if (await this.mayLeave()) await this.host.openSession(id) }
   async openConversation(id: string, list_id: string) { if (await this.mayLeave()) await this.send({ type: "conversation", conversation: { id, list_id } }) }
   async navigate(text: string) {
+    if (/^\/(exit|quit)$/.test(text.trim()) && this.requestQuit) { await this.requestQuit(); return }
     if (!await this.mayLeave()) return
     if (text === "/chat") { if (this.state?.panel) await this.send({ type: "navigate", text: "/chat" }); this.route = "chat"; this.emit("change"); return }
     if (text === "/following" || text === "/saved" || text === "/settings") { this.route = text === "/following" ? "following" : text === "/saved" ? "saved" : "settings"; this.emit("change"); return }

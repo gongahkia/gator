@@ -10,14 +10,14 @@ export function CommandPaletteDialog() {
   const [section, setSection] = createSignal<string>()
   const [query, setQuery] = createSignal("")
   const options = createMemo(() => commands().flatMap(command => !command.id || !command.palette || command.id === COMMAND_PALETTE_COMMAND ? [] : [{
-    title: command.title ?? command.id, description: command.description, category: command.group || commandGroup(command.id.replace(/^gator\./, "")),
+    title: (command.title ?? command.id).replaceAll("-", " ").toUpperCase(), description: command.description?.toUpperCase(), category: (command.group || commandGroup(command.id.replace(/^gator\./, ""))).toUpperCase(),
     footer: shortcuts.all(command.id), value: command.id,
     onSelect: () => { dialog.clear(); void command.run() },
   }]))
-  const roots = () => commandGroups.map(group => ({ title: group, description: "Open menu →", value: `menu:${group}`, onSelect: () => { setQuery(""); setSection(group) } }))
-  return <Show when={section()} keyed fallback={<DialogSelect title="Gator commands" searchInTitle titlePlaceholder="Search Gator commands"
+  const roots = () => commandGroups.map(group => ({ title: group.toUpperCase(), description: "OPEN MENU →", value: `menu:${group}`, onSelect: () => { setQuery(""); setSection(group) } }))
+  return <Show when={section()} keyed fallback={<DialogSelect title="GATOR COMMANDS" searchInTitle titlePlaceholder="Search Gator commands"
     onFilter={setQuery} options={[...roots(), ...(query().trim() ? options().filter(option => !option.value.startsWith("gator.command.") && !commandGroups.some(group => group.toLowerCase() === option.title.toLowerCase())) : [])]} flat />}>
-    {group => <DialogSelect title={`Gator › ${group}`} placeholder={`Search ${group.toLowerCase()}`} onCancel={() => { setQuery(""); setSection(undefined) }}
-      options={options().filter(option => option.category === group)} flat />}
+    {group => <DialogSelect title={`GATOR › ${group.toUpperCase()}`} placeholder={`Search ${group.toLowerCase()}`} onCancel={() => { setQuery(""); setSection(undefined) }}
+      options={options().filter(option => option.category === group.toUpperCase())} flat />}
   </Show>
 }

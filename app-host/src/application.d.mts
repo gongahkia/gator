@@ -10,7 +10,7 @@ export class Application extends EventEmitter {
   drafts: { request(request: DraftRequest): Promise<DraftSnapshot>; flush(): Promise<void> }
   preferences: { read(): Promise<FrontendPreferenceValues>; configure(patch: Partial<FrontendPreferenceValues>): Promise<FrontendPreferenceValues>; flush(): Promise<void> }
   snapshot(): HostSnapshot
-  start(): Promise<HostSnapshot>
+  start(request?: { conversation_id?: string }): Promise<HostSnapshot>
   send(frame: FrontendFrame): Promise<void>
   importFiles(paths: string[], context: string): Promise<UploadedFile[]>
   file(request: FileRequest & { action: "attach" }): Promise<UploadedFile>

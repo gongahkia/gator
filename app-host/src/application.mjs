@@ -56,7 +56,7 @@ export class Application extends EventEmitter {
       chatActivity: this.sessions.activity(), allChatsBusy: this.sessions.busy,
       allChatsQueued: this.sessions.pending, terminalBusy: this.terminalBusy };
   }
-  async start() {
+  async start(request = {}) {
     await mkdir(this.workspace, { recursive: true, mode: 0o700 });
     // Malformed journals defer cleanup rather than deleting potentially admitted inputs.
     try {
@@ -65,7 +65,7 @@ export class Application extends EventEmitter {
       for (const draft of saved.drafts) for (const file of draft.uploads ?? []) retained.add(file.id);
       await this.uploads.prune(Date.now(), retained);
     } catch (error) { this.cleanupIssue = error.message; }
-    await this.sessions.open();
+    await this.sessions.open(request);
     return this.snapshot();
   }
   mutable() {
