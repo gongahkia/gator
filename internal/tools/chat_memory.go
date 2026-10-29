@@ -25,7 +25,7 @@ type ChatMemory struct {
 func (m ChatMemory) Tools() []agent.Tool { return []agent.Tool{rememberChat{m}, forgetChat{m}} }
 
 var rememberIntent = regexp.MustCompile(`(?i)\b(remember|save (?:this|that)|keep (?:this|that) in mind|don.t forget)\b`)
-var negativeRemember = regexp.MustCompile(`(?i)\b(don.t|do not|stop|never|no longer) (?:ever )?remember\b`)
+var negativeRemember = regexp.MustCompile(`(?i)\b(?:don['’]?t|do not|stop|never|no longer|must not|should not|shouldn['’]?t|not to|don['’]?t want (?:you )?to|do not want (?:you )?to)\s+(?:(?:ever|please)\s+)?(?:remember(?:ing)?|sav(?:e|ing)|stor(?:e|ing)|retain(?:ing)?|memoriz(?:e|ing)|keep(?:ing)?)\b`)
 var forgetIntent = regexp.MustCompile(`(?i)\b(forget|stop remembering|remove (?:that|this|the|my)|delete (?:that|this|the|my))\b`)
 var negativeForget = regexp.MustCompile(`(?i)\b(?:don['’]?t|do not|never|must not|should not|shouldn['’]?t|not to|don['’]?t want (?:you )?to|do not want (?:you )?to)\s+(?:(?:ever|please)\s+)?(?:forget|remove|delete|stop remembering)\b`)
 

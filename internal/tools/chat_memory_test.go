@@ -53,6 +53,44 @@ func TestChatMemoryRequiresCurrentUserEvidenceAndExplicitForget(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestChatMemoryRejectsNegativeSaveIntentWithCroppedEvidence(t *testing.T) {
+	for _, request := range []string{
+		"Please don't save this: I prefer concise answers.",
+		"Don't store this: I prefer concise answers.",
+		"Do not retain this: I prefer concise answers.",
+		"Never memorize this: I prefer concise answers.",
+		"I don't want you to remember this: I prefer concise answers.",
+		"You shouldn't save this: I prefer concise answers.",
+		"Please don’t keep this in mind: I prefer concise answers.",
+		"Stop remembering this: I prefer concise answers.",
+	} {
+		t.Run(request, func(t *testing.T) {
+			for _, explicit := range []bool{false, true} {
+				store, err := memory.Open(t.TempDir())
+				if err != nil {
+					t.Fatal(err)
+				}
+				m := ChatMemory{Store: store, UserMessage: request, ConversationID: "work-negative", RunID: "run-negative", Automatic: true,
+					Review: func(context.Context, any) (bool, error) {
+						t.Fatal("negative request must not ask to save")
+						return false, nil
+					}}
+				raw, err := json.Marshal(map[string]any{"subject": "preference.response_length", "kind": "preference", "quote": "I prefer concise answers.", "scope": "personal", "explicit": explicit})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := (rememberChat{m}).Execute(context.Background(), raw); err == nil {
+					t.Fatalf("negative save request accepted (explicit=%t)", explicit)
+				}
+				records, err := store.List("", true)
+				if err != nil || len(records) != 0 {
+					t.Fatalf("memory changed: %v, %v", records, err)
+				}
+			}
+		})
+	}
+}
 func TestChatHistoryRetrievesSelectedAncestryAndRejectsCurrentAndOtherGoalChats(t *testing.T) {
 	root := t.TempDir()
 	sessions, _ := worksession.Open(root)
