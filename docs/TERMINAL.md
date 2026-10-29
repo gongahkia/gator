@@ -162,6 +162,24 @@ when it has no transcript card. File checks and proposal inspection do not apply
 changes or confirm external delivery. `/files` opens complete retained files and
 their working versions; unavailable originals report an error.
 
+Drag the sidebar divider to resize it, or use Ctrl+Shift+Left/Right. Ctrl+B hides
+or restores it. The width is retained for the current process. Chat rows show
+local date/time and workspace folder; F3 retains the full details. Command
+palette labels are uppercase, with original command names still searchable.
+
+`/exit`, `/quit` and Ctrl+Q close the application through the same unsaved-work
+and active-work review. After leaving the terminal UI, Gator prints a runnable
+command to resume that chat. Installed launchers accept `gator resume ID`; source
+checkouts can use `bun run --cwd ui start resume ID`. Keep the same profile
+environment when reopening. The printed command quotes the actual launcher path
+so it also works when the launcher is not on PATH.
+
+Rattles Dots indicators cover active terminal operations. Short operations wait
+150 ms before showing incidental progress; reduced motion keeps static feedback.
+Human approvals, manual sign-in and paused/scheduled waiting remain static.
+See [the loading audit](TERMINAL_LOADING_AUDIT_2026-10-29.md) for placements,
+intentional exclusions and verification limits.
+
 The Unix installed-terminal verification uses Python and a pinned terminal
 emulator only for testing:
 
