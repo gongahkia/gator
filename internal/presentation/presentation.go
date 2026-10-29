@@ -140,11 +140,17 @@ func RenderPPTX(spec Spec) ([]byte, Preview, error) {
 	files["ppt/presentation.xml"] = []byte(presentationXML(spec))
 	files["ppt/_rels/presentation.xml.rels"] = []byte(presentationRelationships(spec))
 	files["ppt/theme/theme1.xml"] = []byte(themeXML(spec.Theme))
+	files["ppt/presProps.xml"] = []byte(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:presentationPr xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>`)
+	files["ppt/slideMasters/slideMaster1.xml"] = []byte(slideMasterXML())
+	files["ppt/slideMasters/_rels/slideMaster1.xml.rels"] = []byte(masterRelationships())
+	files["ppt/slideLayouts/slideLayout1.xml"] = []byte(slideLayoutXML())
+	files["ppt/slideLayouts/_rels/slideLayout1.xml.rels"] = []byte(layoutRelationships())
 	files["ppt/notesMasters/notesMaster1.xml"] = []byte(notesMasterXML())
+	files["ppt/notesMasters/_rels/notesMaster1.xml.rels"] = []byte(notesMasterRelationships())
 	for index, slide := range spec.Slides {
 		number := index + 1
 		files[fmt.Sprintf("ppt/slides/slide%d.xml", number)] = []byte(slideXML(slide, spec.Theme))
-		files[fmt.Sprintf("ppt/slides/_rels/slide%d.xml.rels", number)] = []byte(slideRelationships(number, slide.Notes != ""))
+		files[fmt.Sprintf("ppt/slides/_rels/slide%d.xml.rels", number)] = []byte(slideRelationships(number, slide.Notes != "", "../slideLayouts/slideLayout1.xml"))
 		if slide.Notes != "" {
 			files[fmt.Sprintf("ppt/notesSlides/notesSlide%d.xml", number)] = []byte(notesSlideXML(slide.Notes))
 			files[fmt.Sprintf("ppt/notesSlides/_rels/notesSlide%d.xml.rels", number)] = []byte(notesRelationships(number))
@@ -448,8 +454,12 @@ func (d *deck) addSlide(value Slide) error {
 		partPath = fmt.Sprintf("ppt/slides/slide%d.xml", number)
 	}
 	contents := []byte(slideXML(value, "professional"))
+	layout := d.existingLayout()
+	if layout == "" {
+		return errors.New("adding a slide requires an existing slide layout")
+	}
 	d.files[partPath] = newPart(partPath, contents)
-	d.files[fmt.Sprintf("ppt/slides/_rels/slide%d.xml.rels", number)] = newPart("", []byte(slideRelationships(number, value.Notes != "")))
+	d.files[fmt.Sprintf("ppt/slides/_rels/slide%d.xml.rels", number)] = newPart("", []byte(slideRelationships(number, value.Notes != "", relativePartTarget(partPath, layout))))
 	if value.Notes != "" {
 		if _, exists := d.files["ppt/notesMasters/notesMaster1.xml"]; !exists {
 			return errors.New("adding notes requires a deck with a notes master; preserve existing notes or use a Gator-created deck")
@@ -876,6 +886,7 @@ func writeFiles(files map[string][]byte) []byte {
 func contentTypes(spec Spec) string {
 	var value strings.Builder
 	value.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/><Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/><Override PartName="/ppt/notesMasters/notesMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml"/>`)
+	value.WriteString(`<Override PartName="/ppt/presProps.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presProps+xml"/><Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/><Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>`)
 	for index, slide := range spec.Slides {
 		number := index + 1
 		value.WriteString(fmt.Sprintf(`<Override PartName="/ppt/slides/slide%d.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`, number))
@@ -896,7 +907,7 @@ func presentationXML(spec Spec) string {
 	for index := range spec.Slides {
 		slides.WriteString(fmt.Sprintf(`<p:sldId id="%d" r:id="rId%d"/>`, 256+index, index+1))
 	}
-	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst>` + slides.String() + `</p:sldIdLst><p:notesMasterIdLst><p:notesMasterId r:id="rId` + strconv.Itoa(len(spec.Slides)+1) + `"/></p:notesMasterIdLst><p:sldSz cx="12192000" cy="6858000" type="screen16x9"/><p:notesSz cx="6858000" cy="9144000"/></p:presentation>`
+	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId` + strconv.Itoa(len(spec.Slides)+3) + `"/></p:sldMasterIdLst><p:notesMasterIdLst><p:notesMasterId r:id="rId` + strconv.Itoa(len(spec.Slides)+1) + `"/></p:notesMasterIdLst><p:sldIdLst>` + slides.String() + `</p:sldIdLst><p:sldSz cx="12192000" cy="6858000" type="screen16x9"/><p:notesSz cx="6858000" cy="9144000"/></p:presentation>`
 }
 
 func presentationRelationships(spec Spec) string {
@@ -907,12 +918,14 @@ func presentationRelationships(spec Spec) string {
 	}
 	next := len(spec.Slides) + 1
 	value.WriteString(fmt.Sprintf(`<Relationship Id="rId%d" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster" Target="notesMasters/notesMaster1.xml"/><Relationship Id="rId%d" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml"/>`, next, next+1))
+	value.WriteString(fmt.Sprintf(`<Relationship Id="rId%d" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="slideMasters/slideMaster1.xml"/><Relationship Id="rId%d" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/presProps" Target="presProps.xml"/>`, next+2, next+3))
 	value.WriteString(`</Relationships>`)
 	return value.String()
 }
 
-func slideRelationships(number int, notes bool) string {
+func slideRelationships(number int, notes bool, layout string) string {
 	value := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">`
+	value += `<Relationship Id="rIdLayout" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="` + xmlEscape(layout) + `"/>`
 	if notes {
 		value += fmt.Sprintf(`<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide" Target="../notesSlides/notesSlide%d.xml"/>`, number)
 	}
@@ -944,7 +957,7 @@ func notesSlideXML(notes string) string {
 }
 
 func notesMasterXML() string {
-	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:notesMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld name=""><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld><p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/><p:hf dt="0" hdr="0" ftr="0" sldNum="0"/><p:txStyles/></p:notesMaster>`
+	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:notesMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld name=""><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld><p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/><p:hf dt="0" hdr="0" ftr="0" sldNum="0"/><p:notesStyle/></p:notesMaster>`
 }
 
 func textShape(id int, name, value string, x, y, cx, cy int, color string, size int, bold bool) string {
@@ -963,5 +976,5 @@ func themeXML(theme string) string {
 	if theme == "report" {
 		primary, accent = "1F4E79", "5B9BD5"
 	}
-	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Gator"><a:themeElements><a:clrScheme name="Gator"><a:dk1><a:srgbClr val="000000"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="222222"/></a:dk2><a:lt2><a:srgbClr val="F5F7FA"/></a:lt2><a:accent1><a:srgbClr val="` + primary + `"/></a:accent1><a:accent2><a:srgbClr val="` + accent + `"/></a:accent2><a:accent3><a:srgbClr val="70AD47"/></a:accent3><a:accent4><a:srgbClr val="FFC000"/></a:accent4><a:accent5><a:srgbClr val="ED7D31"/></a:accent5><a:accent6><a:srgbClr val="A5A5A5"/></a:accent6><a:hlink><a:srgbClr val="0563C1"/></a:hlink><a:folHlink><a:srgbClr val="954F72"/></a:folHlink></a:clrScheme><a:fontScheme name="Gator"><a:majorFont><a:latin typeface="Aptos Display"/></a:majorFont><a:minorFont><a:latin typeface="Aptos"/></a:minorFont></a:fontScheme><a:fmtScheme name="Gator"><a:fillStyleLst/><a:lnStyleLst/><a:effectStyleLst/><a:bgFillStyleLst/></a:fmtScheme></a:themeElements></a:theme>`
+	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Gator"><a:themeElements><a:clrScheme name="Gator"><a:dk1><a:srgbClr val="000000"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="222222"/></a:dk2><a:lt2><a:srgbClr val="F5F7FA"/></a:lt2><a:accent1><a:srgbClr val="` + primary + `"/></a:accent1><a:accent2><a:srgbClr val="` + accent + `"/></a:accent2><a:accent3><a:srgbClr val="70AD47"/></a:accent3><a:accent4><a:srgbClr val="FFC000"/></a:accent4><a:accent5><a:srgbClr val="ED7D31"/></a:accent5><a:accent6><a:srgbClr val="A5A5A5"/></a:accent6><a:hlink><a:srgbClr val="0563C1"/></a:hlink><a:folHlink><a:srgbClr val="954F72"/></a:folHlink></a:clrScheme><a:fontScheme name="Gator"><a:majorFont><a:latin typeface="Aptos Display"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont><a:minorFont><a:latin typeface="Aptos"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont></a:fontScheme><a:fmtScheme name="Gator">` + themeStyleLists() + `</a:fmtScheme></a:themeElements></a:theme>`
 }

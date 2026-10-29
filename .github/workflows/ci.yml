@@ -65,6 +65,26 @@ jobs:
           npm run pack --prefix desktop
           GATOR_DESKTOP_TEST_EXECUTABLE="$PWD/desktop/release/mac/Gator.app/Contents/MacOS/Gator" npm run test:e2e --prefix desktop
 
+  office:
+    name: Office package validation
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.25.13"
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.427"
+      - name: Generate representative new and edited presentations
+        run: go run ./scripts/office-fixtures .gator/office-fixtures
+      - name: Validate with the independent Open XML SDK
+        run: |
+          dotnet restore scripts/office-validation/OfficeValidation.csproj --locked-mode
+          dotnet run --no-restore --project scripts/office-validation -- .gator/office-fixtures/*.pptx
+
   browser:
     name: browser-${{ matrix.os }}
     runs-on: ${{ matrix.os }}
