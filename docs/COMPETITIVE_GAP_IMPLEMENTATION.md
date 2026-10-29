@@ -1075,3 +1075,30 @@ external model requests were used. CI now runs the same harness and retains
 evidence on failure; no remote CI was triggered. Syntax, workflow YAML and diff
 checks pass. Physical-host/kernel reboot, remote network/proxy setup, permanent
 deployment and physical phone acceptance remain open.
+
+### Phone companion check-health disclosure — 29 October
+
+The terminal already exposed conversation-owned check health, but the companion
+dropped it and displayed a generic “Ready” even when recurring checks were
+offline. The phone client now shows the existing Go health projection: state,
+issue, consecutive unsuccessful checks, next action, last success for current
+settings, next schedule and observed gaps. “Ready for messages” now distinguishes
+chat readiness from monitoring. Times use readable UTC text while retaining exact
+timestamp attributes. The offline recovery hint points to Recovery on the host.
+
+This adds no remote scheduling or recovery mutation. Failed reads and connection
+loss mark retained health as stale until a successful response; merely starting
+a reconnect does not clear that warning. Unchanged polls retain DOM nodes;
+changed health preserves expanded details and keyboard focus. Empty health stays
+hidden unless an availability error needs disclosure. Chat switching and token
+revocation clear unrelated/private health; fields render as plain text.
+
+Verification: one real-Go integration journey and all twelve Chromium/WebKit
+companion browser journeys pass. Real storage covers offline/limited evidence,
+conversation ownership, a monitoring gap, corrupt availability data, recovery,
+paused state and restart with zero model calls and unchanged attempt history.
+Browsers additionally cover unavailable/empty health, pending reconnect, retained
+drafts, focus, malicious-looking text, revoked access and 320/390/760-pixel widths.
+Dark/light 390-pixel images were inspected. CI includes the real health journey
+in both existing host test matrices; no remote CI was triggered. Physical phones,
+screen-reader acceptance and real-account monitoring remain unverified.

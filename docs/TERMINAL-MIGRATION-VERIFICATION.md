@@ -1666,3 +1666,61 @@ Final ignored evidence: `.gator/native-tools/companion-boot-verified/`. Native
 physical-host reboot, kernel restart, permanent remote deployment, HTTPS/tunnel
 availability and physical iOS/Android use are still unverified. The existing
 listener-crash and offline-supervisor tests remain separate coverage.
+
+### Companion parity with terminal check-health disclosure — 29 October
+
+The phone client now renders the same conversation-owned check-health projection
+as the terminal's `check-health` view. This is a read-only companion addition;
+the terminal parity gate and host-only scheduling/recovery controls are unchanged.
+Canonical fields include state, issue, unsuccessful count, next action, last
+successful check for current settings, next due time and observed monitoring gap.
+The UI distinguishes chat readiness from check health and labels stale data after
+failed reads, disconnection or tab hiding until a successful response arrives.
+
+Validation completed on this Mac:
+
+- `GATOR_TEST_BINARY="$PWD/ui/runtime/gator-runtime" node --test companion/health.test.mjs`:
+  **1 pass**. Real Go/CLI/storage checks conversation ownership, offline and limit
+  evidence, observed gaps, corrupt availability storage, recovery to paused state
+  and listener restart. No model requests or new attempts occur. The fixture waits
+  for asynchronous health refresh rather than treating process readiness as data
+  readiness. Unauthenticated reads return 401.
+- Full `companion/client.test.mjs` with Chromium and WebKit: **12 pass / 0 fail**.
+  The new journey covers plain-text untrusted fields, no mutation frames, keyboard
+  disclosure/focus, unchanged polling, updated health, stale storage, offline and
+  held reconnect responses, independent drafts/chats, empty/error-only state and
+  revocation. Existing admission/approval/catalog/device/update journeys also pass.
+- Layout bounds at **320, 390 and 760 pixels**, disclosure targets at least **44px**;
+  final Chromium light and WebKit dark 390px screenshots inspected. Earlier dark
+  Chromium review prompted replacing raw ISO text with readable UTC timestamps.
+- JavaScript syntax, workflow YAML/wiring and `git diff --check`: pass. CI adds
+  the real-Go health test to the existing host matrices; remote CI not triggered.
+
+Full interface review scope: the new companion health section and its state
+transitions, plain DOM JavaScript with the existing CSS tokens. Other screens
+received behavioral regression coverage, not a new exhaustive visual review.
+
+| Category | Evidence inspected | Result |
+| --- | --- | --- |
+| Typography | Dark/light narrow screenshots; long untrusted title, counts and UTC times | Wrapping retained; tabular numerals added to timing/count hints |
+| Surfaces | Existing article, hint, warning and focus styles; 44px summaries | Existing tokens retained; no extra nested cards or styling system |
+| Animations | New health render/freshness paths | No motion added; 10% replay not applicable |
+| Icons | Native details disclosure | No custom icon set or state icons added |
+| Performance | Stable JSON key, node-identity and focus assertions across polling | Unchanged health does not rebuild cards; changed health retains disclosure/focus |
+
+| Severity | Location | Before | After | Why |
+| --- | --- | --- | --- | --- |
+| HIGH | `companion/public/client.mjs`, `index.html` | Health omitted; generic Ready could coexist with offline checks | Conversation-owned health, explicit Ready for messages, host Recovery instruction | Static status must communicate actual monitoring evidence |
+| HIGH | `companion/public/client.mjs` | No health freshness disclosure | Stale warning remains through pending reconnect; issue-only state remains visible | Connection intent is not evidence of fresh health |
+| MEDIUM | `companion/public/client.mjs`, `styles.css` | No keyboard health details; initial raw timestamps wrapped awkwardly | Native 44px disclosure, retained focus/expansion, readable UTC times and tabular numerals | Readability, hit area and stable repeated interactions |
+
+Considered but rejected: a pulsing online badge would conflate listener access
+with successful checks; always-expanded timing would push the composer farther
+down when several checks belong to a chat. Status remains text, with optional
+timing details and no new animation. **Verdict: Approve within this reviewed
+scope**; physical-phone touch/permissions and screen-reader acceptance remain
+unverified. Full native terminal parity and remote deployment remain open.
+
+Ignored evidence: `.gator/native-tools/companion-health-real.log`,
+`companion-health-browser-all.log` and `companion-check-*-health-*.png` under the
+same directory. Synthetic profiles and model fixtures were removed after testing.

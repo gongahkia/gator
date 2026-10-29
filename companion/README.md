@@ -203,6 +203,23 @@ separate from the job supervisor's availability. Client-off completion requires
 the execution host to stay online. Mobile notifications and offline client
 synchronization remain pending.
 
+An open chat now shows **Recurring checks** for checks owned by that conversation.
+It displays the host's reported state, issue, unsuccessful count and next action.
+**Timing and coverage** reveals the last successful check for current settings,
+next scheduled time and observed monitoring gaps. Times are displayed in UTC;
+the exact timestamp remains on each time element. A gap does not establish what
+changed while monitoring was unavailable, and a schedule is not a promise that
+an offline host will run it. “Ready for messages” describes the conversation,
+not the health of its recurring checks.
+
+Health inspection is read-only. It does not run/retry a check, acknowledge an
+update or change its resolution. Open Gator on the host to change or restart
+checks. Failed health reads disclose that displayed states may be out of date.
+After a connection loss or hidden tab, retained health stays labeled as last
+received until a successful refresh. A pending reconnect does not establish fresh
+health. Polling preserves expanded timing details and keyboard focus; switching
+chats clears unrelated checks, and revoked access clears displayed health.
+
 For a CLI-created check to appear in a chat's follow-up cards, pass
 `gator job add NAME --conversation CHAT_ID --schedule CRON ... -- TASK` on the
 execution host. Use an existing chat in that host's profile. Its folder is the
@@ -319,7 +336,7 @@ A stopped listener does not stop the separate supervisor.
 From the repository root:
 
 ```sh
-node --test companion/auth.test.mjs companion/server.test.mjs
+node --test companion/auth.test.mjs companion/server.test.mjs companion/health.test.mjs
 node --test companion/linux-service.test.mjs companion/macos-service.test.mjs
 # After installing the desktop dependencies and Playwright browsers:
 GATOR_COMPANION_BROWSERS=chromium,webkit node --test companion/client.test.mjs
@@ -418,3 +435,11 @@ model calls. Browser journeys cover failed-check labeling, lost-response recover
 without replay, unavailable storage, retained drafts, keyboard focus, narrow
 layouts, offline controls and access revocation. These are local fixture results,
 not evidence of physical-phone or real-account acceptance.
+
+The health integration test uses real Go storage/CLI and a local fixture model
+that must receive zero requests. It verifies an offline originating check, limit
+evidence, a monitoring gap, unavailable health storage, recovery to paused state,
+unrelated-chat isolation and listener restart. Browser checks cover offline and
+completed health, stale storage and reconnect, keyboard disclosures/focus, unchanged
+polling, draft preservation, narrow dark/light layouts, plain-text untrusted
+content and clearing health on revocation. Viewing health sends no action frames.
