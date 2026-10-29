@@ -100,6 +100,10 @@ func main() {
 	old := updated
 	old.CreatedAt = time.Now().AddDate(-1, 0, 0)
 	old.UpdatedAt = old.CreatedAt
+	old.LastObservedAt, old.LastConfirmedAt = old.CreatedAt, old.CreatedAt
+	for i := range old.Evidence {
+		old.Evidence[i].ObservedAt = old.CreatedAt
+	}
 	require(os.WriteFile(filepath.Join(root, "evolution/gator/memory", old.ID+".json"), must(json.Marshal(old)), 0600))
 	for index := 0; index < 4; index++ {
 		must(store.RememberChat(input(fmt.Sprintf("preference.other%d", index), fmt.Sprintf("I prefer option %d for a separate topic.", index))))

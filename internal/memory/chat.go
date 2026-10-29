@@ -56,6 +56,7 @@ type ChatInput struct {
 // RememberChat stores the user's exact words. A model cannot manufacture a
 // rewritten fact. Conflicting updates need the current record and timestamp.
 func (s Store) RememberChat(input ChatInput) (Record, error) {
+	input.Quote = strings.TrimSpace(input.Quote)
 	if !subjectPattern.MatchString(input.Subject) || len(input.Quote) > 2000 || strings.TrimSpace(input.Quote) == "" || !strings.HasPrefix(input.ConversationID, "work-") || input.RunID == "" {
 		return Record{}, errors.New("invalid chat memory")
 	}
@@ -91,10 +92,16 @@ func (s Store) RememberChat(input ChatInput) (Record, error) {
 				return Record{}, errors.New("this memory subject is excluded from the current run")
 			}
 		}
-		if current.Text == strings.TrimSpace(input.Quote) {
+		if input.ReplaceID != "" && (current.ID != input.ReplaceID || current.UpdatedAt.Format(time.RFC3339Nano) != input.ExpectedUpdated) {
+			return Record{}, errors.New("memory revision changed; inspect current memory before saving")
+		}
+		if current.Text == input.Quote && current.Kind != input.Kind {
+			return Record{}, errors.New("reconfirmation cannot change a memory's kind")
+		}
+		if current.Text == input.Quote && current.alreadyObserved(input) {
 			return current, nil
 		}
-		if current.ID != input.ReplaceID || current.UpdatedAt.Format(time.RFC3339Nano) != input.ExpectedUpdated {
+		if current.Text != strings.TrimSpace(input.Quote) && (current.ID != input.ReplaceID || current.UpdatedAt.Format(time.RFC3339Nano) != input.ExpectedUpdated) {
 			return Record{}, fmt.Errorf("memory conflict: inspect %s (updated %s) before replacing it", current.ID, current.UpdatedAt.Format(time.RFC3339Nano))
 		}
 		current.Text, current.Kind, current.Source, current.SourceSHA256, current.SourceStatus, current.UpdatedAt = strings.TrimSpace(input.Quote), input.Kind, "Chat "+input.ConversationID, "", "", s.nextUpdate(current.UpdatedAt)
@@ -110,6 +117,7 @@ func (s Store) RememberChat(input ChatInput) (Record, error) {
 	}
 	current.Subject = input.Subject
 	current.Origin = &ChatOrigin{ConversationID: input.ConversationID, RunID: input.RunID, Quote: strings.TrimSpace(input.Quote), Basis: "user-stated"}
+	current.observe("user-stated", current.Origin)
 	if err := validate(current); err != nil {
 		return Record{}, err
 	}

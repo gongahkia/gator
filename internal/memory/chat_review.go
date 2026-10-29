@@ -47,6 +47,7 @@ func (s Store) ReviewChat(id, conversationID, goalID, updated, action, text stri
 	case "correct":
 		record.Text, record.UpdatedAt = strings.TrimSpace(text), s.nextUpdate(record.UpdatedAt)
 		record.Origin = &ChatOrigin{ConversationID: record.Origin.ConversationID, RunID: record.Origin.RunID, Basis: "user-corrected"}
+		record.observe("user-corrected", nil)
 		if err := validate(record); err != nil {
 			return err
 		}

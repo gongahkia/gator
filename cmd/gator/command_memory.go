@@ -153,6 +153,18 @@ func memoryCommand(args []string, out io.Writer) error {
 			return err
 		}
 		_, err = fmt.Fprintf(out, "ID: %s\nKind: %s\nGoal: %s\nSource: %s\nSource status: %s\nExpires: %s\nCreated: %s\nUpdated: %s\nText: %s\n", record.ID, record.Kind, valueOrDash(record.GoalID), valueOrDash(record.Source), valueOrDash(record.SourceStatus), formatMemoryExpiry(record.ExpiresAt), record.CreatedAt.Format(time.RFC3339), record.UpdatedAt.Format(time.RFC3339), record.Text)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(out, "Last observed: %s\nLast confirmed: %s\n", formatMemoryEvidenceTime(record.LastObservedAt), formatMemoryEvidenceTime(record.LastConfirmedAt))
+		if err != nil {
+			return err
+		}
+		for _, evidence := range record.Evidence {
+			if _, err = fmt.Fprintf(out, "Evidence: %s · %s · conversation %s · run %s · text SHA256 %s\n", evidence.ObservedAt.Format(time.RFC3339Nano), evidence.Basis, valueOrDash(evidence.ConversationID), valueOrDash(evidence.RunID), evidence.TextSHA256); err != nil {
+				return err
+			}
+		}
 		return err
 	case "correct":
 		if len(args) < 3 {
@@ -298,6 +310,13 @@ func formatMemoryExpiry(value time.Time) string {
 		return "-"
 	}
 	return value.Format("2006-01-02")
+}
+
+func formatMemoryEvidenceTime(value time.Time) string {
+	if value.IsZero() {
+		return "unknown (legacy record)"
+	}
+	return value.Format(time.RFC3339Nano)
 }
 
 // Partial reads remain visible in script and terminal output; ordinary failures

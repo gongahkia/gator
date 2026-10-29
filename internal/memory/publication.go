@@ -36,6 +36,9 @@ func (s Store) write(record Record, create bool) error {
 	if err != nil {
 		return err
 	}
+	if len(data) > 16*1024 {
+		return errors.New("memory record exceeds the private record size limit")
+	}
 	root, err := os.OpenRoot(s.root)
 	if err != nil {
 		return err

@@ -80,3 +80,19 @@ These do not simulate physical power loss or complete native Windows validation.
 Gap six is still open for the unified personal summary. The other five outcomes
 remain open; this checkpoint does not establish working autonomous maintenance
 or live-model capture quality.
+
+## Evidence checkpoint
+
+New confirmations refresh the existing record's provenance and profile priority.
+The latest eight observations retain time, basis, source conversation/run and a
+text digest; corrections do not keep another copy of the superseded personal
+text. Replays present in this bounded history are idempotent. Revision times stay
+monotonic across clock adjustments. Retrieval never refreshes confirmation.
+Legacy records keep unknown observation dates until new evidence exists.
+`gator memory show ID` exposes these fields and source references.
+
+Memory, tools, workapp and workrun suites and focused command tests pass. The
+fresh synthetic probe reports 16 supported checks and 6 gaps; this is not a
+model-quality score. Freshness remains incomplete until stale/changeable facts
+have bounded maintenance and review behavior. All six required outcomes remain
+in scope.

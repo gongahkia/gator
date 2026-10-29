@@ -30,22 +30,25 @@ type ChatOrigin struct {
 }
 
 type Record struct {
-	Subject      string      `json:"subject,omitempty"`
-	Origin       *ChatOrigin `json:"origin,omitempty"`
-	Version      int         `json:"version"`
-	ID           string      `json:"id"`
-	Kind         string      `json:"kind"`
-	Text         string      `json:"text"`
-	GoalID       string      `json:"goal_id,omitempty"`
-	Source       string      `json:"source,omitempty"`
-	SourceSHA256 string      `json:"source_sha256,omitempty"`
-	SourceStatus string      `json:"-"`
-	MatchedTerms []string    `json:"-"`
-	MatchScope   string      `json:"-"`
-	MatchMethod  string      `json:"-"`
-	ExpiresAt    time.Time   `json:"expires_at,omitempty"`
-	CreatedAt    time.Time   `json:"created_at"`
-	UpdatedAt    time.Time   `json:"updated_at"`
+	Subject         string      `json:"subject,omitempty"`
+	Origin          *ChatOrigin `json:"origin,omitempty"`
+	Version         int         `json:"version"`
+	ID              string      `json:"id"`
+	Kind            string      `json:"kind"`
+	Text            string      `json:"text"`
+	GoalID          string      `json:"goal_id,omitempty"`
+	Source          string      `json:"source,omitempty"`
+	SourceSHA256    string      `json:"source_sha256,omitempty"`
+	SourceStatus    string      `json:"-"`
+	MatchedTerms    []string    `json:"-"`
+	MatchScope      string      `json:"-"`
+	MatchMethod     string      `json:"-"`
+	ExpiresAt       time.Time   `json:"expires_at,omitempty"`
+	CreatedAt       time.Time   `json:"created_at"`
+	UpdatedAt       time.Time   `json:"updated_at"`
+	LastObservedAt  time.Time   `json:"last_observed_at,omitempty"`
+	LastConfirmedAt time.Time   `json:"last_confirmed_at,omitempty"`
+	Evidence        []Evidence  `json:"evidence,omitempty"`
 }
 
 type Store struct {
@@ -107,6 +110,11 @@ func (s Store) addUnlocked(kind, content, goalID, source, sourceSHA256 string, e
 	if err != nil {
 		return Record{}, err
 	}
+	basis := "user-added"
+	if sourceSHA256 != "" {
+		basis = "file-reviewed"
+	}
+	record.observe(basis, nil)
 	return record, s.write(record, true)
 }
 func (s Store) newRecord(kind, content, goalID, source, sourceSHA256 string, expires time.Time) (Record, error) {
@@ -287,6 +295,7 @@ func (s Store) correct(id, content, source, updated string) (Record, error) {
 	if record.Origin != nil {
 		record.Origin = &ChatOrigin{ConversationID: record.Origin.ConversationID, RunID: record.Origin.RunID, Basis: "user-corrected"}
 	}
+	record.observe("user-corrected", nil)
 	if err := validate(record); err != nil {
 		return Record{}, err
 	}
@@ -313,6 +322,7 @@ func (s Store) CorrectFromFile(id, content, path string) (Record, error) {
 	}
 	record.Text, record.Source, record.SourceSHA256, record.SourceStatus, record.UpdatedAt = strings.TrimSpace(content), abs, digest, "current", s.nextUpdate(record.UpdatedAt)
 	record.Origin = nil
+	record.observe("file-reviewed", nil)
 	if err := validate(record); err != nil {
 		return Record{}, err
 	}
@@ -416,6 +426,9 @@ func validID(id string) bool {
 	return err == nil
 }
 func validate(r Record) error {
+	if err := validateEvidence(r); err != nil {
+		return err
+	}
 	if r.Subject != "" && !subjectPattern.MatchString(r.Subject) {
 		return errors.New("invalid memory subject")
 	}
