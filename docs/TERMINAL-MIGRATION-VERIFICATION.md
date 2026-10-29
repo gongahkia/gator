@@ -1404,3 +1404,40 @@ terminal browser panel refreshes that revoked state and explains how to open a
 fresh session. Live owners and legacy controllers are not treated as dead after
 a timeout. Host power loss/simultaneous driver termination and native Windows
 execution remain separate open gates.
+
+### Installation failure recovery — 29 October
+
+The installer previously copied directly into `lib/gator-terminal`, so a copy
+failure could leave a partial product that prevented another attempt. It now
+copies to a private sibling staging directory, checks required files, writes the
+ownership manifest, and renames the complete directory before creating the public
+launcher exclusively. Existing populated installations remain untouched.
+
+`install.mjs --recover PREFIX` recreates a missing launcher only for a recognized
+installation with the required files. It accepts an already-owned launcher and
+refuses unrelated launchers, changed ownership and incomplete packages. No profile
+or background-service state is changed. Recovery can run under the installed Bun;
+it does not require Node. A hard kill before publication may leave an unreferenced
+staging directory; automatic collection and physical power-loss durability are
+not claimed. This is installation recovery, not an automatic upgrade mechanism.
+
+- Four Node installer regressions pass: concurrent installation, persisted
+  interruption before launcher creation, conflict/ownership refusal, incomplete
+  recovery refusal, recursive-destination refusal, and a real broken-symlink copy
+  failure followed by a successful clean retry. The symlink fixture skips on a
+  Windows host without symlink permission. These tests are now in terminal CI.
+- Fresh native `artifact-macos-3` passes production dependency/services checks,
+  including real Go startup, Bun-only child PATH, preference import, PDF rendering,
+  Office/text editing/export, unchanged originals and no model submission.
+- Its isolated installation check passes version/scripted commands, a removed
+  public launcher recovered by the packaged installer under Bun, preserved saved
+  notes, active-profile uninstall refusal, owned uninstall and retained user data.
+- The combined native PTY/editor/untrusted-file probe passes: Unicode/bracketed
+  paste, completion, grouped menus, retained drafts, clean exit, terminal-mode
+  restoration, editor handoff/return, and non-execution of file control sequences.
+- Workflow YAML parses; `git diff --check` passes. No remote CI run or native
+  Windows execution is implied by these local results.
+
+P25 remains open for the broader release lifecycle, including service executable
+migration, signed/published distribution and native Windows acceptance. The
+Electron removal/parity gate is unchanged.

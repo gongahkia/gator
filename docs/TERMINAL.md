@@ -61,8 +61,25 @@ node ui/scripts/uninstall.mjs /tmp/gator-install
 The installed product needs Bun on PATH, but no checkout, Go compiler, Node,
 Electron, development dependencies, or OpenCode server. Optional browser tools
 retain their existing external Node/Playwright requirements. Windows uses the
-console launcher `gator.cmd`; native Windows/macOS runtime evidence is pending.
-The installer refuses to replace an existing path. To update, finish work, save
+console launcher `gator.cmd`; native Windows runtime evidence remains pending.
+The installer refuses to replace an existing path. It copies into a private
+staging directory and publishes the package only after the copy and required-file
+checks succeed. A failed copy cleans up its own staging directory. If the process
+is killed before publication, an unreferenced `.gator-terminal-install-*` directory
+may remain under the prefix's `lib/`; it is not a runnable installation.
+
+If package publication succeeded but launcher creation was interrupted, restore
+the launcher without copying the package or touching profiles:
+
+```sh
+bun /tmp/gator-install/lib/gator-terminal/ui/scripts/install.mjs --recover /tmp/gator-install
+```
+
+Recovery checks installation ownership and required files, and refuses to replace
+an unrelated launcher. It does not repair damaged package contents. These checks
+do not establish artifact authenticity; install a reviewed build.
+
+To update, finish work, save
 drafts, stop background checks through Recovery, install a reviewed artifact at
 a new prefix, then use Recovery's existing reviewed service ownership flow to
 move/re-enable the executable. Do not simply delete an active service executable.
@@ -104,8 +121,10 @@ Native adapters:
 - Existing macOS-only computer control and Windows-unavailable strict sandbox/
   interactive agent terminal tools retain their current limits.
 
-Native runtime and permission checks on macOS/Windows will be completed later as
-agreed; those checks remain pending and do not count as a passing removal gate.
+Native macOS startup, packaged file services, PTY/editor handoff and isolated
+installation/removal have passed as recorded in the verification ledger. Native
+Windows execution, real audio/clipboard permissions and the remaining acceptance
+groups are still open and do not count as a passing removal gate.
 
 Public work activity stays chronological while running and folds above the answer
 when finished. Use `activity` in Ctrl+P to inspect live/retained entries or expand
