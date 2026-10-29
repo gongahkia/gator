@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/hostproc"
 	"github.com/gongahkia/gator/internal/privatefs"
 	sharedusage "github.com/gongahkia/gator/internal/usage"
@@ -122,8 +123,12 @@ func jobLaunchAgent(arguments []string, out io.Writer) error {
 	label := "com.gator.work-supervisor"
 	switch arguments[0] {
 	case "install":
-		if len(arguments) != 1 {
-			return errors.New("usage: gator job launchagent install")
+		expected, err := jobServiceChangeArguments(arguments)
+		if err != nil {
+			return err
+		}
+		if err := checkJobServiceChange(path, stateDir, "darwin", expected); err != nil {
+			return err
 		}
 		executable, err := os.Executable()
 		if err != nil {
@@ -136,7 +141,11 @@ func jobLaunchAgent(arguments []string, out io.Writer) error {
 			return err
 		}
 		logPath := filepath.Join(stateDir, "gator", "jobs", "launchagent.log")
-		plist := launchAgentPlist(label, executable, stateDir, logPath, os.Getenv("GATOR_CONFIG_DIR"))
+		configuration, err := config.ResolveDir("")
+		if err != nil {
+			return err
+		}
+		plist := launchAgentPlist(label, executable, stateDir, logPath, configuration)
 		if err := writePrivateFile(path, []byte(plist)); err != nil {
 			return err
 		}
@@ -144,7 +153,7 @@ func jobLaunchAgent(arguments []string, out io.Writer) error {
 		// only this exact per-user label before reloading the freshly-written file.
 		_ = hostproc.Command("launchctl", "bootout", "gui/"+uid+"/"+label).Run()
 		if output, err := hostproc.Command("launchctl", "bootstrap", "gui/"+uid, path).CombinedOutput(); err != nil {
-			return fmt.Errorf("load job LaunchAgent: %w (%s)", err, strings.TrimSpace(string(output)))
+			return fmt.Errorf("start at login is saved, but the supervisor could not start; repair it again from Recovery: %w (%s)", err, strings.TrimSpace(string(output)))
 		}
 		_, err = fmt.Fprintf(out, "Installed local LaunchAgent %s\n  plist: %s\n  logs: %s\nIt runs the foreground local supervisor while this Mac is on and you are signed in. Desktop/CUA sessions are never scheduled.\n", label, path, logPath)
 		return err
@@ -159,8 +168,12 @@ func jobLaunchAgent(arguments []string, out io.Writer) error {
 		_, err = out.Write(output)
 		return err
 	case "remove":
-		if len(arguments) != 2 || arguments[1] != "--yes" {
-			return errors.New("usage: gator job launchagent remove --yes")
+		expected, err := jobServiceChangeArguments(arguments)
+		if err != nil {
+			return err
+		}
+		if err := checkJobServiceChange(path, stateDir, "darwin", expected); err != nil {
+			return err
 		}
 		_ = hostproc.Command("launchctl", "bootout", "gui/"+uid+"/"+label).Run()
 		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {

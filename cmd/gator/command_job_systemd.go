@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/hostproc"
 )
 
@@ -38,8 +39,12 @@ func jobSystemd(arguments []string, out io.Writer) error {
 	}
 	switch arguments[0] {
 	case "install":
-		if len(arguments) != 1 {
-			return errors.New("usage: gator job systemd install")
+		expected, err := jobServiceChangeArguments(arguments)
+		if err != nil {
+			return err
+		}
+		if err := checkJobServiceChange(unitPath, stateDir, "linux", expected); err != nil {
+			return err
 		}
 		executable, err := os.Executable()
 		if err != nil {
@@ -48,7 +53,11 @@ func jobSystemd(arguments []string, out io.Writer) error {
 		if !filepath.IsAbs(executable) {
 			return errors.New("Gator executable path must be absolute for systemd installation")
 		}
-		unit, err := systemdJobUnit(executable, stateDir, os.Getenv("GATOR_CONFIG_DIR"))
+		configuration, err := config.ResolveDir("")
+		if err != nil {
+			return err
+		}
+		unit, err := systemdJobUnit(executable, stateDir, configuration)
 		if err != nil {
 			return err
 		}
@@ -59,15 +68,15 @@ func jobSystemd(arguments []string, out io.Writer) error {
 			return err
 		}
 		if output, err := command("daemon-reload"); err != nil {
-			return fmt.Errorf("reload user systemd units: %w (%s)", err, strings.TrimSpace(string(output)))
+			return fmt.Errorf("start-at-login configuration is saved, but systemd could not reload it; repair it again from Recovery: %w (%s)", err, strings.TrimSpace(string(output)))
 		}
 		if output, err := command("enable", "--now", jobSystemdUnitName); err != nil {
-			return fmt.Errorf("enable Gator user service: %w (%s)", err, strings.TrimSpace(string(output)))
+			return fmt.Errorf("start-at-login configuration is saved, but systemd could not enable it; repair it again from Recovery: %w (%s)", err, strings.TrimSpace(string(output)))
 		}
 		// enable --now does not restart a unit that was already active. Restart
 		// after daemon-reload so reinstalling a moved binary takes effect.
 		if output, err := command("restart", jobSystemdUnitName); err != nil {
-			return fmt.Errorf("restart Gator user service: %w (%s)", err, strings.TrimSpace(string(output)))
+			return fmt.Errorf("start at login is saved, but the supervisor could not restart; repair it again from Recovery: %w (%s)", err, strings.TrimSpace(string(output)))
 		}
 		_, err = fmt.Fprintf(out, "Installed local user service %s\n  unit: %s\nIt runs while your Linux user manager is active. Desktop/CUA sessions are never scheduled.\n", jobSystemdUnitName, unitPath)
 		return err
@@ -82,8 +91,12 @@ func jobSystemd(arguments []string, out io.Writer) error {
 		_, err = out.Write(output)
 		return err
 	case "remove":
-		if len(arguments) != 2 || arguments[1] != "--yes" {
-			return errors.New("usage: gator job systemd remove --yes")
+		expected, err := jobServiceChangeArguments(arguments)
+		if err != nil {
+			return err
+		}
+		if err := checkJobServiceChange(unitPath, stateDir, "linux", expected); err != nil {
+			return err
 		}
 		if _, err := os.Stat(unitPath); errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("Gator user service unit is not installed at %s", unitPath)

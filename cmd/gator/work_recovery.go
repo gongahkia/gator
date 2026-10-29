@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/auth"
+	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/hostproc"
 	"github.com/gongahkia/gator/internal/jobs"
@@ -89,11 +90,10 @@ func recoveryControlWith(ctx context.Context, stateDir, action string, args []st
 			_, _ = command(ctx, stateDir, "stop")
 		}
 		serviceArgs := []string{service, action}
-		if runtime.GOOS == "windows" {
-			serviceArgs = append(serviceArgs, "--expected", serviceDigest)
-		} else if action == "remove" {
+		if runtime.GOOS != "windows" && action == "remove" {
 			serviceArgs = append(serviceArgs, "--yes")
 		}
+		serviceArgs = append(serviceArgs, "--expected", serviceDigest)
 		output, err := command(ctx, stateDir, serviceArgs...)
 		if err != nil {
 			return workapp.ControlScreen{}, err
@@ -268,6 +268,18 @@ func recoveryControlWith(ctx context.Context, stateDir, action string, args []st
 	}
 	if !installed || ownsService {
 		screen.Actions = append(screen.Actions, autostart)
+	}
+	if installed && ownsService {
+		binary, err := os.Executable()
+		if err != nil {
+			return screen, err
+		}
+		configuration, err := config.ResolveDir("")
+		if err != nil {
+			return screen, err
+		}
+		screen.Actions = append(screen.Actions, workapp.ControlAction{Key: "F", Label: "Repair start at login", Action: "install", Args: []string{jobID, serviceDigest}, Review: true,
+			Description: "Replace the reviewed login service and restart background checks using this Gator installation. Executable: " + binary + ". State: " + stateDir + ". Configuration: " + configuration + ". Saved checks remain; enabled checks may run when the supervisor restarts."})
 	}
 	screen.Actions = append(screen.Actions, workapp.ControlAction{Key: "R", Label: "Refresh", Action: "status", Args: []string{jobID}})
 	if notice != "" {

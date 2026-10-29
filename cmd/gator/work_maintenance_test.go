@@ -74,7 +74,7 @@ func TestRecoveryServiceOwnershipAndReviewedChanges(t *testing.T) {
 	if _, err = recoveryControlWith(context.Background(), root, "install", review, runner); err != nil {
 		t.Fatal(err)
 	}
-	if len(calls) != 2 || strings.Join(calls[0], " ") != "stop" || calls[1][1] != "install" {
+	if len(calls) != 2 || strings.Join(calls[0], " ") != "stop" || strings.Join(calls[1][1:], " ") != "install --expected absent" {
 		t.Fatalf("service actions: %#v", calls)
 	}
 	if err = os.MkdirAll(filepath.Dir(path), 0700); err != nil {
@@ -91,10 +91,28 @@ func TestRecoveryServiceOwnershipAndReviewedChanges(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	screen, err = recoveryControlWith(context.Background(), root, "status", nil, runner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundRepair := false
+	for _, action := range screen.Actions {
+		if action.Label == "Repair start at login" {
+			foundRepair = true
+			binary, _ := os.Executable()
+			configuration, _ := config.ResolveDir("")
+			if !action.Review || action.Action != "install" || len(action.Args) != 2 || action.Args[1] != ownDigest || !strings.Contains(action.Description, binary) || !strings.Contains(action.Description, configuration) {
+				t.Fatalf("repair is not bound to reviewed installation: %+v", action)
+			}
+		}
+	}
+	if !foundRepair {
+		t.Fatal("owned service has no repair action")
+	}
 	if _, err = recoveryControlWith(context.Background(), root, "remove", []string{"", ownDigest}, runner); err != nil {
 		t.Fatal(err)
 	}
-	if len(calls) != 3 || strings.Join(calls[2][1:], " ") != "remove --yes" {
+	if len(calls) != 3 || strings.Join(calls[2][1:], " ") != "remove --yes --expected "+ownDigest {
 		t.Fatal("service removal missing reviewed confirmation", calls)
 	}
 	contents = launchAgentPlist("gator", "/gator", other, "/log")
