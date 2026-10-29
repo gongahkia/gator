@@ -312,7 +312,11 @@ func RenderXLSX(spec Spec, template io.Reader) ([]byte, Preview, error) {
 	if template != nil && len(preview.Warnings) == 0 {
 		preview.Warnings = []string{"This template-based workbook requests recalculation on open; native spreadsheet results have not been verified."}
 	}
-	return output.Bytes(), preview, nil
+	contents, err := normalizePackageXML(output.Bytes())
+	if err != nil {
+		return nil, Preview{}, err
+	}
+	return contents, preview, nil
 }
 
 func unsafeTemplate(payload []byte) bool {
