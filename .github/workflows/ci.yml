@@ -81,16 +81,16 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
-      - name: Generate representative new and edited presentations
+      - name: Generate representative new and edited Office files
         run: go run ./scripts/office-fixtures .gator/office-fixtures
-      - name: Roundtrip a generated deck through the shared file editor
+      - name: Roundtrip all three formats through the shared file editor
         run: |
           npm ci --prefix app-host
           node scripts/office-validation/roundtrip.mjs .gator/office-fixtures
       - name: Validate with the independent Open XML SDK
         run: |
           dotnet restore scripts/office-validation/OfficeValidation.csproj --locked-mode
-          dotnet run --no-restore --project scripts/office-validation -- .gator/office-fixtures/*.pptx
+          dotnet run --no-restore --project scripts/office-validation -- .gator/office-fixtures/*.pptx .gator/office-fixtures/*.docx .gator/office-fixtures/*.xlsx
 
   browser:
     name: browser-${{ matrix.os }}
