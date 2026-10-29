@@ -50,7 +50,7 @@ test("local model keyboard reviews download cancellation selection rename and re
     await select(name); setup.mockInput.pressKey("e"); await until(() => client.state?.panel?.title === "Rename model", "rename")
     await flush(); setup.mockInput.pressEnter(); await flush(); setup.mockInput.pressKey("u", { ctrl: true }); await setup.mockInput.typeText("Tiny local fixture"); setup.mockInput.pressEnter(); await flush(); setup.mockInput.pressKey("F2")
     await until(() => !!client.state?.panel?.rows?.some(row => row.label === "Tiny local fixture"), "alias")
-    await select("Tiny local fixture"); setup.mockInput.pressEnter(); await flush(); await client.navigate("/chat"); await until(() => client.state?.model === modelID, "selected model identity")
+    await select("Tiny local fixture"); setup.mockInput.pressEnter(); await flush(); await until(() => !!client.state?.panel?.notice?.includes("Local model selected") && !client.state?.pending_operation, "model selection saved"); await client.navigate("/chat"); await until(() => !client.state?.panel && client.state?.model === modelID, "return to chat after model selection")
     expect(client.draft.text).toBe("Keep local setup draft"); expect(calls).toBe(0)
     await client.send({ type: "submit", text: "/mode inspect" }); await client.submit(); await until(() => calls === 1 && !client.state?.running, "local model task")
     await client.navigate("/model"); await select("Local model"); setup.mockInput.pressEnter(); await select("Tiny local fixture")

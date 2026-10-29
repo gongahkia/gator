@@ -1,6 +1,7 @@
 import { createEffect, createSignal, createMemo, For, onCleanup, Show } from "solid-js"
 import { NativeImage, TextareaRenderable, type Renderable } from "@opentui/core"
 import { useTerminalDimensions, useRenderer } from "@opentui/solid"
+import { Spinner } from "../component/spinner"
 import { useClient } from "../context/client"
 import { useTheme } from "../context/theme"
 import { Keymap } from "../context/keymap"
@@ -72,7 +73,7 @@ function FileEditor(props: { view: FileView; request: FileRequest; reopen(versio
   let rendering = 0
   const editable = () => props.view.editable && props.view.revision === props.view.current
   const request = (action: FileRequest["action"], extra: Partial<FileRequest> = {}): FileRequest => ({ ...props.request, action, expected: props.view.current, version: props.view.revision, ...extra })
-  const attempt = (operation: Promise<unknown>) => { void operation.catch(error => { setNotice(error instanceof Error ? error.message : String(error)); client.fail(error) }) }
+  const attempt = (operation: Promise<unknown>, label = "Saving file draft…") => { void client.track(label, operation).catch(error => { setNotice(error instanceof Error ? error.message : String(error)); client.fail(error) }) }
   async function retain() { if (dirty() && editable()) await client.host.file(request("draft", { edit: edit() })) }
   function change(next: FileEdit) {
     if (!editable()) return
@@ -154,10 +155,10 @@ function FileEditor(props: { view: FileView; request: FileRequest; reopen(versio
   }
   Keymap.createLayer(() => ({ mode: "modal", priority: 3, commands: [
     { bind: "escape", title: "Close file with draft review", run: close },
-    { bind: "ctrl+s", title: "Save file version", enabled: editable, run: () => attempt(save()) },
+    { bind: "ctrl+s", title: "Save file version", enabled: editable, run: () => attempt(save(), "Saving file version…") },
     { bind: "f3", title: "Edit Office/table content", run: editContent },
-    { bind: "f2", title: "File versions", run: () => { attempt(retain().then(versions)) } },
-    { bind: "f4", title: "Discard file edits", run: () => attempt(discard()) },
+    { bind: "f2", title: "File versions", run: () => { attempt(retain().then(versions), "Loading file versions…") } },
+    { bind: "f4", title: "Discard file edits", run: () => attempt(discard(), "Discarding file edits…") },
     { bind: "f6", title: "Select saved content for Ask Gator", run: selectContent },
     { bind: "f7", title: "Choose displayed worksheet", enabled: !!props.view.sheets, run: () => props.menu("Display worksheet", (props.view.sheets ?? []).map(sheet => ({ title: sheet.name, run: async () => { client.filePositions.set(props.view.id, { sheet: sheet.id, row: 0, col: 0 }); await props.reopen(props.view.revision) } }))) },
     { bind: "ctrl+down", title: "Next table rows", enabled: grid, run: () => setPosition(p => ({ ...p, row: Math.min(Math.floor(Math.max(0, size().rows - 1) / 50), p.row + 1) })) },
@@ -183,7 +184,7 @@ function FileEditor(props: { view: FileView; request: FileRequest; reopen(versio
           onContentChange={() => { if (textarea && editable() && textarea.plainText !== (edit().text ?? props.view.text ?? "")) change({ text: textarea.plainText }) }} />
       </Show>
     </box>
-    <Show when={props.view.kind === "pdf"}><text fg={theme.text.base}>PDF page {page()} of {pages()}{busy() ? " · Rendering…" : ""} · Ctrl+←/→ pages</text></Show>
+    <Show when={props.view.kind === "pdf"}><Show when={busy()} fallback={<text fg={theme.text.base}>PDF page {page()} of {pages()} · Ctrl+←/→ pages</text>}><Spinner delay={150}>Rendering PDF page {page()}…</Spinner></Show></Show>
     <text fg={theme.text.muted}>{literal(notice())}</text>
     <text fg={theme.text.muted}>Ctrl+S save · F3 edit Office/cell · F2 versions/export/Ask Gator · F6 select content · F4 discard · Esc close</text>
   </DialogLayout>

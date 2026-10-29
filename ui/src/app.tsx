@@ -16,6 +16,7 @@ import { DialogSelect } from "./ui/dialog-select"
 import { CommandPaletteDialog } from "./component/command-palette"
 import { SessionFrame } from "./component/session-frame"
 import { Prompt } from "./component/prompt"
+import { Progress } from "./gator/progress"
 import { ConnectionStatus } from "./gator/connection-status"
 import { Transcript } from "./gator/transcript"
 import { Panel } from "./gator/panel"
@@ -36,7 +37,7 @@ function Shell(props: { quit(): Promise<void> }) {
   const navigate = (command: string) => attempt(client.navigate(command))
   const close = async () => {
     if (/^\/(exit|quit)$/.test(client.draft.text.trim())) await client.edit("")
-    await props.quit()
+    await client.track("Closing Gator…", props.quit())
   }
   const quit = async () => {
     if (!await client.mayLeave()) return
@@ -87,6 +88,7 @@ function Shell(props: { quit(): Promise<void> }) {
     <Show when={data.issue || data.snapshot.error || data.snapshot.sessionIssue}><text fg={theme.text.feedback.error.base}>{literal(data.issue || data.snapshot.error || data.snapshot.sessionIssue)}</text></Show>
     <Show when={data.voicePhase !== "idle"}><text fg={theme.text.feedback.warning.base}>Voice: {data.voicePhase} · Ctrl+Shift+V opens stop/cancel controls.</text></Show>
     <Show when={data.state?.external}><text fg={theme.accent}>A reviewed external step is ready. Use “continue-external” in Ctrl+P to continue and return to this chat.</text></Show>
+    <Progress />
     <Show when={data.state?.status_line_enabled}><text fg={theme.text.muted}>{data.state?.status_line.map(literal).join(" · ")}</text></Show>
   </box>
 }

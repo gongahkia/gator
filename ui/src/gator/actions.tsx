@@ -25,14 +25,14 @@ export function useActions() {
     const context = client.context
     if (context !== previousContext) { previousContext = context; dialog.clear() }
   })
-  const attempt = (operation: unknown) => { if (operation instanceof Promise) void operation.catch(e => client.fail(e)) }
+  const attempt = (operation: unknown, label = "Working…") => { if (operation instanceof Promise) void client.track(label, operation).catch(e => client.fail(e)) }
   const menu = (title: string, choices: Choice[] | (() => Choice[]), showDisabled = false, back?: () => void) => dialog.replace(() => <DialogSelect title={title} showDisabled={showDisabled} onCancel={back} options={(typeof choices === "function" ? choices() : choices).map((item, index) => ({
     title: literal(item.title), description: literal(item.description), category: literal(item.category), disabled: item.disabled, value: item.key ?? index,
-    onSelect: () => { dialog.clear(); try { attempt(item.run()) } catch (error) { client.fail(error) } },
+    onSelect: () => { dialog.clear(); try { attempt(item.run(), literal(item.title) + "…") } catch (error) { client.fail(error) } },
   }))} />)
   const prompt = (title: string, value: string, save: (text: string) => unknown, description?: string) => { const token = Symbol(title); dialog.replace(() => <ActionPrompt token={token} title={title} value={value} save={save} description={description} />, undefined, { key: token }) }
   const details = (title: string, text: string) => dialog.replace(() => <Details title={title} text={text} />, undefined, { size: "xlarge" })
-  const confirm = (title: string, message: string, run: () => unknown) => dialog.replace(() => <DialogConfirm title={title} message={literal(message)} onConfirm={() => { try { attempt(run()) } catch (error) { client.fail(error) } }} />)
+  const confirm = (title: string, message: string, run: () => unknown) => dialog.replace(() => <DialogConfirm title={title} message={literal(message)} onConfirm={() => { try { attempt(run(), literal(title) + "…") } catch (error) { client.fail(error) } }} />)
   function outputs() {
     const context = client.context
     menu("Retained outputs and proposed changes", () => conversationBundles(data.state).flatMap((bundle, group) => [
@@ -202,7 +202,7 @@ export function useActions() {
       { title: "Edit text before replacing the composer", run: () => prompt("Reuse message (files in current draft stay attached)", message.text, text => client.edit(text)) },
       { title: "Inspect retained message", run: () => details("Retained message", message.text) },
     ]) }))),
-    "attach-file": () => dialog.replace(() => <PathPicker kind="file" choose={path => { dialog.clear(); attempt(client.attach([path])) }} />),
+    "attach-file": () => dialog.replace(() => <PathPicker kind="file" choose={path => { dialog.clear(); attempt(client.attach([path]), "Importing attachment…") }} />),
     attachments: () => menu("Draft attachments", (client.draft.uploads ?? []).map(file => ({ title: file.name, run: () => menu(file.name, [{ title: "Remove from draft", run: () => client.edit(client.draft.text, client.draft.uploads?.filter(f => f.id !== file.id)) }]) }))),
     chats,
     search: () => prompt("Search this transcript", "", text => menu("Transcript matches", (client.state?.messages ?? []).map((message, index) => ({ message, index })).filter(({ message, index }) => searchableMessage(message, client.activityExpanded.has(activityKey(client.context, message, index))).toLocaleLowerCase().includes(text.toLocaleLowerCase())).map(({ message, index }) => ({ title: `${index + 1}. ${message.text.slice(0, 100)}`, description: [message.role, message.created_at].filter(Boolean).join(" · "), run: () => { client.route = "chat"; client.emit("change"); client.emit("reveal-message", index) } })))),
@@ -224,7 +224,7 @@ export function useActions() {
   }
   const fileWorkflows = useFiles(menu, prompt)
   actions.files = fileWorkflows.files
-  const trigger = (name: string) => { const action = actions[name]; if (action) { try { attempt(action()) } catch (error) { client.fail(error) } } }
+  const trigger = (name: string) => { const action = actions[name]; if (action) { try { attempt(action(), name.replaceAll("-", " ") + "…") } catch (error) { client.fail(error) } } }
   client.on("action", trigger); onCleanup(() => client.off("action", trigger))
   return { menu, prompt, confirm, actions, trigger }
 }

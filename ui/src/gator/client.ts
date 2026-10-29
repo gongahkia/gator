@@ -14,6 +14,11 @@ export class GatorClient extends EventEmitter {
   snapshot: HostSnapshot
   drafts = new Map<string, Draft>()
   pending = new Set<string>()
+  operations = new Map<symbol, { context: string; label: string }>()
+  async track<T>(label: string, operation: Promise<T>): Promise<T> {
+    const key = Symbol(label); this.operations.set(key, { context: this.context, label }); this.emit("change")
+    try { return await operation } finally { this.operations.delete(key); if (!this.#closed) this.emit("change") }
+  }
   issue = ""
   preferences = frontendDefaults()
   voicePhase = "idle"

@@ -13,6 +13,7 @@ import { chatTimeline, updateStatus, updateWarning } from "./timeline"
 import { Activity, activityKey } from "./activity"
 import { Markdown } from "./markdown"
 import { displayDate } from "./display"
+import { Spinner } from "../component/spinner"
 import { WorkingStatus } from "./working-status"
 
 function Result(props: { value: BackendResult }) {
@@ -82,7 +83,7 @@ export function Transcript() {
       <text fg={theme.text.base}>{literal(item.update.summary)}</text>
       <Show when={updateWarning(item.update.status)}>{warning => <text fg={theme.text.feedback.warning.base}>{warning()} Earlier results don’t confirm that nothing changed.</text>}</Show>
       <Show when={item.update.rating}><text fg={theme.text.base}>Feedback: {item.update.rating}</text></Show>
-      <Show when={data.updateFeedback?.id === item.update.id}><text fg={theme.text.muted}>{literal(data.updateFeedback?.message)}</text></Show>
+      <Show when={data.updateFeedback?.id === item.update.id}><Show when={data.updateFeedback?.saving} fallback={<text fg={theme.text.muted}>{literal(data.updateFeedback?.message)}</text>}><Spinner>{literal(data.updateFeedback?.message)}</Spinner></Show></Show>
       <text fg={theme.text.muted}>Use “updates” in Ctrl+P to inspect evidence, read, reply, mark done or give feedback.</text>
     </box> : undefined}>{messageItem => { const { message, index } = messageItem(); return <box id={`message-${index}`} paddingY={1} gap={0} border={revealed() === index ? ["left"] : false} borderColor={revealed() === index ? theme.accent : undefined}>
       <text fg={message.role === "You" ? theme.accent : theme.text.muted}><b>{literal(message.role)}</b><span style={{ attributes: TextAttributes.DIM }}> {displayDate(message.created_at)}</span></text>

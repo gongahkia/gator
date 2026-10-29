@@ -53,6 +53,7 @@ test("chat updates keep delivery, read, done, acknowledged feedback and retained
     expect(setup.captureCharFrame()).not.toContain("PRIVATE OTHER CHAT")
     await action("Calendar check", "Mark read"); await action("Calendar check", "Mark done")
     let failed = await read("inbox-failed"); expect(failed.status).toBe("failed"); expect(hasTime(failed.read_at)).toBe(true); expect(hasTime(failed.resolved_at)).toBe(true)
+    await until(() => !!client.state?.chat_updates?.find(update => update.id === "inbox-failed")?.resolved, "resolved update visible")
     await action("Calendar check")
     await writeFile(entryPath("inbox-failed"), JSON.stringify({ ...failed, resolution_version: 3 }))
     await choose("Reopen"); await until(() => client.issue.includes("this update changed"), "stale resolution refusal")

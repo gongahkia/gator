@@ -29,7 +29,7 @@ test("keyboard indexed catalog pages, renames, pins and archives by original ide
   const flush = async () => { await setup.flush(); await Bun.sleep(40); await setup.flush() }
   const loaded = () => !!client.state?.panel?.catalog && !client.state.catalog_busy && !client.state.panel.catalog.loading
   const chooseAction = async (title: string) => { setup.mockInput.pressKey("F3"); await flush(); await setup.mockInput.typeText(title); await flush(); setup.mockInput.pressEnter(); await flush() }
-  const filter = async (title: string) => { setup.mockInput.pressKey("l", { ctrl: true }); await flush(); await setup.mockInput.typeText(title); await flush(); setup.mockInput.pressEnter(); await until(loaded, "filter loaded"); await flush() }
+  const filter = async (title: string) => { setup.mockInput.pressKey("l", { ctrl: true }); await flush(); await setup.mockInput.typeText(title); await flush(); setup.mockInput.pressEnter(); await until(() => loaded() && client.state?.panel?.filter?.value === title.toLowerCase(), "filter loaded"); await flush() }
   const search = async () => { setup.mockInput.pressKey("f", { ctrl: true }); await flush(); await setup.mockInput.typeText("jade orchid"); setup.mockInput.pressEnter(); await until(() => loaded() && client.state?.panel?.rows?.length === 1, "indexed old-message result"); await flush() }
   try {
     await client.start(); const originalContext = client.context; await client.edit("Keep the catalog draft"); await client.navigate("/conversations")
