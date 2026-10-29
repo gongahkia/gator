@@ -381,18 +381,46 @@ func templateBodyXML(spec Spec) string {
 }
 
 func paragraphXML(text, style string, bold bool) string {
-	var escaped bytes.Buffer
-	_ = xml.EscapeText(&escaped, []byte(text))
 	run := ""
 	if bold {
 		run = "<w:rPr><w:b/></w:rPr>"
 	}
-	return `<w:p><w:pPr><w:pStyle w:val="` + style + `"/></w:pPr><w:r>` + run + `<w:t xml:space="preserve">` + escaped.String() + `</w:t></w:r></w:p>`
+	return `<w:p><w:pPr><w:pStyle w:val="` + style + `"/></w:pPr><w:r>` + run + wordTextXML(text) + `</w:r></w:p>`
+}
+
+func wordTextXML(text string) string {
+	text = strings.NewReplacer("\r\n", "\n", "\r", "\n").Replace(text)
+	var result strings.Builder
+	for lineIndex, line := range strings.Split(text, "\n") {
+		if lineIndex > 0 {
+			result.WriteString("<w:br/>")
+		}
+		for tabIndex, segment := range strings.Split(line, "\t") {
+			if tabIndex > 0 {
+				result.WriteString("<w:tab/>")
+			}
+			if segment == "" {
+				continue
+			}
+			var escaped bytes.Buffer
+			_ = xml.EscapeText(&escaped, []byte(segment))
+			result.WriteString(`<w:t xml:space="preserve">` + escaped.String() + `</w:t>`)
+		}
+	}
+	return result.String()
 }
 
 func tableXML(headers []string, rows [][]string) string {
 	var result strings.Builder
-	result.WriteString(`<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="0" w:type="auto"/></w:tblPr>`)
+	result.WriteString(`<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders>`)
+	for _, edge := range []string{"top", "left", "bottom", "right", "insideH", "insideV"} {
+		result.WriteString(`<w:` + edge + ` w:val="single" w:sz="4" w:color="D9D9D9"/>`)
+	}
+	result.WriteString(`</w:tblBorders></w:tblPr><w:tblGrid>`)
+	for range headers {
+		result.WriteString(`<w:gridCol w:w="0"/>`)
+	}
+	result.WriteString(`</w:tblGrid>`)
 	all := append([][]string{headers}, rows...)
 	for rowIndex, row := range all {
 		result.WriteString("<w:tr>")
@@ -401,9 +429,7 @@ func tableXML(headers []string, rows [][]string) string {
 			if rowIndex == 0 {
 				result.WriteString("<w:rPr><w:b/></w:rPr>")
 			}
-			var escaped bytes.Buffer
-			_ = xml.EscapeText(&escaped, []byte(cell))
-			result.WriteString(`<w:t xml:space="preserve">` + escaped.String() + "</w:t></w:r></w:p></w:tc>")
+			result.WriteString(wordTextXML(cell) + "</w:r></w:p></w:tc>")
 		}
 		result.WriteString("</w:tr>")
 	}
