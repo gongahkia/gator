@@ -157,3 +157,10 @@ states, stale/unlinked observations, bounds and cancellation.
 This is an outcome-driven review mechanism. General semantic lessons, idle-time
 fact reconciliation, fair scanning of histories larger than the current bound,
 alias/forget coverage and measured live-model usefulness remain outstanding.
+
+Validation at this checkpoint: learning, personalization, workrun and workapp
+race suites pass, as do focused command tests. The synthetic probe now reports
+20 supported checks and 2 observed gaps. Its repeated-failure fixture supplies
+retained evidence references and invokes the same maintenance API that Work
+finalization uses. This does not close the broader semantic or longitudinal
+requirements listed above.
