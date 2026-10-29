@@ -111,3 +111,22 @@ extraction quality still need wider evaluation. Focused race tests cover positiv
 capture, cropped evidence, sensitive review, negative requests in several
 languages, rejection and durable results. The synthetic capability probe now
 reports 19 supported checks and 3 gaps; the six broader outcomes remain open.
+
+## Personal summary checkpoint
+
+`gator memory summary` (or `--json`) and the Memory settings panel now expose a
+derived personal view: preferences, personal facts, saved context and active
+global guidance. Each entry has its owning ID and source; chat-origin memories
+include conversation/run references and confirmation time. CLI output provides
+the owning correction/forget/guidance commands. The view is rebuilt on each CLI
+read or settings refresh, without a second persistent copy or model call.
+
+Goal/project context and unapproved lessons are not personal claims. Expired or
+changed-source records are counted separately, partial-read warnings stay visible,
+and the view is bounded to 40 entries. Applicable guidance follows the existing
+16-record projection limit; full stores remain available through their lists.
+Tests cover source ownership, correction, forgetting, disabled guidance, pending
+lessons, scope exclusion, corruption warnings, restart reads and output bounds.
+
+This closes the initial missing unified inspection surface, not the wider
+concept/alias, suppression, maintenance or live-model evaluation requirements.

@@ -9,6 +9,7 @@ import (
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/knowledge"
 	"github.com/gongahkia/gator/internal/memory"
+	"github.com/gongahkia/gator/internal/personalization"
 	"github.com/gongahkia/gator/internal/uisnapshot"
 	"github.com/gongahkia/gator/internal/workrun"
 )
@@ -25,6 +26,12 @@ func workMemoryResult(stateDir, activeGoal string, arguments []string) (*uisnaps
 	}
 	scope, remaining := uiScope(activeGoal, arguments[1:])
 	switch arguments[0] {
+	case "summary":
+		summary, err := personalization.Read(stateDir)
+		if err != nil {
+			return nil, err
+		}
+		return &uisnapshot.Result{Kind: "details", Title: "What Gator knows about you", Summary: strings.Join(summary.Lines(), "\n")}, nil
 	case "list", "search":
 		var records []memory.Record
 		if arguments[0] == "list" {

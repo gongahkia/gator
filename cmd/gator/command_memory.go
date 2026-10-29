@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/localmodel"
 	"github.com/gongahkia/gator/internal/memory"
+	"github.com/gongahkia/gator/internal/personalization"
 	"github.com/gongahkia/gator/internal/retrieval"
 	"github.com/gongahkia/gator/internal/state"
 )
@@ -24,6 +26,7 @@ const memoryUsage = `Gator memory — explicit, inspectable personal knowledge
   gator memory list [--goal ID] [--all]
   gator memory search [--goal ID] QUERY
   gator memory diagnose
+  gator memory summary [--json]
   gator memory show ID
   gator memory correct ID [--source-file PATH] TEXT
   gator memory forget ID
@@ -48,6 +51,19 @@ func memoryCommand(args []string, out io.Writer) error {
 		return err
 	}
 	switch args[0] {
+	case "summary":
+		if len(args) > 2 || len(args) == 2 && args[1] != "--json" {
+			return errors.New("usage: gator memory summary [--json]")
+		}
+		summary, err := personalization.Read(stateDir)
+		if err != nil {
+			return err
+		}
+		if len(args) == 2 {
+			return json.NewEncoder(out).Encode(summary)
+		}
+		_, err = fmt.Fprintln(out, "What Gator knows about you\n\n"+strings.Join(summary.Lines(), "\n")+"\n\nInspect: gator memory show ID\nCorrect: gator memory correct ID TEXT\nForget: gator memory forget ID\nGuidance: gator learnings show ID; gator learnings edit ID TEXT; gator learnings disable ID\nInferred guidance must be reviewed; replace its wording by adding user-authored guidance.")
+		return err
 	case "embeddings":
 		return memoryEmbeddingsCommand(args[1:], out)
 	case "diagnose":

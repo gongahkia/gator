@@ -8,6 +8,7 @@ import (
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/localmodel"
 	"github.com/gongahkia/gator/internal/memory"
+	"github.com/gongahkia/gator/internal/personalization"
 	"github.com/gongahkia/gator/internal/retrieval"
 	"github.com/gongahkia/gator/internal/workapp"
 )
@@ -22,6 +23,11 @@ func workRecallStatus(ctx context.Context, stateDir string) (workapp.RecallStatu
 		provider = "ollama"
 	}
 	status := workapp.RecallStatus{Provider: provider, State: "Basic recall available", Storage: "Saved memories, notes, transcripts, and Work records stay in the private local Gator state directory on this computer. Forgetting removes an item from future recall; prior transcripts and retained Work evidence may still contain it."}
+	if summary, summaryErr := personalization.Read(stateDir); summaryErr == nil {
+		status.PersonalSummary = summary.Lines()
+	} else {
+		status.PersonalSummary = []string{"Personal summary unavailable: " + summaryErr.Error()}
+	}
 	memories, err := memory.Open(stateDir)
 	if err != nil {
 		return status, err

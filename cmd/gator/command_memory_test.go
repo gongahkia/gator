@@ -2,15 +2,50 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gongahkia/gator/internal/knowledge"
 	"github.com/gongahkia/gator/internal/memory"
+	"github.com/gongahkia/gator/internal/personalization"
 	"github.com/gongahkia/gator/internal/workrun"
 )
+
+func TestPersonalSummaryCLIAndTerminalResultFollowCorrections(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("GATOR_STATE_DIR", dir)
+	store, _ := memory.Open(dir)
+	record, err := store.Add("preference", "Use concise answers.", "", "user", time.Time{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	if err := memoryCommand([]string{"summary", "--json"}, &output); err != nil {
+		t.Fatal(err)
+	}
+	var summary personalization.Summary
+	if err := json.Unmarshal(output.Bytes(), &summary); err != nil || len(summary.Entries) != 1 || summary.Entries[0].ID != record.ID {
+		t.Fatal("CLI summary", output.String(), err)
+	}
+	if _, err := store.Correct(record.ID, "Use detailed reviews.", "user"); err != nil {
+		t.Fatal(err)
+	}
+	panel, err := workMemoryResult(dir, "", []string{"summary"})
+	if err != nil || panel == nil || strings.Contains(panel.Summary, "concise answers") || !strings.Contains(panel.Summary, "detailed reviews") {
+		t.Fatal("stale terminal summary", panel, err)
+	}
+	if err := store.Forget(record.ID); err != nil {
+		t.Fatal(err)
+	}
+	output.Reset()
+	if err := memoryCommand([]string{"summary"}, &output); err != nil || strings.Contains(output.String(), record.ID) || !strings.Contains(output.String(), "gator memory correct ID TEXT") {
+		t.Fatal("stale summary or missing correction route", output.String(), err)
+	}
+}
 
 func TestMemoryCLIAndPromptProjection(t *testing.T) {
 	state := t.TempDir()

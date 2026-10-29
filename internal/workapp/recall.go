@@ -181,6 +181,9 @@ func (m Model) recallPanel() uisnapshot.Panel {
 	}
 	p.Summary = []uisnapshot.Field{{Label: "Recall readiness", Value: valueOrDefault(m.recall.State, fallback)}, {Label: "Learn from chats", Value: learning}, {Label: "Refer to earlier chats", Value: history}}
 	p.Blocks[0].Lines = []string{m.recall.Detail}
+	if len(m.recall.PersonalSummary) != 0 {
+		p.Blocks = append(p.Blocks, uisnapshot.Block{Title: "What Gator knows about you", Collapsible: true, Lines: append(append([]string{}, m.recall.PersonalSummary...), "Press K to inspect, correct or forget saved knowledge; R rebuilds this summary.")})
+	}
 	if m.recallBusy {
 		p.Hints = []uisnapshot.Hint{{Shortcut: "Esc", Action: "cancel download"}}
 	} else {
