@@ -250,3 +250,37 @@ concurrency, candidate retention and opt-out before and after a scheduled pass.
 Learning, personalization, lifecycle and workrun race suites and focused CLI/
 supervisor tests pass. Semantic lesson interpretation and live usefulness remain
 unverified.
+
+## Unrecognized categories and live evaluation checkpoint
+
+The agent save tool now requires exact-text host review for categories outside
+the recognized personal schema, or a kind/category mismatch. The review shows
+the proposed label and up to 32 existing same-scope memories with bounded text
+previews, IDs and visible omissions. Renaming an unknown concept can no longer
+silently add another authoritative fact through this tool. Declining or lacking
+a review callback leaves saved state unchanged. An earlier approval does not
+grant blanket automatic admission to future unknown-category proposals.
+
+This is conservative admission, not general semantic reconciliation. A model
+can still misclassify meaning within recognized categories. Trusted manual store
+APIs remain separate; the two raw-store unregistered-paraphrase probes therefore
+remain open, rather than being rewritten to manufacture a passing score. New
+host-tool tests exercise the automatic boundary separately. Supported ordinary
+personal categories continue to save passively when enabled.
+
+An opt-in live check now shares the production memory prompt and real save/read/
+forget tools. It uses isolated synthetic state, declines review requests, caps
+provider calls/tokens and records provider/model, per-case results and usage.
+No external action tools are exposed. It is a small development corpus, not a
+held-out quality score or measurement of user usefulness. Run with a configured
+provider credential and a new report path:
+
+```sh
+GATOR_LIVE_MEMORY_REPORT=/tmp/gator-memory-live-NEW.json go test ./cmd/gator -run '^TestLiveMemoryEvaluation$' -count=1 -v
+```
+
+The attempted run on 30 October stopped at provider setup: the selected
+`gemini/gemini-3.5-flash` had no available `GEMINI_API_KEY`. **Zero provider
+requests and zero evaluated trials.** Setup failure is recorded in the report;
+live capture accuracy, multilingual behavior and suggestion usefulness are not
+claimed. Real-account browser sign-in remains deferred independently.
