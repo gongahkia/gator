@@ -165,6 +165,15 @@ separate from the job supervisor's availability. Client-off completion requires
 the execution host to stay online. Mobile notifications and offline client
 synchronization remain pending.
 
+For a CLI-created check to appear in a chat's follow-up cards, pass
+`gator job add NAME --conversation CHAT_ID --schedule CRON ... -- TASK` on the
+execution host. Use an existing chat in that host's profile. Its folder is the
+default source, and an explicit source must match. The command confirms the
+update's owning chat. See [scheduled-job CLI details](../docs/JOBS.md#cli).
+Jobs created without this option keep their host inbox behavior; there is no
+global phone inbox for unbound updates yet. Execution chats remain separate from
+the originating chat that owns follow-up decisions.
+
 ## macOS launch at login
 
 `macos-service.mjs` prepares a reviewable per-user LaunchAgent. It validates the
@@ -280,7 +289,7 @@ GATOR_COMPANION_BROWSERS=chromium,webkit node --test companion/client.test.mjs
 GATOR_COMPANION_LAUNCHD_TEST=1 node --test companion/macos-service.test.mjs
 # On Linux with an active user manager and a built Linux runtime:
 GATOR_COMPANION_SYSTEMD_TEST=1 GATOR_TEST_BINARY=/path/to/gator-runtime \
-  node --test companion/linux-service.test.mjs
+  node --test companion/linux-service.test.mjs companion/linux-monitoring.test.mjs
 ```
 
 Tests build the real Go runtime, use a disposable profile and local model fixture,
@@ -325,6 +334,16 @@ The test removes its own unit and disposable profile; it does not enable
 lingering, boot startup, a supervisor or a real account. CI runs this test on
 Linux; local container evidence does not establish remote-host reboot or logout
 availability.
+
+The Linux monitoring test additionally starts the real job supervisor in a unique
+transient user service, creates a CLI check linked to an existing chat, and holds
+its local fixture model response. It disables future runs, stops the companion,
+then releases the admitted check. The result completes with the listener offline.
+After reconnecting, its card appears in the originating chat, remains unread and
+unresolved, and does not appear as an owned update in the execution chat. Restarting
+the supervisor and reading again retain the same update without another model
+request. This exercises local service coordination; it does not prove permanent
+host deployment, physical phone access or real-account delivery.
 
 Follow-up checks cover 55 real-Go retained updates, paging, conversation binding,
 read/done/reopen, stale resolution refusal and receipts across restart, without

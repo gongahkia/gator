@@ -1,6 +1,8 @@
 # Durable jobs design
 
-**Interface status:** Gator is a desktop app. Shell examples below are source-checkout developer operations with an explicit internal opt-in; see [development instructions](DEVELOPMENT.md). They do not install or enable a public CLI.
+**Interface status:** The [terminal distribution](TERMINAL.md) exposes these
+retained command families as `gator job ...`. Source-checkout examples below use
+the Go runtime's explicit internal opt-in; see [development instructions](DEVELOPMENT.md).
 
 ## Implemented boundary
 
@@ -254,6 +256,26 @@ and credential availability. Remote response content and credentials are not
 written to scheduler lifecycle events.
 
 ## CLI
+
+To route a CLI-created check's updates to an existing chat, use the terminal
+launcher with that chat's exact ID:
+
+```sh
+gator job add 'Weekly review' --conversation work-EXISTING_ID \
+  --schedule '0 9 * * 1' --timezone Asia/Singapore --mode inspect \
+  -- 'Review this project and report changes needing attention'
+```
+
+The chat must exist in the selected profile. Its folder becomes the default
+source; an explicit `--source` must identify that same directory. Later source
+edits must preserve this binding. Updates appear in the originating chat in
+Gator and the companion, with separate execution conversations for each run.
+Opening an execution conversation does not grant it the originating chat's
+follow-up controls. The command confirms the selected chat ID after saving.
+Without `--conversation`, jobs retain their existing host inbox behavior; the
+companion does not expose a global inbox for those unbound updates. This option
+does not start the supervisor, configure remote access or send a notification
+immediately. The configured execution host still needs to stay online.
 
 ```text
 GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator job add NAME --schedule '0 9 * * 1' --timezone Asia/Singapore \

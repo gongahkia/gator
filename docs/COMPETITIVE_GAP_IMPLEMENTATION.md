@@ -902,3 +902,46 @@ acceptance, supervisor-plus-listener acceptance, physical-phone access, device
 pairing/revocation and mobile notifications are not established by this container
 run. The execution host must remain on; the new generator does not make the Mac
 or its files available while it is asleep or offline.
+
+
+### Offline companion monitoring and CLI chat routing — 29 October
+
+A combined Linux service test now exercises the job supervisor and companion
+against a real Go runtime and a loopback model fixture. Its first complete run
+proved that a CLI-created check finished while the listener was stopped, but the
+follow-up card was absent on reconnect. This exposed an integration gap: ordinary
+CLI jobs have no originating chat, while chat update controls deliberately require
+that exact owner. The global host inbox retained the result correctly.
+
+`gator job add --conversation ID` now explicitly binds a new job to an existing
+chat in the selected profile. The chat's folder becomes the default source instead
+of shell cwd; an explicit source must refer to the same directory. Source edits
+preserve this binding. Missing chats and mismatched sources fail before job
+publication. The command reports the owning chat ID. Jobs without the option keep
+their existing host inbox behavior. Execution conversations do not inherit the
+originating chat's update authority; no inbox ownership checks were weakened.
+
+Validation: focused command/edit/follow-up race tests and full inbox/jobs race
+suites pass. Windows command tests cross-compile. A rebuilt Mac runtime passes a
+real Bun-launcher smoke check from a different cwd, retaining the selected chat
+and its source without starting a supervisor or model. Workflow YAML and diff
+checks pass.
+
+All four Linux service/monitoring tests pass in the disposable Debian systemd
+container. The new journey creates its originating chat through the companion
+API, adds the linked check through the runtime command path used by the terminal,
+and starts the real supervisor as a unique transient user service. It waits for
+the scheduled model request, disables future runs, stops the companion listener,
+and then releases the admitted model response. It verifies a completed durable
+attempt while the listener is inactive. After reconnecting, the originating chat
+shows the retained, unread and unresolved card; the execution chat has no authority
+for it. Supervisor restart and subsequent reads preserve the same update and make
+no additional model requests. The temporary listener unit, supervisor and container
+are stopped/removed. No real accounts, external network or production services
+were used. CI includes this combined journey; remote CI was not run.
+
+Limits: the test uses a transient supervisor service, not a permanent production
+installation. Host reboot/logout behavior, permanent deployment, HTTPS and physical
+phone access remain unverified. The companion still has no global inbox for
+unbound CLI updates. Scheduled reminders and mobile/desktop push delivery are
+separate work; this change routes scheduled-work results into an existing chat.
