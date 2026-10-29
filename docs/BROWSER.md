@@ -179,9 +179,17 @@ Shutdown gives the driver two seconds to close its browser before forcing the
 driver to exit. Profiles and downloads use an owned private scratch directory;
 cleanup removes it even after forced driver termination. A short bounded retry
 handles lingering native file handles; a cleanup failure is returned to the
-daemon log. A host crash or killing the entire daemon bypasses this cleanup and
-can still leave private scratch data. Stopping an attached session disconnects
-it; the separately owned browser profile is retained.
+daemon log. If the controller process is killed, its surviving driver closes
+the browser and removes its assigned scratch directory on stdin EOF. On the
+next browser request, a released controller lease causes Gator to revoke the
+saved session and remove its token and endpoint. Live or legacy controllers
+are never declared dead merely because of a timeout; legacy controllers without
+leases still require explicit revocation.
+
+A host crash, or killing/freezing both the controller and driver together, can
+still leave private scratch data; startup collection for that case remains
+unimplemented. Stopping an attached session disconnects it; the separately owned
+browser profile is retained.
 
 Snapshots are bounded to 32 KiB of visible text and 128 visible actionable
 elements. Screenshot observations are bounded to 2 MiB PNG; retained local

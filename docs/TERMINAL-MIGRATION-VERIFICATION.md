@@ -1396,3 +1396,11 @@ available yet. Whole-daemon crash cleanup and real-account sign-in remain open;
 the user deferred sign-in. A terminal control journey rejected a stale view
 under concurrent native-test load; both journeys passed on standalone rerun.
 See the competitive-gap ledger for the exact evidence and remaining limits.
+
+Whole-controller crash follow-up: a native macOS fixture now kills the actual Go
+controller process and verifies child Chromium exit, private scratch removal,
+and lease-based session/token/socket revocation on the next client probe. The
+terminal browser panel refreshes that revoked state and explains how to open a
+fresh session. Live owners and legacy controllers are not treated as dead after
+a timeout. Host power loss/simultaneous driver termination and native Windows
+execution remain separate open gates.

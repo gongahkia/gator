@@ -87,7 +87,7 @@ jobs:
           GATOR_BROWSER_INTEGRATION: "1"
         run: go test -count=1 -run TestSidecarManagedBrowserIntegration ./internal/browser
       - name: Test browser interruption, revocation and native cleanup
-        run: go test -count=1 -timeout=3m -run 'TestSidecar(Cancellation|Close|Frozen|Stalled)|TestService|TestWindows' ./internal/browser
+        run: go test -count=1 -timeout=3m -run 'TestSidecar(Cancellation|Close|Frozen|Stalled|DaemonCrash)|TestControllerLease|TestDuplicateController|TestService|TestWindows' ./internal/browser
 
   windows:
     name: Windows desktop preview

@@ -425,3 +425,37 @@ passed; the Windows amd64 browser test binary cross-compiled; and the Go runtime
 rebuilt. Both terminal browser journeys passed against that final runtime
 (16 assertions, 9.8 seconds). CI YAML parsed successfully with the Windows
 browser entry. The CI change is committed locally, not remotely executed.
+
+### Whole-controller crash recovery follow-up
+
+The controller now holds a per-session process lease. Lease publication and
+acquisition are serialized with probes to avoid declaring a starting controller
+dead. A second controller cannot replace its socket or revoke its session.
+When a client finds an existing lease released, it revokes the saved session,
+removes the token and endpoint, and refuses the operation. Missing leases retain
+legacy/startup behavior; a live owner or a response timeout is not crash evidence.
+The browser panel reloads the recovered state and displays stopped/revoked access
+instead of offering a stale revoke action.
+
+The JS child also removes its assigned private scratch directory after browser
+shutdown on stdin EOF, so killing the Go controller need not strand profiles.
+An opt-in native test launches a separate real Go controller process and Chromium,
+kills the Go process, observes its browser children exit and scratch directory
+disappear, then verifies a client probe removes the dead session's token/socket.
+The controller lease tests also cover a live owner, legacy/no-lease startup and
+duplicate-controller refusal. These tests pass with the race detector on macOS;
+focused command/browser-control tests pass and the Windows test package compiles.
+The browser CI recovery step includes the new tests (Unix process inspection is
+not a Windows runtime claim).
+
+Host power loss or simultaneous controller/driver termination/freezing is still
+outside this cleanup path. There is no startup collector for those leftover
+scratch directories. Real-account sign-in remains deferred; no live accounts
+were used or contacted by the recovery fixtures.
+
+Final verification for this follow-up: browser recovery/ownership/service and
+reviewed-policy race checks, including native Chromium journeys, passed in 22.6
+seconds; command browser-control race checks passed. Both terminal browser
+journeys passed against the rebuilt runtime (16 assertions, 10.3 seconds).
+Windows amd64 test cross-compilation and CI YAML validation passed. No remote
+CI execution or native Windows result is claimed.
