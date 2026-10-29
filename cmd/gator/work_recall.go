@@ -7,6 +7,7 @@ import (
 
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/localmodel"
+	"github.com/gongahkia/gator/internal/memory"
 	"github.com/gongahkia/gator/internal/retrieval"
 	"github.com/gongahkia/gator/internal/workapp"
 )
@@ -21,6 +22,16 @@ func workRecallStatus(ctx context.Context, stateDir string) (workapp.RecallStatu
 		provider = "ollama"
 	}
 	status := workapp.RecallStatus{Provider: provider, State: "Basic recall available", Storage: "Saved memories, notes, transcripts, and Work records stay in the private local Gator state directory on this computer. Forgetting removes an item from future recall; prior transcripts and retained Work evidence may still contain it."}
+	memories, err := memory.Open(stateDir)
+	if err != nil {
+		return status, err
+	}
+	_, readErr := memories.List("", true)
+	if warning := memory.ReadWarning(readErr); warning != "" {
+		status.Storage += " " + warning
+	} else if readErr != nil {
+		return status, readErr
+	}
 	status.LearnFromChats = settings.Desktop.LearnsFromChats()
 	status.ReferToChats = settings.Desktop.RefersToChats()
 	status.Retrieval = "Basic word matching works without a download. Enhanced recall uses " + provider + "; unavailable embeddings fall back to basic matching."

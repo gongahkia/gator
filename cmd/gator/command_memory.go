@@ -23,6 +23,7 @@ const memoryUsage = `Gator memory — explicit, inspectable personal knowledge
   gator memory add [--kind fact|preference|decision|note] [--goal ID] [--source REF|--source-file PATH] [--expires YYYY-MM-DD] TEXT
   gator memory list [--goal ID] [--all]
   gator memory search [--goal ID] QUERY
+  gator memory diagnose
   gator memory show ID
   gator memory correct ID [--source-file PATH] TEXT
   gator memory forget ID
@@ -49,6 +50,33 @@ func memoryCommand(args []string, out io.Writer) error {
 	switch args[0] {
 	case "embeddings":
 		return memoryEmbeddingsCommand(args[1:], out)
+	case "diagnose":
+		if len(args) != 1 {
+			return errors.New("usage: gator memory diagnose")
+		}
+		_, readErr := store.List("", true)
+		var issues *memory.ReadIssues
+		if errors.As(readErr, &issues) {
+			if _, err := fmt.Fprintln(out, issues.Error()); err != nil {
+				return err
+			}
+			for _, issue := range issues.Items {
+				if _, err := fmt.Fprintf(out, "Unreadable record: %q\n", issue.File); err != nil {
+					return err
+				}
+			}
+			if issues.Count > len(issues.Items) {
+				_, err = fmt.Fprintf(out, "%d additional unreadable records.\n", issues.Count-len(issues.Items))
+				return err
+			}
+			_, err = fmt.Fprintln(out, "No files were modified. Restore damaged records from a verified backup; do not replace them with invented facts.")
+			return err
+		}
+		if readErr != nil {
+			return readErr
+		}
+		_, err = fmt.Fprintln(out, "No unreadable memory records found.")
+		return err
 	case "add":
 		flags := flag.NewFlagSet("memory add", flag.ContinueOnError)
 		flags.SetOutput(io.Discard)
@@ -106,10 +134,7 @@ func memoryCommand(args []string, out io.Writer) error {
 			return errors.New("usage: gator memory list [--goal ID] [--all]")
 		}
 		records, err := store.List(*goalID, *all)
-		if err != nil {
-			return err
-		}
-		return printMemories(out, records)
+		return printMemoryRead(out, records, err)
 	case "search":
 		flags := flag.NewFlagSet("memory search", flag.ContinueOnError)
 		flags.SetOutput(io.Discard)
@@ -118,10 +143,7 @@ func memoryCommand(args []string, out io.Writer) error {
 			return err
 		}
 		records, err := store.Search(strings.Join(flags.Args(), " "), *goalID, 30)
-		if err != nil {
-			return err
-		}
-		return printMemories(out, records)
+		return printMemoryRead(out, records, err)
 	case "show":
 		if len(args) != 2 {
 			return errors.New("usage: gator memory show ID")
@@ -276,4 +298,17 @@ func formatMemoryExpiry(value time.Time) string {
 		return "-"
 	}
 	return value.Format("2006-01-02")
+}
+
+// Partial reads remain visible in script and terminal output; ordinary failures
+// still return an error and are never presented as an empty memory store.
+func printMemoryRead(out io.Writer, records []memory.Record, readErr error) error {
+	if warning := memory.ReadWarning(readErr); warning != "" {
+		if _, err := fmt.Fprintln(out, "Warning: "+warning); err != nil {
+			return err
+		}
+	} else if readErr != nil {
+		return readErr
+	}
+	return printMemories(out, records)
 }

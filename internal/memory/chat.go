@@ -132,7 +132,7 @@ func (s Store) RememberChat(input ChatInput) (Record, error) {
 // retrieved by query; project/goal facts never enter this global capsule.
 func (s Store) Profile(excluded []string) ([]Record, error) {
 	records, err := s.List("", false)
-	if err != nil {
+	if err != nil && ReadWarning(err) == "" {
 		return nil, err
 	}
 	var selected []Record
@@ -153,7 +153,7 @@ func (s Store) Profile(excluded []string) ([]Record, error) {
 			break
 		}
 	}
-	return selected, nil
+	return selected, err
 }
 
 // Revisions stay ordered even on clocks with coarse resolution or after a

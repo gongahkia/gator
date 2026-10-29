@@ -65,7 +65,8 @@ func readWorkContext(stateDir, workID, goalID string) (workapp.ContextState, err
 	if workID == "" {
 		result.Outcome = "Saved knowledge available to this goal"
 		records, err := memories.List(goalID, false)
-		if err != nil {
+		result.Recall = memory.ReadWarning(err)
+		if err != nil && result.Recall == "" {
 			return result, err
 		}
 		for _, r := range records {

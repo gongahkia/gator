@@ -357,7 +357,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		surface = append(surface, (tools.ChatMemory{Store: memoryStore, UserMessage: request.Objective, ConversationID: conversation.ID, RunID: request.RunID, GoalID: request.GoalID, Automatic: request.LearnFromChats, Review: request.ApproveAppChange, ExcludedIDs: request.ExcludedKnowledgeIDs}).Tools()...)
 	}
 	memories, err := memoryStore.List(request.GoalID, false)
-	if err != nil {
+	if err != nil && memory.ReadWarning(err) == "" {
 		return outcome, fmt.Errorf("list saved memories: %w", err)
 	}
 	if len(notes)+len(skills)+len(memories) > 0 {

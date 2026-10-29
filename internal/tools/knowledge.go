@@ -55,6 +55,7 @@ func (t knowledgeSearch) Execute(_ context.Context, raw json.RawMessage) (agent.
 	queries := append([]string{args.Query}, args.Alternates...)
 	result := make([]item, 0, 16)
 	seen := map[string]bool{}
+	readWarning := ""
 	for _, query := range queries {
 		if len(query) > 512 || strings.TrimSpace(query) == "" {
 			return agent.ToolResult{}, errors.New("knowledge alternate query must be 1–512 bytes")
@@ -64,7 +65,10 @@ func (t knowledgeSearch) Execute(_ context.Context, raw json.RawMessage) (agent.
 			return agent.ToolResult{}, err
 		}
 		memories, err := t.Memories.Search(query, t.GoalID, 8)
-		if err != nil {
+		if warning := memory.ReadWarning(err); warning != "" {
+			readWarning = warning
+		}
+		if err != nil && memory.ReadWarning(err) == "" {
 			return agent.ToolResult{}, err
 		}
 		for _, n := range notes {
@@ -80,7 +84,11 @@ func (t knowledgeSearch) Execute(_ context.Context, raw json.RawMessage) (agent.
 			}
 		}
 	}
-	content, err := success(result)
+	var payload any = result
+	if readWarning != "" {
+		payload = map[string]any{"items": result, "warning": readWarning}
+	}
+	content, err := success(payload)
 	return agent.ToolResult{Content: content}, err
 }
 

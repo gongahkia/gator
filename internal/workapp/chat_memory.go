@@ -41,10 +41,11 @@ func (m *Model) refreshChatMemories() {
 		return
 	}
 	records, err := m.config.ReadChatMemories(m.conversation, m.goalID)
-	if err != nil {
+	if err != nil && memory.ReadWarning(err) == "" {
 		m.chatMemoryIssue = "Saved memories could not refresh. Shown memories may be out of date; your open edits are kept."
 		return
 	}
+	m.chatMemoryIssue = memory.ReadWarning(err)
 	m.chatMemories = nil
 	for _, record := range records {
 		if record.Origin == nil || record.Origin.ConversationID != m.conversation || record.GoalID != "" && record.GoalID != m.goalID {

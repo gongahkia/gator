@@ -293,7 +293,7 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 				return nil, err
 			}
 			records, err := store.List(activeGoal, false)
-			if err != nil {
+			if err != nil && memory.ReadWarning(err) == "" {
 				return nil, err
 			}
 			var owned []memory.Record
@@ -302,7 +302,7 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 					owned = append(owned, record)
 				}
 			}
-			return owned, nil
+			return owned, err
 		},
 		ReviewChatMemory: func(a workapp.ChatMemoryAction, activeGoal string) error {
 			release, err := state.Guard(stateDir, false)

@@ -160,13 +160,15 @@ func (s Store) List(goalID string, includeExpired bool) ([]Record, error) {
 		return nil, err
 	}
 	var result []Record
+	var issues ReadIssues
 	for _, entry := range entries {
 		if entry.IsDir() || strings.HasPrefix(entry.Name(), ".") || filepath.Ext(entry.Name()) != ".json" {
 			continue
 		}
 		record, err := s.Load(strings.TrimSuffix(entry.Name(), ".json"))
 		if err != nil {
-			return nil, fmt.Errorf("load %s: %w", entry.Name(), err)
+			issues.add(entry.Name())
+			continue
 		}
 		if goalID != "" && record.GoalID != "" && record.GoalID != goalID {
 			continue
@@ -185,6 +187,9 @@ func (s Store) List(goalID string, includeExpired bool) ([]Record, error) {
 		}
 		return result[i].UpdatedAt.After(result[j].UpdatedAt)
 	})
+	if issues.Count > 0 {
+		return result, &issues
+	}
 	return result, nil
 }
 
@@ -192,12 +197,12 @@ func (s Store) List(goalID string, includeExpired bool) ([]Record, error) {
 // semantic matches; no match is safer than an unrelated remembered fact.
 func (s Store) Search(query, goalID string, limit int) ([]Record, error) {
 	records, err := s.List(goalID, false)
-	if err != nil {
+	if err != nil && ReadWarning(err) == "" {
 		return nil, err
 	}
 	terms := tokenize(query)
 	if len(terms) == 0 {
-		return nil, nil
+		return nil, err
 	}
 	type scored struct {
 		record Record
@@ -246,7 +251,7 @@ func (s Store) Search(query, goalID string, limit int) ([]Record, error) {
 	for _, match := range matches[:limit] {
 		result = append(result, match.record)
 	}
-	return result, nil
+	return result, err
 }
 
 func (s Store) Correct(id, content, source string) (Record, error) {

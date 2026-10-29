@@ -142,7 +142,7 @@ func main() {
 	bad := must(broken.Add("fact", "Another fixture fact.", "", "fixture", time.Time{}))
 	require(os.WriteFile(filepath.Join(root, "corrupt/gator/memory", bad.ID+".json"), []byte("{"), 0600))
 	hits, searchErr := broken.Search("Harbor", "", 8)
-	add("one corrupt record preserves unrelated healthy recall", searchErr == nil && contains(hits, healthy.ID), map[string]bool{"search_failed": searchErr != nil})
+	add("one corrupt record preserves unrelated healthy recall", (searchErr == nil || memory.ReadWarning(searchErr) != "") && contains(hits, healthy.ID), map[string]bool{"search_failed": searchErr != nil && memory.ReadWarning(searchErr) == "", "partial_read_warning": memory.ReadWarning(searchErr) != "", "healthy_record_recalled": contains(hits, healthy.ID)})
 	learnings := must(learning.Open(filepath.Join(root, "learning")))
 	for index := 0; index < 3; index++ {
 		must(learnings.RecordObservation(learning.ObservationInput{Signal: learning.WorkFailed, WorkID: fmt.Sprintf("work-failure-%d", index), Summary: "Synthetic repeated verification failure."}))

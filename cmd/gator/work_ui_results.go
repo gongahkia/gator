@@ -32,12 +32,16 @@ func workMemoryResult(stateDir, activeGoal string, arguments []string) (*uisnaps
 		} else {
 			records, err = store.Search(strings.Join(remaining, " "), scope, 30)
 		}
-		if err != nil {
+		if err != nil && memory.ReadWarning(err) == "" {
 			return nil, err
 		}
+		warning := memory.ReadWarning(err)
 		result := &uisnapshot.Result{Kind: "list", Title: "Memory", Summary: fmt.Sprintf("%d memories", len(records))}
 		if len(records) == 0 {
 			result.Summary = "No matching memories."
+		}
+		if warning != "" {
+			result.Summary += " · " + warning
 		}
 		for _, record := range records {
 			state := record.Kind + " · global"

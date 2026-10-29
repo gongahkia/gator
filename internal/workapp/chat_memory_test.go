@@ -7,6 +7,22 @@ import (
 	"time"
 )
 
+func TestMemoryReceiptPartialRefreshUsesHealthyRecordsAndKeepsWarning(t *testing.T) {
+	records := []memory.Record{{ID: "mem-healthy", Text: "Short replies", Origin: &memory.ChatOrigin{ConversationID: "work-chat", RunID: "run-1"}}}
+	readErr := &memory.ReadIssues{Count: 1}
+	m := New(Config{ReadChatMemories: func(string, string) ([]memory.Record, error) { return records, readErr }})
+	m.conversation = "work-chat"
+	m.refreshChatMemories()
+	if len(m.chatMemories) != 1 || m.chatMemories[0].ID != "mem-healthy" || m.chatMemoryIssue != readErr.Error() {
+		t.Fatal("partial refresh lost healthy receipts or warning", m.chatMemories, m.chatMemoryIssue)
+	}
+	records = nil
+	m.refreshChatMemories()
+	if len(m.chatMemories) != 0 || m.chatMemoryIssue == "" {
+		t.Fatal("partial refresh retained a record absent from healthy results")
+	}
+}
+
 func TestMemoryReceiptProjectsOwnedSavedStateAndAcknowledgesRejection(t *testing.T) {
 	now := time.Now().UTC()
 	records := []memory.Record{{ID: "mem-1", Text: "Short replies", CreatedAt: now, UpdatedAt: now, Origin: &memory.ChatOrigin{ConversationID: "work-chat", RunID: "run-1", Quote: "Short replies", Basis: "user-stated"}}, {ID: "mem-foreign", Text: "Not this chat", Origin: &memory.ChatOrigin{ConversationID: "work-other"}}}

@@ -92,7 +92,7 @@ func TestMemoryRejectsInvalidOnDiskRecord(t *testing.T) {
 	if err := os.Symlink(filepath.Join(t.TempDir(), "outside"), path); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.Search("trusted", "", 8); err == nil || !strings.Contains(err.Error(), "bounded regular") {
+	if records, err := store.Search("trusted", "", 8); ReadWarning(err) == "" || len(records) != 0 {
 		t.Fatalf("symlink accepted: %v", err)
 	}
 }

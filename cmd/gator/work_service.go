@@ -157,9 +157,10 @@ func applyMemoryContext(stateDir string, request *workrun.Request) error {
 	}
 	query := request.Objective + " " + request.GoalContext
 	lexical, err := store.Search(query, request.GoalID, 8)
-	if err != nil {
+	if err != nil && memory.ReadWarning(err) == "" {
 		return fmt.Errorf("resolve relevant memories: %w", err)
 	}
+	readWarning := memory.ReadWarning(err)
 	records := lexical
 	lexical = filterMemoryExclusions(lexical, request.ExcludedKnowledgeIDs)
 	records = lexical
@@ -168,7 +169,10 @@ func applyMemoryContext(stateDir string, request *workrun.Request) error {
 		lexicalByID[record.ID] = record
 	}
 	all, err := store.List(request.GoalID, false)
-	if err != nil {
+	if warning := memory.ReadWarning(err); warning != "" {
+		readWarning = warning
+	}
+	if err != nil && memory.ReadWarning(err) == "" {
 		return err
 	}
 	if embedder, embedErr := configuredEmbedder(stateDir); embedErr == nil && len(all) > 0 {
@@ -219,12 +223,18 @@ func applyMemoryContext(stateDir string, request *workrun.Request) error {
 	var profile []memory.Record
 	if request.ForegroundApp {
 		profile, err = store.Profile(request.ExcludedKnowledgeIDs)
-		if err != nil {
+		if warning := memory.ReadWarning(err); warning != "" {
+			readWarning = warning
+		}
+		if err != nil && memory.ReadWarning(err) == "" {
 			return err
 		}
 	}
 	if len(profile) > 0 {
 		recallState += " + personal profile"
+	}
+	if readWarning != "" {
+		recallState += "; " + readWarning
 	}
 	appendRecallStatus(request, "Memories", recallState)
 	seen := map[string]bool{}
@@ -239,6 +249,9 @@ func applyMemoryContext(stateDir string, request *workrun.Request) error {
 		}
 	}
 	request.MemoryContext, selected = memory.RenderSelection(combined)
+	if readWarning != "" {
+		request.MemoryContext = readWarning + "\n" + request.MemoryContext
+	}
 	for _, record := range selected {
 		request.ContextRefs = append(request.ContextRefs, record.ID)
 		request.ContextItems = append(request.ContextItems, workhistory.ContextItem{ID: record.ID, Kind: "memory", Title: record.Kind, Excerpt: boundedContextExcerpt(record.Text), Scope: contextScope(record.GoalID), Source: record.Source, UpdatedAt: record.UpdatedAt})
