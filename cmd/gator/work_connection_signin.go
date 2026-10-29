@@ -89,6 +89,9 @@ func (s *connectionSignIn) Begin(stateDir, id, digest, clientSecret string) (con
 			clientSecret = prior.OAuthClientSecret
 		}
 	}
+	if clientSecret == "" && usesBundledGoogle(descriptor) {
+		clientSecret = googleDesktopClientSecret
+	}
 	flow := auth.BrowserFlow{ClientID: descriptor.OAuthClientID, ClientSecret: clientSecret, AuthorizationURL: descriptor.OAuthAuthorizeURL, TokenURL: descriptor.OAuthTokenURL, RedirectURL: descriptor.OAuthRedirectURL, Scopes: strings.Fields(descriptor.OAuthScopes), AllowMissingExpiry: true, RequireBearerToken: true}
 	var attempt auth.BrowserAttempt
 	var callback *auth.Callback

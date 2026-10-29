@@ -32,6 +32,7 @@ jobs:
           npm ci --prefix desktop
           npm run check --prefix desktop
           npm test --prefix desktop
+          node --test scripts/google-oauth-build.test.mjs
       - name: Check formatting
         shell: bash
         run: |
@@ -126,6 +127,7 @@ jobs:
           npm ci --prefix desktop
           npm run check --prefix desktop
           npm test --prefix desktop
+          node --test scripts/google-oauth-build.test.mjs
       - name: Package Windows x64 and verify native app workflows
         shell: bash
         env:

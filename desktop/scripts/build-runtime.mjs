@@ -1,3 +1,4 @@
+import { googleOAuthFlags } from "../../scripts/google-oauth-build.mjs";
 import { mkdirSync, rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -11,6 +12,7 @@ const metadata = [process.env.VERSION, process.env.COMMIT, process.env.BUILD_DAT
 const target = process.env.GOOS || process.platform;
 const linker = target === "windows" || target === "win32" ? ["-H=windowsgui"] : [];
 if (metadata.some(Boolean)) linker.push(...["version", "commit", "date"].map((name, index) => `-X main.${name}=${metadata[index] || (index === 0 ? "dev" : "unknown")}`));
+linker.push(...googleOAuthFlags());
 const flags = linker.length ? ["-ldflags", linker.join(" ")] : [];
 const result = spawnSync("go", ["build", "-trimpath", ...flags, "-o", join(runtime, runtimeName(target)), "./cmd/gator"], { cwd: root, stdio: "inherit", windowsHide: true });
 if (result.error) console.error(result.error.message);

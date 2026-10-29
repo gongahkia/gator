@@ -25,6 +25,9 @@ jobs:
     env:
       VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '0.0.0-dev' }}
       COMMIT: ${{ github.sha }}
+      # Installed Desktop client material only, never a web-app secret or user token.
+      GATOR_GOOGLE_DESKTOP_CLIENT_ID: ${{ github.ref_type == 'tag' && vars.GOOGLE_DESKTOP_CLIENT_ID || '' }}
+      GATOR_GOOGLE_DESKTOP_CLIENT_SECRET: ${{ github.ref_type == 'tag' && secrets.GOOGLE_DESKTOP_CLIENT_SECRET || '' }}
       DESKTOP_PLATFORM: ${{ matrix.platform }}
       DESKTOP_ARCH: ${{ matrix.arch }}
       CSC_LINK: ${{ github.ref_type == 'tag' && matrix.goos == 'darwin' && secrets.MAC_CSC_LINK || '' }}

@@ -41,8 +41,8 @@ detail scans so a changed account cannot inherit another account's cache.
 ## Set up in the desktop app
 
 1. Open **Settings → Connections → Connect Google email & calendar**.
-2. Enter a unique connection ID, a display name and your Google Cloud **Desktop app** OAuth client ID. Enable the Gmail and Calendar APIs in that project. Gator does not yet operate a managed Google OAuth application, so this is still an advanced prerequisite.
-3. Review and save. Choose **Sign in**, optionally enter the client secret required by your own OAuth app, and review the requested scopes.
+2. Enter a unique connection ID and display name. A distributor-configured build supplies its Desktop OAuth client. Otherwise, enter your own Google Cloud **Desktop app** OAuth client ID and enable the Gmail and Calendar APIs in that project. **Use your own Google OAuth client** remains available in configured builds.
+3. Review and save. Choose **Sign in** and review the requested scopes. For your own OAuth client, optionally enter its client secret; distributor-configured connections do not ask for one.
 4. Choose **Continue in browser**. Finish Google consent and return to Gator. Sign-in waits up to five minutes; you can cancel it or switch to another chat and return through Connections.
 5. Choose **Check account & read access**. Gator verifies the account identity and makes bounded reads for the configured email, calendar and Drive metadata scopes. A failure on one service is reported as a failed check. A verified email is shown only if Google marks it verified.
 6. Select the connection in chat settings or in a follow-up agreement. Saving credentials does not select it for a chat or authorize writes.
@@ -207,3 +207,29 @@ A matching Sent copy is reported separately from the immutable original outcome.
 No match remains unconfirmed because indexing can lag; multiple matches require
 manual inspection. The saved check is bound to the original task manifest and
 can be reopened locally after restart, including when account access is offline.
+
+## Distribution-owned desktop sign-in
+
+Both runtime build scripts accept `GATOR_GOOGLE_DESKTOP_CLIENT_ID` and
+`GATOR_GOOGLE_DESKTOP_CLIENT_SECRET` at build time. Set both from a registered
+Google **Desktop app** client. Missing pairs or invalid characters fail the build
+without printing their values. With neither set, manual setup is unchanged.
+Tagged desktop releases read `GOOGLE_DESKTOP_CLIENT_ID` from the release
+environment variables and `GOOGLE_DESKTOP_CLIENT_SECRET` from its secrets.
+Pull-request builds do not receive them.
+These are embedded in the Go binary, never supplied by conversation text or
+runtime environment overrides. They are extractable desktop client material,
+not confidential web-application credentials or user tokens. Never supply a
+web-app secret, refresh token, or service-account key.
+
+The simplified setup requests the same email/calendar read scopes and uses the
+existing PKCE/loopback browser flow. It does not enable writes or select the
+account for a conversation. Bundled client material is used only for the matching
+client ID and fixed Google resource, authorization, token, and redirect URLs.
+User-owned connections retain their existing secret entry and credential storage.
+
+The distributor must enable APIs, configure its consent screen/test audience,
+and complete applicable Google verification before general distribution. Build
+configuration does not establish that verification. This checkout contains no
+production client and does not claim operational managed Google sign-in.
+See [Google's desktop OAuth guide](https://developers.google.com/identity/protocols/oauth2/native-app).

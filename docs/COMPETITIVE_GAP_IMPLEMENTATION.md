@@ -158,3 +158,34 @@ Desktop catalog verification: full workapp race tests, focused catalog/recents t
 - Quiet shared admission holds: regression testing found that the health-incident reducer introduced an inbox alert for a deliberately paused shared budget. Shared admission holds now stay in chat health/Usage and unsuccessful coverage counts, without creating inbox incidents or fabricated recovery notifications. Execution failures and check-specific limits retain incident handling. The original shared-pause test and focused job/command health race tests pass; model calls remain blocked while paused.
 
 Final storage checks: the full command-package race suite passed after the shared-hold fix. SQLite file URIs preserve Unix punctuation/spaces and use the correct Windows drive form. Cache locks use the rooted file-identity checks; six concurrent cold queries initialize a usable cache. Focused URI and concurrent query/organization race tests passed three repetitions. Runtime Windows execution remains unverified.
+
+## Current goal continuation — 29 October 2026
+
+The requested scope remains G14/G15 remote monitoring and phone access, G05
+simpler setup, terminal migration/native release gates, G08/G11 complete connected
+and browser workflows, and G10 document quality/fidelity. None is closed by a
+single implementation checkpoint.
+
+- Google setup: distributor-configured runtime builds now supply desktop OAuth
+  client material, remove client-ID/secret entry from the ordinary setup path,
+  and preserve the manual option. Fixed endpoint/client binding prevents supplying
+  that material to a modified connector. No production client is configured;
+  provider registration/verification, actual account consent and novice usability
+  observation remain outstanding.
+- Remote companion/mobile: still requires authenticated persistent execution,
+  revocation, disconnected-client completion, original-chat decisions, and receipt
+  deduplication on an always-on host. No deployment has been made.
+- Terminal: this macOS checkout has Go and Node but no Bun on PATH. Native
+  terminal checks and the existing parity ledger remain outstanding.
+- Connected/browser: real-account workflow validation and integrated sign-in,
+  takeover and recovery remain outstanding.
+- Documents: representative rendering/native opening, calculations and factual
+  review remain outstanding beyond structural validators.
+
+Verification for distribution Google setup: targeted Go setup/native-connection
+suites pass normally and with `-race` on macOS; Node build-configuration tests
+pass, including rejected partial configuration and linker-argument injection.
+The setup test verifies unchanged read scopes, no credentials before consent,
+manual fallback, the credential-free sign-in form and changed-endpoint refusal.
+Existing loopback callback tests cover PKCE and credential lifecycle with a local
+server. Real Google sign-in and rendered frontend acceptance remain unverified.

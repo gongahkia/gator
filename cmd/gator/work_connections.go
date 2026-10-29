@@ -49,7 +49,13 @@ func (c *connectionControls) call(ctx context.Context, operation string, args []
 	}
 	switch operation {
 	case "status", "select":
-	case "add-google":
+	case "add-google", "add-google-bundled":
+		if operation == "add-google-bundled" {
+			if !bundledGoogleAvailable() || len(args) != 2 {
+				return workapp.ControlScreen{}, errors.New("this build has no configured Google sign-in; use your own desktop OAuth client")
+			}
+			args = append(append([]string(nil), args...), googleDesktopClientID)
+		}
 		if len(args) != 3 {
 			return workapp.ControlScreen{}, errors.New("provide a connection ID, display name and desktop OAuth client ID")
 		}
@@ -245,6 +251,16 @@ func (c *connectionControls) screen(id string) (workapp.ControlScreen, error) {
 			workapp.ControlAction{Key: "G", Label: "Connect Google email & calendar", Action: "add-google", Description: "Read email and calendar events. This setup requires your own Google Cloud desktop OAuth client; Gator does not yet provide a managed Google sign-in app. You will sign in after saving, and choose access per chat or follow-up.", Review: true, Fields: []workapp.ControlField{{Label: "Connection ID", Value: "google", Help: "A unique lowercase name, for example google-personal."}, {Label: "Display name", Value: "Google"}, {Label: "Desktop OAuth client ID", Help: "From a Google Cloud OAuth client of type Desktop app. No client secret here."}}},
 			workapp.ControlAction{Key: "T", Label: "Add a service token connection", Action: "add-token", Description: "For an existing Slack, Notion, Atlassian or JSON API account. Add the service and resource first, then enter its token privately.", Review: true, Fields: []workapp.ControlField{{Label: "Connection ID"}, {Label: "Display name"}, {Label: "Service", Kind: "select", Value: connector.KindHTTPJSON, Options: []uisnapshot.Option{{Value: connector.KindHTTPJSON, Label: "JSON API"}, {Value: connector.KindSlack, Label: "Slack"}, {Value: connector.KindNotion, Label: "Notion"}, {Value: connector.KindAtlassian, Label: "Atlassian"}}}, {Label: "Resource URL", Help: "The HTTPS API resource for this account. Do not include tokens in the URL."}}},
 			workapp.ControlAction{Key: "R", Label: "Refresh", Action: "status"})
+		if bundledGoogleAvailable() {
+			for i := range screen.Actions {
+				if screen.Actions[i].Action == "add-google" {
+					screen.Actions[i].Key = "O"
+					screen.Actions[i].Label = "Use your own Google OAuth client"
+					screen.Actions[i].Description = "Advanced setup using your own Google Cloud Desktop app client. Sign in after saving; choose access per chat or follow-up."
+				}
+			}
+			screen.Actions = append([]workapp.ControlAction{bundledGoogleAction()}, screen.Actions...)
+		}
 		screen.Panel.Blocks = []uisnapshot.Block{{Title: "Access stays scoped", Lines: []string{"Connecting an account makes it available. Choose it in chat settings or a follow-up agreement before Gator uses it.", "You can start with a message or attached file without connecting any accounts."}}}
 		return screen, nil
 	}
@@ -290,6 +306,12 @@ func (c *connectionControls) screen(id string) (workapp.ControlScreen, error) {
 				label = "Reconnect account"
 			}
 			screen.Actions = append(screen.Actions, workapp.ControlAction{Key: "S", Label: label, Action: "signin", Args: []string{id, digest}, Review: true, Description: "Sign in using your browser for " + d.Name + ". This replaces only this connection's credentials. Requested permissions: " + d.OAuthScopes, Fields: []workapp.ControlField{{Label: "OAuth client secret (optional)", Secret: true, Help: "Only if your own desktop OAuth client requires it. Leave blank to keep a stored secret."}}})
+			if usesBundledGoogle(d) {
+				a := &screen.Actions[len(screen.Actions)-1]
+				a.Fields = nil
+				a.Args = append(a.Args, "")
+			}
+
 		} else if d.Authentication == connector.AuthBearer {
 			screen.Actions = append(screen.Actions, workapp.ControlAction{Key: "S", Label: "Set access token", Action: "token", Args: review, Review: true, Description: "Replace the private token for " + d.Name + " at " + d.Resource + ". No chat or follow-up permissions change.", Fields: []workapp.ControlField{{Label: "Access token", Secret: true, Help: "Enter a new access token. It is stored privately on this device."}}})
 		}
