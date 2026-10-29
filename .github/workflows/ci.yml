@@ -33,7 +33,7 @@ jobs:
           npm run check --prefix desktop
           npm test --prefix desktop
           node --test scripts/google-oauth-build.test.mjs
-          node --test companion/server.test.mjs
+          node --test companion/server.test.mjs companion/macos-service.test.mjs
       - name: Check companion browser journeys
         if: runner.os == 'Linux'
         env:
@@ -136,7 +136,7 @@ jobs:
           npm run check --prefix desktop
           npm test --prefix desktop
           node --test scripts/google-oauth-build.test.mjs
-          node --test companion/server.test.mjs
+          node --test companion/server.test.mjs companion/macos-service.test.mjs
       - name: Package Windows x64 and verify native app workflows
         shell: bash
         env:

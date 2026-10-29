@@ -1,0 +1,11 @@
+{
+  "node": "/usr/local/bin/node",
+  "entry": "/Users/you/Library/Application Support/Gator Companion/companion/main.mjs",
+  "runtime": "/Users/you/Library/Application Support/Gator Companion/runtime/gator-runtime",
+  "workspace": "/Users/you/Library/Application Support/Gator Companion/workspace",
+  "tokenFile": "/Users/you/Library/Application Support/Gator Companion/private/access.token",
+  "configDir": "/Users/you/Library/Application Support/Gator Companion/config",
+  "stateDir": "/Users/you/Library/Application Support/Gator Companion/state",
+  "logFile": "/Users/you/Library/Application Support/Gator Companion/private/service.log",
+  "port": 7341
+}

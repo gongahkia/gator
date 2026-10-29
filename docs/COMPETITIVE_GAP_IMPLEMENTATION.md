@@ -276,3 +276,21 @@ broke installed dependencies; fixture synchronization and canonical temporary
 paths were corrected separately. See `TERMINAL-MIGRATION-VERIFICATION.md` for
 exact scope and remaining native-device/Windows/release gaps. Electron remains
 available; this checkpoint does not close migration parity.
+
+### Mac companion login service preparation
+
+The local Mac is the first development target following the user's request for
+the easiest available host. `companion/macos-service.mjs` generates a validated,
+private, reviewable LaunchAgent plan from explicit installation/profile paths.
+It does not activate a service or change sleep settings. The plan binds a fixed
+loopback port, private log directory, token-file path and exact profile; launchd
+restarts the listener with throttling. The README documents explicit activation
+and removal, awake/logged-in requirements and the separate job supervisor.
+
+The opt-in native macOS test passes: plist validation, isolated copied listener
+startup, crash/restart, authentication after restart and completed service
+removal. The test was removed from launchd and its temporary files cleaned up;
+no permanent service was installed. This probe never opens a Go conversation;
+the real-runtime durability test supplies that separate evidence. Production
+profile selection, stable deployment paths, HTTPS and phone enrollment remain
+open. No remote monitoring deployment is claimed.

@@ -115,6 +115,40 @@ separate from the job supervisor's availability. Client-off completion requires
 the execution host to stay online. Mobile notifications and offline client
 synchronization remain pending.
 
+## macOS launch at login
+
+`macos-service.mjs` prepares a reviewable per-user LaunchAgent. It validates the
+runtime, profile, workspace, private token and log paths, refuses to overwrite
+an existing plan, and does not start a service. Copy `macos.example.json`, replace
+its paths with a stable installation and already-configured dedicated profile,
+and create the referenced directories first. The installation must retain
+`companion/` and its sibling `app-host/src/` modules. Do not point at temporary
+test builds or move the installation after activation. Use a stable Node path.
+
+```sh
+node companion/macos-service.mjs /private/path/companion.json /private/path/com.gator.companion.plist
+plutil -lint /private/path/com.gator.companion.plist
+```
+
+Review the generated arguments/profile paths. When ready to enable it, place
+the plist at `~/Library/LaunchAgents/com.gator.companion.plist`, retaining mode
+0600 and without overwriting another service. Activation and removal are
+explicit operations:
+
+```sh
+launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.gator.companion.plist"
+launchctl print "gui/$(id -u)/com.gator.companion"
+# Stop the service before removing its owned plist:
+launchctl bootout "gui/$(id -u)/com.gator.companion"
+```
+
+Launchd restarts the listener after exit, with a ten-second throttle. It does
+not replay interrupted Go work. This is a login service: the Mac must be awake,
+online and logged in. It does not keep a sleeping Mac awake, configure HTTPS,
+enroll a phone, or start Gator's separate job supervisor. A permanent companion
+should use the same dedicated profile as the reviewed supervisor configuration.
+Logs stay in the private directory; log rotation is not automated yet.
+
 ## Verification
 
 From the repository root:
@@ -123,6 +157,8 @@ From the repository root:
 node --test companion/server.test.mjs
 # After installing the desktop dependencies and Playwright browsers:
 GATOR_COMPANION_BROWSERS=chromium,webkit node --test companion/client.test.mjs
+# On a logged-in Mac: temporary service, isolated profile, automatic removal.
+GATOR_COMPANION_LAUNCHD_TEST=1 node --test companion/macos-service.test.mjs
 ```
 
 Tests build the real Go runtime, use a disposable profile and local model fixture,
@@ -134,3 +170,8 @@ host fixture to exercise reload after a lost acknowledgement, stable admission
 identity, current approval review/replacement/denial, plain-text untrusted content,
 offline behavior, narrow layouts and revocation. A simulated phone viewport is
 not physical iOS/Android acceptance.
+
+The opt-in launchd test checks plist validity, startup, authentication after a
+forced listener crash/restart, and asynchronous service removal. It runs a
+temporary copied listener, never opens a conversation and does not invoke a
+model or real account. Real-Go work durability is exercised by `server.test.mjs`.
