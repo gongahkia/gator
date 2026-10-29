@@ -96,3 +96,18 @@ fresh synthetic probe reports 16 supported checks and 6 gaps; this is not a
 model-quality score. Freshness remains incomplete until stale/changeable facts
 have bounded maintenance and review behavior. All six required outcomes remain
 in scope.
+
+## Passive admission checkpoint
+
+The host now screens the complete current message as well as its proposed quote.
+Recognized credential patterns are refused. Temporary, hypothetical, reported,
+sensitive and unsupported personal wording needs an exact-text review. Ordinary
+supported self-statements still save passively when enabled. Review cannot turn
+disabled automatic capture on or silently restore a forgotten subject.
+
+This is conservative deterministic screening, not a multilingual semantic
+classifier. Unrecognized secret formats, nuanced ownership and live-model
+extraction quality still need wider evaluation. Focused race tests cover positive
+capture, cropped evidence, sensitive review, negative requests in several
+languages, rejection and durable results. The synthetic capability probe now
+reports 19 supported checks and 3 gaps; the six broader outcomes remain open.

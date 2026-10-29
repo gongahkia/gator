@@ -62,6 +62,10 @@ func (t rememberChat) Execute(ctx context.Context, raw json.RawMessage) (agent.T
 	if negativeRemember.MatchString(t.UserMessage) {
 		return agent.ToolResult{}, errors.New("this message asks not to remember; do not save a memory")
 	}
+	denied, suitabilityReview := memorySuitability(t.UserMessage, a.Quote)
+	if denied != "" {
+		return agent.ToolResult{}, errors.New("memory not saved: " + denied)
+	}
 	explicit := a.Explicit && rememberIntent.MatchString(t.UserMessage)
 	needsReview := a.Explicit && !explicit
 	if !t.Automatic && !explicit && !needsReview {
@@ -79,11 +83,19 @@ func (t rememberChat) Execute(ctx context.Context, raw json.RawMessage) (agent.T
 	if !t.available(a.ReplaceID) {
 		return agent.ToolResult{}, errors.New("this memory is excluded from the current run")
 	}
-	if needsReview {
-		if err := t.review(ctx, map[string]any{"setting": "memory", "action": "remember", "saved_text": a.Quote, "scope": a.Scope, "effect": "Save these words as memory for future chats. The language of the request needs your confirmation."}); err != nil {
+	if needsReview || suitabilityReview != "" {
+		reason := suitabilityReview
+		if needsReview {
+			reason += " The language of the request needs your confirmation."
+		}
+		if err := t.review(ctx, map[string]any{"setting": "memory", "action": "remember", "saved_text": a.Quote, "scope": a.Scope, "reason": strings.TrimSpace(reason), "effect": "Save these exact words as memory for future chats."}); err != nil {
 			return agent.ToolResult{}, err
 		}
-		explicit = true
+		// Suitability review alone must not lift an earlier forget instruction.
+		// Only review of an actual unfamiliar explicit request can do that.
+		if needsReview {
+			explicit = true
+		}
 	}
 	record, err := t.Store.RememberChat(memory.ChatInput{Subject: a.Subject, Kind: a.Kind, Quote: a.Quote, GoalID: goalID, ConversationID: t.ConversationID, RunID: t.RunID, ReplaceID: a.ReplaceID, ExpectedUpdated: a.ExpectedUpdated, Explicit: explicit, ExcludedIDs: t.ExcludedIDs})
 	if err != nil {
