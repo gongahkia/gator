@@ -757,3 +757,68 @@ Observed verification:
 G05 remains open for observed novice use, actual provider access and distributor
 Google OAuth registration/verification. No account or paid model was contacted;
 real-account sign-in remains deferred at the user's request.
+
+### Follow-up decisions from the phone — 29 October
+
+The companion now exposes Mark read, Done and Reopen for retained follow-up
+updates, with earlier/newer history pages, next steps and evidence. These use the
+existing host conversation/identity/version checks. Marking done changes attention
+state only; a failed check remains visibly failed. Opening or polling a chat does
+not silently mark updates read or resolved. Replies with an update reference and
+quality feedback remain host operations.
+
+A lost response leaves an explicit unconfirmed notice. Refresh reads the retained
+status without replaying the mutation. Stale resolution changes show the host's
+error and refreshed version. Polling retains expanded details and keyboard focus;
+the initial keyboard test caught focus loss when controls became disabled during
+a request, which was corrected. Unavailable update storage is distinguished from
+an empty conversation. Empty update sections stay out of ordinary chats.
+
+Verification on this Mac:
+
+- All six companion HTTP tests pass. The real-Go journey now seeds 55 retained
+  updates, pages 50/5, rejects another conversation and stale resolution version,
+  preserves read/done/version across companion restart and token rotation, and
+  makes no model request for receipt or paging operations.
+- All eight Chromium/WebKit browser journeys pass. New follow-up checks exercise
+  explicit read, stale Done, successful Done/Reopen, an applied mutation whose
+  response is lost, refresh without replay, older/newer pages, retained draft,
+  unavailable storage, keyboard focus, offline controls and revoked access.
+  Focused checks also verify that an empty section is hidden.
+- Dark/light 390-pixel Chromium/WebKit screenshots were inspected. Overflow
+  checks pass at 320, 390 and 760 pixels; update buttons are at least 44 pixels
+  high. Hostile title/evidence markup stays plain text. Evidence is under ignored
+  `.gator/native-tools/companion-*-updates-*.png`.
+- The first WebKit attempt found no browser matching the freshly installed
+  Playwright 1.64.1. Installing its WebKit 2370 in the isolated test directory
+  allowed all four WebKit journeys to run and pass. No remote CI was run.
+
+Interface review: **full** mode, limited to the companion follow-up cards, status
+actions, paging, error/empty/offline states and focus behavior. Framework: plain
+DOM; styling: the existing CSS tokens and native disclosure controls. No new
+animation, icon library or styling framework was introduced.
+
+| Category | Evidence inspected | Result |
+| --- | --- | --- |
+| Typography | Dark/light screenshots, hostile titles and failed-check copy | Readable wrapping; update count uses tabular numbers. |
+| Surfaces | Existing cards/buttons, 320–760-pixel bounds, disabled/focus states | Shared styling and 44-pixel touch controls; keyboard focus retained. |
+| Animations | New DOM/CSS paths | No animation; 10% speed motion inspection is not applicable. |
+| Icons | Native details disclosure; text action buttons | Existing browser disclosure retained; no new icon treatment. |
+| Performance | Poll/render code and expanded-detail checks | At most 50 visible updates; unchanged polling does not rebuild cards. |
+
+| Severity | Location | Before | After | Why |
+| --- | --- | --- | --- | --- |
+| HIGH | `companion/public/client.mjs` follow-up cards | Phone updates were read-only, with no history controls. | Explicit read/done/reopen and paging retain the original check result. | Makes the intended interaction available without implying successful execution. |
+| MEDIUM | `companion/public/client.mjs` render/refresh | Polling rebuilt cards; disabling buttons lost keyboard focus. | Stable unchanged cards, retained expanded details and focus restoration. | Preserves interaction context during frequent refreshes. |
+| MEDIUM | `companion/public/index.html`, `companion/public/styles.css` | No grouped follow-up status/history surface. | Labeled section, failed-check context, wrapping sources, shared touch buttons and hidden empty section. | Readable hierarchy and adequate hit areas without crowding ordinary chats. |
+
+Considered but rejected: animated status/card transitions would add movement to
+frequent polling; new action icons would introduce a visual vocabulary the small
+client does not otherwise use. Text labels and the existing CSS were sufficient.
+Verdict: **Approve for the inspected scope**. Physical iOS/Android, native Safari,
+screen-reader acceptance and deployed remote-host behavior remain unverified.
+
+G14/G15 remain open for permanent always-on deployment, device enrollment and
+per-device revocation, mobile notifications, file transfer and broader remote
+workflows. A sleeping/offline Mac is still unavailable. No production service or
+real account was activated.

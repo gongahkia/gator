@@ -131,6 +131,21 @@ A client should inspect the corresponding Go result/receipt after acknowledgemen
 Setup, navigation, filesystem selection, external-program handoffs, attachments
 and profile maintenance are not yet exposed by this transport.
 
+Follow-up cards offer **Mark read**, **Done** and **Reopen**, plus **Earlier
+updates** and **Newer updates** for retained history. Read status and resolution
+are separate from the check's result: marking a failed check's update done does
+not make the check successful, retry it, or authorize an external action. Details
+show the next step, evidence and update identity as plain text. Merely opening
+the page does not mark an update read or done.
+
+Each status change uses the current conversation, update identity and resolution
+version. A stale change is rejected and shown with the refreshed status. If its
+response is lost, refresh and inspect the saved status before trying again; the
+client never automatically replays the change. Decisions are retained on the
+host across companion restarts. Polling preserves expanded details and keyboard
+focus. Replying with an update reference and rating its usefulness still require
+Gator on the host.
+
 The host allows four open conversation processes and at most three executing
 chats. The dispatch queue is bounded. Opening another chat can retire an idle
 process. Running work, queues, approvals, setup panels and local operations are
@@ -228,3 +243,10 @@ The opt-in launchd test checks plist validity, startup, authentication after a
 forced listener crash/restart, and asynchronous service removal. It runs a
 temporary copied listener, never opens a conversation and does not invoke a
 model or real account. Real-Go work durability is exercised by `server.test.mjs`.
+
+Follow-up checks cover 55 real-Go retained updates, paging, conversation binding,
+read/done/reopen, stale resolution refusal and receipts across restart, without
+model calls. Browser journeys cover failed-check labeling, lost-response recovery
+without replay, unavailable storage, retained drafts, keyboard focus, narrow
+layouts, offline controls and access revocation. These are local fixture results,
+not evidence of physical-phone or real-account acceptance.
