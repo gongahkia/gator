@@ -30,6 +30,8 @@ const memoryUsage = `Gator memory — explicit, inspectable personal knowledge
   gator memory summary [--json]
   gator memory maintain [--status]
   gator memory show ID
+  gator memory review [--goal ID]
+  gator memory confirm ID --expected-updated TIMESTAMP
   gator memory correct ID [--source-file PATH] TEXT
   gator memory forget ID
   gator memory embeddings status
@@ -53,6 +55,34 @@ func memoryCommand(args []string, out io.Writer) error {
 		return err
 	}
 	switch args[0] {
+	case "review":
+		flags := flag.NewFlagSet("memory review", flag.ContinueOnError)
+		flags.SetOutput(io.Discard)
+		goalID := flags.String("goal", "", "goal ID")
+		if err := flags.Parse(args[1:]); err != nil {
+			return err
+		}
+		if len(flags.Args()) != 0 {
+			return errors.New("usage: gator memory review [--goal ID]")
+		}
+		records, readErr := store.List(*goalID, true)
+		var pending []memory.Record
+		for _, record := range records {
+			if !record.Recallable() || !record.ExpiresAt.IsZero() && !record.ExpiresAt.After(time.Now()) {
+				pending = append(pending, record)
+			}
+		}
+		return printMemoryRead(out, pending, readErr)
+	case "confirm":
+		if len(args) != 4 || args[2] != "--expected-updated" {
+			return errors.New("usage: gator memory confirm ID --expected-updated TIMESTAMP (inspect with memory show first)")
+		}
+		record, err := store.ConfirmReviewed(args[1], args[3])
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(out, "Confirmed %s without changing its text.\n", record.ID)
+		return err
 	case "maintain":
 		if len(args) > 2 || len(args) == 2 && args[1] != "--status" {
 			return errors.New("usage: gator memory maintain [--status]")
@@ -204,7 +234,7 @@ func memoryCommand(args []string, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprintf(out, "Last observed: %s\nLast confirmed: %s\n", formatMemoryEvidenceTime(record.LastObservedAt), formatMemoryEvidenceTime(record.LastConfirmedAt))
+		_, err = fmt.Fprintf(out, "Last observed: %s\nLast confirmed: %s\nReview after: %s\nConfirmation revision: %s\n", formatMemoryEvidenceTime(record.LastObservedAt), formatMemoryEvidenceTime(record.LastConfirmedAt), formatMemoryEvidenceTime(record.ReviewAfter), record.UpdatedAt.Format(time.RFC3339Nano))
 		if err != nil {
 			return err
 		}

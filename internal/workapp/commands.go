@@ -1490,7 +1490,7 @@ func workHelp() string {
                                  review proposed durable changes
   /memory                        set up recall; inspect data destinations
   /context [WORK_ID]              review sources and saved context; correct or omit
-  /memory add|list|search|show|correct|forget ...
+  /memory add|list|search|show|review|confirm|correct|forget ...
                                  manage explicit saved knowledge
   /note add TITLE | BODY          save a Markdown note in the current goal
   /note list|search|show|edit     find and revise saved notes

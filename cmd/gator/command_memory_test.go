@@ -15,6 +15,57 @@ import (
 	"github.com/gongahkia/gator/internal/workrun"
 )
 
+func TestMemoryReviewAndConfirmationCLI(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("GATOR_STATE_DIR", dir)
+	store, _ := memory.Open(dir)
+	record, err := store.RememberChat(memory.ChatInput{Subject: "profile.city", Kind: "fact", Quote: "I live in Harbor City.", ConversationID: "work-source", RunID: "run-source"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().AddDate(0, 0, -91)
+	record.CreatedAt, record.UpdatedAt, record.LastObservedAt, record.LastConfirmedAt = old, old, old, old
+	for i := range record.Evidence {
+		record.Evidence[i].ObservedAt = old
+	}
+	data, err := json.Marshal(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "gator", "memory", record.ID+".json"), data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	if err := memoryCommand([]string{"review"}, &output); err != nil || !strings.Contains(output.String(), record.ID) || !strings.Contains(output.String(), "90-day review") {
+		t.Fatal(output.String(), err)
+	}
+	panel, err := workMemoryResult(dir, "", []string{"review"})
+	if err != nil || len(panel.Items) != 1 || panel.Items[0].Tone != "warning" {
+		t.Fatal(panel, err)
+	}
+	summary, err := personalization.Read(dir)
+	if err != nil || summary.NeedsReview != 1 || len(summary.Entries) != 0 {
+		t.Fatal(summary, err)
+	}
+	request := workrun.Request{Objective: "Where is Harbor City?"}
+	if err := applyMemoryContext(dir, &request); err != nil || strings.Contains(request.MemoryContext, record.Text) {
+		t.Fatal("stale context", request.MemoryContext, err)
+	}
+	if err := memoryCommand([]string{"confirm", record.ID, "--expected-updated", old.Format(time.RFC3339Nano)}, &output); err != nil {
+		t.Fatal(err)
+	}
+	if err := applyMemoryContext(dir, &request); err != nil || !strings.Contains(request.MemoryContext, record.Text) {
+		t.Fatal("confirmation not recalled", request.MemoryContext, err)
+	}
+	if err := memoryCommand([]string{"confirm", record.ID, "--expected-updated", old.Format(time.RFC3339Nano)}, &output); err == nil {
+		t.Fatal("old revision confirmed")
+	}
+	summary, err = personalization.Read(dir)
+	if err != nil || summary.NeedsReview != 0 || len(summary.Entries) != 1 {
+		t.Fatal(summary, err)
+	}
+}
+
 func TestPersonalSummaryCLIAndTerminalResultFollowCorrections(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("GATOR_STATE_DIR", dir)

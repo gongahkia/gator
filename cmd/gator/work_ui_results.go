@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/delivery"
@@ -32,9 +33,17 @@ func workMemoryResult(stateDir, activeGoal string, arguments []string) (*uisnaps
 			return nil, err
 		}
 		return &uisnapshot.Result{Kind: "details", Title: "What Gator knows about you", Summary: strings.Join(summary.Lines(), "\n")}, nil
-	case "list", "search":
+	case "list", "search", "review":
 		var records []memory.Record
-		if arguments[0] == "list" {
+		if arguments[0] == "review" {
+			var all []memory.Record
+			all, err = store.List(scope, true)
+			for _, record := range all {
+				if !record.Recallable() || !record.ExpiresAt.IsZero() && !record.ExpiresAt.After(time.Now()) {
+					records = append(records, record)
+				}
+			}
+		} else if arguments[0] == "list" {
 			records, err = store.List(scope, containsWord(remaining, "--all"))
 		} else {
 			records, err = store.Search(strings.Join(remaining, " "), scope, 30)
@@ -86,6 +95,8 @@ func workMemoryResult(stateDir, activeGoal string, arguments []string) (*uisnaps
 			{Label: "ID", Value: record.ID}, {Label: "Kind", Value: record.Kind}, {Label: "Goal", Value: uiEmpty(record.GoalID)},
 			{Label: "Source", Value: uiEmpty(record.Source)}, {Label: "Source status", Value: uiEmpty(record.SourceStatus)},
 			{Label: "Canonical subject", Value: uiEmpty(memory.CanonicalSubject(record.Subject))}, {Label: "Recall warning", Value: uiEmpty(record.RecallIssue)},
+			{Label: "Last confirmed", Value: formatMemoryEvidenceTime(record.LastConfirmedAt)}, {Label: "Review after", Value: formatMemoryEvidenceTime(record.ReviewAfter)},
+			{Label: "Confirm unchanged", Value: "/memory confirm " + record.ID + " --expected-updated " + record.UpdatedAt.Format(time.RFC3339Nano)},
 			{Label: "Expires", Value: formatMemoryExpiry(record.ExpiresAt)}, {Label: "Created", Value: record.CreatedAt.Local().Format("2006-01-02 15:04")}, {Label: "Updated", Value: record.UpdatedAt.Local().Format("2006-01-02 15:04")},
 		}}, nil
 	}

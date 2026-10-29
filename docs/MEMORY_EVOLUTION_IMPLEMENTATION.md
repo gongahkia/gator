@@ -201,3 +201,27 @@ part of the general forgetting gap. Tests cover evidence rotation, restart,
 scope, explicit restoration, history-tool exclusion, unchanged transcripts and
 backup/restore preservation of the markers. Retention fixtures now age their
 new evidence timestamps consistently with the simulated old records.
+
+## Freshness and explicit confirmation checkpoint
+
+Known changeable facts (city, timezone, job, role, employer and workplace) now
+require review after 90 days without user confirmation. This is a conservative
+review interval, not evidence that a fact has become false. Stable preferences
+and unclassified subjects are not expired by guessing from their text. Legacy
+changeable facts without confirmation dates and implausibly future confirmations
+also stay out of automatic recall until reviewed. No record is deleted or
+silently rewritten. These checks apply on recall, including after idle periods.
+
+`gator memory review` lists pending items. `memory show` exposes the review date
+and exact revision; `memory confirm ID --expected-updated TIMESTAMP` confirms the
+inspected text. Confirmation cannot lift a forget marker, resolve a collision,
+renew explicit expiry or certify a changed source file. New user evidence can
+refresh the record; reading it or replaying an old save cannot. Summary and
+terminal result views expose the same current state.
+
+Memory, personalization, tools, workapp and workrun race suites pass, as do
+focused CLI memory tests. Longitudinal tests cover aging, stable preferences,
+restart, unknown legacy dates, clock changes, replay, fresh evidence, confirmation
+revision guards, prompt/summary exclusion and restoration after confirmation.
+General subject classification and usefulness of the default interval still
+need broader evaluation.

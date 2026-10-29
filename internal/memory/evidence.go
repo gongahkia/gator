@@ -63,7 +63,7 @@ func validateEvidence(record Record) error {
 			return errors.New("invalid memory evidence digest")
 		}
 		switch evidence.Basis {
-		case "user-stated", "user-corrected", "user-added", "file-reviewed":
+		case "user-stated", "user-corrected", "user-added", "user-confirmed", "file-reviewed":
 		default:
 			return errors.New("invalid memory evidence basis")
 		}

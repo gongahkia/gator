@@ -31,6 +31,7 @@ type ChatOrigin struct {
 
 type Record struct {
 	RecallIssue     string      `json:"recall_issue,omitempty"`
+	ReviewAfter     time.Time   `json:"review_after,omitzero"`
 	Subject         string      `json:"subject,omitempty"`
 	Origin          *ChatOrigin `json:"origin,omitempty"`
 	Version         int         `json:"version"`
@@ -161,6 +162,7 @@ func (s Store) Load(id string) (Record, error) {
 	}
 	record.SourceStatus = sourceFileStatus(record)
 	record.RecallIssue = "" // Derived from current store state, never trusted from disk.
+	record.ReviewAfter = time.Time{}
 	return record, nil
 }
 
@@ -194,6 +196,7 @@ func (s Store) List(goalID string, includeExpired bool) ([]Record, error) {
 	if err := s.annotateConcepts(result); err != nil {
 		return nil, err
 	}
+	s.annotateFreshness(result)
 	sort.Slice(result, func(i, j int) bool {
 		if result[i].UpdatedAt.Equal(result[j].UpdatedAt) {
 			return result[i].ID < result[j].ID

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/gongahkia/gator/internal/privatefs"
 )
@@ -30,6 +31,7 @@ func privateDirectory(path string) error {
 // remain hidden from readers. All callers hold the store's mutation lock.
 func (s Store) write(record Record, create bool) error {
 	record.RecallIssue = ""
+	record.ReviewAfter = time.Time{}
 	if err := validate(record); err != nil {
 		return err
 	}
