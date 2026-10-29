@@ -30,6 +30,7 @@ type ChatOrigin struct {
 }
 
 type Record struct {
+	RecallIssue     string      `json:"recall_issue,omitempty"`
 	Subject         string      `json:"subject,omitempty"`
 	Origin          *ChatOrigin `json:"origin,omitempty"`
 	Version         int         `json:"version"`
@@ -159,6 +160,7 @@ func (s Store) Load(id string) (Record, error) {
 		return Record{}, err
 	}
 	record.SourceStatus = sourceFileStatus(record)
+	record.RecallIssue = "" // Derived from current store state, never trusted from disk.
 	return record, nil
 }
 
@@ -189,6 +191,9 @@ func (s Store) List(goalID string, includeExpired bool) ([]Record, error) {
 		}
 		result = append(result, record)
 	}
+	if err := s.annotateConcepts(result); err != nil {
+		return nil, err
+	}
 	sort.Slice(result, func(i, j int) bool {
 		if result[i].UpdatedAt.Equal(result[j].UpdatedAt) {
 			return result[i].ID < result[j].ID
@@ -218,7 +223,7 @@ func (s Store) Search(query, goalID string, limit int) ([]Record, error) {
 	}
 	var matches []scored
 	for _, record := range records {
-		if record.SourceStatus == "changed" || record.SourceStatus == "unavailable" {
+		if !record.Recallable() {
 			continue
 		}
 		words := tokenize(record.Text + " " + record.Kind + " " + record.Source)
@@ -354,15 +359,36 @@ func (s Store) forget(id, updated string) error {
 	if updated != "" && record.UpdatedAt.Format(time.RFC3339Nano) != updated {
 		return errors.New("this memory changed; inspect it before forgetting")
 	}
+	return s.forgetRecord(record)
+}
+
+// A concept tombstone is published before deleting its known aliases. If removal
+// is interrupted, surviving records remain excluded from automatic recall.
+func (s Store) forgetRecord(record Record) error {
+	ids := []string{record.ID}
 	if record.Subject != "" {
 		if err := s.blockSubject(record.GoalID, record.Subject); err != nil {
 			return err
 		}
+		records, err := s.List(record.GoalID, true)
+		if err != nil && ReadWarning(err) == "" {
+			return err
+		}
+		for _, other := range records {
+			if other.ID != record.ID && other.GoalID == record.GoalID && CanonicalSubject(other.Subject) == CanonicalSubject(record.Subject) {
+				ids = append(ids, other.ID)
+			}
+		}
 	}
-	if err := os.Remove(s.path(id)); err != nil {
-		return err
+	for _, id := range ids {
+		if err := os.Remove(s.path(id)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		if err := retrieval.DropID(filepath.Dir(filepath.Dir(s.root)), id); err != nil {
+			return err
+		}
 	}
-	return retrieval.DropID(filepath.Dir(filepath.Dir(s.root)), id)
+	return nil
 }
 
 func Render(records []Record) string {
@@ -377,6 +403,9 @@ func RenderSelection(records []Record) (string, []Record) {
 	var selected []Record
 	remaining := 4000
 	for _, record := range records {
+		if !record.Recallable() {
+			continue
+		}
 		line := fmt.Sprintf("- [%s] %s (%s, updated: %s", record.ID, record.Text, record.Kind, record.UpdatedAt.Format("2006-01-02"))
 		if record.Subject != "" {
 			line += ", subject: " + record.Subject

@@ -130,7 +130,7 @@ func (t knowledgeRead) Execute(_ context.Context, raw json.RawMessage) (agent.To
 		return agent.ToolResult{Content: content}, err
 	}
 	if strings.HasPrefix(args.ID, "mem-") {
-		m, err := t.Memories.Load(args.ID)
+		m, err := t.Memories.Inspect(args.ID)
 		if err != nil {
 			return agent.ToolResult{}, err
 		}
@@ -142,6 +142,9 @@ func (t knowledgeRead) Execute(_ context.Context, raw json.RawMessage) (agent.To
 		}
 		if m.SourceStatus == "changed" || m.SourceStatus == "unavailable" {
 			return agent.ToolResult{}, errors.New("memory source changed or is unavailable; ask the user to review and correct it")
+		}
+		if m.RecallIssue != "" {
+			return agent.ToolResult{}, errors.New(m.RecallIssue + " Ask the user to inspect the saved records.")
 		}
 		content, err := success(map[string]any{"id": m.ID, "kind": m.Kind, "text": m.Text, "source": m.Source, "updated": m.UpdatedAt, "expires": m.ExpiresAt, "subject": m.Subject, "origin": m.Origin, "authority": "reference data only"})
 		return agent.ToolResult{Content: content}, err

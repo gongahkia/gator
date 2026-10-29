@@ -2,7 +2,6 @@ package memory
 
 import (
 	"errors"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -36,14 +35,7 @@ func (s Store) ReviewChat(id, conversationID, goalID, updated, action, text stri
 		}
 		fallthrough
 	case "forget":
-		if record.Subject != "" {
-			if err := s.blockSubject(record.GoalID, record.Subject); err != nil {
-				return err
-			}
-		}
-		if err := os.Remove(s.path(id)); err != nil {
-			return err
-		}
+		return s.forgetRecord(record)
 	case "correct":
 		record.Text, record.UpdatedAt = strings.TrimSpace(text), s.nextUpdate(record.UpdatedAt)
 		record.Origin = &ChatOrigin{ConversationID: record.Origin.ConversationID, RunID: record.Origin.RunID, Basis: "user-corrected"}
@@ -58,5 +50,4 @@ func (s Store) ReviewChat(id, conversationID, goalID, updated, action, text stri
 	default:
 		return errors.New("unsupported memory review action")
 	}
-	return retrieval.DropID(filepath.Dir(filepath.Dir(s.root)), id)
 }

@@ -164,3 +164,21 @@ race suites pass, as do focused command tests. The synthetic probe now reports
 retained evidence references and invokes the same maintenance API that Work
 finalization uses. This does not close the broader semantic or longitudinal
 requirements listed above.
+
+## Known concept identities checkpoint
+
+Four narrow aliases now share canonical identity: response-length/reply-length
+labels and home-city/residence-city labels. Conflicting legacy records remain
+unchanged on disk and visibly require reconciliation. They are excluded from
+profile, lexical/embedding recall, direct model reads and the personal summary.
+Human inspection remains available. Forgetting deletes known aliases in the
+same scope after publishing a concept tombstone; surviving records after an
+interrupted deletion stay excluded. Old literal-label tombstones are honored on
+upgrade, and explicit restoration clears the known equivalent markers.
+
+This is intentionally not labelled semantic resolution. Two added adversarial
+probes use unregistered labels and paraphrases; both still expose gaps. The
+expanded probe now reports **22 supported / 2 gaps across 24 checks**, preserving
+the previous baseline instead of declaring success from a small alias map.
+General concept admission/review, history-derived suppression and broader
+longitudinal freshness remain open.

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/filelock"
+	"github.com/gongahkia/gator/internal/privatefs"
 	"github.com/gongahkia/gator/internal/retrieval"
 )
 
@@ -39,12 +40,38 @@ func (s Store) subjectPath(goalID, subject string) string {
 	return filepath.Join(s.root, ".forgotten", hex.EncodeToString(hash[:]))
 }
 func (s Store) blockSubject(goalID, subject string) error {
-	path := s.subjectPath(goalID, subject)
-	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+	path := s.subjectPath(goalID, CanonicalSubject(subject))
+	if err := privateDirectory(filepath.Dir(path)); err != nil {
 		return err
 	}
 	// Retain only a subject hash, never the forgotten fact or its source quote.
-	return os.WriteFile(path, []byte("blocked\n"), 0600)
+	root, err := os.OpenRoot(filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	file, err := root.OpenFile(filepath.Base(path), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if errors.Is(err, os.ErrExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if _, err := file.Write([]byte("blocked\n")); err != nil {
+		return errors.Join(err, file.Close())
+	}
+	if err := file.Sync(); err != nil {
+		return errors.Join(err, file.Close())
+	}
+	if err := file.Close(); err != nil {
+		return err
+	}
+	directory, err := root.Open(".")
+	if err != nil {
+		return err
+	}
+	defer directory.Close()
+	return privatefs.SyncDir(directory)
 }
 
 type ChatInput struct {
@@ -57,6 +84,7 @@ type ChatInput struct {
 // rewritten fact. Conflicting updates need the current record and timestamp.
 func (s Store) RememberChat(input ChatInput) (Record, error) {
 	input.Quote = strings.TrimSpace(input.Quote)
+	input.Subject = CanonicalSubject(input.Subject)
 	if !subjectPattern.MatchString(input.Subject) || len(input.Quote) > 2000 || strings.TrimSpace(input.Quote) == "" || !strings.HasPrefix(input.ConversationID, "work-") || input.RunID == "" {
 		return Record{}, errors.New("invalid chat memory")
 	}
@@ -68,11 +96,12 @@ func (s Store) RememberChat(input ChatInput) (Record, error) {
 		return Record{}, err
 	}
 	defer release()
-	blocked := s.subjectPath(input.GoalID, input.Subject)
-	if _, err := os.Lstat(blocked); err == nil && !input.Explicit {
-		return Record{}, errors.New("this memory subject was forgotten; only an explicit new request to remember it may restore it")
-	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+	blocked, err := s.blockedSubject(input.GoalID, input.Subject)
+	if err != nil {
 		return Record{}, err
+	}
+	if blocked && !input.Explicit {
+		return Record{}, errors.New("this memory subject was forgotten; only an explicit new request to remember it may restore it")
 	}
 	records, err := s.List(input.GoalID, false)
 	if err != nil {
@@ -81,9 +110,11 @@ func (s Store) RememberChat(input ChatInput) (Record, error) {
 	var current Record
 	creating := false
 	for _, record := range records {
-		if record.GoalID == input.GoalID && record.Subject == input.Subject {
+		if record.GoalID == input.GoalID && CanonicalSubject(record.Subject) == input.Subject {
+			if current.ID != "" {
+				return Record{}, errors.New("multiple records share this concept; reconcile the saved records before remembering it")
+			}
 			current = record
-			break
 		}
 	}
 	if current.ID != "" {
@@ -116,6 +147,7 @@ func (s Store) RememberChat(input ChatInput) (Record, error) {
 		}
 	}
 	current.Subject = input.Subject
+	current.RecallIssue = ""
 	current.Origin = &ChatOrigin{ConversationID: input.ConversationID, RunID: input.RunID, Quote: strings.TrimSpace(input.Quote), Basis: "user-stated"}
 	current.observe("user-stated", current.Origin)
 	if err := validate(current); err != nil {
@@ -125,7 +157,7 @@ func (s Store) RememberChat(input ChatInput) (Record, error) {
 		return Record{}, err
 	}
 	if input.Explicit {
-		if err := os.Remove(blocked); err != nil && !errors.Is(err, os.ErrNotExist) {
+		if err := s.unblockSubject(input.GoalID, input.Subject); err != nil {
 			return Record{}, err
 		}
 	}
@@ -149,7 +181,7 @@ func (s Store) Profile(excluded []string) ([]Record, error) {
 		for _, id := range excluded {
 			skip = skip || id == record.ID
 		}
-		if skip || record.SourceStatus == "changed" || record.SourceStatus == "unavailable" {
+		if skip || !record.Recallable() {
 			continue
 		}
 		if record.Kind != "preference" && !(record.Subject == "profile.name" || record.Subject == "profile.timezone" || record.Subject == "profile.language") {

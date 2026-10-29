@@ -30,7 +30,7 @@ func readWorkContext(stateDir, workID, goalID string) (workapp.ContextState, err
 	load := func(id string) workapp.KnowledgeItem {
 		item := workapp.KnowledgeItem{ID: id, Title: id, Text: "This item is no longer saved.", Scope: "unknown"}
 		if strings.HasPrefix(id, "mem-") {
-			if r, err := memories.Load(id); err == nil && (r.GoalID == "" || r.GoalID == result.GoalID) {
+			if r, err := memories.Inspect(id); err == nil && (r.GoalID == "" || r.GoalID == result.GoalID) {
 				item.Kind, item.Title, item.Text, item.CurrentText, item.Scope, item.Source, item.Available = "memory", r.Kind, r.Text, r.Text, contextScope(r.GoalID), r.Source, true
 				item.SourceReviewNeeded = r.SourceStatus == "changed" || r.SourceStatus == "unavailable"
 				if r.Subject != "" {
@@ -43,6 +43,9 @@ func readWorkContext(stateDir, workID, goalID string) (workapp.ContextState, err
 							item.Source = "Chat: " + chat.Title + " · " + r.Origin.Basis
 						}
 					}
+				}
+				if r.RecallIssue != "" {
+					item.Source += " · " + r.RecallIssue
 				}
 				item.Updated = r.UpdatedAt.Local().Format("Jan 2 15:04")
 				item.Revision = r.UpdatedAt.Format(time.RFC3339Nano)

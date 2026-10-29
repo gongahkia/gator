@@ -176,6 +176,12 @@ func applyMemoryContext(stateDir string, request *workrun.Request) error {
 	if err != nil && memory.ReadWarning(err) == "" {
 		return err
 	}
+	for _, record := range all {
+		if record.RecallIssue != "" {
+			readWarning = strings.TrimSpace(readWarning + " Saved memories with unresolved or forgotten concepts are excluded; inspect memory list before relying on them.")
+			break
+		}
+	}
 	if embedder, embedErr := configuredEmbedder(stateDir); embedErr == nil && len(all) > 0 {
 		documents := make([]retrieval.Document, 0, len(all))
 		available := map[string]memory.Record{}
@@ -183,7 +189,7 @@ func applyMemoryContext(stateDir string, request *workrun.Request) error {
 			if sliceHas(request.ExcludedKnowledgeIDs, record.ID) {
 				continue
 			}
-			if record.SourceStatus == "changed" || record.SourceStatus == "unavailable" {
+			if !record.Recallable() {
 				continue
 			}
 			available[record.ID] = record
@@ -225,7 +231,9 @@ func applyMemoryContext(stateDir string, request *workrun.Request) error {
 	if request.ForegroundApp {
 		profile, err = store.Profile(request.ExcludedKnowledgeIDs)
 		if warning := memory.ReadWarning(err); warning != "" {
-			readWarning = warning
+			if !strings.Contains(readWarning, warning) {
+				readWarning = strings.TrimSpace(readWarning + " " + warning)
+			}
 		}
 		if err != nil && memory.ReadWarning(err) == "" {
 			return err

@@ -127,6 +127,13 @@ func main() {
 	city.Subject = "profile.home_city"
 	_, err = forgetStore.RememberChat(city)
 	add("forgotten meaning stays suppressed across aliases", err != nil, map[string]bool{"alias_relearned": err == nil})
+	city.Subject = "personal.base_location"
+	city.Quote = "Harbor City is where I am based."
+	_, err = forgetStore.RememberChat(city)
+	add("unregistered paraphrase cannot restore a forgotten concept", err != nil, map[string]bool{"unregistered_paraphrase_saved": err == nil})
+	unregistered := input("communication.detail_level", "Keep my replies concise.")
+	_, err = store.RememberChat(unregistered)
+	add("unregistered semantic alias requires reconciliation", err != nil, map[string]bool{"unregistered_alias_saved": err == nil})
 	scope := newStore("scope")
 	goal := input("preference.project", "Use Project Alpha terminology.")
 	goal.GoalID = "goal-0123456789abcdef01234567"

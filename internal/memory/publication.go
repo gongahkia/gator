@@ -29,6 +29,7 @@ func privateDirectory(path string) error {
 // an ID collision cannot replace an existing record. Interrupted temporary files
 // remain hidden from readers. All callers hold the store's mutation lock.
 func (s Store) write(record Record, create bool) error {
+	record.RecallIssue = ""
 	if err := validate(record); err != nil {
 		return err
 	}

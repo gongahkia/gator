@@ -56,10 +56,16 @@ func workMemoryResult(stateDir, activeGoal string, arguments []string) (*uisnaps
 				state = record.Kind + " · " + record.GoalID
 			}
 			detail := record.ID
+			if record.RecallIssue != "" {
+				detail += " · " + record.RecallIssue
+			}
 			if len(record.MatchedTerms) > 0 {
 				detail += " · matched " + strings.Join(record.MatchedTerms, ", ") + " in " + record.MatchScope
 			}
 			tone := ""
+			if record.RecallIssue != "" {
+				tone = "warning"
+			}
 			if record.SourceStatus == "changed" || record.SourceStatus == "unavailable" {
 				state += " · source " + record.SourceStatus
 				detail += " · excluded from automatic recall"
@@ -72,13 +78,14 @@ func workMemoryResult(stateDir, activeGoal string, arguments []string) (*uisnaps
 		if len(arguments) != 2 {
 			return nil, nil
 		}
-		record, err := store.Load(arguments[1])
+		record, err := store.Inspect(arguments[1])
 		if err != nil {
 			return nil, err
 		}
 		return &uisnapshot.Result{Kind: "details", Title: "Memory", Summary: record.Text, Fields: []uisnapshot.Field{
 			{Label: "ID", Value: record.ID}, {Label: "Kind", Value: record.Kind}, {Label: "Goal", Value: uiEmpty(record.GoalID)},
 			{Label: "Source", Value: uiEmpty(record.Source)}, {Label: "Source status", Value: uiEmpty(record.SourceStatus)},
+			{Label: "Canonical subject", Value: uiEmpty(memory.CanonicalSubject(record.Subject))}, {Label: "Recall warning", Value: uiEmpty(record.RecallIssue)},
 			{Label: "Expires", Value: formatMemoryExpiry(record.ExpiresAt)}, {Label: "Created", Value: record.CreatedAt.Local().Format("2006-01-02 15:04")}, {Label: "Updated", Value: record.UpdatedAt.Local().Format("2006-01-02 15:04")},
 		}}, nil
 	}

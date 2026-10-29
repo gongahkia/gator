@@ -62,7 +62,7 @@ func Read(stateDir string) (Summary, error) {
 		if record.GoalID != "" {
 			continue
 		}
-		if !record.ExpiresAt.IsZero() && !record.ExpiresAt.After(now) || record.SourceStatus == "changed" || record.SourceStatus == "unavailable" {
+		if !record.ExpiresAt.IsZero() && !record.ExpiresAt.After(now) || !record.Recallable() {
 			result.NeedsReview++
 			continue
 		}
@@ -143,7 +143,7 @@ func (s Summary) Lines() []string {
 		lines = append(lines, fmt.Sprintf("%d more entries: inspect memory list and learnings list.", s.Omitted))
 	}
 	if s.NeedsReview > 0 {
-		lines = append(lines, fmt.Sprintf("%d expired or changed-source memories omitted; inspect memory list --all.", s.NeedsReview))
+		lines = append(lines, fmt.Sprintf("%d expired, changed-source or unresolved memories omitted; inspect memory list --all.", s.NeedsReview))
 	}
 	if s.PendingLessons > 0 {
 		lines = append(lines, fmt.Sprintf("%d proposed lessons await review; they are not active guidance.", s.PendingLessons))

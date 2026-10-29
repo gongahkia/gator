@@ -186,9 +186,19 @@ func memoryCommand(args []string, out io.Writer) error {
 		if len(args) != 2 {
 			return errors.New("usage: gator memory show ID")
 		}
-		record, err := store.Load(args[1])
+		record, err := store.Inspect(args[1])
 		if err != nil {
 			return err
+		}
+		if record.RecallIssue != "" {
+			if _, err := fmt.Fprintln(out, "Recall warning: "+record.RecallIssue); err != nil {
+				return err
+			}
+		}
+		if record.Subject != "" {
+			if _, err := fmt.Fprintf(out, "Subject: %s\nCanonical subject: %s\n", record.Subject, memory.CanonicalSubject(record.Subject)); err != nil {
+				return err
+			}
 		}
 		_, err = fmt.Fprintf(out, "ID: %s\nKind: %s\nGoal: %s\nSource: %s\nSource status: %s\nExpires: %s\nCreated: %s\nUpdated: %s\nText: %s\n", record.ID, record.Kind, valueOrDash(record.GoalID), valueOrDash(record.Source), valueOrDash(record.SourceStatus), formatMemoryExpiry(record.ExpiresAt), record.CreatedAt.Format(time.RFC3339), record.UpdatedAt.Format(time.RFC3339), record.Text)
 		if err != nil {
@@ -331,6 +341,9 @@ func memoryEmbeddingsCommand(args []string, out io.Writer) error {
 func printMemories(out io.Writer, records []memory.Record) error {
 	for _, record := range records {
 		line := record.Text
+		if record.RecallIssue != "" {
+			line += " [" + record.RecallIssue + "]"
+		}
 		if record.SourceStatus == "changed" || record.SourceStatus == "unavailable" {
 			line += " [source " + record.SourceStatus + "; excluded from automatic recall]"
 		}
