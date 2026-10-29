@@ -6,7 +6,8 @@ import (
 )
 
 type ReadIssue struct {
-	File string `json:"file"`
+	File  string `json:"file"`
+	Cause error  `json:"-"`
 }
 
 // ReadIssues accompanies a partial, validated result. Read-only consumers may
@@ -21,10 +22,10 @@ func (issues *ReadIssues) Error() string {
 	return fmt.Sprintf("%d saved memory record(s) unreadable or invalid; healthy records remain available. Original files are retained. Run gator memory diagnose to inspect.", issues.Count)
 }
 
-func (issues *ReadIssues) add(name string) {
+func (issues *ReadIssues) add(name string, cause error) {
 	issues.Count++
 	if len(issues.Items) < 32 {
-		issues.Items = append(issues.Items, ReadIssue{File: name})
+		issues.Items = append(issues.Items, ReadIssue{File: name, Cause: cause})
 	}
 }
 

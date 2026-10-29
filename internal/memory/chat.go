@@ -19,6 +19,14 @@ import (
 var subjectPattern = regexp.MustCompile(`^[a-z][a-z0-9_.-]{1,95}$`)
 
 func (s Store) lock() (func(), error) {
+	return s.lockMode(filelock.Exclusive)
+}
+
+func (s Store) readLock() (func(), error) {
+	return s.lockMode(filelock.Shared)
+}
+
+func (s Store) lockMode(mode int) (func(), error) {
 	root, err := os.OpenRoot(s.root)
 	if err != nil {
 		return nil, err
@@ -28,7 +36,7 @@ func (s Store) lock() (func(), error) {
 		root.Close()
 		return nil, err
 	}
-	if err = filelock.Lock(file, filelock.Exclusive); err != nil {
+	if err = filelock.Lock(file, mode); err != nil {
 		file.Close()
 		root.Close()
 		return nil, err
@@ -107,7 +115,7 @@ func (s Store) RememberChat(input ChatInput) (Record, error) {
 	if blocked && !input.Explicit {
 		return Record{}, errors.New("this memory subject was forgotten; only an explicit new request to remember it may restore it")
 	}
-	records, err := s.List(input.GoalID, false)
+	records, err := s.listUnlocked(input.GoalID, false)
 	if err != nil {
 		return Record{}, err
 	}

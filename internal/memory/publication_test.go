@@ -53,6 +53,12 @@ func TestPublicationNeverExposesPartialRecordsToConcurrentReaders(t *testing.T) 
 	close(failures)
 	for err := range failures {
 		t.Errorf("reader saw incomplete publication: %v", err)
+		var issues *ReadIssues
+		if errors.As(err, &issues) {
+			for _, issue := range issues.Items {
+				t.Errorf("%s: %v", issue.File, issue.Cause)
+			}
+		}
 	}
 }
 

@@ -18,7 +18,7 @@ func (s Store) ReviewChat(id, conversationID, goalID, updated, action, text stri
 		return err
 	}
 	defer release()
-	record, err := s.Load(id)
+	record, err := s.loadUnlocked(id)
 	if err != nil {
 		return err
 	}

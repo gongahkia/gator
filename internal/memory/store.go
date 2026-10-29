@@ -136,6 +136,18 @@ func (s Store) newRecord(kind, content, goalID, source, sourceSHA256 string, exp
 }
 
 func (s Store) Load(id string) (Record, error) {
+	// Coordinate with publication on every platform. Windows can otherwise
+	// expose transient path/handle failures during replacement even though all
+	// published bytes are complete. Hold the lease only for this bounded read.
+	release, err := s.readLock()
+	if err != nil {
+		return Record{}, err
+	}
+	defer release()
+	return s.loadUnlocked(id)
+}
+
+func (s Store) loadUnlocked(id string) (Record, error) {
 	if !validID(id) {
 		return Record{}, errors.New("invalid memory ID")
 	}
@@ -167,6 +179,15 @@ func (s Store) Load(id string) (Record, error) {
 }
 
 func (s Store) List(goalID string, includeExpired bool) ([]Record, error) {
+	return s.list(goalID, includeExpired, s.Load)
+}
+
+// Mutation callers already hold the exclusive lease and must not reacquire it.
+func (s Store) listUnlocked(goalID string, includeExpired bool) ([]Record, error) {
+	return s.list(goalID, includeExpired, s.loadUnlocked)
+}
+
+func (s Store) list(goalID string, includeExpired bool, load func(string) (Record, error)) ([]Record, error) {
 	entries, err := os.ReadDir(s.root)
 	if err != nil {
 		return nil, err
@@ -177,9 +198,9 @@ func (s Store) List(goalID string, includeExpired bool) ([]Record, error) {
 		if entry.IsDir() || strings.HasPrefix(entry.Name(), ".") || filepath.Ext(entry.Name()) != ".json" {
 			continue
 		}
-		record, err := s.Load(strings.TrimSuffix(entry.Name(), ".json"))
+		record, err := load(strings.TrimSuffix(entry.Name(), ".json"))
 		if err != nil {
-			issues.add(entry.Name())
+			issues.add(entry.Name(), err)
 			continue
 		}
 		if goalID != "" && record.GoalID != "" && record.GoalID != goalID {
@@ -288,7 +309,7 @@ func (s Store) correct(id, content, source, updated string) (Record, error) {
 		return Record{}, err
 	}
 	defer release()
-	record, err := s.Load(id)
+	record, err := s.loadUnlocked(id)
 	if err != nil {
 		return Record{}, err
 	}
@@ -324,7 +345,7 @@ func (s Store) CorrectFromFile(id, content, path string) (Record, error) {
 	if err != nil {
 		return Record{}, err
 	}
-	record, err := s.Load(id)
+	record, err := s.loadUnlocked(id)
 	if err != nil {
 		return Record{}, err
 	}
@@ -355,7 +376,7 @@ func (s Store) forget(id, updated string) error {
 		return err
 	}
 	defer release()
-	record, err := s.Load(id)
+	record, err := s.loadUnlocked(id)
 	if err != nil {
 		return err
 	}
@@ -376,7 +397,7 @@ func (s Store) forgetRecord(record Record) error {
 		if err := s.blockSubject(record.GoalID, record.Subject); err != nil {
 			return err
 		}
-		records, err := s.List(record.GoalID, true)
+		records, err := s.listUnlocked(record.GoalID, true)
 		if err != nil && ReadWarning(err) == "" {
 			return err
 		}

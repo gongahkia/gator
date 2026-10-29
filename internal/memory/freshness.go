@@ -53,7 +53,7 @@ func (s Store) ConfirmReviewed(id, updated string) (Record, error) {
 		return Record{}, err
 	}
 	defer release()
-	record, err := s.Load(id)
+	record, err := s.loadUnlocked(id)
 	if err != nil {
 		return Record{}, err
 	}
@@ -63,7 +63,7 @@ func (s Store) ConfirmReviewed(id, updated string) (Record, error) {
 	if record.SourceStatus == "changed" || record.SourceStatus == "unavailable" || !record.ExpiresAt.IsZero() && !record.ExpiresAt.After(s.clock()) {
 		return Record{}, errors.New("this memory expired or its source changed; review and correct its source or expiry instead")
 	}
-	records, err := s.List(record.GoalID, true)
+	records, err := s.listUnlocked(record.GoalID, true)
 	if err != nil {
 		return Record{}, err
 	}
