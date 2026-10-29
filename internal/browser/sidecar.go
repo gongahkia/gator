@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/hostproc"
+	"github.com/gongahkia/gator/internal/privatefs"
 )
 
 const maxSidecarResponseBytes = 4 * 1024 * 1024
@@ -28,16 +29,18 @@ type SidecarConfig struct {
 }
 
 type sidecar struct {
-	process *exec.Cmd
-	input   io.WriteCloser
-	output  *bufio.Reader
-	pipe    io.ReadCloser
-	gate    chan struct{}
-	closed  chan struct{}
-	exited  chan struct{}
-	done    chan struct{}
-	once    sync.Once
-	nextID  uint64
+	process   *exec.Cmd
+	input     io.WriteCloser
+	output    *bufio.Reader
+	pipe      io.ReadCloser
+	gate      chan struct{}
+	closed    chan struct{}
+	exited    chan struct{}
+	done      chan struct{}
+	once      sync.Once
+	nextID    uint64
+	directory string
+	closeErr  error
 }
 
 // StartSidecar verifies the explicitly installed runtime and launches the
@@ -61,7 +64,7 @@ func StartSidecar(ctx context.Context, config SidecarConfig) (Driver, error) {
 	command := hostproc.Command(status.Node, filepath.Join(status.Directory, "driver.mjs"))
 	command.Dir = status.Directory
 	command.Env = append(os.Environ(), "PLAYWRIGHT_BROWSERS_PATH="+filepath.Join(status.Directory, "browsers"))
-	driver, err := startSidecarProcess(ctx, command)
+	driver, err := startSidecarProcess(ctx, command, config.Store.Directory())
 	if err != nil {
 		return nil, err
 	}
@@ -73,10 +76,29 @@ func StartSidecar(ctx context.Context, config SidecarConfig) (Driver, error) {
 	return driver, nil
 }
 
-func startSidecarProcess(ctx context.Context, command *exec.Cmd) (*sidecar, error) {
+func startSidecarProcess(ctx context.Context, command *exec.Cmd, scratchRoot string) (*sidecar, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	directory, err := os.MkdirTemp(scratchRoot, ".process-")
+	if err != nil {
+		return nil, fmt.Errorf("create private browser scratch directory: %w", err)
+	}
+	started := false
+	defer func() {
+		if !started {
+			_ = os.RemoveAll(directory)
+		}
+	}()
+	if err := privatefs.Protect(directory); err != nil {
+		return nil, err
+	}
+	if command.Env == nil {
+		command.Env = os.Environ()
+	}
+	// Playwright normally creates profiles/downloads in the system temp folder.
+	// Own their parent so forced driver termination cannot strand login data.
+	command.Env = append(command.Env, "TMPDIR="+directory, "TMP="+directory, "TEMP="+directory)
 	input, err := command.StdinPipe()
 	if err != nil {
 		return nil, fmt.Errorf("open browser driver input: %w", err)
@@ -91,7 +113,8 @@ func startSidecarProcess(ctx context.Context, command *exec.Cmd) (*sidecar, erro
 		_ = output.Close()
 		return nil, fmt.Errorf("start browser driver: %w", err)
 	}
-	driver := &sidecar{process: command, input: input, pipe: output, output: bufio.NewReaderSize(output, 64*1024), gate: make(chan struct{}, 1), closed: make(chan struct{}), exited: make(chan struct{}), done: make(chan struct{})}
+	started = true
+	driver := &sidecar{process: command, input: input, pipe: output, output: bufio.NewReaderSize(output, 64*1024), gate: make(chan struct{}, 1), closed: make(chan struct{}), exited: make(chan struct{}), done: make(chan struct{}), directory: directory}
 	go func() {
 		_ = command.Wait()
 		close(driver.exited)
@@ -209,7 +232,7 @@ func (driver *sidecar) elementAction(ctx context.Context, method, tabID, ref, va
 func (driver *sidecar) Close() error {
 	driver.shutdown()
 	<-driver.done
-	return nil
+	return driver.closeErr
 }
 
 // Done closes as soon as this engine becomes unusable, so the controller can
@@ -225,6 +248,23 @@ func (driver *sidecar) shutdown() {
 		_ = driver.pipe.Close()
 		go func() {
 			defer close(driver.done)
+			defer func() {
+				// Windows can briefly retain Chromium's open profile handles after
+				// Node exits. Retry deletion, but never report cleanup as successful
+				// if those private files remain.
+				deadline := time.Now().Add(2 * time.Second)
+				for {
+					err := os.RemoveAll(driver.directory)
+					if err == nil {
+						return
+					}
+					if time.Now().After(deadline) {
+						driver.closeErr = fmt.Errorf("remove private browser scratch directory: %w", err)
+						return
+					}
+					time.Sleep(50 * time.Millisecond)
+				}
+			}()
 			timer := time.NewTimer(2 * time.Second)
 			defer timer.Stop()
 			select {

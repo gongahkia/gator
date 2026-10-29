@@ -52,7 +52,7 @@ func hungSidecar(t *testing.T, stubborn bool) (*sidecar, string) {
 	}
 	command := exec.Command(os.Args[0], "-test.run=^TestSidecarProcessHelper$")
 	command.Env = append(os.Environ(), "GATOR_SIDECAR_TEST_HELPER="+mode, "GATOR_SIDECAR_TEST_MARKER="+marker)
-	driver, err := startSidecarProcess(context.Background(), command)
+	driver, err := startSidecarProcess(context.Background(), command, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,6 +136,48 @@ func TestSidecarCloseInterruptsStubbornProcess(t *testing.T) {
 	}
 	if driver.process.ProcessState == nil {
 		t.Fatal("missing child exit state")
+	}
+}
+
+func TestSidecarClosedWhenControllerCannotListen(t *testing.T) {
+	driver, _ := hungSidecar(t, false)
+	store, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := store.Start(StartOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, token, err := CreateToken(store, session.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parentFile := filepath.Join(t.TempDir(), "not-a-directory")
+	if err := os.WriteFile(parentFile, []byte("fixture"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	service, err := NewService(ServiceConfig{Store: store, SessionID: session.ID, Token: token, Driver: driver, Socket: filepath.Join(parentFile, "controller")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.Run(context.Background()); err == nil {
+		t.Fatal("invalid controller socket accepted")
+	}
+	select {
+	case <-driver.done:
+	default:
+		t.Fatal("startup failure leaked driver")
+	}
+	if _, err := os.Stat(driver.directory); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("scratch directory not cleaned: %v", err)
+	}
+	recorded, err := store.Get(session.ID)
+	if err != nil || recorded.State != StateStopped {
+		t.Fatalf("startup failure not revoked: %#v, %v", recorded, err)
+	}
+	if _, err := os.Stat(tokenPath(store, session.ID)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("startup token not revoked: %v", err)
 	}
 }
 

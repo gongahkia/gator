@@ -92,6 +92,61 @@ func waitForBrowserProcessExit(t *testing.T, pids []int) {
 	}
 }
 
+func TestSidecarFrozenDriverRecoveryIntegration(t *testing.T) {
+	store := integrationRecoveryStore(t)
+	d, err := StartSidecar(context.Background(), SidecarConfig{Store: store, Mode: ModeManaged})
+	if err != nil {
+		t.Fatal(err)
+	}
+	driver := d.(*sidecar)
+	entries, err := os.ReadDir(driver.directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundProfile := false
+	for _, entry := range entries {
+		foundProfile = foundProfile || strings.HasPrefix(entry.Name(), "playwright_chromiumdev_profile-")
+	}
+	if !foundProfile {
+		t.Fatal("managed profile is outside the owned scratch directory")
+	}
+	pids := sidecarDescendants(t, driver.process.Process.Pid)
+	if len(pids) < 2 {
+		t.Fatal("no native browser child observed")
+	}
+	defer driver.Close()
+	// This test deliberately freezes only its own driver, never a user's browser.
+	// Always release/clean up its children, including when the regression fails.
+	cleanupNeeded := true
+	defer func() {
+		if !cleanupNeeded {
+			return
+		}
+		for n := len(pids) - 1; n >= 0; n-- {
+			_ = syscall.Kill(pids[n], syscall.SIGCONT)
+			_ = syscall.Kill(pids[n], syscall.SIGKILL)
+		}
+	}()
+	if err := syscall.Kill(driver.process.Process.Pid, syscall.SIGSTOP); err != nil {
+		t.Fatal(err)
+	}
+	closed := make(chan error, 1)
+	go func() { closed <- driver.Close() }()
+	select {
+	case err := <-closed:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(7 * time.Second):
+		t.Fatal("frozen driver did not stop")
+	}
+	waitForBrowserProcessExit(t, pids)
+	cleanupNeeded = false
+	if _, err := os.Stat(driver.directory); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("private browser data remained: %v", err)
+	}
+}
+
 func TestSidecarStalledPageRecoveryIntegration(t *testing.T) {
 	for _, stop := range []bool{false, true} {
 		name := "cancel"

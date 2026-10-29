@@ -101,10 +101,25 @@ func NewService(config ServiceConfig) (*Service, error) {
 // Run serves until context cancellation or a Stop request. It serializes all
 // requests through one controller lock so an agent cannot race a user takeover
 // or another granted run on the same selected tab.
-func (service *Service) Run(ctx context.Context) error {
+func (service *Service) Run(ctx context.Context) (runErr error) {
 	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 	var handlers sync.WaitGroup
+	var listener net.Listener
+	defer func() {
+		cancel()
+		if listener != nil {
+			_ = listener.Close()
+			_ = os.Remove(service.socket)
+		}
+		_, stopErr := service.store.Stop(service.sessionID)
+		if errors.Is(stopErr, ErrStopped) {
+			stopErr = nil
+		}
+		removeToken(service.store, service.sessionID)
+		closeErr := service.driver.Close()
+		handlers.Wait()
+		runErr = errors.Join(runErr, stopErr, closeErr)
+	}()
 	if err := privatefs.MkdirAll(filepath.Dir(service.socket)); err != nil {
 		return fmt.Errorf("create browser socket directory: %w", err)
 	}
@@ -117,15 +132,6 @@ func (service *Service) Run(ctx context.Context) error {
 		return fmt.Errorf("listen on browser socket: %w", err)
 	}
 	service.listener = listener
-	defer func() {
-		cancel()
-		_ = listener.Close()
-		_ = os.Remove(service.socket)
-		_, _ = service.store.Stop(service.sessionID)
-		removeToken(service.store, service.sessionID)
-		_ = service.driver.Close()
-		handlers.Wait()
-	}()
 	if session, err := service.store.Get(service.sessionID); err != nil {
 		return err
 	} else if err := service.driver.SetOrigins(ctx, session.Origins); err != nil {
