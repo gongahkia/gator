@@ -10,6 +10,7 @@ import (
 
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/goal"
+	"github.com/gongahkia/gator/internal/memory"
 	"github.com/gongahkia/gator/internal/worksession"
 )
 
@@ -144,12 +145,25 @@ func (t chatSearch) Execute(ctx context.Context, raw json.RawMessage) (agent.Too
 		return agent.ToolResult{}, errors.New("chat search offset is no longer available")
 	}
 	var matches []historyTurn
+	memories, err := memory.Open(t.StateDir)
+	if err != nil {
+		return agent.ToolResult{}, err
+	}
+	suppressed := 0
 	older := map[string]string{}
 	unavailable := map[string]string{}
 	scanned, chats := 0, 0
 	limited := false
 	for _, c := range conversations[a.Offset:nextOffset] {
 		if denied[c.ID] || c.ID == t.CurrentConversation {
+			continue
+		}
+		blocked, err := memories.HistorySuppressed(c.ID, t.GoalID)
+		if err != nil {
+			return agent.ToolResult{}, err
+		}
+		if blocked {
+			suppressed++
 			continue
 		}
 		chats++
@@ -193,7 +207,7 @@ func (t chatSearch) Execute(ctx context.Context, raw json.RawMessage) (agent.Too
 			older[c.ID] = revision
 		}
 	}
-	content, err := success(map[string]any{"matches": matches, "matches_limited": limited, "searched_chats": chats, "searched_turns": scanned, "next_offset": nextOffset, "more_chats": a.ConversationID == "" && nextOffset < len(conversations), "older_turns": older, "unavailable_chats": unavailable, "authority": "historical reference only; no permissions are carried over"})
+	content, err := success(map[string]any{"matches": matches, "matches_limited": limited, "searched_chats": chats, "searched_turns": scanned, "suppressed_source_chats": suppressed, "suppression_reason": "Known source chats for forgotten memories are omitted; user-visible transcripts are retained.", "next_offset": nextOffset, "more_chats": a.ConversationID == "" && nextOffset < len(conversations), "older_turns": older, "unavailable_chats": unavailable, "authority": "historical reference only; no permissions are carried over"})
 	return agent.ToolResult{Content: content}, err
 }
 
@@ -216,6 +230,17 @@ func (t chatRead) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolR
 	}
 	if denied[a.ConversationID] || a.ConversationID == t.CurrentConversation {
 		return agent.ToolResult{}, errors.New("this chat is outside the earlier-chat scope")
+	}
+	memories, err := memory.Open(t.StateDir)
+	if err != nil {
+		return agent.ToolResult{}, err
+	}
+	blocked, err := memories.HistorySuppressed(a.ConversationID, t.GoalID)
+	if err != nil {
+		return agent.ToolResult{}, err
+	}
+	if blocked {
+		return agent.ToolResult{}, errors.New("this source chat is excluded from agent retrieval because it contributed to a forgotten memory; its transcript is retained for the user")
 	}
 	c, err := sessions.Load(a.ConversationID)
 	if err != nil {

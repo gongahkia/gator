@@ -41,6 +41,10 @@ func (s Store) subjectPath(goalID, subject string) string {
 }
 func (s Store) blockSubject(goalID, subject string) error {
 	path := s.subjectPath(goalID, CanonicalSubject(subject))
+	return blockMarker(path)
+}
+
+func blockMarker(path string) error {
 	if err := privateDirectory(filepath.Dir(path)); err != nil {
 		return err
 	}
@@ -151,6 +155,9 @@ func (s Store) RememberChat(input ChatInput) (Record, error) {
 	current.Origin = &ChatOrigin{ConversationID: input.ConversationID, RunID: input.RunID, Quote: strings.TrimSpace(input.Quote), Basis: "user-stated"}
 	current.observe("user-stated", current.Origin)
 	if err := validate(current); err != nil {
+		return Record{}, err
+	}
+	if err := s.retainHistoryOrigin(current); err != nil {
 		return Record{}, err
 	}
 	if err := s.write(current, creating); err != nil {

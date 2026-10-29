@@ -30,6 +30,49 @@ import (
 
 type restoreModel struct{}
 
+func TestRestorePreservesForgottenConceptAndSourceChatSuppression(t *testing.T) {
+	root := t.TempDir()
+	memories, err := memory.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := memory.ChatInput{Subject: "profile.home_city", Kind: "fact", Quote: "I live in Harbor City.", ConversationID: "work-source", RunID: "run-source"}
+	record, err := memories.RememberChat(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := memories.Forget(record.ID); err != nil {
+		t.Fatal(err)
+	}
+	store, err := Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	archive := filepath.Join(t.TempDir(), "backup.tar.gz")
+	if _, err := store.Export(context.Background(), archive); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := store.PreviewRestore(context.Background(), archive, filepath.Join(t.TempDir(), "restored"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	receipt, err := store.Restore(context.Background(), plan.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	restored, err := memory.Open(receipt.Plan.Target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input.Subject = "profile.city"
+	if _, err := restored.RememberChat(input); err == nil {
+		t.Fatal("restore lost canonical forget marker")
+	}
+	if blocked, err := restored.HistorySuppressed(input.ConversationID, ""); err != nil || !blocked {
+		t.Fatal("restore lost source-history marker", err)
+	}
+}
+
 func (restoreModel) Complete(context.Context, agent.TurnRequest) (agent.Turn, error) {
 	return agent.Turn{Text: "The decision is due Friday. Original paths in this transcript are historical."}, nil
 }

@@ -140,6 +140,41 @@ func TestChatHistoryRetrievesSelectedAncestryAndRejectsCurrentAndOtherGoalChats(
 	}
 }
 
+func TestForgottenMemoryCannotBeReadBackFromItsSourceChat(t *testing.T) {
+	root := t.TempDir()
+	sessions, _ := worksession.Open(root)
+	memories, _ := memory.Open(root)
+	chat, err := sessions.CreateChat(t.TempDir(), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sessions.AddRevision(chat.ID, worksession.Revision{ID: "rev-source", Objective: "I live in Harbor City.", FinalText: "Your home is Harbor City.", SnapshotID: "snap-test", BundlePath: "/bundle/source", Status: "completed"}); err != nil {
+		t.Fatal(err)
+	}
+	record, err := memories.RememberChat(memory.ChatInput{Subject: "profile.city", Kind: "fact", Quote: "I live in Harbor City.", ConversationID: chat.ID, RunID: "rev-source"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := ChatHistory{StateDir: root, CurrentConversation: "work-current"}
+	args, _ := json.Marshal(map[string]string{"conversation_id": chat.ID})
+	if _, err := (chatRead{h}).Execute(context.Background(), args); err != nil {
+		t.Fatal(err)
+	}
+	if err := memories.Forget(record.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (chatRead{h}).Execute(context.Background(), args); err == nil {
+		t.Fatal("forgotten source directly read")
+	}
+	result, err := (chatSearch{h}).Execute(context.Background(), json.RawMessage(`{"query":"Harbor City"}`))
+	if err != nil || strings.Contains(result.Content, "Harbor City") || strings.Contains(result.Content, chat.ID) || !strings.Contains(result.Content, `"suppressed_source_chats":1`) {
+		t.Fatal("forgotten source searched or omission hidden", result.Content, err)
+	}
+	if retained, err := sessions.LoadRevision(chat.ID, "rev-source"); err != nil || retained.Objective != "I live in Harbor City." {
+		t.Fatal("user-visible history was destroyed", retained, err)
+	}
+}
+
 func TestMultilingualMemoryRequestsNeedExactHostReview(t *testing.T) {
 	for _, quote := range []string{"请记住，我喜欢简短的回复。", "Recuerda que prefiero respuestas breves.", "Tolong ingat saya suka jawapan ringkas."} {
 		t.Run(quote, func(t *testing.T) {

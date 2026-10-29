@@ -182,3 +182,22 @@ expanded probe now reports **22 supported / 2 gaps across 24 checks**, preservin
 the previous baseline instead of declaring success from a small alias map.
 General concept admission/review, history-derived suppression and broader
 longitudinal freshness remain open.
+
+## Tracked source-history suppression checkpoint
+
+Chat saves now retain a separate hash-only index of their source conversations.
+It outlives rotation of the eight-entry readable evidence log. Forgetting marks
+those sources before deleting the memory; agent `chat_search`/`chat_read` omit
+the whole tracked conversation because dependent replies and titles can repeat
+the fact. Search reports the omission without exposing the excluded text.
+Transcripts remain available to the user, unrelated conversations remain eligible,
+and goal-specific markers preserve scope. Explicitly restoring a saved fact does
+not silently re-enable its old source chats.
+
+Legacy records use whatever origin/evidence references they still retain. This
+cannot reconstruct already-lost provenance, identify every unrelated paraphrase,
+or revoke text already supplied to a running model. Those limitations remain
+part of the general forgetting gap. Tests cover evidence rotation, restart,
+scope, explicit restoration, history-tool exclusion, unchanged transcripts and
+backup/restore preservation of the markers. Retention fixtures now age their
+new evidence timestamps consistently with the simulated old records.

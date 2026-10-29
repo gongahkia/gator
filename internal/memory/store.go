@@ -365,6 +365,9 @@ func (s Store) forget(id, updated string) error {
 // A concept tombstone is published before deleting its known aliases. If removal
 // is interrupted, surviving records remain excluded from automatic recall.
 func (s Store) forgetRecord(record Record) error {
+	if err := s.suppressHistory(record); err != nil {
+		return err
+	}
 	ids := []string{record.ID}
 	if record.Subject != "" {
 		if err := s.blockSubject(record.GoalID, record.Subject); err != nil {
@@ -376,6 +379,9 @@ func (s Store) forgetRecord(record Record) error {
 		}
 		for _, other := range records {
 			if other.ID != record.ID && other.GoalID == record.GoalID && CanonicalSubject(other.Subject) == CanonicalSubject(record.Subject) {
+				if err := s.suppressHistory(other); err != nil {
+					return err
+				}
 				ids = append(ids, other.ID)
 			}
 		}

@@ -159,7 +159,7 @@ func (t forgetChat) Execute(ctx context.Context, raw json.RawMessage) (agent.Too
 	if err = t.Store.ForgetReviewed(a.ID, a.ExpectedUpdated); err != nil {
 		return agent.ToolResult{}, err
 	}
-	content, err := success(map[string]any{"forgotten": a.ID, "history_retained": true})
+	content, err := success(map[string]any{"forgotten": a.ID, "history_retained": true, "known_source_chats_excluded_from_agent_retrieval": true})
 	return agent.ToolResult{Content: content}, err
 }
 

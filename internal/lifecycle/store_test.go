@@ -242,6 +242,10 @@ func TestRetentionDefaultsKeepDataAndProtectOngoingGoals(t *testing.T) {
 	for _, m := range []memory.Record{global, active} {
 		m.UpdatedAt = now.Add(-40 * 24 * time.Hour)
 		m.CreatedAt = m.UpdatedAt
+		m.LastObservedAt, m.LastConfirmedAt = m.UpdatedAt, m.UpdatedAt
+		for i := range m.Evidence {
+			m.Evidence[i].ObservedAt = m.UpdatedAt
+		}
 		data, _ := json.Marshal(m)
 		writeFixture(t, root, "memory/"+m.ID+".json", string(data))
 	}
@@ -343,18 +347,21 @@ func TestRetentionPreservesSelectedUnsentChatAndBackupMemorySuppression(t *testi
 	if err = memories.Forget(record.ID); err != nil {
 		t.Fatal(err)
 	}
+	writeFixture(t, root, "memory/.memory-interrupted", "incomplete private staging bytes")
+	writeFixture(t, root, "learnings/.learning-interrupted.tmp", "incomplete private staging bytes")
 	manifest, err := s.Export(context.Background(), filepath.Join(t.TempDir(), "backup.tar.gz"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	found := false
+	found, historyFound := false, false
 	for file := range manifest.Files {
-		if strings.Contains(file, ".write-lock") {
-			t.Fatal("transient lock in backup")
+		if strings.Contains(file, ".write-lock") || strings.Contains(file, ".memory-interrupted") || strings.Contains(file, ".learning-interrupted") {
+			t.Fatal("transient lock or staging file in backup")
 		}
 		found = found || strings.Contains(file, ".forgotten/")
+		historyFound = historyFound || strings.Contains(file, ".forgotten-history/")
 	}
-	if !found {
-		t.Fatal("backup lost forgotten-subject suppression")
+	if !found || !historyFound {
+		t.Fatal("backup lost forgotten-subject or source-history suppression")
 	}
 }
