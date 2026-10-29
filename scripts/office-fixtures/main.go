@@ -136,7 +136,10 @@ func generate(directory string) error {
 	if !preview.Sheets[0].Streamed {
 		return fmt.Errorf("streaming fixture did not exercise the streaming renderer")
 	}
-	return os.WriteFile(filepath.Join(directory, "streamed.xlsx"), streamed, 0600)
+	if err := os.WriteFile(filepath.Join(directory, "streamed.xlsx"), streamed, 0600); err != nil {
+		return err
+	}
+	return calculationFixtures(directory)
 }
 
 // Model a common Office template: formatted text is split into runs, and the
