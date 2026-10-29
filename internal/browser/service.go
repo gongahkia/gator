@@ -102,6 +102,9 @@ func NewService(config ServiceConfig) (*Service, error) {
 // requests through one controller lock so an agent cannot race a user takeover
 // or another granted run on the same selected tab.
 func (service *Service) Run(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	var handlers sync.WaitGroup
 	if err := privatefs.MkdirAll(filepath.Dir(service.socket)); err != nil {
 		return fmt.Errorf("create browser socket directory: %w", err)
 	}
@@ -115,11 +118,13 @@ func (service *Service) Run(ctx context.Context) error {
 	}
 	service.listener = listener
 	defer func() {
+		cancel()
 		_ = listener.Close()
 		_ = os.Remove(service.socket)
-		_ = service.driver.Close()
 		_, _ = service.store.Stop(service.sessionID)
 		removeToken(service.store, service.sessionID)
+		_ = service.driver.Close()
+		handlers.Wait()
 	}()
 	if session, err := service.store.Get(service.sessionID); err != nil {
 		return err
@@ -127,7 +132,14 @@ func (service *Service) Run(ctx context.Context) error {
 		return fmt.Errorf("apply browser origin policy: %w", err)
 	}
 	go func() {
-		<-ctx.Done()
+		var engineDone <-chan struct{}
+		if engine, ok := service.driver.(interface{ Done() <-chan struct{} }); ok {
+			engineDone = engine.Done()
+		}
+		select {
+		case <-ctx.Done():
+		case <-engineDone:
+		}
 		_ = listener.Close()
 	}()
 	for {
@@ -138,13 +150,18 @@ func (service *Service) Run(ctx context.Context) error {
 			}
 			return fmt.Errorf("accept browser socket request: %w", err)
 		}
-		go service.serveConnection(ctx, connection)
+		handlers.Add(1)
+		go func() { defer handlers.Done(); service.serveConnection(ctx, connection) }()
 	}
 }
 
 func (service *Service) serveConnection(ctx context.Context, connection net.Conn) {
 	defer connection.Close()
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
 	_ = connection.SetDeadline(time.Now().Add(30 * time.Second))
+	stopCancel := context.AfterFunc(ctx, func() { _ = connection.SetReadDeadline(time.Now()) })
+	defer stopCancel()
 	request, err := decodeRequest(connection)
 	if err != nil {
 		_ = encodeResponse(connection, rpcResponse{Error: err.Error()})
@@ -154,8 +171,26 @@ func (service *Service) serveConnection(ctx context.Context, connection net.Conn
 		_ = encodeResponse(connection, rpcResponse{ID: request.ID, Error: "browser session authentication failed"})
 		return
 	}
+	// One request per connection. A caller that disconnects/cancels must also
+	// cancel its engine work, rather than leaving the controller lock held.
+	go func() {
+		var extra [1]byte
+		_, _ = connection.Read(extra[:])
+		cancel()
+	}()
+	// Unconditional revocation must not queue behind a stalled browser action.
+	// Reviewed requests still go through the normal policy check below.
+	if request.Method == "stop" && request.ExpectedPolicy == "" {
+		_ = encodeResponse(connection, service.handle(ctx, request))
+		return
+	}
 	service.mu.Lock()
-	response := service.handle(ctx, request)
+	response := rpcResponse{ID: request.ID}
+	if ctx.Err() != nil {
+		response.Error = ctx.Err().Error()
+	} else {
+		response = service.handle(ctx, request)
+	}
 	service.mu.Unlock()
 	_ = encodeResponse(connection, response)
 }

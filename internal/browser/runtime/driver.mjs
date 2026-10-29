@@ -8,6 +8,8 @@ const maxElements = 128;
 const maxArtifactBytes = 8 * 1024 * 1024;
 
 let browser;
+let starting;
+let closing = false;
 let context;
 let managed = false;
 let origins = new Set();
@@ -254,7 +256,7 @@ async function start(params) {
 
 async function dispatch(method, params = {}) {
   switch (method) {
-    case 'start': return start(params);
+    case 'start': starting = start(params); return starting;
     case 'invalidate_references': {
       // Preserve monotonically increasing generations: clearing the entire map
       // would let a later snapshot accidentally reuse a pre-takeover ref.
@@ -346,13 +348,28 @@ async function dispatch(method, params = {}) {
 }
 
 const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
+async function shutdown() {
+  if (closing) return;
+  closing = true;
+  try {
+    await starting?.catch(() => {});
+    if (browser) await browser.close();
+  } finally {
+    process.exit(0);
+  }
+}
+// The parent closes stdin even when an operation is stuck. Cleanup must not
+// wait for that operation's response, nor lose to an EPIPE from its late reply.
+lines.on('close', () => { void shutdown(); });
+process.stdout.on('error', () => { void shutdown(); });
 lines.on('line', async line => {
+  if (closing) return;
   let request;
   try {
     request = JSON.parse(line);
     const result = await dispatch(request.method, request.params);
-    process.stdout.write(JSON.stringify({ id: request.id, result }) + '\n');
+    if (!closing) process.stdout.write(JSON.stringify({ id: request.id, result }) + '\n');
   } catch (error) {
-    process.stdout.write(JSON.stringify({ id: request?.id || 0, error: error instanceof Error ? error.message : 'browser driver failed' }) + '\n');
+    if (!closing) process.stdout.write(JSON.stringify({ id: request?.id || 0, error: error instanceof Error ? error.message : 'browser driver failed' }) + '\n');
   }
 });

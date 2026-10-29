@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/gongahkia/gator/internal/hostproc"
 )
@@ -30,7 +31,12 @@ type sidecar struct {
 	process *exec.Cmd
 	input   io.WriteCloser
 	output  *bufio.Reader
-	mu      sync.Mutex
+	pipe    io.ReadCloser
+	gate    chan struct{}
+	closed  chan struct{}
+	exited  chan struct{}
+	done    chan struct{}
+	once    sync.Once
 	nextID  uint64
 }
 
@@ -52,26 +58,52 @@ func StartSidecar(ctx context.Context, config SidecarConfig) (Driver, error) {
 	if !status.Installed {
 		return nil, errors.New(status.Error)
 	}
-	command := hostproc.CommandContext(ctx, status.Node, filepath.Join(status.Directory, "driver.mjs"))
+	command := hostproc.Command(status.Node, filepath.Join(status.Directory, "driver.mjs"))
 	command.Dir = status.Directory
 	command.Env = append(os.Environ(), "PLAYWRIGHT_BROWSERS_PATH="+filepath.Join(status.Directory, "browsers"))
+	driver, err := startSidecarProcess(ctx, command)
+	if err != nil {
+		return nil, err
+	}
+	var ignored map[string]any
+	if err := driver.call(ctx, "start", map[string]any{"mode": config.Mode, "headed": config.Headed, "cdp_endpoint": config.CDPEndpoint}, &ignored); err != nil {
+		_ = driver.Close()
+		return nil, fmt.Errorf("start browser driver: %w", err)
+	}
+	return driver, nil
+}
+
+func startSidecarProcess(ctx context.Context, command *exec.Cmd) (*sidecar, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	input, err := command.StdinPipe()
 	if err != nil {
 		return nil, fmt.Errorf("open browser driver input: %w", err)
 	}
 	output, err := command.StdoutPipe()
 	if err != nil {
+		_ = input.Close()
 		return nil, fmt.Errorf("open browser driver output: %w", err)
 	}
 	if err := command.Start(); err != nil {
+		_ = input.Close()
+		_ = output.Close()
 		return nil, fmt.Errorf("start browser driver: %w", err)
 	}
-	driver := &sidecar{process: command, input: input, output: bufio.NewReaderSize(output, 64*1024)}
-	var ignored map[string]any
-	if err := driver.call(ctx, "start", map[string]any{"mode": config.Mode, "headed": config.Headed, "cdp_endpoint": config.CDPEndpoint}, &ignored); err != nil {
-		_ = driver.Close()
-		return nil, fmt.Errorf("start browser driver: %w", err)
-	}
+	driver := &sidecar{process: command, input: input, pipe: output, output: bufio.NewReaderSize(output, 64*1024), gate: make(chan struct{}, 1), closed: make(chan struct{}), exited: make(chan struct{}), done: make(chan struct{})}
+	go func() {
+		_ = command.Wait()
+		close(driver.exited)
+		driver.shutdown()
+	}()
+	go func() {
+		select {
+		case <-ctx.Done():
+			driver.shutdown()
+		case <-driver.closed:
+		}
+	}()
 	return driver, nil
 }
 
@@ -175,27 +207,69 @@ func (driver *sidecar) elementAction(ctx context.Context, method, tabID, ref, va
 }
 
 func (driver *sidecar) Close() error {
-	driver.mu.Lock()
-	defer driver.mu.Unlock()
-	if driver.process == nil {
-		return nil
-	}
-	_ = driver.input.Close()
-	err := driver.process.Process.Kill()
-	_, waitErr := driver.process.Process.Wait()
-	driver.process = nil
-	if err != nil && !errors.Is(err, os.ErrProcessDone) {
-		return err
-	}
-	return waitErr
+	driver.shutdown()
+	<-driver.done
+	return nil
 }
 
-func (driver *sidecar) call(_ context.Context, method string, parameters any, target any) error {
-	driver.mu.Lock()
-	defer driver.mu.Unlock()
-	if driver.process == nil {
+// Done closes as soon as this engine becomes unusable, so the controller can
+// revoke its session before waiting for native browser cleanup.
+func (driver *sidecar) Done() <-chan struct{} { return driver.closed }
+
+func (driver *sidecar) shutdown() {
+	driver.once.Do(func() {
+		close(driver.closed)
+		// EOF asks the JS driver to close its managed browser (or disconnect an
+		// attached one). Closing both pipes also interrupts blocked Go I/O.
+		_ = driver.input.Close()
+		_ = driver.pipe.Close()
+		go func() {
+			defer close(driver.done)
+			timer := time.NewTimer(2 * time.Second)
+			defer timer.Stop()
+			select {
+			case <-driver.exited:
+				return
+			case <-timer.C:
+				_ = driver.process.Process.Kill()
+				<-driver.exited
+			}
+		}()
+	})
+}
+
+func (driver *sidecar) call(ctx context.Context, method string, parameters any, target any) error {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	select {
+	case driver.gate <- struct{}{}:
+		defer func() { <-driver.gate }()
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-driver.closed:
 		return errors.New("browser driver is closed")
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	select {
+	case <-driver.closed:
+		return errors.New("browser driver is closed")
+	default:
+	}
+	// An admitted request cannot be retried safely after interruption: the
+	// browser may already have acted. Discard the stream and its references.
+	stopCancel := context.AfterFunc(ctx, driver.shutdown)
+	defer stopCancel()
+	err := driver.exchange(method, parameters, target)
+	if ctx.Err() != nil {
+		driver.shutdown()
+		return fmt.Errorf("browser operation interrupted; outcome may be unknown; open a new session: %w", ctx.Err())
+	}
+	return err
+}
+
+func (driver *sidecar) exchange(method string, parameters any, target any) error {
 	driver.nextID++
 	request := struct {
 		ID     uint64 `json:"id"`
@@ -210,10 +284,12 @@ func (driver *sidecar) call(_ context.Context, method string, parameters any, ta
 		return errors.New("browser driver request exceeds 4 MiB")
 	}
 	if _, err := driver.input.Write(append(payload, '\n')); err != nil {
+		driver.shutdown()
 		return fmt.Errorf("write browser driver request: %w", err)
 	}
 	line, err := readSidecarLine(driver.output, maxSidecarResponseBytes)
 	if err != nil {
+		driver.shutdown()
 		return fmt.Errorf("read browser driver response: %w", err)
 	}
 	var response struct {
@@ -222,9 +298,11 @@ func (driver *sidecar) call(_ context.Context, method string, parameters any, ta
 		Error  string          `json:"error"`
 	}
 	if err := json.Unmarshal(line, &response); err != nil {
+		driver.shutdown()
 		return errors.New("browser driver returned invalid JSON")
 	}
 	if response.ID != request.ID {
+		driver.shutdown()
 		return errors.New("browser driver returned a mismatched response")
 	}
 	if response.Error != "" {
