@@ -3,9 +3,13 @@
 package main
 
 import (
+	"archive/zip"
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/gongahkia/gator/internal/presentation"
 )
@@ -54,6 +58,63 @@ func generate(directory string) error {
 		if err := os.WriteFile(filepath.Join(directory, theme+"-edited.pptx"), edited, 0o600); err != nil {
 			return err
 		}
+		if theme == "professional" {
+			rich, err := richTextTemplate(deck)
+			if err != nil {
+				return err
+			}
+			if err := os.WriteFile(filepath.Join(directory, "rich-template.pptx"), rich, 0o600); err != nil {
+				return err
+			}
+			rich, _, err = presentation.EditPPTX(rich, []presentation.Edit{{Operation: "set_title", Slide: 0, Title: "Revised title"}, {Operation: "set_body", Slide: 0, Body: []string{"Revised first paragraph", "Revised second paragraph"}}})
+			if err != nil {
+				return err
+			}
+			if err := os.WriteFile(filepath.Join(directory, "rich-template-edited.pptx"), rich, 0o600); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
+}
+
+// Model a common Office template: formatted text is split into runs, and the
+// DrawingML namespace uses a prefix different from the renderer's own output.
+func richTextTemplate(contents []byte) ([]byte, error) {
+	archive, err := zip.NewReader(bytes.NewReader(contents), int64(len(contents)))
+	if err != nil {
+		return nil, err
+	}
+	var output bytes.Buffer
+	writer := zip.NewWriter(&output)
+	for _, file := range archive.File {
+		reader, err := file.Open()
+		if err != nil {
+			return nil, err
+		}
+		data, err := io.ReadAll(reader)
+		_ = reader.Close()
+		if err != nil {
+			return nil, err
+		}
+		if file.Name == "ppt/slides/slide1.xml" {
+			value := string(data)
+			value = strings.Replace(value, `<a:t>Results &amp; decisions</a:t>`, `<a:t>Results </a:t></a:r><a:r><a:rPr i="1"/><a:t>&amp; decisions</a:t>`, 1)
+			value = strings.Replace(value, `<a:t>Availability improved to 99.7%.</a:t>`, `<a:t>Availability </a:t></a:r><a:r><a:rPr b="1"/><a:t>improved to 99.7%.</a:t>`, 1)
+			value = strings.ReplaceAll(strings.ReplaceAll(value, "xmlns:a=", "xmlns:d="), "a:", "d:")
+			data = []byte(value)
+		}
+		header := file.FileHeader
+		entry, err := writer.CreateHeader(&header)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := entry.Write(data); err != nil {
+			return nil, err
+		}
+	}
+	if err := writer.Close(); err != nil {
+		return nil, err
+	}
+	return output.Bytes(), nil
 }

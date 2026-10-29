@@ -176,6 +176,9 @@ func InspectPPTX(contents []byte) (Preview, error) {
 		if len(texts) > 0 && strings.TrimSpace(texts[0]) != "" {
 			title = texts[0]
 		}
+		if identified := slideTitle(slide.contents); identified != "" {
+			title = identified
+		}
 		preview.Outline = append(preview.Outline, fmt.Sprintf("%d. %s", index+1, title))
 		if notePath := deck.notePath(slide.path); notePath != "" {
 			if len(xmlText(deck.files[notePath].contents, 32*1024)) > 0 {
@@ -325,12 +328,12 @@ func (d *deck) apply(edit Edit) error {
 		}
 		changed := false
 		for index := range d.slides {
-			next, didChange := replaceTextRuns(d.slides[index].contents, edit.Find, edit.Replace, false)
+			next, didChange := replaceTextRuns(d.slides[index].contents, edit.Find, edit.Replace)
 			d.slides[index].contents = next
 			d.files[d.slides[index].path] = withContents(d.files[d.slides[index].path], next)
 			changed = changed || didChange
 			if note := d.notePath(d.slides[index].path); note != "" {
-				next, didChange = replaceTextRuns(d.files[note].contents, edit.Find, edit.Replace, false)
+				next, didChange = replaceTextRuns(d.files[note].contents, edit.Find, edit.Replace)
 				d.files[note] = withContents(d.files[note], next)
 				changed = changed || didChange
 			}
@@ -380,9 +383,9 @@ func (d *deck) applySlide(edit Edit) error {
 		if invalidText(edit.Title, 4096) {
 			return errors.New("set_title requires a bounded title")
 		}
-		next, changed := replaceFirstTextRun(slide.contents, edit.Title)
-		if !changed {
-			return errors.New("slide has no editable text run for its title")
+		next, err := replaceShapeText(slide.contents, "title", []string{edit.Title})
+		if err != nil {
+			return err
 		}
 		slide.contents = next
 		d.files[slide.path] = withContents(d.files[slide.path], next)
@@ -395,9 +398,9 @@ func (d *deck) applySlide(edit Edit) error {
 				return errors.New("set_body contains invalid text")
 			}
 		}
-		next, changed := replaceBodyText(slide.contents, edit.Body)
-		if !changed {
-			return errors.New("slide has no editable text run for its body")
+		next, err := replaceShapeText(slide.contents, "body", edit.Body)
+		if err != nil {
+			return err
 		}
 		slide.contents = next
 		d.files[slide.path] = withContents(d.files[slide.path], next)
@@ -416,9 +419,9 @@ func (d *deck) applySlide(edit Edit) error {
 		if note == "" {
 			return errors.New("set_notes requires an existing notes slide; use add_slide to add new notes")
 		}
-		next, changed := replaceFirstTextRun(d.files[note].contents, edit.Notes)
-		if !changed {
-			return errors.New("notes slide has no editable text run")
+		next, err := replaceShapeText(d.files[note].contents, "notes", []string{edit.Notes})
+		if err != nil {
+			return err
 		}
 		d.files[note] = withContents(d.files[note], next)
 	}
@@ -677,31 +680,9 @@ func replaceSlideList(contents []byte, slides []slideRef) []byte {
 	return append(append([]byte(nil), contents[:start]...), append([]byte(list.String()), contents[end:]...)...)
 }
 
-func replaceFirstTextRun(contents []byte, replacement string) ([]byte, bool) {
-	return replaceTextRuns(contents, "", replacement, true)
-}
-
-func replaceBodyText(contents []byte, values []string) ([]byte, bool) {
-	matches := textRunPattern.FindAllIndex(contents, -1)
-	if len(matches) < 2 {
-		return contents, false
-	}
-	// Keep the title run (the first visible run) and write the requested body
-	// into the next run. Existing further body shapes remain untouched because
-	// their layout may encode unsupported semantics.
-	start, end := matches[1][0], matches[1][1]
-	openEnd := bytes.IndexByte(contents[start:end], '>')
-	if openEnd < 0 {
-		return contents, false
-	}
-	value := xmlEscape(strings.Join(values, "\n"))
-	replacement := append(append([]byte(nil), contents[start:start+openEnd+1]...), append([]byte(value), contents[end-len("</a:t>"):end]...)...)
-	return append(append([]byte(nil), contents[:start]...), append(replacement, contents[end:]...)...), true
-}
-
 var textRunPattern = regexp.MustCompile(`(?s)<a:t(?:\s[^>]*)?>.*?</a:t>`)
 
-func replaceTextRuns(contents []byte, find, replacement string, firstOnly bool) ([]byte, bool) {
+func replaceTextRuns(contents []byte, find, replacement string) ([]byte, bool) {
 	matches := textRunPattern.FindAllIndex(contents, -1)
 	if len(matches) == 0 {
 		return contents, false
@@ -717,12 +698,8 @@ func replaceTextRuns(contents []byte, find, replacement string, firstOnly bool) 
 			return contents, false
 		}
 		text := decodeXMLText(run[openEnd+1 : len(run)-len("</a:t>")])
-		if (firstOnly && !changed) || (!firstOnly && strings.Contains(text, find)) {
-			if firstOnly {
-				text = replacement
-			} else {
-				text = strings.ReplaceAll(text, find, replacement)
-			}
+		if strings.Contains(text, find) {
+			text = strings.ReplaceAll(text, find, replacement)
 			output.Write(run[:openEnd+1])
 			output.WriteString(xmlEscape(text))
 			output.WriteString("</a:t>")
@@ -965,7 +942,7 @@ func textShape(id int, name, value string, x, y, cx, cy int, color string, size 
 	if bold {
 		boldValue = ` b="1"`
 	}
-	return fmt.Sprintf(`<p:sp><p:nvSpPr><p:cNvPr id="%d" name="%s"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="%d" y="%d"/><a:ext cx="%d" cy="%d"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></p:spPr><p:txBody><a:bodyPr wrap="square"/><a:lstStyle/><a:p><a:r><a:rPr lang="en-US" sz="%d"%s><a:solidFill><a:srgbClr val="%s"/></a:solidFill></a:rPr><a:t>%s</a:t></a:r></a:p></p:txBody></p:sp>`, id, xmlEscape(name), x, y, cx, cy, size, boldValue, color, xmlEscape(value))
+	return fmt.Sprintf(`<p:sp><p:nvSpPr><p:cNvPr id="%d" name="%s"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="%d" y="%d"/><a:ext cx="%d" cy="%d"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></p:spPr><p:txBody><a:bodyPr wrap="square"/><a:lstStyle/>%s</p:txBody></p:sp>`, id, xmlEscape(name), x, y, cx, cy, textParagraphs([]string{value}, "", fmt.Sprintf(`<a:rPr lang="en-US" sz="%d"%s><a:solidFill><a:srgbClr val="%s"/></a:solidFill></a:rPr>`, size, boldValue, color)))
 }
 
 func themeXML(theme string) string {

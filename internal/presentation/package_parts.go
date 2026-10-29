@@ -11,7 +11,7 @@ const slideColorMap = `<p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1
 const relationshipsHeader = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">`
 
 func slideMasterXML() string {
-	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sldMaster ` + presentationNamespaces + `><p:cSld>` + emptyShapeTree + `</p:cSld>` + slideColorMap + `<p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst><p:txStyles><p:titleStyle/><p:bodyStyle/><p:otherStyle/></p:txStyles></p:sldMaster>`
+	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sldMaster ` + presentationNamespaces + `><p:cSld><p:bg><p:bgPr><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>` + emptyShapeTree + `</p:cSld>` + slideColorMap + `<p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst><p:txStyles><p:titleStyle/><p:bodyStyle/><p:otherStyle/></p:txStyles></p:sldMaster>`
 }
 
 func slideLayoutXML() string {
