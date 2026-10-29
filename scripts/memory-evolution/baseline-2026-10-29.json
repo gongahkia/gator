@@ -1,0 +1,176 @@
+{
+  "gaps": 8,
+  "met": 14,
+  "probes": [
+    {
+      "capability": "passive exact-quote save",
+      "outcome": "met",
+      "evidence": {
+        "host_rejected": false,
+        "saved": true
+      }
+    },
+    {
+      "capability": "automatic learning opt-out",
+      "outcome": "met",
+      "evidence": {
+        "host_rejected": true,
+        "saved": false
+      }
+    },
+    {
+      "capability": "negative save instruction",
+      "outcome": "met",
+      "evidence": {
+        "host_rejected": true,
+        "saved": false
+      }
+    },
+    {
+      "capability": "secret rejected by host",
+      "outcome": "gap",
+      "evidence": {
+        "host_rejected": false,
+        "saved": true
+      }
+    },
+    {
+      "capability": "third-party statement rejected by host",
+      "outcome": "gap",
+      "evidence": {
+        "host_rejected": false,
+        "saved": true
+      }
+    },
+    {
+      "capability": "temporary request rejected by host",
+      "outcome": "gap",
+      "evidence": {
+        "host_rejected": false,
+        "saved": true
+      }
+    },
+    {
+      "capability": "conflicting replacement requires current revision",
+      "outcome": "met",
+      "evidence": {
+        "rejected": true
+      }
+    },
+    {
+      "capability": "reviewed correction survives reopen",
+      "outcome": "met",
+      "evidence": {
+        "record_count": 1,
+        "same_id": true,
+        "updated_after_original": true
+      }
+    },
+    {
+      "capability": "old revision cannot overwrite newer correction",
+      "outcome": "met",
+      "evidence": {
+        "rejected": true
+      }
+    },
+    {
+      "capability": "reconfirmation refreshes evidence and profile priority",
+      "outcome": "gap",
+      "evidence": {
+        "chat_memory_has_expiry": false,
+        "in_four_item_profile": false,
+        "latest_origin_retained": false,
+        "profile_size": 4,
+        "timestamp_refreshed": false
+      }
+    },
+    {
+      "capability": "contradictory alias requires reconciliation",
+      "outcome": "gap",
+      "evidence": {
+        "alias_saved_without_conflict": true
+      }
+    },
+    {
+      "capability": "forgotten exact subject stays suppressed",
+      "outcome": "met",
+      "evidence": {
+        "rejected": true
+      }
+    },
+    {
+      "capability": "forgotten meaning stays suppressed across aliases",
+      "outcome": "gap",
+      "evidence": {
+        "alias_relearned": true
+      }
+    },
+    {
+      "capability": "goal facts stay out of personal and other-goal memory",
+      "outcome": "met",
+      "evidence": {
+        "own_goal_visible": true
+      }
+    },
+    {
+      "capability": "explicit expiry excludes stale facts",
+      "outcome": "met",
+      "evidence": {
+        "retained_for_inspection": true
+      }
+    },
+    {
+      "capability": "changed file source is excluded from recall",
+      "outcome": "met",
+      "evidence": {
+        "source_status": "changed"
+      }
+    },
+    {
+      "capability": "one corrupt record preserves unrelated healthy recall",
+      "outcome": "gap",
+      "evidence": {
+        "search_failed": true
+      }
+    },
+    {
+      "capability": "repeated failure observations produce a reviewable candidate",
+      "outcome": "gap",
+      "evidence": {
+        "candidates_generated": 0,
+        "observations_recorded": 3
+      }
+    },
+    {
+      "capability": "inferred lesson awaits confirmation",
+      "outcome": "met",
+      "evidence": {
+        "status": "candidate",
+        "stored_confidence": 100
+      }
+    },
+    {
+      "capability": "repeated identical correction consolidates evidence",
+      "outcome": "met",
+      "evidence": {
+        "evidence_work_count": 2,
+        "same_id": true
+      }
+    },
+    {
+      "capability": "approved lesson enters future projection",
+      "outcome": "met",
+      "evidence": {
+        "active": 1
+      }
+    },
+    {
+      "capability": "withdrawn lesson stops future projection",
+      "outcome": "met",
+      "evidence": {
+        "retained_records": 1
+      }
+    }
+  ],
+  "scope": "Deterministic synthetic host/store capability probes, not live-model extraction accuracy or a memory quality score. Gaps are retained as findings; this command does not repair them."
+}
