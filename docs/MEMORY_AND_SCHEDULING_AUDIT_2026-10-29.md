@@ -1,5 +1,10 @@
 # Memory audit and requested scheduling follow-up
 
+Follow-up: the [memory evolution evaluation](MEMORY_EVOLUTION_EVALUATION_2026-10-29.md)
+adds a reproducible passive/proactive capability probe, reconfirmation evidence,
+fresh regression results and priorities for ongoing maintenance. It preserves
+eight observed gaps; no additional production fixes are claimed by that report.
+
 Status: audit completed locally; two memory defects fixed. New reminder,
 scheduled-task management and personal-summary features remain queued after
 the current competitive-gap implementation. This does not close its live-use,
