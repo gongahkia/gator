@@ -1,15 +1,14 @@
 import { createServer } from 'node:http';
-import { createHash, timingSafeEqual } from 'node:crypto';
-import { open, readFile } from 'node:fs/promises';
-import { constants } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Backend } from '../app-host/src/backend.mjs';
 import { validateFrame } from '../app-host/src/policy.mjs';
+import { authenticate, readToken } from './auth.mjs';
+export { readToken } from './auth.mjs';
 
 const identity = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/;
 const creationIdentity = /^[a-zA-Z0-9][a-zA-Z0-9_-]{15,95}$/;
-const hash = text => createHash('sha256').update(text).digest();
 const execute = promisify(execFile);
 const idle = worker => !worker.closed && !['running', 'queued', 'pending_approval', 'pending_connection', 'external', 'panel', 'receipt_busy', 'catalog_busy'].some(key => worker.state?.[key]) && !worker.state?.queue?.length;
 const assets = new Map([
@@ -22,19 +21,6 @@ const browserHeaders = {
   'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY',
   'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
 };
-
-// Re-read each time: replacing the token file revokes every old client, without
-// cancelling admitted work. Only a private regular file can authorize access.
-export async function readToken(path) {
-  const file = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW || 0) | (constants.O_NONBLOCK || 0));
-  try {
-    const stat = await file.stat();
-    if (!stat.isFile() || stat.size !== 65 || process.platform !== 'win32' && (stat.mode & 0o077)) throw new Error('Use a private token file.');
-    const token = (await file.readFile('utf8')).trim();
-    if (!/^[a-f0-9]{64}$/.test(token)) throw new Error('Invalid companion token.');
-    return token;
-  } finally { await file.close(); }
-}
 
 export function createCompanion({ binary, workspace, env, tokenFile, origin,
   queryCatalog = async ({ query, scope, after }) => {
@@ -104,8 +90,9 @@ export function createCompanion({ binary, workspace, env, tokenFile, origin,
         return res.end(body);
       }
       const supplied = req.headers.authorization || '';
-      const token = await readToken(tokenFile);
-      if (!timingSafeEqual(hash(supplied), hash(`Bearer ${token}`))) return respond(res, 401, { error: 'Authentication required.' });
+      const access = await authenticate(tokenFile, supplied);
+      const authorized = async () => access !== null && access === await authenticate(tokenFile, supplied);
+      if (!access) return respond(res, 401, { error: 'Authentication required.' });
       if (stopping) return respond(res, 503, { error: 'Companion is stopping.' });
       const url = new URL(req.url, localOrigin);
       if (url.pathname === '/v1/chats' && req.method === 'GET') {
@@ -114,10 +101,10 @@ export function createCompanion({ binary, workspace, env, tokenFile, origin,
         const query = params.get('q') || '', scope = params.get('scope') || 'active', after = params.get('after') || '';
         if (Buffer.byteLength(query) > 512 || /[\x00-\x1f\x7f]/.test(query) || !['active', 'archived', 'all'].includes(scope) || after.length > 1024) throw new Error('Invalid conversation search.');
         const page = await serial(async () => {
-          if (stopping || token !== await readToken(tokenFile)) throw new Error('Access was revoked.');
+          if (stopping || !await authorized()) throw Object.assign(new Error('Access was revoked.'), { code: 'AUTH_REVOKED' });
           return queryCatalog({ query, scope, after });
         });
-        if (token !== await readToken(tokenFile)) return respond(res, 401, { error: 'Authentication required.' });
+        if (!await authorized()) return respond(res, 401, { error: 'Authentication required.' });
         return respond(res, 200, { ...page, new_chat_source: workspace });
       }
       if (req.url === '/v1/chats' && req.method === 'POST') {
@@ -131,10 +118,10 @@ export function createCompanion({ binary, workspace, env, tokenFile, origin,
         const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
         if (!body || Object.keys(body).length !== 1 || typeof body.request_id !== 'string' || !creationIdentity.test(body.request_id)) throw new Error('Use a stable new-chat request ID, without source or message fields.');
         const created = await serial(async () => {
-          if (stopping || token !== await readToken(tokenFile)) throw new Error('Access was revoked.');
+          if (stopping || !await authorized()) throw Object.assign(new Error('Access was revoked.'), { code: 'AUTH_REVOKED' });
           return createChat(body.request_id);
         });
-        if (token !== await readToken(tokenFile)) return respond(res, 401, { error: 'Authentication required.' });
+        if (!await authorized()) return respond(res, 401, { error: 'Authentication required.' });
         if (created.request_id !== body.request_id || !identity.test(created.conversation_id)) throw new Error('The host did not confirm this chat identity. Retry the same request.');
         return respond(res, 200, created);
       }
@@ -157,9 +144,10 @@ export function createCompanion({ binary, workspace, env, tokenFile, origin,
       }
       const state = await serial(async () => {
         // Authorization may have been revoked while waiting for another action.
-        if (token !== await readToken(tokenFile)) throw new Error('Access was revoked.');
+        if (!await authorized()) throw Object.assign(new Error('Access was revoked.'), { code: 'AUTH_REVOKED' });
         if (stopping) throw new Error('Companion is stopping.');
         const owner = await worker(match[1]);
+        if (!await authorized()) throw Object.assign(new Error('Access was revoked.'), { code: 'AUTH_REVOKED' });
         if (frame) {
           if (owner.state?.external || owner.state?.panel || owner.state?.pending_connection) throw new Error('Finish this conversation’s host setup first.');
           if ((frame.type === 'upload_submit' || frame.type === 'queue' && frame.queue.action === 'run') && !owner.state.running && [...workers.values()].filter(w => !w.closed && w.state?.running).length >= 3) throw new Error('Three conversations are working.');
@@ -168,10 +156,11 @@ export function createCompanion({ binary, workspace, env, tokenFile, origin,
         }
         return { conversation_id: match[1], execution_host: 'companion', state: owner.state, disconnected: owner.closed, error: owner.closed ? owner.failure : undefined };
       });
-      if (token !== await readToken(tokenFile)) return respond(res, 401, { error: 'Authentication required.' });
+      if (!await authorized()) return respond(res, 401, { error: 'Authentication required.' });
       respond(res, 200, state);
     } catch (error) {
       // Do not expose filesystem errors or authentication file details.
+      if (error.code === 'AUTH_REVOKED') return respond(res, 401, { error: 'Authentication required.' });
       respond(res, error.code ? 503 : 400, { error: error.code ? 'Companion is unavailable.' : error.message });
     }
   });

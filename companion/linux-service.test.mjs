@@ -58,7 +58,7 @@ test('native Linux user manager starts, restarts and removes an isolated compani
     systemctl('show-environment'); // An explicitly requested native test must not silently skip a missing manager.
     const workspace = join(root, 'work %n ${HOME} "quoted" \\ ü'), stateDir = join(root, 'state %n ${HOME}'), configDir = join(root, 'config %n ${HOME}');
     for (const directory of [workspace, stateDir, configDir, join(root, 'private')]) await mkdir(directory, { mode: 0o700 });
-    for (const name of ['main.mjs', 'server.mjs', 'public']) await cp(new URL(`./${name}`, import.meta.url), join(root, 'companion', name), { recursive: true });
+    for (const name of ['main.mjs', 'server.mjs', 'auth.mjs', 'public']) await cp(new URL(`./${name}`, import.meta.url), join(root, 'companion', name), { recursive: true });
     await cp(new URL('../app-host/src', import.meta.url), join(root, 'app-host/src'), { recursive: true });
     const runtime = join(root, 'gator-runtime'); await cp(resolve(process.env.GATOR_TEST_BINARY), runtime);
     const tokenFile = join(root, 'private/access.token'), token = 'b'.repeat(64);

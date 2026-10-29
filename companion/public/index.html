@@ -16,7 +16,7 @@
     <form id="connect-form" class="card">
       <div id="credentials">
       <label for="token">Host access token</label>
-      <input id="token" type="password" autocomplete="off" spellcheck="false" required pattern="[a-f0-9]{64}" aria-describedby="token-help">
+      <input id="token" type="password" autocomplete="off" spellcheck="false" required pattern="([a-f0-9]{64}|gator_device_[a-f0-9]{32}_[a-f0-9]{64})" aria-describedby="token-help">
       <p id="token-help" class="hint">Kept in this page’s memory. Closing or reloading asks for it again.</p>
       <details><summary>Open a known conversation</summary>
       <label for="conversation">Conversation ID</label>

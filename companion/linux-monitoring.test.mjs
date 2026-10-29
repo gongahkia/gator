@@ -50,7 +50,7 @@ test('Linux supervisor finishes a scheduled check without the companion and expo
     systemctl('show-environment');
     for (const directory of [workspace, stateDir, join(configDir, 'gator'), join(root, 'private')]) await mkdir(directory, { recursive: true, mode: 0o700 });
     await cp(resolve(process.env.GATOR_TEST_BINARY), runtime);
-    for (const name of ['main.mjs', 'server.mjs', 'public']) await cp(new URL(`./${name}`, import.meta.url), join(root, 'companion', name), { recursive: true });
+    for (const name of ['main.mjs', 'server.mjs', 'auth.mjs', 'public']) await cp(new URL(`./${name}`, import.meta.url), join(root, 'companion', name), { recursive: true });
     await cp(new URL('../app-host/src', import.meta.url), join(root, 'app-host/src'), { recursive: true });
     await writeFile(tokenFile, token + '\n', { mode: 0o600 });
     await new Promise(resolve => provider.listen(0, '127.0.0.1', resolve));

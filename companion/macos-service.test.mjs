@@ -28,7 +28,7 @@ test('native launchd starts, restarts and removes an isolated companion listener
   try {
     for (const name of ['workspace', 'config', 'state', 'logs', 'companion', 'app-host']) await mkdir(join(root, name), { mode: 0o700 });
     // Launchd should not need Desktop access or the development checkout.
-    for (const name of ['main.mjs', 'server.mjs', 'public']) await cp(new URL(`./${name}`, import.meta.url), join(root, 'companion', name), { recursive: true });
+    for (const name of ['main.mjs', 'server.mjs', 'auth.mjs', 'public']) await cp(new URL(`./${name}`, import.meta.url), join(root, 'companion', name), { recursive: true });
     await cp(new URL('../app-host/src', import.meta.url), join(root, 'app-host/src'), { recursive: true });
     await writeFile(tokenFile, token + '\n', { mode: 0o600 });
     const portProbe = createServer();
