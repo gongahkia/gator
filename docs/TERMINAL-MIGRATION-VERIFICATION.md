@@ -1573,3 +1573,52 @@ disabled during calculation and only synthetic files copied in. The container
 was removed afterward. No production document was opened. This is independent
 calculation compatibility evidence, not native Microsoft Excel acceptance,
 visual layout approval, arbitrary-template fidelity or general analysis accuracy.
+
+### Independent Word and PowerPoint rendering — 29 October
+
+LibreOffice Writer/Impress 24.2.7.2 rendered seven DOCX and ten PPTX fixtures into
+42 PDF pages. `scripts/office-validation/render.py` checks expected text on each
+page, explicit Word pagination, slide order after add/move/delete edits, text
+bounding boxes, and Word table column/row alignment including a multiline cell.
+The additional dense slide has a two-line title and sixteen body paragraphs;
+all remain present and inside the fixture's title/body rectangles. The slide
+also passes independent Open XML SDK Office2007 validation with zero errors.
+No production renderer change was necessary for these exercised layouts.
+
+Four deliberate mutations are rejected: a missing final dense-slide paragraph,
+reordered slides, text outside the page, and a displaced table cell. Every
+generated DOCX/PPTX must have expectations. Fresh output directories and isolated
+LibreOffice profiles prevent stale results; input SHA-256 hashes remain unchanged.
+The report records the engine version, input hashes, page/text counts and negative
+controls. PDFs, extracted text and bounding boxes, embedded-font inventories and
+PNG images are retained for review. CI uploads these artifacts even when the
+layout check fails. No remote CI run was triggered during this local check.
+
+Representative images were inspected for new/filled Word pages, edited slide
+order and content, the dense slide, Chinese/Arabic text and shared-editor output.
+This caught a real limitation of text extraction: the crocodile emoji survived
+in PDF text but appeared as a missing-glyph box without an emoji font. Adding
+`fonts-noto-color-emoji` to the test environment restored the visible glyph in
+both Word and PowerPoint renders. A second complete render/check passed with
+that font installed. The CI font dependencies now include Latin, CJK, Arabic and
+emoji fallbacks. Text checks alone do not establish correct glyph appearance.
+
+After generating fixtures and running the shared-editor roundtrip above:
+
+```sh
+python3 scripts/office-validation/render.py .gator/office-fixtures .gator/office-rendered
+```
+
+Install LibreOffice Writer/Impress, Poppler (`pdftotext`, `pdftoppm`, `pdffonts`)
+and the fonts listed in the Office CI job. Use a new output directory; `--soffice`
+can select another executable. The local run used a disposable Ubuntu container
+on the Mac, with networking disabled while rendering, copied synthetic inputs
+and no host mounts. It was removed afterward. Final evidence is retained under
+ignored `.gator/native-tools/layout-with-emoji/`.
+
+This establishes compatibility for these synthetic layouts, using fallback fonts.
+It does not verify native Microsoft Word/PowerPoint, installed Aptos typography,
+general mixed-direction shaping, transitions/speaker-note presentation, arbitrary
+customer templates, all possible text density, or overall design quality. The
+automated checks do not detect every overlap or missing-glyph appearance; review
+the retained images when layout or font behavior changes.

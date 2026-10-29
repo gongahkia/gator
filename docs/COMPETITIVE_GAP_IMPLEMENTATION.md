@@ -1024,3 +1024,27 @@ G10/document quality remains open for native Microsoft Excel, Word and PowerPoin
 acceptance, representative customer files, visual layout and arbitrary template
 fidelity. These fixtures demonstrate independent calculation compatibility; they
 do not establish that an arbitrary model-generated analysis is correct.
+
+### Independent Word/PowerPoint layout evidence — 29 October
+
+Added a dense-slide fixture and an independent Writer/Impress → PDF check.
+LibreOffice 24.2.7.2 rendered all seven DOCX and ten PPTX fixtures into 42 pages.
+Checks cover expected text per page, Word page breaks, edited slide order,
+page/slide text bounds, table column/row alignment and multiline cells. Four
+negative controls reject missing text, reordered slides, off-page text and a
+displaced table cell. Original hashes remain unchanged; output directories must
+be fresh. The additional slide has zero independent Office2007 schema errors.
+
+Image review found a missing crocodile glyph despite successful PDF text
+extraction. Installing the emoji fallback font in the test environment fixed its
+appearance in Word and PowerPoint, and the complete check passed again. CI now
+installs the required rendering/font tools and retains PDFs, PNGs, extracted
+text/bounds, font inventories and a report, including artifacts on failure.
+Local evidence is in ignored `.gator/native-tools/layout-with-emoji/`; the
+disposable rendering container was removed. No remote CI was triggered.
+
+No production renderer changes were needed for these cases. G10 remains open
+for native Office, representative customer documents, arbitrary template fidelity,
+general typography/overflow and design quality. Automated text/bounds checks do
+not prove glyph appearance or detect every overlap. The verification ledger
+records the inspected examples, font-dependent limitation and repeat command.
