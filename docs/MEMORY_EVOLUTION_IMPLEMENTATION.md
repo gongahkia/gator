@@ -49,3 +49,34 @@ GitHub run `40902016728` exercises Linux, Intel/ARM macOS and Windows. It expose
 a Windows PDF.js trailing-slash path failure and an outdated uppercase-palette
 assertion on Linux; fixes and subsequent native results belong in the terminal
 verification ledger. It is a test workflow, not a deployment.
+
+## Completed storage/recovery checkpoint
+
+- `9f9ae6ace`: complete JSON is written and flushed in a private staging file,
+  then published atomically. Exclusive creation cannot overwrite an existing ID.
+  Unix directory metadata is flushed; Windows retains the existing `privatefs`
+  limitation that directory flushing is not available through its read handle.
+  Owned memory directories reject symlinks and use native private permissions.
+- `4d7aef2fb`: listing/search/profile can return validated healthy records with
+  a typed partial-read diagnostic. CLI output, saved-context views, memory
+  settings, chat receipts, model preparation and knowledge-search tools expose
+  that warning. `gator memory diagnose` identifies up to 32 unreadable filenames
+  and reports the total; it does not modify or delete damaged records.
+- Direct reads of damaged records still fail. Ordinary store-access errors stay
+  fatal. Automatic subject consolidation remains blocked while an unreadable
+  record might contain a conflicting subject; recovery must not invent facts.
+- Fresh capability probe: **15 supported, 7 gaps**, versus the preserved 14/8
+  baseline. The corruption probe now requires healthy results and accepts an
+  explicit partial-read warning; an error with no healthy results still fails.
+
+Verification: race suites for memory, tools, workapp and workrun pass; focused
+command race tests matching Memory/Learning/Recall/ContextRetains/SavedKnowledge
+pass. Added integration tests cover foreground/background context, CLI list/
+search/diagnose, settings, retained-context presentation, healthy chat receipts,
+tool exclusions and unchanged damaged bytes. Publication tests cover concurrent
+readers, exclusive-ID collision, interrupted staging and owned-directory links.
+These do not simulate physical power loss or complete native Windows validation.
+
+Gap six is still open for the unified personal summary. The other five outcomes
+remain open; this checkpoint does not establish working autonomous maintenance
+or live-model capture quality.

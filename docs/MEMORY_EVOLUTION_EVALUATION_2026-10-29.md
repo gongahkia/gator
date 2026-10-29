@@ -1,5 +1,11 @@
 # Memory evolution evaluation
 
+Implementation follow-up: [the active ledger](MEMORY_EVOLUTION_IMPLEMENTATION.md)
+records subsequent fixes. Atomic publication and visible partial-recall recovery
+now pass their focused tests; the fresh capability count is 15 supported / 7 gaps.
+The original findings below remain the baseline, not a claim that later fixes
+were present during that evaluation.
+
 **Verdict: useful foundations, but not yet dependable evolving memory.** Gator
 can save, recall and correct information. It does not yet reliably reconcile
 meaning across labels, track repeated confirmation, reassess aging chat facts,
