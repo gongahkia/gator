@@ -140,7 +140,7 @@ path.write_text("Editor returned draft 🐊\\nSecond retained line")
             assert b"\x1b]0;GATOR_UNTRUSTED_TITLE" not in output, "Untrusted title command reached terminal output"
             assert (root / "untrusted.txt").read_bytes() == payload, "Viewing changed original file bytes"
             os.write(master, b"\x1b")
-            time.sleep(0.1)
+            wait_for(lambda: not visible("Retained final line"), "file view closed before quit")
         os.write(master, b"\x11")
         wait_for(lambda: child.poll() is not None, "clean terminal exit", timeout=10)
         assert child.returncode == 0, child.returncode

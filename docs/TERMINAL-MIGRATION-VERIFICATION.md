@@ -1344,3 +1344,11 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   probe reached editor return and untrusted file viewing but failed its exit
   wait. Both are under investigation. Native Windows and the overall parity
   gate remain open.
+
+- The isolated receipt journey now passes (13 assertions); the initial stall
+  has not been assigned a cause. A fresh bounded full-suite run is still required.
+  The PTY exit failure was a harness synchronization defect: it sent Ctrl+Q after
+  a fixed 100 ms delay while the file dialog could still own input. Waiting for
+  the observed file view to close fixes the probe. The combined native PTY,
+  Go-owned editor, untrusted-file, clean-exit and terminal-mode restoration
+  checks now pass with `artifact-macos-2`; no product shutdown guard was relaxed.
