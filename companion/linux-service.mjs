@@ -23,13 +23,16 @@ export function userService(config) {
     GATOR_COMPANION_ORIGIN: config.origin || '',
     PATH: `${posix.dirname(config.node)}:/usr/local/bin:/usr/bin:/bin`,
   };
+  // WorkingDirectory is a raw path, unlike ExecStart/Environment. A final slash
+  // keeps trailing spaces or a literal backslash from becoming unit syntax.
+  const workingDirectory = config.workspace.replace(/%/g, '%%') + '/';
   return `[Unit]
 Description=Gator companion listener
 
 [Service]
 Type=exec
 ExecStart=:${args.map(quote).join(' ')}
-WorkingDirectory=${quote(config.workspace)}
+WorkingDirectory=${workingDirectory}
 ${Object.entries(environment).map(([key, value]) => `Environment=${quote(`${key}=${value}`)}`).join('\n')}
 UMask=0077
 Restart=always
