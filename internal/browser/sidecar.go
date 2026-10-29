@@ -82,6 +82,11 @@ func (driver *sidecar) SetOrigins(ctx context.Context, origins []Origin) error {
 	}{origins}, &ignored)
 }
 
+func (driver *sidecar) InvalidateReferences(ctx context.Context) error {
+	var ignored map[string]any
+	return driver.call(ctx, "invalidate_references", nil, &ignored)
+}
+
 func (driver *sidecar) CandidateTabs(ctx context.Context) ([]Tab, error) {
 	var result []Tab
 	err := driver.call(ctx, "candidate_tabs", nil, &result)

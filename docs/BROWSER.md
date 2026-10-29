@@ -37,9 +37,9 @@ GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator browser select SESSION_ID TAB_ID [T
 Attached sessions never expose candidate tabs to the model. The CLI lists them
 only for the developer; agent tools can see only selected tabs. `gator browser
 stop SESSION_ID` closes a managed browser, disconnects an attached browser, and
-revokes the local token. The TUI exposes the same operations with `/browser`:
-`start`, `attach`, `tabs`, `select`, `use`, `origins`, `visual`, `upload`,
-`artifacts`, `export`, `stop`, and `none`.
+revokes the local token. These remain internal developer commands. The current
+desktop/terminal task UI does not yet expose the complete browser lifecycle
+and task-grant journey; the old `/browser` TUI claim did not describe this UI.
 
 List capture metadata with `gator browser artifacts SESSION_ID`; copy one to a
 new developer-selected path without overwriting an existing file through
@@ -72,6 +72,30 @@ storage, CDP endpoints, clipboard operations, browser permissions, extension
 control, or arbitrary filesystem paths. Password, passkey, username,
 one-time-code, autocomplete-sensitive, and file inputs cannot be filled by an
 agent. Use the headed managed window to log in or take over manually.
+
+## Private sign-in and takeover
+
+Pause agent access **before** entering private information and wait for its
+acknowledgement:
+
+```sh
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator browser pause SESSION_ID
+# Sign in or make the intended change in the headed browser.
+GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator browser resume SESSION_ID
+```
+
+Pause is serialized with browser operations. An already-running operation may
+finish before the acknowledgement; after acknowledgement, all agent tab reads,
+snapshots, screenshots and actions are rejected. Pause remains recorded if the
+driver fails. Resuming requires a separate local request and invalidates every
+old element reference before access opens again. A model cannot pause/resume
+through its browser tools. Failed invalidation keeps access paused.
+
+Approved origins remain in force during private takeover. Authentication
+redirects may need additional explicit origin grants; pause does not grant new
+network access. A stopped controller cannot be recovered merely by resuming it.
+These controls do not yet provide an integrated account-login or browser-recovery
+journey in the desktop/terminal interface.
 
 ## Network and profile boundary
 

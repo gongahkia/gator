@@ -27,6 +27,8 @@ const browserUsage = `usage:
   gator browser select SESSION_ID TAB_ID [TAB_ID...]
   gator browser origins SESSION_ID list|add URL|remove URL
   gator browser visual SESSION_ID on|off
+  gator browser pause SESSION_ID
+  gator browser resume SESSION_ID
   gator browser allow-upload SESSION_ID ABSOLUTE_PATH
   gator browser artifacts SESSION_ID
   gator browser export SESSION_ID ARTIFACT_ID --out ABSOLUTE_PATH
@@ -85,6 +87,24 @@ func browserCommand(arguments []string, out io.Writer) error {
 		return browserOrigins(arguments[1:], out, store)
 	case "visual":
 		return browserVisual(arguments[1:], out, store)
+	case "pause", "resume":
+		if len(arguments) != 2 {
+			return errors.New("usage: gator browser pause|resume SESSION_ID")
+		}
+		client, err := gatorbrowser.NewClient(store, arguments[1])
+		if err != nil {
+			return err
+		}
+		session, err := client.SetPaused(context.Background(), arguments[0] == "pause")
+		if err != nil {
+			return err
+		}
+		if session.Paused {
+			_, err = fmt.Fprintf(out, "Paused browser %s. Agent reads and actions are blocked. Sign in or take over in the browser, then explicitly resume; approved origins remain in force.\n", session.ID)
+		} else {
+			_, err = fmt.Fprintf(out, "Resumed browser %s. Prior element references are invalid; the agent must inspect a fresh snapshot.\n", session.ID)
+		}
+		return err
 	case "allow-upload":
 		return browserAllowUpload(arguments[1:], out, store)
 	case "artifacts":
@@ -476,7 +496,7 @@ func writeBrowserStatus(out io.Writer, store *gatorbrowser.Store) error {
 				active = "unavailable"
 			}
 		}
-		if _, err := fmt.Fprintf(out, "%s\t%s\t%s\ttabs=%d\torigins=%d\tvisual=%t\n", session.ID, session.Mode, active, len(session.SelectedTabs), len(session.Origins), session.VisualCapture); err != nil {
+		if _, err := fmt.Fprintf(out, "%s\t%s\t%s\ttabs=%d\torigins=%d\tvisual=%t\tpaused=%t\n", session.ID, session.Mode, active, len(session.SelectedTabs), len(session.Origins), session.VisualCapture, session.Paused); err != nil {
 			return err
 		}
 	}

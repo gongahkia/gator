@@ -201,6 +201,15 @@ func (s *Store) SetVisualCapture(id string, allowed bool) (Session, error) {
 	})
 }
 
+// SetPaused is called only by the authenticated local controller, after its
+// serialized takeover transition. Agent tools cannot change this permission.
+func (s *Store) SetPaused(id string, paused bool) (Session, error) {
+	return s.update(id, func(session *Session) error {
+		session.Paused = paused
+		return nil
+	})
+}
+
 // AllowUpload registers a display-safe opaque upload ID. The controller keeps
 // the validated real path in memory for the lifetime of the session.
 func (s *Store) AllowUpload(id, name string) (Session, Upload, error) {

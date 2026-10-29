@@ -30,6 +30,7 @@ const (
 // interface so policy behavior is independently verifiable without Chromium.
 type Driver interface {
 	SetOrigins(context.Context, []Origin) error
+	InvalidateReferences(context.Context) error
 	CandidateTabs(context.Context) ([]Tab, error)
 	Snapshot(context.Context, string) (Snapshot, error)
 	Screenshot(context.Context, string) ([]byte, error)
@@ -161,9 +162,45 @@ func (service *Service) serveConnection(ctx context.Context, connection net.Conn
 
 func (service *Service) handle(ctx context.Context, request rpcRequest) rpcResponse {
 	response := rpcResponse{ID: request.ID}
+	// Check under the same controller lock as the actual operation. A request
+	// admitted before a takeover may finish; once pause is acknowledged, no agent
+	// reads/actions can reach the driver until an explicit local resume.
+	switch request.Method {
+	case "tabs", "snapshot", "screenshot", "navigate", "click", "fill", "select", "press", "download", "upload":
+		session, err := service.store.Get(service.sessionID)
+		if err != nil {
+			response.Error = err.Error()
+			return response
+		}
+		if session.Paused {
+			response.Error = ErrPaused.Error()
+			return response
+		}
+	}
 	var result any
 	var err error
 	switch request.Method {
+	case "set_paused":
+		var parameters struct {
+			Paused *bool `json:"paused"`
+		}
+		err = decodeParams(request.Params, &parameters)
+		if err == nil && parameters.Paused == nil {
+			err = errors.New("provide an explicit browser pause or resume decision")
+		}
+		if err == nil && *parameters.Paused {
+			// Persist the denial first; an invalidation failure must remain paused.
+			result, err = service.store.SetPaused(service.sessionID, true)
+			if err == nil {
+				err = service.driver.InvalidateReferences(ctx)
+			}
+		} else if err == nil {
+			// Old refs cannot become usable again after the person changes a page.
+			err = service.driver.InvalidateReferences(ctx)
+			if err == nil {
+				result, err = service.store.SetPaused(service.sessionID, false)
+			}
+		}
 	case "session":
 		result, err = service.store.Get(service.sessionID)
 	case "tabs":

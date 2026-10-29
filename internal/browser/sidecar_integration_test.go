@@ -112,6 +112,29 @@ func TestSidecarManagedBrowserIntegration(t *testing.T) {
 	if err != nil || !strings.Contains(snapshot.Text, "clicked") {
 		t.Fatalf("Click = %#v, %v", snapshot, err)
 	}
+	priorRef := snapshot.Elements[0].Ref
+	if paused, err := client.SetPaused(context.Background(), true); err != nil || !paused.Paused {
+		t.Fatalf("pause = %#v, %v", paused, err)
+	}
+	if _, err := client.Snapshot(context.Background(), session.ID, tabs[0].ID); err == nil || err.Error() != ErrPaused.Error() {
+		t.Fatalf("private snapshot: %v", err)
+	}
+	if _, err := client.Screenshot(context.Background(), session.ID, tabs[0].ID); err == nil || err.Error() != ErrPaused.Error() {
+		t.Fatalf("private screenshot: %v", err)
+	}
+	if resumed, err := client.SetPaused(context.Background(), false); err != nil || resumed.Paused {
+		t.Fatalf("resume = %#v, %v", resumed, err)
+	}
+	if _, err := client.Click(context.Background(), session.ID, tabs[0].ID, priorRef); err == nil || !strings.Contains(err.Error(), "stale") {
+		t.Fatalf("pre-takeover ref was accepted: %v", err)
+	}
+	fresh, err := client.Snapshot(context.Background(), session.ID, tabs[0].ID)
+	if err != nil || len(fresh.Elements) == 0 || fresh.Elements[0].Ref == priorRef || fresh.Elements[0].Ref == button {
+		t.Fatalf("snapshot reused a prior ref: %#v, %v", fresh, err)
+	}
+	if _, err := client.Click(context.Background(), session.ID, tabs[0].ID, button); err == nil || !strings.Contains(err.Error(), "stale") {
+		t.Fatalf("old ref revived after fresh snapshot: %v", err)
+	}
 	capture, err := client.Screenshot(context.Background(), session.ID, tabs[0].ID)
 	if err != nil || len(capture.PNG) == 0 || capture.Artifact.Kind != "screenshot" {
 		t.Fatalf("Screenshot = %#v, %v", capture, err)

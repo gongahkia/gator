@@ -225,6 +225,16 @@ func (client *Client) SetVisualCapture(ctx context.Context, allowed bool) (Sessi
 	return result, err
 }
 
+// SetPaused is a host administration operation, deliberately absent from the
+// agent-facing Controller interface and browser tool definitions.
+func (client *Client) SetPaused(ctx context.Context, paused bool) (Session, error) {
+	var result Session
+	err := client.call(ctx, "set_paused", struct {
+		Paused bool `json:"paused"`
+	}{paused}, &result)
+	return result, err
+}
+
 func (client *Client) AllowUpload(ctx context.Context, path string) (Session, Upload, error) {
 	var result struct {
 		Session Session `json:"session"`

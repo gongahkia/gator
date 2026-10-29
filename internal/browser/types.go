@@ -36,6 +36,7 @@ type Session struct {
 	State          SessionState `json:"state"`
 	Headed         bool         `json:"headed"`
 	VisualCapture  bool         `json:"visual_capture"`
+	Paused         bool         `json:"paused,omitempty"`
 	CreatedAt      time.Time    `json:"created_at"`
 	StoppedAt      *time.Time   `json:"stopped_at,omitempty"`
 	SelectedTabs   []Tab        `json:"selected_tabs,omitempty"`
@@ -93,6 +94,7 @@ type Artifact struct {
 var (
 	ErrNotFound       = errors.New("browser session was not found")
 	ErrStopped        = errors.New("browser session is stopped")
+	ErrPaused         = errors.New("browser is paused for private user takeover; resume it on the host before agent access")
 	ErrNoSelectedTabs = errors.New("browser session has no developer-selected tabs")
 )
 

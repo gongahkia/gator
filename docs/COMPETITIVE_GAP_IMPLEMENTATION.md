@@ -294,3 +294,20 @@ no permanent service was installed. This probe never opens a Go conversation;
 the real-runtime durability test supplies that separate evidence. Production
 profile selection, stable deployment paths, HTTPS and phone enrollment remain
 open. No remote monitoring deployment is claimed.
+
+### Browser private takeover foundation
+
+The local browser controller now supports an explicit host-only pause/resume.
+Once pause is acknowledged, all agent tab reads, snapshots, screenshots and
+actions are blocked. The denial survives storage reopen and driver failure.
+Resume invalidates old page references before re-enabling access; old references
+cannot reappear after a new snapshot. Existing origin restrictions stay in force.
+The agent-facing tool interface cannot change this permission.
+
+Targeted controller/tool/command race tests pass. The pinned Playwright 1.56.1
+real-Chromium integration passes on macOS, covering denied private captures,
+resume and stale-reference rejection alongside existing scoped browsing checks.
+It uses a local page and isolated state, not a real login. Current controls are
+internal host commands; the integrated frontend lifecycle/task-grant journey
+remains open. `docs/BROWSER.md` corrects a stale claim that the current terminal
+already exposed that journey.

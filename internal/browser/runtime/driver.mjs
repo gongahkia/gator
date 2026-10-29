@@ -255,6 +255,12 @@ async function start(params) {
 async function dispatch(method, params = {}) {
   switch (method) {
     case 'start': return start(params);
+    case 'invalidate_references': {
+      // Preserve monotonically increasing generations: clearing the entire map
+      // would let a later snapshot accidentally reuse a pre-takeover ref.
+      for (const value of refs.values()) { value.entries.clear(); value.generation++; }
+      return { ok: true };
+    }
     case 'set_origins': {
       if (params.origins !== null && !Array.isArray(params.origins)) fail('browser origins are invalid');
       origins = new Set((params.origins || []).map(item => item.url));

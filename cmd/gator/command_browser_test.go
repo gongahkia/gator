@@ -44,3 +44,24 @@ func TestBrowserStopRevokesUnavailableSession(t *testing.T) {
 		t.Fatalf("browser stop output = %q", output.String())
 	}
 }
+
+func TestBrowserStatusShowsPrivatePause(t *testing.T) {
+	store, err := gatorbrowser.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := store.Start(gatorbrowser.StartOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SetPaused(session.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	if err := writeBrowserStatus(&output, store); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "paused=true") {
+		t.Fatalf("private takeover is absent from status: %s", output.String())
+	}
+}

@@ -146,6 +146,8 @@ type serviceDriver struct {
 	origins []Origin
 }
 
+func (*serviceDriver) InvalidateReferences(context.Context) error { return nil }
+
 func (driver *serviceDriver) SetOrigins(_ context.Context, origins []Origin) error {
 	driver.origins = append([]Origin(nil), origins...)
 	return nil
@@ -179,3 +181,76 @@ func (*serviceDriver) Upload(_ context.Context, tabID, _, _ string) (Snapshot, e
 	return Snapshot{TabID: tabID}, nil
 }
 func (*serviceDriver) Close() error { return nil }
+
+type takeoverDriver struct {
+	serviceDriver
+	invalidations   int
+	invalidateError error
+}
+
+func (driver *takeoverDriver) InvalidateReferences(context.Context) error {
+	driver.invalidations++
+	return driver.invalidateError
+}
+
+func TestPrivateTakeoverBlocksEveryAgentOperationAndFailsClosed(t *testing.T) {
+	root := t.TempDir()
+	store, err := Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := store.Start(StartOptions{VisualCapture: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	driver := &takeoverDriver{}
+	service, err := NewService(ServiceConfig{Store: store, SessionID: session.ID, Token: make([]byte, 32), Driver: driver, Socket: socketPath(store, session.ID)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	call := func(method, params string) rpcResponse {
+		return service.handle(context.Background(), rpcRequest{ID: 1, Method: method, Params: json.RawMessage(params)})
+	}
+	if response := call("set_paused", `{"paused":true}`); response.Error != "" {
+		t.Fatal(response.Error)
+	}
+	for _, operation := range []string{"tabs", "snapshot", "screenshot", "navigate", "click", "fill", "select", "press", "download", "upload"} {
+		response := call(operation, `{}`)
+		if response.Error != ErrPaused.Error() || response.Result != nil {
+			t.Fatalf("%s escaped private takeover: %#v", operation, response)
+		}
+	}
+	reopened, err := Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	retained, err := reopened.Get(session.ID)
+	if err != nil || !retained.Paused {
+		t.Fatalf("pause not retained: %#v, %v", retained, err)
+	}
+	if response := call("set_paused", `{}`); response.Error == "" {
+		t.Fatal("missing decision resumed the browser")
+	}
+	driver.invalidateError = errors.New("driver failed")
+	if response := call("set_paused", `{"paused":false}`); response.Error == "" {
+		t.Fatal("failed invalidation resumed access")
+	}
+	if response := call("snapshot", `{}`); response.Error != ErrPaused.Error() {
+		t.Fatal("failed resume did not stay private")
+	}
+	driver.invalidateError = nil
+	if response := call("set_paused", `{"paused":false}`); response.Error != "" {
+		t.Fatal(response.Error)
+	}
+	retained, err = store.Get(session.ID)
+	if err != nil || retained.Paused || driver.invalidations != 3 {
+		t.Fatalf("resume: %#v, %d invalidations, %v", retained, driver.invalidations, err)
+	}
+	driver.invalidateError = errors.New("driver failed")
+	if response := call("set_paused", `{"paused":true}`); response.Error == "" {
+		t.Fatal("expected invalidation error")
+	}
+	if response := call("tabs", `{}`); response.Error != ErrPaused.Error() {
+		t.Fatal("failed pause did not deny agent access")
+	}
+}
