@@ -76,7 +76,7 @@ func main() {
 	} {
 		store := newStore(fmt.Sprint(len(findings)))
 		tool := (tools.ChatMemory{Store: store, UserMessage: item.message, ConversationID: "work-probe", RunID: "run-probe", Automatic: item.automatic}).Tools()[0]
-		arguments := must(json.Marshal(map[string]any{"subject": "preference.response", "kind": "preference", "quote": item.quote, "scope": "personal"}))
+		arguments := must(json.Marshal(map[string]any{"subject": "preference.response_length", "kind": "preference", "quote": item.quote, "scope": "personal"}))
 		_, err := tool.Execute(context.Background(), arguments)
 		records := must(store.List("", false))
 		saved := err == nil && len(records) == 1

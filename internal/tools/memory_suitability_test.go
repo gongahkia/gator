@@ -36,7 +36,11 @@ func TestPassiveMemorySuitabilityUsesWholeMessage(t *testing.T) {
 					}
 					return approval, nil
 				}}}
-				raw, _ := json.Marshal(map[string]any{"subject": "preference.response", "kind": "preference", "quote": tc.quote, "scope": "personal"})
+				subject, kind := "preference.response_length", "preference"
+				if tc.name == "fact" {
+					subject, kind = "profile.city", "fact"
+				}
+				raw, _ := json.Marshal(map[string]any{"subject": subject, "kind": kind, "quote": tc.quote, "scope": "personal"})
 				_, err := tool.Execute(context.Background(), raw)
 				wantSave := tc.action == "save" || tc.action == "review" && approval
 				if wantSave != (err == nil) {

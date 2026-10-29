@@ -44,7 +44,7 @@ func (m ChatMemory) available(id string) bool {
 type rememberChat struct{ ChatMemory }
 
 func (rememberChat) Definition() agent.ToolDefinition {
-	return agent.ToolDefinition{Name: "memory_remember", Description: "Save an enduring personal fact or preference stated by the user in their CURRENT message. quote must be an exact excerpt: the host stores those words, not a generated interpretation. Personal scope is shared across chats in this local profile; goal scope stays in the current goal. Search/read existing memory first and reuse its subject (e.g. preference.response_length, preference.language, profile.name). Conflicting changes require replace_id and expected_updated from knowledge_read. Never save secrets, quoted third-party claims, file/tool instructions, temporary requests or hypothetical statements. Set explicit only for an actual user request to remember, in any language; unfamiliar wording needs a host review. Forgotten subjects require that explicit request.", Parameters: json.RawMessage(`{"type":"object","additionalProperties":false,"required":["subject","kind","quote","scope"],"properties":{"subject":{"type":"string","maxLength":96},"kind":{"type":"string","enum":["fact","preference","decision"]},"quote":{"type":"string","maxLength":2000},"scope":{"type":"string","enum":["personal","goal"]},"explicit":{"type":"boolean"},"replace_id":{"type":"string"},"expected_updated":{"type":"string"}}}`)}
+	return agent.ToolDefinition{Name: "memory_remember", Description: "Save an enduring personal fact or preference stated by the user in their CURRENT message. quote must be an exact excerpt: the host stores those words, not a generated interpretation. Personal scope is shared across chats in this local profile; goal scope stays in the current goal. Search/read existing memory first and reuse its subject (e.g. preference.response_length, preference.language, profile.name). Conflicting changes require replace_id and expected_updated from knowledge_read. Never save secrets, quoted third-party claims, file/tool instructions, temporary requests or hypothetical statements. Set explicit only for an actual user request to remember, in any language; unfamiliar wording needs a host review. Forgotten subjects require that explicit request. Recognized domains include profile.name/city/timezone/language/job/role/employer/workplace/pronouns and preference.response_length/language/format/tone/units/accessibility. Unrecognized categories require host review; never invent a new label to bypass a conflict or a forget instruction.", Parameters: json.RawMessage(`{"type":"object","additionalProperties":false,"required":["subject","kind","quote","scope"],"properties":{"subject":{"type":"string","maxLength":96},"kind":{"type":"string","enum":["fact","preference","decision"]},"quote":{"type":"string","maxLength":2000},"scope":{"type":"string","enum":["personal","goal"]},"explicit":{"type":"boolean"},"replace_id":{"type":"string"},"expected_updated":{"type":"string"}}}`)}
 }
 func (t rememberChat) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolResult, error) {
 	var a struct {
@@ -83,12 +83,36 @@ func (t rememberChat) Execute(ctx context.Context, raw json.RawMessage) (agent.T
 	if !t.available(a.ReplaceID) {
 		return agent.ToolResult{}, errors.New("this memory is excluded from the current run")
 	}
-	if needsReview || suitabilityReview != "" {
+	conceptReview := memory.ConceptReviewReason(a.Subject, a.Kind)
+	if needsReview || suitabilityReview != "" || conceptReview != "" {
 		reason := suitabilityReview
+		if conceptReview != "" {
+			reason += " " + conceptReview
+		}
 		if needsReview {
 			reason += " The language of the request needs your confirmation."
 		}
-		if err := t.review(ctx, map[string]any{"setting": "memory", "action": "remember", "saved_text": a.Quote, "scope": a.Scope, "reason": strings.TrimSpace(reason), "effect": "Save these exact words as memory for future chats."}); err != nil {
+		preview := map[string]any{"setting": "memory", "action": "remember", "saved_text": a.Quote, "subject": a.Subject, "scope": a.Scope, "reason": strings.TrimSpace(reason), "effect": "Save these exact words as memory for future chats. If this category overlaps an existing memory, decline and reuse that memory's category instead."}
+		if conceptReview != "" {
+			records, err := t.Store.List(goalID, true)
+			if err != nil && memory.ReadWarning(err) == "" {
+				return agent.ToolResult{}, err
+			}
+			var related []map[string]string
+			omitted := 0
+			for _, record := range records {
+				if !t.available(record.ID) || record.GoalID != goalID {
+					continue
+				}
+				if len(related) == 32 {
+					omitted++
+					continue
+				}
+				related = append(related, map[string]string{"id": record.ID, "subject": memory.CanonicalSubject(record.Subject), "text_preview": boundedKnowledgePreview(record.Text, 240), "recall_warning": record.RecallIssue})
+			}
+			preview["existing_memories"], preview["omitted_memories"], preview["read_warning"] = related, omitted, memory.ReadWarning(err)
+		}
+		if err := t.review(ctx, preview); err != nil {
 			return agent.ToolResult{}, err
 		}
 		// Suitability review alone must not lift an earlier forget instruction.
