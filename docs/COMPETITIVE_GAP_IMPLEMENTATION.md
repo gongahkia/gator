@@ -591,3 +591,58 @@ revocation, file transfer, mobile notifications and a permanently configured
 always-on deployment are not established here. A Mac login service still needs
 the Mac awake, online and logged in. No production service or real account was
 activated, and native Windows execution remains unverified.
+
+### Starting a chat from the companion — 29 October
+
+The phone catalog now offers New chat in the configured host workspace. The
+workspace is shown before creation; remote callers cannot supply a source path,
+message or model options to the creation endpoint. Go creates the same kind of
+empty retained conversation as the local UI, without a source snapshot, revision,
+admitted request or model call. Opening the chat is a separate read. Send remains
+the action that starts work.
+
+Creation uses a durable request ID retained by the browser before dispatch. The
+Go store serializes competing processes and saves a receipt before publishing a
+complete staged chat directory. Retrying after a lost response, failed opening,
+reload or companion restart returns the original chat. If a published chat was
+subsequently deleted, an old request refuses to recreate it. Receipt metadata
+contains the ID, creation time and a source fingerprint, without raw workspace
+paths or chat text. Profile maintenance excludes concurrent creation through the
+existing shared guard, and retained-history backups carry the receipts.
+
+The browser keeps the creation retry until both creation and opening are
+acknowledged. Dismiss retry only clears that browser retry; it neither deletes
+an already-created chat nor sends a new request. Changing the advertised host
+workspace disables the old retry. Existing drafts remain in their original chat.
+
+Observed checks on this Mac:
+
+- The full worksession race suite passes. Focused creation tests cover four
+  concurrent processes, distinct requests, changed-source rejection, empty-chat
+  state, persisted pre-publication/pre-rename recovery, deleted-chat refusal,
+  invalid identities and linked receipt-directory rejection.
+- The backup/restore race regression preserves the original creation identity
+  and returns one chat on retry in the restored profile. Its initial assertion
+  omitted the manifest's `gator/` prefix; correcting that fixture made the actual
+  receipt and restored identity checks pass.
+- Six HTTP tests pass, including real Go creation/opening with no model request,
+  stable creation across retries, restart and token rotation, rejected source/
+  message fields, size bounds and the existing disconnect/admission transport
+  boundaries. Focused command race checks pass.
+- All six Chromium/WebKit journeys pass. New-chat journeys lose the creation
+  response, reload without automatic retry, fail the first open, then recover the
+  same chat. No message is sent until Send. Both original and new drafts retain
+  their ownership. Subsequent focused browser checks also verify that a changed
+  workspace disables a pending retry and Dismiss makes no request or deletion.
+- The phone control has a 44-pixel minimum height; 320/390-pixel overflow checks
+  pass, and the WebKit new-chat screenshot was inspected. This extends the
+  existing DOM/CSS system without animation or additional UI dependencies.
+- Windows worksession tests cross-compile; this is not native Windows execution.
+- The local UI runtime rebuild passes with the new internal creation command.
+
+Limits: deleting all retained history also removes creation receipts, so old
+browser retries must be dismissed after a history reset. Source relinking does
+not rewrite a creation request's original workspace binding. Persisted-boundary
+fixtures are not physical power-loss tests. Physical iOS/Android, permanent
+remote deployment, device enrollment, mobile notifications and file transfer
+remain open; this change does not make a sleeping Mac available.

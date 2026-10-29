@@ -51,8 +51,9 @@ Open the configured HTTPS origin on your phone, or `http://127.0.0.1:7341` on
 the host. Enter the host token to browse existing conversations. Search titles
 and host folder paths, select active/archived/all chats, and use the page controls
 to reach older records. You can also expand **Open a known conversation** and
-enter its ID. Creating chats from the phone is not yet supported. The shell is
-public; every conversation and catalog request requires
+enter its ID. **New chat** creates an empty conversation in the host workspace
+shown above the button. Work starts only when you send a message. The shell is
+public; every conversation, creation and catalog request requires
 the token. The token stays in memory and is cleared on disconnect/reload.
 
 The client displays messages, updates, queue state and exact pending approval
@@ -81,6 +82,13 @@ a failure. The list is refreshed explicitly and when the page becomes visible;
 an open chat continues polling. Token revocation is enforced on every request
 and clears displayed data when the client next contacts the host.
 
+New-chat requests are saved in this tab before dispatch. If the connection drops
+or the chat cannot open yet, **Retry new chat** keeps the same creation request
+across reloads and host restarts. It never sends a message. **Dismiss retry** only
+clears this browser's pending retry; any created chat stays in Conversations.
+A changed host workspace requires dismissing the old retry before starting a
+different chat. The phone cannot choose an arbitrary host filesystem path.
+
 ## API v1
 
 All API requests need `Authorization: Bearer TOKEN`. Responses are JSON with
@@ -96,6 +104,13 @@ All API requests need `Authorization: Bearer TOKEN`. Responses are JSON with
   contains `items`, an optional `next` cursor, and any `incomplete`/`skipped`
   indicators. Cursors belong to their original search. Unknown or repeated
   parameters are rejected. No host filesystem path can be supplied as a source.
+- `POST /v1/chats`: create an empty chat with JSON
+  `{"request_id":"client-generated-unique-id"}` (16–96 ASCII letters, digits,
+  underscores or hyphens, starting with a letter/digit; UUIDs are supported).
+  No other fields are accepted. The body limit is 4 KiB. The response contains
+  `request_id`, `conversation_id` and `source`. Creation does not open a worker
+  or submit work; use the existing conversation GET to open it. Retain the same
+  request until creation and opening are confirmed.
 
 A message uses the durable upload-admission protocol, initially with no files:
 
@@ -198,6 +213,16 @@ failed results, separate drafts across switches, retained retry identity, keyboa
 selection, 44-pixel controls, and clearing private rows after revocation. Build
 the updated Go runtime together with the companion; older runtimes do not expose
 the internal `companion-catalog` transport.
+
+Creation checks also exercise concurrent Go processes, interrupted publication,
+deleted-chat refusal, backup/restore, and companion restart. Creation receipts
+live under retained conversation history and keep a workspace fingerprint, not
+the raw workspace path or chat text. Deleting an individual chat leaves its
+receipt and rejects an old retry; deleting all history also clears receipts and
+their deduplication guarantees. After a history reset, dismiss old browser
+creation retries. Source relinking does not rewrite the original creation
+request's workspace binding. Interrupted publication fixtures test persisted
+boundary states; they are not a physical power-loss test.
 
 The opt-in launchd test checks plist validity, startup, authentication after a
 forced listener crash/restart, and asynchronous service removal. It runs a
