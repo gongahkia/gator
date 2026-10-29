@@ -78,8 +78,15 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.427"
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
       - name: Generate representative new and edited presentations
         run: go run ./scripts/office-fixtures .gator/office-fixtures
+      - name: Roundtrip a generated deck through the shared file editor
+        run: |
+          npm ci --prefix app-host
+          node scripts/office-validation/roundtrip.mjs .gator/office-fixtures
       - name: Validate with the independent Open XML SDK
         run: |
           dotnet restore scripts/office-validation/OfficeValidation.csproj --locked-mode

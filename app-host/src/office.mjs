@@ -60,7 +60,8 @@ function runStyle(run) {
   return { bold: boolean(first(props, "b")) || attr(props, "b") === "1", italic: boolean(first(props, "i")) || attr(props, "i") === "1", underline: boolean(first(props, "u")), color: colour(attr(first(props, "color"), "val") || attr(first(props, "srgbClr"), "val")), size: Number(attr(first(props, "sz"), "val") || attr(props, "sz")) / (props?.namespaceURI?.includes("wordprocessing") ? 2 : 100) || undefined };
 }
 function paragraphModel(node, id) {
-  return { id, text: paragraphText(node), style: attr(first(node, "pStyle"), "val"), align: attr(first(node, "jc"), "val"), runs: elements(node, "r").map(run => ({ text: leaves(run).map(leafText).join(""), ...runStyle(run) })) };
+  const runs = node.namespaceURI === ns.a ? children(node).filter(child => ["r", "br", "fld"].includes(child.localName)) : elements(node, "r");
+  return { id, text: paragraphText(node), style: attr(first(node, "pStyle"), "val"), align: attr(first(node, "jc"), "val"), runs: runs.map(run => ({ text: run.localName === "br" ? "\n" : leaves(run).map(leafText).join(""), ...runStyle(run) })) };
 }
 function validText(value) {
   if (typeof value !== "string" || value.length > 1024 * 1024 || !value.isWellFormed() || /[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(value)) throw new Error("An edited text block contains invalid or excessive text.");
@@ -70,6 +71,8 @@ function validText(value) {
 function replaceParagraph(paragraph, value) {
   validText(value); const nodes = leaves(paragraph), before = nodes.map(leafText).join("");
   if (before === value) return;
+  if (paragraph.namespaceURI === ns.a && nodes.some(node => node.parentNode?.localName === "fld")) throw new Error("Automatic slide fields cannot be replaced as plain text.");
+  if (paragraph.namespaceURI === ns.a && nodes.some(node => !(node.localName === "br" && node.parentNode === paragraph) && !(node.localName === "t" && node.parentNode.localName === "r" && children(node.parentNode).filter(child => child.localName !== "rPr").length === 1))) throw new Error("This slide contains an unsupported text-run structure.");
   let start = 0, end = before.length, tail = value.length;
   while (start < end && start < tail && before[start] === value[start]) start++;
   if (start && /[\ud800-\udbff]/.test(before[start - 1])) start--;
@@ -87,6 +90,7 @@ function replaceParagraph(paragraph, value) {
     if (!inserted && start <= next) { result += value.slice(start, tail); inserted = true; }
     result += old.slice(Math.max(0, Math.min(old.length, end - offset)));
     offset = next; if (result === old) continue;
+    if (paragraph.namespaceURI === ns.a) { replaceDrawingLeaf(node, result); continue; }
     const parent = node.parentNode, document = node.ownerDocument, prefix = node.prefix || parent.prefix || "w", namespace = node.namespaceURI;
     for (const segment of result.split(/([\n\t])/)) {
       if (!segment) continue;
@@ -96,6 +100,33 @@ function replaceParagraph(paragraph, value) {
     }
     parent.removeChild(node);
   }
+}
+
+// DrawingML breaks are paragraph children, unlike Word breaks inside a run.
+// Each regular DrawingML run contains one text element; tabs are text characters.
+function replaceDrawingLeaf(node, value) {
+  const document = node.ownerDocument, prefix = node.prefix || "a";
+  const reference = node.parentNode.localName === "r" ? node.parentNode : node;
+  const paragraph = reference.parentNode;
+  let style = children(reference, "rPr")[0];
+  if (!style && reference.localName === "br") {
+    for (let prior = reference.previousSibling; prior; prior = prior.previousSibling) {
+      if (prior.nodeType === 1 && prior.localName === "r") { style = children(prior, "rPr")[0]; break; }
+    }
+  }
+  const make = name => document.createElementNS(ns.a, `${prefix}:${name}`);
+  for (const [index, line] of value.split("\n").entries()) {
+    if (index) {
+      const lineBreak = make("br"); if (style) lineBreak.appendChild(style.cloneNode(true));
+      paragraph.insertBefore(lineBreak, reference);
+    }
+    if (!line) continue;
+    const run = make("r"), text = make("t");
+    if (style) run.appendChild(style.cloneNode(true));
+    text.setAttributeNS("http://www.w3.org/XML/1998/namespace", "xml:space", "preserve"); text.textContent = line;
+    run.appendChild(text); paragraph.insertBefore(run, reference);
+  }
+  paragraph.removeChild(reference);
 }
 function word(files) {
   const path = "word/document.xml", document = load(files, path), paragraphs = elements(document, "p"), nodeIDs = new Map(paragraphs.map((node, index) => [node, `p:${index}`]));
