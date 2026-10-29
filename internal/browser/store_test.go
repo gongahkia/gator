@@ -6,9 +6,51 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
+
+func TestIndependentBrowserStoresRetainConcurrentSessionsAndRevocations(t *testing.T) {
+	root := t.TempDir()
+	first, err := Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prior, err := first.Start(StartOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < 24; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			store, err := Open(root)
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			if i == 0 {
+				_, err = store.Stop(prior.ID)
+			} else {
+				_, err = store.Start(StartOptions{Paused: true})
+			}
+			if err != nil {
+				t.Error(err)
+			}
+		}(i)
+	}
+	wg.Wait()
+	sessions, err := first.List()
+	if err != nil || len(sessions) != 24 {
+		t.Fatalf("lost sessions: %d %v", len(sessions), err)
+	}
+	stopped, err := first.Get(prior.ID)
+	if err != nil || stopped.State != StateStopped {
+		t.Fatalf("revocation lost: %#v %v", stopped, err)
+	}
+}
 
 func TestStorePersistsSafeSessionMetadataAndStops(t *testing.T) {
 	stateDir := t.TempDir()

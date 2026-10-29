@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gongahkia/gator/internal/filelock"
 	"github.com/gongahkia/gator/internal/privatefs"
 )
 
@@ -66,8 +67,11 @@ func (s *Store) Directory() string {
 }
 
 func (s *Store) List() ([]Session, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	unlock, err := s.lock()
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
 	record, err := s.loadLocked()
 	if err != nil {
 		return nil, err
@@ -81,8 +85,11 @@ func (s *Store) Get(id string) (Session, error) {
 	if err := sessionError(id); err != nil {
 		return Session{}, err
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	unlock, err := s.lock()
+	if err != nil {
+		return Session{}, err
+	}
+	defer unlock()
 	record, err := s.loadLocked()
 	if err != nil {
 		return Session{}, err
@@ -95,8 +102,11 @@ func (s *Store) Get(id string) (Session, error) {
 }
 
 func (s *Store) Start(options StartOptions) (Session, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	unlock, err := s.lock()
+	if err != nil {
+		return Session{}, err
+	}
+	defer unlock()
 	record, err := s.loadLocked()
 	if err != nil {
 		return Session{}, err
@@ -117,8 +127,11 @@ func (s *Store) Attach(options AttachOptions) (Session, error) {
 	if err := ValidateCDPEndpoint(options.CDPEndpoint); err != nil {
 		return Session{}, err
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	unlock, err := s.lock()
+	if err != nil {
+		return Session{}, err
+	}
+	defer unlock()
 	record, err := s.loadLocked()
 	if err != nil {
 		return Session{}, err
@@ -248,8 +261,11 @@ func (s *Store) update(id string, mutate func(*Session) error) (Session, error) 
 	if err := sessionError(id); err != nil {
 		return Session{}, err
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	unlock, err := s.lock()
+	if err != nil {
+		return Session{}, err
+	}
+	defer unlock()
 	record, err := s.loadLocked()
 	if err != nil {
 		return Session{}, err
@@ -435,4 +451,28 @@ func cloneSession(source Session) Session {
 		result.StoppedAt = &stopped
 	}
 	return result
+}
+
+// Controllers and app windows use separate Store instances/processes. Hold a
+// file lock across the complete read-modify-write to avoid lost revocations.
+func (s *Store) lock() (func(), error) {
+	s.mu.Lock()
+	root, err := os.OpenRoot(s.directory)
+	if err != nil {
+		s.mu.Unlock()
+		return nil, err
+	}
+	file, err := filelock.OpenRootFile(root, ".sessions-lock", os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		root.Close()
+		s.mu.Unlock()
+		return nil, err
+	}
+	if err = filelock.Lock(file, filelock.Exclusive); err != nil {
+		file.Close()
+		root.Close()
+		s.mu.Unlock()
+		return nil, err
+	}
+	return func() { _ = filelock.Unlock(file); _ = file.Close(); _ = root.Close(); s.mu.Unlock() }, nil
 }
