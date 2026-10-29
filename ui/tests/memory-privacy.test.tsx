@@ -24,7 +24,7 @@ test("personal memory crosses chats while earlier-chat retrieval and learning re
   const until = async (predicate: () => boolean, label: string) => { const end = Date.now() + 15000; while (!predicate()) { if (Date.now() > end) throw new Error(label + ": " + client.issue + "\n" + setup.captureCharFrame()); await flush() } }
   const ask = async (text: string) => { await client.navigate("/chat"); await client.send({ type: "submit", text: "/mode inspect" }); const before = calls.length; await client.edit(text); await flush(); setup.mockInput.pressEnter(); await until(() => calls.length > before && !client.state?.running, "completed request"); return calls[before] }
   const setting = (label: string) => client.state?.panel?.summary?.find(field => field.label === label)?.value
-  const memoryPage = async () => { await client.navigate("/memory"); await until(() => !!setting("Learn from chats"), "memory privacy page"); await flush() }
+  const memoryPage = async () => { await client.navigate("/memory"); await until(() => !!setting("Learn from chats") && !client.state?.pending_operation, "memory privacy page ready"); await flush() }
   try {
     await client.start(); await ask("Remember: " + quote); await until(() => !!client.state?.chat_memories?.length, "grounded memory")
     const origin = client.context, id = client.state!.chat_memories![0].id, path = join(root, "state/gator/memory", id + ".json")
@@ -43,7 +43,7 @@ test("personal memory crosses chats while earlier-chat retrieval and learning re
     await client.close(); await setup.dispose(); client = new GatorClient(new Application(options)); setup = await render(); await client.start(); await memoryPage()
     expect(client.context).toBe(current); expect(client.draft.text).toBe("Keep second privacy draft"); expect(calls).toHaveLength(count)
     expect(setting("Refer to earlier chats")).not.toBe(beforeHistory); expect(setting("Learn from chats")).toBe(learning)
-    setup.mockInput.pressKey("h"); await until(() => setting("Refer to earlier chats") === beforeHistory, "restored earlier-chat retrieval"); await flush()
+    setup.mockInput.pressKey("h"); await until(() => setting("Refer to earlier chats") === beforeHistory && !client.state?.pending_operation, "restored earlier-chat retrieval"); await flush()
     setup.mockInput.pressKey("a"); await until(() => setting("Learn from chats") !== learning, "disabled automatic learning"); expect(setting("Refer to earlier chats")).toBe(beforeHistory)
     const restored = await ask("Find our earlier preferences discussion.")
     expect(restored.tools?.map(tool => tool.function.name)).toContain("chat_search"); expect(restored.tools?.map(tool => tool.function.name)).toContain("chat_read")

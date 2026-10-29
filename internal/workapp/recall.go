@@ -20,6 +20,9 @@ func (m *Model) recallStatusCommand() tea.Cmd {
 	if m.config.RecallStatus == nil {
 		return nil
 	}
+	if m.recallChecking > 0 {
+		return nil
+	}
 	m.recallChecking++
 	read := m.config.RecallStatus
 	return func() tea.Msg {
@@ -36,6 +39,13 @@ func (m *Model) openRecall() tea.Cmd {
 }
 
 func (m Model) updateRecallKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.recallChecking > 0 || m.config.RecallStatus != nil && m.recall.State == "" {
+		switch key.String() {
+		case "a", "h", "i", "l", "o", "g", "enter":
+			m.sectionNotice = "Memory settings are not ready. Wait for loading to finish, or press R to retry."
+			return m, nil
+		}
+	}
 	if m.recallBusy {
 		if key.String() == "esc" && m.recallCancel != nil {
 			m.recallCancel()
@@ -178,6 +188,9 @@ func (m Model) recallPanel() uisnapshot.Panel {
 	history := "Off"
 	if m.recall.ReferToChats {
 		history = "On"
+	}
+	if m.recallChecking > 0 && m.recall.State == "" {
+		learning, history = "Checking…", "Checking…"
 	}
 	p.Summary = []uisnapshot.Field{{Label: "Recall readiness", Value: valueOrDefault(m.recall.State, fallback)}, {Label: "Learn from chats", Value: learning}, {Label: "Refer to earlier chats", Value: history}}
 	p.Blocks[0].Lines = []string{m.recall.Detail}

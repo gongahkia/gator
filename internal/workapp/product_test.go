@@ -110,6 +110,34 @@ func TestHistoryControlDoesNotChangeLearningAndReportsFailure(t *testing.T) {
 	}
 }
 
+func TestMemorySettingsCannotToggleBeforeReadCompletes(t *testing.T) {
+	writes := 0
+	m := New(Config{RecallStatus: func(context.Context) (RecallStatus, error) {
+		return RecallStatus{State: "Basic recall available", LearnFromChats: true, ReferToChats: true}, nil
+	}, ConfigureChatLearning: func(bool) error { writes++; return nil }})
+	cmd := m.openRecall()
+	if cmd == nil {
+		t.Fatal("missing settings read")
+	}
+	m, _ = productKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	if writes != 0 {
+		t.Fatal("toggle wrote before loading")
+	}
+	if next := m.recallStatusCommand(); next != nil {
+		t.Fatal("overlapping settings reads allowed")
+	}
+	next, _ := m.Update(cmd())
+	m = next.(Model)
+	m, cmd = productKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	if writes != 1 || m.recall.LearnFromChats || cmd == nil {
+		t.Fatal("loaded toggle failed")
+	}
+	m, _ = productKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	if writes != 1 {
+		t.Fatal("toggle raced refresh")
+	}
+}
+
 func TestRecallInstallCancelsWithoutLeavingBusyState(t *testing.T) {
 	started := make(chan struct{})
 	m := New(Config{InstallRecall: func(ctx context.Context, progress func(string)) error { close(started); <-ctx.Done(); return ctx.Err() }})

@@ -1778,3 +1778,11 @@ instead of timing out at the first tick's exact deadline.
 Focused local terminal checks pass (10 tests across seven files, with the pages
 case rerun after correcting its session-opening helper). These changes require
 a fresh native run; local success does not establish Windows or ARM acceptance.
+
+Runs `40907419030` and `40908906781` both passed Linux and Intel/ARM macOS.
+Windows first exposed a feedback acknowledgement race in its test; after that
+fix it reached a Memory privacy assertion before asynchronous settings loading
+finished. Memory controls now refuse mutations during loading (or before a
+successful initial read), initial unknown values display as checking, and only
+one readiness read may be in flight. The terminal test awaits readiness before
+reading or toggling those values. Native Windows acceptance remains pending.
