@@ -102,6 +102,17 @@ jobs:
         run: |
           dotnet restore scripts/office-validation/OfficeValidation.csproj --locked-mode
           dotnet run --no-restore --project scripts/office-validation -- .gator/office-fixtures/*.pptx .gator/office-fixtures/*.docx .gator/office-fixtures/*.xlsx
+      - name: Recalculate spreadsheets with LibreOffice Calc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-calc fonts-liberation
+          python3 scripts/office-validation/recalculate.py .gator/office-fixtures .gator/office-calculated
+      - uses: actions/upload-artifact@v4
+        with:
+          name: office-calculation-evidence
+          path: |
+            .gator/office-calculated/calculation-report.json
+            .gator/office-calculated/*.xlsx
 
   browser:
     name: browser-${{ matrix.os }}
