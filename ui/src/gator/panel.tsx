@@ -13,6 +13,8 @@ import { literal } from "./text"
 import { PathPicker } from "./path-picker"
 import { SecretField } from "./secret-field"
 import { DialogConfirm } from "../ui/dialog-confirm"
+import { displayDate, folderLabel } from "./display"
+import { Details } from "./details"
 import { Highlight } from "./highlight"
 
 export function Panel(props: { panel: BackendPanel }) {
@@ -20,6 +22,7 @@ export function Panel(props: { panel: BackendPanel }) {
   const [fields, setFields] = createSignal<Record<number, string>>({}), [busy, setBusy] = createSignal(false), [query, setQuery] = createSignal("")
   const selectedRow = () => Math.max(0, Math.min(props.panel.selected ?? 0, (props.panel.rows?.length ?? 1) - 1))
   const footer = () => {
+    if (props.panel.catalog) return "Enter open · Ctrl+F search · F3 actions · F1 help"
     const parts = (props.panel.footer ?? "").split("·").map(part => part.trim()).filter(Boolean)
     for (const hint of props.panel.hints ?? []) {
       if (!parts.some(part => part.toLowerCase().startsWith(hint.shortcut.toLowerCase() + " "))) parts.push(`${hint.shortcut} ${hint.action}`)
@@ -128,6 +131,9 @@ export function Panel(props: { panel: BackendPanel }) {
     if (dialog.stack.length || busy()) return
     const name = ({ escape: "esc", return: "enter" }[event.name] ?? event.name)
     const key = event.ctrl ? `ctrl+${name}` : event.shift && name === "tab" ? "shift+tab" : name
+    if (key === "f1" && props.panel.catalog) {
+      event.preventDefault(); dialog.replace(() => <Details title="Chat shortcuts" text={"↑/↓ select · Enter open · Esc back\nCtrl+F or / search all retained messages\nCtrl+L filter active, pinned or archived\nCtrl+←/→ previous/next page\nCtrl+R or F5 refresh\nF3 details, rename, pin or archive"} />); return
+    }
     if (key === "f3" && props.panel.catalog?.can_organize) { event.preventDefault(); client.emit("action", "catalog-actions"); return }
     if (["ctrl+r", "f5"].includes(key) && props.panel.catalog) { event.preventDefault(); void action({ action: "refresh" }); return }
     if (key === "esc" && Object.keys(fields()).length) { event.preventDefault(); void guard().then(leave => { if (leave) void action({ action: "key", fields: undefined }, "esc") }); return }
@@ -169,18 +175,20 @@ export function Panel(props: { panel: BackendPanel }) {
   return <box flexGrow={1} minHeight={0} paddingX={2} gap={1}>
     <text fg={theme.accent}><b>{literal(props.panel.title)}</b>{busy() ? " · Saving…" : ""}</text>
     <Show when={props.panel.subtitle}><text fg={theme.text.muted}>{literal(props.panel.subtitle)}</text></Show>
-    <Show when={props.panel.filter}><text fg={theme.text.muted}>Filter: {literal(props.panel.filter?.value)} · Ctrl+L changes</text></Show>
-    <Show when={props.panel.catalog}><text fg={theme.text.muted}>Page {props.panel.catalog?.page} · Ctrl+←/→ pages · Ctrl+R/F5 refresh{props.panel.catalog?.can_organize ? " · F3 rename/pin/archive" : ""}</text></Show>
+    <Show when={props.panel.filter && !props.panel.catalog}><text fg={theme.text.muted}>Filter: {literal(props.panel.filter?.value)} · Ctrl+L changes</text></Show>
+    <Show when={props.panel.catalog}><text fg={theme.text.muted}>{props.panel.filter?.options.find(option => option.value === props.panel.filter?.value)?.label || "Chats"} · {props.panel.catalog?.loading || busy() ? "Loading…" : `${props.panel.rows?.length ?? 0} chats`}{props.panel.catalog?.has_previous || props.panel.catalog?.has_next ? ` · Page ${props.panel.catalog?.page} · Ctrl+←/→` : ""}</text></Show>
     <Show when={props.panel.catalog && props.panel.query}><text fg={theme.text.muted}>Search retained messages: {literal(props.panel.query)}</text></Show>
     <Show when={query()}><text fg={theme.text.muted}>Filter loaded entries: {literal(query())} · {visible().length} of {props.panel.rows?.length ?? 0} · Ctrl+F changes or clears</text></Show>
     <scrollbox ref={node => { scroll = node }} flexGrow={1} minHeight={0}>
       <For each={props.panel.summary}>{field => <text>{literal(field.label)}: {literal(field.value)}</text>}</For>
       <Show when={query() && !visible().length}><text fg={theme.text.muted}>No matching loaded items. Clear the filter to choose an entry.</text></Show>
+      <Show when={props.panel.catalog && !props.panel.catalog.loading && !props.panel.rows?.length}><text fg={theme.text.muted}>{props.panel.query ? "No chats match this search. Ctrl+F to change it." : "No chats in this view. Ctrl+L to change the filter."}</text></Show>
       <For each={visible()}>{({ row, index }) => <box id={`panel-row-${index}`} backgroundColor={index === selectedRow() ? theme.background.raised.high : undefined} paddingY={0} onMouseUp={() => row.input ? edit(index) : void action({ action: "activate", row: index })}>
-        <text fg={index === selectedRow() ? theme.accent : theme.text.base}>{index === selectedRow() ? "› " : "  "}{literal(row.label)}{row.state ? ` · ${literal(row.state_label || row.state)}` : ""}{row.input ? `: ${row.input.secret ? "[credential]" : literal(fields()[index] ?? row.input.value)}` : ""}</text>
-        <Show when={row.detail}><text fg={theme.text.muted}>  <Highlight text={row.detail} query={props.panel.catalog ? props.panel.query : query()} /></text></Show>
-        <Show when={row.source || row.updated_at || row.pinned || row.archived}><text fg={theme.text.muted}>  {[row.pinned ? "Pinned" : "", row.archived ? "Archived" : "", row.updated_at, row.source].filter(Boolean).map(literal).join(" · ")}</text></Show>
-        <For each={row.metadata}>{field => <text fg={theme.text.muted}>  {literal(field.label)}: {literal(field.value)}</text>}</For>
+        <text wrapMode={props.panel.catalog ? "none" : "word"} truncate={!!props.panel.catalog} height={props.panel.catalog ? 1 : undefined} fg={index === selectedRow() ? theme.accent : theme.text.base}>{index === selectedRow() ? "› " : "  "}{literal(row.label)}{row.state ? ` · ${literal(row.state_label || row.state)}` : ""}{row.input ? `: ${row.input.secret ? "[credential]" : literal(fields()[index] ?? row.input.value)}` : ""}</text>
+        <Show when={props.panel.catalog}><text height={1} wrapMode="none" truncate fg={theme.text.muted}>  {[row.pinned ? "Pinned" : "", row.archived ? "Archived" : "", displayDate(row.updated_at), folderLabel(row.source)].filter(Boolean).map(literal).join(" · ")}{row.detail ? " · " : ""}<Highlight text={row.detail} query={props.panel.query} /></text></Show>
+        <Show when={!props.panel.catalog && row.detail}><text fg={theme.text.muted}>  <Highlight text={row.detail} query={props.panel.catalog ? props.panel.query : query()} /></text></Show>
+        <Show when={!props.panel.catalog && (row.source || row.updated_at || row.pinned || row.archived)}><text fg={theme.text.muted}>  {[row.pinned ? "Pinned" : "", row.archived ? "Archived" : "", row.updated_at, row.source].filter(Boolean).map(literal).join(" · ")}</text></Show>
+        <For each={props.panel.catalog ? [] : row.metadata}>{field => <text fg={theme.text.muted}>  {literal(field.label)}: {literal(field.value)}</text>}</For>
         <Show when={row.input?.help}><text fg={theme.text.muted}>  {literal(row.input?.help)}</text></Show>
       </box>}</For>
       <For each={props.panel.blocks}>{block => <box marginTop={1}><text fg={theme.accent}>{literal(block.title)}</text><For each={block.fields}>{f => <text>{literal(f.label)}: {literal(f.value)}</text>}</For><For each={block.lines ?? []}>{line => <text>{literal(line)}</text>}</For></box>}</For>

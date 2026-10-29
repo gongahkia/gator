@@ -161,6 +161,7 @@ export function useActions() {
       if (state?.notice || state?.panel?.notice_tone === "error") throw new Error(state.notice || state.panel?.notice || "The conversation changed. Refresh and review before retrying.")
     }
     menu(item.label, [
+      { title: "Conversation details", run: () => details(item.label, [item.source ? `Folder: ${item.source}` : "", item.updated_at ? `Updated: ${item.updated_at}` : "", item.detail, ...(item.metadata ?? []).map(field => `${field.label}: ${field.value}`)].filter(Boolean).join("\n\n")) },
       { title: "Rename conversation", run: () => prompt("Rename retained conversation", item.label, text => change("rename", text)) },
       { title: item.pinned ? "Unpin conversation" : "Pin conversation", run: () => change(item.pinned ? "unpin" : "pin") },
       { title: item.archived ? "Restore conversation" : "Archive conversation", run: () => confirm(item.archived ? "Restore this conversation?" : "Archive this conversation?", item.label, () => change(item.archived ? "restore" : "archive")) },
