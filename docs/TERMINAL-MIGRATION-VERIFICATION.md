@@ -1786,3 +1786,18 @@ finished. Memory controls now refuse mutations during loading (or before a
 successful initial read), initial unknown values display as checking, and only
 one readiness read may be in flight. The terminal test awaits readiness before
 reading or toggling those values. Native Windows acceptance remains pending.
+
+Run [40914908922](https://github.com/gongahkia/gator/actions/runs/40914908922)
+at `9d53b8183` passes all four runners: Windows, Linux, Intel macOS and ARM macOS.
+This includes host/terminal integration, production packaging, installed lifecycle
+and upgrade/rollback/uninstall checks. Unix runners also pass PTY/editor handoff.
+Windows PTY/editor handoff is not part of this workflow.
+
+Two final harness fixes preceded that run: external-editor tests await the actual
+renderer resume acknowledgement, and upgrade phases each use a fresh application
+process which fully exits before uninstall. Keeping old installed JavaScript
+imports in the test's long-lived Bun process had left Windows removal failing
+after the Go workers closed. All continuity assertions remain: selected chat and
+source, two independent drafts, attachment, file versions/edit draft, preferences,
+notes, unchanged configuration and zero model calls. These are same-artifact
+switch/rollback checks, not proof of a future schema-changing release migration.
