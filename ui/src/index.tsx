@@ -20,6 +20,7 @@ async function quit() {
   if (closing) return
   const id = client.state?.conversation_id
   await client.close()
+  if (closing) return
   closing = true; renderer.destroy()
   await renderer.closed
   const launcher = process.env.GATOR_TERMINAL_LAUNCHER || resolve(import.meta.dir, "../launcher/gator.mjs")

@@ -26,7 +26,7 @@ test("rail removes repeated branding, supports pointer resizing and keeps chat s
     setup.resize(110, 32); await flush(); expect(rail().width).toBe(44)
     setup.mockInput.pressKey("p", { ctrl: true }); await flush(); expect(setup.captureCharFrame()).toContain("CHATS")
     await setup.mockInput.typeText("catalog-actions"); await flush(); expect(setup.captureCharFrame()).toContain("CATALOG ACTIONS")
-    expect(setup.captureCharFrame()).not.toContain("catalog-actions")
+    expect(setup.captureCharFrame().match(/catalog-actions/g)).toHaveLength(1) // typed query only; result label is uppercase
   } finally { await client.close(); await setup.dispose(); await rm(root, { recursive: true, force: true }) }
 })
 
@@ -43,7 +43,8 @@ test("slash exit and quit use application shutdown, preserve cancelled reviews, 
     await client.submit(); await flush(); expect(setup.captureCharFrame()).toContain("Stop work and close Gator?")
     setup.mockInput.pressEscape(); await flush(); expect(closed).toBe(0); expect(client.draft.text).toBe("/exit")
     busy = false; host.change(host.current); await client.submit(); expect(closed).toBe(1); expect(client.draft.text).toBe("")
-    await client.edit("/quit"); await client.submit(); expect(closed).toBe(2); expect(host.sent).toHaveLength(0)
+    await client.edit("/quit", [], "inbox-fixture"); await client.submit(); expect(closed).toBe(2); expect(host.sent).toHaveLength(0)
+    expect(client.draft.reply_to_update_id).toBe("inbox-fixture")
   } finally { await client.close(); await setup.dispose(); await rm(root, { recursive: true, force: true }) }
 })
 
