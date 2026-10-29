@@ -347,6 +347,14 @@ func (client *Client) ExportArtifact(id, destination string) error {
 }
 
 func (client *Client) call(ctx context.Context, method string, parameters any, target any) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if recovered, err := client.store.recoverController(client.sessionID); err != nil {
+		return err
+	} else if recovered {
+		return ErrUnavailable
+	}
 	token, err := readToken(client.store, client.sessionID)
 	if err != nil {
 		return ErrUnavailable

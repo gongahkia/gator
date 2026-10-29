@@ -102,6 +102,11 @@ func NewService(config ServiceConfig) (*Service, error) {
 // requests through one controller lock so an agent cannot race a user takeover
 // or another granted run on the same selected tab.
 func (service *Service) Run(ctx context.Context) (runErr error) {
+	lease, err := service.store.controllerLease(service.sessionID, true)
+	if err != nil {
+		return errors.Join(fmt.Errorf("acquire browser controller ownership: %w", err), service.driver.Close())
+	}
+	defer lease.Close()
 	ctx, cancel := context.WithCancel(ctx)
 	var handlers sync.WaitGroup
 	var listener net.Listener
@@ -127,13 +132,15 @@ func (service *Service) Run(ctx context.Context) (runErr error) {
 		return fmt.Errorf("protect browser socket directory: %w", err)
 	}
 	_ = os.Remove(service.socket)
-	listener, err := listenController(service.socket)
+	listener, err = listenController(service.socket)
 	if err != nil {
 		return fmt.Errorf("listen on browser socket: %w", err)
 	}
 	service.listener = listener
 	if session, err := service.store.Get(service.sessionID); err != nil {
 		return err
+	} else if session.State != StateRunning {
+		return ErrStopped
 	} else if err := service.driver.SetOrigins(ctx, session.Origins); err != nil {
 		return fmt.Errorf("apply browser origin policy: %w", err)
 	}

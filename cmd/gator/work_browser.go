@@ -230,7 +230,16 @@ func browserControlScreen(ctx context.Context, store *browser.Store, id string) 
 	defer cancel()
 	current, liveErr := client.Session(checkCtx, id)
 	if liveErr != nil || current.State != browser.StateRunning {
+		// The liveness probe can revoke a controller whose process exited.
+		// Do not offer a stale revocation action for the pre-probe revision.
+		recorded, err = store.Get(id)
+		if err != nil {
+			return screen, err
+		}
 		screen.Panel.Blocks = []uisnapshot.Block{{Title: "Browser unavailable", Lines: []string{"Gator could not confirm a live browser connection. Refresh to retry, or revoke access before opening a new window.", "Revoking access does not establish whether the last browser action completed."}}}
+		if recorded.State == browser.StateStopped {
+			screen.Panel.Blocks = []uisnapshot.Block{{Title: "Browser stopped", Lines: []string{"This session's access is revoked. Return to All browsers to open a new private window.", "Earlier browser actions may already have completed. Gator will not retry them automatically."}}}
+		}
 		if recorded.State == browser.StateRunning {
 			screen.Actions = append(screen.Actions, workapp.ControlAction{Key: "S", Label: "Revoke browser access", Action: "stop", Args: []string{id, browser.PolicyDigest(recorded)}, Review: true, Description: "Revoke this browser session's local access. A managed window closes when its controller can be reached; an unavailable controller may require closing the window yourself."})
 		}
