@@ -95,7 +95,15 @@ Gator user-data directory. `GATOR_DESKTOP_USER_DATA`, `GATOR_DESKTOP_WORKSPACE`,
 state/config overrides and existing desktop-named Go preferences remain
 compatible. `GATOR_TERMINAL_USER_DATA` and `GATOR_TERMINAL_WORKSPACE` explicitly
 select alternate roots. No private data is imported into OpenCode storage.
-Uninstall leaves all profiles intact. Tests must use isolated roots.
+Uninstall checks the selected Go state/configuration stores, the default draft
+store and both explicit draft overrides. If any resolves inside the installation,
+removal stops before deleting the launcher or package. Move that data outside the
+installation and select its new location first. Directory aliases and missing
+descendants are checked too. Older runtimes without profile-location metadata
+cannot pass this check; use a current terminal build before uninstalling.
+Other files or unselected profiles placed inside the installation are not
+discovered automatically. Keep private data outside the package tree. Tests must
+use isolated roots. Active-profile and background-service guards still apply.
 On first terminal use, sidebar and recent-chat grouping preferences are imported
 from a private copy of Gator's Chromium Local Storage into
 `frontend-preferences.json`. The original database remains unchanged. Subsequent

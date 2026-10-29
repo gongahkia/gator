@@ -1517,3 +1517,20 @@ changes, and shared settings updates preserve unrelated edits. There is no
 cross-file crash journal for settings/auth publication; this does not establish
 power-loss atomicity. Native Windows, live provider access and an independent
 first-use trial remain open. The competitive-gap ledger records full evidence.
+
+
+### Uninstall protects nested profile storage — 29 October
+
+A disposable owned installation reproduced deletion of a synthetic profile inside
+its package tree. Uninstall now obtains the selected state/configuration paths
+from the leased Go runtime and checks those paths, default draft storage and both
+explicit draft overrides before removing anything. Canonicalization follows
+aliases and missing descendants. Unverifiable metadata or overlapping storage
+refuses removal; sibling paths remain valid.
+
+Fourteen installer/uninstaller tests pass on macOS. The independent packaged Bun
+lifecycle passes launcher recovery, active-profile refusal, nested-draft refusal,
+owned removal and retained external notes. Go guard race tests and Windows command
+test cross-compilation pass. Windows execution remains unverified. These checks do
+not discover unselected profiles inside the package or complete the broader
+update/drain/service lifecycle.

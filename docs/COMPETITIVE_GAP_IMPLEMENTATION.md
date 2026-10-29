@@ -822,3 +822,36 @@ G14/G15 remain open for permanent always-on deployment, device enrollment and
 per-device revocation, mobile notifications, file transfer and broader remote
 workflows. A sleeping/offline Mac is still unavailable. No production service or
 real account was activated.
+
+
+### Nested-profile uninstall protection — 29 October
+
+A synthetic fixture demonstrated a data-loss bug: successful uninstall recursively
+removed profile data stored under its owned installation. No real profile was
+used. The leased Go helper now reports resolved state/configuration storage paths;
+the uninstaller checks those plus default, terminal and desktop draft storage.
+It resolves directory aliases and missing descendants, refuses overlapping paths
+before removing the launcher, and rejects runtime metadata it cannot verify.
+Installation roots and manifests must be ordinary directories/files. Successful
+removal reports retention of checked storage, rather than claiming all profiles
+were discovered.
+
+Validation: 14 Node installer/uninstaller tests pass, including each storage
+override, default drafts, existing/dangling directory aliases and a non-overlapping
+sibling path. An independently packaged macOS artifact passes the Bun install,
+launcher recovery, active-profile refusal, nested-draft refusal, removal and
+retained-note lifecycle. Go guard race checks pass; Windows command tests compile.
+The terminal OS matrix now includes these uninstall regression tests after the
+runtime build. No remote CI or native Windows execution was performed.
+
+The broader application-host run exposed an unrelated macOS test expectation:
+export correctly returned the canonical `/private/var/...` location, while the
+test expected its `/var/...` alias. The assertion now compares the canonical
+parent while continuing to exercise writes through the original alias. The host
+suite then passes 77 tests; its native Windows handoff test is skipped on macOS.
+
+Limits: unselected profiles or other private files placed in the installation are
+not automatically discovered. The existing exclusive profile guard is retained;
+uninstalling an older installation while another process uses that profile still
+requires work to stop. This does not close the broader release lifecycle gate or
+claim atomic deletion on Windows. Real-account sign-in remains deferred.
