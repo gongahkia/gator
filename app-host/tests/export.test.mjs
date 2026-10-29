@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile, rm, symlink, link, mkdir } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile, rm, symlink, link, mkdir, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ExportStore } from "../src/export.mjs";
@@ -9,7 +9,7 @@ test("export replaces only an explicitly reviewed unchanged destination and cons
   const root = await mkdtemp(join(tmpdir(), "gator-export-"));
   try {
     const store = new ExportStore(), path = join(root, "copy.txt");
-    assert.deepEqual(await store.review(path), { path, exists: false });
+    assert.deepEqual(await store.review(path), { path: join(await realpath(root), "copy.txt"), exists: false });
     await store.write(path, Buffer.from("Existing long content"));
     await assert.rejects(store.write(path, Buffer.from("Unreviewed")), /EEXIST/);
     const review = await store.review(path);
