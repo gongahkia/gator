@@ -855,3 +855,50 @@ not automatically discovered. The existing exclusive profile guard is retained;
 uninstalling an older installation while another process uses that profile still
 requires work to stop. This does not close the broader release lifecycle gate or
 claim atomic deletion on Windows. Real-account sign-in remains deferred.
+
+
+### Linux companion service and native lifecycle — 29 October
+
+The companion now has a reviewable Linux user-service generator and example
+configuration. Preparation checks the runtime, entry, selected profile/workspace
+and private token, then exclusively creates a mode-0600 unit. It never activates
+a service or changes login/boot policy. The README describes explicit installation,
+status, journal access, removal, optional administrator-managed lingering and the
+separate Gator job supervisor required for recurring checks.
+
+The generated unit preserves exact argv and environment values, escapes systemd
+percent specifiers, disables command-line environment substitution and explicitly
+sets the selected origin/profile. It keeps the existing loopback listener, uses
+journal output, restarts the listener after exit and permits graceful child
+shutdown before its stop deadline. The token contents are never embedded.
+
+Validation used a disposable Debian Bookworm Linux container on this Mac's Docker
+VM, Node 24 and systemd 252.39. It had no external network, published ports or host
+filesystem mounts. Container-local privileges permitted its own systemd manager;
+all repository code and the cross-built Linux Go runtime were copied in. The
+native test ran as the ordinary `node` user, not root. All three Linux tests pass:
+plan/preparation validation plus a real user-manager lifecycle. The lifecycle
+verifies literal paths with spaces, quotes, backslashes, Unicode, percent and
+variable-like text; authenticated creation of a real Go conversation; forced
+listener crash and a new PID; retained history; opening a Go worker; worker exit
+on service stop; retained data after stop; and removal of the temporary unit.
+The container was removed afterward. No accounts, paid models or production
+services were used.
+
+The first container attempts exposed an executable-mount setting and a manager
+startup race in the disposable harness. After correcting those, systemd's real
+parser rejected quoted WorkingDirectory syntax. That product bug was fixed using
+a raw path with escaped specifiers and a trailing directory separator; the full
+native lifecycle then passed. Mac-local plan checks also pass; native opt-in tests
+are skipped in that run. Workflow YAML parses and diff checks pass.
+
+CI now includes plan tests and a Linux user-manager lifecycle step. No remote CI
+was triggered. The initial service files were committed in an intervening user
+commit; the path correction, lifecycle assertions and CI changes have separate
+commits for rollback.
+
+G14/G15 remain open: a permanent host, HTTPS/tunnel deployment, logout/reboot
+acceptance, supervisor-plus-listener acceptance, physical-phone access, device
+pairing/revocation and mobile notifications are not established by this container
+run. The execution host must remain on; the new generator does not make the Mac
+or its files available while it is asleep or offline.

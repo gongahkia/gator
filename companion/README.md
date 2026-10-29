@@ -273,10 +273,14 @@ From the repository root:
 
 ```sh
 node --test companion/server.test.mjs
+node --test companion/linux-service.test.mjs companion/macos-service.test.mjs
 # After installing the desktop dependencies and Playwright browsers:
 GATOR_COMPANION_BROWSERS=chromium,webkit node --test companion/client.test.mjs
 # On a logged-in Mac: temporary service, isolated profile, automatic removal.
 GATOR_COMPANION_LAUNCHD_TEST=1 node --test companion/macos-service.test.mjs
+# On Linux with an active user manager and a built Linux runtime:
+GATOR_COMPANION_SYSTEMD_TEST=1 GATOR_TEST_BINARY=/path/to/gator-runtime \
+  node --test companion/linux-service.test.mjs
 ```
 
 Tests build the real Go runtime, use a disposable profile and local model fixture,
@@ -311,6 +315,16 @@ The opt-in launchd test checks plist validity, startup, authentication after a
 forced listener crash/restart, and asynchronous service removal. It runs a
 temporary copied listener, never opens a conversation and does not invoke a
 model or real account. Real-Go work durability is exercised by `server.test.mjs`.
+
+The opt-in Linux test requires a working user manager and fails if it is missing.
+It verifies the unit with systemd, starts a unique temporary runtime-linked
+service, checks literal profile paths containing percent/dollar characters,
+creates a real Go conversation, kills the listener, verifies restart and retained
+history, opens a Go worker, and stops/removes the service with its children.
+The test removes its own unit and disposable profile; it does not enable
+lingering, boot startup, a supervisor or a real account. CI runs this test on
+Linux; local container evidence does not establish remote-host reboot or logout
+availability.
 
 Follow-up checks cover 55 real-Go retained updates, paging, conversation binding,
 read/done/reopen, stale resolution refusal and receipts across restart, without
