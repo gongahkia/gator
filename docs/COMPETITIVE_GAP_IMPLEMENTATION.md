@@ -1102,3 +1102,24 @@ drafts, focus, malicious-looking text, revoked access and 320/390/760-pixel widt
 Dark/light 390-pixel images were inspected. CI includes the real health journey
 in both existing host test matrices; no remote CI was triggered. Physical phones,
 screen-reader acceptance and real-account monitoring remain unverified.
+
+### Terminal installation continuity and rollback — 29 October
+
+The new installed-package probe verifies a real old/new-prefix switch, rollback,
+and continued use of the new installation after removing the old package. It
+imports bundled services and runs each installed Go binary with a shared external
+synthetic profile. Two chat drafts, an attachment, saved file versions, unfinished
+file edit, note, preferences and config survive. Changed launch directories do
+not widen restored chat source access. No messages or model calls occur.
+
+Native Mac x64 runs pass for two distinct retained/fresh runtime artifacts and
+for the same-build prefix-relocation variant. Reports include runtime hashes,
+version labels, tested phases and counts. The fresh package also passes its
+existing independent dependency/file-service check. The terminal workflow now
+runs the same-build switch/rollback check on each native runner and retains its
+report; no remote CI was triggered. Test prefixes/profile were removed.
+
+General cross-version/schema migration, signed updates, native Windows acceptance
+and full terminal parity remain open. Service relocation is covered by its
+separate reviewed repair workflow. This checkpoint does not claim arbitrary
+older versions can safely read newer profile formats.

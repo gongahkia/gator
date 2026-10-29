@@ -1724,3 +1724,39 @@ unverified. Full native terminal parity and remote deployment remain open.
 Ignored evidence: `.gator/native-tools/companion-health-real.log`,
 `companion-health-browser-all.log` and `companion-check-*-health-*.png` under the
 same directory. Synthetic profiles and model fixtures were removed after testing.
+
+### Installed package switch and rollback — 29 October
+
+Added `ui/scripts/verify-upgrade.mjs`, a Bun harness importing the actual bundled
+application services and launching each installed Go runtime. Two disposable
+prefixes share one external synthetic profile. The original package creates two
+chats/drafts, an immutable upload, two file versions, an unfinished file edit,
+a saved note and a frontend preference. No user work is submitted.
+
+The probe opens the newer installation from a different working directory,
+checks the original chat source and last selection, changes one draft, reopens
+the older installation, then removes the older package with its bundled
+uninstaller and reopens the new one. Every phase verifies retained drafts,
+attachment identity, file versions/edit draft, exact exported bytes, unchanged
+original file, note, preference and configuration. A local fixture model receives
+zero requests. The installed launchers also report their respective versions.
+
+Native Mac x64 evidence: **pass** using retained `artifact-macos-4` and a freshly
+built/package-verified `artifact-macos-upgrade`. Their runtime SHA-256 digests
+differ; the new runtime identifies commit `48e1af9ae`, while the earlier runtime
+has the existing unknown development revision label. Both hashes are retained
+in `.gator/native-tools/upgrade-continuity-report.json`. A second run using the
+new artifact twice also passes, matching the same-build relocation variant
+added to the four-platform terminal workflow. No remote CI was triggered.
+
+The fresh package's independent service/dependency check also passed, covering
+Bun-only child PATH, real Go, preference import, rendered PDF pages, native Office
+save/export/handoff and unchanged originals. JavaScript syntax, workflow YAML
+and diff checks pass. Disposable prefixes, profiles and model fixtures were
+removed. Build/package and continuity logs remain under ignored
+`.gator/native-tools/upgrade-*`.
+
+This verifies bundled-host/data continuity for these artifacts. It is not proof
+of a schema-changing release migration, signed OS installer, automatic updater,
+service relocation or native Windows execution. The existing macOS service-repair
+and PTY journeys are separate evidence. The terminal parity gate remains open.

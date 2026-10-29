@@ -89,6 +89,21 @@ and Recovery can retry the repair. A changed service review must be refreshed.
 Do not simply delete an active service executable.
 Signing, publishing and release-account configuration are separate work.
 
+To verify installation continuity with two reviewed local artifacts:
+
+```sh
+bun ui/scripts/verify-upgrade.mjs /path/to/old-artifact /path/to/new-artifact /tmp/gator-upgrade-report.json
+```
+
+The probe uses disposable installation prefixes and a synthetic profile. It
+checks switching to the new package, reopening with the old package, then using
+the new package after removing the old one. It retains chat/file drafts, uploads,
+saved versions, notes, preferences and configuration without sending a model
+request. The report records both runtime hashes; use a new report filename.
+Passing the same artifact twice checks prefix relocation only. Passing distinct
+artifacts checks those particular builds; it does not establish compatibility
+across arbitrary schema changes or replace reviewed background-service repair.
+
 Profiles keep Gator's existing configuration/state directories and file formats.
 The terminal reads the same per-profile draft store under Electron's established
 Gator user-data directory. `GATOR_DESKTOP_USER_DATA`, `GATOR_DESKTOP_WORKSPACE`,
