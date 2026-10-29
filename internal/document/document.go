@@ -252,9 +252,15 @@ func RenderDOCXTemplate(spec Spec, template io.Reader) ([]byte, Preview, error) 
 			title := xmlTextRun(spec.Title)
 			body := templateBodyXML(spec)
 			var replaced bool
-			documentXML, replaced = replaceMarker(documentXML, "gator:title", title)
+			documentXML, replaced, err = replaceMarker(documentXML, "gator:title", title)
+			if err != nil {
+				return nil, Preview{}, err
+			}
 			found = found || replaced
-			documentXML, replaced = replaceMarker(documentXML, "gator:body", body)
+			documentXML, replaced, err = replaceMarker(documentXML, "gator:body", body)
+			if err != nil {
+				return nil, Preview{}, err
+			}
 			found = found || replaced
 			contents = []byte(documentXML)
 		}
@@ -277,39 +283,68 @@ func RenderDOCXTemplate(spec Spec, template io.Reader) ([]byte, Preview, error) 
 	return output.Bytes(), spec.Preview(), nil
 }
 
-func replaceMarker(documentXML, marker, replacement string) (string, bool) {
+func replaceMarker(documentXML, marker, replacement string) (string, bool, error) {
 	placeholder := "{{" + marker + "}}"
 	if strings.Contains(documentXML, placeholder) {
 		if marker == "gator:body" {
 			position := strings.Index(documentXML, placeholder)
-			start := strings.LastIndex(documentXML[:position], "<w:p")
-			endRelative := strings.Index(documentXML[position:], "</w:p>")
-			if start >= 0 && endRelative >= 0 {
-				end := position + endRelative + len("</w:p>")
-				return documentXML[:start] + replacement + documentXML[end:], true
+			// <w:pPr> and <w:pStyle> are not paragraphs. Resolve the
+			// enclosing element from XML tokens instead of a name prefix.
+			start, end, err := enclosingWordParagraph(documentXML, position)
+			if err != nil {
+				return documentXML, false, err
 			}
+			return documentXML[:start] + replacement + documentXML[end:], true, nil
 		}
-		return strings.ReplaceAll(documentXML, placeholder, replacement), true
+		return strings.ReplaceAll(documentXML, placeholder, replacement), true, nil
 	}
 	needle := `w:val="` + marker + `"`
 	position := strings.Index(documentXML, needle)
 	if position < 0 {
-		return documentXML, false
+		return documentXML, false, nil
 	}
 	start := strings.LastIndex(documentXML[:position], "<w:sdt>")
 	endRelative := strings.Index(documentXML[position:], "</w:sdt>")
 	if start < 0 || endRelative < 0 {
-		return documentXML, false
+		return documentXML, false, nil
 	}
 	end := position + endRelative + len("</w:sdt>")
 	contentStartRelative := strings.Index(documentXML[start:end], "<w:sdtContent>")
 	contentEndRelative := strings.Index(documentXML[start:end], "</w:sdtContent>")
 	if contentStartRelative < 0 || contentEndRelative < 0 {
-		return documentXML, false
+		return documentXML, false, nil
 	}
 	contentStart := start + contentStartRelative + len("<w:sdtContent>")
 	contentEnd := start + contentEndRelative
-	return documentXML[:contentStart] + replacement + documentXML[contentEnd:], true
+	return documentXML[:contentStart] + replacement + documentXML[contentEnd:], true, nil
+}
+
+// Keep untouched template bytes while locating the actual paragraph boundary.
+// Token offsets account for attributes, styles, comments and self-closing tags.
+func enclosingWordParagraph(documentXML string, position int) (int, int, error) {
+	decoder := xml.NewDecoder(strings.NewReader(documentXML))
+	start := -1
+	for {
+		offset := int(decoder.InputOffset())
+		token, err := decoder.Token()
+		if err != nil {
+			return 0, 0, errors.New("DOCX body placeholder has no enclosing Word paragraph")
+		}
+		switch value := token.(type) {
+		case xml.StartElement:
+			if value.Name.Space == "http://schemas.openxmlformats.org/wordprocessingml/2006/main" && value.Name.Local == "p" {
+				start = offset
+			}
+		case xml.EndElement:
+			if value.Name.Space == "http://schemas.openxmlformats.org/wordprocessingml/2006/main" && value.Name.Local == "p" {
+				end := int(decoder.InputOffset())
+				if start >= 0 && start <= position && position < end {
+					return start, end, nil
+				}
+				start = -1
+			}
+		}
+	}
 }
 
 func xmlTextRun(value string) string {

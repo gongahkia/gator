@@ -239,3 +239,15 @@ Physical iOS/Android, remote HTTPS deployment, device enrollment/revocation,
 conversation discovery/creation, native service installation, file transfer,
 and live connected workflows remain open. A browser viewport fixture does not
 close G14/G15 or the physical-device acceptance gap.
+
+### DOCX styled-template regression
+
+A representative body placeholder with paragraph properties reproduced malformed
+output: prefix matching treated `<w:pPr>` as the enclosing `<w:p>`, leaving an
+unclosed style element. Replacement now locates the actual Word paragraph using
+XML token offsets and preserves surrounding bytes. A body placeholder outside a
+Word paragraph rejects the whole render, even when a title marker was valid.
+The regression checks XML parsing and preservation of surrounding paragraphs
+and inserted table/prose content. `go test -race ./internal/document` and focused
+document/artifact tool tests pass on macOS. This fixes one reproducible fidelity
+defect; it does not establish visual layout or native Word acceptance.
