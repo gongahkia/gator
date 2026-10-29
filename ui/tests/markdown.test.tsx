@@ -16,6 +16,8 @@ test("Markdown styles prose and preserves code, lists, links and tables at narro
     await setup.flush()
     const frame = setup.captureCharFrame(), spans = setup.captureSpans().lines.flatMap(line => line.spans)
     for (const label of ["Plan", "First item", "Second item", "A useful quote", "Reference", "Report", "Ready", "Safe text", 'const value = "**literal**"']) expect(frame).toContain(label)
+    expect(spans.some(span => span.text.includes("Plan") && !!(span.attributes & TextAttributes.BOLD))).toBe(true)
+    expect(spans.find(span => span.text.includes("Bold"))?.fg.intent).toBe("default")
     expect(frame).not.toContain("**Bold**"); expect(frame).not.toContain("# Plan"); expect(frame).not.toContain("```")
     expect(spans.some(span => span.text.includes("italic") && !!(span.attributes & TextAttributes.ITALIC))).toBe(true)
     setup.resize(38, 45); await setup.flush()

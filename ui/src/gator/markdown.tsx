@@ -9,6 +9,7 @@ export function Markdown(props: { text?: string; streaming?: boolean }) {
   const style = SyntaxStyle.fromStyles({
     default: { fg: theme.text.base },
     "markup.heading": { fg: theme.text.base, bold: true },
+    ...Object.fromEntries([1, 2, 3, 4, 5, 6].map(level => [`markup.heading.${level}`, { fg: theme.text.base, bold: true }])),
     "markup.strong": { bold: true },
     "markup.italic": { italic: true },
     "markup.raw": { fg: theme.accent },
