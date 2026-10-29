@@ -81,6 +81,7 @@ func (s Store) ReviewNote(id, goalID, revision, action, text string) (Document, 
 		if err := s.write(d); err != nil {
 			return Document{}, err
 		}
+		return d, retrieval.InvalidateID(filepath.Dir(filepath.Dir(s.root)), id)
 	case "forget":
 		if err := s.remove("note", id); err != nil {
 			return Document{}, err

@@ -284,6 +284,18 @@ func saveIndex(path string, index indexFile) error {
 
 // DropID removes a forgotten record's vectors from every backend/scope index.
 func DropID(stateDir, id string) error {
+	return clearID(stateDir, id, true)
+}
+
+// InvalidateID clears cached vectors for a live record without excluding it
+// from later searches. Call only after saving the authoritative record, while
+// holding its owner's mutation lock. This also repairs deletion markers left
+// by older save/correction paths; a genuinely forgotten record must use DropID.
+func InvalidateID(stateDir, id string) error {
+	return clearID(stateDir, id, false)
+}
+
+func clearID(stateDir, id string, forgotten bool) error {
 	if id == "" || len(id) > 128 {
 		return errors.New("invalid semantic document ID")
 	}
@@ -296,15 +308,15 @@ func DropID(stateDir, id string) error {
 		return err
 	}
 	defer unlock()
-	marker, err := os.OpenFile(forgottenPath(root, id), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
-	if errors.Is(err, os.ErrExist) {
-		err = nil
-	} else if err != nil {
-		return err
-	}
-	if marker != nil {
-		if err := marker.Close(); err != nil {
+	if forgotten {
+		marker, err := os.OpenFile(forgottenPath(root, id), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+		if err != nil && !errors.Is(err, os.ErrExist) {
 			return err
+		}
+		if marker != nil {
+			if err := marker.Close(); err != nil {
+				return err
+			}
 		}
 	}
 	files, err := os.ReadDir(root)
@@ -348,6 +360,11 @@ func DropID(stateDir, id string) error {
 			if err := saveIndex(path, index); err != nil {
 				return err
 			}
+		}
+	}
+	if !forgotten {
+		if err := os.Remove(forgottenPath(root, id)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
 		}
 	}
 	return nil

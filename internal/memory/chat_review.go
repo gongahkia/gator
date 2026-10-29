@@ -53,6 +53,7 @@ func (s Store) ReviewChat(id, conversationID, goalID, updated, action, text stri
 		if err := s.write(record, false); err != nil {
 			return err
 		}
+		return retrieval.InvalidateID(filepath.Dir(filepath.Dir(s.root)), id)
 	default:
 		return errors.New("unsupported memory review action")
 	}

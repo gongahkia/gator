@@ -291,7 +291,10 @@ func (s Store) updateNote(id, title, body string, refs []string, replaceRefs boo
 	if err := validate(d); err != nil {
 		return Document{}, err
 	}
-	return d, s.write(d)
+	if err := s.write(d); err != nil {
+		return Document{}, err
+	}
+	return d, retrieval.InvalidateID(filepath.Dir(filepath.Dir(s.root)), id)
 }
 
 func (s Store) UpdateSkill(id, description, body string) (Document, error) {

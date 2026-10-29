@@ -283,7 +283,10 @@ func (s Store) correct(id, content, source, updated string) (Record, error) {
 	if err := validate(record); err != nil {
 		return Record{}, err
 	}
-	return record, s.write(record, false)
+	if err := s.write(record, false); err != nil {
+		return Record{}, err
+	}
+	return record, retrieval.InvalidateID(filepath.Dir(filepath.Dir(s.root)), id)
 }
 
 // CorrectFromFile records a user-reviewed correction against the current file.
@@ -306,7 +309,10 @@ func (s Store) CorrectFromFile(id, content, path string) (Record, error) {
 	if err := validate(record); err != nil {
 		return Record{}, err
 	}
-	return record, s.write(record, false)
+	if err := s.write(record, false); err != nil {
+		return Record{}, err
+	}
+	return record, retrieval.InvalidateID(filepath.Dir(filepath.Dir(s.root)), id)
 }
 
 func (s Store) Forget(id string) error { return s.forget(id, "") }

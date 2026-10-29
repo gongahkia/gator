@@ -122,7 +122,7 @@ func (s Store) RememberChat(input ChatInput) (Record, error) {
 		}
 	}
 	// A changed record must not keep a stale embedding under the same ID.
-	if err := retrieval.DropID(filepath.Dir(filepath.Dir(s.root)), current.ID); err != nil {
+	if err := retrieval.InvalidateID(filepath.Dir(filepath.Dir(s.root)), current.ID); err != nil {
 		return current, err
 	}
 	return current, nil
