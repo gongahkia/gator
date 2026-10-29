@@ -303,3 +303,59 @@ func TestReviewedBrowserPolicyRejectsChangedAuthority(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestReviewedClientCannotDowngradeToLegacyDaemon(t *testing.T) {
+	store, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := store.Start(StartOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := CreateToken(store, session.ID); err != nil {
+		t.Fatal(err)
+	}
+	listener, err := listenController(socketPath(store, session.ID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	requests := make(chan rpcRequest, 1)
+	go func() {
+		connection, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		defer connection.Close()
+		request, err := decodeRequest(connection)
+		if err != nil {
+			return
+		}
+		requests <- request
+		// A legacy daemon understands only the unprefixed mutation name.
+		response := rpcResponse{ID: request.ID, Error: "browser driver method is unsupported"}
+		if request.Method == "set_visual_capture" {
+			response.Error = ""
+			response.Result = session
+		}
+		_ = encodeResponse(connection, response)
+	}()
+	client, err := NewClient(store, session.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if _, err := client.Reviewed(PolicyDigest(session)).SetVisualCapture(ctx, true); err == nil {
+		t.Fatal("legacy daemon silently accepted reviewed mutation")
+	}
+	select {
+	case request := <-requests:
+		if request.Method != "reviewed:set_visual_capture" || request.ExpectedPolicy != PolicyDigest(session) {
+			t.Fatalf("review binding not in wire method: %#v", request)
+		}
+	case <-ctx.Done():
+		t.Fatal("legacy daemon received no request")
+	}
+}

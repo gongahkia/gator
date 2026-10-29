@@ -162,6 +162,13 @@ func (service *Service) serveConnection(ctx context.Context, connection net.Conn
 
 func (service *Service) handle(ctx context.Context, request rpcRequest) rpcResponse {
 	response := rpcResponse{ID: request.ID}
+	if strings.HasPrefix(request.Method, "reviewed:") {
+		if request.ExpectedPolicy == "" {
+			response.Error = "reviewed browser operation requires an access policy"
+			return response
+		}
+		request.Method = strings.TrimPrefix(request.Method, "reviewed:")
+	}
 	if request.ExpectedPolicy != "" {
 		session, err := service.store.Get(service.sessionID)
 		if err != nil {

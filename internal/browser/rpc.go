@@ -355,6 +355,11 @@ func (client *Client) call(ctx context.Context, method string, parameters any, t
 	if err != nil {
 		return fmt.Errorf("encode browser controller request: %w", err)
 	}
+	// Older daemons ignore unknown JSON fields. Use a distinct method name so
+	// they reject a reviewed operation rather than ignoring its policy binding.
+	if client.expectedPolicy != "" {
+		method = "reviewed:" + method
+	}
 	request := rpcRequest{ID: client.sequence.Add(1), Token: token, Method: method, Params: payload, ExpectedPolicy: client.expectedPolicy}
 	connection, err := dialController(ctx, client.socket)
 	if err != nil {
