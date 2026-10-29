@@ -347,6 +347,12 @@ func TestProfilePublicationCannotReplaceAnExistingEmptyDirectory(t *testing.T) {
 func TestRestorePreservesUnsentChatWithoutSyntheticRevisions(t *testing.T) {
 	ctx := context.Background()
 	root, source := t.TempDir(), t.TempDir()
+	// Restore canonicalizes existing source paths. macOS may return a /var
+	// temporary path whose real directory is under /private/var.
+	source, err := filepath.EvalSymlinks(source)
+	if err != nil {
+		t.Fatal(err)
+	}
 	sessions, err := worksession.Open(root)
 	if err != nil {
 		t.Fatal(err)
