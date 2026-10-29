@@ -9,6 +9,111 @@ import { createCompanion } from './server.mjs';
 // isolated installation without changing this checkout's dependency tree.
 const { chromium, webkit } = await import(process.env.GATOR_PLAYWRIGHT_MODULE || '../desktop/node_modules/playwright/index.mjs');
 for (const name of (process.env.GATOR_COMPANION_BROWSERS || 'chromium').split(',')) {
+  test(`${name}: browse, search and switch chats with independent retained drafts`, { timeout: 90000 }, async () => {
+    const root = await mkdtemp(join(tmpdir(), 'gator-phone-catalog-')), tokenFile = join(root, 'token'), token = 'a'.repeat(64);
+    const queries = [], submissions = [], workers = new Map();
+    let browser, companion, failCatalog = false;
+    try {
+      await writeFile(tokenFile, token + '\n', { mode: 0o600 });
+      companion = createCompanion({ tokenFile, queryCatalog: async query => {
+        queries.push(query);
+        if (failCatalog) throw new Error('Catalog is temporarily unavailable.');
+        if (query.query === 'missing') return { items: [] };
+        return { items: query.after ? [{ id: 'work-second', title: 'Second chat', source: '/host/second', archived: query.scope === 'archived' }] : [{ id: 'work-first', title: 'First chat <img src=x onerror="window.injected=true">', source: '/host/first', pinned: true }], next: query.after ? '' : 'second-page', incomplete: query.scope === 'archived' };
+      }, spawnBackend: id => {
+        const worker = { state: { conversation_id: id, title: id === 'work-first' ? 'First chat' : 'Second chat', messages: [{ role: 'assistant', text: `Answer belonging to ${id}` }], queue: [], running: false }, async ready() {}, async stop() { this.closed = true; }, async submitUpload(frame) {
+          submissions.push(structuredClone(frame.upload));
+          if (!this.state.messages.some(m => m.request_id === frame.upload.request_id)) this.state.messages.push({ role: 'user', text: frame.upload.text, request_id: frame.upload.request_id });
+        } };
+        workers.set(id, worker); return worker;
+      } });
+      const address = await companion.listen(), base = `http://127.0.0.1:${address.port}`;
+      browser = await ({ chromium, webkit }[name]).launch({ headless: true, executablePath: process.env[`GATOR_${name.toUpperCase()}_EXECUTABLE`] });
+      const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, colorScheme: 'dark' }), page = await context.newPage(), errors = [];
+      page.on('pageerror', error => errors.push(error.message));
+      await page.goto(base);
+      await page.getByLabel('Host access token', { exact: true }).fill(token);
+      await page.getByRole('button', { name: 'Connect', exact: true }).click();
+      await page.locator('.chat-choice').waitFor();
+      assert.equal(workers.size, 0, 'listing must not open any chat');
+      assert.equal(await page.locator('#catalog img').count(), 0);
+      assert.equal(await page.evaluate(() => !!window.injected), false);
+      assert.equal(await page.locator('#token').inputValue(), '');
+      for (const width of [320, 390, 760]) {
+        await page.setViewportSize({ width, height: 844 });
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+      }
+      await page.setViewportSize({ width: 390, height: 844 });
+      if (process.env.GATOR_COMPANION_SCREENSHOT) {
+        await page.screenshot({ path: `${process.env.GATOR_COMPANION_SCREENSHOT}-${name}-catalog.png`, fullPage: true });
+        await page.emulateMedia({ colorScheme: 'light' });
+        await page.screenshot({ path: `${process.env.GATOR_COMPANION_SCREENSHOT}-${name}-catalog-light.png`, fullPage: true });
+        await page.emulateMedia({ colorScheme: 'dark' });
+      }
+      await page.getByLabel('Search titles and folders', { exact: true }).fill('missing');
+      failCatalog = true;
+      await page.getByRole('button', { name: 'Search', exact: true }).click();
+      await page.getByText('Catalog is temporarily unavailable.', { exact: true }).waitFor();
+      assert.equal(await page.locator('#next').isDisabled(), true);
+      failCatalog = false;
+      await page.getByRole('button', { name: 'Refresh list', exact: true }).click();
+      await page.getByText('No conversations match.', { exact: true }).waitFor();
+      assert.equal(queries.at(-1).query, 'missing', 'refresh must retry the failed search');
+      assert.equal(await page.locator('#next').isDisabled(), true);
+      await page.getByLabel('Search titles and folders', { exact: true }).fill('');
+      await page.getByLabel('Show', { exact: true }).selectOption('archived');
+      await page.getByRole('button', { name: 'Search', exact: true }).click();
+      await page.getByText(/Some retained conversations could not be checked/).waitFor();
+      await page.getByRole('button', { name: 'Next page', exact: true }).click();
+      await page.locator('.chat-choice').filter({ hasText: 'Second chat' }).waitFor();
+      assert.deepEqual(queries.at(-1), { query: '', scope: 'archived', after: 'second-page' });
+      await page.getByRole('button', { name: 'Previous page', exact: true }).click();
+      const firstChoice = page.locator('.chat-choice').filter({ hasText: 'First chat' });
+      await firstChoice.waitFor(); await firstChoice.focus(); await page.keyboard.press('Enter');
+      await page.getByText('Answer belonging to work-first', { exact: true }).waitFor();
+      assert.equal(await page.locator('#chat-title').evaluate(node => document.activeElement === node), true);
+      await page.getByLabel('Message', { exact: true }).fill('Unsent first draft');
+      await page.getByRole('button', { name: 'Conversations', exact: true }).click();
+      await page.getByRole('button', { name: 'Next page', exact: true }).click();
+      await page.locator('.chat-choice').filter({ hasText: 'Second chat' }).click();
+      await page.getByText('Answer belonging to work-second', { exact: true }).waitFor();
+      assert.equal(await page.getByLabel('Message', { exact: true }).inputValue(), '');
+      await page.getByLabel('Message', { exact: true }).fill('Separate second draft');
+      await page.getByRole('button', { name: 'Conversations', exact: true }).click();
+      await page.locator('.chat-choice').filter({ hasText: 'First chat' }).click();
+      await page.getByText('Answer belonging to work-first', { exact: true }).waitFor();
+      assert.equal(await page.getByLabel('Message', { exact: true }).inputValue(), 'Unsent first draft');
+      assert.equal(submissions.length, 0);
+      let drop = true;
+      await page.route('**/actions', async route => {
+        if (drop) { drop = false; await route.fetch(); await route.abort('connectionfailed'); }
+        else await route.continue();
+      });
+      await page.getByRole('button', { name: 'Send message', exact: true }).click();
+      await page.waitForFunction(() => document.querySelector('#error').textContent.length > 0);
+      await page.getByRole('button', { name: 'Conversations', exact: true }).click();
+      await page.getByRole('button', { name: 'Next page', exact: true }).click();
+      await page.locator('.chat-choice').filter({ hasText: 'Second chat' }).click();
+      await page.getByText('Answer belonging to work-second', { exact: true }).waitFor();
+      assert.equal(await page.getByLabel('Message', { exact: true }).inputValue(), 'Separate second draft');
+      assert.equal(await page.locator('#message').getAttribute('readonly'), null);
+      await page.getByRole('button', { name: 'Conversations', exact: true }).click();
+      await page.locator('.chat-choice').filter({ hasText: 'First chat' }).click();
+      await page.getByRole('button', { name: 'Retry same message', exact: true }).click();
+      await page.waitForFunction(() => document.querySelector('#message').value === '');
+      assert.deepEqual(submissions[1], submissions[0]);
+      assert.equal(workers.get('work-first').state.messages.filter(m => m.role === 'user').length, 1);
+      await page.getByRole('button', { name: 'Conversations', exact: true }).click();
+      await page.locator('.chat-choice').waitFor();
+      await writeFile(tokenFile, 'b'.repeat(64) + '\n');
+      await page.getByRole('button', { name: 'Refresh list', exact: true }).click();
+      await page.getByText('Access expired · enter the current host token', { exact: true }).waitFor();
+      assert.equal(await page.locator('#catalog').isVisible(), false);
+      assert.equal(await page.locator('#catalog-items').textContent(), '');
+      assert.equal(await page.evaluate(token => JSON.stringify({ ...sessionStorage, ...localStorage }).includes(token), token), false);
+      assert.deepEqual(errors, []);
+    } finally { await browser?.close(); await companion?.close(); await rm(root, { recursive: true, force: true }); }
+  });
   test(`${name}: mobile reconnect, retained admission, exact approval and revocation`, { timeout: 90000 }, async () => {
     const root = await mkdtemp(join(tmpdir(), 'gator-phone-'));
     const tokenFile = join(root, 'token'), token = 'a'.repeat(64), submitted = [], decisions = [];
@@ -42,8 +147,9 @@ for (const name of (process.env.GATOR_COMPANION_BROWSERS || 'chromium').split(',
       await page.goto(base);
       const connect = async () => {
         await page.getByLabel('Host access token', { exact: true }).fill(token);
+        await page.getByText('Open a known conversation', { exact: true }).click();
         await page.getByLabel('Conversation ID', { exact: true }).fill('work-phone');
-        await page.getByRole('button', { name: 'Open conversation', exact: true }).click();
+        await page.getByRole('button', { name: 'Connect', exact: true }).click();
         await page.getByText('Saved answer from the host.', { exact: true }).waitFor();
       };
       await connect();

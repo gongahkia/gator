@@ -18,16 +18,31 @@
       <label for="token">Host access token</label>
       <input id="token" type="password" autocomplete="off" spellcheck="false" required pattern="[a-f0-9]{64}" aria-describedby="token-help">
       <p id="token-help" class="hint">Kept in this page’s memory. Closing or reloading asks for it again.</p>
+      <details><summary>Open a known conversation</summary>
       <label for="conversation">Conversation ID</label>
-      <input id="conversation" autocomplete="off" autocapitalize="none" spellcheck="false" required pattern="[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}">
+      <input id="conversation" autocomplete="off" autocapitalize="none" spellcheck="false" pattern="[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}">
+      </details>
       </div>
       <p id="connected-chat" class="hint" hidden></p>
-      <div class="row"><button id="connect" type="submit">Open conversation</button><button id="disconnect" type="button" class="secondary" hidden>Disconnect</button></div>
+      <div class="row"><button id="connect" type="submit">Connect</button><button id="browse" type="button" class="secondary" hidden>Conversations</button><button id="disconnect" type="button" class="secondary" hidden>Disconnect</button></div>
     </form>
     <p id="connection" role="status">Not connected</p>
     <p id="error" role="alert" hidden></p>
+    <section id="catalog" hidden aria-labelledby="catalog-title">
+      <h2 id="catalog-title" tabindex="-1">Conversations on your host</h2>
+      <form id="search-form" class="card">
+        <label for="search">Search titles and folders</label>
+        <input id="search" type="search" maxlength="512" autocomplete="off">
+        <label for="scope">Show</label>
+        <select id="scope"><option value="active">Active chats</option><option value="archived">Archived chats</option><option value="all">All chats</option></select>
+        <div class="row"><button id="search-submit" type="submit">Search</button><button id="catalog-refresh" type="button" class="secondary">Refresh list</button><button id="return-chat" type="button" class="secondary" hidden>Back to current chat</button></div>
+      </form>
+      <p id="catalog-status" role="status"></p>
+      <div id="catalog-items"></div>
+      <div class="row"><button id="previous" type="button" class="secondary" disabled>Previous page</button><button id="next" type="button" class="secondary" disabled>Next page</button></div>
+    </section>
     <section id="chat" hidden aria-labelledby="chat-title">
-      <div class="row"><h2 id="chat-title">Conversation</h2><button id="refresh" class="secondary" type="button">Refresh</button></div>
+      <div class="row"><h2 id="chat-title" tabindex="-1">Conversation</h2><button id="refresh" class="secondary" type="button">Refresh</button></div>
       <p id="host-status" class="muted" role="status"></p>
       <p id="host-notice" class="notice" hidden></p>
       <div id="updates"></div>

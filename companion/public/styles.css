@@ -15,10 +15,15 @@ p { text-wrap: pretty; overflow-wrap: anywhere; }
 .hint { font-size: 14px; }
 .card, article { padding: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; margin: 20px 0; }
 label { display: block; font-weight: 600; margin: 0 0 8px; }
-input, textarea, button { font: inherit; }
-input, textarea { color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 10px; width: 100%; min-height: 44px; }
+input, textarea, button, select { font: inherit; }
+input, textarea, select { color: inherit; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 10px; width: 100%; min-height: 44px; }
+#scope { margin-bottom: 4px; }
+#search { margin-bottom: 16px; }
+.chat-choice { display: block; width: 100%; text-align: left; margin: 12px 0; overflow-wrap: anywhere; }
+.chat-choice span { display: block; }
+.chat-choice .hint { margin-top: 4px; }
 textarea { resize: vertical; }
-input:focus-visible, textarea:focus-visible { outline: 2px solid var(--muted); outline-offset: 2px; }
+input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--muted); outline-offset: 2px; }
 input:read-only, textarea:read-only { color: var(--muted); }
 .row { margin-top: 16px; }
 button { min-height: 44px; padding: 10px 16px; border: 1px solid transparent; border-radius: 6px; color: var(--ink); background: var(--accent); cursor: pointer; }
