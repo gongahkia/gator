@@ -25,7 +25,7 @@ test("rail removes repeated branding, supports pointer resizing and keeps chat s
     setup.resize(60, 24); await flush(); expect(setup.renderer.root.findDescendantById("navigation-rail")).toBeUndefined()
     setup.resize(110, 32); await flush(); expect(rail().width).toBe(44)
     setup.mockInput.pressKey("p", { ctrl: true }); await flush(); expect(setup.captureCharFrame()).toContain("CHATS")
-    await setup.mockInput.typeText("catalog"); await flush(); expect(setup.captureCharFrame()).toContain("CATALOG ACTIONS")
+    await setup.mockInput.typeText("catalog-actions"); await flush(); expect(setup.captureCharFrame()).toContain("CATALOG ACTIONS")
     expect(setup.captureCharFrame()).not.toContain("catalog-actions")
   } finally { await client.close(); await setup.dispose(); await rm(root, { recursive: true, force: true }) }
 })

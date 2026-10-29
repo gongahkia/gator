@@ -11,7 +11,7 @@ export function CommandPaletteDialog() {
   const [query, setQuery] = createSignal("")
   const options = createMemo(() => commands().flatMap(command => !command.id || !command.palette || command.id === COMMAND_PALETTE_COMMAND ? [] : [{
     title: (command.title ?? command.id).replaceAll("-", " ").toUpperCase(), description: command.description?.toUpperCase(), category: (command.group || commandGroup(command.id.replace(/^gator\./, ""))).toUpperCase(),
-    footer: shortcuts.all(command.id), value: command.id,
+    searchText: `${command.id} ${command.title ?? ""}`, footer: shortcuts.all(command.id), value: command.id,
     onSelect: () => { dialog.clear(); void command.run() },
   }]))
   const roots = () => commandGroups.map(group => ({ title: group.toUpperCase(), description: "OPEN MENU →", value: `menu:${group}`, onSelect: () => { setQuery(""); setSection(group) } }))
