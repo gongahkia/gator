@@ -1455,3 +1455,43 @@ again (one test, 15 assertions): real content is saved/exported and originals
 remain intact. Quick Look previews were inspected, with pagination and cropping
 limitations recorded in the competitive-gap ledger. Actual Office applications,
 native Windows and application recalculation remain unverified.
+
+### Login-service relocation and repair — 29 October
+
+Recovery now offers a reviewed **Repair start at login** action for the selected
+profile's installed service. The review identifies the current executable,
+state and configuration paths and discloses that enabled checks may run after
+restart. The Unix installers retain the resolved configuration directory, reject
+another profile or a linked service file, and recheck the reviewed file digest
+inside the service command. A startup failure distinguishes saved configuration
+from successful activation and leaves repair available.
+
+- Focused Go race checks cover repair of a missing executable path, unchanged
+  saved check bytes, stale install/removal reviews, another profile's refusal,
+  linked-file refusal and activation failure followed by repair. Service-manager
+  commands in those tests are fixtures, not native systemd/launchd evidence.
+- The terminal keyboard journey passes with 19 assertions: review identifies
+  paths, cancel has no service effect, changed configuration invalidates approval,
+  fresh approval repairs through the real Go command using an intercepted service
+  manager, and the composer draft survives with no model submission.
+- A separate native macOS test starts a real bundled Go supervisor under a unique
+  temporary LaunchAgent, verifies authenticated health, unloads it, deletes its
+  old executable, writes the generated configuration for a second executable,
+  and verifies a new supervisor identity and launchd program path. It unloads the
+  temporary service and verifies registration removal and offline health.
+- An initial native test assumed `bootout` removed registration immediately.
+  launchd briefly retained the unloading record; the test now waits for the
+  observed service-not-found exit code. The corrected native check passes.
+- Runtime rebuild and Windows test cross-compilation pass. Native Windows and
+  native systemd activation are not verified by this Mac run. This does not close
+  the full update/drain/uninstall lifecycle or signing/distribution gates.
+
+To repeat the opt-in native check from a macOS login session after rebuilding:
+
+```sh
+GATOR_NATIVE_LAUNCHAGENT_BINARY="$PWD/ui/runtime/gator-runtime" \
+  go test ./cmd/gator -run '^TestNativeLaunchAgentExecutableRelocation$' -count=1 -v
+```
+
+The test uses a random `com.gator.test.relocation.*` label and temporary profile;
+it does not install the user's production Gator service or use real accounts.

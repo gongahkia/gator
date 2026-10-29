@@ -79,10 +79,14 @@ Recovery checks installation ownership and required files, and refuses to replac
 an unrelated launcher. It does not repair damaged package contents. These checks
 do not establish artifact authenticity; install a reviewed build.
 
-To update, finish work, save
-drafts, stop background checks through Recovery, install a reviewed artifact at
-a new prefix, then use Recovery's existing reviewed service ownership flow to
-move/re-enable the executable. Do not simply delete an active service executable.
+To update, finish work and save drafts, then install a reviewed artifact at a new
+prefix. Open the new installation with the same profile. In `/recovery`, choose
+**Repair start at login** if a service is already configured, or **Enable start
+at login** otherwise. Repair shows the executable, state and configuration paths
+before replacing the service and restarting checks. Saved checks remain; enabled
+checks may run after restart. If startup fails, the saved configuration remains
+and Recovery can retry the repair. A changed service review must be refreshed.
+Do not simply delete an active service executable.
 Signing, publishing and release-account configuration are separate work.
 
 Profiles keep Gator's existing configuration/state directories and file formats.

@@ -691,3 +691,24 @@ Office application was available for these checks. Schema validity alone does
 not establish those outcomes. Local evidence remains under ignored
 `.gator/native-tools/office-format-audit`, `office-formats-fixed` and
 `office-format-previews`.
+
+### Repair after moving an installation — 29 October
+
+The installed login service previously had only a disable action in Recovery,
+so repairing an obsolete executable required disabling and enabling it again.
+Recovery now provides a single reviewed repair, showing the current executable
+and profile paths before replacement/restart. Unix service commands recheck the
+reviewed configuration digest, retain the resolved configuration directory and
+refuse another profile's service or a linked configuration. Failed activation
+reports that configuration was saved and allows a fresh repair attempt.
+
+Local verification includes saved-check preservation, activation-failure retry,
+stale/foreign-profile refusal, a 19-assertion terminal keyboard journey and actual
+macOS launchd relocation between two copies of the bundled Go runtime, with a new
+authenticated supervisor identity and verified service removal afterward. The
+native test uses a unique temporary label and isolated profile. Full details and
+the repeatable command are in the terminal migration verification ledger.
+
+G13 remains open for complete update/drain/uninstall behavior, native Windows,
+signed distribution and release-account work. The repair action is user-reviewed;
+updating the application does not silently migrate or enable background services.
