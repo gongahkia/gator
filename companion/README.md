@@ -6,8 +6,8 @@ client disconnect does not stop admitted work. This does not migrate laptop
 work or make an offline laptop's files accessible.
 
 This checkpoint supplies an authenticated API and a small phone/browser client
-using the existing Go bridge. Device pairing, per-device revocation, file transfer, service
-installation and remote account onboarding remain unfinished. Keep Electron and
+using the existing Go bridge. Device pairing, per-device revocation, file transfer,
+automated deployment and remote account onboarding remain unfinished. Keep Electron and
 the terminal available for host setup and recovery. The terminal parity gate is
 unchanged. Do not expose this listener directly to the internet.
 
@@ -198,6 +198,74 @@ online and logged in. It does not keep a sleeping Mac awake, configure HTTPS,
 enroll a phone, or start Gator's separate job supervisor. A permanent companion
 should use the same dedicated profile as the reviewed supervisor configuration.
 Logs stay in the private directory; log rotation is not automated yet.
+
+## Linux host service
+
+`linux-service.mjs` prepares a per-user systemd unit for an always-on Linux host.
+Use a dedicated ordinary user and an already-configured host profile. Copy
+`linux.example.json`, replace its paths, create the referenced directories and
+private token, and use a Linux runtime built for that host. Retain `companion/`
+and its sibling `app-host/src/` together in a stable installation. Node 22.12+
+and systemd with `Type=exec` support are required.
+
+```sh
+node companion/linux-service.mjs /home/gator/companion.json /home/gator/gator-companion.service
+systemd-analyze --user verify /home/gator/gator-companion.service
+```
+
+Preparation validates the executable, workspace/profile directories and private
+token, writes a new mode-0600 file, and refuses overwrite. It does not install,
+start or enable anything. Review the file, including the selected profile and
+optional exact HTTPS origin. The token itself is not embedded. The listener
+still binds only loopback; configure the tunnel or HTTPS proxy described above.
+
+As the dedicated user, install the reviewed file only if that unit name is free:
+
+```sh
+mkdir -p "$HOME/.config/systemd/user"
+# Refuse an existing unit or symlink. Link the reviewed file without replacing it.
+ln /home/gator/gator-companion.service "$HOME/.config/systemd/user/gator-companion.service"
+systemctl --user daemon-reload
+systemctl --user enable --now gator-companion.service
+systemctl --user status --no-pager gator-companion.service
+journalctl --user -u gator-companion.service -n 50 --no-pager
+```
+
+For operation after logout and at boot, the host administrator must enable
+lingering for this dedicated user, for example `sudo loginctl enable-linger gator`.
+Check it with `loginctl show-user gator --property=Linger`. This is a separate
+host policy change; the generator never performs it. Lingering keeps the user
+manager available after logout, as described in the
+[systemd login manager documentation](https://www.freedesktop.org/software/systemd/man/latest/loginctl.html).
+It cannot keep a powered-off host running. Disable lingering only if no other
+services for this user need it.
+
+Install Gator's separate job supervisor through Recovery on this Linux host with
+these same state/configuration paths. The listener alone does not execute
+recurring checks. Both services must be enabled and the execution host online;
+the phone and original laptop can then disconnect. Host files and credentials
+remain on this host; there is no automatic laptop migration.
+
+The unit restarts a failed listener after ten seconds. Stop first sends SIGTERM
+to the listener so it can drain its children; after thirty seconds systemd kills
+remaining processes in the service. This does not replay interrupted Go work.
+Output goes to the host's journal under its configured retention policy. Review
+it for startup failures; a successful service start alone is not an authenticated
+application health check. Exact argument handling and restart/stop behavior use
+[systemd service semantics](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html).
+
+To remove this reviewed service, stop it before removing its unit:
+
+```sh
+systemctl --user disable --now gator-companion.service
+rm "$HOME/.config/systemd/user/gator-companion.service"
+systemctl --user daemon-reload
+```
+
+Keep the profile and token directories. The supervisor is managed separately.
+For an installation move, stop the listener, generate and review a new unit with
+the new executable paths, replace only the owned unit, reload and start again.
+A stopped listener does not stop the separate supervisor.
 
 ## Verification
 

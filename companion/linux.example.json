@@ -1,0 +1,10 @@
+{
+  "node": "/usr/bin/node",
+  "entry": "/home/gator/gator/companion/main.mjs",
+  "runtime": "/home/gator/gator/runtime/gator-runtime",
+  "workspace": "/home/gator/workspace",
+  "tokenFile": "/home/gator/private/access.token",
+  "configDir": "/home/gator/config",
+  "stateDir": "/home/gator/state",
+  "port": 7341
+}
