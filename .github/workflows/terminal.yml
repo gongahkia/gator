@@ -48,6 +48,14 @@ jobs:
         run: node ui/scripts/package.mjs terminal-artifact
       - name: Verify installed lifecycle without Electron
         run: node ui/scripts/verify-install.mjs terminal-artifact
+      - name: Verify installation switch and rollback
+        run: bun ui/scripts/verify-upgrade.mjs terminal-artifact terminal-artifact terminal-upgrade-report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: terminal-upgrade-${{ matrix.runner }}
+          path: terminal-upgrade-report.json
+          if-no-files-found: ignore
       - name: Verify native terminal and editor handoff
         if: runner.os != 'Windows'
         run: |
