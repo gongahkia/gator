@@ -361,7 +361,7 @@ func (m Model) bridgeLearningsPanel() uisnapshot.Panel {
 			{Title: "Evidence", Collapsible: true, Lines: compactLines(record.Provenance.EvidenceRefs, 3)},
 		}
 		if record.Origin == learning.Inferred {
-			panel.Blocks = append(panel.Blocks, uisnapshot.Block{Title: "Confidence", Collapsible: true, Lines: []string{fmt.Sprint(record.Confidence)}})
+			panel.Blocks = append(panel.Blocks, uisnapshot.Block{Title: "Confidence", Collapsible: true, Lines: []string{learning.ConfidenceDescription(record.Confidence)}})
 		}
 		if !record.Provenance.UserConfirmedAt.IsZero() {
 			panel.Blocks = append(panel.Blocks, uisnapshot.Block{Title: "Confirmed", Collapsible: true, Lines: []string{record.Provenance.UserConfirmedAt.Local().Format("2006-01-02 15:04")}})
@@ -397,7 +397,7 @@ func (m Model) bridgeLearningsPanel() uisnapshot.Panel {
 	for _, item := range m.learningItems {
 		detail := string(item.Status) + " · " + string(item.Type) + " · " + learningScopeShort(item.Scope)
 		if item.Origin == learning.Inferred {
-			detail += fmt.Sprintf(" · confidence %d", item.Confidence)
+			detail += " · confidence " + learning.ConfidenceDescription(item.Confidence)
 		}
 		panel.Rows = append(panel.Rows, uisnapshot.Row{Label: singleLine(item.Content), Detail: detail, State: string(item.Status), UpdatedAt: item.CreatedAt.Format(time.RFC3339),
 			Metadata: []uisnapshot.Field{{Label: "Type", Value: strings.ReplaceAll(string(item.Type), "_", " ")}, {Label: "Scope", Value: learningScopeShort(item.Scope)}}})

@@ -130,3 +130,30 @@ lessons, scope exclusion, corruption warnings, restart reads and output bounds.
 
 This closes the initial missing unified inspection surface, not the wider
 concept/alias, suppression, maintenance or live-model evaluation requirements.
+
+## Repeated-outcome maintenance checkpoint
+
+Foreground and background Work finalization now runs bounded local maintenance
+when chat learning is enabled. It scans at most 512 observation files, considers
+the last 30 days, groups by outcome signal and exact scope, and requires three
+independent Work IDs with retained evidence references. At most three proposals
+are published per pass. Multiple retries from one Work do not multiply evidence.
+
+Proposals describe conservative process checks, not invented root causes or
+personal traits. They remain candidates until reviewed. Stable identities and
+exclusive atomic publication prevent duplicate candidates; existing rejection,
+disable and approval states are never overwritten. Publication now flushes full
+private learning/observation records before making them visible. Confidence
+defaults to unknown; historical supplied scores are explicitly uncalibrated.
+
+`gator memory maintain` runs a pass; `--status` reads its retained report.
+Timeout/cancellation, corrupt observations and incomplete scan coverage are
+visible there and in personal-summary warnings. No model calls, network calls,
+automatic rule activation or external actions are performed. Runtime tests cover
+foreground/background finalization, opt-out and unchanged provider call count;
+race tests cover independent evidence, scope, concurrency, rejected/approved
+states, stale/unlinked observations, bounds and cancellation.
+
+This is an outcome-driven review mechanism. General semantic lessons, idle-time
+fact reconciliation, fair scanning of histories larger than the current bound,
+alias/forget coverage and measured live-model usefulness remain outstanding.

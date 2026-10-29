@@ -163,6 +163,13 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 			})
 			break
 		}
+		if request.MaintainMemory {
+			maintenanceContext, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			// Optional maintenance has its own bounded report. It never alters the
+			// Work result, activates a proposal or makes a provider/tool request.
+			_, _ = store.Maintain(maintenanceContext)
+		}
 	}()
 	defer func() {
 		_, err := history.Finish(request.RunID, workhistory.Finish{

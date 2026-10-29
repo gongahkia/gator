@@ -1,6 +1,7 @@
 // Package learning stores small, inspectable, user-controlled guidance for
 // future Work. It intentionally stores provenance references rather than Work
-// payloads, and does not derive or promote learnings on its own.
+// payloads. Bounded maintenance can propose guidance; activation always requires
+// user confirmation.
 package learning
 
 import (
@@ -15,6 +16,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/gongahkia/gator/internal/privatefs"
 )
 
 const (
@@ -423,8 +426,8 @@ func validateRecord(record Record) error {
 	if record.Origin == UserAuthored && record.Confidence != 0 {
 		return errors.New("user-authored learning cannot have inferred confidence")
 	}
-	if record.Origin == Inferred && (record.Confidence < 1 || record.Confidence > 100) {
-		return errors.New("inferred learning confidence must be 1 through 100")
+	if record.Origin == Inferred && (record.Confidence < 0 || record.Confidence > 100) {
+		return errors.New("inferred learning confidence must be zero (unknown) or 1 through 100")
 	}
 	if record.Origin == Inferred && record.Status == Active && record.Provenance.UserConfirmedAt.IsZero() {
 		return errors.New("inferred learning requires user confirmation before activation")
@@ -594,48 +597,59 @@ func readJSONRecord(path string, target any) error {
 	return nil
 }
 
-func writeExclusive(path string, value any) error {
-	data, err := json.MarshalIndent(value, "", "  ")
-	if err != nil {
-		return err
-	}
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
-	if err != nil {
-		return err
-	}
-	if _, err := file.Write(append(data, '\n')); err != nil {
-		file.Close()
-		return err
-	}
-	if err := file.Close(); err != nil {
-		return err
-	}
-	return nil
-}
+func writeExclusive(path string, value any) error { return publishJSON(path, value, true) }
+func writeAtomic(path string, value any) error    { return publishJSON(path, value, false) }
 
-func writeAtomic(path string, value any) error {
+// Publish complete bytes only. Exclusive hard-link publication prevents a
+// competing maintenance pass from overwriting an existing user-reviewed state.
+func publishJSON(path string, value any, exclusive bool) error {
 	data, err := json.MarshalIndent(value, "", "  ")
 	if err != nil {
 		return err
 	}
-	file, err := os.CreateTemp(filepath.Dir(path), ".learning-*.tmp")
+	data = append(data, '\n')
+	if len(data) > maxRecordBytes {
+		return errors.New("learning record exceeds size limit")
+	}
+	directory := filepath.Dir(path)
+	file, err := os.CreateTemp(directory, ".learning-*.tmp")
 	if err != nil {
 		return err
 	}
 	temporary := file.Name()
 	defer os.Remove(temporary)
-	if err := file.Chmod(0o600); err != nil {
-		file.Close()
+	defer file.Close()
+	if err := privatefs.Protect(temporary); err != nil {
 		return err
 	}
-	if _, err := file.Write(append(data, '\n')); err != nil {
-		file.Close()
+	if _, err := file.Write(data); err != nil {
+		return err
+	}
+	if err := file.Sync(); err != nil {
 		return err
 	}
 	if err := file.Close(); err != nil {
 		return err
 	}
-	return os.Rename(temporary, path)
+	root, err := os.OpenRoot(directory)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	if exclusive {
+		err = root.Link(filepath.Base(temporary), filepath.Base(path))
+	} else {
+		err = root.Rename(filepath.Base(temporary), filepath.Base(path))
+	}
+	if err != nil {
+		return err
+	}
+	dir, err := root.Open(".")
+	if err != nil {
+		return err
+	}
+	defer dir.Close()
+	return privatefs.SyncDir(dir)
 }
 
 func totalBytes(values []string) int {

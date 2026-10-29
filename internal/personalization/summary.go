@@ -4,6 +4,7 @@ package personalization
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -81,6 +82,19 @@ func Read(stateDir string) (Summary, error) {
 	if err != nil {
 		result.Warnings = append(result.Warnings, "Saved guidance unavailable: "+err.Error())
 		return result, nil
+	}
+	if report, statusErr := lessons.MaintenanceStatus(); statusErr == nil {
+		if report.Error != "" {
+			result.Warnings = append(result.Warnings, "Memory maintenance failed: "+report.Error)
+		}
+		if report.Truncated {
+			result.Warnings = append(result.Warnings, "Memory maintenance reached its scan or proposal limit; coverage is incomplete.")
+		}
+		if report.Invalid > 0 {
+			result.Warnings = append(result.Warnings, fmt.Sprintf("Memory maintenance skipped %d invalid observations.", report.Invalid))
+		}
+	} else if !os.IsNotExist(statusErr) {
+		result.Warnings = append(result.Warnings, "Memory maintenance status unavailable: "+statusErr.Error())
 	}
 	guidance, err := lessons.List()
 	if err != nil {

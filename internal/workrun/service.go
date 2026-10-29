@@ -49,6 +49,7 @@ func (s Service) Execute(ctx context.Context, request Request) (Outcome, error) 
 		request.OTLPEndpoint = s.Defaults.OTLPEndpoint
 		request.LearningContext = s.Defaults.LearningContext
 		request.LearnFromChats = s.Defaults.LearnFromChats
+		request.MaintainMemory = s.Defaults.MaintainMemory
 		request.DisableChatHistory = s.Defaults.DisableChatHistory
 		request.MemoryContext = s.Defaults.MemoryContext
 		request.NoteContext = s.Defaults.NoteContext
@@ -107,13 +108,14 @@ func effectiveConfiguration(request Request) any {
 		DesktopSession       string
 		ForegroundApp        bool
 		LearnFromChats       bool
+		MaintainMemory       bool `json:",omitempty"`
 		DisableChatHistory   bool `json:",omitempty"`
 	}{request.Contract, request.Mode, request.Code, request.ConnectorIDs, request.OAuthRefreshPins, request.OAuthAccountPins, request.ConnectorPermissions, request.WebOrigins, request.IgnoredInstructionPaths, request.Limits, request.MaxSteps, request.Provider, request.GoalContext, request.GoalPlanContext, request.GoalID, request.MemoryContext, request.NoteContext, request.RoleConfiguration, func() string {
 		if request.Project != nil {
 			return request.Project.SHA256
 		}
 		return ""
-	}(), request.DisableDelegation, request.DisabledRoles, request.EnableCode, request.RequireCode, request.BrowserPolicy, request.BrowserSession, request.DisableBrowser, request.ExcludedKnowledgeIDs, request.DesktopSession, request.ForegroundApp, request.LearnFromChats, request.DisableChatHistory}
+	}(), request.DisableDelegation, request.DisabledRoles, request.EnableCode, request.RequireCode, request.BrowserPolicy, request.BrowserSession, request.DisableBrowser, request.ExcludedKnowledgeIDs, request.DesktopSession, request.ForegroundApp, request.LearnFromChats, request.MaintainMemory, request.DisableChatHistory}
 }
 
 type Interaction struct {

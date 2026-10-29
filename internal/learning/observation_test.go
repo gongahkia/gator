@@ -25,7 +25,7 @@ func TestExplicitCorrectionCreatesObservationAndInactiveCandidate(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if candidate.Status != Candidate || candidate.Origin != Inferred || candidate.Confidence != 100 {
+	if candidate.Status != Candidate || candidate.Origin != Inferred || candidate.Confidence != 0 {
 		t.Fatalf("candidate = %#v", candidate)
 	}
 	if _, err := store.LinkObservation(observation.ID, candidate.ID); err != nil {

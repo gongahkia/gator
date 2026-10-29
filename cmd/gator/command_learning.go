@@ -235,7 +235,7 @@ func writeLearnings(out io.Writer, records []learning.Record) error {
 	for _, record := range records {
 		confidence := ""
 		if record.Origin == learning.Inferred {
-			confidence = fmt.Sprintf(" confidence:%d", record.Confidence)
+			confidence = " confidence: " + learning.ConfidenceDescription(record.Confidence)
 		}
 		if _, err := fmt.Fprintf(out, "%s  %s  %s  %s  %s%s\n", record.ID, record.Status, record.Type, formatLearningScope(record.Scope), record.Key, confidence); err != nil {
 			return err

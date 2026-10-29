@@ -215,11 +215,8 @@ func (s Store) Propose(input Proposal) (Record, error) {
 	if err != nil {
 		return Record{}, err
 	}
-	if input.Confidence == 0 {
-		input.Confidence = 100
-	}
-	if input.Confidence < 1 || input.Confidence > 100 {
-		return Record{}, errors.New("candidate confidence must be 1 through 100")
+	if input.Confidence < 0 || input.Confidence > 100 {
+		return Record{}, errors.New("candidate confidence must be zero (unknown) or 1 through 100")
 	}
 	records, err := s.List()
 	if err != nil {

@@ -13,6 +13,7 @@ import (
 
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/goal"
+	"github.com/gongahkia/gator/internal/learning"
 	"github.com/gongahkia/gator/internal/localmodel"
 	"github.com/gongahkia/gator/internal/memory"
 	"github.com/gongahkia/gator/internal/personalization"
@@ -27,6 +28,7 @@ const memoryUsage = `Gator memory — explicit, inspectable personal knowledge
   gator memory search [--goal ID] QUERY
   gator memory diagnose
   gator memory summary [--json]
+  gator memory maintain [--status]
   gator memory show ID
   gator memory correct ID [--source-file PATH] TEXT
   gator memory forget ID
@@ -51,6 +53,26 @@ func memoryCommand(args []string, out io.Writer) error {
 		return err
 	}
 	switch args[0] {
+	case "maintain":
+		if len(args) > 2 || len(args) == 2 && args[1] != "--status" {
+			return errors.New("usage: gator memory maintain [--status]")
+		}
+		lessons, err := learning.Open(stateDir)
+		if err != nil {
+			return err
+		}
+		var report learning.MaintenanceReport
+		if len(args) == 2 {
+			report, err = lessons.MaintenanceStatus()
+		} else {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			report, err = lessons.Maintain(ctx)
+		}
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(out).Encode(report)
 	case "summary":
 		if len(args) > 2 || len(args) == 2 && args[1] != "--json" {
 			return errors.New("usage: gator memory summary [--json]")

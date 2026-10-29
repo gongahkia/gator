@@ -149,8 +149,11 @@ func main() {
 	add("one corrupt record preserves unrelated healthy recall", (searchErr == nil || memory.ReadWarning(searchErr) != "") && contains(hits, healthy.ID), map[string]bool{"search_failed": searchErr != nil && memory.ReadWarning(searchErr) == "", "partial_read_warning": memory.ReadWarning(searchErr) != "", "healthy_record_recalled": contains(hits, healthy.ID)})
 	learnings := must(learning.Open(filepath.Join(root, "learning")))
 	for index := 0; index < 3; index++ {
-		must(learnings.RecordObservation(learning.ObservationInput{Signal: learning.WorkFailed, WorkID: fmt.Sprintf("work-failure-%d", index), Summary: "Synthetic repeated verification failure."}))
+		reference := fmt.Sprintf("fixture-failure-%d.txt", index)
+		require(os.WriteFile(filepath.Join(root, "learning", reference), []byte("Synthetic failed verification evidence."), 0600))
+		must(learnings.RecordObservation(learning.ObservationInput{Signal: learning.WorkFailed, WorkID: fmt.Sprintf("work-failure-%d", index), Summary: "Synthetic repeated verification failure.", EvidenceRefs: []string{reference}}))
 	}
+	must(learnings.Maintain(context.Background()))
 	add("repeated failure observations produce a reviewable candidate", len(must(learnings.List())) > 0, map[string]any{"observations_recorded": 3, "candidates_generated": len(must(learnings.List()))})
 	observation := must(learnings.RecordObservation(learning.ObservationInput{Signal: learning.UserCorrected, WorkID: "work-correction", Summary: "Use focused checks first."}))
 	proposal := learning.Proposal{Observation: observation, Type: learning.FailurePrevention, Key: "focused-checks", Content: "Run focused checks before broad suites.", Scope: learning.Scope{Kind: learning.Global}}
