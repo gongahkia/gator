@@ -79,7 +79,7 @@ test("chat updates keep delivery, read, done, acknowledged feedback and retained
     await action("Offsite venue", "Feedback: clear"); await action("Offsite venue", "Feedback: noise")
     expect((await read("inbox-offsite")).rating).toBe("noise")
     expect(hasTime((await read("inbox-offsite")).read_at)).toBe(false); expect(hasTime((await read("inbox-offsite")).resolved_at)).toBe(false)
-    await action("Offsite venue", "Reply in original chat"); await client.edit("Use the second option")
+    await action("Offsite venue", "Reply in original chat"); await until(() => client.draft.reply_to_update_id === "inbox-offsite", "reply context ready"); await client.edit("Use the second option")
     await client.openConversation(other, client.state!.recent_id!); expect(client.draft.reply_to_update_id).toBeUndefined(); expect(client.draft.text).toBe("Other chat draft")
     await client.openConversation(origin, client.state!.recent_id!); expect(client.draft.reply_to_update_id).toBe("inbox-offsite")
     await client.close(); await setup.dispose(); host = new Application(options); client = new GatorClient(host); setup = await render(); await client.start()
