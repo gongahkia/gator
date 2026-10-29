@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, writeFile, readdir, chmod, access } from "node:fs/promises";
+import { cp, mkdir, readFile, writeFile, readdir, chmod, access, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { resolve, join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,6 +24,14 @@ await cp(join(root, "ui/patches"), join(destination, "ui/patches"), { recursive:
 for (const name of ["install.mjs", "uninstall.mjs"]) await cp(join(root, "ui/scripts", name), join(destination, "ui/scripts", name));
 const result = spawnSync("bun", ["install", "--cwd", join(destination, "ui"), "--production", "--frozen-lockfile"], { stdio: "inherit", windowsHide: true });
 if (result.error || result.status !== 0) throw result.error || new Error("Production dependency installation failed.");
+// Bun can install file: dependencies as absolute per-file symlinks on macOS.
+// Those resolve from app-host/ (outside ui/node_modules), losing its transitive
+// dependencies, and break when the artifact moves. Materialize our own package
+// beside its dependencies before verification/distribution. This destination is
+// a newly created artifact, never an existing installation.
+const installedHost = join(destination, "ui/node_modules/@gator/application-host");
+await rm(installedHost, { recursive: true, force: true });
+await cp(join(destination, "app-host"), installedHost, { recursive: true, dereference: true });
 const metadata = { product: "gator-terminal", version: 1, platform: process.platform, arch: process.arch, upstream: "f669c46c9604ea3d70b8a7ed1f0c10f3a5ac1f61", runtime: "Bun >=1.4.2", electron: false };
 await writeFile(join(destination, "gator-distribution.json"), JSON.stringify(metadata, null, 2) + "\n");
 const notices = ["Gator terminal production JavaScript dependency notices.\nOpenCode's source license is retained separately.\n"];

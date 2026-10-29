@@ -1318,3 +1318,29 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   remains at 8.9 MiB free. A temporary fake-Go subprocess probe verifies nonzero exit
   propagation, cleanup after failure, and retention of an explicit caller directory.
   Build log: `/home/gongahkia/.cache/gator-migration/tmp-build-fix.log`.
+
+## Native macOS continuation — 29 October 2026
+
+- Host: macOS 15.7.7, Intel x64, Node 24.19, Go 1.27 and pinned Bun 1.4.2.
+  Bun and the pinned PTY Python environment are isolated under ignored
+  `.gator/native-tools/`; fixture profiles do not use the user's live data.
+- Terminal TypeScript check, frontend production build and runtime build pass.
+  A minimal real-Go startup/render/flush/close/dispose probe passes on this host.
+- The first independent package failed: Bun installed the local host package
+  with absolute per-file symlinks back to artifact `app-host/`. Dependency
+  resolution from there could not find `fflate`; such links also break relocation.
+  Packaging now materializes that package under `ui/node_modules`, and the
+  production verification rejects absolute or escaping artifact symlinks.
+- The corrected `artifact-macos-2` passes production service/dependency checks:
+  real Go startup, Bun-only child PATH, legacy preference import, distinct PDF
+  page rendering, supported Office/text edit/export/selected-version handoff,
+  unchanged originals and no model submission. These are local file adapters,
+  not native Microsoft Office layout/fidelity certification.
+- Isolated installation, version/scripted commands, active-profile uninstall
+  refusal, owned uninstall and retained user data pass. Logs/artifacts remain
+  under `.gator/native-tools/` in this checkout.
+- The full terminal suite stalled in its first receipt case and required a
+  bounded stop; this is **not a passing suite**. The combined installed PTY
+  probe reached editor return and untrusted file viewing but failed its exit
+  wait. Both are under investigation. Native Windows and the overall parity
+  gate remain open.

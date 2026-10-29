@@ -2,7 +2,7 @@
 // resolved from the production artifact; fixture generators stay in the checkout.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { mkdtemp, mkdir, readFile, writeFile, rm, symlink, realpath, copyFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, writeFile, rm, symlink, realpath, copyFile, readdir, readlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative, resolve, isAbsolute } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -13,6 +13,19 @@ import { wordFixture, workbookFixture, slidesFixture } from "../../app-host/test
 
 assert.ok(process.versions.bun, "Run this probe with the installed Bun runtime.");
 const artifact = await realpath(resolve(process.argv[2]));
+// A dependency can resolve successfully before installation while an absolute
+// link still points at the build tree. Reject such artifacts before shipping.
+async function checkLinks(directory) {
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name);
+    if (entry.isSymbolicLink()) {
+      assert.ok(!isAbsolute(await readlink(path)), `Artifact contains an absolute symlink: ${path}`);
+      const part = relative(artifact, await realpath(path));
+      assert.ok(!isAbsolute(part) && part !== ".." && !part.startsWith("../") && !part.startsWith("..\\"), `Artifact symlink escapes its installation: ${path}`);
+    } else if (entry.isDirectory()) await checkLinks(path);
+  }
+}
+await checkLinks(artifact);
 const module = join(artifact, "ui/node_modules/@gator/application-host/src/application.mjs"), require = createRequire(module);
 const metadata = JSON.parse(await readFile(join(artifact, "app-host/package.json"), "utf8"));
 for (const dependency of Object.keys(metadata.dependencies)) {
