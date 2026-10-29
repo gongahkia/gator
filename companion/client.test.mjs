@@ -1,14 +1,53 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createCompanion } from './server.mjs';
+import { addDevice, revokeDevice } from './auth.mjs';
 
 // Uses the desktop's pinned Playwright. A path override supports an existing
 // isolated installation without changing this checkout's dependency tree.
 const { chromium, webkit } = await import(process.env.GATOR_PLAYWRIGHT_MODULE || '../desktop/node_modules/playwright/index.mjs');
 for (const name of (process.env.GATOR_COMPANION_BROWSERS || 'chromium').split(',')) {
+  test(`${name}: individual device tokens connect and revoke without disconnecting another device`, { timeout: 45000 }, async () => {
+    const root = await mkdtemp(join(tmpdir(), 'gator-phone-devices-')), tokenFile = join(root, 'owner.token');
+    let companion, browser;
+    try {
+      await writeFile(tokenFile, 'a'.repeat(64) + '\n', { mode: 0o600 });
+      const devices = [];
+      for (const label of ['Phone', 'Tablet']) {
+        const path = join(root, label + '.token'), device = await addDevice(tokenFile, label, path);
+        devices.push({ ...device, token: (await readFile(path, 'utf8')).trim() });
+      }
+      companion = createCompanion({ tokenFile, queryCatalog: async () => ({ items: [{ id: 'work-private', title: 'Private device fixture', source: '/host/workspace' }] }) });
+      const address = await companion.listen(), base = `http://127.0.0.1:${address.port}`;
+      browser = await ({ chromium, webkit }[name]).launch({ headless: true, executablePath: process.env[`GATOR_${name.toUpperCase()}_EXECUTABLE`] });
+      const pages = [];
+      for (const device of devices) {
+        const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }), page = await context.newPage();
+        pages.push(page); await page.goto(base);
+        await page.getByLabel('Host access token', { exact: true }).fill(device.token);
+        assert.equal(await page.locator('#token').evaluate(input => input.checkValidity()), true);
+        await page.getByRole('button', { name: 'Connect', exact: true }).click();
+        await page.getByText('Private device fixture', { exact: true }).waitFor();
+        assert.equal(await page.locator('#token').inputValue(), '');
+        assert.equal(await page.evaluate(token => JSON.stringify({ ...sessionStorage, ...localStorage }).includes(token), device.token), false);
+      }
+      await revokeDevice(tokenFile, devices[0].id);
+      await pages[0].bringToFront();
+      await pages[0].getByRole('button', { name: 'Refresh list', exact: true }).click();
+      await pages[0].getByText('Access expired · enter the current host token', { exact: true }).waitFor();
+      assert.equal(await pages[0].locator('#catalog-items').textContent(), '');
+      await pages[1].bringToFront();
+      await pages[1].getByRole('button', { name: 'Refresh list', exact: true }).click();
+      await pages[1].getByText('Private device fixture', { exact: true }).waitFor();
+      assert.equal(await pages[1].locator('#catalog').isVisible(), true);
+      await pages[1].reload();
+      assert.equal(await pages[1].locator('#token').inputValue(), '');
+      assert.equal(await pages[1].locator('#catalog').isVisible(), false);
+    } finally { await browser?.close(); await companion?.close(); await rm(root, { recursive: true, force: true }); }
+  });
   test(`${name}: follow-up status changes survive reconnect and reject stale decisions`, { timeout: 90000 }, async () => {
     const root = await mkdtemp(join(tmpdir(), 'gator-phone-updates-')), tokenFile = join(root, 'token'), token = 'a'.repeat(64);
     const actions = [], updates = [
