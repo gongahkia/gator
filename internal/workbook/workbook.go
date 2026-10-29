@@ -52,9 +52,10 @@ type Chart struct {
 }
 
 type Preview struct {
-	Title  string         `json:"title,omitempty"`
-	Theme  string         `json:"theme"`
-	Sheets []SheetPreview `json:"sheets"`
+	Title    string         `json:"title,omitempty"`
+	Theme    string         `json:"theme"`
+	Sheets   []SheetPreview `json:"sheets"`
+	Warnings []string       `json:"warnings,omitempty"`
 }
 
 type SheetPreview struct {
@@ -159,6 +160,19 @@ func RenderXLSX(spec Spec, template io.Reader) ([]byte, Preview, error) {
 		return nil, Preview{}, fmt.Errorf("open workbook template: %w", err)
 	}
 	defer file.Close()
+	if template != nil {
+		// Changed inputs can invalidate formulas on sheets the spec did not edit.
+		if err := file.UpdateLinkedValue(); err != nil {
+			return nil, Preview{}, err
+		}
+	}
+	// A derived workbook may inherit manual calculation and stale cached values.
+	// Ask the spreadsheet application to recalculate; these flags are not evidence
+	// that Gator or a native Office application has evaluated the formulas.
+	automatic, recalculate := "auto", true
+	if err := file.SetCalcProps(&excelize.CalcPropsOptions{CalcMode: &automatic, FullCalcOnLoad: &recalculate, ForceFullCalc: &recalculate}); err != nil {
+		return nil, Preview{}, err
+	}
 	headerStyle, err := file.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true, Color: "FFFFFF"}, Fill: excelize.Fill{Type: "pattern", Color: []string{themeColor(spec.Theme)}, Pattern: 1}, Alignment: &excelize.Alignment{Vertical: "center"}})
 	if err != nil {
 		return nil, Preview{}, err
@@ -215,7 +229,11 @@ func RenderXLSX(spec Spec, template io.Reader) ([]byte, Preview, error) {
 			for rowIndex, row := range sheet.Rows {
 				values := make([]any, len(row))
 				for columnIndex, cellValue := range row {
-					values[columnIndex] = excelize.Cell{StyleID: columnStyles[columnIndex], Value: cellValue.Value, Formula: cellValue.Formula}
+					value := cellValue.Value
+					if cellValue.Formula != "" {
+						value = nil // A supplied value is not a verified formula cache.
+					}
+					values[columnIndex] = excelize.Cell{StyleID: columnStyles[columnIndex], Value: value, Formula: cellValue.Formula}
 				}
 				cell, _ := excelize.CoordinatesToCellName(1, rowIndex+2)
 				if err := writer.SetRow(cell, values); err != nil {
@@ -240,6 +258,9 @@ func RenderXLSX(spec Spec, template io.Reader) ([]byte, Preview, error) {
 				for columnIndex, cellValue := range row {
 					cell, _ := excelize.CoordinatesToCellName(columnIndex+1, rowIndex+2)
 					if cellValue.Formula != "" {
+						if err := file.SetCellValue(sheet.Name, cell, nil); err != nil {
+							return nil, Preview{}, err
+						}
 						if err := file.SetCellFormula(sheet.Name, cell, cellValue.Formula); err != nil {
 							return nil, Preview{}, err
 						}
@@ -281,7 +302,17 @@ func RenderXLSX(spec Spec, template io.Reader) ([]byte, Preview, error) {
 	if _, err := file.WriteTo(&output); err != nil {
 		return nil, Preview{}, err
 	}
-	return output.Bytes(), spec.Preview(), nil
+	preview := spec.Preview()
+	for _, sheet := range preview.Sheets {
+		if sheet.Formulas > 0 {
+			preview.Warnings = []string{"Formula results have not been calculated by this renderer. Recalculate in a spreadsheet application before relying on totals."}
+			break
+		}
+	}
+	if template != nil && len(preview.Warnings) == 0 {
+		preview.Warnings = []string{"This template-based workbook requests recalculation on open; native spreadsheet results have not been verified."}
+	}
+	return output.Bytes(), preview, nil
 }
 
 func unsafeTemplate(payload []byte) bool {

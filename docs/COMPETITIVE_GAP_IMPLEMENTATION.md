@@ -251,3 +251,18 @@ The regression checks XML parsing and preservation of surrounding paragraphs
 and inserted table/prose content. `go test -race ./internal/document` and focused
 document/artifact tool tests pass on macOS. This fixes one reproducible fidelity
 defect; it does not establish visual layout or native Word acceptance.
+
+### XLSX calculation integrity
+
+A template regression reproduced a changed formula displaying the prior cell's
+cached `999`, while its actual inputs totalled `200`. The renderer now clears
+template formula caches (including dependent sheets), clears values before
+writing replacement formulas, and requests automatic full recalculation on open.
+The streaming writer also omits unverified supplied formula values. Preview
+warnings distinguish formula creation from calculation verification.
+
+`go test -race ./internal/workbook` and the workbook tool test pass. Tests reopen
+the saved XLSX, reject stale caches, independently evaluate the expected `200`
+total and `400` dependent result using Excelize, and check totals through both
+ordinary and 10,001-row streaming paths. This is stronger calculation evidence
+for those fixtures, not native Excel recalculation or general analysis accuracy.
