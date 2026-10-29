@@ -459,3 +459,67 @@ seconds; command browser-control race checks passed. Both terminal browser
 journeys passed against the rebuilt runtime (16 assertions, 10.3 seconds).
 Windows amd64 test cross-compilation and CI YAML validation passed. No remote
 CI execution or native Windows result is claimed.
+
+### Presentation package, editing and native preview verification
+
+Independent validation exposed defects that Gator's own PPTX parser accepted.
+Microsoft's Open XML SDK 3.5.1 reported nine errors for a two-slide generated
+deck: missing slide master, incorrect presentation child ordering, an invalid
+notes-master element, empty theme style lists and incomplete font definitions.
+The generator now emits slide masters/layouts and their relationships,
+presentation properties, complete theme styles, and corrected notes markup.
+Added slides reuse an existing layout; unsupported templates without a layout
+are rejected instead of exporting another structurally incomplete slide.
+This follows the [PresentationML package structure](https://learn.microsoft.com/en-us/office/open-xml/presentation/structure-of-a-presentationml-document).
+
+The first usable Quick Look preview revealed a second issue: body paragraphs
+were encoded as newlines inside one text run and displayed as continuous text.
+New decks now emit separate DrawingML paragraphs and an explicit white master
+background. A namespace-aware editor replaces one identified title/body/notes
+shape completely, including text split across formatting runs and paragraphs.
+It preserves the shape geometry and first paragraph/run styling, leaves
+unrelated shapes untouched, and rejects ambiguous targets. Inspection uses an
+identified title rather than an earlier decorative caption. The tool description
+now distinguishes editable content from native layout verification.
+
+A third defect appeared when the shared Node file editor exported a multiline
+edit: it placed DrawingML breaks inside runs, where Word breaks belong but
+PowerPoint breaks do not. The independent validator rejected the exported file.
+The editor now places breaks at paragraph level, uses one text element per run,
+keeps tabs as text, and preserves run formatting. Its styled preview includes
+breaks and automatic fields; automatic fields cannot be silently replaced as
+plain text. Word behavior is unchanged and remains covered by its own roundtrip
+checks.
+
+Reproducible checks are in `scripts/office-fixtures`,
+`scripts/office-validation/roundtrip.mjs`, and the locked .NET validation project
+in `scripts/office-validation`. The CI Office job generates all three themes,
+notes, transitions, slide add/move/delete, whole-shape edits, alternate namespace
+prefixes and split formatting runs; it then roundtrips a generated deck through
+the shared editor and validates all nine resulting packages independently.
+The .NET SDK is a verification dependency, not a Gator runtime dependency.
+
+Local verification on macOS:
+
+- The original sample produced nine SDK errors; all nine current fixture
+  packages produce zero errors, including the formerly invalid multiline
+  shared-editor export.
+- Full presentation race tests, focused presentation tool/schema checks and
+  the PPTX evaluation-grader regression pass. Eleven Node Office/comparison
+  checks pass, including Word/Excel preservation, DrawingML line breaks,
+  formatting and automatic-field refusal.
+- Quick Look images were inspected for a short slide, a longer title/body,
+  whole-body replacement, and the shared-editor multiline/tab/emoji export.
+  Paragraph separation, white background and the expected replacement text are
+  visible. An initial thumbnail attempt produced no output; subsequent fixed
+  packages generated previews successfully. This does not prove that the
+  initial timeout was caused by the package defects.
+- The Go runtime was rebuilt. After the shared-editor changes, terminal
+  keyboard Office/CSV editing/export passed with 15 assertions, and the
+  terminal production build passed.
+
+G10 remains incomplete: PowerPoint/Word/Excel themselves were not run, arbitrary
+template dimensions, dense-slide overflow, notes-pane behavior and multilingual
+font/shaping fidelity are not established by these synthetic fixtures. Quick
+Look is useful independent rendering evidence, not native Office certification.
+The CI job is committed locally and has not been remotely executed.
