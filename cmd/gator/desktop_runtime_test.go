@@ -13,9 +13,10 @@ func TestDesktopRuntimeRejectsStandaloneCommandsBeforeOpeningProfile(t *testing.
 	t.Setenv("GATOR_INTERNAL_COMMANDS", "")
 	t.Setenv("GATOR_UI_BACKEND", "")
 	t.Setenv("GATOR_DESKTOP_UPDATE_GUARD", "")
+	t.Setenv("GATOR_COMPANION_CREATE", "")
 	root := filepath.Join(t.TempDir(), "must-not-be-created")
 	t.Setenv("GATOR_STATE_DIR", root)
-	for _, args := range [][]string{nil, {"work", "write a report"}, {"note", "list"}, {"config"}, {"doctor"}, {"ui-backend", "", ""}, {"desktop-update-guard"}} {
+	for _, args := range [][]string{nil, {"work", "write a report"}, {"note", "list"}, {"config"}, {"doctor"}, {"ui-backend", "", ""}, {"desktop-update-guard"}, {"companion-create-chat", "stable-new-chat-request"}} {
 		if err := runDesktopRuntime(args, io.Discard); err == nil || !strings.Contains(err.Error(), "standalone Gator CLI is retired") {
 			t.Fatalf("standalone %v: %v", args, err)
 		}

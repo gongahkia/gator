@@ -8,6 +8,7 @@ import { Backend } from '../app-host/src/backend.mjs';
 import { validateFrame } from '../app-host/src/policy.mjs';
 
 const identity = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/;
+const creationIdentity = /^[a-zA-Z0-9][a-zA-Z0-9_-]{15,95}$/;
 const hash = text => createHash('sha256').update(text).digest();
 const execute = promisify(execFile);
 const idle = worker => !worker.closed && !['running', 'queued', 'pending_approval', 'pending_connection', 'external', 'panel', 'receipt_busy', 'catalog_busy'].some(key => worker.state?.[key]) && !worker.state?.queue?.length;
@@ -44,6 +45,14 @@ export function createCompanion({ binary, workspace, env, tokenFile, origin,
       // execFile timeout errors can have a null code and embed the full command.
       // Keep host paths and diagnostics out of transport errors in every case.
       throw Object.assign(new Error('Conversation catalog is unavailable.'), { code: 'CATALOG_UNAVAILABLE' });
+    }
+  },
+  createChat = async requestID => {
+    try {
+      const { stdout } = await execute(binary, ['companion-create-chat', requestID], { cwd: workspace, env: { ...env, GATOR_COMPANION_CREATE: '1' }, timeout: 20000, maxBuffer: 32768, windowsHide: true });
+      return JSON.parse(stdout);
+    } catch {
+      throw Object.assign(new Error('Chat creation is unconfirmed. Retry the same request.'), { code: 'CREATION_UNCONFIRMED' });
     }
   },
   spawnBackend = (id) => new Backend(binary, workspace, { ...env, GATOR_UI_SESSION_HOST: '1', GATOR_UI_FRONTEND: 'companion' }, ['ui-backend', id, '']) }) {
@@ -109,7 +118,25 @@ export function createCompanion({ binary, workspace, env, tokenFile, origin,
           return queryCatalog({ query, scope, after });
         });
         if (token !== await readToken(tokenFile)) return respond(res, 401, { error: 'Authentication required.' });
-        return respond(res, 200, page);
+        return respond(res, 200, { ...page, new_chat_source: workspace });
+      }
+      if (req.url === '/v1/chats' && req.method === 'POST') {
+        if (req.headers['content-type'] !== 'application/json') return respond(res, 415, { error: 'Use application/json.' });
+        const chunks = []; let size = 0;
+        for await (const chunk of req) {
+          size += chunk.length;
+          if (size > 4096) return respond(res, 413, { error: 'New-chat request exceeds 4 KiB.' });
+          chunks.push(chunk);
+        }
+        const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        if (!body || Object.keys(body).length !== 1 || typeof body.request_id !== 'string' || !creationIdentity.test(body.request_id)) throw new Error('Use a stable new-chat request ID, without source or message fields.');
+        const created = await serial(async () => {
+          if (stopping || token !== await readToken(tokenFile)) throw new Error('Access was revoked.');
+          return createChat(body.request_id);
+        });
+        if (token !== await readToken(tokenFile)) return respond(res, 401, { error: 'Authentication required.' });
+        if (created.request_id !== body.request_id || !identity.test(created.conversation_id)) throw new Error('The host did not confirm this chat identity. Retry the same request.');
+        return respond(res, 200, created);
       }
       const match = /^\/v1\/chats\/([a-zA-Z0-9_-]+)(\/actions)?$/.exec(req.url);
       if (!match || !['GET', 'POST'].includes(req.method) || (req.method === 'POST') !== !!match[2]) return respond(res, 404, { error: 'Unknown operation.' });

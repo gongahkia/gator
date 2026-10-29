@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer, get as httpGet } from 'node:http';
 import { execFileSync, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, mkdir, writeFile, rm, readdir, readFile, chmod, symlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, rm, readdir, readFile, chmod, symlink, realpath } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createCompanion, readToken } from './server.mjs';
@@ -59,6 +59,20 @@ test('real Go work survives a client disconnect, deduplicates admission and revo
     assert.deepEqual(page.items.map(item => item.id), [id]);
     assert.equal(requests, beforeCatalog, 'browsing must not invoke a model');
     assert.equal((await readdir(join(state, 'gator/conversations'))).filter(name => name.startsWith('work-')).length, 1);
+    assert.equal(page.new_chat_source, workspace);
+    const creation = { request_id: 'stable-new-chat-request' };
+    const create = (base = catalog, key = token) => fetch(base, { method: 'POST', headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' }, body: JSON.stringify(creation) });
+    const created = await create(); assert.equal(created.status, 200, 'new-chat creation must succeed');
+    const newChat = await created.json();
+    assert.equal(newChat.request_id, creation.request_id);
+    assert.equal(newChat.source, await realpath(workspace));
+    assert.notEqual(newChat.conversation_id, id);
+    assert.deepEqual(await (await create()).json(), newChat, 'retry must return the same empty chat');
+    const emptyChat = await (await fetch(catalog + '/' + newChat.conversation_id, { headers: { authorization: `Bearer ${token}` } })).json();
+    assert.equal(emptyChat.state.conversation_id, newChat.conversation_id);
+    assert.equal(emptyChat.state.running, false);
+    assert.equal(requests, beforeCatalog, 'creating and opening an empty chat must not invoke a model');
+    assert.equal((await readdir(join(state, 'gator/conversations'))).filter(name => name.startsWith('work-')).length, 2);
     assert.equal((await get('bad')).status, 401);
     assert.equal((await get(token, { origin: 'https://attacker.example' })).status, 403);
     const first = await (await get()).json(); assert.equal(first.state.conversation_id, id);
@@ -90,6 +104,7 @@ test('real Go work survives a client disconnect, deduplicates admission and revo
     await companion.close();
     companion = createCompanion({ binary, workspace, env, tokenFile });
     const reopened = await companion.listen();
+    assert.deepEqual(await (await create(`http://127.0.0.1:${reopened.port}/v1/chats`, 'b'.repeat(64))).json(), newChat, 'creation receipt must survive companion restart and token rotation');
     const retained = await fetch(`http://127.0.0.1:${reopened.port}/v1/chats/${id}`, { headers: { authorization: `Bearer ${'b'.repeat(64)}` } });
     const retainedState = await retained.json();
     assert.equal(retained.status, 200);
@@ -102,6 +117,25 @@ test('real Go work survives a client disconnect, deduplicates admission and revo
     provider.closeAllConnections(); await new Promise(r => provider.close(r));
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test('new chats reject unreviewed source or message fields and require stable identities', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'gator-create-chat-')), tokenFile = join(root, 'token'), token = 'a'.repeat(64), creations = [];
+  let companion;
+  try {
+    await writeFile(tokenFile, token + '\n', { mode: 0o600 });
+    companion = createCompanion({ tokenFile, createChat: async requestID => { creations.push(requestID); return { request_id: requestID, conversation_id: 'work-new', source: '/host/workspace' }; }, spawnBackend() { throw new Error('Creating a chat must not open a worker.'); } });
+    const address = await companion.listen(), url = `http://127.0.0.1:${address.port}/v1/chats`;
+    const send = (body, authorization = `Bearer ${token}`) => fetch(url, { method: 'POST', headers: { authorization, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    assert.equal((await send({ request_id: 'valid-creation-request' }, '')).status, 401);
+    for (const body of [null, {}, [], { request_id: 'short' }, { request_id: '../unsafe-creation-request' }, { request_id: 'valid-creation-request', source: '/other' }, { request_id: 'valid-creation-request', text: 'Do work now' }]) assert.equal((await send(body)).status, 400);
+    assert.equal((await send({ request_id: 'x'.repeat(5000) })).status, 413);
+    assert.deepEqual(creations, []);
+    const created = await send({ request_id: 'valid-creation-request' });
+    assert.equal(created.status, 200);
+    assert.equal((await created.json()).conversation_id, 'work-new');
+    assert.deepEqual(creations, ['valid-creation-request']);
+  } finally { await companion?.close(); await rm(root, { recursive: true, force: true }); }
 });
 
 test('catalog authorizes reads, bounds parameters and rechecks revocation after a queued read', async () => {

@@ -42,6 +42,9 @@ func runDesktopRuntime(args []string, out io.Writer) error {
 	if len(args) == 4 && args[0] == "companion-catalog" && os.Getenv("GATOR_COMPANION_CATALOG") == "1" {
 		return companionCatalog(args[1], args[2], args[3], out)
 	}
+	if len(args) == 2 && args[0] == "companion-create-chat" && os.Getenv("GATOR_COMPANION_CREATE") == "1" {
+		return companionCreateChat(args[1], out)
+	}
 	desktop := args[0] == "ui-backend" && len(args) == 3 && os.Getenv("GATOR_UI_BACKEND") == "1"
 	supervisor := len(args) >= 2 && args[0] == "job" && args[1] == "supervisor"
 	internal := os.Getenv("GATOR_INTERNAL_COMMANDS") == "1"
