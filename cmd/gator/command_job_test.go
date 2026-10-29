@@ -16,6 +16,7 @@ import (
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workrun"
+	"github.com/gongahkia/gator/internal/worksession"
 )
 
 func TestJobCommandCreatesDurableInspectSchedule(t *testing.T) {
@@ -40,6 +41,63 @@ func TestJobCommandRejectsUnattendedApproval(t *testing.T) {
 	err := jobCommand([]string{"add", "unsafe", "--schedule", "* * * * *", "--actions", "approve", "--", "Send this"}, &bytes.Buffer{})
 	if err == nil {
 		t.Fatal("scheduled approval was accepted")
+	}
+}
+
+func TestJobCommandBindsFollowupsToAnExistingChatAndItsSource(t *testing.T) {
+	stateDir, source := t.TempDir(), t.TempDir()
+	t.Setenv("GATOR_STATE_DIR", stateDir)
+	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
+	sessions, err := worksession.Open(stateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chat, err := sessions.CreateChat(source, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	arguments := []string{"add", "chat check", "--schedule", "* * * * *", "--mode", "inspect", "--conversation", chat.ID}
+	if err := jobCommand(append(arguments, "--", "Inspect this chat's folder"), &output); err != nil {
+		t.Fatal(err)
+	}
+	store, err := jobs.Open(stateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	definitions, err := store.List()
+	if err != nil || len(definitions) != 1 {
+		t.Fatalf("definitions = %+v, %v", definitions, err)
+	}
+	definition := definitions[0]
+	if definition.OriginConversationID != chat.ID || definition.SourcePath != chat.SourcePath || !strings.Contains(output.String(), chat.ID) {
+		t.Fatalf("lost explicit chat/source: %+v, %s", definition, output.String())
+	}
+	entry, err := recordJobInbox(stateDir, definition, jobs.Attempt{ID: "attempt-cli", Conversation: "execution-chat", Status: "completed", Summary: "Completed check"})
+	if err != nil || entry.OriginConversationID != chat.ID || entry.ConversationID != "execution-chat" {
+		t.Fatalf("update routing = %+v, %v", entry, err)
+	}
+	for _, args := range [][]string{
+		append(append([]string{}, arguments...), "--source", t.TempDir(), "--", "Wrong source"),
+		{"add", "missing", "--schedule", "* * * * *", "--conversation", "work-missing", "--", "Missing chat"},
+	} {
+		if err := jobCommand(args, &bytes.Buffer{}); err == nil {
+			t.Fatal("invalid chat/source was accepted")
+		}
+	}
+	definitions, err = store.List()
+	if err != nil || len(definitions) != 1 {
+		t.Fatalf("rejected command created a job: %+v, %v", definitions, err)
+	}
+	if err := jobCommand([]string{"edit", definition.ID, "--source", t.TempDir()}, &bytes.Buffer{}); err == nil {
+		t.Fatal("source edit detached a chat-linked check")
+	}
+	if err := jobCommand([]string{"edit", definition.ID, "--name", "renamed check"}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	updated, err := store.Load(definition.ID)
+	if err != nil || updated.OriginConversationID != chat.ID || updated.SourcePath != chat.SourcePath {
+		t.Fatalf("edit lost routing: %+v, %v", updated, err)
 	}
 }
 

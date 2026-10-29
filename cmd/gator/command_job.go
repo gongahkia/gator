@@ -36,6 +36,7 @@ import (
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/lifecycle"
 	"github.com/gongahkia/gator/internal/state"
+	"github.com/gongahkia/gator/internal/worksession"
 )
 
 type jobResult struct {
@@ -271,6 +272,7 @@ func addJob(arguments []string, out io.Writer) error {
 	timezone := flags.String("timezone", settings.JobDefaults.Timezone, "IANA timezone")
 	missed := flags.String("missed", settings.JobDefaults.Missed, "skip or run_once")
 	source := flags.String("source", ".", "local source directory")
+	conversation := flags.String("conversation", "", "existing chat that receives this job's follow-up updates; defaults source to that chat's folder")
 	refresh := flags.Bool("refresh-snapshot", true, "capture current source for each attempt; false freezes at creation")
 	changeOnly := flags.Bool("change-only", false, "skip a local-only run if files and saved context are unchanged")
 	contractPath := flags.String("contract", "", "complete outcome contract JSON")
@@ -308,6 +310,26 @@ func addJob(arguments []string, out io.Writer) error {
 			return err
 		}
 	}
+	store, stateDir, err := jobStore()
+	if err != nil {
+		return err
+	}
+	if *conversation != "" {
+		sourceSet := false
+		flags.Visit(func(f *flag.Flag) {
+			if f.Name == "source" {
+				sourceSet = true
+			}
+		})
+		selected := *source
+		if !sourceSet {
+			selected = ""
+		}
+		*source, err = jobConversationSource(stateDir, *conversation, selected)
+		if err != nil {
+			return err
+		}
+	}
 	absolute, err := filepath.Abs(*source)
 	if err != nil {
 		return err
@@ -318,16 +340,37 @@ func addJob(arguments []string, out io.Writer) error {
 		}
 		return errors.New("job source must be a directory")
 	}
-	store, _, err := jobStore()
-	if err != nil {
-		return err
-	}
-	definition, err := store.Save(jobs.Definition{Name: name, Enabled: true, Schedule: *schedule, Timezone: *timezone, Missed: *missed, SourcePath: absolute, RefreshSnapshot: *refresh, ChangeOnly: *changeOnly, Limits: agent.Limits{ModelRequests: *requests, Tokens: *tokens, WallSeconds: *seconds}, WebOrigins: webOrigins, Objective: objective, Provider: *provider, Model: *model, Mode: mode, Contract: contract, ConnectorIDs: connectors, MaxSteps: *maxSteps})
+	definition, err := store.Save(jobs.Definition{Name: name, Enabled: true, Schedule: *schedule, Timezone: *timezone, Missed: *missed, SourcePath: absolute, OriginConversationID: *conversation, RefreshSnapshot: *refresh, ChangeOnly: *changeOnly, Limits: agent.Limits{ModelRequests: *requests, Tokens: *tokens, WallSeconds: *seconds}, WebOrigins: webOrigins, Objective: objective, Provider: *provider, Model: *model, Mode: mode, Contract: contract, ConnectorIDs: connectors, MaxSteps: *maxSteps})
 	if err != nil {
 		return err
 	}
 	_, err = fmt.Fprintf(out, "Added job %s (%s) on %s %s.\n", definition.ID, definition.Name, definition.Schedule, definition.Timezone)
+	if err == nil && definition.OriginConversationID != "" {
+		_, err = fmt.Fprintf(out, "Follow-up updates belong to conversation %s.\n", definition.OriginConversationID)
+	}
 	return err
+}
+
+// A CLI-linked check uses the same source as its requesting chat. Empty source
+// selects that chat's folder instead of the shell's current directory.
+func jobConversationSource(stateDir, conversationID, source string) (string, error) {
+	sessions, err := worksession.Open(stateDir)
+	if err != nil {
+		return "", err
+	}
+	chat, err := sessions.Load(conversationID)
+	if err != nil {
+		return "", fmt.Errorf("load follow-up conversation: %w", err)
+	}
+	if source == "" {
+		source = chat.SourcePath
+	}
+	selected, sourceErr := os.Stat(source)
+	origin, originErr := os.Stat(chat.SourcePath)
+	if sourceErr != nil || originErr != nil || !selected.IsDir() || !origin.IsDir() || !os.SameFile(selected, origin) {
+		return "", errors.New("a chat-linked job must use that chat's available source folder; select the matching conversation or create an inbox-only job without --conversation")
+	}
+	return source, nil
 }
 
 func manageJob(command, id string, arguments []string, out io.Writer) error {
@@ -432,6 +475,11 @@ func manageJob(command, id string, arguments []string, out io.Writer) error {
 			definition.Timezone = *timezone
 		}
 		if *source != "" {
+			if definition.OriginConversationID != "" {
+				if _, err := jobConversationSource(stateDir, definition.OriginConversationID, *source); err != nil {
+					return err
+				}
+			}
 			absolute, err := filepath.Abs(*source)
 			if err != nil {
 				return err
