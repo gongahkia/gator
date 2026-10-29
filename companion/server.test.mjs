@@ -7,11 +7,13 @@ import { mkdtemp, mkdir, writeFile, rm, readdir, readFile, chmod, symlink, realp
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createCompanion, readToken } from './server.mjs';
+import { addDevice } from './auth.mjs';
 
-test('real Go work survives a client disconnect, deduplicates admission and revokes old access', { timeout: 120000 }, async () => {
+test('real Go work through an enrolled device survives disconnect, deduplicates admission and revokes old access', { timeout: 120000 }, async () => {
   const root = await mkdtemp(join(tmpdir(), 'gator-companion-'));
   const workspace = join(root, 'workspace'), config = join(root, 'config'), state = join(root, 'state'), binary = join(root, process.platform === 'win32' ? 'runtime.exe' : 'runtime');
-  const tokenFile = join(root, 'token'), token = 'a'.repeat(64);
+  const tokenFile = join(root, 'token'), ownerToken = 'a'.repeat(64);
+  let token;
   let releaseModel, startedModel;
   const started = new Promise(r => startedModel = r), gate = new Promise(r => releaseModel = r);
   let requests = 0;
@@ -27,7 +29,10 @@ test('real Go work survives a client disconnect, deduplicates admission and revo
   let companion;
   try {
     await mkdir(workspace); await mkdir(join(config, 'gator'), { recursive: true });
-    await writeFile(tokenFile, token + '\n', { mode: 0o600 });
+    await writeFile(tokenFile, ownerToken + '\n', { mode: 0o600 });
+    const exportFile = join(root, 'phone.token');
+    await addDevice(tokenFile, 'Real Go fixture phone', exportFile);
+    token = (await readFile(exportFile, 'utf8')).trim();
     await new Promise(r => provider.listen(0, '127.0.0.1', r));
     await writeFile(join(config, 'gator/config.json'), JSON.stringify({ version: 4, defaults: { provider: 'fixture', model: 'fixture' }, custom_providers: [{ id: 'fixture', base_url: `http://127.0.0.1:${provider.address().port}/chat`, models: ['fixture'], default_model: 'fixture' }] }));
     const env = { ...process.env, GATOR_CONFIG_DIR: config, GATOR_STATE_DIR: state, GATOR_INTERNAL_COMMANDS: '1' };
