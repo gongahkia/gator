@@ -50,6 +50,13 @@
       <div class="row"><h2 id="chat-title" tabindex="-1">Conversation</h2><button id="refresh" class="secondary" type="button">Refresh</button></div>
       <p id="host-status" class="muted" role="status"></p>
       <p id="host-notice" class="notice" hidden></p>
+      <section id="check-health" hidden aria-labelledby="checks-title">
+        <h2 id="checks-title" tabindex="-1">Recurring checks</h2>
+        <p class="hint">Open Gator on the host to change or restart a check.</p>
+        <p id="checks-issue" class="notice" role="alert" hidden></p>
+        <p id="checks-freshness" class="hint"></p>
+        <div id="checks"></div>
+      </section>
       <section id="followups" aria-labelledby="updates-title">
         <h2 id="updates-title" tabindex="-1">Follow-up updates</h2>
         <p class="hint">Marking an update done changes its status here. It does not run a task or fix a failed check.</p>

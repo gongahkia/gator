@@ -2,6 +2,7 @@ const $ = id => document.getElementById(id);
 let session, generation = 0, timer, busy = false, reading = false, fresh = false;
 let state, pending, approvalKey = '', transcriptKey = '';
 let updatesKey = '', updateIssue = '';
+let checksKey = '', checksFresh = false;
 let browsing = false, catalogQuery = { query: '', scope: 'active', after: '' }, anchors = [], nextPage = '';
 let creationPending = null, creationIssue = '', newChatSource = '';
 const creationKey = 'gator.companion.creation.v1';
@@ -17,6 +18,7 @@ const currentApproval = () => {
   return { approval, preview: message.text + '\n\n' + JSON.stringify(message.result, null, 2) };
 };
 function controls() {
+  checkFreshness();
   const active = !!session?.id && !browsing && fresh && !document.hidden && !busy && !reading && !hostSetup();
   $('send').disabled = !active;
   for (const button of $('updates').querySelectorAll('button')) button.disabled = !active;
@@ -76,12 +78,13 @@ async function request(owner, frame) {
 }
 function render(next) {
   state = next; fresh = !document.hidden;
+  checksFresh = !document.hidden && navigator.onLine;
   $('connection').textContent = 'Connected · work runs on your host';
   $('credentials').hidden = $('connect').hidden = true;
   $('browse').hidden = false; $('catalog').hidden = true;
   $('connected-chat').hidden = false; $('connected-chat').textContent = `Conversation: ${session.id}`;
   $('chat').hidden = false; $('chat-title').textContent = state.title || session.id;
-  $('host-status').textContent = state.running ? 'Working on the host…' : state.pending_approval ? 'Waiting for your decision' : 'Ready';
+  $('host-status').textContent = state.running ? 'Working on the host…' : state.pending_approval ? 'Waiting for your decision' : 'Ready for messages';
   $('host-notice').textContent = hostSetup() ? 'Finish setup or the open panel in Gator on the host before sending another action.' : state.pending_approval && !currentApproval() ? 'The current approval preview is unavailable. Review this action in Gator on the host.' : state.notice || state.requests_issue || '';
   $('host-notice').hidden = !$('host-notice').textContent;
   const messages = state.messages || [], nextTranscript = JSON.stringify(messages);
@@ -96,13 +99,62 @@ function render(next) {
       return article;
     }));
   }
-  renderUpdates();
+  renderChecks(); renderUpdates();
   $('queue').replaceChildren(...(state.queue || []).map(item => node('p', `${item.interrupted ? 'Interrupted · review on host' : 'Queued'}: ${item.text}`)));
   const review = currentApproval(), nextKey = review ? JSON.stringify(review) : '';
   if (nextKey !== approvalKey) { dialog.close(); approvalKey = nextKey; }
   $('approval').hidden = !review;
   $('approval-preview').textContent = review?.preview || '';
   controls();
+}
+function checkFreshness() {
+  const stale = !checksFresh || !session || document.hidden || !navigator.onLine;
+  const text = stale ? 'Last received check health · reconnect or refresh to confirm current status.'
+    : state?.chat_checks_issue ? 'Check health may be out of date; the host could not refresh it.'
+    : 'Reported by the host. Scheduled times require the host and its checks to be running.';
+  if ($('checks-freshness').textContent !== text) $('checks-freshness').textContent = text;
+  $('checks-freshness').classList.toggle('notice', stale || !!state?.chat_checks_issue);
+}
+function checkTime(value) {
+  const date = new Date(value);
+  const element = node('time', Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'long', timeZone: 'UTC' }).format(date));
+  element.dateTime = value; element.title = value; return element;
+}
+function renderChecks() {
+  const checks = state?.chat_checks || [];
+  $('check-health').hidden = !checks.length && !state?.chat_checks_issue;
+  $('checks-issue').textContent = state?.chat_checks_issue || '';
+  $('checks-issue').hidden = !$('checks-issue').textContent;
+  $('checks-freshness').hidden = !checks.length;
+  const key = JSON.stringify([state?.conversation_id, checks]);
+  if (key === checksKey) return;
+  checksKey = key;
+  const expanded = new Set([...$('checks').children].filter(card => card.querySelector('details')?.open).map(card => card.dataset.check));
+  const focused = document.activeElement?.closest('#checks article')?.dataset.check;
+  $('checks').replaceChildren(...checks.map(check => {
+    const card = node('article', ''); card.dataset.check = check.id;
+    card.append(node('h3', check.title), node('p', `Check status: ${check.state || 'Unavailable'}`));
+    if (check.issue) card.append(node('p', check.issue, 'notice'));
+    if (check.unsuccessful > 0) card.append(node('p', `${check.unsuccessful} consecutive unsuccessful checks.`, 'hint'));
+    if (check.next_action) card.append(node('p', check.next_action === 'Start the local supervisor' ? 'Start background checks in Recovery on the host.' : `On the host: ${check.next_action}`));
+    const details = node('details', ''); details.open = expanded.has(check.id);
+    details.append(node('summary', 'Timing and coverage'));
+    const success = node('p', check.last_success ? 'Last successful check for current settings: ' : 'No successful check recorded for current settings.', 'hint');
+    if (check.last_success) success.append(checkTime(check.last_success));
+    const due = node('p', check.next_due ? 'Next scheduled: ' : 'No next check is currently scheduled.', 'hint');
+    if (check.next_due) due.append(checkTime(check.next_due));
+    details.append(success, due);
+    if (check.gap_from && check.gap_to) {
+      const gap = node('p', 'Observed monitoring gap: ', 'hint');
+      gap.append(checkTime(check.gap_from), ' – ', checkTime(check.gap_to), '. This does not establish what changed while checks were unavailable.');
+      details.append(gap);
+    }
+    card.append(details); return card;
+  }));
+  if (focused) {
+    const card = [...$('checks').children].find(card => card.dataset.check === focused);
+    (card?.querySelector('summary') || ($('check-health').hidden ? $('chat-title') : $('checks-title'))).focus();
+  }
 }
 function renderUpdates() {
   const updates = state?.chat_updates || [], key = JSON.stringify(updates);
@@ -173,7 +225,7 @@ async function changeUpdate(id, action) {
 $('updates-older').addEventListener('click', () => { const first = state?.chat_updates?.[0]; if (first) void changeUpdate(first.id, 'older'); });
 $('updates-newer').addEventListener('click', () => { const last = state?.chat_updates?.at(-1); if (last) void changeUpdate(last.id, 'newer'); });
 function failed(error) {
-  fresh = false; dialog.close();
+  fresh = false; checksFresh = false; dialog.close();
   $('connection').textContent = error.unauthorized ? 'Access expired · enter the current host token' : 'Disconnected · the host may still be working';
   report(error.message); controls();
   if (error.unauthorized) disconnect(false);
@@ -188,7 +240,7 @@ async function refresh() {
 }
 function disconnect(clear = true) {
   generation++; clearInterval(timer); session = null; state = null; fresh = false; busy = false; reading = false;
-  approvalKey = ''; transcriptKey = ''; updatesKey = ''; updateIssue = ''; dialog.close();
+  approvalKey = ''; transcriptKey = ''; updatesKey = ''; checksKey = ''; checksFresh = false; updateIssue = ''; dialog.close();
   browsing = false; anchors = []; nextPage = ''; catalogQuery = { query: '', scope: 'active', after: '' };
   creationPending = null; creationIssue = ''; newChatSource = ''; $('new-chat-controls').hidden = true; $('new-chat-source').textContent = '';
   $('catalog').hidden = $('browse').hidden = true; $('catalog-items').replaceChildren(); $('catalog-status').textContent = '';
@@ -198,6 +250,7 @@ function disconnect(clear = true) {
   $('credentials').hidden = $('connect').hidden = false; $('connected-chat').hidden = true; $('connected-chat').textContent = '';
   $('chat').hidden = true; $('messages').replaceChildren(); $('updates').replaceChildren(); $('queue').replaceChildren();
   $('updates-issue').textContent = $('updates-count').textContent = ''; $('updates-issue').hidden = true;
+  $('checks').replaceChildren(); $('checks-issue').textContent = ''; $('check-health').hidden = true;
   $('approval-preview').textContent = $('confirm-preview').textContent = ''; $('message').value = ''; pending = null;
   if (clear) { report(''); $('connection').textContent = 'Disconnected · admitted work stays on the host'; }
   controls();
@@ -341,10 +394,10 @@ async function decide(approved) {
 $('confirm').addEventListener('click', () => decide(true));
 $('deny').addEventListener('click', () => decide(false));
 document.addEventListener('visibilitychange', () => {
-  fresh = false; dialog.close(); controls();
+  fresh = false; checksFresh = false; dialog.close(); controls();
   if (!document.hidden) void refresh();
 });
-window.addEventListener('offline', () => { fresh = false; dialog.close(); $('connection').textContent = 'Offline · the host may still be working'; controls(); });
+window.addEventListener('offline', () => { fresh = false; checksFresh = false; dialog.close(); $('connection').textContent = 'Offline · the host may still be working'; controls(); });
 window.addEventListener('online', refresh);
 window.addEventListener('pagehide', () => disconnect());
 controls();

@@ -10,6 +10,110 @@ import { addDevice, revokeDevice } from './auth.mjs';
 // isolated installation without changing this checkout's dependency tree.
 const { chromium, webkit } = await import(process.env.GATOR_PLAYWRIGHT_MODULE || '../desktop/node_modules/playwright/index.mjs');
 for (const name of (process.env.GATOR_COMPANION_BROWSERS || 'chromium').split(',')) {
+  test(`${name}: recurring check health stays read-only, scoped and explicitly stale offline`, { timeout: 90000 }, async () => {
+    const root = await mkdtemp(join(tmpdir(), 'gator-phone-health-')), tokenFile = join(root, 'owner.token'), token = 'a'.repeat(64);
+    const check = { id: 'job-health', title: 'Project deadline <img src=x onerror="window.injected=true">', state: 'offline', issue: 'Daily model request limit reached', unsuccessful: 3, next_action: 'Start the local supervisor', gap_from: '2026-10-29T01:00:00Z', gap_to: '2026-10-29T02:00:00Z' };
+    const health = { conversation_id: 'work-health', title: 'Monitored project', messages: [], queue: [], chat_checks: [check] };
+    const other = { conversation_id: 'work-other', title: 'Separate chat', messages: [], queue: [] };
+    let browser, companion, actions = 0, holdReads = false, held = false, release;
+    const gate = new Promise(resolve => release = resolve);
+    try {
+      await writeFile(tokenFile, token + '\n', { mode: 0o600 });
+      companion = createCompanion({ tokenFile,
+        queryCatalog: async () => ({ items: [{ id: health.conversation_id, title: health.title, source: '/host/project' }, { id: other.conversation_id, title: other.title, source: '/host/other' }] }),
+        spawnBackend: id => ({ state: id === health.conversation_id ? health : other, async ready() {}, async stop() { this.closed = true; }, async send() { actions++; }, async submitUpload() { actions++; } }),
+      });
+      const address = await companion.listen();
+      browser = await ({ chromium, webkit }[name]).launch({ headless: true, executablePath: process.env[`GATOR_${name.toUpperCase()}_EXECUTABLE`] });
+      const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }), page = await context.newPage(), errors = [];
+      page.on('pageerror', error => errors.push(error.message));
+      await page.route('**/v1/chats/work-health', async route => {
+        if (holdReads) { held = true; await gate; }
+        await route.continue();
+      });
+      await page.goto(`http://127.0.0.1:${address.port}`);
+      await page.getByLabel('Host access token', { exact: true }).fill(token);
+      await page.getByText('Open a known conversation', { exact: true }).click();
+      await page.getByLabel('Conversation ID', { exact: true }).fill(health.conversation_id);
+      await page.getByRole('button', { name: 'Connect', exact: true }).click();
+      await page.getByText('Check status: offline', { exact: true }).waitFor();
+      assert.equal(await page.locator('#host-status').textContent(), 'Ready for messages');
+      assert.match(await page.locator('#checks').textContent(), /3 consecutive unsuccessful checks/);
+      await page.locator('#message').fill('Keep this unsent draft.');
+      const summary = page.locator('#checks summary');
+      await summary.focus(); await page.keyboard.press('Enter');
+      await page.getByText('No successful check recorded for current settings.', { exact: true }).waitFor();
+      assert.match(await page.locator('#checks').textContent(), /does not establish what changed/);
+      assert.equal(await page.locator('#checks img, #checks script').count(), 0);
+      assert.equal(await page.evaluate(() => window.injected), undefined);
+      await summary.evaluate(element => { element.dataset.fixture = 'unchanged'; });
+      // Automatic reads must not replace unchanged details or steal focus.
+      await page.waitForTimeout(2800);
+      assert.equal(await summary.getAttribute('data-fixture'), 'unchanged');
+      assert.equal(await summary.evaluate(element => element === document.activeElement), true);
+      check.state = 'completed'; check.issue = ''; check.unsuccessful = 0;
+      check.last_success = '2026-10-29T03:00:00Z'; check.next_due = '2026-10-29T03:15:00Z'; check.next_action = 'Review results in /inbox';
+      await page.getByText('Check status: completed', { exact: true }).waitFor();
+      assert.equal(await page.locator('#checks details').getAttribute('open'), '');
+      assert.equal(await summary.evaluate(element => element === document.activeElement), true);
+      await page.locator('#checks time[datetime="2026-10-29T03:15:00Z"]').waitFor();
+      assert.match(await page.locator('#checks time[datetime="2026-10-29T03:15:00Z"]').textContent(), /UTC/);
+      health.chat_checks_issue = 'Check health could not refresh. Displayed states may be out of date.';
+      await page.locator('#checks-issue').filter({ hasText: 'out of date' }).waitFor();
+      assert.match(await page.locator('#checks-freshness').textContent(), /could not refresh/);
+      health.chat_checks_issue = '';
+      await page.waitForFunction(() => document.querySelector('#checks-issue').hidden);
+      await context.setOffline(true);
+      await page.waitForFunction(() => document.querySelector('#checks-freshness').textContent.startsWith('Last received'));
+      assert.equal(await page.locator('#checks details').getAttribute('open'), '');
+      holdReads = true; await context.setOffline(false);
+      await page.waitForFunction(() => document.querySelector('#send').disabled);
+      await page.waitForTimeout(200); assert.equal(held, true);
+      assert.match(await page.locator('#checks-freshness').textContent(), /Last received/);
+      holdReads = false; release();
+      await page.waitForFunction(() => document.querySelector('#checks-freshness').textContent.startsWith('Reported by'));
+      check.state = 'offline'; check.issue = 'Daily model request limit reached'; check.unsuccessful = 3;
+      check.next_due = ''; check.next_action = 'Start the local supervisor';
+      await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+      await page.getByText('Check status: offline', { exact: true }).waitFor();
+      for (const width of [320, 390, 760]) {
+        await page.setViewportSize({ width, height: 844 });
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+        assert.ok((await summary.boundingBox()).height >= 44);
+      }
+      await page.setViewportSize({ width: 390, height: 844 });
+      for (const colorScheme of ['dark', 'light']) {
+        await page.emulateMedia({ colorScheme });
+        if (process.env.GATOR_COMPANION_SCREENSHOT) await page.screenshot({ path: `${process.env.GATOR_COMPANION_SCREENSHOT}-${name}-health-${colorScheme}.png`, fullPage: true });
+      }
+      await page.getByRole('button', { name: 'Conversations', exact: true }).click();
+      await page.getByRole('button', { name: /Separate chat/ }).click();
+      await page.locator('#chat-title').filter({ hasText: 'Separate chat' }).waitFor();
+      assert.equal(await page.locator('#check-health').isVisible(), false);
+      assert.equal(await page.locator('#checks').textContent(), '');
+      await page.getByRole('button', { name: 'Conversations', exact: true }).click();
+      await page.getByRole('button', { name: /Monitored project/ }).click();
+      await page.locator('#chat-title').filter({ hasText: 'Monitored project' }).waitFor();
+      assert.equal(await page.locator('#message').inputValue(), 'Keep this unsent draft.');
+      health.chat_checks = []; health.chat_checks_issue = 'Check health could not refresh. Displayed states may be out of date.';
+      await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+      await page.waitForFunction(() => document.querySelector('#checks').children.length === 0 && !document.querySelector('#checks-issue').hidden);
+      assert.equal(await page.locator('#check-health').isVisible(), true);
+      health.chat_checks_issue = '';
+      await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+      await page.waitForFunction(() => document.querySelector('#check-health').hidden);
+      health.chat_checks = [check];
+      await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+      await page.getByText('Check status: offline', { exact: true }).waitFor();
+      await writeFile(tokenFile, 'b'.repeat(64) + '\n', { mode: 0o600 });
+      await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+      await page.getByText('Access expired · enter the current host token', { exact: true }).waitFor();
+      assert.equal(await page.locator('#checks').textContent(), '');
+      assert.equal(await page.locator('#checks-issue').textContent(), '');
+      assert.equal(await page.locator('#check-health').isVisible(), false);
+      assert.equal(actions, 0); assert.deepEqual(errors, []);
+    } finally { release(); await browser?.close(); await companion?.close(); await rm(root, { recursive: true, force: true }); }
+  });
   test(`${name}: individual device tokens connect and revoke without disconnecting another device`, { timeout: 45000 }, async () => {
     const root = await mkdtemp(join(tmpdir(), 'gator-phone-devices-')), tokenFile = join(root, 'owner.token');
     let companion, browser;
