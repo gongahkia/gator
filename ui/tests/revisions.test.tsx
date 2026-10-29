@@ -26,7 +26,7 @@ test("revision navigation preserves ancestry and drafts and reopening from anoth
   let setup = await render()
   const flush = async () => { await setup.flush(); await Bun.sleep(30); await setup.flush() }
   const until = async (predicate: () => boolean, label: string) => { const end = Date.now() + 15000; while (!predicate()) { if (Date.now() > end) throw new Error(label + ": " + client.issue + "\n" + setup.captureCharFrame()); await flush() } }
-  const command = async (group: string, label: string) => { setup.mockInput.pressKey("p", { ctrl: true }); await flush(); await setup.mockInput.typeText(group); await flush(); setup.mockInput.pressEnter(); await flush(); expect(setup.captureCharFrame()).toContain(`Gator › ${group}`); await setup.mockInput.typeText(label); await flush(); setup.mockInput.pressEnter(); await flush() }
+  const command = async (group: string, label: string) => { setup.mockInput.pressKey("p", { ctrl: true }); await flush(); await setup.mockInput.typeText(group); await flush(); setup.mockInput.pressEnter(); await flush(); expect(setup.captureCharFrame()).toContain(`GATOR › ${group.toUpperCase()}`); await setup.mockInput.typeText(label); await flush(); setup.mockInput.pressEnter(); await flush() }
   try {
     await client.start(); await client.send({ type: "submit", text: "/mode inspect" }); await client.edit("Read the original note."); await client.submit(); await until(() => !client.state?.running && answers === 1, "first revision")
     const id = client.state!.conversation_id!, snapshot = client.state?.work_details?.snapshot_id
