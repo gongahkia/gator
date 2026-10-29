@@ -30,6 +30,11 @@
     <p id="error" role="alert" hidden></p>
     <section id="catalog" hidden aria-labelledby="catalog-title">
       <h2 id="catalog-title" tabindex="-1">Conversations on your host</h2>
+      <div id="new-chat-controls" class="card" hidden>
+        <p id="new-chat-source" class="hint"></p>
+        <div class="row"><button id="new-chat" type="button">New chat</button><button id="dismiss-creation" type="button" class="secondary" hidden>Dismiss retry</button></div>
+        <p id="creation-status" class="hint" role="status">Creates an empty chat. Work starts only when you send a message.</p>
+      </div>
       <form id="search-form" class="card">
         <label for="search">Search titles and folders</label>
         <input id="search" type="search" maxlength="512" autocomplete="off">

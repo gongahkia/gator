@@ -9,6 +9,97 @@ import { createCompanion } from './server.mjs';
 // isolated installation without changing this checkout's dependency tree.
 const { chromium, webkit } = await import(process.env.GATOR_PLAYWRIGHT_MODULE || '../desktop/node_modules/playwright/index.mjs');
 for (const name of (process.env.GATOR_COMPANION_BROWSERS || 'chromium').split(',')) {
+  test(`${name}: new-chat retries survive reload without duplicates or premature work`, { timeout: 90000 }, async () => {
+    const root = await mkdtemp(join(tmpdir(), 'gator-phone-new-')), tokenFile = join(root, 'token'), token = 'a'.repeat(64);
+    const creations = new Map(), calls = [], submissions = [];
+    let browser, companion, failOpen = true;
+    try {
+      await writeFile(tokenFile, token + '\n', { mode: 0o600 });
+      companion = createCompanion({ tokenFile, workspace: '/host/configured-workspace',
+        queryCatalog: async () => ({ items: [{ id: 'work-parent', title: 'Original chat', source: '/host/original' }] }),
+        createChat: async requestID => {
+          calls.push(requestID);
+          if (!creations.has(requestID)) creations.set(requestID, { request_id: requestID, conversation_id: `work-new-${creations.size + 1}`, source: '/host/configured-workspace' });
+          return creations.get(requestID);
+        },
+        spawnBackend: id => ({ state: { conversation_id: id, title: id === 'work-parent' ? 'Original chat' : 'New chat', messages: [], running: false, queue: [] },
+          async ready() { if (id.startsWith('work-new') && failOpen) { failOpen = false; throw new Error('Four chats have pending work. Try opening this saved chat later.'); } },
+          async stop() { this.closed = true; }, async submitUpload(frame) { submissions.push(structuredClone(frame.upload)); this.state.messages.push({ role: 'user', text: frame.upload.text }); },
+        }),
+      });
+      const address = await companion.listen(), base = `http://127.0.0.1:${address.port}`;
+      browser = await ({ chromium, webkit }[name]).launch({ headless: true, executablePath: process.env[`GATOR_${name.toUpperCase()}_EXECUTABLE`] });
+      const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }), page = await context.newPage(), errors = [];
+      page.on('pageerror', error => errors.push(error.message));
+      const connect = async () => {
+        await page.getByLabel('Host access token', { exact: true }).fill(token);
+        await page.getByRole('button', { name: 'Connect', exact: true }).click();
+        await page.locator('.chat-choice').waitFor();
+      };
+      await page.goto(base); await connect();
+      await page.locator('.chat-choice').click();
+      await page.locator('#message').fill('Keep the original draft.');
+      await page.getByRole('button', { name: 'Conversations', exact: true }).click();
+      await page.getByText('New chats use this host workspace: /host/configured-workspace', { exact: true }).waitFor();
+      assert.equal(calls.length, 0);
+      let drop = true;
+      await page.route('**/v1/chats', async route => {
+        if (drop && route.request().method() === 'POST') { drop = false; await route.fetch(); await route.abort('connectionfailed'); }
+        else await route.continue();
+      });
+      await page.getByRole('button', { name: 'New chat', exact: true }).click();
+      await page.waitForFunction(() => document.querySelector('#error').textContent.length > 0);
+      assert.equal(creations.size, 1);
+      assert.equal(submissions.length, 0);
+      await page.reload(); await connect();
+      assert.equal(calls.length, 1, 'reload must not automatically retry creation');
+      await page.getByRole('button', { name: 'Retry new chat', exact: true }).click();
+      await page.getByText('Four chats have pending work. Try opening this saved chat later.', { exact: true }).waitFor();
+      assert.equal(creations.size, 1, 'an opening failure must retain the created identity');
+      await page.getByRole('button', { name: 'Retry new chat', exact: true }).click();
+      await page.locator('#chat-title').filter({ hasText: 'New chat' }).waitFor();
+      assert.equal(await page.locator('#message').inputValue(), '');
+      assert.equal(await page.locator('#message').evaluate(node => document.activeElement === node), true);
+      assert.deepEqual(calls, [calls[0], calls[0], calls[0]]);
+      assert.equal(creations.size, 1);
+      assert.equal(submissions.length, 0, 'opening must not start model work');
+      assert.equal(await page.evaluate(() => sessionStorage.getItem('gator.companion.creation.v1')), null);
+      await page.locator('#message').fill('Start only after this send.');
+      await page.getByRole('button', { name: 'Send message', exact: true }).click();
+      await page.waitForFunction(() => document.querySelector('#message').value === '');
+      assert.equal(submissions.length, 1);
+      assert.equal(submissions[0].context, 'conversation:work-new-1');
+      await page.getByRole('button', { name: 'Conversations', exact: true }).click();
+      await page.locator('.chat-choice').click();
+      await page.locator('#chat-title').filter({ hasText: 'Original chat' }).waitFor();
+      assert.equal(await page.locator('#message').inputValue(), 'Keep the original draft.');
+      await page.getByRole('button', { name: 'Conversations', exact: true }).click();
+      await page.locator('.chat-choice').waitFor();
+      if (process.env.GATOR_COMPANION_SCREENSHOT) await page.screenshot({ path: `${process.env.GATOR_COMPANION_SCREENSHOT}-${name}-new-chat.png`, fullPage: true });
+      for (const width of [320, 390]) {
+        await page.setViewportSize({ width, height: 844 });
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+        assert.ok((await page.locator('#new-chat').boundingBox()).height >= 44);
+      }
+      drop = true;
+      await page.getByRole('button', { name: 'New chat', exact: true }).click();
+      await page.waitForFunction(() => document.querySelector('#error').textContent.length > 0);
+      const beforeDismiss = calls.length;
+      await page.route('**/v1/chats?*', async route => {
+        const response = await route.fetch(), pageData = await response.json();
+        await route.fulfill({ response, json: { ...pageData, new_chat_source: '/host/changed-workspace' } });
+      });
+      await page.getByRole('button', { name: 'Refresh list', exact: true }).click();
+      await page.getByText('The host workspace changed. Dismiss this retry before starting another chat.', { exact: true }).waitFor();
+      assert.equal(await page.getByRole('button', { name: 'Retry new chat', exact: true }).isDisabled(), true);
+      await page.getByRole('button', { name: 'Dismiss retry', exact: true }).click();
+      assert.equal(await page.evaluate(() => sessionStorage.getItem('gator.companion.creation.v1')), null);
+      assert.equal(calls.length, beforeDismiss, 'dismissing must not send or retry');
+      assert.equal(creations.size, 2, 'dismissing must not delete the already-created chat');
+      assert.equal(await page.evaluate(token => JSON.stringify({ ...sessionStorage, ...localStorage }).includes(token), token), false);
+      assert.deepEqual(errors, []);
+    } finally { await browser?.close(); await companion?.close(); await rm(root, { recursive: true, force: true }); }
+  });
   test(`${name}: browse, search and switch chats with independent retained drafts`, { timeout: 90000 }, async () => {
     const root = await mkdtemp(join(tmpdir(), 'gator-phone-catalog-')), tokenFile = join(root, 'token'), token = 'a'.repeat(64);
     const queries = [], submissions = [], workers = new Map();

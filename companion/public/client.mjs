@@ -2,6 +2,8 @@ const $ = id => document.getElementById(id);
 let session, generation = 0, timer, busy = false, reading = false, fresh = false;
 let state, pending, approvalKey = '', transcriptKey = '';
 let browsing = false, catalogQuery = { query: '', scope: 'active', after: '' }, anchors = [], nextPage = '';
+let creationPending = null, creationIssue = '', newChatSource = '';
+const creationKey = 'gator.companion.creation.v1';
 const dialog = $('approval-dialog');
 const draftKey = id => `gator.companion.draft.v1:${id}`;
 const report = message => { $('error').textContent = message; $('error').hidden = !message; };
@@ -23,6 +25,13 @@ function controls() {
   $('previous').disabled = !session || !fresh || busy || reading || document.hidden || !anchors.length;
   $('next').disabled = !session || !fresh || busy || reading || document.hidden || !nextPage;
   for (const button of $('catalog-items').querySelectorAll('button')) button.disabled = !fresh || busy || reading || document.hidden;
+  $('new-chat').disabled = !session || !browsing || !newChatSource || !!creationIssue || busy || reading || document.hidden || (!fresh && !creationPending) || !!creationPending && creationPending.source !== newChatSource;
+  $('new-chat').textContent = creationPending ? 'Retry new chat' : 'New chat';
+  $('dismiss-creation').hidden = !creationPending && !creationIssue;
+  $('dismiss-creation').disabled = !session || busy || reading;
+  $('creation-status').textContent = creationIssue || (creationPending
+    ? creationPending.source !== newChatSource ? 'The host workspace changed. Dismiss this retry before starting another chat.' : 'Opening the new chat is unconfirmed. Retry uses the same request. Dismiss leaves any created chat in Conversations.'
+    : 'Creates an empty chat. Work starts only when you send a message.');
   $('message').readOnly = !!pending;
   $('send').textContent = pending ? 'Retry same message' : 'Send message';
   $('draft-status').textContent = pending
@@ -111,6 +120,7 @@ function disconnect(clear = true) {
   generation++; clearInterval(timer); session = null; state = null; fresh = false; busy = false; reading = false;
   approvalKey = ''; transcriptKey = ''; dialog.close();
   browsing = false; anchors = []; nextPage = ''; catalogQuery = { query: '', scope: 'active', after: '' };
+  creationPending = null; creationIssue = ''; newChatSource = ''; $('new-chat-controls').hidden = true; $('new-chat-source').textContent = '';
   $('catalog').hidden = $('browse').hidden = true; $('catalog-items').replaceChildren(); $('catalog-status').textContent = '';
   $('search').value = ''; $('scope').value = 'active';
   $('token').value = ''; $('conversation').readOnly = false; $('token').disabled = false;
@@ -137,6 +147,9 @@ async function loadCatalog(query = { query: '', scope: 'active', after: '' }, hi
     if (!response.ok) { const error = new Error(page.error || 'Could not load conversations.'); error.unauthorized = response.status === 401; throw error; }
     if (at !== generation) return;
     if (!Array.isArray(page.items) || page.items.some(item => !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/.test(item.id))) throw new Error('The host returned an invalid conversation list.');
+    newChatSource = typeof page.new_chat_source === 'string' ? page.new_chat_source : '';
+    $('new-chat-controls').hidden = !newChatSource;
+    $('new-chat-source').textContent = `New chats use this host workspace: ${newChatSource}`;
     nextPage = page.next || ''; fresh = !document.hidden;
     $('credentials').hidden = $('connect').hidden = true; $('browse').hidden = false;
     $('connection').textContent = 'Connected · work runs on your host';
@@ -150,6 +163,38 @@ async function loadCatalog(query = { query: '', scope: 'active', after: '' }, hi
   } catch (error) { if (at === generation) { $('catalog-status').textContent = 'Conversations unavailable. Refresh the list to retry.'; failed(error); } }
   finally { if (at === generation) { reading = false; controls(); } }
 }
+
+async function createNewChat() {
+  if ($('new-chat').disabled || !session) return;
+  const at = generation, token = session.token;
+  try {
+    saveDraft();
+    creationPending ||= { request_id: crypto.randomUUID(), source: newChatSource };
+    // Keep this identity until both creation and opening are acknowledged.
+    sessionStorage.setItem(creationKey, JSON.stringify(creationPending));
+  } catch { report('Could not retain the new-chat request. Nothing was sent; restore session storage before retrying.'); controls(); return; }
+  const creation = creationPending;
+  busy = true; dialog.close(); controls(); report('');
+  try {
+    const response = await fetch('/v1/chats', { method: 'POST', cache: 'no-store', redirect: 'error', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ request_id: creation.request_id }), signal: AbortSignal.timeout(30000) });
+    const result = await response.json();
+    if (!response.ok) { const error = new Error(result.error || 'Chat creation is unconfirmed. Retry the same request.'); error.unauthorized = response.status === 401; throw error; }
+    if (at !== generation) return;
+    if (result.request_id !== creation.request_id || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/.test(result.conversation_id)) throw new Error('The host did not confirm this chat identity. Retry the same request.');
+    const owner = { id: result.conversation_id, token }, draft = readDraft(owner.id), next = await request(owner);
+    if (at !== generation) return;
+    sessionStorage.removeItem(creationKey); creationPending = null;
+    session = owner; browsing = false; pending = draft.pending || null; $('message').value = draft.text;
+    transcriptKey = ''; approvalKey = ''; report(''); render(next); $('message').focus();
+  } catch (error) { if (at === generation) failed(error); }
+  finally { if (at === generation) { busy = false; controls(); } }
+}
+$('new-chat').addEventListener('click', createNewChat);
+$('dismiss-creation').addEventListener('click', () => {
+  if (!session || busy || reading) return;
+  try { sessionStorage.removeItem(creationKey); creationPending = null; creationIssue = ''; report('Retry dismissed. Any created chat remains in Conversations.'); controls(); }
+  catch { report('Could not dismiss the retained request. Restore session storage before starting another chat.'); }
+});
 
 async function openChat(id) {
   if (!session || busy || reading || !fresh || document.hidden) return;
@@ -174,6 +219,11 @@ $('connect-form').addEventListener('submit', async event => {
   if (session) return;
   if (!window.isSecureContext) return report('Open the companion through HTTPS, or use its loopback address on the host.');
   generation++; session = { id: $('conversation').value.trim(), token: $('token').value.trim() };
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(creationKey) || 'null');
+    if (saved && (typeof saved.request_id !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{15,95}$/.test(saved.request_id) || typeof saved.source !== 'string' || !saved.source)) throw new Error('Invalid retained creation request.');
+    creationPending = saved;
+  } catch { creationIssue = 'The retained new-chat request is unavailable. Restore session storage or dismiss it before starting another chat.'; }
   $('token').value = ''; $('token').disabled = true; $('conversation').readOnly = true;
   $('connect').disabled = true; $('disconnect').hidden = false;
   if (session.id) {
