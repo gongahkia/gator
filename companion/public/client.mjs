@@ -106,6 +106,7 @@ function render(next) {
 }
 function renderUpdates() {
   const updates = state?.chat_updates || [], key = JSON.stringify(updates);
+  $('followups').hidden = !updates.length && !updateIssue && !state?.chat_updates_issue;
   $('updates-issue').textContent = updateIssue || state?.chat_updates_issue || '';
   $('updates-issue').hidden = !$('updates-issue').textContent;
   $('updates-count').textContent = updates.length ? `${updates.length} of ${state.chat_updates_total ?? updates.length} updates` : state?.chat_updates_issue ? 'Could not load follow-up updates.' : 'No follow-up updates in this conversation.';

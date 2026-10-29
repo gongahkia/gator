@@ -83,7 +83,10 @@ for (const name of (process.env.GATOR_COMPANION_BROWSERS || 'chromium').split(',
       await page.getByRole('button', { name: 'Refresh', exact: true }).click();
       await page.getByText('Could not load follow-up updates.', { exact: true }).waitFor();
       assert.equal(await page.locator('#updates-issue').textContent(), 'Follow-up storage unavailable.');
-      backend.state.chat_updates_issue = ''; sync();
+      backend.state.chat_updates_issue = '';
+      await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+      await page.waitForFunction(() => document.querySelector('#followups').hidden);
+      sync();
       await page.getByRole('button', { name: 'Refresh', exact: true }).click();
       await page.locator('[data-update="inbox-new"]').waitFor();
       for (const width of [320, 390, 760]) {
