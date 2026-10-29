@@ -988,3 +988,39 @@ token copies require owner cleanup. Interrupted enrollment and power-loss limits
 are documented; native Windows ACL acceptance remains open. Permanent hosting,
 HTTPS deployment, physical-phone acceptance and mobile notifications are still
 unverified. G14/G15 are not closed by these local tests.
+
+
+### Independent spreadsheet calculation engine — 29 October
+
+The Office fixture generator now produces explicit calculation expectations and
+two additional workbooks covering analysis formulas and a stale manual-calculation
+template with a dependent unedited sheet. A new Python checker invokes LibreOffice
+in a temporary profile and reads its saved XLSX results using standard ZIP/XML
+parsers. It does not use the renderer's formula evaluator. It requires coverage
+for every generated workbook and formula, checks the original caches are empty,
+refuses an existing output directory, verifies the input hashes remain unchanged,
+and includes a wrong-total negative control. No renderer changes were necessary
+for the exercised calculations.
+
+Local evidence: LibreOffice Calc 24.2.7.2 recalculated all ten XLSX fixtures and
+matched 10,024 expected formula values plus a formula-looking literal string.
+Coverage includes all three themes, ordinary/streaming writers, template and
+shared-editor changes, quoted cross-sheet references, negative/zero/fractional
+inputs, conditional sums/counts, mean/rounding, conditions, lookup, booleans,
+text results and an intentionally visible division error. The old template
+values 999/1998 were absent before conversion; the independent results were
+200/400. The two additional workbooks have zero Office2007 schema errors under
+the independent Open XML SDK. A false expected total is rejected by the checker.
+
+Calculation ran in a disposable Ubuntu container with no external network or host
+filesystem mounts; only generated synthetic files and the verifier were copied
+in. The container was removed. The result copies and JSON report are retained
+under ignored `.gator/native-tools/calc-results/`; the report records engine version
+and original file digests. Final coverage/reinspection, Python syntax, workflow
+YAML and diff checks pass. CI now runs this calculation gate and uploads the
+result copies/report, but no remote CI was triggered.
+
+G10/document quality remains open for native Microsoft Excel, Word and PowerPoint
+acceptance, representative customer files, visual layout and arbitrary template
+fidelity. These fixtures demonstrate independent calculation compatibility; they
+do not establish that an arbitrary model-generated analysis is correct.
