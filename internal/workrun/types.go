@@ -147,6 +147,7 @@ type Request struct {
 	// granted to the Work manager itself. It is intentionally separate from
 	// Code.BrowserSession: the manager cannot silently borrow a Code grant.
 	BrowserSession string
+	BrowserPolicy  string
 	// DisableBrowser is set by the local-model route. A local model must never
 	// receive browser/computer-use capability merely because a session exists.
 	DisableBrowser bool

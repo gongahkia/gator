@@ -2,6 +2,7 @@ package workapp
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -65,6 +66,9 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		if value.Generation != m.controlGeneration {
 			return m, nil
 		}
+		if value.Screen.BrowserGrant != nil && value.Screen.BrowserGrant.ConversationID != m.conversation {
+			value.Err = errors.New("the chat changed; review browser access in this chat")
+		}
 		m.controlBusy = false
 		m.controlBackground = false
 		if m.controlCancel != nil {
@@ -75,17 +79,21 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 			m.sectionNotice = value.Err.Error()
 		} else {
 			selection := 0
-			if m.controlFamily == "overview" || m.controlFamily == "connections" {
+			if m.controlFamily == "overview" || m.controlFamily == "connections" || m.controlFamily == "browser" {
 				selection = preservedControlSelection(m.controlScreen, value.Screen, m.selected)
 			}
 			m.controlScreen = value.Screen
-			if m.controlFamily == "connections" {
+			if m.controlFamily == "connections" || m.controlFamily == "browser" {
 				m.controlRootArgs = nil
 				if value.Screen.Location != "" {
 					m.controlRootArgs = []string{value.Screen.Location}
 				}
 			}
 			m.selected = selection
+			if value.Screen.BrowserGrant != nil && m.controlFamily == "browser" {
+				m.options.BrowserSession = value.Screen.BrowserGrant.SessionID
+				m.options.BrowserPolicy = value.Screen.BrowserGrant.Policy
+			}
 			m.sectionNotice = ""
 			m.clearRemovedData(value.Screen)
 			m.refreshBridgeConversations()
@@ -846,6 +854,7 @@ func (m Model) submitRunningInput() (tea.Model, tea.Cmd) {
 	m.options.Uploads = nil
 	m.options.ExcludedKnowledgeIDs = nil
 	m.options.RefreshSource = false
+	m.options.BrowserSession, m.options.BrowserPolicy = "", ""
 	m.status = fmt.Sprintf("Working from an immutable snapshot… · %d queued", len(m.queue))
 	return m, nil
 }
@@ -931,6 +940,7 @@ func (m Model) submitComposerInput() (tea.Model, tea.Cmd) {
 	m.options.Uploads = nil
 	m.options.ExcludedKnowledgeIDs = nil
 	m.options.RefreshSource = false
+	m.options.BrowserSession, m.options.BrowserPolicy = "", ""
 	return m.startWork(source, conversation, prompt, options)
 }
 

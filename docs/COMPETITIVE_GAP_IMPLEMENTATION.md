@@ -336,3 +336,49 @@ Further hardening is warranted: subject aliases can evade forgetting, original
 history remains independently retrievable, and exact quotes alone do not filter
 credentials or third-party statements. The personal summary should expose these
 distinctions and evidence; it must not become another independent facts store.
+
+### Integrated browser controls and next-task grants (29 October)
+
+`/browser` now exposes reviewed runtime installation, a fresh headed window,
+allowed sites, tab selection, screenshot permission, private pause/resume,
+next-task selection, stop and unavailable-controller revocation. New application
+windows start paused with screenshots off. Users sign in in the browser window.
+The shared panel uses existing form/review components in terminal and desktop
+command navigation; it can stay in the active chat during private takeover.
+
+The reviewed browser grant is consumed by one submitted or queued task. Durable
+queue recovery preserves it without automatically replaying interrupted work;
+other tasks/chats and Code specialists do not inherit it. Delayed control results
+cannot grant access to a different chat. Selected browser identity is visible in
+the next-task details. The controller checks a policy digest on every granted
+operation, so changed tab/site/capture/upload permissions cannot silently widen
+the reviewed scope. Separate browser stores now serialize session updates using
+a process-held file lock, protecting concurrent session creation/revocation.
+Reviewed operations use distinct wire method names: an older daemon rejects
+them instead of silently ignoring the policy field. Stop remains available to
+revoke such a session without granting any new access.
+
+Verification on macOS:
+
+- Browser/workapp/workrun race suites and focused command tests pass.
+- Tests cover exact review, changed-policy refusal, queued/restarted grants,
+  one-task consumption, delayed results in another chat, private pause and
+  unavailable-session revocation. Independent-store concurrency retains all
+  sessions and the concurrent stop.
+- TypeScript and terminal production build pass.
+- Full terminal suite: 58 pass, 3 skip, 0 fail, 867 assertions across 44 files.
+  Skips are native image paste, dictation, and the opt-in managed-browser test.
+- Separately, both browser terminal journeys pass, including real pinned
+  Chromium opening paused, site review, resume, one-task grant, no browser grant
+  on the next task, private takeover and stop. The model is a local fixture.
+  Setup cancellation creates no session or download. No leftover test daemon
+  was found after cleanup.
+
+This closes the missing local control surface, not the whole browser/connected
+workflow gate. Real-account login/redirects, novice observation, native Windows
+and desktop-specific interaction evidence remain. A hung sidecar's bounded
+cancellation and forced shutdown/cleanup still need stronger recovery work;
+unavailable-controller tests here cover missing transport, not every engine hang.
+Attaching a CDP browser, registering uploads and exporting browser artifacts
+remain advanced CLI operations. The phone companion does not yet expose this
+complete panel. See `BROWSER.md` for current behavior.

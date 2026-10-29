@@ -25,6 +25,8 @@ func workControlsWithConnections(stateDir string, connections *connectionControl
 			return workapp.ControlScreen{}, err
 		}
 		switch family {
+		case "browser":
+			return browserControl(ctx, stateDir, action, args)
 		case "connections":
 			return connections.call(ctx, action, args)
 		case "overview":

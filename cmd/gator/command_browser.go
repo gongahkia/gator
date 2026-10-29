@@ -151,36 +151,57 @@ func startBrowserSession(arguments []string, out io.Writer, store *gatorbrowser.
 	if err := flags.Parse(arguments); err != nil || len(flags.Args()) != 0 {
 		return errors.New("usage: gator browser start [--headed] [--visual-capture]")
 	}
-	status := gatorbrowser.Runtime(store)
-	if !status.Installed {
-		return errors.New(status.Error)
-	}
-	session, err := store.Start(gatorbrowser.StartOptions{Headed: *headed, VisualCapture: *visual})
+	session, err := openManagedBrowser(context.Background(), store, stateDir, gatorbrowser.StartOptions{Headed: *headed, VisualCapture: *visual})
 	if err != nil {
 		return err
 	}
-	if err := launchBrowserDaemon(store, stateDir, session, "", out); err != nil {
-		_, _ = store.Stop(session.ID)
-		return err
+	_, err = fmt.Fprintf(out, "Started local browser session %s\n  mode: managed\n  selected tab: %s\n  visual capture: %t\nUse 'gator browser origins %s add URL' before a run may navigate.\n", session.ID, session.SelectedTabs[0].ID, *visual, session.ID)
+	return err
+}
+
+// openManagedBrowser returns trusted state to both application controls and CLI.
+// A partially started controller is stopped and revoked before returning failure.
+func openManagedBrowser(ctx context.Context, store *gatorbrowser.Store, stateDir string, options gatorbrowser.StartOptions) (session gatorbrowser.Session, resultErr error) {
+	if status := gatorbrowser.Runtime(store); !status.Installed {
+		return session, errors.New(status.Error)
+	}
+	if err := ctx.Err(); err != nil {
+		return session, err
+	}
+	session, err := store.Start(options)
+	if err != nil {
+		return session, err
+	}
+	var process *os.Process
+	defer func() {
+		if resultErr != nil {
+			if process != nil {
+				_ = process.Kill()
+			}
+			_, _ = store.Stop(session.ID)
+			_ = gatorbrowser.RemoveToken(store, session.ID)
+		}
+	}()
+	process, err = startBrowserDaemon(ctx, store, stateDir, session, "")
+	if err != nil {
+		return session, err
 	}
 	client, err := gatorbrowser.NewClient(store, session.ID)
 	if err != nil {
-		return err
+		return session, err
 	}
-	// The sole tab in a fresh managed profile is created by this explicit start
-	// command, so selecting it cannot disclose an existing user browser tab.
-	candidates, err := client.CandidateTabs(context.Background())
+	candidates, err := client.CandidateTabs(ctx)
 	if err != nil {
-		return err
+		return session, err
 	}
 	if len(candidates) != 1 {
-		return errors.New("managed browser session did not create exactly one initial tab")
+		return session, errors.New("managed browser session did not create exactly one initial tab")
 	}
-	if _, err := client.SelectTabs(context.Background(), candidates); err != nil {
-		return err
+	selected, err := client.SelectTabs(ctx, candidates)
+	if err != nil {
+		return session, err
 	}
-	_, err = fmt.Fprintf(out, "Started local browser session %s\n  mode: managed\n  selected tab: %s\n  visual capture: %t\nUse 'gator browser origins %s add URL' before a run may navigate.\n", session.ID, candidates[0].ID, *visual, session.ID)
-	return err
+	return selected, nil
 }
 
 func attachBrowserSession(arguments []string, out io.Writer, store *gatorbrowser.Store, stateDir string) error {
@@ -225,9 +246,18 @@ func attachBrowserSession(arguments []string, out io.Writer, store *gatorbrowser
 }
 
 func launchBrowserDaemon(store *gatorbrowser.Store, stateDir string, session gatorbrowser.Session, endpoint string, out io.Writer) error {
-	tokenFile, _, err := gatorbrowser.CreateToken(store, session.ID)
+	process, err := startBrowserDaemon(context.Background(), store, stateDir, session, endpoint)
 	if err != nil {
 		return err
+	}
+	_, err = fmt.Fprintf(out, "Browser daemon started (pid %d).\n", process.Pid)
+	return err
+}
+
+func startBrowserDaemon(ctx context.Context, store *gatorbrowser.Store, stateDir string, session gatorbrowser.Session, endpoint string) (*os.Process, error) {
+	tokenFile, _, err := gatorbrowser.CreateToken(store, session.ID)
+	if err != nil {
+		return nil, err
 	}
 	revokeToken := true
 	defer func() {
@@ -244,45 +274,47 @@ func launchBrowserDaemon(store *gatorbrowser.Store, stateDir string, session gat
 	}
 	logDirectory := filepath.Join(store.Directory(), "logs")
 	if err := os.MkdirAll(logDirectory, 0o700); err != nil {
-		return fmt.Errorf("create browser daemon log directory: %w", err)
+		return nil, fmt.Errorf("create browser daemon log directory: %w", err)
 	}
 	logFile, err := os.OpenFile(filepath.Join(logDirectory, session.ID+".log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
-		return fmt.Errorf("open browser daemon log: %w", err)
+		return nil, fmt.Errorf("open browser daemon log: %w", err)
 	}
 	command := hostproc.Command(os.Args[0], arguments...)
+	command.Env = append(os.Environ(), "GATOR_INTERNAL_COMMANDS=1")
 	command.Stdout = logFile
 	command.Stderr = logFile
 	configureDetached(command, false)
 	if err := command.Start(); err != nil {
 		_ = logFile.Close()
-		return fmt.Errorf("start browser daemon: %w", err)
+		return nil, fmt.Errorf("start browser daemon: %w", err)
 	}
 	_ = logFile.Close()
-	if err := waitBrowserReady(store, session.ID, command.Process); err != nil {
+	go func() { _ = command.Wait() }()
+	if err := waitBrowserReadyContext(ctx, store, session.ID); err != nil {
 		_ = command.Process.Kill()
-		return err
+		return nil, err
 	}
 	revokeToken = false
-	_, err = fmt.Fprintf(out, "Browser daemon started (pid %d).\n", command.Process.Pid)
-	return err
+	return command.Process, nil
 }
 
-func waitBrowserReady(store *gatorbrowser.Store, sessionID string, process *os.Process) error {
-	deadline := time.Now().Add(15 * time.Second)
-	for time.Now().Before(deadline) {
+func waitBrowserReadyContext(parent context.Context, store *gatorbrowser.Store, sessionID string) error {
+	ctx, cancel := context.WithTimeout(parent, 15*time.Second)
+	defer cancel()
+	for {
 		client, err := gatorbrowser.NewClient(store, sessionID)
 		if err == nil {
-			if _, err := client.CandidateTabs(context.Background()); err == nil {
+			if _, err := client.CandidateTabs(ctx); err == nil {
 				return nil
 			}
 		}
-		time.Sleep(50 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("browser did not become ready: %w; reopen Browser to review its state", ctx.Err())
+		case <-time.After(50 * time.Millisecond):
+		}
 	}
-	if process != nil {
-		_ = process.Kill()
-	}
-	return errors.New("browser daemon did not become ready; inspect 'gator browser status' and its private local log")
 }
 
 func selectBrowserTabs(arguments []string, out io.Writer, store *gatorbrowser.Store) error {

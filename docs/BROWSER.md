@@ -1,6 +1,6 @@
 # Local controlled browser sessions
 
-**Interface status:** Gator is a desktop app. Shell examples below are source-checkout developer operations with an explicit internal opt-in; see [development instructions](DEVELOPMENT.md). They do not install or enable a public CLI.
+The terminal distribution exposes browser commands and a `/browser` panel. The shared application panel also appears in desktop command navigation. Source-checkout shell examples below use an explicit internal opt-in; see [development instructions](DEVELOPMENT.md).
 
 Gator can control a real local Chromium session for browser-based development
 and visual verification. It is not a hosted browser, a remote executor, or a
@@ -8,6 +8,38 @@ general computer-use surface. A browser is available to an agent only when the
 developer explicitly starts or attaches a local session, selects specific tabs,
 and grants that session to one Work run. The browser capability is separate
 from ordinary HTTP research and does not imply desktop/app control.
+
+## In the terminal or desktop application
+
+Open `/browser` from the command palette. The shared panel provides:
+
+1. **Install browser**: review the download before installing the pinned runtime.
+2. **Open private browser**: a separate headed window starts paused, with
+   screenshots off. Add allowed site origins, including required sign-in redirects.
+3. **Private sign-in**: use that window yourself while access is paused. Gator
+   does not ask for passwords or one-time codes in chat.
+4. **Resume agent access**: review the selected tabs, sites and screenshot setting.
+   Choose a different shared tab if needed.
+5. **Use for next task**: review a separate task grant, then submit your request.
+   The grant is consumed by one submitted or queued task in that chat. It does
+   not carry into later prompts, new chats, or the Code specialist.
+6. **Pause for private takeover**: available while work is running. Wait for the
+   acknowledgement before entering private information. Resume explicitly.
+7. **Stop browser**: revoke access and close a managed window, or disconnect an
+   attached browser. If a controller cannot be reached, the panel offers explicit
+   revocation and refresh. It does not claim an uncertain browser action failed.
+
+Every request using the reviewed task grant checks the browser policy at the
+controller. A change to selected tabs, allowed sites, upload registrations or
+capture permission fails closed until access matches the reviewed policy. Queue
+recovery preserves the grant and does not automatically replay interrupted work.
+A live task's element references are invalidated across private takeover.
+
+The browser panel shows the next-task selection; clearing it affects future
+submission only. Pause or stop the session to block already submitted tasks.
+Managed windows have temporary sign-in state; a new window starts fresh. Existing
+attached sessions are manageable here, but attaching a CDP browser and registering
+uploads still use the advanced CLI. This is not proof of a real account sign-in.
 
 ## Setup and lifecycle
 
@@ -37,9 +69,8 @@ GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator browser select SESSION_ID TAB_ID [T
 Attached sessions never expose candidate tabs to the model. The CLI lists them
 only for the developer; agent tools can see only selected tabs. `gator browser
 stop SESSION_ID` closes a managed browser, disconnects an attached browser, and
-revokes the local token. These remain internal developer commands. The current
-desktop/terminal task UI does not yet expose the complete browser lifecycle
-and task-grant journey; the old `/browser` TUI claim did not describe this UI.
+revokes the local token. The application panel also manages these sessions;
+creating an attached CDP session remains an advanced CLI operation.
 
 List capture metadata with `gator browser artifacts SESSION_ID`; copy one to a
 new developer-selected path without overwriting an existing file through
@@ -94,8 +125,8 @@ through its browser tools. Failed invalidation keeps access paused.
 Approved origins remain in force during private takeover. Authentication
 redirects may need additional explicit origin grants; pause does not grant new
 network access. A stopped controller cannot be recovered merely by resuming it.
-These controls do not yet provide an integrated account-login or browser-recovery
-journey in the desktop/terminal interface.
+The `/browser` panel exposes private takeover and unavailable-session recovery.
+Actual provider sign-in and redirect requirements still need real-account testing.
 
 ## Network and profile boundary
 

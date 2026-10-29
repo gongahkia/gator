@@ -100,6 +100,7 @@ func effectiveConfiguration(request Request) any {
 		DisabledRoles        []string
 		EnableCode           bool
 		RequireCode          bool
+		BrowserPolicy        string
 		BrowserSession       string
 		DisableBrowser       bool
 		ExcludedKnowledgeIDs []string
@@ -112,7 +113,7 @@ func effectiveConfiguration(request Request) any {
 			return request.Project.SHA256
 		}
 		return ""
-	}(), request.DisableDelegation, request.DisabledRoles, request.EnableCode, request.RequireCode, request.BrowserSession, request.DisableBrowser, request.ExcludedKnowledgeIDs, request.DesktopSession, request.ForegroundApp, request.LearnFromChats, request.DisableChatHistory}
+	}(), request.DisableDelegation, request.DisabledRoles, request.EnableCode, request.RequireCode, request.BrowserPolicy, request.BrowserSession, request.DisableBrowser, request.ExcludedKnowledgeIDs, request.DesktopSession, request.ForegroundApp, request.LearnFromChats, request.DisableChatHistory}
 }
 
 type Interaction struct {

@@ -678,6 +678,8 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 	}
 	var appChangesMu sync.Mutex
 	request := workrun.Request{
+		BrowserSession:  options.BrowserSession,
+		BrowserPolicy:   options.BrowserPolicy,
 		ReplyToUpdateID: options.ReplyToUpdateID,
 		AfterAppRun: func(change workrun.AppChange, mutation workrun.AppMutation) {
 			appChangesMu.Lock()

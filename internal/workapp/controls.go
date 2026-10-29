@@ -32,7 +32,10 @@ type ControlAction struct {
 }
 type SourceMove struct{ From, To string }
 
+type BrowserGrant struct{ SessionID, Policy, ConversationID string }
+
 type ControlScreen struct {
+	BrowserGrant         *BrowserGrant
 	Location             string
 	SourceMoves          []SourceMove
 	ResetConversation    bool
@@ -73,8 +76,14 @@ func (m *Model) controlCommand(action string, args []string) tea.Cmd {
 	m.controlBusy = true
 	m.controlBackground = false
 	call, family := m.config.Controls, m.controlFamily
+	conversation := m.conversation
 	return func() tea.Msg {
 		screen, err := call(ctx, family, action, args)
+		if screen.BrowserGrant != nil {
+			grant := *screen.BrowserGrant
+			grant.ConversationID = conversation
+			screen.BrowserGrant = &grant
+		}
 		return controlDone{generation, screen, err}
 	}
 }
@@ -174,7 +183,7 @@ func (m Model) updateControls(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if key.String() == "esc" {
-		if (m.controlFamily == "overview" || m.controlFamily == "connections") && len(m.controlRootArgs) > 0 {
+		if (m.controlFamily == "overview" || m.controlFamily == "connections" || m.controlFamily == "browser") && len(m.controlRootArgs) > 0 {
 			m.controlRootArgs = m.controlRootArgs[:len(m.controlRootArgs)-1]
 			cmd := m.controlCommand("status", m.controlRootArgs)
 			return m, cmd
@@ -302,6 +311,13 @@ func (m Model) controlsPanel() uisnapshot.Panel {
 			hint.Tone = "error"
 		}
 		p.Hints = append(p.Hints, hint)
+	}
+	if m.controlFamily == "browser" {
+		selected := "None"
+		if m.options.BrowserSession != "" {
+			selected = m.options.BrowserSession
+		}
+		p.Blocks = append(append([]uisnapshot.Block(nil), p.Blocks...), uisnapshot.Block{Title: "Next task in this chat", Lines: []string{"Selected browser: " + selected, "This selection is consumed when you submit or queue one task."}})
 	}
 	p.Hints = append(p.Hints, uisnapshot.Hint{Shortcut: "Esc", Action: "back"})
 	if m.controlBusy {

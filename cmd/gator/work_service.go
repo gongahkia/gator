@@ -106,9 +106,18 @@ func configuredWorkService(provider, modelName, stateDir string, request *workru
 		if err != nil {
 			return workrun.Service{}, err
 		}
+		if request.BrowserPolicy != "" {
+			client = client.Reviewed(request.BrowserPolicy)
+		}
 		session, err := client.Session(context.Background(), request.BrowserSession)
 		if err != nil {
 			return workrun.Service{}, err
+		}
+		if session.State != browser.StateRunning {
+			return workrun.Service{}, browser.ErrStopped
+		}
+		if session.Paused {
+			return workrun.Service{}, browser.ErrPaused
 		}
 		if len(session.SelectedTabs) == 0 {
 			return workrun.Service{}, errors.New("Work browser session has no developer-selected tabs")

@@ -1365,3 +1365,23 @@ remaining release/platform matrix. A passing fixture does not verify hardware.
   not inferred. This suite used the runtime built before the subsequent DOCX/XLSX
   changes, which have their own Go regression checks. Windows, device permissions,
   release signing and the broader parity ledger remain open.
+
+### Browser controls checkpoint — 29 October
+
+The terminal now exposes `/browser` installation review, private-window lifecycle,
+site/tab/capture controls, pause/resume and one-task grants. The fresh full suite
+passes **58 tests, 3 skips, 0 failures, 867 assertions across 44 files** in 164.09
+seconds (`.gator/native-tools/terminal-browser-full.log`). The extra skip is the
+opt-in native browser test; it ran separately with the pinned local runtime.
+
+The separate browser suite passes both journeys and 16 assertions: cancellation
+without a download/session, and real headed Chromium starting paused, reviewed
+site/resume/task access, an actual selected-tab tool result, no inherited browser
+tools on the next task, private takeover and stop. It uses a local fixture model
+and synthetic profile, not real accounts. Log: `.gator/native-tools/browser-ui.log`.
+The complete suite used the runtime built for the browser functional changes;
+the focused journey was rerun after the final wording/prompt changes.
+
+Go race suites and TypeScript/terminal build checks pass as recorded in the
+competitive-gap ledger. Desktop-specific interaction, Windows, native device
+permissions, real sign-in and hung-engine recovery remain separate open gates.

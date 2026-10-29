@@ -46,6 +46,7 @@ func TestRetainedQueueRestoresOptionsAndNeverAutomaticallyReplaysInterruptedWork
 	m.options.Uploads = []string{strings.Repeat("a", 32) + "/brief.txt"}
 	m.options.ConnectorIDs = []string{"selected-account"}
 	m.options.MaxSteps = 12
+	m.options.BrowserSession, m.options.BrowserPolicy = "browser-reviewed", "policy-reviewed"
 	next, _ = m.SubmitText("Use the brief")
 	m = next.(Model)
 	next, _ = m.SubmitText("Then summarize")
@@ -82,7 +83,7 @@ func TestRetainedQueueRestoresOptionsAndNeverAutomaticallyReplaysInterruptedWork
 	if auto != nil || len(prompts) != 2 || prompts[1] != "Use the brief" {
 		t.Fatal("recovered queue ran without an explicit request", prompts)
 	}
-	if captured[1].MaxSteps != 12 || len(captured[1].Uploads) != 1 || captured[1].ConnectorIDs[0] != "selected-account" {
+	if captured[1].BrowserSession != "browser-reviewed" || captured[1].BrowserPolicy != "policy-reviewed" || captured[1].MaxSteps != 12 || len(captured[1].Uploads) != 1 || captured[1].ConnectorIDs[0] != "selected-account" {
 		t.Fatalf("captured options lost: %+v", captured[1])
 	}
 	j, err := store.LoadRequests(conversation)

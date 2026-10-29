@@ -124,6 +124,7 @@ export type BackendState = {
     snapshot_id?: string;
     attachments: string[];
     connector_ids: string[];
+    browser_session?: string;
     latest_bundle?: BackendBundle;
   };
   checks?: { goal_id?: string; title: string; health: string; state: string; tone?: ResultTone }[];

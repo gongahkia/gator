@@ -160,11 +160,12 @@ type BridgeFollowingGoal struct {
 // retained result, including a failed run. It does not measure context usage
 // or assert that a selected connector is authenticated or authorized.
 type BridgeWorkDetails struct {
-	Mode         string         `json:"mode"`
-	SnapshotID   string         `json:"snapshot_id,omitempty"`
-	Attachments  []string       `json:"attachments"`
-	ConnectorIDs []string       `json:"connector_ids"`
-	LatestBundle *BundleSummary `json:"latest_bundle,omitempty"`
+	BrowserSession string         `json:"browser_session,omitempty"`
+	Mode           string         `json:"mode"`
+	SnapshotID     string         `json:"snapshot_id,omitempty"`
+	Attachments    []string       `json:"attachments"`
+	ConnectorIDs   []string       `json:"connector_ids"`
+	LatestBundle   *BundleSummary `json:"latest_bundle,omitempty"`
 }
 
 func (m Model) BridgeState() BridgeState {
@@ -222,7 +223,8 @@ func (m Model) BridgeState() BridgeState {
 	}
 	state.GuidanceID = m.bridgeGuidanceID()
 	state.WorkDetails = BridgeWorkDetails{
-		Mode: m.options.Mode, SnapshotID: m.snapshot,
+		BrowserSession: m.options.BrowserSession,
+		Mode:           m.options.Mode, SnapshotID: m.snapshot,
 		Attachments:  append([]string{}, m.options.Attachments...),
 		ConnectorIDs: append([]string{}, m.options.ConnectorIDs...),
 	}
@@ -354,7 +356,7 @@ func (m Model) RespondBridgeApproval(id int, token string, approved bool) (tea.M
 func (m Model) NavigateBridge(command string) (tea.Model, tea.Cmd) {
 	m.bridgeNotice = ""
 	switch command {
-	case "/gator", "/chat", "/knowledge", "/new", "/overview", "/goals", "/conversations", "/inbox", "/followup", "/history", "/memory", "/context", "/usage", "/data", "/recovery", "/connections", "/model", "/settings", "/help":
+	case "/gator", "/chat", "/knowledge", "/new", "/overview", "/goals", "/conversations", "/inbox", "/followup", "/history", "/memory", "/context", "/usage", "/data", "/recovery", "/connections", "/browser", "/model", "/settings", "/help":
 	default:
 		known := false
 		for _, entry := range m.availableCommandEntries() {
@@ -364,7 +366,7 @@ func (m Model) NavigateBridge(command string) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	}
-	if m.config.ManagedSessions && (m.running && command != "/chat" || m.pendingConnection() != "" && command != "/connections") && !m.controlBusy && !m.followupSaving && !m.recallBusy && m.bridgeExternal == nil {
+	if m.config.ManagedSessions && (m.running && command != "/chat" && command != "/browser" || m.pendingConnection() != "" && command != "/connections") && !m.controlBusy && !m.followupSaving && !m.recallBusy && m.bridgeExternal == nil {
 		if command == "/new" {
 			m.requestSession(BridgeSessionRequest{New: true})
 		} else {
@@ -372,7 +374,7 @@ func (m Model) NavigateBridge(command string) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	if (m.running && command != "/chat") || m.controlBusy || m.followupSaving || m.recallBusy || m.bridgeExternal != nil {
+	if (m.running && command != "/chat" && command != "/browser") || m.controlBusy || m.followupSaving || m.recallBusy || m.bridgeExternal != nil {
 		m.status = "Finish or stop the current operation before switching views."
 		m.bridgeNotice = m.status
 		return m, nil

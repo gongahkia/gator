@@ -125,6 +125,8 @@ type BundleActionRequest struct {
 // one prompt. They configure Gator and bound its internal Code specialist;
 // they are never editable by the manager model itself.
 type RunOptions struct {
+	BrowserSession          string
+	BrowserPolicy           string
 	ReplyToUpdateID         string
 	ModelProvider           string
 	ModelName               string
