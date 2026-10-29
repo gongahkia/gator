@@ -1,12 +1,22 @@
 import { createServer } from 'node:http';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { open } from 'node:fs/promises';
+import { open, readFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { Backend } from '../app-host/src/backend.mjs';
 import { validateFrame } from '../app-host/src/policy.mjs';
 
 const identity = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/;
 const hash = text => createHash('sha256').update(text).digest();
+const assets = new Map([
+  ['/', ['index.html', 'text/html; charset=utf-8']],
+  ['/client.mjs', ['client.mjs', 'text/javascript; charset=utf-8']],
+  ['/styles.css', ['styles.css', 'text/css; charset=utf-8']],
+]);
+const browserHeaders = {
+  'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY',
+  'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+};
 
 // Re-read each time: replacing the token file revokes every old client, without
 // cancelling admitted work. Only a private regular file can authorize access.
@@ -22,6 +32,7 @@ export async function readToken(path) {
 }
 
 export function createCompanion({ binary, workspace, env, tokenFile, origin, spawnBackend = (id) => new Backend(binary, workspace, { ...env, GATOR_UI_SESSION_HOST: '1', GATOR_UI_FRONTEND: 'companion' }, ['ui-backend', id, '']) }) {
+  if (origin && (new URL(origin).origin !== origin || new URL(origin).protocol !== 'https:')) throw new Error('The companion browser origin must be an exact HTTPS origin.');
   const workers = new Map();
   let sequence = Promise.resolve(), stopping = false, pending = 0;
   const serial = task => {
@@ -47,14 +58,22 @@ export function createCompanion({ binary, workspace, env, tokenFile, origin, spa
     return current;
   };
   const respond = (res, status, value) => {
-    res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+    res.writeHead(status, { ...browserHeaders, 'Content-Type': 'application/json' });
     res.end(JSON.stringify(value));
   };
   const server = createServer(async (req, res) => {
     try {
-      // No ambient cookie authentication or permissive CORS. A browser must be
-      // served from the configured origin; CLI/SSH clients may omit Origin.
-      if (req.headers.origin && req.headers.origin !== origin) return respond(res, 403, { error: 'Origin is not allowed.' });
+      const localOrigin = `http://127.0.0.1:${server.address().port}`;
+      if (![new URL(localOrigin).host, origin && new URL(origin).host].includes(req.headers.host)) return respond(res, 421, { error: 'Host is not allowed.' });
+      // The static shell is public; all conversation data still requires a token.
+      // Restrict both Host (DNS rebinding) and Origin. No cookies or CORS.
+      if (req.headers.origin && ![localOrigin, origin].includes(req.headers.origin)) return respond(res, 403, { error: 'Origin is not allowed.' });
+      const asset = assets.get(req.url);
+      if (asset && req.method === 'GET') {
+        const body = await readFile(new URL(`./public/${asset[0]}`, import.meta.url));
+        res.writeHead(200, { ...browserHeaders, 'Content-Type': asset[1] });
+        return res.end(body);
+      }
       const supplied = req.headers.authorization || '';
       const token = await readToken(tokenFile);
       if (!timingSafeEqual(hash(supplied), hash(`Bearer ${token}`))) return respond(res, 401, { error: 'Authentication required.' });

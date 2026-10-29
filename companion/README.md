@@ -5,8 +5,8 @@ host. The host owns its files, configured accounts, models and execution. A
 client disconnect does not stop admitted work. This does not migrate laptop
 work or make an offline laptop's files accessible.
 
-This checkpoint supplies an authenticated API using the existing Go bridge.
-Phone/browser UI, device pairing, per-device revocation, file transfer, service
+This checkpoint supplies an authenticated API and a small phone/browser client
+using the existing Go bridge. Device pairing, per-device revocation, file transfer, service
 installation and remote account onboarding remain unfinished. Keep Electron and
 the terminal available for host setup and recovery. The terminal parity gate is
 unchanged. Do not expose this listener directly to the internet.
@@ -29,8 +29,10 @@ node companion/main.mjs /path/to/gator-runtime /path/to/host/workspace \
 The listener binds only `127.0.0.1`. Use an SSH tunnel, or an HTTPS reverse proxy
 on the execution host that preserves the Authorization header. Never send the
 bearer token over an unencrypted remote connection or put it in a URL. For a
-future same-origin browser client, set `GATOR_COMPANION_ORIGIN` to its exact HTTPS
-origin; other browser origins are rejected. No permissive CORS is enabled.
+same-origin browser client, set `GATOR_COMPANION_ORIGIN` to its exact HTTPS
+origin (no trailing slash). Preserve that Host header or the listener's exact
+`127.0.0.1:PORT` header through the proxy. Other hosts and browser origins are
+rejected. No permissive CORS is enabled.
 Token creation refuses overwrite; rotation atomically replaces an existing token:
 
 ```sh
@@ -43,9 +45,33 @@ device enrollment/revocation is not implemented yet. Keep token directories
 private; macOS/Linux permissions and symlink checks are enforced. Native Windows
 ACL and deployment acceptance remain pending.
 
+## Open on a phone or browser
+
+Open the configured HTTPS origin on your phone, or `http://127.0.0.1:7341` on
+the host. Enter the host token and an existing conversation ID. IDs come from
+the host's retained conversations; browsing/creating chats from the phone is
+not yet supported. The shell is public; every conversation request requires
+the token. The token stays in memory and is cleared on disconnect/reload.
+
+The client displays messages, updates, queue state and exact pending approval
+details. Result fields, previews and file/action receipts are available as plain
+text; Office rendering and file download remain host operations. Approving
+requires opening the current preview and explicitly confirming it. A changed
+preview closes the confirmation. Check the resulting receipt to establish the
+outcome; acknowledgement alone is not successful delivery.
+
+Draft text and unconfirmed message IDs use this tab's session storage. If a send
+loses its acknowledgement, reconnect and use **Retry same message**. Reloading
+retains the exact payload/ID so Go can deduplicate it. Unconfirmed text stays
+locked until acknowledged; don't resubmit it as new work elsewhere. Requests
+are never automatically resent. Closing the tab may discard this browser's
+draft; admitted host work remains retained. Disconnect does not delete a draft.
+The client polls while visible and disables actions when disconnected, hidden,
+or refreshing. Token revocation clears the displayed conversation.
+
 ## API v1
 
-All requests need `Authorization: Bearer TOKEN`. Responses are JSON with
+All API requests need `Authorization: Bearer TOKEN`. Responses are JSON with
 `Cache-Control: no-store`.
 
 - `GET /v1/chats/CONVERSATION_ID`: open an existing conversation and read its
@@ -95,10 +121,16 @@ From the repository root:
 
 ```sh
 node --test companion/server.test.mjs
+# After installing the desktop dependencies and Playwright browsers:
+GATOR_COMPANION_BROWSERS=chromium,webkit node --test companion/client.test.mjs
 ```
 
 Tests build the real Go runtime, use a disposable profile and local model fixture,
 then exercise authentication, origin and conversation binding, client disconnect,
 duplicate admission, token revocation, restart and non-replay. No real accounts
 or paid provider requests are used. This does not establish remote deployment,
-real-account action delivery or mobile usability.
+real-account action delivery or mobile usability. Browser tests use a deterministic
+host fixture to exercise reload after a lost acknowledgement, stable admission
+identity, current approval review/replacement/denial, plain-text untrusted content,
+offline behavior, narrow layouts and revocation. A simulated phone viewport is
+not physical iOS/Android acceptance.

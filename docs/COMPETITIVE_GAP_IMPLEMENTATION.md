@@ -212,3 +212,30 @@ companion and confirms the saved answer reopens without additional model calls.
 The forced socket-drop fixture reconnects an idempotent GET after an expected
 stale pooled socket reset. Token-file permission, symlink and format tests pass;
 Windows ACL acceptance is not inferred from them. Syntax and diff checks pass.
+
+### Companion phone client checkpoint
+
+The companion now serves a responsive, same-origin client for an existing chat.
+It shows retained messages, updates, queued work and complete plain-text approval
+previews. Approval requires an explicit second confirmation; a changed live
+preview cancels it. Offline/hidden/refreshing clients cannot submit a decision.
+Tokens remain in memory. Unconfirmed messages retain their exact payload and
+admission ID in tab session storage, including across reload, and retries are
+explicit. Revocation clears the displayed conversation. Fixed static assets use
+a restrictive CSP; Host/Origin checks reject foreign browser origins and rebinding.
+
+Verification on this macOS Intel host: the real-Go disconnect/restart/admission
+test and token tests pass, as does the public-shell/authentication test. The
+phone-width journey passes in installed Chrome and cached Playwright WebKit
+2370, driven by the locally available Playwright 1.64.0 alpha. It exercises an
+acknowledgement lost after admission, reload/retry with the identical request,
+approval replacement/confirmation/denial, untrusted text rendering, offline
+controls and revocation. Widths 320/390/760 have no horizontal overflow; dark
+and light screenshots were inspected. The browser host is a deterministic
+fixture; real Go admission is verified separately. Linux CI now runs the same
+journey with the desktop's pinned Playwright browsers. No CI result is claimed.
+
+Physical iOS/Android, remote HTTPS deployment, device enrollment/revocation,
+conversation discovery/creation, native service installation, file transfer,
+and live connected workflows remain open. A browser viewport fixture does not
+close G14/G15 or the physical-device acceptance gap.

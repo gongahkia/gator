@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <title>Gator companion</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/client.mjs"></script>
+</head>
+<body>
+  <main>
+    <header><span class="brand">Gator</span><span class="muted">Companion · preview</span></header>
+    <h1>Your work, on the host</h1>
+    <p class="muted">Check a conversation while your host keeps working.</p>
+    <form id="connect-form" class="card">
+      <div id="credentials">
+      <label for="token">Host access token</label>
+      <input id="token" type="password" autocomplete="off" spellcheck="false" required pattern="[a-f0-9]{64}" aria-describedby="token-help">
+      <p id="token-help" class="hint">Kept in this page’s memory. Closing or reloading asks for it again.</p>
+      <label for="conversation">Conversation ID</label>
+      <input id="conversation" autocomplete="off" autocapitalize="none" spellcheck="false" required pattern="[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}">
+      </div>
+      <p id="connected-chat" class="hint" hidden></p>
+      <div class="row"><button id="connect" type="submit">Open conversation</button><button id="disconnect" type="button" class="secondary" hidden>Disconnect</button></div>
+    </form>
+    <p id="connection" role="status">Not connected</p>
+    <p id="error" role="alert" hidden></p>
+    <section id="chat" hidden aria-labelledby="chat-title">
+      <div class="row"><h2 id="chat-title">Conversation</h2><button id="refresh" class="secondary" type="button">Refresh</button></div>
+      <p id="host-status" class="muted" role="status"></p>
+      <p id="host-notice" class="notice" hidden></p>
+      <div id="updates"></div>
+      <div id="messages" aria-label="Conversation messages"></div>
+      <section id="approval" class="card" hidden aria-labelledby="approval-title">
+        <h2 id="approval-title">Review requested action</h2>
+        <p>Check the complete action below before deciding.</p>
+        <pre id="approval-preview"></pre>
+        <div class="row"><button id="review" type="button">Review approval</button><button id="deny" type="button" class="secondary">Deny</button></div>
+      </section>
+      <div id="queue"></div>
+      <form id="send-form" class="card">
+        <label for="message">Message</label>
+        <textarea id="message" rows="4" maxlength="60000" placeholder="Ask about this conversation…" required></textarea>
+        <p id="draft-status" class="hint">Drafts stay in this browser tab’s session storage until sent. No attachments yet.</p>
+        <button id="send" type="submit">Send message</button>
+      </form>
+      <p class="hint">Disconnecting leaves admitted work running. The host must stay online. Open Gator on the host for settings, files and recovery.</p>
+    </section>
+  </main>
+  <dialog id="approval-dialog" aria-labelledby="confirm-title">
+    <h2 id="confirm-title">Approve this exact action?</h2>
+    <pre id="confirm-preview"></pre>
+    <div class="row"><button id="confirm" type="button">Approve action</button><button id="cancel" type="button" class="secondary">Back</button></div>
+  </dialog>
+</body>
+</html>

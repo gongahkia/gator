@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createServer } from 'node:http';
+import { createServer, get as httpGet } from 'node:http';
 import { execFileSync, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdtemp, mkdir, writeFile, rm, readdir, readFile, chmod, symlink } from 'node:fs/promises';
@@ -106,4 +106,28 @@ test('token files reject public permissions, symlinks and malformed values', { s
     await symlink(path, join(root, 'link')); await assert.rejects(readToken(join(root, 'link')));
     await writeFile(path, 'not-a-token'); await assert.rejects(readToken(path));
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('public browser shell has no host data and rejects foreign hosts and origins', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'gator-companion-shell-'));
+  const tokenFile = join(root, 'token'); let companion;
+  try {
+    await writeFile(tokenFile, 'a'.repeat(64) + '\n', { mode: 0o600 });
+    companion = createCompanion({ tokenFile, spawnBackend() { throw new Error('Shell must not start a runtime.'); } });
+    const address = await companion.listen(), base = `http://127.0.0.1:${address.port}`;
+    const page = await fetch(base);
+    assert.equal(page.status, 200);
+    assert.ok(page.headers.get('content-security-policy').includes("frame-ancestors 'none'"));
+    assert.equal(page.headers.get('cache-control'), 'no-store');
+    assert.match(await page.text(), /Gator companion/);
+    assert.equal((await fetch(base + '/client.mjs')).status, 200);
+    assert.equal((await fetch(base + '/v1/chats/work-private')).status, 401);
+    const foreignHost = await new Promise((resolve, reject) => {
+      httpGet(base, { headers: { Host: 'attacker.example' } }, res => { res.resume(); resolve(res.statusCode); }).on('error', reject);
+    });
+    assert.equal(foreignHost, 421);
+    assert.equal((await fetch(base, { headers: { Origin: 'https://attacker.example' } })).status, 403);
+    assert.equal((await fetch(base, { headers: { Origin: base } })).status, 200);
+    assert.throws(() => createCompanion({ tokenFile, origin: 'https://example.test/path' }));
+  } finally { await companion?.close(); await rm(root, { recursive: true, force: true }); }
 });
