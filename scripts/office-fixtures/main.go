@@ -139,7 +139,10 @@ func generate(directory string) error {
 	if err := os.WriteFile(filepath.Join(directory, "streamed.xlsx"), streamed, 0600); err != nil {
 		return err
 	}
-	return calculationFixtures(directory)
+	if err := calculationFixtures(directory); err != nil {
+		return err
+	}
+	return layoutFixtures(directory)
 }
 
 // Model a common Office template: formatted text is split into runs, and the
