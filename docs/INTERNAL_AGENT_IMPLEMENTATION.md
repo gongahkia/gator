@@ -180,3 +180,14 @@ Existing profiles load without migration. Newly written plan scheduling fields
 and note receipts require this version of the reader; restoring an older binary
 alone does not remove those fields from a profile. Use a matching profile backup
 when rolling back data formats.
+
+### Final local verification
+
+- `go test ./internal/... ./cmd/...` passed after updating the remaining legacy
+  access-probe tests. The regenerated deck scenario passes in the full corpus.
+- `node ui/scripts/build-runtime.mjs` rebuilt the local runtime successfully.
+  The rebuilt binary's `goal agenda --days 7` passed an isolated empty-profile
+  smoke test.
+- The terminal CI workflow now exercises native goal, note, suggestion and
+  follow-up lifecycles on Linux, both macOS architectures and Windows. Current
+  run status is recorded in GitHub Actions, not inferred from this Mac's tests.
