@@ -44,36 +44,41 @@ type Plan struct {
 }
 
 type Step struct {
-	StartsAt  time.Time  `json:"starts_at,omitempty"`
-	EndsAt    time.Time  `json:"ends_at,omitempty"`
-	DependsOn []string   `json:"depends_on,omitempty"`
-	ID        string     `json:"id"`
-	Title     string     `json:"title"`
-	Status    StepStatus `json:"status"`
-	DueAt     time.Time  `json:"due_at,omitempty"`
-	Evidence  []string   `json:"evidence,omitempty"`
-	UpdatedAt time.Time  `json:"updated_at"`
+	Recurrence  *Recurrence          `json:"recurrence,omitempty"`
+	Occurrences []OccurrenceOverride `json:"occurrences,omitempty"`
+	StartsAt    time.Time            `json:"starts_at,omitempty"`
+	EndsAt      time.Time            `json:"ends_at,omitempty"`
+	DependsOn   []string             `json:"depends_on,omitempty"`
+	ID          string               `json:"id"`
+	Title       string               `json:"title"`
+	Status      StepStatus           `json:"status"`
+	DueAt       time.Time            `json:"due_at,omitempty"`
+	Evidence    []string             `json:"evidence,omitempty"`
+	UpdatedAt   time.Time            `json:"updated_at"`
 }
 
 // PlanChange is a single typed edit. ExpectedRevision prevents a stale agent
 // proposal from overwriting a later user correction.
 type PlanChange struct {
-	StartsAt          time.Time  `json:"starts_at,omitempty"`
-	EndsAt            time.Time  `json:"ends_at,omitempty"`
-	ClearSchedule     bool       `json:"clear_schedule,omitempty"`
-	DependsOn         []string   `json:"depends_on,omitempty"`
-	ClearDependencies bool       `json:"clear_dependencies,omitempty"`
-	Kind              string     `json:"kind"`
-	ExpectedRevision  int        `json:"expected_revision"`
-	StepID            string     `json:"step_id,omitempty"`
-	Title             string     `json:"title,omitempty"`
-	Status            StepStatus `json:"status,omitempty"`
-	DueAt             time.Time  `json:"due_at,omitempty"`
-	ClearDue          bool       `json:"clear_due,omitempty"`
-	Evidence          []string   `json:"evidence,omitempty"`
-	ClearEvidence     bool       `json:"clear_evidence,omitempty"`
-	Outcome           string     `json:"outcome,omitempty"`
-	NextReviewAt      time.Time  `json:"next_review_at,omitempty"`
+	Recurrence        *Recurrence         `json:"recurrence,omitempty"`
+	ClearRecurrence   bool                `json:"clear_recurrence,omitempty"`
+	Occurrence        *OccurrenceOverride `json:"occurrence,omitempty"`
+	StartsAt          time.Time           `json:"starts_at,omitempty"`
+	EndsAt            time.Time           `json:"ends_at,omitempty"`
+	ClearSchedule     bool                `json:"clear_schedule,omitempty"`
+	DependsOn         []string            `json:"depends_on,omitempty"`
+	ClearDependencies bool                `json:"clear_dependencies,omitempty"`
+	Kind              string              `json:"kind"`
+	ExpectedRevision  int                 `json:"expected_revision"`
+	StepID            string              `json:"step_id,omitempty"`
+	Title             string              `json:"title,omitempty"`
+	Status            StepStatus          `json:"status,omitempty"`
+	DueAt             time.Time           `json:"due_at,omitempty"`
+	ClearDue          bool                `json:"clear_due,omitempty"`
+	Evidence          []string            `json:"evidence,omitempty"`
+	ClearEvidence     bool                `json:"clear_evidence,omitempty"`
+	Outcome           string              `json:"outcome,omitempty"`
+	NextReviewAt      time.Time           `json:"next_review_at,omitempty"`
 }
 
 func (s Store) LoadPlan(goalID string) (Plan, error) {
@@ -241,11 +246,20 @@ func (s Store) applyPlanChange(goalID string, change PlanChange, mutationID stri
 		if _, err := rand.Read(random[:]); err != nil {
 			return Plan{}, err
 		}
-		plan.Steps = append(plan.Steps, Step{StartsAt: change.StartsAt.UTC(), EndsAt: change.EndsAt.UTC(), DependsOn: append([]string(nil), change.DependsOn...), ID: "step-" + hex.EncodeToString(random[:]), Title: strings.TrimSpace(change.Title), Status: StepPending, DueAt: change.DueAt.UTC(), Evidence: append([]string(nil), change.Evidence...), UpdatedAt: now})
+		plan.Steps = append(plan.Steps, Step{Recurrence: change.Recurrence, StartsAt: change.StartsAt.UTC(), EndsAt: change.EndsAt.UTC(), DependsOn: append([]string(nil), change.DependsOn...), ID: "step-" + hex.EncodeToString(random[:]), Title: strings.TrimSpace(change.Title), Status: StepPending, DueAt: change.DueAt.UTC(), Evidence: append([]string(nil), change.Evidence...), UpdatedAt: now})
 	case "update_step":
 		found := false
 		for i := range plan.Steps {
 			if plan.Steps[i].ID == change.StepID {
+				if change.Recurrence != nil {
+					plan.Steps[i].Recurrence = change.Recurrence
+				}
+				if change.ClearRecurrence {
+					if len(plan.Steps[i].Occurrences) > 0 {
+						return Plan{}, errors.New("clear occurrence overrides explicitly before removing recurrence")
+					}
+					plan.Steps[i].Recurrence = nil
+				}
 				if change.Title != "" {
 					plan.Steps[i].Title = strings.TrimSpace(change.Title)
 				}
@@ -280,6 +294,40 @@ func (s Store) applyPlanChange(goalID string, change PlanChange, mutationID stri
 				found = true
 				break
 			}
+		}
+		if !found {
+			return Plan{}, errors.New("goal step not found")
+		}
+
+	case "update_occurrence", "clear_occurrence":
+		found := false
+		for i := range plan.Steps {
+			step := &plan.Steps[i]
+			if step.ID != change.StepID {
+				continue
+			}
+			found = true
+			if step.Recurrence == nil {
+				return Plan{}, errors.New("step has no recurrence")
+			}
+			position := -1
+			for j, o := range step.Occurrences {
+				if o.Date == change.Occurrence.Date {
+					position = j
+					break
+				}
+			}
+			if change.Kind == "clear_occurrence" {
+				if position < 0 {
+					return Plan{}, errors.New("occurrence override does not exist")
+				}
+				step.Occurrences = append(step.Occurrences[:position], step.Occurrences[position+1:]...)
+			} else if position >= 0 {
+				step.Occurrences[position] = *change.Occurrence
+			} else {
+				step.Occurrences = append(step.Occurrences, *change.Occurrence)
+			}
+			step.UpdatedAt = now
 		}
 		if !found {
 			return Plan{}, errors.New("goal step not found")
@@ -385,6 +433,16 @@ func writePrivatePlan(path string, data []byte) error {
 }
 
 func validateChange(change PlanChange) error {
+
+	if change.ClearRecurrence && change.Recurrence != nil {
+		return errors.New("cannot set and clear recurrence together")
+	}
+	if (change.Recurrence != nil || change.ClearRecurrence) && change.Kind != "add_step" && change.Kind != "update_step" {
+		return errors.New("recurrence requires a step edit")
+	}
+	if change.Occurrence != nil && change.Kind != "update_occurrence" && change.Kind != "clear_occurrence" {
+		return errors.New("occurrence requires an occurrence edit")
+	}
 	if err := validateSchedule(change.StartsAt, change.EndsAt, change.DependsOn); err != nil {
 		return err
 	}
@@ -411,8 +469,16 @@ func validateChange(change PlanChange) error {
 		if !validStepID(change.StepID) || (change.Title != "" && !validStepTitle(change.Title)) || (change.Status != "" && !validStepStatus(change.Status)) || !validEvidence(change.Evidence) || (change.ClearDue && !change.DueAt.IsZero()) || (change.ClearEvidence && change.Evidence != nil) {
 			return errors.New("invalid goal step update")
 		}
-		if change.Title == "" && change.Status == "" && change.DueAt.IsZero() && change.Evidence == nil && !change.ClearDue && !change.ClearEvidence && change.StartsAt.IsZero() && !change.ClearSchedule && change.DependsOn == nil && !change.ClearDependencies {
+		if change.Title == "" && change.Status == "" && change.DueAt.IsZero() && change.Evidence == nil && !change.ClearDue && !change.ClearEvidence && change.StartsAt.IsZero() && !change.ClearSchedule && change.DependsOn == nil && !change.ClearDependencies && change.Recurrence == nil && !change.ClearRecurrence {
 			return errors.New("goal step update is empty")
+		}
+
+	case "update_occurrence", "clear_occurrence":
+		if !validStepID(change.StepID) || change.Occurrence == nil {
+			return errors.New("occurrence edit requires a step and occurrence")
+		}
+		if _, err := time.Parse("2006-01-02", change.Occurrence.Date); err != nil {
+			return errors.New("occurrence date must be YYYY-MM-DD")
 		}
 	case "remove_step":
 		if !validStepID(change.StepID) {
@@ -443,6 +509,9 @@ func validatePlan(plan Plan) error {
 			return errors.New("invalid goal plan step")
 		}
 		if err := validateSchedule(step.StartsAt, step.EndsAt, step.DependsOn); err != nil {
+			return err
+		}
+		if err := validateRecurrence(step); err != nil {
 			return err
 		}
 		seen[step.ID] = true

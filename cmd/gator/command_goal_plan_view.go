@@ -14,6 +14,7 @@ const tuiPlanUsage = `usage:
   /plan add TITLE [| RFC3339_DUE [| EVIDENCE]]
   /plan step STEP_ID pending|doing|blocked|done [| EVIDENCE]
   /plan review-at RFC3339|clear
+  /plan occurrence STEP_ID YYYY-MM-DD pending|doing|blocked|done|skipped|clear
   /plan reviewed
   /plan remove STEP_ID --yes`
 
@@ -51,6 +52,8 @@ func workTUIPlanAction(store goal.Store, goalID, command string) (string, error)
 		}
 	case strings.HasPrefix(command, "review-at "):
 		arguments = append(arguments, "review-at", strings.TrimSpace(strings.TrimPrefix(command, "review-at ")))
+	case strings.HasPrefix(command, "occurrence "):
+		arguments = append(arguments, strings.Fields(command)...)
 	case command == "reviewed":
 		arguments = append(arguments, "reviewed")
 	case strings.HasPrefix(command, "remove "):

@@ -535,6 +535,9 @@ func applyGoalPlanContext(stateDir string, request *workrun.Request) error {
 		if !step.StartsAt.IsZero() {
 			line += " (scheduled " + step.StartsAt.Format(time.RFC3339) + " to " + step.EndsAt.Format(time.RFC3339) + ")"
 		}
+		if step.Recurrence != nil {
+			line += fmt.Sprintf(" [repeats %s every %d in %s]", step.Recurrence.Frequency, step.Recurrence.Interval, step.Recurrence.Timezone)
+		}
 		if len(step.DependsOn) > 0 {
 			line += " [depends on: " + strings.Join(step.DependsOn, ", ") + "]"
 		}

@@ -7,14 +7,15 @@ import (
 )
 
 type AgendaItem struct {
-	GoalID       string   `json:"goal_id"`
-	GoalTitle    string   `json:"goal_title"`
-	PlanRevision int      `json:"plan_revision"`
-	Step         Step     `json:"step"`
-	Overdue      bool     `json:"overdue"`
-	Scheduled    bool     `json:"scheduled"`
-	BlockedBy    []string `json:"blocked_by,omitempty"`
-	Conflicts    []string `json:"conflicts,omitempty"`
+	OccurrenceDate string   `json:"occurrence_date,omitempty"`
+	GoalID         string   `json:"goal_id"`
+	GoalTitle      string   `json:"goal_title"`
+	PlanRevision   int      `json:"plan_revision"`
+	Step           Step     `json:"step"`
+	Overdue        bool     `json:"overdue"`
+	Scheduled      bool     `json:"scheduled"`
+	BlockedBy      []string `json:"blocked_by,omitempty"`
+	Conflicts      []string `json:"conflicts,omitempty"`
 }
 
 type Agenda struct {
@@ -66,21 +67,34 @@ func (s Store) Agenda(scope string, now, until time.Time) (Agenda, error) {
 			if step.Status == StepDone {
 				continue
 			}
-			// Keep overdue, undated and scheduled-within-window work; an expired block
-			// remains visible as unfinished rather than silently becoming completed.
-			if (step.DueAt.IsZero() || step.DueAt.After(until)) && !step.StartsAt.IsZero() && step.StartsAt.After(until) {
-				continue
-			}
-			if step.StartsAt.IsZero() && !step.DueAt.IsZero() && step.DueAt.After(until) {
-				continue
-			}
-			item := AgendaItem{GoalID: r.ID, GoalTitle: r.Title, PlanRevision: plan.Revision, Step: step, Overdue: !step.DueAt.IsZero() && step.DueAt.Before(now), Scheduled: !step.StartsAt.IsZero()}
-			for _, dep := range step.DependsOn {
-				if status[dep] != StepDone {
-					item.BlockedBy = append(item.BlockedBy, dep)
+			occurrences := []BlockOccurrence{{Step: step}}
+			if step.Recurrence != nil {
+				occurrences, err = ExpandBlock(step, now, until)
+				if err != nil {
+					return result, err
 				}
 			}
-			result.Items = append(result.Items, item)
+			for _, occurrence := range occurrences {
+				step := occurrence.Step
+				if step.Status == StepDone {
+					continue
+				}
+				// Keep overdue, undated and scheduled-within-window work; an expired block
+				// remains visible as unfinished rather than silently becoming completed.
+				if (step.DueAt.IsZero() || step.DueAt.After(until)) && !step.StartsAt.IsZero() && step.StartsAt.After(until) {
+					continue
+				}
+				if step.StartsAt.IsZero() && !step.DueAt.IsZero() && step.DueAt.After(until) {
+					continue
+				}
+				item := AgendaItem{OccurrenceDate: occurrence.Date, GoalID: r.ID, GoalTitle: r.Title, PlanRevision: plan.Revision, Step: step, Overdue: !step.DueAt.IsZero() && step.DueAt.Before(now), Scheduled: !step.StartsAt.IsZero()}
+				for _, dep := range step.DependsOn {
+					if status[dep] != StepDone {
+						item.BlockedBy = append(item.BlockedBy, dep)
+					}
+				}
+				result.Items = append(result.Items, item)
+			}
 		}
 	}
 	sort.Slice(result.Items, func(i, j int) bool {
@@ -117,7 +131,7 @@ func (s Store) Agenda(scope string, now, until time.Time) (Agenda, error) {
 		for j := range result.Items {
 			b := result.Items[j]
 			if i != j && b.Step.EndsAt.After(now) && a.Step.StartsAt.Before(b.Step.EndsAt) && b.Step.StartsAt.Before(a.Step.EndsAt) {
-				a.Conflicts = append(a.Conflicts, b.GoalID+"/"+b.Step.ID)
+				a.Conflicts = append(a.Conflicts, agendaReference(b))
 			}
 		}
 	}
@@ -128,4 +142,12 @@ func agendaTime(s Step) time.Time {
 		return s.StartsAt
 	}
 	return s.DueAt
+}
+
+func agendaReference(item AgendaItem) string {
+	ref := item.GoalID + "/" + item.Step.ID
+	if item.OccurrenceDate != "" {
+		ref += "@" + item.OccurrenceDate
+	}
+	return ref
 }

@@ -83,6 +83,9 @@ func localJobInputHashAt(definition jobs.Definition, stateDir string, now time.T
 			return "", err
 		}
 		if definition.GoalWatch {
+			if err := write(goalPlanWatchItems(plan, now, dependencies)); err != nil {
+				return "", err
+			}
 			// Crossing a due time is a new input even when every file stays
 			// identical. The boolean stays stable after the crossing, so it
 			// triggers one review rather than a model call every minute.

@@ -18,6 +18,7 @@ const goalPlanUsage = `usage:
   gator goal plan ID step STEP_ID pending|doing|blocked|done [--due RFC3339 | --clear-due] [--start RFC3339 --end RFC3339 | --clear-schedule] [--depends-on STEP_ID | --clear-dependencies] [--evidence REF | --clear-evidence]
   gator goal plan ID remove STEP_ID --yes
   gator goal plan ID review-at RFC3339|clear
+  gator goal plan ID occurrence STEP_ID YYYY-MM-DD pending|doing|blocked|done|skipped|clear [--start RFC3339 --end RFC3339]
   gator goal plan ID reviewed`
 
 type evidenceValues []string
@@ -42,6 +43,12 @@ func goalPlanCommand(store goal.Store, args []string, out io.Writer) error {
 			return err
 		}
 		for _, step := range plan.Steps {
+			if step.Recurrence != nil {
+				fmt.Fprintf(out, "Repeats: %s every %d · %s · until %s\n", step.Recurrence.Frequency, step.Recurrence.Interval, step.Recurrence.Timezone, formatPlanTime(step.Recurrence.Until))
+			}
+			for _, o := range step.Occurrences {
+				fmt.Fprintf(out, "  occurrence %s: %s · %s to %s\n", o.Date, o.Status, formatPlanTime(o.StartsAt), formatPlanTime(o.EndsAt))
+			}
 			if _, err := fmt.Fprintf(out, "%s  %-7s  %s  due %s\n", step.ID, step.Status, step.Title, formatPlanTime(step.DueAt)); err != nil {
 				return err
 			}
@@ -113,6 +120,31 @@ func goalPlanCommand(store goal.Store, args []string, out io.Writer) error {
 		if err != nil {
 			return err
 		}
+
+	case "occurrence":
+		if len(args) < 5 {
+			return errors.New(goalPlanUsage)
+		}
+		flags := flag.NewFlagSet("goal plan occurrence", flag.ContinueOnError)
+		flags.SetOutput(io.Discard)
+		start := flags.String("start", "", "rescheduled start")
+		end := flags.String("end", "", "rescheduled end")
+		if err := flags.Parse(args[5:]); err != nil || len(flags.Args()) != 0 {
+			return errors.New(goalPlanUsage)
+		}
+		o := &goal.OccurrenceOverride{Date: args[3], Status: args[4]}
+		o.StartsAt, err = parsePlanTime(*start)
+		if err != nil {
+			return err
+		}
+		o.EndsAt, err = parsePlanTime(*end)
+		if err != nil {
+			return err
+		}
+		change.Kind, change.StepID, change.Occurrence = "update_occurrence", args[2], o
+		if args[4] == "clear" {
+			change.Kind = "clear_occurrence"
+		}
 	case "remove":
 		if len(args) != 4 || args[3] != "--yes" {
 			return errors.New(goalPlanUsage)
@@ -168,6 +200,12 @@ func planScheduleFlags(flags *flag.FlagSet) func(*goal.PlanChange) error {
 	start := flags.String("start", "", "RFC3339 scheduled start")
 	end := flags.String("end", "", "RFC3339 scheduled end")
 	clear := flags.Bool("clear-schedule", false, "remove scheduled block")
+
+	repeat := flags.String("repeat", "", "daily or weekly recurring block")
+	interval := flags.Int("interval", 1, "recurrence interval, 1 through 52")
+	timezone := flags.String("timezone", "", "IANA recurrence timezone")
+	until := flags.String("until", "", "last permitted occurrence start, RFC3339")
+	clearRepeat := flags.Bool("clear-repeat", false, "remove recurrence after clearing overrides")
 	clearDeps := flags.Bool("clear-dependencies", false, "remove dependencies")
 	var deps evidenceValues
 	flags.Var(&deps, "depends-on", "step ID or GOAL_ID/STEP_ID; repeat for multiple dependencies")
@@ -180,6 +218,17 @@ func planScheduleFlags(flags *flag.FlagSet) func(*goal.PlanChange) error {
 		change.EndsAt, err = parsePlanTime(*end)
 		if err != nil {
 			return err
+		}
+
+		change.ClearRecurrence = *clearRepeat
+		if *repeat != "" {
+			end, err := parsePlanTime(*until)
+			if err != nil {
+				return err
+			}
+			change.Recurrence = &goal.Recurrence{Frequency: *repeat, Interval: *interval, Timezone: *timezone, Until: end}
+		} else if *timezone != "" || *until != "" || *interval != 1 {
+			return errors.New("recurrence options require --repeat")
 		}
 		change.ClearSchedule, change.ClearDependencies, change.DependsOn = *clear, *clearDeps, deps
 		return nil
@@ -212,6 +261,9 @@ func goalAgendaCommand(store goal.Store, args []string, out io.Writer) error {
 				label = "overdue"
 			}
 			fmt.Fprintf(out, "  %s %s\n", label, item.Step.DueAt.Local().Format(time.RFC3339))
+		}
+		if item.OccurrenceDate != "" {
+			fmt.Fprintf(out, "  occurrence %s\n", item.OccurrenceDate)
 		}
 		if item.Scheduled {
 			fmt.Fprintf(out, "  scheduled %s to %s\n", item.Step.StartsAt.Local().Format(time.RFC3339), item.Step.EndsAt.Local().Format(time.RFC3339))
