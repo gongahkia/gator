@@ -67,7 +67,7 @@ func Open(stateDir string) (Store, error) {
 	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		return Store{}, errors.New("suggestion directory is not a regular directory")
 	}
-	if err := os.Chmod(root, 0700); err != nil {
+	if err := privatefs.Protect(root); err != nil {
 		return Store{}, err
 	}
 	return Store{root: root}, nil

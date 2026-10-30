@@ -66,9 +66,8 @@ in the owner's Google account.
 
 ## Verification log
 
-Implementation in progress. Record actual checks, commits and live results below
-as they complete. No live-account test, external message, or deployment is part
-of this phase.
+The checks and live results below cover this implementation phase. No
+live-account sign-in test, external message, or deployment is part of this phase.
 
 ### Calendar retirement
 
@@ -191,3 +190,9 @@ when rolling back data formats.
 - The terminal CI workflow now exercises native goal, note, suggestion and
   follow-up lifecycles on Linux, both macOS architectures and Windows. Current
   run status is recorded in GitHub Actions, not inferred from this Mac's tests.
+- Windows CI exposed Unix-only permission assertions in the goal, knowledge
+  and suggestion stores. These stores now apply the shared privacy helper:
+  Unix mode protection or an inheritable Windows DACL. Lifecycle assertions
+  check actual platform privacy for the directories and persisted files,
+  including updated notes and accepted suggestions. The affected local store,
+  planning-tool and CLI tests passed; native Windows verification runs in CI.

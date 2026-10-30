@@ -14,6 +14,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/gongahkia/gator/internal/privatefs"
 )
 
 const Version = 1
@@ -56,7 +58,7 @@ func Open(stateDir string) (Store, error) {
 	if err := os.MkdirAll(root, 0700); err != nil {
 		return Store{}, err
 	}
-	if err := os.Chmod(root, 0700); err != nil {
+	if err := privatefs.Protect(root); err != nil {
 		return Store{}, err
 	}
 	plans := filepath.Join(root, "plans")
@@ -67,7 +69,7 @@ func Open(stateDir string) (Store, error) {
 	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		return Store{}, errors.New("goal plans path is not a directory")
 	}
-	if err := os.Chmod(plans, 0700); err != nil {
+	if err := privatefs.Protect(plans); err != nil {
 		return Store{}, err
 	}
 	return Store{root: root, now: time.Now}, nil

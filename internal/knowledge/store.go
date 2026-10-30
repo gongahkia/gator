@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gongahkia/gator/internal/privatefs"
 	"github.com/gongahkia/gator/internal/retrieval"
 	"io"
 	"os"
@@ -91,7 +92,7 @@ func privateDirectory(path string) error {
 	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		return fmt.Errorf("knowledge path %s is not a directory", path)
 	}
-	return os.Chmod(path, 0700)
+	return privatefs.Protect(path)
 }
 
 func (s Store) Root() string { return s.root }

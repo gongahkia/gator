@@ -7,6 +7,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/gongahkia/gator/internal/privatefs"
 )
 
 func TestGoalPlanPersistsEvidenceAndRejectsStaleChanges(t *testing.T) {
@@ -59,9 +61,10 @@ func TestGoalPlanPersistsEvidenceAndRejectsStaleChanges(t *testing.T) {
 	if err != nil || loaded.Revision != 6 || loaded.Outcome != "Choose a venue and confirm the budget" || loaded.Steps[0].Status != StepDone {
 		t.Fatalf("reopened plan = %#v, %v", loaded, err)
 	}
-	info, err := os.Stat(reopened.planPath(goalRecord.ID))
-	if err != nil || info.Mode().Perm() != 0600 {
-		t.Fatalf("plan mode = %v, %v", info, err)
+	for _, path := range []string{reopened.root, filepath.Join(reopened.root, "plans"), reopened.path(goalRecord.ID), reopened.planPath(goalRecord.ID)} {
+		if err := privatefs.Check(path); err != nil {
+			t.Fatalf("private goal path %s: %v", path, err)
+		}
 	}
 }
 

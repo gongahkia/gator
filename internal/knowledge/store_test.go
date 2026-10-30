@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/gongahkia/gator/internal/privatefs"
 )
 
 func TestNotesAndSkillsPersistWithScopeAndCorrection(t *testing.T) {
@@ -72,9 +74,15 @@ func TestNotesAndSkillsPersistWithScopeAndCorrection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	info, err := os.Stat(path)
-	if err != nil || info.Mode().Perm() != 0600 {
-		t.Fatalf("note permissions = %v, %v", info, err)
+	for _, privatePath := range []string{
+		reopened.root, reopened.parent("note"), reopened.parent("skill"), path,
+		filepath.Join(reopened.dir("note", local.ID), "content.md"),
+		filepath.Join(reopened.dir("note", local.ID), "meta.json"),
+		filepath.Join(reopened.dir("skill", skill.ID), "SKILL.md"),
+	} {
+		if err := privatefs.Check(privatePath); err != nil {
+			t.Fatalf("private knowledge path %s: %v", privatePath, err)
+		}
 	}
 	if err := reopened.RemoveNote(local.ID); err != nil {
 		t.Fatal(err)

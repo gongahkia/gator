@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/gongahkia/gator/internal/goal"
+	"github.com/gongahkia/gator/internal/privatefs"
 )
 
 func TestSuggestionRemainsPendingUntilOneReviewDecision(t *testing.T) {
@@ -46,9 +47,10 @@ func TestSuggestionRemainsPendingUntilOneReviewDecision(t *testing.T) {
 	if err != nil || loaded.Status != "accepted" || loaded.ResultID != "note-1" {
 		t.Fatalf("resolved = %#v, %v", loaded, err)
 	}
-	info, err := os.Stat(store.path(record.ID))
-	if err != nil || info.Mode().Perm() != 0600 {
-		t.Fatalf("private record = %v, %v", info, err)
+	for _, path := range []string{store.root, store.path(record.ID)} {
+		if err := privatefs.Check(path); err != nil {
+			t.Fatalf("private suggestion path %s: %v", path, err)
+		}
 	}
 }
 
