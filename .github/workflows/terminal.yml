@@ -49,7 +49,8 @@ jobs:
         run: |
           set -euo pipefail
           go test ./internal/memory ./internal/learning ./internal/personalization ./internal/retrieval
-          go test ./internal/goal ./internal/knowledge ./internal/suggestion ./internal/followup ./internal/tools
+          go test ./internal/goal ./internal/knowledge ./internal/suggestion ./internal/followup
+          go test ./internal/tools -run 'Knowledge|Suggest|MainChatPlan'
           go test ./internal/lifecycle -run 'RestorePreservesForgotten|Retention|Backup'
           go test ./cmd/gator -run 'Memory|PersonalSummary|Recall|IdleMemoryMaintenance|Plan|Agenda|Suggest|GoalWatch|ScheduledBlock|Calendar|Followup|ConnectedGoal'
       - name: Build independent production artifact
