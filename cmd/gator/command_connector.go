@@ -411,7 +411,7 @@ func loginConnectorOAuth(descriptor connector.Descriptor, credentials auth.Store
 func withoutGooglePlannerScopes(scopes []string) []string {
 	filtered := make([]string, 0, len(scopes))
 	for _, scope := range scopes {
-		if scope == "https://www.googleapis.com/auth/tasks" || scope == "https://www.googleapis.com/auth/calendar" {
+		if scope == "https://www.googleapis.com/auth/tasks" || strings.HasPrefix(scope, "https://www.googleapis.com/auth/tasks.") || scope == "https://www.googleapis.com/auth/calendar" || strings.HasPrefix(scope, "https://www.googleapis.com/auth/calendar.") {
 			continue
 		}
 		filtered = append(filtered, scope)
