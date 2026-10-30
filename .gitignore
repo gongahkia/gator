@@ -11,3 +11,5 @@ node_modules
 /desktop/test-results/
 /desktop/playwright-report/
 /.pty-venv/
+/.env
+/.env.local
