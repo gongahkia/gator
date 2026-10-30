@@ -6,14 +6,17 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gongahkia/gator/internal/sandbox"
+	"net/url"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
 type Config struct {
 	Kind           string   `json:"kind"`
 	Executable     string   `json:"executable"`
+	BaseURL        string   `json:"base_url,omitempty"`
 	Model          string   `json:"model,omitempty"`
 	Provider       string   `json:"provider,omitempty"`
 	APIKeyEnv      string   `json:"api_key_env"`
@@ -39,6 +42,12 @@ func (c Config) Validate() error {
 	for _, v := range []string{c.Model, c.Provider} {
 		if len(v) > 256 || strings.ContainsAny(v, "\x00\r\n") {
 			return errors.New("invalid CLI model or provider")
+		}
+	}
+	if c.BaseURL != "" {
+		u, err := url.Parse(c.BaseURL)
+		if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || strings.ContainsAny(c.BaseURL, "\x00\r\n") {
+			return errors.New("CLI base URL must be HTTPS without credentials, query or fragment")
 		}
 	}
 	if c.Provider != "" && c.Kind != "pi" {
@@ -68,11 +77,13 @@ func ValidateAll(configs []Config) error {
 func (c Config) Arguments(edit bool) []string {
 	switch c.Kind {
 	case "codex":
-		mode := "read-only"
-		if edit {
-			mode = "workspace-write"
+		// Gator establishes the strict OS sandbox before executing this argv.
+		// Nested Seatbelt cannot initialize on macOS. The child's sandbox mode
+		// does not relax Gator's enforced read/write envelope.
+		args := []string{"exec", "--json", "--skip-git-repo-check", "--ephemeral", "--ignore-user-config", "--ignore-rules", "--sandbox", "danger-full-access", "-c", `approval_policy="never"`, "--disable", "multi_agent", "--color", "never"}
+		if c.BaseURL != "" {
+			args = append(args, "-c", `model_provider="gator"`, "-c", `model_providers.gator.name="Gator selected endpoint"`, "-c", "model_providers.gator.base_url="+strconv.Quote(c.BaseURL), "-c", `model_providers.gator.env_key="CODEX_API_KEY"`, "-c", `model_providers.gator.wire_api="responses"`)
 		}
-		args := []string{"exec", "--json", "--skip-git-repo-check", "--ephemeral", "--ignore-user-config", "--ignore-rules", "--sandbox", mode, "--color", "never"}
 		if c.Model != "" {
 			args = append(args, "--model", c.Model)
 		}
@@ -96,9 +107,11 @@ func (c Config) Arguments(edit bool) []string {
 		if c.Model != "" {
 			args = append(args, "--model", c.Model)
 		}
-		if c.Provider != "" {
-			args = append(args, "--provider", c.Provider)
+		provider := c.Provider
+		if provider == "" {
+			provider = "openai"
 		}
+		args = append(args, "--provider", provider)
 		return args
 	}
 }

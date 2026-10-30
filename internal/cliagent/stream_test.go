@@ -11,9 +11,9 @@ func TestStreamsRequireTerminalSuccess(t *testing.T) {
 		lines   []string
 		summary string
 	}{
-		{"codex", []string{`{"type":"thread.started"}`, `{"type":"item.completed","item":{"type":"agent_message","text":"done"}}`, `{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":2}}`}, "done"},
+		{"codex", []string{`{"type":"error","message":"retrying temporary transport failure"}`, `{"type":"thread.started"}`, `{"type":"item.completed","item":{"type":"agent_message","text":"done"}}`, `{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":2}}`}, "done"},
 		{"claude", []string{`{"type":"assistant"}`, `{"type":"result","subtype":"success","result":"done","usage":{"input_tokens":10,"output_tokens":2}}`}, "done"},
-		{"pi", []string{`{"type":"message_end","message":{"role":"user","content":"read notes"}}`, `{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"done"}],"stopReason":"stop","usage":{"input":10,"output":2}}}`, `{"type":"agent_end"}`, `{"type":"agent_settled","aborted":false}`}, "done"},
+		{"pi", []string{`{"type":"tool_execution_end","result":{"content":[{"type":"text","text":"file"}]}}`, `{"type":"message_end","message":{"role":"user","content":"read notes"}}`, `{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"done"}],"stopReason":"stop","usage":{"input":10,"output":2}}}`, `{"type":"agent_end"}`, `{"type":"agent_settled","aborted":false}`}, "done"},
 	} {
 		t.Run(test.kind, func(t *testing.T) {
 			s := streamState{}
@@ -38,14 +38,14 @@ func TestStreamsRequireTerminalSuccess(t *testing.T) {
 		t.Fatal("malformed stream accepted")
 	}
 }
-func TestAdapterArgumentsDoNotBypassPermissions(t *testing.T) {
+func TestAdapterArgumentsDisableNestedAgentsAndExtraTools(t *testing.T) {
 	for _, kind := range []string{"codex", "claude", "pi"} {
 		c := Config{Kind: kind}
 		args := strings.Join(c.Arguments(false), " ")
 		if strings.Contains(args, "dangerously") || strings.Contains(args, "bypassPermissions") {
 			t.Fatal(args)
 		}
-		if kind == "codex" && !strings.Contains(args, "read-only") {
+		if kind == "codex" && !strings.Contains(args, "--disable multi_agent") {
 			t.Fatal(args)
 		}
 		if kind == "pi" && strings.Contains(args, "bash") {
