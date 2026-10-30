@@ -30,16 +30,23 @@ func privateDirectory(path string) error {
 // an ID collision cannot replace an existing record. Interrupted temporary files
 // remain hidden from readers. All callers hold the store's mutation lock.
 func (s Store) write(record Record, create bool) error {
+	record.ConceptID = ""
 	record.RecallIssue = ""
 	record.ReviewAfter = time.Time{}
 	if err := validate(record); err != nil {
 		return err
 	}
-	data, err := json.MarshalIndent(record, "", "  ")
+	return s.publish(record.ID+".json", record, 16*1024, create)
+}
+
+// The caller holds the mutation lease. Metadata and records share the same
+// complete-bytes publication protocol and private staging rules.
+func (s Store) publish(target string, value any, limit int, create bool) error {
+	data, err := json.MarshalIndent(value, "", "  ")
 	if err != nil {
 		return err
 	}
-	if len(data) > 16*1024 {
+	if len(data) > limit {
 		return errors.New("memory record exceeds the private record size limit")
 	}
 	root, err := os.OpenRoot(s.root)
@@ -67,9 +74,9 @@ func (s Store) write(record Record, create bool) error {
 		return err
 	}
 	if create {
-		err = root.Link(name, record.ID+".json")
+		err = root.Link(name, target)
 	} else {
-		err = root.Rename(name, record.ID+".json")
+		err = root.Rename(name, target)
 	}
 	if err != nil {
 		return err

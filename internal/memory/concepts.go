@@ -3,6 +3,7 @@ package memory
 import (
 	"errors"
 	"os"
+	"path/filepath"
 )
 
 // These are deliberately narrow, documented label aliases. They do not claim
@@ -24,33 +25,32 @@ func CanonicalSubject(subject string) string {
 // Old tombstones used the model's literal label. Check those as well as the
 // canonical label so upgrading cannot resurrect previously forgotten memory.
 func (s Store) blockedSubject(goalID, subject string) (bool, error) {
-	canonical := CanonicalSubject(subject)
-	labels := []string{canonical}
-	for alias, target := range conceptAliases {
-		if target == canonical {
-			labels = append(labels, alias)
-		}
+	bindings, err := s.bindings()
+	if err != nil {
+		return false, err
 	}
-	for _, label := range labels {
-		if _, err := os.Lstat(s.subjectPath(goalID, label)); err == nil {
-			return true, nil
-		} else if !errors.Is(err, os.ErrNotExist) {
-			return false, err
-		}
-	}
-	return false, nil
+	return s.blockedConcept(bindings, goalID, subject)
 }
 
 func (s Store) unblockSubject(goalID, subject string) error {
-	canonical := CanonicalSubject(subject)
-	labels := []string{canonical}
+	bindings, err := s.bindings()
+	if err != nil {
+		return err
+	}
+	root := bindings.resolve(goalID, subject)
+	keys := map[string]bool{root: true, conceptKey(goalID, subject): true}
 	for alias, target := range conceptAliases {
-		if target == canonical {
-			labels = append(labels, alias)
+		if bindings.resolve(goalID, target) == root {
+			keys[historyHash(goalID, alias)] = true
 		}
 	}
-	for _, label := range labels {
-		if err := os.Remove(s.subjectPath(goalID, label)); err != nil && !errors.Is(err, os.ErrNotExist) {
+	for alias, target := range bindings {
+		if target == root {
+			keys[alias] = true
+		}
+	}
+	for key := range keys {
+		if err := os.Remove(filepath.Join(s.root, ".forgotten", key)); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
 	}
@@ -58,12 +58,16 @@ func (s Store) unblockSubject(goalID, subject string) error {
 }
 
 func (s Store) annotateConcepts(records []Record) error {
+	bindings, err := s.bindings()
+	if err != nil {
+		return err
+	}
 	groups := map[string][]int{}
 	for i, record := range records {
 		if record.Subject == "" {
 			continue
 		}
-		blocked, err := s.blockedSubject(record.GoalID, record.Subject)
+		blocked, err := s.blockedConcept(bindings, record.GoalID, record.Subject)
 		if err != nil {
 			return err
 		}
@@ -73,7 +77,8 @@ func (s Store) annotateConcepts(records []Record) error {
 		if !record.ExpiresAt.IsZero() && !record.ExpiresAt.After(s.clock()) {
 			continue
 		}
-		key := record.GoalID + "\x00" + CanonicalSubject(record.Subject)
+		key := bindings.resolve(record.GoalID, record.Subject)
+		records[i].ConceptID = key
 		groups[key] = append(groups[key], i)
 	}
 	for _, indices := range groups {

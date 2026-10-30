@@ -30,6 +30,7 @@ type ChatOrigin struct {
 }
 
 type Record struct {
+	ConceptID       string      `json:"concept_id,omitempty"`
 	RecallIssue     string      `json:"recall_issue,omitempty"`
 	ReviewAfter     time.Time   `json:"review_after,omitzero"`
 	Subject         string      `json:"subject,omitempty"`
@@ -173,6 +174,7 @@ func (s Store) loadUnlocked(id string) (Record, error) {
 		return Record{}, err
 	}
 	record.SourceStatus = sourceFileStatus(record)
+	record.ConceptID = ""
 	record.RecallIssue = "" // Derived from current store state, never trusted from disk.
 	record.ReviewAfter = time.Time{}
 	return record, nil
@@ -392,6 +394,10 @@ func (s Store) forgetRecord(record Record) error {
 	if err := s.suppressHistory(record); err != nil {
 		return err
 	}
+	bindings, err := s.bindings()
+	if err != nil {
+		return err
+	}
 	ids := []string{record.ID}
 	if record.Subject != "" {
 		if err := s.blockSubject(record.GoalID, record.Subject); err != nil {
@@ -402,7 +408,7 @@ func (s Store) forgetRecord(record Record) error {
 			return err
 		}
 		for _, other := range records {
-			if other.ID != record.ID && other.GoalID == record.GoalID && CanonicalSubject(other.Subject) == CanonicalSubject(record.Subject) {
+			if other.ID != record.ID && other.GoalID == record.GoalID && bindings.resolve(other.GoalID, other.Subject) == bindings.resolve(record.GoalID, record.Subject) {
 				if err := s.suppressHistory(other); err != nil {
 					return err
 				}

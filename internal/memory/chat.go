@@ -48,7 +48,11 @@ func (s Store) subjectPath(goalID, subject string) string {
 	return filepath.Join(s.root, ".forgotten", hex.EncodeToString(hash[:]))
 }
 func (s Store) blockSubject(goalID, subject string) error {
-	path := s.subjectPath(goalID, CanonicalSubject(subject))
+	bindings, err := s.bindings()
+	if err != nil {
+		return err
+	}
+	path := filepath.Join(s.root, ".forgotten", bindings.resolve(goalID, subject))
 	return blockMarker(path)
 }
 
@@ -119,10 +123,14 @@ func (s Store) RememberChat(input ChatInput) (Record, error) {
 	if err != nil {
 		return Record{}, err
 	}
+	bindings, err := s.bindings()
+	if err != nil {
+		return Record{}, err
+	}
 	var current Record
 	creating := false
 	for _, record := range records {
-		if record.GoalID == input.GoalID && CanonicalSubject(record.Subject) == input.Subject {
+		if record.GoalID == input.GoalID && bindings.resolve(record.GoalID, record.Subject) == bindings.resolve(input.GoalID, input.Subject) {
 			if current.ID != "" {
 				return Record{}, errors.New("multiple records share this concept; reconcile the saved records before remembering it")
 			}
@@ -158,7 +166,11 @@ func (s Store) RememberChat(input ChatInput) (Record, error) {
 			return Record{}, err
 		}
 	}
+	if current.Subject != "" {
+		input.Subject = CanonicalSubject(current.Subject)
+	}
 	current.Subject = input.Subject
+	current.ConceptID = bindings.resolve(input.GoalID, input.Subject)
 	current.RecallIssue = ""
 	current.Origin = &ChatOrigin{ConversationID: input.ConversationID, RunID: input.RunID, Quote: strings.TrimSpace(input.Quote), Basis: "user-stated"}
 	current.observe("user-stated", current.Origin)

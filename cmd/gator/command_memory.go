@@ -32,6 +32,7 @@ const memoryUsage = `Gator memory — explicit, inspectable personal knowledge
   gator memory show ID
   gator memory review [--goal ID]
   gator memory confirm ID --expected-updated TIMESTAMP
+  gator memory reconcile --keep ID [--aliases LABEL,LABEL] ID=TIMESTAMP [ID=TIMESTAMP ...]
   gator memory correct ID [--source-file PATH] TEXT
   gator memory forget ID
   gator memory embeddings status
@@ -55,6 +56,31 @@ func memoryCommand(args []string, out io.Writer) error {
 		return err
 	}
 	switch args[0] {
+	case "reconcile":
+		flags := flag.NewFlagSet("memory reconcile", flag.ContinueOnError)
+		flags.SetOutput(io.Discard)
+		keep := flags.String("keep", "", "inspected memory whose text will be kept")
+		aliases := flags.String("aliases", "", "comma-separated equivalent subject labels")
+		if err := flags.Parse(args[1:]); err != nil {
+			return err
+		}
+		input := memory.Reconciliation{KeepID: *keep, Revisions: map[string]string{}}
+		if *aliases != "" {
+			input.Aliases = strings.Split(*aliases, ",")
+		}
+		for _, pair := range flags.Args() {
+			id, revision, ok := strings.Cut(pair, "=")
+			if !ok || id == "" || revision == "" || input.Revisions[id] != "" {
+				return errors.New("supply each inspected memory once as ID=TIMESTAMP")
+			}
+			input.Revisions[id] = revision
+		}
+		record, err := store.Reconcile(input)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(out, "Reconciled into %s. Kept text: %s\nFact confirmation date unchanged; reviewed aliases share this concept.\n", record.ID, record.Text)
+		return err
 	case "review":
 		flags := flag.NewFlagSet("memory review", flag.ContinueOnError)
 		flags.SetOutput(io.Discard)
@@ -226,7 +252,7 @@ func memoryCommand(args []string, out io.Writer) error {
 			}
 		}
 		if record.Subject != "" {
-			if _, err := fmt.Fprintf(out, "Subject: %s\nCanonical subject: %s\n", record.Subject, memory.CanonicalSubject(record.Subject)); err != nil {
+			if _, err := fmt.Fprintf(out, "Subject: %s\nCanonical subject: %s\nConcept identity: %s\n", record.Subject, memory.CanonicalSubject(record.Subject), record.ConceptID); err != nil {
 				return err
 			}
 		}

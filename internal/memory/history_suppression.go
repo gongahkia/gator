@@ -31,7 +31,7 @@ func (s Store) retainHistoryOrigin(record Record) error {
 	return blockMarker(filepath.Join(s.originDirectory(record), historyHash(record.GoalID, record.Origin.ConversationID)))
 }
 
-func (s Store) suppressHistory(record Record) error {
+func (s Store) historyOrigins(record Record) (map[string]bool, error) {
 	hashes := map[string]bool{}
 	if record.Origin != nil && record.Origin.ConversationID != "" {
 		hashes[historyHash(record.GoalID, record.Origin.ConversationID)] = true
@@ -44,17 +44,25 @@ func (s Store) suppressHistory(record Record) error {
 	if record.Subject != "" {
 		entries, err := os.ReadDir(s.originDirectory(record))
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			return err
+			return nil, err
 		}
 		for _, entry := range entries {
 			if entry.IsDir() || len(entry.Name()) != 64 {
-				return errors.New("invalid memory history-origin index")
+				return nil, errors.New("invalid memory history-origin index")
 			}
 			if _, err := hex.DecodeString(entry.Name()); err != nil {
-				return errors.New("invalid memory history-origin digest")
+				return nil, errors.New("invalid memory history-origin digest")
 			}
 			hashes[entry.Name()] = true
 		}
+	}
+	return hashes, nil
+}
+
+func (s Store) suppressHistory(record Record) error {
+	hashes, err := s.historyOrigins(record)
+	if err != nil {
+		return err
 	}
 	for hash := range hashes {
 		if err := blockMarker(filepath.Join(s.root, ".forgotten-history", hash)); err != nil {

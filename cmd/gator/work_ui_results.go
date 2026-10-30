@@ -95,6 +95,7 @@ func workMemoryResult(stateDir, activeGoal string, arguments []string) (*uisnaps
 			{Label: "ID", Value: record.ID}, {Label: "Kind", Value: record.Kind}, {Label: "Goal", Value: uiEmpty(record.GoalID)},
 			{Label: "Source", Value: uiEmpty(record.Source)}, {Label: "Source status", Value: uiEmpty(record.SourceStatus)},
 			{Label: "Canonical subject", Value: uiEmpty(memory.CanonicalSubject(record.Subject))}, {Label: "Recall warning", Value: uiEmpty(record.RecallIssue)},
+			{Label: "Concept identity", Value: uiEmpty(record.ConceptID)},
 			{Label: "Last confirmed", Value: formatMemoryEvidenceTime(record.LastConfirmedAt)}, {Label: "Review after", Value: formatMemoryEvidenceTime(record.ReviewAfter)},
 			{Label: "Confirm unchanged", Value: "/memory confirm " + record.ID + " --expected-updated " + record.UpdatedAt.Format(time.RFC3339Nano)},
 			{Label: "Expires", Value: formatMemoryExpiry(record.ExpiresAt)}, {Label: "Created", Value: record.CreatedAt.Local().Format("2006-01-02 15:04")}, {Label: "Updated", Value: record.UpdatedAt.Local().Format("2006-01-02 15:04")},

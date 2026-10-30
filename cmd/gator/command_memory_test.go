@@ -15,6 +15,35 @@ import (
 	"github.com/gongahkia/gator/internal/workrun"
 )
 
+func TestMemoryReconcileCLIUsesReviewedRevisions(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("GATOR_STATE_DIR", dir)
+	store, _ := memory.Open(dir)
+	first, err := store.RememberChat(memory.ChatInput{Subject: "custom.first", Kind: "preference", Quote: "I prefer detailed replies.", ConversationID: "work-first", RunID: "run-first"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := store.RememberChat(memory.ChatInput{Subject: "custom.second", Kind: "preference", Quote: "I prefer concise replies.", ConversationID: "work-second", RunID: "run-second"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	args := []string{"reconcile", "--keep", second.ID, "--aliases", "communication.detail_level", first.ID + "=" + first.UpdatedAt.Format(time.RFC3339Nano), second.ID + "=" + second.UpdatedAt.Format(time.RFC3339Nano)}
+	var output bytes.Buffer
+	if err := memoryCommand(args, &output); err != nil || !strings.Contains(output.String(), second.Text) {
+		t.Fatal(output.String(), err)
+	}
+	if _, err := store.Load(first.ID); !os.IsNotExist(err) {
+		t.Fatal("discarded record remained", err)
+	}
+	if err := memoryCommand(args, &output); err == nil {
+		t.Fatal("replayed old reconciliation accepted")
+	}
+	current, err := store.Inspect(second.ID)
+	if err != nil || current.ConceptID == "" {
+		t.Fatal(current, err)
+	}
+}
+
 func TestMemoryReviewAndConfirmationCLI(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("GATOR_STATE_DIR", dir)
