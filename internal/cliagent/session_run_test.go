@@ -2,6 +2,7 @@ package cliagent
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -63,5 +64,21 @@ func TestSessionDoesNotAcceptNewBaselineOnContinuation(t *testing.T) {
 	_, err := RunSession(context.Background(), SessionRequest{Request: Request{Config: binding.Config, Task: "continue", Baseline: []byte("different")}, Store: dir, SessionID: id, Owner: binding.Owner, Capture: binding.Capture})
 	if err == nil || !strings.Contains(err.Error(), "existing") && !strings.Contains(err.Error(), "retained checkout") {
 		t.Fatalf("accepted changed baseline: %v", err)
+	}
+}
+
+func TestSessionRetainsReconciliationErrorIdentityAfterRedaction(t *testing.T) {
+	dir, binding := sessionFixture(t)
+	s := readySession(t, dir, binding)
+	id := s.record.ID
+	s.record.ProcessOpen = true
+	if err := s.saveLocked(); err != nil {
+		t.Fatal(err)
+	}
+	s.Close()
+	t.Setenv("OPENAI_API_KEY", "synthetic-private-key")
+	_, err := RunSession(context.Background(), SessionRequest{Request: Request{Config: binding.Config, Task: "continue"}, Store: dir, SessionID: id, Owner: binding.Owner, Capture: binding.Capture})
+	if !errors.Is(err, ErrSessionReconciliation) {
+		t.Fatalf("lost reconciliation category: %v", err)
 	}
 }

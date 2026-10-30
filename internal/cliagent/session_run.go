@@ -50,7 +50,7 @@ func RunSession(ctx context.Context, r SessionRequest) (result Result, err error
 	}
 	defer func() {
 		if err != nil {
-			err = errors.New(strings.ReplaceAll(err.Error(), key, "[redacted]"))
+			err = redactedSessionError{cause: err, text: strings.ReplaceAll(err.Error(), key, "[redacted]")}
 		}
 	}()
 	s, err := openSession(r.Store, r.SessionID, SessionBinding{Owner: r.Owner, Capture: r.Capture, Config: r.Config, Edit: r.Edit, Scopes: r.Scopes})
@@ -173,6 +173,14 @@ func RunSession(ctx context.Context, r SessionRequest) (result Result, err error
 		}
 	}
 }
+
+type redactedSessionError struct {
+	cause error
+	text  string
+}
+
+func (e redactedSessionError) Error() string { return e.text }
+func (e redactedSessionError) Unwrap() error { return e.cause }
 
 func controlSession(ctx context.Context, s *sessionLease, c *nativeClient, control SessionControl) error {
 	switch control.Kind {
