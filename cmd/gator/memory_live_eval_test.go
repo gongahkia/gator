@@ -40,7 +40,14 @@ func TestLiveMemoryEvaluation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	provider, modelName, err := resolveConfiguredProvider(settings.Defaults.Provider, settings.Defaults.Model)
+	selectedProvider, selectedModel := settings.Defaults.Provider, settings.Defaults.Model
+	if override := os.Getenv("GATOR_LIVE_MEMORY_PROVIDER"); override != "" {
+		selectedProvider, selectedModel = override, ""
+	}
+	if override := os.Getenv("GATOR_LIVE_MEMORY_MODEL"); override != "" {
+		selectedModel = override
+	}
+	provider, modelName, err := resolveConfiguredProvider(selectedProvider, selectedModel)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,15 +59,17 @@ func TestLiveMemoryEvaluation(t *testing.T) {
 	t.Setenv("GATOR_STATE_DIR", t.TempDir())
 	budget := &agent.Budget{Limits: agent.Limits{ModelRequests: 48, Tokens: 60000}}
 	type trial struct {
-		Name         string `json:"name"`
-		Status       string `json:"status"`
-		Passed       bool   `json:"passed"`
-		Count        int    `json:"saved_count"`
-		Reviews      int    `json:"review_requests"`
-		Steps        int    `json:"steps"`
-		Milliseconds int64  `json:"milliseconds"`
-		Output       string `json:"output"`
-		Error        string `json:"error,omitempty"`
+		Name           string           `json:"name"`
+		Status         string           `json:"status"`
+		Passed         bool             `json:"passed"`
+		Count          int              `json:"saved_count"`
+		Reviews        int              `json:"review_requests"`
+		ReviewPreviews []any            `json:"review_previews,omitempty"`
+		ToolCalls      []agent.ToolCall `json:"tool_calls,omitempty"`
+		Steps          int              `json:"steps"`
+		Milliseconds   int64            `json:"milliseconds"`
+		Output         string           `json:"output"`
+		Error          string           `json:"error,omitempty"`
 	}
 	report := struct {
 		Provider   string      `json:"provider"`
@@ -80,8 +89,12 @@ func TestLiveMemoryEvaluation(t *testing.T) {
 		}
 	}()
 	var backend agent.Model
+	baseURL := settings.ProviderEndpoint(provider)
+	if override := os.Getenv("GATOR_LIVE_MEMORY_BASE_URL"); override != "" {
+		baseURL = override
+	}
 	if custom, ok := configuredCustomProvider(settings, provider); ok {
-		configured, setupErr := newCustomExecutorConfiguration(settings, custom, modelName, "")
+		configured, setupErr := newCustomExecutorConfiguration(settings, custom, modelName, baseURL)
 		err, backend = setupErr, configured.Model
 	} else {
 		selected, parseErr := model.ParseProvider(provider)
@@ -89,7 +102,7 @@ func TestLiveMemoryEvaluation(t *testing.T) {
 			report.SetupError = parseErr.Error()
 			t.Fatal(parseErr)
 		}
-		configured, setupErr := model.New(model.Config{Provider: selected, Model: modelName, Credentials: &credentials, BaseURL: settings.ProviderEndpoint(provider), ProviderOptions: settings.OptionsForProvider(provider)})
+		configured, setupErr := model.New(model.Config{Provider: selected, Model: modelName, Credentials: &credentials, BaseURL: baseURL, ProviderOptions: settings.OptionsForProvider(provider)})
 		err, backend = setupErr, configured.Model
 	}
 	if err != nil {
@@ -115,6 +128,9 @@ func TestLiveMemoryEvaluation(t *testing.T) {
 		{"learning disabled", "I prefer concise answers.", "", "", "", "", 0, false},
 		{"explicit while disabled", "Please remember: I prefer concise answers.", "", "", "", "concise", 1, false},
 	} {
+		if selected := os.Getenv("GATOR_LIVE_MEMORY_CASE"); selected != "" && scenario.name != selected {
+			continue
+		}
 		state := t.TempDir()
 		memories, _ := memory.Open(state)
 		notes, _ := knowledge.Open(state)
@@ -124,7 +140,11 @@ func TestLiveMemoryEvaluation(t *testing.T) {
 			}
 		}
 		current := trial{Name: scenario.name}
-		memoryTools := tools.ChatMemory{Store: memories, UserMessage: scenario.message, ConversationID: "work-live-fixture", RunID: "run-live", Automatic: scenario.automatic, Review: func(context.Context, any) (bool, error) { current.Reviews++; return false, nil }}
+		memoryTools := tools.ChatMemory{Store: memories, UserMessage: scenario.message, ConversationID: "work-live-fixture", RunID: "run-live", Automatic: scenario.automatic, Review: func(_ context.Context, preview any) (bool, error) {
+			current.Reviews++
+			current.ReviewPreviews = append(current.ReviewPreviews, preview)
+			return false, nil
+		}}
 		available := memoryTools.Tools()
 		available = append(available, (tools.PersonalKnowledge{Notes: notes, Memories: memories}).Tools()[:2]...)
 		profile, err := memories.Profile(nil)
@@ -135,7 +155,11 @@ func TestLiveMemoryEvaluation(t *testing.T) {
 		system := "You are Gator, a personal assistant. Respond concisely.\n" + workrun.MemoryPrompt(scenario.automatic, true) + "\nCurrent selected saved memory:\n" + profileText
 		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 		started := time.Now()
-		result, runErr := (agent.Runner{Model: backend, Tools: available}).Run(ctx, agent.RunOptions{Task: scenario.message, System: system, MaxSteps: 4})
+		result, runErr := (agent.Runner{Model: backend, Tools: available}).Run(ctx, agent.RunOptions{Task: scenario.message, System: system, MaxSteps: 4, OnEvent: func(event agent.Event) {
+			if event.Kind == agent.EventToolCalled && event.ToolCall != nil {
+				current.ToolCalls = append(current.ToolCalls, *event.ToolCall)
+			}
+		}})
 		cancel()
 		current.Milliseconds, current.Steps, current.Output = time.Since(started).Milliseconds(), result.Steps, result.FinalText
 		if runErr != nil {
@@ -168,5 +192,8 @@ func TestLiveMemoryEvaluation(t *testing.T) {
 			t.Log(fmt.Sprintf("Provider unavailable; stopped after %s", scenario.name))
 			break
 		}
+	}
+	if len(report.Trials) == 0 {
+		t.Error("no live evaluation cases matched the selection")
 	}
 }

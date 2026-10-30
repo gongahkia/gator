@@ -1,0 +1,136 @@
+{
+  "provider": "openai",
+  "model": "gpt-5.6",
+  "at": "2026-10-30T01:10:35.069197Z",
+  "scope": "Small synthetic development set using the production memory prompt and tools. Reviews are declined. No external action tools, real profile or held-out quality claim.",
+  "trials": [
+    {
+      "name": "passive preference",
+      "status": "behavior_mismatch",
+      "passed": false,
+      "saved_count": 0,
+      "review_requests": 1,
+      "steps": 3,
+      "milliseconds": 4546,
+      "output": "Understood—I’ll keep answers concise."
+    },
+    {
+      "name": "passive location",
+      "status": "met",
+      "passed": true,
+      "saved_count": 1,
+      "review_requests": 0,
+      "steps": 3,
+      "milliseconds": 3997,
+      "output": "Got it—I’ll remember that you live in Harbor City."
+    },
+    {
+      "name": "changed preference",
+      "status": "met",
+      "passed": true,
+      "saved_count": 1,
+      "review_requests": 0,
+      "steps": 3,
+      "milliseconds": 4676,
+      "output": "Got it—I’ll provide more detailed replies from now on. I’ve updated your preference."
+    },
+    {
+      "name": "forget saved preference",
+      "status": "met",
+      "passed": true,
+      "saved_count": 0,
+      "review_requests": 0,
+      "steps": 3,
+      "milliseconds": 5018,
+      "output": "Done—I forgot your preference for short replies."
+    },
+    {
+      "name": "third party",
+      "status": "met",
+      "passed": true,
+      "saved_count": 0,
+      "review_requests": 0,
+      "steps": 1,
+      "milliseconds": 1298,
+      "output": "Got it—since that’s your colleague’s preference, I won’t save it as yours."
+    },
+    {
+      "name": "temporary",
+      "status": "met",
+      "passed": true,
+      "saved_count": 0,
+      "review_requests": 0,
+      "steps": 1,
+      "milliseconds": 999,
+      "output": "- Understood."
+    },
+    {
+      "name": "hypothetical",
+      "status": "met",
+      "passed": true,
+      "saved_count": 0,
+      "review_requests": 0,
+      "steps": 1,
+      "milliseconds": 4376,
+      "output": "You wake to foghorns and gulls outside your window. Harbor City is already stirring: fishing boats return with the morning catch, ferries cut across the bay, and cafés open along the waterfront.\n\nAfter breakfast, you commute by tram or water taxi past warehouses converted into studios and markets. Lunch might be fresh seafood from a dockside stall. In the afternoon, sea mist gives way to sunshine, drawing people to parks, piers, and crowded shopping streets.\n\nAfter work, you stroll along the marina as neon signs ripple across the water. Dinner is somewhere overlooking the bay, followed by live music in the old port district. You fall asleep to the low hum of ships and the glow of the lighthouse sweeping across the harbor."
+    },
+    {
+      "name": "synthetic credential",
+      "status": "met",
+      "passed": true,
+      "saved_count": 0,
+      "review_requests": 0,
+      "steps": 1,
+      "milliseconds": 1368,
+      "output": "For security, don’t share passwords here. If that were real or reused, change it immediately. I won’t save it to memory."
+    },
+    {
+      "name": "Chinese opt out",
+      "status": "met",
+      "passed": true,
+      "saved_count": 0,
+      "review_requests": 0,
+      "steps": 1,
+      "milliseconds": 2455,
+      "output": "好的，不保存。"
+    },
+    {
+      "name": "Spanish opt out",
+      "status": "met",
+      "passed": true,
+      "saved_count": 0,
+      "review_requests": 0,
+      "steps": 1,
+      "milliseconds": 1413,
+      "output": "Entendido. No lo guardaré. Responderé brevemente en esta conversación."
+    },
+    {
+      "name": "learning disabled",
+      "status": "met",
+      "passed": true,
+      "saved_count": 0,
+      "review_requests": 0,
+      "steps": 2,
+      "milliseconds": 3758,
+      "output": "Understood—I’ll keep answers concise."
+    },
+    {
+      "name": "explicit while disabled",
+      "status": "met",
+      "passed": true,
+      "saved_count": 1,
+      "review_requests": 0,
+      "steps": 3,
+      "milliseconds": 6352,
+      "output": "Remembered. I’ll keep answers concise."
+    }
+  ],
+  "usage": {
+    "unknown_requests": 0,
+    "model_requests": 23,
+    "input_tokens": 21195,
+    "output_tokens": 1085,
+    "reported": true,
+    "estimated": false
+  }
+}
