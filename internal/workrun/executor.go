@@ -374,7 +374,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	if err != nil {
 		return outcome, fmt.Errorf("open change suggestions: %w", err)
 	}
-	surface = append(surface, tools.SuggestChange{Store: suggestions, GoalID: request.GoalID, WorkID: request.RunID, SourcePath: request.SourcePath})
+	surface = append(surface, tools.SuggestChange{Notes: &knowledgeStore, ExcludedIDs: request.ExcludedKnowledgeIDs, Store: suggestions, GoalID: request.GoalID, WorkID: request.RunID, SourcePath: request.SourcePath})
 	for i, tool := range surface {
 		switch tool.Definition().Name {
 		case "read_file", "extract_document", "inspect_table":

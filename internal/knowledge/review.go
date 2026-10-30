@@ -14,7 +14,7 @@ import (
 	"github.com/gongahkia/gator/internal/retrieval"
 )
 
-func (s Store) lock(readOnly bool) (func(), error) {
+func (s Store) lock(_ bool) (func(), error) {
 	root, err := os.OpenRoot(s.root)
 	if err != nil {
 		return nil, err
@@ -24,10 +24,8 @@ func (s Store) lock(readOnly bool) (func(), error) {
 		root.Close()
 		return nil, err
 	}
+	// Reads may finish an interrupted note transaction, so they also take the writer lock.
 	mode := filelock.Exclusive
-	if readOnly {
-		mode = filelock.Shared
-	}
 	if err := filelock.Lock(file, mode); err != nil {
 		file.Close()
 		root.Close()

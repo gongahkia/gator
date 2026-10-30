@@ -81,3 +81,16 @@ of this phase.
 - Full `./cmd/gator` run reported a slide-deck fixture failure in
   `TestUserWorkV4CorpusThroughProductService` (49/50). Investigate separately;
   this is not a clean full-suite result.
+
+### Reviewed updates to existing notes
+
+- `knowledge_read` exposes the inspected revision. `suggest_change` can propose
+  a replacement body for that exact note; acceptance preserves its ID, scope and
+  prior references. Review output includes the current body and revision match.
+- Stale, excluded and cross-goal proposals fail. Acceptance retries do not create
+  another note or overwrite a later owner edit.
+- A durable journal recovers interrupted body/metadata writes. A conflicting
+  direct edit is preserved and reported instead of overwritten.
+- Passed note/knowledge/suggestion tests across knowledge, suggestion, tools,
+  workrun and CLI packages, including restart, interruption and acceptance retry.
+  Live workflow verification follows with the local tracking work.

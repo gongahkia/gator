@@ -29,22 +29,29 @@ var skillIDPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,63}$`)
 var noteIDPattern = regexp.MustCompile(`^note-[0-9a-f]{24}$`)
 var goalIDPattern = regexp.MustCompile(`^goal-[0-9a-f]{24}$`)
 
+type NoteUpdateReceipt struct {
+	ID          string `json:"id"`
+	InputHash   string `json:"input_hash"`
+	ContentHash string `json:"content_hash"`
+}
+
 type Document struct {
-	Version      int       `json:"version"`
-	ID           string    `json:"id"`
-	Kind         string    `json:"kind"`
-	Title        string    `json:"title"`
-	Description  string    `json:"description,omitempty"`
-	SourceRefs   []string  `json:"source_refs,omitempty"`
-	GoalID       string    `json:"goal_id,omitempty"`
-	Enabled      bool      `json:"enabled,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-	Body         string    `json:"-"`
-	MatchedTerms []string  `json:"-"`
-	MatchScope   string    `json:"-"`
-	MatchMethod  string    `json:"-"`
-	Excerpt      string    `json:"-"`
+	LastUpdate   *NoteUpdateReceipt `json:"last_update,omitempty"`
+	Version      int                `json:"version"`
+	ID           string             `json:"id"`
+	Kind         string             `json:"kind"`
+	Title        string             `json:"title"`
+	Description  string             `json:"description,omitempty"`
+	SourceRefs   []string           `json:"source_refs,omitempty"`
+	GoalID       string             `json:"goal_id,omitempty"`
+	Enabled      bool               `json:"enabled,omitempty"`
+	CreatedAt    time.Time          `json:"created_at"`
+	UpdatedAt    time.Time          `json:"updated_at"`
+	Body         string             `json:"-"`
+	MatchedTerms []string           `json:"-"`
+	MatchScope   string             `json:"-"`
+	MatchMethod  string             `json:"-"`
+	Excerpt      string             `json:"-"`
 }
 
 type Store struct {
@@ -376,6 +383,15 @@ func (s Store) list(kind string) ([]Document, error) {
 }
 
 func (s Store) load(kind, id string) (Document, error) {
+	if kind == "note" && validID(kind, id) {
+		if err := s.recoverNoteUpdate(id); err != nil {
+			return Document{}, err
+		}
+	}
+	return s.loadRaw(kind, id)
+}
+
+func (s Store) loadRaw(kind, id string) (Document, error) {
 	if !validID(kind, id) {
 		return Document{}, errors.New("invalid knowledge ID")
 	}
@@ -431,11 +447,14 @@ func (s Store) create(d Document) error {
 }
 
 func (s Store) write(d Document) error {
-	if _, err := s.load(d.Kind, d.ID); err != nil {
+	before, err := s.load(d.Kind, d.ID)
+	if err != nil {
 		return err
 	}
-	dir := s.dir(d.Kind, d.ID)
-	return writeFiles(dir, d)
+	if d.Kind == "note" {
+		return s.writeNoteUpdate(before, d)
+	}
+	return writeFiles(s.dir(d.Kind, d.ID), d)
 }
 
 func writeFiles(dir string, d Document) error {
@@ -481,6 +500,17 @@ func validate(d Document) error {
 	}
 	if d.Title == "" || len(d.Title) > 256 || strings.ContainsAny(d.Title, "\x00\r\n") || !utf8.ValidString(d.Title) {
 		return errors.New("invalid knowledge title")
+	}
+	if d.LastUpdate != nil {
+		r := d.LastUpdate
+		if d.Kind != "note" || !strings.HasPrefix(r.ID, "suggestion-") || len(r.ID) != 35 || len(r.InputHash) != 64 || len(r.ContentHash) != 64 {
+			return errors.New("invalid note update receipt")
+		}
+		for _, value := range []string{r.ID[11:], r.InputHash, r.ContentHash} {
+			if _, err := hex.DecodeString(value); err != nil {
+				return errors.New("invalid note update receipt digest")
+			}
+		}
 	}
 	if d.Kind == "note" {
 		if d.GoalID != "" && !goalIDPattern.MatchString(d.GoalID) {

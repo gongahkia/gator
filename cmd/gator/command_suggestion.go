@@ -59,12 +59,25 @@ func suggestionCommand(args []string, out io.Writer) error {
 		if err != nil {
 			return err
 		}
+		var currentNote any
+		if record.NoteID != "" {
+			notes, err := knowledge.Open(stateDir)
+			if err != nil {
+				return err
+			}
+			note, err := notes.LoadNote(record.NoteID)
+			if err != nil {
+				return err
+			}
+			currentNote = map[string]any{"id": note.ID, "title": note.Title, "body": note.Body, "source_refs": note.SourceRefs, "revision": note.Revision(), "matches_proposal": note.Revision() == record.ExpectedNoteRevision}
+		}
 		encoder := json.NewEncoder(out)
 		encoder.SetIndent("", "  ")
 		return encoder.Encode(struct {
 			suggestion.Record
 			ReferenceIntegrity suggestionEvidenceCheck `json:"reference_integrity"`
-		}{Record: record, ReferenceIntegrity: checkSuggestionEvidence(stateDir, record)})
+			CurrentNote        any                     `json:"current_note,omitempty"`
+		}{Record: record, CurrentNote: currentNote, ReferenceIntegrity: checkSuggestionEvidence(stateDir, record)})
 	case "accept", "reject":
 		record, err := store.Resolve(args[1], args[0], func(record suggestion.Record) (string, error) {
 			return applySuggestion(stateDir, record)
@@ -83,6 +96,9 @@ func suggestionCommand(args []string, out io.Writer) error {
 }
 
 func suggestionLabel(record suggestion.Record) string {
+	if record.NoteID != "" {
+		return "Update note: " + record.Title
+	}
 	if record.Title != "" {
 		return record.Title
 	}
@@ -125,6 +141,10 @@ func applySuggestion(stateDir string, record suggestion.Record) (string, error) 
 		}
 		id := "note-" + strings.TrimPrefix(record.ID, "suggestion-")
 		refs := append(append([]string(nil), record.SourceRefs...), "work:"+record.WorkID)
+		if record.NoteID != "" {
+			updated, err := store.ApplyNoteUpdate(record.NoteID, record.GoalID, record.ExpectedNoteRevision, record.ID, record.Title, record.Body, refs)
+			return updated.ID, err
+		}
 		created, err := store.AddNoteWithIDAndRefs(id, record.Title, record.Body, record.GoalID, refs)
 		if os.IsExist(err) {
 			existing, loadErr := store.LoadNote(id)

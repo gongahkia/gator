@@ -281,3 +281,29 @@ func TestAcceptedScheduleSuggestionCreatesInspectOnlyGoalJob(t *testing.T) {
 		t.Fatalf("schedule retry created a duplicate: %#v, %v", all, err)
 	}
 }
+
+func TestAcceptNoteUpdatePreservesExistingIdentityAndRetry(t *testing.T) {
+	state := t.TempDir()
+	t.Setenv("GATOR_STATE_DIR", state)
+	notes, _ := knowledge.Open(state)
+	queue, _ := suggestion.Open(state)
+	note, _ := notes.AddNoteWithRefs("Plan", "Original", "", []string{"user:original"})
+	proposal, err := queue.Create(suggestion.Record{Kind: "note", NoteID: note.ID, ExpectedNoteRevision: note.Revision(), Title: "Plan", Body: "Corrected", WorkID: "work-1", SourceRefs: []string{"user:correction"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Simulate an interrupted acceptance after the note write but before resolution.
+	id, err := applySuggestion(state, proposal)
+	if err != nil || id != note.ID {
+		t.Fatalf("apply = %s %v", id, err)
+	}
+	accepted, err := queue.Resolve(proposal.ID, "accept", func(r suggestion.Record) (string, error) { return applySuggestion(state, r) })
+	if err != nil || accepted.ResultID != note.ID {
+		t.Fatalf("retry = %#v %v", accepted, err)
+	}
+	updated, _ := notes.LoadNote(note.ID)
+	all, _ := notes.ListNotes("")
+	if updated.Body != "Corrected" || len(all) != 1 || len(updated.SourceRefs) != 3 {
+		t.Fatalf("update = %#v, notes=%d", updated, len(all))
+	}
+}

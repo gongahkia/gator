@@ -27,28 +27,30 @@ const Version = 1
 var skillIDPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,63}$`)
 
 type Record struct {
-	Version        int             `json:"version"`
-	ID             string          `json:"id"`
-	Kind           string          `json:"kind"`
-	Status         string          `json:"status"`
-	Title          string          `json:"title,omitempty"`
-	Body           string          `json:"body,omitempty"`
-	SourceRefs     []string        `json:"source_refs,omitempty"`
-	SkillID        string          `json:"skill_id,omitempty"`
-	Description    string          `json:"description,omitempty"`
-	GoalID         string          `json:"goal_id,omitempty"`
-	GoalSourcePath string          `json:"goal_source_path,omitempty"`
-	GoalOutcome    string          `json:"goal_outcome,omitempty"`
-	GoalSteps      []string        `json:"goal_steps,omitempty"`
-	WorkID         string          `json:"work_id"`
-	PlanChange     goal.PlanChange `json:"plan_change,omitempty"`
-	Cron           string          `json:"cron,omitempty"`
-	Task           string          `json:"task,omitempty"`
-	Timezone       string          `json:"timezone,omitempty"`
-	ChangeOnly     bool            `json:"change_only,omitempty"`
-	ResultID       string          `json:"result_id,omitempty"`
-	CreatedAt      time.Time       `json:"created_at"`
-	ResolvedAt     time.Time       `json:"resolved_at,omitempty"`
+	NoteID               string          `json:"note_id,omitempty"`
+	ExpectedNoteRevision string          `json:"expected_note_revision,omitempty"`
+	Version              int             `json:"version"`
+	ID                   string          `json:"id"`
+	Kind                 string          `json:"kind"`
+	Status               string          `json:"status"`
+	Title                string          `json:"title,omitempty"`
+	Body                 string          `json:"body,omitempty"`
+	SourceRefs           []string        `json:"source_refs,omitempty"`
+	SkillID              string          `json:"skill_id,omitempty"`
+	Description          string          `json:"description,omitempty"`
+	GoalID               string          `json:"goal_id,omitempty"`
+	GoalSourcePath       string          `json:"goal_source_path,omitempty"`
+	GoalOutcome          string          `json:"goal_outcome,omitempty"`
+	GoalSteps            []string        `json:"goal_steps,omitempty"`
+	WorkID               string          `json:"work_id"`
+	PlanChange           goal.PlanChange `json:"plan_change,omitempty"`
+	Cron                 string          `json:"cron,omitempty"`
+	Task                 string          `json:"task,omitempty"`
+	Timezone             string          `json:"timezone,omitempty"`
+	ChangeOnly           bool            `json:"change_only,omitempty"`
+	ResultID             string          `json:"result_id,omitempty"`
+	CreatedAt            time.Time       `json:"created_at"`
+	ResolvedAt           time.Time       `json:"resolved_at,omitempty"`
 }
 
 type Store struct{ root string }
@@ -281,6 +283,17 @@ func validate(record Record) error {
 	}
 	if record.Kind != "goal" && (record.GoalSourcePath != "" || record.GoalOutcome != "" || len(record.GoalSteps) != 0) {
 		return errors.New("goal proposal fields require a goal suggestion")
+	}
+	if record.NoteID != "" || record.ExpectedNoteRevision != "" {
+		if record.Kind != "note" || !strings.HasPrefix(record.NoteID, "note-") || len(record.NoteID) != 29 || len(record.ExpectedNoteRevision) != 64 {
+			return errors.New("note updates require note_id and an inspected expected_note_revision")
+		}
+		if _, err := hex.DecodeString(record.NoteID[5:]); err != nil {
+			return errors.New("invalid note identity")
+		}
+		if _, err := hex.DecodeString(record.ExpectedNoteRevision); err != nil {
+			return errors.New("invalid note revision")
+		}
 	}
 	switch record.Kind {
 	case "goal":

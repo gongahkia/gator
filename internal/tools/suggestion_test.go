@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/gongahkia/gator/internal/knowledge"
 	"github.com/gongahkia/gator/internal/suggestion"
 )
 
@@ -55,5 +56,37 @@ func TestSuggestChangeQueuesScopedProposal(t *testing.T) {
 	records, err := store.List("pending")
 	if err != nil || len(records) != 1 || records[0].Kind != "note" || records[0].WorkID != "work-1" {
 		t.Fatalf("queued = %#v, %v", records, err)
+	}
+}
+
+func TestSuggestNoteUpdateRequiresCurrentScopedVisibleRevision(t *testing.T) {
+	state := t.TempDir()
+	queue, _ := suggestion.Open(state)
+	notes, _ := knowledge.Open(state)
+	note, _ := notes.AddNote("Plan", "Original", "")
+	tool := SuggestChange{Store: queue, Notes: &notes, WorkID: "work-update"}
+	raw, _ := json.Marshal(map[string]any{"kind": "note", "note_id": note.ID, "expected_note_revision": note.Revision(), "title": "Plan", "body": "Corrected"})
+	tool.ExcludedIDs = []string{note.ID}
+	if _, err := tool.Execute(context.Background(), raw); err == nil {
+		t.Fatal("excluded note update allowed")
+	}
+	tool.ExcludedIDs = nil
+	if _, err := tool.Execute(context.Background(), raw); err != nil {
+		t.Fatal(err)
+	}
+	current, _ := notes.LoadNote(note.ID)
+	if current.Body != "Original" {
+		t.Fatal("suggestion applied without review")
+	}
+	if _, err := notes.UpdateNote(note.ID, "Plan", "Owner correction"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tool.Execute(context.Background(), raw); err == nil {
+		t.Fatal("stale proposal allowed")
+	}
+	scoped, _ := notes.AddNote("Private project", "Scoped", "goal-0123456789abcdef01234567")
+	raw, _ = json.Marshal(map[string]any{"kind": "note", "note_id": scoped.ID, "expected_note_revision": scoped.Revision(), "title": "Plan", "body": "Wrong scope"})
+	if _, err := tool.Execute(context.Background(), raw); err == nil {
+		t.Fatal("cross-goal update allowed")
 	}
 }
