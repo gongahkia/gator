@@ -6,13 +6,14 @@ import { tmpdir } from "node:os"
 import { Application } from "@gator/application-host/application"
 import { App } from "../src/app"
 import { GatorClient } from "../src/gator/client"
+import { memoryComparisonMessage } from "./memory-fixture"
 
 type Request = { messages: { role: string; content: string }[]; tools?: { function: { name: string } }[] }
 test("personal memory crosses chats while earlier-chat retrieval and learning remain independent through restart", async () => {
   const root = await mkdtemp(join(tmpdir(), "gator-terminal-memory-privacy-")), config = join(root, "config/gator"), quote = "I prefer concise answers with bullet points.", calls: Request[] = []
   const server = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(request) {
     const payload = await request.json() as Request; calls.push(payload); const last = payload.messages.at(-1)
-    const message = last?.role === "user" && last.content.includes(quote) ? { role: "assistant", tool_calls: [{ id: "remember-" + calls.length, type: "function", function: { name: "memory_remember", arguments: JSON.stringify({ subject: "preference.response_length", kind: "preference", quote, scope: "personal", explicit: true }) } }] } : { role: "assistant", content: "The supplied preference is available." }
+    const message = memoryComparisonMessage(payload) ?? (last?.role === "user" && last.content.includes(quote) ? { role: "assistant", tool_calls: [{ id: "remember-" + calls.length, type: "function", function: { name: "memory_remember", arguments: JSON.stringify({ subject: "preference.response_length", kind: "preference", quote, scope: "personal", explicit: true }) } }] } : { role: "assistant", content: "The supplied preference is available." })
     return Response.json({ choices: [{ message, finish_reason: "tool_calls" in message ? "tool_calls" : "stop" }], usage: { total_tokens: 20 } })
   } })
   await mkdir(config, { recursive: true }); await writeFile(join(config, "config.json"), JSON.stringify({ version: 4, defaults: { provider: "fixture", model: "fixture" }, custom_providers: [{ id: "fixture", base_url: `http://127.0.0.1:${server.port}/chat`, models: ["fixture"], default_model: "fixture" }] }))

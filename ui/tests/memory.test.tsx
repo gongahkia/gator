@@ -7,6 +7,7 @@ import { execFileSync } from "node:child_process"
 import { Application } from "@gator/application-host/application"
 import { App } from "../src/app"
 import { GatorClient } from "../src/gator/client"
+import { memoryComparisonMessage } from "./memory-fixture"
 
 type Request = { messages: { role: string; content: string }[] }
 async function until(predicate: () => boolean | Promise<boolean>, label: string) { const end = Date.now() + 15000; while (!await predicate()) { if (Date.now() > end) throw new Error(`Timed out: ${label}`); await Bun.sleep(20) } }
@@ -16,7 +17,7 @@ test("personal memory keyboard corrections retain stale edits, preserve concurre
   const env = { ...process.env, GATOR_STATE_DIR: join(root, "state"), GATOR_CONFIG_DIR: join(root, "config") }, calls: Request[] = []
   const server = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(request) {
     const input = await request.json() as Request; calls.push(input); const last = input.messages.at(-1)
-    const message = last?.role !== "tool" && last?.content.includes(quote) ? { role: "assistant", content: null, tool_calls: [{ id: "remember-" + calls.length, type: "function", function: { name: "memory_remember", arguments: JSON.stringify({ subject: "preference.response_length", kind: "preference", quote, scope: "personal", explicit: true }) } }] } : { role: "assistant", content: "Your grounded preference is available." }
+    const message = memoryComparisonMessage(input) ?? (last?.role !== "tool" && last?.content.includes(quote) ? { role: "assistant", content: null, tool_calls: [{ id: "remember-" + calls.length, type: "function", function: { name: "memory_remember", arguments: JSON.stringify({ subject: "preference.response_length", kind: "preference", quote, scope: "personal", explicit: true }) } }] } : { role: "assistant", content: "Your grounded preference is available." })
     return Response.json({ choices: [{ message, finish_reason: "tool_calls" in message ? "tool_calls" : "stop" }], usage: { prompt_tokens: 10, completion_tokens: 10, total_tokens: 20 } })
   } })
   const cli = (args: string[]) => execFileSync(binary, args, { env: { ...env, GATOR_INTERNAL_COMMANDS: "1" } })
