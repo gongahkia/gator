@@ -103,7 +103,7 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	actionDisposition := flags.String("actions", string(action.Forbid), "external actions: forbid, draft, or approve")
 	externalAgents := flags.Bool("external-agents", false, "allow configured external CLI specialists; separately billed")
 	var verification verificationFlags
-	flags.Var(&verification, "verify", "host-selected candidate verification argv, separated by spaces (repeatable)")
+	flags.Var(&verification, "acceptance-check", "host-selected completion check argv, separated by spaces (repeatable)")
 	var codeScopes stringFlags
 	flags.Var(&codeScopes, "scope", "source-relative path a coding worker may edit (repeatable)")
 	maxSteps := flags.Int("max-steps", 24, "maximum model turns")

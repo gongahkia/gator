@@ -117,13 +117,13 @@ For example, after enabling an adapter with `--allow-edits`:
 
 ```sh
 gator work --source ./project --external-agents --mode draft \
-  --scope src --verify 'python3 -B verify.py' \
+  --scope src --acceptance-check 'python3 -B verify.py' \
   'Use complete_code with cli_codex to fix the parser; require all verifier cases to pass and review the result.'
 gator work completions RUN_ID
 gator work completions RUN_ID COMPLETION_ID
 ```
 
-`--verify` and `--scope` are repeatable host grants. Verification arguments are
+`--acceptance-check` and `--scope` are repeatable host grants. Check arguments are
 separated by whitespace; no shell is implied. Put complex verification logic
 in a script and select that script explicitly. The model cannot supply new
 commands or widen write scopes through `complete_code` arguments.

@@ -61,7 +61,7 @@ jobs:
           set -euo pipefail
           go test ./internal/orchestrator ./internal/cliagent
           go test ./internal/workrun -run 'ExternalAgent|ExternalPatch|ExternalNativeSession|WorkTaskAnswer|Completion'
-          go test ./cmd/gator -run 'AgentCLI|ExternalAgents|WorkTaskAnswer|Completion'
+          go test ./cmd/gator -run 'AgentCLI|ExternalAgents|WorkTaskAnswer|Completion|RetiredCodePolicyFlags'
       - name: Verify bounded companion recovery
         run: node --test companion/recovery.test.mjs
       - name: Build independent production artifact

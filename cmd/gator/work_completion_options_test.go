@@ -20,7 +20,7 @@ func TestWorkCommandRetainsExplicitCompletionChecksAndScopes(t *testing.T) {
 	t.Setenv("GATOR_MODEL", "test-model")
 	m := &workScriptedModel{turns: []agent.Turn{{Text: "Inspected."}}}
 	var output bytes.Buffer
-	err := runWorkTask([]string{"--source", t.TempDir(), "--mode", "inspect", "--run-id", "completion-options", "--verify", "python3 -B verify.py", "--scope", "normalize.py", "Inspect only"}, strings.NewReader(""), &output, func(_, _, _ string) (agent.Model, error) { return m, nil })
+	err := runWorkTask([]string{"--source", t.TempDir(), "--mode", "inspect", "--run-id", "completion-options", "--acceptance-check", "python3 -B verify.py", "--scope", "normalize.py", "Inspect only"}, strings.NewReader(""), &output, func(_, _, _ string) (agent.Model, error) { return m, nil })
 	if err != nil {
 		t.Fatal(err)
 	}
