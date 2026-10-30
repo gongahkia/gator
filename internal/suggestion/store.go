@@ -20,6 +20,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/gongahkia/gator/internal/goal"
+	"github.com/gongahkia/gator/internal/reconciliation"
 	"github.com/robfig/cron/v3"
 )
 
@@ -28,30 +29,31 @@ const Version = 1
 var skillIDPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,63}$`)
 
 type Record struct {
-	NoteID               string          `json:"note_id,omitempty"`
-	ExpectedNoteRevision string          `json:"expected_note_revision,omitempty"`
-	Version              int             `json:"version"`
-	ID                   string          `json:"id"`
-	Kind                 string          `json:"kind"`
-	Status               string          `json:"status"`
-	Title                string          `json:"title,omitempty"`
-	Body                 string          `json:"body,omitempty"`
-	SourceRefs           []string        `json:"source_refs,omitempty"`
-	SkillID              string          `json:"skill_id,omitempty"`
-	Description          string          `json:"description,omitempty"`
-	GoalID               string          `json:"goal_id,omitempty"`
-	GoalSourcePath       string          `json:"goal_source_path,omitempty"`
-	GoalOutcome          string          `json:"goal_outcome,omitempty"`
-	GoalSteps            []string        `json:"goal_steps,omitempty"`
-	WorkID               string          `json:"work_id"`
-	PlanChange           goal.PlanChange `json:"plan_change,omitempty"`
-	Cron                 string          `json:"cron,omitempty"`
-	Task                 string          `json:"task,omitempty"`
-	Timezone             string          `json:"timezone,omitempty"`
-	ChangeOnly           bool            `json:"change_only,omitempty"`
-	ResultID             string          `json:"result_id,omitempty"`
-	CreatedAt            time.Time       `json:"created_at"`
-	ResolvedAt           time.Time       `json:"resolved_at,omitempty"`
+	ConflictSources      []reconciliation.Source `json:"conflict_sources,omitempty"`
+	NoteID               string                  `json:"note_id,omitempty"`
+	ExpectedNoteRevision string                  `json:"expected_note_revision,omitempty"`
+	Version              int                     `json:"version"`
+	ID                   string                  `json:"id"`
+	Kind                 string                  `json:"kind"`
+	Status               string                  `json:"status"`
+	Title                string                  `json:"title,omitempty"`
+	Body                 string                  `json:"body,omitempty"`
+	SourceRefs           []string                `json:"source_refs,omitempty"`
+	SkillID              string                  `json:"skill_id,omitempty"`
+	Description          string                  `json:"description,omitempty"`
+	GoalID               string                  `json:"goal_id,omitempty"`
+	GoalSourcePath       string                  `json:"goal_source_path,omitempty"`
+	GoalOutcome          string                  `json:"goal_outcome,omitempty"`
+	GoalSteps            []string                `json:"goal_steps,omitempty"`
+	WorkID               string                  `json:"work_id"`
+	PlanChange           goal.PlanChange         `json:"plan_change,omitempty"`
+	Cron                 string                  `json:"cron,omitempty"`
+	Task                 string                  `json:"task,omitempty"`
+	Timezone             string                  `json:"timezone,omitempty"`
+	ChangeOnly           bool                    `json:"change_only,omitempty"`
+	ResultID             string                  `json:"result_id,omitempty"`
+	CreatedAt            time.Time               `json:"created_at"`
+	ResolvedAt           time.Time               `json:"resolved_at,omitempty"`
 }
 
 type Store struct{ root string }
@@ -95,7 +97,7 @@ func (s Store) Create(record Record) (Record, error) {
 	}
 	// An identical pending edit already has a review identity and provenance.
 	// Reuse it across background runs instead of multiplying review requests.
-	if record.Kind == "plan" || record.Kind == "note" && record.NoteID != "" {
+	if record.Kind == "conflict" || record.Kind == "plan" || record.Kind == "note" && record.NoteID != "" {
 		for _, existing := range entries {
 			if reflect.DeepEqual(proposalContent(existing), proposalContent(record)) {
 				return existing, nil
@@ -301,7 +303,17 @@ func validate(record Record) error {
 			return errors.New("invalid note revision")
 		}
 	}
+	if record.Kind != "conflict" && len(record.ConflictSources) > 0 {
+		return errors.New("conflict sources require a conflict proposal")
+	}
 	switch record.Kind {
+	case "conflict":
+		if strings.TrimSpace(record.Title) == "" || strings.TrimSpace(record.Body) == "" || record.GoalID != "" && !validGoalID(record.GoalID) {
+			return errors.New("conflict needs title, explanation and a valid scope")
+		}
+		if err := reconciliation.Validate(record.ConflictSources); err != nil {
+			return err
+		}
 	case "goal":
 		if strings.TrimSpace(record.Title) == "" || len(record.Body) > 8192 || record.GoalID != "" || len(record.SourceRefs) != 0 || strings.TrimSpace(record.GoalOutcome) == "" || len(record.GoalOutcome) > 2048 || !utf8.ValidString(record.GoalOutcome) || strings.ContainsRune(record.GoalOutcome, 0) || len(record.GoalSteps) == 0 || len(record.GoalSteps) > 8 {
 			return errors.New("goal suggestion needs a title, outcome, and 1-8 plan steps")

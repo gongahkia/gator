@@ -13,6 +13,7 @@ import (
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/knowledge"
+	"github.com/gongahkia/gator/internal/reconciliation"
 	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/suggestion"
 )
@@ -71,13 +72,30 @@ func suggestionCommand(args []string, out io.Writer) error {
 			}
 			currentNote = map[string]any{"id": note.ID, "title": note.Title, "body": note.Body, "source_refs": note.SourceRefs, "revision": note.Revision(), "matches_proposal": note.Revision() == record.ExpectedNoteRevision}
 		}
+
+		conflictCheck := ""
+		if record.Kind == "conflict" {
+			goals, err := goal.Open(stateDir)
+			if err != nil {
+				return err
+			}
+			notes, err := knowledge.Open(stateDir)
+			if err != nil {
+				return err
+			}
+			conflictCheck = "Sources match the inspected revisions. Accept acknowledges review only; it does not correct any source."
+			if err := reconciliation.Check(goals, notes, record.ConflictSources, record.GoalID, record.GoalID == "", nil); err != nil {
+				conflictCheck = "Source check failed: " + err.Error()
+			}
+		}
 		encoder := json.NewEncoder(out)
 		encoder.SetIndent("", "  ")
 		return encoder.Encode(struct {
 			suggestion.Record
 			ReferenceIntegrity suggestionEvidenceCheck `json:"reference_integrity"`
 			CurrentNote        any                     `json:"current_note,omitempty"`
-		}{Record: record, CurrentNote: currentNote, ReferenceIntegrity: checkSuggestionEvidence(stateDir, record)})
+			ConflictCheck      string                  `json:"conflict_check,omitempty"`
+		}{Record: record, CurrentNote: currentNote, ConflictCheck: conflictCheck, ReferenceIntegrity: checkSuggestionEvidence(stateDir, record)})
 	case "accept", "reject":
 		record, err := store.Resolve(args[1], args[0], func(record suggestion.Record) (string, error) {
 			return applySuggestion(stateDir, record)
@@ -96,6 +114,9 @@ func suggestionCommand(args []string, out io.Writer) error {
 }
 
 func suggestionLabel(record suggestion.Record) string {
+	if record.Kind == "conflict" {
+		return "Conflict review: " + record.Title
+	}
 	if record.NoteID != "" {
 		return "Update note: " + record.Title
 	}
@@ -113,6 +134,20 @@ func suggestionLabel(record suggestion.Record) string {
 
 func applySuggestion(stateDir string, record suggestion.Record) (string, error) {
 	switch record.Kind {
+	case "conflict":
+		goals, err := goal.Open(stateDir)
+		if err != nil {
+			return "", err
+		}
+		notes, err := knowledge.Open(stateDir)
+		if err != nil {
+			return "", err
+		}
+		if err := reconciliation.Check(goals, notes, record.ConflictSources, record.GoalID, record.GoalID == "", nil); err != nil {
+			return "", err
+		}
+		return "reviewed-no-source-changes", nil
+
 	case "goal":
 		store, err := goal.Open(stateDir)
 		if err != nil {
