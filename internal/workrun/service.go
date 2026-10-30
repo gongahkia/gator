@@ -284,6 +284,7 @@ func (s Service) Start(ctx context.Context, request Request) *Operation {
 	request.controlRespond = o.respondBound
 	request.controlCancelTask = o.CancelTask
 	request.controlSteerTask = o.SteerTask
+	request.controlAnswerTask = o.AnswerTask
 	sink := request.OnEvent
 	request.OnEvent = func(event agent.Event) {
 		if sink != nil {
@@ -380,4 +381,14 @@ func (o *Operation) SteerTask(id, instruction string) error {
 		return errors.New("specialists are not started")
 	}
 	return tasks.Steer(id, instruction)
+}
+
+func (o *Operation) AnswerTask(id, questionID string, answers map[string][]string) error {
+	o.mu.Lock()
+	tasks := o.tasks
+	o.mu.Unlock()
+	if tasks == nil {
+		return errors.New("specialists are not started")
+	}
+	return tasks.Answer(id, questionID, answers)
 }

@@ -48,7 +48,7 @@ type workControl struct {
 // local CLI process. The token is confined to a private state file. A decision
 // endpoint exists only when the foreground operation has an exact pending
 // interaction and checks the original in-memory preview digest.
-func startWorkControl(ctx context.Context, stateDir, runID string, cancel context.CancelFunc, incoming <-chan string, direct chan string, respond func(int, string, bool) error, cancelTask func(string) error, steerTask func(string, string) error) (*workControl, <-chan string, error) {
+func startWorkControl(ctx context.Context, stateDir, runID string, cancel context.CancelFunc, incoming <-chan string, direct chan string, respond func(int, string, bool) error, cancelTask func(string) error, steerTask func(string, string) error, answerTask func(string, string, map[string][]string) error) (*workControl, <-chan string, error) {
 	if !validInteractionRunID(runID) {
 		return nil, nil, errors.New("invalid Work control run ID")
 	}
@@ -250,6 +250,33 @@ func startWorkControl(ctx context.Context, stateDir, runID string, cancel contex
 		}
 		writer.WriteHeader(http.StatusAccepted)
 	}))
+	mux.HandleFunc("/task/answer", authorized(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method != http.MethodPost {
+			http.Error(writer, "method", http.StatusMethodNotAllowed)
+			return
+		}
+		if answerTask == nil || ctx.Err() != nil {
+			http.Error(writer, "task answers unavailable", http.StatusConflict)
+			return
+		}
+		var command taskAnswer
+		decoder := json.NewDecoder(http.MaxBytesReader(writer, request.Body, 32*1024))
+		decoder.DisallowUnknownFields()
+		if decoder.Decode(&command) != nil || !command.valid() {
+			http.Error(writer, "invalid task answer", http.StatusBadRequest)
+			return
+		}
+		var trailing any
+		if decoder.Decode(&trailing) != io.EOF {
+			http.Error(writer, "invalid task answer", http.StatusBadRequest)
+			return
+		}
+		if answerTask(command.ID, command.QuestionID, command.Answers) != nil {
+			http.Error(writer, "question changed or cannot be answered", http.StatusConflict)
+			return
+		}
+		writer.WriteHeader(http.StatusAccepted)
+	}))
 	control := &workControl{server: &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}, listener: listener, root: root, name: runID + ".json"}
 	go func() { _ = control.server.Serve(listener) }()
 	payload, err := json.Marshal(state)
@@ -384,7 +411,7 @@ func SendWorkTaskCancel(ctx context.Context, stateDir, runID, taskID string) err
 	return nil
 }
 
-// SendWorkTaskSteer queues a bounded instruction for one active LLM
+// SendWorkTaskSteer queues a bounded instruction for one active, steerable
 // specialist. Acceptance means it was queued, not that a later model turn ran.
 func SendWorkTaskSteer(ctx context.Context, stateDir, runID, taskID, instruction string) error {
 	if !validSpecialistTaskID(taskID) || !validSpecialistSteering(instruction) {
@@ -411,6 +438,57 @@ func SendWorkTaskSteer(ctx context.Context, stateDir, runID, taskID, instruction
 	_ = response.Body.Close()
 	if response.StatusCode != http.StatusAccepted {
 		return fmt.Errorf("Work specialist steering returned HTTP %d", response.StatusCode)
+	}
+	return nil
+}
+
+type taskAnswer struct {
+	ID         string              `json:"id"`
+	QuestionID string              `json:"question_id"`
+	Answers    map[string][]string `json:"answers"`
+}
+
+func (a taskAnswer) valid() bool {
+	if !validSpecialistTaskID(a.ID) || len(a.QuestionID) != 64 || len(a.Answers) < 1 || len(a.Answers) > 3 {
+		return false
+	}
+	if _, err := hex.DecodeString(a.QuestionID); err != nil {
+		return false
+	}
+	for id, values := range a.Answers {
+		if id == "" || len(id) > 128 || len(values) != 1 || !validSpecialistSteering(values[0]) {
+			return false
+		}
+	}
+	return true
+}
+
+func SendWorkTaskAnswer(ctx context.Context, stateDir, runID, taskID, questionID string, answers map[string][]string) error {
+	command := taskAnswer{taskID, questionID, answers}
+	if !command.valid() {
+		return errors.New("invalid task answer")
+	}
+	client, state, err := connectWorkControl(ctx, stateDir, runID)
+	if err != nil {
+		return err
+	}
+	payload, err := json.Marshal(command)
+	if err != nil {
+		return err
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, state.URL+"/task/answer", bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Authorization", "Bearer "+state.Token)
+	request.Header.Set("Content-Type", "application/json")
+	response, err := client.Do(request)
+	if err != nil {
+		return fmt.Errorf("Work task answer failed: %w", err)
+	}
+	_ = response.Body.Close()
+	if response.StatusCode != http.StatusAccepted {
+		return fmt.Errorf("Work task answer returned HTTP %d", response.StatusCode)
 	}
 	return nil
 }

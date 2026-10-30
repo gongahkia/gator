@@ -145,7 +145,7 @@ func commandUsesPrivateData(args []string) bool {
 			return false
 		}
 		switch args[1] {
-		case "feedback", "snapshot", "apply", "reconcile", "review", "answer", "steer", "stop", "cancel-task", "steer-task":
+		case "feedback", "snapshot", "apply", "reconcile", "review", "answer", "steer", "stop", "cancel-task", "steer-task", "answer-task":
 			return true
 		}
 	}

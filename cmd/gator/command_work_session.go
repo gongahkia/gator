@@ -21,7 +21,7 @@ import (
 
 func isWorkSessionCommand(value string) bool {
 	switch value {
-	case "list", "show", "history", "resume", "back", "forward", "tasks", "activity", "decisions", "answer", "reconcile", "stop", "steer", "cancel-task", "steer-task":
+	case "list", "show", "history", "resume", "back", "forward", "tasks", "activity", "decisions", "answer", "reconcile", "stop", "steer", "cancel-task", "steer-task", "answer-task":
 		return true
 	default:
 		return false
@@ -69,6 +69,31 @@ func workSessionCommand(arguments []string, in io.Reader, out io.Writer, modelFa
 			return err
 		}
 		_, err := fmt.Fprintf(out, "Steering queued for specialist %s in Work run %s; it applies at the next model boundary if the specialist continues.\n", arguments[2], arguments[1])
+		return err
+	}
+	if arguments[0] == "answer-task" {
+		if len(arguments) != 5 {
+			return errors.New("usage: gator work answer-task RUN_ID TASK_ID QUESTION_ID ANSWERS_JSON_OR_DASH")
+		}
+		input := io.Reader(strings.NewReader(arguments[4]))
+		if arguments[4] == "-" {
+			input = in
+		}
+		payload, err := io.ReadAll(io.LimitReader(input, 32*1024+1))
+		if err != nil {
+			return err
+		}
+		if len(payload) > 32*1024 {
+			return errors.New("task answers exceed 32 KiB")
+		}
+		var answers map[string][]string
+		if err := json.Unmarshal(payload, &answers); err != nil {
+			return errors.New("answers must be a JSON object mapping question keys to one-element text arrays")
+		}
+		if err := workrun.SendWorkTaskAnswer(context.Background(), stateDir, arguments[1], arguments[2], arguments[3], answers); err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(out, "Answer queued for specialist %s in Work run %s.\n", arguments[2], arguments[1])
 		return err
 	}
 	store, err := worksession.Open(stateDir)

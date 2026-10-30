@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -20,8 +21,71 @@ import (
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/tools"
+	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workspace"
 )
+
+func TestWorkTaskAnswerBindsQuestionAndRejectsReplay(t *testing.T) {
+	state := t.TempDir()
+	history, err := workhistory.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lease, err := history.AcquireRun("answer-worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lease.Close()
+	if _, err := history.Start(workhistory.Start{ID: "answer-worker", Objective: "answer worker", Mode: action.Inspect, ExternalActions: artifact.InspectionContract().ExternalActions, StartedAt: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	question := strings.Repeat("a", 64)
+	var mu sync.Mutex
+	answered := false
+	control, _, err := startWorkControl(ctx, state, "answer-worker", cancel, nil, nil, nil, nil, nil, func(id, token string, answers map[string][]string) error {
+		mu.Lock()
+		defer mu.Unlock()
+		if answered || id != "subagent-001" || token != question || len(answers["format"]) != 1 || answers["format"][0] != "Markdown" {
+			return errors.New("question does not match")
+		}
+		answered = true
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer control.Close()
+	answers := map[string][]string{"format": {"Markdown"}}
+	if err := SendWorkTaskAnswer(ctx, state, "answer-worker", "subagent-001", strings.Repeat("b", 64), answers); err == nil {
+		t.Fatal("stale question accepted")
+	}
+	client, live, err := connectWorkControl(ctx, state, "answer-worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	request, _ := http.NewRequestWithContext(ctx, http.MethodPost, live.URL+"/task/answer", strings.NewReader(`{}`))
+	response, err := client.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if response.StatusCode != http.StatusUnauthorized {
+		t.Fatal("unauthenticated answer accepted")
+	}
+	if err := SendWorkTaskAnswer(ctx, state, "answer-worker", "subagent-001", question, answers); err != nil {
+		t.Fatal(err)
+	}
+	if err := SendWorkTaskAnswer(ctx, state, "answer-worker", "subagent-001", question, answers); err == nil {
+		t.Fatal("replayed answer accepted")
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if !answered {
+		t.Fatal("answer not delivered")
+	}
+}
 
 func TestWorkDecisionAcrossProcesses(t *testing.T) {
 	for _, approved := range []bool{true, false} {
