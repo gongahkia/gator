@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 type NativeQuestion struct {
@@ -17,25 +18,27 @@ type NativeQuestion struct {
 	Options []string `json:"options,omitempty"`
 }
 type NativeState struct {
-	ThreadID  string           `json:"thread_id"`
-	TurnID    string           `json:"turn_id,omitempty"`
-	Status    string           `json:"status"`
-	Summary   string           `json:"summary,omitempty"`
-	Error     string           `json:"error,omitempty"`
-	Questions []NativeQuestion `json:"questions,omitempty"`
+	QuestionID string           `json:"question_id,omitempty"`
+	ThreadID   string           `json:"thread_id"`
+	TurnID     string           `json:"turn_id,omitempty"`
+	Status     string           `json:"status"`
+	Summary    string           `json:"summary,omitempty"`
+	Error      string           `json:"error,omitempty"`
+	Questions  []NativeQuestion `json:"questions,omitempty"`
 }
 
 // nativeClient tracks a real CLI conversation. It does not infer completion
 // from command acceptance or agent_end, and never answers approvals as consent.
 type nativeClient struct {
-	wire       *rpcWire
-	kind       string
-	mu         sync.Mutex
-	sendMu     sync.Mutex
-	state      NativeState
-	turnDone   chan struct{}
-	questionID json.RawMessage
-	secret     string
+	wire         *rpcWire
+	kind         string
+	mu           sync.Mutex
+	sendMu       sync.Mutex
+	state        NativeState
+	turnDone     chan struct{}
+	questionID   json.RawMessage
+	secret       string
+	retiredTurns map[string]bool
 }
 
 func newNativeClient(ctx context.Context, kind string, w *rpcWire, cfg Config, cwd, threadID string) (*nativeClient, error) {
@@ -121,7 +124,7 @@ func (c *nativeClient) State() NativeState {
 	return s
 }
 func nativeText(text string) error {
-	if strings.TrimSpace(text) == "" || len(text) > 32768 || strings.ContainsRune(text, 0) {
+	if strings.TrimSpace(text) == "" || len(text) > 32768 || strings.ContainsRune(text, 0) || !utf8.ValidString(text) {
 		return errors.New("native message must be 1 through 32768 bytes without NUL")
 	}
 	return nil
@@ -137,11 +140,18 @@ func (c *nativeClient) Send(ctx context.Context, text string) error {
 		c.mu.Unlock()
 		return errors.New("native session is not ready for a new turn")
 	}
+	if c.state.TurnID != "" {
+		if c.retiredTurns == nil {
+			c.retiredTurns = map[string]bool{}
+		}
+		c.retiredTurns[c.state.TurnID] = true
+	}
 	c.state.Status = "running"
 	c.state.Summary = ""
 	c.state.Error = ""
 	c.state.TurnID = ""
 	c.state.Questions = nil
+	c.state.QuestionID = ""
 	c.questionID = nil
 	c.turnDone = make(chan struct{})
 	thread := c.state.ThreadID
@@ -247,6 +257,7 @@ func (c *nativeClient) Answer(ctx context.Context, answers map[string][]string) 
 	if string(c.questionID) == string(id) && c.state.Status == "answering" {
 		c.questionID = nil
 		c.state.Questions = nil
+		c.state.QuestionID = ""
 		c.state.Status = "running"
 	}
 	c.mu.Unlock()
@@ -272,6 +283,7 @@ func (c *nativeClient) finish(status, diagnostic string) {
 	c.state.Status = status
 	c.state.Error = diagnostic
 	c.state.Questions = nil
+	c.state.QuestionID = ""
 	c.questionID = nil
 	if c.turnDone != nil {
 		select {
@@ -328,9 +340,24 @@ func (c *nativeClient) event(raw json.RawMessage) error {
 	}
 	c.mu.Lock()
 	thread := c.state.ThreadID
+	turn := c.state.TurnID
+	eventTurn := e.Params.TurnID
+	if eventTurn == "" {
+		eventTurn = e.Params.Turn.ID
+	}
+	retired := c.retiredTurns[eventTurn]
 	c.mu.Unlock()
 	if thread != "" && e.Params.ThreadID != "" && thread != e.Params.ThreadID {
 		return errors.New("CLI event belongs to another thread")
+	}
+	if retired {
+		if len(e.ID) > 0 {
+			return errors.New("native request belongs to a finished turn")
+		}
+		return nil
+	}
+	if turn != "" && eventTurn != "" && turn != eventTurn {
+		return errors.New("CLI event belongs to another turn")
 	}
 	if len(e.ID) > 0 {
 		if e.Method != "item/tool/requestUserInput" {
@@ -367,6 +394,7 @@ func (c *nativeClient) event(raw json.RawMessage) error {
 			return errors.New("overlapping native questions")
 		}
 		c.questionID = append(json.RawMessage(nil), e.ID...)
+		c.state.QuestionID = sessionDigest(append([]byte(c.state.ThreadID+"/"+c.state.TurnID+"/"), e.ID...))
 		c.state.Questions = questions
 		c.state.Status = "awaiting_input"
 		return nil

@@ -16,6 +16,10 @@ import (
 func (e Executor) externalCLISpecialist(request Request, work workspace.Work, cfg cliagent.Config) orchestrator.Specialist {
 	edit := cfg.AllowEdits && request.Mode != action.Inspect
 	description := fmt.Sprintf("Run the configured %s CLI in an isolated source copy; separate provider billing, bounded runtime, no live steering. Returns findings", cfg.Kind)
+	persistent := cfg.Kind == "codex" || cfg.Kind == "pi"
+	if persistent {
+		description = fmt.Sprintf("Work with %s in a retained isolated conversation. Use start_agent with continue to send follow-ups to the same native session, or steer_agent during active work. Separate provider billing, bounded runtime. Returns findings", cfg.Kind)
+	}
 	if edit {
 		description += " and a reviewable patch; original files remain unchanged."
 	} else {
@@ -26,8 +30,26 @@ func (e Executor) externalCLISpecialist(request Request, work workspace.Work, cf
 		if err != nil {
 			return orchestrator.Result{}, err
 		}
-		value, err := cliagent.Run(ctx, cliagent.Request{Config: cfg, Source: work.Source.Path(), Scratch: work.Scratch.Path(), ID: i.ID, Task: i.Task, Edit: edit, Scopes: request.Code.Scopes, Baseline: baseline, OnEvent: i.OnEvent})
-		result := orchestrator.Result{Summary: value.Summary, BaselineSHA256: value.BaselineSHA256, Usage: value.Usage, Steps: value.Turns}
+		assignment := cliagent.Request{Config: cfg, Source: work.Source.Path(), Scratch: work.Scratch.Path(), ID: i.ID, Task: i.Task, Edit: edit, Scopes: request.Code.Scopes, Baseline: baseline, OnEvent: i.OnEvent}
+		var value cliagent.Result
+		if persistent {
+			owner := request.ConversationID
+			if owner == "" {
+				owner = "run:" + request.RunID
+			}
+			capture := request.SnapshotID
+			if capture == "" {
+				capture = work.Source.Path()
+			}
+			store, pathErr := filepath.EvalSymlinks(request.StateDir)
+			if pathErr != nil {
+				return orchestrator.Result{}, pathErr
+			}
+			value, err = cliagent.RunSession(ctx, cliagent.SessionRequest{Request: assignment, Store: filepath.Join(store, "gator", "cli-sessions"), Owner: owner, Capture: capture, SessionID: i.SessionID, Steering: i.Steering, Controls: i.Controls, OnState: i.OnState})
+		} else {
+			value, err = cliagent.Run(ctx, assignment)
+		}
+		result := orchestrator.Result{SessionID: value.SessionID, Summary: value.Summary, BaselineSHA256: value.BaselineSHA256, Usage: value.Usage, Steps: value.Turns}
 		if err != nil {
 			return result, err
 		}
@@ -47,5 +69,6 @@ func (e Executor) externalCLISpecialist(request Request, work workspace.Work, cf
 		return result, nil
 	})
 	specialist.Configuration = orchestrator.RoleConfiguration{Version: 1, Provider: cfg.Kind + "/" + cfg.Model, MaxSteps: 16}
+	specialist.Sessions, specialist.Steering = persistent, persistent
 	return specialist
 }

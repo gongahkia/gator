@@ -27,6 +27,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/cliagent"
 )
 
 const (
@@ -41,16 +42,20 @@ var specialistNamePattern = regexp.MustCompile(`\A[a-z][a-z0-9_]{0,63}\z`)
 
 // Invocation is the isolated assignment passed to one specialist.
 type Invocation struct {
-	Baseline string
-	OnEvent  agent.EventSink
-	ID       string
-	Task     string
-	Steering <-chan string
+	Controls  <-chan cliagent.SessionControl
+	OnState   func(string, cliagent.NativeState) error
+	SessionID string
+	Baseline  string
+	OnEvent   agent.EventSink
+	ID        string
+	Task      string
+	Steering  <-chan string
 }
 
 // Result is the bounded information returned from a specialist to its manager.
 // Artifact fields are optional trusted evidence supplied by the host.
 type Result struct {
+	SessionID      string
 	BaselineSHA256 string
 	Usage          agent.Usage
 	Summary        string
@@ -59,10 +64,12 @@ type Result struct {
 	ArtifactSHA256 string
 }
 
-// Specialist describes one capability visible to the manager. Run must start
-// from fresh context and return only the information needed by the manager.
+// Specialist describes one capability visible to the manager. Native session
+// specialists may resume host-selected context; others start fresh.
 // Backend selects LLM tools or a hosted engine; it is not a second manager API.
 type Specialist struct {
+	Sessions      bool
+	Steering      bool
 	Configuration RoleConfiguration
 	Backend       Backend
 	Name          string

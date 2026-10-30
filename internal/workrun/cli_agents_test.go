@@ -91,13 +91,11 @@ func TestExternalPatchEntersVerifiedIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	executable := filepath.Join(root, "fake-cli")
-	script := `#!/bin/sh
-set -eu
-cat >/dev/null
-printf 'after\n' > note.txt
-printf '%s\n' '{"type":"item.completed","item":{"type":"agent_message","text":"Updated note.txt"}}' '{"type":"turn.completed"}'
-`
-	if err := os.WriteFile(executable, []byte(script), 0700); err != nil {
+	script, err := os.ReadFile("../cliagent/testdata/codex_rpc.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(executable, script, 0700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("FIXTURE_API_KEY", "test-only-credential")
@@ -116,6 +114,14 @@ printf '%s\n' '{"type":"item.completed","item":{"type":"agent_message","text":"U
 	if result.ArtifactPath == "" || request.integration.patches[result.ArtifactPath] != result.ArtifactSHA256 {
 		t.Fatal("patch not registered")
 	}
+	if result.SessionID == "" {
+		t.Fatal("native session identity missing")
+	}
+	continued, err := specialist.Run(context.Background(), orchestrator.Invocation{ID: "subagent-2", SessionID: result.SessionID, Task: "Revise the same note"})
+	if err != nil || continued.SessionID != result.SessionID || !strings.Contains(continued.Summary, "turn 2") {
+		t.Fatalf("native continuation failed: %+v %v", continued, err)
+	}
+	result = continued
 	input, _ := json.Marshal(map[string]any{"patches": []string{result.ArtifactPath}})
 	integrated, err := request.integration.Execute(context.Background(), input)
 	if err != nil {

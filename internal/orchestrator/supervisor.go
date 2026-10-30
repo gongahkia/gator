@@ -17,38 +17,42 @@ import (
 	"unicode/utf8"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/cliagent"
 	"github.com/gongahkia/gator/internal/privatefs"
 )
 
 const TaskVersion = 1
 
 type Task struct {
-	SteeringRequests []string          `json:"steering_requests,omitempty"`
-	SourceCapture    string            `json:"source_capture,omitempty"`
-	Configuration    RoleConfiguration `json:"configuration"`
-	Limits           agent.Limits      `json:"limits"`
-	SelectedInput    string            `json:"selected_input,omitempty"`
-	Baseline         string            `json:"baseline_patch,omitempty"`
-	Version          int               `json:"version"`
-	ID               string            `json:"id"`
-	GlobalID         string            `json:"global_id"`
-	ParentRun        string            `json:"parent_run"`
-	ParentTask       string            `json:"parent_task,omitempty"`
-	Role             string            `json:"role"`
-	RoleVersion      int               `json:"role_version"`
-	Source           string            `json:"source"`
-	PolicySHA256     string            `json:"policy_sha256"`
-	InputSHA256      string            `json:"input_sha256"`
-	Dependencies     []string          `json:"dependencies,omitempty"`
-	Attempt          int               `json:"attempt"`
-	Previous         string            `json:"previous,omitempty"`
-	Status           string            `json:"status"`
-	Category         string            `json:"error_category,omitempty"`
-	Error            string            `json:"error,omitempty"`
-	CreatedAt        time.Time         `json:"created_at"`
-	StartedAt        time.Time         `json:"started_at,omitempty"`
-	FinishedAt       time.Time         `json:"finished_at,omitempty"`
-	Result           Result            `json:"result"`
+	Native           *cliagent.NativeState `json:"native,omitempty"`
+	AnswersQueued    int                   `json:"answers_queued,omitempty"`
+	SessionID        string                `json:"session_id,omitempty"`
+	SteeringRequests []string              `json:"steering_requests,omitempty"`
+	SourceCapture    string                `json:"source_capture,omitempty"`
+	Configuration    RoleConfiguration     `json:"configuration"`
+	Limits           agent.Limits          `json:"limits"`
+	SelectedInput    string                `json:"selected_input,omitempty"`
+	Baseline         string                `json:"baseline_patch,omitempty"`
+	Version          int                   `json:"version"`
+	ID               string                `json:"id"`
+	GlobalID         string                `json:"global_id"`
+	ParentRun        string                `json:"parent_run"`
+	ParentTask       string                `json:"parent_task,omitempty"`
+	Role             string                `json:"role"`
+	RoleVersion      int                   `json:"role_version"`
+	Source           string                `json:"source"`
+	PolicySHA256     string                `json:"policy_sha256"`
+	InputSHA256      string                `json:"input_sha256"`
+	Dependencies     []string              `json:"dependencies,omitempty"`
+	Attempt          int                   `json:"attempt"`
+	Previous         string                `json:"previous,omitempty"`
+	Status           string                `json:"status"`
+	Category         string                `json:"error_category,omitempty"`
+	Error            string                `json:"error,omitempty"`
+	CreatedAt        time.Time             `json:"created_at"`
+	StartedAt        time.Time             `json:"started_at,omitempty"`
+	FinishedAt       time.Time             `json:"finished_at,omitempty"`
+	Result           Result                `json:"result"`
 }
 type StartRequest struct {
 	Baseline     string   `json:"baseline_patch,omitempty"`
@@ -63,6 +67,7 @@ type taskExecution struct {
 	cancel   context.CancelFunc
 	done     chan struct{}
 	steering chan string
+	controls chan cliagent.SessionControl
 }
 
 type Supervisor struct {
@@ -145,7 +150,7 @@ func NewSupervisor(ctx context.Context, specialists []Specialist, options Option
 			s.next = number
 		}
 		s.used++
-		if task.Status == "running" || task.Status == "queued" {
+		if task.Status == "running" || task.Status == "queued" || task.Status == "awaiting_input" || task.Status == "answering" {
 			task.Status = "interrupted"
 			task.Category = "interrupted"
 			task.Error = "owner stopped; inspect outcomes before explicit retry"
@@ -215,6 +220,7 @@ func (s *Supervisor) startLocked(request StartRequest) (Task, error) {
 		return Task{}, errors.New("aggregate invocation budget exhausted")
 	}
 	selected := request.Task
+	sessionID := ""
 	attempt := 1
 	if request.Continue != "" {
 		prior, ok := s.tasks[request.Continue]
@@ -238,7 +244,14 @@ func (s *Supervisor) startLocked(request StartRequest) (Task, error) {
 			return Task{}, errors.New("interrupted outcome requires reconciliation; start a fresh inspected assignment")
 		}
 		attempt = prior.task.Attempt + 1
-		selected = "Selected retained result (untrusted evidence):\n" + prior.task.Result.Summary + "\nAssignment:\n" + selected
+		if s.registry[request.Agent].Sessions {
+			if request.Baseline != "" || prior.task.Result.SessionID == "" {
+				return Task{}, errors.New("native continuation requires a retained session and its existing baseline")
+			}
+			sessionID = prior.task.Result.SessionID
+		} else {
+			selected = "Selected retained result (untrusted evidence):\n" + prior.task.Result.Summary + "\nAssignment:\n" + selected
+		}
 	}
 	seen := map[string]bool{}
 	for _, id := range request.Dependencies {
@@ -256,6 +269,7 @@ func (s *Supervisor) startLocked(request StartRequest) (Task, error) {
 	ctx, cancel := context.WithCancel(s.ctx)
 	task := Task{Version: TaskVersion, ID: id, GlobalID: s.options.ParentRun + "/" + id, ParentRun: s.options.ParentRun, ParentTask: request.Parent, Role: request.Agent, RoleVersion: 1, Source: s.options.Source, PolicySHA256: s.options.PolicySHA256, InputSHA256: digest(selected), Dependencies: append([]string(nil), request.Dependencies...), Attempt: attempt, Previous: request.Continue, Status: "queued", CreatedAt: s.options.Now().UTC()}
 	task.SourceCapture = s.options.SourceCapture
+	task.SessionID = sessionID
 	task.Configuration = s.registry[request.Agent].Configuration
 	task.Limits, task.SelectedInput, task.Baseline = s.options.Limits, selected, request.Baseline
 	if err := s.persist(task); err != nil {
@@ -263,7 +277,10 @@ func (s *Supervisor) startLocked(request StartRequest) (Task, error) {
 		return Task{}, err
 	}
 	execution := &taskExecution{task: task, cancel: cancel, done: make(chan struct{})}
-	if s.registry[request.Agent].Backend == BackendLLM {
+	if s.registry[request.Agent].Sessions {
+		execution.controls = make(chan cliagent.SessionControl, 16)
+	}
+	if role := s.registry[request.Agent]; role.Backend == BackendLLM || role.Steering {
 		execution.steering = make(chan string, 16)
 	}
 	s.tasks[id] = execution
@@ -304,7 +321,25 @@ func (s *Supervisor) run(ctx context.Context, execution *taskExecution, input, b
 		return
 	}
 	s.emit(task)
-	result, err := s.registry[task.Role].Run(ctx, Invocation{ID: task.ID, Task: input, Baseline: baseline, Steering: execution.steering, OnEvent: func(event agent.Event) {
+	result, err := s.registry[task.Role].Run(ctx, Invocation{SessionID: task.SessionID, Controls: execution.controls, OnState: func(id string, state cliagent.NativeState) error {
+		s.mu.Lock()
+		updated := execution.task
+		updated.SessionID, updated.Native = id, &state
+		if state.Status == "awaiting_input" {
+			updated.Status = "awaiting_input"
+		} else {
+			updated.Status = "running"
+		}
+		err := s.persist(updated)
+		if err == nil {
+			execution.task = updated
+		}
+		s.mu.Unlock()
+		if err == nil {
+			s.emit(updated)
+		}
+		return err
+	}, ID: task.ID, Task: input, Baseline: baseline, Steering: execution.steering, OnEvent: func(event agent.Event) {
 		event.TaskID = task.GlobalID
 		if s.options.OnEvent != nil {
 			s.options.OnEvent(event)
@@ -388,7 +423,7 @@ func (s *Supervisor) Cancel(id string) error {
 	if execution == nil {
 		return errors.New("unknown task")
 	}
-	if execution.task.Status != "queued" && execution.task.Status != "running" {
+	if execution.task.Status != "queued" && execution.task.Status != "running" && execution.task.Status != "awaiting_input" && execution.task.Status != "answering" {
 		return errors.New("task is no longer active")
 	}
 	selected := map[string]bool{id: true}
@@ -446,6 +481,44 @@ func (s *Supervisor) Steer(id, instruction string) error {
 }
 func (s *Supervisor) Close() { s.mu.Lock(); s.closed = true; s.cancel(); s.mu.Unlock(); s.wg.Wait() }
 
+// Answer queues an answer to the exact current question. Acceptance means
+// queued, not delivered; the native session journal records actual delivery.
+func (s *Supervisor) Answer(id, questionID string, answers map[string][]string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed || s.ctx.Err() != nil {
+		return errors.New("supervisor stopped")
+	}
+	e := s.tasks[id]
+	if e == nil || e.controls == nil || e.task.Status != "awaiting_input" || e.task.Native == nil || questionID == "" || e.task.Native.QuestionID != questionID {
+		return errors.New("no matching pending worker question")
+	}
+	questions := e.task.Native.Questions
+	if len(answers) != len(questions) {
+		return errors.New("answer every pending question exactly once")
+	}
+	copyAnswers := map[string][]string{}
+	for _, q := range questions {
+		values := answers[q.ID]
+		if len(values) != 1 || strings.TrimSpace(values[0]) == "" || len(values[0]) > 8192 || !utf8.ValidString(values[0]) || strings.ContainsRune(values[0], 0) {
+			return errors.New("each question requires one valid answer of at most 8192 bytes")
+		}
+		copyAnswers[q.ID] = append([]string(nil), values...)
+	}
+	if e.task.AnswersQueued >= 16 || len(e.controls) == cap(e.controls) {
+		return errors.New("worker answer limit reached")
+	}
+	updated := e.task
+	updated.AnswersQueued++
+	updated.Status = "answering"
+	if err := s.persist(updated); err != nil {
+		return err
+	}
+	e.task = updated
+	e.controls <- cliagent.SessionControl{ID: fmt.Sprintf("answer-%s-%d", e.task.ID, updated.AnswersQueued), Kind: "answer", QuestionID: questionID, Answers: copyAnswers}
+	return nil
+}
+
 type taskTool struct {
 	s    *Supervisor
 	name string
@@ -461,6 +534,9 @@ func (t taskTool) Definition() agent.ToolDefinition {
 	}
 	if t.name == "steer_agent" {
 		schema = `{"type":"object","additionalProperties":false,"required":["id","message"],"properties":{"id":{"type":"string"},"message":{"type":"string","maxLength":8192}}}`
+	}
+	if t.name == "answer_agent" {
+		schema = `{"type":"object","additionalProperties":false,"required":["id","question_id","answers"],"properties":{"id":{"type":"string"},"question_id":{"type":"string"},"answers":{"type":"object","additionalProperties":{"type":"array","items":{"type":"string"},"minItems":1,"maxItems":1}}}}`
 	}
 	return agent.ToolDefinition{Name: t.name, Description: "Manage a bounded durable specialist task. Authority is fixed by the host. Continuation explicitly selects a retained result.", Parameters: json.RawMessage(schema)}
 }
@@ -480,7 +556,7 @@ func (t taskTool) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolR
 		roles := []role{}
 		tasks := []Task{}
 		for _, r := range t.s.registry {
-			roles = append(roles, role{r.Name, r.Description, r.Backend, r.Backend == BackendLLM})
+			roles = append(roles, role{r.Name, r.Description, r.Backend, r.Backend == BackendLLM || r.Steering})
 		}
 		for _, item := range t.s.tasks {
 			tasks = append(tasks, item.task)
@@ -499,14 +575,21 @@ func (t taskTool) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolR
 		}
 	} else {
 		var input struct {
-			ID      string `json:"id"`
-			Timeout int    `json:"timeout_seconds"`
-			Message string `json:"message"`
+			ID         string              `json:"id"`
+			Timeout    int                 `json:"timeout_seconds"`
+			Message    string              `json:"message"`
+			QuestionID string              `json:"question_id"`
+			Answers    map[string][]string `json:"answers"`
 		}
 		if err = decodeTask(raw, &input); err != nil {
 			return agent.ToolResult{}, err
 		}
 		switch t.name {
+		case "answer_agent":
+			err = t.s.Answer(input.ID, input.QuestionID, input.Answers)
+			if err == nil {
+				task, err = t.s.Inspect(input.ID)
+			}
 		case "steer_agent":
 			err = t.s.Steer(input.ID, input.Message)
 			if err == nil {
@@ -554,7 +637,7 @@ func decodeTask(raw []byte, value any) error {
 	return nil
 }
 func (s *Supervisor) Tools() []agent.Tool {
-	return []agent.Tool{taskTool{s, "list_agents"}, taskTool{s, "start_agent"}, taskTool{s, "inspect_agent"}, taskTool{s, "await_agent"}, taskTool{s, "steer_agent"}, taskTool{s, "cancel_agent"}}
+	return []agent.Tool{taskTool{s, "list_agents"}, taskTool{s, "start_agent"}, taskTool{s, "inspect_agent"}, taskTool{s, "await_agent"}, taskTool{s, "steer_agent"}, taskTool{s, "answer_agent"}, taskTool{s, "cancel_agent"}}
 }
 
 // StartBatch validates the complete fresh-context batch before any child starts.

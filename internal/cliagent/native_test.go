@@ -162,6 +162,19 @@ func TestNativeRejectsOtherThreadAndSecretQuestions(t *testing.T) {
 		}
 	}
 }
+
+func TestNativeIgnoresRetiredTurnsAndRejectsOtherActiveTurn(t *testing.T) {
+	c := &nativeClient{kind: "codex", state: NativeState{ThreadID: "thread", TurnID: "current", Status: "running"}, retiredTurns: map[string]bool{"old": true}}
+	if err := c.event([]byte(`{"method":"turn/completed","params":{"threadId":"thread","turn":{"id":"old","status":"completed"}}}`)); err != nil {
+		t.Fatal(err)
+	}
+	if c.State().Status != "running" {
+		t.Fatal("old completion finished new work")
+	}
+	if err := c.event([]byte(`{"method":"turn/completed","params":{"threadId":"thread","turn":{"id":"unrelated","status":"completed"}}}`)); err == nil {
+		t.Fatal("unrelated turn accepted")
+	}
+}
 func TestNativeArgumentsPreserveSessionsAndLimitDiscovery(t *testing.T) {
 	for _, kind := range []string{"codex", "pi"} {
 		args := strings.Join(nativeArguments(Config{Kind: kind, Provider: "openai"}, false, "/private/session"), " ")

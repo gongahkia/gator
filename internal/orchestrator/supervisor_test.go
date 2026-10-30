@@ -10,10 +10,101 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/gongahkia/gator/internal/cliagent"
 )
 
 func hostedReader(run func(context.Context, Invocation) (Result, error)) Specialist {
 	return HostedSpecialist("reader", "Inspect frozen source without mutation.", run)
+}
+
+func TestSupervisorNativeContinuationUsesSessionNotSummary(t *testing.T) {
+	role := hostedReader(func(_ context.Context, i Invocation) (Result, error) {
+		if i.Task == "follow-up" && i.SessionID != "host-retained-session" {
+			return Result{}, errors.New("session identity lost")
+		}
+		if strings.Contains(i.Task, "UNTRUSTED-OLD-SUMMARY") {
+			return Result{}, errors.New("native follow-up replaced with summary")
+		}
+		return Result{Summary: "UNTRUSTED-OLD-SUMMARY", SessionID: "host-retained-session"}, nil
+	})
+	role.Sessions, role.Steering = true, true
+	s, err := NewSupervisor(context.Background(), []Specialist{role}, Options{StatePath: t.TempDir(), ParentRun: "native", Source: "snapshot"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	first, err := s.Start(StartRequest{Agent: "reader", Task: "first"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err = s.Await(context.Background(), first.ID)
+	if err != nil || first.Status != "completed" {
+		t.Fatal(first, err)
+	}
+	if _, err := s.Start(StartRequest{Agent: "reader", Task: "follow-up", Continue: first.ID, Baseline: "different.patch"}); err == nil {
+		t.Fatal("replaced native baseline")
+	}
+	next, err := s.Start(StartRequest{Agent: "reader", Task: "follow-up", Continue: first.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	next, err = s.Await(context.Background(), next.ID)
+	if err != nil || next.Status != "completed" || next.Result.SessionID != first.Result.SessionID {
+		t.Fatal(next, err)
+	}
+}
+
+func TestSupervisorRoutesExactNativeQuestion(t *testing.T) {
+	question := make(chan struct{})
+	role := hostedReader(func(ctx context.Context, i Invocation) (Result, error) {
+		state := cliagent.NativeState{Status: "awaiting_input", QuestionID: "question-one", Questions: []cliagent.NativeQuestion{{ID: "format", Text: "Which format?"}}}
+		if err := i.OnState("native-session", state); err != nil {
+			return Result{}, err
+		}
+		close(question)
+		select {
+		case control := <-i.Controls:
+			if control.Kind != "answer" || control.QuestionID != "question-one" || len(control.Answers["format"]) != 1 {
+				return Result{}, errors.New("wrong answer routed")
+			}
+			return Result{SessionID: "native-session", Summary: control.Answers["format"][0]}, nil
+		case <-ctx.Done():
+			return Result{}, ctx.Err()
+		}
+	})
+	role.Sessions = true
+	s, err := NewSupervisor(context.Background(), []Specialist{role}, Options{StatePath: t.TempDir(), ParentRun: "question", Source: "snapshot"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	task, err := s.Start(StartRequest{Agent: "reader", Task: "draft"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-question
+	if err := s.Answer(task.ID, "stale", map[string][]string{"format": {"Markdown"}}); err == nil {
+		t.Fatal("stale answer accepted")
+	}
+	if err := s.Answer(task.ID, "question-one", map[string][]string{"other": {"Markdown"}}); err == nil {
+		t.Fatal("wrong question key accepted")
+	}
+	for _, tool := range s.Tools() {
+		if tool.Definition().Name == "answer_agent" {
+			payload, _ := json.Marshal(map[string]any{"id": task.ID, "question_id": "question-one", "answers": map[string][]string{"format": {"Markdown"}}})
+			if _, err := tool.Execute(context.Background(), payload); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	result, err := s.Await(context.Background(), task.ID)
+	if err != nil || result.Status != "completed" || result.Result.Summary != "Markdown" {
+		t.Fatal(result, err)
+	}
+	if err := s.Answer(task.ID, "question-one", map[string][]string{"format": {"Markdown"}}); err == nil {
+		t.Fatal("duplicate answer accepted")
+	}
 }
 
 func TestSupervisorPersistsEachPeerAndRecoversWithoutReexecution(t *testing.T) {

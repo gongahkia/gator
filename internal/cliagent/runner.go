@@ -29,6 +29,7 @@ type Request struct {
 	OnEvent                   agent.EventSink
 }
 type Result struct {
+	SessionID      string
 	Summary        string
 	Patch          []byte
 	BaselineSHA256 string
