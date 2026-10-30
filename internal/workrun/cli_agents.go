@@ -16,9 +16,12 @@ import (
 func (e Executor) externalCLISpecialist(request Request, work workspace.Work, cfg cliagent.Config) orchestrator.Specialist {
 	edit := cfg.AllowEdits && request.Mode != action.Inspect
 	description := fmt.Sprintf("Run the configured %s CLI in an isolated source copy; separate provider billing, bounded runtime, no live steering. Returns findings", cfg.Kind)
-	persistent := cfg.Kind == "codex" || cfg.Kind == "pi"
+	persistent := cfg.Kind == "codex" || cfg.Kind == "pi" || cfg.Kind == "claude"
 	if persistent {
 		description = fmt.Sprintf("Work with %s in a retained isolated conversation. Use start_agent with continue to send follow-ups to the same native session, or steer_agent during active work. Separate provider billing, bounded runtime. Returns findings", cfg.Kind)
+	}
+	if cfg.Kind == "claude" {
+		description = "Work with Claude in a retained isolated conversation. Use start_agent with continue for follow-ups and answer_agent for structured questions. Active-turn steering is unavailable. Separate provider billing, bounded runtime. Returns findings"
 	}
 	if edit {
 		description += " and a reviewable patch; original files remain unchanged."
@@ -69,6 +72,6 @@ func (e Executor) externalCLISpecialist(request Request, work workspace.Work, cf
 		return result, nil
 	})
 	specialist.Configuration = orchestrator.RoleConfiguration{Version: 1, Provider: cfg.Kind + "/" + cfg.Model, MaxSteps: 16}
-	specialist.Sessions, specialist.Steering = persistent, persistent
+	specialist.Sessions, specialist.Steering = persistent, persistent && cfg.Kind != "claude"
 	return specialist
 }

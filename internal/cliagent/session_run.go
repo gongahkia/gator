@@ -41,7 +41,7 @@ func RunSession(ctx context.Context, r SessionRequest) (result Result, err error
 	if err := nativeText(r.Task); err != nil {
 		return result, err
 	}
-	if r.Config.Kind != "codex" && r.Config.Kind != "pi" {
+	if r.Config.Kind != "codex" && r.Config.Kind != "pi" && r.Config.Kind != "claude" {
 		return result, errors.New("persistent sessions unavailable for this adapter")
 	}
 	key := os.Getenv(r.Config.APIKeyEnv)
@@ -99,7 +99,11 @@ func RunSession(ctx context.Context, r SessionRequest) (result Result, err error
 	if err := p.client.Send(ctx, r.Task); err != nil {
 		return result, err
 	}
-	if err := s.commandStatus(id, "acknowledged"); err != nil {
+	delivery := "acknowledged"
+	if r.Config.Kind == "claude" {
+		delivery = "delivered"
+	}
+	if err := s.commandStatus(id, delivery); err != nil {
 		return result, err
 	}
 	if r.OnEvent != nil {

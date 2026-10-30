@@ -449,7 +449,7 @@ type taskAnswer struct {
 }
 
 func (a taskAnswer) valid() bool {
-	if !validSpecialistTaskID(a.ID) || len(a.QuestionID) != 64 || len(a.Answers) < 1 || len(a.Answers) > 3 {
+	if !validSpecialistTaskID(a.ID) || len(a.QuestionID) != 64 || len(a.Answers) < 1 || len(a.Answers) > 4 {
 		return false
 	}
 	if _, err := hex.DecodeString(a.QuestionID); err != nil {

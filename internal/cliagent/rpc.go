@@ -20,6 +20,7 @@ type rpcWire struct {
 	reader  io.ReadCloser
 	writer  io.WriteCloser
 	pi      bool
+	claude  bool
 	mu      sync.Mutex
 	next    uint64
 	pending map[string]chan rpcReply
@@ -39,7 +40,11 @@ type rpcWrite struct {
 }
 
 func newRPCWire(reader io.ReadCloser, writer io.WriteCloser, pi bool) *rpcWire {
-	w := &rpcWire{reader: reader, writer: writer, pi: pi, pending: map[string]chan rpcReply{}, done: make(chan struct{}), events: make(chan json.RawMessage, 128), writes: make(chan rpcWrite, 16)}
+	return newProtocolWire(reader, writer, pi, false)
+}
+
+func newProtocolWire(reader io.ReadCloser, writer io.WriteCloser, pi, claude bool) *rpcWire {
+	w := &rpcWire{reader: reader, writer: writer, pi: pi, claude: claude, pending: map[string]chan rpcReply{}, done: make(chan struct{}), events: make(chan json.RawMessage, 128), writes: make(chan rpcWrite, 16)}
 	go w.readLoop()
 	go w.writeLoop()
 	return w
@@ -125,6 +130,16 @@ func (w *rpcWire) Call(ctx context.Context, method string, params map[string]any
 			request[key] = value
 		}
 	}
+	if w.claude {
+		body := map[string]any{"subtype": method}
+		for key, value := range params {
+			if key == "subtype" {
+				return nil, errors.New("reserved Claude control parameter")
+			}
+			body[key] = value
+		}
+		request = map[string]any{"type": "control_request", "request_id": id, "request": body}
+	}
 	if err := w.write(ctx, request); err != nil {
 		return nil, err
 	}
@@ -151,6 +166,13 @@ func (w *rpcWire) Reply(ctx context.Context, id json.RawMessage, result any) err
 	if len(id) == 0 || !json.Valid(id) {
 		return errors.New("invalid CLI request ID")
 	}
+	if w.claude {
+		var requestID string
+		if json.Unmarshal(id, &requestID) != nil || requestID == "" {
+			return errors.New("invalid Claude control request ID")
+		}
+		return w.write(ctx, map[string]any{"type": "control_response", "response": map[string]any{"subtype": "success", "request_id": requestID, "response": result}})
+	}
 	return w.write(ctx, map[string]any{"id": id, "result": result})
 }
 func (w *rpcWire) readLoop() {
@@ -169,19 +191,37 @@ func (w *rpcWire) readLoop() {
 			return
 		}
 		var record struct {
-			ID      json.RawMessage `json:"id"`
-			Method  string          `json:"method"`
-			Type    string          `json:"type"`
-			Success bool            `json:"success"`
-			Result  json.RawMessage `json:"result"`
-			Data    json.RawMessage `json:"data"`
-			Error   json.RawMessage `json:"error"`
+			ID       json.RawMessage `json:"id"`
+			Method   string          `json:"method"`
+			Type     string          `json:"type"`
+			Success  bool            `json:"success"`
+			Result   json.RawMessage `json:"result"`
+			Data     json.RawMessage `json:"data"`
+			Error    json.RawMessage `json:"error"`
+			Response struct {
+				ID      string          `json:"request_id"`
+				Subtype string          `json:"subtype"`
+				Data    json.RawMessage `json:"response"`
+				Error   json.RawMessage `json:"error"`
+			} `json:"response"`
 		}
 		if err := json.Unmarshal(line, &record); err != nil {
 			w.stop(errors.New("CLI emitted malformed RPC JSON"))
 			return
 		}
-		response := len(record.ID) > 0 && record.Method == "" && ((!w.pi && (record.Result != nil || record.Error != nil)) || (w.pi && record.Type == "response"))
+		response := !w.claude && len(record.ID) > 0 && record.Method == "" && ((!w.pi && (record.Result != nil || record.Error != nil)) || (w.pi && record.Type == "response"))
+		if w.claude && record.Type == "control_response" {
+			if record.Response.ID == "" || (record.Response.Subtype != "success" && record.Response.Subtype != "error") {
+				w.stop(errors.New("invalid Claude control response"))
+				return
+			}
+			record.ID, _ = json.Marshal(record.Response.ID)
+			record.Result, record.Error = record.Response.Data, record.Response.Error
+			if record.Response.Subtype == "error" && record.Error == nil {
+				record.Error = json.RawMessage(`"unspecified control error"`)
+			}
+			response = true
+		}
 		if response {
 			var id string
 			if err := json.Unmarshal(record.ID, &id); err != nil {

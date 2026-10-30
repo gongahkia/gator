@@ -287,7 +287,7 @@ func (s *sessionLease) commandStatus(id, status string) error {
 		if c.ID != id {
 			continue
 		}
-		allowed := c.Status == status || c.Status == "admitted" && (status == "acknowledged" || status == "completed" || status == "rejected") || c.Status == "acknowledged" && status == "completed"
+		allowed := c.Status == status || c.Status == "admitted" && (status == "acknowledged" || status == "delivered" || status == "completed" || status == "rejected") || (c.Status == "acknowledged" || c.Status == "delivered") && status == "completed"
 		if !allowed {
 			return errors.New("invalid CLI command state transition")
 		}

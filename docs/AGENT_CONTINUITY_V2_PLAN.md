@@ -10,8 +10,12 @@ through the Work manager, including retained conversation/checkout identity,
 follow-ups, steering and exact-question answers. Leases and command admission
 fail closed on uncertain recovery. Live manager/native continuity scenarios
 pass for both providers; protocol, ownership and integration tests pass locally.
-This is partial progress on items 1 and 4, not completion of this plan. Claude
-native sessions, live steering/question proof, completion loops, independent
+Claude native sessions now have deterministic protocol/process coverage for
+resumption, questions, denied permissions and interruption, but no live-provider
+evidence. Threads also survive unrelated turns on the selected conversation
+lineage; sibling branches are excluded and discovery indexes retained sessions.
+This is partial progress on items 1, 3 and 4, not completion of this plan. Claude
+live verification, live steering/question proof, completion loops, independent
 background ownership/recovery, terminal task UX and longitudinal proactive
 validation remain required. See `SUBAGENTS_AND_CLI_INTEROP.md` for evidence and
 current limitations.

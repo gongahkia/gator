@@ -72,14 +72,15 @@ gator work cancel-task RUN_ID TASK_ID
 gator work steer-task RUN_ID TASK_ID 'Focus on the parsing failure.'
 ```
 
-Live steering works for internal LLM specialists and Codex/Pi. Codex/Pi
+Live steering works for internal LLM specialists and Codex/Pi. Codex/Pi/Claude
 follow-ups now resume the same native conversation and private checkout. The
 manager selects the completed task with `start_agent`'s `continue` field; it
 cannot supply an arbitrary native thread ID. Continuation keeps the original
 source capture and permission envelope, and cannot select a new baseline patch.
-Claude still uses one-shot execution and summary-based continuation.
+Claude supports structured questions and native interruption, but rejects
+active-turn steering. Send a follow-up after interrupting or completing its turn.
 
-Codex clarification requests appear in task details as `native.questions` and
+Codex/Claude clarification requests appear in task details as `native.questions` and
 `native.question_id`. The manager can use `answer_agent`, or the user can answer
 from another terminal (replace QUESTION_ID with that exact current token):
 
@@ -90,6 +91,12 @@ gator work answer-task RUN_ID TASK_ID QUESTION_ID '{"format":["Markdown"]}'
 
 Answers are bound to the current question and queued once. Approval requests
 are never converted into clarification questions or automatically approved.
+Claude answers map host question keys back to the original question text; the
+original questions are included in the protocol response without granting
+additional tool permissions. Multi-select answers can be sent as comma-joined
+labels in the answer text. Claude's user-message delivery has no native RPC
+acknowledgement; the journal distinguishes delivery from acknowledgement and
+waits for a terminal result before recording turn completion.
 Pi currently asks ordinary clarification questions in its response text; it
 does not expose Codex's structured pending-question protocol.
 
@@ -155,7 +162,9 @@ Live synthetic checks on 2026-10-30 with OpenAI `gpt-5.6`:
 Reports: `scripts/cli-agent-eval/results/`. These are five original smoke checks, not a
 reliability benchmark or evidence of parity with other assistants. Claude has
 protocol coverage but was not run live: it was not installed and no Anthropic
-credential was supplied. Claude native ongoing sessions remain unimplemented.
+credential was supplied. Claude native sessions, resumption, questions,
+permission denial and interruption have deterministic protocol/process coverage;
+they still require verification against a real authenticated Claude CLI.
 
 The separate `session-manager-*` reports exercise a **live Gator manager and
 live Codex/Pi worker** through the normal Work service. Each run makes two
@@ -194,6 +203,9 @@ Protocol references checked against installed CLI help and official docs:
 - [Codex app-server](https://learn.chatgpt.com/docs/app-server)
 - [Codex CA environment configuration](https://learn.chatgpt.com/docs/config-file/environment-variables)
 - [Claude Code headless execution](https://code.claude.com/docs/en/headless)
+- [Claude streaming sessions](https://code.claude.com/docs/en/agent-sdk/streaming-vs-single-mode)
+- [Claude clarification protocol](https://code.claude.com/docs/en/agent-sdk/user-input)
+- [Anthropic SDK control implementation](https://github.com/anthropics/claude-agent-sdk-python/blob/main/src/claude_agent_sdk/_internal/query.py)
 - [Pi CLI integration](https://pi.dev/docs/latest/cli-integration)
 - [Pi JSON stream](https://pi.dev/docs/latest/json)
 - [Pi RPC sessions](https://pi.dev/docs/latest/rpc)

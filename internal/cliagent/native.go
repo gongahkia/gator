@@ -30,15 +30,17 @@ type NativeState struct {
 // nativeClient tracks a real CLI conversation. It does not infer completion
 // from command acceptance or agent_end, and never answers approvals as consent.
 type nativeClient struct {
-	wire         *rpcWire
-	kind         string
-	mu           sync.Mutex
-	sendMu       sync.Mutex
-	state        NativeState
-	turnDone     chan struct{}
-	questionID   json.RawMessage
-	secret       string
-	retiredTurns map[string]bool
+	wire          *rpcWire
+	kind          string
+	mu            sync.Mutex
+	sendMu        sync.Mutex
+	state         NativeState
+	turnDone      chan struct{}
+	questionID    json.RawMessage
+	secret        string
+	retiredTurns  map[string]bool
+	questionInput json.RawMessage
+	interrupting  bool
 }
 
 func newNativeClient(ctx context.Context, kind string, w *rpcWire, cfg Config, cwd, threadID string) (*nativeClient, error) {
@@ -101,6 +103,16 @@ func newNativeClient(ctx context.Context, kind string, w *rpcWire, cfg Config, c
 		c.state.ThreadID = result.ID
 		c.state.Status = "idle"
 		c.mu.Unlock()
+	} else if kind == "claude" {
+		if !nativeUUIDPattern.MatchString(threadID) {
+			return fail(errors.New("Claude requires a host-selected native session UUID"))
+		}
+		if _, err := w.Call(ctx, "initialize", map[string]any{"hooks": nil}); err != nil {
+			return fail(err)
+		}
+		c.mu.Lock()
+		c.state.Status = "idle"
+		c.mu.Unlock()
 	} else {
 		return fail(errors.New("native session protocol is not implemented for this adapter"))
 	}
@@ -156,6 +168,8 @@ func (c *nativeClient) Send(ctx context.Context, text string) error {
 	c.state.Questions = nil
 	c.state.QuestionID = ""
 	c.questionID = nil
+	c.questionInput = nil
+	c.interrupting = false
 	c.turnDone = make(chan struct{})
 	thread := c.state.ThreadID
 	c.mu.Unlock()
@@ -163,6 +177,12 @@ func (c *nativeClient) Send(ctx context.Context, text string) error {
 	var err error
 	if c.kind == "codex" {
 		data, err = c.wire.Call(ctx, "turn/start", map[string]any{"threadId": thread, "input": []any{map[string]any{"type": "text", "text": text}}})
+	} else if c.kind == "claude" {
+		uuid := nativeUUID()
+		c.mu.Lock()
+		c.state.TurnID = uuid
+		c.mu.Unlock()
+		err = c.wire.write(ctx, map[string]any{"type": "user", "session_id": thread, "uuid": uuid, "parent_tool_use_id": nil, "message": map[string]any{"role": "user", "content": text}})
 	} else {
 		data, err = c.wire.Call(ctx, "prompt", map[string]any{"message": text})
 	}
@@ -189,6 +209,9 @@ func (c *nativeClient) Send(ctx context.Context, text string) error {
 	return nil
 }
 func (c *nativeClient) Steer(ctx context.Context, text string) error {
+	if c.kind == "claude" {
+		return errors.New("Claude does not support steering an active turn; interrupt it and send a follow-up")
+	}
 	if err := nativeText(text); err != nil {
 		return err
 	}
@@ -215,6 +238,13 @@ func (c *nativeClient) Interrupt(ctx context.Context) error {
 		_, err := c.wire.Call(ctx, "turn/interrupt", map[string]any{"threadId": s.ThreadID, "turnId": s.TurnID})
 		return err
 	}
+	if c.kind == "claude" {
+		c.mu.Lock()
+		c.interrupting = true
+		c.mu.Unlock()
+		_, err := c.wire.Call(ctx, "interrupt", nil)
+		return err
+	}
 	// Pi abort otherwise starts already queued follow-ups again.
 	if _, err := c.wire.Call(ctx, "clear_queue", nil); err != nil {
 		return err
@@ -230,6 +260,7 @@ func (c *nativeClient) Answer(ctx context.Context, answers map[string][]string) 
 	}
 	id := append(json.RawMessage(nil), c.questionID...)
 	questions := append([]NativeQuestion(nil), c.state.Questions...)
+	questionInput := append(json.RawMessage(nil), c.questionInput...)
 	c.mu.Unlock()
 	if len(answers) != len(questions) {
 		return errors.New("answer every pending question exactly once")
@@ -252,13 +283,22 @@ func (c *nativeClient) Answer(ctx context.Context, answers map[string][]string) 
 	}
 	c.state.Status = "answering"
 	c.mu.Unlock()
-	if err := c.wire.Reply(ctx, id, map[string]any{"answers": response}); err != nil {
+	var result any = map[string]any{"answers": response}
+	if c.kind == "claude" {
+		claudeAnswers := map[string]string{}
+		for _, q := range questions {
+			claudeAnswers[q.Text] = answers[q.ID][0]
+		}
+		result = map[string]any{"behavior": "allow", "updatedInput": map[string]any{"questions": questionInput, "answers": claudeAnswers}}
+	}
+	if err := c.wire.Reply(ctx, id, result); err != nil {
 		c.finish("interrupted", "native answer acknowledgement is uncertain")
 		return err
 	}
 	c.mu.Lock()
 	if string(c.questionID) == string(id) && c.state.Status == "answering" {
 		c.questionID = nil
+		c.questionInput = nil
 		c.state.Questions = nil
 		c.state.QuestionID = ""
 		c.state.Status = "running"
@@ -288,6 +328,7 @@ func (c *nativeClient) finish(status, diagnostic string) {
 	c.state.Questions = nil
 	c.state.QuestionID = ""
 	c.questionID = nil
+	c.questionInput = nil
 	if c.turnDone != nil {
 		select {
 		case <-c.turnDone:
@@ -310,6 +351,9 @@ func (c *nativeClient) events() {
 	}
 }
 func (c *nativeClient) event(raw json.RawMessage) error {
+	if c.kind == "claude" {
+		return c.claudeEvent(raw)
+	}
 	if c.kind == "pi" {
 		return c.piEvent(raw)
 	}
