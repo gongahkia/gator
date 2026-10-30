@@ -91,6 +91,9 @@ gator work answer-task RUN_ID TASK_ID QUESTION_ID '{"format":["Markdown"]}'
 
 Answers are bound to the current question and queued once. Approval requests
 are never converted into clarification questions or automatically approved.
+Codex gets a host-defined `gator_ask_user` tool that works in ordinary coding
+turns; its built-in `request_user_input` path is also handled. For the host tool,
+the answer key is `answer`. Neither path adds filesystem or execution authority.
 Claude answers map host question keys back to the original question text; the
 original questions are included in the protocol response without granting
 additional tool permissions. Multi-select answers can be sent as comma-joined
@@ -178,8 +181,14 @@ The `cross-chat-*` reports split the assignments across two Work conversation
 turns. Initial runs exposed first-turn ownership being assigned before the new
 conversation ID was available. Both providers pass after that fix, with seven
 checks per scenario. Failed reports are retained alongside successful reruns.
-Live steering and structured question handling still have fixture evidence,
-not live-provider evidence. The terminal question UI and cross-chat background
+The `native-controls-*` reports add live Codex structured questions, live
+Codex/Pi steering, native interruption and resumption after interruption. Codex
+passes five checks in one scenario; Pi passes four in one scenario. Pi's initial
+failure is retained: its aborted assistant message was incorrectly classified
+as failure because the final settled event carries no abort flag. That mapping
+was corrected and the live scenario passed on rerun. These control tests invoke
+the native session runner; they do not prove the terminal user journey.
+The terminal question UI and cross-chat background
 ownership remain part of the active continuity plan.
 
 To repeat the opt-in live adapter checks with synthetic state:
@@ -189,6 +198,7 @@ go run ./scripts/cli-agent-eval --kind codex --model gpt-5.6 --base-url https://
 go run ./scripts/cli-agent-eval --kind pi --model gpt-5.6 --base-url https://us.api.openai.com/v1 --edit
 go run ./scripts/cli-agent-eval --session-manager --kind codex --model gpt-5.6 --base-url https://us.api.openai.com/v1
 go run ./scripts/cli-agent-eval --session-manager --cross-chat --kind pi --model gpt-5.6 --base-url https://us.api.openai.com/v1
+go run ./scripts/cli-agent-eval --controls --kind codex --model gpt-5.6 --base-url https://us.api.openai.com/v1
 ```
 
 These commands use `OPENAI_API_KEY` from the current environment. They do not

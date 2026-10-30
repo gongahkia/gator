@@ -22,6 +22,7 @@ func main() {
 	edit := flag.Bool("edit", false, "test isolated patch creation")
 	sessions := flag.Bool("session-manager", false, "test live manager/native-worker follow-up continuity")
 	crossChat := flag.Bool("cross-chat", false, "split the native follow-up across separate Work conversation turns")
+	controls := flag.Bool("controls", false, "test native clarification (Codex), steering, interruption and resumption")
 	flag.Parse()
 	path, err := exec.LookPath(*kind)
 	check(err)
@@ -58,6 +59,10 @@ func main() {
 	}
 	if *sessions {
 		check(runSessionManager(context.Background(), cfg, root, source, original, *crossChat))
+		return
+	}
+	if *controls {
+		check(runSessionControls(context.Background(), cfg, root, source, original))
 		return
 	}
 	task := "Read project.md. Report the project name, owner and deadline exactly. Do not edit files."

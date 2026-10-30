@@ -1,0 +1,41 @@
+{
+  "at": "2026-10-30T09:02:17Z",
+  "checks": {
+    "live_steering_observed": true,
+    "native_interruption": true,
+    "original_unchanged": true,
+    "resume_after_interruption": true,
+    "structured_question_answered": true
+  },
+  "evaluation": "native-session-controls-v1",
+  "kind": "codex",
+  "model": "gpt-5.6",
+  "passed": true,
+  "seconds": 18.827262542,
+  "turns": [
+    {
+      "Stage": "question",
+      "Status": "completed",
+      "Summary": "- **Format:** Markdown\n- **Owner:** Mira",
+      "Error": ""
+    },
+    {
+      "Stage": "steering",
+      "Status": "completed",
+      "Summary": "Project Lantern is a draft project owned by Mira, with a deadline of May 16, 2030.\n\nSTEERING-LANTERN-924",
+      "Error": ""
+    },
+    {
+      "Stage": "interruption",
+      "Status": "cancelled",
+      "Summary": "",
+      "Error": "CLI turn cancelled: "
+    },
+    {
+      "Stage": "resume_after_interruption",
+      "Status": "completed",
+      "Summary": "RESUMED-AFTER-INTERRUPT",
+      "Error": ""
+    }
+  ]
+}
