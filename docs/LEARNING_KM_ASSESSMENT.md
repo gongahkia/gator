@@ -5,6 +5,11 @@ validate learning, writing and project knowledge as its primary workflows.
 A shared team knowledge platform is a separate expansion, not a smaller build.
 This assessment does not authorize or implement that platform.
 
+The [PKM problem research](research/pkm-problem-statement-2026-10-30.md) narrows
+the proposed audience to people maintaining knowledge across existing tools. It
+records supporting and contrary evidence, competitor overlap, and a validation
+plan; the direction remains a hypothesis rather than a validated market.
+
 ## User intent
 
 A conversational companion that helps someone understand a subject, develops
