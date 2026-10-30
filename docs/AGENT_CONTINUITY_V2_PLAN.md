@@ -17,10 +17,19 @@ steering, interruption and resumption; terminal controls remain to be exercised.
 Threads also survive unrelated turns on the selected conversation
 lineage; sibling branches are excluded and discovery indexes retained sessions.
 This is partial progress on items 1, 3 and 4, not completion of this plan. Claude
-live verification, terminal question/control journeys, completion loops, independent
+live verification, terminal question/control journeys, independent
 background ownership/recovery, terminal task UX and longitudinal proactive
 validation remain required. See `SUBAGENTS_AND_CLI_INTEROP.md` for evidence and
 current limitations.
+
+Item 2 now has a manager-callable `complete_code` loop with host verification,
+independent SHA-bound review and same-session repairs. Unit/integration cases
+cover verification/review repair, false success, repeated failures, conflicts,
+budget exhaustion, cancellation, pending questions and uncertain recovery.
+Live OpenAI-backed Codex and Pi scenarios both pass eight checks across two
+attempts. These controlled initial-defect cases prove the repair path, not a
+general task-success rate. Loops still use foreground ownership; durable waiting
+and background recovery remain coupled to the unfinished items 3 and 4.
 
 ## 1. Two-way external-agent sessions
 

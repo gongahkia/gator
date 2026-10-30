@@ -23,6 +23,7 @@ func main() {
 	sessions := flag.Bool("session-manager", false, "test live manager/native-worker follow-up continuity")
 	crossChat := flag.Bool("cross-chat", false, "split the native follow-up across separate Work conversation turns")
 	controls := flag.Bool("controls", false, "test native clarification (Codex), steering, interruption and resumption")
+	completion := flag.Bool("completion-loop", false, "test live implementation, host checks, independent review and repair")
 	flag.Parse()
 	path, err := exec.LookPath(*kind)
 	check(err)
@@ -59,6 +60,11 @@ func main() {
 	}
 	if *sessions {
 		check(runSessionManager(context.Background(), cfg, root, source, original, *crossChat))
+		return
+	}
+	if *completion {
+		cfg.AllowEdits = true
+		check(runCompletionLoop(context.Background(), cfg, root, source))
 		return
 	}
 	if *controls {

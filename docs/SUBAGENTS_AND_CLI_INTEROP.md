@@ -103,6 +103,65 @@ waits for a terminal result before recording turn completion.
 Pi currently asks ordinary clarification questions in its response text; it
 does not expose Codex's structured pending-question protocol.
 
+## Bounded code completion
+
+`complete_code` gives the manager a bounded implementation → verification →
+independent review → repair loop. It is available only in draft/act mode with an
+enabled editable native CLI worker, explicit host verification commands, and an
+enabled `artifact_reviewer`. Workers and reviews share the normal supervisor
+delegation budget. Each loop allows 1–3 attempts and at most 15 minutes; one
+Work operation can create at most three loops. CLI provider billing remains
+separate from Gator's model-request budget.
+
+For example, after enabling an adapter with `--allow-edits`:
+
+```sh
+gator work --source ./project --external-agents --mode draft \
+  --scope src --verify 'python3 -B verify.py' \
+  'Use complete_code with cli_codex to fix the parser; require all verifier cases to pass and review the result.'
+gator work completions RUN_ID
+gator work completions RUN_ID COMPLETION_ID
+```
+
+`--verify` and `--scope` are repeatable host grants. Verification arguments are
+separated by whitespace; no shell is implied. Put complex verification logic
+in a script and select that script explicitly. The model cannot supply new
+commands or widen write scopes through `complete_code` arguments.
+
+Loop arguments select `agent`, `objective`, 1–8 `acceptance` criteria, and
+optional `max_attempts`. Each attempt returns a retained patch, which the host
+checks in a separate candidate. The independent reviewer reads that candidate
+and returns a structured verdict bound to its SHA-256. Concrete failures return
+to the same native worker conversation. An unchanged failing patch stops the
+loop; exhausted budgets, invalid review verdicts, cancelled workers and uncertain
+outcomes cannot become successful completions. A success claim without a patch
+is rejected; no-change outcomes currently require separate review.
+
+Records under `gator/completions/RUN_ID` retain objectives, acceptance commands,
+worker/reviewer task IDs, patch hashes, candidate checks, findings and stop
+reasons. Failed/conflicting patches remain available as evidence. Original files
+are never changed by the loop. Completed loops are idempotent; an interrupted
+admitted phase requires reconciliation rather than automatic replay.
+
+A clarification returns `waiting_input`. While the original Work owner remains
+active, answer its worker with `answer_agent`/`answer-task`, then call
+`complete_code` with only `resume: COMPLETION_ID` to continue the existing
+assignment. Completion loops currently share the foreground owner's lifetime;
+ending that owner stops pending workers. Durable background resumption is still
+part of the active continuity plan.
+
+Live `completion-loop-*` evaluations use a real manager, Codex/Pi worker and
+independent OpenAI reviewer. Both pass eight checks in two-attempt scenarios:
+an intentionally incomplete first draft fails four host acceptance cases,
+the same native worker repairs it, checks pass and an independent review
+approves the exact candidate. Both patches remain retained and original source
+and verifier files stay unchanged. These are controlled repair scenarios, not
+an unbiased task-success benchmark.
+
+```sh
+go run ./scripts/cli-agent-eval --completion-loop --kind codex --model gpt-5.6 --base-url https://us.api.openai.com/v1
+```
+
 ## Execution boundary and limits
 
 - Each CLI runs in a private source copy under Gator's strict OS sandbox.

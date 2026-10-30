@@ -1,0 +1,144 @@
+{
+  "at": "2026-10-30T09:20:10Z",
+  "checks": {
+    "attempt_patches_retained": true,
+    "loop_completed": true,
+    "one_retained_loop": true,
+    "original_and_verifier_unchanged": true,
+    "repair_observed": true,
+    "same_native_worker": true,
+    "verified_and_independently_reviewed": true,
+    "work_succeeded": true
+  },
+  "completion": {
+    "version": 1,
+    "id": "completion-94755ad6c6a0b7232ca1b87f3d3a9833",
+    "run_id": "completion-live",
+    "policy_sha256": "efb69f73b5bac10399930136415ebf6f3dd1786d7127cbaf0384cb4624b65c4d",
+    "agent": "cli_codex",
+    "objective": "Implement normalize_title(text) in normalize.py: trim surrounding whitespace, collapse all whitespace runs to one space, lowercase letters, and return an empty string for whitespace-only input. Controlled repair evaluation: on the first assignment only, implement just lowercasing and return so the host verifier can expose the remaining cases. On later repair assignments, satisfy every acceptance criterion. Change only normalize.py.",
+    "acceptance": [
+      "Leading/trailing whitespace is removed",
+      "All internal whitespace runs collapse to a single space",
+      "Letters are lowercased",
+      "Whitespace-only text normalizes to empty"
+    ],
+    "verification": [
+      [
+        "python3",
+        "-B",
+        "verify.py"
+      ]
+    ],
+    "max_attempts": 3,
+    "status": "completed",
+    "attempts": [
+      {
+        "number": 1,
+        "stage": "repair_needed",
+        "worker_id": "subagent-001",
+        "session_id": "cli-c5c87be15e7248c707f5d13bd8f6a8e3",
+        "artifact": "code/completion-live-subagent-001-codex.patch",
+        "artifact_sha256": "61a8b8fcac6a6d7a2de2b95ada2a21dba8ec1dcb8d5645d46f16760fbee51d8c",
+        "candidate": {
+          "before": {
+            "normalize.py": "a9aa5126b8fd814e21429bfc63b7eacd0d3273873a8dc172e3652736fa0a0ee6"
+          },
+          "patch_path": "code/completion-live-candidate-8bf1cdbf73e0759c28b011e5.patch",
+          "version": 1,
+          "id": "candidate-8bf1cdbf73e0759c28b011e5",
+          "baseline": "a8a4ef1302d710ae9d69dcbdcdf2b668fe38d305\n",
+          "patches": [
+            "code/completion-live-subagent-001-codex.patch"
+          ],
+          "changed_paths": [
+            "normalize.py"
+          ],
+          "sha256": "61a8b8fcac6a6d7a2de2b95ada2a21dba8ec1dcb8d5645d46f16760fbee51d8c",
+          "status": "failed",
+          "error": "combined verification failed: exit status 1: Traceback (most recent call last):\n  File \"/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/gator-cli-eval-1088828424/state/gator/workspaces/2d1b7ede22c1fc8775a84904573657e2/completion-live/scratch/integration-001/verify.py\", line 5, in \u003cmodule\u003e\n    assert actual == expected, f\"normalize_title({value!r}): expected {expected!r}, got {actual!r}\"\n           ^^^^^^^^^^^^^^^^^^\nAssertionError: normalize_title('  Hello   WORLD  '): expected 'hello world', got '  hello   world  '",
+          "verification": [
+            {
+              "argv": [
+                "git",
+                "diff",
+                "--check"
+              ],
+              "passed": true
+            },
+            {
+              "argv": [
+                "python3",
+                "-B",
+                "verify.py"
+              ],
+              "passed": false,
+              "diagnostic": "Traceback (most recent call last):\n  File \"/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/gator-cli-eval-1088828424/state/gator/workspaces/2d1b7ede22c1fc8775a84904573657e2/completion-live/scratch/integration-001/verify.py\", line 5, in \u003cmodule\u003e\n    assert actual == expected, f\"normalize_title({value!r}): expected {expected!r}, got {actual!r}\"\n           ^^^^^^^^^^^^^^^^^^\nAssertionError: normalize_title('  Hello   WORLD  '): expected 'hello world', got '  hello   world  '\n"
+            }
+          ]
+        },
+        "feedback": "Deterministic verification failed: combined verification failed: exit status 1: Traceback (most recent call last):\n  File \"/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/gator-cli-eval-1088828424/state/gator/workspaces/2d1b7ede22c1fc8775a84904573657e2/completion-live/scratch/integration-001/verify.py\", line 5, in \u003cmodule\u003e\n    assert actual == expected, f\"normalize_title({value!r}): expected {expected!r}, got {actual!r}\"\n           ^^^^^^^^^^^^^^^^^^\nAssertionError: normalize_title('  Hello   WORLD  '): expected 'hello world', got '  hello   world  '"
+      },
+      {
+        "number": 2,
+        "stage": "completed",
+        "worker_id": "subagent-002",
+        "session_id": "cli-c5c87be15e7248c707f5d13bd8f6a8e3",
+        "artifact": "code/completion-live-subagent-002-codex.patch",
+        "artifact_sha256": "e046a00b53693885a8988bd1357414f72884b7951bc15ef69d0e575821a50bfe",
+        "candidate": {
+          "before": {
+            "normalize.py": "a9aa5126b8fd814e21429bfc63b7eacd0d3273873a8dc172e3652736fa0a0ee6"
+          },
+          "patch_path": "code/completion-live-candidate-892e42c94f23e44cc4d84c8a.patch",
+          "version": 1,
+          "id": "candidate-892e42c94f23e44cc4d84c8a",
+          "baseline": "a8a4ef1302d710ae9d69dcbdcdf2b668fe38d305\n",
+          "patches": [
+            "code/completion-live-subagent-002-codex.patch"
+          ],
+          "changed_paths": [
+            "normalize.py"
+          ],
+          "sha256": "e046a00b53693885a8988bd1357414f72884b7951bc15ef69d0e575821a50bfe",
+          "status": "verified",
+          "verification": [
+            {
+              "argv": [
+                "git",
+                "diff",
+                "--check"
+              ],
+              "passed": true
+            },
+            {
+              "argv": [
+                "python3",
+                "-B",
+                "verify.py"
+              ],
+              "passed": true,
+              "diagnostic": "4 acceptance cases passed\n"
+            }
+          ]
+        },
+        "reviewer_id": "subagent-003",
+        "review": {
+          "passed": true,
+          "candidate_sha256": "e046a00b53693885a8988bd1357414f72884b7951bc15ef69d0e575821a50bfe",
+          "findings": []
+        }
+      }
+    ],
+    "created_at": "2026-10-30T09:19:14.143422Z",
+    "deadline": "2026-10-30T09:34:14.143422Z",
+    "updated_at": "2026-10-30T09:20:01.013386Z"
+  },
+  "controlled_initial_defect": true,
+  "error": "",
+  "evaluation": "bounded-completion-loop-v1",
+  "kind": "codex",
+  "model": "gpt-5.6",
+  "passed": true,
+  "seconds": 59.034200803
+}
