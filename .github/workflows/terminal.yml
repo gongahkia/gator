@@ -44,13 +44,14 @@ jobs:
           fi
           node --test ui/scripts/uninstall.test.mjs
           bun run --cwd ui test
-      - name: Verify native memory lifecycle
+      - name: Verify native memory and local tracking lifecycle
         shell: bash
         run: |
           set -euo pipefail
           go test ./internal/memory ./internal/learning ./internal/personalization ./internal/retrieval
+          go test ./internal/goal ./internal/knowledge ./internal/suggestion ./internal/followup ./internal/tools
           go test ./internal/lifecycle -run 'RestorePreservesForgotten|Retention|Backup'
-          go test ./cmd/gator -run 'Memory|PersonalSummary|Recall|IdleMemoryMaintenance'
+          go test ./cmd/gator -run 'Memory|PersonalSummary|Recall|IdleMemoryMaintenance|Plan|Agenda|Suggest|GoalWatch|ScheduledBlock|Calendar|Followup|ConnectedGoal'
       - name: Build independent production artifact
         run: node ui/scripts/package.mjs terminal-artifact
       - name: Verify installed lifecycle without Electron
