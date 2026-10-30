@@ -20,6 +20,8 @@ const (
 type Backend string
 
 var hostReservedTools = map[string]struct{}{
+	"list_agents":       {},
+	"steer_agent":       {},
 	"delegate_agents":   {},
 	"start_agent":       {},
 	"inspect_agent":     {},

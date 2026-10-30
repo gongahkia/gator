@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -22,31 +23,32 @@ import (
 const TaskVersion = 1
 
 type Task struct {
-	SourceCapture string            `json:"source_capture,omitempty"`
-	Configuration RoleConfiguration `json:"configuration"`
-	Limits        agent.Limits      `json:"limits"`
-	SelectedInput string            `json:"selected_input,omitempty"`
-	Baseline      string            `json:"baseline_patch,omitempty"`
-	Version       int               `json:"version"`
-	ID            string            `json:"id"`
-	GlobalID      string            `json:"global_id"`
-	ParentRun     string            `json:"parent_run"`
-	ParentTask    string            `json:"parent_task,omitempty"`
-	Role          string            `json:"role"`
-	RoleVersion   int               `json:"role_version"`
-	Source        string            `json:"source"`
-	PolicySHA256  string            `json:"policy_sha256"`
-	InputSHA256   string            `json:"input_sha256"`
-	Dependencies  []string          `json:"dependencies,omitempty"`
-	Attempt       int               `json:"attempt"`
-	Previous      string            `json:"previous,omitempty"`
-	Status        string            `json:"status"`
-	Category      string            `json:"error_category,omitempty"`
-	Error         string            `json:"error,omitempty"`
-	CreatedAt     time.Time         `json:"created_at"`
-	StartedAt     time.Time         `json:"started_at,omitempty"`
-	FinishedAt    time.Time         `json:"finished_at,omitempty"`
-	Result        Result            `json:"result"`
+	SteeringRequests []string          `json:"steering_requests,omitempty"`
+	SourceCapture    string            `json:"source_capture,omitempty"`
+	Configuration    RoleConfiguration `json:"configuration"`
+	Limits           agent.Limits      `json:"limits"`
+	SelectedInput    string            `json:"selected_input,omitempty"`
+	Baseline         string            `json:"baseline_patch,omitempty"`
+	Version          int               `json:"version"`
+	ID               string            `json:"id"`
+	GlobalID         string            `json:"global_id"`
+	ParentRun        string            `json:"parent_run"`
+	ParentTask       string            `json:"parent_task,omitempty"`
+	Role             string            `json:"role"`
+	RoleVersion      int               `json:"role_version"`
+	Source           string            `json:"source"`
+	PolicySHA256     string            `json:"policy_sha256"`
+	InputSHA256      string            `json:"input_sha256"`
+	Dependencies     []string          `json:"dependencies,omitempty"`
+	Attempt          int               `json:"attempt"`
+	Previous         string            `json:"previous,omitempty"`
+	Status           string            `json:"status"`
+	Category         string            `json:"error_category,omitempty"`
+	Error            string            `json:"error,omitempty"`
+	CreatedAt        time.Time         `json:"created_at"`
+	StartedAt        time.Time         `json:"started_at,omitempty"`
+	FinishedAt       time.Time         `json:"finished_at,omitempty"`
+	Result           Result            `json:"result"`
 }
 type StartRequest struct {
 	Baseline     string   `json:"baseline_patch,omitempty"`
@@ -426,6 +428,15 @@ func (s *Supervisor) Steer(id, instruction string) error {
 	if execution.steering == nil {
 		return errors.New("specialist does not support live steering")
 	}
+	if len(execution.task.SteeringRequests) >= 16 || len(execution.steering) == cap(execution.steering) {
+		return errors.New("specialist steering limit reached")
+	}
+	updated := execution.task
+	updated.SteeringRequests = append(append([]string(nil), updated.SteeringRequests...), instruction)
+	if err := s.persist(updated); err != nil {
+		return err
+	}
+	execution.task = updated
 	select {
 	case execution.steering <- instruction:
 		return nil
@@ -445,9 +456,40 @@ func (t taskTool) Definition() agent.ToolDefinition {
 	if t.name == "start_agent" {
 		schema = `{"type":"object","additionalProperties":false,"required":["agent","task"],"properties":{"agent":{"type":"string"},"task":{"type":"string"},"dependencies":{"type":"array","items":{"type":"string"}},"parent":{"type":"string"},"continue":{"type":"string"},"baseline_patch":{"type":"string"}}}`
 	}
+	if t.name == "list_agents" {
+		schema = `{"type":"object","additionalProperties":false,"properties":{}}`
+	}
+	if t.name == "steer_agent" {
+		schema = `{"type":"object","additionalProperties":false,"required":["id","message"],"properties":{"id":{"type":"string"},"message":{"type":"string","maxLength":8192}}}`
+	}
 	return agent.ToolDefinition{Name: t.name, Description: "Manage a bounded durable specialist task. Authority is fixed by the host. Continuation explicitly selects a retained result.", Parameters: json.RawMessage(schema)}
 }
 func (t taskTool) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolResult, error) {
+	if t.name == "list_agents" {
+		if err := decodeTask(raw, &struct{}{}); err != nil {
+			return agent.ToolResult{}, err
+		}
+		t.s.mu.Lock()
+		defer t.s.mu.Unlock()
+		type role struct {
+			Name        string  `json:"name"`
+			Description string  `json:"description"`
+			Backend     Backend `json:"backend"`
+			Steering    bool    `json:"steering"`
+		}
+		roles := []role{}
+		tasks := []Task{}
+		for _, r := range t.s.registry {
+			roles = append(roles, role{r.Name, r.Description, r.Backend, r.Backend == BackendLLM})
+		}
+		for _, item := range t.s.tasks {
+			tasks = append(tasks, item.task)
+		}
+		sort.Slice(roles, func(i, j int) bool { return roles[i].Name < roles[j].Name })
+		sort.Slice(tasks, func(i, j int) bool { return tasks[i].ID < tasks[j].ID })
+		data, err := json.Marshal(map[string]any{"agents": roles, "tasks": tasks, "remaining": t.s.options.MaxDelegations - t.s.used, "max_parallel": t.s.options.MaxParallel})
+		return agent.ToolResult{Content: string(data)}, err
+	}
 	var task Task
 	var err error
 	if t.name == "start_agent" {
@@ -459,11 +501,17 @@ func (t taskTool) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolR
 		var input struct {
 			ID      string `json:"id"`
 			Timeout int    `json:"timeout_seconds"`
+			Message string `json:"message"`
 		}
 		if err = decodeTask(raw, &input); err != nil {
 			return agent.ToolResult{}, err
 		}
 		switch t.name {
+		case "steer_agent":
+			err = t.s.Steer(input.ID, input.Message)
+			if err == nil {
+				task, err = t.s.Inspect(input.ID)
+			}
 		case "inspect_agent":
 			task, err = t.s.Inspect(input.ID)
 		case "cancel_agent":
@@ -478,9 +526,13 @@ func (t taskTool) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolR
 			if input.Timeout < 1 || input.Timeout > 300 {
 				return agent.ToolResult{}, errors.New("invalid wait deadline")
 			}
+			parent := ctx
 			ctx, cancel := context.WithTimeout(ctx, time.Duration(input.Timeout)*time.Second)
 			defer cancel()
 			task, err = t.s.Await(ctx, input.ID)
+			if errors.Is(err, context.DeadlineExceeded) && parent.Err() == nil {
+				task, err = t.s.Inspect(input.ID)
+			}
 		}
 	}
 	if err != nil {
@@ -502,7 +554,7 @@ func decodeTask(raw []byte, value any) error {
 	return nil
 }
 func (s *Supervisor) Tools() []agent.Tool {
-	return []agent.Tool{taskTool{s, "start_agent"}, taskTool{s, "inspect_agent"}, taskTool{s, "await_agent"}, taskTool{s, "cancel_agent"}}
+	return []agent.Tool{taskTool{s, "list_agents"}, taskTool{s, "start_agent"}, taskTool{s, "inspect_agent"}, taskTool{s, "await_agent"}, taskTool{s, "steer_agent"}, taskTool{s, "cancel_agent"}}
 }
 
 // StartBatch validates the complete fresh-context batch before any child starts.

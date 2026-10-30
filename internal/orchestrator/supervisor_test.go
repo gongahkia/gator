@@ -188,3 +188,53 @@ func TestSupervisorCrashRecoveryExplicitContinuationAndAtomicBatchValidation(t *
 		t.Fatal("interrupted effect silently repeated")
 	}
 }
+
+func TestManagerCanDiscoverSteerAndPollAgents(t *testing.T) {
+	role := Specialist{Name: "reader", Description: "Read only", Backend: BackendLLM, Run: func(ctx context.Context, i Invocation) (Result, error) {
+		select {
+		case message := <-i.Steering:
+			return Result{Summary: message}, nil
+		case <-ctx.Done():
+			return Result{}, ctx.Err()
+		}
+	}}
+	s, err := NewSupervisor(context.Background(), []Specialist{role}, Options{StatePath: t.TempDir(), ParentRun: "managed", Source: "snapshot"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	invoke := func(name, args string) string {
+		t.Helper()
+		for _, tool := range s.Tools() {
+			if tool.Definition().Name == name {
+				result, err := tool.Execute(context.Background(), json.RawMessage(args))
+				if err != nil {
+					t.Fatal(err)
+				}
+				return result.Content
+			}
+		}
+		t.Fatalf("missing tool %s", name)
+		return ""
+	}
+	if !strings.Contains(invoke("list_agents", `{}`), `"steering":true`) {
+		t.Fatal("no capability discovery")
+	}
+	task, err := s.Start(StartRequest{Agent: "reader", Task: "Wait for guidance"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := invoke("await_agent", `{"id":"`+task.ID+`","timeout_seconds":1}`)
+	if !strings.Contains(state, `"status":"running"`) {
+		t.Fatalf("poll must return live status: %s", state)
+	}
+	invoke("steer_agent", `{"id":"`+task.ID+`","message":"Focus on the budget"}`)
+	result, err := s.Await(context.Background(), task.ID)
+	if err != nil || result.Result.Summary != "Focus on the budget" {
+		t.Fatalf("steering: %#v %v", result, err)
+	}
+	retained, err := ReadTasks(s.options.StatePath)
+	if err != nil || len(retained) != 1 || len(retained[0].SteeringRequests) != 1 {
+		t.Fatalf("steering evidence: %#v %v", retained, err)
+	}
+}
