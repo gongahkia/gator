@@ -3,10 +3,14 @@ package orchestrator
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/tools"
+	"github.com/gongahkia/gator/internal/workspace"
 )
 
 func TestHostedSpecialistPreservesResultEvidence(t *testing.T) {
@@ -40,6 +44,53 @@ func TestToolsRejectsMissingBackend(t *testing.T) {
 	}}}, Options{})
 	if err == nil || !strings.Contains(err.Error(), "backend") {
 		t.Fatalf("backend error = %v", err)
+	}
+}
+
+type reviewReadModel struct{ step int }
+
+func (m *reviewReadModel) Complete(_ context.Context, _ agent.TurnRequest) (agent.Turn, error) {
+	m.step++
+	if m.step == 1 {
+		calls := []agent.ToolCall{}
+		for i, path := range []string{"candidate/changed.txt", "candidate/deleted.txt", "source/deleted.txt"} {
+			data, _ := json.Marshal(map[string]string{"path": path})
+			calls = append(calls, agent.ToolCall{ID: string(rune('a' + i)), Name: "read_file", Arguments: data})
+		}
+		return agent.Turn{ToolCalls: calls}, nil
+	}
+	return agent.Turn{Text: "Reviewed."}, nil
+}
+
+func TestLLMReviewRetainsActualReadsAndMissingCandidateEvidence(t *testing.T) {
+	root := t.TempDir()
+	for _, dir := range []string{"candidate", "source"} {
+		if err := os.Mkdir(filepath.Join(root, dir), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(root, "candidate", "changed.txt"), []byte("changed\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "source", "deleted.txt"), []byte("original\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	candidate, err := workspace.Open(filepath.Join(root, "candidate"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	source, err := workspace.Open(filepath.Join(root, "source"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader := tools.ReadFile{Root: candidate, NamedRoots: []workspace.NamedRoot{{Name: "candidate", Root: candidate}, {Name: "source", Root: source}}}
+	role := LLMSpecialist("artifact_reviewer", "Read actual candidate files", &reviewReadModel{}, []agent.Tool{reader}, "Review files.", 3, nil)
+	result, err := role.Run(context.Background(), Invocation{Task: "Inspect changed and deleted files."})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.InspectedPaths) != 2 || result.InspectedPaths[0] != "candidate/changed.txt" || result.InspectedPaths[1] != "source/deleted.txt" || len(result.MissingPaths) != 1 || result.MissingPaths[0] != "candidate/deleted.txt" {
+		t.Fatalf("incorrect host read evidence: %+v", result)
 	}
 }
 

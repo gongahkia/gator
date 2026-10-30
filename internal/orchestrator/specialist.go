@@ -2,7 +2,11 @@ package orchestrator
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -65,10 +69,40 @@ func LLMSpecialist(name, description string, model agent.Model, tools []agent.To
 				return Result{}, policyErr
 			}
 			usage := &agent.Budget{Limits: agent.Limits{ModelRequests: 4096}}
+			inspected := []string{}
+			missing := []string{}
+			seen := map[string]bool{}
 			result, err := (agent.Runner{Model: agent.WithBudget(model, usage), Tools: tools, Now: now}).Run(ctx, agent.RunOptions{
 				Task: invocation.Task, System: system, MaxSteps: maxSteps, OnEvent: invocation.OnEvent, Steering: invocation.Steering,
+				AfterTool: func(_ context.Context, call agent.ToolCall, result agent.ToolResult, err error) error {
+					if call.Name != "read_file" {
+						return nil
+					}
+					if err != nil {
+						if errors.Is(err, os.ErrNotExist) && len(missing) < 64 {
+							var args struct {
+								Path string `json:"path"`
+							}
+							if json.Unmarshal(call.Arguments, &args) == nil && strings.HasPrefix(path.Clean(args.Path), "candidate/") {
+								missing = append(missing, path.Clean(args.Path))
+							}
+						}
+						return nil
+					}
+					var read struct {
+						OK     bool `json:"ok"`
+						Result struct {
+							Path string `json:"path"`
+						} `json:"result"`
+					}
+					if json.Unmarshal([]byte(result.Content), &read) == nil && read.OK && read.Result.Path != "" && !seen[read.Result.Path] && len(inspected) < 64 {
+						seen[read.Result.Path] = true
+						inspected = append(inspected, read.Result.Path)
+					}
+					return nil
+				},
 			})
-			return Result{Summary: result.FinalText, Steps: result.Steps, Usage: usage.Usage()}, err
+			return Result{InspectedPaths: inspected, MissingPaths: missing, Summary: result.FinalText, Steps: result.Steps, Usage: usage.Usage()}, err
 		},
 	}
 }

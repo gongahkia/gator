@@ -22,12 +22,14 @@ import (
 )
 
 type completionFixture struct {
-	tool           *codeCompletion
-	work           workspace.Work
-	assignments    []string
-	reviews        int
-	question       chan struct{}
-	reviewOverride string
+	tool             *codeCompletion
+	work             workspace.Work
+	assignments      []string
+	reviews          int
+	question         chan struct{}
+	reviewOverride   string
+	noReadEvidence   bool
+	deletionEvidence bool
 }
 
 func newCompletionFixture(t *testing.T, values []string, rejectFirst, ask bool) *completionFixture {
@@ -82,6 +84,9 @@ func newCompletionFixture(t *testing.T, values []string, rejectFirst, ask bool) 
 		if value == "conflict" {
 			payload = []byte("diff --git a/note.txt b/note.txt\n--- a/note.txt\n+++ b/note.txt\n@@ -1 +1 @@\n-not-the-baseline\n+fixed\n")
 		}
+		if value == "delete" {
+			payload = []byte("diff --git a/note.txt b/note.txt\ndeleted file mode 100644\n--- a/note.txt\n+++ /dev/null\n@@ -1 +0,0 @@\n-before\n")
+		}
 		name := "code/" + i.ID + ".patch"
 		if err := artifact.WriteBinary(work.Output, r.Contract, name, payload); err != nil {
 			return result, err
@@ -97,7 +102,7 @@ func newCompletionFixture(t *testing.T, values []string, rejectFirst, ask bool) 
 	reviewer := orchestrator.HostedSpecialist("artifact_reviewer", "Read-only independent review fixture", func(_ context.Context, i orchestrator.Invocation) (orchestrator.Result, error) {
 		f.reviews++
 		if f.reviewOverride != "" {
-			return orchestrator.Result{Summary: f.reviewOverride}, nil
+			return orchestrator.Result{Summary: f.reviewOverride, InspectedPaths: []string{"candidate/note.txt"}}, nil
 		}
 		payload, err := r.integration.baseline(i.Baseline)
 		if err != nil {
@@ -109,7 +114,14 @@ func newCompletionFixture(t *testing.T, values []string, rejectFirst, ask bool) 
 			passed, findings = false, []string{"The requested review marker is missing."}
 		}
 		data, _ := json.Marshal(completionReview{Passed: &passed, CandidateSHA256: hex.EncodeToString(hash[:]), Findings: findings})
-		return orchestrator.Result{Summary: string(data)}, nil
+		paths := []string{"candidate/note.txt"}
+		if f.noReadEvidence {
+			paths = nil
+		}
+		if f.deletionEvidence {
+			return orchestrator.Result{Summary: string(data), InspectedPaths: []string{"source/note.txt"}, MissingPaths: []string{"candidate/note.txt"}}, nil
+		}
+		return orchestrator.Result{Summary: string(data), InspectedPaths: paths}, nil
 	})
 	s, err := orchestrator.NewSupervisor(context.Background(), []orchestrator.Specialist{worker, reviewer}, orchestrator.Options{StatePath: filepath.Join(state, "tasks"), ParentRun: r.RunID, Source: work.Source.Path()})
 	if err != nil {
@@ -179,6 +191,27 @@ func TestCompletionRejectsUnboundOrUnstructuredReview(t *testing.T) {
 		if r.Status != "failed" || !strings.Contains(r.Error, "invalid or mismatched verdict") || len(f.assignments) != 1 {
 			t.Fatalf("unverified completion: %+v", r)
 		}
+	}
+}
+
+func TestCompletionRequiresActualReviewerFileReads(t *testing.T) {
+	f := newCompletionFixture(t, []string{"fixed"}, false, false)
+	f.noReadEvidence = true
+	r := f.execute(t, context.Background(), completionArgs)
+	if r.Status != "failed" || !strings.Contains(r.Error, "did not inspect changed candidate file") {
+		t.Fatalf("review without file inspection passed: %+v", r)
+	}
+}
+
+func TestCompletionReviewsDeletedFilesThroughSourceAndAbsenceEvidence(t *testing.T) {
+	f := newCompletionFixture(t, []string{"delete"}, false, false)
+	checks := [][]string{{"sh", "-c", "test ! -e note.txt"}}
+	f.tool.request.Code.Verification = checks
+	f.tool.request.integration.request.Code.Verification = checks
+	f.deletionEvidence = true
+	r := f.execute(t, context.Background(), completionArgs)
+	if r.Status != "completed" || len(r.Attempts[0].MissingPaths) != 1 {
+		t.Fatalf("deletion review failed: %+v", r)
 	}
 }
 

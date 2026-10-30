@@ -57,6 +57,8 @@ type Invocation struct {
 // Result is the bounded information returned from a specialist to its manager.
 // Artifact fields are optional trusted evidence supplied by the host.
 type Result struct {
+	InspectedPaths []string
+	MissingPaths   []string
 	SessionID      string
 	BaselineSHA256 string
 	Usage          agent.Usage
