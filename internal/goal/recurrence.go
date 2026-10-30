@@ -4,6 +4,8 @@ import (
 	"errors"
 	"sort"
 	"time"
+	// Packaged Windows runtimes and minimal hosts may have no IANA zone files.
+	_ "time/tzdata"
 )
 
 // Recurrence describes local-wall-clock blocks. Expansion is read-only; it

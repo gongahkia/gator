@@ -45,7 +45,8 @@ links, and deleting a referenced step. A scoped watch gets the explicitly linked
 step's status, not another project's files or notes. A model must inspect both
 plans from the main chat before proposing a new cross-project link.
 
-Daily/weekly blocks use an explicit IANA timezone and interval 1–52. Start/end
+Daily/weekly blocks use an explicit IANA timezone and interval 1–52. Go timezone
+data is bundled for packaged Windows runtimes and hosts without zone files. Start/end
 form an elapsed duration up to 24 hours; local start time is preserved through
 DST. Nonexistent spring-forward times are skipped. Ambiguous fall-back times
 use Go's timezone resolution, with the original anchor instant preserved.
