@@ -49,12 +49,14 @@ jobs:
         run: |
           set -euo pipefail
           go test ./internal/memory ./internal/learning ./internal/personalization ./internal/retrieval
-          go test ./internal/goal ./internal/knowledge ./internal/suggestion ./internal/followup
+          go test ./internal/goal ./internal/knowledge ./internal/suggestion ./internal/reconciliation ./internal/followup
           go test ./internal/tools -run 'Knowledge|Suggest|MainChatPlan'
           go test ./internal/lifecycle -run 'RestorePreservesForgotten|Retention|Backup'
           # Code-agent follow-up/shell tests run in ci.yml with sandbox dependencies.
           go test ./internal/workapp -run 'Followup|Calendar'
-          go test ./cmd/gator -run 'Memory|PersonalSummary|Recall|IdleMemoryMaintenance|Plan|Agenda|Suggest|AcceptNoteUpdate|GoalWatch|GoalAccess|NativeConnectionChecks|ScheduledBlock|Calendar|^Test(ChatFollowup|Reviewed.*Followup|DailyFollowup|JobCommandBindsFollowups)|ConnectedGoal'
+          go test ./cmd/gator -run 'Memory|PersonalSummary|Recall|IdleMemoryMaintenance|Plan|Agenda|Suggest|AcceptNoteUpdate|GoalWatch|GoalContinuation|GoalActivity|GoalAccess|NativeConnectionChecks|ScheduledBlock|Calendar|^Test(ChatFollowup|Reviewed.*Followup|DailyFollowup|JobCommandBindsFollowups)|ConnectedGoal'
+      - name: Verify bounded companion recovery
+        run: node --test companion/recovery.test.mjs
       - name: Build independent production artifact
         run: node ui/scripts/package.mjs terminal-artifact
       - name: Verify installed lifecycle without Electron

@@ -249,9 +249,17 @@ func (refs watchReferenceSet) allows(reference string) bool {
 	if !found || entry.Locator != path || entry.SnapshotPath == "" {
 		return false
 	}
-	line, err := strconv.Atoi(lineText)
+	first, last, ranged := strings.Cut(lineText, "-")
+	line, err := strconv.Atoi(first)
 	if err != nil || line < 1 || line > 100_000 {
 		return false
+	}
+	end := line
+	if ranged {
+		end, err = strconv.Atoi(last)
+		if err != nil || end < line || end > 100_000 {
+			return false
+		}
 	}
 	data, err := refs.source.ReadRegularFile(strings.TrimPrefix(path, "source/"), 512*1024)
 	if err != nil {
@@ -265,7 +273,7 @@ func (refs watchReferenceSet) allows(reference string) bool {
 	if len(data) > 0 && data[len(data)-1] != '\n' {
 		lineCount++
 	}
-	return line <= lineCount
+	return end <= lineCount
 }
 
 func boundedWatchEvidence(references []string, allowed watchReferenceSet) (string, bool) {

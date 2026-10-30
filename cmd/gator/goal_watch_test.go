@@ -174,7 +174,7 @@ func TestGoalWatchUrgencyRequiresValidAttentiveDecision(t *testing.T) {
 
 func TestGoalWatchAlertShowsBoundedEvidenceOrReviewWarning(t *testing.T) {
 	source := t.TempDir()
-	contents := []byte("Venue changed.\n")
+	contents := []byte("Venue changed.\nReview alternatives.\n")
 	if err := os.WriteFile(filepath.Join(source, "venue.md"), contents, 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -193,10 +193,21 @@ func TestGoalWatchAlertShowsBoundedEvidenceOrReviewWarning(t *testing.T) {
 	if attention, summary = classifyGoalWatchResult(valid, nil, nil, references); !attention || !strings.Contains(summary, "[evidence: source/venue.md:1]") {
 		t.Fatalf("retained line reference was rejected: %t %q", attention, summary)
 	}
+
+	for _, reference := range []string{"source/venue.md:1-2", "source/venue.md:2-2"} {
+		if !references.allows(reference) {
+			t.Fatalf("valid source range rejected: %s", reference)
+		}
+	}
+	for _, reference := range []string{"source/venue.md:0-1", "source/venue.md:2-1", "source/venue.md:1-3", "source/venue.md:1-", "source/venue.md:1-2-3"} {
+		if references.allows(reference) {
+			t.Fatalf("invalid source range accepted: %s", reference)
+		}
+	}
 	if err := os.WriteFile(filepath.Join(source, "venue.md"), []byte("Changed after the run.\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if references.allows("source/venue.md:1") {
+	if references.allows("source/venue.md:1") || references.allows("source/venue.md:1-2") {
 		t.Fatal("changed source line was accepted as retained evidence")
 	}
 	fabricated := `{"attention":true,"summary":"Venue changed.","evidence":["source/missing.md:1"]}`
