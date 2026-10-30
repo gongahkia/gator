@@ -63,6 +63,7 @@ func Run(ctx context.Context, r Request) (Result, error) {
 	if err := patch.InitSnapshot(ctx, r.Source, directory); err != nil {
 		return result, err
 	}
+	defer os.RemoveAll(directory)
 	// Remember the initial tree identity independently of any CLI Git activity.
 	git := func(args ...string) ([]byte, error) {
 		cmd := hostproc.CommandContext(ctx, "git", args...)
@@ -100,6 +101,7 @@ func Run(ctx context.Context, r Request) (Result, error) {
 	if err := os.Rename(filepath.Join(directory, ".git"), trustedGit); err != nil {
 		return result, err
 	}
+	defer os.RemoveAll(trustedGit)
 	policy := sandbox.Policy{Mode: sandbox.Strict, Network: sandbox.AllowNetwork, ReadOnlyRoots: append([]string(nil), r.Config.ReadOnlyRoots...)}
 	policy.ReadOnlyRoots = append(policy.ReadOnlyRoots, r.Config.Executable)
 	// Rust TLS cannot consult macOS Keychain services inside Seatbelt. Use the

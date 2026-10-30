@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/patch"
 	"github.com/gongahkia/gator/internal/sandbox"
 )
@@ -92,11 +93,17 @@ func TestRunnerCanInspectSelectedBaseline(t *testing.T) {
 func TestRunnerCancellationStopsProcess(t *testing.T) {
 	r := fixtureRequest(t, `sleep 30 &
 wait`)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	start := time.Now()
+	var start time.Time
+	r.OnEvent = func(event agent.Event) {
+		if strings.Contains(event.Text, "started") {
+			start = time.Now()
+			time.AfterFunc(250*time.Millisecond, cancel)
+		}
+	}
 	_, err := Run(ctx, r)
-	if !errors.Is(err, context.DeadlineExceeded) {
+	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected cancellation: %v", err)
 	}
 	if time.Since(start) > 5*time.Second {
@@ -113,6 +120,9 @@ func TestRunnerRejectsFailedAndSecretResults(t *testing.T) {
 		}
 		if len(value.Patch) > 0 {
 			t.Fatal("retained rejected patch")
+		}
+		if _, err := os.Stat(filepath.Join(r.Scratch, r.ID+"-cli")); !os.IsNotExist(err) {
+			t.Fatal("private working files not cleaned up")
 		}
 	}
 }
