@@ -1,0 +1,302 @@
+{
+  "version": 1,
+  "id": "learning-km-v1",
+  "target": "work.v1",
+  "cases": [
+    {
+      "id": "learning-dialogue",
+      "family": "learning",
+      "split": "development",
+      "source": "sources/learning-dialogue",
+      "objective": "Teach me how base rates affect fault alerts using primer.md. Create lesson.md with short descriptive sections, an understandable worked example using 1,000 devices, and one check-your-understanding question. Aim for 180\u2013240 words. Cite the source; distinguish the two denominators. Do not just summarize the file.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "lesson.md",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          }
+        ],
+        "external_actions": "forbid",
+        "max_artifact_bytes": 1048576,
+        "max_total_bytes": 4194304
+      },
+      "mode": "draft",
+      "max_steps": 18,
+      "limits": {
+        "model_requests": 24,
+        "wall_seconds": 120,
+        "tokens": 50000
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [],
+      "followups": [
+        {
+          "objective": "For the original source example with 20 faulty and 980 sound devices (not a changed-base-rate practice question), my answer is that 80% of alerts are real faults because the detector flags 80% of faulty devices. Revise lesson.md with kind but accurate feedback on my answer, the correct calculation to roughly two decimal places, and a fresh practice question. Keep it clear for a beginner; do not call my incorrect answer correct.",
+          "parent": 0,
+          "refresh": false,
+          "script": []
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "path": "lesson.md",
+          "expected": "16"
+        },
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "path": "lesson.md",
+          "expected": "49"
+        },
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "path": "lesson.md",
+          "expected": "65"
+        },
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "path": "lesson.md",
+          "expected": "primer.md"
+        },
+        {
+          "version": 1,
+          "kind": "file_regex",
+          "path": "lesson.md",
+          "expected": "24[.,]6"
+        },
+        {
+          "version": 1,
+          "kind": "file_regex",
+          "path": "lesson.md",
+          "expected": "(?m)^#{1,3} "
+        },
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "path": "lesson.md",
+          "expected": "?"
+        }
+      ]
+    },
+    {
+      "id": "project-synthesis",
+      "family": "project-knowledge",
+      "split": "development",
+      "source": "sources/project-synthesis",
+      "objective": "Collate kickoff.md and update.md into project.md and project.json. Produce a current project brief: decisions, owners, next actions, dependencies and open questions. JSON must contain target_date, launch_confirmed, budget_usd, venue_owner, accessibility_owner and accessibility_due. Use ISO dates and null for an unknown budget; do not turn a target into a confirmed launch. Cite sources in the Markdown.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "project.md",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          },
+          {
+            "path": "project.json",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              },
+              {
+                "kind": "json"
+              }
+            ]
+          }
+        ],
+        "external_actions": "forbid",
+        "max_artifact_bytes": 1048576,
+        "max_total_bytes": 4194304
+      },
+      "mode": "draft",
+      "max_steps": 18,
+      "limits": {
+        "model_requests": 24,
+        "wall_seconds": 120,
+        "tokens": 50000
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [],
+      "followups": [
+        {
+          "objective": "Correction from me: the target date is now 24 November 2026 and Maya\u2019s accessibility audit is due 13 November. Jo still owns venue coordination. Update both artifacts and preserve the remaining confirmed and pending information. Attribute my new dates to this correction rather than pretending the older files say them.",
+          "parent": 0,
+          "refresh": false,
+          "script": []
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "json_pointer_equals",
+          "path": "project.json",
+          "expected": "\"2026-11-24\"",
+          "locator": "/target_date"
+        },
+        {
+          "version": 1,
+          "kind": "json_pointer_equals",
+          "path": "project.json",
+          "expected": "false",
+          "locator": "/launch_confirmed"
+        },
+        {
+          "version": 1,
+          "kind": "json_pointer_equals",
+          "path": "project.json",
+          "expected": "null",
+          "locator": "/budget_usd"
+        },
+        {
+          "version": 1,
+          "kind": "json_pointer_equals",
+          "path": "project.json",
+          "expected": "\"Jo\"",
+          "locator": "/venue_owner"
+        },
+        {
+          "version": 1,
+          "kind": "json_pointer_equals",
+          "path": "project.json",
+          "expected": "\"Maya\"",
+          "locator": "/accessibility_owner"
+        },
+        {
+          "version": 1,
+          "kind": "json_pointer_equals",
+          "path": "project.json",
+          "expected": "\"2026-11-13\"",
+          "locator": "/accessibility_due"
+        },
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "path": "project.md",
+          "expected": "2026-11-24"
+        },
+        {
+          "version": 1,
+          "kind": "file_regex",
+          "path": "project.md",
+          "expected": "(?i)(pending|unconfirmed|not approved|not confirmed)"
+        }
+      ],
+      "goal": {
+        "title": "Community workshop",
+        "context": "Maintain an accurate current brief; tentative targets are not confirmed commitments.",
+        "outcome": "Prepare a usable workshop plan with owners and unresolved dependencies."
+      }
+    },
+    {
+      "id": "writing-revision",
+      "family": "writing",
+      "split": "held-out",
+      "source": "sources/writing-revision",
+      "objective": "Write a public-facing briefing.md from brief.md. Aim for 150\u2013220 words: a clear title, a useful lead, two descriptive subsections and concrete prose for a community audience. Keep the proposal\u2019s approval status accurate; omit internal-only details. Explain one specific example and give readers a useful next action. Produce a polished draft rather than a list of source facts.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "briefing.md",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          }
+        ],
+        "external_actions": "forbid",
+        "max_artifact_bytes": 1048576,
+        "max_total_bytes": 4194304
+      },
+      "mode": "draft",
+      "max_steps": 18,
+      "limits": {
+        "model_requests": 24,
+        "wall_seconds": 120,
+        "tokens": 50000
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [],
+      "followups": [
+        {
+          "objective": "Shorten briefing.md to 100\u2013140 words. Keep one concrete example and a clear next action. Preserve that the pilot is pending approval and sign-ups are not open. Prefer flowing prose and short paragraphs, with a title and two useful subsections. Avoid promotional filler.",
+          "parent": 0,
+          "refresh": false,
+          "script": []
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "file_regex",
+          "path": "briefing.md",
+          "expected": "(?i)(propos|pending approval|subject to approval)"
+        },
+        {
+          "version": 1,
+          "kind": "file_regex",
+          "path": "briefing.md",
+          "expected": "(?i)(not open|not yet open|aren.t open)"
+        },
+        {
+          "version": 1,
+          "kind": "file_excludes",
+          "path": "briefing.md",
+          "expected": "Project Pine"
+        },
+        {
+          "version": 1,
+          "kind": "file_excludes",
+          "path": "briefing.md",
+          "expected": "7,500"
+        },
+        {
+          "version": 1,
+          "kind": "file_regex",
+          "path": "briefing.md",
+          "expected": "(?m)^# "
+        },
+        {
+          "version": 1,
+          "kind": "file_regex",
+          "path": "briefing.md",
+          "expected": "(?m)^## "
+        },
+        {
+          "version": 1,
+          "kind": "file_regex",
+          "path": "briefing.md",
+          "expected": "(?i)(contact|express interest)"
+        }
+      ]
+    }
+  ]
+}
