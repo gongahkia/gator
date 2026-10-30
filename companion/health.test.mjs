@@ -17,7 +17,12 @@ test('real Go check health is conversation-scoped, reports offline/stale states 
   let companion, base, requests = 0;
   const model = createServer((req, res) => { requests++; req.resume(); res.writeHead(500); res.end('This read-only fixture must not call a model.'); });
   const command = (...args) => execFileSync(binary, args, { env, cwd: workspace, encoding: 'utf8', timeout: 20000, stdio: 'pipe' });
-  const request = (path, options = {}) => fetch(base + path, { ...options, headers: { authorization: `Bearer ${token}`, ...options.headers }, signal: AbortSignal.timeout(3000) });
+  // Cold backend readiness allows 15s and catalog creation allows 20s. This
+  // integration check tests health correctness, not a 3s startup latency SLO.
+  const request = async (path, options = {}) => {
+    try { return await fetch(base + path, { ...options, headers: { authorization: `Bearer ${token}`, ...options.headers }, signal: AbortSignal.timeout(25000) }); }
+    catch (error) { throw new Error(`Health fixture request failed: ${options.method || "GET"} ${path}`, { cause: error }); }
+  };
   async function state(id) { const response = await request(`/v1/chats/${id}`); assert.equal(response.status, 200); return (await response.json()).state; }
   async function until(read, label) {
     const deadline = Date.now() + 20000;
