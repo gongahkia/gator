@@ -19,6 +19,7 @@ import (
 	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/patch"
 	"github.com/gongahkia/gator/internal/tools"
+	"github.com/gongahkia/gator/internal/worksession"
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
@@ -149,13 +150,23 @@ func (e Executor) subagentTools(ctx context.Context, request Request, work works
 	}
 	options := orchestrator.Options{SourceCapture: request.SnapshotID, Limits: request.Limits, MaxDelegations: 8, MaxParallel: 3, Now: e.Now, OnEvent: onEvent, OnRecord: onRecord, StatePath: filepath.Join(request.StateDir, "gator", "tasks", request.RunID), ParentRun: request.RunID, Source: work.Source.Path(), PolicySHA256: digest}
 	if request.ParentRevisionID != "" {
-		tasks, err := orchestrator.ReadTasks(filepath.Join(request.StateDir, "gator", "tasks", request.ParentRevisionID))
+		sessions, err := worksession.Open(request.StateDir)
+		if err != nil {
+			return nil, nil, err
+		}
+		lineage, err := sessions.Lineage(request.ConversationID, request.ParentRevisionID)
 		if err != nil {
 			return nil, nil, err
 		}
 		options.Retained = map[string]orchestrator.Task{}
-		for _, task := range tasks {
-			options.Retained[task.GlobalID] = task
+		for _, revision := range lineage {
+			tasks, err := orchestrator.ReadTasks(filepath.Join(request.StateDir, "gator", "tasks", revision.ID))
+			if err != nil {
+				return nil, nil, err
+			}
+			for _, task := range tasks {
+				options.Retained[task.GlobalID] = task
+			}
 		}
 	}
 	supervisor, err := orchestrator.NewSupervisor(ctx, specialists, options)

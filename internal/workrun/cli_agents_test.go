@@ -75,8 +75,27 @@ func TestExternalNativeSessionContinuesAcrossWorkConversationTurns(t *testing.T)
 	if err != nil || len(first) != 1 || first[0].Status != "completed" {
 		t.Fatalf("first task: %+v %v", first, err)
 	}
+	// Create a sibling branch with a different native worker. It must not be
+	// imported when the user returns to the first revision's main branch.
+	service.Executor.Model = &nativeContinuationModel{}
+	request.RunID, request.ConversationID = "sibling", out.ConversationID
+	if _, err := service.Execute(context.Background(), request); err != nil {
+		t.Fatal(err)
+	}
+	sibling, err := orchestrator.ReadTasks(filepath.Join(state, "gator", "tasks", "sibling"))
+	if err != nil || len(sibling) != 1 || sibling[0].Status != "completed" {
+		t.Fatalf("sibling task: %+v %v", sibling, err)
+	}
+	// A turn with no delegated work must not hide earlier native threads.
+	service.Executor.Model = &agentDiscoveryModel{step: 1}
+	request.RunID, request.ConversationID, request.Objective = "unrelated", out.ConversationID, "Hello, how are you?"
+	request.ParentRevisionID = "first"
+	if _, err := service.Execute(context.Background(), request); err != nil {
+		t.Fatal(err)
+	}
 	service.Executor.Model = &nativeContinuationModel{previous: first[0].GlobalID}
 	request.RunID, request.ConversationID = "second", out.ConversationID
+	request.ParentRevisionID = "unrelated"
 	if _, err := service.Execute(context.Background(), request); err != nil {
 		t.Fatal(err)
 	}
@@ -86,6 +105,15 @@ func TestExternalNativeSessionContinuesAcrossWorkConversationTurns(t *testing.T)
 	}
 	if second[0].Result.SessionID != first[0].Result.SessionID || !strings.Contains(second[0].Result.Summary, "turn 2") {
 		t.Fatalf("lost native conversation: %+v", second[0])
+	}
+	service.Executor.Model = &nativeContinuationModel{previous: sibling[0].GlobalID}
+	request.RunID, request.ParentRevisionID = "wrong-branch", "second"
+	if _, err := service.Execute(context.Background(), request); err != nil {
+		t.Fatal(err)
+	}
+	rejected, err := orchestrator.ReadTasks(filepath.Join(state, "gator", "tasks", "wrong-branch"))
+	if err != nil || len(rejected) != 0 {
+		t.Fatalf("resumed sibling branch task: %+v %v", rejected, err)
 	}
 }
 

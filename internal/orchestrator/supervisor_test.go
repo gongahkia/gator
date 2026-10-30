@@ -18,6 +18,41 @@ func hostedReader(run func(context.Context, Invocation) (Result, error)) Special
 	return HostedSpecialist("reader", "Inspect frozen source without mutation.", run)
 }
 
+func TestDiscoveryIndexesLatestRetainedNativeThreads(t *testing.T) {
+	role := hostedReader(func(context.Context, Invocation) (Result, error) { return Result{}, nil })
+	role.Sessions = true
+	options := Options{StatePath: t.TempDir(), ParentRun: "index", Source: "source", SourceCapture: "capture", Retained: map[string]Task{}}
+	for _, id := range []string{"older", "newer", "other-capture"} {
+		task := Task{GlobalID: id + "/subagent-001", Role: "reader", SourceCapture: "capture", Status: "completed", Result: Result{SessionID: "same-thread", Summary: strings.Repeat("z", 2000)}}
+		if id == "newer" {
+			task.CreatedAt = time.Now()
+		}
+		if id == "other-capture" {
+			task.SourceCapture = "elsewhere"
+			task.Result.SessionID = "different-thread"
+		}
+		options.Retained[task.GlobalID] = task
+	}
+	s, err := NewSupervisor(context.Background(), []Specialist{role}, options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	result, err := (taskTool{s, "list_agents"}).Execute(context.Background(), []byte(`{}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded struct {
+		Threads []retainedThread `json:"retained_threads"`
+	}
+	if err := json.Unmarshal([]byte(result.Content), &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if len(decoded.Threads) != 1 || decoded.Threads[0].ID != "newer/subagent-001" || len(decoded.Threads[0].Summary) > 1024 {
+		t.Fatalf("wrong retained index: %+v", decoded.Threads)
+	}
+}
+
 func TestSupervisorNativeContinuationUsesSessionNotSummary(t *testing.T) {
 	role := hostedReader(func(_ context.Context, i Invocation) (Result, error) {
 		if i.Task == "follow-up" && i.SessionID != "host-retained-session" {

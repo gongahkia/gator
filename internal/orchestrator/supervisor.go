@@ -563,7 +563,8 @@ func (t taskTool) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolR
 		}
 		sort.Slice(roles, func(i, j int) bool { return roles[i].Name < roles[j].Name })
 		sort.Slice(tasks, func(i, j int) bool { return tasks[i].ID < tasks[j].ID })
-		data, err := json.Marshal(map[string]any{"agents": roles, "tasks": tasks, "remaining": t.s.options.MaxDelegations - t.s.used, "max_parallel": t.s.options.MaxParallel})
+		retained, more := t.s.retainedThreads()
+		data, err := json.Marshal(map[string]any{"agents": roles, "tasks": tasks, "retained_threads": retained, "more_retained_threads": more, "remaining": t.s.options.MaxDelegations - t.s.used, "max_parallel": t.s.options.MaxParallel})
 		return agent.ToolResult{Content: string(data)}, err
 	}
 	var task Task
@@ -623,6 +624,49 @@ func (t taskTool) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolR
 	}
 	data, err := json.Marshal(task)
 	return agent.ToolResult{Content: string(data)}, err
+}
+
+type retainedThread struct {
+	ID      string `json:"id"`
+	Agent   string `json:"agent"`
+	Status  string `json:"status"`
+	Summary string `json:"summary"`
+}
+
+// The caller holds s.mu. Index only the newest task for each native session
+// from the selected conversation lineage. Full checkpoints stay out of the
+// discovery response; the continuation ID is the host task's global ID.
+func (s *Supervisor) retainedThreads() ([]retainedThread, bool) {
+	latest := map[string]Task{}
+	for _, task := range s.options.Retained {
+		role, enabled := s.registry[task.Role]
+		if !enabled || !role.Sessions || task.Result.SessionID == "" || task.SourceCapture != s.options.SourceCapture {
+			continue
+		}
+		prior, exists := latest[task.Result.SessionID]
+		if !exists || task.CreatedAt.After(prior.CreatedAt) || task.CreatedAt.Equal(prior.CreatedAt) && task.GlobalID > prior.GlobalID {
+			latest[task.Result.SessionID] = task
+		}
+	}
+	ordered := make([]Task, 0, len(latest))
+	for _, task := range latest {
+		ordered = append(ordered, task)
+	}
+	sort.Slice(ordered, func(i, j int) bool {
+		if ordered[i].CreatedAt.Equal(ordered[j].CreatedAt) {
+			return ordered[i].GlobalID < ordered[j].GlobalID
+		}
+		return ordered[i].CreatedAt.After(ordered[j].CreatedAt)
+	})
+	more := len(ordered) > 64
+	if more {
+		ordered = ordered[:64]
+	}
+	threads := make([]retainedThread, 0, len(ordered))
+	for _, task := range ordered {
+		threads = append(threads, retainedThread{task.GlobalID, task.Role, task.Status, boundedText(task.Result.Summary, 1024)})
+	}
+	return threads, more
 }
 func decodeTask(raw []byte, value any) error {
 	decoder := json.NewDecoder(bytes.NewReader(raw))
