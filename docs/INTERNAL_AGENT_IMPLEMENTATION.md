@@ -147,6 +147,39 @@ The repository still contains historical desktop-era and connector-heavy
 research documents. This ledger and the connector inventory describe this phase;
 old plans should not be read as statements of current support.
 
+### Proactive implementation follow-up
+
+The next phase implements behavior before broader live/longitudinal evaluation:
+
+- Local watches retain per-step fingerprints and report added, changed and
+  removed items. Deadline and block boundaries change once. Dependency
+  completion changes the dependent step's fingerprint too. A removed step is
+  not treated as completed, and an empty latest snapshot remains authoritative.
+- Each watch receives its last completed decision under the current policy,
+  up to eight pending proposals for its goal, and up to four explicitly rated
+  alerts for that same job and goal. Ratings are loaded afresh, so correcting
+  or clearing them affects subsequent checks. Unrated alerts imply nothing.
+  Feedback guides the model; it does not automatically rewrite facts, change
+  notification settings or expand the reviewed responsibility.
+- Identical pending plan edits and existing-note corrections reuse their
+  original review ID and provenance across runs. Creation and acceptance share
+  a process lock. Different revisions or content remain separate proposals.
+- Unchanged checks no longer reset duplicate-alert suppression. For change-only
+  local watches with checked plan-only evidence, rewording the same concern
+  also stays quiet. Changed evidence, time boundaries and urgency produce a
+  different identity. Artifacts, proposed edits and other source types retain
+  ordinary result handling. Every attempt remains in history.
+- Stored plan context includes each step's last update time. A plan edited
+  while a watch runs makes the conclusion review-required; a goal paused or
+  completed during the check produces no attention alert. No date or silence
+  automatically marks progress or completion.
+
+Focused local regression checks cover these paths, including concurrent
+proposal creation, feedback isolation/withdrawal, deadline and dependency
+transitions, and edits during execution. These are implementation checks, not
+a new live quality benchmark. Longitudinal usefulness, recurring plan blocks,
+cross-project dependencies and always-on deployment remain separate work.
+
 ### Live OpenAI lifecycle (30 October)
 
 Retained reports and reproduction instructions:
