@@ -102,7 +102,9 @@ service/ACL acceptance and power-loss testing remain unverified by this work.
   tests were skipped. The health integration probe initially timed out; its 3s
   deadline was shorter than backend startup/catalog limits. It passed after
   alignment to 25s, preserving all state and zero-model-call assertions.
-- Live OpenAI synthetic reports and runner instructions are in
+- Final live OpenAI run passed 17/17 checks (20 requests, no tool errors),
+  including producing a checked draft from a retained ready action and holding
+  for owner review. Earlier failed runs are retained. Reports and instructions are in
   [internal-agent evals](../scripts/internal-agent-eval/README.md).
 - The local terminal runtime was rebuilt. Native CI includes the new recurrence,
   reconciliation, continuation and companion recovery coverage.

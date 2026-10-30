@@ -69,3 +69,21 @@ Retained October 30 reports:
 These short, directed workflows do not measure open-ended planning, broad
 contradiction recall, or weeks of memory/proactive usefulness. The seeded ready
 case tests execution from retained state, not autonomous goal discovery.
+
+Expanded draft-continuation runs:
+
+- `openai-2026-10-30-continuity-3.json`: 16/17 checks, 20 requests,
+  145,091 input + 2,384 output tokens, no tool errors. The draft was created and
+  checked, but a valid `source/workshop.txt:1-3` citation was rejected by the
+  single-line-only evidence validator. That forced review and discarded the
+  requested structured continuation. The validator now checks ordered, in-bounds
+  line ranges against the same retained source hash; invalid/stale ranges still
+  fail. Regression tests cover valid, reversed, malformed and excessive ranges.
+- `openai-2026-10-30-continuity-4.json`: **17/17 checks**, 20 requests,
+  144,981 input + 2,112 output tokens, no tool errors; approximately 48.5 seconds
+  for the full test. The final report retains the draft text and checked blocked
+  continuation, with no scheduled wake and no inferred task completion.
+
+The four runs used 71 provider requests in total. Keep both failed runs when
+reporting these results; the final pass followed an evaluator fix and a real
+source-reference compatibility fix, not four independent clean passes.
