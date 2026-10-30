@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"sort"
 	"strings"
@@ -83,9 +84,23 @@ func (s Store) Create(record Record) (Record, error) {
 	if err := validate(record); err != nil {
 		return Record{}, err
 	}
+	release, err := s.lock()
+	if err != nil {
+		return Record{}, err
+	}
+	defer release()
 	entries, err := s.List("pending")
 	if err != nil {
 		return Record{}, err
+	}
+	// An identical pending edit already has a review identity and provenance.
+	// Reuse it across background runs instead of multiplying review requests.
+	if record.Kind == "plan" || record.Kind == "note" && record.NoteID != "" {
+		for _, existing := range entries {
+			if reflect.DeepEqual(proposalContent(existing), proposalContent(record)) {
+				return existing, nil
+			}
+		}
 	}
 	if len(entries) >= 256 {
 		return Record{}, errors.New("too many pending suggestions; review or reject some first")
@@ -181,20 +196,11 @@ func (s Store) Resolve(id, decision string, apply func(Record) (string, error)) 
 	if !validID(id) || decision != "accept" && decision != "reject" {
 		return Record{}, errors.New("invalid suggestion decision")
 	}
-	lock, err := os.OpenFile(filepath.Join(s.root, ".lock"), os.O_CREATE|os.O_RDWR, 0600)
+	release, err := s.lock()
 	if err != nil {
 		return Record{}, err
 	}
-	defer lock.Close()
-	info, statErr := os.Lstat(filepath.Join(s.root, ".lock"))
-	opened, openErr := lock.Stat()
-	if statErr != nil || openErr != nil || !info.Mode().IsRegular() || !os.SameFile(info, opened) {
-		return Record{}, errors.New("suggestion lock is not a regular file")
-	}
-	if err := filelock.Lock(lock, filelock.Exclusive); err != nil {
-		return Record{}, err
-	}
-	defer filelock.Unlock(lock)
+	defer release()
 	record, err := s.Load(id)
 	if err != nil {
 		return Record{}, err
@@ -359,4 +365,31 @@ func validGoalID(id string) bool {
 	}
 	_, err := hex.DecodeString(id[5:])
 	return err == nil
+}
+
+// Creation and review share a lock, so an edit cannot be deduplicated against
+// a record while another process is accepting it.
+func (s Store) lock() (func(), error) {
+	lock, err := os.OpenFile(filepath.Join(s.root, ".lock"), os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		return nil, err
+	}
+	info, statErr := os.Lstat(filepath.Join(s.root, ".lock"))
+	opened, openErr := lock.Stat()
+	if statErr != nil || openErr != nil || !info.Mode().IsRegular() || !os.SameFile(info, opened) {
+		lock.Close()
+		return nil, errors.New("suggestion lock is not a regular file")
+	}
+	if err := filelock.Lock(lock, filelock.Exclusive); err != nil {
+		lock.Close()
+		return nil, err
+	}
+	return func() { _ = filelock.Unlock(lock); _ = lock.Close() }, nil
+}
+
+func proposalContent(record Record) Record {
+	record.Version = 0
+	record.ID, record.Status, record.WorkID, record.ResultID = "", "", "", ""
+	record.CreatedAt, record.ResolvedAt = time.Time{}, time.Time{}
+	return record
 }

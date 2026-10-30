@@ -82,3 +82,44 @@ func TestSuggestionRejectsSymlinkAndInvalidPlan(t *testing.T) {
 		t.Fatal("symlinked suggestion accepted")
 	}
 }
+
+func TestPendingPlanProposalReusesIdentityAcrossConcurrentRuns(t *testing.T) {
+	store, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := Record{Kind: "plan", GoalID: "goal-aaaaaaaaaaaaaaaaaaaaaaaa", WorkID: "work-first", PlanChange: goal.PlanChange{Kind: "add_step", Title: "Ask for updated dates"}}
+	ids := make(chan string, 4)
+	var wg sync.WaitGroup
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			record, err := store.Create(base)
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			ids <- record.ID
+		}()
+	}
+	wg.Wait()
+	close(ids)
+	var id string
+	for got := range ids {
+		if id != "" && got != id {
+			t.Fatal("duplicate pending identities")
+		}
+		id = got
+	}
+	base.WorkID = "work-later"
+	again, err := store.Create(base)
+	if err != nil || again.ID != id || again.WorkID != "work-first" {
+		t.Fatalf("retry lost identity/provenance: %#v %v", again, err)
+	}
+	base.PlanChange.ExpectedRevision = 1
+	changed, err := store.Create(base)
+	if err != nil || changed.ID == id {
+		t.Fatalf("different revision collapsed: %#v %v", changed, err)
+	}
+}
