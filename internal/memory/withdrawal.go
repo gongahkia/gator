@@ -1,6 +1,8 @@
 package memory
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"os"
@@ -242,4 +244,89 @@ func (s Store) ForgetWithTopic(id, updated, topic string) error {
 		return err
 	}
 	return s.forgetRecord(record)
+}
+
+// WithdrawalRevision identifies the exact metadata inspected in an owning
+// control. It also covers a legacy marker's inferred scope and pending state.
+func WithdrawalRevision(rule WithdrawalRule) string {
+	data, _ := json.Marshal(rule)
+	digest := sha256.Sum256(data)
+	return hex.EncodeToString(digest[:])
+}
+
+// ReviewWithdrawal supplies missing abstract metadata without reconstructing a
+// deleted fact. Scope must be explicitly chosen by the owner for legacy hashes.
+// Historical barriers remain intact, including barriers for restored topics.
+func (s Store) ReviewWithdrawal(id, expected, scope, topic string) (WithdrawalRule, error) {
+	if !validConceptKey(id) || !validConceptKey(expected) {
+		return WithdrawalRule{}, errors.New("inspect the withdrawal and supply its revision")
+	}
+	topic = strings.TrimSpace(topic)
+	if topic == "" || len(topic) > 1000 || strings.ContainsAny(topic, "\x00\r\n\x1b") {
+		return WithdrawalRule{}, errors.New("supply a short abstract attribute topic, without the forgotten value")
+	}
+	if scope != "" {
+		if len(scope) != 29 || !strings.HasPrefix(scope, "goal-") {
+			return WithdrawalRule{}, errors.New("invalid withdrawal goal scope")
+		}
+		if _, err := hex.DecodeString(scope[5:]); err != nil {
+			return WithdrawalRule{}, errors.New("invalid withdrawal goal scope")
+		}
+	}
+	release, err := s.lock()
+	if err != nil {
+		return WithdrawalRule{}, err
+	}
+	defer release()
+	rules, err := s.withdrawalRulesUnlocked(scope)
+	if err != nil {
+		return WithdrawalRule{}, err
+	}
+	for _, rule := range rules {
+		if rule.ID != id {
+			continue
+		}
+		if WithdrawalRevision(rule) != expected {
+			return WithdrawalRule{}, errors.New("withdrawal changed during review; inspect it again")
+		}
+		if !rule.ScopeUnknown && rule.Scope != scope {
+			return WithdrawalRule{}, errors.New("a known withdrawal cannot move to another scope")
+		}
+		rule.Scope, rule.ScopeUnknown, rule.Topic, rule.Derived = scope, false, topic, false
+		if err := s.writeWithdrawal(rule); err != nil {
+			return WithdrawalRule{}, err
+		}
+		return rule, nil
+	}
+	return WithdrawalRule{}, errors.New("withdrawal was not found in this scope")
+}
+
+// WithdrawalTopic is an inspect-only hint for a pending forget operation. The
+// result contains no generated fact values and does not change the record.
+func (s Store) WithdrawalTopic(id, updated string) (string, error) {
+	release, err := s.readLock()
+	if err != nil {
+		return "", err
+	}
+	defer release()
+	r, err := s.loadUnlocked(id)
+	if err != nil {
+		return "", err
+	}
+	if r.UpdatedAt.Format(time.RFC3339Nano) != updated {
+		return "", errors.New("memory changed during withdrawal review; inspect it again")
+	}
+	bindings, err := s.bindings()
+	if err != nil {
+		return "", err
+	}
+	identity := withdrawalKey(bindings, r)
+	rule, err := s.loadWithdrawal(identity)
+	if err == nil && rule.Topic != "" {
+		return rule.Topic, nil
+	}
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return "", err
+	}
+	return topicForConcept(bindings, r.GoalID, identity), nil
 }

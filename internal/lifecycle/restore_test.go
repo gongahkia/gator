@@ -44,6 +44,10 @@ func TestRestorePreservesForgottenConceptAndSourceChatSuppression(t *testing.T) 
 	if err := memories.Forget(record.ID); err != nil {
 		t.Fatal(err)
 	}
+	beforeRules, err := memories.WithdrawalRules("")
+	if err != nil || len(beforeRules) != 1 {
+		t.Fatal(beforeRules, err)
+	}
 	store, err := Open(root)
 	if err != nil {
 		t.Fatal(err)
@@ -70,6 +74,13 @@ func TestRestorePreservesForgottenConceptAndSourceChatSuppression(t *testing.T) 
 	}
 	if blocked, err := restored.HistorySuppressed(input.ConversationID, ""); err != nil || !blocked {
 		t.Fatal("restore lost source-history marker", err)
+	}
+	afterRules, err := restored.WithdrawalRules("")
+	if err != nil || len(afterRules) != 1 || memory.WithdrawalRevision(afterRules[0]) != memory.WithdrawalRevision(beforeRules[0]) {
+		t.Fatal("restore lost abstract withdrawal state", afterRules, err)
+	}
+	if screen, err := restored.ScreenHistory(context.Background(), nil, "", []memory.HistoryFragment{{ID: "untracked", User: "My home is Harbor City."}}); err == nil || len(screen.Allowed) != 0 {
+		t.Fatal("restore reopened unchecked history", screen, err)
 	}
 }
 

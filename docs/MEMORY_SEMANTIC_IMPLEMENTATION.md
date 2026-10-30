@@ -143,3 +143,33 @@ rephrasing, inspected/reviewed conflict changes, concurrent added/edited records
 scope/statement mismatch, expiry, legacy aliases, missing migration metadata,
 abstract-topic retention and semantic restoration. Production tool binding,
 custom-topic review controls and historical screening are still pending.
+
+## Withdrawal owner controls
+
+The foreground save and history tools now use the Work run's budgeted model.
+History is screened at the return boundary, including titles, folder names and
+assistant replies; private classifier context is not added to foreground replay.
+No result is returned on a malformed, unavailable or stale comparison. Empty
+legacy topics are a visible migration gap and withhold unchecked history.
+
+`gator memory withdrawals [--goal ID]` lists abstract topics, pending scope/topic
+metadata and exact review revisions. To supply missing metadata, run:
+
+```sh
+gator memory withdrawals review ID --scope personal --expected REVISION --topic "the user's keyboard preferences"
+# For a goal: --scope goal --goal GOAL_ID
+```
+
+This retains no deleted fact value and does not restore its use. Known scopes
+cannot be moved. A custom forget can approve its topic in one guarded command:
+
+```sh
+gator memory forget MEMORY_ID --topic "the user's keyboard preferences" --expected-updated TIMESTAMP
+```
+
+In chat, unfamiliar attributes can get a generated abstract-topic proposal, with
+the exact retained wording shown for host review. Declining still forgets the
+saved fact and leaves metadata pending. Topic generation never publishes a rule
+on its own. Restore uses an explicit new memory request, retains the historical
+cutoff and keeps old tracked source chats suppressed. Lifecycle tests verify
+that abstract rules also survive backup/restore.

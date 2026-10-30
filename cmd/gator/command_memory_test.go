@@ -44,6 +44,43 @@ func TestMemoryReconcileCLIUsesReviewedRevisions(t *testing.T) {
 	}
 }
 
+func TestMemoryWithdrawalsCLIReviewsMetadataWithExactRevision(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("GATOR_STATE_DIR", root)
+	store, _ := memory.Open(root)
+	r, err := store.RememberChat(memory.ChatInput{Subject: "equipment.keyboard", Kind: "fact", Quote: "I use a split keyboard.", ConversationID: "work-source", RunID: "run-source"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := memoryCommand([]string{"forget", r.ID}, &out); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	if err := memoryCommand([]string{"withdrawals"}, &out); err != nil || strings.Contains(out.String(), "split keyboard") || !strings.Contains(out.String(), `"migration_pending":true`) {
+		t.Fatal(out.String(), err)
+	}
+	var listing struct {
+		Withdrawals []struct{ ID, Revision string }
+	}
+	if err := json.Unmarshal(out.Bytes(), &listing); err != nil || len(listing.Withdrawals) != 1 {
+		t.Fatal(listing, err)
+	}
+	w := listing.Withdrawals[0]
+	args := []string{"withdrawals", "review", w.ID, "--scope", "personal", "--expected", w.Revision, "--topic", "the user's keyboard preferences"}
+	out.Reset()
+	if err := memoryCommand(args, &out); err != nil {
+		t.Fatal(err)
+	}
+	if err := memoryCommand(args, &out); err == nil {
+		t.Fatal("stale revision replay accepted")
+	}
+	out.Reset()
+	if err := memoryCommand([]string{"withdrawals"}, &out); err != nil || !strings.Contains(out.String(), `"migration_pending":false`) || strings.Contains(out.String(), "split keyboard") {
+		t.Fatal(out.String(), err)
+	}
+}
+
 func TestMemoryReviewAndConfirmationCLI(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("GATOR_STATE_DIR", dir)

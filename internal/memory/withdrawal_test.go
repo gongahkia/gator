@@ -129,3 +129,57 @@ func TestApprovedTopicIsRevisionGuardedAndEntersSnapshotIdentity(t *testing.T) {
 		t.Fatal("changed withdrawal did not invalidate comparison", err)
 	}
 }
+
+func TestWithdrawalReviewMigratesUnknownLegacyMetadataWithoutRestoringHistory(t *testing.T) {
+	s, _ := Open(t.TempDir())
+	if err := blockMarker(s.subjectPath("", "equipment.keyboard")); err != nil {
+		t.Fatal(err)
+	}
+	rules, err := s.WithdrawalRules("")
+	if err != nil || len(rules) != 1 || !rules[0].ScopeUnknown {
+		t.Fatal(rules, err)
+	}
+	before := rules[0]
+	if _, err := s.ReviewWithdrawal(before.ID, strings.Repeat("0", 64), "", "the user's keyboard preferences"); err == nil {
+		t.Fatal("stale review accepted")
+	}
+	after, err := s.ReviewWithdrawal(before.ID, WithdrawalRevision(before), "", "the user's keyboard preferences")
+	if err != nil || after.ScopeUnknown || after.Topic == "" || !after.ForgottenAt.Equal(before.ForgottenAt) || !after.RestoredAt.IsZero() {
+		t.Fatal(after, err)
+	}
+	if _, err := s.ReviewWithdrawal(before.ID, WithdrawalRevision(before), "", "another attribute"); err == nil {
+		t.Fatal("old review replayed")
+	}
+	if _, err := s.ReviewWithdrawal(after.ID, WithdrawalRevision(after), "goal-0123456789abcdef01234567", "another attribute"); err == nil {
+		t.Fatal("known scope moved")
+	}
+	reopened, _ := Open(filepath.Dir(filepath.Dir(s.root)))
+	rules, err = reopened.WithdrawalRules("")
+	if err != nil || len(rules) != 1 || rules[0].ScopeUnknown || rules[0].Derived {
+		t.Fatal("migration did not persist", rules, err)
+	}
+	if snapshot, err := s.SemanticSnapshot("", nil); err != nil || !snapshot.Complete {
+		t.Fatal("migration gap remained", snapshot, err)
+	}
+}
+
+func TestWithdrawalTopicSuggestionIsProposalOnlyAndStrictlyParsed(t *testing.T) {
+	s, _ := Open(t.TempDir())
+	r := reconciliationRecord(t, s, "equipment.keyboard", "I use a split keyboard.", "work-source", "")
+	if topic, err := s.WithdrawalTopic(r.ID, r.UpdatedAt.Format(time.RFC3339Nano)); err != nil || topic != "" {
+		t.Fatal(topic, err)
+	}
+	for _, response := range []string{`{"topic":"the user's keyboard preferences"}`, `{"topic":"I use a split keyboard."}`, `{"topic":"attribute","value":"split"}`, `{"topic":"attribute"}{}`, `{"topic":""}`} {
+		model := &semanticFixture{response: response}
+		topic, err := SuggestWithdrawalTopic(context.Background(), model, r)
+		if (response == `{"topic":"the user's keyboard preferences"}`) != (err == nil && topic != "") {
+			t.Fatal(topic, err)
+		}
+	}
+	if _, err := s.Load(r.ID); err != nil {
+		t.Fatal("proposal removed fact", err)
+	}
+	if rules, err := s.WithdrawalRules(""); err != nil || len(rules) != 0 {
+		t.Fatal("proposal published a rule", rules, err)
+	}
+}

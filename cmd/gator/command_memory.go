@@ -35,6 +35,9 @@ const memoryUsage = `Gator memory — explicit, inspectable personal knowledge
   gator memory reconcile --keep ID [--aliases LABEL,LABEL] ID=TIMESTAMP [ID=TIMESTAMP ...]
   gator memory correct ID [--source-file PATH] TEXT
   gator memory forget ID
+  gator memory forget ID --topic "the user's abstract attribute" --expected-updated TIMESTAMP
+  gator memory withdrawals [--goal ID]
+  gator memory withdrawals review ID --scope personal|goal --goal ID --expected REVISION --topic TOPIC
   gator memory embeddings status
   gator memory embeddings set ollama|openai|gemini [--allow-upload]
   gator memory embeddings install --yes
@@ -56,6 +59,8 @@ func memoryCommand(args []string, out io.Writer) error {
 		return err
 	}
 	switch args[0] {
+	case "withdrawals":
+		return memoryWithdrawalsCommand(store, args[1:], out)
 	case "reconcile":
 		flags := flag.NewFlagSet("memory reconcile", flag.ContinueOnError)
 		flags.SetOutput(io.Discard)
@@ -299,17 +304,78 @@ func memoryCommand(args []string, out io.Writer) error {
 		_, err = fmt.Fprintf(out, "Corrected %s.\n", record.ID)
 		return err
 	case "forget":
-		if len(args) != 2 {
-			return errors.New("usage: gator memory forget ID")
+		if len(args) < 2 {
+			return errors.New("usage: gator memory forget ID [--topic TOPIC --expected-updated TIMESTAMP]")
 		}
-		if err := store.Forget(args[1]); err != nil {
+		flags := flag.NewFlagSet("memory forget", flag.ContinueOnError)
+		flags.SetOutput(io.Discard)
+		topic := flags.String("topic", "", "approved abstract attribute; omit the forgotten value")
+		updated := flags.String("expected-updated", "", "inspected memory revision")
+		if err := flags.Parse(args[2:]); err != nil {
 			return err
 		}
-		_, err = fmt.Fprintf(out, "Forgot %s.\n", args[1])
+		if len(flags.Args()) != 0 || (*topic == "") != (*updated == "") {
+			return errors.New("supply --topic and --expected-updated together")
+		}
+		if *topic != "" {
+			err = store.ForgetWithTopic(args[1], *updated, *topic)
+		} else {
+			err = store.Forget(args[1])
+		}
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(out, "Forgot %s. Inspect retained abstract withdrawal topics with: gator memory withdrawals\n", args[1])
 		return err
 	default:
 		return fmt.Errorf("unknown memory command %q", args[0])
 	}
+}
+
+func memoryWithdrawalsCommand(store memory.Store, args []string, out io.Writer) error {
+	review := len(args) > 0 && args[0] == "review"
+	id := ""
+	if review {
+		if len(args) < 2 {
+			return errors.New("usage: gator memory withdrawals review ID --scope personal|goal [--goal ID] --expected REVISION --topic TOPIC")
+		}
+		id, args = args[1], args[2:]
+	}
+	flags := flag.NewFlagSet("memory withdrawals", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	goalID := flags.String("goal", "", "goal ID")
+	scope := flags.String("scope", "", "explicit scope for reviewed legacy metadata")
+	expected := flags.String("expected", "", "inspected withdrawal revision")
+	topic := flags.String("topic", "", "abstract attribute without the forgotten value")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if len(flags.Args()) != 0 {
+		return errors.New("unexpected withdrawal arguments")
+	}
+	if review {
+		if (*scope != "personal" && *scope != "goal") || (*scope == "goal" && *goalID == "") || (*scope == "personal" && *goalID != "") {
+			return errors.New("choose --scope personal, or --scope goal --goal ID")
+		}
+		rule, err := store.ReviewWithdrawal(id, *expected, *goalID, *topic)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(out, "Reviewed withdrawal %s. Historical barriers preserved; no fact was restored.\n", rule.ID)
+		return err
+	}
+	if *scope != "" || *expected != "" || *topic != "" {
+		return errors.New("metadata changes require withdrawals review ID")
+	}
+	rules, err := store.WithdrawalRules(*goalID)
+	if err != nil {
+		return err
+	}
+	var entries []map[string]any
+	for _, rule := range rules {
+		entries = append(entries, map[string]any{"id": rule.ID, "scope": rule.Scope, "scope_unknown": rule.ScopeUnknown, "topic": rule.Topic, "forgotten_at": rule.ForgottenAt, "restored_at": rule.RestoredAt, "migration_pending": rule.ScopeUnknown || rule.Topic == "", "revision": memory.WithdrawalRevision(rule)})
+	}
+	return json.NewEncoder(out).Encode(map[string]any{"withdrawals": entries, "notice": "Abstract topics only; fact values are not retained. Pending metadata withholds unchecked historical context. Review a topic without repeating the forgotten value; explicit new memory requests restore the topic without reopening old sources."})
 }
 
 func memoryEmbeddingsCommand(args []string, out io.Writer) error {

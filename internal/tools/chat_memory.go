@@ -184,10 +184,37 @@ func (t forgetChat) Execute(ctx context.Context, raw json.RawMessage) (agent.Too
 	if err = ctx.Err(); err != nil {
 		return agent.ToolResult{}, err
 	}
-	if err = t.Store.ForgetReviewed(a.ID, a.ExpectedUpdated); err != nil {
+	topic, err := t.Store.WithdrawalTopic(a.ID, a.ExpectedUpdated)
+	if err != nil {
 		return agent.ToolResult{}, err
 	}
-	content, err := success(map[string]any{"forgotten": a.ID, "history_retained": true, "known_source_chats_excluded_from_agent_retrieval": true})
+	// Deleting a fact does not depend on accepting generated metadata. Without
+	// an approved custom topic we delete it and expose a migration gap, which
+	// withholds unchecked historical context until its owner supplies a topic.
+	if topic == "" && t.Semantics != nil && t.Review != nil {
+		proposed, suggestErr := memory.SuggestWithdrawalTopic(ctx, t.Semantics, record)
+		if suggestErr == nil {
+			approved, reviewErr := t.Review(ctx, map[string]any{"setting": "memory", "action": "withdrawal_topic", "retained_topic": proposed, "effect": "Delete the saved fact and retain only this abstract topic to filter historical paraphrases. Declining still deletes the fact, but historical retrieval remains pending topic review. Do not approve wording that contains the forgotten value."})
+			if reviewErr != nil {
+				return agent.ToolResult{}, reviewErr
+			}
+			if approved {
+				topic = proposed
+			}
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return agent.ToolResult{}, err
+	}
+	if topic != "" {
+		err = t.Store.ForgetWithTopic(a.ID, a.ExpectedUpdated, topic)
+	} else {
+		err = t.Store.ForgetReviewed(a.ID, a.ExpectedUpdated)
+	}
+	if err != nil {
+		return agent.ToolResult{}, err
+	}
+	content, err := success(map[string]any{"forgotten": a.ID, "history_retained": true, "known_source_chats_excluded_from_agent_retrieval": true, "withdrawal_migration_pending": topic == "", "retained_abstract_topic": topic})
 	return agent.ToolResult{Content: content}, err
 }
 
