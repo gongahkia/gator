@@ -1,0 +1,988 @@
+{
+  "outcomes": {
+    "completed": 3
+  },
+  "version": 1,
+  "id": "learning-km-live-v1",
+  "dataset": "learning-km-v1",
+  "dataset_sha256": "aff504e749024d62d8a15bb9b4d9ef3f37b948417acae7b3fd7456aa1be9b4ff",
+  "target": "work.v1",
+  "harness": "learning-km-eval-v1",
+  "provider": "openai",
+  "model": "gpt-5.6",
+  "split": "all",
+  "scripted": false,
+  "delegation": false,
+  "attempts": 1,
+  "trials": [
+    {
+      "metrics": {
+        "model_requests": 11,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 0,
+        "artifact_checks": 4,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/tmp/gator-learning-km-openai-20261030/state-1422726843/gator/traces/learning-km-live-v1-learning-dialogue-01-rev1/trace.json",
+      "spans": [
+        {
+          "id": "aa95fdb07dd6885d",
+          "name": "work",
+          "start": "2026-10-30T10:59:47.322943+08:00",
+          "end": "2026-10-30T03:00:21.317931Z"
+        },
+        {
+          "id": "f61c5d1decce386a",
+          "parent": "aa95fdb07dd6885d",
+          "name": "turn_started",
+          "start": "2026-10-30T10:59:47.420509+08:00",
+          "end": "2026-10-30T10:59:47.420509+08:00",
+          "step": 1
+        },
+        {
+          "id": "bf62480241171314",
+          "parent": "aa95fdb07dd6885d",
+          "name": "model_attempt",
+          "start": "2026-10-30T10:59:47.420521+08:00",
+          "end": "2026-10-30T11:00:08.970147+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 6863,
+            "output_tokens": 85,
+            "reported": true,
+            "estimated": false
+          }
+        },
+        {
+          "id": "0943c367ddaf8729",
+          "parent": "aa95fdb07dd6885d",
+          "name": "tool/list_files",
+          "start": "2026-10-30T11:00:08.970188+08:00",
+          "end": "2026-10-30T11:00:08.971052+08:00",
+          "step": 1
+        },
+        {
+          "id": "7093d7b2435d373b",
+          "parent": "aa95fdb07dd6885d",
+          "name": "tool/read_file",
+          "start": "2026-10-30T11:00:08.971059+08:00",
+          "end": "2026-10-30T11:00:08.972645+08:00",
+          "step": 1
+        },
+        {
+          "id": "121bd5cd067d8aba",
+          "parent": "aa95fdb07dd6885d",
+          "name": "turn_started",
+          "start": "2026-10-30T11:00:08.972652+08:00",
+          "end": "2026-10-30T11:00:08.972652+08:00",
+          "step": 2
+        },
+        {
+          "id": "02b167a8e541b655",
+          "parent": "aa95fdb07dd6885d",
+          "name": "model_attempt",
+          "start": "2026-10-30T11:00:08.972745+08:00",
+          "end": "2026-10-30T11:00:10.669959+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 7209,
+            "output_tokens": 31,
+            "reported": true,
+            "estimated": false
+          }
+        },
+        {
+          "id": "7c9e90f9ea07e7c5",
+          "parent": "aa95fdb07dd6885d",
+          "name": "tool/read_file",
+          "start": "2026-10-30T11:00:10.66998+08:00",
+          "end": "2026-10-30T11:00:10.670544+08:00",
+          "step": 2
+        },
+        {
+          "id": "170da1f27c674327",
+          "parent": "aa95fdb07dd6885d",
+          "name": "turn_started",
+          "start": "2026-10-30T11:00:10.670564+08:00",
+          "end": "2026-10-30T11:00:10.670564+08:00",
+          "step": 3
+        },
+        {
+          "id": "2bb98133acd349d5",
+          "parent": "aa95fdb07dd6885d",
+          "name": "model_attempt",
+          "start": "2026-10-30T11:00:10.670594+08:00",
+          "end": "2026-10-30T11:00:16.134952+08:00",
+          "step": 3,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 7633,
+            "output_tokens": 497,
+            "reported": true,
+            "estimated": false
+          }
+        },
+        {
+          "id": "bd0cb6a6f159fada",
+          "parent": "aa95fdb07dd6885d",
+          "name": "tool/write_artifact",
+          "start": "2026-10-30T11:00:16.134991+08:00",
+          "end": "2026-10-30T11:00:16.18285+08:00",
+          "step": 3
+        },
+        {
+          "id": "80f5519f1e09bd4d",
+          "parent": "aa95fdb07dd6885d",
+          "name": "turn_started",
+          "start": "2026-10-30T11:00:16.182865+08:00",
+          "end": "2026-10-30T11:00:16.182865+08:00",
+          "step": 4
+        },
+        {
+          "id": "497a2602768c2bb9",
+          "parent": "aa95fdb07dd6885d",
+          "name": "model_attempt",
+          "start": "2026-10-30T11:00:16.182964+08:00",
+          "end": "2026-10-30T11:00:17.535233+08:00",
+          "step": 4,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 8075,
+            "output_tokens": 15,
+            "reported": true,
+            "estimated": false
+          }
+        },
+        {
+          "id": "62f542e2c3af219b",
+          "parent": "aa95fdb07dd6885d",
+          "name": "tool/artifact_status",
+          "start": "2026-10-30T11:00:17.535254+08:00",
+          "end": "2026-10-30T11:00:17.535767+08:00",
+          "step": 4
+        },
+        {
+          "id": "bf7539f20e6ad371",
+          "parent": "aa95fdb07dd6885d",
+          "name": "turn_started",
+          "start": "2026-10-30T11:00:17.535771+08:00",
+          "end": "2026-10-30T11:00:17.535771+08:00",
+          "step": 5
+        },
+        {
+          "id": "146a81fd99ed7d31",
+          "parent": "aa95fdb07dd6885d",
+          "name": "model_attempt",
+          "start": "2026-10-30T11:00:17.535779+08:00",
+          "end": "2026-10-30T11:00:21.216261+08:00",
+          "step": 5,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 8207,
+            "output_tokens": 88,
+            "reported": true,
+            "estimated": false
+          }
+        },
+        {
+          "id": "d37db1ce6fef6fe5",
+          "parent": "aa95fdb07dd6885d",
+          "name": "run_finished",
+          "start": "2026-10-30T11:00:21.216759+08:00",
+          "end": "2026-10-30T11:00:21.216759+08:00",
+          "step": 5
+        },
+        {
+          "id": "71d761c04dab4c9c",
+          "parent": "aa95fdb07dd6885d",
+          "name": "artifact_seal",
+          "start": "2026-10-30T11:00:21.216838+08:00",
+          "end": "2026-10-30T11:00:21.216838+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "learning-km-live-v1-learning-dialogue-01",
+      "case_id": "learning-dialogue",
+      "case_sha256": "a28b3e1d259cf326bd8f6b19cfd067ed06064568ed657985416b822eb232072d",
+      "split": "development",
+      "family": "learning",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "kind": "file_contains",
+          "passed": true,
+          "evidence": "expected \"16\"; observed SHA-256 5636209febf732369a9f77f016688f7a758a6d49198eafb763c5f8e6d75f8906"
+        },
+        {
+          "kind": "file_contains",
+          "passed": true,
+          "evidence": "expected \"49\"; observed SHA-256 5636209febf732369a9f77f016688f7a758a6d49198eafb763c5f8e6d75f8906"
+        },
+        {
+          "kind": "file_contains",
+          "passed": true,
+          "evidence": "expected \"65\"; observed SHA-256 5636209febf732369a9f77f016688f7a758a6d49198eafb763c5f8e6d75f8906"
+        },
+        {
+          "kind": "file_contains",
+          "passed": true,
+          "evidence": "expected \"primer.md\"; observed SHA-256 5636209febf732369a9f77f016688f7a758a6d49198eafb763c5f8e6d75f8906"
+        },
+        {
+          "kind": "file_regex",
+          "passed": true,
+          "evidence": "expected \"24[.,]6\"; observed SHA-256 5636209febf732369a9f77f016688f7a758a6d49198eafb763c5f8e6d75f8906"
+        },
+        {
+          "kind": "file_regex",
+          "passed": true,
+          "evidence": "expected \"(?m)^#{1,3} \"; observed SHA-256 5636209febf732369a9f77f016688f7a758a6d49198eafb763c5f8e6d75f8906"
+        },
+        {
+          "kind": "file_contains",
+          "passed": true,
+          "evidence": "expected \"?\"; observed SHA-256 5636209febf732369a9f77f016688f7a758a6d49198eafb763c5f8e6d75f8906"
+        }
+      ],
+      "conversation_id": "work-20261030T025928-8385948a68008640",
+      "revision_id": "learning-km-live-v1-learning-dialogue-01-rev1",
+      "snapshot_id": "snap-093ae5899e154c3be50f6e5a",
+      "contract_sha256": "57e1bebb69d88ac8726c2096f955217b77984f7e9882be0b7819426da064394c",
+      "policy_sha256": "22f17ec319e1c3c39197e328b1b40ffdb38f501aae09de786c56a18c36d4bd8d",
+      "source_sha256": "705e2377df61ce0b7f133ca0aefedfe8f9eec7bdcfa5847e29e8e90a9f53c7e2",
+      "bundle_path": "/private/tmp/gator-learning-km-openai-20261030/state-1422726843/gator/workspaces/d4f169f80783d670ba0cb5a33d2c820e/learning-km-live-v1-learning-dialogue-01-rev1",
+      "usage": {
+        "unknown_requests": 0,
+        "model_requests": 11,
+        "input_tokens": 74138,
+        "output_tokens": 1879,
+        "reported": true,
+        "estimated": false
+      },
+      "duration_ms": 52855
+    },
+    {
+      "metrics": {
+        "model_requests": 12,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 0,
+        "artifact_checks": 10,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/tmp/gator-learning-km-openai-20261030/state-486213329/gator/traces/learning-km-live-v1-project-synthesis-01-rev1/trace.json",
+      "spans": [
+        {
+          "id": "7e4492d0694d679b",
+          "name": "work",
+          "start": "2026-10-30T11:00:43.039793+08:00",
+          "end": "2026-10-30T03:01:05.995758Z"
+        },
+        {
+          "id": "7f29a397e8792fc0",
+          "parent": "7e4492d0694d679b",
+          "name": "turn_started",
+          "start": "2026-10-30T11:00:43.171615+08:00",
+          "end": "2026-10-30T11:00:43.171615+08:00",
+          "step": 1
+        },
+        {
+          "id": "389a40cb3fa982e8",
+          "parent": "7e4492d0694d679b",
+          "name": "model_attempt",
+          "start": "2026-10-30T11:00:43.171633+08:00",
+          "end": "2026-10-30T11:00:45.963417+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 7737,
+            "output_tokens": 76,
+            "reported": true,
+            "estimated": false
+          }
+        },
+        {
+          "id": "e0e78870295f49bd",
+          "parent": "7e4492d0694d679b",
+          "name": "tool/list_files",
+          "start": "2026-10-30T11:00:45.963433+08:00",
+          "end": "2026-10-30T11:00:45.963762+08:00",
+          "step": 1
+        },
+        {
+          "id": "fa77cdcfb889e910",
+          "parent": "7e4492d0694d679b",
+          "name": "tool/list_files",
+          "start": "2026-10-30T11:00:45.963768+08:00",
+          "end": "2026-10-30T11:00:45.963952+08:00",
+          "step": 1
+        },
+        {
+          "id": "a7426e988b7c4455",
+          "parent": "7e4492d0694d679b",
+          "name": "turn_started",
+          "start": "2026-10-30T11:00:45.963956+08:00",
+          "end": "2026-10-30T11:00:45.963956+08:00",
+          "step": 2
+        },
+        {
+          "id": "2969f6c1e243f080",
+          "parent": "7e4492d0694d679b",
+          "name": "model_attempt",
+          "start": "2026-10-30T11:00:45.963962+08:00",
+          "end": "2026-10-30T11:00:48.260757+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 7863,
+            "output_tokens": 126,
+            "reported": true,
+            "estimated": false
+          }
+        },
+        {
+          "id": "55de29be10718d46",
+          "parent": "7e4492d0694d679b",
+          "name": "tool/read_file",
+          "start": "2026-10-30T11:00:48.260765+08:00",
+          "end": "2026-10-30T11:00:48.260945+08:00",
+          "step": 2
+        },
+        {
+          "id": "51ef9a9ff762ac8e",
+          "parent": "7e4492d0694d679b",
+          "name": "tool/read_file",
+          "start": "2026-10-30T11:00:48.260949+08:00",
+          "end": "2026-10-30T11:00:48.261065+08:00",
+          "step": 2
+        },
+        {
+          "id": "f9b3c59e2c2d5f71",
+          "parent": "7e4492d0694d679b",
+          "name": "tool/read_file",
+          "start": "2026-10-30T11:00:48.261067+08:00",
+          "end": "2026-10-30T11:00:48.261535+08:00",
+          "step": 2
+        },
+        {
+          "id": "5be6003d8d1fb87f",
+          "parent": "7e4492d0694d679b",
+          "name": "tool/read_file",
+          "start": "2026-10-30T11:00:48.26154+08:00",
+          "end": "2026-10-30T11:00:48.261994+08:00",
+          "step": 2
+        },
+        {
+          "id": "ec34cd2309fdda1e",
+          "parent": "7e4492d0694d679b",
+          "name": "turn_started",
+          "start": "2026-10-30T11:00:48.262+08:00",
+          "end": "2026-10-30T11:00:48.262+08:00",
+          "step": 3
+        },
+        {
+          "id": "e75bc0b8f703a508",
+          "parent": "7e4492d0694d679b",
+          "name": "model_attempt",
+          "start": "2026-10-30T11:00:48.262015+08:00",
+          "end": "2026-10-30T11:00:55.045487+08:00",
+          "step": 3,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 9701,
+            "output_tokens": 1000,
+            "reported": true,
+            "estimated": false
+          }
+        },
+        {
+          "id": "3a0028d058dfed2d",
+          "parent": "7e4492d0694d679b",
+          "name": "tool/write_artifact",
+          "start": "2026-10-30T11:00:55.045505+08:00",
+          "end": "2026-10-30T11:00:55.088464+08:00",
+          "step": 3
+        },
+        {
+          "id": "76227df4d4940b69",
+          "parent": "7e4492d0694d679b",
+          "name": "turn_started",
+          "start": "2026-10-30T11:00:55.088475+08:00",
+          "end": "2026-10-30T11:00:55.088475+08:00",
+          "step": 4
+        },
+        {
+          "id": "fa45c2c24a39aeae",
+          "parent": "7e4492d0694d679b",
+          "name": "model_attempt",
+          "start": "2026-10-30T11:00:55.088501+08:00",
+          "end": "2026-10-30T11:00:59.346308+08:00",
+          "step": 4,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 10654,
+            "output_tokens": 491,
+            "reported": true,
+            "estimated": false
+          }
+        },
+        {
+          "id": "0d21a5dc4cb826b6",
+          "parent": "7e4492d0694d679b",
+          "name": "tool/write_json_artifact",
+          "start": "2026-10-30T11:00:59.346332+08:00",
+          "end": "2026-10-30T11:00:59.390631+08:00",
+          "step": 4
+        },
+        {
+          "id": "120469805a44f6b1",
+          "parent": "7e4492d0694d679b",
+          "name": "turn_started",
+          "start": "2026-10-30T11:00:59.390652+08:00",
+          "end": "2026-10-30T11:00:59.390652+08:00",
+          "step": 5
+        },
+        {
+          "id": "364b705b9c342ddc",
+          "parent": "7e4492d0694d679b",
+          "name": "model_attempt",
+          "start": "2026-10-30T11:00:59.390693+08:00",
+          "end": "2026-10-30T11:01:01.782208+08:00",
+          "step": 5,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 11170,
+            "output_tokens": 15,
+            "reported": true,
+            "estimated": false
+          }
+        },
+        {
+          "id": "a4b1689363e9132f",
+          "parent": "7e4492d0694d679b",
+          "name": "tool/artifact_status",
+          "start": "2026-10-30T11:01:01.782222+08:00",
+          "end": "2026-10-30T11:01:01.782973+08:00",
+          "step": 5
+        },
+        {
+          "id": "10f3a30454870b8e",
+          "parent": "7e4492d0694d679b",
+          "name": "turn_started",
+          "start": "2026-10-30T11:01:01.782985+08:00",
+          "end": "2026-10-30T11:01:01.782985+08:00",
+          "step": 6
+        },
+        {
+          "id": "85e236fa6a15395d",
+          "parent": "7e4492d0694d679b",
+          "name": "model_attempt",
+          "start": "2026-10-30T11:01:01.783018+08:00",
+          "end": "2026-10-30T11:01:05.884571+08:00",
+          "step": 6,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 11398,
+            "output_tokens": 96,
+            "reported": true,
+            "estimated": false
+          }
+        },
+        {
+          "id": "7fc5aed565bca9c4",
+          "parent": "7e4492d0694d679b",
+          "name": "run_finished",
+          "start": "2026-10-30T11:01:05.885134+08:00",
+          "end": "2026-10-30T11:01:05.885134+08:00",
+          "step": 6
+        },
+        {
+          "id": "56e774f667f57380",
+          "parent": "7e4492d0694d679b",
+          "name": "artifact_seal",
+          "start": "2026-10-30T11:01:05.885144+08:00",
+          "end": "2026-10-30T11:01:05.885144+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "learning-km-live-v1-project-synthesis-01",
+      "case_id": "project-synthesis",
+      "case_sha256": "f184d8562def7f6880223f3a542c9658a8bf9ac99fa51c5bb3d4a86a23dd7742",
+      "split": "development",
+      "family": "project-knowledge",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "kind": "json_pointer_equals",
+          "passed": true,
+          "evidence": "JSON pointer \"/target_date\" present=true; artifact SHA-256 35612ab734ad18472c0749b0afa14a004dde89ea4e9a8cd9baf692500a0c9a86"
+        },
+        {
+          "kind": "json_pointer_equals",
+          "passed": true,
+          "evidence": "JSON pointer \"/launch_confirmed\" present=true; artifact SHA-256 35612ab734ad18472c0749b0afa14a004dde89ea4e9a8cd9baf692500a0c9a86"
+        },
+        {
+          "kind": "json_pointer_equals",
+          "passed": true,
+          "evidence": "JSON pointer \"/budget_usd\" present=true; artifact SHA-256 35612ab734ad18472c0749b0afa14a004dde89ea4e9a8cd9baf692500a0c9a86"
+        },
+        {
+          "kind": "json_pointer_equals",
+          "passed": true,
+          "evidence": "JSON pointer \"/venue_owner\" present=true; artifact SHA-256 35612ab734ad18472c0749b0afa14a004dde89ea4e9a8cd9baf692500a0c9a86"
+        },
+        {
+          "kind": "json_pointer_equals",
+          "passed": true,
+          "evidence": "JSON pointer \"/accessibility_owner\" present=true; artifact SHA-256 35612ab734ad18472c0749b0afa14a004dde89ea4e9a8cd9baf692500a0c9a86"
+        },
+        {
+          "kind": "json_pointer_equals",
+          "passed": true,
+          "evidence": "JSON pointer \"/accessibility_due\" present=true; artifact SHA-256 35612ab734ad18472c0749b0afa14a004dde89ea4e9a8cd9baf692500a0c9a86"
+        },
+        {
+          "kind": "file_contains",
+          "passed": true,
+          "evidence": "expected \"2026-11-24\"; observed SHA-256 642049e6fbd644cd49a6d8d7cf55049fa3a38a005643c37f6a9a7c6bdd9efa74"
+        },
+        {
+          "kind": "file_regex",
+          "passed": true,
+          "evidence": "expected \"(?i)(pending|unconfirmed|not approved|not confirmed)\"; observed SHA-256 642049e6fbd644cd49a6d8d7cf55049fa3a38a005643c37f6a9a7c6bdd9efa74"
+        }
+      ],
+      "conversation_id": "work-20261030T030021-e98efde761d8e47c",
+      "revision_id": "learning-km-live-v1-project-synthesis-01-rev1",
+      "snapshot_id": "snap-99f2a3db8af601e5a4a27166",
+      "contract_sha256": "e8d93ba959b64921e9078330e75751f138c2aa2809e8788858c33e7bcc377754",
+      "policy_sha256": "f42b09e0e00240160378677cbf2427b3597266080462082f31940f095821f36a",
+      "source_sha256": "07e24b5bb437ab8d88ec7408c75810ddec851e79743dc437466a9f87c0ce030e",
+      "bundle_path": "/private/tmp/gator-learning-km-openai-20261030/state-486213329/gator/workspaces/8a6b68731440ffdb709022b7dab3bfe9/learning-km-live-v1-project-synthesis-01-rev1",
+      "usage": {
+        "unknown_requests": 0,
+        "model_requests": 12,
+        "input_tokens": 98184,
+        "output_tokens": 3242,
+        "reported": true,
+        "estimated": false
+      },
+      "duration_ms": 44640
+    },
+    {
+      "metrics": {
+        "model_requests": 10,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 0,
+        "artifact_checks": 4,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/tmp/gator-learning-km-openai-20261030/state-3628574218/gator/traces/learning-km-live-v1-writing-revision-01-rev1/trace.json",
+      "spans": [
+        {
+          "id": "cacba95ca3f1015f",
+          "name": "work",
+          "start": "2026-10-30T11:01:18.469007+08:00",
+          "end": "2026-10-30T03:01:31.06526Z"
+        },
+        {
+          "id": "dcc5fb703ea6dd68",
+          "parent": "cacba95ca3f1015f",
+          "name": "turn_started",
+          "start": "2026-10-30T11:01:18.552929+08:00",
+          "end": "2026-10-30T11:01:18.552929+08:00",
+          "step": 1
+        },
+        {
+          "id": "7dcbc017cfb0cf35",
+          "parent": "cacba95ca3f1015f",
+          "name": "model_attempt",
+          "start": "2026-10-30T11:01:18.552955+08:00",
+          "end": "2026-10-30T11:01:20.998687+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 6277,
+            "output_tokens": 109,
+            "reported": true,
+            "estimated": false
+          }
+        },
+        {
+          "id": "09fa48ef565ffb37",
+          "parent": "cacba95ca3f1015f",
+          "name": "tool/list_files",
+          "start": "2026-10-30T11:01:20.998704+08:00",
+          "end": "2026-10-30T11:01:20.999107+08:00",
+          "step": 1
+        },
+        {
+          "id": "14395d8dd6debc03",
+          "parent": "cacba95ca3f1015f",
+          "name": "tool/read_file",
+          "start": "2026-10-30T11:01:20.999117+08:00",
+          "end": "2026-10-30T11:01:21.000996+08:00",
+          "step": 1
+        },
+        {
+          "id": "cee44b357256ee5f",
+          "parent": "cacba95ca3f1015f",
+          "name": "turn_started",
+          "start": "2026-10-30T11:01:21.001054+08:00",
+          "end": "2026-10-30T11:01:21.001054+08:00",
+          "step": 2
+        },
+        {
+          "id": "fa988b01b8a7c00f",
+          "parent": "cacba95ca3f1015f",
+          "name": "model_attempt",
+          "start": "2026-10-30T11:01:21.001092+08:00",
+          "end": "2026-10-30T11:01:22.860347+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 6561,
+            "output_tokens": 32,
+            "reported": true,
+            "estimated": false
+          }
+        },
+        {
+          "id": "28a123986fc923f8",
+          "parent": "cacba95ca3f1015f",
+          "name": "tool/read_file",
+          "start": "2026-10-30T11:01:22.860359+08:00",
+          "end": "2026-10-30T11:01:22.860621+08:00",
+          "step": 2
+        },
+        {
+          "id": "a9a79d2938c097e7",
+          "parent": "cacba95ca3f1015f",
+          "name": "turn_started",
+          "start": "2026-10-30T11:01:22.860626+08:00",
+          "end": "2026-10-30T11:01:22.860626+08:00",
+          "step": 3
+        },
+        {
+          "id": "65b791d654ca5db1",
+          "parent": "cacba95ca3f1015f",
+          "name": "model_attempt",
+          "start": "2026-10-30T11:01:22.860634+08:00",
+          "end": "2026-10-30T11:01:27.968753+08:00",
+          "step": 3,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 6882,
+            "output_tokens": 531,
+            "reported": true,
+            "estimated": false
+          }
+        },
+        {
+          "id": "f4ea68c15ffa97ba",
+          "parent": "cacba95ca3f1015f",
+          "name": "tool/write_artifact",
+          "start": "2026-10-30T11:01:27.968773+08:00",
+          "end": "2026-10-30T11:01:28.015319+08:00",
+          "step": 3
+        },
+        {
+          "id": "1d43a24d8c3ef515",
+          "parent": "cacba95ca3f1015f",
+          "name": "turn_started",
+          "start": "2026-10-30T11:01:28.015333+08:00",
+          "end": "2026-10-30T11:01:28.015333+08:00",
+          "step": 4
+        },
+        {
+          "id": "e21ae0d6d1fabc1e",
+          "parent": "cacba95ca3f1015f",
+          "name": "model_attempt",
+          "start": "2026-10-30T11:01:28.015361+08:00",
+          "end": "2026-10-30T11:01:29.55932+08:00",
+          "step": 4,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 7095,
+            "output_tokens": 29,
+            "reported": true,
+            "estimated": false
+          }
+        },
+        {
+          "id": "3dc6c5271624921d",
+          "parent": "cacba95ca3f1015f",
+          "name": "tool/artifact_status",
+          "start": "2026-10-30T11:01:29.559352+08:00",
+          "end": "2026-10-30T11:01:29.559657+08:00",
+          "step": 4
+        },
+        {
+          "id": "cf5139acbdecdd4f",
+          "parent": "cacba95ca3f1015f",
+          "name": "turn_started",
+          "start": "2026-10-30T11:01:29.559661+08:00",
+          "end": "2026-10-30T11:01:29.559661+08:00",
+          "step": 5
+        },
+        {
+          "id": "3e8875a4c8851c38",
+          "parent": "cacba95ca3f1015f",
+          "name": "model_attempt",
+          "start": "2026-10-30T11:01:29.55967+08:00",
+          "end": "2026-10-30T11:01:30.969369+08:00",
+          "step": 5,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 7229,
+            "output_tokens": 57,
+            "reported": true,
+            "estimated": false
+          }
+        },
+        {
+          "id": "98aed009c5886409",
+          "parent": "cacba95ca3f1015f",
+          "name": "run_finished",
+          "start": "2026-10-30T11:01:30.970038+08:00",
+          "end": "2026-10-30T11:01:30.970038+08:00",
+          "step": 5
+        },
+        {
+          "id": "06cf8648bd8734c9",
+          "parent": "cacba95ca3f1015f",
+          "name": "artifact_seal",
+          "start": "2026-10-30T11:01:30.970052+08:00",
+          "end": "2026-10-30T11:01:30.970052+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "learning-km-live-v1-writing-revision-01",
+      "case_id": "writing-revision",
+      "case_sha256": "b0d957b7e1fb1e8e0d90ad252845e41dabb935639642d4ef0284207cd19363b7",
+      "split": "held-out",
+      "family": "writing",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "kind": "file_regex",
+          "passed": true,
+          "evidence": "expected \"(?i)(propos|pending approval|subject to approval)\"; observed SHA-256 f33f1f47bededaa0f2c8cc93de81a76db288e09ae22c1a6d32367b32f46706f5"
+        },
+        {
+          "kind": "file_regex",
+          "passed": true,
+          "evidence": "expected \"(?i)(not open|not yet open|aren.t open)\"; observed SHA-256 f33f1f47bededaa0f2c8cc93de81a76db288e09ae22c1a6d32367b32f46706f5"
+        },
+        {
+          "kind": "file_excludes",
+          "passed": true,
+          "evidence": "expected \"Project Pine\"; observed SHA-256 f33f1f47bededaa0f2c8cc93de81a76db288e09ae22c1a6d32367b32f46706f5"
+        },
+        {
+          "kind": "file_excludes",
+          "passed": true,
+          "evidence": "expected \"7,500\"; observed SHA-256 f33f1f47bededaa0f2c8cc93de81a76db288e09ae22c1a6d32367b32f46706f5"
+        },
+        {
+          "kind": "file_regex",
+          "passed": true,
+          "evidence": "expected \"(?m)^# \"; observed SHA-256 f33f1f47bededaa0f2c8cc93de81a76db288e09ae22c1a6d32367b32f46706f5"
+        },
+        {
+          "kind": "file_regex",
+          "passed": true,
+          "evidence": "expected \"(?m)^## \"; observed SHA-256 f33f1f47bededaa0f2c8cc93de81a76db288e09ae22c1a6d32367b32f46706f5"
+        },
+        {
+          "kind": "file_regex",
+          "passed": true,
+          "evidence": "expected \"(?i)(contact|express interest)\"; observed SHA-256 f33f1f47bededaa0f2c8cc93de81a76db288e09ae22c1a6d32367b32f46706f5"
+        }
+      ],
+      "conversation_id": "work-20261030T030106-53000ae87a013c50",
+      "revision_id": "learning-km-live-v1-writing-revision-01-rev1",
+      "snapshot_id": "snap-17176d805dbf8cb8e88003b7",
+      "contract_sha256": "a7eaedaa89aad75e8f760ede28e95f115cf33f21549e5e5ad9099609203dc4bf",
+      "policy_sha256": "843816fd3e6c9c8428775fdbbdb37d2962f7ef79e7ecd66cce26446247811047",
+      "source_sha256": "b474e3ebfde4b70d4faeb85fb9d3a77f81f12527b5893f28d4ce56209ed51ce9",
+      "bundle_path": "/private/tmp/gator-learning-km-openai-20261030/state-3628574218/gator/workspaces/ba3f5635418152ce5a81d487ff2ad23c/learning-km-live-v1-writing-revision-01-rev1",
+      "usage": {
+        "unknown_requests": 0,
+        "model_requests": 10,
+        "input_tokens": 62842,
+        "output_tokens": 1246,
+        "reported": true,
+        "estimated": false
+      },
+      "duration_ms": 25018
+    }
+  ],
+  "categories": {
+    "success": 3
+  },
+  "passed": 3,
+  "total": 3,
+  "cases_at_least_one": 3,
+  "cases_all": 3
+}

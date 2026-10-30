@@ -110,7 +110,11 @@ Local affected race suites pass for memory, tools, retrieval, personalization,
 lifecycle, workapp and workrun. Focused command memory/recall/maintenance tests
 and terminal memory/restart tests also pass. Production Executor tests verify
 shared budgets and that private classifier context never enters retained replay.
-Native CI status is recorded separately when the final checkpoint completes.
+[Native CI run 40995174776](https://github.com/gongahkia/gator/actions/runs/40995174776)
+passes Windows, Linux, Intel macOS and ARM macOS at product checkpoint
+`4ab982826`, including native memory/lifecycle suites, terminal UI, installation,
+upgrade/rollback and Unix terminal handoff. Later benchmark-only files are
+validated separately and do not change the packaged product paths.
 
 Comparison currently caps at 128 candidates / 64 KiB of candidate JSON; larger
 or excluded incomplete profiles require review rather than a sampled claim of

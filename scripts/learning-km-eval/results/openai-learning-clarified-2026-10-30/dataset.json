@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "id": "learning-km-v1",
+  "target": "work.v1",
+  "cases": [
+    {
+      "fixture_sha256": "1467c5ee393445442b02eb81128333bf57c25d1c698795ca819537a1fa36bdde",
+      "id": "learning-dialogue",
+      "family": "learning",
+      "split": "development",
+      "source": "sources/learning-dialogue",
+      "objective": "Teach me how base rates affect fault alerts using primer.md. Create lesson.md with short descriptive sections, an understandable worked example using 1,000 devices, and one check-your-understanding question. Aim for 180–240 words. Cite the source; distinguish the two denominators. Do not just summarize the file.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "lesson.md",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          }
+        ],
+        "max_artifact_bytes": 1048576,
+        "max_total_bytes": 4194304,
+        "external_actions": "forbid"
+      },
+      "mode": "draft",
+      "max_steps": 18,
+      "limits": {
+        "model_requests": 24,
+        "tokens": 50000,
+        "wall_seconds": 120
+      },
+      "code": {
+        "MaxSteps": 0,
+        "Verification": null,
+        "Scopes": null,
+        "Profile": "",
+        "Setup": null,
+        "AllowedCommands": null,
+        "AllowedCommandPrefixes": null,
+        "Sandbox": {},
+        "Capabilities": null,
+        "BrowserSession": ""
+      },
+      "capabilities": [],
+      "script": [],
+      "followups": [
+        {
+          "objective": "For the original source example with 20 faulty and 980 sound devices (not a changed-base-rate practice question), my answer is that 80% of alerts are real faults because the detector flags 80% of faulty devices. Revise lesson.md with kind but accurate feedback on my answer, the correct calculation to roughly two decimal places, and a fresh practice question. Keep it clear for a beginner; do not call my incorrect answer correct.",
+          "parent": 0,
+          "refresh": false,
+          "script": []
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "path": "lesson.md",
+          "expected": "16"
+        },
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "path": "lesson.md",
+          "expected": "49"
+        },
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "path": "lesson.md",
+          "expected": "65"
+        },
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "path": "lesson.md",
+          "expected": "primer.md"
+        },
+        {
+          "version": 1,
+          "kind": "file_regex",
+          "path": "lesson.md",
+          "expected": "24[.,]6"
+        },
+        {
+          "version": 1,
+          "kind": "file_regex",
+          "path": "lesson.md",
+          "expected": "(?m)^#{1,3} "
+        },
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "path": "lesson.md",
+          "expected": "?"
+        }
+      ]
+    }
+  ]
+}

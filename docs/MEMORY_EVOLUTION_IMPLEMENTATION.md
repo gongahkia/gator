@@ -1,5 +1,7 @@
 # Evolving memory implementation
 
+Current semantic/history implementation and live evidence: [semantic memory](MEMORY_SEMANTIC_IMPLEMENTATION.md). This file preserves the earlier implementation history.
+
 User request, 29 October 2026: resolve all six findings from the current memory
 audit, including working passive capture and proactive maintenance/use. Preserve
 the broader competitive-gap goal and monitor the terminal platform run alongside

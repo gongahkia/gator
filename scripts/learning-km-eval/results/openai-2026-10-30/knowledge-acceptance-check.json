@@ -1,0 +1,31 @@
+{
+  "scope": "Synthetic owner acceptance through the actual CLI; no real profile was touched",
+  "exit_code": 0,
+  "stdout": "Accepted suggestion-15e7456e8a02eb0ed3eac5c5. Result: note-15e7456e8a02eb0ed3eac5c5\n",
+  "stderr": "",
+  "notes_after": [
+    {
+      "version": 1,
+      "id": "note-3aeed57a9bb098bbcce62af2",
+      "kind": "note",
+      "title": "Community workshop project",
+      "created_at": "2026-10-30T03:02:00.95309Z",
+      "updated_at": "2026-10-30T03:02:00.95309Z",
+      "body": "Target date: 2026-11-20. Status: proposed; budget unapproved."
+    },
+    {
+      "version": 1,
+      "id": "note-15e7456e8a02eb0ed3eac5c5",
+      "kind": "note",
+      "title": "Update existing note: Community workshop project",
+      "source_refs": [
+        "Saved note note-3aeed57a9bb098bbcce62af2 \u2014 \u201cCommunity workshop project\u201d \u2014 updated 2026-10-30T03:02:00.95309Z",
+        "work:work-20261030T030201-40dcd83c54b3"
+      ],
+      "created_at": "2026-10-30T03:04:45.80678Z",
+      "updated_at": "2026-10-30T03:04:45.80678Z",
+      "body": "Apply this correction to the existing saved note `note-3aeed57a9bb098bbcce62af2` (do not create a new note):\n\nTarget date: 2026-11-24. Status: proposed; budget unapproved.\n\nPreserve the note's identity and existing source history. This is project knowledge, not personal profile memory."
+    }
+  ],
+  "original_note_updated": false
+}

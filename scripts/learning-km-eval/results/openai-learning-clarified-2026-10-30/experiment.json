@@ -1,0 +1,334 @@
+{
+  "outcomes": {
+    "completed": 1
+  },
+  "version": 1,
+  "id": "learning-km-live-v1",
+  "dataset": "learning-km-v1",
+  "dataset_sha256": "386d3a9a1d09c5b3733c39b897f08344cc3dfcb40fe0357175a146c1664deb41",
+  "target": "work.v1",
+  "harness": "learning-km-eval-v1",
+  "provider": "openai",
+  "model": "gpt-5.6",
+  "split": "all",
+  "scripted": false,
+  "delegation": false,
+  "attempts": 1,
+  "trials": [
+    {
+      "metrics": {
+        "model_requests": 10,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 0,
+        "artifact_checks": 4,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/tmp/gator-learning-km-learning-clarified-20261030/state-4250582026/gator/traces/learning-km-live-v1-learning-dialogue-01-rev1/trace.json",
+      "spans": [
+        {
+          "id": "aa95fdb07dd6885d",
+          "name": "work",
+          "start": "2026-10-30T11:08:36.765213+08:00",
+          "end": "2026-10-30T03:08:49.168288Z"
+        },
+        {
+          "id": "f61c5d1decce386a",
+          "parent": "aa95fdb07dd6885d",
+          "name": "turn_started",
+          "start": "2026-10-30T11:08:37.018832+08:00",
+          "end": "2026-10-30T11:08:37.018832+08:00",
+          "step": 1
+        },
+        {
+          "id": "bf62480241171314",
+          "parent": "aa95fdb07dd6885d",
+          "name": "model_attempt",
+          "start": "2026-10-30T11:08:37.018844+08:00",
+          "end": "2026-10-30T11:08:38.825854+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 6484,
+            "output_tokens": 81,
+            "reported": true,
+            "estimated": false
+          }
+        },
+        {
+          "id": "0943c367ddaf8729",
+          "parent": "aa95fdb07dd6885d",
+          "name": "tool/list_files",
+          "start": "2026-10-30T11:08:38.825916+08:00",
+          "end": "2026-10-30T11:08:38.826459+08:00",
+          "step": 1
+        },
+        {
+          "id": "7093d7b2435d373b",
+          "parent": "aa95fdb07dd6885d",
+          "name": "tool/list_files",
+          "start": "2026-10-30T11:08:38.826466+08:00",
+          "end": "2026-10-30T11:08:38.826794+08:00",
+          "step": 1
+        },
+        {
+          "id": "121bd5cd067d8aba",
+          "parent": "aa95fdb07dd6885d",
+          "name": "turn_started",
+          "start": "2026-10-30T11:08:38.8268+08:00",
+          "end": "2026-10-30T11:08:38.8268+08:00",
+          "step": 2
+        },
+        {
+          "id": "02b167a8e541b655",
+          "parent": "aa95fdb07dd6885d",
+          "name": "model_attempt",
+          "start": "2026-10-30T11:08:38.826808+08:00",
+          "end": "2026-10-30T11:08:40.959239+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 6602,
+            "output_tokens": 74,
+            "reported": true,
+            "estimated": false
+          }
+        },
+        {
+          "id": "7c9e90f9ea07e7c5",
+          "parent": "aa95fdb07dd6885d",
+          "name": "tool/read_file",
+          "start": "2026-10-30T11:08:40.959251+08:00",
+          "end": "2026-10-30T11:08:40.960466+08:00",
+          "step": 2
+        },
+        {
+          "id": "170da1f27c674327",
+          "parent": "aa95fdb07dd6885d",
+          "name": "tool/read_file",
+          "start": "2026-10-30T11:08:40.960503+08:00",
+          "end": "2026-10-30T11:08:40.960766+08:00",
+          "step": 2
+        },
+        {
+          "id": "2bb98133acd349d5",
+          "parent": "aa95fdb07dd6885d",
+          "name": "turn_started",
+          "start": "2026-10-30T11:08:40.960772+08:00",
+          "end": "2026-10-30T11:08:40.960772+08:00",
+          "step": 3
+        },
+        {
+          "id": "bd0cb6a6f159fada",
+          "parent": "aa95fdb07dd6885d",
+          "name": "model_attempt",
+          "start": "2026-10-30T11:08:40.960783+08:00",
+          "end": "2026-10-30T11:08:45.482568+08:00",
+          "step": 3,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 7331,
+            "output_tokens": 483,
+            "reported": true,
+            "estimated": false
+          }
+        },
+        {
+          "id": "80f5519f1e09bd4d",
+          "parent": "aa95fdb07dd6885d",
+          "name": "tool/write_artifact",
+          "start": "2026-10-30T11:08:45.482649+08:00",
+          "end": "2026-10-30T11:08:45.546498+08:00",
+          "step": 3
+        },
+        {
+          "id": "497a2602768c2bb9",
+          "parent": "aa95fdb07dd6885d",
+          "name": "turn_started",
+          "start": "2026-10-30T11:08:45.546523+08:00",
+          "end": "2026-10-30T11:08:45.546523+08:00",
+          "step": 4
+        },
+        {
+          "id": "62f542e2c3af219b",
+          "parent": "aa95fdb07dd6885d",
+          "name": "model_attempt",
+          "start": "2026-10-30T11:08:45.546558+08:00",
+          "end": "2026-10-30T11:08:47.136569+08:00",
+          "step": 4,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 7787,
+            "output_tokens": 15,
+            "reported": true,
+            "estimated": false
+          }
+        },
+        {
+          "id": "bf7539f20e6ad371",
+          "parent": "aa95fdb07dd6885d",
+          "name": "tool/artifact_status",
+          "start": "2026-10-30T11:08:47.136582+08:00",
+          "end": "2026-10-30T11:08:47.137453+08:00",
+          "step": 4
+        },
+        {
+          "id": "146a81fd99ed7d31",
+          "parent": "aa95fdb07dd6885d",
+          "name": "turn_started",
+          "start": "2026-10-30T11:08:47.137497+08:00",
+          "end": "2026-10-30T11:08:47.137497+08:00",
+          "step": 5
+        },
+        {
+          "id": "d37db1ce6fef6fe5",
+          "parent": "aa95fdb07dd6885d",
+          "name": "model_attempt",
+          "start": "2026-10-30T11:08:47.137522+08:00",
+          "end": "2026-10-30T11:08:49.069767+08:00",
+          "step": 5,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 7924,
+            "output_tokens": 82,
+            "reported": true,
+            "estimated": false
+          }
+        },
+        {
+          "id": "71d761c04dab4c9c",
+          "parent": "aa95fdb07dd6885d",
+          "name": "run_finished",
+          "start": "2026-10-30T11:08:49.070179+08:00",
+          "end": "2026-10-30T11:08:49.070179+08:00",
+          "step": 5
+        },
+        {
+          "id": "53f40898d633b7ed",
+          "parent": "aa95fdb07dd6885d",
+          "name": "artifact_seal",
+          "start": "2026-10-30T11:08:49.070248+08:00",
+          "end": "2026-10-30T11:08:49.070248+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "learning-km-live-v1-learning-dialogue-01",
+      "case_id": "learning-dialogue",
+      "case_sha256": "67e31048d576c80beb9dac1341f9a87151157b15d7976bb1fbeaf46c055fcfc0",
+      "split": "development",
+      "family": "learning",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "kind": "file_contains",
+          "passed": true,
+          "evidence": "expected \"16\"; observed SHA-256 8082d3caa84754d8b5103309675f884d4db39517c3b93f39299df20437ea108b"
+        },
+        {
+          "kind": "file_contains",
+          "passed": true,
+          "evidence": "expected \"49\"; observed SHA-256 8082d3caa84754d8b5103309675f884d4db39517c3b93f39299df20437ea108b"
+        },
+        {
+          "kind": "file_contains",
+          "passed": true,
+          "evidence": "expected \"65\"; observed SHA-256 8082d3caa84754d8b5103309675f884d4db39517c3b93f39299df20437ea108b"
+        },
+        {
+          "kind": "file_contains",
+          "passed": true,
+          "evidence": "expected \"primer.md\"; observed SHA-256 8082d3caa84754d8b5103309675f884d4db39517c3b93f39299df20437ea108b"
+        },
+        {
+          "kind": "file_regex",
+          "passed": true,
+          "evidence": "expected \"24[.,]6\"; observed SHA-256 8082d3caa84754d8b5103309675f884d4db39517c3b93f39299df20437ea108b"
+        },
+        {
+          "kind": "file_regex",
+          "passed": true,
+          "evidence": "expected \"(?m)^#{1,3} \"; observed SHA-256 8082d3caa84754d8b5103309675f884d4db39517c3b93f39299df20437ea108b"
+        },
+        {
+          "kind": "file_contains",
+          "passed": true,
+          "evidence": "expected \"?\"; observed SHA-256 8082d3caa84754d8b5103309675f884d4db39517c3b93f39299df20437ea108b"
+        }
+      ],
+      "conversation_id": "work-20261030T030824-85cef7f6bf3c28eb",
+      "revision_id": "learning-km-live-v1-learning-dialogue-01-rev1",
+      "snapshot_id": "snap-a30df969876075bc256a40a7",
+      "contract_sha256": "57e1bebb69d88ac8726c2096f955217b77984f7e9882be0b7819426da064394c",
+      "policy_sha256": "22f17ec319e1c3c39197e328b1b40ffdb38f501aae09de786c56a18c36d4bd8d",
+      "source_sha256": "705e2377df61ce0b7f133ca0aefedfe8f9eec7bdcfa5847e29e8e90a9f53c7e2",
+      "bundle_path": "/private/tmp/gator-learning-km-learning-clarified-20261030/state-4250582026/gator/workspaces/48ea409ea3dc80a5be443dfa2e82f480/learning-km-live-v1-learning-dialogue-01-rev1",
+      "usage": {
+        "unknown_requests": 0,
+        "model_requests": 10,
+        "input_tokens": 65267,
+        "output_tokens": 1533,
+        "reported": true,
+        "estimated": false
+      },
+      "duration_ms": 24843
+    }
+  ],
+  "categories": {
+    "success": 1
+  },
+  "passed": 1,
+  "total": 1,
+  "cases_at_least_one": 1,
+  "cases_all": 1
+}

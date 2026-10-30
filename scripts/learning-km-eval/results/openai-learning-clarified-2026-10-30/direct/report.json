@@ -1,0 +1,32 @@
+[
+  {
+    "case_id": "learning-dialogue",
+    "turn": 0,
+    "status": "completed",
+    "output": "learning-dialogue-turn0.md",
+    "milliseconds": 6018,
+    "usage": {
+      "unknown_requests": 0,
+      "model_requests": 1,
+      "input_tokens": 353,
+      "output_tokens": 572,
+      "reported": true,
+      "estimated": false
+    }
+  },
+  {
+    "case_id": "learning-dialogue",
+    "turn": 1,
+    "status": "completed",
+    "output": "learning-dialogue-turn1.md",
+    "milliseconds": 4791,
+    "usage": {
+      "unknown_requests": 0,
+      "model_requests": 1,
+      "input_tokens": 818,
+      "output_tokens": 436,
+      "reported": true,
+      "estimated": false
+    }
+  }
+]

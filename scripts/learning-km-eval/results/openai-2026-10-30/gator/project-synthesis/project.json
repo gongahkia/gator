@@ -1,0 +1,113 @@
+{
+  "as_of": "2026-11-02",
+  "target_date": "2026-11-24",
+  "launch_confirmed": false,
+  "budget_usd": null,
+  "venue_owner": "Jo",
+  "accessibility_owner": "Maya",
+  "accessibility_due": "2026-11-13",
+  "corrections": [
+    {
+      "field": "target_date",
+      "value": "2026-11-24",
+      "source": "User correction in current request",
+      "supersedes_source_values": [
+        "2026-11-20"
+      ]
+    },
+    {
+      "field": "accessibility_due",
+      "value": "2026-11-13",
+      "source": "User correction in current request",
+      "supersedes_source_values": [
+        "2026-11-12"
+      ]
+    },
+    {
+      "field": "venue_owner",
+      "value": "Jo",
+      "source": "User correction in current request",
+      "note": "Jo still owns venue coordination"
+    }
+  ],
+  "target_status": "proposed",
+  "target_dependencies": [
+    "Venue availability and approval",
+    "Budget approval"
+  ],
+  "decisions": [
+    {
+      "decision": "Use a printed worksheet as an offline alternative",
+      "status": "agreed"
+    },
+    {
+      "decision": "Recording",
+      "status": "undecided"
+    }
+  ],
+  "owners": [
+    {
+      "area": "venue coordination",
+      "owner": "Jo",
+      "delegated": false
+    },
+    {
+      "area": "accessibility",
+      "owner": "Maya"
+    }
+  ],
+  "next_actions": [
+    {
+      "owner": "Maya",
+      "action": "Complete the accessibility audit",
+      "due": "2026-11-13",
+      "source": "User correction in current request"
+    },
+    {
+      "owner": "Jo",
+      "action": "Confirm venue availability after receiving the supplier response",
+      "due": "2026-11-14",
+      "source": "update.md, line 4"
+    },
+    {
+      "owner": null,
+      "action": "Obtain budget approval and confirm the amount",
+      "due": null
+    },
+    {
+      "owner": null,
+      "action": "Resolve room capacity",
+      "due": null
+    },
+    {
+      "owner": null,
+      "action": "Decide whether recording will be permitted",
+      "due": null
+    }
+  ],
+  "dependencies": [
+    {
+      "dependency": "Venue availability and approval",
+      "affects": "Proposed target date"
+    },
+    {
+      "dependency": "Budget approval",
+      "affects": "Proposed target date"
+    },
+    {
+      "dependency": "Supplier response",
+      "affects": "Venue confirmation"
+    },
+    {
+      "dependency": "Room capacity resolution",
+      "affects": "Venue readiness"
+    }
+  ],
+  "open_questions": [
+    "Will the venue be available and approved for the proposed target date?",
+    "What budget amount, if any, will be approved?",
+    "What room capacity will be approved?",
+    "Will recording be approved?",
+    "Who owns the unresolved budget, room-capacity, and recording decisions?"
+  ]
+}

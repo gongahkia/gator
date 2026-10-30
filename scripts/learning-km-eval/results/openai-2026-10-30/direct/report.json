@@ -1,0 +1,92 @@
+[
+  {
+    "case_id": "learning-dialogue",
+    "turn": 0,
+    "status": "completed",
+    "output": "learning-dialogue-turn0.md",
+    "milliseconds": 5491,
+    "usage": {
+      "unknown_requests": 0,
+      "model_requests": 0,
+      "input_tokens": 353,
+      "output_tokens": 502,
+      "reported": true,
+      "estimated": false
+    }
+  },
+  {
+    "case_id": "learning-dialogue",
+    "turn": 1,
+    "status": "completed",
+    "output": "learning-dialogue-turn1.md",
+    "milliseconds": 4833,
+    "usage": {
+      "unknown_requests": 0,
+      "model_requests": 0,
+      "input_tokens": 809,
+      "output_tokens": 492,
+      "reported": true,
+      "estimated": false
+    }
+  },
+  {
+    "case_id": "project-synthesis",
+    "turn": 0,
+    "status": "completed",
+    "output": "project-synthesis-turn0.md",
+    "milliseconds": 5173,
+    "usage": {
+      "unknown_requests": 0,
+      "model_requests": 0,
+      "input_tokens": 338,
+      "output_tokens": 678,
+      "reported": true,
+      "estimated": false
+    }
+  },
+  {
+    "case_id": "project-synthesis",
+    "turn": 1,
+    "status": "completed",
+    "output": "project-synthesis-turn1.md",
+    "milliseconds": 4691,
+    "usage": {
+      "unknown_requests": 0,
+      "model_requests": 0,
+      "input_tokens": 909,
+      "output_tokens": 595,
+      "reported": true,
+      "estimated": false
+    }
+  },
+  {
+    "case_id": "writing-revision",
+    "turn": 0,
+    "status": "completed",
+    "output": "writing-revision-turn0.md",
+    "milliseconds": 6105,
+    "usage": {
+      "unknown_requests": 0,
+      "model_requests": 0,
+      "input_tokens": 298,
+      "output_tokens": 543,
+      "reported": true,
+      "estimated": false
+    }
+  },
+  {
+    "case_id": "writing-revision",
+    "turn": 1,
+    "status": "completed",
+    "output": "writing-revision-turn1.md",
+    "milliseconds": 3466,
+    "usage": {
+      "unknown_requests": 0,
+      "model_requests": 0,
+      "input_tokens": 619,
+      "output_tokens": 220,
+      "reported": true,
+      "estimated": false
+    }
+  }
+]

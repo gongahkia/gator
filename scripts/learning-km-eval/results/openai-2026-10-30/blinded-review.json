@@ -1,0 +1,63 @@
+{
+  "reviewer": "Codex assistant; producer labels withheld during content review; not an independent human study",
+  "scale": "0\u20134, higher is better; manual_rework=4 means no substantive edits",
+  "reviews": [
+    {
+      "case": "learning-dialogue",
+      "label": "A",
+      "factual_support": 4,
+      "task_completion": 3,
+      "structure_and_style": 3,
+      "manual_rework": 3,
+      "notes": "Correct 20/980 groups, 16 true and 49 false alerts, 65 total, 24.62%; directly corrects the learner and supplies a fresh question. More verbose than the original 180\u2013240 word aim.",
+      "comparison_usable": false
+    },
+    {
+      "case": "learning-dialogue",
+      "label": "B",
+      "factual_support": 2,
+      "task_completion": 2,
+      "structure_and_style": 3,
+      "manual_rework": 2,
+      "notes": "Changes the original worked example to 10 faulty devices without a request, producing 13.91% instead of the requested source example\u2019s 24.62%. Arithmetic is correct for its invented variant; the learner correction should preserve the original example.",
+      "comparison_usable": false
+    },
+    {
+      "case": "project-synthesis",
+      "label": "A",
+      "factual_support": 4,
+      "task_completion": 4,
+      "structure_and_style": 2,
+      "manual_rework": 3,
+      "notes": "Preserves corrections, owners and pending approvals. Repeats status and provenance extensively and emits a much larger JSON schema than requested; useful facts are buried in repeated citations and parallel lists."
+    },
+    {
+      "case": "project-synthesis",
+      "label": "B",
+      "factual_support": 4,
+      "task_completion": 4,
+      "structure_and_style": 3,
+      "manual_rework": 4,
+      "notes": "Correct revised dates, pending status and compact requested JSON. Clearer and shorter than A. Source citations still create visual weight in the brief."
+    },
+    {
+      "case": "writing-revision",
+      "label": "A",
+      "factual_support": 3,
+      "task_completion": 4,
+      "structure_and_style": 3,
+      "manual_rework": 3,
+      "notes": "Clear public draft with example, approval qualifier and interest CTA. Adds a promise about registration details being shared after approval that the source does not explicitly make."
+    },
+    {
+      "case": "writing-revision",
+      "label": "B",
+      "factual_support": 3,
+      "task_completion": 4,
+      "structure_and_style": 3,
+      "manual_rework": 3,
+      "notes": "Clear title and sections, concrete example, pending status, no internal details. The sentence describing the next step as useful is filler; future-detail publication is an extra commitment."
+    }
+  ],
+  "amendment": "Inspection of the prior baseline turn showed that its check question changed the base rate to 10 faulty devices. The learner follow-up was ambiguous about which question it answered. The initial A/B learning comparison is therefore unsuitable for claiming an advantage; both calculations are correct for their respective assumptions. A focused rerun uses an explicit original-example follow-up."
+}
