@@ -1,6 +1,11 @@
 package main
 
 import (
+	"context"
+	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/inbox"
+	"github.com/gongahkia/gator/internal/workrun"
 	"strings"
 	"testing"
 	"time"
@@ -70,5 +75,103 @@ func TestGoalWatchContinuityScopesPendingProposals(t *testing.T) {
 	}
 	if strings.Contains(context, "aaaaaaaaaaaaaaaaaaaaaaaa") {
 		t.Fatalf("cross-goal proposal: %s", context)
+	}
+}
+
+func TestGoalWatchLocalDigestTracksEvidenceNotWording(t *testing.T) {
+	now := time.Now()
+	plan := goal.Plan{GoalID: "goal-a", Steps: []goal.Step{{ID: "step-a", Status: goal.StepPending, DueAt: now}}}
+	decision := jobs.WatchDecision{Status: "attention", Summary: "Deadline passed", Evidence: []string{"goal plan step step-a"}}
+	first := localWatchDecisionDigest(decision, plan, now, nil)
+	decision.Summary = "Please check this overdue task"
+	if first == "" || localWatchDecisionDigest(decision, plan, now, nil) != first {
+		t.Fatal("rewording changed concern identity")
+	}
+	decision.Urgent = true
+	if localWatchDecisionDigest(decision, plan, now, nil) == first {
+		t.Fatal("urgency escalation suppressed")
+	}
+	decision.Urgent = false
+	plan.Steps[0].DueAt = now.Add(time.Hour)
+	if localWatchDecisionDigest(decision, plan, now, nil) == first {
+		t.Fatal("rescheduling suppressed")
+	}
+	decision.Evidence = []string{"source/notes.md:1"}
+	if localWatchDecisionDigest(decision, plan, now, nil) != "" {
+		t.Fatal("unfingerprinted evidence collapsed")
+	}
+}
+
+func TestGoalWatchDoesNotPresentConcurrentEditsAsCurrent(t *testing.T) {
+	for _, pause := range []bool{false, true} {
+		state := t.TempDir()
+		goals, err := goal.Open(state)
+		if err != nil {
+			t.Fatal(err)
+		}
+		record, err := goals.Add("Workshop", "", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		definition := jobs.Definition{ID: "job-watch", GoalWatch: true, GoalID: record.ID}
+		result, err := runJobProcessWith(context.Background(), definition, state, func(context.Context, string, string, string, workrun.Request) (workrun.Outcome, error) {
+			if pause {
+				_, err = goals.SetStatus(record.ID, goal.Paused)
+			} else {
+				_, err = goals.ApplyPlanChange(record.ID, goal.PlanChange{Kind: "set_outcome", Outcome: "New owner instructions"})
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			return workrun.Outcome{Manifest: artifact.Manifest{Status: artifact.Completed}, Result: agent.Result{FinalText: `{"attention":false,"summary":"Nothing changed."}`}}, nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result.WatchDecision == nil {
+			t.Fatal("missing decision")
+		}
+		if pause && (result.WatchAttention || result.Urgent) {
+			t.Fatalf("paused goal alerted: %#v", result)
+		}
+		if !pause && (result.WatchDecision.Status != "review" || !result.WatchAttention) {
+			t.Fatalf("stale conclusion accepted: %#v", result)
+		}
+	}
+}
+
+func TestGoalWatchFeedbackIsScopedAndCorrectionsAreFresh(t *testing.T) {
+	state := t.TempDir()
+	mailbox, err := inbox.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	goalID := "goal-aaaaaaaaaaaaaaaaaaaaaaaa"
+	for _, id := range []string{"job-watch", "job-other"} {
+		_, err := mailbox.Add(inbox.Entry{ID: id, Kind: "job", Title: "Update", Summary: id + " concern", JobID: id, GoalID: goalID, Status: "completed"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := mailbox.Rate(id, "noise", time.Now()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	definition := jobs.Definition{ID: "job-watch", GoalID: goalID}
+	text, err := goalWatchContinuity(state, definition, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(text, "job-watch concern") || strings.Contains(text, "job-other concern") {
+		t.Fatalf("incorrect feedback scope: %s", text)
+	}
+	if _, err := mailbox.Rate("job-watch", "clear", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	text, err = goalWatchContinuity(state, definition, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(text, "job-watch concern") {
+		t.Fatalf("withdrawn feedback retained: %s", text)
 	}
 }

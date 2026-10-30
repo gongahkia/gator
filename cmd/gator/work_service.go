@@ -526,6 +526,9 @@ func applyGoalPlanContext(stateDir string, request *workrun.Request) error {
 	}
 	for _, step := range plan.Steps {
 		line := fmt.Sprintf("- [%s] %s: %s", step.ID, step.Status, step.Title)
+		if !step.UpdatedAt.IsZero() {
+			line += " (last updated " + step.UpdatedAt.Format(time.RFC3339) + ")"
+		}
 		if !step.DueAt.IsZero() {
 			line += " (due " + step.DueAt.Format("2006-01-02T15:04Z07:00") + ")"
 		}

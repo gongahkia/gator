@@ -765,6 +765,17 @@ func runJobProcessWith(ctx context.Context, definition jobs.Definition, stateDir
 	if len(runIDs) > 0 {
 		request.RunID = runIDs[0]
 	}
+	var inspectedPlan goal.Plan
+	if definition.GoalWatch && definition.GoalID != "" {
+		goals, openErr := goal.Open(stateDir)
+		if openErr != nil {
+			return jobResult{}, openErr
+		}
+		inspectedPlan, err = goals.LoadPlan(definition.GoalID)
+		if err != nil {
+			return jobResult{}, err
+		}
+	}
 	outcome, err := execute(ctx, definition.Provider, definition.Model, stateDir, request)
 	result := jobResult{ConversationID: outcome.ConversationID, RevisionID: outcome.RevisionID, ManifestPath: outcome.Work.ManifestPath, Status: string(outcome.Manifest.Status)}
 	if err == nil && result.Status == "completed" {
@@ -772,17 +783,39 @@ func runJobProcessWith(ctx context.Context, definition jobs.Definition, stateDir
 		result.ResultSHA256 = digestJobResult(outcome.Result.FinalText, outcome.Manifest.Artifacts)
 		if definition.GoalWatch {
 			var plan goal.Plan
+			active := true
 			if definition.GoalID != "" {
-				if goals, openErr := goal.Open(stateDir); openErr == nil {
-					plan, _ = goals.LoadPlan(definition.GoalID)
+				goals, openErr := goal.Open(stateDir)
+				if openErr != nil {
+					return result, openErr
+				}
+				record, loadErr := goals.Load(definition.GoalID)
+				if loadErr != nil {
+					return result, loadErr
+				}
+				active = record.Status == goal.Active
+				plan, err = goals.LoadPlan(definition.GoalID)
+				if err != nil {
+					return result, err
 				}
 			}
 			references := newWatchReferenceSet(outcome.Manifest, definition.RuntimeWatchItems, plan, outcome.Work)
 			decision := evaluateGoalWatchResult(outcome.Result.FinalText, outcome.Result.Messages, outcome.Manifest.Artifacts, references, definition.RuntimeWatchChanges)
+			if !active {
+				decision = jobs.WatchDecision{Status: "quiet", Summary: "Goal is no longer active.", Rationale: "The owner paused or completed this goal during the check."}
+			} else if plan.Revision != inspectedPlan.Revision {
+				decision = jobs.WatchDecision{Status: "review", Summary: "The plan changed during this check; its conclusion needs a fresh review.", NextStep: "Inspect the current plan before acting on this check.", Rationale: "A concurrent plan edit invalidated the checked revision."}
+			}
 			result.WatchDecision = &decision
 			result.WatchAttention = decision.Status != "quiet"
 			result.Summary = decision.Summary
 			result.Urgent = decision.Urgent
+			rawDecision, validDecision := parseGoalWatchDecision(outcome.Result.FinalText)
+			if definition.ChangeOnly && validDecision && len(rawDecision.Evidence) == len(decision.Evidence) && len(definition.WatchSources) == 0 && len(outcome.Manifest.Artifacts) == 0 {
+				if digest := localWatchDecisionDigest(decision, plan, time.Now(), outcome.Result.Messages); digest != "" {
+					result.ResultSHA256 = digest
+				}
+			}
 		}
 	}
 	return result, err
