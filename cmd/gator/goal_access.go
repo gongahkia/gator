@@ -56,7 +56,13 @@ func probeGoalAccess(ctx context.Context, stateDir, goalID string, out io.Writer
 		if definition.GoalID != goalID || !definition.GoalWatch {
 			continue
 		}
-		pinErr := verifyGoalOAuthPins(ctx, definition, registry, credentials)
+		var pinErr error
+		for _, source := range definition.WatchSources {
+			if source.Operation != "calendar_events" {
+				pinErr = verifyGoalOAuthPins(ctx, definition, registry, credentials)
+				break
+			}
+		}
 		boundRuntime := runtime
 		boundRuntime.OAuthRefreshPins = definition.OAuthRefreshPins
 		boundRuntime.OAuthAccountPins = definition.OAuthAccountPins
@@ -65,7 +71,7 @@ func probeGoalAccess(ctx context.Context, stateDir, goalID string, out io.Writer
 			if count > 8 {
 				continue
 			}
-			if pinErr != nil {
+			if pinErr != nil && source.Operation != "calendar_events" {
 				if _, err := fmt.Fprintf(out, "  %s %s/%s: %s\n", definition.ID, source.ConnectorID, source.Operation, activityLine(pinErr.Error(), 160)); err != nil {
 					return err
 				}
@@ -89,7 +95,10 @@ func probeGoalAccess(ctx context.Context, stateDir, goalID string, out io.Writer
 	return err
 }
 
-func probeGoalWatchSource(ctx context.Context, runtime connector.Runtime, registry connector.Registry, permissions connector.PermissionSet, credentials auth.Store, source jobs.WatchSource, now time.Time) string {
+func probeGoalWatchSource(ctx context.Context, runtime connector.Runtime, registry connector.Registry, permissions connector.PermissionSet, credentials auth.Store, source jobs.WatchSource, _ time.Time) string {
+	if source.Operation == "calendar_events" {
+		return "Google Calendar support was removed; edit this follow-up to use local plan dates"
+	}
 	descriptor, found := registry.Get(source.ConnectorID)
 	if !found {
 		return "connector configuration missing; edit or disable this watch"
@@ -115,13 +124,6 @@ func probeGoalWatchSource(ctx context.Context, runtime connector.Runtime, regist
 		input = []byte(`{}`)
 	case "gmail_list":
 		input, _ = json.Marshal(map[string]any{"query": source.Query, "limit": 1})
-	case "calendar_events":
-		day := now.UTC().Truncate(24 * time.Hour)
-		input, _ = json.Marshal(map[string]any{
-			"time_min": day.Add(-24 * time.Hour).Format(time.RFC3339),
-			"time_max": day.Add(time.Duration(source.Days+1) * 24 * time.Hour).Format(time.RFC3339),
-			"limit":    1,
-		})
 	default:
 		return "unsupported selected watch operation"
 	}
@@ -159,15 +161,6 @@ func probeGoalWatchSource(ctx context.Context, runtime connector.Runtime, regist
 			return "list reachable; detail response did not match the selected message"
 		}
 		return "list and one message detail reachable"
-	case "calendar_events":
-		var listing struct {
-			Items []json.RawMessage `json:"items"`
-			Error json.RawMessage   `json:"error"`
-		}
-		if json.Unmarshal(result.Data, &listing) != nil || listing.Items == nil || listing.Error != nil {
-			return "read returned an invalid Calendar event list; inspect the connector"
-		}
-		return "event list reachable"
 	default:
 		return "JSON source reachable"
 	}

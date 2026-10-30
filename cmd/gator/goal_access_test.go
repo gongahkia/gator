@@ -34,11 +34,6 @@ func TestGoalAccessChecksSelectedReadsWithoutChangingWatchHistory(t *testing.T) 
 			_, _ = writer.Write([]byte(`{"messages":[{"id":"mail-1"}]}`))
 		case "/gmail/v1/users/me/messages/mail-1":
 			_, _ = writer.Write([]byte(`{"id":"mail-1","snippet":"private mail content"}`))
-		case "/calendar/v3/calendars/primary/events":
-			if request.URL.Query().Get("maxResults") != "1" {
-				t.Errorf("Calendar probe query = %s", request.URL.String())
-			}
-			_, _ = writer.Write([]byte(`{"items":[{"id":"event-1"}]}`))
 		default:
 			t.Errorf("unexpected probe path %s", request.URL.Path)
 			writer.WriteHeader(http.StatusNotFound)
@@ -81,10 +76,10 @@ func TestGoalAccessChecksSelectedReadsWithoutChangingWatchHistory(t *testing.T) 
 		t.Fatal(err)
 	}
 	text := output.String()
-	if !strings.Contains(text, "list and one message detail reachable") || !strings.Contains(text, "event list reachable") || strings.Contains(text, "private mail content") || strings.Contains(text, "label:offsite") {
+	if !strings.Contains(text, "list and one message detail reachable") || !strings.Contains(text, "Calendar support was removed") || strings.Contains(text, "private mail content") || strings.Contains(text, "label:offsite") {
 		t.Fatalf("goal access output = %q", text)
 	}
-	if len(requests) != 3 {
+	if len(requests) != 2 {
 		t.Fatalf("probe made %d requests: %#v", len(requests), requests)
 	}
 	history, err := jobStore.History(definition.ID, 0)

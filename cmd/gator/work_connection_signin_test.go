@@ -204,7 +204,7 @@ func TestNativeConnectionReviewRejectsStaleDisconnectAndProtectsSecrets(t *testi
 }
 
 func TestNativeConnectionChecksEachGrantedReadAndReportsPartialFailure(t *testing.T) {
-	calendarFails := true
+	driveFails := true
 	seen := map[string]int{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seen[r.URL.Path]++
@@ -213,8 +213,8 @@ func TestNativeConnectionChecksEachGrantedReadAndReportsPartialFailure(t *testin
 			_, _ = w.Write([]byte(`{"sub":"stable-account","email":"me@example.com","email_verified":true}`))
 		case "/gmail/v1/users/me/messages":
 			_, _ = w.Write([]byte(`{"messages":[]}`))
-		case "/calendar/v3/calendars/primary/events":
-			if calendarFails {
+		case "/drive/v3/files":
+			if driveFails {
 				w.WriteHeader(http.StatusForbidden)
 			} else {
 				_, _ = w.Write([]byte(`{"items":[]}`))
@@ -226,18 +226,31 @@ func TestNativeConnectionChecksEachGrantedReadAndReportsPartialFailure(t *testin
 	}))
 	defer server.Close()
 	root, d, credentials := nativeConnectionFixture(t, server.URL)
+	d.OAuthScopes += " https://www.googleapis.com/auth/drive.metadata.readonly https://www.googleapis.com/auth/calendar.events.readonly"
+	settings, err := loadSettings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings.Connectors = []connector.Descriptor{d}
+	configStore, err := config.DefaultStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := configStore.Save(settings); err != nil {
+		t.Fatal(err)
+	}
 	_ = credentials.Put(d.CredentialRef(), auth.Credential{Type: "oauth", Access: "fixture-token"})
 	controls := &connectionControls{stateDir: root}
-	_, err := controls.call(context.Background(), "verify", []string{d.ID, connectorLoginReview(d)})
-	if err == nil || !strings.Contains(err.Error(), "calendar read check failed") {
+	_, err = controls.call(context.Background(), "verify", []string{d.ID, connectorLoginReview(d)})
+	if err == nil || !strings.Contains(err.Error(), "Drive metadata read check failed") {
 		t.Fatal("partial read presented as fully healthy", err)
 	}
-	calendarFails = false
+	driveFails = false
 	screen, err := controls.call(context.Background(), "verify", []string{d.ID, connectorLoginReview(d)})
-	if err != nil || !strings.Contains(screen.Panel.Notice, "me@example.com") || !strings.Contains(screen.Panel.Notice, "email, calendar") {
+	if err != nil || !strings.Contains(screen.Panel.Notice, "me@example.com") || !strings.Contains(screen.Panel.Notice, "email, Drive metadata") {
 		t.Fatal("verification missing", err, screen.Panel.Notice)
 	}
-	if seen["/gmail/v1/users/me/messages"] != 2 || seen["/calendar/v3/calendars/primary/events"] != 2 {
+	if seen["/gmail/v1/users/me/messages"] != 2 || seen["/drive/v3/files"] != 2 || seen["/calendar/v3/calendars/primary/events"] != 0 {
 		t.Fatal("granted surfaces not checked", seen)
 	}
 }

@@ -138,7 +138,7 @@ func (d Draft) ReviewLines() []string {
 		lines = append(lines, "Updates return to the conversation where you requested this check.")
 	}
 	if d.CalendarDays > 0 {
-		lines = append(lines, fmt.Sprintf("Calendar selection: next %d days", d.CalendarDays))
+		lines = append(lines, fmt.Sprintf("Retired Calendar selection: %d days (remove before saving)", d.CalendarDays))
 	}
 	if !d.Enabled {
 		lines = append(lines, "This check remains paused after saving. Resume it explicitly when ready.")
