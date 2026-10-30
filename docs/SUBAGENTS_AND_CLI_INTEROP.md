@@ -132,6 +132,11 @@ Loop arguments select `agent`, `objective`, 1–8 `acceptance` criteria, and
 optional `max_attempts`. Each attempt returns a retained patch, which the host
 checks in a separate candidate. The independent reviewer reads that candidate
 and returns a structured verdict bound to its SHA-256. Concrete failures return
+to the same native worker conversation. The host records actual successful file
+reads and requires the reviewer to inspect every changed candidate file. For a
+deletion it requires both an observed missing candidate path and reading the
+original source. A claimed inspection in model prose does not satisfy this gate.
+Concrete failures return
 to the same native worker conversation. An unchanged failing patch stops the
 loop; exhausted budgets, invalid review verdicts, cancelled workers and uncertain
 outcomes cannot become successful completions. A success claim without a patch
@@ -157,6 +162,8 @@ the same native worker repairs it, checks pass and an independent review
 approves the exact candidate. Both patches remain retained and original source
 and verifier files stay unchanged. These are controlled repair scenarios, not
 an unbiased task-success benchmark.
+The later `completion-loop-reviewed-*` reports repeat both scenarios with the
+host-observed read gate enabled and retain `reviewed_paths` in the final attempt.
 
 ```sh
 go run ./scripts/cli-agent-eval --completion-loop --kind codex --model gpt-5.6 --base-url https://us.api.openai.com/v1
