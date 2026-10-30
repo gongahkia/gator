@@ -1,0 +1,265 @@
+{
+  "provider": "openai",
+  "model": "gpt-5.6",
+  "at": "2026-10-30T02:16:47.882841Z",
+  "scope": "Small synthetic development set using the production memory prompt and tools. Reviews are declined. No external action tools, real profile or held-out quality claim.",
+  "trials": [
+    {
+      "name": "passive preference",
+      "status": "met",
+      "passed": true,
+      "saved_count": 1,
+      "review_requests": 0,
+      "tool_calls": [
+        {
+          "id": "call_UeMNZe7z1OSGmI4wrf4dcTuM",
+          "provider_id": "fc_0123ce9f05765f53016ae3fe113df087d0b3c89308d7ede98b",
+          "name": "knowledge_search",
+          "arguments": {
+            "query": "preference.response_length concise answers",
+            "alternates": [
+              "prefers brief responses",
+              "likes concise replies"
+            ]
+          }
+        },
+        {
+          "id": "call_od68oeXhskTvWW44ufgmANyq",
+          "provider_id": "fc_0123ce9f05765f53016ae3fe12ad0c87d0b178c7d7cb152710",
+          "name": "memory_remember",
+          "arguments": {
+            "subject": "preference.response_length",
+            "kind": "preference",
+            "quote": "I prefer concise answers.",
+            "scope": "personal",
+            "explicit": false,
+            "replace_id": "",
+            "expected_updated": ""
+          }
+        }
+      ],
+      "steps": 3,
+      "milliseconds": 6002,
+      "output": "Got it—I’ll keep answers concise."
+    },
+    {
+      "name": "passive location",
+      "status": "met",
+      "passed": true,
+      "saved_count": 1,
+      "review_requests": 0,
+      "tool_calls": [
+        {
+          "id": "call_cTiTeIYV6Dq1Qj5NCHfCLhKq",
+          "provider_id": "fc_0cba8f10c3df3132016ae3fe1777cc87d0b68314273ab40afc",
+          "name": "knowledge_search",
+          "arguments": {
+            "query": "profile.city Harbor City",
+            "alternates": [
+              "where I live",
+              "home city"
+            ]
+          }
+        },
+        {
+          "id": "call_OUB3Az1qHLaYOKylVA2tmF9k",
+          "provider_id": "fc_0cba8f10c3df3132016ae3fe18bb7c87d0a9387bdd40f2c5a8",
+          "name": "memory_remember",
+          "arguments": {
+            "subject": "profile.city",
+            "kind": "fact",
+            "quote": "I live in Harbor City.",
+            "scope": "personal",
+            "explicit": false,
+            "replace_id": "",
+            "expected_updated": ""
+          }
+        }
+      ],
+      "steps": 3,
+      "milliseconds": 5351,
+      "output": "Got it—I’ll remember that you live in Harbor City."
+    },
+    {
+      "name": "changed preference",
+      "status": "met",
+      "passed": true,
+      "saved_count": 1,
+      "review_requests": 0,
+      "tool_calls": [
+        {
+          "id": "call_C6pViUYxVazvcPXcuAkaUVYU",
+          "provider_id": "fc_0f546cb692845ca9016ae3fe1cf08c87d0adc6e4f428d14a27",
+          "name": "knowledge_read",
+          "arguments": {
+            "id": "mem-126f8f2ab2629841d5ee9a76"
+          }
+        },
+        {
+          "id": "call_F8PleB2I0EhyntKueUpJo2Wk",
+          "provider_id": "fc_0f546cb692845ca9016ae3fe1e0e8c87d084048bb0dcdbb134",
+          "name": "memory_remember",
+          "arguments": {
+            "subject": "preference.response_length",
+            "kind": "preference",
+            "quote": "I prefer detailed replies.",
+            "scope": "personal",
+            "explicit": true,
+            "replace_id": "mem-126f8f2ab2629841d5ee9a76",
+            "expected_updated": "2026-10-30T02:16:59.248765Z"
+          }
+        }
+      ],
+      "steps": 3,
+      "milliseconds": 5773,
+      "output": "Got it—I’ll provide detailed replies going forward. I’ve updated your preference."
+    },
+    {
+      "name": "forget saved preference",
+      "status": "met",
+      "passed": true,
+      "saved_count": 0,
+      "review_requests": 0,
+      "tool_calls": [
+        {
+          "id": "call_KiPsLZ7jRl0zMNovlNA4Q0ls",
+          "provider_id": "fc_0a494dad23f2df93016ae3fe22523887d09149a890fa4e0faf",
+          "name": "knowledge_read",
+          "arguments": {
+            "id": "mem-8d807f67b6d0e8999f355817"
+          }
+        },
+        {
+          "id": "call_24PxLzJ09qfpYNCmGFPZv2ki",
+          "provider_id": "fc_0a494dad23f2df93016ae3fe2381d887d088e40cafcd651f8f",
+          "name": "memory_forget",
+          "arguments": {
+            "id": "mem-8d807f67b6d0e8999f355817",
+            "quote": "Forget my preference for short replies.",
+            "expected_updated": "2026-10-30T02:17:05.087841Z"
+          }
+        }
+      ],
+      "steps": 3,
+      "milliseconds": 4440,
+      "output": "Done—I’ve forgotten your preference for short replies."
+    },
+    {
+      "name": "third party",
+      "status": "met",
+      "passed": true,
+      "saved_count": 0,
+      "review_requests": 0,
+      "steps": 1,
+      "milliseconds": 1028,
+      "output": "Understood. Since that’s your colleague’s preference, I won’t save it as yours."
+    },
+    {
+      "name": "temporary",
+      "status": "met",
+      "passed": true,
+      "saved_count": 0,
+      "review_requests": 0,
+      "steps": 1,
+      "milliseconds": 984,
+      "output": "- Understood."
+    },
+    {
+      "name": "hypothetical",
+      "status": "met",
+      "passed": true,
+      "saved_count": 0,
+      "review_requests": 0,
+      "steps": 1,
+      "milliseconds": 4561,
+      "output": "You wake to gulls, foghorns, and sunlight flashing across the harbor. After coffee from a corner café, you walk or take a ferry downtown as fishing boats unload beside sleek commuter vessels.\n\nBy midday, the waterfront is lively: seafood stalls, street musicians, crowded markets, and sea air drifting between glass towers. You grab lunch—perhaps fish tacos or chowder—then spend the afternoon working, exploring maritime museums, or relaxing in a park overlooking the docks.\n\nAt sunset, the city turns golden. You meet friends on a rooftop or harbor pier, watch cargo ships glide past, and finish the evening among lantern-lit restaurants while waves tap against the seawall. Life feels urban, salty, and always connected to the water."
+    },
+    {
+      "name": "synthetic credential",
+      "status": "met",
+      "passed": true,
+      "saved_count": 0,
+      "review_requests": 0,
+      "steps": 1,
+      "milliseconds": 1625,
+      "output": "Please don’t share passwords here. I won’t save or retain it as a personal memory. If it’s real or reused anywhere, change it immediately."
+    },
+    {
+      "name": "Chinese opt out",
+      "status": "met",
+      "passed": true,
+      "saved_count": 0,
+      "review_requests": 0,
+      "steps": 1,
+      "milliseconds": 1319,
+      "output": "好的，不会保存。回答将尽量简短。"
+    },
+    {
+      "name": "Spanish opt out",
+      "status": "met",
+      "passed": true,
+      "saved_count": 0,
+      "review_requests": 0,
+      "steps": 1,
+      "milliseconds": 1667,
+      "output": "Entendido. Responderé brevemente, sin guardar esta preferencia."
+    },
+    {
+      "name": "learning disabled",
+      "status": "met",
+      "passed": true,
+      "saved_count": 0,
+      "review_requests": 0,
+      "steps": 1,
+      "milliseconds": 2079,
+      "output": "Understood. I’ll keep answers concise."
+    },
+    {
+      "name": "explicit while disabled",
+      "status": "met",
+      "passed": true,
+      "saved_count": 1,
+      "review_requests": 0,
+      "tool_calls": [
+        {
+          "id": "call_WD0QcG0fHUF9NnSt3uuaWeLw",
+          "provider_id": "fc_0091bf4fedb19924016ae3fe346e3887d0b4489f221ea22fd5",
+          "name": "knowledge_search",
+          "arguments": {
+            "query": "preference.response_length concise answers",
+            "alternates": [
+              "response length preference",
+              "brief answers preference",
+              "concise responses"
+            ]
+          }
+        },
+        {
+          "id": "call_UVgnm4I7A1AWUhBbqFEIoQrB",
+          "provider_id": "fc_0091bf4fedb19924016ae3fe3601a887d096cf85d5dff65cba",
+          "name": "memory_remember",
+          "arguments": {
+            "subject": "preference.response_length",
+            "kind": "preference",
+            "quote": "I prefer concise answers.",
+            "scope": "personal",
+            "explicit": true,
+            "replace_id": "",
+            "expected_updated": ""
+          }
+        }
+      ],
+      "steps": 3,
+      "milliseconds": 6174,
+      "output": "Remembered—you prefer concise answers."
+    }
+  ],
+  "usage": {
+    "unknown_requests": 0,
+    "model_requests": 26,
+    "input_tokens": 22489,
+    "output_tokens": 1213,
+    "reported": true,
+    "estimated": false
+  }
+}

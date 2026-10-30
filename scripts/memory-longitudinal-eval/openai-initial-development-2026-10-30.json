@@ -1,0 +1,271 @@
+{
+  "Provider": "openai",
+  "Model": "gpt-5.6",
+  "Split": "development",
+  "DatasetSHA256": "6db64def2022ab5903845a064862b60391f916f48eb6629156ade5e166de7cc8",
+  "Scope": "Synthetic longitudinal production-tool evaluation with fresh contexts/reopened stores; abstract-topic approvals simulated and recorded. No real profile, UI, external actions, or broad generalization claim.",
+  "At": "2026-10-30T02:37:13.132546Z",
+  "Scenarios": [
+    {
+      "ID": "reply-detail",
+      "Split": "development",
+      "Capture": "I prefer concise answers.",
+      "Paraphrase": "I prefer brief replies.",
+      "Correction": "I prefer detailed replies instead.",
+      "Restore": "I prefer medium-length replies.",
+      "Forget": "Forget my response-length preference.",
+      "History": [
+        {
+          "ID": "paraphrase",
+          "User": "Keep my explanations expansive; I enjoy all the detail.",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "",
+          "Blocked": true
+        },
+        {
+          "ID": "translation",
+          "User": "我喜欢详细的回答。",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "",
+          "Blocked": true
+        },
+        {
+          "ID": "assistant",
+          "User": "How should you write for me?",
+          "Assistant": "You like answers with plenty of explanation.",
+          "Title": "",
+          "Folder": "",
+          "Blocked": true
+        },
+        {
+          "ID": "title",
+          "User": "The workshop is at Orchard Hall.",
+          "Assistant": "",
+          "Title": "My preference for long answers",
+          "Folder": "",
+          "Blocked": true
+        },
+        {
+          "ID": "folder",
+          "User": "The workshop is at Orchard Hall.",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "my-detailed-reply-preference",
+          "Blocked": true
+        },
+        {
+          "ID": "unrelated",
+          "User": "The workshop is at Orchard Hall.",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "",
+          "Blocked": false
+        },
+        {
+          "ID": "other-owner",
+          "User": "My colleague prefers detailed replies.",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "",
+          "Blocked": false
+        }
+      ]
+    },
+    {
+      "ID": "home-city",
+      "Split": "held-out",
+      "Capture": "I live in Harbor City.",
+      "Paraphrase": "I live in Harbor City, my permanent home.",
+      "Correction": "I live in Birch City now.",
+      "Restore": "I live in Cedar City.",
+      "Forget": "Forget where I live.",
+      "History": [
+        {
+          "ID": "paraphrase",
+          "User": "My permanent base is Birch City.",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "",
+          "Blocked": true
+        },
+        {
+          "ID": "translation",
+          "User": "我的家在Birch City。",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "",
+          "Blocked": true
+        },
+        {
+          "ID": "assistant",
+          "User": "Where is my home?",
+          "Assistant": "You are based in Birch City.",
+          "Title": "",
+          "Folder": "",
+          "Blocked": true
+        },
+        {
+          "ID": "title",
+          "User": "The workshop is at Orchard Hall.",
+          "Assistant": "",
+          "Title": "Home in Birch City",
+          "Folder": "",
+          "Blocked": true
+        },
+        {
+          "ID": "folder",
+          "User": "The workshop is at Orchard Hall.",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "my-home-in-Birch-City",
+          "Blocked": true
+        },
+        {
+          "ID": "unrelated",
+          "User": "The workshop is at Orchard Hall.",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "",
+          "Blocked": false
+        },
+        {
+          "ID": "other-owner",
+          "User": "My colleague lives in Birch City.",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "",
+          "Blocked": false
+        }
+      ]
+    },
+    {
+      "ID": "keyboard",
+      "Split": "held-out",
+      "Capture": "I prefer split keyboards.",
+      "Paraphrase": "I prefer keyboards with separate left and right halves.",
+      "Correction": "I prefer conventional single-piece keyboards instead.",
+      "Restore": "I prefer compact keyboards.",
+      "Forget": "Forget my keyboard preference.",
+      "History": [
+        {
+          "ID": "paraphrase",
+          "User": "For my own desk I favor a standard keyboard in one piece.",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "",
+          "Blocked": true
+        },
+        {
+          "ID": "translation",
+          "User": "我喜欢传统的一体式键盘。",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "",
+          "Blocked": true
+        },
+        {
+          "ID": "assistant",
+          "User": "What keyboard suits my preference?",
+          "Assistant": "You favor a conventional one-piece board.",
+          "Title": "",
+          "Folder": "",
+          "Blocked": true
+        },
+        {
+          "ID": "title",
+          "User": "The workshop is at Orchard Hall.",
+          "Assistant": "",
+          "Title": "My preference for traditional keyboards",
+          "Folder": "",
+          "Blocked": true
+        },
+        {
+          "ID": "folder",
+          "User": "The workshop is at Orchard Hall.",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "my-keyboard-preferences",
+          "Blocked": true
+        },
+        {
+          "ID": "unrelated",
+          "User": "The workshop is at Orchard Hall.",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "",
+          "Blocked": false
+        },
+        {
+          "ID": "other-owner",
+          "User": "My colleague prefers single-piece keyboards.",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "",
+          "Blocked": false
+        }
+      ]
+    }
+  ],
+  "Trials": [
+    {
+      "id": "reply-detail",
+      "split": "development",
+      "passed": false,
+      "checks": [
+        {
+          "name": "passive capture",
+          "passed": true,
+          "milliseconds": 5436,
+          "tool_calls": [
+            {
+              "id": "call_ul0JvG5QiTXR2cQyiM0jg4vu",
+              "provider_id": "fc_0bfacf1e0fa7e1bc016ae402da9b8487d09e1c836d62bff695",
+              "name": "knowledge_search",
+              "arguments": {
+                "query": "preference.response_length concise answers",
+                "alternates": [
+                  "prefers brief responses",
+                  "short concise replies"
+                ]
+              }
+            },
+            {
+              "id": "call_c34gDkwLtKAQGpGbYywJXnsP",
+              "provider_id": "fc_0bfacf1e0fa7e1bc016ae402dbdae887d08b740e9bb5305ff5",
+              "name": "memory_remember",
+              "arguments": {
+                "subject": "preference.response_length",
+                "kind": "preference",
+                "quote": "I prefer concise answers.",
+                "scope": "personal",
+                "explicit": false,
+                "replace_id": "",
+                "expected_updated": ""
+              }
+            }
+          ],
+          "result": "Got it—I’ll keep answers concise."
+        },
+        {
+          "name": "equivalent paraphrase",
+          "passed": false,
+          "milliseconds": 2262,
+          "result": "Understood—I’ll keep replies brief.",
+          "error": "current user statement was not retained"
+        }
+      ],
+      "error": "current user statement was not retained"
+    }
+  ],
+  "Usage": {
+    "unknown_requests": 0,
+    "model_requests": 5,
+    "input_tokens": 4220,
+    "output_tokens": 232,
+    "reported": true,
+    "estimated": false
+  },
+  "Error": "reply-detail: current user statement was not retained"
+}

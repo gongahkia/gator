@@ -1,0 +1,1129 @@
+{
+  "Provider": "openai",
+  "Model": "gpt-5.6",
+  "Split": "all",
+  "DatasetSHA256": "6db64def2022ab5903845a064862b60391f916f48eb6629156ade5e166de7cc8",
+  "Scope": "Synthetic longitudinal production-tool evaluation with fresh contexts/reopened stores; abstract-topic approvals simulated and recorded. No real profile, UI, external actions, or broad generalization claim.",
+  "At": "2026-10-30T02:42:04.289371Z",
+  "Scenarios": [
+    {
+      "ID": "reply-detail",
+      "Split": "development",
+      "Capture": "I prefer concise answers.",
+      "Paraphrase": "I prefer brief replies.",
+      "Correction": "I prefer detailed replies instead.",
+      "Restore": "I prefer medium-length replies.",
+      "Forget": "Forget my response-length preference.",
+      "History": [
+        {
+          "ID": "paraphrase",
+          "User": "Keep my explanations expansive; I enjoy all the detail.",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "",
+          "Blocked": true
+        },
+        {
+          "ID": "translation",
+          "User": "我喜欢详细的回答。",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "",
+          "Blocked": true
+        },
+        {
+          "ID": "assistant",
+          "User": "How should you write for me?",
+          "Assistant": "You like answers with plenty of explanation.",
+          "Title": "",
+          "Folder": "",
+          "Blocked": true
+        },
+        {
+          "ID": "title",
+          "User": "The workshop is at Orchard Hall.",
+          "Assistant": "",
+          "Title": "My preference for long answers",
+          "Folder": "",
+          "Blocked": true
+        },
+        {
+          "ID": "folder",
+          "User": "The workshop is at Orchard Hall.",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "my-detailed-reply-preference",
+          "Blocked": true
+        },
+        {
+          "ID": "unrelated",
+          "User": "The workshop is at Orchard Hall.",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "",
+          "Blocked": false
+        },
+        {
+          "ID": "other-owner",
+          "User": "My colleague prefers detailed replies.",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "",
+          "Blocked": false
+        }
+      ]
+    },
+    {
+      "ID": "home-city",
+      "Split": "held-out",
+      "Capture": "I live in Harbor City.",
+      "Paraphrase": "I live in Harbor City, my permanent home.",
+      "Correction": "I live in Birch City now.",
+      "Restore": "I live in Cedar City.",
+      "Forget": "Forget where I live.",
+      "History": [
+        {
+          "ID": "paraphrase",
+          "User": "My permanent base is Birch City.",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "",
+          "Blocked": true
+        },
+        {
+          "ID": "translation",
+          "User": "我的家在Birch City。",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "",
+          "Blocked": true
+        },
+        {
+          "ID": "assistant",
+          "User": "Where is my home?",
+          "Assistant": "You are based in Birch City.",
+          "Title": "",
+          "Folder": "",
+          "Blocked": true
+        },
+        {
+          "ID": "title",
+          "User": "The workshop is at Orchard Hall.",
+          "Assistant": "",
+          "Title": "Home in Birch City",
+          "Folder": "",
+          "Blocked": true
+        },
+        {
+          "ID": "folder",
+          "User": "The workshop is at Orchard Hall.",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "my-home-in-Birch-City",
+          "Blocked": true
+        },
+        {
+          "ID": "unrelated",
+          "User": "The workshop is at Orchard Hall.",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "",
+          "Blocked": false
+        },
+        {
+          "ID": "other-owner",
+          "User": "My colleague lives in Birch City.",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "",
+          "Blocked": false
+        }
+      ]
+    },
+    {
+      "ID": "keyboard",
+      "Split": "held-out",
+      "Capture": "I prefer split keyboards.",
+      "Paraphrase": "I prefer keyboards with separate left and right halves.",
+      "Correction": "I prefer conventional single-piece keyboards instead.",
+      "Restore": "I prefer compact keyboards.",
+      "Forget": "Forget my keyboard preference.",
+      "History": [
+        {
+          "ID": "paraphrase",
+          "User": "For my own desk I favor a standard keyboard in one piece.",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "",
+          "Blocked": true
+        },
+        {
+          "ID": "translation",
+          "User": "我喜欢传统的一体式键盘。",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "",
+          "Blocked": true
+        },
+        {
+          "ID": "assistant",
+          "User": "What keyboard suits my preference?",
+          "Assistant": "You favor a conventional one-piece board.",
+          "Title": "",
+          "Folder": "",
+          "Blocked": true
+        },
+        {
+          "ID": "title",
+          "User": "The workshop is at Orchard Hall.",
+          "Assistant": "",
+          "Title": "My preference for traditional keyboards",
+          "Folder": "",
+          "Blocked": true
+        },
+        {
+          "ID": "folder",
+          "User": "The workshop is at Orchard Hall.",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "my-keyboard-preferences",
+          "Blocked": true
+        },
+        {
+          "ID": "unrelated",
+          "User": "The workshop is at Orchard Hall.",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "",
+          "Blocked": false
+        },
+        {
+          "ID": "other-owner",
+          "User": "My colleague prefers single-piece keyboards.",
+          "Assistant": "",
+          "Title": "",
+          "Folder": "",
+          "Blocked": false
+        }
+      ]
+    }
+  ],
+  "Trials": [
+    {
+      "id": "reply-detail",
+      "split": "development",
+      "passed": true,
+      "checks": [
+        {
+          "name": "passive capture",
+          "passed": true,
+          "milliseconds": 7771,
+          "tool_calls": [
+            {
+              "id": "call_08e8VduhPYNAfRmdclpqP01e",
+              "provider_id": "fc_035efa91361a8a67016ae403fe691c87d0a297a18ed179fe50",
+              "name": "knowledge_search",
+              "arguments": {
+                "query": "preference for concise answers or response length",
+                "alternates": [
+                  "prefers brief responses",
+                  "concise answer preference"
+                ]
+              }
+            },
+            {
+              "id": "call_ldYcoKoBwk62m0cz0vB8U8vo",
+              "provider_id": "fc_035efa91361a8a67016ae40400566c87d08f45fe01591b5ff6",
+              "name": "memory_remember",
+              "arguments": {
+                "subject": "preference.response_length",
+                "kind": "preference",
+                "quote": "I prefer concise answers.",
+                "scope": "personal",
+                "explicit": false,
+                "replace_id": "",
+                "expected_updated": ""
+              }
+            }
+          ],
+          "result": "Got it—I’ll keep answers concise."
+        },
+        {
+          "name": "equivalent paraphrase",
+          "passed": true,
+          "milliseconds": 6876,
+          "tool_calls": [
+            {
+              "id": "call_ZYqFcj9TpNxBS0madrBKSbqq",
+              "provider_id": "fc_0eb64bba607411f7016ae40405b44887d0a9253a984a1b5b27",
+              "name": "knowledge_search",
+              "arguments": {
+                "query": "preference.response_length brief replies concise answers",
+                "alternates": [
+                  "I prefer brief replies.",
+                  "I prefer concise answers.",
+                  "response length preference"
+                ]
+              }
+            },
+            {
+              "id": "call_OZA8b7Szz9c4NnDcBFs9B1FE",
+              "provider_id": "fc_0eb64bba607411f7016ae40406f25087d0ba87d618f6b66ecb",
+              "name": "knowledge_read",
+              "arguments": {
+                "id": "mem-9877c80cefdfa85f10fc52ec"
+              }
+            },
+            {
+              "id": "call_MBoQRhyMUUsYTk9inmu7s9id",
+              "provider_id": "fc_0eb64bba607411f7016ae4040825dc87d0b735ec5538030680",
+              "name": "memory_remember",
+              "arguments": {
+                "subject": "preference.response_length",
+                "kind": "preference",
+                "quote": "I prefer brief replies.",
+                "scope": "personal",
+                "explicit": false,
+                "replace_id": "mem-9877c80cefdfa85f10fc52ec",
+                "expected_updated": "2026-10-30T02:42:10.031856Z"
+              }
+            }
+          ],
+          "result": "Got it—I’ll keep replies brief."
+        },
+        {
+          "name": "inspected correction",
+          "passed": true,
+          "milliseconds": 6000,
+          "tool_calls": [
+            {
+              "id": "call_nCn4A2aM8dikphjmsLlbJaek",
+              "provider_id": "fc_0a9f39ab26c249cd016ae4040c6bb087d0bfb19b9fa2f4f98e",
+              "name": "knowledge_read",
+              "arguments": {
+                "id": "mem-9877c80cefdfa85f10fc52ec"
+              }
+            },
+            {
+              "id": "call_7fEFZCdAX6AVJWhecAQEKyuK",
+              "provider_id": "fc_0a9f39ab26c249cd016ae4040dfdc887d0bbf60f87e41f48be",
+              "name": "memory_remember",
+              "arguments": {
+                "subject": "preference.response_length",
+                "kind": "preference",
+                "quote": "I prefer detailed replies instead.",
+                "scope": "personal",
+                "explicit": true,
+                "replace_id": "mem-9877c80cefdfa85f10fc52ec",
+                "expected_updated": "2026-10-30T02:42:17.767398Z"
+              }
+            }
+          ],
+          "result": "Understood. I’ll provide detailed replies going forward, and I’ve updated your preference."
+        },
+        {
+          "name": "explicit forget",
+          "passed": true,
+          "milliseconds": 4033,
+          "tool_calls": [
+            {
+              "id": "call_gSdcS1OHtLaURCOp3HM0pue4",
+              "provider_id": "fc_0a37e1e34080a44f016ae40412a06487d0bc3de7c4374a0869",
+              "name": "knowledge_read",
+              "arguments": {
+                "id": "mem-9877c80cefdfa85f10fc52ec"
+              }
+            },
+            {
+              "id": "call_LP8j81OaAFdC3w6JiDPFcKRO",
+              "provider_id": "fc_0a37e1e34080a44f016ae40413ef3087d0915fb79b7bd8f840",
+              "name": "memory_forget",
+              "arguments": {
+                "id": "mem-9877c80cefdfa85f10fc52ec",
+                "quote": "Forget my response-length preference.",
+                "expected_updated": "2026-10-30T02:42:23.486618Z"
+              }
+            }
+          ],
+          "result": "Forgotten."
+        },
+        {
+          "name": "passive relearning refused",
+          "passed": true,
+          "milliseconds": 6294,
+          "tool_calls": [
+            {
+              "id": "call_YXATIePGVuflKsu8SID3zEgs",
+              "provider_id": "fc_0028e46b2fb0e9fc016ae4041724a887d0ae4d20306f055879",
+              "name": "knowledge_search",
+              "arguments": {
+                "query": "preference.response_length detailed replies",
+                "alternates": [
+                  "response length preference",
+                  "prefers concise or detailed answers",
+                  "verbosity preference"
+                ]
+              }
+            },
+            {
+              "id": "call_euw25rnDstjFFJ5hhgM48McS",
+              "provider_id": "fc_0028e46b2fb0e9fc016ae404187df887d0b9a303e9abf0e049",
+              "name": "memory_remember",
+              "arguments": {
+                "subject": "preference.response_length",
+                "kind": "preference",
+                "quote": "I prefer detailed replies instead.",
+                "scope": "personal",
+                "explicit": true,
+                "replace_id": "",
+                "expected_updated": ""
+              }
+            }
+          ],
+          "result": "Understood—I’ll provide more detailed replies. I couldn’t save this preference to memory, but I’ll follow it in this conversation."
+        },
+        {
+          "name": "historical privacy/paraphrase",
+          "passed": true,
+          "milliseconds": 2940,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":null,\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":1}}"
+        },
+        {
+          "name": "historical privacy/translation",
+          "passed": true,
+          "milliseconds": 1324,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":null,\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":1}}"
+        },
+        {
+          "name": "historical privacy/assistant",
+          "passed": true,
+          "milliseconds": 2005,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":null,\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":1}}"
+        },
+        {
+          "name": "historical privacy/title",
+          "passed": true,
+          "milliseconds": 1493,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":null,\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":1}}"
+        },
+        {
+          "name": "historical privacy/folder",
+          "passed": true,
+          "milliseconds": 2421,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":null,\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":1}}"
+        },
+        {
+          "name": "historical privacy/unrelated",
+          "passed": true,
+          "milliseconds": 2349,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":[{\"conversation_id\":\"work-20261030T024225-6e5af5192181b537\",\"revision_id\":\"rev-archive\",\"title\":\"Archive notes\",\"folder\":\"neutral-workspace\",\"at\":\"2026-10-30T02:42:25Z\",\"user\":\"The workshop is at Orchard Hall.\"}],\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":0}}"
+        },
+        {
+          "name": "historical privacy/other-owner",
+          "passed": true,
+          "milliseconds": 1978,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":[{\"conversation_id\":\"work-20261030T024225-d6e73366557e08cd\",\"revision_id\":\"rev-archive\",\"title\":\"Archive notes\",\"folder\":\"neutral-workspace\",\"at\":\"2026-10-30T02:42:25Z\",\"user\":\"My colleague prefers detailed replies.\"}],\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":0}}"
+        },
+        {
+          "name": "search privacy and benign recall",
+          "passed": true,
+          "milliseconds": 7132,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"matches\":[{\"conversation_id\":\"work-20261030T024225-d6e73366557e08cd\",\"revision_id\":\"rev-archive\",\"title\":\"Archive notes\",\"folder\":\"neutral-workspace\",\"at\":\"2026-10-30T02:42:25Z\",\"user\":\"My colleague prefers detailed replies.\"},{\"conversation_id\":\"work-20261030T024225-6e5af5192181b537\",\"revision_id\":\"rev-archive\",\"title\":\"Archive notes\",\"folder\":\"neutral-workspace\",\"at\":\"2026-10-30T02:42:25Z\",\"user\":\"The workshop is at Orchard Hall.\"}],\"matches_limited\":false,\"more_chats\":false,\"next_offset\":12,\"older_turns\":{},\"searched_chats\":9,\"searched_turns\":9,\"suppressed_source_chats\":3,\"suppression_reason\":\"Known source chats for forgotten memories are omitted; user-visible transcripts are retained.\",\"unavailable_chats\":{},\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":5}}"
+        },
+        {
+          "name": "explicit restoration",
+          "passed": true,
+          "milliseconds": 5683,
+          "tool_calls": [
+            {
+              "id": "call_htLMmHVgyaHLnIcUSooSz8r0",
+              "provider_id": "fc_090b16de935108ec016ae40432b86087d0be86b5ca24ec6d69",
+              "name": "knowledge_search",
+              "arguments": {
+                "query": "preferred response length",
+                "alternates": [
+                  "medium-length replies",
+                  "response length preference"
+                ]
+              }
+            },
+            {
+              "id": "call_SGnxVRlPqX2ucaoXtOHvQszR",
+              "provider_id": "fc_090b16de935108ec016ae40433d84487d0a699c11f77e7ee9a",
+              "name": "memory_remember",
+              "arguments": {
+                "subject": "preference.response_length",
+                "kind": "preference",
+                "quote": "I prefer medium-length replies.",
+                "scope": "personal",
+                "explicit": true,
+                "replace_id": "",
+                "expected_updated": ""
+              }
+            }
+          ],
+          "result": "Got it—I’ll keep my replies medium-length."
+        },
+        {
+          "name": "old history after restore/paraphrase",
+          "passed": true,
+          "milliseconds": 1519,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":null,\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":1}}"
+        },
+        {
+          "name": "old history after restore/title",
+          "passed": true,
+          "milliseconds": 1443,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":null,\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":1}}"
+        },
+        {
+          "name": "old history after restore/folder",
+          "passed": true,
+          "milliseconds": 2237,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":null,\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":1}}"
+        },
+        {
+          "name": "new context after restore/new-current-value",
+          "passed": true,
+          "milliseconds": 2,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":[{\"conversation_id\":\"work-20261030T024308-747b6155aac576c4\",\"revision_id\":\"rev-archive\",\"title\":\"Restored preference\",\"folder\":\"neutral-workspace\",\"at\":\"2026-10-30T02:43:08Z\",\"user\":\"I prefer medium-length replies.\"}],\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":0}}"
+        },
+        {
+          "name": "production Work executor capture",
+          "passed": true,
+          "milliseconds": 4607,
+          "tool_calls": [
+            {
+              "id": "call_KJeEVcHPBAt6xWLckfrnAT8o",
+              "provider_id": "fc_091c4b26ff33fba4016ae4043e11cc87d080fe6eeed46adcf2",
+              "name": "memory_remember",
+              "arguments": {
+                "subject": "preference.response_length",
+                "kind": "preference",
+                "quote": "I prefer concise answers.",
+                "scope": "personal",
+                "explicit": false,
+                "replace_id": "",
+                "expected_updated": ""
+              }
+            }
+          ],
+          "result": "work-20261030T024308-582b8743b6fa2d9e/work-20261030T024308-52575194382e"
+        }
+      ],
+      "reviews": [
+        {
+          "action": "restore",
+          "effect": "Explicitly restore this topic using the current words. Old historical sources remain suppressed.",
+          "reason": "The request's remember intent needs confirmation for a previously withdrawn topic.",
+          "saved_text": "I prefer detailed replies instead.",
+          "scope": "personal",
+          "setting": "memory"
+        }
+      ]
+    },
+    {
+      "id": "home-city",
+      "split": "held-out",
+      "passed": true,
+      "checks": [
+        {
+          "name": "passive capture",
+          "passed": true,
+          "milliseconds": 6862,
+          "tool_calls": [
+            {
+              "id": "call_B1ZqQbyW0KTymPK9QqXP2YxP",
+              "provider_id": "fc_0a9f39608a4d1de2016ae404438ef487d0b5d6bddf2fb50525",
+              "name": "knowledge_search",
+              "arguments": {
+                "query": "profile.city Harbor City",
+                "alternates": [
+                  "where I live",
+                  "home city"
+                ]
+              }
+            },
+            {
+              "id": "call_JuDMKBvBTckv0CN2TCwjR4kx",
+              "provider_id": "fc_0a9f39608a4d1de2016ae4044568a487d0be8318235c04e29e",
+              "name": "memory_remember",
+              "arguments": {
+                "subject": "profile.city",
+                "kind": "fact",
+                "quote": "I live in Harbor City.",
+                "scope": "personal",
+                "explicit": false,
+                "replace_id": "",
+                "expected_updated": ""
+              }
+            }
+          ],
+          "result": "Got it—I’ll remember that you live in Harbor City."
+        },
+        {
+          "name": "equivalent paraphrase",
+          "passed": true,
+          "milliseconds": 7667,
+          "tool_calls": [
+            {
+              "id": "call_UFWeUVNo7oXiMa5FV8RHJIND",
+              "provider_id": "fc_06f3e59128be1d54016ae40449433887d0807a2b5aca294a31",
+              "name": "knowledge_search",
+              "arguments": {
+                "query": "profile city permanent home Harbor City",
+                "alternates": [
+                  "where I live",
+                  "home city",
+                  "place of residence"
+                ]
+              }
+            },
+            {
+              "id": "call_re8j5DejMhFr99Z78GD12597",
+              "provider_id": "fc_06f3e59128be1d54016ae4044af2ac87d0a7571ef3b70a9aef",
+              "name": "knowledge_read",
+              "arguments": {
+                "id": "mem-0008d3ad132c576a7df4c7d3"
+              }
+            },
+            {
+              "id": "call_nx1TR6WkNkSHGfknWmqcJrkg",
+              "provider_id": "fc_06f3e59128be1d54016ae4044c444087d0be0f725aeb8b5655",
+              "name": "memory_remember",
+              "arguments": {
+                "subject": "profile.city",
+                "kind": "fact",
+                "quote": "I live in Harbor City, my permanent home.",
+                "scope": "personal",
+                "explicit": false,
+                "replace_id": "mem-0008d3ad132c576a7df4c7d3",
+                "expected_updated": "2026-10-30T02:43:18.489912Z"
+              }
+            }
+          ],
+          "result": "Got it—I’ll remember Harbor City is your permanent home."
+        },
+        {
+          "name": "inspected correction",
+          "passed": true,
+          "milliseconds": 9166,
+          "tool_calls": [
+            {
+              "id": "call_OLFtNakLva6r1KpJICtEdN8b",
+              "provider_id": "fc_04add51fb3b4663a016ae40450bb1487d0b01b283c0a45d7bb",
+              "name": "knowledge_search",
+              "arguments": {
+                "query": "profile.city Birch City current residence",
+                "alternates": [
+                  "where I live",
+                  "home city",
+                  "current city"
+                ]
+              }
+            },
+            {
+              "id": "call_ACiS2cHf0TbiFotbmcMQumdP",
+              "provider_id": "fc_04add51fb3b4663a016ae40452319487d0b16883d43f9279b7",
+              "name": "knowledge_read",
+              "arguments": {
+                "id": "mem-0008d3ad132c576a7df4c7d3"
+              }
+            },
+            {
+              "id": "call_tguU4sr8J3JHLyZjlQKMuU7F",
+              "provider_id": "fc_04add51fb3b4663a016ae4045499f887d08c0f6c718afc5d99",
+              "name": "memory_remember",
+              "arguments": {
+                "subject": "profile.city",
+                "kind": "fact",
+                "quote": "I live in Birch City now.",
+                "scope": "personal",
+                "explicit": false,
+                "replace_id": "mem-0008d3ad132c576a7df4c7d3",
+                "expected_updated": "2026-10-30T02:43:26.12329Z"
+              }
+            }
+          ],
+          "result": "Got it—I’ve updated your city to Birch City."
+        },
+        {
+          "name": "explicit forget",
+          "passed": true,
+          "milliseconds": 6330,
+          "tool_calls": [
+            {
+              "id": "call_ganJlvNB9XM0JzdGp3WByOUc",
+              "provider_id": "fc_0437b95c9022d1fd016ae4045adbb087d09a7cab8a0897fcb1",
+              "name": "knowledge_search",
+              "arguments": {
+                "query": "where I live home city location residence",
+                "alternates": [
+                  "profile.city",
+                  "my city",
+                  "place of residence"
+                ]
+              }
+            },
+            {
+              "id": "call_x4tSxeCCjDSs8jmBPN7emQBb",
+              "provider_id": "fc_0437b95c9022d1fd016ae4045cbf5487d0b3fbe75a6aec716c",
+              "name": "knowledge_read",
+              "arguments": {
+                "id": "mem-0008d3ad132c576a7df4c7d3"
+              }
+            },
+            {
+              "id": "call_oTuRCW5eJUn1AEXh6jx3qclv",
+              "provider_id": "fc_0437b95c9022d1fd016ae4045df4a087d0ab5ee3391341c1dc",
+              "name": "memory_forget",
+              "arguments": {
+                "id": "mem-0008d3ad132c576a7df4c7d3",
+                "quote": "Forget where I live.",
+                "expected_updated": "2026-10-30T02:43:34.812745Z"
+              }
+            }
+          ],
+          "result": "I’ve forgotten where you live."
+        },
+        {
+          "name": "passive relearning refused",
+          "passed": true,
+          "milliseconds": 6259,
+          "tool_calls": [
+            {
+              "id": "call_fMsOzMEr9DYiMTXBb9M2RIBA",
+              "provider_id": "fc_022f24c1b920a48f016ae4046110c487d0afd9e69dbbc70491",
+              "name": "knowledge_search",
+              "arguments": {
+                "query": "profile.city Birch City",
+                "alternates": [
+                  "where I live",
+                  "current city"
+                ]
+              }
+            },
+            {
+              "id": "call_vLwh2rL00Cc9H9EaV1YXgXVE",
+              "provider_id": "fc_022f24c1b920a48f016ae40462b7b887d095245d3fbfdb4308",
+              "name": "memory_remember",
+              "arguments": {
+                "subject": "profile.city",
+                "kind": "fact",
+                "quote": "I live in Birch City now.",
+                "scope": "personal",
+                "explicit": false,
+                "replace_id": "",
+                "expected_updated": ""
+              }
+            }
+          ],
+          "result": "Got it—you live in Birch City now. It wasn’t saved to memory because this topic was previously forgotten."
+        },
+        {
+          "name": "historical privacy/paraphrase",
+          "passed": true,
+          "milliseconds": 2343,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":null,\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":1}}"
+        },
+        {
+          "name": "historical privacy/translation",
+          "passed": true,
+          "milliseconds": 1685,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":null,\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":1}}"
+        },
+        {
+          "name": "historical privacy/assistant",
+          "passed": true,
+          "milliseconds": 1398,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":null,\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":1}}"
+        },
+        {
+          "name": "historical privacy/title",
+          "passed": true,
+          "milliseconds": 2751,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":null,\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":1}}"
+        },
+        {
+          "name": "historical privacy/folder",
+          "passed": true,
+          "milliseconds": 2245,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":null,\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":1}}"
+        },
+        {
+          "name": "historical privacy/unrelated",
+          "passed": true,
+          "milliseconds": 1942,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":[{\"conversation_id\":\"work-20261030T024336-25c5ab3a3fb856bf\",\"revision_id\":\"rev-archive\",\"title\":\"Archive notes\",\"folder\":\"neutral-workspace\",\"at\":\"2026-10-30T02:43:36Z\",\"user\":\"The workshop is at Orchard Hall.\"}],\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":0}}"
+        },
+        {
+          "name": "historical privacy/other-owner",
+          "passed": true,
+          "milliseconds": 2408,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":[{\"conversation_id\":\"work-20261030T024337-73f3a982495a6652\",\"revision_id\":\"rev-archive\",\"title\":\"Archive notes\",\"folder\":\"neutral-workspace\",\"at\":\"2026-10-30T02:43:37Z\",\"user\":\"My colleague lives in Birch City.\"}],\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":0}}"
+        },
+        {
+          "name": "search privacy and benign recall",
+          "passed": true,
+          "milliseconds": 7399,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"matches\":[{\"conversation_id\":\"work-20261030T024337-73f3a982495a6652\",\"revision_id\":\"rev-archive\",\"title\":\"Archive notes\",\"folder\":\"neutral-workspace\",\"at\":\"2026-10-30T02:43:37Z\",\"user\":\"My colleague lives in Birch City.\"},{\"conversation_id\":\"work-20261030T024336-25c5ab3a3fb856bf\",\"revision_id\":\"rev-archive\",\"title\":\"Archive notes\",\"folder\":\"neutral-workspace\",\"at\":\"2026-10-30T02:43:36Z\",\"user\":\"The workshop is at Orchard Hall.\"}],\"matches_limited\":false,\"more_chats\":false,\"next_offset\":12,\"older_turns\":{},\"searched_chats\":9,\"searched_turns\":9,\"suppressed_source_chats\":3,\"suppression_reason\":\"Known source chats for forgotten memories are omitted; user-visible transcripts are retained.\",\"unavailable_chats\":{},\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":5}}"
+        },
+        {
+          "name": "explicit restoration",
+          "passed": true,
+          "milliseconds": 5543,
+          "tool_calls": [
+            {
+              "id": "call_cpLMKZWRyTWEYEzw5e7hCSma",
+              "provider_id": "fc_030b1d7284eed907016ae4047d597887d0ba078fb345bcf4b3",
+              "name": "knowledge_search",
+              "arguments": {
+                "query": "profile.city Cedar City",
+                "alternates": [
+                  "where I live",
+                  "home city"
+                ]
+              }
+            },
+            {
+              "id": "call_CGveFGE5rkNUddLo9OUeZzCo",
+              "provider_id": "fc_030b1d7284eed907016ae4047e84f487d0b3e7641417080e85",
+              "name": "memory_remember",
+              "arguments": {
+                "subject": "profile.city",
+                "kind": "fact",
+                "quote": "I live in Cedar City.",
+                "scope": "personal",
+                "explicit": true,
+                "replace_id": "",
+                "expected_updated": ""
+              }
+            }
+          ],
+          "result": "Got it—I’ll remember that you live in Cedar City."
+        },
+        {
+          "name": "old history after restore/paraphrase",
+          "passed": true,
+          "milliseconds": 1224,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":null,\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":1}}"
+        },
+        {
+          "name": "old history after restore/title",
+          "passed": true,
+          "milliseconds": 1441,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":null,\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":1}}"
+        },
+        {
+          "name": "old history after restore/folder",
+          "passed": true,
+          "milliseconds": 1622,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":null,\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":1}}"
+        },
+        {
+          "name": "new context after restore/new-current-value",
+          "passed": true,
+          "milliseconds": 2,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":[{\"conversation_id\":\"work-20261030T024421-d30871f112214b97\",\"revision_id\":\"rev-archive\",\"title\":\"Restored preference\",\"folder\":\"neutral-workspace\",\"at\":\"2026-10-30T02:44:22Z\",\"user\":\"I live in Cedar City.\"}],\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":0}}"
+        }
+      ]
+    },
+    {
+      "id": "keyboard",
+      "split": "held-out",
+      "passed": true,
+      "checks": [
+        {
+          "name": "passive capture",
+          "passed": true,
+          "milliseconds": 6532,
+          "tool_calls": [
+            {
+              "id": "call_2qHy2mkYSmOmZfAfUd7KAx0j",
+              "provider_id": "fc_068583442f9ab97a016ae40487ecd887d0879b3eeb7fd6750a",
+              "name": "knowledge_search",
+              "arguments": {
+                "query": "preference for split keyboards",
+                "alternates": [
+                  "keyboard preference",
+                  "ergonomic split keyboard preference"
+                ]
+              }
+            },
+            {
+              "id": "call_sbYrBjvNIS2k2wNdUiFzGLk0",
+              "provider_id": "fc_068583442f9ab97a016ae40489866887d093f794fb32c91856",
+              "name": "memory_remember",
+              "arguments": {
+                "subject": "preference.keyboard.type",
+                "kind": "preference",
+                "quote": "I prefer split keyboards.",
+                "scope": "personal",
+                "explicit": false,
+                "replace_id": "",
+                "expected_updated": ""
+              }
+            }
+          ],
+          "result": "Got it—I’ll remember that you prefer split keyboards."
+        },
+        {
+          "name": "equivalent paraphrase",
+          "passed": true,
+          "milliseconds": 7782,
+          "tool_calls": [
+            {
+              "id": "call_yUCwgV54qmDo6Rdk4P5E309i",
+              "provider_id": "fc_092dcd2157517f9b016ae4048e249887d09c2def66b5448503",
+              "name": "knowledge_search",
+              "arguments": {
+                "query": "keyboard type preference separate left and right halves",
+                "alternates": [
+                  "split keyboard preference",
+                  "preferred keyboard layout"
+                ]
+              }
+            },
+            {
+              "id": "call_TQQ9he9D41CaXt2pRsQexu1x",
+              "provider_id": "fc_092dcd2157517f9b016ae4048f56cc87d0bc73b4b32aef1cdf",
+              "name": "knowledge_read",
+              "arguments": {
+                "id": "mem-ec43f8e4f2e3f563a518b87c"
+              }
+            },
+            {
+              "id": "call_HJwzxj9DDZhOWL6yRenBSWwN",
+              "provider_id": "fc_092dcd2157517f9b016ae40491164887d08ca8a016ecd8f956",
+              "name": "memory_remember",
+              "arguments": {
+                "subject": "preference.keyboard.type",
+                "kind": "preference",
+                "quote": "I prefer keyboards with separate left and right halves.",
+                "scope": "personal",
+                "explicit": false,
+                "replace_id": "mem-ec43f8e4f2e3f563a518b87c",
+                "expected_updated": "2026-10-30T02:44:27.103322Z"
+              }
+            }
+          ],
+          "result": "Got it—I’ll remember that you prefer split keyboards with separate left and right halves."
+        },
+        {
+          "name": "inspected correction",
+          "passed": true,
+          "milliseconds": 6250,
+          "tool_calls": [
+            {
+              "id": "call_TX19vUbYeabEPRP36VwQOVva",
+              "provider_id": "fc_0056269f1638f78a016ae404961f7c87d0bc77d00a35a6b584",
+              "name": "knowledge_read",
+              "arguments": {
+                "id": "mem-ec43f8e4f2e3f563a518b87c"
+              }
+            },
+            {
+              "id": "call_SmAoYvk6Nj8pmrNdPoH4oztA",
+              "provider_id": "fc_0056269f1638f78a016ae4049774a087d084014ed22d74a33e",
+              "name": "memory_remember",
+              "arguments": {
+                "subject": "preference.keyboard.type",
+                "kind": "preference",
+                "quote": "I prefer conventional single-piece keyboards instead.",
+                "scope": "personal",
+                "explicit": false,
+                "replace_id": "mem-ec43f8e4f2e3f563a518b87c",
+                "expected_updated": "2026-10-30T02:44:35.202326Z"
+              }
+            }
+          ],
+          "result": "Got it—I’ll remember that you prefer conventional single-piece keyboards."
+        },
+        {
+          "name": "explicit forget",
+          "passed": true,
+          "milliseconds": 7377,
+          "tool_calls": [
+            {
+              "id": "call_FWl3lX3aFtd5O1WVwYNXu9to",
+              "provider_id": "fc_01ac53b48031d82e016ae4049dd40487d0a3d58aa23ae7e920",
+              "name": "knowledge_read",
+              "arguments": {
+                "id": "mem-ec43f8e4f2e3f563a518b87c"
+              }
+            },
+            {
+              "id": "call_NzqrsxM7lZdKzvpOab7rHYkz",
+              "provider_id": "fc_01ac53b48031d82e016ae4049fee2487d09c0aae35ec3e5ff9",
+              "name": "memory_forget",
+              "arguments": {
+                "id": "mem-ec43f8e4f2e3f563a518b87c",
+                "quote": "Forget my keyboard preference.",
+                "expected_updated": "2026-10-30T02:44:41.421686Z"
+              }
+            }
+          ],
+          "result": "Forgotten. I won’t retain your keyboard preference."
+        },
+        {
+          "name": "passive relearning refused",
+          "passed": true,
+          "milliseconds": 5812,
+          "tool_calls": [
+            {
+              "id": "call_3bloEqugsyaImlwTDl3N5Z0f",
+              "provider_id": "fc_089df9a0f90b6e05016ae404a4d07487d0b8f91894b0f60ecc",
+              "name": "knowledge_search",
+              "arguments": {
+                "query": "preference for conventional single-piece keyboards",
+                "alternates": [
+                  "keyboard form factor preference",
+                  "prefers non-split keyboards",
+                  "traditional one-piece keyboard"
+                ]
+              }
+            },
+            {
+              "id": "call_8sQnobJdtKbOeJBwB6MrtEy9",
+              "provider_id": "fc_089df9a0f90b6e05016ae404a6534887d09022ea0bba45bdc2",
+              "name": "memory_remember",
+              "arguments": {
+                "subject": "preference.keyboard_form_factor",
+                "kind": "preference",
+                "quote": "I prefer conventional single-piece keyboards instead.",
+                "scope": "personal",
+                "explicit": false,
+                "replace_id": "",
+                "expected_updated": ""
+              }
+            }
+          ],
+          "result": "Understood—you prefer conventional single-piece keyboards."
+        },
+        {
+          "name": "historical privacy/paraphrase",
+          "passed": true,
+          "milliseconds": 1763,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":null,\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":1}}"
+        },
+        {
+          "name": "historical privacy/translation",
+          "passed": true,
+          "milliseconds": 1624,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":null,\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":1}}"
+        },
+        {
+          "name": "historical privacy/assistant",
+          "passed": true,
+          "milliseconds": 1397,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":null,\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":1}}"
+        },
+        {
+          "name": "historical privacy/title",
+          "passed": true,
+          "milliseconds": 1496,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":null,\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":1}}"
+        },
+        {
+          "name": "historical privacy/folder",
+          "passed": true,
+          "milliseconds": 1545,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":null,\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":1}}"
+        },
+        {
+          "name": "historical privacy/unrelated",
+          "passed": true,
+          "milliseconds": 1889,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":[{\"conversation_id\":\"work-20261030T024443-c6573a005a37dc01\",\"revision_id\":\"rev-archive\",\"title\":\"Archive notes\",\"folder\":\"neutral-workspace\",\"at\":\"2026-10-30T02:44:43Z\",\"user\":\"The workshop is at Orchard Hall.\"}],\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":0}}"
+        },
+        {
+          "name": "historical privacy/other-owner",
+          "passed": true,
+          "milliseconds": 1633,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":[{\"conversation_id\":\"work-20261030T024443-d56724484c09b65f\",\"revision_id\":\"rev-archive\",\"title\":\"Archive notes\",\"folder\":\"neutral-workspace\",\"at\":\"2026-10-30T02:44:44Z\",\"user\":\"My colleague prefers single-piece keyboards.\"}],\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":0}}"
+        },
+        {
+          "name": "search privacy and benign recall",
+          "passed": true,
+          "milliseconds": 7789,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"matches\":[{\"conversation_id\":\"work-20261030T024443-d56724484c09b65f\",\"revision_id\":\"rev-archive\",\"title\":\"Archive notes\",\"folder\":\"neutral-workspace\",\"at\":\"2026-10-30T02:44:44Z\",\"user\":\"My colleague prefers single-piece keyboards.\"},{\"conversation_id\":\"work-20261030T024443-c6573a005a37dc01\",\"revision_id\":\"rev-archive\",\"title\":\"Archive notes\",\"folder\":\"neutral-workspace\",\"at\":\"2026-10-30T02:44:43Z\",\"user\":\"The workshop is at Orchard Hall.\"}],\"matches_limited\":false,\"more_chats\":false,\"next_offset\":12,\"older_turns\":{},\"searched_chats\":9,\"searched_turns\":9,\"suppressed_source_chats\":3,\"suppression_reason\":\"Known source chats for forgotten memories are omitted; user-visible transcripts are retained.\",\"unavailable_chats\":{},\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":5}}"
+        },
+        {
+          "name": "explicit restoration",
+          "passed": true,
+          "milliseconds": 6106,
+          "tool_calls": [
+            {
+              "id": "call_qRocgIL6CXAXWbfifonsLv6M",
+              "provider_id": "fc_0d72a2d3c14f4bc3016ae404bd939c87d09ba1bb754a718c26",
+              "name": "knowledge_search",
+              "arguments": {
+                "query": "preference for compact keyboards",
+                "alternates": [
+                  "keyboard size preference",
+                  "prefers small keyboards",
+                  "compact keyboard preference"
+                ]
+              }
+            },
+            {
+              "id": "call_wuWhhtWhgHIAMUjjiU7uOMqp",
+              "provider_id": "fc_0d72a2d3c14f4bc3016ae404bed57487d08bff3dbd7f9f935d",
+              "name": "memory_remember",
+              "arguments": {
+                "subject": "preference.keyboard.size",
+                "kind": "preference",
+                "quote": "I prefer compact keyboards.",
+                "scope": "personal",
+                "explicit": true,
+                "replace_id": "",
+                "expected_updated": ""
+              }
+            }
+          ],
+          "result": "Remembered: you prefer compact keyboards."
+        },
+        {
+          "name": "old history after restore/paraphrase",
+          "passed": true,
+          "milliseconds": 1770,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":null,\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":1}}"
+        },
+        {
+          "name": "old history after restore/title",
+          "passed": true,
+          "milliseconds": 2122,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":null,\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":1}}"
+        },
+        {
+          "name": "old history after restore/folder",
+          "passed": true,
+          "milliseconds": 1628,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":null,\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":1}}"
+        },
+        {
+          "name": "new context after restore/new-current-value",
+          "passed": true,
+          "milliseconds": 1,
+          "result": "{\"ok\":true,\"result\":{\"authority\":\"historical reference only; no permissions are carried over\",\"next_before\":\"\",\"turns_newest_first\":[{\"conversation_id\":\"work-20261030T024528-f8bb720c4ba7c641\",\"revision_id\":\"rev-archive\",\"title\":\"Restored preference\",\"folder\":\"neutral-workspace\",\"at\":\"2026-10-30T02:45:28Z\",\"user\":\"I prefer compact keyboards.\"}],\"withdrawal_migration_pending\":false,\"withheld_historical_turns\":0}}"
+        }
+      ],
+      "reviews": [
+        {
+          "action": "withdrawal_topic",
+          "effect": "Delete the saved fact and retain only this abstract topic to filter historical paraphrases. Declining still deletes the fact, but historical retrieval remains pending topic review. Do not approve wording that contains the forgotten value.",
+          "retained_topic": "the user's keyboard preferences",
+          "setting": "memory"
+        }
+      ]
+    }
+  ],
+  "Usage": {
+    "unknown_requests": 0,
+    "model_requests": 120,
+    "input_tokens": 96450,
+    "output_tokens": 7808,
+    "reported": true,
+    "estimated": false
+  }
+}

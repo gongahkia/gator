@@ -1,175 +1,127 @@
-# Semantic memory implementation
+# Semantic memory: implementation and evidence
 
-Active user objective: implement semantic reconciliation, suppression of
-untracked historical paraphrases, and live quality testing. This extends the
-[earlier implementation](MEMORY_EVOLUTION_IMPLEMENTATION.md); completing a store
-API alone does not complete this objective.
+Current implementation, 30 October 2026. This extends the historical
+[memory evolution log](MEMORY_EVOLUTION_IMPLEMENTATION.md).
 
-## Required outcomes and evidence
+## What works
 
-| Outcome | Acceptance evidence | Current state |
+| Outcome | Implementation | Evidence |
 | --- | --- | --- |
-| General concept identity | Arbitrary reviewed labels share durable identity across restart; corrections and withdrawal apply to every bound alias; scope and inspected revisions are enforced | Store and CLI implemented; local race suites pass |
-| Semantic relation planning | Actual model-assisted comparison of meaning distinguishes equivalent, contradictory, unrelated and uncertain statements across domains and languages; original quotes remain intact; incomplete/failed analysis cannot silently add conflicting authoritative facts | Bounded analyzer implemented; small live classification baseline obtained; production application pending |
-| Reconciliation authority and recovery | Contradictions require an inspected choice; no stale or cross-scope changes; an interrupted merge quarantines remaining duplicates; prepared/applied receipts and source associations survive | Store protocol implemented; semantic-tool integration pending |
-| Untracked historical paraphrases | Forgetting also prevents historical paraphrases and dependent assistant replies from entering agent context through search, direct reads, titles, pagination and older branches; source transcripts remain user-controlled | Pending |
-| Withdrawal migration and privacy | Legacy provenance gaps and classifier outages are visible; restart, changed transcripts, backup/restore and explicit restoration preserve suppression; implementation must not retain forgotten fact plaintext just to recognize it later | Pending |
-| Live evaluation | Real provider runs with synthetic isolated state; separate development/held-out longitudinal cases; capture, correction, conflict, withdrawal, retrieval, scope, restart, uncertainty and provider failure coverage; source attribution and request/token/latency reporting | Initial development baseline obtained; expanded evaluation pending |
+| General identity | Meaning comparison across arbitrary labels; durable digest-only bindings | Semantic store/tool tests; nine live classification cases |
+| Updates | Fresh user statements retain exact quotes and provenance; equivalence shares identity; conflicts require inspected revisions; multiple matches require review | Store race tests, production Executor binding/budget tests, live corrections |
+| Forgetting | Saved fact removed; abstract topic retained; tracked source chats suppressed; untracked snippets, replies, titles and folders screened before return | Search/direct-read/older-branch/restart tests; live historical privacy checks |
+| Migration | Legacy topic/scope gaps visible; guarded owner review supplies metadata without reconstructing values | CLI/store tests and live custom-topic review |
+| Restoration | Explicit current consent required; new values allowed; old historical cutoff and tracked-source suppression retained | Store tests and live fresh-context/old-history checks |
+| Recovery | Atomic private publication, inspected revisions, complete-snapshot guards, interruption quarantine, backup/restore of abstract rules | Affected race suites and native lifecycle CI |
 
-## Implementation sequence
+## Save path
 
-1. General digest-only concept bindings and inspected reconciliation, including
-   source-history association transfer and interruption behavior.
-2. Bounded semantic relation planner and host-controlled application of its
-   decisions. A small alias list or admission filter is insufficient.
-3. Semantic withdrawal representation and screening of all agent history return
-   paths, with migration and source-version-bound cache invalidation. A blanket
-   history shutdown is not a substitute for identifying relevant paraphrases.
-4. Longitudinal development and held-out live evaluation, then fixes driven by
-   observed failures. Deterministic stand-ins validate host boundaries separately.
+Foreground memory tools use the Work run's budgeted model. A separate, tool-free
+classification compares the current exact quote against the complete allowed
+scope and returns equivalent, contradictory, distinct, uncertain or withdrawn.
+The host validates JSON, references, relation consistency and limits. Unavailable,
+malformed or incomplete comparison never defaults to distinct.
 
-No semantic quality percentage or universal language guarantee is established
-by a few passing cases. Model errors remain possible; uncertain analysis must
-be observable and require reconciliation rather than becoming hidden biography.
+Application acquires the write lease and revalidates the entire snapshot,
+including records, bindings and withdrawal rules. Direct source edits without a
+revision bump also invalidate it. Equivalence preserves identity. A conflicting
+replacement requires the inspected ID/revision; multiple matches require a
+separate exact-input consolidation review. Current quotes retain source-chat,
+run, timestamp and text-hash evidence. Merely reading memory never confirms it.
 
-## Initial checkpoints
+`memory reconcile --keep ID [--aliases LABEL,LABEL] ID=TIMESTAMP ...` offers the
+same inspected identity controls directly. Prepared/applied receipts and
+source-chat associations survive interrupted consolidation; remaining duplicates
+are quarantined. Explicitly expired entries cannot be revived by comparison.
 
-- General bindings store only scope/subject digests, rather than saved personal
-  text or an expanding hard-coded alias list. Bindings remain after forgetting.
-- `memory reconcile --keep ID [--aliases LABEL,LABEL] ID=TIMESTAMP ...` keeps the
-  chosen inspected text verbatim, consumes reviewed duplicates and preserves its
-  confirmation date. Alias-only binding is also supported. Unreviewed group
-  members, stale records, cross-scope inputs and forgotten concepts are refused.
-- Hash-only source-chat associations are transferred before duplicates are
-  removed. Prepared/applied reconciliation receipts retain IDs, revisions and
-  binding digests. Identity publication precedes deletion, so a surviving file
-  after interruption remains quarantined until reconciled.
-- The live harness can explicitly select provider, model and endpoint without
-  changing Gator's saved default. The user's key is read locally and omitted
-  from logs/reports; `.env` and `.env.local` are ignored by Git.
+## Historical privacy
 
-The first successful live-provider run used OpenAI `gpt-5.6` and isolated
-synthetic state. **11 of 12 small development cases passed**, using 23 provider
-requests. One ordinary concise-answer preference reached review and was not
-saved. This is an observed capture miss, not an established cause or a general
-memory score. Location capture, inspected preference correction, forgetting,
-temporary/third-party/hypothetical exclusions, synthetic credential exclusion,
-Chinese/Spanish negative requests and learning controls passed those cases.
+Forgetting stores a neutral attribute description, such as “the user's home
+city,” rather than the old value. Known topics are host-defined; unfamiliar
+attributes can get a generated proposal whose exact retained wording requires
+host review. Declining still deletes the fact and leaves metadata pending.
 
-The project required a US regional endpoint. The initial global endpoint failed
-with a geography error; the US endpoint worked. Endpoint selection follows the
-[official regional data controls](https://developers.openai.com/api/docs/guides/your-data).
-The baseline is retained in `scripts/memory-evolution/openai-development-baseline-2026-10-30.json`.
+Every earlier-chat return path screens the exact excerpts and metadata about to
+be exposed. Dependent assistant replies and revealing titles/folder names are
+included. Only clear verdicts return a row; uncertain or blocked rows are omitted.
+Classifier context is transient and never appended to foreground replay. No
+persisted clearance cache exists: every retrieval screens current content, so
+new turns and edits cannot reuse old clearance. Separate body and metadata dates
+preserve old barriers after restoration.
 
-Live opt-in variables:
+Malformed responses, provider outages and changed withdrawal settings return no
+unchecked page. Unknown legacy topic/scope metadata explicitly withholds affected
+history until owner review. Normal screening preserves unrelated history; it is
+not a permanent blanket history switch. User-visible transcripts remain intact.
 
-- `GATOR_LIVE_MEMORY_REPORT`: a new private report file, required to run.
-- `GATOR_LIVE_MEMORY_PROVIDER`, `GATOR_LIVE_MEMORY_MODEL`: explicit test selection.
-- `GATOR_LIVE_MEMORY_BASE_URL`: full adapter endpoint, e.g. the US Responses URL.
-- `GATOR_LIVE_MEMORY_CASE`: optional exact case name for focused diagnosis.
-
-Run `go test ./cmd/gator -run '^TestLiveMemoryEvaluation$' -count=1 -v` with those
-variables and the provider key available in the child process. The harness does
-not automatically source environment files. Review previews and called tool
-arguments are retained only for these synthetic evaluation cases.
-
-A focused repeat of the concise-answer case saved it successfully (three model
-requests). That variability does not erase the earlier miss or establish its
-cause. The harness now retains synthetic tool arguments and review previews to
-support diagnosis. The general reconciliation checkpoint passes local race
-suites for memory, tools, retrieval, personalization, lifecycle, workapp and
-workrun, plus focused memory/recall/maintenance command tests. Model-driven
-planning and historical-paraphrase screening remain required next steps.
-
-## Meaning comparison checkpoint
-
-`Store.AnalyzeChat` now uses an actual model to compare a proposed quote against
-the complete supplied scope, rather than infer identity from labels alone. It
-returns equivalent, contradictory, distinct or uncertain with references to
-existing candidate IDs. It supplies no action tools, rejects fabricated IDs,
-duplicate references, malformed or inconsistent JSON and unexpected fields, and
-has a 12-second model-call deadline. Unavailable or incomplete comparison returns
-an error for the host's review path; it never defaults to distinct.
-
-Snapshots include exact scoped records and identity bindings in their digest.
-Direct edits without a revision bump also invalidate a snapshot. Excluded
-records are never supplied to the comparison model, and incomplete coverage
-prevents classification. The current bound is 128 candidates and 64 KiB of
-candidate JSON. These are explicit resource limits, not exhaustive support for
-larger profiles. Analysis alone never modifies saved facts or aliases.
-
-The independent live classifier evaluation passed eight synthetic cases with
-OpenAI `gpt-5.6`: paraphrase, contradiction, separate topics, languages spoken
-versus preferred reply language, translated residence, home versus travel,
-different ownership and embedded instructions. The development and explicitly
-selected held-out-labelled examples are recorded separately in the report;
-this small developer-authored set does not establish broad generalization.
+## Owner controls
 
 ```sh
-go run ./scripts/memory-semantic-eval --provider openai --endpoint https://us.api.openai.com/v1/responses --split all --report /tmp/NEW-semantic-report.json
-```
-
-The source report is retained at
-`scripts/memory-semantic-eval/openai-classification-baseline-2026-10-30.json`.
-Host-boundary tests cover scope isolation, fabricated references, inconsistent
-relations, attempted tool invocations, cancellation, exclusions and source
-snapshot changes. This checkpoint still requires guarded application through
-the real memory tools, semantic withdrawal/history screening, migrations and
-longitudinal live evaluation before the active objective can be complete.
-
-## Guarded application and withdrawal state checkpoint
-
-Semantic plans can now be applied under the memory write lease. The complete
-scope snapshot, statement digest, scope, selected IDs and inspected revisions
-are revalidated before changes. Equivalence preserves the existing identity
-while saving the current user's exact words; contradictions need the inspected
-replacement guard or a separate host review. Multiple matches require a
-consolidation review. Stale plans, changed statements, unavailable/expired sources
-and cross-scope matches are refused. Explicitly expired entries remain historical
-evidence and cannot be revived by the classifier.
-
-Forgetting now records an abstract withdrawal topic independently of fact text.
-Known topics come from neutral host definitions. Custom approved topics are
-revision-guarded and cannot repeat the complete forgotten statement. Unclassified
-legacy markers remain visible scope/topic migration gaps. Restoring a concept
-closes its active withdrawal while preserving a historical cutoff; tracked old
-source chats stay suppressed. A model relation of withdrawn cannot silently
-relearn an attribute under a new label or value; explicit current consent is
-required. Withdrawal state also participates in semantic snapshot invalidation.
-
-Local race suites pass for memory, tools, retrieval, personalization, lifecycle,
-workapp and workrun, plus focused command tests. New cases exercise equivalent
-rephrasing, inspected/reviewed conflict changes, concurrent added/edited records,
-scope/statement mismatch, expiry, legacy aliases, missing migration metadata,
-abstract-topic retention and semantic restoration. Production tool binding,
-custom-topic review controls and historical screening are still pending.
-
-## Withdrawal owner controls
-
-The foreground save and history tools now use the Work run's budgeted model.
-History is screened at the return boundary, including titles, folder names and
-assistant replies; private classifier context is not added to foreground replay.
-No result is returned on a malformed, unavailable or stale comparison. Empty
-legacy topics are a visible migration gap and withhold unchecked history.
-
-`gator memory withdrawals [--goal ID]` lists abstract topics, pending scope/topic
-metadata and exact review revisions. To supply missing metadata, run:
-
-```sh
+gator memory withdrawals [--goal GOAL_ID]
 gator memory withdrawals review ID --scope personal --expected REVISION --topic "the user's keyboard preferences"
-# For a goal: --scope goal --goal GOAL_ID
-```
-
-This retains no deleted fact value and does not restore its use. Known scopes
-cannot be moved. A custom forget can approve its topic in one guarded command:
-
-```sh
+# For a goal use: --scope goal --goal GOAL_ID
 gator memory forget MEMORY_ID --topic "the user's keyboard preferences" --expected-updated TIMESTAMP
 ```
 
-In chat, unfamiliar attributes can get a generated abstract-topic proposal, with
-the exact retained wording shown for host review. Declining still forgets the
-saved fact and leaves metadata pending. Topic generation never publishes a rule
-on its own. Restore uses an explicit new memory request, retains the historical
-cutoff and keeps old tracked source chats suppressed. Lifecycle tests verify
-that abstract rules also survive backup/restore.
+`withdrawals` reports abstract topics, pending metadata, scope, timestamps and
+exact revision digests. Reviewing metadata cannot move a known scope, restore a
+fact, or erase a historical barrier. Supply an attribute description without its
+forgotten value. Explicit new remember requests restore the topic using current
+words while old tracked source chats remain suppressed.
+
+## Live evidence
+
+All runs used OpenAI `gpt-5.6`, the US Responses endpoint and synthetic isolated
+profiles. The key came from the local environment and is absent from reports.
+No real memories, chats, accounts or files were evaluated. Saved provider defaults
+were not changed. Cost is unpriced; token/request counts are provider reported.
+
+- The preserved original capture baseline passed 11/12 cases; one ordinary
+  preference reached review and was not saved.
+- After foreground integration, all 12 small capture cases passed, using 26
+  requests. These cover capture, correction, forgetting, learning controls,
+  third-party/temporary/hypothetical exclusion and multilingual opt-out examples.
+- The first longitudinal development attempt found that the agent acknowledged
+  equivalent restatements without recording new evidence. The foreground policy
+  now explicitly records new user confirmation; the initial failed run is kept.
+- The final longitudinal run passed **55 checks across three sequences**: reply
+  detail, home city and an unfamiliar keyboard preference. It used 120 requests,
+  96,450 input tokens and 7,808 output tokens. Checks cover fresh contexts,
+  attribution, paraphrases, correction, forget, refused passive relearning,
+  translated/assistant/metadata copies, benign retrieval, search, explicit
+  restoration and old/new history. One case also uses the real Work Executor.
+- Nine classification cases passed after correcting fact/preference metadata in
+  the fixtures and adding missing-reference uncertainty: nine requests, 3,991
+  input tokens and 461 output tokens.
+
+Reports live beside the runners in `scripts/memory-evolution`,
+`scripts/memory-semantic-eval` and `scripts/memory-longitudinal-eval`. The latter
+retains the dataset digest and both development/held-out labels. These are small
+engineer-authored probes, not statistically independent quality estimates or a
+competitor benchmark. Custom-topic approvals are simulated and recorded.
+
+A transient evaluation parser bug read the tool payload outside its `result`
+envelope and incorrectly marked correct privacy outputs as failures. That was
+fixed before the final run; no product acceptance criteria were relaxed.
+
+## Verification and practical limits
+
+Local affected race suites pass for memory, tools, retrieval, personalization,
+lifecycle, workapp and workrun. Focused command memory/recall/maintenance tests
+and terminal memory/restart tests also pass. Production Executor tests verify
+shared budgets and that private classifier context never enters retained replay.
+Native CI status is recorded separately when the final checkpoint completes.
+
+Comparison currently caps at 128 candidates / 64 KiB of candidate JSON; larger
+or excluded incomplete profiles require review rather than a sampled claim of
+coverage. History caps at eight returned turns, four field checks per request,
+64 KiB per classification payload and a 12-second call deadline. These add
+provider latency/cost and can over-withhold during outages or ambiguity.
+
+Semantic judgments remain fallible. Admission is still conservative and uses
+host screening/review for sensitive, unfamiliar or ambiguous statements; this
+is not a universal multilingual understanding guarantee. Background maintenance
+still proposes reviewable lessons from repeated outcome evidence, rather than
+autonomously inventing personal facts. This history gate cannot revoke text
+already in an active conversation, user-opened transcripts, attachments, external
+provider logs, or unrelated copies outside the managed retrieval paths.

@@ -94,3 +94,38 @@ func TestChatHistoryFiltersUntrackedCopiesAcrossSearchReadAndRestart(t *testing.
 		t.Fatal("offline classifier fell back to raw history", result, err)
 	}
 }
+
+func TestChatHistoryRechecksNewTurnsWithoutCachingEarlierClearance(t *testing.T) {
+	root := t.TempDir()
+	sessions, _ := worksession.Open(root)
+	c, err := sessions.Create("Planning", t.TempDir(), "snap-test", time.Now().Add(-time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sessions.AddRevision(c.ID, worksession.Revision{ID: "rev-clear", SnapshotID: "snap-test", Objective: "The venue is Birch Hall.", BundlePath: "/synthetic/bundle", Status: "completed"}); err != nil {
+		t.Fatal(err)
+	}
+	memories, _ := memory.Open(root)
+	r, err := memories.RememberChat(memory.ChatInput{Subject: "profile.city", Kind: "fact", Quote: "I live in Harbor City.", ConversationID: "work-other", RunID: "run-other"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := memories.Forget(r.ID); err != nil {
+		t.Fatal(err)
+	}
+	m := &privacyHistoryModel{}
+	h := ChatHistory{StateDir: root, Semantics: m}
+	raw, _ := json.Marshal(map[string]string{"conversation_id": c.ID})
+	result, err := h.Tools()[1].Execute(context.Background(), raw)
+	if err != nil || !strings.Contains(result.Content, "Birch Hall") {
+		t.Fatal(result.Content, err)
+	}
+	priorCalls := m.calls
+	if _, err := sessions.AddRevision(c.ID, worksession.Revision{ID: "rev-new-copy", ParentRevisionID: "rev-clear", SnapshotID: "snap-test", Objective: "My home is Harbor City.", BundlePath: "/synthetic/bundle", Status: "completed"}); err != nil {
+		t.Fatal(err)
+	}
+	result, err = h.Tools()[1].Execute(context.Background(), raw)
+	if err != nil || strings.Contains(result.Content, "Harbor") || !strings.Contains(result.Content, "Birch Hall") || m.calls <= priorCalls || !strings.Contains(result.Content, `"withheld_historical_turns":1`) {
+		t.Fatal("old clearance reused for new source", result.Content, m.calls, err)
+	}
+}
