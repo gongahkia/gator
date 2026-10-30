@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/cliagent"
 	"github.com/gongahkia/gator/internal/orchestrator"
@@ -21,11 +22,12 @@ import (
 )
 
 type completionFixture struct {
-	tool        *codeCompletion
-	work        workspace.Work
-	assignments []string
-	reviews     int
-	question    chan struct{}
+	tool           *codeCompletion
+	work           workspace.Work
+	assignments    []string
+	reviews        int
+	question       chan struct{}
+	reviewOverride string
 }
 
 func newCompletionFixture(t *testing.T, values []string, rejectFirst, ask bool) *completionFixture {
@@ -94,6 +96,9 @@ func newCompletionFixture(t *testing.T, values []string, rejectFirst, ask bool) 
 	worker.Sessions = true
 	reviewer := orchestrator.HostedSpecialist("artifact_reviewer", "Read-only independent review fixture", func(_ context.Context, i orchestrator.Invocation) (orchestrator.Result, error) {
 		f.reviews++
+		if f.reviewOverride != "" {
+			return orchestrator.Result{Summary: f.reviewOverride}, nil
+		}
 		payload, err := r.integration.baseline(i.Baseline)
 		if err != nil {
 			return orchestrator.Result{}, err
@@ -163,6 +168,17 @@ func TestCompletionRepairsIndependentReviewFailure(t *testing.T) {
 	r := f.execute(t, context.Background(), completionArgs)
 	if r.Status != "completed" || len(r.Attempts) != 2 || f.reviews != 2 || !strings.Contains(f.assignments[1], "review marker") {
 		t.Fatalf("review loop failed: %+v", r)
+	}
+}
+
+func TestCompletionRejectsUnboundOrUnstructuredReview(t *testing.T) {
+	for _, verdict := range []string{`{"passed":true,"candidate_sha256":"wrong-candidate","findings":[]}`, `Looks good to me.`} {
+		f := newCompletionFixture(t, []string{"fixed"}, false, false)
+		f.reviewOverride = verdict
+		r := f.execute(t, context.Background(), completionArgs)
+		if r.Status != "failed" || !strings.Contains(r.Error, "invalid or mismatched verdict") || len(f.assignments) != 1 {
+			t.Fatalf("unverified completion: %+v", r)
+		}
 	}
 }
 
@@ -270,5 +286,82 @@ func TestCompletionRejectsAuthorityChangesInArguments(t *testing.T) {
 		if _, err := f.tool.Execute(context.Background(), []byte(args)); err == nil {
 			t.Fatal("accepted widened authority", args)
 		}
+	}
+}
+
+func TestCompletionHonorsSharedDelegationBudget(t *testing.T) {
+	f := newCompletionFixture(t, []string{"fixed"}, false, false)
+	for range 8 {
+		task, err := f.tool.supervisor.Start(orchestrator.StartRequest{Agent: "cli_codex", Task: "existing assignment"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.tool.supervisor.Await(context.Background(), task.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	r := f.execute(t, context.Background(), completionArgs)
+	if r.Status != "exhausted" || len(f.assignments) != 8 || f.reviews != 0 {
+		t.Fatalf("bypassed shared task budget: %+v", r)
+	}
+}
+
+type completionInventoryModel struct {
+	seen  bool
+	write bool
+	step  int
+}
+
+func (m *completionInventoryModel) Complete(_ context.Context, request agent.TurnRequest) (agent.Turn, error) {
+	for _, tool := range request.Tools {
+		if tool.Name == "complete_code" {
+			m.seen = true
+		}
+	}
+	m.step++
+	if m.write && m.step == 1 {
+		return agent.Turn{ToolCalls: []agent.ToolCall{{ID: "inventory", Name: "write_artifact", Arguments: []byte(`{"path":"report.md","content":"Tool inventory checked."}`)}}}, nil
+	}
+	return agent.Turn{Text: "Tool inventory checked."}, nil
+}
+
+func TestCompletionToolRequiresEditableWorkerHostChecksAndReviewer(t *testing.T) {
+	for _, test := range []struct {
+		name                                              string
+		inspect, readOnly, noChecks, noReviewer, disabled bool
+		want                                              bool
+	}{
+		{name: "enabled", want: true},
+		{name: "inspect", inspect: true},
+		{name: "read-only", readOnly: true},
+		{name: "no-host-checks", noChecks: true},
+		{name: "reviewer-disabled", noReviewer: true},
+		{name: "worker-disabled", disabled: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			m := &completionInventoryModel{write: !test.inspect}
+			mode, contract := action.Draft, artifact.DefaultContract("report.md")
+			if test.inspect {
+				mode, contract = action.Inspect, artifact.InspectionContract()
+			}
+			cfg := cliagent.Config{Kind: "codex", Executable: filepath.Join(t.TempDir(), "codex"), APIKeyEnv: "OPENAI_API_KEY", TimeoutSeconds: 60, AllowEdits: !test.readOnly}
+			r := Request{SourcePath: t.TempDir(), Objective: "Inspect available tools.", Mode: mode, Contract: contract, ExternalAgents: []cliagent.Config{cfg}}
+			if !test.noChecks {
+				r.Code.Verification = [][]string{{"true"}}
+			}
+			if test.noReviewer {
+				r.DisabledRoles = append(r.DisabledRoles, "artifact_reviewer")
+			}
+			if test.disabled {
+				r.DisabledRoles = append(r.DisabledRoles, "cli_codex")
+			}
+			_, err := (Service{Executor: Executor{Model: m, StateDir: t.TempDir()}}).Execute(context.Background(), r)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if m.seen != test.want {
+				t.Fatalf("completion tool available=%v, want %v", m.seen, test.want)
+			}
+		})
 	}
 }

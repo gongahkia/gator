@@ -40,6 +40,8 @@ const (
 
 var specialistNamePattern = regexp.MustCompile(`\A[a-z][a-z0-9_]{0,63}\z`)
 
+var ErrDelegationBudget = errors.New("aggregate invocation budget exhausted")
+
 // Invocation is the isolated assignment passed to one specialist.
 type Invocation struct {
 	Controls  <-chan cliagent.SessionControl

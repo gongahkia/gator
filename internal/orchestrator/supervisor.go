@@ -217,7 +217,7 @@ func (s *Supervisor) startLocked(request StartRequest) (Task, error) {
 		return Task{}, errors.New("invalid task input")
 	}
 	if s.used >= s.options.MaxDelegations {
-		return Task{}, errors.New("aggregate invocation budget exhausted")
+		return Task{}, ErrDelegationBudget
 	}
 	selected := request.Task
 	sessionID := ""

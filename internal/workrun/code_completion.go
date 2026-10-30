@@ -18,6 +18,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/cliagent"
 	"github.com/gongahkia/gator/internal/filelock"
 	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/patch"
@@ -60,6 +61,47 @@ type completionRecord struct {
 	CreatedAt    time.Time           `json:"created_at"`
 	Deadline     time.Time           `json:"deadline"`
 	UpdatedAt    time.Time           `json:"updated_at"`
+}
+
+// CompletionRecord is retained host evidence for a bounded code completion.
+type CompletionRecord = completionRecord
+
+func ReadCompletions(stateDir, runID string) ([]CompletionRecord, error) {
+	if !validInteractionRunID(runID) {
+		return nil, errors.New("invalid completion run ID")
+	}
+	directory := filepath.Join(stateDir, "gator", "completions", runID)
+	entries, err := os.ReadDir(directory)
+	if errors.Is(err, os.ErrNotExist) {
+		return []CompletionRecord{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	root, err := workspace.Open(directory)
+	if err != nil {
+		return nil, err
+	}
+	records := []CompletionRecord{}
+	for _, entry := range entries {
+		if filepath.Ext(entry.Name()) != ".json" {
+			continue
+		}
+		id := strings.TrimSuffix(entry.Name(), ".json")
+		if !completionID.MatchString(id) {
+			return nil, errors.New("invalid completion checkpoint filename")
+		}
+		data, err := root.ReadRegularFile(entry.Name(), 1024*1024)
+		if err != nil {
+			return nil, err
+		}
+		var record CompletionRecord
+		if decodeCompletion(data, &record) != nil || record.Version != 1 || record.ID != id || record.RunID != runID {
+			return nil, errors.New("invalid retained completion checkpoint")
+		}
+		records = append(records, record)
+	}
+	return records, nil
 }
 
 type codeCompletion struct {
@@ -193,6 +235,12 @@ func (c *codeCompletion) Execute(ctx context.Context, raw json.RawMessage) (agen
 			if errors.Is(err, context.DeadlineExceeded) {
 				record.Status = "exhausted"
 			}
+			if errors.Is(err, agent.ErrBudget) || errors.Is(err, orchestrator.ErrDelegationBudget) {
+				record.Status = "exhausted"
+			}
+			if errors.Is(err, cliagent.ErrSessionReconciliation) {
+				record.Status = "needs_reconciliation"
+			}
 			if stopErr := c.stop(&record); stopErr != nil {
 				record.Status = "needs_reconciliation"
 				record.Error = completionBound(record.Error+"; "+stopErr.Error(), 4096)
@@ -288,10 +336,16 @@ func (c *codeCompletion) run(ctx context.Context, r *completionRecord, save func
 			r.Status, a.Stage = "waiting_input", "waiting_input"
 			return save()
 		}
+		a.SessionID, a.Artifact, a.ArtifactSHA256 = worker.Result.SessionID, worker.Result.ArtifactPath, worker.Result.ArtifactSHA256
+		if worker.Status == "cancelled" {
+			return fmt.Errorf("completion worker cancelled: %w", context.Canceled)
+		}
+		if worker.Status == "interrupted" || worker.Native != nil && worker.Native.Status == "interrupted" {
+			return fmt.Errorf("worker outcome uncertain: %w", cliagent.ErrSessionReconciliation)
+		}
 		if worker.Status != "completed" {
 			return fmt.Errorf("worker stopped with %s: %s", worker.Status, worker.Error)
 		}
-		a.SessionID, a.Artifact, a.ArtifactSHA256 = worker.Result.SessionID, worker.Result.ArtifactPath, worker.Result.ArtifactSHA256
 		if a.SessionID == "" || len(r.Attempts) > 1 && a.SessionID != r.Attempts[0].SessionID {
 			return errors.New("completion worker lost native conversation identity")
 		}
