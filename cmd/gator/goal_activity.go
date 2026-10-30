@@ -134,6 +134,22 @@ func renderGoalActivity(stateDir, goalID string, out io.Writer) error {
 				fmt.Fprintf(&view, " — %s", activityLine(last.Summary, 140))
 			}
 			view.WriteByte('\n')
+			// Quiet fingerprint checks do not replace an earlier retained wake.
+			if last.Status == "unchanged" && definition.Enabled && record.Status == goal.Active {
+				for _, prior := range history[1:] {
+					if prior.Status == "running" || prior.Status == "unchanged" {
+						continue
+					}
+					if prior.Status == "completed" && prior.NotificationPolicySHA256 == jobNotificationPolicyHash(definition) && prior.WatchDecision != nil && prior.WatchDecision.Continuation != "" {
+						fmt.Fprintf(&view, "    retained continuation: %s", prior.WatchDecision.Continuation)
+						if !prior.WatchDecision.NextCheckAt.IsZero() {
+							fmt.Fprintf(&view, " · wake after %s", prior.WatchDecision.NextCheckAt.Local().Format(time.RFC3339))
+						}
+						view.WriteByte('\n')
+					}
+					break
+				}
+			}
 			if last.WatchDecision != nil {
 				fmt.Fprintf(&view, "    decision: %s — %s\n", last.WatchDecision.Status, activityLine(last.WatchDecision.Rationale, 180))
 				if last.WatchDecision.NextStep != "" {

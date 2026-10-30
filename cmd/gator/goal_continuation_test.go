@@ -1,6 +1,9 @@
 package main
 
 import (
+	"bytes"
+	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -56,5 +59,88 @@ func TestGoalContinuationRejectsInvalidAuthorityAndTiming(t *testing.T) {
 		if d.Status != "review" || !d.NextCheckAt.IsZero() {
 			t.Fatalf("invalid continuation accepted: %#v", d)
 		}
+	}
+}
+
+func TestGoalContinuationReopensDurableWakeAfterQuietPoll(t *testing.T) {
+	state := t.TempDir()
+	t.Setenv("GATOR_STATE_DIR", state)
+	goals, err := goal.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := goals.Add("Waiting approval", "", t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := goals.InitializePlan(record.ID, "Approve budget", []string{"Approval"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := goalCommand([]string{"watch", record.ID, "--task", "Wait for reported approval"}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	store, err := jobs.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	definitions, err := store.List()
+	if err != nil || len(definitions) != 1 {
+		t.Fatalf("definitions: %v %v", definitions, err)
+	}
+	definition := definitions[0]
+	input, err := localJobInputHash(definition, state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	for index, status := range []string{"completed", "unchanged"} {
+		attempt, err := store.Begin(definition, now.Add(time.Duration(index-2)*time.Hour))
+		if err != nil {
+			t.Fatal(err)
+		}
+		attempt.Status, attempt.FinishedAt = status, time.Now().UTC()
+		attempt.InputSHA256, attempt.NotificationPolicySHA256 = input, jobNotificationPolicyHash(definition)
+		if status == "completed" {
+			attempt.WatchDecision = &jobs.WatchDecision{Status: "quiet", Continuation: "waiting", NextStepID: plan.Steps[0].ID, NextCheckAt: now.Add(-time.Minute)}
+		}
+		if err := store.Record(attempt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	store, err = jobs.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var view bytes.Buffer
+	if err := renderGoalActivity(state, record.ID, &view); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(view.String(), "retained continuation: waiting") {
+		t.Fatalf("lost retained wake: %s", view.String())
+	}
+	calls := 0
+	execute := func(context.Context, jobs.Definition, string, ...string) (jobResult, error) {
+		calls++
+		return jobResult{Status: "completed", WatchDecision: &jobs.WatchDecision{Status: "quiet", Continuation: "idle"}}, nil
+	}
+	current, err := store.Begin(definition, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	current = executeJobContextWith(context.Background(), definition, current, state, false, execute)
+	if calls != 1 || current.Status != "completed" {
+		t.Fatalf("wake skipped: calls=%d attempt=%#v", calls, current)
+	}
+	if err := store.Record(current); err != nil {
+		t.Fatal(err)
+	}
+	current, err = store.Begin(definition, now.Add(time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	current = executeJobContextWith(context.Background(), definition, current, state, false, execute)
+	if calls != 1 || current.Status != "unchanged" {
+		t.Fatalf("old wake replayed: calls=%d status=%s", calls, current.Status)
 	}
 }
