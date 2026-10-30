@@ -139,6 +139,13 @@ func renderGoalActivity(stateDir, goalID string, out io.Writer) error {
 				if last.WatchDecision.NextStep != "" {
 					fmt.Fprintf(&view, "    next step: %s\n", activityLine(last.WatchDecision.NextStep, 180))
 				}
+				if last.WatchDecision.Continuation != "" {
+					fmt.Fprintf(&view, "    continuation: %s", last.WatchDecision.Continuation)
+					if !last.WatchDecision.NextCheckAt.IsZero() {
+						fmt.Fprintf(&view, " · wake after %s", last.WatchDecision.NextCheckAt.Local().Format(time.RFC3339))
+					}
+					view.WriteByte('\n')
+				}
 			}
 			changes := last.WatchChanges
 			if len(changes) == 0 {

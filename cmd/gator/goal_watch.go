@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/gongahkia/gator/internal/agent"
@@ -17,13 +18,16 @@ import (
 )
 
 type goalWatchDecision struct {
-	Attention *bool    `json:"attention"`
-	Urgent    bool     `json:"urgent"`
-	Summary   string   `json:"summary"`
-	NextStep  string   `json:"next_step"`
-	Rationale string   `json:"rationale"`
-	Evidence  []string `json:"evidence"`
-	ChangeIDs []string `json:"change_ids"`
+	Continuation string    `json:"continuation,omitempty"`
+	NextCheckAt  time.Time `json:"next_check_at,omitempty"`
+	NextStepID   string    `json:"next_step_id,omitempty"`
+	Attention    *bool     `json:"attention"`
+	Urgent       bool      `json:"urgent"`
+	Summary      string    `json:"summary"`
+	NextStep     string    `json:"next_step"`
+	Rationale    string    `json:"rationale"`
+	Evidence     []string  `json:"evidence"`
+	ChangeIDs    []string  `json:"change_ids"`
 }
 
 func parseGoalWatchDecision(finalText string) (goalWatchDecision, bool) {
