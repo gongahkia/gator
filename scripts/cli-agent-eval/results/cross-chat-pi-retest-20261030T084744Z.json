@@ -1,0 +1,41 @@
+{
+  "at": "2026-10-30T08:47:59Z",
+  "checks": {
+    "followup_not_rehydrated": true,
+    "original_unchanged": true,
+    "remembered_facts": true,
+    "same_native_conversation": true,
+    "separate_work_turns": true,
+    "two_worker_turns": true,
+    "work_succeeded": true
+  },
+  "cross_chat": true,
+  "error": "",
+  "evaluation": "live-manager-native-session-v1",
+  "kind": "pi",
+  "model": "gpt-5.6",
+  "passed": true,
+  "seconds": 14.578296838,
+  "tasks": [
+    {
+      "ID": "session-manager/subagent-001",
+      "Previous": "",
+      "SessionID": "cli-c5ab8b00cff86c4853b2f1c593f779d7",
+      "NativeThread": "01a18bfe-6619-76ae-b00f-1af0dad66208",
+      "Assignment": "Read project.md. Remember the codeword capybara-924 in this conversation. Report the project owner and deadline and confirm the codeword. Do not edit files.",
+      "Summary": "Project owner: Mira  \nDeadline: 2030-05-16  \nCodeword confirmed: capybara-924",
+      "Status": "completed",
+      "Error": ""
+    },
+    {
+      "ID": "session-manager-next/subagent-001",
+      "Previous": "session-manager/subagent-001",
+      "SessionID": "cli-c5ab8b00cff86c4853b2f1c593f779d7",
+      "NativeThread": "01a18bfe-6619-76ae-b00f-1af0dad66208",
+      "Assignment": "Without reading any files, what codeword did I ask you to remember? Who owns the project and what is its deadline?",
+      "Summary": "Codeword: capybara-924  \nProject owner: Mira  \nDeadline: 2030-05-16",
+      "Status": "completed",
+      "Error": ""
+    }
+  ]
+}

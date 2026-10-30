@@ -1,0 +1,41 @@
+{
+  "at": "2026-10-30T08:47:44Z",
+  "checks": {
+    "followup_not_rehydrated": true,
+    "original_unchanged": true,
+    "remembered_facts": true,
+    "same_native_conversation": true,
+    "separate_work_turns": true,
+    "two_worker_turns": true,
+    "work_succeeded": true
+  },
+  "cross_chat": true,
+  "error": "",
+  "evaluation": "live-manager-native-session-v1",
+  "kind": "codex",
+  "model": "gpt-5.6",
+  "passed": true,
+  "seconds": 19.768894127,
+  "tasks": [
+    {
+      "ID": "session-manager/subagent-001",
+      "Previous": "",
+      "SessionID": "cli-70b9d6ba9ef14863d5eb53ec4a908457",
+      "NativeThread": "01a18bfe-1913-7670-ac70-e9689bfee8ea",
+      "Assignment": "Read project.md. Remember the codeword capybara-924 in this conversation. Report the project owner and deadline and confirm the codeword. Do not edit files.",
+      "Summary": "- Project owner: **Mira**\n- Deadline: **May 16, 2030**\n- Codeword confirmed: **capybara-924**\n- No files edited.",
+      "Status": "completed",
+      "Error": ""
+    },
+    {
+      "ID": "session-manager-next/subagent-001",
+      "Previous": "session-manager/subagent-001",
+      "SessionID": "cli-70b9d6ba9ef14863d5eb53ec4a908457",
+      "NativeThread": "01a18bfe-1913-7670-ac70-e9689bfee8ea",
+      "Assignment": "Without reading any files, what codeword did I ask you to remember? Who owns the project and what is its deadline?",
+      "Summary": "- Codeword: **capybara-924**\n- Project owner: **Mira**\n- Deadline: **May 16, 2030**",
+      "Status": "completed",
+      "Error": ""
+    }
+  ]
+}

@@ -23,7 +23,7 @@ import (
 // This evaluation uses a live manager and a live native worker, exercising the
 // normal Work service and tool routing. It verifies native identity plus exact
 // remembered facts, rather than accepting the manager's claim of completion.
-func runSessionManager(ctx context.Context, cfg cliagent.Config, root, source, original string) error {
+func runSessionManager(ctx context.Context, cfg cliagent.Config, root, source, original string, crossChat bool) error {
 	backend, err := model.New(model.Config{Provider: model.OpenAI, Model: cfg.Model, BaseURL: strings.TrimRight(cfg.BaseURL, "/") + "/responses"})
 	if err != nil {
 		return err
@@ -34,11 +34,23 @@ func runSessionManager(ctx context.Context, cfg cliagent.Config, root, source, o
 	service := workrun.Service{Executor: workrun.Executor{Model: backend.Model, StateDir: state}}
 	objective := fmt.Sprintf(`Test native conversation continuity using %s only. First call start_agent with this exact task: "Read project.md. Remember the codeword capybara-924 in this conversation. Report the project owner and deadline and confirm the codeword. Do not edit files." Wait for completion. Then call start_agent with continue pointing to that completed task and this exact task: "Without reading any files, what codeword did I ask you to remember? Who owns the project and what is its deadline?" Do not paste prior answers, the owner, deadline, or codeword into this second assignment. Wait for completion and report both results. Do not call another specialist or create files.`, cfg.Role())
 	request := workrun.Request{SourcePath: source, RunID: "session-manager", Objective: objective, Mode: action.Inspect, Contract: artifact.InspectionContract(), ExternalAgents: []cliagent.Config{cfg}, MaxSteps: 16, Limits: agent.Limits{ModelRequests: 20, Tokens: 100000}}
+	if crossChat {
+		request.Objective = fmt.Sprintf(`Call start_agent using %s with this exact task: "Read project.md. Remember the codeword capybara-924 in this conversation. Report the project owner and deadline and confirm the codeword. Do not edit files." Wait for completion, then report the result. Make exactly one assignment.`, cfg.Role())
+	}
 	start := time.Now()
-	_, runErr := service.Execute(ctx, request)
+	out, runErr := service.Execute(ctx, request)
 	tasks, taskErr := orchestrator.ReadTasks(filepath.Join(state, "gator", "tasks", "session-manager"))
+	if crossChat && runErr == nil && taskErr == nil && len(tasks) == 1 {
+		request.RunID = "session-manager-next"
+		request.ConversationID = out.ConversationID
+		request.Objective = fmt.Sprintf(`Continue specialist %s using start_agent with continue=%q and this exact task: "Without reading any files, what codeword did I ask you to remember? Who owns the project and what is its deadline?" Do not copy previous answers or remembered facts into the assignment. Wait for completion and report the result. Make exactly one assignment.`, cfg.Role(), tasks[0].GlobalID)
+		_, runErr = service.Execute(ctx, request)
+		var next []orchestrator.Task
+		next, taskErr = orchestrator.ReadTasks(filepath.Join(state, "gator", "tasks", request.RunID))
+		tasks = append(tasks, next...)
+	}
 	checks := map[string]bool{"work_succeeded": runErr == nil, "two_worker_turns": taskErr == nil && len(tasks) == 2}
-	type evidence struct{ ID, Previous, SessionID, NativeThread, Assignment, Summary, Status string }
+	type evidence struct{ ID, Previous, SessionID, NativeThread, Assignment, Summary, Status, Error string }
 	items := []evidence{}
 	var first, second *orchestrator.Task
 	for i := range tasks {
@@ -47,7 +59,7 @@ func runSessionManager(ctx context.Context, cfg cliagent.Config, root, source, o
 		if t.Native != nil {
 			thread = t.Native.ThreadID
 		}
-		items = append(items, evidence{t.ID, t.Previous, t.Result.SessionID, thread, t.SelectedInput, t.Result.Summary, t.Status})
+		items = append(items, evidence{t.GlobalID, t.Previous, t.Result.SessionID, thread, t.SelectedInput, t.Result.Summary, t.Status, t.Error})
 		if t.Previous == "" {
 			first = t
 		} else {
@@ -55,6 +67,9 @@ func runSessionManager(ctx context.Context, cfg cliagent.Config, root, source, o
 		}
 	}
 	checks["same_native_conversation"] = first != nil && second != nil && first.Result.SessionID != "" && first.Result.SessionID == second.Result.SessionID && first.Native != nil && second.Native != nil && first.Native.ThreadID == second.Native.ThreadID
+	if crossChat {
+		checks["separate_work_turns"] = first != nil && second != nil && first.ParentRun != second.ParentRun
+	}
 	checks["followup_not_rehydrated"] = second != nil && !strings.Contains(second.SelectedInput, "capybara-924") && !strings.Contains(second.SelectedInput, "Mira") && !strings.Contains(second.SelectedInput, "2030-05-16")
 	checks["remembered_facts"] = second != nil && second.Status == "completed" && recalledFixture(second.Result.Summary)
 	current, readErr := os.ReadFile(filepath.Join(source, "project.md"))
@@ -67,7 +82,7 @@ func runSessionManager(ctx context.Context, cfg cliagent.Config, root, source, o
 	if err := errors.Join(runErr, taskErr); err != nil {
 		diagnostic = strings.ReplaceAll(err.Error(), os.Getenv(cfg.APIKeyEnv), "[redacted]")
 	}
-	report := map[string]any{"kind": cfg.Kind, "model": cfg.Model, "evaluation": "live-manager-native-session-v1", "at": time.Now().UTC().Format(time.RFC3339), "passed": passed, "checks": checks, "tasks": items, "seconds": time.Since(start).Seconds(), "error": diagnostic}
+	report := map[string]any{"kind": cfg.Kind, "model": cfg.Model, "evaluation": "live-manager-native-session-v1", "cross_chat": crossChat, "at": time.Now().UTC().Format(time.RFC3339), "passed": passed, "checks": checks, "tasks": items, "seconds": time.Since(start).Seconds(), "error": diagnostic}
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	if err := encoder.Encode(report); err != nil {

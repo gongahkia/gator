@@ -165,6 +165,10 @@ without those facts being copied into the follow-up. Original files remained
 unchanged. Each final report passes six checks; this is two scenarios, not
 twelve independent reliability trials. The initial Codex report is retained:
 its date-format-only grader failure was fixed and the scenario passed on rerun.
+The `cross-chat-*` reports split the assignments across two Work conversation
+turns. Initial runs exposed first-turn ownership being assigned before the new
+conversation ID was available. Both providers pass after that fix, with seven
+checks per scenario. Failed reports are retained alongside successful reruns.
 Live steering and structured question handling still have fixture evidence,
 not live-provider evidence. The terminal question UI and cross-chat background
 ownership remain part of the active continuity plan.
@@ -175,6 +179,7 @@ To repeat the opt-in live adapter checks with synthetic state:
 go run ./scripts/cli-agent-eval --kind codex --model gpt-5.6 --base-url https://us.api.openai.com/v1
 go run ./scripts/cli-agent-eval --kind pi --model gpt-5.6 --base-url https://us.api.openai.com/v1 --edit
 go run ./scripts/cli-agent-eval --session-manager --kind codex --model gpt-5.6 --base-url https://us.api.openai.com/v1
+go run ./scripts/cli-agent-eval --session-manager --cross-chat --kind pi --model gpt-5.6 --base-url https://us.api.openai.com/v1
 ```
 
 These commands use `OPENAI_API_KEY` from the current environment. They do not

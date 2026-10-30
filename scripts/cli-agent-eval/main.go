@@ -21,6 +21,7 @@ func main() {
 	baseURL := flag.String("base-url", "", "regional API base URL")
 	edit := flag.Bool("edit", false, "test isolated patch creation")
 	sessions := flag.Bool("session-manager", false, "test live manager/native-worker follow-up continuity")
+	crossChat := flag.Bool("cross-chat", false, "split the native follow-up across separate Work conversation turns")
 	flag.Parse()
 	path, err := exec.LookPath(*kind)
 	check(err)
@@ -56,7 +57,7 @@ func main() {
 		cfg.Provider = "openai"
 	}
 	if *sessions {
-		check(runSessionManager(context.Background(), cfg, root, source, original))
+		check(runSessionManager(context.Background(), cfg, root, source, original, *crossChat))
 		return
 	}
 	task := "Read project.md. Report the project name, owner and deadline exactly. Do not edit files."
