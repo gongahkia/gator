@@ -75,6 +75,9 @@ func newNativeClient(ctx context.Context, kind string, w *rpcWire, cfg Config, c
 		if err := json.Unmarshal(data, &result); err != nil || result.Thread.ID == "" {
 			return fail(errors.New("Codex returned no native thread identity"))
 		}
+		if threadID != "" && threadID != result.Thread.ID {
+			return fail(errors.New("Codex resumed a different native thread"))
+		}
 		c.mu.Lock()
 		c.state.ThreadID = result.Thread.ID
 		c.state.Status = "idle"
@@ -178,7 +181,7 @@ func (c *nativeClient) Send(ctx context.Context, text string) error {
 			return errors.New("missing native turn identity")
 		}
 		c.mu.Lock()
-		if c.state.Status == "running" {
+		if c.state.TurnID == "" {
 			c.state.TurnID = result.Turn.ID
 		}
 		c.mu.Unlock()
@@ -359,6 +362,9 @@ func (c *nativeClient) event(raw json.RawMessage) error {
 	if turn != "" && eventTurn != "" && turn != eventTurn {
 		return errors.New("CLI event belongs to another turn")
 	}
+	if (e.Method == "turn/started" || e.Method == "turn/completed") && eventTurn == "" {
+		return errors.New("native turn event has no identity")
+	}
 	if len(e.ID) > 0 {
 		if e.Method != "item/tool/requestUserInput" {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -378,12 +384,15 @@ func (c *nativeClient) event(raw json.RawMessage) error {
 		questions := []NativeQuestion{}
 		seen := map[string]bool{}
 		for _, q := range e.Params.Questions {
-			if q.Secret || q.ID == "" || seen[q.ID] || len(q.Text) > 8192 || len(q.Options) > 8 {
+			if q.Secret || q.ID == "" || len(q.ID) > 128 || seen[q.ID] || strings.TrimSpace(q.Text) == "" || len(q.Text) > 8192 || len(q.Options) > 8 {
 				return errors.New("invalid or secret native question")
 			}
 			seen[q.ID] = true
 			value := NativeQuestion{ID: q.ID, Text: q.Text}
 			for _, option := range q.Options {
+				if len(option.Label) > 8192 {
+					return errors.New("native question option exceeds limit")
+				}
 				value.Options = append(value.Options, option.Label)
 			}
 			questions = append(questions, value)
@@ -394,7 +403,11 @@ func (c *nativeClient) event(raw json.RawMessage) error {
 			return errors.New("overlapping native questions")
 		}
 		c.questionID = append(json.RawMessage(nil), e.ID...)
-		c.state.QuestionID = sessionDigest(append([]byte(c.state.ThreadID+"/"+c.state.TurnID+"/"), e.ID...))
+		if c.state.TurnID == "" {
+			c.state.TurnID = e.Params.TurnID
+		}
+		// A host nonce prevents an old answer matching a reused CLI request ID.
+		c.state.QuestionID = sessionDigest([]byte(sessionToken()))
 		c.state.Questions = questions
 		c.state.Status = "awaiting_input"
 		return nil

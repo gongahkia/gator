@@ -515,7 +515,7 @@ func (s *Supervisor) Answer(id, questionID string, answers map[string][]string) 
 		return err
 	}
 	e.task = updated
-	e.controls <- cliagent.SessionControl{ID: fmt.Sprintf("answer-%s-%d", e.task.ID, updated.AnswersQueued), Kind: "answer", QuestionID: questionID, Answers: copyAnswers}
+	e.controls <- cliagent.SessionControl{ID: fmt.Sprintf("answer-%s-%d", digest(e.task.GlobalID), updated.AnswersQueued), Kind: "answer", QuestionID: questionID, Answers: copyAnswers}
 	return nil
 }
 

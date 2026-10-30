@@ -175,6 +175,24 @@ func TestNativeIgnoresRetiredTurnsAndRejectsOtherActiveTurn(t *testing.T) {
 		t.Fatal("unrelated turn accepted")
 	}
 }
+
+func TestNativeCodexRejectsWrongResumedThread(t *testing.T) {
+	wire, server, reader := rpcFixture(t, false)
+	go func() {
+		initialize := readRPC(t, reader)
+		data, _ := json.Marshal(map[string]any{"id": initialize["id"], "result": map[string]any{}})
+		fmt.Fprintln(server, string(data))
+		_ = readRPC(t, reader) // initialized notification
+		resume := readRPC(t, reader)
+		data, _ = json.Marshal(map[string]any{"id": resume["id"], "result": map[string]any{"thread": map[string]any{"id": "unrelated"}}})
+		fmt.Fprintln(server, string(data))
+	}()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if _, err := newNativeClient(ctx, "codex", wire, Config{}, "/fixture", "expected"); err == nil || !strings.Contains(err.Error(), "different native thread") {
+		t.Fatalf("wrong native thread accepted: %v", err)
+	}
+}
 func TestNativeArgumentsPreserveSessionsAndLimitDiscovery(t *testing.T) {
 	for _, kind := range []string{"codex", "pi"} {
 		args := strings.Join(nativeArguments(Config{Kind: kind, Provider: "openai"}, false, "/private/session"), " ")
