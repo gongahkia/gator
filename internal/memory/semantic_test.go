@@ -91,6 +91,27 @@ func TestSemanticCoverageExclusionsAndCancellationDoNotCallProvider(t *testing.T
 	}
 }
 
+func TestSemanticCoverageLimitsDoNotSilentlySampleCandidates(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		count, size int
+	}{{"count", 129, 20}, {"bytes", 18, 4096}} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, _ := Open(t.TempDir())
+			for i := 0; i < tc.count; i++ {
+				if _, err := s.Add("fact", strings.Repeat("a", tc.size), "", "fixture", time.Time{}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			m := &semanticFixture{}
+			input := ChatInput{Subject: "custom.property", Kind: "fact", Quote: "An enduring statement."}
+			if _, err := s.AnalyzeChat(context.Background(), m, input, input.Quote); err != ErrSemanticCoverage || m.calls != 0 {
+				t.Fatal("partial candidate set treated as complete", err, m.calls)
+			}
+		})
+	}
+}
+
 func TestSemanticSnapshotDetectsDirectChangesWithoutRevisionBump(t *testing.T) {
 	s, _ := Open(t.TempDir())
 	record := reconciliationRecord(t, s, "custom.property", "I prefer short replies.", "work-first", "")
