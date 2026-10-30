@@ -22,7 +22,7 @@ func TestAgentCLIConfigurationLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	var output bytes.Buffer
-	if err := agentCommand([]string{"cli", "enable", "codex", "--executable", executable, "--model", "fixture-model", "--base-url", "https://us.api.openai.com/v1", "--allow-edits"}, &output); err != nil {
+	if err := agentFamilyCommand([]string{"cli", "enable", "codex", "--executable", executable, "--model", "fixture-model", "--base-url", "https://us.api.openai.com/v1", "--allow-edits"}, &output); err != nil {
 		t.Fatal(err)
 	}
 	store, err := config.DefaultStore()
@@ -37,16 +37,16 @@ func TestAgentCLIConfigurationLifecycle(t *testing.T) {
 		t.Fatalf("config: %+v", settings.ExternalAgents)
 	}
 	output.Reset()
-	if err := agentCommand([]string{"cli", "list"}, &output); err != nil {
+	if err := agentFamilyCommand([]string{"cli", "list"}, &output); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(output.String(), "codex  enabled  "+executable) {
 		t.Fatal(output.String())
 	}
-	if err := agentCommand([]string{"cli", "enable", "codex", "--executable", executable, "--api-key-env", "actual-secret-value"}, &output); err == nil {
+	if err := agentFamilyCommand([]string{"cli", "enable", "codex", "--executable", executable, "--api-key-env", "actual-secret-value"}, &output); err == nil {
 		t.Fatal("secret accepted as variable name")
 	}
-	if err := agentCommand([]string{"cli", "disable", "codex"}, &output); err != nil {
+	if err := agentFamilyCommand([]string{"cli", "disable", "codex"}, &output); err != nil {
 		t.Fatal(err)
 	}
 	settings, err = store.Load()

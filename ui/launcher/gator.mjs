@@ -17,7 +17,7 @@ gator resume <chat-id>         Reopen a retained conversation
 gator --version               Show build information
 gator work "task"              Run a scripted task
 gator work-rpc                JSON-lines automation
-gator config|provider|job|goal|memory|note|data|usage|doctor ...
+gator config|provider|agent|job|goal|memory|note|data|usage|doctor ...
                               Retained Gator command families
 gator update                  Explain manual updates
 

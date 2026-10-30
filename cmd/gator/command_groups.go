@@ -8,6 +8,7 @@ import (
 
 const agentFamilyUsage = `usage:
   gator agent list
+  gator agent cli list|enable|disable|doctor ...
 
 short form:
   gator -a ...`
@@ -30,7 +31,7 @@ func agentFamilyCommand(arguments []string, out io.Writer) error {
 	switch arguments[0] {
 	case "acp":
 		return errors.New("ACP Code mode is retired; use Gator conversations or work-rpc for automation")
-	case "list":
+	case "list", "cli":
 		return agentCommand(arguments, out)
 	default:
 		return errors.New(agentFamilyUsage)
