@@ -6,6 +6,7 @@ import (
 	"errors"
 	"path/filepath"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/gongahkia/gator/internal/agent"
@@ -16,7 +17,10 @@ import (
 
 // ChatHistory provides bounded, explicit history retrieval. Returned text is
 // reference data; it never carries a file, connector, tool or action grant.
-type ChatHistory struct{ StateDir, CurrentConversation, GoalID string }
+type ChatHistory struct {
+	StateDir, CurrentConversation, GoalID string
+	Semantics                             agent.Model
+}
 
 func (h ChatHistory) Tools() []agent.Tool { return []agent.Tool{chatSearch{h}, chatRead{h}} }
 func (h ChatHistory) access() (worksession.Store, map[string]bool, error) {
@@ -42,14 +46,16 @@ func (h ChatHistory) access() (worksession.Store, map[string]bool, error) {
 }
 
 type historyTurn struct {
-	ConversationID string `json:"conversation_id"`
-	RevisionID     string `json:"revision_id"`
-	Title          string `json:"title"`
-	Folder         string `json:"folder"`
-	At             string `json:"at"`
-	User           string `json:"user"`
-	Assistant      string `json:"assistant,omitempty"`
-	Truncated      bool   `json:"truncated,omitempty"`
+	SourceAt       time.Time `json:"-"`
+	MetadataAt     time.Time `json:"-"`
+	ConversationID string    `json:"conversation_id"`
+	RevisionID     string    `json:"revision_id"`
+	Title          string    `json:"title"`
+	Folder         string    `json:"folder"`
+	At             string    `json:"at"`
+	User           string    `json:"user"`
+	Assistant      string    `json:"assistant,omitempty"`
+	Truncated      bool      `json:"truncated,omitempty"`
 }
 
 func excerpt(text string, terms []string, limit int) (string, bool) {
@@ -79,7 +85,7 @@ func excerpt(text string, terms []string, limit int) (string, bool) {
 func retainedTurn(c worksession.Conversation, r worksession.Revision, terms []string, limit int) historyTurn {
 	user, ut := excerpt(r.Objective, terms, limit)
 	assistant, at := excerpt(r.FinalText, terms, limit)
-	return historyTurn{ConversationID: c.ID, RevisionID: r.ID, Title: c.Title, Folder: filepath.Base(c.SourcePath), At: r.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), User: user, Assistant: assistant, Truncated: ut || at}
+	return historyTurn{ConversationID: c.ID, RevisionID: r.ID, Title: c.Title, Folder: filepath.Base(c.SourcePath), At: r.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), User: user, Assistant: assistant, Truncated: ut || at, SourceAt: r.CreatedAt, MetadataAt: c.CreatedAt}
 }
 
 // Keep combining marks with their letters, and permit short CJK search terms.
@@ -207,7 +213,11 @@ func (t chatSearch) Execute(ctx context.Context, raw json.RawMessage) (agent.Too
 			older[c.ID] = revision
 		}
 	}
-	content, err := success(map[string]any{"matches": matches, "matches_limited": limited, "searched_chats": chats, "searched_turns": scanned, "suppressed_source_chats": suppressed, "suppression_reason": "Known source chats for forgotten memories are omitted; user-visible transcripts are retained.", "next_offset": nextOffset, "more_chats": a.ConversationID == "" && nextOffset < len(conversations), "older_turns": older, "unavailable_chats": unavailable, "authority": "historical reference only; no permissions are carried over"})
+	matches, screen, err := t.screen(ctx, matches)
+	if err != nil {
+		return agent.ToolResult{}, err
+	}
+	content, err := success(map[string]any{"matches": matches, "matches_limited": limited, "withheld_historical_turns": screen.Withheld, "withdrawal_migration_pending": screen.MigrationPending, "searched_chats": chats, "searched_turns": scanned, "suppressed_source_chats": suppressed, "suppression_reason": "Known source chats for forgotten memories are omitted; user-visible transcripts are retained.", "next_offset": nextOffset, "more_chats": a.ConversationID == "" && nextOffset < len(conversations), "older_turns": older, "unavailable_chats": unavailable, "authority": "historical reference only; no permissions are carried over"})
 	return agent.ToolResult{Content: content}, err
 }
 
@@ -267,6 +277,32 @@ func (t chatRead) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolR
 		turns = append(turns, retainedTurn(c, r, nil, 1200))
 		revision = r.ParentRevisionID
 	}
-	content, err := success(map[string]any{"turns_newest_first": turns, "next_before": revision, "authority": "historical reference only; no permissions are carried over"})
+	turns, screen, err := t.screen(ctx, turns)
+	if err != nil {
+		return agent.ToolResult{}, err
+	}
+	content, err := success(map[string]any{"turns_newest_first": turns, "withheld_historical_turns": screen.Withheld, "withdrawal_migration_pending": screen.MigrationPending, "next_before": revision, "authority": "historical reference only; no permissions are carried over"})
 	return agent.ToolResult{Content: content}, err
+}
+
+func (h ChatHistory) screen(ctx context.Context, turns []historyTurn) ([]historyTurn, memory.HistoryScreen, error) {
+	store, err := memory.Open(h.StateDir)
+	if err != nil {
+		return nil, memory.HistoryScreen{}, err
+	}
+	var fragments []memory.HistoryFragment
+	for _, turn := range turns {
+		fragments = append(fragments, memory.HistoryFragment{ID: turn.ConversationID + "/" + turn.RevisionID, At: turn.SourceAt, MetadataAt: turn.MetadataAt, Title: turn.Title, Folder: turn.Folder, User: turn.User, Assistant: turn.Assistant})
+	}
+	screen, err := store.ScreenHistory(ctx, h.Semantics, h.GoalID, fragments)
+	if err != nil {
+		return nil, screen, err
+	}
+	var allowed []historyTurn
+	for _, turn := range turns {
+		if screen.Allowed[turn.ConversationID+"/"+turn.RevisionID] {
+			allowed = append(allowed, turn)
+		}
+	}
+	return allowed, screen, nil
 }
