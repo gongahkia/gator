@@ -131,13 +131,11 @@ commands or widen write scopes through `complete_code` arguments.
 Loop arguments select `agent`, `objective`, 1–8 `acceptance` criteria, and
 optional `max_attempts`. Each attempt returns a retained patch, which the host
 checks in a separate candidate. The independent reviewer reads that candidate
-and returns a structured verdict bound to its SHA-256. Concrete failures return
-to the same native worker conversation. The host records actual successful file
+and returns a structured verdict bound to its SHA-256. The host records successful file
 reads and requires the reviewer to inspect every changed candidate file. For a
 deletion it requires both an observed missing candidate path and reading the
 original source. A claimed inspection in model prose does not satisfy this gate.
-Concrete failures return
-to the same native worker conversation. An unchanged failing patch stops the
+Concrete failures return to the same native worker conversation. An unchanged failing patch stops the
 loop; exhausted budgets, invalid review verdicts, cancelled workers and uncertain
 outcomes cannot become successful completions. A success claim without a patch
 is rejected; no-change outcomes currently require separate review.
