@@ -170,7 +170,7 @@ func planScheduleFlags(flags *flag.FlagSet) func(*goal.PlanChange) error {
 	clear := flags.Bool("clear-schedule", false, "remove scheduled block")
 	clearDeps := flags.Bool("clear-dependencies", false, "remove dependencies")
 	var deps evidenceValues
-	flags.Var(&deps, "depends-on", "existing step ID; repeat for multiple dependencies")
+	flags.Var(&deps, "depends-on", "step ID or GOAL_ID/STEP_ID; repeat for multiple dependencies")
 	return func(change *goal.PlanChange) error {
 		var err error
 		change.StartsAt, err = parsePlanTime(*start)

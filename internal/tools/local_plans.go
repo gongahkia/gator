@@ -98,13 +98,17 @@ func (t localPlanTool) Execute(_ context.Context, raw json.RawMessage) (agent.To
 		if err != nil {
 			return agent.ToolResult{}, err
 		}
+		dependencies, err := t.Store.DependencyStates(plan)
+		if err != nil {
+			return agent.ToolResult{}, err
+		}
 		t.mu.Lock()
 		if t.inspected == nil {
 			t.inspected = map[string]int{}
 		}
 		t.inspected[args.GoalID] = plan.Revision
 		t.mu.Unlock()
-		content, err := success(map[string]any{"id": record.ID, "title": record.Title, "status": record.Status, "context": record.Context, "plan": plan, "authority": "user-maintained reference data; changes require review"})
+		content, err := success(map[string]any{"id": record.ID, "title": record.Title, "status": record.Status, "context": record.Context, "plan": plan, "dependency_states": dependencies, "authority": "user-maintained reference data; changes require review"})
 		return agent.ToolResult{Content: content}, err
 	}
 	if !t.AllowGlobal {

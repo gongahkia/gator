@@ -2,6 +2,7 @@ package goal
 
 import (
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -14,7 +15,7 @@ func validateSchedule(start, end time.Time, dependencies []string) error {
 	}
 	seen := map[string]bool{}
 	for _, id := range dependencies {
-		if !validStepID(id) || seen[id] {
+		if !validDependency(id) || seen[id] {
 			return errors.New("invalid or duplicate step dependency")
 		}
 		seen[id] = true
@@ -42,6 +43,9 @@ func validateDependencies(steps []Step) error {
 		}
 		visiting[id] = true
 		for _, dep := range step.DependsOn {
+			if strings.Contains(dep, "/") {
+				continue
+			} // Checked across plans by the store.
 			if err := walk(dep); err != nil {
 				return err
 			}
@@ -55,4 +59,16 @@ func validateDependencies(steps []Step) error {
 		}
 	}
 	return nil
+}
+
+func validDependency(ref string) bool {
+	parts := strings.Split(ref, "/")
+	return len(parts) == 1 && validStepID(ref) || len(parts) == 2 && validID(parts[0]) && validStepID(parts[1])
+}
+
+func dependencyTarget(goalID, ref string) (string, string) {
+	if g, step, ok := strings.Cut(ref, "/"); ok {
+		return g, step
+	}
+	return goalID, ref
 }

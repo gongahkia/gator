@@ -203,6 +203,11 @@ func (s Store) applyPlanChange(goalID string, change PlanChange, mutationID stri
 	if err := validateChange(change); err != nil {
 		return Plan{}, err
 	}
+	graphLock, err := s.lockPlan("dependency-graph")
+	if err != nil {
+		return Plan{}, err
+	}
+	defer func() { _ = filelock.Unlock(graphLock); _ = graphLock.Close() }()
 	lock, err := s.lockPlan(goalID)
 	if err != nil {
 		return Plan{}, err
@@ -308,6 +313,9 @@ func (s Store) applyPlanChange(goalID string, change PlanChange, mutationID stri
 	plan.Revision++
 	plan.UpdatedAt = now
 	if err := validatePlan(plan); err != nil {
+		return Plan{}, err
+	}
+	if err := s.validateDependencyGraph(plan); err != nil {
 		return Plan{}, err
 	}
 	data, err := json.MarshalIndent(plan, "", "  ")

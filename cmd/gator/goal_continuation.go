@@ -52,7 +52,7 @@ func guardStalledContinuation(history []jobs.Attempt, current jobs.Attempt) jobs
 	return current
 }
 
-func checkedGoalContinuation(result jobs.WatchDecision, proposed goalWatchDecision, plan goal.Plan, definition jobs.Definition, now time.Time) jobs.WatchDecision {
+func checkedGoalContinuation(result jobs.WatchDecision, proposed goalWatchDecision, plan goal.Plan, definition jobs.Definition, now time.Time, dependencies ...map[string]goal.StepStatus) jobs.WatchDecision {
 	if proposed.Continuation == "" && proposed.NextCheckAt.IsZero() && proposed.NextStepID == "" {
 		return result
 	}
@@ -93,6 +93,11 @@ func checkedGoalContinuation(result jobs.WatchDecision, proposed goalWatchDecisi
 		states := map[string]goal.StepStatus{}
 		for _, step := range plan.Steps {
 			states[step.ID] = step.Status
+		}
+		if len(dependencies) > 0 {
+			for id, value := range dependencies[0] {
+				states[id] = value
+			}
 		}
 		for _, step := range plan.Steps {
 			if step.ID != proposed.NextStepID {

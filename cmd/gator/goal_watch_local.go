@@ -25,13 +25,17 @@ func localGoalWatchItems(stateDir, goalID string, now time.Time) ([]jobs.WatchIt
 	if err != nil {
 		return nil, err
 	}
-	return goalPlanWatchItems(plan, now), nil
+	states, err := store.DependencyStates(plan)
+	if err != nil {
+		return nil, err
+	}
+	return goalPlanWatchItems(plan, now, states), nil
 }
 
 // Suppress rewordings of the same checked local concern, not new evidence,
 // urgency, artifacts or proposed edits. Other source types retain their full
 // result digest until an equally reliable evidence identity is available.
-func localWatchDecisionDigest(decision jobs.WatchDecision, plan goal.Plan, now time.Time, messages []agent.Message) string {
+func localWatchDecisionDigest(decision jobs.WatchDecision, plan goal.Plan, now time.Time, messages []agent.Message, dependencies ...map[string]goal.StepStatus) string {
 	if decision.Status != "attention" || len(decision.Evidence) == 0 {
 		return ""
 	}
@@ -41,7 +45,7 @@ func localWatchDecisionDigest(decision jobs.WatchDecision, plan goal.Plan, now t
 		}
 	}
 	items := map[string]string{}
-	for _, item := range goalPlanWatchItems(plan, now) {
+	for _, item := range goalPlanWatchItems(plan, now, dependencies...) {
 		ref := "goal plan step " + item.ID
 		if item.ID == "review" {
 			ref = "goal plan review"
@@ -66,7 +70,7 @@ func localWatchDecisionDigest(decision jobs.WatchDecision, plan goal.Plan, now t
 	return hex.EncodeToString(digest[:])
 }
 
-func goalPlanWatchItems(plan goal.Plan, now time.Time) []jobs.WatchItem {
+func goalPlanWatchItems(plan goal.Plan, now time.Time, dependencies ...map[string]goal.StepStatus) []jobs.WatchItem {
 	items := make([]jobs.WatchItem, 0, len(plan.Steps)+1)
 	add := func(id string, value any) {
 		data, _ := json.Marshal(value)
@@ -81,6 +85,11 @@ func goalPlanWatchItems(plan goal.Plan, now time.Time) []jobs.WatchItem {
 	status := map[string]goal.StepStatus{}
 	for _, step := range plan.Steps {
 		status[step.ID] = step.Status
+	}
+	if len(dependencies) > 0 {
+		for id, value := range dependencies[0] {
+			status[id] = value
+		}
 	}
 	for _, step := range plan.Steps {
 		blocked := []string{}

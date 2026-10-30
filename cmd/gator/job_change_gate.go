@@ -75,6 +75,13 @@ func localJobInputHashAt(definition jobs.Definition, stateDir string, now time.T
 		if err := write(plan); err != nil {
 			return "", err
 		}
+		dependencies, err := goals.DependencyStates(plan)
+		if err != nil {
+			return "", err
+		}
+		if err := write(dependencies); err != nil {
+			return "", err
+		}
 		if definition.GoalWatch {
 			// Crossing a due time is a new input even when every file stays
 			// identical. The boolean stays stable after the crossing, so it

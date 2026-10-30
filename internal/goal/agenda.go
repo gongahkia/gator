@@ -58,9 +58,9 @@ func (s Store) Agenda(scope string, now, until time.Time) (Agenda, error) {
 		if err != nil {
 			return result, err
 		}
-		status := map[string]StepStatus{}
-		for _, step := range plan.Steps {
-			status[step.ID] = step.Status
+		status, err := s.DependencyStates(plan)
+		if err != nil {
+			return result, err
 		}
 		for _, step := range plan.Steps {
 			if step.Status == StepDone {

@@ -748,7 +748,7 @@ func preparedJobWorkRequest(definition jobs.Definition, stateDir string) (workru
 		request.System += continuity
 	}
 	for _, attempt := range history {
-		if attempt.Status == "completed" && attempt.Conversation != "" && attempt.NotificationPolicySHA256 == jobNotificationPolicyHash(definition) {
+		if attempt.Status == "completed" && attempt.Conversation != "" && (!definition.GoalWatch || attempt.NotificationPolicySHA256 == jobNotificationPolicyHash(definition)) {
 			request.ConversationID = attempt.Conversation
 			break
 		}
@@ -792,6 +792,7 @@ func runJobProcessWith(ctx context.Context, definition jobs.Definition, stateDir
 		result.ResultSHA256 = digestJobResult(outcome.Result.FinalText, outcome.Manifest.Artifacts)
 		if definition.GoalWatch {
 			var plan goal.Plan
+			var dependencyStates map[string]goal.StepStatus
 			active := true
 			if definition.GoalID != "" {
 				goals, openErr := goal.Open(stateDir)
@@ -807,12 +808,16 @@ func runJobProcessWith(ctx context.Context, definition jobs.Definition, stateDir
 				if err != nil {
 					return result, err
 				}
+				dependencyStates, err = goals.DependencyStates(plan)
+				if err != nil {
+					return result, err
+				}
 			}
 			references := newWatchReferenceSet(outcome.Manifest, definition.RuntimeWatchItems, plan, outcome.Work)
 			decision := evaluateGoalWatchResult(outcome.Result.FinalText, outcome.Result.Messages, outcome.Manifest.Artifacts, references, definition.RuntimeWatchChanges)
 			rawDecision, validDecision := parseGoalWatchDecision(outcome.Result.FinalText)
 			if validDecision {
-				decision = checkedGoalContinuation(decision, rawDecision, plan, definition, time.Now())
+				decision = checkedGoalContinuation(decision, rawDecision, plan, definition, time.Now(), dependencyStates)
 			}
 			if !active {
 				decision = jobs.WatchDecision{Status: "quiet", Summary: "Goal is no longer active.", Rationale: "The owner paused or completed this goal during the check."}
@@ -824,7 +829,7 @@ func runJobProcessWith(ctx context.Context, definition jobs.Definition, stateDir
 			result.Summary = decision.Summary
 			result.Urgent = decision.Urgent
 			if definition.ChangeOnly && validDecision && len(rawDecision.Evidence) == len(decision.Evidence) && len(definition.WatchSources) == 0 && len(outcome.Manifest.Artifacts) == 0 {
-				if digest := localWatchDecisionDigest(decision, plan, time.Now(), outcome.Result.Messages); digest != "" {
+				if digest := localWatchDecisionDigest(decision, plan, time.Now(), outcome.Result.Messages, dependencyStates); digest != "" {
 					result.ResultSHA256 = digest
 				}
 			}
