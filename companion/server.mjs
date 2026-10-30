@@ -10,7 +10,8 @@ export { readToken } from './auth.mjs';
 const identity = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/;
 const creationIdentity = /^[a-zA-Z0-9][a-zA-Z0-9_-]{15,95}$/;
 const execute = promisify(execFile);
-const idle = worker => !worker.closed && !['running', 'queued', 'pending_approval', 'pending_connection', 'external', 'panel', 'receipt_busy', 'catalog_busy'].some(key => worker.state?.[key]) && !worker.state?.queue?.length;
+const recoverable = worker => !!worker.state && !worker.unconfirmedAction && !['running', 'queued', 'pending_approval', 'pending_connection', 'external', 'panel', 'receipt_busy', 'catalog_busy'].some(key => worker.state?.[key]) && !worker.state?.queue?.length;
+const idle = worker => !worker.closed && recoverable(worker);
 const assets = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
   ['/client.mjs', ['client.mjs', 'text/javascript; charset=utf-8']],
@@ -41,9 +42,12 @@ export function createCompanion({ binary, workspace, env, tokenFile, origin,
       throw Object.assign(new Error('Chat creation is unconfirmed. Retry the same request.'), { code: 'CREATION_UNCONFIRMED' });
     }
   },
+  now = () => Date.now(),
   spawnBackend = (id) => new Backend(binary, workspace, { ...env, GATOR_UI_SESSION_HOST: '1', GATOR_UI_FRONTEND: 'companion' }, ['ui-backend', id, '']) }) {
   if (origin && (new URL(origin).origin !== origin || new URL(origin).protocol !== 'https:')) throw new Error('The companion browser origin must be an exact HTTPS origin.');
   const workers = new Map();
+  const recoveries = new Map();
+  const startedAt = now();
   let sequence = Promise.resolve(), stopping = false, pending = 0;
   const serial = task => {
     if (pending >= 32) throw new Error('Companion request queue is full.');
@@ -52,16 +56,32 @@ export function createCompanion({ binary, workspace, env, tokenFile, origin,
     sequence = next.catch(() => {});
     return next;
   };
-  const worker = async id => {
+  const worker = async (id, readOnly) => {
     if (!identity.test(id)) throw new Error('Invalid conversation identity.');
     let current = workers.get(id);
-    if (current?.closed) throw new Error('The host process stopped. Review this conversation on the host before reopening it.');
+    if (current?.closed) {
+      if (!readOnly || !recoverable(current)) throw new Error('The host process stopped with work that needs review. Review this conversation on the host before reopening it.');
+      const attempts = (recoveries.get(id) || []).filter(at => now() - at < 300000);
+      if (attempts.length >= 3 || attempts.length && now() - attempts.at(-1) < 10000) throw new Error('Idle session recovery is cooling down. Retry this read later; no action was replayed.');
+      attempts.push(now());
+      recoveries.set(id, attempts);
+      // Keep the closed worker until a replacement confirms its identity. Failed
+      // starts therefore remain bounded on subsequent browser polls too.
+      const replacement = spawnBackend(id);
+      try {
+        await replacement.ready();
+        if (replacement.state?.conversation_id !== id) throw new Error('The host opened a different conversation.');
+        workers.set(id, replacement);
+        current = replacement;
+      } catch (error) { await replacement.stop(); throw error; }
+    }
     if (!current) {
       if (workers.size >= 4) {
         const available = [...workers].find(([, value]) => idle(value));
         if (!available) throw new Error('Four conversations have pending work. Finish a task or review its queue on the host before opening another.');
         await available[1].stop();
         workers.delete(available[0]);
+        recoveries.delete(available[0]);
       }
       current = spawnBackend(id);
       try {
@@ -95,6 +115,10 @@ export function createCompanion({ binary, workspace, env, tokenFile, origin,
       if (!access) return respond(res, 401, { error: 'Authentication required.' });
       if (stopping) return respond(res, 503, { error: 'Companion is stopping.' });
       const url = new URL(req.url, localOrigin);
+      if (req.url === '/v1/health' && req.method === 'GET') {
+        if (!await authorized()) return respond(res, 401, { error: 'Authentication required.' });
+        return respond(res, 200, { protocol: 1, status: 'ready', uptime_seconds: Math.max(0, Math.floor((now() - startedAt) / 1000)), sessions: workers.size, stopped_sessions: [...workers.values()].filter(w => w.closed).length, pending_requests: pending });
+      }
       if (url.pathname === '/v1/chats' && req.method === 'GET') {
         const params = url.searchParams;
         if ([...params.keys()].some(key => !['q', 'scope', 'after'].includes(key) || params.getAll(key).length !== 1)) throw new Error('Unknown or repeated catalog parameter.');
@@ -146,13 +170,19 @@ export function createCompanion({ binary, workspace, env, tokenFile, origin,
         // Authorization may have been revoked while waiting for another action.
         if (!await authorized()) throw Object.assign(new Error('Access was revoked.'), { code: 'AUTH_REVOKED' });
         if (stopping) throw new Error('Companion is stopping.');
-        const owner = await worker(match[1]);
+        const owner = await worker(match[1], !frame);
         if (!await authorized()) throw Object.assign(new Error('Access was revoked.'), { code: 'AUTH_REVOKED' });
         if (frame) {
+          const admission = frame.type === 'upload_submit' ? JSON.stringify(frame) : undefined;
+          if (owner.unconfirmedAction && (!admission || admission !== owner.unconfirmedAdmission)) throw new Error('The previous action is unconfirmed. Review it on the host, or retry the exact same message request.');
           if (owner.state?.external || owner.state?.panel || owner.state?.pending_connection) throw new Error('Finish this conversation’s host setup first.');
           if ((frame.type === 'upload_submit' || frame.type === 'queue' && frame.queue.action === 'run') && !owner.state.running && [...workers.values()].filter(w => !w.closed && w.state?.running).length >= 3) throw new Error('Three conversations are working.');
+          owner.unconfirmedAction = true;
+          owner.unconfirmedAdmission = admission;
           if (frame.type === 'upload_submit') await owner.submitUpload(frame);
           else await owner.apply(frame);
+          owner.unconfirmedAction = false;
+          owner.unconfirmedAdmission = undefined;
         }
         return { conversation_id: match[1], execution_host: 'companion', state: owner.state, disconnected: owner.closed, error: owner.closed ? owner.failure : undefined };
       });

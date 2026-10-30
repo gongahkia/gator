@@ -443,3 +443,29 @@ unrelated-chat isolation and listener restart. Browser checks cover offline and
 completed health, stale storage and reconnect, keyboard disclosures/focus, unchanged
 polling, draft preservation, narrow dark/light layouts, plain-text untrusted
 content and clearing health on revocation. Viewing health sends no action frames.
+
+## Listener readiness and idle recovery
+
+After preparing/installing a service, check its authenticated listener without
+opening a chat or calling a provider:
+
+```sh
+node companion/doctor.mjs http://127.0.0.1:7341 /private/path/gator-companion/access.token
+```
+
+Use the owner token file on the host. The probe follows no redirects, times out
+in five seconds, and prints counts only (no token, conversation IDs or paths).
+Exit 0 means the listener responds with no stopped sessions; 2 means stopped
+sessions need attention; 1 means the probe failed. This is not a model/provider,
+job-supervisor or end-to-end task health check. `GET /v1/health` requires the same
+authentication and Host/Origin checks as conversation routes.
+
+A read can now reopen a crashed **idle** backend. Restarts are capped at three
+attempts per five minutes, with ten seconds between attempts, including failed
+starts. No POST or prior action is replayed. Active work, queued messages,
+approvals, connection handoffs and unconfirmed actions require host review.
+A live backend can retry the exact same unconfirmed message admission with its
+stable request ID; different mutations stay blocked. A listener restart still
+uses the existing retained Go queue/admission semantics. These safeguards do not
+prove recovery from host power loss or remove the need to run the separate job
+supervisor on an always-on host.
