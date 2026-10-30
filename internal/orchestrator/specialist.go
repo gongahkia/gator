@@ -27,6 +27,8 @@ var hostReservedTools = map[string]struct{}{
 	"inspect_agent":     {},
 	"await_agent":       {},
 	"cancel_agent":      {},
+	"answer_agent":      {},
+	"complete_code":     {},
 	"delegate_readonly": {},
 	"delegate_writer":   {},
 	"delegate_writers":  {},

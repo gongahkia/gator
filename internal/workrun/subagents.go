@@ -182,7 +182,23 @@ func (e Executor) subagentTools(ctx context.Context, request Request, work works
 		supervisor.Close()
 		return nil, nil, err
 	}
-	return append(batch, supervisor.Tools()...), supervisor.Close, nil
+	surface := append(batch, supervisor.Tools()...)
+	if request.Mode != action.Inspect && len(request.Code.Verification) > 0 {
+		eligible := map[string]bool{}
+		hasReviewer := false
+		for _, role := range specialists {
+			hasReviewer = hasReviewer || role.Name == "artifact_reviewer"
+			for _, cfg := range request.ExternalAgents {
+				if role.Sessions && role.Name == cfg.Role() && cfg.AllowEdits {
+					eligible[role.Name] = true
+				}
+			}
+		}
+		if hasReviewer && len(eligible) > 0 {
+			surface = append(surface, &codeCompletion{supervisor: supervisor, request: request, eligible: eligible, policy: digest})
+		}
+	}
+	return surface, supervisor.Close, nil
 }
 
 func (e Executor) hostedCodeSpecialist(request Request, work workspace.Work) orchestrator.Specialist {
