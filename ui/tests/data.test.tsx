@@ -20,7 +20,10 @@ test("private data keyboard reviews export verify and restore into a separate pa
   const flush = async () => { await setup.flush(); await Bun.sleep(30); await setup.flush() }
   const until = async (predicate: () => boolean | Promise<boolean>, label: string) => { const end = Date.now() + 15000; while (!await predicate()) { if (Date.now() > end) throw new Error(label + ": " + JSON.stringify(client.state?.panel)); await flush() } }
   const choose = async (label: string) => {
-    await until(() => !!client.state?.panel?.rows?.some(row => row.label === label), "available " + label)
+    await until(() => !client.state?.pending_operation && !!client.state?.panel?.rows?.some(row => row.label === label), "available " + label)
+    // Host state can arrive before the corresponding panel owns keyboard focus.
+    const title = client.state!.panel!.title
+    await flush(); await setup.waitForFrame(frame => frame.includes(title))
     setup.mockInput.pressKey("f", { ctrl: true }); await flush(); setup.mockInput.pressKey("u", { ctrl: true }); await setup.mockInput.typeText(label); setup.mockInput.pressEnter(); await flush()
     await until(() => client.state?.panel?.rows?.[client.state.panel.selected ?? 0]?.label === label, "selected " + label)
     setup.mockInput.pressEnter(); await flush()

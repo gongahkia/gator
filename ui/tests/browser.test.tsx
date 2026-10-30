@@ -63,6 +63,7 @@ test("browser setup is discoverable, reviewed and cancellable without downloadin
     expect(f.setup.captureCharFrame()).toContain("Download")
     expect(f.client.state?.work_details?.browser_session).toBeUndefined()
     f.setup.mockInput.pressEscape(); await f.flush()
+    await f.until(() => f.client.state?.panel?.title === "Browser", "cancelled install review")
     expect(f.client.state?.panel?.title).toBe("Browser")
     expect(f.client.draft.text).toBe("Keep my browser task draft")
     expect(await f.sessions().catch(() => [])).toEqual([])
