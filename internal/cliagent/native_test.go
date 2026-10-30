@@ -132,7 +132,8 @@ func TestPiNativeSettledIsRequiredAndAbortClearsQueuedWork(t *testing.T) {
 			t.Error("expected abort")
 		}
 		reply(r, nil)
-		fmt.Fprintln(server, `{"type":"agent_settled","aborted":true}`)
+		fmt.Fprintln(server, `{"type":"message_end","message":{"role":"assistant","content":[],"stopReason":"aborted","errorMessage":"Request aborted"}}`)
+		fmt.Fprintln(server, `{"type":"agent_settled"}`)
 	}()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -152,6 +153,19 @@ func TestPiNativeSettledIsRequiredAndAbortClearsQueuedWork(t *testing.T) {
 	state, err := c.Await(ctx)
 	if err != nil || state.Status != "cancelled" {
 		t.Fatal(state, err)
+	}
+}
+
+func TestPiErrorStopCannotBecomeSuccessWithoutErrorText(t *testing.T) {
+	c := &nativeClient{kind: "pi", state: NativeState{Status: "running"}}
+	if err := c.piEvent([]byte(`{"type":"message_end","message":{"role":"assistant","content":[],"stopReason":"error"}}`)); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.piEvent([]byte(`{"type":"agent_settled"}`)); err != nil {
+		t.Fatal(err)
+	}
+	if c.State().Status != "failed" {
+		t.Fatal(c.State())
 	}
 }
 func TestNativeRejectsOtherThreadAndSecretQuestions(t *testing.T) {
@@ -191,6 +205,35 @@ func TestNativeCodexRejectsWrongResumedThread(t *testing.T) {
 	defer cancel()
 	if _, err := newNativeClient(ctx, "codex", wire, Config{}, "/fixture", "expected"); err == nil || !strings.Contains(err.Error(), "different native thread") {
 		t.Fatalf("wrong native thread accepted: %v", err)
+	}
+}
+
+func TestCodexDynamicClarificationReturnsAnswerWithoutPermissions(t *testing.T) {
+	wire, _, reader := rpcFixture(t, false)
+	c := &nativeClient{wire: wire, kind: "codex", state: NativeState{ThreadID: "thread", TurnID: "turn", Status: "running"}}
+	if err := c.event([]byte(`{"id":7,"method":"item/tool/call","params":{"threadId":"thread","turnId":"turn","tool":"gator_ask_user","arguments":{"question":"Which format?","options":["Markdown"]}}}`)); err != nil {
+		t.Fatal(err)
+	}
+	s := c.State()
+	if s.Status != "awaiting_input" || len(s.Questions) != 1 || s.Questions[0].ID != "answer" {
+		t.Fatal(s)
+	}
+	done := make(chan error, 1)
+	go func() { done <- c.Answer(context.Background(), map[string][]string{"answer": {"Markdown"}}) }()
+	response := readRPC(t, reader)
+	result := response["result"].(map[string]any)
+	items := result["contentItems"].([]any)
+	if result["success"] != true || len(items) != 1 || items[0].(map[string]any)["text"] != `{"answer":"Markdown"}` {
+		t.Fatal(response)
+	}
+	if _, granted := result["permissions"]; granted {
+		t.Fatal("question response granted permissions")
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if c.State().Status != "running" {
+		t.Fatal(c.State())
 	}
 }
 func TestNativeArgumentsPreserveSessionsAndLimitDiscovery(t *testing.T) {

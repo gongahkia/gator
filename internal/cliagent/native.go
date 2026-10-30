@@ -30,17 +30,18 @@ type NativeState struct {
 // nativeClient tracks a real CLI conversation. It does not infer completion
 // from command acceptance or agent_end, and never answers approvals as consent.
 type nativeClient struct {
-	wire          *rpcWire
-	kind          string
-	mu            sync.Mutex
-	sendMu        sync.Mutex
-	state         NativeState
-	turnDone      chan struct{}
-	questionID    json.RawMessage
-	secret        string
-	retiredTurns  map[string]bool
-	questionInput json.RawMessage
-	interrupting  bool
+	wire           *rpcWire
+	kind           string
+	mu             sync.Mutex
+	sendMu         sync.Mutex
+	state          NativeState
+	turnDone       chan struct{}
+	questionID     json.RawMessage
+	secret         string
+	retiredTurns   map[string]bool
+	questionInput  json.RawMessage
+	questionMethod string
+	interrupting   bool
 }
 
 func newNativeClient(ctx context.Context, kind string, w *rpcWire, cfg Config, cwd, threadID string) (*nativeClient, error) {
@@ -64,6 +65,7 @@ func newNativeClient(ctx context.Context, kind string, w *rpcWire, cfg Config, c
 			params["threadId"] = threadID
 		} else {
 			params["ephemeral"] = false
+			params["dynamicTools"] = []any{map[string]any{"type": "function", "name": "gator_ask_user", "description": "Ask the user a clarification question before making an uncertain decision. Never request credentials or permissions. Wait for the answer; this tool grants no other capability.", "inputSchema": json.RawMessage(`{"type":"object","additionalProperties":false,"required":["question","options"],"properties":{"question":{"type":"string","maxLength":8192},"options":{"type":"array","maxItems":8,"items":{"type":"string","maxLength":8192}}}}`)}}
 		}
 		data, err := w.Call(ctx, method, params)
 		if err != nil {
@@ -169,6 +171,7 @@ func (c *nativeClient) Send(ctx context.Context, text string) error {
 	c.state.QuestionID = ""
 	c.questionID = nil
 	c.questionInput = nil
+	c.questionMethod = ""
 	c.interrupting = false
 	c.turnDone = make(chan struct{})
 	thread := c.state.ThreadID
@@ -261,6 +264,7 @@ func (c *nativeClient) Answer(ctx context.Context, answers map[string][]string) 
 	id := append(json.RawMessage(nil), c.questionID...)
 	questions := append([]NativeQuestion(nil), c.state.Questions...)
 	questionInput := append(json.RawMessage(nil), c.questionInput...)
+	questionMethod := c.questionMethod
 	c.mu.Unlock()
 	if len(answers) != len(questions) {
 		return errors.New("answer every pending question exactly once")
@@ -284,6 +288,10 @@ func (c *nativeClient) Answer(ctx context.Context, answers map[string][]string) 
 	c.state.Status = "answering"
 	c.mu.Unlock()
 	var result any = map[string]any{"answers": response}
+	if c.kind == "codex" && questionMethod == "dynamic" {
+		text, _ := json.Marshal(map[string]string{"answer": answers["answer"][0]})
+		result = map[string]any{"success": true, "contentItems": []any{map[string]any{"type": "inputText", "text": string(text)}}}
+	}
 	if c.kind == "claude" {
 		claudeAnswers := map[string]string{}
 		for _, q := range questions {
@@ -299,6 +307,7 @@ func (c *nativeClient) Answer(ctx context.Context, answers map[string][]string) 
 	if string(c.questionID) == string(id) && c.state.Status == "answering" {
 		c.questionID = nil
 		c.questionInput = nil
+		c.questionMethod = ""
 		c.state.Questions = nil
 		c.state.QuestionID = ""
 		c.state.Status = "running"
@@ -329,6 +338,7 @@ func (c *nativeClient) finish(status, diagnostic string) {
 	c.state.QuestionID = ""
 	c.questionID = nil
 	c.questionInput = nil
+	c.questionMethod = ""
 	if c.turnDone != nil {
 		select {
 		case <-c.turnDone:
@@ -361,9 +371,11 @@ func (c *nativeClient) event(raw json.RawMessage) error {
 		ID     json.RawMessage `json:"id"`
 		Method string          `json:"method"`
 		Params struct {
-			ThreadID string `json:"threadId"`
-			TurnID   string `json:"turnId"`
-			Turn     struct {
+			Tool      string          `json:"tool"`
+			Arguments json.RawMessage `json:"arguments"`
+			ThreadID  string          `json:"threadId"`
+			TurnID    string          `json:"turnId"`
+			Turn      struct {
 				ID     string          `json:"id"`
 				Status string          `json:"status"`
 				Error  json.RawMessage `json:"error"`
@@ -410,6 +422,37 @@ func (c *nativeClient) event(raw json.RawMessage) error {
 		return errors.New("native turn event has no identity")
 	}
 	if len(e.ID) > 0 {
+		if e.Method == "item/tool/call" && e.Params.Tool == "gator_ask_user" {
+			var input struct {
+				Question string   `json:"question"`
+				Options  []string `json:"options"`
+			}
+			if json.Unmarshal(e.Params.Arguments, &input) != nil || nativeText(input.Question) != nil || len(input.Question) > 8192 || len(input.Options) > 8 {
+				return errors.New("invalid Codex clarification")
+			}
+			for _, option := range input.Options {
+				if len(option) > 8192 {
+					return errors.New("Codex clarification option exceeds limit")
+				}
+			}
+			c.mu.Lock()
+			defer c.mu.Unlock()
+			if c.questionID != nil || c.state.Status != "running" {
+				return errors.New("unexpected Codex clarification")
+			}
+			if e.Params.TurnID == "" || e.Params.ThreadID != c.state.ThreadID {
+				return errors.New("Codex clarification has no matching turn or thread")
+			}
+			if c.state.TurnID == "" {
+				c.state.TurnID = e.Params.TurnID
+			}
+			c.questionID = append(json.RawMessage(nil), e.ID...)
+			c.questionMethod = "dynamic"
+			c.state.QuestionID = sessionDigest([]byte(sessionToken()))
+			c.state.Questions = []NativeQuestion{{ID: "answer", Text: input.Question, Options: input.Options}}
+			c.state.Status = "awaiting_input"
+			return nil
+		}
 		if e.Method != "item/tool/requestUserInput" {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
@@ -527,12 +570,21 @@ func (c *nativeClient) piEvent(raw json.RawMessage) error {
 		if m.Stop == "length" && m.Error == "" {
 			c.state.Error = "model output limit reached"
 		}
+		if m.Stop == "error" && m.Error == "" {
+			c.state.Error = "Pi model turn failed without error detail"
+		}
+		if m.Stop == "aborted" {
+			c.interrupting = true
+		}
 		c.mu.Unlock()
 	}
 	if e.Type == "agent_settled" {
 		s := c.State()
 		status := "completed"
-		if e.Aborted {
+		c.mu.Lock()
+		aborted := c.interrupting
+		c.mu.Unlock()
+		if e.Aborted || aborted {
 			status = "cancelled"
 		} else if s.Error != "" {
 			status = "failed"

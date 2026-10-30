@@ -135,6 +135,9 @@ func RunSession(ctx context.Context, r SessionRequest) (result Result, err error
 				return result, err
 			}
 			p.Close()
+			if state.Status == "cancelled" {
+				return result, fmt.Errorf("CLI turn cancelled: %s: %w", state.Error, context.Canceled)
+			}
 			if state.Status != "completed" {
 				return result, fmt.Errorf("CLI turn %s: %s", state.Status, state.Error)
 			}
