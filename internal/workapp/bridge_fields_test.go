@@ -82,3 +82,18 @@ func TestNativeRestoreMappingsKeepCanonicalArgumentsAndReview(t *testing.T) {
 		t.Fatal("mapping editor changed canonical arguments or skipped review")
 	}
 }
+
+func TestLegacyCalendarFollowupCanClearRetiredSelection(t *testing.T) {
+	m := New(Config{CurrentFolder: t.TempDir()})
+	m.newFollowup()
+	m.followupForm.Draft.CalendarDays = 14
+	panel := m.BridgeState().Panel
+	if panel.Rows[5].Input == nil {
+		t.Fatal("legacy selection has no removal control")
+	}
+	next, cmd := m.ApplyBridgePanel(BridgePanelAction{ID: panel.ID, Action: "key", Fields: map[int]string{5: "0"}}, tea.KeyMsg{Type: tea.KeyCtrlR})
+	m = next.(Model)
+	if cmd != nil || m.followupForm.Draft.CalendarDays != 0 || !m.followupForm.Review {
+		t.Fatal("cannot review a local follow-up after clearing retired Calendar")
+	}
+}

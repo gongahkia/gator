@@ -404,6 +404,11 @@ func (m Model) followupPanel() uisnapshot.Panel {
 				p.Rows[3].Input.Options = append(p.Rows[3].Input.Options, uisnapshot.Option{Value: id, Label: id + " (unavailable)"})
 			}
 		}
+		if d.CalendarDays != 0 {
+			p.Rows[5].Label = "Retired Calendar source"
+			p.Rows[5].Detail = "Remove this old selection before saving; use local plan dates."
+			p.Rows[5].Input = bridgeSelect(strconv.Itoa(d.CalendarDays), uisnapshot.Option{Value: strconv.Itoa(d.CalendarDays), Label: "Old Calendar window (unavailable)"}, uisnapshot.Option{Value: "0", Label: "Remove retired Calendar source"})
+		}
 		p.Rows[6].Label, p.Rows[6].Input = "Check frequency", bridgeSelect(strconv.Itoa(d.IntervalMinutes),
 			uisnapshot.Option{Value: "5", Label: "Every 5 minutes"}, uisnapshot.Option{Value: "15", Label: "Every 15 minutes"},
 			uisnapshot.Option{Value: "30", Label: "Every 30 minutes"}, uisnapshot.Option{Value: "60", Label: "Every hour"})
