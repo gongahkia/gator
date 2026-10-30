@@ -1801,3 +1801,19 @@ after the Go workers closed. All continuity assertions remain: selected chat and
 source, two independent drafts, attachment, file versions/edit draft, preferences,
 notes, unchanged configuration and zero model calls. These are same-artifact
 switch/rollback checks, not proof of a future schema-changing release migration.
+
+### Memory and lifecycle native acceptance — 30 October
+
+Run [40980460758](https://github.com/gongahkia/gator/actions/runs/40980460758)
+at `70a596794` passes the complete workflow on Windows, Linux, Intel macOS and
+ARM macOS. It adds native Go memory/learning/personalization/retrieval suites,
+focused backup, retention and forget/restore tests, and memory/recall/idle
+maintenance command tests to the existing terminal and package checks.
+
+Windows acceptance required coordinating memory reads with publication,
+protecting backup staging files with native ACLs, checking privacy through
+`privatefs.Check`, and converting retention selection paths for `io/fs` traversal.
+Local race tests pass for the affected consumers. Package build, installation,
+switch/rollback and old-package removal pass on all four runners; Unix PTY/editor
+handoff also passes. Live-provider memory evaluation remains separate and did
+not complete because Gemini rejected the configured credential.

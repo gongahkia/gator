@@ -287,3 +287,24 @@ and no completed behavior trials**. Execution errors are distinguished from
 behavior mismatches. Live capture accuracy, multilingual behavior and suggestion
 usefulness are not claimed. Real-account browser sign-in remains deferred
 independently.
+
+## Native platform acceptance checkpoint
+
+Run [40980460758](https://github.com/gongahkia/gator/actions/runs/40980460758)
+at `70a596794` passes Windows, Linux, Intel macOS and ARM macOS. The workflow
+now runs native memory, learning, personalization and retrieval suites, focused
+backup/retention/forget-restore tests, and memory/recall/idle-maintenance command
+tests alongside terminal integration and installed-package lifecycle checks.
+
+Native Windows testing exposed three issues which are now fixed and verified:
+bounded record reads share a lease with publication to avoid intermittent reads
+during replacement; backup files receive native private access controls before
+private bytes are written; and retention converts native selection paths to the
+slash-separated form required by `io/fs`. The publication stress assertions stay
+in place, and underlying read failures remain available to test diagnostics.
+
+Local race suites also pass for the affected memory and lifecycle consumers.
+This establishes the tested storage/application behavior across these platforms.
+The semantic reconciliation, untracked historical paraphrases and live usefulness
+limits documented above remain open; provider authentication still prevents the
+live evaluation from completing.
