@@ -171,7 +171,7 @@ func applySuggestion(stateDir string, record suggestion.Record) (string, error) 
 		if err != nil {
 			return "", err
 		}
-		plan, err := store.ApplyPlanChange(record.GoalID, record.PlanChange)
+		plan, err := store.ApplyReviewedPlanChange(record.GoalID, record.PlanChange, record.ID)
 		if err != nil {
 			return "", err
 		}

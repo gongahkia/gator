@@ -21,6 +21,7 @@ import (
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/attachment"
 	"github.com/gongahkia/gator/internal/connector"
+	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/knowledge"
 	"github.com/gongahkia/gator/internal/learning"
 	"github.com/gongahkia/gator/internal/memory"
@@ -374,7 +375,16 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	if err != nil {
 		return outcome, fmt.Errorf("open change suggestions: %w", err)
 	}
-	surface = append(surface, tools.SuggestChange{Notes: &knowledgeStore, ExcludedIDs: request.ExcludedKnowledgeIDs, Store: suggestions, GoalID: request.GoalID, WorkID: request.RunID, SourcePath: request.SourcePath})
+	var plans *tools.LocalPlans
+	if request.ForegroundApp || request.GoalID != "" {
+		goals, err := goal.Open(request.StateDir)
+		if err != nil {
+			return outcome, err
+		}
+		plans = &tools.LocalPlans{Store: goals, GoalID: request.GoalID, AllowGlobal: request.ForegroundApp}
+		surface = append(surface, plans.Tools()...)
+	}
+	surface = append(surface, tools.SuggestChange{Plans: plans, Notes: &knowledgeStore, ExcludedIDs: request.ExcludedKnowledgeIDs, Store: suggestions, GoalID: request.GoalID, WorkID: request.RunID, SourcePath: request.SourcePath})
 	for i, tool := range surface {
 		switch tool.Definition().Name {
 		case "read_file", "extract_document", "inspect_table":

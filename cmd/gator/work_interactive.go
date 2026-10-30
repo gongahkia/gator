@@ -241,6 +241,14 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			}
 			return workapp.GoalState{SourcePath: source, Title: "Work in " + filepath.Base(source)}, nil
 		},
+		AgendaAction: func(arguments []string) (string, error) {
+			if goalID != "" {
+				arguments = append(append([]string(nil), arguments...), "--goal", goalID)
+			}
+			var output bytes.Buffer
+			err := goalAgendaCommand(goalStore, arguments, &output)
+			return strings.TrimSpace(output.String()), err
+		},
 		PlanAction: func(command string) (string, error) {
 			if goalID == "" {
 				return "", errors.New("select an active goal with /goals before using /plan")

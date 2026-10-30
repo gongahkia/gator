@@ -14,8 +14,8 @@ import (
 const goalPlanUsage = `usage:
   gator goal plan ID
   gator goal plan ID outcome TEXT
-  gator goal plan ID add --title TEXT [--due RFC3339] [--evidence REF]
-  gator goal plan ID step STEP_ID pending|doing|blocked|done [--due RFC3339 | --clear-due] [--evidence REF | --clear-evidence]
+  gator goal plan ID add --title TEXT [--due RFC3339] [--start RFC3339 --end RFC3339] [--depends-on STEP_ID] [--evidence REF]
+  gator goal plan ID step STEP_ID pending|doing|blocked|done [--due RFC3339 | --clear-due] [--start RFC3339 --end RFC3339 | --clear-schedule] [--depends-on STEP_ID | --clear-dependencies] [--evidence REF | --clear-evidence]
   gator goal plan ID remove STEP_ID --yes
   gator goal plan ID review-at RFC3339|clear
   gator goal plan ID reviewed`
@@ -45,6 +45,12 @@ func goalPlanCommand(store goal.Store, args []string, out io.Writer) error {
 			if _, err := fmt.Fprintf(out, "%s  %-7s  %s  due %s\n", step.ID, step.Status, step.Title, formatPlanTime(step.DueAt)); err != nil {
 				return err
 			}
+			if !step.StartsAt.IsZero() {
+				fmt.Fprintf(out, "  scheduled: %s to %s\n", formatPlanTime(step.StartsAt), formatPlanTime(step.EndsAt))
+			}
+			if len(step.DependsOn) > 0 {
+				fmt.Fprintf(out, "  depends on: %s\n", strings.Join(step.DependsOn, ", "))
+			}
 			for _, evidence := range step.Evidence {
 				if _, err := fmt.Fprintf(out, "  evidence: %s\n", evidence); err != nil {
 					return err
@@ -65,12 +71,16 @@ func goalPlanCommand(store goal.Store, args []string, out io.Writer) error {
 		flags.SetOutput(io.Discard)
 		title := flags.String("title", "", "step title")
 		due := flags.String("due", "", "RFC3339 deadline")
+		schedule := planScheduleFlags(flags)
 		var evidence evidenceValues
 		flags.Var(&evidence, "evidence", "source or confirmation reference")
 		if err := flags.Parse(args[2:]); err != nil || len(flags.Args()) != 0 {
 			return errors.New(goalPlanUsage)
 		}
 		change.Kind, change.Title, change.Evidence = "add_step", *title, evidence
+		if err := schedule(&change); err != nil {
+			return err
+		}
 		change.DueAt, err = parsePlanTime(*due)
 		if err != nil {
 			return err
@@ -82,6 +92,7 @@ func goalPlanCommand(store goal.Store, args []string, out io.Writer) error {
 		flags := flag.NewFlagSet("goal plan step", flag.ContinueOnError)
 		flags.SetOutput(io.Discard)
 		due := flags.String("due", "", "RFC3339 deadline")
+		schedule := planScheduleFlags(flags)
 		clearDue := flags.Bool("clear-due", false, "remove deadline")
 		clearEvidence := flags.Bool("clear-evidence", false, "remove evidence references")
 		var evidence evidenceValues
@@ -94,6 +105,9 @@ func goalPlanCommand(store goal.Store, args []string, out io.Writer) error {
 		change.Evidence = evidence
 		if len(evidence) == 0 {
 			change.Evidence = nil
+		}
+		if err := schedule(&change); err != nil {
+			return err
 		}
 		change.DueAt, err = parsePlanTime(*due)
 		if err != nil {
@@ -148,4 +162,69 @@ func formatPlanTime(value time.Time) string {
 		return "–"
 	}
 	return value.Format(time.RFC3339)
+}
+
+func planScheduleFlags(flags *flag.FlagSet) func(*goal.PlanChange) error {
+	start := flags.String("start", "", "RFC3339 scheduled start")
+	end := flags.String("end", "", "RFC3339 scheduled end")
+	clear := flags.Bool("clear-schedule", false, "remove scheduled block")
+	clearDeps := flags.Bool("clear-dependencies", false, "remove dependencies")
+	var deps evidenceValues
+	flags.Var(&deps, "depends-on", "existing step ID; repeat for multiple dependencies")
+	return func(change *goal.PlanChange) error {
+		var err error
+		change.StartsAt, err = parsePlanTime(*start)
+		if err != nil {
+			return err
+		}
+		change.EndsAt, err = parsePlanTime(*end)
+		if err != nil {
+			return err
+		}
+		change.ClearSchedule, change.ClearDependencies, change.DependsOn = *clear, *clearDeps, deps
+		return nil
+	}
+}
+
+func goalAgendaCommand(store goal.Store, args []string, out io.Writer) error {
+	flags := flag.NewFlagSet("goal agenda", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	days := flags.Int("days", 7, "days ahead, 1 through 31")
+	id := flags.String("goal", "", "restrict to one goal")
+	if err := flags.Parse(args); err != nil || len(flags.Args()) != 0 || *days < 1 || *days > 31 {
+		return errors.New("usage: gator goal agenda [--days 1..31] [--goal ID]")
+	}
+	now := time.Now()
+	agenda, err := store.Agenda(*id, now, now.Add(time.Duration(*days)*24*time.Hour))
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(out, "Local agenda · last reported progress")
+	if len(agenda.Items) == 0 {
+		_, err = fmt.Fprintln(out, "No unfinished steps in this window.")
+		return err
+	}
+	for _, item := range agenda.Items {
+		fmt.Fprintf(out, "%s · %s · %s\n", item.GoalTitle, item.Step.Title, item.Step.Status)
+		if !item.Step.DueAt.IsZero() {
+			label := "due"
+			if item.Overdue {
+				label = "overdue"
+			}
+			fmt.Fprintf(out, "  %s %s\n", label, item.Step.DueAt.Local().Format(time.RFC3339))
+		}
+		if item.Scheduled {
+			fmt.Fprintf(out, "  scheduled %s to %s\n", item.Step.StartsAt.Local().Format(time.RFC3339), item.Step.EndsAt.Local().Format(time.RFC3339))
+		}
+		if len(item.BlockedBy) > 0 {
+			fmt.Fprintf(out, "  waiting on %s\n", strings.Join(item.BlockedBy, ", "))
+		}
+		if len(item.Conflicts) > 0 {
+			fmt.Fprintf(out, "  overlaps %s\n", strings.Join(item.Conflicts, ", "))
+		}
+	}
+	if agenda.Truncated {
+		fmt.Fprintf(out, "Showing %d of %d steps; select a goal for the full view. Overlaps cover shown steps only.\n", len(agenda.Items), agenda.Total)
+	}
+	return nil
 }

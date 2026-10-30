@@ -375,3 +375,32 @@ func TestGoalWatchOffsiteDraftAndPlanSuggestionStayForReview(t *testing.T) {
 		t.Fatalf("unreviewed plan was changed: %#v, %v", unchangedPlan, err)
 	}
 }
+
+func TestLocalScheduledBlockCrossingsAreStableAndNeverCompleteTasks(t *testing.T) {
+	state := t.TempDir()
+	goals, _ := goal.Open(state)
+	record, _ := goals.Add("Workshop", "", t.TempDir())
+	start := time.Date(2026, 10, 30, 9, 0, 0, 0, time.UTC)
+	plan, err := goals.ApplyPlanChange(record.ID, goal.PlanChange{Kind: "add_step", Title: "Draft", StartsAt: start, EndsAt: start.Add(time.Hour)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	definition := jobs.Definition{GoalID: record.ID, GoalWatch: true, ChangeOnly: true, RefreshSnapshot: true, SourcePath: record.SourcePath}
+	hashAt := func(now time.Time) string {
+		value, err := localJobInputHashAt(definition, state, now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return value
+	}
+	before := hashAt(start.Add(-time.Minute))
+	begun := hashAt(start)
+	ended := hashAt(start.Add(time.Hour))
+	if before == begun || begun == ended || ended != hashAt(start.Add(2*time.Hour)) {
+		t.Fatal("scheduled boundaries did not produce stable change gates")
+	}
+	current, _ := goals.LoadPlan(record.ID)
+	if current.Revision != plan.Revision || current.Steps[0].Status != goal.StepPending {
+		t.Fatal("time passing changed reported progress")
+	}
+}

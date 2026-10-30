@@ -80,10 +80,22 @@ func localJobInputHashAt(definition jobs.Definition, stateDir string, now time.T
 			// identical. The boolean stays stable after the crossing, so it
 			// triggers one review rather than a model call every minute.
 			due := struct {
-				Review bool
-				Steps  []string
+				Review  bool
+				Steps   []string
+				Started []string
+				Ended   []string
 			}{Review: !plan.NextReviewAt.IsZero() && !plan.NextReviewAt.After(now) && plan.LastReviewAt.Before(plan.NextReviewAt)}
 			for _, step := range plan.Steps {
+				if step.Status == goal.StepDone {
+					continue
+				}
+				if !step.StartsAt.IsZero() && !step.StartsAt.After(now) {
+					due.Started = append(due.Started, step.ID)
+				}
+				if !step.EndsAt.IsZero() && !step.EndsAt.After(now) {
+					due.Ended = append(due.Ended, step.ID)
+				}
+
 				if step.Status != goal.StepDone && !step.DueAt.IsZero() && !step.DueAt.After(now) {
 					due.Steps = append(due.Steps, step.ID)
 				}

@@ -242,6 +242,7 @@ type Config struct {
 	BeforeLocalCommand       func() (func(), error)
 	ResetPrivateState        func() (GoalState, error)
 	PilotAction              func(workID string, arguments []string) (*uisnapshot.Result, error)
+	AgendaAction             func(arguments []string) (string, error)
 	PlanAction               func(command string) (string, error)
 	PlanResult               func(command string) (*uisnapshot.Result, error)
 	ActivityAction           func() (string, error)

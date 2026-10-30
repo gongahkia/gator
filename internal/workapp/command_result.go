@@ -11,7 +11,7 @@ var commandResultTitles = map[string]string{
 	"/help": "Gator commands", "/?": "Gator commands", "/effort": "Effort", "/mode": "Work mode",
 	"/status": "Current session", "/permissions": "Work authority", "/settings": "Settings",
 	"/agents": "Internal specialists", "/queue": "Queued prompts", "/dequeue": "Queued prompts",
-	"/clear-queue": "Queued prompts", "/plan": "Goal plan", "/activity": "Activity",
+	"/agenda": "Local agenda", "/clear-queue": "Queued prompts", "/plan": "Goal plan", "/activity": "Activity",
 	"/notifications": "Notifications", "/suggestions": "Suggestions", "/memory": "Memory",
 	"/note": "Notes", "/skill": "Skills", "/review": "Deliverable preview",
 	"/feedback": "Feedback", "/artifact": "Expected files", "/connector": "Connected sources",

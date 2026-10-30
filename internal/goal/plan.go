@@ -2,6 +2,7 @@ package goal
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -30,17 +31,22 @@ const (
 // Plan is the durable, user-reviewable state of an ongoing responsibility.
 // Conversation text can inform a change, but does not mutate this record.
 type Plan struct {
-	Version      int       `json:"version"`
-	GoalID       string    `json:"goal_id"`
-	Revision     int       `json:"revision"`
-	Outcome      string    `json:"outcome,omitempty"`
-	Steps        []Step    `json:"steps,omitempty"`
-	LastReviewAt time.Time `json:"last_review_at,omitempty"`
-	NextReviewAt time.Time `json:"next_review_at,omitempty"`
-	UpdatedAt    time.Time `json:"updated_at,omitempty"`
+	LastChangeID   string    `json:"last_change_id,omitempty"`
+	LastChangeHash string    `json:"last_change_hash,omitempty"`
+	Version        int       `json:"version"`
+	GoalID         string    `json:"goal_id"`
+	Revision       int       `json:"revision"`
+	Outcome        string    `json:"outcome,omitempty"`
+	Steps          []Step    `json:"steps,omitempty"`
+	LastReviewAt   time.Time `json:"last_review_at,omitempty"`
+	NextReviewAt   time.Time `json:"next_review_at,omitempty"`
+	UpdatedAt      time.Time `json:"updated_at,omitempty"`
 }
 
 type Step struct {
+	StartsAt  time.Time  `json:"starts_at,omitempty"`
+	EndsAt    time.Time  `json:"ends_at,omitempty"`
+	DependsOn []string   `json:"depends_on,omitempty"`
 	ID        string     `json:"id"`
 	Title     string     `json:"title"`
 	Status    StepStatus `json:"status"`
@@ -52,17 +58,22 @@ type Step struct {
 // PlanChange is a single typed edit. ExpectedRevision prevents a stale agent
 // proposal from overwriting a later user correction.
 type PlanChange struct {
-	Kind             string     `json:"kind"`
-	ExpectedRevision int        `json:"expected_revision"`
-	StepID           string     `json:"step_id,omitempty"`
-	Title            string     `json:"title,omitempty"`
-	Status           StepStatus `json:"status,omitempty"`
-	DueAt            time.Time  `json:"due_at,omitempty"`
-	ClearDue         bool       `json:"clear_due,omitempty"`
-	Evidence         []string   `json:"evidence,omitempty"`
-	ClearEvidence    bool       `json:"clear_evidence,omitempty"`
-	Outcome          string     `json:"outcome,omitempty"`
-	NextReviewAt     time.Time  `json:"next_review_at,omitempty"`
+	StartsAt          time.Time  `json:"starts_at,omitempty"`
+	EndsAt            time.Time  `json:"ends_at,omitempty"`
+	ClearSchedule     bool       `json:"clear_schedule,omitempty"`
+	DependsOn         []string   `json:"depends_on,omitempty"`
+	ClearDependencies bool       `json:"clear_dependencies,omitempty"`
+	Kind              string     `json:"kind"`
+	ExpectedRevision  int        `json:"expected_revision"`
+	StepID            string     `json:"step_id,omitempty"`
+	Title             string     `json:"title,omitempty"`
+	Status            StepStatus `json:"status,omitempty"`
+	DueAt             time.Time  `json:"due_at,omitempty"`
+	ClearDue          bool       `json:"clear_due,omitempty"`
+	Evidence          []string   `json:"evidence,omitempty"`
+	ClearEvidence     bool       `json:"clear_evidence,omitempty"`
+	Outcome           string     `json:"outcome,omitempty"`
+	NextReviewAt      time.Time  `json:"next_review_at,omitempty"`
 }
 
 func (s Store) LoadPlan(goalID string) (Plan, error) {
@@ -171,6 +182,21 @@ func (s Store) loadPlan(goalID string) (Plan, error) {
 }
 
 func (s Store) ApplyPlanChange(goalID string, change PlanChange) (Plan, error) {
+	return s.applyPlanChange(goalID, change, "")
+}
+
+// ApplyReviewedPlanChange safely retries one accepted proposal after a crash.
+func (s Store) ApplyReviewedPlanChange(goalID string, change PlanChange, mutationID string) (Plan, error) {
+	if !strings.HasPrefix(mutationID, "suggestion-") || len(mutationID) != 35 {
+		return Plan{}, errors.New("invalid plan proposal identity")
+	}
+	if _, err := hex.DecodeString(mutationID[11:]); err != nil {
+		return Plan{}, err
+	}
+	return s.applyPlanChange(goalID, change, mutationID)
+}
+
+func (s Store) applyPlanChange(goalID string, change PlanChange, mutationID string) (Plan, error) {
 	if _, err := s.Load(goalID); err != nil {
 		return Plan{}, err
 	}
@@ -185,6 +211,15 @@ func (s Store) ApplyPlanChange(goalID string, change PlanChange) (Plan, error) {
 	plan, err := s.loadPlan(goalID)
 	if err != nil {
 		return Plan{}, err
+	}
+	input, _ := json.Marshal(change)
+	digest := sha256.Sum256(input)
+	changeHash := hex.EncodeToString(digest[:])
+	if mutationID != "" && plan.LastChangeID == mutationID {
+		if plan.LastChangeHash == changeHash && plan.Revision == change.ExpectedRevision+1 {
+			return plan, nil
+		}
+		return Plan{}, errors.New("accepted plan changed; inspect it again")
 	}
 	if plan.Revision != change.ExpectedRevision {
 		return Plan{}, fmt.Errorf("goal plan changed: expected revision %d, now %d", change.ExpectedRevision, plan.Revision)
@@ -201,7 +236,7 @@ func (s Store) ApplyPlanChange(goalID string, change PlanChange) (Plan, error) {
 		if _, err := rand.Read(random[:]); err != nil {
 			return Plan{}, err
 		}
-		plan.Steps = append(plan.Steps, Step{ID: "step-" + hex.EncodeToString(random[:]), Title: strings.TrimSpace(change.Title), Status: StepPending, DueAt: change.DueAt.UTC(), Evidence: append([]string(nil), change.Evidence...), UpdatedAt: now})
+		plan.Steps = append(plan.Steps, Step{StartsAt: change.StartsAt.UTC(), EndsAt: change.EndsAt.UTC(), DependsOn: append([]string(nil), change.DependsOn...), ID: "step-" + hex.EncodeToString(random[:]), Title: strings.TrimSpace(change.Title), Status: StepPending, DueAt: change.DueAt.UTC(), Evidence: append([]string(nil), change.Evidence...), UpdatedAt: now})
 	case "update_step":
 		found := false
 		for i := range plan.Steps {
@@ -214,6 +249,18 @@ func (s Store) ApplyPlanChange(goalID string, change PlanChange) (Plan, error) {
 				}
 				if !change.DueAt.IsZero() {
 					plan.Steps[i].DueAt = change.DueAt.UTC()
+				}
+				if !change.StartsAt.IsZero() {
+					plan.Steps[i].StartsAt, plan.Steps[i].EndsAt = change.StartsAt.UTC(), change.EndsAt.UTC()
+				}
+				if change.ClearSchedule {
+					plan.Steps[i].StartsAt, plan.Steps[i].EndsAt = time.Time{}, time.Time{}
+				}
+				if change.DependsOn != nil {
+					plan.Steps[i].DependsOn = append([]string(nil), change.DependsOn...)
+				}
+				if change.ClearDependencies {
+					plan.Steps[i].DependsOn = nil
 				}
 				if change.ClearDue {
 					plan.Steps[i].DueAt = time.Time{}
@@ -253,6 +300,10 @@ func (s Store) ApplyPlanChange(goalID string, change PlanChange) (Plan, error) {
 		if !plan.NextReviewAt.IsZero() && !plan.NextReviewAt.After(now) {
 			plan.NextReviewAt = time.Time{}
 		}
+	}
+	plan.LastChangeID, plan.LastChangeHash = mutationID, ""
+	if mutationID != "" {
+		plan.LastChangeHash = changeHash
 	}
 	plan.Revision++
 	plan.UpdatedAt = now
@@ -326,6 +377,16 @@ func writePrivatePlan(path string, data []byte) error {
 }
 
 func validateChange(change PlanChange) error {
+	if err := validateSchedule(change.StartsAt, change.EndsAt, change.DependsOn); err != nil {
+		return err
+	}
+	if (change.ClearSchedule && !change.StartsAt.IsZero()) || (change.ClearDependencies && change.DependsOn != nil) {
+		return errors.New("cannot set and clear schedule or dependencies together")
+	}
+	if change.Kind != "add_step" && change.Kind != "update_step" && (!change.StartsAt.IsZero() || change.ClearSchedule || change.DependsOn != nil || change.ClearDependencies) {
+		return errors.New("scheduling fields require a step change")
+	}
+
 	if change.ExpectedRevision < 0 || change.ExpectedRevision > 1000000 {
 		return errors.New("invalid expected plan revision")
 	}
@@ -342,7 +403,7 @@ func validateChange(change PlanChange) error {
 		if !validStepID(change.StepID) || (change.Title != "" && !validStepTitle(change.Title)) || (change.Status != "" && !validStepStatus(change.Status)) || !validEvidence(change.Evidence) || (change.ClearDue && !change.DueAt.IsZero()) || (change.ClearEvidence && change.Evidence != nil) {
 			return errors.New("invalid goal step update")
 		}
-		if change.Title == "" && change.Status == "" && change.DueAt.IsZero() && change.Evidence == nil && !change.ClearDue && !change.ClearEvidence {
+		if change.Title == "" && change.Status == "" && change.DueAt.IsZero() && change.Evidence == nil && !change.ClearDue && !change.ClearEvidence && change.StartsAt.IsZero() && !change.ClearSchedule && change.DependsOn == nil && !change.ClearDependencies {
 			return errors.New("goal step update is empty")
 		}
 	case "remove_step":
@@ -373,9 +434,12 @@ func validatePlan(plan Plan) error {
 		if !validStepID(step.ID) || seen[step.ID] || !validStepTitle(step.Title) || !validStepStatus(step.Status) || !validEvidence(step.Evidence) || step.UpdatedAt.IsZero() {
 			return errors.New("invalid goal plan step")
 		}
+		if err := validateSchedule(step.StartsAt, step.EndsAt, step.DependsOn); err != nil {
+			return err
+		}
 		seen[step.ID] = true
 	}
-	return nil
+	return validateDependencies(plan.Steps)
 }
 
 func validStepID(id string) bool {

@@ -520,7 +520,7 @@ func applyGoalPlanContext(stateDir string, request *workrun.Request) error {
 	if err != nil {
 		return fmt.Errorf("load goal plan: %w", err)
 	}
-	var lines []string
+	lines := []string{fmt.Sprintf("Plan revision: %d; status is last reported, not verified completion.", plan.Revision)}
 	if plan.Outcome != "" {
 		lines = append(lines, "Outcome: "+plan.Outcome)
 	}
@@ -528,6 +528,12 @@ func applyGoalPlanContext(stateDir string, request *workrun.Request) error {
 		line := fmt.Sprintf("- [%s] %s: %s", step.ID, step.Status, step.Title)
 		if !step.DueAt.IsZero() {
 			line += " (due " + step.DueAt.Format("2006-01-02T15:04Z07:00") + ")"
+		}
+		if !step.StartsAt.IsZero() {
+			line += " (scheduled " + step.StartsAt.Format(time.RFC3339) + " to " + step.EndsAt.Format(time.RFC3339) + ")"
+		}
+		if len(step.DependsOn) > 0 {
+			line += " [depends on: " + strings.Join(step.DependsOn, ", ") + "]"
 		}
 		if len(step.Evidence) > 0 {
 			line += " [evidence: " + strings.Join(step.Evidence, ", ") + "]"

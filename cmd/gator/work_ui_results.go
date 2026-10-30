@@ -223,7 +223,13 @@ func workPlanResult(store goal.Store, activeGoal, command string) (*uisnapshot.R
 	for _, step := range plan.Steps {
 		detail := step.ID
 		if !step.DueAt.IsZero() {
-			detail += " · due " + step.DueAt.Local().Format("2006-01-02")
+			detail += " · due " + step.DueAt.Local().Format("Jan 2 15:04")
+		}
+		if !step.StartsAt.IsZero() {
+			detail += " · scheduled " + step.StartsAt.Local().Format("Jan 2 15:04") + "–" + step.EndsAt.Local().Format("Jan 2 15:04")
+		}
+		if len(step.DependsOn) > 0 {
+			detail += " · depends on " + strings.Join(step.DependsOn, ", ")
 		}
 		if len(step.Evidence) > 0 {
 			detail += " · " + strings.Join(step.Evidence, ", ")

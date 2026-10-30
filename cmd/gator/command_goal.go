@@ -22,6 +22,7 @@ const goalUsage = `Gator goals — ongoing responsibilities
 
   gator goal add [--source DIR] [--context TEXT] TITLE
   gator goal list
+  gator goal agenda [--days N] [--goal ID]
   gator goal show ID
   gator goal activity ID
   gator goal access ID
@@ -31,7 +32,7 @@ const goalUsage = `Gator goals — ongoing responsibilities
   gator goal pause|resume|complete ID
   gator goal chat ID
   gator goal schedule ID --cron '0 9 * * *' [--timezone AREA/CITY] [--connector ID] [--mode inspect|draft] [--artifact PATH] --task TEXT
-  gator goal watch ID [--task TEXT] [--artifact PATH] [--connector ID] [--gmail-query QUERY] [--calendar-days N]
+  gator goal watch ID [--task TEXT] [--artifact PATH] [--connector ID] [--gmail-query QUERY]
   gator goal schedules ID
   gator goal unschedule ID JOB_ID
 
@@ -53,6 +54,8 @@ func goalCommand(args []string, out io.Writer) error {
 		return err
 	}
 	switch args[0] {
+	case "agenda":
+		return goalAgendaCommand(store, args[1:], out)
 	case "plan":
 		return goalPlanCommand(store, args[1:], out)
 	case "chat":

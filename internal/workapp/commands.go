@@ -212,6 +212,7 @@ func commandPaletteEntries() []entry {
 		{title: "/data", subtitle: "Retention, private backups, and deletion", kind: "command", command: "/data"},
 		{title: "/context", subtitle: "Inspect sources and saved context supplied to this work", kind: "command", command: "/context"},
 		{title: "/pilot", subtitle: "Review a project follow-up pilot and record outcomes", kind: "command-input", command: "/pilot", advanced: true},
+		{title: "/agenda", subtitle: "See local deadlines, time blocks and blockers", kind: "command-input", command: "/agenda"},
 		{title: "/plan", subtitle: "Show or update this goal's plan", kind: "command-input", command: "/plan"},
 		{title: "/activity", subtitle: "Show checks and work for this goal", kind: "command", command: "/activity"},
 		{title: "/notifications", subtitle: "Set alerts for this goal", kind: "command-input", command: "/notifications"},
@@ -335,6 +336,8 @@ func (m Model) commandAvailable(command string) bool {
 		return m.config.InboxAction != nil || m.config.RefreshInbox != nil || len(m.config.Inbox) > 0
 	case "/goals":
 		return m.config.ListGoals != nil || len(m.config.Goals) > 0
+	case "/agenda":
+		return m.config.AgendaAction != nil
 	case "/plan":
 		return m.goalID != "" && m.config.PlanAction != nil
 	case "/activity":
@@ -738,6 +741,12 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		}
 		m.openGoalPicker()
 		return m, nil
+	case "/agenda":
+		if m.config.AgendaAction == nil {
+			err = errorsUnavailable("local agenda")
+			break
+		}
+		result, err = m.config.AgendaAction(fields[1:])
 	case "/plan":
 		if m.config.PlanAction == nil {
 			err = errorsUnavailable("goal plans")
@@ -1486,6 +1495,7 @@ func workHelp() string {
   /activity                     show goal checks, running Work, and decisions
   /notifications [--desktop on|off] [--urgent-only on|off] [--quiet HH:MM-HH:MM --timezone AREA/CITY | --clear-quiet]
                                  set desktop alerts for the current goal
+  /agenda [--days 1..31]
   /suggestions [list|show|accept|reject]
                                  review proposed durable changes
   /memory                        set up recall; inspect data destinations
