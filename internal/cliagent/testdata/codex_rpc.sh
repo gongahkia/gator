@@ -13,10 +13,14 @@ while IFS= read -r request; do
       if test -f "$HOME/count"; then count=$(cat "$HOME/count"); fi
       count=$((count + 1))
       printf '%s' "$count" > "$HOME/count"
-      printf 'after-%s\n' "$count" > note.txt
-      # A child-created Git directory must never become trusted host metadata.
-      mkdir -p .git
-      printf 'invalid child metadata\n' > .git/config
+      case "$request" in
+        *'read-only fixture'*) ;;
+        *)
+          printf 'after-%s\n' "$count" > note.txt
+          # A child-created Git directory must never become trusted metadata.
+          mkdir -p .git
+          printf 'invalid child metadata\n' > .git/config ;;
+      esac
       printf '{"id":"%s","result":{"turn":{"id":"turn-%s"}}}\n' "$id" "$count"
       printf '{"method":"item/completed","params":{"threadId":"fixture-thread","turnId":"turn-%s","item":{"type":"agentMessage","text":"Updated note.txt on turn %s"}}}\n' "$count" "$count"
       printf '{"method":"turn/completed","params":{"threadId":"fixture-thread","turn":{"id":"turn-%s","status":"completed"}}}\n' "$count" ;;

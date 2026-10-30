@@ -542,6 +542,9 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		integration.accepted[path] = hash
 	}
 	request.integration = integration
+	// Specialists must receive the newly created conversation's stable owner
+	// before their closures are built, including the very first chat turn.
+	request.ConversationID = conversation.ID
 	if request.Mode != action.Inspect && ((e.Code != nil && request.codeEnabled()) || request.externalEditsEnabled()) {
 		surface = append(surface, integration)
 	}
@@ -555,7 +558,6 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	}
 	defer closeSpecialists()
 	surface = append(surface, delegationSurface...)
-	request.ConversationID = conversation.ID
 	var afterReply []struct {
 		change   AppChange
 		mutation AppMutation

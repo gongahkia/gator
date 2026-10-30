@@ -22,6 +22,73 @@ type agentDiscoveryModel struct {
 	step   int
 }
 
+type nativeContinuationModel struct {
+	step     int
+	previous string
+}
+
+func (m *nativeContinuationModel) Complete(_ context.Context, _ agent.TurnRequest) (agent.Turn, error) {
+	m.step++
+	if m.step == 1 {
+		args, _ := json.Marshal(map[string]any{"agent": "cli_codex", "task": "read-only fixture", "continue": m.previous})
+		return agent.Turn{ToolCalls: []agent.ToolCall{{ID: "start", Name: "start_agent", Arguments: args}}}, nil
+	}
+	if m.step == 2 {
+		return agent.Turn{ToolCalls: []agent.ToolCall{{ID: "await", Name: "await_agent", Arguments: []byte(`{"id":"subagent-001"}`)}}}, nil
+	}
+	return agent.Turn{Text: "Fixture complete."}, nil
+}
+
+func TestExternalNativeSessionContinuesAcrossWorkConversationTurns(t *testing.T) {
+	if _, err := sandbox.StrictAvailability(); err != nil {
+		t.Skip(err)
+	}
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := filepath.Join(root, "source")
+	if err := os.Mkdir(source, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "note.txt"), []byte("unchanged\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	script, err := os.ReadFile("../cliagent/testdata/codex_rpc.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	exe := filepath.Join(root, "cli")
+	if err := os.WriteFile(exe, script, 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("FIXTURE_API_KEY", "synthetic-test-key")
+	cfg := cliagent.Config{Kind: "codex", Executable: exe, APIKeyEnv: "FIXTURE_API_KEY", TimeoutSeconds: 10}
+	state := filepath.Join(root, "state")
+	request := Request{RunID: "first", SourcePath: source, Objective: "read-only fixture", Mode: action.Inspect, Contract: artifact.InspectionContract(), ExternalAgents: []cliagent.Config{cfg}}
+	service := Service{Executor: Executor{Model: &nativeContinuationModel{}, StateDir: state}}
+	out, err := service.Execute(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := orchestrator.ReadTasks(filepath.Join(state, "gator", "tasks", "first"))
+	if err != nil || len(first) != 1 || first[0].Status != "completed" {
+		t.Fatalf("first task: %+v %v", first, err)
+	}
+	service.Executor.Model = &nativeContinuationModel{previous: first[0].GlobalID}
+	request.RunID, request.ConversationID = "second", out.ConversationID
+	if _, err := service.Execute(context.Background(), request); err != nil {
+		t.Fatal(err)
+	}
+	second, err := orchestrator.ReadTasks(filepath.Join(state, "gator", "tasks", "second"))
+	if err != nil || len(second) != 1 || second[0].Status != "completed" {
+		t.Fatalf("continued task: %+v %v", second, err)
+	}
+	if second[0].Result.SessionID != first[0].Result.SessionID || !strings.Contains(second[0].Result.Summary, "turn 2") {
+		t.Fatalf("lost native conversation: %+v", second[0])
+	}
+}
+
 func (m *agentDiscoveryModel) Complete(_ context.Context, r agent.TurnRequest) (agent.Turn, error) {
 	m.step++
 	if m.step == 1 {
