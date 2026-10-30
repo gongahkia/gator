@@ -24,8 +24,8 @@ func TestResponsesCompleteConvertsToolCall(t *testing.T) {
 		if body.Model != "test-model" || body.Store || len(body.Tools) != 1 || body.Tools[0].Name != "read_file" {
 			t.Fatalf("request = %#v", body)
 		}
-		if body.Tools[0].Strict {
-			t.Fatal("tool schema should not be marked strict until every tool schema is strict-compatible")
+		if body.Tools[0].Strict == nil || *body.Tools[0].Strict {
+			t.Fatal("tool must explicitly send strict:false to preserve optional fields")
 		}
 		_, _ = io.WriteString(writer, `{"output":[{"id":"fc_item","type":"function_call","call_id":"call_1","name":"read_file","arguments":"{\"path\":\"README.md\"}"}]}`)
 	}))

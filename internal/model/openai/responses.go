@@ -148,6 +148,9 @@ func (r Responses) requestBody(turn agent.TurnRequest) (responseRequest, error) 
 		return responseRequest{}, err
 	}
 	tools := make([]responseTool, 0, len(turn.Tools)+1)
+	// Responses normalizes omitted strictness into strict schemas. Explicit false
+	// preserves our host-validated optional and kind-specific parameters.
+	strict := false
 	for _, definition := range turn.Tools {
 		if definition.Name == "computer_action" && turn.Computer != nil {
 			continue // CUA is a provider-native computer tool, not a function schema.
@@ -160,7 +163,7 @@ func (r Responses) requestBody(turn agent.TurnRequest) (responseRequest, error) 
 			Name:        definition.Name,
 			Description: definition.Description,
 			Parameters:  definition.Parameters,
-			Strict:      false,
+			Strict:      &strict,
 		})
 	}
 	store := false
@@ -222,7 +225,7 @@ type responseTool struct {
 	Name        string          `json:"name,omitempty"`
 	Description string          `json:"description,omitempty"`
 	Parameters  json.RawMessage `json:"parameters,omitempty"`
-	Strict      bool            `json:"strict,omitempty"`
+	Strict      *bool           `json:"strict,omitempty"`
 }
 
 type inputItem struct {
