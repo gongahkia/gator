@@ -20,6 +20,7 @@ func main() {
 	model := flag.String("model", "gpt-5.6", "model")
 	baseURL := flag.String("base-url", "", "regional API base URL")
 	edit := flag.Bool("edit", false, "test isolated patch creation")
+	sessions := flag.Bool("session-manager", false, "test live manager/native-worker follow-up continuity")
 	flag.Parse()
 	path, err := exec.LookPath(*kind)
 	check(err)
@@ -53,6 +54,10 @@ func main() {
 	cfg := cliagent.Config{Kind: *kind, Executable: path, Model: *model, BaseURL: *baseURL, APIKeyEnv: "OPENAI_API_KEY", ReadOnlyRoots: roots, TimeoutSeconds: 120, AllowEdits: *edit}
 	if *kind == "pi" {
 		cfg.Provider = "openai"
+	}
+	if *sessions {
+		check(runSessionManager(context.Background(), cfg, root, source, original))
+		return
 	}
 	task := "Read project.md. Report the project name, owner and deadline exactly. Do not edit files."
 	if *edit {

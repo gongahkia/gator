@@ -1,0 +1,37 @@
+{
+  "at": "2026-10-30T08:35:53Z",
+  "checks": {
+    "followup_not_rehydrated": true,
+    "original_unchanged": true,
+    "remembered_facts": false,
+    "same_native_conversation": true,
+    "two_worker_turns": true,
+    "work_succeeded": true
+  },
+  "error": "",
+  "evaluation": "live-manager-native-session-v1",
+  "kind": "codex",
+  "model": "gpt-5.6",
+  "passed": false,
+  "seconds": 18.129444035,
+  "tasks": [
+    {
+      "ID": "subagent-001",
+      "Previous": "",
+      "SessionID": "cli-a4aca06cde657c12c51dd5a38364275c",
+      "NativeThread": "01a18bf3-4272-7f12-8db9-559eae6dcd6b",
+      "Assignment": "Read project.md. Remember the codeword capybara-924 in this conversation. Report the project owner and deadline and confirm the codeword. Do not edit files.",
+      "Summary": "- Project owner: **Mira**\n- Deadline: **May 16, 2030**\n- Codeword confirmed: **capybara-924**\n- No files edited.",
+      "Status": "completed"
+    },
+    {
+      "ID": "subagent-002",
+      "Previous": "subagent-001",
+      "SessionID": "cli-a4aca06cde657c12c51dd5a38364275c",
+      "NativeThread": "01a18bf3-4272-7f12-8db9-559eae6dcd6b",
+      "Assignment": "Without reading any files, what codeword did I ask you to remember? Who owns the project and what is its deadline?",
+      "Summary": "- Codeword: **capybara-924**\n- Project owner: **Mira**\n- Deadline: **May 16, 2030**",
+      "Status": "completed"
+    }
+  ]
+}
