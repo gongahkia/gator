@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/gongahkia/gator/internal/cliagent"
 	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/hooks"
 	"github.com/gongahkia/gator/internal/lsp"
@@ -34,13 +35,14 @@ type WorkRole struct {
 }
 
 type Settings struct {
-	Desktop    DesktopSettings   `json:"desktop,omitzero"`
-	WorkRoles  []WorkRole        `json:"work_roles,omitempty"`
-	Version    int               `json:"version"`
-	Defaults   Defaults          `json:"defaults"`
-	Embeddings EmbeddingSettings `json:"embeddings"`
-	Theme      string            `json:"theme,omitempty"`
-	TUI        TUISettings       `json:"tui,omitzero"`
+	ExternalAgents []cliagent.Config `json:"external_agents,omitempty"`
+	Desktop        DesktopSettings   `json:"desktop,omitzero"`
+	WorkRoles      []WorkRole        `json:"work_roles,omitempty"`
+	Version        int               `json:"version"`
+	Defaults       Defaults          `json:"defaults"`
+	Embeddings     EmbeddingSettings `json:"embeddings"`
+	Theme          string            `json:"theme,omitempty"`
+	TUI            TUISettings       `json:"tui,omitzero"`
 	// ProviderEndpoints stores explicit non-secret endpoint overrides by
 	// provider ID. Credentials remain exclusively in Gator's auth store.
 	ProviderEndpoints map[string]string `json:"provider_endpoints,omitempty"`
@@ -311,6 +313,9 @@ func (s Store) Save(settings Settings) error {
 }
 
 func validate(settings Settings) error {
+	if err := cliagent.ValidateAll(settings.ExternalAgents); err != nil {
+		return err
+	}
 	if err := settings.Desktop.Validate(); err != nil {
 		return err
 	}

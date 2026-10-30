@@ -101,6 +101,7 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	sourcePath := flags.String("source", ".", "read-only source directory")
 	modeName := flags.String("mode", string(action.Draft), "work mode: inspect, draft, or act")
 	actionDisposition := flags.String("actions", string(action.Forbid), "external actions: forbid, draft, or approve")
+	externalAgents := flags.Bool("external-agents", false, "allow configured external CLI specialists; separately billed")
 	maxSteps := flags.Int("max-steps", 24, "maximum model turns")
 	contractPath := flags.String("contract", "", "complete outcome contract JSON")
 	requests := flags.Int("max-model-requests", 256, "aggregate manager and child requests")
@@ -333,6 +334,9 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		ApproveBrowser:       workBrowserApprover(*jsonOutput, in, out),
 		DesktopSession:       strings.TrimSpace(*desktopSession),
 		ApproveDesktop:       workDesktopApprover(*jsonOutput, in, out),
+	}
+	if *externalAgents {
+		request.ExternalAgents = settings.ExternalAgents
 	}
 	if err := applyLearningContext(stateDir, &request); err != nil {
 		return err

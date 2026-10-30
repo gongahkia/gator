@@ -20,6 +20,7 @@ import (
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/attachment"
+	"github.com/gongahkia/gator/internal/cliagent"
 	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/knowledge"
@@ -541,7 +542,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		integration.accepted[path] = hash
 	}
 	request.integration = integration
-	if request.Mode != action.Inspect && e.Code != nil && request.codeEnabled() {
+	if request.Mode != action.Inspect && ((e.Code != nil && request.codeEnabled()) || request.externalEditsEnabled()) {
 		surface = append(surface, integration)
 	}
 	delegationSurface, closeSpecialists, err := e.subagentTools(ctx, request, work, previousRoot, emit, func(record orchestrator.Record) {
@@ -568,7 +569,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	surface = append(surface, applicationTools(e.App, request)...)
 	runner := agent.Runner{Model: e.Model, Tools: surface, Now: now}
 	var malformedCallFallback []string
-	if !request.codeEnabled() {
+	if !request.codeEnabled() && !request.externalEditsEnabled() {
 		for _, tool := range delegationSurface {
 			malformedCallFallback = append(malformedCallFallback, tool.Definition().Name)
 		}
@@ -943,6 +944,9 @@ func (e Executor) normalizeAndValidate(request Request) (Request, error) {
 	}
 	if request.MaxSteps < 0 {
 		return Request{}, errors.New("work max steps must not be negative")
+	}
+	if err := cliagent.ValidateAll(request.ExternalAgents); err != nil {
+		return Request{}, err
 	}
 	request.RoleConfiguration = make(map[string]orchestrator.RoleConfiguration)
 	for _, name := range workRoleNames {

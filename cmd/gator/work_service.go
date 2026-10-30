@@ -72,6 +72,12 @@ func configuredWorkService(provider, modelName, stateDir string, request *workru
 	request.DisableChatHistory = !settings.Desktop.RefersToChats()
 	request.DisableBrowser = provider == "gator-local"
 	request.StateDir = stateDir
+	// CLI subprocess costs are separate from scheduled-job model budgets.
+	// Scheduled jobs never inherit new CLI authority from user settings.
+	request.ExternalAgents = nil
+	if request.ForegroundApp {
+		request.ExternalAgents = settings.ExternalAgents
+	}
 	if err := applyLearningContext(stateDir, request); err != nil {
 		return workrun.Service{}, err
 	}

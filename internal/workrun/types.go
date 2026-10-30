@@ -12,6 +12,7 @@ import (
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/browser"
+	"github.com/gongahkia/gator/internal/cliagent"
 	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/desktop"
 	"github.com/gongahkia/gator/internal/orchestrator"
@@ -64,6 +65,7 @@ func (p CodePolicy) HasCapability(name string) bool {
 
 // Request describes one bounded local work session.
 type Request struct {
+	ExternalAgents          []cliagent.Config
 	ReplyToUpdateID         string
 	UpdateContext           string
 	InputIDs                []string
@@ -169,6 +171,23 @@ type Request struct {
 }
 
 func (r Request) codeEnabled() bool { return r.EnableCode || r.RequireCode }
+func (r Request) externalEditsEnabled() bool {
+	if r.DisableDelegation {
+		return false
+	}
+	for _, cfg := range r.ExternalAgents {
+		disabled := false
+		for _, role := range r.DisabledRoles {
+			if role == cfg.Role() {
+				disabled = true
+			}
+		}
+		if cfg.AllowEdits && !disabled {
+			return true
+		}
+	}
+	return false
+}
 
 // Outcome retains staged files and trusted evidence even when model execution
 // fails. Source is never modified by the executor.

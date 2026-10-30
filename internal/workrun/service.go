@@ -16,6 +16,7 @@ import (
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/cliagent"
 	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/workhistory"
@@ -33,7 +34,7 @@ var workRoleNames = []string{"source_researcher", "artifact_reviewer", "claim_ve
 func ValidateDisabledRoles(roles []string) error {
 	seen := map[string]bool{}
 	for _, role := range roles {
-		if !slices.Contains(workRoleNames, role) || seen[role] {
+		if (!slices.Contains(workRoleNames, role) && role != "cli_codex" && role != "cli_claude" && role != "cli_pi") || seen[role] {
 			return fmt.Errorf("invalid or repeated disabled role %q", role)
 		}
 		seen[role] = true
@@ -43,6 +44,7 @@ func ValidateDisabledRoles(roles []string) error {
 
 func (s Service) Execute(ctx context.Context, request Request) (Outcome, error) {
 	if s.Defaults != nil {
+		request.ExternalAgents = append([]cliagent.Config(nil), s.Defaults.ExternalAgents...)
 		request.Provider = s.Defaults.Provider
 		request.ConnectorPermissions = s.Defaults.ConnectorPermissions
 		request.SnapshotOptions = s.Defaults.SnapshotOptions
@@ -108,14 +110,15 @@ func effectiveConfiguration(request Request) any {
 		DesktopSession       string
 		ForegroundApp        bool
 		LearnFromChats       bool
-		MaintainMemory       bool `json:",omitempty"`
-		DisableChatHistory   bool `json:",omitempty"`
+		MaintainMemory       bool              `json:",omitempty"`
+		DisableChatHistory   bool              `json:",omitempty"`
+		ExternalAgents       []cliagent.Config `json:",omitempty"`
 	}{request.Contract, request.Mode, request.Code, request.ConnectorIDs, request.OAuthRefreshPins, request.OAuthAccountPins, request.ConnectorPermissions, request.WebOrigins, request.IgnoredInstructionPaths, request.Limits, request.MaxSteps, request.Provider, request.GoalContext, request.GoalPlanContext, request.GoalID, request.MemoryContext, request.NoteContext, request.RoleConfiguration, func() string {
 		if request.Project != nil {
 			return request.Project.SHA256
 		}
 		return ""
-	}(), request.DisableDelegation, request.DisabledRoles, request.EnableCode, request.RequireCode, request.BrowserPolicy, request.BrowserSession, request.DisableBrowser, request.ExcludedKnowledgeIDs, request.DesktopSession, request.ForegroundApp, request.LearnFromChats, request.MaintainMemory, request.DisableChatHistory}
+	}(), request.DisableDelegation, request.DisabledRoles, request.EnableCode, request.RequireCode, request.BrowserPolicy, request.BrowserSession, request.DisableBrowser, request.ExcludedKnowledgeIDs, request.DesktopSession, request.ForegroundApp, request.LearnFromChats, request.MaintainMemory, request.DisableChatHistory, request.ExternalAgents}
 }
 
 type Interaction struct {

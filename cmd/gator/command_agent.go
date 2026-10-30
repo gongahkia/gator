@@ -12,12 +12,16 @@ import (
 )
 
 const agentUsage = `usage:
-  gator agent list`
+  gator agent list
+  gator agent cli list|enable|disable|doctor`
 
 // agentCommand makes project-defined profiles and roles inspectable before a
 // model is allowed to select one. Profiles and role overlays can only narrow
 // run policy; role kind remains enforced by the native delegation tool surface.
 func agentCommand(arguments []string, out io.Writer) error {
+	if len(arguments) > 0 && arguments[0] == "cli" {
+		return agentCLICommand(arguments[1:], out)
+	}
 	if len(arguments) != 1 || arguments[0] != "list" {
 		return errors.New(agentUsage)
 	}
