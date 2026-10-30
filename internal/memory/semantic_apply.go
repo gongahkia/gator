@@ -144,6 +144,15 @@ func (s Store) restoreSemanticChatUnlocked(input ChatInput, plan SemanticPlan, c
 	if err != nil {
 		return Record{}, err
 	}
+	remaining, err := s.listUnlocked(input.GoalID, true)
+	if err != nil {
+		return Record{}, err
+	}
+	for _, record := range remaining {
+		if record.GoalID == input.GoalID && record.Subject != "" && bindings.resolve(record.GoalID, record.Subject) == rule.ID {
+			return Record{}, errors.New("review records left by an interrupted withdrawal before restoring this topic")
+		}
+	}
 	aliases := []string{input.Subject, CanonicalSubject(plan.SuggestedSubject)}
 	for _, alias := range aliases {
 		root := bindings.resolve(input.GoalID, alias)

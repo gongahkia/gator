@@ -83,6 +83,15 @@ func (s Store) semanticSnapshotUnlocked(scope string, excluded []string) (Semant
 			continue
 		}
 		scoped = append(scoped, record)
+		blocked, err := s.blockedConcept(bindings, record.GoalID, record.Subject)
+		if err != nil {
+			return result, err
+		}
+		// Interrupted deletion must not supply the forgotten plaintext to the
+		// classifier. Its abstract withdrawal rule represents this concept.
+		if blocked {
+			continue
+		}
 		// Explicitly expired entries are historical evidence, not current
 		// authoritative facts. They still participate in snapshot invalidation.
 		if !record.ExpiresAt.IsZero() && !record.ExpiresAt.After(s.clock()) {

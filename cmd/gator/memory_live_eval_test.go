@@ -140,7 +140,7 @@ func TestLiveMemoryEvaluation(t *testing.T) {
 			}
 		}
 		current := trial{Name: scenario.name}
-		memoryTools := tools.ChatMemory{Store: memories, UserMessage: scenario.message, ConversationID: "work-live-fixture", RunID: "run-live", Automatic: scenario.automatic, Review: func(_ context.Context, preview any) (bool, error) {
+		memoryTools := tools.ChatMemory{Store: memories, UserMessage: scenario.message, ConversationID: "work-live-fixture", RunID: "run-live", Automatic: scenario.automatic, Semantics: backend, Review: func(_ context.Context, preview any) (bool, error) {
 			current.Reviews++
 			current.ReviewPreviews = append(current.ReviewPreviews, preview)
 			return false, nil

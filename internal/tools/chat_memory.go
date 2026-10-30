@@ -19,6 +19,7 @@ type ChatMemory struct {
 	UserMessage, ConversationID, RunID, GoalID string
 	Automatic                                  bool
 	ExcludedIDs                                []string
+	Semantics                                  agent.Model
 	Review                                     func(context.Context, any) (bool, error)
 }
 
@@ -82,6 +83,9 @@ func (t rememberChat) Execute(ctx context.Context, raw json.RawMessage) (agent.T
 	}
 	if !t.available(a.ReplaceID) {
 		return agent.ToolResult{}, errors.New("this memory is excluded from the current run")
+	}
+	if t.Semantics != nil {
+		return t.semanticRemember(ctx, memory.ChatInput{Subject: a.Subject, Kind: a.Kind, Quote: a.Quote, GoalID: goalID, ConversationID: t.ConversationID, RunID: t.RunID, ReplaceID: a.ReplaceID, ExpectedUpdated: a.ExpectedUpdated, Explicit: explicit, ExcludedIDs: t.ExcludedIDs}, a.Scope, needsReview, suitabilityReview)
 	}
 	conceptReview := memory.ConceptReviewReason(a.Subject, a.Kind)
 	if needsReview || suitabilityReview != "" || conceptReview != "" {
