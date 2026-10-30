@@ -114,8 +114,10 @@ func (s Store) recoverNoteUpdate(id string) error {
 	}
 	partial := j.Before
 	partial.Body = j.After.Body
+	reversePartial := j.After
+	reversePartial.Body = j.Before.Body
 	// A direct file edit during downtime is never overwritten by recovery.
-	if current.Revision() != j.Before.Revision() && current.Revision() != partial.Revision() && current.Revision() != j.After.Revision() {
+	if current.Revision() != j.Before.Revision() && current.Revision() != partial.Revision() && current.Revision() != reversePartial.Revision() && current.Revision() != j.After.Revision() {
 		return errors.New("note changed outside an interrupted update; preserve the files and resolve update.json before continuing")
 	}
 	if err := writeFiles(dir, j.After); err != nil {

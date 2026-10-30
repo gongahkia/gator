@@ -42,7 +42,7 @@ func TestNoteUpdateKeepsIdentityEvidenceAndRejectsStaleRetry(t *testing.T) {
 }
 
 func TestNoteJournalRecoversEveryInterruptedWriteAndProtectsDirectEdits(t *testing.T) {
-	for _, phase := range []string{"prepared", "body-written", "both-written", "external-edit"} {
+	for _, phase := range []string{"prepared", "body-written", "metadata-written", "both-written", "external-edit"} {
 		t.Run(phase, func(t *testing.T) {
 			root := t.TempDir()
 			s, _ := Open(root)
@@ -59,6 +59,12 @@ func TestNoteJournalRecoversEveryInterruptedWriteAndProtectsDirectEdits(t *testi
 			switch phase {
 			case "body-written":
 				if err := os.WriteFile(filepath.Join(dir, "content.md"), []byte(after.Body), 0600); err != nil {
+					t.Fatal(err)
+				}
+			case "metadata-written":
+				partial := after
+				partial.Body = before.Body
+				if err := writeFiles(dir, partial); err != nil {
 					t.Fatal(err)
 				}
 			case "both-written":
