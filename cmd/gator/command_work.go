@@ -102,6 +102,10 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	modeName := flags.String("mode", string(action.Draft), "work mode: inspect, draft, or act")
 	actionDisposition := flags.String("actions", string(action.Forbid), "external actions: forbid, draft, or approve")
 	externalAgents := flags.Bool("external-agents", false, "allow configured external CLI specialists; separately billed")
+	var verification verificationFlags
+	flags.Var(&verification, "verify", "host-selected candidate verification argv, separated by spaces (repeatable)")
+	var codeScopes stringFlags
+	flags.Var(&codeScopes, "scope", "source-relative path a coding worker may edit (repeatable)")
 	maxSteps := flags.Int("max-steps", 24, "maximum model turns")
 	contractPath := flags.String("contract", "", "complete outcome contract JSON")
 	requests := flags.Int("max-model-requests", 256, "aggregate manager and child requests")
@@ -306,6 +310,7 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 	request := workrun.Request{
+		Code:                 workrun.CodePolicy{Verification: verification, Scopes: codeScopes},
 		Limits:               agent.Limits{ModelRequests: *requests, Tokens: *tokens, WallSeconds: *seconds},
 		OTLPEndpoint:         os.Getenv("GATOR_OTLP_ENDPOINT"),
 		WebOrigins:           webOrigins,

@@ -21,7 +21,7 @@ import (
 
 func isWorkSessionCommand(value string) bool {
 	switch value {
-	case "list", "show", "history", "resume", "back", "forward", "tasks", "activity", "decisions", "answer", "reconcile", "stop", "steer", "cancel-task", "steer-task", "answer-task":
+	case "list", "show", "history", "resume", "back", "forward", "tasks", "completions", "activity", "decisions", "answer", "reconcile", "stop", "steer", "cancel-task", "steer-task", "answer-task":
 		return true
 	default:
 		return false
@@ -105,6 +105,23 @@ func workSessionCommand(arguments []string, in io.Reader, out io.Writer, modelFa
 		return err
 	}
 	switch arguments[0] {
+	case "completions":
+		if len(arguments) < 2 || len(arguments) > 3 {
+			return errors.New("usage: gator work completions RUN_ID [COMPLETION_ID]")
+		}
+		records, err := workrun.ReadCompletions(stateDir, arguments[1])
+		if err != nil {
+			return err
+		}
+		if len(arguments) == 3 {
+			for _, record := range records {
+				if record.ID == arguments[2] {
+					return json.NewEncoder(out).Encode(record)
+				}
+			}
+			return errors.New("retained completion not found")
+		}
+		return json.NewEncoder(out).Encode(records)
 	case "tasks":
 		if len(arguments) < 2 || len(arguments) > 3 {
 			return errors.New("usage: gator work tasks RUN_ID [TASK_ID]")
