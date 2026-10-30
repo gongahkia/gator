@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gongahkia/gator/internal/privatefs"
 	"github.com/gongahkia/gator/internal/state"
 )
 
@@ -89,7 +90,7 @@ func (s Store) Export(ctx context.Context, destination string) (BackupManifest, 
 	}
 	defer os.Remove(f.Name())
 	defer f.Close()
-	if err = f.Chmod(0600); err != nil {
+	if err = privatefs.Protect(f.Name()); err != nil {
 		return manifest, err
 	}
 	gz := gzip.NewWriter(f)

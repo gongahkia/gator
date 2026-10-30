@@ -212,6 +212,9 @@ func (s Store) walk(ctx context.Context, paths []string, hash bool) ([]Item, err
 	seen := map[string]bool{}
 	var out []Item
 	for _, base := range paths {
+		// Root.FS follows io/fs path rules even on Windows. Selection code
+		// builds native paths, but WalkDir requires slash-separated names.
+		base = filepath.ToSlash(base)
 		err = fs.WalkDir(root.FS(), base, func(path string, entry fs.DirEntry, walkErr error) error {
 			if err := ctx.Err(); err != nil {
 				return err

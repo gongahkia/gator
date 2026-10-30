@@ -13,6 +13,7 @@ import (
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/memory"
+	"github.com/gongahkia/gator/internal/privatefs"
 	"github.com/gongahkia/gator/internal/snapshot"
 	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/workhistory"
@@ -160,9 +161,8 @@ func TestPrivateBackupVerifiesAndExcludesCredentials(t *testing.T) {
 	if err != nil || len(verified.Files) != 1 {
 		t.Fatalf("verify: %v", err)
 	}
-	info, _ := os.Stat(output)
-	if info.Mode().Perm() != 0600 {
-		t.Fatal("backup is not private")
+	if err := privatefs.Check(output); err != nil {
+		t.Fatal("backup is not private:", err)
 	}
 	if _, err = s.Export(context.Background(), output); err == nil {
 		t.Fatal("backup overwrote an existing file")
