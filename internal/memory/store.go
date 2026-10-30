@@ -391,6 +391,9 @@ func (s Store) forget(id, updated string) error {
 // A concept tombstone is published before deleting its known aliases. If removal
 // is interrupted, surviving records remain excluded from automatic recall.
 func (s Store) forgetRecord(record Record) error {
+	if err := s.recordWithdrawal(record, ""); err != nil {
+		return err
+	}
 	if err := s.suppressHistory(record); err != nil {
 		return err
 	}

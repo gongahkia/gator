@@ -99,19 +99,20 @@ type ChatInput struct {
 // RememberChat stores the user's exact words. A model cannot manufacture a
 // rewritten fact. Conflicting updates need the current record and timestamp.
 func (s Store) RememberChat(input ChatInput) (Record, error) {
-	input.Quote = strings.TrimSpace(input.Quote)
-	input.Subject = CanonicalSubject(input.Subject)
-	if !subjectPattern.MatchString(input.Subject) || len(input.Quote) > 2000 || strings.TrimSpace(input.Quote) == "" || !strings.HasPrefix(input.ConversationID, "work-") || input.RunID == "" {
-		return Record{}, errors.New("invalid chat memory")
-	}
-	if input.Kind != "fact" && input.Kind != "preference" && !(input.Kind == "decision" && input.GoalID != "") {
-		return Record{}, errors.New("save personal facts/preferences, or decisions scoped to the current goal")
-	}
 	release, err := s.lock()
 	if err != nil {
 		return Record{}, err
 	}
 	defer release()
+	return s.rememberChatUnlocked(input)
+}
+
+func (s Store) rememberChatUnlocked(input ChatInput) (Record, error) {
+	input.Quote = strings.TrimSpace(input.Quote)
+	input.Subject = CanonicalSubject(input.Subject)
+	if err := validateChatInput(input); err != nil {
+		return Record{}, err
+	}
 	blocked, err := s.blockedSubject(input.GoalID, input.Subject)
 	if err != nil {
 		return Record{}, err
@@ -231,4 +232,14 @@ func (s Store) nextUpdate(prior time.Time) time.Time {
 		return prior.Add(time.Nanosecond)
 	}
 	return now
+}
+
+func validateChatInput(input ChatInput) error {
+	if !subjectPattern.MatchString(input.Subject) || len(input.Quote) > 2000 || strings.TrimSpace(input.Quote) == "" || !strings.HasPrefix(input.ConversationID, "work-") || input.RunID == "" {
+		return errors.New("invalid chat memory")
+	}
+	if input.Kind != "fact" && input.Kind != "preference" && !(input.Kind == "decision" && input.GoalID != "") {
+		return errors.New("save personal facts/preferences, or decisions scoped to the current goal")
+	}
+	return nil
 }

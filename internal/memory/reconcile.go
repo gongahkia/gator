@@ -43,6 +43,10 @@ func (s Store) Reconcile(input Reconciliation) (Record, error) {
 		return Record{}, err
 	}
 	defer release()
+	return s.reconcileUnlocked(input)
+}
+
+func (s Store) reconcileUnlocked(input Reconciliation) (Record, error) {
 	bindings, err := s.bindings()
 	if err != nil {
 		return Record{}, err

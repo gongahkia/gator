@@ -33,6 +33,9 @@ func (s Store) blockedSubject(goalID, subject string) (bool, error) {
 }
 
 func (s Store) unblockSubject(goalID, subject string) error {
+	if err := s.restoreWithdrawal(goalID, subject); err != nil {
+		return err
+	}
 	bindings, err := s.bindings()
 	if err != nil {
 		return err

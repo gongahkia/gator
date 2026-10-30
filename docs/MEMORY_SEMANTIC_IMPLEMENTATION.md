@@ -116,3 +116,30 @@ relations, attempted tool invocations, cancellation, exclusions and source
 snapshot changes. This checkpoint still requires guarded application through
 the real memory tools, semantic withdrawal/history screening, migrations and
 longitudinal live evaluation before the active objective can be complete.
+
+## Guarded application and withdrawal state checkpoint
+
+Semantic plans can now be applied under the memory write lease. The complete
+scope snapshot, statement digest, scope, selected IDs and inspected revisions
+are revalidated before changes. Equivalence preserves the existing identity
+while saving the current user's exact words; contradictions need the inspected
+replacement guard or a separate host review. Multiple matches require a
+consolidation review. Stale plans, changed statements, unavailable/expired sources
+and cross-scope matches are refused. Explicitly expired entries remain historical
+evidence and cannot be revived by the classifier.
+
+Forgetting now records an abstract withdrawal topic independently of fact text.
+Known topics come from neutral host definitions. Custom approved topics are
+revision-guarded and cannot repeat the complete forgotten statement. Unclassified
+legacy markers remain visible scope/topic migration gaps. Restoring a concept
+closes its active withdrawal while preserving a historical cutoff; tracked old
+source chats stay suppressed. A model relation of withdrawn cannot silently
+relearn an attribute under a new label or value; explicit current consent is
+required. Withdrawal state also participates in semantic snapshot invalidation.
+
+Local race suites pass for memory, tools, retrieval, personalization, lifecycle,
+workapp and workrun, plus focused command tests. New cases exercise equivalent
+rephrasing, inspected/reviewed conflict changes, concurrent added/edited records,
+scope/statement mismatch, expiry, legacy aliases, missing migration metadata,
+abstract-topic retention and semantic restoration. Production tool binding,
+custom-topic review controls and historical screening are still pending.
