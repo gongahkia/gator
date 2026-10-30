@@ -11,7 +11,7 @@ import (
 func diffGoalWatchItems(history []jobs.Attempt, current []jobs.WatchItem, policy string) []jobs.WatchChange {
 	var previous []jobs.WatchItem
 	for _, attempt := range history {
-		if attempt.Status == "completed" && attempt.NotificationPolicySHA256 == policy && len(attempt.WatchItems) > 0 {
+		if attempt.Status == "completed" && attempt.NotificationPolicySHA256 == policy {
 			previous = attempt.WatchItems
 			break
 		}

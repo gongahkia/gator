@@ -201,6 +201,12 @@ func TestScheduledInboxIsQuietForRepeatedResult(t *testing.T) {
 	if id := complete("No change in the brief", "same", "completed"); id != "" {
 		t.Fatal("identical result created a new inbox item")
 	}
+	if id := complete("Inputs unchanged", "", "unchanged"); id != "" {
+		t.Fatal("unchanged check created an inbox item")
+	}
+	if id := complete("No change in the brief", "same", "completed"); id != "" {
+		t.Fatal("unchanged check reset duplicate suppression")
+	}
 	if id := complete("The deadline moved", "changed", "completed"); id == "" {
 		t.Fatal("changed result was suppressed")
 	}
