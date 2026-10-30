@@ -14,8 +14,10 @@ import (
 const goalPlanUsage = `usage:
   gator goal plan ID
   gator goal plan ID outcome TEXT
-  gator goal plan ID add --title TEXT [--due RFC3339] [--start RFC3339 --end RFC3339] [--depends-on STEP_ID] [--evidence REF]
-  gator goal plan ID step STEP_ID pending|doing|blocked|done [--due RFC3339 | --clear-due] [--start RFC3339 --end RFC3339 | --clear-schedule] [--depends-on STEP_ID | --clear-dependencies] [--evidence REF | --clear-evidence]
+  gator goal plan ID add --title TEXT [--due RFC3339] [--start RFC3339 --end RFC3339] [--depends-on STEP_ID|GOAL_ID/STEP_ID] [--evidence REF]
+  gator goal plan ID step STEP_ID pending|doing|blocked|done [--due RFC3339 | --clear-due] [--start RFC3339 --end RFC3339 | --clear-schedule] [--depends-on STEP_ID|GOAL_ID/STEP_ID | --clear-dependencies] [--evidence REF | --clear-evidence]
+  Recurrence on add/step: --repeat daily|weekly --interval N --timezone IANA [--until RFC3339]
+  Remove recurrence on step: --clear-repeat (clear occurrence overrides first)
   gator goal plan ID remove STEP_ID --yes
   gator goal plan ID review-at RFC3339|clear
   gator goal plan ID occurrence STEP_ID YYYY-MM-DD pending|doing|blocked|done|skipped|clear [--start RFC3339 --end RFC3339]
