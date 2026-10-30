@@ -26,7 +26,7 @@ func usesBundledGoogle(d connector.Descriptor) bool {
 }
 
 func bundledGoogleAction() workapp.ControlAction {
-	return workapp.ControlAction{Key: "G", Label: "Connect Google email & calendar", Action: "add-google-bundled", Review: true,
-		Description: "Use this distribution's Google desktop sign-in. Read email and calendar events; sending and document editing are not requested. After saving, sign in in your browser and select this connection for a chat or follow-up.",
+	return workapp.ControlAction{Key: "G", Label: "Connect Google email", Action: "add-google-bundled", Review: true,
+		Description: "Use this distribution's Google desktop sign-in. Read email; sending and document editing are not requested. After saving, sign in in your browser and select this connection for a chat or follow-up.",
 		Fields:      []workapp.ControlField{{Label: "Connection ID", Value: "google", Help: "Choose a different name for an additional account."}, {Label: "Display name", Value: "Google"}}}
 }

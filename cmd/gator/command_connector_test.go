@@ -227,10 +227,13 @@ func TestGoogleDailyContextRequiresExplicitScopes(t *testing.T) {
 	for _, operation := range descriptor.Operations() {
 		operations[operation.ID] = true
 	}
-	for _, required := range []string{"calendar_events", "gmail_list", "gmail_get"} {
+	for _, required := range []string{"gmail_list", "gmail_get"} {
 		if !operations[required] {
 			t.Fatalf("daily context operation %q missing", required)
 		}
+	}
+	if operations["calendar_events"] || strings.Contains(descriptor.OAuthScopes, "calendar") || strings.Contains(descriptor.OAuthScopes, "/auth/tasks") {
+		t.Fatal("retired Calendar or Tasks requested")
 	}
 }
 

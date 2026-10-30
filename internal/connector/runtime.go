@@ -499,29 +499,6 @@ func serviceRead(descriptor Descriptor, operation string, input serviceInput) (s
 			return "", "", nil, err
 		}
 		path = "/v4/spreadsheets/" + url.PathEscape(sheetID) + "/values/" + url.PathEscape(cellRange)
-	case KindGoogle + "/calendar_events":
-		minTime, minErr := time.Parse(time.RFC3339, input.TimeMin)
-		maxTime, maxErr := time.Parse(time.RFC3339, input.TimeMax)
-		if minErr != nil || maxErr != nil || !maxTime.After(minTime) {
-			return "", "", nil, errors.New("calendar events require time_min and time_max as an increasing RFC3339 window")
-		}
-		calendarID := input.ResourceID
-		if calendarID == "" {
-			calendarID = "primary"
-		}
-		path = "/calendar/v3/calendars/" + url.PathEscape(calendarID) + "/events"
-		query.Set("timeMin", minTime.Format(time.RFC3339))
-		query.Set("timeMax", maxTime.Format(time.RFC3339))
-		query.Set("singleEvents", "true")
-		query.Set("orderBy", "startTime")
-		limit := input.Limit
-		if limit == 0 {
-			limit = 20
-		}
-		query.Set("maxResults", fmt.Sprint(limit))
-		if input.Cursor != "" {
-			query.Set("pageToken", input.Cursor)
-		}
 	case KindGoogle + "/gmail_list":
 		path = "/gmail/v1/users/me/messages"
 		search := input.Query

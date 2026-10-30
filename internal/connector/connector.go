@@ -37,7 +37,7 @@ const (
 	GoogleOAuthTokenURL     = "https://oauth2.googleapis.com/token"
 	GoogleOAuthRedirectURL  = "http://127.0.0.1:0/oauth/callback"
 	GoogleOAuthScopes       = "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/drive.metadata.readonly https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/spreadsheets"
-	GoogleDailyOAuthScopes  = "https://www.googleapis.com/auth/calendar.events.readonly https://www.googleapis.com/auth/gmail.readonly"
+	GoogleDailyOAuthScopes  = "https://www.googleapis.com/auth/gmail.readonly"
 	GoogleSendOAuthScope    = "https://www.googleapis.com/auth/gmail.send"
 )
 
@@ -236,9 +236,6 @@ func (d Descriptor) Operations() []Operation {
 		}
 		filtered := operations[:0]
 		for _, operation := range operations {
-			if operation.ID == "calendar_events" && !granted["https://www.googleapis.com/auth/calendar.events.readonly"] {
-				continue
-			}
 			if (operation.ID == "gmail_list" || operation.ID == "gmail_get") && !granted["https://www.googleapis.com/auth/gmail.readonly"] {
 				continue
 			}
@@ -293,7 +290,6 @@ func googleOperations() []Operation {
 		{"docs_get", "Read one Google Doc.", action.ConnectedRead},
 		{"sheets_get", "Read one Google Sheet.", action.ConnectedRead},
 		{"sheets_values_get", "Read a bounded range from one Google Sheet.", action.ConnectedRead},
-		{"calendar_events", "Read a bounded window of events from a Google Calendar. Use resource_id=primary for the current user's calendar.", action.ConnectedRead},
 		{"gmail_list", "List recent Gmail message IDs; use gmail_get to read a selected message.", action.ConnectedRead},
 		{"gmail_get", "Read one selected Gmail message, including headers, snippet, and bounded body data.", action.ConnectedRead},
 	}
@@ -313,9 +309,6 @@ func googleOperations() []Operation {
 		}
 		if operations[index].ID == "drive_get" {
 			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["resource_id"],"properties":{"resource_id":{"type":"string","minLength":1,"maxLength":2048},"fields":{"type":"string","maxLength":4096}},"additionalProperties":false}`)
-		}
-		if operations[index].ID == "calendar_events" {
-			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["time_min","time_max"],"properties":{"resource_id":{"type":"string","maxLength":2048},"time_min":{"type":"string","maxLength":64},"time_max":{"type":"string","maxLength":64},"limit":{"type":"integer","minimum":1,"maximum":100},"cursor":{"type":"string","maxLength":2048}},"additionalProperties":false}`)
 		}
 		if operations[index].ID == "gmail_list" {
 			operations[index].InputSchema = json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","maxLength":4096},"limit":{"type":"integer","minimum":1,"maximum":100},"cursor":{"type":"string","maxLength":2048}},"additionalProperties":false}`)
@@ -386,6 +379,9 @@ func (r Registry) Operation(connectorID, operationID string) (Descriptor, Operat
 	descriptor, found := r.Get(connectorID)
 	if !found {
 		return Descriptor{}, Operation{}, fmt.Errorf("connector %q is not configured", connectorID)
+	}
+	if descriptor.Kind == KindGoogle && operationID == "calendar_events" {
+		return Descriptor{}, Operation{}, errors.New("Google Calendar support was removed; replace this source with Gator's local plan dates")
 	}
 	for _, operation := range descriptor.Operations() {
 		if operation.ID == operationID {

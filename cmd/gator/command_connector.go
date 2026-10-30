@@ -115,7 +115,7 @@ func addConnector(id string, arguments []string, out io.Writer) error {
 	oauthTokenURL := flags.String("oauth-token-url", "", "OAuth token endpoint")
 	oauthRedirectURL := flags.String("oauth-redirect-url", "", "registered HTTP loopback callback URL (Google defaults to a private ephemeral callback)")
 	oauthScopes := flags.String("oauth-scopes", "", "space-separated OAuth scopes")
-	dailyContext := flags.Bool("daily-context", false, "request Google Calendar event and Gmail read scopes")
+	dailyContext := flags.Bool("daily-context", false, "request Gmail read scope")
 	sendEmail := flags.Bool("send-email", false, "request the separate Gmail send scope for foreground approved messages")
 	if err := flags.Parse(arguments); err != nil {
 		return err

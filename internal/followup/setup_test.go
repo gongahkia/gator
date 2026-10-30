@@ -56,3 +56,18 @@ func TestReviewedDraftAllowsQuietChecksWithoutGrantingActions(t *testing.T) {
 		t.Fatal("editing a paused agreement resumed it")
 	}
 }
+
+func TestCalendarWindowIsRetiredButLocalFollowupWorks(t *testing.T) {
+	draft, err := New(t.TempDir(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	draft.CalendarDays = 14
+	if err := draft.Validate(); err == nil || !strings.Contains(err.Error(), "support was removed") {
+		t.Fatalf("calendar draft = %v", err)
+	}
+	draft.CalendarDays = 0
+	if err := draft.Validate(); err != nil {
+		t.Fatalf("local-only draft = %v", err)
+	}
+}

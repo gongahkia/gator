@@ -1,31 +1,19 @@
 # Google Workspace in Gator
 
-**Interface status:** Gator is a desktop app. Shell examples below are source-checkout developer operations with an explicit internal opt-in; see [development instructions](DEVELOPMENT.md). They do not install or enable a public CLI.
+Gator's optional Google Workspace connector provides Drive, Docs, Sheets and
+Gmail operations. Native goals, plan steps, deadlines, notes and reminders work
+without a Google account. See [the internal-agent audit](INTERNAL_AGENT_IMPLEMENTATION.md)
+for the full connector inventory and current scope.
 
-Gator's Google Workspace connector provides Google Drive, Docs, Sheets,
-Calendar event reads, and Gmail message reads to Gator Work. This supports a
-daily brief that combines local notes, today's calendar, and selected inbox
-messages, then drafts a local document or email for review. A separately
-enabled Gmail send operation can send one plain-text message to one recipient
-only in a foreground `act` run after exact approval. Gator does not change
-calendar events through this connector.
+Google Calendar support has been removed. Google Tasks has no built-in
+operations. New setup requests neither permission; existing grants are not
+revoked automatically. Old Calendar follow-ups retain their records and report
+an unavailable source. Edit those agreements to track user-provided dates locally.
 
-Ask Gator in chat to watch selected mail or calendar changes, then review the
-sources, timing, end date and notification condition before saving. The
-**Following → Manage checks** form remains available for precise edits. Checks
-run only while the local supervisor is available; the agreement reports that
-availability. A bounded mail/calendar poll uses the schedule you review.
-It requires the needed read scopes and keeps a
-durable content hash. Gmail watches retain a mailbox history cursor alongside
-selected message fingerprints. They still list the selected search query on
-every poll, so messages entering or leaving a time-relative query remain
-visible. Gmail history identifies which existing message details need rereading;
-an expired cursor, too much history, or a 24-hour full-sync interval causes a
-full detail scan. The cursor is mailbox-wide and does not make the watch a push
-subscription. A query with more than 500 Gmail matches or a Calendar window
-with more than 500 events fails for review; narrow the scope. Calendar's moving
-time window cannot use the [`events.list` sync token](https://developers.google.com/workspace/calendar/api/v3/reference/events/list), so the watch reads each
-bounded page of that window on every poll. There is no automatic email sending.
+Gmail watches list the selected query on each poll and retain a history cursor
+and message fingerprints to avoid rereading unchanged details. They run only
+while the supervisor is available and are not push subscriptions. Sending is
+separately enabled and requires exact foreground approval.
 
 Gmail's [history API](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.history/list)
 can return HTTP 404 for an expired cursor; Gator then performs a full selected
@@ -40,15 +28,14 @@ detail scans so a changed account cannot inherit another account's cache.
 
 ## Set up in the desktop app
 
-1. Open **Settings → Connections → Connect Google email & calendar**.
-2. Enter a unique connection ID and display name. A distributor-configured build supplies its Desktop OAuth client. Otherwise, enter your own Google Cloud **Desktop app** OAuth client ID and enable the Gmail and Calendar APIs in that project. **Use your own Google OAuth client** remains available in configured builds.
+1. Open **Settings → Connections → Connect Google email**.
+2. Enter a unique connection ID and display name. A distributor-configured build supplies its Desktop OAuth client. Otherwise, enter your own Google Cloud **Desktop app** OAuth client ID and enable the Gmail API in that project. **Use your own Google OAuth client** remains available in configured builds.
 3. Review and save. Choose **Sign in** and review the requested scopes. For your own OAuth client, optionally enter its client secret; distributor-configured connections do not ask for one.
 4. Choose **Continue in browser**. Finish Google consent and return to Gator. Sign-in waits up to five minutes; you can cancel it or switch to another chat and return through Connections.
-5. Choose **Check account & read access**. Gator verifies the account identity and makes bounded reads for the configured email, calendar and Drive metadata scopes. A failure on one service is reported as a failed check. A verified email is shown only if Google marks it verified.
+5. Choose **Check account & read access**. Gator verifies the account identity and makes bounded reads for the configured email and Drive metadata scopes. A failure on one service is reported as a failed check. A verified email is shown only if Google marks it verified.
 6. Select the connection in chat settings or in a follow-up agreement. Saving credentials does not select it for a chat or authorize writes.
 
-The native email/calendar setup requests OpenID, email, Gmail read and Calendar
-event read scopes. It does not request document editing or email sending.
+The native email setup requests OpenID, email and Gmail read scopes. It does not request document editing or email sending.
 Existing Google connections with other scopes can also be signed in and managed
 here. The advanced developer configuration below can create those connections.
 
@@ -222,7 +209,7 @@ runtime environment overrides. They are extractable desktop client material,
 not confidential web-application credentials or user tokens. Never supply a
 web-app secret, refresh token, or service-account key.
 
-The simplified setup requests the same email/calendar read scopes and uses the
+The simplified setup requests the same email read scopes and uses the
 existing PKCE/loopback browser flow. It does not enable writes or select the
 account for a conversation. Bundled client material is used only for the matching
 client ID and fixed Google resource, authorization, token, and redirect URLs.

@@ -218,15 +218,18 @@ func goalCommand(args []string, out io.Writer) error {
 		var selected connectorFlags
 		flags.Var(&selected, "connector", "configured Google or JSON connector to poll")
 		gmailQuery := flags.String("gmail-query", "", "explicit Gmail search query for selected Google connectors")
-		calendarDays := flags.Int("calendar-days", 0, "watch the next 1-30 calendar days on selected Google connectors")
+		calendarDays := flags.Int("calendar-days", 0, "retired; track dates in Gator plans instead")
 		if err := flags.Parse(args[2:]); err != nil {
 			return err
 		}
 		if len(flags.Args()) != 0 || strings.TrimSpace(*task) == "" {
 			return errors.New("usage: gator goal watch ID [--task TEXT] [--artifact PATH] [--connector ID] [--gmail-query QUERY] [--calendar-days N]")
 		}
-		if *calendarDays < 0 || *calendarDays > 30 || len(selected) == 0 && (*gmailQuery != "" || *calendarDays != 0) {
-			return errors.New("goal watch needs a selected Google connector for Gmail or Calendar reads")
+		if *calendarDays != 0 {
+			return errors.New("Google Calendar support was removed; track dates in Gator plans instead")
+		}
+		if len(selected) == 0 && *gmailQuery != "" {
+			return errors.New("goal watch needs a selected Google connector for Gmail reads")
 		}
 		var watchSources []jobs.WatchSource
 		if len(selected) > 0 {
@@ -254,21 +257,19 @@ func goalCommand(args []string, out io.Writer) error {
 					watchSources = append(watchSources, jobs.WatchSource{ConnectorID: id, Operation: "fetch"})
 				case connector.KindGoogle:
 					hasGoogle = true
-					if *gmailQuery == "" && *calendarDays == 0 {
-						return errors.New("Google goal watch requires --gmail-query or --calendar-days")
+					if *gmailQuery == "" {
+						return errors.New("Google goal watch requires --gmail-query")
 					}
 					if *gmailQuery != "" {
 						watchSources = append(watchSources, jobs.WatchSource{ConnectorID: id, Operation: "gmail_list", Query: *gmailQuery})
 					}
-					if *calendarDays > 0 {
-						watchSources = append(watchSources, jobs.WatchSource{ConnectorID: id, Operation: "calendar_events", Days: *calendarDays})
-					}
+
 				default:
 					return fmt.Errorf("connector %q has no bounded goal watch reader", id)
 				}
 			}
-			if !hasGoogle && (*gmailQuery != "" || *calendarDays != 0) {
-				return errors.New("Gmail and Calendar watch options require a selected Google connector")
+			if !hasGoogle && *gmailQuery != "" {
+				return errors.New("Gmail watch options require a selected Google connector")
 			}
 			if len(watchSources) > 4 {
 				return errors.New("goal watch supports at most four connected read sources")

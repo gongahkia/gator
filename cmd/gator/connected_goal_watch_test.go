@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -20,85 +19,12 @@ import (
 	"github.com/gongahkia/gator/internal/jobs"
 )
 
-func TestCalendarWatchPaginatesSelectedWindowAndRejectsOverflow(t *testing.T) {
-	oversized, repeatPage, duplicateSecond := false, false, false
-	secondPageSummary := "Planning meeting"
-	windowStart, windowEnd := "", ""
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Content-Type", "application/json")
-		query := request.URL.Query()
-		if query.Get("maxResults") != "100" || query.Get("singleEvents") != "true" || query.Get("timeMin") == "" || query.Get("timeMax") == "" {
-			t.Errorf("unexpected Calendar query: %v", query)
-		}
-		if windowStart == "" {
-			windowStart, windowEnd = query.Get("timeMin"), query.Get("timeMax")
-		} else if query.Get("timeMin") != windowStart || query.Get("timeMax") != windowEnd {
-			t.Errorf("Calendar window changed between pages: %v", query)
-		}
-		page := 1
-		if token := query.Get("pageToken"); token != "" {
-			var err error
-			page, err = strconv.Atoi(token)
-			if err != nil {
-				t.Error(err)
-			}
-		}
-		count := 1
-		if page == 1 || oversized {
-			count = 100
-		}
-		events := make([]string, 0, count)
-		for index := range count {
-			summary := "Planning meeting"
-			if page == 2 && index == 0 {
-				summary = secondPageSummary
-			}
-			id := (page-1)*100 + index
-			if duplicateSecond && page == 2 && index == 0 {
-				id = 0
-			}
-			events = append(events, fmt.Sprintf(`{"id":"event-%03d","summary":%q}`, id, summary))
-		}
-		more := ""
-		if page == 1 || oversized || repeatPage {
-			next := strconv.Itoa(page + 1)
-			if repeatPage && page > 1 {
-				next = "2"
-			}
-			more = fmt.Sprintf(`,"nextPageToken":%q`, next)
-		}
-		_, _ = fmt.Fprintf(writer, `{"items":[%s]%s}`, strings.Join(events, ","), more)
-	}))
-	defer server.Close()
-	descriptor := connector.Descriptor{Version: connector.DescriptorVersion, ID: "google", Name: "Google", Kind: connector.KindGoogle, Resource: server.URL, Authentication: connector.AuthNone}
-	registry, err := connector.NewRegistry([]connector.Descriptor{descriptor})
-	if err != nil {
-		t.Fatal(err)
-	}
-	runtime := connector.Runtime{Registry: registry, HTTPClient: server.Client()}
-	source := jobs.WatchSource{ConnectorID: "google", Operation: "calendar_events", Days: 14}
-	now := time.Date(2026, 10, 17, 9, 0, 0, 0, time.UTC)
-	firstHash := sha256.New()
-	items, err := hashCalendarWatch(context.Background(), firstHash, runtime, source, now)
-	if err != nil || len(items) != 101 || items[0].ID != "event-000" || items[100].ID != "event-100" {
-		t.Fatalf("two-page Calendar watch = %d items, %v", len(items), err)
-	}
-	secondPageSummary = "Planning meeting moved"
-	secondHash := sha256.New()
-	if _, err := hashCalendarWatch(context.Background(), secondHash, runtime, source, now); err != nil || string(firstHash.Sum(nil)) == string(secondHash.Sum(nil)) {
-		t.Fatalf("second-page event change was missed: %v", err)
-	}
-	oversized = true
-	if _, err := hashCalendarWatch(context.Background(), sha256.New(), runtime, source, now); err == nil || !strings.Contains(err.Error(), "more than 500") {
-		t.Fatalf("overlarge Calendar window was accepted: %v", err)
-	}
-	oversized, repeatPage = false, true
-	if _, err := hashCalendarWatch(context.Background(), sha256.New(), runtime, source, now); err == nil || !strings.Contains(err.Error(), "invalid pagination") {
-		t.Fatalf("repeated Calendar page was accepted: %v", err)
-	}
-	repeatPage, duplicateSecond = false, true
-	if _, err := hashCalendarWatch(context.Background(), sha256.New(), runtime, source, now); err == nil || !strings.Contains(err.Error(), "duplicate event ID") {
-		t.Fatalf("duplicate Calendar event was accepted: %v", err)
+func TestRetiredCalendarWatchFailsBeforeAnyNetworkAccess(t *testing.T) {
+	definition := jobs.Definition{WatchSources: []jobs.WatchSource{{ConnectorID: "old-google", Operation: "calendar_events", Days: 14}}}
+	// No profile, credentials, or local workspace: retirement must be checked first.
+	_, err := connectedGoalWatchHash(context.Background(), definition, t.TempDir(), time.Now())
+	if err == nil || !strings.Contains(err.Error(), "Google Calendar support was removed") {
+		t.Fatalf("retired Calendar watch = %v", err)
 	}
 }
 
@@ -411,11 +337,11 @@ func TestConnectedJSONGoalWatchSkipsUnchangedPollAfterRestart(t *testing.T) {
 	}
 }
 
-func TestConnectedGoogleWatchHashesMessageAndEventContent(t *testing.T) {
+func TestConnectedGoogleWatchHashesMessageContent(t *testing.T) {
 	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
 	state := t.TempDir()
 	t.Setenv("GATOR_STATE_DIR", state)
-	snippet, summary := "Venue available", "Planning meeting"
+	snippet := "Venue available"
 	moreMail := false
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
@@ -430,8 +356,6 @@ func TestConnectedGoogleWatchHashesMessageAndEventContent(t *testing.T) {
 			_, _ = writer.Write([]byte(`{"messages":[{"id":"mail-1"}]}`))
 		case "/gmail/v1/users/me/messages/mail-1":
 			_, _ = writer.Write([]byte(`{"id":"mail-1","snippet":"` + snippet + `","payload":{"headers":[{"name":"Subject","value":"Venue"}]}}`))
-		case "/calendar/v3/calendars/primary/events":
-			_, _ = writer.Write([]byte(`{"items":[{"id":"event-1","summary":"` + summary + `"}]}`))
 		default:
 			t.Errorf("unexpected connector path %s", request.URL.Path)
 			writer.WriteHeader(http.StatusNotFound)
@@ -455,7 +379,7 @@ func TestConnectedGoogleWatchHashesMessageAndEventContent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	definition := jobs.Definition{GoalID: record.ID, GoalWatch: true, ChangeOnly: true, RefreshSnapshot: true, SourcePath: record.SourcePath, ConnectorIDs: []string{"google-test"}, WatchSources: []jobs.WatchSource{{ConnectorID: "google-test", Operation: "gmail_list", Query: "subject:Venue newer_than:7d"}, {ConnectorID: "google-test", Operation: "calendar_events", Days: 14}}, Mode: action.Inspect, Contract: artifact.InspectionContract()}
+	definition := jobs.Definition{GoalID: record.ID, GoalWatch: true, ChangeOnly: true, RefreshSnapshot: true, SourcePath: record.SourcePath, ConnectorIDs: []string{"google-test"}, WatchSources: []jobs.WatchSource{{ConnectorID: "google-test", Operation: "gmail_list", Query: "subject:Venue newer_than:7d"}}, Mode: action.Inspect, Contract: artifact.InspectionContract()}
 	now := time.Date(2026, 10, 17, 9, 0, 0, 0, time.UTC)
 	first, err := connectedGoalWatchHash(context.Background(), definition, state, now)
 	if err != nil {
@@ -469,11 +393,6 @@ func TestConnectedGoogleWatchHashesMessageAndEventContent(t *testing.T) {
 	changed, err := connectedGoalWatchHash(context.Background(), definition, state, now.Add(2*time.Minute))
 	if err != nil || changed == first {
 		t.Fatalf("changed Gmail message was missed: %s %s %v", first, changed, err)
-	}
-	summary = "Planning meeting moved"
-	changedAgain, err := connectedGoalWatchHash(context.Background(), definition, state, now.Add(3*time.Minute))
-	if err != nil || changedAgain == changed {
-		t.Fatalf("changed Calendar event was missed: %s %s %v", changed, changedAgain, err)
 	}
 	moreMail = true
 	if _, err := connectedGoalWatchHash(context.Background(), definition, state, now.Add(4*time.Minute)); err == nil {

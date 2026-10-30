@@ -215,21 +215,19 @@ func followupSources(draft followup.Draft) ([]jobs.WatchSource, map[string]strin
 			sources = append(sources, jobs.WatchSource{ConnectorID: id, Operation: "fetch"})
 		case connector.KindGoogle:
 			hasGoogle = true
-			if draft.GmailQuery == "" && draft.CalendarDays == 0 {
-				return nil, nil, "", errors.New("select a mail query or calendar window for Google")
+			if draft.GmailQuery == "" {
+				return nil, nil, "", errors.New("select a mail query for Google")
 			}
 			if draft.GmailQuery != "" {
 				sources = append(sources, jobs.WatchSource{ConnectorID: id, Operation: "gmail_list", Query: draft.GmailQuery})
 			}
-			if draft.CalendarDays > 0 {
-				sources = append(sources, jobs.WatchSource{ConnectorID: id, Operation: "calendar_events", Days: draft.CalendarDays})
-			}
+
 		default:
 			return nil, nil, "", fmt.Errorf("%s has no bounded follow-up reader", id)
 		}
 	}
-	if !hasGoogle && (draft.GmailQuery != "" || draft.CalendarDays != 0) {
-		return nil, nil, "", errors.New("mail and calendar selections require a Google connector")
+	if !hasGoogle && draft.GmailQuery != "" {
+		return nil, nil, "", errors.New("mail selection requires a Google connector")
 	}
 	if len(sources) > 4 {
 		return nil, nil, "", errors.New("select at most four connected read surfaces")

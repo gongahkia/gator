@@ -248,7 +248,7 @@ func (c *connectionControls) screen(id string) (workapp.ControlScreen, error) {
 			screen.Panel.Notice = "A browser sign-in is waiting. Open its connection to continue or cancel."
 		}
 		screen.Actions = append(screen.Actions,
-			workapp.ControlAction{Key: "G", Label: "Connect Google email & calendar", Action: "add-google", Description: "Read email and calendar events. This setup requires your own Google Cloud desktop OAuth client; Gator does not yet provide a managed Google sign-in app. You will sign in after saving, and choose access per chat or follow-up.", Review: true, Fields: []workapp.ControlField{{Label: "Connection ID", Value: "google", Help: "A unique lowercase name, for example google-personal."}, {Label: "Display name", Value: "Google"}, {Label: "Desktop OAuth client ID", Help: "From a Google Cloud OAuth client of type Desktop app. No client secret here."}}},
+			workapp.ControlAction{Key: "G", Label: "Connect Google email", Action: "add-google", Description: "Read email. This setup requires your own Google Cloud desktop OAuth client; Gator does not yet provide a managed Google sign-in app. You will sign in after saving, and choose access per chat or follow-up.", Review: true, Fields: []workapp.ControlField{{Label: "Connection ID", Value: "google", Help: "A unique lowercase name, for example google-personal."}, {Label: "Display name", Value: "Google"}, {Label: "Desktop OAuth client ID", Help: "From a Google Cloud OAuth client of type Desktop app. No client secret here."}}},
 			workapp.ControlAction{Key: "T", Label: "Add a service token connection", Action: "add-token", Description: "For an existing Slack, Notion, Atlassian or JSON API account. Add the service and resource first, then enter its token privately.", Review: true, Fields: []workapp.ControlField{{Label: "Connection ID"}, {Label: "Display name"}, {Label: "Service", Kind: "select", Value: connector.KindHTTPJSON, Options: []uisnapshot.Option{{Value: connector.KindHTTPJSON, Label: "JSON API"}, {Value: connector.KindSlack, Label: "Slack"}, {Value: connector.KindNotion, Label: "Notion"}, {Value: connector.KindAtlassian, Label: "Atlassian"}}}, {Label: "Resource URL", Help: "The HTTPS API resource for this account. Do not include tokens in the URL."}}},
 			workapp.ControlAction{Key: "R", Label: "Refresh", Action: "status"})
 		if bundledGoogleAvailable() {
@@ -364,10 +364,6 @@ func connectionReadProbes(d connector.Descriptor, now time.Time) []connectionRea
 	if slices.Contains(scopes, "https://www.googleapis.com/auth/gmail.readonly") {
 		probes = append(probes, connectionReadProbe{"gmail_list", "email", json.RawMessage(`{"limit":1}`)})
 	}
-	if slices.Contains(scopes, "https://www.googleapis.com/auth/calendar.events.readonly") {
-		input, _ := json.Marshal(map[string]any{"time_min": now.UTC().Format(time.RFC3339), "time_max": now.Add(24 * time.Hour).UTC().Format(time.RFC3339), "limit": 1})
-		probes = append(probes, connectionReadProbe{"calendar_events", "calendar", input})
-	}
 	if slices.Contains(scopes, "https://www.googleapis.com/auth/drive.metadata.readonly") {
 		probes = append(probes, connectionReadProbe{"drive_search", "Drive metadata", json.RawMessage(`{"limit":1}`)})
 	}
@@ -386,7 +382,7 @@ func connectionAccessLabel(d connector.Descriptor) string {
 	}
 	var access []string
 	scopes := strings.Fields(d.OAuthScopes)
-	for _, item := range []struct{ scope, label string }{{"gmail.readonly", "Read email"}, {"calendar.events.readonly", "Read calendar events"}, {"drive.metadata.readonly", "Read Drive metadata"}, {"documents", "Read and edit documents"}, {"spreadsheets", "Read and edit spreadsheets"}, {"gmail.send", "Send email"}} {
+	for _, item := range []struct{ scope, label string }{{"gmail.readonly", "Read email"}, {"calendar.events.readonly", "Calendar access retired; revoke in Google account settings if no longer needed"}, {"drive.metadata.readonly", "Read Drive metadata"}, {"documents", "Read and edit documents"}, {"spreadsheets", "Read and edit spreadsheets"}, {"gmail.send", "Send email"}} {
 		if slices.Contains(scopes, "https://www.googleapis.com/auth/"+item.scope) {
 			access = append(access, item.label)
 		}
