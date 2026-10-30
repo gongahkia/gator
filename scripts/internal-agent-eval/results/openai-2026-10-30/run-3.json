@@ -1,0 +1,326 @@
+{
+  "model": "gpt-5.6",
+  "started_at": "2026-10-30T04:39:12.430434Z",
+  "phases": [
+    {
+      "name": "correct-existing-note",
+      "objective": "Find my saved Community workshop project note. Update that existing note: the target date is now 2026-11-24 and it remains a proposal with unapproved budget. Keep its identity and source history; do not create a duplicate or store project content as profile memory. Prepare the exact update for my review.",
+      "response": "Prepared an update to the existing **Community workshop project** note for your review:\n\n\u003e Target date: 2026-11-24. Status: proposed; budget unapproved.\n\nThe proposal preserves the note’s identity and source history. No duplicate note or profile memory was created. The update remains pending until you approve it.",
+      "tools": [
+        "knowledge_search",
+        "knowledge_read",
+        "suggest_change"
+      ],
+      "proposals": [
+        {
+          "note_id": "note-368b78ea4cfeb737ccf2466b",
+          "expected_note_revision": "cb3ae8c164d54d51817c776f732047cc9dfdc0427eea6e5862ab193b873b1492",
+          "version": 1,
+          "id": "suggestion-31395aef178f107843b50899",
+          "kind": "note",
+          "status": "pending",
+          "title": "Community workshop project",
+          "body": "Target date: 2026-11-24. Status: proposed; budget unapproved.",
+          "work_id": "work-20261030T043912-360e8dc83c27",
+          "plan_change": {
+            "starts_at": "0001-01-01T00:00:00Z",
+            "ends_at": "0001-01-01T00:00:00Z",
+            "kind": "",
+            "expected_revision": 0,
+            "due_at": "0001-01-01T00:00:00Z",
+            "next_review_at": "0001-01-01T00:00:00Z"
+          },
+          "created_at": "2026-10-30T04:39:18.203655Z",
+          "resolved_at": "0001-01-01T00:00:00Z"
+        }
+      ],
+      "milliseconds": 7926,
+      "usage_cumulative": {
+        "unknown_requests": 0,
+        "model_requests": 4,
+        "input_tokens": 24978,
+        "output_tokens": 274,
+        "reported": true,
+        "estimated": false
+      }
+    },
+    {
+      "name": "schedule-native-step",
+      "objective": "In my Community workshop goal, I have started Budget approval. Set that existing step to doing, with a work block from 2026-10-31T04:39:00Z to 2026-10-31T05:39:00Z and deadline 2026-11-01T05:39:00Z. Record this as my reported update. Propose the change for review; do not create a new goal, reminder or connector.",
+      "response": "Proposed the **Budget approval** step update for review:\n\n- Status: **Doing**\n- Work block: **Oct 31, 2026, 04:39–05:39 UTC**\n- Deadline: **Nov 1, 2026, 05:39 UTC**\n- Evidence: recorded as your reported update\n\nNo new goal, reminder, or connector was created.",
+      "tools": [
+        "local_plan",
+        "suggest_change"
+      ],
+      "proposals": [
+        {
+          "version": 1,
+          "id": "suggestion-d114d67da81a8bf56b2b0f7d",
+          "kind": "plan",
+          "status": "pending",
+          "goal_id": "goal-6a016a59dde6eeecd3a07659",
+          "work_id": "work-20261030T043920-e0b4fe74b357",
+          "plan_change": {
+            "starts_at": "2026-10-31T04:39:00Z",
+            "ends_at": "2026-10-31T05:39:00Z",
+            "kind": "update_step",
+            "expected_revision": 1,
+            "step_id": "step-424ce9958a5e9539",
+            "status": "doing",
+            "due_at": "2026-11-01T05:39:00Z",
+            "evidence": [
+              "User reported: started Budget approval."
+            ],
+            "next_review_at": "0001-01-01T00:00:00Z"
+          },
+          "created_at": "2026-10-30T04:39:26.259342Z",
+          "resolved_at": "0001-01-01T00:00:00Z"
+        }
+      ],
+      "milliseconds": 7713,
+      "usage_cumulative": {
+        "unknown_requests": 0,
+        "model_requests": 7,
+        "input_tokens": 44154,
+        "output_tokens": 531,
+        "reported": true,
+        "estimated": false
+      }
+    },
+    {
+      "name": "add-native-dependency",
+      "objective": "For my existing Workshop outline step in Community workshop, it depends on Budget approval. Schedule the outline from 2026-10-31T05:09:00Z to 2026-10-31T06:39:00Z. Keep its current pending status and propose this update for review. An overlap is intentional for this test; point it out but don't move either block.",
+      "response": "Proposed the **Workshop outline** update for review:\n\n- **Schedule:** 2026-10-31 05:09Z–06:39Z\n- **Depends on:** Budget approval\n- **Status:** Remains pending\n\nIntentional overlap noted: it overlaps **Budget approval** from **05:09Z to 05:39Z** (30 minutes). Neither block was moved.",
+      "tools": [
+        "local_plan",
+        "suggest_change"
+      ],
+      "proposals": [
+        {
+          "version": 1,
+          "id": "suggestion-b96c2d26a0ea6f27df5c3cc1",
+          "kind": "plan",
+          "status": "pending",
+          "title": "Schedule Workshop outline with Budget approval dependency",
+          "goal_id": "goal-6a016a59dde6eeecd3a07659",
+          "work_id": "work-20261030T043928-1e30880b9bfd",
+          "plan_change": {
+            "starts_at": "2026-10-31T05:09:00Z",
+            "ends_at": "2026-10-31T06:39:00Z",
+            "depends_on": [
+              "step-424ce9958a5e9539"
+            ],
+            "kind": "update_step",
+            "expected_revision": 2,
+            "step_id": "step-980d8b60e8737ff8",
+            "status": "pending",
+            "due_at": "0001-01-01T00:00:00Z",
+            "next_review_at": "0001-01-01T00:00:00Z"
+          },
+          "created_at": "2026-10-30T04:39:34.013369Z",
+          "resolved_at": "0001-01-01T00:00:00Z"
+        }
+      ],
+      "milliseconds": 7995,
+      "usage_cumulative": {
+        "unknown_requests": 0,
+        "model_requests": 10,
+        "input_tokens": 63438,
+        "output_tokens": 846,
+        "reported": true,
+        "estimated": false
+      }
+    },
+    {
+      "name": "fresh-chat-recall",
+      "objective": "In a fresh chat, read my saved Community workshop project note and local agenda. Tell me the target date, unfinished work, unresolved dependency and scheduling overlap. Do not change anything or imply the budget is approved.",
+      "response": "- **Target date:** November 24, 2026 — **proposed**, not confirmed.\n- **Unfinished work:**\n  - Budget approval — **in progress**, due November 1.\n  - Workshop outline — **pending**.\n- **Unresolved dependency:** The workshop outline is blocked by the unfinished budget approval. **The budget is not approved.**\n- **Scheduling overlap:** On October 31, the budget approval block (12:39–1:39 PM) overlaps the workshop outline block (1:09–2:39 PM) by **30 minutes**. Times use the agenda’s UTC+08:00 offset.\n\nNothing was changed.",
+      "tools": [
+        "knowledge_search",
+        "local_agenda",
+        "knowledge_read"
+      ],
+      "milliseconds": 7835,
+      "usage_cumulative": {
+        "unknown_requests": 0,
+        "model_requests": 13,
+        "input_tokens": 82844,
+        "output_tokens": 1242,
+        "reported": true,
+        "estimated": false
+      }
+    },
+    {
+      "name": "reported-completion",
+      "objective": "Update Community workshop: I have now completed Budget approval. Mark only that existing step done, with my update as evidence, for review. Workshop outline is still pending; do not change or reschedule it.",
+      "response": "Queued for review: mark **Budget approval** done and add your completion update as evidence. **Workshop outline** remains pending with no scheduling changes.",
+      "tools": [
+        "local_plan",
+        "suggest_change"
+      ],
+      "proposals": [
+        {
+          "version": 1,
+          "id": "suggestion-4a31c2547711999cc95e729d",
+          "kind": "plan",
+          "status": "pending",
+          "title": "Mark Budget approval done",
+          "goal_id": "goal-6a016a59dde6eeecd3a07659",
+          "work_id": "work-20261030T043944-6304decc9d45",
+          "plan_change": {
+            "starts_at": "0001-01-01T00:00:00Z",
+            "ends_at": "0001-01-01T00:00:00Z",
+            "kind": "update_step",
+            "expected_revision": 3,
+            "step_id": "step-424ce9958a5e9539",
+            "status": "done",
+            "due_at": "0001-01-01T00:00:00Z",
+            "evidence": [
+              "User reported: started Budget approval.",
+              "User reported: I have now completed Budget approval."
+            ],
+            "next_review_at": "0001-01-01T00:00:00Z"
+          },
+          "created_at": "2026-10-30T04:39:48.514416Z",
+          "resolved_at": "0001-01-01T00:00:00Z"
+        }
+      ],
+      "milliseconds": 6836,
+      "usage_cumulative": {
+        "unknown_requests": 0,
+        "model_requests": 16,
+        "input_tokens": 102012,
+        "output_tokens": 1449,
+        "reported": true,
+        "estimated": false
+      }
+    },
+    {
+      "name": "quiet-check",
+      "objective": "Check this local goal's current plan. Notify only if an unfinished step is overdue now. Future blocks and already completed steps alone are not alerts. Treat statuses as last reported. Inspect the current plan; do not propose changes or claim actions. Return only JSON with attention (boolean), summary and evidence (array of exact 'goal plan step STEP_ID' references).",
+      "response": "{\"attention\":false,\"summary\":\"No unfinished step is overdue now.\",\"evidence\":[]}",
+      "tools": [
+        "local_plan"
+      ],
+      "milliseconds": 3925,
+      "usage_cumulative": {
+        "unknown_requests": 0,
+        "model_requests": 18,
+        "input_tokens": 113298,
+        "output_tokens": 1606,
+        "reported": true,
+        "estimated": false
+      }
+    },
+    {
+      "name": "overdue-check",
+      "objective": "Check this local goal's current plan. Notify only if an unfinished step is overdue now. Future blocks and already completed steps alone are not alerts. Treat statuses as last reported. Inspect the current plan; do not propose changes or claim actions. Return only JSON with attention (boolean), summary and evidence (array of exact 'goal plan step STEP_ID' references).",
+      "response": "{\"attention\":true,\"summary\":\"Workshop outline is unfinished and overdue.\",\"evidence\":[\"goal plan step step-980d8b60e8737ff8\"]}",
+      "tools": [
+        "local_plan"
+      ],
+      "milliseconds": 4763,
+      "usage_cumulative": {
+        "unknown_requests": 0,
+        "model_requests": 21,
+        "input_tokens": 125027,
+        "output_tokens": 1870,
+        "reported": true,
+        "estimated": false
+      }
+    }
+  ],
+  "checks": {
+    "agenda reports dependency and overlap": true,
+    "chat scheduled exact existing step": true,
+    "completion only affects reported step": true,
+    "dependency preserved on original step": true,
+    "fresh chat recalls corrected date": true,
+    "live checks did not complete overdue work": true,
+    "original note source retained": true,
+    "original note updated without duplicate": true,
+    "overdue alert cites the actual pending step": true,
+    "overdue-check decision": true,
+    "overdue-check has no mutations": true,
+    "quiet-check decision": true,
+    "quiet-check has no mutations": true,
+    "read-only recall queued no changes": true
+  },
+  "usage": {
+    "unknown_requests": 0,
+    "model_requests": 22,
+    "input_tokens": 125464,
+    "output_tokens": 1962,
+    "reported": true,
+    "estimated": false
+  },
+  "note_body": "Target date: 2026-11-24. Status: proposed; budget unapproved.",
+  "plan": {
+    "version": 1,
+    "goal_id": "goal-6a016a59dde6eeecd3a07659",
+    "revision": 5,
+    "outcome": "Prepare a workshop",
+    "steps": [
+      {
+        "starts_at": "2026-10-31T04:39:00Z",
+        "ends_at": "2026-10-31T05:39:00Z",
+        "id": "step-424ce9958a5e9539",
+        "title": "Budget approval",
+        "status": "done",
+        "due_at": "2026-11-01T05:39:00Z",
+        "evidence": [
+          "User reported: started Budget approval.",
+          "User reported: I have now completed Budget approval."
+        ],
+        "updated_at": "2026-10-30T04:39:51.008421Z"
+      },
+      {
+        "starts_at": "2026-10-31T05:09:00Z",
+        "ends_at": "2026-10-31T06:39:00Z",
+        "depends_on": [
+          "step-424ce9958a5e9539"
+        ],
+        "id": "step-980d8b60e8737ff8",
+        "title": "Workshop outline",
+        "status": "pending",
+        "due_at": "2026-10-30T03:39:57.091404Z",
+        "updated_at": "2026-10-30T04:39:57.091645Z"
+      }
+    ],
+    "last_review_at": "0001-01-01T00:00:00Z",
+    "next_review_at": "0001-01-01T00:00:00Z",
+    "updated_at": "2026-10-30T04:39:57.091645Z"
+  },
+  "decision_baselines": [
+    {
+      "name": "quiet-check",
+      "objective": "Check this local goal's current plan. Notify only if an unfinished step is overdue now. Future blocks and already completed steps alone are not alerts. Treat statuses as last reported. Inspect the current plan; do not propose changes or claim actions. Return only JSON with attention (boolean), summary and evidence (array of exact 'goal plan step STEP_ID' references).",
+      "response": "{\"attention\":false,\"summary\":\"No unfinished step is overdue now.\",\"evidence\":[]}",
+      "tools": null,
+      "milliseconds": 2046,
+      "usage_cumulative": {
+        "unknown_requests": 0,
+        "model_requests": 19,
+        "input_tokens": 113793,
+        "output_tokens": 1691,
+        "reported": true,
+        "estimated": false
+      }
+    },
+    {
+      "name": "overdue-check",
+      "objective": "Check this local goal's current plan. Notify only if an unfinished step is overdue now. Future blocks and already completed steps alone are not alerts. Treat statuses as last reported. Inspect the current plan; do not propose changes or claim actions. Return only JSON with attention (boolean), summary and evidence (array of exact 'goal plan step STEP_ID' references).",
+      "response": "{\"attention\":true,\"summary\":\"Workshop outline is unfinished and overdue.\",\"evidence\":[\"goal plan step step-980d8b60e8737ff8\"]}",
+      "tools": null,
+      "milliseconds": 2201,
+      "usage_cumulative": {
+        "unknown_requests": 0,
+        "model_requests": 22,
+        "input_tokens": 125464,
+        "output_tokens": 1962,
+        "reported": true,
+        "estimated": false
+      }
+    }
+  ]
+}

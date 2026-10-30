@@ -94,3 +94,89 @@ of this phase.
 - Passed note/knowledge/suggestion tests across knowledge, suggestion, tools,
   workrun and CLI packages, including restart, interruption and acceptance retry.
   Live workflow verification follows with the local tracking work.
+
+### Local plans and agenda
+
+- Steps now support explicit start/end blocks and up to eight same-plan
+  dependencies. Invalid intervals, missing dependencies, duplicate dependencies
+  and cycles are rejected. Removing a referenced step requires unlinking it first.
+- `/agenda` and `gator goal agenda [--days N] [--goal ID]` show unfinished work,
+  overdue dates, blocked dependencies and overlapping blocks. Paused/completed
+  goals and completed steps are omitted. This is derived from the plan store.
+- Main chat can inspect an existing project by title with `local_plan`, then
+  propose an exact revision-checked update without switching chats. A goal chat
+  can only inspect/update its own plan. Ambiguous titles require disambiguation.
+- Plan acceptance has a persisted receipt, so an interrupted acceptance cannot
+  add the same step twice. A later owner edit still invalidates a stale proposal.
+- Existing goal watches detect scheduled start/end boundaries once; unchanged
+  checks remain quiet across restarts. Dates never imply completion. Watches
+  still require an explicit reviewed agreement and an available supervisor.
+- A block is a user-maintained plan, not an externally booked event. It does not
+  silently create a reminder. One-off reminders and recurring jobs remain the
+  existing notification mechanism. Repeating calendar-style blocks are not added.
+
+Example: “In my workshop project, schedule the outline for 2 November from
+10:00 to 11:00 Singapore time. It depends on budget approval. Keep it pending.”
+Gator reads that project and proposes the change. After accepting it through
+`/suggestions`, `/agenda` reflects the new block and unresolved dependency.
+
+Direct terminal edits also support `gator goal plan ID add --title TEXT --start
+RFC3339 --end RFC3339 --depends-on STEP_ID` and the corresponding `step` flags.
+Use an explicit timezone offset. `--clear-schedule` and `--clear-dependencies`
+remove those fields without deleting the task.
+
+### Limits still open across the six broader gaps
+
+1. **Ongoing coordination:** native planning is stronger, but applying plan
+   changes still needs owner review. No claim of autonomous multi-week execution.
+2. **Everyday capability:** local dates/progress/notes work without connectors.
+   Recurring time blocks, richer calendar views and cross-project dependencies
+   remain separate future work. Other connector families are optional, not removed.
+3. **Proactive judgment:** quiet/overdue decisions can be tested, but a small
+   synthetic sample cannot establish usefulness or low noise over real weeks.
+4. **Availability:** closing the terminal can leave the supervisor working, but
+   a sleeping/offline Mac does not become an always-on host. The companion still
+   needs deployment, device and real-world recovery validation.
+5. **Maintained knowledge:** existing notes can now be corrected in place.
+   Resolving contradictions across separate notes/plans is not automatic, and
+   shared editing by multiple people is not implemented.
+6. **Speed/evidence:** title lookup avoids a list/read round trip. Live reports
+   retain latency, calls and tokens. No claim of better reasoning than the same
+   base model; persistence and checked actions are the product's added capability.
+
+The repository still contains historical desktop-era and connector-heavy
+research documents. This ledger and the connector inventory describe this phase;
+old plans should not be read as statements of current support.
+
+### Live OpenAI lifecycle (30 October)
+
+Retained reports and reproduction instructions:
+[`scripts/internal-agent-eval`](../scripts/internal-agent-eval/README.md).
+All runs used `gpt-5.6`, synthetic profiles and zero selected connectors.
+
+| Run | Result | Requests | Input/output tokens | Interpretation |
+| --- | --- | ---: | --- | --- |
+| 1 | Failed, budget exhausted | 39 | 291,037 / 10,305 | Exposed omitted `strict:false` in the Responses adapter; optional unrelated suggestion fields were being filled. Failure retained. |
+| 2 | 13/13 checks passed | 27 | 158,081 / 2,357 | Real note acceptance, plan edits, fresh-chat recall and quiet/overdue decisions worked. ~56.5s total. Tool retries were not separately recorded in this version. |
+| 3 | 14/14 checks passed | 22 | 125,464 / 1,962 | Added evidence-reference check, tool-error capture and direct title lookup. Zero recorded tool errors; ~51.8s total. |
+
+Request/token totals include two text-only decision baselines. Both baselines
+also made the correct quiet/overdue decisions; there is no measured reasoning
+advantage here. The final Gator workflow used 20 calls, versus 2 calls for the
+baseline's narrower decision task. Those workloads are not interchangeable.
+A single rerun with fewer calls is not a statistically established latency gain.
+
+The adapter now explicitly sends `strict:false` for function tools, preserving
+host-validated optional fields. This matches the documented behavior that
+[omitting strictness can normalize Responses schemas into strict mode](https://developers.openai.com/api/docs/guides/function-calling).
+Computer tools remain separate. No credentials or real user state are retained
+in the reports.
+
+The broad-suite deck failure was traced to an old generated PPTX without a slide
+layout. Regenerating that synthetic fixture with the current renderer preserved
+its content and made the isolated edit scenario pass; no assertion was weakened.
+
+Existing profiles load without migration. Newly written plan scheduling fields
+and note receipts require this version of the reader; restoring an older binary
+alone does not remove those fields from a profile. Use a matching profile backup
+when rolling back data formats.
