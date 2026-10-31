@@ -30,7 +30,7 @@ test('real isolated tmux: separate trust, grants, literal input, keys, interrupt
   await execute('go',['build','-o',binary,'./cmd/gator'],{timeout:90000});await writeFile(tokenFile,'a'.repeat(64)+'\n',{mode:0o600});
   const phone=await addDevice(tokenFile,'Phone',join(root,'phone')),token=(await readFile(join(root,'phone'),'utf8')).trim(),actor=await inspectionDeviceActor(tokenFile,phone.id);
   await tmux('new-session','-d','-s','fixture','-x','120','-y','32',process.execPath,'-e',"process.on('SIGINT',()=>console.log('T4_INTERRUPTED'));process.stdin.on('data',b=>console.log('READ:'+b.toString('hex')));setInterval(()=>{},1000)");
-  const pane=(await tmux('display-message','-p','#{pane_id}')).stdout.trim();await tmux('split-window','-d','cat');const other=(await tmux('list-panes','-F','#{pane_id}')).stdout.trim().split('\n').find(p=>p!==pane);await tmux('select-pane','-t',other);
+  const pane=(await tmux('display-message','-p','#{pane_id}')).stdout.trim();await tmux('split-window','-d','cat');const other=(await tmux('list-panes','-F','#{pane_id}')).stdout.trim().split('\n').find(p=>p!==pane);await tmux('select-pane','-t',other);await tmux('swap-pane','-s',pane,'-t',other);
   const enrolled=JSON.parse((await execute(binary,['external-tmux','enroll','--reviewed-read-config',mux,socket,pane,'T4 intended pane'],{env})).stdout),b=enrolled.binding;
   await execute(process.execPath,[resolve('companion/external-access.mjs'),binary,tokenFile,b.id,phone.id,'60'],{env});
   c=createCompanion({binary,workspace:root,env,tokenFile,spawnBackend(){throw new Error('External control created Work');}});const address=await c.listen(),base=`http://127.0.0.1:${address.port}`,headers={Authorization:`Bearer ${token}`,'Content-Type':'application/json'};

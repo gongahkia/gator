@@ -203,3 +203,109 @@ T5 is deferred. It must preserve separate trust/grants, exact identity, bounded
 capture, durable receipts, unknown-outcome blocking and the trusted-server limits.
 No Ghostty/Zellij/Screen, new terminal protocol, supervisor, generic shell,
 autonomous model control, push notifications or prompt automation is included.
+
+## Implementation manifest
+
+Added:
+
+- `internal/actionlog/terminal.go`, `terminal_test.go`: existing-store terminal
+  receipts, global action ID binding, fsynced namespace/identity, process locks.
+- `internal/executiontarget/tmux/input.go`, `input_test.go`: finite native sends,
+  exact payload validation, control scope and conservative partial delivery.
+- `internal/executiontarget/external/control.go`, `control_test.go`: local control
+  trust, operation grants, fresh authorization, durable owner-side admission.
+- `companion/external-control.mjs`, `external-control-access.mjs`: typed gateway
+  projection/helper and trusted local grant command.
+- `companion/public/external-actions.mjs`: exact review and receipt-only recovery.
+- `companion/terminal.test.mjs`, `terminal-client.test.mjs`: adversarial gateway,
+  real isolated native/helper/device flow and Chromium intervention journey.
+- This document.
+
+Adapted:
+
+- `internal/actionlog/store.go`: ignore the new hidden terminal namespace when
+  enumerating connected-service/Work effects; retain existing run semantics.
+- tmux `controller.go`, `review.go`, `live_test.go`: distinct control review,
+  final invocation authorization and native finite-key/alias fixtures.
+- external `catalog.go`: independent control grants/review, admission initialization
+  state and redacted authorized operation offers on snapshots.
+- `cmd/gator/{companion_external.go,desktop_runtime.go}`: fixed local administrative
+  commands and bounded, maintenance-free Go mutation helper.
+- `companion/{server.mjs,external.mjs,README.md}` and
+  `companion/public/{index.html,external-view.mjs}`: existing transport and view.
+- `app-host/contracts/{external.ts,protocol.ts}`: typed finite actions/receipts.
+- `third_party/onibi/NOTICE.md`, `desktop/licenses/DEPENDENCIES.txt`: attribution
+  for the adapted input methods; Apache text/project licensing remain unchanged.
+
+## Verification commands
+
+```sh
+go test ./internal/executiontarget/...
+go test -race ./internal/executiontarget/... ./internal/actionlog
+go test ./internal/actionlog ./internal/workrun
+GOMAXPROCS=4 go test ./...
+go vet ./...
+npm test --prefix app-host
+npm run check --prefix desktop
+npm test --prefix desktop
+npm run check --prefix ui
+node --test companion/auth.test.mjs companion/recovery.test.mjs companion/inspection.test.mjs companion/mutation.test.mjs companion/external.test.mjs companion/server.test.mjs companion/health.test.mjs
+node --test companion/client.test.mjs companion/inspection-client.test.mjs companion/mutation-client.test.mjs companion/external-client.test.mjs
+node --test companion/terminal-client.test.mjs companion/terminal.test.mjs
+GATOR_TMUX_LIVE=1 node --test companion/terminal.test.mjs companion/external.test.mjs
+GATOR_TMUX_LIVE=1 go test ./internal/executiontarget/... -count=1
+```
+
+The concurrent duplicate fixture permits observing an in-flight claimed/unknown
+receipt, then reconciles final acknowledgement and verifies exactly one copy of
+the sentinel. It does not assume that an in-flight claim is already acknowledged.
+Go subprocess fixtures reproduce both surviving uncertain claims and a process
+exit after a possible-dispatch sentinel; they do not claim physical-program
+acceptance. Partial text/Enter is reproduced with a fake runner.
+
+## Acceptance evidence — 31 October 2026
+
+**PASS under the reviewed, user-trusted backend model.** Physical-phone acceptance
+is separate and was not performed.
+
+| Check | Result |
+| --- | --- |
+| `go test ./...` (final default invocation) | PASS, 72 packages; 11 without tests |
+| Bounded-concurrency full Go runs (`GOMAXPROCS=4`) | PASS, same package set |
+| `go test -race ./internal/executiontarget/... ./internal/actionlog` | PASS, four packages |
+| `go test ./internal/actionlog ./internal/workrun` | PASS |
+| `go vet ./...` | PASS, no diagnostics |
+| app-host tests | 77 pass, one existing skip |
+| Desktop TypeScript | PASS |
+| Desktop tests | Seven pass, one existing skip; nested app-host 77 pass, one skip |
+| OpenTUI TypeScript | PASS |
+| Existing companion auth/recovery/inspection/mutation/external/server/health | 22 pass, one opt-in native skip |
+| Existing Chromium journeys | Nine pass |
+| New terminal Chromium journey | One pass |
+| New terminal gateway/lost-reply tests | Two pass |
+| Combined opt-in terminal/external HTTP suites | Six pass, no skips |
+| Opt-in Go target suites, including native finite keys/alias fixtures | Three packages pass |
+| Linux and Windows external package cross-compilation | PASS; not native runtime acceptance |
+| Formatting and diff checks | PASS |
+| Bun | Unavailable; not installed/run |
+| Physical phone / native Linux / WSL | Not performed |
+
+An initial unbounded-parallel full run hit the existing three-second runner
+fixture deadline with no captured bytes. Focused reruns, bounded-concurrency full
+runs and the final default full run passed without relaxing production limits.
+The new native key fixture was corrected to use an explicitly private short
+socket directory. Concurrent duplicate assertions were corrected to reconcile
+an in-flight claimed receipt rather than mislabel it as final acknowledgement.
+
+The final native fixture uses its own private socket and two disposable panes,
+changes active pane and swaps pane positions, sends literal UTF-8 text ending in
+semicolon, proves no implicit Enter, sends reviewed Enter and text-plus-Enter,
+observes exactly one sentinel from six helper invocations sharing an action ID,
+exercises a harmless Ctrl-C handler, then withdraws control and verifies inspection
+and historical receipt lookup continue. Existing native inspection fixtures still
+verify replacement/stale-server rejection. No ordinary developer server is used.
+
+Operational limits remain deliberate: no silent pruning, no successful-outcome
+recovery button, no exclusive control against another keyboard/client, and no
+claim of automatic alias/configuration attestation. Unknown outcomes require
+inspection and local intervention. T5 was not started.
