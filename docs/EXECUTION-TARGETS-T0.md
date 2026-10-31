@@ -1,5 +1,9 @@
 # Execution target foundation (T0)
 
+Final scope: see [T4.5 consolidation](EXECUTION-TARGETS-T4.5.md). This is a
+historical tranche record. Current scope is owned Work supervision and optional
+external tmux; Ghostty T5/T6 are permanently removed from the current roadmap.
+
 Status: contracts only. No execution adapter, route, discovery, enrollment UI,
 grant store, daemon, or lifecycle change is enabled by this tranche.
 

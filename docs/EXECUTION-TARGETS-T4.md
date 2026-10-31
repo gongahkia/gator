@@ -1,5 +1,9 @@
 # T4: authorized external tmux intervention
 
+Final scope: see [T4.5 consolidation](EXECUTION-TARGETS-T4.5.md). This is a
+historical tranche record. Current scope is owned Work supervision and optional
+external tmux; Ghostty T5/T6 are permanently removed from the current roadmap.
+
 T4 adds reviewed human input to explicitly enrolled tmux panes. It leaves Work
 owners, native specialist controls, approvals/artifact verification, scheduling,
 memory, providers and execution lifetimes unchanged. No model tool, SSH, new
@@ -182,7 +186,7 @@ Terminal contents/input are not logged, added to memory or sent to models. Nativ
 text argv can be observable to privileged/same-user OS process inspection; this
 interface does not claim OS-level secrecy against the host owner.
 
-## Manual verification and T5 boundary
+## Manual verification and final scope
 
 Use only a disposable server/socket for acceptance. Enroll a pane running a
 harmless input-recorder program, review control locally, grant Inspect and only
@@ -199,8 +203,9 @@ They use fixture lifecycle commands; production exposes none. No physical-phone
 acceptance is claimed from browser/native fixture results. Windows preview remains
 unsupported for native tmux control; Linux/WSL runtime acceptance is separate.
 
-T5 is deferred. It must preserve separate trust/grants, exact identity, bounded
-capture, durable receipts, unknown-outcome blocking and the trusted-server limits.
+The integration roadmap concludes with T4.5 consolidation. Ghostty T5/T6 are
+permanently removed. Existing trust/grants, exact identity, bounded capture, durable
+receipts, unknown-outcome blocking and trusted-server limitations remain in force.
 No Ghostty/Zellij/Screen, new terminal protocol, supervisor, generic shell,
 autonomous model control, push notifications or prompt automation is included.
 
@@ -308,4 +313,4 @@ verify replacement/stale-server rejection. No ordinary developer server is used.
 Operational limits remain deliberate: no silent pruning, no successful-outcome
 recovery button, no exclusive control against another keyboard/client, and no
 claim of automatic alias/configuration attestation. Unknown outcomes require
-inspection and local intervention. T5 was not started.
+inspection and local intervention. T5/T6 are removed from the current roadmap; no Ghostty implementation exists.

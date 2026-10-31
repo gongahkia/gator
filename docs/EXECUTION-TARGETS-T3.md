@@ -1,5 +1,9 @@
 # T3: explicitly enrolled external tmux inspection
 
+Final scope: see [T4.5 consolidation](EXECUTION-TARGETS-T4.5.md). This is a
+historical tranche record. Current scope is owned Work supervision and optional
+external tmux; Ghostty T5/T6 are permanently removed from the current roadmap.
+
 Status: T3.1 formalizes acceptance under the **reviewed, user-trusted backend
 model**. See [T3.1](EXECUTION-TARGETS-T3.1.md) for the instance-bound review record,
 pre-invocation passive checks, withdrawal and dynamic-configuration limitations.

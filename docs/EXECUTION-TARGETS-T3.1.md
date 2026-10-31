@@ -1,5 +1,9 @@
 # T3.1: reviewed tmux backend trust
 
+Final scope: see [T4.5 consolidation](EXECUTION-TARGETS-T4.5.md). This is a
+historical tranche record. Current scope is owned Work supervision and optional
+external tmux; Ghostty T5/T6 are permanently removed from the current roadmap.
+
 Gator accepts a locally reviewed, user-trusted backend model. It issues intended
 read operations; it does not prove that arbitrary server configuration cannot
 translate them into mutations. Review is neither enrollment nor device authority.

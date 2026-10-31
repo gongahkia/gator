@@ -1,5 +1,9 @@
 # T1: remote inspection of live owned Work
 
+Final scope: see [T4.5 consolidation](EXECUTION-TARGETS-T4.5.md). This is a
+historical tranche record. Current scope is owned Work supervision and optional
+external tmux; Ghostty T5/T6 are permanently removed from the current roadmap.
+
 T1 adds read-only Work inspection to the existing companion. It builds on
 `internal/executiontarget`; it does not add terminal controls or external targets.
 

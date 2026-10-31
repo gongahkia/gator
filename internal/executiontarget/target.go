@@ -15,9 +15,11 @@ import (
 type Backend string
 
 const (
-	Work    Backend = "gator_work"
-	PTY     Backend = "gator_pty"
-	Tmux    Backend = "external_tmux"
+	Work Backend = "gator_work"
+	PTY  Backend = "gator_pty"
+	Tmux Backend = "external_tmux"
+	// Ghostty is a reserved T0 wire value retained for contract compatibility.
+	// No adapter, enrollment, discovery or control is implemented or planned.
 	Ghostty Backend = "external_ghostty"
 )
 

@@ -108,7 +108,7 @@ func (s Store) terminalRoot(target executiontarget.Binding, create bool) (worksp
 		if err = privatefs.MkdirAll(dir); err != nil {
 			return workspace.Root{}, err
 		}
-		parent, e := os.Open(s.path)
+		parent, e := os.Open(filepath.Dir(dir))
 		if e != nil {
 			return workspace.Root{}, e
 		}
@@ -131,27 +131,8 @@ func (s Store) terminalRecords(create bool) (workspace.Root, error) {
 	if err := s.terminalNamespace("receipts", create); err != nil {
 		return workspace.Root{}, err
 	}
-	dir := filepath.Join(s.path, ".terminal", "receipts")
-	info, err := os.Lstat(dir)
-	if errors.Is(err, os.ErrNotExist) && create {
-		if err = privatefs.MkdirAll(dir); err != nil {
-			return workspace.Root{}, err
-		}
-		parent, e := os.Open(s.path)
-		if e != nil {
-			return workspace.Root{}, e
-		}
-		e = privatefs.SyncDir(parent)
-		parent.Close()
-		if e != nil {
-			return workspace.Root{}, e
-		}
-	} else if err != nil {
-		return workspace.Root{}, err
-	} else if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || privatefs.Check(dir) != nil {
-		return workspace.Root{}, errors.New("unsafe terminal receipts")
-	}
-	return workspace.Open(dir)
+	// terminalNamespace already creates, validates and syncs this directory.
+	return workspace.Open(filepath.Join(s.path, ".terminal", "receipts"))
 }
 
 // LockTerminal serializes all Gator-originated dispatches to this exact target

@@ -19,7 +19,7 @@ await cp(join(root, "ui/runtime", runtime), join(destination, "runtime", runtime
 await cp(join(root, "ui/dist"), join(destination, "ui/dist"), { recursive: true });
 await cp(join(root, "app-host/src"), join(destination, "app-host/src"), { recursive: true });
 await cp(join(root, "app-host/contracts"), join(destination, "app-host/contracts"), { recursive: true });
-for (const [source, target] of [["ui/package.json", "ui/package.json"], ["ui/bun.lock", "ui/bun.lock"], ["app-host/package.json", "app-host/package.json"], ["ui/UPSTREAM.md", "licenses/OPENCODE-UPSTREAM.md"], ["ui/upstream/LICENSE", "licenses/OPENCODE-LICENSE"], ["docs/TERMINAL.md", "TERMINAL.md"]]) await cp(join(root, source), join(destination, target));
+for (const [source, target] of [["ui/package.json", "ui/package.json"], ["ui/bun.lock", "ui/bun.lock"], ["app-host/package.json", "app-host/package.json"], ["ui/UPSTREAM.md", "licenses/OPENCODE-UPSTREAM.md"], ["ui/upstream/LICENSE", "licenses/OPENCODE-LICENSE"], ["docs/TERMINAL.md", "TERMINAL.md"], ["third_party/onibi/LICENSE", "licenses/ONIBI-LICENSE"], ["third_party/onibi/NOTICE.md", "licenses/ONIBI-NOTICE.md"]]) await cp(join(root, source), join(destination, target));
 await cp(join(root, "ui/patches"), join(destination, "ui/patches"), { recursive: true });
 for (const name of ["install.mjs", "uninstall.mjs"]) await cp(join(root, "ui/scripts", name), join(destination, "ui/scripts", name));
 const result = spawnSync("bun", ["install", "--cwd", join(destination, "ui"), "--production", "--frozen-lockfile"], { stdio: "inherit", windowsHide: true });

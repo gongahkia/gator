@@ -1,5 +1,14 @@
 # Self-hosted companion transport
 
+The companion is optional. Gator remains a terminal-agnostic, local-first personal
+agent; neither a phone, private-network service nor tmux is required for ordinary
+agent, desktop or OpenTUI operation. Remote Work supervision uses the actual Work
+owner and semantic coding-agent controls. Optional external tmux is independently
+enrolled and authorized host-terminal access, with different trust and lifetime
+boundaries. It is not a replacement for Work controls or a generic SSH client.
+Ghostty integration is not implemented and T5/T6 are removed from the roadmap.
+See [final integration scope](../docs/EXECUTION-TARGETS-T4.5.md).
+
 The Active Work view also supports separately authorized semantic controls:
 Work cancellation, specialist steering/answers, and exact bounded command
 approvals. Each requires a host-local operation/scope grant and explicit phone

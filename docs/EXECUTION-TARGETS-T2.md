@@ -1,5 +1,9 @@
 # T2: durable remote semantic intervention
 
+Final scope: see [T4.5 consolidation](EXECUTION-TARGETS-T4.5.md). This is a
+historical tranche record. Current scope is owned Work supervision and optional
+external tmux; Ghostty T5/T6 are permanently removed from the current roadmap.
+
 T2 extends the T0 capability contracts and T1 verified-owner channel. It adds no
 PTY input, terminal keys, external terminal access, provider routing, daemon,
 execution ownership, scheduler, or execution-lifetime changes. Onibi is untouched.
