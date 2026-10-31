@@ -25,3 +25,8 @@ Onibi's third-party fonts and rattles assets/notices are outside this extraction
 This notice licenses the identified adapted material; it does not assign an
 Apache-2.0 license to the remainder of Gator. No root project license was present
 when this adaptation was made.
+
+T4 also adapts the already selected attach.go literal SendText/SendKey patterns in
+`internal/executiontarget/tmux/input.go`. Gator adds control-review/grant gates,
+finite keys and input bounds, trailing-semicolon argv escaping, exact native
+identity checks, partial-delivery semantics and no automatic input retries.

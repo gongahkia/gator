@@ -181,7 +181,7 @@ export function createCompanion({ binary, workspace, env, tokenFile, origin,
           if(req.method!=='POST'||url.search)return respond(res,405,{error:'Use a reviewed terminal action.'});
           if(req.headers['content-type']!=='application/json')return respond(res,415,{error:'Use application/json.'});
           const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>8192)return respond(res,413,{error:'Terminal action exceeds limit.'});chunks.push(chunk);}
-          action=validateTerminalAction(JSON.parse(Buffer.concat(chunks).toString('utf8')),terminalAction[1]);
+          try{action=validateTerminalAction(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(Buffer.concat(chunks))),terminalAction[1]);}catch{throw new Error('Invalid reviewed terminal action.');}
         }
         const input={actor:inspectionActor(access),action};
         const guarded=async(mode)=>{

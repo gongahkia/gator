@@ -41,7 +41,7 @@ test('real isolated tmux: separate trust, grants, literal input, keys, interrupt
   assert.notEqual((await post(action('a',{kind:'text',text:'unauthorized'}))).status,200);
   await execute(binary,['external-tmux','review-control',b.id],{env});
   const grant=op=>execute(process.execPath,[resolve('companion/external-control-access.mjs'),binary,tokenFile,b.id,phone.id,op,'60'],{env});
-  await grant('text_input');const literal='Enter Escape ; $(LITERAL_ONLY)';const a=action('b',{kind:'text',text:literal});
+  await grant('text_input');const literal='Enter Escape ; $(LITERAL_ONLY) 猫;' ;const a=action('b',{kind:'text',text:literal});
   const sent=await post(a);assert.equal(sent.status,200,JSON.stringify(sent.value));assert.equal(sent.value.receipt.delivery,'dispatch_acknowledged');
   let out=(await snapshot()).targets[0].text;assert.match(out,/LITERAL_ONLY/);assert.doesNotMatch(out,/READ:/,'no Enter must be appended');assert.doesNotMatch((await tmux('capture-pane','-p','-t',other)).stdout,/LITERAL_ONLY/);
   assert.notEqual((await post(action('c',{kind:'interrupt'}))).status,200,'text grant cannot interrupt');

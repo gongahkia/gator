@@ -86,6 +86,12 @@ func TestTerminalCrossProcessClaimsAndCrashRecovery(t *testing.T) {
 	// A second isolated target reproduces a process exiting after possible dispatch.
 	binding2, _ := executiontarget.NewBinding(executiontarget.Tmux, "other-instance", "native2")
 	r.Target = binding2
+	original := r.ID
+	r.ID = strings.Repeat("a", 32)
+	if _, _, err := s.ClaimTerminal(r); err == nil {
+		t.Fatal("action ID crossed targets")
+	}
+	r.ID = original
 	data, _ = json.Marshal(r)
 	if out, err := child(true).CombinedOutput(); err == nil {
 		t.Fatal("fixture did not crash", string(out))

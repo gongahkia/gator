@@ -8,8 +8,8 @@ export function createExternalActions({getSession,revoked}){
  const op=kind=>kind==='interrupt'?'interrupt':kind==='key'?'key_input':'text_input';
  function render(){
   $('external-actions').hidden=!binding||(!item?.controls?.length&&!pending);
-  $('terminal-draft').hidden=!item?.controls?.includes('text_input');
-  $('terminal-key-choice').hidden=!item?.controls?.includes('key_input');
+  $('terminal-draft').hidden=!item?.controls?.includes('text_input');$('terminal-draft-label').hidden=$('terminal-draft').hidden;
+  $('terminal-key-choice').hidden=!item?.controls?.includes('key_input');$('terminal-key-label').hidden=$('terminal-key-choice').hidden;
   for(const kind of ['text','text_enter','key','interrupt'])$(`terminal-${kind}`).hidden=!item?.controls?.includes(op(kind));
   for(const kind of ['text','text_enter','key','interrupt'])$(`terminal-${kind}`).disabled=!allowed();
   $('terminal-draft').disabled=!allowed()||!item?.controls?.includes('text_input');
@@ -37,7 +37,7 @@ export function createExternalActions({getSession,revoked}){
   const input={kind};if(kind==='text'||kind==='text_enter'){input.text=$('terminal-draft').value;if(!input.text||new TextEncoder().encode(input.text).length>2048||/[\p{Cc}\p{Cf}\p{Cs}\u2028\u2029]/u.test(input.text)){ $('terminal-status').textContent='Enter at most 2048 bytes, without newlines or control characters.';return;}}
   if(kind==='key')input.key=$('terminal-key-choice').value;
   reviewedAt=item.captured_at;reviewed={id:crypto.randomUUID().replaceAll('-',''),target:binding.id,generation:binding.generation,input};
-  $('terminal-review').textContent=`Target: ${item.target.label} · tmux\n${binding.id}\nSnapshot age: ${Math.max(0,Math.floor((Date.now()-Date.parse(item.captured_at))/1000))} seconds\nOperation: ${kind}\nEnter appended: ${kind==='text_enter'?'yes':'no'}\nExact payload: ${JSON.stringify(input)}\nTerminal input has host-user authority. Dispatch does not prove program completion.`;
+  $('terminal-review').textContent=`Target: ${item.target.label} · tmux\n${binding.id}\nSnapshot age: ${Math.max(0,Math.floor((Date.now()-Date.parse(item.captured_at))/1000))} seconds\nOperation: ${kind==='interrupt'?'Ctrl-C terminal interrupt request (termination is not guaranteed)':kind}\nEnter appended: ${kind==='text_enter'?'yes':'no'}\nExact payload: ${JSON.stringify(input)}\nTerminal input has host-user authority. Dispatch does not prove program completion.`;
   render();dialog.showModal();
  }
  for(const kind of ['text','text_enter','key','interrupt'])$(`terminal-${kind}`).addEventListener('click',()=>review(kind));

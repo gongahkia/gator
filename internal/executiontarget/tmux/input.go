@@ -5,6 +5,7 @@ package tmux
 
 import (
 	"context"
+	"strings"
 	"unicode"
 	"unicode/utf8"
 
@@ -83,7 +84,13 @@ func (c *Controller) Send(ctx context.Context, expected Native, input Input, aut
 	ok := false
 	switch input.Kind {
 	case "text", "text_enter":
-		ok = send("send-keys", "-t", expected.Pane, "-l", "--", input.Text)
+		literal := input.Text
+		// tmux's argv parser treats a trailing semicolon as a command boundary.
+		// Escape only that final byte for tmux (never construct an OS shell).
+		if strings.HasSuffix(literal, ";") {
+			literal = strings.TrimSuffix(literal, ";") + "\\;"
+		}
+		ok = send("send-keys", "-t", expected.Pane, "-l", "--", literal)
 		if ok && input.Kind == "text_enter" {
 			ok = send("send-keys", "-t", expected.Pane, "--", "Enter")
 		}

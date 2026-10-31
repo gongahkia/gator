@@ -37,9 +37,9 @@
         <p id="external-status" role="status">Enroll a pane and grant Inspect on the host.</p>
         <p id="external-meta" class="hint"></p><pre id="external-output" aria-label="Recent terminal snapshot"></pre>
         <section id="external-actions" hidden aria-label="Authorized terminal controls">
-          <label for="terminal-draft">Literal text (no newlines)</label><textarea id="terminal-draft" rows="3" maxlength="2048"></textarea>
+          <label id="terminal-draft-label" for="terminal-draft">Literal text (no newlines)</label><textarea id="terminal-draft" rows="3" maxlength="2048"></textarea>
           <div class="row"><button id="terminal-text" type="button">Send without Enter</button><button id="terminal-text_enter" type="button">Send with Enter</button></div>
-          <label for="terminal-key-choice">Key</label><select id="terminal-key-choice"><option>Enter</option><option>Escape</option><option>Tab</option><option>Backspace</option><option>Up</option><option>Down</option><option>Left</option><option>Right</option></select>
+          <label id="terminal-key-label" for="terminal-key-choice">Key</label><select id="terminal-key-choice"><option>Enter</option><option>Escape</option><option>Tab</option><option>Backspace</option><option>Up</option><option>Down</option><option>Left</option><option>Right</option></select>
           <div class="row"><button id="terminal-key" type="button">Review key</button><button id="terminal-interrupt" type="button">Review Ctrl-C</button></div>
           <p id="terminal-status" role="status">No terminal action submitted.</p>
           <button id="terminal-reconcile" type="button" hidden>Retrieve terminal receipt</button><button id="terminal-dismiss" type="button" hidden>Dismiss acknowledged receipt</button>

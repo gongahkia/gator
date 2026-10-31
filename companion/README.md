@@ -539,3 +539,36 @@ GATOR_INTERNAL_COMMANDS=1 /path/to/gator-runtime external-tmux unreview TARGET_I
 Renewal requires new enrollment and separate device grants. See
 [the reviewed-backend model](../docs/EXECUTION-TARGETS-T3.1.md). No control authority
 is conferred by read review.
+
+## Reviewed external tmux input (T4)
+
+External input is host-user execution authority. Read review and Inspect alone
+never authorize it. After the existing exact-pane enrollment, use the same profile:
+
+```sh
+GATOR_INTERNAL_COMMANDS=1 /path/to/gator-runtime external-tmux review-control TARGET_ID
+node companion/external-control-access.mjs /path/to/gator-runtime /private/path/access.token TARGET_ID DEVICE_ID text_input 300
+node companion/external-control-access.mjs /path/to/gator-runtime /private/path/access.token TARGET_ID DEVICE_ID key_input 300
+node companion/external-control-access.mjs /path/to/gator-runtime /private/path/access.token TARGET_ID DEVICE_ID interrupt 300
+```
+
+`text_input` allows reviewed literal text with OR without Enter. `key_input`
+allows Enter, Escape, Tab, Backspace and arrows. Interrupt sends Ctrl-C and does
+not guarantee termination. Grant only intended operations; maximum expiry remains
+900 seconds. The phone shows only authorized controls and requires exact target
+and payload review before submission. Text cannot include newlines/control bytes.
+The backend remains explicitly user-trusted: aliases/hooks can alter command
+behavior, and arbitrary runtime configuration changes are not attested.
+
+```sh
+node companion/external-control-access.mjs /path/to/gator-runtime /private/path/access.token TARGET_ID DEVICE_ID text_input 0
+GATOR_INTERNAL_COMMANDS=1 /path/to/gator-runtime external-tmux unreview-control TARGET_ID
+```
+
+`unreview-control` removes server-instance control review/grants and preserves
+inspection. Use existing `unreview` to withdraw both trust scopes before relevant
+configuration changes. Re-review requires fresh mutation grants. If receipt
+history is cleared, the old enrollment cannot regain control: enroll a fresh
+target. The UI stores receipt identity only and reconciles through GET, never
+replays input. Unknown outcomes block further input; no "mark successful" recovery
+exists. See [T4 architecture and verification](../docs/EXECUTION-TARGETS-T4.md).

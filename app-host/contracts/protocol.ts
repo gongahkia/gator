@@ -179,4 +179,4 @@ export type Frame = {
   conversation?: { id: string; list_id: string };
 };
 
-export type { ExternalTargetSnapshot, ExternalTargetResponse } from "./external";
+export type { ExternalTargetSnapshot, ExternalTargetResponse, ExternalTerminalAction, ExternalTerminalReceipt } from "./external";

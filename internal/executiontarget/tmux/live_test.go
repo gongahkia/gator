@@ -177,11 +177,17 @@ func TestLiveFiniteKeyEncoding(t *testing.T) {
 	review.ServerStart = n.ServerStart
 	review.Scope = ControlTrustScope
 	c.Config.ControlReview = &review
+	fixture("set-option", "-g", "@t4_alias_seen", "no")
+	fixture("set-option", "-s", "command-alias[110]", "send-keys=set-option -g @t4_alias_seen yes ; send-keys")
 	for _, key := range []string{"Enter", "Escape", "Tab", "Backspace", "Up", "Down", "Left", "Right"} {
 		if d := c.Send(ctx, n, Input{Kind: "key", Key: key}, func() bool { return true }); d != executiontarget.DispatchAcknowledged {
 			t.Fatal(key, d)
 		}
 	}
+	if fixture("show-option", "-gv", "@t4_alias_seen") != "yes" {
+		t.Fatal("control alias fixture did not execute")
+	}
+	fixture("set-option", "-su", "command-alias[110]")
 	want := "0d 1b 09 7f 1b 5b 41 1b 5b 42 1b 5b 44 1b 5b 43"
 	for i := 0; i < 50; i++ {
 		got, err := c.Capture(ctx, n, 20)

@@ -4242,3 +4242,9 @@ Copyright 2026 gongahkia
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+
+Onibi adaptation update (T4): internal/executiontarget/tmux/input.go adapts the
+already selected attach.go literal SendText/SendKey patterns, modified by Gator
+for exact identity, separate control trust, finite bounded input, trailing-
+semicolon handling, durable uncertainty and no automatic retry. The Onibi
+Apache-2.0 license reproduced above applies to this adapted source as well.

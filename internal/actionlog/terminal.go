@@ -37,7 +37,18 @@ func (r TerminalReceipt) validate() error {
 		return errors.New("invalid terminal control receipt")
 	}
 	switch r.Operation {
-	case executiontarget.TextInput, executiontarget.KeyInput, executiontarget.Interrupt:
+	case executiontarget.TextInput:
+		if r.Scope != "text" && r.Scope != "text_enter" {
+			return errors.New("invalid text receipt scope")
+		}
+	case executiontarget.KeyInput:
+		if r.Scope != "key" {
+			return errors.New("invalid key receipt scope")
+		}
+	case executiontarget.Interrupt:
+		if r.Scope != "interrupt" {
+			return errors.New("invalid interrupt receipt scope")
+		}
 	default:
 		return errors.New("invalid terminal control operation")
 	}

@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gongahkia/gator/internal/companionaccess"
 	"github.com/gongahkia/gator/internal/executiontarget"
@@ -145,7 +147,11 @@ func companionExternalControl(mode string, input io.Reader, out io.Writer) error
 		Actor  string          `json:"actor"`
 		Action external.Action `json:"action"`
 	}
-	d := json.NewDecoder(io.LimitReader(input, 8193))
+	raw, readErr := io.ReadAll(io.LimitReader(input, 8193))
+	if readErr != nil || len(raw) > 8192 || !utf8.Valid(raw) {
+		return external.ErrDenied
+	}
+	d := json.NewDecoder(bytes.NewReader(raw))
 	d.DisallowUnknownFields()
 	if d.Decode(&v) != nil || d.Decode(new(any)) != io.EOF {
 		return external.ErrDenied
