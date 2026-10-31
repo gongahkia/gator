@@ -28,7 +28,7 @@ test('ordinary Work and desktop/OpenTUI hosts need no tmux, Onibi, phone or exte
   if(!process.env.GATOR_INDEPENDENCE_BINARY)await execute('go',['build','-o',binary,'./cmd/gator'],{cwd:source,timeout:90000});
   await new Promise(r=>provider.listen(0,'127.0.0.1',r));
   await writeFile(join(config,'gator/config.json'),JSON.stringify({version:4,defaults:{provider:'fixture',model:'fixture'},custom_providers:[{id:'fixture',base_url:`http://127.0.0.1:${provider.address().port}/chat`,models:['fixture'],default_model:'fixture'}]}));
-  const env={PATH:bin,HOME:root,GATOR_CONFIG_DIR:config,GATOR_STATE_DIR:state,GATOR_INTERNAL_COMMANDS:'1',GATOR_UI_SESSION_HOST:'1'};
+  const env={PATH:bin,HOME:process.env.HOME,GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:'/dev/null',GATOR_CONFIG_DIR:config,GATOR_STATE_DIR:state,GATOR_INTERNAL_COMMANDS:'1',GATOR_UI_SESSION_HOST:'1'};
   await execute(binary,['work','--source',workspace,'--mode','inspect','Independent fixture'],{cwd:workspace,env,timeout:45000});
   assert.ok(requests>0,'real Work must reach the fixture provider');
   const id=(await readdir(join(state,'gator/conversations'))).find(n=>n.startsWith('work-'));assert.ok(id);

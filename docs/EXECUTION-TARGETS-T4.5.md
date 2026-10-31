@@ -191,3 +191,53 @@ user session is touched. Bun-dependent checks and full terminal packaging requir
 an existing Bun installation; none is installed merely to complete consolidation.
 Signed Electron installation and physical-device/native Linux/WSL workflows are
 separate acceptance work. No further integration tranche is initiated.
+
+## Consolidation verification record
+
+Engineering consolidation: **PASS**. Physical-device release readiness remains
+separate. Starting point was clean HEAD `d9ab922e2`; no interrupted T5 cleanup was
+needed. No agent-created commit, history rewrite or Onibi modification was made.
+The sibling `../onibi` existed at the initial audit and became unavailable later
+in the session without any move/delete/archive action by this implementation.
+Final checks still passed; no assumption is made about where that repository went.
+
+| Check | Result |
+| --- | --- |
+| `go test ./internal/executiontarget/...` | PASS, three packages |
+| `go test -race ./internal/executiontarget/... ./internal/actionlog` | PASS, four packages |
+| `go test ./internal/workrun ./internal/actionlog` | PASS |
+| `go test ./...` | PASS, 72 packages; 11 without tests |
+| `go vet ./...` | PASS, no diagnostics |
+| app-host | 78 pass, one existing skip; includes new independence fixture |
+| Desktop TypeScript | PASS |
+| Desktop tests | Seven pass, one existing skip; nested app-host 78 pass, one skip |
+| OpenTUI TypeScript | PASS |
+| Companion auth/inspection/mutation/external/terminal/recovery/server/health | 24 pass, two explicitly opt-in native tests skipped |
+| Chromium companion journeys | Ten pass, including Work/tmux controls and recovery |
+| Isolated native tmux HTTP suites | Six pass, no skips; private disposable sockets only |
+| Opt-in Go target suites | Three packages pass, including native key encoding/alias fixtures |
+| Isolated copied-source Go build/dependency closure/target and actionlog tests | PASS; no sibling Onibi |
+| Isolated ordinary Work, local notes, desktop and OpenTUI Go hosts | PASS with only Git on PATH; no tmux, Onibi, Tailscale, phone or terminal catalog |
+| Isolated `npm run build --prefix desktop` | PASS; Go runtime, frontend assets and bundled attribution produced |
+| Linux and Windows full Go runtime cross-builds, CGO disabled | PASS; not native OS acceptance |
+| Terminal packaging source/syntax audit | PASS, vendored Onibi LICENSE/NOTICE included; full Bun packaging not run |
+| Formatting / diff checks | PASS |
+| Bun tests and full terminal artifact packaging | Not run: Bun unavailable; no toolchain installed |
+| Signed installer, physical phone, native Linux/WSL, locked-screen/unattended acceptance | Not performed |
+
+The isolated desktop build emitted dependency module-directive and bundle-size
+warnings but completed successfully. Those are not Onibi dependencies and no
+unrelated bundler rewrite was attempted. Tests use a localhost deterministic
+provider; no real account/model or ordinary user tmux session is exercised.
+
+Files changed: `internal/actionlog/terminal.go`,
+`internal/executiontarget/target.go`, `ui/scripts/package.mjs`,
+`app-host/tests/execution-independence.test.mjs`, `README.txt`,
+`companion/README.md`, the historical T0/T1/T2/T3/T3.1/T4 documents and this record.
+
+Remaining acceptance work is operator-focused: verify the actual phone over its
+configured private connection, token/device revocation and reconnect recovery;
+exercise native Linux/WSL tmux behavior on supported versions; complete supported
+Bun production packaging and signed installers using the established release
+process. No Ghostty or additional terminal integration is a prerequisite or next
+tranche. Archive Onibi only as a separate explicit repository-owner action.

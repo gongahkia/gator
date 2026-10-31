@@ -8,6 +8,8 @@ enrolled and authorized host-terminal access, with different trust and lifetime
 boundaries. It is not a replacement for Work controls or a generic SSH client.
 Ghostty integration is not implemented and T5/T6 are removed from the roadmap.
 See [final integration scope](../docs/EXECUTION-TARGETS-T4.5.md).
+See [T7 acceptance results and operator-led iPhone checklist](../docs/EXECUTION-TARGETS-T7.md)
+for verified workflows and remaining device/platform acceptance.
 
 The Active Work view also supports separately authorized semantic controls:
 Work cancellation, specialist steering/answers, and exact bounded command
