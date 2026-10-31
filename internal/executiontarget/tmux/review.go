@@ -21,8 +21,9 @@ type Review struct {
 	Scope            string                `json:"scope"`
 }
 
-func (r *Review) Valid() bool {
-	return r != nil && r.SocketEvidence != "" && r.ExecutableDigest != "" && r.Reviewer.ID != "" && r.Reviewer.Kind == executiontarget.Human && r.Reviewer.Origin == executiontarget.Local && !r.ReviewedAt.IsZero() && !r.ReviewedAt.After(time.Now()) && r.Scope == ReadTrustScope
+func (r *Review) Valid() bool { return r.ValidFor(ReadTrustScope) }
+func (r *Review) ValidFor(scope string) bool {
+	return r != nil && r.SocketEvidence != "" && r.ExecutableDigest != "" && r.Reviewer.ID != "" && r.Reviewer.Kind == executiontarget.Human && r.Reviewer.Origin == executiontarget.Local && !r.ReviewedAt.IsZero() && !r.ReviewedAt.After(time.Now()) && r.Scope == scope
 }
 
 // AcceptReadConfig is reachable only from trusted local administration. It does

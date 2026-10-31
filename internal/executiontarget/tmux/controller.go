@@ -30,7 +30,8 @@ const processBytes = 64 * 1024
 const nativeFormat = "#{pid}|#{start_time}|#{session_id}|#{session_created}|#{window_id}|#{pane_id}|#{pane_pid}|#{pane_dead}|#{version}|#{pane_height}|#{history_size}"
 
 type Config struct {
-	Review *Review `json:"review,omitempty"`
+	Review        *Review `json:"review,omitempty"`
+	ControlReview *Review `json:"control_review,omitempty"`
 	// A trusted local administrator must review canonical command aliases before
 	// any connection. tmux expands aliases before a guard can inspect options.
 	ReadConfigReviewed bool   `json:"read_config_reviewed"`
@@ -51,10 +52,11 @@ type Probe interface {
 	Process(int) (string, error)
 }
 type Controller struct {
-	ReviewCurrent func() bool // optional host catalog revocation check, before each invocation
-	Config        Config
-	Runner        Runner
-	Probe         Probe
+	MutationCurrent func() bool
+	ReviewCurrent   func() bool // optional host catalog revocation check, before each invocation
+	Config          Config
+	Runner          Runner
+	Probe           Probe
 }
 type Native struct {
 	ServerPID      int    `json:"server_pid"`
@@ -105,6 +107,9 @@ func (c *Controller) run(ctx context.Context, args ...string) (Result, error) {
 		return Result{}, ErrUnavailable
 	}
 	if !c.reviewed() {
+		return Result{}, ErrUnavailable
+	}
+	if len(args) > 0 && args[0] == "send-keys" && (c.MutationCurrent == nil || !c.MutationCurrent()) {
 		return Result{}, ErrUnavailable
 	}
 	// No environment-based socket/config selection. -N refuses server startup;

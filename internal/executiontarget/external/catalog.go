@@ -38,6 +38,7 @@ type InspectGrant struct {
 	Authority companionaccess.Reference `json:"authority"`
 }
 type Entry struct {
+	ControlGrants    []InspectGrant             `json:"control_grants,omitempty"`
 	Target           executiontarget.Target     `json:"target"`
 	Enrollment       executiontarget.Enrollment `json:"enrollment"`
 	CreatedAt        time.Time                  `json:"created_at"`
@@ -52,16 +53,18 @@ type catalog struct {
 	Entries []Entry `json:"entries"`
 }
 type Store struct {
+	stateDir    string
 	root        workspace.Root
 	OpenReader  func(tmux.Config) (NativeReader, error)
 	Fingerprint func(string) (string, error)
 }
 type Snapshot struct {
-	Target     executiontarget.Target `json:"target"`
-	CapturedAt *time.Time             `json:"captured_at,omitempty"`
-	Text       string                 `json:"text"`
-	Truncated  bool                   `json:"truncated"`
-	Stale      bool                   `json:"stale"`
+	Controls   []executiontarget.Operation `json:"controls,omitempty"`
+	Target     executiontarget.Target      `json:"target"`
+	CapturedAt *time.Time                  `json:"captured_at,omitempty"`
+	Text       string                      `json:"text"`
+	Truncated  bool                        `json:"truncated"`
+	Stale      bool                        `json:"stale"`
 }
 type Response struct {
 	Targets     []Snapshot `json:"targets"`
@@ -84,7 +87,7 @@ func Open(stateDir string) (Store, error) {
 		return Store{}, err
 	}
 	root, err := workspace.Open(base)
-	return Store{root: root, OpenReader: func(c tmux.Config) (NativeReader, error) { return tmux.New(c) }, Fingerprint: tmux.ExecutableFingerprint}, err
+	return Store{root: root, stateDir: stateDir, OpenReader: func(c tmux.Config) (NativeReader, error) { return tmux.New(c) }, Fingerprint: tmux.ExecutableFingerprint}, err
 }
 func (s Store) transaction(write bool, f func(*catalog) error) error {
 	if privatefs.Check(s.root.Path()) != nil {
@@ -119,7 +122,7 @@ func (s Store) transaction(write bool, f func(*catalog) error) error {
 			return ErrDenied
 		}
 		for _, e := range value.Entries {
-			if e.Target.Validate() != nil || e.Target.Binding.Backend != executiontarget.Tmux || e.Enrollment.Target != e.Target.Binding || len(e.Grants) > 8 {
+			if e.Target.Validate() != nil || e.Target.Binding.Backend != executiontarget.Tmux || e.Enrollment.Target != e.Target.Binding || len(e.Grants) > 8 || len(e.ControlGrants) > 24 {
 				return ErrDenied
 			}
 		}
@@ -209,6 +212,8 @@ func (s Store) Revoke(id string) error {
 				c.Entries[i].Config.Review = nil
 				c.Entries[i].Config.ReadConfigReviewed = false
 				c.Entries[i].Grants = nil
+				c.Entries[i].ControlGrants = nil
+				c.Entries[i].Config.ControlReview = nil
 				return nil
 			}
 		}
@@ -345,6 +350,7 @@ func (s Store) Read(ctx context.Context, actor executiontarget.Actor, id, genera
 	err = s.transaction(false, func(c *catalog) error {
 		for _, fresh := range c.Entries {
 			if fresh.Target.Binding == e.Target.Binding {
+				value.Controls = s.ControlOffers(fresh, actor)
 				return s.authorized(fresh, actor, e.Target.Binding)
 			}
 		}
@@ -395,6 +401,8 @@ func (s Store) LocalStatus(ctx context.Context) ([]Entry, error) {
 			e.Target.Available = false
 			e.Target.UnavailableReason = "Native identity cannot be re-established; enroll again"
 			e.Grants = nil
+			e.ControlGrants = nil
+			e.Config.ControlReview = nil
 		}
 	}
 	return entries, nil
@@ -423,6 +431,8 @@ func (s Store) Unreview(id string) error {
 				e.Config.Review = nil
 				e.Config.ReadConfigReviewed = false
 				e.Grants = nil
+				e.ControlGrants = nil
+				e.Config.ControlReview = nil
 			}
 		}
 		return nil

@@ -129,3 +129,34 @@ Companion: `GATOR_TMUX_LIVE=1 node --test companion/auth.test.mjs companion/insp
 Chromium: `node --test companion/client.test.mjs companion/inspection-client.test.mjs companion/mutation-client.test.mjs companion/external-client.test.mjs`.
 Bun tests run only when Bun is already installed. Automated/native fixture tests
 are not physical-phone acceptance or native Linux/WSL acceptance.
+
+## Acceptance evidence — 31 October 2026
+
+**PASS under the explicitly reviewed, user-trusted backend model.** This verdict
+makes claim A (intended reads), not claim B (configuration cannot transform them).
+
+| Verification | Result |
+| --- | --- |
+| Target package tests, including opt-in isolated native aliases | PASS, three packages |
+| `go test -race ./internal/executiontarget/...` | PASS |
+| `go test ./...` | PASS, 72 packages; 11 without tests |
+| `go vet ./...` | PASS, no diagnostics |
+| App-host | 77 pass, one existing skip |
+| Desktop TypeScript | PASS |
+| Desktop tests | Seven pass, one existing skip; nested app-host 77 pass, one skip |
+| OpenTUI TypeScript | PASS |
+| Companion auth/inspection/mutation/external/recovery/server/health with live opt-in | 23 pass, no skips |
+| Chromium journeys | Nine pass |
+| Final real-helper external suite, including server-wide unreview, fresh enrollment and replacement | Three pass |
+| Linux and Windows tmux adapter cross-compilation | PASS; not native runtime acceptance |
+| Formatting and diff checks | PASS |
+| Bun | Unavailable; not installed or run |
+| Physical phone / native Linux / WSL | Not performed |
+
+Files added: `internal/executiontarget/tmux/review.go`, this document.
+Files adapted: tmux `controller.go`, `controller_test.go`, `live_test.go`;
+external `catalog.go`, `catalog_test.go`; `cmd/gator/companion_external.go`;
+`companion/external.test.mjs`, `companion/public/index.html`,
+`companion/README.md`, `docs/EXECUTION-TARGETS-T3.md`.
+Existing unrelated work was preserved. No changes to Onibi, toolchains, project
+licensing, Work execution ownership, authentication infrastructure or T4 controls.
