@@ -26,7 +26,7 @@ type ControlReply struct {
 
 func (e Entry) controlTrusted() bool {
 	r := e.Config.ControlReview
-	return !e.Invalid && e.Config.Review.Valid() && r.ValidFor(tmux.ControlTrustScope) && r.SocketEvidence == e.Native.SocketEvidence && r.ServerPID == e.Native.ServerPID && r.ServerStart == e.Native.ServerStart && r.ExecutableDigest == e.ExecutableDigest
+	return !e.Invalid && e.Config.ReadConfigReviewed && e.Config.Review.Valid() && r.ValidFor(tmux.ControlTrustScope) && r.SocketEvidence == e.Native.SocketEvidence && r.ServerPID == e.Native.ServerPID && r.ServerStart == e.Native.ServerStart && r.ExecutableDigest == e.ExecutableDigest
 }
 func (s Store) ReviewControl(ctx context.Context, id string, actor executiontarget.Actor) error {
 	if actor.Kind != executiontarget.Human || actor.Origin != executiontarget.Local || actor.ID == "" {
@@ -39,6 +39,13 @@ func (s Store) ReviewControl(ctx context.Context, id string, actor executiontarg
 	if _, err = s.verify(ctx, e); err != nil {
 		return ErrDenied
 	}
+	log, err := actionlog.Open(s.stateDir)
+	if err != nil {
+		return err
+	}
+	if err = log.PrepareTerminal(e.Target.Binding, !e.ControlInitialized); err != nil {
+		return ErrDenied
+	}
 	r := *e.Config.Review
 	r.Reviewer = actor
 	r.ReviewedAt = time.Now().UTC()
@@ -48,6 +55,7 @@ func (s Store) ReviewControl(ctx context.Context, id string, actor executiontarg
 			v := &c.Entries[i]
 			if v.Target.Binding == e.Target.Binding && !v.Invalid && v.Config.Review.Valid() {
 				v.Config.ControlReview = &r
+				v.ControlInitialized = true
 				v.ControlGrants = nil
 				return nil
 			}
@@ -125,6 +133,10 @@ func (s Store) controlAuthorized(e Entry, actor executiontarget.Actor, op execut
 	if !e.controlTrusted() || !actorPattern.MatchString(actor.ID) || actor.Kind != executiontarget.Human || actor.Origin != executiontarget.Remote {
 		return false
 	}
+	log, err := actionlog.Open(s.stateDir)
+	if err != nil || log.PrepareTerminal(e.Target.Binding, false) != nil {
+		return false
+	}
 	t := e.Target
 	t.Capabilities = []executiontarget.Operation{executiontarget.Inspect, executiontarget.TextInput, executiontarget.KeyInput, executiontarget.Interrupt}
 	for _, g := range e.ControlGrants {
@@ -178,8 +190,8 @@ func (s Store) Control(ctx context.Context, actor executiontarget.Actor, a Actio
 	}{actor, e.Target.Binding, a})
 	sum := sha256.Sum256(data)
 	want := actionlog.TerminalReceipt{ID: a.ID, Target: e.Target.Binding, Actor: actor, Operation: a.Input.Operation(), Scope: a.Input.Kind, Digest: hex.EncodeToString(sum[:]), CreatedAt: time.Now().UTC()}
-	if prior, err := log.ReadTerminal(e.Target.Binding, a.ID); err == nil {
-		if prior.Actor != actor || prior.Digest != want.Digest {
+	if prior, err := log.LookupTerminalID(a.ID); err == nil {
+		if prior.Target != e.Target.Binding || prior.Actor != actor || prior.Digest != want.Digest {
 			return ControlReply{}, ErrDenied
 		}
 		return ControlReply{Receipt: &prior}, nil
@@ -215,6 +227,9 @@ func (s Store) Control(ctx context.Context, actor executiontarget.Actor, a Actio
 	}
 	delivery := executiontarget.NotDispatched
 	reader, err := s.verify(ctx, e)
+	if err != nil {
+		s.Revoke(a.Target)
+	}
 	if err == nil && authorize() {
 		if sender, ok := reader.(interface {
 			Send(context.Context, tmux.Native, tmux.Input, func() bool) executiontarget.Delivery

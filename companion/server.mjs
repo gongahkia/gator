@@ -1,3 +1,4 @@
+import {callTerminal,validateTerminalAction,validateTerminalReply} from './external-control.mjs';
 import { validateExternal } from './external.mjs';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
@@ -17,6 +18,7 @@ const recoverable = worker => !!worker.state && !worker.unconfirmedAction && !['
 const idle = worker => !worker.closed && recoverable(worker);
 const assets = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
+  ['/external-actions.mjs', ['external-actions.mjs', 'text/javascript; charset=utf-8']],
   ['/external-view.mjs', ['external-view.mjs', 'text/javascript; charset=utf-8']],
   ['/work-view.mjs', ['work-view.mjs', 'text/javascript; charset=utf-8']],
   ['/work-actions.mjs', ['work-actions.mjs', 'text/javascript; charset=utf-8']],
@@ -30,6 +32,7 @@ const browserHeaders = {
 };
 
 export function createCompanion({ binary, workspace, env, tokenFile, origin,
+  controlTerminal = (mode,input)=>callTerminal(binary,workspace,env,mode,input),
   controlWork = (mode, input) => callControl(binary, workspace, env, mode, input),
   queryExternal = async ({ actor, mode, target, generation }) => {
     try {
@@ -165,6 +168,39 @@ export function createCompanion({ binary, workspace, env, tokenFile, origin,
           return validateControlReply(await controlWork('dispatch',input),action.target.id,action.id);
         });
         if(!await authorized())return respond(res,401,{error:'Authentication required. The action may already have been dispatched.'});
+        return respond(res,200,result);
+      }
+      const terminalAction=/^\/v1\/external\/(target-[a-f0-9]{32})\/actions$/.exec(url.pathname);
+      const terminalReceipt=/^\/v1\/external\/(target-[a-f0-9]{32})\/receipts\/([a-f0-9]{32})$/.exec(url.pathname);
+      if(terminalAction||terminalReceipt){
+        let action;
+        if(terminalReceipt){
+          if(req.method!=='GET'||[...url.searchParams.keys()].length!==1||!/^[a-f0-9]{32}$/.test(url.searchParams.get('generation')||''))return respond(res,400,{error:'Use exact receipt generation.'});
+          action={id:terminalReceipt[2],target:terminalReceipt[1],generation:url.searchParams.get('generation')};
+        }else{
+          if(req.method!=='POST'||url.search)return respond(res,405,{error:'Use a reviewed terminal action.'});
+          if(req.headers['content-type']!=='application/json')return respond(res,415,{error:'Use application/json.'});
+          const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>8192)return respond(res,413,{error:'Terminal action exceeds limit.'});chunks.push(chunk);}
+          action=validateTerminalAction(JSON.parse(Buffer.concat(chunks).toString('utf8')),terminalAction[1]);
+        }
+        const input={actor:inspectionActor(access),action};
+        const guarded=async(mode)=>{
+          if(!await authorized())throw Object.assign(new Error('Access revoked.'),{code:'AUTH_REVOKED'});
+          return validateTerminalReply(await controlTerminal(mode,input),action.target,action.id);
+        };
+        if(terminalAction){
+          let first;try{first=await serial(()=>guarded('check'));}catch{return respond(res,409,{error:'Preflight rejected. Reconcile any retained receipt before retrying.',delivery:'not_dispatched'});}
+          if(!await authorized())return respond(res,401,{error:'Authentication required.'});
+          if(first.receipt)return respond(res,200,first);
+          if(!first.authorized)return respond(res,403,{error:'Terminal operation is not authorized.',delivery:'not_dispatched'});
+        }
+        const result=await serial(async()=>{
+          if(terminalReceipt)return guarded('receipt');
+          const current=await guarded('check');if(current.receipt)return current;
+          if(!current.authorized)throw new Error('Terminal authority withdrawn.');
+          return guarded('dispatch');
+        });
+        if(!await authorized())return respond(res,401,{error:'Access withdrawn. Reconcile any action receipt after reconnect.'});
         return respond(res,200,result);
       }
       const external = /^\/v1\/external(?:\/(target-[a-f0-9]{32})(\/snapshot)?)?$/.exec(url.pathname);

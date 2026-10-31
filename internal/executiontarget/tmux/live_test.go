@@ -132,3 +132,63 @@ func TestLiveIsolatedTmux(t *testing.T) {
 		t.Fatal("missing-pane read fired error hook")
 	}
 }
+
+func TestLiveFiniteKeyEncoding(t *testing.T) {
+	if os.Getenv("GATOR_TMUX_LIVE") != "1" {
+		t.Skip("isolated native key fixture opt-in")
+	}
+	bin, err := exec.LookPath("tmux")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir, err := os.MkdirTemp("", "gt4-key-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	socket := filepath.Join(dir, "keys.sock")
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	fixture := func(args ...string) string {
+		t.Helper()
+		out, err := exec.CommandContext(ctx, bin, append([]string{"-f", os.DevNull, "-S", socket}, args...)...).CombinedOutput()
+		if err != nil {
+			t.Fatal(err, string(out))
+		}
+		return strings.TrimSpace(string(out))
+	}
+	fixture("new-session", "-d", "-s", "keys", "sh", "-c", "stty raw -echo; od -An -tx1 -v")
+	defer func() { exec.Command(bin, "-N", "-S", socket, "kill-server").Run() }()
+	config, err := AcceptReadConfig(Config{Executable: bin, Socket: socket}, executiontarget.Actor{ID: "fixture", Kind: executiontarget.Human, Origin: executiontarget.Local})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := New(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	panes, err := c.Candidates(ctx)
+	if err != nil || len(panes) != 1 {
+		t.Fatal(err)
+	}
+	n := panes[0]
+	review := *config.Review
+	review.ServerPID = n.ServerPID
+	review.ServerStart = n.ServerStart
+	review.Scope = ControlTrustScope
+	c.Config.ControlReview = &review
+	for _, key := range []string{"Enter", "Escape", "Tab", "Backspace", "Up", "Down", "Left", "Right"} {
+		if d := c.Send(ctx, n, Input{Kind: "key", Key: key}, func() bool { return true }); d != executiontarget.DispatchAcknowledged {
+			t.Fatal(key, d)
+		}
+	}
+	want := "0d 1b 09 7f 1b 5b 41 1b 5b 42 1b 5b 44 1b 5b 43"
+	for i := 0; i < 50; i++ {
+		got, err := c.Capture(ctx, n, 20)
+		if err == nil && strings.Contains(strings.Join(strings.Fields(got.Text), " "), want) {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("native key bytes not observed", fixture("capture-pane", "-p", "-t", n.Pane))
+}

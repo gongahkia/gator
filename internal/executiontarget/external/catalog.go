@@ -38,15 +38,16 @@ type InspectGrant struct {
 	Authority companionaccess.Reference `json:"authority"`
 }
 type Entry struct {
-	ControlGrants    []InspectGrant             `json:"control_grants,omitempty"`
-	Target           executiontarget.Target     `json:"target"`
-	Enrollment       executiontarget.Enrollment `json:"enrollment"`
-	CreatedAt        time.Time                  `json:"created_at"`
-	Config           tmux.Config                `json:"config"`
-	ExecutableDigest string                     `json:"executable_digest"`
-	Native           tmux.Native                `json:"native"`
-	Invalid          bool                       `json:"invalid"`
-	Grants           []InspectGrant             `json:"grants"`
+	ControlInitialized bool                       `json:"control_initialized,omitempty"`
+	ControlGrants      []InspectGrant             `json:"control_grants,omitempty"`
+	Target             executiontarget.Target     `json:"target"`
+	Enrollment         executiontarget.Enrollment `json:"enrollment"`
+	CreatedAt          time.Time                  `json:"created_at"`
+	Config             tmux.Config                `json:"config"`
+	ExecutableDigest   string                     `json:"executable_digest"`
+	Native             tmux.Native                `json:"native"`
+	Invalid            bool                       `json:"invalid"`
+	Grants             []InspectGrant             `json:"grants"`
 }
 type catalog struct {
 	Version int     `json:"version"`

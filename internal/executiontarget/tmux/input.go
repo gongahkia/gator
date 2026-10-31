@@ -14,7 +14,7 @@ import (
 const ControlTrustScope = "trusted_server_control_command_behavior"
 const MaxInputBytes = 2048
 
-var Keys = map[string]string{"Enter": "Enter", "Escape": "Escape", "Tab": "Tab", "Backspace": "BSpace", "Up": "Up", "Down": "Down", "Left": "Left", "Right": "Right"}
+var terminalKeys = map[string]string{"Enter": "Enter", "Escape": "Escape", "Tab": "Tab", "Backspace": "BSpace", "Up": "Up", "Down": "Down", "Left": "Left", "Right": "Right"}
 
 type Input struct {
 	Kind string `json:"kind"`
@@ -46,7 +46,7 @@ func (i Input) Valid() bool {
 		}
 		return true
 	case "key":
-		_, ok := Keys[i.Key]
+		_, ok := terminalKeys[i.Key]
 		return ok && i.Text == ""
 	case "interrupt":
 		return i.Text == "" && i.Key == ""
@@ -58,14 +58,14 @@ func (i Input) Valid() bool {
 // Once a mutation subprocess may have started, all failures are conservative
 // unknown (including partial text/Enter). No internal retry is performed.
 func (c *Controller) Send(ctx context.Context, expected Native, input Input, authorize func() bool) executiontarget.Delivery {
-	if !input.Valid() {
+	if !input.Valid() || authorize == nil {
 		return executiontarget.NotDispatched
 	}
 	c.MutationCurrent = authorize
 	defer func() { c.MutationCurrent = nil }()
 	attempted := false
 	send := func(args ...string) bool {
-		if !c.Config.ControlReview.ValidFor(ControlTrustScope) || !c.reviewed() || !authorize() {
+		if !c.Config.Review.Valid() || !c.Config.ControlReview.ValidFor(ControlTrustScope) || c.Config.ControlReview.SocketEvidence != expected.SocketEvidence || c.Config.ControlReview.ServerPID != expected.ServerPID || c.Config.ControlReview.ServerStart != expected.ServerStart || c.Config.ControlReview.ExecutableDigest != c.Config.Review.ExecutableDigest || !c.reviewed() || !authorize() {
 			return false
 		}
 		n, err := c.Resolve(ctx, expected.Pane)
@@ -88,7 +88,7 @@ func (c *Controller) Send(ctx context.Context, expected Native, input Input, aut
 			ok = send("send-keys", "-t", expected.Pane, "--", "Enter")
 		}
 	case "key":
-		ok = send("send-keys", "-t", expected.Pane, "--", Keys[input.Key])
+		ok = send("send-keys", "-t", expected.Pane, "--", terminalKeys[input.Key])
 	case "interrupt":
 		ok = send("send-keys", "-t", expected.Pane, "--", "C-c")
 	}

@@ -54,7 +54,7 @@ func (r TerminalReceipt) validate() error {
 	return errors.New("invalid terminal delivery")
 }
 
-// Existing history deletion/retention/backup owns external-actions/RUN. Live
+// Existing history deletion/backup owns external-actions. Live
 // profile guards prevent removal while the owner executes. No tombstones are
 // pruned here; reaching the per-target bound refuses further admission.
 func (s Store) terminalRoot(target executiontarget.Binding, create bool) (workspace.Root, error) {
@@ -62,6 +62,32 @@ func (s Store) terminalRoot(target executiontarget.Binding, create bool) (worksp
 		return workspace.Root{}, errors.New("invalid terminal receipt target")
 	}
 	dir := filepath.Join(s.path, "terminal-"+target.ID)
+	info, err := os.Lstat(dir)
+	if errors.Is(err, os.ErrNotExist) && create {
+		if err = privatefs.MkdirAll(dir); err != nil {
+			return workspace.Root{}, err
+		}
+		parent, e := os.Open(s.path)
+		if e != nil {
+			return workspace.Root{}, e
+		}
+		e = privatefs.SyncDir(parent)
+		parent.Close()
+		if e != nil {
+			return workspace.Root{}, e
+		}
+	} else if err != nil {
+		return workspace.Root{}, err
+	} else if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || privatefs.Check(dir) != nil {
+		return workspace.Root{}, errors.New("unsafe terminal receipts")
+	}
+	return workspace.Open(dir)
+}
+
+// Terminal action IDs are globally claimed inside the existing action store;
+// reuse against another target is a conflict, not a new dispatch intention.
+func (s Store) terminalRecords(create bool) (workspace.Root, error) {
+	dir := filepath.Join(s.path, "terminal-claims")
 	info, err := os.Lstat(dir)
 	if errors.Is(err, os.ErrNotExist) && create {
 		if err = privatefs.MkdirAll(dir); err != nil {
@@ -133,7 +159,7 @@ func (s Store) ClaimTerminal(r TerminalReceipt) (TerminalReceipt, bool, error) {
 	if err := r.validate(); err != nil {
 		return TerminalReceipt{}, false, err
 	}
-	root, err := s.terminalRoot(r.Target, true)
+	root, err := s.terminalRecords(true)
 	if err != nil {
 		return TerminalReceipt{}, false, err
 	}
@@ -156,16 +182,17 @@ func (s Store) ClaimTerminal(r TerminalReceipt) (TerminalReceipt, bool, error) {
 	if err != nil {
 		return TerminalReceipt{}, false, err
 	}
-	entries, e := dir.ReadDir(130)
+	entries, e := dir.ReadDir(4098)
 	dir.Close()
 	if e != nil && e != io.EOF {
 		return TerminalReceipt{}, false, e
 	}
-	if len(entries) >= 129 {
+	if len(entries) >= 4097 {
 		return TerminalReceipt{}, false, errors.New("terminal action admission limit reached")
 	}
 	// A crashed or ambiguous predecessor blocks new intentions. No recovery
 	// button can establish that native input did or did not occur.
+	targetCount := 0
 	for _, entry := range entries {
 		if filepath.Ext(entry.Name()) != ".json" {
 			continue
@@ -174,9 +201,16 @@ func (s Store) ClaimTerminal(r TerminalReceipt) (TerminalReceipt, bool, error) {
 		if e != nil {
 			return TerminalReceipt{}, false, e
 		}
+		if prior.Target != r.Target {
+			continue
+		}
+		targetCount++
 		if prior.Delivery == executiontarget.OutcomeUnknown {
 			return TerminalReceipt{}, false, errors.New("unresolved terminal action; no follow-up admitted")
 		}
+	}
+	if targetCount >= 128 {
+		return TerminalReceipt{}, false, errors.New("target action limit reached")
 	}
 	data, _ := json.Marshal(r)
 	if err = root.WriteRegularFileAtomic(r.ID+".json", data, 8192); err != nil {
@@ -185,9 +219,17 @@ func (s Store) ClaimTerminal(r TerminalReceipt) (TerminalReceipt, bool, error) {
 	return r, true, nil
 }
 
+func (s Store) LookupTerminalID(id string) (TerminalReceipt, error) {
+	root, err := s.terminalRecords(false)
+	if err != nil {
+		return TerminalReceipt{}, err
+	}
+	return readTerminal(root, id)
+}
+
 // ReadTerminal never dispatches and remains readable after target disappearance.
 func (s Store) ReadTerminal(target executiontarget.Binding, id string) (TerminalReceipt, error) {
-	root, err := s.terminalRoot(target, false)
+	root, err := s.terminalRecords(false)
 	if err != nil {
 		return TerminalReceipt{}, err
 	}
@@ -199,7 +241,7 @@ func (s Store) ReadTerminal(target executiontarget.Binding, id string) (Terminal
 }
 
 func (s Store) FinishTerminal(r TerminalReceipt, delivery executiontarget.Delivery, note string) (TerminalReceipt, error) {
-	root, err := s.terminalRoot(r.Target, false)
+	root, err := s.terminalRecords(false)
 	if err != nil {
 		return r, err
 	}
@@ -231,4 +273,34 @@ func (s Store) FinishTerminal(r TerminalReceipt, delivery executiontarget.Delive
 		return prior, err
 	}
 	return next, nil
+}
+
+// PrepareTerminal binds durable admission to this enrollment. Only initial local
+// control review may create the marker. If history/receipts were cleared later,
+// this enrollment cannot regain mutation authority; fresh enrollment is required.
+func (s Store) PrepareTerminal(target executiontarget.Binding, initial bool) error {
+	if _, err := s.terminalRecords(initial); err != nil {
+		return err
+	}
+	root, err := s.terminalRoot(target, initial)
+	if err != nil {
+		return err
+	}
+	lock, err := controlLock(root)
+	if err != nil {
+		return err
+	}
+	defer lock.Close()
+	want, _ := json.Marshal(target)
+	data, err := root.ReadRegularFile(".identity", 2048)
+	if err == nil {
+		if string(data) != string(want) {
+			return errors.New("terminal admission identity changed")
+		}
+		return nil
+	}
+	if !initial || !errors.Is(err, os.ErrNotExist) {
+		return errors.New("terminal admission history missing; reenroll target")
+	}
+	return root.WriteRegularFileAtomic(".identity", want, 2048)
 }

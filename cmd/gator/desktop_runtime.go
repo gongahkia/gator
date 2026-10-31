@@ -45,6 +45,9 @@ func runDesktopRuntime(args []string, out io.Writer) error {
 	if len(args) >= 2 && args[0] == "external-tmux" && os.Getenv("GATOR_INTERNAL_COMMANDS") == "1" {
 		return companionExternal(args[1:], true, os.Stdin, out)
 	}
+	if len(args) == 2 && args[0] == "companion-external-control" && os.Getenv("GATOR_COMPANION_EXTERNAL_CONTROL") == "1" {
+		return companionExternalControl(args[1], os.Stdin, out)
+	}
 	if len(args) == 5 && args[0] == "companion-external" && os.Getenv("GATOR_COMPANION_EXTERNAL") == "1" {
 		return companionExternal(args[1:], false, os.Stdin, out)
 	}

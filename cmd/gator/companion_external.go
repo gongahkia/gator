@@ -58,6 +58,25 @@ func companionExternal(args []string, local bool, input io.Reader, out io.Writer
 			}
 			return encode(v.Target)
 		}
+		if len(args) == 2 && args[0] == "review-control" {
+			return store.ReviewControl(ctx, args[1], executiontarget.Actor{ID: "local-profile-owner", Kind: executiontarget.Human, Origin: executiontarget.Local})
+		}
+		if len(args) == 2 && args[0] == "unreview-control" {
+			return store.UnreviewControl(args[1])
+		}
+		if len(args) == 2 && args[0] == "grant-control" {
+			var v struct {
+				Authority companionaccess.Reference `json:"authority"`
+				Operation executiontarget.Operation `json:"operation"`
+				Seconds   int                       `json:"seconds"`
+			}
+			d := json.NewDecoder(io.LimitReader(input, 8193))
+			d.DisallowUnknownFields()
+			if d.Decode(&v) != nil || d.Decode(new(any)) != io.EOF {
+				return external.ErrDenied
+			}
+			return store.GrantControl(ctx, args[1], v.Authority, v.Operation, v.Seconds)
+		}
 		if len(args) == 1 && args[0] == "list" {
 			v, e := store.LocalStatus(ctx)
 			if e != nil {
@@ -104,4 +123,44 @@ func companionExternal(args []string, local bool, input io.Reader, out io.Writer
 		return encode(external.Response{Targets: []external.Snapshot{}, Unavailable: true, Reason: "Target unavailable or access withdrawn."})
 	}
 	return encode(external.Response{Targets: []external.Snapshot{v}})
+}
+
+func companionExternalControl(mode string, input io.Reader, out io.Writer) error {
+	root, err := state.ResolveDir("")
+	if err != nil {
+		return err
+	}
+	release, err := state.Guard(root, false)
+	if err != nil {
+		return err
+	}
+	defer release()
+	store, err := external.Open(root)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	var v struct {
+		Actor  string          `json:"actor"`
+		Action external.Action `json:"action"`
+	}
+	d := json.NewDecoder(io.LimitReader(input, 8193))
+	d.DisallowUnknownFields()
+	if d.Decode(&v) != nil || d.Decode(new(any)) != io.EOF {
+		return external.ErrDenied
+	}
+	actor := executiontarget.Actor{ID: v.Actor, Kind: executiontarget.Human, Origin: executiontarget.Remote}
+	var reply external.ControlReply
+	if mode == "receipt" {
+		reply, err = store.Receipt(actor, v.Action.Target, v.Action.Generation, v.Action.ID)
+	} else if mode == "check" || mode == "dispatch" {
+		reply, err = store.Control(ctx, actor, v.Action, mode == "dispatch")
+	} else {
+		return external.ErrDenied
+	}
+	if err != nil {
+		return external.ErrDenied
+	}
+	return json.NewEncoder(out).Encode(reply)
 }
