@@ -1,3 +1,4 @@
+import { validateExternal } from './external.mjs';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
@@ -16,6 +17,7 @@ const recoverable = worker => !!worker.state && !worker.unconfirmedAction && !['
 const idle = worker => !worker.closed && recoverable(worker);
 const assets = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
+  ['/external-view.mjs', ['external-view.mjs', 'text/javascript; charset=utf-8']],
   ['/work-view.mjs', ['work-view.mjs', 'text/javascript; charset=utf-8']],
   ['/work-actions.mjs', ['work-actions.mjs', 'text/javascript; charset=utf-8']],
   ['/client.mjs', ['client.mjs', 'text/javascript; charset=utf-8']],
@@ -29,6 +31,12 @@ const browserHeaders = {
 
 export function createCompanion({ binary, workspace, env, tokenFile, origin,
   controlWork = (mode, input) => callControl(binary, workspace, env, mode, input),
+  queryExternal = async ({ actor, mode, target, generation }) => {
+    try {
+      const {stdout}=await execute(binary,['companion-external',actor,mode,target,generation],{cwd:workspace,env:{...env,GATOR_COMPANION_EXTERNAL:'1'},timeout:20000,maxBuffer:64*1024,windowsHide:true});
+      return JSON.parse(stdout);
+    } catch {throw new Error('External inspection unavailable.');}
+  },
   queryWork = async ({ actor, target, generation }) => {
     try {
       const { stdout } = await execute(binary, ['companion-inspect', actor, target, generation], { cwd: workspace, env: { ...env, GATOR_COMPANION_INSPECT: '1' }, timeout: 20000, maxBuffer: 128 * 1024, windowsHide: true });
@@ -158,6 +166,20 @@ export function createCompanion({ binary, workspace, env, tokenFile, origin,
         });
         if(!await authorized())return respond(res,401,{error:'Authentication required. The action may already have been dispatched.'});
         return respond(res,200,result);
+      }
+      const external = /^\/v1\/external(?:\/(target-[a-f0-9]{32})(\/snapshot)?)?$/.exec(url.pathname);
+      if(external){
+        if(req.method!=='GET')return respond(res,405,{error:'External inspection is read-only.'});
+        const target=external[1]||'',generation=url.searchParams.get('generation')||'',snapshot=!!external[2];
+        if(target ? [...url.searchParams.keys()].length!==1||!/^[a-f0-9]{32}$/.test(generation) : url.search)throw new Error('Use the selected target generation.');
+        const value=await serial(async()=>{
+          if(stopping||!await authorized())throw Object.assign(new Error('Access revoked.'),{code:'AUTH_REVOKED'});
+          const result=await queryExternal({actor:inspectionActor(access),mode:target?(snapshot?'snapshot':'metadata'):'list',target,generation});
+          if(!await authorized())throw Object.assign(new Error('Access revoked.'),{code:'AUTH_REVOKED'});
+          return validateExternal(result,target,generation,snapshot);
+        });
+        if(!await authorized())return respond(res,401,{error:'Authentication required.'});
+        return respond(res,200,value);
       }
       const work = /^\/v1\/work(?:\/(target-[a-f0-9]{32})(?:\/activity)?)?$/.exec(url.pathname);
       if (work) {

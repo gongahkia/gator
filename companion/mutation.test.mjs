@@ -56,3 +56,17 @@ test('semantic HTTP shapes reject actor, grant, endpoint and terminal input inje
   const target='target-'+'a'.repeat(32),a={id:'a'.repeat(32),run_id:'run',target:{id:target,backend:'gator_work',owner:'owner',generation:'b'.repeat(32),incarnation:'one'},operation:'cancel'};
   for(const extra of [{actor:'trusted'},{grant:{}},{endpoint:'http://127.0.0.1:1'},{instruction:'raw input'},{operation:'text_input'},{operation:'interrupt'}])assert.throws(()=>validateRemoteAction({...a,...extra},target));
 });
+
+test('losing the gateway response after dispatch reconciles through a receipt read without replay',async()=>{
+  const root=await mkdtemp(join(tmpdir(),'gator-control-lost-response-')),tokenFile=join(root,'owner.token'),token='a'.repeat(64);let companion,release,entered,receipt,dispatches=0;
+  const gate=new Promise(r=>release=r),started=new Promise(r=>entered=r);
+  const action={id:'a'.repeat(32),run_id:'run',target:{id:'target-'+'a'.repeat(32),backend:'gator_work',owner:'owner',generation:'b'.repeat(32),incarnation:'one'},operation:'cancel'};
+  try{await writeFile(tokenFile,token+'\n',{mode:0o600});companion=createCompanion({binary:'',workspace:root,tokenFile,controlWork:async(mode)=>{
+      if(mode==='check')return{authorized:true};if(mode==='receipt')return{receipt};
+      dispatches++;receipt={version:1,id:action.id,run_id:action.run_id,target:action.target,operation:'cancel',scope:'',digest:'c'.repeat(64),phase:'settled',delivery:'dispatch_acknowledged',note:'Cancellation requested, not termination.',created_at:new Date().toISOString(),updated_at:new Date().toISOString()};entered();await gate;return{receipt};
+    }});const addr=await companion.listen(),base=`http://127.0.0.1:${addr.port}`,headers={Authorization:`Bearer ${token}`},controller=new AbortController();
+    const pending=fetch(base+`/v1/work/${action.target.id}/actions`,{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify(action),signal:controller.signal});
+    const rejected=assert.rejects(pending);await started;controller.abort();await rejected;release();
+    const recovered=await(await fetch(base+`/v1/work/${action.target.id}/receipts/${action.id}?run_id=run`,{headers})).json();assert.equal(recovered.receipt.delivery,'dispatch_acknowledged');assert.equal(dispatches,1);
+  }finally{release();await companion?.close();await rm(root,{recursive:true,force:true});}
+});

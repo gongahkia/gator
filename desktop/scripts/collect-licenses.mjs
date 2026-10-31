@@ -15,4 +15,7 @@ for (const [path, entry] of Object.entries(lock.packages).sort(([a], [b]) => a.l
   notices.push(`\n${"=".repeat(72)}\n${metadata.name}@${metadata.version}\nLicense: ${metadata.license ?? entry.license ?? "See package metadata"}\n`);
   for (const name of licenses) notices.push(`\n${name}\n${await readFile(join(directory, name), "utf8")}\n`);
 }
+notices.push("\nOnibi adapted tmux/text components (modified by Gator):\n");
+notices.push(await readFile(join(root, "../third_party/onibi/NOTICE.md"), "utf8"));
+notices.push(await readFile(join(root, "../third_party/onibi/LICENSE"), "utf8"));
 await writeFile(join(root, "licenses/DEPENDENCIES.txt"), notices.join(""));

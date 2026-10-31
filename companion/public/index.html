@@ -28,6 +28,16 @@
     </form>
     <p id="connection" role="status">Not connected</p>
     <p id="error" role="alert" hidden></p>
+    <section id="external-terminals" hidden aria-labelledby="external-title">
+      <details id="external-open" class="card"><summary id="external-title">External terminals</summary>
+        <p class="hint">Snapshots from locally trusted tmux backends, enrolled and shared with this device. Gator requests reads; server configuration controls command behavior.</p>
+        <label for="external-select">Shared terminal</label>
+        <select id="external-select"><option value="">Choose a terminal</option></select>
+        <button id="external-refresh" type="button" class="secondary">Refresh terminals</button>
+        <p id="external-status" role="status">Enroll a pane and grant Inspect on the host.</p>
+        <p id="external-meta" class="hint"></p><pre id="external-output" aria-label="Recent terminal snapshot"></pre>
+      </details>
+    </section>
     <section id="owned-work" hidden aria-labelledby="work-title">
       <details id="work-open" class="card">
         <summary id="work-title">Active Work</summary>

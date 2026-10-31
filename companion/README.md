@@ -482,3 +482,60 @@ stable request ID; different mutations stay blocked. A listener restart still
 uses the existing retained Go queue/admission semantics. These safeguards do not
 prove recovery from host power loss or remove the need to run the separate job
 supervisor on an always-on host.
+
+## External tmux snapshots (T3)
+
+External terminals are separate from Active Work. They require an existing tmux
+pane, explicit host-local enrollment, and a separate per-device Inspect grant.
+Use the companion's same `GATOR_STATE_DIR`; no remote enrollment is available:
+
+```sh
+GATOR_INTERNAL_COMMANDS=1 /path/to/gator-runtime external-tmux candidates --reviewed-read-config /absolute/path/to/tmux /private/path/socket
+GATOR_INTERNAL_COMMANDS=1 /path/to/gator-runtime external-tmux enroll --reviewed-read-config /absolute/path/to/tmux /private/path/socket '%3' 'Build monitor'
+GATOR_INTERNAL_COMMANDS=1 /path/to/gator-runtime external-tmux list
+node companion/external-access.mjs /path/to/gator-runtime /private/path/access.token TARGET_ID DEVICE_ID 300
+```
+
+The socket parent must be private and owned by the companion OS user; the server
+must already exist. Current accepted tmux versions are 3.4–3.8. Configured read or
+error hooks are refused. T3 never changes these settings to enable inspection.
+Choose the enrolled pane in **External terminals**; the view refreshes every five
+seconds while open/visible/online, showing bounded plain-text snapshots. It has
+no input, interrupt, terminal emulator or model access. Snapshot text may contain
+secrets; grant only the exact pane/device intended. Revocation cannot recall data
+already received. To revoke or remove enrollment:
+
+```sh
+node companion/external-access.mjs /path/to/gator-runtime /private/path/access.token TARGET_ID DEVICE_ID 0
+GATOR_INTERNAL_COMMANDS=1 /path/to/gator-runtime external-tmux revoke TARGET_ID
+```
+
+Grants expire within 900 seconds and also depend on current device enrollment and
+owner-token generation. Missing/replaced native identities invalidate enrollment;
+explicitly enroll the new pane rather than reusing a name. See
+[EXECUTION-TARGETS-T3.md](../docs/EXECUTION-TARGETS-T3.md) for exact identity evidence,
+API bounds, license provenance, supported platforms and verification commands.
+
+`--reviewed-read-config` is a required local initialization acknowledgement.
+Before using it, review the existing server's command aliases: canonical
+`if-shell`, `list-panes`, `display-message` and `capture-pane` can be shadowed.
+Explicitly accept the selected server's behavior and keep it trusted throughout
+enrollment; withdraw review before known changes. Gator cannot safely inspect an overridden
+bootstrap command through the same parser and does not change aliases for you.
+Unreviewable configurations are unsupported. This is a manual local trust
+decision, not automatic attestation of arbitrary tmux configuration.
+
+T3.1 binds review to passive socket identity and, after enrollment, the server's
+process incarnation in the existing catalog. A prior boolean acknowledgement
+alone is no longer sufficient; explicitly enroll again and grant the device.
+Review accepts the selected server's command behavior; it does not automatically
+attest aliases or detect later runtime configuration changes. Before known changes,
+withdraw trust for every enrollment on that server instance:
+
+```sh
+GATOR_INTERNAL_COMMANDS=1 /path/to/gator-runtime external-tmux unreview TARGET_ID
+```
+
+Renewal requires new enrollment and separate device grants. See
+[the reviewed-backend model](../docs/EXECUTION-TARGETS-T3.1.md). No control authority
+is conferred by read review.

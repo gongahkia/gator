@@ -178,3 +178,5 @@ export type Frame = {
   queue?: QueueAction;
   conversation?: { id: string; list_id: string };
 };
+
+export type { ExternalTargetSnapshot, ExternalTargetResponse } from "./external";

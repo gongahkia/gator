@@ -50,3 +50,8 @@ dialog::backdrop { background: #000b; }
   :root { color-scheme: light; background: #fafafa; color: #202020; --surface: #fff; --line: #ccc; --muted: #626262; --accent: #b7dbb8; --warning: #795819; }
 }
 @media (hover: hover) { button:enabled:hover { filter: brightness(.94); } }
+
+#external-terminals { margin-block: 1rem; }
+#external-select { width: 100%; margin-block: .5rem; }
+#external-output { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 28rem; overflow: auto; font-size: .85rem; }
+#external-meta { overflow-wrap: anywhere; white-space: pre-wrap; font-size: .85rem; }
