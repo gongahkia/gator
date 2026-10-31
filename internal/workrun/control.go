@@ -20,6 +20,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/gongahkia/gator/internal/privatefs"
+	"github.com/gongahkia/gator/internal/executiontarget"
 	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workspace"
 )
@@ -35,6 +36,7 @@ type workControlState struct {
 	URL     string `json:"url"`
 	Token   string `json:"token"`
 	Nonce   string `json:"nonce"`
+	Inspection *executiontarget.Binding `json:"inspection,omitempty"`
 }
 
 type workControl struct {
@@ -48,7 +50,7 @@ type workControl struct {
 // local CLI process. The token is confined to a private state file. A decision
 // endpoint exists only when the foreground operation has an exact pending
 // interaction and checks the original in-memory preview digest.
-func startWorkControl(ctx context.Context, stateDir, runID string, cancel context.CancelFunc, incoming <-chan string, direct chan string, respond func(int, string, bool) error, cancelTask func(string) error, steerTask func(string, string) error, answerTask func(string, string, map[string][]string) error) (*workControl, <-chan string, error) {
+func startWorkControl(ctx context.Context, stateDir, runID string, cancel context.CancelFunc, incoming <-chan string, direct chan string, respond func(int, string, bool) error, cancelTask func(string) error, steerTask func(string, string) error, answerTask func(string, string, map[string][]string) error, inspection ...*liveInspection) (*workControl, <-chan string, error) {
 	if !validInteractionRunID(runID) {
 		return nil, nil, errors.New("invalid Work control run ID")
 	}
@@ -119,6 +121,12 @@ func startWorkControl(ctx context.Context, stateDir, runID string, cancel contex
 		writer.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(writer).Encode(struct{ RunID, Nonce string }{state.RunID, state.Nonce})
 	}))
+	if len(inspection) == 1 && inspection[0] != nil {
+		binding, issueErr := executiontarget.NewBinding(executiontarget.Work, "work-owner-"+state.Nonce, state.Nonce)
+		if issueErr != nil { listener.Close(); return nil, nil, issueErr }
+		state.Inspection = &binding
+		inspection[0].install(ctx, mux, authorized, binding)
+	}
 	mux.HandleFunc("/stop", authorized(func(writer http.ResponseWriter, request *http.Request) {
 		if request.Method != http.MethodPost {
 			http.Error(writer, "method", http.StatusMethodNotAllowed)

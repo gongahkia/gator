@@ -285,6 +285,7 @@ func (s Service) Start(ctx context.Context, request Request) *Operation {
 	request.controlCancelTask = o.CancelTask
 	request.controlSteerTask = o.SteerTask
 	request.controlAnswerTask = o.AnswerTask
+	request.controlPending = func() int { o.mu.Lock(); defer o.mu.Unlock(); return len(o.pending) }
 	sink := request.OnEvent
 	request.OnEvent = func(event agent.Event) {
 		if sink != nil {

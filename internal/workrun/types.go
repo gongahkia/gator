@@ -104,6 +104,7 @@ type Request struct {
 	controlCancelTask func(string) error
 	controlSteerTask  func(string, string) error
 	controlAnswerTask func(string, string, map[string][]string) error
+	controlPending func() int
 	MaxSteps          int
 	Mode              action.Mode
 	// DecisionOrigin identifies how the host chose this run's route. It is

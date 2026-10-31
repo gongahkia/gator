@@ -190,8 +190,10 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 			finalErr = errors.Join(finalErr, fmt.Errorf("retain local telemetry: %w", err))
 		}
 	}()
+	var inspection *liveInspection
 	if request.EnableControl {
-		control, steering, err := startWorkControl(ctx, request.StateDir, request.RunID, cancel, request.Steering, request.controlSteering, request.controlRespond, request.controlCancelTask, request.controlSteerTask, request.controlAnswerTask)
+		inspection = newLiveInspection(request.RunID, request.ConversationID, startedAt, request.controlPending)
+		control, steering, err := startWorkControl(ctx, request.StateDir, request.RunID, cancel, request.Steering, request.controlSteering, request.controlRespond, request.controlCancelTask, request.controlSteerTask, request.controlAnswerTask, inspection)
 		if err != nil {
 			return Outcome{}, fmt.Errorf("start Work control: %w", err)
 		}
@@ -489,6 +491,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		defer eventMu.Unlock()
 		trace.Record(event)
 		activity.Record(event)
+		if inspection != nil { inspection.record(event) }
 		if event.Kind != agent.EventTextDelta {
 			events = append(events, event)
 		}
