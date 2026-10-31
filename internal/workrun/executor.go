@@ -193,6 +193,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	var inspection *liveInspection
 	if request.EnableControl {
 		inspection = newLiveInspection(request.RunID, request.ConversationID, startedAt, request.controlPending)
+		inspection.controls = newRemoteControls(request.StateDir, request.RunID, cancel, request.controlSteerTask, request.controlAnswerTask, request.controlRespond, request.controlInspectTask, request.controlReview)
 		control, steering, err := startWorkControl(ctx, request.StateDir, request.RunID, cancel, request.Steering, request.controlSteering, request.controlRespond, request.controlCancelTask, request.controlSteerTask, request.controlAnswerTask, inspection)
 		if err != nil {
 			return Outcome{}, fmt.Errorf("start Work control: %w", err)
@@ -293,6 +294,11 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		if err != nil {
 			return Outcome{}, err
 		}
+	}
+	if inspection != nil {
+		inspection.mu.Lock()
+		inspection.value.ConversationID = conversation.ID
+		inspection.mu.Unlock()
 	}
 	outcome := Outcome{ConversationID: conversation.ID, ParentRevisionID: request.ParentRevisionID, SnapshotID: sourceSnapshot.ID, SourceSnapshot: sourceSnapshot}
 	work, err := workspace.CreateWork(sourceSnapshot.Materialized, request.StateDir, request.RunID, startedAt)
@@ -491,7 +497,9 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		defer eventMu.Unlock()
 		trace.Record(event)
 		activity.Record(event)
-		if inspection != nil { inspection.record(event) }
+		if inspection != nil {
+			inspection.record(event)
+		}
 		if event.Kind != agent.EventTextDelta {
 			events = append(events, event)
 		}

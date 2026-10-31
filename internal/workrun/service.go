@@ -158,8 +158,9 @@ type Operation struct {
 }
 
 type pendingInteraction struct {
-	response chan bool
-	digest   string
+	response    chan bool
+	digest      string
+	interaction Interaction
 }
 
 func (o *Operation) Cancel() { o.cancel() }
@@ -257,7 +258,7 @@ func (s Service) Start(ctx context.Context, request Request) *Operation {
 			o.mu.Unlock()
 			return false, err
 		}
-		o.pending[id] = pendingInteraction{response: response, digest: digest}
+		o.pending[id] = pendingInteraction{response: response, digest: digest, interaction: interaction}
 		o.mu.Unlock()
 		defer func() { o.mu.Lock(); delete(o.pending, id); o.mu.Unlock() }()
 		if err := persistInteraction(InteractionRecord{Version: 1, Status: "pending", Interaction: interaction}, id); err != nil {
@@ -285,6 +286,8 @@ func (s Service) Start(ctx context.Context, request Request) *Operation {
 	request.controlCancelTask = o.CancelTask
 	request.controlSteerTask = o.SteerTask
 	request.controlAnswerTask = o.AnswerTask
+	request.controlInspectTask = o.InspectTask
+	request.controlReview = o.reviewRemoteDecision
 	request.controlPending = func() int { o.mu.Lock(); defer o.mu.Unlock(); return len(o.pending) }
 	sink := request.OnEvent
 	request.OnEvent = func(event agent.Event) {

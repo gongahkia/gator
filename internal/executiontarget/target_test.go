@@ -50,9 +50,9 @@ func TestIdentityAndRoundTrip(t *testing.T) {
 
 func TestCapabilitiesDoNotConflateNativeControlsAndKeys(t *testing.T) {
 	for _, backend := range []Backend{Work, PTY, Tmux, Ghostty} {
-		for _, op := range []Operation{Inspect, Steer, Answer, Interrupt, TextInput, KeyInput, Cancel, "launch"} {
+		for _, op := range []Operation{Inspect, Steer, Answer, Decision, Interrupt, TextInput, KeyInput, Cancel, "launch"} {
 			target := fixture(t, backend, op)
-			want := op == Inspect || op == Interrupt || op == Cancel || backend == Work && (op == Steer || op == Answer) || backend != Work && (op == TextInput || op == KeyInput)
+			want := op == Inspect || op == Interrupt || op == Cancel || backend == Work && (op == Steer || op == Answer || op == Decision) || backend != Work && (op == TextInput || op == KeyInput)
 			if (target.Validate() == nil) != want {
 				t.Fatalf("%s/%s validation", backend, op)
 			}

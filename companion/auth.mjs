@@ -56,6 +56,18 @@ export async function authenticate(tokenFile, authorization) {
   return `device:${device.id}:${generation}:${device.secret_hash}`;
 }
 
+// An inspection principal is distinct from conversation access and bound to the
+// current token generation. Only a separate local owner grant authorizes reads.
+export const inspectionActor = access => `inspection-${digest(access)}`;
+export async function inspectionDeviceActor(tokenFile, id) {
+  const owner = await readToken(tokenFile), generation = digest(owner);
+  if (id === 'owner') return inspectionActor(`owner:${generation}`);
+  if (!deviceID.test(id)) throw new Error('Use an enrolled device ID or owner.');
+  const device = await readDevice(tokenFile, id);
+  if (!same(device.owner_hash, generation)) throw new Error('Device is revoked.');
+  return inspectionActor(`device:${id}:${generation}:${device.secret_hash}`);
+}
+
 export async function addDevice(tokenFile, name, output) {
   if (typeof name !== 'string' || !name.trim() || name.length > 80 || /[\x00-\x1f\x7f]/.test(name)) throw new Error('Use a device name of 1–80 characters without control characters.');
   tokenFile = resolve(tokenFile); output = resolve(output);

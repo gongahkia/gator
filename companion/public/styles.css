@@ -36,6 +36,8 @@ pre, .message-text { white-space: pre-wrap; overflow-wrap: anywhere; word-break:
 #updates li { overflow-wrap: anywhere; }
 #updates-count { font-variant-numeric: tabular-nums; }
 #checks .hint { font-variant-numeric: tabular-nums; }
+#work-meta, #work-status { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; white-space: pre-wrap; }
+#work-select { min-width: 0; max-width: 100%; flex: 1; }
 #updates article:focus { outline: 2px solid var(--accent); outline-offset: 3px; }
 pre { font-family: "SFMono-Regular", Consolas, monospace; font-size: 13px; }
 .message-text { margin-bottom: 0; }

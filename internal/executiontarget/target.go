@@ -33,6 +33,7 @@ const (
 	TextInput Operation = "text_input"
 	KeyInput  Operation = "key_input"
 	Cancel    Operation = "cancel"
+	Decision  Operation = "decision"
 )
 
 // Binding is an exact authority boundary, not a display name or PID selector.
@@ -108,7 +109,7 @@ func supports(backend Backend, op Operation) bool {
 	switch op {
 	case Inspect, Interrupt, Cancel:
 		return true
-	case Steer, Answer:
+	case Steer, Answer, Decision:
 		return backend == Work
 	case TextInput, KeyInput:
 		return backend == PTY || backend.External()

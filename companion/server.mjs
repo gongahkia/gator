@@ -4,7 +4,9 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Backend } from '../app-host/src/backend.mjs';
 import { validateFrame } from '../app-host/src/policy.mjs';
-import { authenticate, readToken } from './auth.mjs';
+import { authenticate, readToken, inspectionActor } from './auth.mjs';
+import { validateInspection } from './inspection.mjs';
+import { callControl, validateRemoteAction, validateControlReply } from './control.mjs';
 export { readToken } from './auth.mjs';
 
 const identity = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/;
@@ -14,6 +16,8 @@ const recoverable = worker => !!worker.state && !worker.unconfirmedAction && !['
 const idle = worker => !worker.closed && recoverable(worker);
 const assets = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
+  ['/work-view.mjs', ['work-view.mjs', 'text/javascript; charset=utf-8']],
+  ['/work-actions.mjs', ['work-actions.mjs', 'text/javascript; charset=utf-8']],
   ['/client.mjs', ['client.mjs', 'text/javascript; charset=utf-8']],
   ['/styles.css', ['styles.css', 'text/css; charset=utf-8']],
 ]);
@@ -24,6 +28,13 @@ const browserHeaders = {
 };
 
 export function createCompanion({ binary, workspace, env, tokenFile, origin,
+  controlWork = (mode, input) => callControl(binary, workspace, env, mode, input),
+  queryWork = async ({ actor, target, generation }) => {
+    try {
+      const { stdout } = await execute(binary, ['companion-inspect', actor, target, generation], { cwd: workspace, env: { ...env, GATOR_COMPANION_INSPECT: '1' }, timeout: 20000, maxBuffer: 128 * 1024, windowsHide: true });
+      return JSON.parse(stdout);
+    } catch { throw Object.assign(new Error('Work inspection is unavailable.'), { code: 'INSPECTION_UNAVAILABLE' }); }
+  },
   queryCatalog = async ({ query, scope, after }) => {
     try {
       const { stdout } = await execute(binary, ['companion-catalog', query, scope, after], { cwd: workspace, env: { ...env, GATOR_COMPANION_CATALOG: '1' }, timeout: 20000, maxBuffer: 1024 * 1024, windowsHide: true });
@@ -115,6 +126,53 @@ export function createCompanion({ binary, workspace, env, tokenFile, origin,
       if (!access) return respond(res, 401, { error: 'Authentication required.' });
       if (stopping) return respond(res, 503, { error: 'Companion is stopping.' });
       const url = new URL(req.url, localOrigin);
+      const actionRoute = /^\/v1\/work\/(target-[a-f0-9]{32})\/actions$/.exec(url.pathname);
+      const receiptRoute = /^\/v1\/work\/(target-[a-f0-9]{32})\/receipts\/([a-f0-9]{32})$/.exec(url.pathname);
+      if (receiptRoute) {
+        if (req.method !== 'GET' || [...url.searchParams.keys()].length !== 1 || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/.test(url.searchParams.get('run_id')||'')) return respond(res,400,{error:'Use an exact receipt and run identity.'});
+        const input={actor:inspectionActor(access),target:receiptRoute[1],id:receiptRoute[2],run_id:url.searchParams.get('run_id')};
+        const value=await serial(async()=>{if(!await authorized())throw Object.assign(new Error('Access revoked.'),{code:'AUTH_REVOKED'});return controlWork('receipt',input);});
+        if(!await authorized())return respond(res,401,{error:'Authentication required.'});
+        return respond(res,200,validateControlReply(value,input.target,input.id));
+      }
+      if(actionRoute){
+        if(req.method!=='POST'||url.search)return respond(res,405,{error:'Use a reviewed semantic action.'});
+        if(req.headers['content-type']!=='application/json')return respond(res,415,{error:'Use application/json.'});
+        const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>24576)return respond(res,413,{error:'Action exceeds 24 KiB.'});chunks.push(chunk);}
+        const action=validateRemoteAction(JSON.parse(Buffer.concat(chunks).toString('utf8')),actionRoute[1]);
+        const input={actor:inspectionActor(access),action};
+        // Owner-authorized preflight at the gateway, then again after queueing.
+        let first;
+        try{if(!await authorized())return respond(res,401,{error:'Authentication required.'});first=await serial(async()=>{if(!await authorized())throw Object.assign(new Error('Access revoked.'),{code:'AUTH_REVOKED'});return validateControlReply(await controlWork('check',input),action.target.id,action.id);});}
+        catch(error){if(error.code==='AUTH_REVOKED')return respond(res,401,{error:'Authentication required.'});return respond(res,409,{error:'Preflight rejected: authorization, scope, action identity or owner is unavailable. Retrieve any existing receipt before another attempt.'});}
+        if(!await authorized())return respond(res,401,{error:'Authentication required.'});
+        if(first.receipt)return respond(res,200,first);
+        if(!first.authorized)return respond(res,403,{error:'Operation access is not authorized.',delivery:'not_dispatched'});
+        const result=await serial(async()=>{
+          if(!await authorized())throw Object.assign(new Error('Access revoked.'),{code:'AUTH_REVOKED'});
+          const checked=validateControlReply(await controlWork('check',input),action.target.id,action.id);
+          if(checked.receipt)return checked;
+          if(!checked.authorized)throw new Error('Operation access is no longer authorized.');
+          if(!await authorized())throw Object.assign(new Error('Access revoked.'),{code:'AUTH_REVOKED'});
+          return validateControlReply(await controlWork('dispatch',input),action.target.id,action.id);
+        });
+        if(!await authorized())return respond(res,401,{error:'Authentication required. The action may already have been dispatched.'});
+        return respond(res,200,result);
+      }
+      const work = /^\/v1\/work(?:\/(target-[a-f0-9]{32})(?:\/activity)?)?$/.exec(url.pathname);
+      if (work) {
+        if (req.method !== 'GET') return respond(res, 405, { error: 'Work inspection is read-only.' });
+        const target = work[1] || '', generation = url.searchParams.get('generation') || '';
+        if (target ? [...url.searchParams.keys()].length !== 1 || !/^[a-f0-9]{32}$/.test(generation) : url.search) throw new Error('Use the selected target generation.');
+        const value = await serial(async () => {
+          if (stopping || !await authorized()) throw Object.assign(new Error('Access was revoked.'), { code: 'AUTH_REVOKED' });
+          const result = await queryWork({ actor: inspectionActor(access), target, generation });
+          if (!await authorized()) throw Object.assign(new Error('Access was revoked.'), { code: 'AUTH_REVOKED' });
+          return validateInspection(result, target, generation);
+        });
+        if (!await authorized()) return respond(res, 401, { error: 'Authentication required.' });
+        return respond(res, 200, value);
+      }
       if (req.url === '/v1/health' && req.method === 'GET') {
         if (!await authorized()) return respond(res, 401, { error: 'Authentication required.' });
         return respond(res, 200, { protocol: 1, status: 'ready', uptime_seconds: Math.max(0, Math.floor((now() - startedAt) / 1000)), sessions: workers.size, stopped_sessions: [...workers.values()].filter(w => w.closed).length, pending_requests: pending });

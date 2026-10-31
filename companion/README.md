@@ -1,5 +1,18 @@
 # Self-hosted companion transport
 
+The Active Work view also supports separately authorized semantic controls:
+Work cancellation, specialist steering/answers, and exact bounded command
+approvals. Each requires a host-local operation/scope grant and explicit phone
+review. Inspect alone never grants control. See [T2 grants, durable receipts and
+limitations](../docs/EXECUTION-TARGETS-T2.md). Lost acknowledgements use receipt
+retrieval; no mutation is automatically resent.
+
+The **Active Work** view can inspect explicitly shared live Work
+owned by desktop, OpenTUI, or this companion. Device authentication alone does
+not grant inspection: use the host-local, short-lived grant procedure in
+[T1 owned Work inspection](../docs/EXECUTION-TARGETS-T1.md). This view does not
+start a chat worker, keep the execution owner alive, or expose terminal input.
+
 Experimental single-owner transport for Gator conversations on an always-on
 host. The host owns its files, configured accounts, models and execution. A
 client disconnect does not stop admitted work. This does not migrate laptop

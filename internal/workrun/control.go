@@ -19,8 +19,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/gongahkia/gator/internal/privatefs"
 	"github.com/gongahkia/gator/internal/executiontarget"
+	"github.com/gongahkia/gator/internal/privatefs"
 	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workspace"
 )
@@ -31,11 +31,11 @@ const (
 )
 
 type workControlState struct {
-	Version int    `json:"version"`
-	RunID   string `json:"run_id"`
-	URL     string `json:"url"`
-	Token   string `json:"token"`
-	Nonce   string `json:"nonce"`
+	Version    int                      `json:"version"`
+	RunID      string                   `json:"run_id"`
+	URL        string                   `json:"url"`
+	Token      string                   `json:"token"`
+	Nonce      string                   `json:"nonce"`
 	Inspection *executiontarget.Binding `json:"inspection,omitempty"`
 }
 
@@ -123,7 +123,10 @@ func startWorkControl(ctx context.Context, stateDir, runID string, cancel contex
 	}))
 	if len(inspection) == 1 && inspection[0] != nil {
 		binding, issueErr := executiontarget.NewBinding(executiontarget.Work, "work-owner-"+state.Nonce, state.Nonce)
-		if issueErr != nil { listener.Close(); return nil, nil, issueErr }
+		if issueErr != nil {
+			listener.Close()
+			return nil, nil, issueErr
+		}
 		state.Inspection = &binding
 		inspection[0].install(ctx, mux, authorized, binding)
 	}

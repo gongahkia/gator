@@ -1,3 +1,4 @@
+import { createWorkView } from './work-view.mjs';
 const $ = id => document.getElementById(id);
 let session, generation = 0, timer, busy = false, reading = false, fresh = false;
 let state, pending, approvalKey = '', transcriptKey = '';
@@ -18,6 +19,7 @@ const currentApproval = () => {
   return { approval, preview: message.text + '\n\n' + JSON.stringify(message.result, null, 2) };
 };
 function controls() {
+  workView.sync();
   checkFreshness();
   const active = !!session?.id && !browsing && fresh && !document.hidden && !busy && !reading && !hostSetup();
   $('send').disabled = !active;
@@ -400,4 +402,5 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('offline', () => { fresh = false; checksFresh = false; dialog.close(); $('connection').textContent = 'Offline · the host may still be working'; controls(); });
 window.addEventListener('online', refresh);
 window.addEventListener('pagehide', () => disconnect());
+const workView = createWorkView({ getSession: () => session, revoked: () => disconnect(false) });
 controls();

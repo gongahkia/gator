@@ -98,15 +98,17 @@ type Request struct {
 	PreparationContext      context.Context
 	// EnableControl exposes stop and steering for this foreground run through a
 	// private loopback endpoint. It never grants action approval authority.
-	EnableControl     bool
-	controlSteering   chan string
-	controlRespond    func(int, string, bool) error
-	controlCancelTask func(string) error
-	controlSteerTask  func(string, string) error
-	controlAnswerTask func(string, string, map[string][]string) error
-	controlPending func() int
-	MaxSteps          int
-	Mode              action.Mode
+	EnableControl      bool
+	controlSteering    chan string
+	controlRespond     func(int, string, bool) error
+	controlCancelTask  func(string) error
+	controlSteerTask   func(string, string) error
+	controlAnswerTask  func(string, string, map[string][]string) error
+	controlPending     func() int
+	controlInspectTask func(string) (orchestrator.Task, error)
+	controlReview      func(int) (Interaction, string, error)
+	MaxSteps           int
+	Mode               action.Mode
 	// DecisionOrigin identifies how the host chose this run's route. It is
 	// observational metadata and cannot widen Mode or any tool grant.
 	DecisionOrigin string

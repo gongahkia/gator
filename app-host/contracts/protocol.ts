@@ -1,4 +1,5 @@
 // Display contract shared by the terminal and desktop. Go owns workflow state.
+export type { OwnedWorkInspection, OwnedWorkResponse, WorkControlOffer, WorkRemoteAction, WorkControlReceipt } from "./inspection";
 export type ResultTone = "success" | "warning" | "error" | "muted" | "";
 export type ResultField = { label: string; value: string; tone?: ResultTone };
 export type ResultItem = { label: string; detail?: string; state?: string; tone?: ResultTone };

@@ -42,6 +42,18 @@ func runDesktopRuntime(args []string, out io.Writer) error {
 	if len(args) == 4 && args[0] == "companion-catalog" && os.Getenv("GATOR_COMPANION_CATALOG") == "1" {
 		return companionCatalog(args[1], args[2], args[3], out)
 	}
+	if len(args) == 4 && args[0] == "companion-inspect" && os.Getenv("GATOR_COMPANION_INSPECT") == "1" {
+		return companionInspection(args[1:], false, out)
+	}
+	if len(args) == 2 && args[0] == "companion-control" && os.Getenv("GATOR_COMPANION_CONTROL") == "1" && (args[1] == "check" || args[1] == "dispatch" || args[1] == "receipt") {
+		return companionControl(args[1], os.Stdin, out)
+	}
+	if len(args) == 2 && args[0] == "control-access" && os.Getenv("GATOR_INTERNAL_COMMANDS") == "1" {
+		return companionControlGrant(args[1], os.Stdin, out)
+	}
+	if len(args) == 4 && args[0] == "inspection-access" && os.Getenv("GATOR_INTERNAL_COMMANDS") == "1" {
+		return companionInspection(args[1:], true, out)
+	}
 	if len(args) == 2 && args[0] == "companion-create-chat" && os.Getenv("GATOR_COMPANION_CREATE") == "1" {
 		return companionCreateChat(args[1], out)
 	}

@@ -28,6 +28,26 @@
     </form>
     <p id="connection" role="status">Not connected</p>
     <p id="error" role="alert" hidden></p>
+    <section id="owned-work" hidden aria-labelledby="work-title">
+      <details id="work-open" class="card">
+        <summary id="work-title">Active Work</summary>
+        <p class="hint">Shows only live Work shared with this device on the host. Closing the execution host stops its work.</p>
+        <div class="row"><label for="work-select">Task</label><select id="work-select"><option value="">Choose a task</option></select><button id="work-refresh" type="button" class="secondary">Refresh Work</button></div>
+        <p id="work-status" role="status">Refresh to see shared Work.</p>
+        <p id="work-meta" class="hint"></p>
+        <pre id="work-progress" aria-label="Recent Work progress"></pre>
+        <section id="work-actions" hidden aria-label="Authorized semantic controls">
+          <label for="work-operation">Authorized operation</label><select id="work-operation"><option value="">No authorized controls</option></select>
+          <div id="work-steer-fields" hidden><label for="work-instruction">Steering instruction</label><textarea id="work-instruction" rows="3" maxlength="8192"></textarea></div>
+          <div id="work-answer-fields" hidden></div>
+          <div id="work-decision-fields" hidden><pre id="work-command-preview"></pre><label for="work-decision">Decision</label><select id="work-decision"><option value="">Choose a decision</option><option value="deny">Deny</option><option value="approve">Approve</option></select></div>
+          <button id="work-action-review" type="button" disabled>Review action</button>
+          <p id="work-action-status" role="status">No action submitted.</p>
+          <button id="work-receipt-refresh" type="button" class="secondary" hidden>Retrieve action receipt</button>
+          <button id="work-receipt-dismiss" type="button" class="secondary" hidden>Dismiss settled receipt</button>
+        </section>
+      </details>
+    </section>
     <section id="catalog" hidden aria-labelledby="catalog-title">
       <h2 id="catalog-title" tabindex="-1">Conversations on your host</h2>
       <div id="new-chat-controls" class="card" hidden>
@@ -87,5 +107,6 @@
     <pre id="confirm-preview"></pre>
     <div class="row"><button id="confirm" type="button">Approve action</button><button id="cancel" type="button" class="secondary">Back</button></div>
   </dialog>
+  <dialog id="work-action-dialog" aria-labelledby="work-action-title"><h2 id="work-action-title">Confirm this exact Work action?</h2><pre id="work-action-preview"></pre><p>Dispatch acknowledgement does not establish task completion. Cancellation acceptance does not mean Work has stopped.</p><div class="row"><button id="work-action-confirm" type="button">Confirm reviewed action</button><button id="work-action-back" type="button" class="secondary">Back</button></div></dialog>
 </body>
 </html>
