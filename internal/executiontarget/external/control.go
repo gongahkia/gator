@@ -20,6 +20,7 @@ type Action struct {
 	Input      tmux.Input `json:"input"`
 }
 type ControlReply struct {
+	Delivery   executiontarget.Delivery   `json:"delivery,omitempty"`
 	Authorized bool                       `json:"authorized"`
 	Receipt    *actionlog.TerminalReceipt `json:"receipt,omitempty"`
 }
@@ -220,7 +221,12 @@ func (s Store) Control(ctx context.Context, actor executiontarget.Actor, a Actio
 	}
 	receipt, claimed, err := log.ClaimTerminal(want)
 	if err != nil {
-		return ControlReply{}, err
+		// No native dispatch is possible on this branch. If a failed durable write
+		// nevertheless left a matching claim, expose its retained uncertainty.
+		if prior, e := log.LookupTerminalID(a.ID); e == nil && prior.Actor == actor && prior.Target == want.Target && prior.Digest == want.Digest {
+			return ControlReply{Receipt: &prior}, nil
+		}
+		return ControlReply{Delivery: executiontarget.NotDispatched}, nil
 	}
 	if !claimed {
 		return ControlReply{Receipt: &receipt}, nil

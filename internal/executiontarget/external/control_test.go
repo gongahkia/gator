@@ -96,8 +96,8 @@ func TestTerminalPermissionsDurabilityAndDuplicates(t *testing.T) {
 		t.Fatal("unknown replay")
 	}
 	a.ID = strings.Repeat("c", 32)
-	if _, err := s.Control(ctx, actor, a, true); err == nil {
-		t.Fatal("follow-up after unknown")
+	if reply, err := s.Control(ctx, actor, a, true); err == nil && reply.Delivery != executiontarget.NotDispatched {
+		t.Fatal("follow-up after unknown", reply)
 	}
 	s.UnreviewControl(a.Target)
 	if _, err := s.Control(ctx, actor, a, false); err == nil {

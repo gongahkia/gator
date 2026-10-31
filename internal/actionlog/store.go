@@ -326,14 +326,6 @@ func (s Store) List(run string) ([]Entry, error) {
 		return nil, err
 	}
 	defer root.Close()
-	// Terminal receipts have no Work run/conversation and are not connected-
-	// service Entry records. Keep their durable namespace out of Work retention.
-	if run == "terminal-claims" {
-		return []Entry{}, nil
-	}
-	if strings.HasPrefix(run, "terminal-target-") && ControlID.MatchString(strings.TrimPrefix(run, "terminal-target-")) {
-		return []Entry{}, nil
-	}
 	runs := []string{run}
 	if run == "" {
 		f, err := root.Open(".")
@@ -350,14 +342,11 @@ func (s Store) List(run string) ([]Entry, error) {
 		}
 		runs = nil
 		for _, d := range dirs {
+			if d.IsDir() && d.Name() == ".terminal" {
+				continue
+			}
 			if !d.IsDir() || !identity.MatchString(d.Name()) {
 				return nil, errors.New("invalid external request run directory")
-			}
-			if d.Name() == "terminal-claims" {
-				continue
-			}
-			if strings.HasPrefix(d.Name(), "terminal-target-") && ControlID.MatchString(strings.TrimPrefix(d.Name(), "terminal-target-")) {
-				continue
 			}
 			runs = append(runs, d.Name())
 		}

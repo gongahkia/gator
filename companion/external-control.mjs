@@ -10,7 +10,7 @@ export function validateTerminalAction(a,id){
  return {id:a.id,target:id,generation:a.generation,input:{kind:i.kind,...(i.text!==undefined?{text:i.text}:{}),...(i.key!==undefined?{key:i.key}:{})}};
 }
 export function validateTerminalReply(value,id,action){
- const r=value?.receipt;if(!r)return {authorized:value?.authorized===true};
+ const r=value?.receipt;if(!r)return {authorized:value?.authorized===true,...(value?.delivery==='not_dispatched'?{delivery:'not_dispatched'}:{})};
  if(r.id!==action||r.target?.id!==id||r.target.backend!=='external_tmux'||!hex.test(r.target.generation)||!['text_input','key_input','interrupt'].includes(r.operation)||!['text','text_enter','key','interrupt'].includes(r.scope)||!['claimed','settled'].includes(r.phase)||!['not_dispatched','dispatch_acknowledged','outcome_unknown'].includes(r.delivery)||!/^[a-f0-9]{64}$/.test(r.digest)||typeof r.note!=='string'||r.note.length>256)throw new Error('Invalid terminal receipt.');
  return {authorized:false,receipt:{id:r.id,target:{id:r.target.id,generation:r.target.generation},operation:r.operation,kind:r.scope,digest:r.digest,phase:r.phase,delivery:r.delivery,note:r.note,created_at:r.created_at,updated_at:r.updated_at}};
 }

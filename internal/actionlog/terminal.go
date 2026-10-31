@@ -68,11 +68,41 @@ func (r TerminalReceipt) validate() error {
 // Existing history deletion/backup owns external-actions. Live
 // profile guards prevent removal while the owner executes. No tombstones are
 // pruned here; reaching the per-target bound refuses further admission.
+// Hidden namespace cannot collide with legacy Work run IDs (which begin with
+// an alphanumeric character). Sync every newly created directory's parent.
+func (s Store) terminalNamespace(part string, create bool) error {
+	for _, dir := range []string{filepath.Join(s.path, ".terminal"), filepath.Join(s.path, ".terminal", part)} {
+		info, err := os.Lstat(dir)
+		if errors.Is(err, os.ErrNotExist) && create {
+			if err = privatefs.MkdirAll(dir); err != nil {
+				return err
+			}
+			p, e := os.Open(filepath.Dir(dir))
+			if e != nil {
+				return e
+			}
+			e = privatefs.SyncDir(p)
+			p.Close()
+			if e != nil {
+				return e
+			}
+		} else if err != nil {
+			return err
+		} else if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || privatefs.Check(dir) != nil {
+			return errors.New("unsafe terminal namespace")
+		}
+	}
+	return nil
+}
+
 func (s Store) terminalRoot(target executiontarget.Binding, create bool) (workspace.Root, error) {
 	if target.Validate() != nil || target.Backend != executiontarget.Tmux {
 		return workspace.Root{}, errors.New("invalid terminal receipt target")
 	}
-	dir := filepath.Join(s.path, "terminal-"+target.ID)
+	if err := s.terminalNamespace("targets", create); err != nil {
+		return workspace.Root{}, err
+	}
+	dir := filepath.Join(s.path, ".terminal", "targets", target.ID)
 	info, err := os.Lstat(dir)
 	if errors.Is(err, os.ErrNotExist) && create {
 		if err = privatefs.MkdirAll(dir); err != nil {
@@ -98,7 +128,10 @@ func (s Store) terminalRoot(target executiontarget.Binding, create bool) (worksp
 // Terminal action IDs are globally claimed inside the existing action store;
 // reuse against another target is a conflict, not a new dispatch intention.
 func (s Store) terminalRecords(create bool) (workspace.Root, error) {
-	dir := filepath.Join(s.path, "terminal-claims")
+	if err := s.terminalNamespace("receipts", create); err != nil {
+		return workspace.Root{}, err
+	}
+	dir := filepath.Join(s.path, ".terminal", "receipts")
 	info, err := os.Lstat(dir)
 	if errors.Is(err, os.ErrNotExist) && create {
 		if err = privatefs.MkdirAll(dir); err != nil {

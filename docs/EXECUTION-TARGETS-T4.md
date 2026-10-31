@@ -104,7 +104,7 @@ required and cannot defend against malicious same-user configuration/processes.
 ## Durable admission, duplicate identity and uncertainty
 
 `actionlog/terminal.go` adds terminal receipts to the existing private action
-store. Global terminal action IDs live in `external-actions/terminal-claims`;
+store. Global terminal action IDs live in `external-actions/.terminal/receipts`;
 metadata includes exact target/generation/incarnation, actor, operation, action
 kind, canonical payload SHA-256, timestamps, phase and delivery. It contains no raw
 terminal text, stdout, credentials or native control configuration. Target-scoped
@@ -116,7 +116,7 @@ binding. A claim is atomically written and fsynced as `claimed/outcome_unknown`
 before mutation. Matching duplicates return that action's retained receipt;
 changed payload/actor/target conflicts. Concurrent helpers cannot both win.
 A crashed claimant is never given dispatch permission again. Receipt retrieval
-cannot dispatch. Terminal namespaces are explicitly excluded from connected-
+cannot dispatch. The hidden `.terminal` namespace cannot collide with legacy run IDs and is explicitly excluded from connected-
 service/Work receipt scanning; no connected-service approval classification is
 borrowed. Limits are 128 receipts per target and 4096 globally; nothing is
 silently pruned to admit more actions.

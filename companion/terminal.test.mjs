@@ -51,12 +51,23 @@ test('real isolated tmux: separate trust, grants, literal input, keys, interrupt
   out=(await snapshot()).targets[0].text;assert.match(out,new RegExp('READ:'+Buffer.from(literal+'\n').toString('hex')));
   const concurrent=action('e',{kind:'text',text:'ONCE_ONLY'});
   const replies=await Promise.all(Array.from({length:6},()=>callTerminal(binary,root,env,'dispatch',{actor,action:concurrent})));
-  assert.ok(replies.every(r=>r.receipt.delivery==='dispatch_acknowledged'));out=(await snapshot()).targets[0].text;assert.equal(out.split('ONCE_ONLY').length-1,1,'cross-process duplicates typed once');
+  assert.ok(replies.every(r=>r.receipt.id===concurrent.id&&['dispatch_acknowledged','outcome_unknown'].includes(r.receipt.delivery)));const reconciled=await callTerminal(binary,root,env,'receipt',{actor,action:{id:concurrent.id,target:b.id,generation:b.generation}});assert.equal(reconciled.receipt.delivery,'dispatch_acknowledged',JSON.stringify(reconciled));out=(await snapshot()).targets[0].text;assert.equal(out.split('ONCE_ONLY').length-1,1,'cross-process duplicates typed once');
   const withEnter=await post(action('f',{kind:'text_enter',text:'TEXT_PLUS_ENTER'}));assert.equal(withEnter.value.receipt.delivery,'dispatch_acknowledged');
   await grant('interrupt');const interrupt=await post(action('1',{kind:'interrupt'}));assert.equal(interrupt.value.receipt.delivery,'dispatch_acknowledged');
   for(let i=0;i<50;i++){out=(await snapshot()).targets[0].text;if(out.includes('T4_INTERRUPTED'))break;await new Promise(r=>setTimeout(r,20));}assert.match(out,/T4_INTERRUPTED/);
-  const receiptPath=join(root,'state/gator/external-actions','terminal-claims',a.id+'.json');assert.equal((await readFile(receiptPath,'utf8')).includes(literal),false);
+  const receiptPath=join(root,'state/gator/external-actions','.terminal','receipts',a.id+'.json');assert.equal((await readFile(receiptPath,'utf8')).includes(literal),false);
   await execute(binary,['external-tmux','unreview-control',b.id],{env});assert.notEqual((await post(action('2',{kind:'text',text:'DENIED'}))).status,200);assert.ok((await snapshot()).targets[0]);
   const receipt=await fetch(`${base}/v1/external/${b.id}/receipts/${a.id}?generation=${b.generation}`,{headers});assert.equal(receipt.status,200,'receipt remains reconciliable after control withdrawal');
  }finally{await c?.close();await tmux('kill-server').catch(()=>{});await rm(root,{recursive:true,force:true});}
+});
+
+test('lost dispatch reply reconciles retained receipt without repeating input',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'gt4-lost-')),tokenFile=join(root,'token');let c,retained,dispatches=0;
+ try{await writeFile(tokenFile,'a'.repeat(64)+'\n',{mode:0o600});c=createCompanion({binary:'',workspace:root,tokenFile,controlTerminal:async(mode,{action})=>{
+ if(mode==='check')return {authorized:true};if(mode==='receipt')return {receipt:retained};dispatches++;retained={id:action.id,target:{id:action.target,backend:'external_tmux',generation:action.generation},operation:'text_input',scope:'text',digest:'d'.repeat(64),phase:'settled',delivery:'dispatch_acknowledged',note:'tmux accepted dispatch; program outcome unproven.',created_at:new Date().toISOString(),updated_at:new Date().toISOString()};throw new Error('Simulated loss after dispatch');
+ }});const address=await c.listen(),base=`http://127.0.0.1:${address.port}`,headers={Authorization:'Bearer '+'a'.repeat(64),'Content-Type':'application/json'},action={id:'9'.repeat(32),target,generation,input:{kind:'text',text:'once'}};
+ const lost=await fetch(`${base}/v1/external/${target}/actions`,{method:'POST',headers,body:JSON.stringify(action)});assert.notEqual(lost.status,200);
+ for(let i=0;i<3;i++){const response=await fetch(`${base}/v1/external/${target}/receipts/${action.id}?generation=${generation}`,{headers});assert.equal(response.status,200);assert.equal((await response.json()).receipt.delivery,'dispatch_acknowledged');}
+ assert.equal(dispatches,1);
+ }finally{await c?.close();await rm(root,{recursive:true,force:true});}
 });
