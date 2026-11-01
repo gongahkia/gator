@@ -85,7 +85,22 @@ Before any provider calls, use bounded requests/input/output and verified model
 rates to reserve a conservative upper bound. Keep a cumulative ledger across
 attempts, including failed requests; do not treat unknown billing as zero or
 automatically retry uncertain requests. Never expose credentials or real user
-data. No live calls have been made for this milestone yet; initial spend is $0.
+data. Live evaluation has begun. Attempt 01 retained 17 calls, 159,711 input and
+2,327 output tokens, a conservative upper estimate of $0.845095 and no unresolved
+provider reservation. It failed at the evaluator's original request-size cap on
+the third phase; its earlier phases used actual public reads and model outputs.
+The current cumulative authority is `scripts/project-followup-eval/results/budget.json`,
+which includes further in-flight attempts. Never reset that ledger to retry.
+See [live evaluation records](../scripts/project-followup-eval/README.md).
+
+Attempt 02 passes its three live phases: initial local/knowledge/public-page
+research and draft, refreshed earlier deadline/blocker with untrusted source
+instructions, then reopened conversation with a corrected saved writing
+preference. It used 16 further calls in approximately 44.3 seconds. The retained
+reports total 33 calls, 325,471 input and 5,106 output tokens and a conservative
+model estimate of **$1.729475**, without unresolved reservations. The successful
+run is not a full scheduled workflow, live-search acceptance or a human quality
+assessment; those remain explicit requirements below.
 
 Use the real Work/watch/application paths with an opt-in synthetic fixture.
 Record model/endpoint, scenario, calls, input/output usage, latency, tool/provider
