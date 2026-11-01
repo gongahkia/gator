@@ -186,6 +186,16 @@ export function App() {
   useEffect(() => { if (argumentCommand && argumentCommand.context !== drafts.context) setArgumentCommand(undefined); }, [drafts.context, argumentCommand]);
   const navigationBusy = navigationPending || !!sessionSwitching || sending || queueAction.busy || memoryAction.busy || updateFeedback.busy || receiptInspection.busy || !!state?.receipt_busy || voiceBusy || editorBusy || attachments.busy;
   const returnToComposer = useRef(false);
+  const returnFromCommands = useRef(false);
+  useEffect(() => {
+    if (showCommands) { returnFromCommands.current = true; return; }
+    if (!returnFromCommands.current) return;
+    if (argumentCommand || panel) { returnFromCommands.current = false; return; }
+    if (!navigationBusy) {
+      returnFromCommands.current = false;
+      requestAnimationFrame(() => (commandReturn.current?.isConnected ? commandReturn.current : composer.current)?.focus());
+    }
+  }, [showCommands, argumentCommand, panel, navigationBusy]);
   useEffect(() => {
     if (panel) returnToComposer.current = true;
     else if (returnToComposer.current && !navigationBusy && !showCommands && !showDrafts && !argumentCommand && !state?.external && drafts.ready) {

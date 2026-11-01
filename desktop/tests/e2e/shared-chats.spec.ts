@@ -5,6 +5,7 @@ import { createServer } from "node:http";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { closeDesktop, temporaryDirectory } from "./lifecycle";
+import { memoryComparisonMessage } from "./memory-fixture";
 
 type Message = { role: string; content: unknown; tool_calls?: {function:{name:string;arguments:string}}[] };
 type Request = { messages: Message[]; tools?: {function:{name:string}}[] };
@@ -27,7 +28,10 @@ async function fixture() {
   await mkdir(workspace);await mkdir(join(directory,"config/gator"),{recursive:true});
   const requests:Request[]=[];
   const server=createServer((request,response)=>{let body="";request.on("data",chunk=>body+=chunk);request.on("end",()=>{
-    const input:Request=JSON.parse(body);requests.push(input);
+    const input:Request=JSON.parse(body);
+    const comparison=memoryComparisonMessage(input);
+    if(comparison){response.writeHead(200,{"Content-Type":"application/json"});response.end(JSON.stringify({choices:[{message:comparison,finish_reason:"stop"}],usage:{prompt_tokens:10,completion_tokens:10,total_tokens:20}}));return;}
+    requests.push(input);
     const user=textOf(input.messages.filter(m=>m.role==="user").at(-1)),last=input.messages.at(-1);
     const call=(name:string,args:unknown)=>({role:"assistant",content:null,tool_calls:[{id:`call-${requests.length}`,type:"function",function:{name,arguments:JSON.stringify(args)}}]});
     let message:unknown={role:"assistant",content:last?.role==="tool"?"The requested memory or history operation finished.":"A fresh answer from the same Gator."};

@@ -1,0 +1,12 @@
+{
+  "phases": [
+    {
+      "name": "initial-live-answer",
+      "milliseconds": 3050,
+      "answer": "Work ended after 2s\n\nGator\nWork failed\n\nI couldn't finish that run: model turn 1: decode OpenAI stream event: unexpected end of JSON input",
+      "checked": false
+    }
+  ],
+  "manual_quality": "unreviewed by a human",
+  "real_provider": "OpenAI Responses gpt-5.6 through budget proxy"
+}

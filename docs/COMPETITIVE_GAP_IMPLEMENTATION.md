@@ -1,5 +1,10 @@
 # Competitive gap implementation
 
+> Current product scope, 1 November 2026: Electron is the sole primary app.
+> Terminal migration checkpoints below are historical; the terminal product
+> was retired after capability consolidation. See
+> [Electron consolidation](ELECTRON-CONSOLIDATION.md).
+
 Objective: implement the code changes in the [22 October gap audit](COMPETITIVE_GAP_AUDIT_2026-10-22.md), with atomic commits and engineering, product and desktop verification. This ledger retains the entire scope across implementation sessions. An implementation entry is not a claim of successful live use.
 
 ## Requirements and evidence ledger

@@ -1,5 +1,10 @@
 # Gator's internal agent: implementation and verification
 
+> Current product scope, 1 November 2026: Electron is the sole primary app.
+> Terminal migration checkpoints below are historical; the terminal product
+> was retired after capability consolidation. See
+> [Electron consolidation](ELECTRON-CONSOLIDATION.md).
+
 30 October 2026. User direction: retain a general-purpose terminal agent. Make
 personal tracking useful with user-provided updates and no external connectors.
 External integrations can return to the roadmap after the internal primitives

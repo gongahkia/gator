@@ -9,8 +9,12 @@ export async function temporaryDirectory(prefix: string) {
 
 // Let Playwright disconnect its inspector after requesting Gator's normal quit
 // path; do not close its debugger connection from inside the application.
+const applicationProcesses = new WeakMap<ElectronApplication, ReturnType<ElectronApplication["process"]>>();
 export async function closeDesktop(application: ElectronApplication) {
-  const child = application.process();
+  // Playwright may dispose its remote process object after close(). Retain the
+  // real child handle for idempotent finally-cleanup and authoritative exit state.
+  const child = applicationProcesses.get(application) ?? application.process();
+  applicationProcesses.set(application, child);
   if (child.exitCode !== null || child.signalCode !== null) return;
   let timeout: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<never>((_, reject) => {
