@@ -240,6 +240,11 @@ func (c *evidenceCatalog) web(origins []string, options tools.HTTPFetchOptions) 
 		if len(argv) != 2 {
 			return tools.CommandDeny, nil
 		}
+		// The search wrapper scopes discovery and filters all returned URLs.
+		// This branch is reachable only with selected origins and a host key.
+		if argv[0] == "web_search" {
+			return tools.CommandAllowOnce, nil
+		}
 		parsed, err := url.Parse(argv[1])
 		if err != nil {
 			return tools.CommandDeny, err
@@ -250,7 +255,11 @@ func (c *evidenceCatalog) web(origins []string, options tools.HTTPFetchOptions) 
 		return tools.CommandDeny, errors.New("origin is not selected for this Work run")
 	}}
 	surface := tools.HTTPTools(policy, options)
-	return []agent.Tool{webEvidenceTool{surface[0], c}}, nil
+	result := []agent.Tool{webEvidenceTool{surface[0], c}}
+	if len(surface) > 1 {
+		result = append(result, scopedWebSearch{tool: surface[1], origins: allowed})
+	}
+	return result, nil
 }
 
 func (c *evidenceCatalog) privateAttachment(name string, data []byte, at time.Time) {
