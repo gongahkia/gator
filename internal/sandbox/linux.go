@@ -20,6 +20,11 @@ func prepareLinux(ctx context.Context, root, scratch string, argv, environment [
 	}
 	readRoots = removeWritableRoots(readRoots, writeRoots)
 	arguments := []string{"--die-with-parent", "--new-session", "--unshare-all", "--proc", "/proc", "--dev", "/dev"}
+	// --unshare-all includes the network namespace. AllowNetwork must undo
+	// that isolation explicitly; omitting --unshare-net does not restore it.
+	if policy.Network == AllowNetwork {
+		arguments = append(arguments, "--share-net")
+	}
 	for _, directory := range []string{"/usr", "/bin", "/sbin", "/lib", "/lib64", "/etc", "/opt"} {
 		if exists(directory) {
 			arguments = append(arguments, "--ro-bind", directory, directory)
