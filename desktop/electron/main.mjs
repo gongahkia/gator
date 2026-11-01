@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, net, protocol, session, shell, systemPreferences } from "electron";
-import { mkdir, access, readFile, writeFile } from "node:fs/promises";
+import { mkdir, access, readFile } from "node:fs/promises";
 import { constants, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -18,6 +18,8 @@ import { microphoneAllowed, runSpeechRequest, validateVoiceRequest } from "@gato
 import { FileStore, readBoundedFile, validateFileRequest } from "@gator/application-host/files";
 import { selectedFileSource } from "@gator/application-host/file-sources";
 import { importPastedImages, validatePastedImages } from "@gator/application-host/pasted-images";
+import { ExportStore } from "@gator/application-host/export";
+import { editComposer } from "./composer-editor.mjs";
 import { retainedRequestUploads } from "@gator/application-host/request-retention";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -30,6 +32,7 @@ if (process.env.GATOR_DESKTOP_USER_DATA) app.setPath("userData", resolve(process
 const stateRoot = stateDirectory();
 const uploads = new UploadStore(join(stateRoot, "gator", "uploads"));
 const files = new FileStore(join(stateRoot, "gator", "files"));
+const exports = new ExportStore([join(stateRoot, "gator"), app.getPath("userData")]);
 const importedFiles = new Map();
 const drafts = new DraftStore(join(app.getPath("userData"), "drafts", `${createHash("sha256").update(stateRoot).digest("hex")}.json`));
 protocol.registerSchemesAsPrivileged([{ scheme: "gator", privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
@@ -77,7 +80,7 @@ function snapshot() {
 function trusted(event) {
   if (!window || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || event.senderFrame.url !== APP_URL) throw new Error("Untrusted desktop request");
 }
-function mutable(event) { trusted(event); if (updatePreparing) throw new Error("Gator is preparing to restart. Please wait."); if (sessions?.switching) throw new Error("Wait for this conversation to open."); }
+function mutable(event) { trusted(event); if (updatePreparing) throw new Error("Gator is preparing to restart. Please wait."); if (sessions?.switching) throw new Error("Wait for this conversation to open."); if (terminalBusy) throw new Error("Finish the current external step first."); }
 async function startBackend() {
   if (starting) return starting;
   starting = (async () => {
@@ -215,8 +218,15 @@ else {
       if (request.action === "export") {
         const selected = await dialog.showSaveDialog(window, { title: "Save a copy", defaultPath: result.name });
         if (selected.canceled || !selected.filePath) return { exported: false };
-        if (!current()) throw new Error("The conversation changed before export. Try again in the intended conversation.");
-        await writeFile(selected.filePath, result.bytes, { mode: 0o600 }); return { exported: true };
+        const assertCurrent = () => { mutable(event); if (!current()) throw new Error("The conversation changed before export. Try again in the intended conversation."); };
+        assertCurrent();
+        const review = await exports.review(selected.filePath);
+        if (review.exists) {
+          const answer = await dialog.showMessageBox(window, { type: "warning", message: "Replace this export file?", detail: `${review.path}\n${review.bytes} bytes · modified ${review.modified}\n\nReplace this reviewed file with the selected saved version? If it changes before saving, Gator will refuse the replacement.`, buttons: ["Keep existing file", "Replace file"], defaultId: 0, cancelId: 0 });
+          if (answer.response !== 1) return { exported: false };
+        }
+        await exports.write(review.path, result.bytes, review.token, assertCurrent);
+        return { exported: true };
       }
       return result;
     });
@@ -334,6 +344,13 @@ else {
     });
     ipcMain.handle("gator:link", async (event, value) => { trusted(event); const url = externalURL(value); if (!url) throw new Error("Only web links can be opened"); await shell.openExternal(url); });
     ipcMain.handle("gator:restart", async (event) => { mutable(event); if (terminalBusy || (backend?.state?.running && !backend.closed)) throw new Error("Finish the current operation first"); await startBackend(); update(); });
+    ipcMain.handle("gator:editor", async (event, request) => {
+      mutable(event);
+      const owner = backend;
+      terminalBusy = true; update();
+      try { return await editComposer(owner, request, terminalHandoff); }
+      finally { terminalBusy = false; update(); }
+    });
     ipcMain.handle("gator:terminal", async (event) => {
       mutable(event);
       if (!backend?.state?.external || terminalBusy) return;

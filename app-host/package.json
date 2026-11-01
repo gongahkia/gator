@@ -14,6 +14,7 @@
     "./attachment-limits": "./src/attachment-limits.mjs",
     "./drafts": "./src/drafts.mjs",
     "./files": "./src/files.mjs",
+    "./export": "./src/export.mjs",
     "./file-content": "./src/file-content.mjs",
     "./file-comparison": "./src/file-comparison.mjs",
     "./file-sources": "./src/file-sources.mjs",

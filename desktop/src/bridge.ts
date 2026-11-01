@@ -30,6 +30,7 @@ declare global {
       choosePath(request: { panel_id: string; kind: string }): Promise<string | null>;
       openLink(url: string): Promise<void>;
       continueInTerminal(): Promise<void>;
+      editComposer(request: { context: string; text: string }): Promise<{ context: string; text: string; error: string }>;
       restart(): Promise<void>;
       drafts(request: DraftRequest): Promise<DraftSnapshot>;
       updates(request: UpdateRequest): Promise<UpdateState>;

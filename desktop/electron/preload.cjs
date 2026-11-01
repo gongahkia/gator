@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld("gator", {
   choosePath: (request) => ipcRenderer.invoke("gator:pick-path", request),
   openLink: (url) => ipcRenderer.invoke("gator:link", url),
   continueInTerminal: () => ipcRenderer.invoke("gator:terminal"),
+  editComposer: (request) => attachmentRequest("gator:editor", request),
   restart: () => ipcRenderer.invoke("gator:restart"),
   drafts: (request) => ipcRenderer.invoke("gator:drafts", request),
   updates: (request) => ipcRenderer.invoke("gator:updates", request),

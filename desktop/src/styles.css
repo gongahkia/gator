@@ -1056,3 +1056,15 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .chat-memory-receipt summary::-webkit-details-marker { display: none; }
 .chat-memory-receipt summary > svg:last-child { transition: transform 150ms ease; }
 .chat-memory-receipt[open] summary > svg:last-child { transform: rotate(180deg); }
+
+.message-tools { position: relative; }
+.message-tools-panel { position: absolute; bottom: calc(100% + 12px); left: -100px; z-index: 25; width: min(420px, calc(100vw - 64px)); max-height: min(480px, 65vh); overflow: auto; padding: 12px; border: 1px solid var(--color-line); border-radius: var(--radius-md); background: var(--color-raised); box-shadow: 0 12px 36px #0003; }
+.message-tools-panel header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.message-tool-action { display: flex; gap: 10px; width: 100%; min-height: 44px; padding: 10px; border: 0; border-radius: var(--radius-sm); text-align: left; background: transparent; color: var(--color-secondary); }
+.message-tool-action:hover:not(:disabled) { background: var(--color-hover); }
+.message-tool-action small { display: block; margin-top: 4px; color: var(--color-muted); }
+.message-tools-panel input, .message-tools-panel textarea { width: 100%; min-height: 40px; padding: 8px; margin: 8px 0; border: 1px solid var(--color-line); border-radius: var(--radius-sm); background: var(--color-base); color: var(--color-contrast); }
+.composer .message-tools-panel textarea { min-height: 140px; max-height: 240px; resize: vertical; border: 1px solid var(--color-line); padding: 8px; }
+.message-history-list article { padding: 12px 0; border-bottom: 1px solid var(--color-line-subtle); }
+.message-history-list pre { max-height: 120px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+.message-history-list article > div, .message-tools-review { display: flex; flex-wrap: wrap; gap: 8px; }
