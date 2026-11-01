@@ -186,7 +186,8 @@ test("durable follow-up cards return to their chat and retain explicit reply own
     await composer().fill("Plan the offsite"); await page.getByRole("button", { name: "Send message", exact: true }).click();
     await expect(page.getByText("Retained reply 1.", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "New chat", exact: true }).click();
-    await expect.poll(async () => (await snapshot()).state!.conversation_id).not.toBe(origin);
+    await expect.poll(async () => (await snapshot()).state?.conversation_id || origin).not.toBe(origin);
+    await expect.poll(async () => !!(await snapshot()).sessionSwitching).toBe(false);
     const inboxPath = join(env.GATOR_STATE_DIR, "gator/inbox"); await mkdir(inboxPath, { recursive: true });
     const entry = { version: 1, id: "inbox-offsite", kind: "job", title: "Offsite venue", summary: "The venue changed rooms. Option one is the garden; option two is the library.", status: "completed", origin_conversation_id: origin, conversation_id: "work-background", job_id: "job-offsite", attempt_id: "attempt-one", created_at: new Date().toISOString(), next_step: "Choose a room before Friday.", evidence: ["source/offsite.md:12"] };
     const file = join(inboxPath, `${entry.id}.json`);

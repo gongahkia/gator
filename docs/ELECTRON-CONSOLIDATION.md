@@ -19,12 +19,12 @@ search and in-app slash commands, not a standalone CLI.
 | --- | --- | --- |
 | Chat, stream, stop, independent running chats | `Sessions`, `Backend`, `internal/workapp` | Existing `App`, `RecentConversations`; concurrent-chat journeys |
 | Queued messages, ordering, editing, resume, live guidance | Go request journals and queue frames | Existing `MessageQueue`, `App` Guide now; no replay on restart |
-| Exact live approvals and specialist controls | Go approval tokens, `/tasks`, `/steer-task`, `/cancel-task`, `/answer-task` | Existing `Result`, command search and typed Go panels; native protocols remain semantic |
+| Exact live approvals and specialist controls | Go approval tokens, `/tasks`, `/steer-task`, `/cancel-task` | Existing `Result`, command search and typed Go panels; native protocols remain semantic |
 | Reconnect and uncertain admission | `Backend`, `Sessions`, request journal | Existing reconnect screen and stable admission IDs |
 | Drafts, attachments, per-chat recovery | `DraftStore`, `UploadStore` | Existing `useDrafts`, `DraftManager`, `Attachments` |
-| Reuse a previous message without sending | Retained Go transcript; frontend draft staging | **Gap:** add Message tools → Reuse a message, append or explicitly review replacement; keep attachments/reply identity |
-| Command arguments independent of message draft | Go command handling, frontend argument prompt | **Gap:** command search opens a separate argument dialog rather than overwriting the composer |
-| External composer editor | `Backend.prepareComposerEditor`, Go-owned editor handoff | **Gap:** add narrow host-owned editor IPC and Message tools action; no arbitrary renderer command execution |
+| Reuse a previous message without sending | Retained Go transcript; frontend draft staging | **Ported:** Message tools → Reuse a message, append or explicitly review replacement; keep attachments/reply identity |
+| Command arguments independent of message draft | Go command handling, frontend argument prompt | **Ported:** command search opens a separate argument dialog rather than overwriting the composer |
+| External composer editor | `Backend.prepareComposerEditor`, Go-owned editor handoff | **Ported:** narrow host-owned editor IPC and Message tools action; no arbitrary renderer command execution |
 | Public activity and transcript search | Go activity projection | Existing `ActivityTimeline`, `useConversationSearch` |
 | Current selections vs retained evidence | Go `work_details`, verified manifests | Existing `WorkDetails`, latest-only context and output projections |
 | Following goals, checks, Inbox, attention | Go goals/jobs/inbox/overview adapters | Existing `LibraryDrawer`, `/goals`, `/followup`, `/inbox`, `/overview` |
@@ -41,7 +41,7 @@ search and in-app slash commands, not a standalone CLI.
 | Image and PDF visual preview | Shared file validation, renderer decoding | Existing image previews and `PDFPreview`; no terminal image protocol needed |
 | Version comparison/restoration, edit-draft recovery | Shared file/comparison services | Existing `FileVersionComparison`, version menu; originals/sealed outputs unchanged |
 | Ask Gator about exact saved version/selection | `FileStore` attachment link and provenance | Existing file Ask Gator and selection controls; user still sends |
-| Export/review existing destination safely | `ExportStore`, selected saved bytes | **Gap:** reuse shared replacement tokens/fingerprints in Electron; reject changed/symlink/private destinations |
+| Export/review existing destination safely | `ExportStore`, selected saved bytes | **Ported:** shared replacement tokens/fingerprints in Electron; reject changed/symlink/private destinations |
 | Model, effort, API/provider credentials | Go composer IDs and model/provider forms | Existing `ModelPicker`, Settings → Models, typed secret fields |
 | Local model download/cancel/rename/remove | Go local-model manager | Existing local-model panels; review and stream state retained |
 | Connections, token/OAuth sign-in, verify/disconnect | Go connection flows, trusted external handoff | Existing Connections forms and system browser/Terminal handoff |
@@ -72,6 +72,48 @@ applications, user profiles, drafts, credentials, services or historical release
 Historical terminal migration evidence remains labelled as superseded. The
 desktop development/build/package/release commands become the only current app
 instructions. No new provider calls are required for this consolidation.
+
+## Additional removal and compatibility details
+
+The generic `Application` wrapper was used only by the removed TUI. Its runtime
+composition duplicated Electron's host. It and the terminal-only Chromium
+preference importer are removed after checking for remaining consumers. The
+importer's `classic-level` dependency and its exclusive dependency subtree are
+removed from both lockfiles. No retained package version is deliberately upgraded.
+Electron continues to use its own existing Chromium preferences; no original
+preferences, imported JSON files, application installations or profiles are deleted.
+`Backend`, `Sessions`, drafts, uploads, files, exports, policy, voice and the
+Go-owned handoff services remain shared and authoritative. The new native-service
+workflow preserves the old terminal workflow's backend coverage without Bun,
+terminal packaging or a second application host.
+
+The removed launcher forwarded `work`, `work-rpc`, `config`, `provider`, `agent`,
+`job`, `goal`, `memory`, `note`, `data`, `usage`, `doctor` and other legacy service
+handlers to the private Go runtime. Those handlers remain available to explicit
+maintenance/evaluation callers and the app. This change removes their public
+Bun launcher, not their business logic, and does not turn them into an arbitrary
+renderer command-execution API. Ordinary interactive equivalents are mapped
+above. Host-local device grants/enrollment remain local administrative operations;
+a remote client or model gains no new authority to perform them.
+
+If a terminal installation used a custom `GATOR_TERMINAL_USER_DATA` location,
+select that same location explicitly with `GATOR_DESKTOP_USER_DATA` to reuse its
+retained draft/file data. Default application data already used the same location.
+The terminal-only display-preference JSON is no longer read; Electron's own
+settings remain. No automatic copy or migration is attempted. If branch protection
+requires old `terminal-*` check names, the repository owner must replace those
+required checks with the retained desktop/native-service checks; no remote rules
+were changed here.
+
+Editor dispatch is bound to the current idle Go owner and a host-prepared job.
+The normal result is saved through the existing draft store before IPC
+acknowledgement when retention is enabled; newer draft text, attachment and reply
+identities are kept. Returned oversized text requires explicit shortening in the
+open recovery view; that recovery buffer is not promised across app reloads.
+Go's internal input buffer no longer silently replaces the renderer's independent
+saved draft at reload. Command argument dialogs are scoped to their original chat
+and rechecked at the host before command dispatch. All review/approval checks
+remain in Go. No new model call, execution worker or terminal input API is added.
 
 ## Verification
 

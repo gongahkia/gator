@@ -21,7 +21,7 @@ declare global {
       snapshot(): Promise<DesktopSnapshot>;
       openSession(id: string): Promise<void>;
       subscribe(callback: (snapshot: DesktopSnapshot) => void): () => void;
-      send(frame: DesktopFrame): Promise<void>;
+      send(frame: DesktopFrame, context?: string): Promise<void>;
       chooseFolder(): Promise<string | null>;
       chooseFiles(context: string): Promise<UploadedFile[]>;
       dropFiles(files: File[], context: string): Promise<UploadedFile[]>;

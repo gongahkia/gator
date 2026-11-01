@@ -9,7 +9,7 @@ contextBridge.exposeInMainWorld("gator", {
   platform: process.platform,
   snapshot: () => ipcRenderer.invoke("gator:snapshot"),
   openSession: (id) => ipcRenderer.invoke("gator:session", id),
-  send: (frame) => frame?.type === "upload_submit" ? attachmentRequest("gator:send", frame) : ipcRenderer.invoke("gator:send", frame),
+  send: (frame, context) => frame?.type === "upload_submit" ? attachmentRequest("gator:send", frame, context) : ipcRenderer.invoke("gator:send", frame, context),
   chooseFolder: () => ipcRenderer.invoke("gator:folder"),
   chooseFiles: (context) => attachmentRequest("gator:files", context),
   dropFiles: (files, context) => attachmentRequest("gator:drop-files", context, files.map((file) => webUtils.getPathForFile(file))),

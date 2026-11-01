@@ -268,13 +268,17 @@ else {
       if (request.action === "releases") { await shell.openExternal(releaseURL); return updates.snapshot(); }
       return updates.request(request);
     });
-    ipcMain.handle("gator:send", async (event, frame) => {
+    ipcMain.handle("gator:send", async (event, frame, expectedContext) => {
       mutable(event);
+      const commandOwner = backend;
+      const assertContext = () => { if (expectedContext !== undefined && (typeof expectedContext !== "string" || backend !== commandOwner || commandOwner?.closed || uploadContext(commandOwner?.state) !== expectedContext)) throw new Error("Return to the original conversation before running this command."); };
+      assertContext();
       if (backend?.state?.external) throw new Error("Finish the current step in Terminal first");
       validateFrame(frame);
       sessions.assertSend(frame);
       if (await sessions.resumeConnection(frame)) return;
       await sessions.prepareProfileAction(frame);
+      assertContext();
       if (frame.type !== "upload_submit") { await backend.apply(frame); await sessions.settled(); return; }
       const owner = backend;
       if (frame.upload.files.length) await uploads.check(frame.upload.files);
@@ -348,7 +352,7 @@ else {
       mutable(event);
       const owner = backend;
       terminalBusy = true; update();
-      try { return await editComposer(owner, request, terminalHandoff); }
+      try { return await editComposer(owner, request, terminalHandoff, drafts); }
       finally { terminalBusy = false; update(); }
     });
     ipcMain.handle("gator:terminal", async (event) => {

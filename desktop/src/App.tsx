@@ -112,14 +112,13 @@ export function App() {
   const [search, setSearch] = useState<string | null>(null);
   const [navigation, setNavigation] = useState<{ target: Navigation; queued: boolean } | null>(null);
   const [showCommands, setShowCommands] = useState(false);
-  const [argumentCommand, setArgumentCommand] = useState<string>();
+  const [argumentCommand, setArgumentCommand] = useState<{ name: string; context: string }>();
   const commandReturn = useRef<HTMLElement | null>(null);
   const [sending, setSending] = useState(false);
   const [navigationPending, setNavigationPending] = useState(false);
   const admission = useRef<{ key: string; id: string } | null>(null);
   const [voiceBusy, setVoiceBusy] = useState(false);
   const [editorBusy, setEditorBusy] = useState(false);
-  const editorPending = useRef(false);
   const [modelBusy, setModelBusy] = useState(false);
   const [approvalBusy, setApprovalBusy] = useState(false);
   const [draftError, setDraftError] = useState("");
@@ -147,7 +146,6 @@ export function App() {
   const previousTranscript = useRef({ identity: "", content: "", running: false });
   const transcriptPositions = useRef(new Map<string, { top: number; latest: boolean }>());
   const returningToTranscript = useRef(false);
-  const backendInput = useRef<string | undefined>(undefined);
   const view = useRef<HTMLDivElement>(null);
   const panel = state?.panel;
   const conversationIdentity = state?.conversation_id || `${state?.primary ? "primary" : "topic"}:${state?.source || ""}`;
@@ -185,7 +183,15 @@ export function App() {
   const fileChat = useMemo(() => ({ context: drafts.context, dirtyKeys: dirtyFiles, attachmentKey, blocked: sending || queueAction.busy || !!error || !!state?.external || !!updatePreparing || !drafts.ready, useFile, dirty: fileDirty }), [drafts.context, sending, queueAction.busy, error, state?.external, updatePreparing, drafts.ready, useFile, fileDirty, dirtyFiles, attachmentKey]);
 
   const hasUnsavedView = !!argumentCommand || memoryEditing.size > 0 || dirtyFiles.size > 0 || queueEditing || panel?.rows?.some((row) => row.input) || panel?.kind === "confirmation" || panel?.kind === "status-line";
+  useEffect(() => { if (argumentCommand && argumentCommand.context !== drafts.context) setArgumentCommand(undefined); }, [drafts.context, argumentCommand]);
   const navigationBusy = navigationPending || !!sessionSwitching || sending || queueAction.busy || memoryAction.busy || updateFeedback.busy || receiptInspection.busy || !!state?.receipt_busy || voiceBusy || editorBusy || attachments.busy;
+  const returnToComposer = useRef(false);
+  useEffect(() => {
+    if (panel) returnToComposer.current = true;
+    else if (returnToComposer.current && !navigationBusy && !showCommands && !showDrafts && !argumentCommand && !state?.external && drafts.ready) {
+      composer.current?.focus(); returnToComposer.current = false;
+    }
+  }, [panel, navigationBusy, showCommands, showDrafts, argumentCommand, state?.external, drafts.ready]);
 
   useLayoutEffect(() => {
     if (!state?.theme) return;
@@ -194,12 +200,6 @@ export function App() {
   }, [state?.theme]);
   useEffect(() => { localStorage.setItem("gator:sidebar-collapsed", String(collapsed)); }, [collapsed]);
   useEffect(() => { if (sessionID) { if (originalSession.current && originalSession.current !== sessionID) setSessionChanged(true); originalSession.current = sessionID; } }, [sessionID]);
-  useEffect(() => {
-    if (state && (state.input ?? "") !== backendInput.current) {
-      backendInput.current = state.input ?? "";
-      if (state.input && !editorPending.current) { setDraft(state.input); composer.current?.focus(); }
-    }
-  }, [state?.input]);
   useEffect(() => {
     if (newChatFocus.current && newChatFocus.current !== drafts.context && drafts.ready && !panel && composer.current && !composer.current.disabled) {
       composer.current.focus(); newChatFocus.current = undefined;
@@ -317,7 +317,9 @@ export function App() {
       input.setRangeText("\n", input.selectionStart, input.selectionEnd, "end"); setDraft(input.value);
     }
   };
-  const home = state.home && !state.messages.length && !state.chat_updates?.length && !panel;
+  // A managed, unsent chat already has an identity. Go's legacy `home` flag
+  // alone no longer identifies that first-task state.
+  const home = !state.messages.length && !state.chat_updates?.length && !panel && !state.running;
   const fileCount = conversationBundles(state).reduce((count, bundle) => count + bundleOutputs(bundle).length, 0);
   const conversationBrowser = state.destination === "/conversations" || state.destination === "/history";
   const messages = state.messages;
@@ -365,9 +367,10 @@ export function App() {
           {(drafts.recovered || drafts.issue) && <p className="draft-recovery" role="status">{drafts.issue || "Draft recovered. Review it before sending."}</p>}
           </div>
           <div className="composer" data-file-drop={attachments.dragging} data-voice-busy={voiceBusy} {...attachments.drop}><PendingAttachments files={drafts.uploads} disabled={sending || attachments.busy} remove={(id) => { drafts.setUploads(drafts.uploads.filter((file) => file.id !== id)); setDraftError(""); composer.current?.focus(); }} /><textarea ref={composer} value={draft} onChange={(event) => { setDraft(event.target.value); setDraftError(""); }} onKeyDown={composerKeys} onPaste={event => attachments.paste(event, value => { setDraft(value); setDraftError(""); })} placeholder={state.running ? "Add a follow-up…" : "Message Gator…"} aria-label="Message Gator" disabled={navigationPending || sessionSwitching || sending || editorBusy || !drafts.ready || !!state.external} rows={2} /><div className="composer-toolbar"><AttachButton busy={attachments.busy} disabled={sending || queueAction.busy || !!error || !!state.external || !!updatePreparing || !drafts.ready || drafts.uploads.length >= uploadLimits.count} choose={() => void attachments.choose().then(() => composer.current?.focus())} /><button className="icon-button composer-options" aria-label="Conversation options" title="Conversation options" onClick={() => openDetails("info")}><SlidersHorizontal size={17} /></button><button className="icon-button draft-trigger" aria-label="Saved drafts" title={drafts.saving ? "Saving draft…" : "Saved drafts and local retention"} onClick={() => { setShowDrafts(true); void drafts.manage({ action: "list" }).catch(() => {}); }}><Clock3 size={16} /></button><MessageTools key={drafts.context} context={drafts.context || ""} messages={state.messages} draft={draft} disabled={sending || voiceBusy || editorBusy || attachments.busy || !!error || !!state.external || !!updatePreparing || !drafts.ready} editorDisabled={state.running || !!state.queued || !!state.pending_approval || window.gator?.platform === "win32" || dirtyFiles.size > 0} onBusyChange={setEditorBusy} stage={(text, append) => { setDraft(current => append && current ? `${current}\n\n${text}` : text); setDraftError(""); composer.current?.focus(); }} restoreEditor={(before, text) => { const current = fileOwner.current.text; const next = current === before ? text : [current, text].filter(Boolean).join("\n\n"); if (new TextEncoder().encode(next).length > 128 * 1024) throw new Error("Combined draft exceeds 128 KiB."); setDraft(next); composer.current?.focus(); }} editExternally={async () => {
-              const context = drafts.context!; editorPending.current = true;
-              try { const result = await window.gator!.editComposer({ context, text: draft }); backendInput.current = result.text; if (result.context !== fileOwner.current.context) throw new Error("Return to the original chat to recover its editor result."); return result; }
-              finally { editorPending.current = false; }
+              const context = drafts.context!;
+              const result = await window.gator!.editComposer({ context, text: draft });
+              if (result.context !== fileOwner.current.context) throw new Error("Return to the original chat to recover its editor result.");
+              return result;
             }} /><div className="composer-actions"><ModelPicker state={state} disabled={sending || voiceBusy || queueAction.busy || !!error || !!state.external || !!updatePreparing || !drafts.ready} send={send} manage={() => navigate("/model")} onBusyChange={setModelBusy} /><VoiceControls context={drafts.context} speakingContext={state.primary ? `primary:${state.source}` : conversationIdentity} disabled={sending || queueAction.busy || !!error || !!state.external || !!updatePreparing || !drafts.ready || showCommands || showDrafts || !!updatesOpen || !!navigation} preferences={state.desktop?.voice} messages={state.messages} running={state.running} shortcuts={state.desktop?.shortcuts} onBusyChange={setVoiceBusy} onTranscript={text => { setDraft(current => current ? `${current}${/\s$/.test(current) ? "" : " "}${text}` : text); setDraftError(""); requestAnimationFrame(() => composer.current?.focus()); }} />
             {state.running && <button className="small-button guide-button" title={drafts.uploads.length ? "Files will be sent with a queued follow-up" : `Guide the current task (${shortcutLabel("guide_work", state.desktop?.shortcuts)})`} disabled={!draft.trim() || !!drafts.replyToUpdateID || !!drafts.uploads.length || sending || modelBusy || dirtyFiles.size > 0 || attachments.busy || queueAction.busy || !state.guidance_id || !!error || !!state.external} onClick={() => void submit(true)}>Guide now</button>}
             {state.running && <button className="send-button stop" aria-label="Stop current work" disabled={state.cancelling} onClick={() => attempt({ type: "key", key: "esc" })}><Square size={13} fill="currentColor" /></button>}
@@ -388,10 +391,10 @@ export function App() {
       setShowCommands(false);
       if (name === "@following" || name === "@saved") { drawerReturn.current = commandReturn.current?.isConnected ? commandReturn.current : composer.current; setRequestedOutput(undefined); setDetailKind(name === "@following" ? "following" : "saved"); setDetails(true); }
       else if (name === "@gator") navigate("/chat");
-      else if (needsInput) setArgumentCommand(name);
+      else if (needsInput && drafts.context) setArgumentCommand({ name, context: drafts.context });
       else navigate(`/${name}`);
     }} />}</Presence>
-    {argumentCommand && <CommandArguments key={`${conversationIdentity}:${argumentCommand}`} name={argumentCommand} description={commands.find(command => command.name === argumentCommand)?.description} run={async text => { await send({ type: "submit", text }); }} close={() => setArgumentCommand(undefined)} />}
+    {argumentCommand && argumentCommand.context === drafts.context && <CommandArguments key={`${argumentCommand.context}:${argumentCommand.name}`} name={argumentCommand.name} description={commands.find(command => command.name === argumentCommand.name)?.description} run={async text => { await window.gator!.send({ type: "submit", text }, argumentCommand.context); }} close={() => setArgumentCommand(undefined)} />}
     <Presence open={showDrafts}>{(open, presenceRef) => <DraftManager open={open} presenceRef={presenceRef} saved={drafts.saved} issue={drafts.issue} manage={drafts.manage} close={() => setShowDrafts(false)} restore={(retained) => { if (retained.reply_to_update_id && retained.context !== drafts.context) { setDraftError("Open this reply’s original chat to restore it."); return; } if (retained.reply_to_update_id) drafts.setReplyToUpdateID(retained.reply_to_update_id); try { drafts.setUploads([...new Map([...drafts.uploads, ...(retained.uploads ?? [])].map((file) => [file.id, file])).values()]); setDraft((current) => !current ? retained.text : current === retained.text ? current : `${current}\n\n${retained.text}`); } catch (error) { setDraftError(error instanceof Error ? error.message : "Couldn’t restore attachments."); } composer.current?.focus(); }} />}</Presence>
     <Presence open={!!navigation}>{(open, presenceRef) => <DiscardDialog open={open} presenceRef={presenceRef} queued={navigation?.queued ?? false} fileEdits={dirtyFiles.size > 0} cancel={() => setNavigation(null)} confirm={() => { if (!navigation) return; performNavigation(navigation.target); setNavigation(null); }} />}</Presence>
   </div></FileChatContext.Provider>;

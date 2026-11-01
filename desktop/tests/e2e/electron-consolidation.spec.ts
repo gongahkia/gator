@@ -66,6 +66,19 @@ test("message reuse and command arguments keep the independent draft and attachm
     await f.page.getByRole("button", { name: "Message tools", exact: true }).click();
     expect(await tools.evaluate(element => { const box = element.getBoundingClientRect(); return box.x >= 0 && box.right <= innerWidth && box.y >= 0 && box.bottom <= innerHeight; })).toBe(true);
     await f.page.screenshot({ path: "test-results/electron-message-tools.png" });
+    await f.page.getByRole("button", { name: "Close message tools", exact: true }).click();
+    const oldContext = await f.page.evaluate(async () => `conversation:${(await window.gator!.snapshot()).state!.conversation_id}`);
+    await expect(f.page.evaluate(context => window.gator!.send({ type: "submit", text: "/mode act" }, context), "conversation:wrong")).rejects.toThrow(/original conversation/);
+    await f.page.keyboard.press(process.platform === "darwin" ? "Meta+k" : "Control+k");
+    await f.page.getByRole("textbox", { name: "Find a command", exact: true }).fill("/mode");
+    await f.page.getByRole("dialog", { name: "Search commands", exact: true }).getByText("/mode", { exact: true }).click();
+    await args.getByRole("textbox", { name: "Arguments for /mode", exact: true }).fill("act");
+    await f.page.evaluate(() => window.gator!.send({ type: "navigate", text: "/new" }));
+    await expect(args).toHaveCount(0); await expect(f.composer).toHaveValue("");
+    await expect(f.page.evaluate(context => window.gator!.send({ type: "submit", text: "/mode act" }, context), oldContext)).rejects.toThrow(/original conversation/);
+    const saved = await f.page.evaluate(() => window.gator!.drafts({ action: "list" }));
+    expect(saved.drafts.find(draft => draft.context === oldContext)?.text).toBe("Reviewed request");
+    expect(f.requests()).toBe(count);
   } finally { await f.close(); }
 });
 
@@ -89,6 +102,9 @@ test("external editor returns text through the real Go owner without sending and
     await tools.getByRole("textbox", { name: "Reviewed message text", exact: true }).fill("Shortened editor result");
     await tools.getByRole("button", { name: "Add to kept draft", exact: true }).click();
     await expect(f.composer).toHaveValue("Saved despite editor exit\n\nShortened editor result");
+    await expect.poll(async () => (await f.page.evaluate(() => window.gator!.drafts({ action: "list" }))).drafts.some(draft => draft.text === "Saved despite editor exit\n\nShortened editor result")).toBe(true);
+    await f.page.reload(); await expect(f.composer).toHaveValue("Saved despite editor exit\n\nShortened editor result");
+    await open(""); await expect(f.composer).toHaveValue("");
     expect(f.requests()).toBe(0);
   } finally { await f.close(); }
 });

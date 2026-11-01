@@ -74,7 +74,7 @@ test("independent chats retain task ownership, drafts and queues while browsing 
     const rows = (await snapshot()).state!.panel!.rows!;
     const row = rows.findIndex(value => value.label === "Second independent task");
     expect(row).toBeGreaterThanOrEqual(0);
-    await page.locator(`.chat-search-row[data-row="${row}"]`).click();
+    await page.locator(".workflow-content").getByRole("button", { name: "Open conversation: Second independent task", exact: true }).click();
     await expect.poll(async () => (await snapshot()).state!.conversation_id).toBe(secondID);
     await expect(composer).toHaveValue("Keep the second chat draft");
     release();

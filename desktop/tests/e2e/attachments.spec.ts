@@ -44,7 +44,10 @@ test("attachments stay with drafts and queued messages and reach the real model 
     let page = await app.firstWindow();
     let composer = page.getByRole("textbox", { name: "Message Gator", exact: true });
     await expect(composer).toBeVisible();
+    const previousChat = (await page.evaluate(() => window.gator!.snapshot())).state?.conversation_id;
     await page.getByRole("button", { name: "New chat", exact: true }).click();
+    await expect.poll(async () => { const snapshot = await page.evaluate(() => window.gator!.snapshot()); return !snapshot.sessionSwitching && snapshot.state?.conversation_id !== previousChat; }).toBe(true);
+    await expect(composer).toBeEnabled();
     await page.evaluate(() => window.gator!.send({ type: "submit", text: "/mode inspect" }));
     await pick(app, [brief]); await page.getByRole("button", { name: "Attach files", exact: true }).click();
     let pending = page.getByRole("region", { name: "Attachments for your next message", exact: true });
