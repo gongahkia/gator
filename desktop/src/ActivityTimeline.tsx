@@ -12,7 +12,7 @@ function duration(trace: BackendActivity) {
 }
 
 function toolLabel(name = "") {
-  const labels: Record<string, string> = { read_file: "Read a file", list_files: "Listed files", search_files: "Searched files", write_artifact: "Prepared a file", web_search: "Searched the web", web_fetch: "Read a web page", delegate_agents: "Consulted specialists", knowledge_read: "Read saved knowledge", knowledge_search: "Searched saved knowledge", memory_remember: "Saved a memory", memory_forget: "Forgot a memory", chat_search: "Searched earlier chats", chat_read: "Read an earlier chat" };
+  const labels: Record<string, string> = { code_open: "Opened an isolated coding workspace", code_read_file: "Read code", code_list_files: "Listed code files", code_search_files: "Searched code", code_apply_patch: "Edited staged code", code_run_command: "Ran a coding command", code_git_status: "Checked changed files", code_git_diff: "Inspected the patch", code_stage: "Staged and checked a patch", code_terminal_start: "Started a workspace terminal", code_terminal_write: "Sent approved terminal input", code_terminal_read: "Read terminal output", complete_code: "Implemented and reviewed code", integrate_code: "Checked a frozen code candidate", read_file: "Read a file", list_files: "Listed files", search_files: "Searched files", write_artifact: "Prepared a file", web_search: "Searched the web", web_fetch: "Read a web page", delegate_agents: "Consulted specialists", knowledge_read: "Read saved knowledge", knowledge_search: "Searched saved knowledge", memory_remember: "Saved a memory", memory_forget: "Forgot a memory", chat_search: "Searched earlier chats", chat_read: "Read an earlier chat" };
   return labels[name] || name.replace(/[_.-]+/g, " ").replace(/^./, (letter) => letter.toUpperCase()) || "Tool activity";
 }
 
@@ -20,8 +20,8 @@ function Indicator({ state }: { state: ActivityEntry["state"] }) {
   return state === "running" ? <LoaderCircle size={14} className="spin" /> : state === "failed" ? <CircleAlert size={14} /> : state === "stopped" ? <CircleDashed size={14} /> : <Check size={14} />;
 }
 
-function Disclosure({ label, icon, children, className = "", tone, follow = false }: { label: ReactNode; icon?: ReactNode; children: ReactNode; className?: string; tone?: string; follow?: boolean }) {
-  const [open, setOpen] = useState(false);
+function Disclosure({ label, icon, children, className = "", tone, follow = false, initiallyOpen = false }: { label: ReactNode; icon?: ReactNode; children: ReactNode; className?: string; tone?: string; follow?: boolean; initiallyOpen?: boolean }) {
+  const [open, setOpen] = useState(initiallyOpen);
   const id = useId();
   const scroll = useRef<HTMLDivElement>(null);
   const latest = useRef(true);
@@ -68,7 +68,7 @@ export function ActivityHistory({ trace }: { trace: BackendActivity }) {
     if (trace.state === "completed") return null;
     return <p className="activity-summary"><Indicator state={trace.state} /><span>{summary}</span></p>;
   }
-  return <Disclosure className="activity-history" icon={<Indicator state={trace.state === "completed" ? "completed" : trace.state === "failed" ? "failed" : "stopped"} />} tone={trace.state === "failed" ? "warning" : undefined} label={summary}><Entries trace={trace} /></Disclosure>;
+  return <Disclosure initiallyOpen={trace.entries.some(entry => entry.tool?.startsWith("code_") || entry.tool === "complete_code")} className="activity-history" icon={<Indicator state={trace.state === "completed" ? "completed" : trace.state === "failed" ? "failed" : "stopped"} />} tone={trace.state === "failed" ? "warning" : undefined} label={summary}><Entries trace={trace} /></Disclosure>;
 }
 
 export function LiveActivity({ trace, status, elapsed, attention }: { trace?: BackendActivity; status: string; elapsed?: string; attention: boolean }) {

@@ -1118,3 +1118,24 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .link-popover input { display: block; width: 100%; margin: 7px 0; padding: 8px; border-radius: 5px; border: 1px solid var(--color-line); background: var(--color-base); color: var(--color-contrast); }
 .link-popover form p { max-width: 280px; font-size: var(--text-xs); color: var(--color-muted); line-height: 1.6; }
 .link-popover footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+
+/* Coding evidence uses the existing chat surfaces and theme in both modes. */
+.syntax-keyword { color: var(--color-link); }
+.syntax-string { color: var(--color-accent); }
+.syntax-number, .syntax-literal { color: var(--color-warning); }
+.syntax-comment { color: var(--color-muted); font-style: italic; }
+.code-changes h4 { margin: 18px 0 10px; font-size: var(--text-ui); font-weight: 600; }
+.code-changed-files, .code-verification { list-style: none; padding: 0; margin: 0 0 16px; }
+.code-changed-files li, .code-verification li { display: flex; align-items: flex-start; gap: 8px; padding: 5px 0; font-size: var(--text-xs); overflow-wrap: anywhere; }
+.code-changed-files svg, .code-verification svg { flex-shrink: 0; margin-top: 2px; }
+.code-verification li[data-passed="true"] > svg { color: var(--color-accent); }
+.code-verification li[data-passed="false"] > svg { color: var(--color-danger); }
+.code-verification code { min-width: 0; white-space: pre-wrap; }
+.code-diff { border: 1px solid var(--color-line); border-radius: var(--radius-sm); overflow: auto; padding: 10px 0; font: var(--text-xs)/1.8 var(--font-mono); tab-size: 4; }
+.code-diff > code { display: block; min-width: max-content; }
+.code-diff > code > span { display: block; padding-right: 12px; white-space: pre; }
+.diff-line-number { display: inline-block; width: 42px; padding-right: 10px; color: var(--color-muted); text-align: right; user-select: none; font-variant-numeric: tabular-nums; }
+.diff-added { color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 8%, transparent); }
+.diff-removed { color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 8%, transparent); }
+.diff-hunk { color: var(--color-link); }
+.diff-header { color: var(--color-secondary); font-weight: 600; }

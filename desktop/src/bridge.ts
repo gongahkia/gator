@@ -1,5 +1,6 @@
 import type { BackendState, Frame } from "./protocol";
 import type { FileRequest, FileView } from "./fileProtocol";
+import type { CodePreviewRequest, CodePreview } from "@gator/application-host/contracts/codePreview";
 import type { SourcePreviewRequest, SourcePreview } from "@gator/application-host/contracts/sourcePreview";
 
 export type UpdateState = { phase: "manual" | "idle" | "checking" | "current" | "available" | "downloading" | "ready" | "installing" | "error"; installed: string; version?: string; reason?: string; percent?: number; checkedAt?: string };
@@ -28,6 +29,7 @@ declare global {
       dropFiles(files: File[], context: string): Promise<UploadedFile[]>;
       pasteImages(images: { type: string; data: Uint8Array }[], context: string): Promise<UploadedFile[]>;
       files<T = FileView>(request: FileRequest): Promise<T>;
+      codePreview(request: CodePreviewRequest): Promise<CodePreview>;
       sourcePreview(request: SourcePreviewRequest): Promise<SourcePreview>;
       choosePath(request: { panel_id: string; kind: string }): Promise<string | null>;
       openLink(url: string): Promise<void>;

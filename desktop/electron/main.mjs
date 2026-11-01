@@ -20,6 +20,7 @@ import { selectedFileSource } from "@gator/application-host/file-sources";
 import { importPastedImages, validatePastedImages } from "@gator/application-host/pasted-images";
 import { ExportStore } from "@gator/application-host/export";
 import { editComposer } from "./composer-editor.mjs";
+import { codePreview } from "./code-preview.mjs";
 import { sourcePreview } from "./source-preview.mjs";
 import { retainedRequestUploads } from "@gator/application-host/request-retention";
 
@@ -199,6 +200,12 @@ else {
       mutable(event);
       if (typeof id !== "string" || !sessions.activity().some(item => item.id === id)) throw new Error("This task is no longer in the open-chat list.");
       await sessions.open({ conversation_id: id });
+    });
+    ipcMain.handle("gator:code-preview", async (event, request) => {
+      mutable(event);
+      const owner = backend;
+      const current = () => backend === owner && !owner?.closed && uploadContext(owner?.state) === request?.context;
+      return codePreview(request, { state: owner?.state, current });
     });
     ipcMain.handle("gator:source-preview", async (event, request) => {
       mutable(event);

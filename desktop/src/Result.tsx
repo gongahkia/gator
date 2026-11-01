@@ -5,13 +5,14 @@ import { SourceReferenceContext, sourceReferences, parseSourceReference } from "
 import { LinkPopover } from "./LinkPopover";
 import { Check, ChevronDown, FileText, Info, ShieldCheck, TriangleAlert } from "lucide-react";
 import type { BackendResult, ResultSection } from "./protocol";
+import { SyntaxCode } from "./SyntaxCode";
 import { CopyButton } from "./CopyButton";
 
 function CodeBlock({ children }: { children?: ReactNode }) {
   const child = Children.toArray(children)[0];
   const code = isValidElement<{ className?: string; children?: string }>(child) ? child.props : undefined;
   const language = code?.className?.replace(/^language-/, "") || "text";
-  return <div className="code-block"><div className="code-block-heading"><span>{language}</span>{typeof code?.children === "string" && <CopyButton label="Copy code" text={code.children} />}</div><pre>{children}</pre></div>;
+  return <div className="code-block"><div className="code-block-heading"><span>{language}</span>{typeof code?.children === "string" && <CopyButton label="Copy code" text={code.children} />}</div><pre>{typeof code?.children === "string" ? <SyntaxCode text={code.children} language={language} /> : children}</pre></div>;
 }
 
 export function Markdown({ text }: { text: string }) {
