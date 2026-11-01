@@ -5,12 +5,24 @@ import { join, resolve } from "node:path";
 import { closeDesktop, temporaryDirectory } from "./lifecycle";
 test.use({ trace: "off" });
 
+function matchesFacts(answer: string, required: string[]) {
+  const text = answer.toLocaleLowerCase();
+  return required.every(value => value === "not approved" ? /\b(?:not approved|unapproved|pending approval|approval pending)\b/.test(text) : text.includes(value.toLocaleLowerCase()));
+}
+
+test("live answer checks accept equivalent unapproved wording and reject an approved budget", () => {
+  expect(matchesFacts("Mina: the budget remains unapproved.", ["Mina", "not approved"])).toBe(true);
+  expect(matchesFacts("Mina: the budget is approved.", ["Mina", "not approved"])).toBe(false);
+});
+
 test("live model populates the actual Electron conversation and revises its answer after a project change", async () => {
   test.skip(!process.env.GATOR_LIVE_UI_ENDPOINT, "explicit live API command only; no real key is read by ordinary UI tests");
   const endpoint = new URL(process.env.GATOR_LIVE_UI_ENDPOINT!);
   expect(endpoint.protocol).toBe("http:"); expect(endpoint.hostname).toBe("127.0.0.1"); expect(endpoint.pathname).toBe("/v1/responses");
   test.setTimeout(240000);
   const root = await temporaryDirectory(join(tmpdir(), "gator-live-ui-")), workspace = join(root, "workspace"), config = join(root, "config/gator");
+  const artifacts = process.env.GATOR_LIVE_UI_ARTIFACT_DIR!;
+  await mkdir(artifacts, { recursive: true, mode: 0o700 });
   await mkdir(workspace); await mkdir(config, { recursive: true });
   const project = join(workspace, "project.md");
   await writeFile(project, "Project: Willow community workshop.\nOwner: Mina.\nReview deadline: 20 November 2026.\nBudget: not approved.\nBlockers: none reported.\n");
@@ -28,9 +40,10 @@ test("live model populates the actual Electron conversation and revises its answ
       await composer.fill(question); await page.getByRole("button", { name: "Send message", exact: true }).click();
       await expect.poll(async () => (await page.locator(".assistant-message").count()) > before && !(await page.evaluate(() => window.gator!.snapshot())).state?.running, { timeout: 100000 }).toBe(true);
       const answer = await page.locator(".assistant-message").last().innerText();
-      const checked = checks.every(value => answer.toLocaleLowerCase().includes(value.toLocaleLowerCase()));
+      const checked = matchesFacts(answer, checks);
       phases.push({ name, milliseconds: Date.now() - start, answer, checked });
       await page.screenshot({ path: test.info().outputPath(`${name}.png`), fullPage: true });
+      await page.screenshot({ path: join(artifacts, `${name}.png`), fullPage: true });
       expect(checked, "Actual model answer must reflect the selected source").toBe(true);
       // A visible headful window gives the operator time to see the real result.
       await page.waitForTimeout(5000);

@@ -38,6 +38,10 @@ func TestLiveDesktopUI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	budgetDirectory, err := filepath.Abs("../../scripts/project-followup-eval/results")
+	if err != nil || filepath.Dir(path) != budgetDirectory {
+		t.Fatal("live UI reports must reuse this goal's cumulative results/budget.json directory")
+	}
 	report, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if err != nil {
 		t.Fatal("report must be a new path in the cumulative evaluation results directory")
@@ -102,7 +106,7 @@ func TestLiveDesktopUI(t *testing.T) {
 		}
 		command.Env = append(command.Env, entry)
 	}
-	command.Env = append(command.Env, "GATOR_LIVE_UI_ENDPOINT="+server.URL+"/v1/responses", "GATOR_LIVE_UI_TOKEN="+localToken, "GATOR_LIVE_UI_BROWSER_REPORT="+path+".browser.json")
+	command.Env = append(command.Env, "GATOR_LIVE_UI_ENDPOINT="+server.URL+"/v1/responses", "GATOR_LIVE_UI_TOKEN="+localToken, "GATOR_LIVE_UI_BROWSER_REPORT="+path+".browser.json", "GATOR_LIVE_UI_ARTIFACT_DIR="+path+".artifacts")
 	command.Stdout, command.Stderr = os.Stdout, os.Stderr
 	start := time.Now()
 	err = command.Run()
@@ -116,7 +120,7 @@ func TestLiveDesktopUI(t *testing.T) {
 		Spend         projectEvalSpend
 		TokenTiming   string
 		ManualQuality string
-	}{calls.Load(), time.Since(start).Milliseconds(), err == nil, spend, "buffered live Responses; provider token timing not assessed", "unreviewed by a human"})
+	}{calls.Load(), time.Since(start).Milliseconds(), err == nil && calls.Load() >= 2, spend, "buffered live Responses; provider token timing not assessed", "unreviewed by a human"})
 	if err != nil {
 		t.Fatal("live Electron journey failed; browser report and cumulative accounting retained")
 	}

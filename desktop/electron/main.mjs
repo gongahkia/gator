@@ -20,6 +20,7 @@ import { selectedFileSource } from "@gator/application-host/file-sources";
 import { importPastedImages, validatePastedImages } from "@gator/application-host/pasted-images";
 import { ExportStore } from "@gator/application-host/export";
 import { editComposer } from "./composer-editor.mjs";
+import { sourcePreview } from "./source-preview.mjs";
 import { retainedRequestUploads } from "@gator/application-host/request-retention";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -198,6 +199,12 @@ else {
       mutable(event);
       if (typeof id !== "string" || !sessions.activity().some(item => item.id === id)) throw new Error("This task is no longer in the open-chat list.");
       await sessions.open({ conversation_id: id });
+    });
+    ipcMain.handle("gator:source-preview", async (event, request) => {
+      mutable(event);
+      const owner = backend;
+      const current = () => backend === owner && !owner?.closed && uploadContext(owner?.state) === request?.context;
+      return sourcePreview(request, { state: owner?.state, stateRoot, current });
     });
     ipcMain.handle("gator:file", async (event, request) => {
       mutable(event); validateFileRequest(request);

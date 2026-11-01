@@ -1,6 +1,8 @@
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Children, isValidElement, type ReactNode } from "react";
+import { Children, isValidElement, useContext, type ReactNode } from "react";
+import { SourceReferenceContext, sourceReferences, parseSourceReference } from "./sourceReferences";
+import { LinkPopover } from "./LinkPopover";
 import { Check, ChevronDown, FileText, Info, ShieldCheck, TriangleAlert } from "lucide-react";
 import type { BackendResult, ResultSection } from "./protocol";
 import { CopyButton } from "./CopyButton";
@@ -13,9 +15,10 @@ function CodeBlock({ children }: { children?: ReactNode }) {
 }
 
 export function Markdown({ text }: { text: string }) {
-  return <div className="markdown"><ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml components={{
+  const source = useContext(SourceReferenceContext);
+  return <div className="markdown"><ReactMarkdown remarkPlugins={[remarkGfm, sourceReferences]} urlTransform={url => url.startsWith("gator-source:") ? url : defaultUrlTransform(url)} components={{
     pre: CodeBlock,
-    a: ({ href, children }) => <a href={href} onClick={(event) => { event.preventDefault(); if (href) void window.gator?.openLink(href).catch(() => {}); }}>{children}</a>,
+    a: ({ href, children }) => href?.startsWith("gator-source:") ? <button className="source-reference" type="button" onClick={() => { try { if (source.run) source.open?.({ run: source.run, ...parseSourceReference(href) }); } catch { /* A malformed model citation grants no filesystem access. */ } }} disabled={!source.run || !source.open} title="Preview the retained source and read range">{children}</button> : <LinkPopover url={href ?? ""} label={Children.toArray(children).map(child => typeof child === "string" ? child : "").join("") || href || "Link"}>{children}</LinkPopover>,
     // Remote images would contact a service just by reading a conversation.
     img: ({ alt }) => <span className="muted">[Image{alt ? `: ${alt}` : ""}]</span>,
   }}>{text}</ReactMarkdown></div>;

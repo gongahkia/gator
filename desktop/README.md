@@ -99,7 +99,10 @@ not silently change a waiting request's model.
 
 Closing the app stops tasks in all its open chats. Restart/update checks cover
 all those chats, and reconnecting affects the selected chat. This is local
-execution; an always-on remote companion is still separate implementation work.
+execution. The optional [phone companion](../companion/README.md) can inspect
+and perform separately authorized controls against a verified live owner; it
+does not keep a desktop worker alive after the app closes or resurrect stopped
+work.
 
 The composer clears ordinary messages only after the runtime confirms admission
 to the private conversation journal. Queued messages retain their text, order,
@@ -155,6 +158,37 @@ npm test --prefix desktop
 make build
 make package
 ```
+
+### Watch real model requests in Electron
+
+The opt-in live journey opens the actual Electron app with a disposable profile
+and project folder. It sends through the normal Go/OpenAI Responses adapter,
+shows a source-grounded answer, changes the project's deadline and blocker, and
+asks for a revised brief and a draft update. It leaves each answer visible for
+five seconds and saves screenshots. It does not use your existing conversations.
+
+Put `OPENAI_API_KEY` in the repository's ignored `.env`, or export it locally.
+From the repository root:
+
+```sh
+make build
+npm run test:live --prefix desktop
+```
+
+This command makes paid requests. It reuses the evaluation ledger and the
+existing $10 session budget; its conservative cutoff is $9.50 including retained
+reservations. Do not reset `scripts/project-followup-eval/results/budget.json`.
+The real key stays in the Go test process; Electron receives a temporary
+loopback token. Ordinary `test` and `test:e2e` runs do not read `.env` or run this
+paid journey. No live retries are configured.
+
+Reports and screenshots are kept under
+`scripts/project-followup-eval/results/ui-*.json[.artifacts/]`.
+The cost proxy buffers real Responses before forwarding them to Gator, so this
+checks real answers and tool execution, **not provider token streaming timing**.
+Factual checks do not replace your review of the draft's quality. See
+[the evaluation guide](../scripts/project-followup-eval/README.md#live-electron-journey)
+for limits, accounting and recorded outcomes.
 
 `make build` builds the frontend and private `desktop/runtime/gator-runtime`
 (`gator-runtime.exe` on Windows).

@@ -145,7 +145,7 @@ test("update feedback waits for host acknowledgement, rejects stale edits and su
     await card().getByRole("button", { name: "Feedback · Unnecessary", exact: true }).click();
     await expect(selection("Unnecessary")).toHaveAttribute("aria-pressed", "true");
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(760, 560));
-    await card().scrollIntoViewIfNeeded();
+    await expect(async () => { await card().scrollIntoViewIfNeeded(); await expect(card()).toBeInViewport(); }).toPass({ timeout: 10000 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: "test-results/chat-update-feedback.png" });
   } finally {
@@ -245,7 +245,7 @@ test("durable follow-up cards return to their chat and retain explicit reply own
     const order = await page.locator(".transcript-content > article").evaluateAll(nodes => nodes.map(node => node.textContent));
     expect(order.findIndex(text => text?.includes("Offsite venue"))).toBeLessThan(order.findIndex(text => text?.includes("Use the second option")));
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(760, 560));
-    await card().scrollIntoViewIfNeeded();
+    await expect(async () => { await card().scrollIntoViewIfNeeded(); await expect(card()).toBeInViewport(); }).toPass({ timeout: 10000 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: "test-results/chat-updates-compact.png" });
   } finally {

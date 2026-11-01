@@ -16,3 +16,4 @@ node_modules
 /.pty-venv/
 /.env
 /.env.local
+/scripts/project-followup-eval/results/*.artifacts/

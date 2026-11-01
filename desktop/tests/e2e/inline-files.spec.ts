@@ -150,6 +150,10 @@ test("generated outputs edit in their message and send the working version witho
     await card.getByRole("button",{name:"Save",exact:true}).click();await expect(card.getByText("Saved · included in your next message",{exact:true})).toBeVisible();expect(await readFile(originalPath,"utf8")).toBe(original);
     await card.getByRole("button",{name:"Ask Gator",exact:true}).click();await card.getByRole("textbox",{name:"Request changes to report.md",exact:true}).fill("Please review my edits.");await card.getByRole("button",{name:"Add to message",exact:true}).click();
     await expect(composer).toHaveValue(/Please review my edits/);await page.evaluate(()=>window.gator!.send({type:"submit",text:"/artifact clear"}));await page.evaluate(()=>window.gator!.send({type:"submit",text:"/mode inspect"}));const count=f.requests.length;await page.getByRole("button",{name:"Send message",exact:true}).click();await expect.poll(()=>f.requests.length).toBeGreaterThan(count);expect(JSON.stringify(f.requests.slice(count))).toContain("Edited output: silver otter.");expect(await readFile(originalPath,"utf8")).toBe(original);expect(errors).toEqual([]);
+    // Observing an HTTP request is not task completion. Finish this fixture's
+    // work before normal shutdown; otherwise the real stop-work dialog awaits
+    // operator input and masks an otherwise completed file assertion.
+    await expect.poll(async () => (await page.evaluate(() => window.gator!.snapshot())).state!.running).toBe(false);
   }finally{await f.close();}
 });
 

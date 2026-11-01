@@ -107,3 +107,65 @@ The complete milestone also requires scheduled change/noise checks, failure and
 recovery, chat delivery, revision/export, and pause controls. This initial live
 sequence complements those tests; it does not replace them. See
 [the acceptance ledger](../../docs/PROJECT-FOLLOWUP-ACCEPTANCE.md).
+
+## Live Electron journey
+
+The actual Electron UI can now run a paid, opt-in project-follow-up journey:
+
+```sh
+make build
+npm run test:live --prefix desktop
+```
+
+`live-ui.mjs` reads only `OPENAI_API_KEY` from the process environment or the
+root's ignored `.env`; it does not source that file as shell code. A test-only
+Go loopback proxy retains the real credential and forwards requests through the
+same durable `projectEvalTransport` budget guard. Electron receives only an
+ephemeral local token. The existing native Responses adapter and Work source
+tools execute the requests. No real credentials enter Playwright traces.
+
+The visible test uses an isolated profile and harmless synthetic project. It
+sends a request using the composer, checks the model's source-grounded brief,
+changes a deadline and adds a missing-photo blocker plus an untrusted embedded
+instruction, refreshes the source, then asks for a comparison and a draft update.
+It checks that no external action was recorded. Each actual answer stays visible
+for five seconds. Nothing is sent from your own accounts or saved in your profile.
+
+Limits remain cumulative across backend and UI evaluations: $9.50 cutoff against
+the authorized $10 maximum, at most eight proxy requests per UI run, bounded
+input/output and a 65-second upstream deadline. The global request-count ceiling
+was increased from 80 to 96 to accommodate these explicitly requested UI
+evaluations; the dollar ceiling was not increased. No automatic retries or
+alternative-provider fallback are installed. Reports must use this same results
+directory; do not copy, delete or reset the ledger to obtain further budget.
+
+Each run writes a new `ui-TIMESTAMP.json`, `.browser.json` and ignored
+`.json.artifacts/` directory containing both screenshots. Browser reports retain
+the actual synthetic-project answers. The Go report records usage and cumulative
+accounting without credentials. The budget proxy buffers the provider response
+before forwarding a native completion event: these are real generated answers,
+but the test does not measure provider token streaming timing.
+
+Recorded attempts on 1 November 2026:
+
+- `ui-2026-11-01T05-06-14-553Z.json`: failed after one real request because the
+  test proxy interpolated pretty-printed JSON into a single SSE data line.
+  Compact event serialization fixed the harness; a free native-adapter regression
+  test now covers it.
+- `ui-2026-11-01T05-09-49-559Z.json`: both real model phases ran, but the grader
+  rejected the equivalent wording “unapproved”. The factual check now accepts
+  equivalent negative approval wording and has a free regression test rejecting
+  a positively approved budget. This was not a production-model fix.
+- `ui-2026-11-01T05-12-05-058Z.json`: **PASS**, five real requests, approximately
+  30.1 seconds. Both answers and screenshots retained.
+- `ui-2026-11-01T05-14-40-555Z.json`: **PASS**, five real requests, approximately
+  29.7 seconds, retained separately. Cumulative ledger: 85 requests, $4.346585
+  conservative model estimate, $1.92 retained search allowance and zero unresolved
+  model reservations: **$6.266585 accounted upper cost**. This is not an invoice.
+
+The automatic facts and no-external-action assertions passed. Human draft quality
+remains unreviewed; a draft suggesting an owner commitment still needs human
+review. Neither physical-device nor multi-week consumer acceptance is claimed.
+Ordinary `npm run test:e2e --prefix desktop` skips the paid journey even when
+`.env` exists; its wording-grader check remains free. The earlier backend/search
+evaluation remains available and exercises a broader workflow than this UI slice.

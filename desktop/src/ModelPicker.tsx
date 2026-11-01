@@ -120,12 +120,13 @@ export function ModelPicker({ state, disabled, send, manage, onBusyChange }: Pro
         </div>
       </> : <div className="picker-effort">
         <span className="picker-eyebrow">Work effort</span>
-        <strong className="picker-effort-label">{labels[position]}</strong>
+        <strong className="picker-effort-label" role="status" aria-live="polite" aria-atomic="true"><span className="sr-only">{labels[position]}</span>{labels.map((label, index) => <span key={label} aria-hidden="true" className="effort-level-word" data-active={index === position}>{label}</span>)}</strong>
         <button className="icon-button picker-reset" aria-label="Reset work effort to Standard" title="Reset work effort to Standard" disabled={locked || effort === 1 || !settings} onClick={() => { setPosition(1); void change({ action: "effort", effort: "standard" }); }}><RotateCcw size={16} /></button>
         <button className="picker-model-select" disabled={!!pending} onClick={() => setView("models")}><span>{modelLabel}</span><ChevronDown size={16} /></button>
-        <div className="effort-slider" style={{ "--effort-position": position / 2 } as CSSProperties}>
+        <div className="effort-slider" data-dragging={dragging.current} style={{ "--effort-position": position / 2 } as CSSProperties}>
           <div className="effort-track" aria-hidden="true"><div className="effort-fill" /></div>
           <div className="effort-stops" aria-hidden="true">{labels.map((label, index) => <span key={label} data-filled={index <= position} />)}</div>
+          <span className="effort-thumb" aria-hidden="true" />
           <input type="range" aria-label="Work effort" aria-valuetext={labels[position]} min={0} max={2} step={1} value={position} disabled={locked || !settings} onPointerDown={() => { dragging.current = true; }} onPointerUp={event => { dragging.current = false; chooseEffort(Number(event.currentTarget.value)); }} onPointerCancel={() => { dragging.current = false; setPosition(effort); }} onBlur={event => { if (dragging.current) { dragging.current = false; chooseEffort(Number(event.currentTarget.value)); } }} onChange={event => { const value = Number(event.target.value); setPosition(value); if (!dragging.current) chooseEffort(value); }} />
         </div>
         <p className="picker-effort-help">How much work Gator can do on a request.</p>

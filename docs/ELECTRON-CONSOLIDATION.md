@@ -43,6 +43,7 @@ search and in-app slash commands, not a standalone CLI.
 | Ask Gator about exact saved version/selection | `FileStore` attachment link and provenance | Existing file Ask Gator and selection controls; user still sends |
 | Export/review existing destination safely | `ExportStore`, selected saved bytes | **Ported:** shared replacement tokens/fingerprints in Electron; reject changed/symlink/private destinations |
 | Model, effort, API/provider credentials | Go composer IDs and model/provider forms | Existing `ModelPicker`, Settings → Models, typed secret fields |
+| Empty-chat welcome and first-task setup | Actual managed-chat state and frontend onboarding | **Corrected:** an empty managed chat has an identity even when `home` is false; setup now appears while keeping the independent draft and attachments |
 | Local model download/cancel/rename/remove | Go local-model manager | Existing local-model panels; review and stream state retained |
 | Connections, token/OAuth sign-in, verify/disconnect | Go connection flows, trusted external handoff | Existing Connections forms and system browser/Terminal handoff |
 | Browser setup and connected coding specialists | Existing Go tool/agent policy | Existing command search `/browser`, `/agents`, `/tasks` and reviews; not removed with terminal frontend |
@@ -72,6 +73,10 @@ applications, user profiles, drafts, credentials, services or historical release
 Historical terminal migration evidence remains labelled as superseded. The
 desktop development/build/package/release commands become the only current app
 instructions. No new provider calls are required for this consolidation.
+
+The owner separately requested live model-driven Electron tests during this work.
+Those opt-in evaluations and their shared spending ledger are documented below;
+ordinary consolidation/regression tests remain independent of paid providers.
 
 ## Additional removal and compatibility details
 
@@ -117,6 +122,82 @@ remain in Go. No new model call, execution worker or terminal input API is added
 
 ## Verification
 
-Implementation and regression verification are in progress. Record exact results
-here before completion; this inventory does not claim live-device, signed-release
-or physical-platform acceptance.
+Verified locally on Intel macOS with Node 24 and the existing Go installation.
+The module's Go declaration, provider dependencies and Onibi notices are unchanged.
+The native-service workflow is prepared for its existing platform matrix; it has
+not been executed on remote CI in this session.
+
+| Check | Observed result |
+| --- | --- |
+| `go test ./...` | PASS across all packages; live API tests skipped by default |
+| `go vet ./...` | PASS |
+| Focused Go application-guide, editor, bridge and follow-up tests | PASS |
+| `go test -race ./internal/workrun ./internal/workapp -run 'ApplicationContext\|Conversation.*Knowledge\|RetiredFrontend\|ComposerEditor\|BridgeEditor\|Followup' -count=1` | PASS |
+| `npm run check --prefix desktop` | PASS |
+| `GATOR_INDEPENDENCE_BINARY="$PWD/desktop/runtime/gator-runtime" npm test --prefix desktop` | PASS: 11 desktop tests plus 73 shared-host tests; one existing opt-in skip in each suite |
+| Companion auth/server/recovery/inspection/mutation/external and Chromium clients, sequential Node runner | PASS: 25, one opt-in native-tmux skip |
+| Real-Go independence fixture with Onibi, tmux and Tailscale absent from `PATH` | PASS; ordinary Work succeeds and creates no external catalog |
+| New three Electron consolidation journeys | PASS: message reuse/arguments, Go-owned editor/error/empty/oversize recovery, exact export replacement |
+| Local `npm run pack --prefix desktop` and ASAR audit | PASS for unsigned macOS x64 package; no terminal renderer, OpenTUI/Solid or terminal-only Level dependency |
+| npm lockfile dry-run installation and workflow YAML parsing | PASS; no retained dependency version intentionally changed |
+| Paid live Electron source-change journey | PASS twice; details and failed preliminary attempts retained in the evaluation guide |
+
+The companion command was:
+
+```sh
+node --test --test-concurrency=1 \
+  companion/auth.test.mjs companion/server.test.mjs \
+  companion/inspection.test.mjs companion/mutation.test.mjs \
+  companion/recovery.test.mjs companion/external.test.mjs \
+  companion/inspection-client.test.mjs companion/mutation-client.test.mjs \
+  companion/external-client.test.mjs companion/terminal-client.test.mjs
+```
+
+Earlier parallel host/companion runs hit fixture deadlines while independently
+compiling Go. Sequential reruns passed without increasing those timeouts.
+Additional ordinary Electron regression outcomes are recorded after the final
+run below. The native editor fixture uses a disposable launcher that imitates
+the existing system Terminal handoff; it does not type into a developer terminal.
+Memory fixtures now separately answer native semantic-comparison requests instead
+of accidentally returning unrelated user-chat tool calls. Production memory and
+evidence policy have not changed.
+
+## Live UI evaluation
+
+Run `make build`, then `npm run test:live --prefix desktop` to watch real OpenAI
+answers populate the Electron conversation. The ignored root `.env` supplies the
+key to the test-only Go cost guard; the renderer gets a temporary loopback token.
+The journey changes a project's deadline and blocker between two actual requests,
+checks updated facts and no external action, and retains screenshots and answers.
+It is a real source/tool/model/UI integration slice, not a comprehensive consumer
+quality score. The proxy buffers responses for usage settlement, so provider token
+streaming timing is not assessed. Default UI and CI tests do not invoke it.
+
+The original $10 evaluation ceiling remains. At the last recorded run, the shared
+ledger conservatively accounts for $6.266585 including search reservations, with
+zero unresolved model reservations. No ledger reset was performed. See
+[exact attempts, bounds and artifacts](../scripts/project-followup-eval/README.md#live-electron-journey).
+
+## Scoped interface review and limits
+
+New controls reuse React, plain CSS, existing tokens and Lucide icons. Typography
+uses existing body/metadata styles, bounded plain-text previews and editable
+review text. Surfaces retain the existing modal/popover hierarchy and 40–44px
+actions. Icons keep the application's inherited color and stroke conventions.
+No new motion or animation library was added; the existing reduced-motion and
+interruptible-motion journeys remain applicable. Performance stays bounded by
+50 displayed message matches and the existing input/output size limits. This is
+a scoped review of the added controls, not a claim that every visual state in
+the application was manually reviewed at slowed animation speed.
+
+The inventory did not justify replacing semantic specialist controls with
+terminal keys, adding a second host/database, or importing terminal rendering
+and animation dependencies. Those alternatives would duplicate authority without
+adding a missing consumer capability. Host-local administration intentionally
+remains distinct from the renderer's finite, reviewed operations.
+
+Physical phone, signed installer, Windows native runtime, Linux/WSL native runtime
+and a real external-editor application were not accepted in this session. The
+external editor button remains unavailable on Windows pending a verified native
+editor handoff. No new native tmux test was run against any user session. Retained
+historical platform records remain evidence for their original scope only.
