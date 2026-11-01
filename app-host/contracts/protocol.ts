@@ -88,6 +88,9 @@ export type Usage = {
   known_cost_usd?: number;
 };
 export type ExternalCommand = { kind: string; program: string; args: string[]; dir?: string; env?: string[] };
+export type ComposerSource = {id: string; label: string; service: string; status: string; access: string; checked_at?: string; unavailable?: string};
+export type ComposerSources = {id: string; choices: ComposerSource[]; selected: string[]; issue?: string; disabled?: string};
+export type SourceAction = {id: string; request_id: string} & ({action: "refresh"} | {action: "select"; ids: string[]});
 export type ComposerModel = { provider: string; model: string; label: string; unavailable?: string };
 export type ComposerSettings = { id: string; effort: "low" | "standard" | "high"; models: ComposerModel[]; issue?: string; disabled?: string };
 export type ComposerAction = { id: string; request_id: string } & ({ action: "model"; provider: string; model: string } | { action: "effort"; effort: "low" | "standard" | "high" });
@@ -104,6 +107,8 @@ export type BackendState = {
   chat_memories?: ChatMemoryReceipt[]; chat_memory_issue?: string; chat_memory_result?: {request_id: string; error?: string};
   pending_connection?: string;
   chat_updates?: ChatUpdate[]; chat_updates_issue?: string; chat_updates_total?: number; updates_have_older?: boolean; updates_have_newer?: boolean;
+  sources?: ComposerSources;
+  sources_result?: {request_id: string; error?: string};
   composer?: ComposerSettings;
   composer_result?: { request_id: string; error?: string };
   desktop?: { shortcuts: Record<string,string>; voice?: VoicePreferences };
@@ -168,12 +173,13 @@ export type PanelAction = {
 };
 export type Frame = {
   version: 1;
-  type: "receipt" | "memory" | "update" | "submit" | "upload_submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "conversation" | "composer";
+  type: "receipt" | "memory" | "update" | "submit" | "upload_submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "conversation" | "composer" | "sources";
   memory?: ChatMemoryAction;
   receipt?: {conversation_id: string; run_id: string; action_id: string; correlation_id: string; manifest_sha256: string; action: "inspect" | "check_sent"; request_id: string};
   update?: { conversation_id: string; id: string; action: "delivered" | "read" | "resolve" | "reopen" | "older" | "newer" | "rate"; version: number; rating?: "useful" | "noise" | "wrong" | "clear"; rating_version?: number; request_id?: string };
   upload?: { request_id: string; context: string; text: string; files: string[]; reply_to_update_id?: string };
   text?: string; key?: string; error?: string; width?: number; height?: number;
+  sources?: SourceAction;
   composer?: ComposerAction;
   panel?: PanelAction; interaction_id?: number; approval_token?: string; approved?: boolean;
   queue?: QueueAction;

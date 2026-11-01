@@ -45,6 +45,8 @@ type BridgeState struct {
 	SessionRequest        *BridgeSessionRequest      `json:"session_request,omitempty"`
 	RequestsRecovered     bool                       `json:"requests_recovered,omitempty"`
 	RequestsIssue         string                     `json:"requests_issue,omitempty"`
+	Sources               ComposerSources            `json:"sources"`
+	SourcesResult         *ComposerResult            `json:"sources_result,omitempty"`
 	Composer              ComposerSettings           `json:"composer"`
 	ComposerResult        *ComposerResult            `json:"composer_result,omitempty"`
 	Desktop               appconfig.DesktopSettings  `json:"desktop"`
@@ -199,6 +201,8 @@ func (m Model) BridgeState() BridgeState {
 		PrimaryConversationID: m.primaryID,
 		GoalID:                m.goalID,
 		Provider:              m.modelStatus.Provider,
+		Sources:               m.composerSourceSettings(),
+		SourcesResult:         m.sourcesResult,
 		Composer:              m.composerSettings(),
 		ComposerResult:        m.composerResult,
 		Model:                 m.modelStatus.Model,

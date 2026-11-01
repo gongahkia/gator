@@ -174,6 +174,8 @@ type ModelStatus struct {
 type GoalState struct{ Title, SourcePath, ConversationID string }
 
 type Config struct {
+	ComposerSources          func() ([]ComposerSource, error)
+	SelectComposerSources    func(string, []string, []string) error
 	SaveConnections          func(string, []string) error
 	Desktop                  appconfig.DesktopSettings
 	ReadDesktop              func() (appconfig.DesktopSettings, error)
@@ -429,6 +431,9 @@ type Model struct {
 	composerModels         []ComposerModel
 	composerModelsIssue    string
 	composerResult         *ComposerResult
+	sourceChoices          []ComposerSource
+	sourcesIssue           string
+	sourcesResult          *ComposerResult
 	bridgeNotice           string
 	bridgeUploadResult     *BridgeUploadResult
 	bridgeRecentIssue      string

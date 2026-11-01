@@ -1,3 +1,4 @@
+import { SourcePicker } from "./SourcePicker";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, Bookmark, ChevronRight, Clock3, Files, Info, ListPlus, LoaderCircle, MessageSquare, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings2, ShieldCheck, SlidersHorizontal, Square, Target, X } from "lucide-react";
 import type { BackendMessage, BackendState } from "./protocol";
@@ -66,7 +67,7 @@ function useBackend() {
   }, []);
   const send = useCallback(async (frame: DesktopFrame) => {
     try { await window.gator?.send(frame); setError(""); }
-    catch (err) { if (frame.type !== "upload_submit" && frame.type !== "composer") setError(err instanceof Error ? err.message : String(err)); throw err; }
+    catch (err) { if (frame.type !== "upload_submit" && frame.type !== "composer" && frame.type !== "sources") setError(err instanceof Error ? err.message : String(err)); throw err; }
   }, []);
   const reconnect = async () => {
     if (reconnecting) return;
@@ -102,6 +103,7 @@ export function App() {
   const commands = useMemo(() => (state?.commands ?? []), [state?.commands]);
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("gator:sidebar-collapsed") === "true");
   const [details, setDetails] = useState(false);
+  const [sourcesBusy, setSourcesBusy] = useState(false);
   const [filesOnly, setFilesOnly] = useState(false);
   const [detailKind, setDetailKind] = useState<"info" | "following" | "saved">("info");
   const libraryKind = useRef<"following" | "saved">("saved");
@@ -305,7 +307,7 @@ export function App() {
 
   const queueFull = state.running && state.queued >= 16 && !draft.trimStart().startsWith("/");
   const submit = async (guide = false) => {
-    if (navigationPending || sessionSwitching || voiceBusy || editorBusy || modelBusy || dirtyFiles.size) return;
+    if (navigationPending || sessionSwitching || voiceBusy || editorBusy || modelBusy || sourcesBusy || dirtyFiles.size) return;
     if ((!draft.trim() && !drafts.uploads.length) || !drafts.ready || sending || attachments.busy || queueAction.busy || panel || error || state.external || (guide ? !state.guidance_id : queueFull)) return;
     if (drafts.replyToUpdateID && (guide || draft.trimStart().startsWith("/"))) { setDraftError("Send this update reply as a message or queued follow-up."); return; }
     if (drafts.uploads.length && (guide || draft.trimStart().startsWith("/"))) { setDraftError("Send attachments with a message or queued follow-up."); return; }
@@ -389,10 +391,10 @@ export function App() {
               const result = await window.gator!.editComposer({ context, text: draft });
               if (result.context !== fileOwner.current.context) throw new Error("Return to the original chat to recover its editor result.");
               return result;
-            }} /><div className="composer-actions"><ModelPicker state={state} disabled={sending || voiceBusy || queueAction.busy || !!error || !!state.external || !!updatePreparing || !drafts.ready} send={send} manage={() => navigate("/model")} onBusyChange={setModelBusy} /><VoiceControls context={drafts.context} speakingContext={state.primary ? `primary:${state.source}` : conversationIdentity} disabled={sending || queueAction.busy || !!error || !!state.external || !!updatePreparing || !drafts.ready || showCommands || showDrafts || !!updatesOpen || !!navigation} preferences={state.desktop?.voice} messages={state.messages} running={state.running} shortcuts={state.desktop?.shortcuts} onBusyChange={setVoiceBusy} onTranscript={text => { setDraft(current => current ? `${current}${/\s$/.test(current) ? "" : " "}${text}` : text); setDraftError(""); requestAnimationFrame(() => composer.current?.focus()); }} />
-            {state.running && <button className="small-button guide-button" title={drafts.uploads.length ? "Files will be sent with a queued follow-up" : `Guide the current task (${shortcutLabel("guide_work", state.desktop?.shortcuts)})`} disabled={!draft.trim() || !!drafts.replyToUpdateID || !!drafts.uploads.length || sending || modelBusy || dirtyFiles.size > 0 || attachments.busy || queueAction.busy || !state.guidance_id || !!error || !!state.external} onClick={() => void submit(true)}>Guide now</button>}
+            }} /><div className="composer-actions"><SourcePicker key={drafts.context} state={state} disabled={sending || modelBusy || voiceBusy || !!error || !!state.external || !!updatePreparing || !drafts.ready} send={send} manage={() => navigate("/connections")} onBusyChange={setSourcesBusy} /><ModelPicker state={state} disabled={sending || sourcesBusy || voiceBusy || queueAction.busy || !!error || !!state.external || !!updatePreparing || !drafts.ready} send={send} manage={() => navigate("/model")} onBusyChange={setModelBusy} /><VoiceControls context={drafts.context} speakingContext={state.primary ? `primary:${state.source}` : conversationIdentity} disabled={sending || queueAction.busy || !!error || !!state.external || !!updatePreparing || !drafts.ready || showCommands || showDrafts || !!updatesOpen || !!navigation} preferences={state.desktop?.voice} messages={state.messages} running={state.running} shortcuts={state.desktop?.shortcuts} onBusyChange={setVoiceBusy} onTranscript={text => { setDraft(current => current ? `${current}${/\s$/.test(current) ? "" : " "}${text}` : text); setDraftError(""); requestAnimationFrame(() => composer.current?.focus()); }} />
+            {state.running && <button className="small-button guide-button" title={drafts.uploads.length ? "Files will be sent with a queued follow-up" : `Guide the current task (${shortcutLabel("guide_work", state.desktop?.shortcuts)})`} disabled={!draft.trim() || !!drafts.replyToUpdateID || !!drafts.uploads.length || sending || modelBusy || sourcesBusy || dirtyFiles.size > 0 || attachments.busy || queueAction.busy || !state.guidance_id || !!error || !!state.external} onClick={() => void submit(true)}>Guide now</button>}
             {state.running && <button className="send-button stop" aria-label="Stop current work" disabled={state.cancelling} onClick={() => attempt({ type: "key", key: "esc" })}><Square size={13} fill="currentColor" /></button>}
-            <button className="send-button" aria-label={state.running ? "Queue message" : "Send message"} title={queueFull ? "Queue is full (16 messages)" : state.running ? "Queue for after this task (Enter)" : "Send message"} aria-busy={sending} disabled={(!draft.trim() && !drafts.uploads.length) || !drafts.ready || sending || modelBusy || voiceBusy || editorBusy || dirtyFiles.size > 0 || attachments.busy || queueAction.busy || queueFull || !!error || !!state.external} onClick={() => void submit()}><IconSwap active={sending} on={<LoaderCircle size={18} className="spin" />} off={state.running ? <ListPlus size={18} /> : <ArrowUp size={18} />} /></button>
+            <button className="send-button" aria-label={state.running ? "Queue message" : "Send message"} title={queueFull ? "Queue is full (16 messages)" : state.running ? "Queue for after this task (Enter)" : "Send message"} aria-busy={sending} disabled={(!draft.trim() && !drafts.uploads.length) || !drafts.ready || sending || modelBusy || sourcesBusy || voiceBusy || editorBusy || dirtyFiles.size > 0 || attachments.busy || queueAction.busy || queueFull || !!error || !!state.external} onClick={() => void submit()}><IconSwap active={sending} on={<LoaderCircle size={18} className="spin" />} off={state.running ? <ListPlus size={18} /> : <ArrowUp size={18} />} /></button>
           </div></div></div>
           {attachments.dragging && <p className="attachment-status" role="status">Drop files to attach to this message</p>}
           {(draftError || attachments.issue) && <p className="composer-error" role="alert">{draftError || attachments.issue}</p>}

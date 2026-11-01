@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gongahkia/gator/internal/action"
@@ -21,6 +22,8 @@ import (
 
 type connectionControls struct {
 	stateDir string
+	checkMu  sync.Mutex
+	checks   map[string]sourceReadCheck
 	signIn   connectionSignIn
 }
 
@@ -159,6 +162,14 @@ func (c *connectionControls) call(ctx context.Context, operation string, args []
 		if connectorLoginReview(d) != args[1] {
 			return workapp.ControlScreen{}, errors.New("connection changed; refresh before checking access")
 		}
+		credential, credentialErr := connectionCredential(credentials, d)
+		if credentialErr != nil {
+			return workapp.ControlScreen{}, credentialErr
+		}
+		checkedSuccessfully := false
+		defer func() {
+			c.recordSourceCheck(id, connectorLoginReview(d)+credentialReview(credential), checkedSuccessfully)
+		}()
 		registry, err := connector.NewRegistry([]connector.Descriptor{d})
 		if err != nil {
 			return workapp.ControlScreen{}, err
@@ -186,6 +197,7 @@ func (c *connectionControls) call(ctx context.Context, operation string, args []
 			}
 			checked = append(checked, probe.label)
 		}
+		checkedSuccessfully = len(probes) > 0
 		notice = "Read access verified just now."
 		if len(checked) > 0 {
 			notice += " Checked: " + strings.Join(checked, ", ") + "."
@@ -228,7 +240,7 @@ func addNativeConnection(d connector.Descriptor) error {
 func (c *connectionControls) screen(id string) (workapp.ControlScreen, error) {
 	screen := workapp.ControlScreen{Location: id, Panel: uisnapshot.Panel{Kind: "connections", Title: "Connections", NoticeTone: "info", Subtitle: "Bring your accounts into the work you choose."}}
 	status := c.signIn.Status()
-	if id == "" {
+	if id == "" || id == "@advanced" {
 		_, settings, err := connectorSettings()
 		if err != nil {
 			return screen, err
@@ -262,6 +274,26 @@ func (c *connectionControls) screen(id string) (workapp.ControlScreen, error) {
 			screen.Actions = append([]workapp.ControlAction{bundledGoogleAction()}, screen.Actions...)
 		}
 		screen.Panel.Blocks = []uisnapshot.Block{{Title: "Access stays scoped", Lines: []string{"Connecting an account makes it available. Choose it in chat settings or a follow-up agreement before Gator uses it.", "You can start with a message or attached file without connecting any accounts."}}}
+		if id == "@advanced" {
+			screen.Panel.Title = "Advanced connections"
+			screen.Panel.BackLabel = "Back to connections"
+			screen.Panel.Subtitle = "Bring your own service token and exact API resource. Existing access policies and action approvals still apply."
+			actions := []workapp.ControlAction{}
+			for _, a := range screen.Actions {
+				if a.Action == "add-token" {
+					actions = append(actions, a)
+				}
+			}
+			screen.Actions = actions
+		} else {
+			actions := []workapp.ControlAction{}
+			for _, a := range screen.Actions {
+				if a.Action != "add-token" {
+					actions = append(actions, a)
+				}
+			}
+			screen.Actions = append(actions, workapp.ControlAction{Key: "T", Label: "Advanced connections", Detail: "Slack, Notion, Atlassian and JSON APIs · bring your own credentials", Action: "select", Args: []string{"@advanced"}})
+		}
 		return screen, nil
 	}
 	d, credentials, err := configuredConnector(id)

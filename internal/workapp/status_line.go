@@ -44,6 +44,7 @@ func resolveStatusLine(configured *[]string) ([]string, bool) {
 }
 
 func (m *Model) refreshModelStatus() {
+	m.refreshComposerSources()
 	status := ModelStatus{}
 	var err error
 	if m.config.ModelStatus != nil {

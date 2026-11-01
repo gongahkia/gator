@@ -20,6 +20,7 @@ type uiFrame struct {
 	Memory        *workapp.ChatMemoryAction         `json:"memory,omitempty"`
 	Update        *workapp.BridgeUpdateAction       `json:"update,omitempty"`
 	Foreground    bool                              `json:"foreground,omitempty"`
+	Sources       *workapp.SourceAction             `json:"sources,omitempty"`
 	Composer      *workapp.ComposerAction           `json:"composer,omitempty"`
 	Version       int                               `json:"version"`
 	Type          string                            `json:"type"`
@@ -126,6 +127,10 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 		case "receipt":
 			if frame.Receipt != nil {
 				next, command = m.model.ApplyReceiptAction(*frame.Receipt)
+			}
+		case "sources":
+			if frame.Sources != nil {
+				next, command = m.model.ApplySourceSelection(*frame.Sources)
 			}
 		case "composer":
 			if frame.Composer == nil {

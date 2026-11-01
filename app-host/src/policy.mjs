@@ -30,6 +30,7 @@ export function validateFrame(frame) {
     panel: ["type", "key", "panel"], approval: ["type", "interaction_id", "approval_token", "approved"],
     queue: ["type", "queue"],
     composer: ["type", "composer"],
+    sources: ["type", "sources"],
     conversation: ["type", "conversation"],
     upload_submit: ["type", "upload"],
     update: ["type", "update"],
@@ -66,6 +67,11 @@ export function validateFrame(frame) {
     if (!["edit", "remove", "earlier", "later", "move", "run", "guide"].includes(queue.action)) throw new Error("Invalid queue action");
     if (queue.action === "move" ? typeof queue.target_id !== "string" || !/^[a-f0-9]{64}$/.test(queue.target_id) || !["before", "after"].includes(queue.placement) : queue.target_id !== undefined || queue.placement !== undefined) throw new Error("Invalid queue destination");
     if (["edit", "guide"].includes(queue.action) ? typeof queue.text !== "string" || !queue.text.trim() || Buffer.byteLength(queue.text, "utf8") > (queue.action === "guide" ? 64 : 128) * 1024 : queue.text !== undefined) throw new Error("Invalid queued message");
+  }
+  if (frame.type === "sources") {
+    const v = frame.sources;
+    if (!v || typeof v !== "object" || Array.isArray(v) || Object.keys(v).some(key => !["id", "request_id", "action", "ids"].includes(key)) || typeof v.id !== "string" || !/^[a-f0-9]{64}$/.test(v.id) || typeof v.request_id !== "string" || !/^[a-zA-Z0-9-]{1,64}$/.test(v.request_id) || !["refresh", "select"].includes(v.action)) throw new Error("Invalid source selection");
+    if (v.action === "refresh" ? v.ids !== undefined : !Array.isArray(v.ids) || v.ids.length > 32 || new Set(v.ids).size !== v.ids.length || v.ids.some(id => typeof id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(id))) throw new Error("Invalid source choices");
   }
   if (frame.type === "composer") {
     const value = frame.composer;

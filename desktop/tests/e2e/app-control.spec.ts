@@ -353,3 +353,78 @@ test("local voice setup offers explicit model download and converts browser audi
     expect(f.voiceRequests()).toBe(0); expect(f.payloads).toHaveLength(0);
   } finally { await f.close(); }
 });
+
+test("composer sources use real per-chat preferences without reads or model calls and reject removed accounts", async () => {
+  const f = await fixture();
+  try {
+    const app = await f.launch(), page = await app.firstWindow();
+    await expect.poll(async () => !!(await state(page)).sources).toBe(true);
+    const original = (await state(page)).conversation_id!;
+    const composer = page.getByRole("textbox", { name: "Message Gator", exact: true });
+    await composer.fill("Keep my source draft");
+    const trigger = page.getByRole("button", { name: "Add sources", exact: true });
+    await trigger.click();
+    const reports = page.getByRole("checkbox", { name: "Reports source", exact: true });
+    await expect(reports).toContainText("access not checked");
+    await expect(reports).toBeEnabled();
+    await reports.click();
+    await expect(reports).toHaveAttribute("aria-checked", "true");
+    await expect.poll(async () => (await state(page)).work_details?.connector_ids).toEqual(["reports"]);
+    await page.keyboard.press("Escape"); await expect(trigger).toBeFocused();
+    await expect(composer).toHaveValue("Keep my source draft");
+    expect(f.payloads).toHaveLength(0); expect(f.voiceRequests()).toBe(0);
+    await page.getByRole("button", { name: "New chat", exact: true }).click();
+    await expect.poll(async () => (await state(page)).conversation_id).not.toBe(original);
+    await expect.poll(async () => (await state(page)).work_details?.connector_ids).toEqual([]);
+    await page.evaluate(async id => {
+      const snapshot = (await window.gator!.snapshot()).state!;
+      await window.gator!.send({ type: "conversation", conversation: { id, list_id: snapshot.recent_id! } });
+    }, original);
+    await expect.poll(async () => (await state(page)).conversation_id).toBe(original);
+    await expect.poll(async () => (await state(page)).work_details?.connector_ids).toEqual(["reports"]);
+    const settingsPath = join(f.directory, "config/gator/config.json");
+    const settings = JSON.parse(await readFile(settingsPath, "utf8")); settings.connectors = [];
+    await writeFile(settingsPath, JSON.stringify(settings), { mode: 0o600 });
+    // An old displayed source ID cannot reselect a removed descriptor.
+    const before = (await state(page)).sources!;
+    await page.evaluate(async id => window.gator!.send({ type: "sources", sources: { id, request_id: "removed-source", action: "select", ids: ["reports"] } }), before.id);
+    await expect.poll(async () => (await state(page)).sources_result?.error).toContain("Sources changed");
+    await trigger.click();
+    await expect(page.getByText("No sources configured. Connect an account in Settings.", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Clear sources", exact: true }).click();
+    await expect.poll(async () => (await state(page)).work_details?.connector_ids).toEqual([]);
+    expect(f.payloads).toHaveLength(0);
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(800, 650));
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.screenshot({ path: "test-results/composer-sources.png" });
+  } finally { await f.close(); }
+});
+
+test("changing composer sources cannot rewrite the durable options of running and queued requests", async () => {
+ test.setTimeout(60000);
+ let release=()=>{};const gate=new Promise<void>(resolve=>{release=resolve;});
+ const f=await fixture(gate);
+ try {
+  const app=await f.launch(),page=await app.firstWindow();
+  const composer=page.getByRole("textbox",{name:"Message Gator",exact:true});
+  await composer.fill("What is my usage?");await composer.press("Enter");
+  await expect.poll(()=>f.payloads.length).toBeGreaterThan(0);
+  const id=(await state(page)).conversation_id!;
+  await page.getByRole("button",{name:"Add sources",exact:true}).click();
+  await page.getByRole("checkbox",{name:"Reports source",exact:true}).click();
+  await expect.poll(async()=>(await state(page)).work_details?.connector_ids).toEqual(["reports"]);
+  await page.keyboard.press("Escape");
+  await composer.fill("Explain my usage limits next.");await composer.press("Enter");
+  await expect.poll(async()=>(await state(page)).queued).toBe(1);
+  const journalPath=join(f.directory,"state/gator/conversations",id,"requests.json");
+  const journal=()=>readFile(journalPath,"utf8").then(text=>JSON.parse(text).requests as {text:string;options:{ConnectorIDs?:string[]}}[]);
+  await expect.poll(async()=>(await journal()).find(item=>item.text==="Explain my usage limits next.")?.options.ConnectorIDs).toEqual(["reports"]);
+  await page.getByRole("button",{name:"Add sources",exact:true}).click();
+  await page.getByRole("button",{name:"Clear sources",exact:true}).click();
+  await expect.poll(async()=>(await state(page)).work_details?.connector_ids).toEqual([]);
+  const retained=await journal();
+  expect(retained.find(item=>item.text==="Explain my usage limits next.")?.options.ConnectorIDs).toEqual(["reports"]);
+  expect(retained.find(item=>item.text==="What is my usage?")?.options.ConnectorIDs??[]).toEqual([]);
+  release();await expect.poll(async()=>(await state(page)).running,{timeout:30000}).toBe(false);
+ } finally {release();await f.close();}
+});

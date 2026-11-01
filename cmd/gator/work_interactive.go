@@ -173,6 +173,10 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 	defer localModels.Close()
 	connections := &connectionControls{stateDir: stateDir}
 	application := workapp.New(workapp.Config{
+		ComposerSources: func() ([]workapp.ComposerSource, error) { return connections.composerSources(settingsStore) },
+		SelectComposerSources: func(id string, expected, ids []string) error {
+			return selectComposerSources(settingsStore, stateDir, id, expected, ids)
+		},
 		SaveConnections: func(id string, ids []string) error {
 			release, err := state.Guard(stateDir, false)
 			if err != nil {

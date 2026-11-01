@@ -28,6 +28,7 @@ test("native account setup reviews credentials, verifies access and returns to b
   await page.getByRole("button",{name:"Settings",exact:true}).click();
   await page.getByRole("button",{name:"Connection settings",exact:true}).click();
   await expect(page.getByRole("heading",{name:"Connections",exact:true})).toBeVisible();
+  await page.getByRole("button",{name:/^Advanced connections/}).click();
   await page.getByRole("button",{name:"Add a service token connection",exact:true}).click();
   await page.getByLabel("Connection ID",{exact:true}).fill("metrics");await page.getByLabel("Display name",{exact:true}).fill("Team metrics");await page.getByLabel("Service",{exact:true}).selectOption("http_json");await page.getByLabel("Resource URL",{exact:true}).fill(base+"/resource");
   const review=()=>page.getByRole("button",{name:/^Review/}).click();
