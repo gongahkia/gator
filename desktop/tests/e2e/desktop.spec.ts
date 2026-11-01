@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { openCommandSearch, openSurface } from "./navigation";
-import { closeDesktop, temporaryDirectory as mkdtemp, launchDesktop } from "./lifecycle";
+import { closeDesktop, temporaryDirectory as mkdtemp, launchDesktop as launchApplication } from "./lifecycle";
 import { mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
@@ -10,7 +10,7 @@ import { createServer } from "node:http";
 const launchDesktop = (env: Record<string, string | undefined>) => {
   const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
   const definedEnv = Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
-  return launchDesktop({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env: { ...definedEnv, GATOR_INTERNAL_COMMANDS: "" } });
+  return launchApplication({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env: { ...definedEnv, GATOR_INTERNAL_COMMANDS: "" } });
 };
 
 // Existing saved conversations remain available alongside new independent chats.
@@ -44,7 +44,7 @@ test("relative profile overrides keep the existing platform interpretation", asy
   const env = { ...process.env, GATOR_STATE_DIR: "profile-state", GATOR_CONFIG_DIR: "profile-config", GATOR_DESKTOP_WORKSPACE: workspace, GATOR_DESKTOP_USER_DATA: join(directory, "desktop") };
   execFileSync(binary, ["note", "add", "--title", "Kept relative profile", "--body", "Existing private data remains in the same profile."], { cwd: directory, env: { ...env, GATOR_INTERNAL_COMMANDS: "1", GATOR_STATE_DIR: join(root, "profile-state"), GATOR_CONFIG_DIR: join(root, "profile-config") } });
   const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
-  const application = await launchDesktop({ executablePath, args: executablePath ? [] : [resolve(".")], cwd: directory, env: { ...Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => typeof entry[1] === "string")), GATOR_INTERNAL_COMMANDS: "" } });
+  const application = await launchApplication({ executablePath, args: executablePath ? [] : [resolve(".")], cwd: directory, env: { ...Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => typeof entry[1] === "string")), GATOR_INTERNAL_COMMANDS: "" } });
   try {
     const page = await application.firstWindow();
     await expect(page.getByRole("textbox", { name: "Message Gator", exact: true })).toBeVisible();
