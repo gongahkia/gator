@@ -1161,3 +1161,8 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .source-picker-popover footer { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--color-line); }
 .source-picker-popover footer > span { display: flex; gap: 5px; font-size: var(--text-xs); }
 @media (max-width: 1000px) { .selected-source-chips { display: none; } .source-picker-trigger > span { display: none; } }
+.source-reference.citation-chip { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; min-height: 22px; padding: 0 5px; margin-inline: 3px; border-radius: 5px; background: color-mix(in srgb, var(--color-accent) 14%, var(--color-surface)); color: var(--color-secondary); text-decoration: none; font: 600 var(--text-xs)/1.4 var(--font-body); vertical-align: baseline; font-variant-numeric: tabular-nums; }
+.citation-popover { position: fixed; z-index: 35; overflow-y: auto; padding: 16px; border-radius: var(--radius-lg); background: var(--color-raised); color: var(--color-secondary); box-shadow: 0 0 0 1px var(--color-outline), 0 16px 48px var(--shadow-strong); }
+.citation-popover strong, .citation-popover small { display: block; overflow-wrap: anywhere; }
+.citation-popover small, .citation-popover p { color: var(--color-muted); font-size: var(--text-xs); line-height: 1.6; margin: 8px 0; }
+.citation-popover pre { white-space: pre-wrap; overflow-wrap: anywhere; font: var(--text-sm)/1.6 var(--font-body); max-height: 150px; overflow-y: auto; margin: 10px 0; }

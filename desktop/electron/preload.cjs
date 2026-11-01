@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld("gator", {
   pasteImages: (images, context) => attachmentRequest("gator:paste-images", context, images),
   files: (request) => attachmentRequest("gator:file", request),
   codePreview: (request) => attachmentRequest("gator:code-preview", request),
+  sourceCatalog: (request) => attachmentRequest("gator:source-catalog", request),
   sourcePreview: (request) => attachmentRequest("gator:source-preview", request),
   choosePath: (request) => ipcRenderer.invoke("gator:pick-path", request),
   openLink: (url) => ipcRenderer.invoke("gator:link", url),

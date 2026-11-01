@@ -1,11 +1,13 @@
 import { createContext } from "react";
+import type { SourceRecord } from "@gator/application-host/contracts/sourcePreview";
 
 export type SourceReference = { run: string; path: string; start?: number; end?: number };
 export type SourceSelection = SourceReference & { context: string; request: number };
-export const SourceReferenceContext = createContext<{ run?: string; open?(reference: SourceReference): void }>({});
+export const SourceReferenceContext = createContext<{ context?: string; references?: SourceRecord[]; run?: string; open?(reference: SourceReference): void }>({});
 
 type Node = { type: string; value?: string; url?: string; children?: Node[] };
 function citation(value: string, following = "") {
+  if (/^evidence:[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(value) || /^connector:[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+$/.test(value)) return `gator-source:${encodeURIComponent(value)}`;
   const match = value.match(/^(source\/[^\x00-\x1f]+?)(?::(\d+)(?:[-–—](\d+))?)?$/);
   if (!match) return;
   const range = following.match(/^\s*,?\s*lines?\s+(\d+)(?:\s*[-–—]\s*(\d+))?/i);
@@ -19,6 +21,10 @@ export function sourceReferences() {
     const visit = (node: Node) => {
       if (!node.children || ["link", "code", "html"].includes(node.type)) return;
       node.children = node.children.flatMap((child, index, children) => {
+        if (child.type === "link" && child.url?.startsWith("gator-evidence:")) {
+          const id = child.url.slice("gator-evidence:".length);
+          if (/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(id)) child.url = `gator-source:${encodeURIComponent("evidence:"+id)}`;
+        }
         if (child.type === "inlineCode" && child.value) {
           const url = citation(child.value, children[index + 1]?.value);
           if (url) return [{ type: "link", url, children: [child] }];

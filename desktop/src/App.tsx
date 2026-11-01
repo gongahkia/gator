@@ -79,6 +79,17 @@ function useBackend() {
 }
 
 const Message = memo(function Message({ inspectSource, message, pending, onApproval, commands, navigate, disabled, preview, shortcuts, memories, conversation, memoryBusy, changeMemory, onMemoryEditingChange, inspectReceipt, receiptBusy, receiptDisabled }: { inspectSource(reference: SourceReference): void; inspectReceipt: InspectReceipt; receiptBusy: boolean; receiptDisabled: boolean; onMemoryEditingChange(id: string, editing: boolean): void; memories?: ChatMemoryReceipt[]; conversation?: string; memoryBusy?: boolean; changeMemory(change: Omit<ChatMemoryAction,"request_id">): Promise<void>; shortcuts?: Record<string,string>; message: BackendMessage; pending?: number; onApproval(approved: boolean): void; commands?: BackendState["commands"]; navigate?(route: string): void; disabled?: boolean; preview(id: string): void }) {
+  const [sourceRecords, setSourceRecords] = useState<{key:string; references: import("@gator/application-host/contracts/sourcePreview").SourceRecord[]}>();
+  const sourceKey = `${conversation}:${message.run_id}`;
+  const sourceArticle = useRef<HTMLElement>(null);
+  useEffect(() => {
+    let active=true;
+    if (message.role!=="Gator" || !message.run_id || !conversation || !/(source\/|https?:|gator-evidence:|connector:)/.test(message.text)) return;
+    const load = () => { void window.gator!.sourceCatalog({context:`conversation:${conversation}`,run:message.run_id!}).then(value=>{if(active)setSourceRecords({key:sourceKey,references:value.references});}).catch(()=>{if(active)setSourceRecords({key:sourceKey,references:[]});}); };
+    const observer = new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){observer.disconnect();load();}},{rootMargin:"200px"});
+    if(sourceArticle.current)observer.observe(sourceArticle.current);
+    return()=>{active=false;observer.disconnect();};
+  },[sourceKey,message.role,message.text]);
   const user = message.role === "You";
   const result = message.result;
   const outputs = message.bundle ? bundleOutputs(message.bundle) : [];
@@ -87,7 +98,7 @@ const Message = memo(function Message({ inspectSource, message, pending, onAppro
   const contextLink = message.role === "Context" && result?.kind === "notice" && result.title === "Context and sources" && result.footer?.startsWith("/context ") && !result.tone;
   if (contextLink || (message.bundle && !result && !outputs.length && !message.bundle.Actions?.length)) return null;
   const approval = result?.kind === "approval" && result.fields?.some((field) => field.label === "Request" && field.value === String(pending)) ? pending : undefined;
-  return <SourceReferenceContext.Provider value={{ run: message.role === "Gator" ? message.run_id : undefined, open: inspectSource }}><article className={`message ${user ? "user-message" : message.role === "Gator" ? "assistant-message" : "result-message"}`} aria-label={user ? "Your message" : `${message.role} message`}>
+  return <SourceReferenceContext.Provider value={{ context: conversation ? `conversation:${conversation}` : undefined, references: sourceRecords?.key===sourceKey ? sourceRecords.references : [], run: message.role === "Gator" ? message.run_id : undefined, open: inspectSource }}><article ref={sourceArticle} className={`message ${user ? "user-message" : message.role === "Gator" ? "assistant-message" : "result-message"}`} aria-label={user ? "Your message" : `${message.role} message`}>
     <div className="message-content">{message.activity && <ActivityHistory trace={message.activity} />}<div className="message-byline">{user ? "You" : message.role === "Gator" ? "Gator" : message.bundle ? (outputs.length ? "Files & changes" : "Connected requests") : message.role}</div>
       {user && message.reply_to_update_id && <span className="message-reply-label">Reply to a follow-up</span>}{user && <InputFiles names={message.inputs} ids={message.input_ids} />}
       {commands && navigate && result?.title === "Gator commands" && result.kind === "report" ? <DesktopHelp shortcuts={shortcuts} commands={commands} navigate={navigate} disabled={!!disabled} /> : result ? <Result result={result} approval={approval} onApproval={onApproval} /> : message.bundle ? <OutputCards outputs={outputs} preview={preview} /> : message.role === "Gator" ? <div className="assistant-speech"><Markdown text={message.text} /></div> : user ? <Markdown text={message.text} /> : <div className="literal prose-text">{message.text}</div>}

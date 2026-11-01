@@ -1,3 +1,4 @@
+import { SourceCitation } from "./SourceCitation";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Children, isValidElement, useContext, type ReactNode } from "react";
@@ -17,9 +18,19 @@ function CodeBlock({ children }: { children?: ReactNode }) {
 
 export function Markdown({ text }: { text: string }) {
   const source = useContext(SourceReferenceContext);
+  const numbers = new Map<string,number>();
+  const number = (key:string) => {if(!numbers.has(key))numbers.set(key,numbers.size+1);return numbers.get(key)!;};
   return <div className="markdown"><ReactMarkdown remarkPlugins={[remarkGfm, sourceReferences]} urlTransform={url => url.startsWith("gator-source:") ? url : defaultUrlTransform(url)} components={{
     pre: CodeBlock,
-    a: ({ href, children }) => href?.startsWith("gator-source:") ? <button className="source-reference" type="button" onClick={() => { try { if (source.run) source.open?.({ run: source.run, ...parseSourceReference(href) }); } catch { /* A malformed model citation grants no filesystem access. */ } }} disabled={!source.run || !source.open} title="Preview the retained source and read range">{children}</button> : <LinkPopover url={href ?? ""} label={Children.toArray(children).map(child => typeof child === "string" ? child : "").join("") || href || "Link"}>{children}</LinkPopover>,
+    a: ({ href, children }) => {
+      if (href?.startsWith("gator-source:")) {
+        if (!source.run) return <span>{children}</span>;
+        try {const reference=parseSourceReference(href);const record=(source.references??[]).find(entry=>reference.path===`evidence:${entry.id}`);const text=Children.toArray(children).map(child=>typeof child==="string"?child:"").join("");return <SourceCitation reference={reference} index={number(href)} label={record?.label || text || reference.path}/>;} catch {return <span>Unavailable source</span>;}
+      }
+      const matches=(source.references??[]).filter(reference=>reference.locator===href);
+      if(matches.length===1 && matches[0].kind==="web")return <SourceCitation reference={{path:`evidence:${matches[0].id}`}} index={number(href!)} label={matches[0].label}/>;
+      return <LinkPopover url={href??""} label={Children.toArray(children).map(child=>typeof child==="string"?child:"").join("")||href||"Link"}>{children}</LinkPopover>;
+    },
     // Remote images would contact a service just by reading a conversation.
     img: ({ alt }) => <span className="muted">[Image{alt ? `: ${alt}` : ""}]</span>,
   }}>{text}</ReactMarkdown></div>;

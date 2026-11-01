@@ -21,7 +21,7 @@ import { importPastedImages, validatePastedImages } from "@gator/application-hos
 import { ExportStore } from "@gator/application-host/export";
 import { editComposer } from "./composer-editor.mjs";
 import { codePreview } from "./code-preview.mjs";
-import { sourcePreview } from "./source-preview.mjs";
+import { sourcePreview, sourceCatalog } from "./source-preview.mjs";
 import { retainedRequestUploads } from "@gator/application-host/request-retention";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -206,6 +206,12 @@ else {
       const owner = backend;
       const current = () => backend === owner && !owner?.closed && uploadContext(owner?.state) === request?.context;
       return codePreview(request, { state: owner?.state, current });
+    });
+    ipcMain.handle("gator:source-catalog", async (event, request) => {
+      mutable(event);
+      const owner = backend;
+      const current = () => backend === owner && !owner?.closed && uploadContext(owner?.state) === request?.context;
+      return sourceCatalog(request, { state: owner?.state, current });
     });
     ipcMain.handle("gator:source-preview", async (event, request) => {
       mutable(event);
