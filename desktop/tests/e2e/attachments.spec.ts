@@ -4,7 +4,7 @@ import { createServer } from "node:http";
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { closeDesktop, temporaryDirectory } from "./lifecycle";
+import { closeDesktop, temporaryDirectory, launchDesktop } from "./lifecycle";
 
 const pick = (app: ElectronApplication, paths: string[]) => app.evaluate(({ dialog }, paths) => {
   dialog.showOpenDialog = async () => ({ canceled: !paths.length, filePaths: paths });
@@ -38,7 +38,7 @@ test("attachments stay with drafts and queued messages and reach the real model 
   const cli = (args: string[]) => execFileSync(binary, args, { env: { ...env, GATOR_INTERNAL_COMMANDS: "1" }, encoding: "utf8" });
   cli(["provider", "add", "file-fixture", "--base-url", `http://127.0.0.1:${port}/v1/chat/completions`, "--model", "fixture-model"]); cli(["config", "set", "default-provider", "file-fixture"]);
   const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
-  const launch = () => electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env });
+  const launch = () => launchDesktop({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env });
   let app = await launch();
   try {
     let page = await app.firstWindow();
@@ -122,7 +122,7 @@ test("attachment cancellation, removal and validation failures preserve the unse
   const cli = (args: string[]) => execFileSync(binary, args, { env: { ...env, GATOR_INTERNAL_COMMANDS: "1" }, encoding: "utf8" });
   cli(["provider", "add", "unused-fixture", "--base-url", "http://127.0.0.1:1/v1/chat/completions", "--model", "fixture-model"]); cli(["config", "set", "default-provider", "unused-fixture"]);
   const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
-  const app = await electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env });
+  const app = await launchDesktop({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env });
   try {
     const page = await app.firstWindow(), composer = page.getByRole("textbox", { name: "Message Gator", exact: true }), button = page.getByRole("button", { name: "Attach files", exact: true });
     await expect(composer).toBeVisible(); await composer.fill("Keep this request");

@@ -1,10 +1,24 @@
-import type { ElectronApplication } from "@playwright/test";
+import { _electron as electron, type ElectronApplication } from "@playwright/test";
 import { mkdtemp, realpath } from "node:fs/promises";
 
 // Match Go's canonical workspace paths, including Windows 8.3 aliases and
 // macOS /var -> /private/var, before asserting a projected source identity.
 export async function temporaryDirectory(prefix: string) {
   return realpath(await mkdtemp(prefix));
+}
+
+// Optional local regression mode: CDP still drives the real window, while the
+// fixture cannot receive the operator's physical keystrokes. Paid live demos
+// remain interactive/visible under their existing explicit opt-in command.
+export async function launchDesktop(options: Parameters<typeof electron.launch>[0]) {
+  const application = await electron.launch(options);
+  applicationProcesses.set(application, application.process());
+  if (process.env.GATOR_E2E_BACKGROUND === "1" && !process.env.GATOR_LIVE_UI_ENDPOINT && process.platform !== "linux") {
+    await application.evaluate(({ BrowserWindow }) => {
+      for (const window of BrowserWindow.getAllWindows()) { window.setFocusable(false); window.blur(); }
+    });
+  }
+  return application;
 }
 
 // Let Playwright disconnect its inspector after requesting Gator's normal quit

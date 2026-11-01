@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { mkdir, writeFile, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { closeDesktop, temporaryDirectory } from "./lifecycle";
+import { closeDesktop, temporaryDirectory, launchDesktop } from "./lifecycle";
 import { draftLinks, markdownLink } from "../../src/draftLinks";
 
 test("draft links preserve punctuation and restrict edits to safe web links", () => {
@@ -36,7 +36,7 @@ async function fixture() {
   try { execFileSync(resolve("runtime", process.platform === "win32" ? "gator-runtime.exe" : "gator-runtime"), ["config", "show"], { env: { ...env, GATOR_INTERNAL_COMMANDS: "1" }, stdio: "ignore" }); }
   catch { server.closeAllConnections(); await new Promise<void>(done => server.close(() => done())); await rm(root, { recursive: true, force: true }); throw new Error("The disposable test configuration is invalid. Electron was not launched."); }
   let app: ElectronApplication;
-  return { workspace, calls: () => calls, async launch() { const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE; app = await electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env }); return app; }, async close() { try { if (app!) { await app.evaluate(({ dialog }) => { dialog.showMessageBox = async () => ({ response: 1, checkboxChecked: false }); }).catch(() => {}); await closeDesktop(app); } } finally { server.closeAllConnections(); await new Promise<void>(done => server.close(() => done())); await rm(root, { recursive: true, force: true }); } } };
+  return { workspace, calls: () => calls, async launch() { const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE; app = await launchDesktop({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env }); return app; }, async close() { try { if (app!) { await app.evaluate(({ dialog }) => { dialog.showMessageBox = async () => ({ response: 1, checkboxChecked: false }); }).catch(() => {}); await closeDesktop(app); } } finally { server.closeAllConnections(); await new Promise<void>(done => server.close(() => done())); await rm(root, { recursive: true, force: true }); } } };
 }
 
 test("source citations open the right sidebar with original evidence and the actual read range", async () => {

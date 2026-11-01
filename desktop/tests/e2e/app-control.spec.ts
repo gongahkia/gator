@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import { chmod, mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { closeDesktop, temporaryDirectory } from "./lifecycle";
+import { closeDesktop, temporaryDirectory, launchDesktop } from "./lifecycle";
 
 async function fixture(waitForReply?: Promise<void>, waitForVoice?: () => Promise<void>) {
   const directory = await temporaryDirectory(join(tmpdir(), "gator-app-control-"));
@@ -55,7 +55,7 @@ async function fixture(waitForReply?: Promise<void>, waitForVoice?: () => Promis
   let application: ElectronApplication | undefined;
   return {
     directory, payloads, voiceRequests: () => voiceRequests,
-    async launch() { const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE; application = await electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env }); return application; },
+    async launch() { const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE; application = await launchDesktop({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env }); return application; },
     async close() { try { if (application) await closeDesktop(application); } finally { server.closeAllConnections(); await new Promise<void>(done => server.close(() => done())); await rm(directory, { recursive: true, force: true }); } },
   };
 }

@@ -137,6 +137,39 @@ drafts are included in private backups and explicit history/all-content deletion
 Automatic age retention leaves them until you explicitly delete them.
 See [format support, architecture and verification](../docs/INLINE-FILES-RESEARCH.md).
 
+## Source previews, Markdown and links
+
+Click a `source/...` reference in an answer to open **Source preview** in the
+right sidebar. It shows the original retained file, line numbers, cited lines,
+and independently recorded ranges read by Gator. Editing the live file later
+does not change this preview. Cited lines are a model-authored reference; the
+read markers come from retained tool results checked against the file's digest.
+Older or compacted records can lack exact ranges; the sidebar says so explicitly.
+Unavailable, unselected or changed evidence is rejected rather than substituted.
+
+The first source preview supports retained UTF-8 text files up to 512 KiB, with
+a 400-line/64 KiB window around the selected lines. Partial final-line reads are
+identified. Binary sources, missing historical evidence and arbitrary local
+paths are not opened through this action. The existing attachment/output viewers
+continue to handle their supported document formats.
+
+Sent user messages and assistant replies render Markdown: paragraphs, emphasis,
+lists, tables, code and links. Raw HTML remains text and remote images do not load
+automatically. Pasted http/https links appear as clickable blue links in the
+composer. Click one for **Open link**, **Edit text**, and **Edit link**. Editing a
+label uses standard Markdown in the retained draft; focusing the composer lets
+you edit that underlying text directly. Native text editing, image paste, undo
+and saved drafts remain available. Link changes do not send a request.
+
+Conversation links offer the same controls. Editing a sent link stages an edited
+copy in the current draft; it does not rewrite the earlier message. Switching
+chats dismisses an open link edit. Links do not fetch a preview, favicon or page
+until you explicitly open them or ask Gator to read them.
+
+The Work effort fill, handle and level label transition between Low, Standard
+and High. Dragging stays immediate, and reduced-motion preferences disable the
+interpolation. Effort retains its existing task-budget meaning.
+
 ## Ask Gator about the app
 
 You can ask questions such as “Where do I change the model?”, “Which model are

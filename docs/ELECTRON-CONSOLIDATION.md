@@ -190,6 +190,40 @@ interruptible-motion journeys remain applicable. Performance stays bounded by
 a scoped review of the added controls, not a claim that every visual state in
 the application was manually reviewed at slowed animation speed.
 
+The owner subsequently requested source-reference inspection, effort transitions
+and pasted-link editing. These are implemented in `SourcePreviewSidebar`,
+`sourceReferences`, `ComposerInput`, `LinkPopover` and the existing `ModelPicker`.
+The source IPC reads only an already selected run's digest-bound manifest and
+retained textual evidence. It checks current conversation ownership before and
+after I/O. Exact read ranges come from matching `read_file` tool results in that
+run's private revision; the private replay itself never crosses IPC. Missing
+historical/compacted ranges are explicitly unknown, not inferred from citations.
+Reads clipped mid-line retain their actual final character offset. The preview
+is bounded to 400 lines/64 KiB from files no larger than 512 KiB. Binary or absent
+evidence fails explicitly, with no fallback to live workspace contents.
+
+User messages now share the safe Markdown renderer used for assistant replies;
+structured reviews and approvals retain their application-generated forms.
+The native textarea remains the draft/IME/selection/undo authority. A matching
+text layer provides clickable links, and unfocused Markdown links display their
+label. Editing uses canonical Markdown, with no HTML-backed persistence or new
+editor dependency. Conversation link edits stage a new draft copy; they do not
+rewrite an executed request. Exact draft context keys prevent cross-chat edits.
+Only explicit Open link invokes the existing host URL allowlist and native
+browser. Neither remote images nor favicons are fetched automatically.
+
+The effort fill and handle use interruptible 200ms CSS transitions; persistent
+labels crossfade without remounting the control. Dragging stays immediate and
+reduced motion disables interpolation. A Chromium check slows active transitions
+to 10% playback, reverses direction, then checks reduced motion. Source and link
+screenshots were inspected; light-theme link contrast has automated coverage.
+This supersedes the earlier “no new motion” statement for this later request.
+
+The dependency notice generator now also retains direct production host-package
+notices when npm marks a root-hoisted copy as a development dependency through
+the local-file link. `fflate` and `@xmldom/xmldom` remain attributed; no dependency
+version or project license was changed.
+
 The inventory did not justify replacing semantic specialist controls with
 terminal keys, adding a second host/database, or importing terminal rendering
 and animation dependencies. Those alternatives would duplicate authority without
