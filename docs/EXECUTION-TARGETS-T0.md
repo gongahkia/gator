@@ -1,5 +1,10 @@
 # Execution target foundation (T0)
 
+> Product-surface update, 1 November 2026: Electron is the sole primary app;
+> the OpenTUI product has been removed. The backend/companion guarantees and
+> historical verification below are retained. See
+> [Electron consolidation](ELECTRON-CONSOLIDATION.md).
+
 Final scope: see [T4.5 consolidation](EXECUTION-TARGETS-T4.5.md). This is a
 historical tranche record. Current scope is owned Work supervision and optional
 external tmux; Ghostty T5/T6 are permanently removed from the current roadmap.

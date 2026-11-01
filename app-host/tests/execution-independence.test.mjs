@@ -11,7 +11,7 @@ import {createServer} from 'node:http';
 import {Backend} from '../src/backend.mjs';
 const execute=promisify(execFile),source=fileURLToPath(new URL('../../',import.meta.url));
 
-test('ordinary Work and desktop/OpenTUI hosts need no tmux, Onibi, phone or external catalog',{skip:process.platform==='win32',timeout:180000},async()=>{
+test('ordinary Work and desktop host need no tmux, Onibi, phone or external catalog',{skip:process.platform==='win32',timeout:180000},async()=>{
  const root=await mkdtemp(join(tmpdir(),'gator-independent-')),bin=join(root,'bin'),workspace=join(root,'workspace'),config=join(root,'config'),state=join(root,'state');let host,requests=0;
  const provider=createServer(async(req,res)=>{let body='';for await(const part of req)body+=part;const p=JSON.parse(body);requests++;
   const classify=p.messages?.some(m=>m.role==='system'&&m.content?.includes("Classify the user's immediate request"));
@@ -32,9 +32,7 @@ test('ordinary Work and desktop/OpenTUI hosts need no tmux, Onibi, phone or exte
   await execute(binary,['work','--source',workspace,'--mode','inspect','Independent fixture'],{cwd:workspace,env,timeout:45000});
   assert.ok(requests>0,'real Work must reach the fixture provider');
   const id=(await readdir(join(state,'gator/conversations'))).find(n=>n.startsWith('work-'));assert.ok(id);
-  for(const frontend of ['desktop','terminal']){
-   host=new Backend(binary,workspace,{...env,GATOR_UI_FRONTEND:frontend},['ui-backend',id,'']);await host.ready();assert.equal(host.state.conversation_id,id);await host.stop();host=undefined;
-  }
+  host=new Backend(binary,workspace,env,['ui-backend',id,'']);await host.ready();assert.equal(host.state.conversation_id,id);await host.stop();host=undefined;
   await execute(binary,['note','add','--title','Independent','--body','Local-only data'],{cwd:workspace,env,timeout:10000});
   assert.match((await execute(binary,['note','list'],{cwd:workspace,env,timeout:10000})).stdout,/Independent/);
   await assert.rejects(access(join(state,'gator/external-targets')),'ordinary startup must not open the external catalog');

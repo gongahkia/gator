@@ -1,5 +1,10 @@
 # Gator terminal migration plan
 
+> **Historical, superseded 1 November 2026.** The terminal product and migration
+> are cancelled. Electron is the sole primary app. The original implementation
+> and test evidence below is retained as history, not current launch/install
+> instructions. See [Electron consolidation](ELECTRON-CONSOLIDATION.md).
+
 26 October 2026. Status: implementation in progress; Electron remains the reference. See the
 [verification ledger](TERMINAL-MIGRATION-VERIFICATION.md) for evidence and open cases.
 

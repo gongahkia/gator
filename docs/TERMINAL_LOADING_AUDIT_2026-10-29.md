@@ -1,5 +1,10 @@
 # Terminal loading and navigation audit — 2026-10-29
 
+> **Historical, superseded 1 November 2026.** The terminal product and migration
+> are cancelled. Electron is the sole primary app. The original implementation
+> and test evidence below is retained as history, not current launch/install
+> instructions. See [Electron consolidation](ELECTRON-CONSOLIDATION.md).
+
 Scope: the native Solid/OpenTUI terminal. Reuse the existing Rattles Dots frame
 data and timing through `Spinner`; OpenTUI owns rendering and cleanup. This does
 not add a Rust process or change the desktop/companion UI or CLI JSON output.

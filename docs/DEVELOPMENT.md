@@ -7,9 +7,11 @@ Node.js 22.12 or newer, then run from the repository root:
 make run
 ```
 
-The planned return to a terminal application is tracked in the
-[terminal migration plan](TERMINAL-MIGRATION-PLAN.md). Electron remains the current
-interface until the plan's feature parity gate passes.
+Electron is the sole primary application. The terminal migration is cancelled;
+its renderer, public launcher, installers and build targets have been removed.
+See the [capability inventory and consolidation record](ELECTRON-CONSOLIDATION.md).
+No Bun installation is required. The phone companion remains an optional,
+authenticated extension; Go maintenance commands are private application services.
 
 `make run` installs the pinned desktop dependencies when missing or when the
 package manifests change, builds the runtime and frontend, then opens Gator.

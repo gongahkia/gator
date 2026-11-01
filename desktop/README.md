@@ -8,7 +8,19 @@ yet. Current source-checkout commands are in [development](../docs/DEVELOPMENT.m
 Gator's primary and currently supported user interface is this Electron app.
 React DOM and Tailwind render the frontend; the private Go runtime owns
 conversations, tools, model configuration, approvals, goals, usage, and data.
-The standalone CLI and React terminal renderer are retired.
+Electron is the sole primary application. Both the old React terminal renderer
+and the later OpenTUI product are retired. No Bun runtime is required. See the
+[capability inventory](../docs/ELECTRON-CONSOLIDATION.md) for retained features,
+the Electron ports and the exact verification record.
+
+The composer's **Message tools** menu can reuse previous message text without
+sending, or edit an idle draft through the host's configured external editor on
+macOS/Linux. The editor uses the existing Go-prepared system Terminal handoff;
+it is not a Gator terminal application. Attachments and reply ownership stay
+with the draft. Command-search arguments now have their own dialog, leaving
+the independent message draft intact. Exporting over an existing file requires
+an exact replacement review and refuses a changed or linked destination or
+Gator's private storage.
 
 Product direction and the remaining capability gaps are recorded in the
 [22 October competitive audit](../docs/COMPETITIVE_GAP_AUDIT_2026-10-22.md).

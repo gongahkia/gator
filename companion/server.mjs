@@ -65,7 +65,7 @@ export function createCompanion({ binary, workspace, env, tokenFile, origin,
     }
   },
   now = () => Date.now(),
-  spawnBackend = (id) => new Backend(binary, workspace, { ...env, GATOR_UI_SESSION_HOST: '1', GATOR_UI_FRONTEND: 'companion' }, ['ui-backend', id, '']) }) {
+  spawnBackend = (id) => new Backend(binary, workspace, { ...env, GATOR_UI_SESSION_HOST: '1' }, ['ui-backend', id, '']) }) {
   if (origin && (new URL(origin).origin !== origin || new URL(origin).protocol !== 'https:')) throw new Error('The companion browser origin must be an exact HTTPS origin.');
   const workers = new Map();
   const recoveries = new Map();

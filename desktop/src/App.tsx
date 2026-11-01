@@ -17,6 +17,7 @@ import { CopyButton } from "./CopyButton";
 import { useDrafts } from "./useDrafts";
 import { DraftManager } from "./DraftManager";
 import { MessageTools } from "./MessageTools";
+import { CommandArguments } from "./CommandArguments";
 import { useConversationSearch } from "./useConversationSearch";
 import { RecentConversations } from "./RecentConversations";
 import { WorkDetails } from "./WorkDetails";
@@ -111,6 +112,7 @@ export function App() {
   const [search, setSearch] = useState<string | null>(null);
   const [navigation, setNavigation] = useState<{ target: Navigation; queued: boolean } | null>(null);
   const [showCommands, setShowCommands] = useState(false);
+  const [argumentCommand, setArgumentCommand] = useState<string>();
   const commandReturn = useRef<HTMLElement | null>(null);
   const [sending, setSending] = useState(false);
   const [navigationPending, setNavigationPending] = useState(false);
@@ -182,7 +184,7 @@ export function App() {
   }, []);
   const fileChat = useMemo(() => ({ context: drafts.context, dirtyKeys: dirtyFiles, attachmentKey, blocked: sending || queueAction.busy || !!error || !!state?.external || !!updatePreparing || !drafts.ready, useFile, dirty: fileDirty }), [drafts.context, sending, queueAction.busy, error, state?.external, updatePreparing, drafts.ready, useFile, fileDirty, dirtyFiles, attachmentKey]);
 
-  const hasUnsavedView = memoryEditing.size > 0 || dirtyFiles.size > 0 || queueEditing || panel?.rows?.some((row) => row.input) || panel?.kind === "confirmation" || panel?.kind === "status-line";
+  const hasUnsavedView = !!argumentCommand || memoryEditing.size > 0 || dirtyFiles.size > 0 || queueEditing || panel?.rows?.some((row) => row.input) || panel?.kind === "confirmation" || panel?.kind === "status-line";
   const navigationBusy = navigationPending || !!sessionSwitching || sending || queueAction.busy || memoryAction.busy || updateFeedback.busy || receiptInspection.busy || !!state?.receipt_busy || voiceBusy || editorBusy || attachments.busy;
 
   useLayoutEffect(() => {
@@ -246,6 +248,7 @@ export function App() {
   };
   useEffect(() => {
     const keyboard = (event: globalThis.KeyboardEvent) => {
+      if (argumentCommand) return;
       if (event.defaultPrevented || showDrafts || updatesOpen || updatePreparing) return;
       if (navigation && event.key !== "Escape") return;
       const bindings = state?.desktop?.shortcuts;
@@ -385,9 +388,10 @@ export function App() {
       setShowCommands(false);
       if (name === "@following" || name === "@saved") { drawerReturn.current = commandReturn.current?.isConnected ? commandReturn.current : composer.current; setRequestedOutput(undefined); setDetailKind(name === "@following" ? "following" : "saved"); setDetails(true); }
       else if (name === "@gator") navigate("/chat");
-      else if (needsInput) navigate("/chat", `/${name} `);
+      else if (needsInput) setArgumentCommand(name);
       else navigate(`/${name}`);
     }} />}</Presence>
+    {argumentCommand && <CommandArguments key={`${conversationIdentity}:${argumentCommand}`} name={argumentCommand} description={commands.find(command => command.name === argumentCommand)?.description} run={async text => { await send({ type: "submit", text }); }} close={() => setArgumentCommand(undefined)} />}
     <Presence open={showDrafts}>{(open, presenceRef) => <DraftManager open={open} presenceRef={presenceRef} saved={drafts.saved} issue={drafts.issue} manage={drafts.manage} close={() => setShowDrafts(false)} restore={(retained) => { if (retained.reply_to_update_id && retained.context !== drafts.context) { setDraftError("Open this reply’s original chat to restore it."); return; } if (retained.reply_to_update_id) drafts.setReplyToUpdateID(retained.reply_to_update_id); try { drafts.setUploads([...new Map([...drafts.uploads, ...(retained.uploads ?? [])].map((file) => [file.id, file])).values()]); setDraft((current) => !current ? retained.text : current === retained.text ? current : `${current}\n\n${retained.text}`); } catch (error) { setDraftError(error instanceof Error ? error.message : "Couldn’t restore attachments."); } composer.current?.focus(); }} />}</Presence>
     <Presence open={!!navigation}>{(open, presenceRef) => <DiscardDialog open={open} presenceRef={presenceRef} queued={navigation?.queued ?? false} fileEdits={dirtyFiles.size > 0} cancel={() => setNavigation(null)} confirm={() => { if (!navigation) return; performNavigation(navigation.target); setNavigation(null); }} />}</Presence>
   </div></FileChatContext.Provider>;

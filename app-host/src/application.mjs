@@ -147,7 +147,7 @@ export class Application extends EventEmitter {
     if (typeof id !== "string" || !this.sessions.activity().some(row => row.id === id)) throw new Error("This chat is no longer in the open-chat list.");
     await this.sessions.open({ conversation_id: id });
   }
-  async version() { return (await helper(this.binary, ["--version"], { maxBytes: 4096 })).toString("utf8").trim().replace("Gator desktop runtime", "Gator terminal"); }
+  async version() { return (await helper(this.binary, ["--version"], { maxBytes: 4096 })).toString("utf8").trim(); }
   async prepareComposerEditor(context, text) {
     this.mutable();
     if (context !== this.context || this.backend.state?.panel || this.backend.state?.running || this.backend.state?.pending_approval) throw new Error("Return to the idle conversation before editing its draft externally.");

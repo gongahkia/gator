@@ -129,24 +129,13 @@ func TestConversationReceivesCurrentAppKnowledgeAfterModelChange(t *testing.T) {
 	}
 }
 
-func TestTerminalApplicationContextUsesActualFrontendControls(t *testing.T) {
+func TestRetiredFrontendEnvironmentCannotChangeApplicationIdentity(t *testing.T) {
 	t.Setenv("GATOR_UI_FRONTEND", "terminal")
 	prompt := applicationContext(Request{Provider: "fixture/current"})
-	for _, wanted := range []string{"OpenCode-derived", "Ctrl+P", "/following", "/saved", "F2 or Ctrl+R", "/files", "gator_app_update", "exact live tokens", "gator --help"} {
-		if !strings.Contains(prompt, wanted) {
-			t.Errorf("terminal guide omitted %q", wanted)
-		}
-	}
-	for _, stale := range []string{"Electron", "bottom-left sliders", "paperclip", "microphone button", "no supported standalone"} {
-		if strings.Contains(prompt, stale) {
-			t.Errorf("terminal guide retained %q", stale)
-		}
+	if !strings.Contains(prompt, "Electron") || strings.Contains(prompt, "OpenCode-derived") || strings.Contains(prompt, "Ctrl+P opens searchable commands") {
+		t.Fatal("retired frontend environment revived terminal help")
 	}
 	if got := readApplicationState(t, prompt)["provider_model"]; got != "fixture/current" {
 		t.Fatalf("changed model authority: %v", got)
-	}
-	t.Setenv("GATOR_UI_FRONTEND", "desktop")
-	if !strings.Contains(applicationContext(Request{}), "Electron") {
-		t.Fatal("reference guide lost desktop identity")
 	}
 }

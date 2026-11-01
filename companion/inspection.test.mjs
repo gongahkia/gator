@@ -13,12 +13,12 @@ import { Backend } from '../app-host/src/backend.mjs';
 
 const execute = promisify(execFile);
 const waitFor = async predicate => { for (let i = 0; i < 300; i++) { const value = await predicate(); if (value) return value; await new Promise(r => setTimeout(r, 50)); } throw new Error('Fixture did not reach expected state'); };
-test('real Go owners behind Electron/OpenTUI/companion transports are inspected without replacement workers', { timeout: 240000 }, async () => {
+test('real Go owners behind Electron/companion transports are inspected without replacement workers', { timeout: 240000 }, async () => {
   const root = await mkdtemp(join(tmpdir(), 'gator-inspection-real-'));
   const binary = join(root, process.platform === 'win32' ? 'runtime.exe' : 'runtime');
   try {
     await execute('go', ['build', '-o', binary, './cmd/gator'], { timeout: 90000 });
-    for (const frontend of ['desktop', 'terminal', 'companion']) {
+    for (const frontend of ['desktop', 'companion']) {
       const dir = join(root, frontend), workspace = join(dir, 'workspace'), config = join(dir, 'config'), state = join(dir, 'state'), tokenFile = join(dir, 'token');
       await mkdir(dir, { mode: 0o700 });
       await mkdir(workspace, { recursive: true }); await mkdir(join(config, 'gator'), { recursive: true });
@@ -38,7 +38,7 @@ test('real Go owners behind Electron/OpenTUI/companion transports are inspected 
       try {
         await new Promise(r => provider.listen(0, '127.0.0.1', r));
         await writeFile(join(config, 'gator/config.json'), JSON.stringify({ version: 4, defaults: { provider: 'fixture', model: 'fixture' }, custom_providers: [{ id: 'fixture', base_url: `http://127.0.0.1:${provider.address().port}/chat`, models: ['fixture'], default_model: 'fixture' }] }));
-        const env = { ...process.env, GATOR_CONFIG_DIR: config, GATOR_STATE_DIR: state, GATOR_INTERNAL_COMMANDS: '1', GATOR_UI_SESSION_HOST: '1', GATOR_UI_FRONTEND: frontend };
+        const env = { ...process.env, GATOR_CONFIG_DIR: config, GATOR_STATE_DIR: state, GATOR_INTERNAL_COMMANDS: '1', GATOR_UI_SESSION_HOST: '1' };
         await execute(binary, ['work', '--source', workspace, '--mode', 'inspect', 'Seed inspection fixture'], { env, timeout: 30000 });
         const id = (await readdir(join(state, 'gator/conversations'))).find(n => n.startsWith('work-'));
         assert.ok(id);

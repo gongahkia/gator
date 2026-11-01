@@ -2,7 +2,7 @@
 
 The companion is optional. Gator remains a terminal-agnostic, local-first personal
 agent; neither a phone, private-network service nor tmux is required for ordinary
-agent, desktop or OpenTUI operation. Remote Work supervision uses the actual Work
+agent or Electron desktop operation. Remote Work supervision uses the actual Work
 owner and semantic coding-agent controls. Optional external tmux is independently
 enrolled and authorized host-terminal access, with different trust and lifetime
 boundaries. It is not a replacement for Work controls or a generic SSH client.
@@ -19,7 +19,7 @@ limitations](../docs/EXECUTION-TARGETS-T2.md). Lost acknowledgements use receipt
 retrieval; no mutation is automatically resent.
 
 The **Active Work** view can inspect explicitly shared live Work
-owned by desktop, OpenTUI, or this companion. Device authentication alone does
+owned by Electron or this companion. Device authentication alone does
 not grant inspection: use the host-local, short-lived grant procedure in
 [T1 owned Work inspection](../docs/EXECUTION-TARGETS-T1.md). This view does not
 start a chat worker, keep the execution owner alive, or expose terminal input.
@@ -31,9 +31,10 @@ work or make an offline laptop's files accessible.
 
 This checkpoint supplies an authenticated API and a small phone/browser client
 using the existing Go bridge. Interactive device pairing, file transfer,
-automated deployment and remote account onboarding remain unfinished. Keep Electron and
-the terminal available for host setup and recovery. The terminal parity gate is
-unchanged. Do not expose this listener directly to the internet.
+automated deployment and remote account onboarding remain unfinished. Use Electron
+for host setup and recovery. The Gator terminal product is retired; explicit
+host-local administrative commands below use the private Go runtime rather than
+a public CLI installation. Do not expose this listener directly to the internet.
 
 ## Start on a configured host
 

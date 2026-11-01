@@ -1,5 +1,10 @@
 # Terminal chat UX review — 2026-10-29
 
+> **Historical, superseded 1 November 2026.** The terminal product and migration
+> are cancelled. Electron is the sole primary app. The original implementation
+> and test evidence below is retained as history, not current launch/install
+> instructions. See [Electron consolidation](ELECTRON-CONSOLIDATION.md).
+
 Full review of the native terminal chat catalog, transcript, loading indicator,
 header, and shared terminal colors. Framework: Solid / OpenTUI 0.6.8; existing
 `useTheme` tokens, native text attributes and renderables. No new styling or

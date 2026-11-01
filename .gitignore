@@ -10,6 +10,9 @@ node_modules
 /desktop/release/
 /desktop/test-results/
 /desktop/playwright-report/
+# Unshipped build remnants from the retired terminal product.
+/ui/dist/
+/ui/runtime/
 /.pty-venv/
 /.env
 /.env.local

@@ -23,6 +23,7 @@ search and in-app slash commands, not a standalone CLI.
 | Reconnect and uncertain admission | `Backend`, `Sessions`, request journal | Existing reconnect screen and stable admission IDs |
 | Drafts, attachments, per-chat recovery | `DraftStore`, `UploadStore` | Existing `useDrafts`, `DraftManager`, `Attachments` |
 | Reuse a previous message without sending | Retained Go transcript; frontend draft staging | **Gap:** add Message tools → Reuse a message, append or explicitly review replacement; keep attachments/reply identity |
+| Command arguments independent of message draft | Go command handling, frontend argument prompt | **Gap:** command search opens a separate argument dialog rather than overwriting the composer |
 | External composer editor | `Backend.prepareComposerEditor`, Go-owned editor handoff | **Gap:** add narrow host-owned editor IPC and Message tools action; no arbitrary renderer command execution |
 | Public activity and transcript search | Go activity projection | Existing `ActivityTimeline`, `useConversationSearch` |
 | Current selections vs retained evidence | Go `work_details`, verified manifests | Existing `WorkDetails`, latest-only context and output projections |

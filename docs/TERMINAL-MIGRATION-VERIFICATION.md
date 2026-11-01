@@ -1,5 +1,10 @@
 # Terminal migration verification
 
+> **Historical, superseded 1 November 2026.** The terminal product and migration
+> are cancelled. Electron is the sole primary app. The original implementation
+> and test evidence below is retained as history, not current launch/install
+> instructions. See [Electron consolidation](ELECTRON-CONSOLIDATION.md).
+
 Started 26 October 2026. **Parity gate: OPEN. Electron removal is not authorized
 by evidence yet.** This ledger records observed results, not inferred parity.
 

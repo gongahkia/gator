@@ -1,5 +1,10 @@
 # Final execution integration scope — T4.5
 
+> Product-surface update, 1 November 2026: Electron is the sole primary app;
+> the OpenTUI product has been removed. The backend/companion guarantees and
+> historical verification below are retained. See
+> [Electron consolidation](ELECTRON-CONSOLIDATION.md).
+
 Gator remains a terminal-agnostic, local-first personal AI agent for ongoing work:
 conversations, memory, files/research, goals, coding specialists, approvals,
 durable recovery and local interfaces. Remote execution supervision supports that

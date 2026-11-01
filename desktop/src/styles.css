@@ -1068,3 +1068,4 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .message-history-list article { padding: 12px 0; border-bottom: 1px solid var(--color-line-subtle); }
 .message-history-list pre { max-height: 120px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
 .message-history-list article > div, .message-tools-review { display: flex; flex-wrap: wrap; gap: 8px; }
+.command-arguments-input { display: block; width: 100%; margin: 8px 0 16px; padding: 10px; border: 1px solid var(--color-line); border-radius: var(--radius-sm); background: var(--color-base); color: var(--color-contrast); }

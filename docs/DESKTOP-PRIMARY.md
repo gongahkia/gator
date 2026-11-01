@@ -1,5 +1,10 @@
 # Desktop as Gator's primary interface
 
+Reconfirmed 1 November 2026: Electron is the sole primary app. The later OpenTUI
+migration is cancelled after a capability inventory and Electron ports; see
+[the consolidation record](ELECTRON-CONSOLIDATION.md). Historical implementation
+steps and results below retain their original dates.
+
 Decision: 22 October 2026. Supersedes the earlier dual-interface rollout.
 
 ## Decision

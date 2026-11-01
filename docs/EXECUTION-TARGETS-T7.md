@@ -1,5 +1,10 @@
 # T7 — final Onibi migration acceptance
 
+> Product-surface update, 1 November 2026: Electron is the sole primary app;
+> the OpenTUI product has been removed. The backend/companion guarantees and
+> historical verification below are retained. See
+> [Electron consolidation](ELECTRON-CONSOLIDATION.md).
+
 Acceptance date: 31 October 2026. This is verification and documentation of the
 completed migration, not another implementation tranche. Gator remains a
 terminal-agnostic, local-first personal AI agent. Remote supervision supports that
