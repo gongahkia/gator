@@ -1,6 +1,6 @@
 // Package workrun orchestrates provider-independent, non-Git Work sessions.
-// Coding is an internal bounded specialist that returns evidence to Work; its
-// native execution engine is intentionally separate from legacy run sessions.
+// Coding is shared by the conversation runner and bounded specialists; its
+// isolated execution engine returns evidence without modifying live source.
 package workrun
 
 import (
@@ -37,7 +37,7 @@ const (
 )
 
 // CodePolicy is the user-owned capability envelope for Gator's internal Code
-// specialist. The Work manager can decide whether to delegate, but it cannot
+// tools and specialists. The Work manager can code or delegate, but it cannot
 // widen this policy. Empty policies deliberately resolve to strict, offline
 // execution with only the built-in patch tools and verifier commands.
 type CodePolicy struct {

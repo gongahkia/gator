@@ -62,6 +62,7 @@ func (c *conversationCode) Tools() []agent.Tool {
 		definition.Description = "Operate on your private coding checkout (paths are checkout-relative, not source/ or output/). " + definition.Description
 		result = append(result, conversationCodeTool{c, definition, native})
 	}
+	result = append(result, conversationCodeTool{c, agent.ToolDefinition{Name: "code_use_integration", Description: "Use one exact optional tool advertised by code_open in integrations. These are the same explicitly host-granted LSP/MCP/extension/web/browser tools available to coding delegates. Unknown or omitted tools fail closed; this cannot invoke arbitrary tool names or mint grants.", Parameters: json.RawMessage(`{"type":"object","additionalProperties":false,"required":["tool","arguments"],"properties":{"tool":{"type":"string"},"arguments":{"type":"object"}}}`)}, "integration"})
 	result = append(result, conversationCodeTool{c, agent.ToolDefinition{Name: "code_open", Description: "Select an optional previously verified baseline patch before the first direct coding tool. Opens an isolated checkout without launching another agent. Cannot switch baseline after opening.", Parameters: json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"baseline_patch":{"type":"string"}}}`)}, "open"})
 	result = append(result, conversationCodeTool{c, agent.ToolDefinition{Name: "code_stage", Description: "Retain your current patch and independently verify its frozen candidate. First inspect code_git_status and code_git_diff, and pass required code_run_command checks after the last change. This does not apply anything to live source and does not claim independent human review.", Parameters: json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{}}`)}, "stage"})
 	return result
@@ -116,7 +117,13 @@ func (t conversationCodeTool) Execute(ctx context.Context, raw json.RawMessage) 
 	}
 	harness := c.session.Harness
 	if t.native == "open" {
-		return codingJSON(map[string]any{"isolated": true, "instructions": harness.System, "live_source_modified": false})
+		integrations := []agent.ToolDefinition{}
+		for _, tool := range harness.Tools {
+			if !coreCodingTool(tool.Definition().Name) {
+				integrations = append(integrations, tool.Definition())
+			}
+		}
+		return codingJSON(map[string]any{"isolated": true, "instructions": harness.System, "integrations": integrations, "live_source_modified": false})
 	}
 	if t.native == "stage" {
 		var args map[string]json.RawMessage
@@ -133,7 +140,8 @@ func (t conversationCodeTool) Execute(ctx context.Context, raw json.RawMessage) 
 			return agent.ToolResult{}, err
 		}
 		if len(evidence.Patch) == 0 {
-			return agent.ToolResult{}, errors.New("no code changes to stage")
+			c.dirty = false
+			return codingJSON(map[string]any{"status": "unchanged", "verification_passed": true, "live_source_modified": false})
 		}
 		c.staged++
 		name := fmt.Sprintf("code/%s-conversation-%03d.patch", c.request.ParentRunID, c.staged)
@@ -154,6 +162,20 @@ func (t conversationCodeTool) Execute(ctx context.Context, raw json.RawMessage) 
 		}
 		return result, err
 	}
+	if t.native == "integration" {
+		var args struct {
+			Tool      string          `json:"tool"`
+			Arguments json.RawMessage `json:"arguments"`
+		}
+		if err := json.Unmarshal(raw, &args); err != nil {
+			return agent.ToolResult{}, err
+		}
+		if args.Tool == "" || coreCodingTool(args.Tool) || len(args.Arguments) == 0 {
+			return agent.ToolResult{}, errors.New("select an exact advertised optional integration tool")
+		}
+		t.native = args.Tool
+		raw = args.Arguments
+	}
 	var tool agent.Tool
 	for _, candidate := range harness.Tools {
 		if candidate.Definition().Name == t.native {
@@ -171,7 +193,7 @@ func (t conversationCodeTool) Execute(ctx context.Context, raw json.RawMessage) 
 		}
 	}
 	// An attempted mutation may have partial effects even if its tool fails.
-	if codingMutation(t.native) {
+	if codingMutation(t.native) || !coreCodingTool(t.native) {
 		c.dirty = true
 		if t.native != "run_command" {
 			c.messages = nil
@@ -182,6 +204,9 @@ func (t conversationCodeTool) Execute(ctx context.Context, raw json.RawMessage) 
 		if after := harness.AfterTool(ctx, call, result, err); after != nil {
 			err = errors.Join(err, after)
 		}
+	}
+	if err != nil {
+		c.messages = nil
 	}
 	if err == nil {
 		c.messages = append(c.messages, agent.Message{Role: agent.RoleTool, ToolName: t.native, Content: result.Content})
@@ -224,4 +249,12 @@ func (c *codeIntegration) retain(work workspace.Work, name string, payload []byt
 	defer c.mu.Unlock()
 	c.patches[name] = hex.EncodeToString(sum[:])
 	return nil
+}
+
+func coreCodingTool(name string) bool {
+	switch name {
+	case "read_file", "list_files", "search_files", "apply_patch", "run_command", "git_status", "git_diff", "terminal_start", "terminal_read", "terminal_write", "terminal_list", "terminal_stop":
+		return true
+	}
+	return false
 }

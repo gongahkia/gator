@@ -669,6 +669,7 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 	var contract artifact.Contract
 	if mode == action.Inspect || len(paths) == 0 {
 		contract = artifact.InspectionContract()
+		contract.AllowOptionalArtifacts = mode == action.Draft
 		contract.ExternalActions = disposition
 	} else {
 		contract, err = workContract(mode, disposition, artifactFlags(paths), nil)
@@ -728,6 +729,9 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 		return result, nil
 	}
 	request.Code = workrun.CodePolicy{MaxSteps: options.Code.MaxSteps, Scopes: options.Code.Scopes, Profile: options.Code.Profile, Sandbox: sandbox.Policy{Mode: sandbox.Mode(options.Code.Sandbox), Network: sandbox.Network(options.Code.Network)}, Capabilities: options.Code.Capabilities, BrowserSession: options.Code.BrowserSession}
+	if request.EnableCode && len(options.Code.Capabilities) == 0 {
+		request.Code.Capabilities = []string{workrun.CodeCapabilityTerminal}
+	}
 	for _, pair := range []struct {
 		values []string
 		target *[][]string
