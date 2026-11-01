@@ -129,12 +129,12 @@ not been executed on remote CI in this session.
 
 | Check | Observed result |
 | --- | --- |
-| `go test ./...` | PASS across all packages; live API tests skipped by default |
+| `go test ./...` | PASS: 72 tested packages, 11 without test files; live API tests skipped by default |
 | `go vet ./...` | PASS |
 | Focused Go application-guide, editor, bridge and follow-up tests | PASS |
 | `go test -race ./internal/workrun ./internal/workapp -run 'ApplicationContext\|Conversation.*Knowledge\|RetiredFrontend\|ComposerEditor\|BridgeEditor\|Followup' -count=1` | PASS |
 | `npm run check --prefix desktop` | PASS |
-| `GATOR_INDEPENDENCE_BINARY="$PWD/desktop/runtime/gator-runtime" npm test --prefix desktop` | PASS: 18 desktop tests plus 73 shared-host tests; one existing opt-in skip in each suite |
+| `GATOR_INDEPENDENCE_BINARY="$PWD/desktop/runtime/gator-runtime" npm test --prefix desktop` | PASS: 19 desktop tests plus 73 shared-host tests; one existing opt-in skip in each suite on macOS |
 | Companion auth/server/recovery/inspection/mutation/external and Chromium clients, sequential Node runner | PASS: 25, one opt-in native-tmux skip |
 | Real-Go independence fixture with Onibi, tmux and Tailscale absent from `PATH` | PASS; ordinary Work succeeds and creates no external catalog |
 | New three Electron consolidation journeys | PASS: message reuse/arguments, Go-owned editor/error/empty/oversize recovery, exact export replacement |
@@ -200,8 +200,8 @@ New controls reuse React, plain CSS, existing tokens and Lucide icons. Typograph
 uses existing body/metadata styles, bounded plain-text previews and editable
 review text. Surfaces retain the existing modal/popover hierarchy and 40–44px
 actions. Icons keep the application's inherited color and stroke conventions.
-No new motion or animation library was added; the existing reduced-motion and
-interruptible-motion journeys remain applicable. Performance stays bounded by
+No animation library was added; the requested effort transitions reuse CSS and
+the existing reduced-motion/interruptible-motion checks. Performance stays bounded by
 50 displayed message matches and the existing input/output size limits. This is
 a scoped review of the added controls, not a claim that every visual state in
 the application was manually reviewed at slowed animation speed.
@@ -233,7 +233,6 @@ labels crossfade without remounting the control. Dragging stays immediate and
 reduced motion disables interpolation. A Chromium check slows active transitions
 to 10% playback, reverses direction, then checks reduced motion. Source and link
 screenshots were inspected; light-theme link contrast has automated coverage.
-This supersedes the earlier “no new motion” statement for this later request.
 
 The dependency notice generator now also retains direct production host-package
 notices when npm marks a root-hoisted copy as a development dependency through

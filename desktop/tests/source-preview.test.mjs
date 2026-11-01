@@ -26,8 +26,12 @@ test("source references cannot open another run, conversation, unselected source
   for (const change of [{ context: "conversation:other" }, { run: "run-other" }, { path: "source/secret.md" }, { path: "source/../secret" }, { path: "/etc/passwd" }, { path: "source/\\secret" }, { start: 0 }, { end: 999 }, { executable: "/bin/sh" }]) await assert.rejects(f.read({ ...f.request, ...change }));
   await assert.rejects(sourcePreview(f.request, { stateRoot: f.root, state: f.state, current: () => false }));
 }));
-test("source tampering and symlinks fail closed; no fallback to the current workspace", () => fixture(async f => {
+test("source tampering fails closed; no fallback to the current workspace", () => fixture(async f => {
   await writeFile(join(f.path, f.file), "Changed private data"); await assert.rejects(f.read(), /changed/);
+}));
+test("linked source bytes cannot bypass the retained-evidence boundary", { skip: process.platform === "win32" }, () => fixture(async f => {
+  // Windows file symlink creation requires additional OS privileges; do not
+  // require elevation or weaken the ordinary cross-platform tamper check.
   await rm(join(f.path, f.file)); await writeFile(join(f.root, "elsewhere.txt"), f.text); await symlink(join(f.root, "elsewhere.txt"), join(f.path, f.file)); await assert.rejects(f.read(), /Linked/);
 }));
 test("unverified or missing replay is explicit and never invented from a model's cited range", () => fixture(async f => {
