@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events"
 import type { Application } from "./application.mjs"
-export type VoiceStatus = { ready: boolean; issue?: string; provider: string; model: string; route: string; preferences: { spoken_replies: boolean; provider?: string; model?: string; language?: string; rate?: number }; max_seconds: number; max_audio_bytes: number }
+import type { VoiceStatus } from "../contracts/voice"
+export type { VoiceStatus } from "../contracts/voice"
 export class VoiceSession extends EventEmitter {
   constructor(application: Application)
   phase: string; playing: boolean; context?: string; issue?: string

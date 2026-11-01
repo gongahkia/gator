@@ -301,3 +301,5 @@ an action review. See [the retirement decision](../docs/DESKTOP-PRIMARY.md).
 
 The live surface mapping and remaining application work are documented in
 [the conversational implementation](../docs/DESKTOP-CONVERSATIONAL-IMPLEMENTATION.md).
+
+Local dictation is available through **Voice → Whisper · local, no API key**. Install the optional whisper.cpp runtime, then use Gator’s explicit one-time model download. Spoken replies use selectable installed local system voices. See [local voice setup and verification](../docs/LOCAL-VOICE.md).

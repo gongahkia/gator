@@ -25,6 +25,7 @@ const DefaultOpenAIModel = "gpt-transcribe"
 type Config struct {
 	Provider, Model, APIKey, BaseURL string
 	Client                           *http.Client
+	Local                            *LocalConfig
 }
 type Recording struct {
 	MediaType string `json:"media_type"`
@@ -57,6 +58,9 @@ func Transcribe(ctx context.Context, config Config, recording Recording) (Result
 	result := Result{Provider: config.Provider, Model: config.Model}
 	if err := ValidateRecording(recording); err != nil {
 		return result, err
+	}
+	if config.Provider == LocalProvider {
+		return transcribeLocal(ctx, config, recording)
 	}
 	if strings.TrimSpace(config.APIKey) == "" {
 		return result, errors.New("configure this voice provider's API key in Settings → Models first")

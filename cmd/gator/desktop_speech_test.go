@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -77,4 +78,90 @@ func TestDesktopSpeechKeepsKeysPrivateAndChargesSharedUsage(t *testing.T) {
 	if err := json.Unmarshal(output.Bytes(), &status); err != nil || status.Ready || status.Issue == "" {
 		t.Fatalf("paused usage allowed microphone setup: %s (%v)", output.String(), err)
 	}
+}
+
+func TestDesktopLocalVoiceRequiresNoAPIKeyAndDoesNotTouchRemoteUsage(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("GATOR_STATE_DIR", root)
+	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
+	t.Setenv("OPENAI_API_KEY", "")
+	t.Setenv("GEMINI_API_KEY", "")
+	t.Setenv("GATOR_WHISPER_BINARY", "/no-such-gator-whisper-runtime")
+	store, _ := config.DefaultStore()
+	settings := config.Default()
+	settings.Desktop.Voice.Provider = speech.LocalProvider
+	if err := store.Save(settings); err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	if err := runDesktopSpeech(strings.NewReader(`{"action":"status"}`), &output); err != nil {
+		t.Fatal(err)
+	}
+	var status desktopVoiceStatus
+	if err := json.Unmarshal(output.Bytes(), &status); err != nil {
+		t.Fatal(err)
+	}
+	if status.Provider != speech.LocalProvider || status.Model != "base" || status.Ready || status.Local == nil || status.Local.RuntimeReady || len(status.Local.Models) != 3 || status.Route == "" {
+		t.Fatalf("local status: %#v", status)
+	}
+	if strings.Contains(output.String(), root) || strings.Contains(output.String(), "no-such") {
+		t.Fatal("local status disclosed host paths")
+	}
+	if err := runDesktopSpeech(strings.NewReader(`{"action":"download","model":"../../private"}`), io.Discard); err == nil {
+		t.Fatal("unselected download accepted")
+	}
+	if err := runDesktopSpeech(strings.NewReader(`{"action":"status","model":"tiny"}`), io.Discard); err == nil {
+		t.Fatal("status silently changed model")
+	}
+}
+
+func TestNativeDesktopLocalVoice(t *testing.T) {
+	if os.Getenv("GATOR_NATIVE_WHISPER_TEST") != "1" {
+		t.Skip("opt-in native public-sample voice helper acceptance")
+	}
+	root := t.TempDir()
+	t.Setenv("GATOR_STATE_DIR", root)
+	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
+	t.Setenv("OPENAI_API_KEY", "")
+	t.Setenv("GEMINI_API_KEY", "")
+	var output bytes.Buffer
+	if err := runDesktopSpeech(strings.NewReader(`{"action":"configure","preferences":{"provider":"whisper-local","model":"tiny","language":"en"}}`), &output); err != nil {
+		t.Fatal(err)
+	}
+	output.Reset()
+	if err := runDesktopSpeech(strings.NewReader(`{"action":"download","model":"tiny"}`), &output); err != nil {
+		t.Fatal(err)
+	}
+	ledger, err := sharedusage.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ledger.SavePolicy(sharedusage.Policy{Paused: true}); err != nil {
+		t.Fatal(err)
+	}
+	output.Reset()
+	if err := runDesktopSpeech(strings.NewReader(`{"action":"status"}`), &output); err != nil {
+		t.Fatal(err)
+	}
+	var status desktopVoiceStatus
+	if err := json.Unmarshal(output.Bytes(), &status); err != nil || !status.Ready {
+		t.Fatalf("local setup unavailable: %v %s", err, output.Bytes())
+	}
+	wav, err := os.ReadFile(os.Getenv("GATOR_NATIVE_WHISPER_WAV"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload, _ := json.Marshal(desktopSpeechRequest{Action: "transcribe", Route: status.Route, Recording: &speech.Recording{MediaType: "audio/wav", Data: wav}})
+	output.Reset()
+	if err := runDesktopSpeech(bytes.NewReader(payload), &output); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(strings.ToLower(output.String()), "country") {
+		t.Fatal("public sample speech was not recognized")
+	}
+	snapshot, err := ledger.Snapshot(time.Now())
+	if err != nil || snapshot.Tokens != 0 || snapshot.Categories["voice"] != 0 {
+		t.Fatalf("local inference charged remote usage: %#v %v", snapshot, err)
+	}
+	t.Log("native Go voice-helper setup/download/route/transcription passed with no API key and paused commercial usage")
 }

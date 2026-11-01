@@ -205,3 +205,53 @@ paid run was started to hide the failure or reset accounting. Future explicitly
 invoked coding runs have a 40-request per-run bound and retain bounded completion
 metadata even when the parent cannot deliver its final answer. The shared
 128-request/$9.50 conservative admission limits remain unchanged.
+
+## Scoped interface review
+
+Full review of the requested coding presentation and local-voice setup only;
+React, existing CSS/Tailwind tokens and Lucide. Other product surfaces were not
+redesigned.
+
+| Category | Evidence inspected | Result |
+| --- | --- | --- |
+| Typography | `SyntaxCode.tsx`, Markdown code blocks, `CodeChanges.tsx`, voice labels | Code remains monospaced text; diff labels supplement colors; timer uses tabular numbers. |
+| Surfaces | Retained-diff scrolling, narrow recording pill, expanded Voice menu | Voice menu gains a viewport-height bound and internal scroll so added setup controls remain reachable. Existing surface tokens retained. |
+| Animations | Activity disclosure and existing recording/reduced-motion journeys | No new entrance animation; existing motion test now slows on transition start to avoid a CDP timing race. Final rerun evidence recorded below. |
+| Icons | File/check/error rows, Download, microphone and speech controls | Existing Lucide/currentColor vocabulary, explicit button labels and text for error/progress. |
+| Performance | Bounded syntax lexer, bounded patch preview, local audio conversion | No new UI dependencies. Highlighting falls back to plain text after its budget; retained patch previews and local audio have independent limits. |
+
+| Severity | Location | Before | After | Why |
+| --- | --- | --- | --- | --- |
+| MEDIUM | `desktop/src/CodeChanges.tsx` | Coding patch/evidence was not inspectable in the chat details | Bounded retained unified diff, changed paths, verification and unavailable states | Users can assess the proposed edit without treating a checkmark as independent review or application permission. |
+| MEDIUM | `desktop/src/VoiceControls.tsx`, `styles.css` | Added model setup could exceed a small window | Bounded scrolling panel, explicit download/cancel, missing-runtime and no-voice states | Setup and cancellation remain reachable and do not imply microphone activity. |
+| MEDIUM | `desktop/src/SyntaxCode.tsx`, `syntax.ts` | Code blocks lacked lexical color | Bounded React-text token rendering, plain-text fallback and unchanged copy text | Improves scanning without interpreting code as HTML or introducing an editor runtime. |
+
+Considered and rejected: a Monaco/terminal emulator for retained patches (unneeded
+editing/runtime authority and bundle cost); automatic Whisper download when the
+microphone is clicked (violates explicit download/recording separation); new
+animation and styling packages (existing styles already cover the interaction).
+Verification uses the real Electron journeys and native checks described in the
+verification records. Native microphone permissions, signed installation,
+subjective recognition quality and the incomplete paid repair/review phase remain
+unverified. No private model reasoning is exposed as an activity stream.
+
+## Final automated verification — 2026-11-01
+
+- `go test ./...`: PASS, 72 tested packages and 11 packages without tests. Repeated after the final coding event-retention correction; no failures.
+- `go vet ./...`: PASS after final Go changes.
+- `go test -race ./internal/speech ./internal/codeexec ./internal/workrun ./internal/orchestrator ./internal/sandbox ./internal/tools ./internal/workactivity`: PASS, seven packages. Final focused race rerun for `codeexec` and `speech`: PASS.
+- `npm test --prefix desktop`: desktop 25 passed / 1 opt-in skipped; shared application host 74 passed / 1 skipped. Focused native/voice Node tests: 10 passed.
+- `npm run check --prefix desktop` and `npm run build --prefix desktop`: PASS.
+- `GATOR_E2E_BACKGROUND=1 npm run test:e2e --prefix desktop`: 69 passed, 2 paid opt-in skipped, 1 existing animation-timing failure. All seven coding journeys passed. The failing test tried to slow an already-finished transition; it now slows on `transitionrun`. A final built-UI rerun of that case, API voice, local voice, and About/draft preservation passed all four. The entire 72-case suite was not rerun after this test-only correction; do not describe the original run as wholly green.
+- `node --test companion/*.test.mjs`: 37 passed, 5 opt-in skipped, no failures, including Chromium journeys. Native tmux fixtures were not opted in for this coding/voice change.
+- CGO-disabled `go build ./cmd/gator` for Linux/amd64 and Windows/amd64: PASS, output only to temporary paths. These are cross-builds, not native runtime acceptance.
+- Existing `electron-builder --dir --publish never`: PASS, unsigned macOS/x64 application. ASAR inspection confirmed the main process and optional Whisper license notices. Packaged Electron API-voice, local-voice, and startup-without-Node/CLI journeys: all three passed.
+- Real CPU Whisper v1.9.5 with a pinned downloaded Tiny model/public sample: PASS. Native Go voice-helper configuration, explicit download, route binding and zero-commercial-usage transcription: PASS. See [Local voice](LOCAL-VOICE.md).
+- `gofmt -l` for changed Go voice/harness files and `git diff --check`: clean. No dependencies or toolchains upgraded. Bun is unavailable and was not installed; the retired terminal UI is not a product surface.
+
+The paid coding repair/review run above remains incomplete. Physical microphone,
+signed installers, Linux/WSL native runtime, physical phones, subjective coding
+quality across repositories and multilingual recognition quality remain separate
+acceptance work. Interface-polish verdict: **Approve within the reviewed scope**;
+the unverified native/device and paid-evaluation items remain explicitly excluded
+from that verdict.

@@ -1139,3 +1139,7 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .diff-removed { color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 8%, transparent); }
 .diff-hunk { color: var(--color-link); }
 .diff-header { color: var(--color-secondary); font-weight: 600; }
+.voice-panel { max-height: min(680px, calc(100dvh - 160px)); overflow-y: auto; }
+.local-voice-setup { padding: 12px 0; border-bottom: 1px solid var(--color-line); }
+.local-voice-setup p { color: var(--color-muted); font-size: var(--text-xs); line-height: 1.6; }
+.local-voice-setup > [role="status"] { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; font-size: var(--text-xs); }

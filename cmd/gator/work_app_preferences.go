@@ -53,19 +53,23 @@ func (c gatorAppController) prepareDesktopPreferences(change workrun.AppChange) 
 		}}, nil
 	}
 	var v struct {
-		Spoken   *bool    `json:"spoken_replies"`
-		Provider *string  `json:"provider"`
-		Model    *string  `json:"model"`
-		Language *string  `json:"language"`
-		Rate     *float64 `json:"rate"`
+		Spoken      *bool    `json:"spoken_replies"`
+		SystemVoice *string  `json:"system_voice"`
+		Provider    *string  `json:"provider"`
+		Model       *string  `json:"model"`
+		Language    *string  `json:"language"`
+		Rate        *float64 `json:"rate"`
 	}
 	if err := workrun.DecodeAppArguments(change.Value, &v); err != nil {
 		return workrun.AppMutation{}, err
 	}
-	if v.Spoken == nil && v.Provider == nil && v.Model == nil && v.Language == nil && v.Rate == nil {
+	if v.SystemVoice == nil && v.Spoken == nil && v.Provider == nil && v.Model == nil && v.Language == nil && v.Rate == nil {
 		return workrun.AppMutation{}, errors.New("provide a voice preference to change")
 	}
 	next := prior.Desktop.Voice
+	if v.SystemVoice != nil {
+		next.SystemVoice = *v.SystemVoice
+	}
 	if v.Spoken != nil {
 		next.SpokenReplies = *v.Spoken
 	}

@@ -289,3 +289,67 @@ test("composer model picker preserves drafts, changes actual defaults and honors
     expect(errors).toEqual([]);
   } finally { release(); await f.close(); }
 });
+
+test("local voice setup offers explicit model download and converts browser audio without cloud fallback", async () => {
+  test.setTimeout(90000);
+  const f = await fixture();
+  try {
+    const app = await f.launch(), page = await app.firstWindow();
+    // UI contract fixture only. Real model download/inference has a separate
+    // opt-in native test; no physical microphone or commercial API is used here.
+    await app.evaluate(({ ipcMain }) => {
+      let model = "base", available = false, provider = "gemini", downloads = 0, recordings = 0;
+      let release: ((value: unknown) => void) | undefined;
+      const status = () => ({ ready: provider === "whisper-local" && available, provider, model, preferences: { provider, model, spoken_replies: false }, max_seconds: 120, max_audio_bytes: 8388608, local: { supported: true, runtime_ready: true, models: ["tiny", "base", "small"].map(id => ({ id, label: id, bytes: 100000000, available: id === model && available })) } });
+      ipcMain.removeHandler("gator:voice");
+      ipcMain.handle("gator:voice", async (_event, request) => {
+        if (request.action === "configure") { provider = request.preferences.provider ?? provider; model = request.preferences.model || model; return status(); }
+        if (request.action === "download") { downloads++; if (downloads === 1) return new Promise(resolve => { release = resolve; }); available = true; return status(); }
+        if (request.action === "cancel") { release?.({ ...status(), issue: "Voice model download cancelled." }); return {}; }
+        if (request.action === "authorize") return { ...status(), allowed: true };
+        if (request.action === "transcribe") {
+          recordings++;
+          const bytes = new Uint8Array(request.data), view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+          if (request.media_type !== "audio/wav" || new TextDecoder().decode(bytes.slice(0, 4)) !== "RIFF" || view.getUint32(24, true) !== 16000 || view.getUint16(22, true) !== 1 || view.getUint16(34, true) !== 16 || bytes.length <= 44) throw new Error("Invalid local PCM conversion");
+          if (recordings > 1) throw new Error("Local runtime failed. No recording was uploaded.");
+          return { text: "Local dictation fixture." };
+        }
+        return status();
+      });
+    });
+    await page.evaluate(() => {
+      Object.defineProperty(navigator.mediaDevices, "getUserMedia", { configurable: true, value: async () => { const ctx = new AudioContext(), tone = ctx.createOscillator(), destination = ctx.createMediaStreamDestination(); tone.connect(destination); tone.start(); return destination.stream; } });
+    });
+    const composer = page.getByRole("textbox", { name: "Message Gator", exact: true });
+    await composer.fill("Keep my draft.");
+    await page.getByRole("button", { name: "Voice dictation", exact: true }).click();
+    await page.getByLabel("Dictation provider", { exact: true }).selectOption("whisper-local");
+    await expect(page.getByText("Audio is transcribed on this device", { exact: false })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Start recording", exact: true })).toBeDisabled();
+    await page.getByLabel("Local dictation model").selectOption("tiny");
+    await page.getByRole("button", { name: "Download local model", exact: true }).click();
+    await expect(page.getByText("Downloading and verifying the model…", { exact: false })).toBeVisible();
+    await page.getByRole("button", { name: "Cancel download", exact: true }).click();
+    await expect(page.getByRole("alert")).toContainText("cancelled");
+    await page.getByRole("button", { name: "Download local model", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Start recording", exact: true })).toBeEnabled();
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(800, 650));
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const panel = await page.getByRole("dialog", { name: "Voice dictation", exact: true }).boundingBox();
+    expect(panel!.y).toBeGreaterThanOrEqual(0);
+    expect(panel!.x + panel!.width).toBeLessThanOrEqual(800);
+    await page.screenshot({ path: "test-results/local-voice-ready.png" });
+    await page.getByRole("button", { name: "Start recording", exact: true }).click();
+    await expect(page.locator(".dictation-time")).toHaveText("0:01");
+    await page.getByRole("button", { name: "Stop & transcribe", exact: true }).click();
+    await expect(composer).toHaveValue("Keep my draft. Local dictation fixture.");
+    expect(f.voiceRequests()).toBe(0); expect(f.payloads).toHaveLength(0);
+    await page.getByRole("button", { name: "Voice dictation", exact: true }).click();
+    await page.getByRole("button", { name: "Start recording", exact: true }).click();
+    await expect(page.locator(".dictation-time")).toHaveText("0:01");
+    await page.getByRole("button", { name: "Stop & transcribe", exact: true }).click();
+    await expect(page.getByRole("alert")).toContainText("No recording was uploaded");
+    await expect(composer).toHaveValue("Keep my draft. Local dictation fixture.");
+    expect(f.voiceRequests()).toBe(0); expect(f.payloads).toHaveLength(0);
+  } finally { await f.close(); }
+});

@@ -1,3 +1,4 @@
+import type { VoicePreferences } from "./voice";
 // Desktop and companion display contracts. Go owns workflow state.
 export type { OwnedWorkInspection, OwnedWorkResponse, WorkControlOffer, WorkRemoteAction, WorkControlReceipt } from "./inspection";
 export type ResultTone = "success" | "warning" | "error" | "muted" | "";
@@ -105,7 +106,7 @@ export type BackendState = {
   chat_updates?: ChatUpdate[]; chat_updates_issue?: string; chat_updates_total?: number; updates_have_older?: boolean; updates_have_newer?: boolean;
   composer?: ComposerSettings;
   composer_result?: { request_id: string; error?: string };
-  desktop?: { shortcuts: Record<string,string>; voice?: { spoken_replies: boolean; provider?: string; model?: string; language?: string; rate?: number } };
+  desktop?: { shortcuts: Record<string,string>; voice?: VoicePreferences };
   mode: "chat" | "panel";
   panel?: BackendPanel;
   messages: BackendMessage[];

@@ -34,12 +34,12 @@ raise limits when Gator cannot make another model request.
 
 1. Open the microphone button beside the message box. Its default shortcut is
    **Cmd+Shift+V** on macOS and **Ctrl+Shift+V** elsewhere.
-2. Check the displayed dictation provider and language. Gemini or OpenAI needs
+2. Choose local Whisper for offline dictation after a one-time runtime/model setup (see [Local voice](LOCAL-VOICE.md)), or check the API dictation provider and language. Gemini or OpenAI needs
    an API key configured through **Settings → Models**. A supported chat provider
    is reused unless a separate voice provider is selected.
 3. Choose **Start recording**, grant the OS microphone permission, speak, then
    choose **Stop & transcribe**. Clips stop at two minutes and are limited to
-   8 MiB. Audio is sent only to the selected provider for transcription.
+   8 MiB. Audio is transcribed locally with Whisper or sent only to the selected API provider.
 4. Review the text added to your existing draft, then send it normally. Cancel,
    navigation, permission denial, and transcription failures preserve the draft.
 
@@ -58,7 +58,7 @@ capturing Gator's own voice.
 
 Audio bytes are transient and are not saved in transcripts, logs, or artifacts.
 The reviewed transcript becomes an ordinary draft; sending it follows the
-normal conversation and retention rules. Voice provider calls count in shared
+normal conversation and retention rules. API voice provider calls count in shared
 usage under **Voice dictation**; unreported token usage retains an estimate.
 Changing the conversation or voice route during capture prevents that recording
 from being added or uploaded under a different selection.
@@ -112,3 +112,5 @@ The implementation is divided into focused Git commits for rollback. Inspect
 `git log --oneline` for the `feat(agent)`, `feat(app)`, `feat(config)`,
 `feat(desktop)`, `feat(voice)`, and related verification commits. Revert dependent
 changes in reverse order when rolling back a whole feature.
+
+Local Whisper dictation does not consume commercial API tokens. Its one-time model download is explicit in Voice settings; local errors never silently upload recordings to a cloud provider. See [local setup, privacy and platform limits](LOCAL-VOICE.md).

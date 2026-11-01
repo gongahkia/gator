@@ -38,7 +38,7 @@ export class VoiceSession extends EventEmitter {
     if (this.phase !== "idle" || this.application.snapshot().state?.panel) throw new Error("Return to the conversation and finish the current dictation first.");
     const generation = ++this.#generation, context = this.application.context;
     const status = await this.status();
-    if (!status.ready) throw new Error(status.issue || "Configure Gemini or OpenAI for dictation first.");
+    if (!status.ready) throw new Error(status.issue || "Choose local Whisper or an API provider for dictation first.");
     if (generation !== this.#generation || context !== this.application.context) throw new Error("The conversation changed before microphone capture started.");
     this.context = context; this.route = status.route; this.issue = "";
     this.#recording = this.capture(); this.phase = "recording"; this.emit("change");

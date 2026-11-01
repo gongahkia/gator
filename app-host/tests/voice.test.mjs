@@ -14,3 +14,15 @@ test("microphone permission belongs only to the current app window and explicit 
   assert.equal(microphoneAllowed(owner, owner, "media", { mediaType: "audio" }, grant, 100), true);
   for (const [contents, permission, details, token, now] of [[owner, "media", { mediaTypes: ["video"] }, grant, 100], [owner, "media", { mediaTypes: ["audio"], isMainFrame: false }, grant, 100], [owner, "media", { mediaTypes: ["audio"] }, undefined, 100], [owner, "media", { mediaTypes: ["audio"] }, grant, 201], [{ getURL: owner.getURL }, "media", { mediaTypes: ["audio"] }, grant, 100], [owner, "clipboard-read", {}, grant, 100]]) assert.equal(microphoneAllowed(owner, contents, permission, details, token, now), false);
 });
+
+test("local model downloads cannot select URLs, paths, credentials or native programs", () => {
+  for (const model of ["tiny", "base", "small"]) assert.deepEqual(validateVoiceRequest({ action: "download", model }), { action: "download", model });
+  for (const request of [
+    { action: "download", model: "../../private" },
+    { action: "download", model: "https://example.com/model" },
+    { action: "download", model: "base", executable: "sh" },
+    { action: "download", model: "base", data: new Uint8Array([1]) },
+    { action: "download", model: "base", api_key: "secret" },
+  ]) assert.throws(() => validateVoiceRequest(request));
+  assert.doesNotThrow(() => validateVoiceRequest({ action: "configure", preferences: { provider: "whisper-local", model: "base", system_voice: "installed-voice" } }));
+});

@@ -1,0 +1,4 @@
+export type VoicePreferences = { spoken_replies: boolean; provider?: string; model?: string; language?: string; rate?: number; system_voice?: string };
+export type LocalVoiceModel = { id: string; label: string; bytes: number; available: boolean };
+export type VoiceStatus = { ready: boolean; issue?: string; provider: string; model: string; route?: string; preferences: VoicePreferences; max_seconds: number; max_audio_bytes: number; allowed?: boolean; text?: string; local?: { supported: boolean; runtime_ready: boolean; models: LocalVoiceModel[] } };
+export type VoiceRequest = { action: "status" | "release" | "cancel" } | { action: "authorize"; context: string } | { action: "configure"; preferences: Partial<VoicePreferences> } | { action: "download"; model: string } | { action: "transcribe"; context: string; media_type: string; data: Uint8Array };

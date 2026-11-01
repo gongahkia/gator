@@ -250,13 +250,20 @@ else {
       const call = (payload, signal) => runSpeechRequest(runtimeBinary(), runtimeWorkspace(), runtimeEnvironment(), payload, signal);
       if (request.action === "release" || request.action === "cancel") { voiceGeneration++; microphoneGrant = undefined; if (request.action === "cancel") speechAbort?.abort(); return {}; }
       if (request.action === "status") return call({ action: "status" });
+      if (request.action === "download") {
+        if (speechAbort || (microphoneGrant && microphoneGrant.expires > Date.now())) throw new Error("Finish the current voice operation first.");
+        microphoneGrant = undefined;
+        const controller = new AbortController(); speechAbort = controller;
+        try { return await call({ action: "download", model: request.model }, controller.signal); }
+        finally { if (speechAbort === controller) speechAbort = undefined; }
+      }
       if (request.action === "configure") { const result = await call({ action: "configure", preferences: request.preferences }); backend?.refreshPreferences(); return result; }
       const owner = backend;
       const context = uploadContext(owner?.state);
       if (!owner || owner.closed || owner.state?.panel || owner.state?.external || request.context !== context) throw new Error("Return to the same conversation before using dictation.");
       if (request.action === "authorize") {
         const generation = ++voiceGeneration;
-        if (speechAbort) throw new Error("Finish the current transcription first.");
+        if (speechAbort) throw new Error("Finish the current voice operation first.");
         const status = await call({ action: "status" });
         if (!status.ready) throw new Error(status.issue || "Configure a voice provider first.");
         if (process.platform === "darwin" && !await systemPreferences.askForMediaAccess("microphone")) throw new Error("Allow microphone access for Gator in macOS System Settings → Privacy & Security → Microphone.");

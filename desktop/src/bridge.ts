@@ -1,3 +1,4 @@
+import type { VoiceStatus, VoiceRequest } from "@gator/application-host/contracts/voice";
 import type { BackendState, Frame } from "./protocol";
 import type { FileRequest, FileView } from "./fileProtocol";
 import type { CodePreviewRequest, CodePreview } from "@gator/application-host/contracts/codePreview";
@@ -11,9 +12,7 @@ export type DesktopFrame = Omit<Frame, "version">;
 export type UploadedFile = { id: string; name: string; size: number };
 export type SavedDraft = { context: string; text: string; title: string; source: string; updated: number; uploads?: UploadedFile[]; reply_to_update_id?: string };
 export type DraftSnapshot = { enabled: boolean; drafts: SavedDraft[] };
-export type VoicePreferences = { spoken_replies: boolean; provider?: string; model?: string; language?: string; rate?: number };
-export type VoiceStatus = { ready: boolean; issue?: string; provider: string; model: string; preferences: VoicePreferences; max_seconds: number; max_audio_bytes: number; allowed?: boolean; text?: string };
-export type VoiceRequest = { action: "status" | "release" | "cancel" } | { action: "authorize"; context: string } | { action: "configure"; preferences: Partial<VoicePreferences> } | { action: "transcribe"; context: string; media_type: string; data: Uint8Array };
+export type { VoicePreferences, VoiceStatus, VoiceRequest } from "@gator/application-host/contracts/voice";
 export type DraftRequest = { action: "list" | "clear" } | { action: "remove"; context: string } | { action: "configure"; enabled: boolean } | { action: "save"; draft: Omit<SavedDraft, "updated"> };
 
 declare global {

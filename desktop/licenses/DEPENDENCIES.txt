@@ -4270,3 +4270,64 @@ Copyright 2026 gongahkia
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+
+Optional local speech runtime and model notices (not bundled executables or weights):
+
+README.md
+# Optional local speech dependencies
+
+Gator’s local voice integration invokes an independently installed whisper.cpp executable and offers explicit downloads of public OpenAI Whisper weights converted to GGML by the upstream whisper.cpp project. No executable, model weights, or runtime source is bundled in this repository by this feature.
+
+- OpenAI Whisper: https://github.com/openai/whisper; MIT; license retained from tag `v20250625` in `LICENSE-whisper.txt`.
+- whisper.cpp: https://github.com/ggml-org/whisper.cpp; MIT; license retained from tag `v1.9.5` in `LICENSE-whisper.cpp.txt`. This version was used for native verification; future upstream behavior is not automatically certified.
+- Model distribution: https://huggingface.co/ggerganov/whisper.cpp, immutable revision `5359861c739e955e79d9a303bcbc70fb988958b1`. Only `ggml-tiny.bin`, `ggml-base.bin`, and `ggml-small.bin` are offered, with exact size/SHA-256 verification in `internal/speech/local_models.go`.
+
+The integration and tests are newly written Gator code. The third-party license notices apply to their respective components and do not relicense Gator. Do not package these dependencies or replace pinned weights without reviewing their provenance and applicable notices.
+
+
+LICENSE-whisper.txt
+MIT License
+
+Copyright (c) 2022 OpenAI
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+LICENSE-whisper.cpp.txt
+MIT License
+
+Copyright (c) 2023-2026 The ggml authors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

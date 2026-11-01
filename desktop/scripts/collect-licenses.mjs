@@ -23,4 +23,8 @@ for (const [path, entry] of Object.entries(lock.packages).sort(([a], [b]) => a.l
 notices.push("\nOnibi adapted tmux/text components (modified by Gator):\n");
 notices.push(await readFile(join(root, "../third_party/onibi/NOTICE.md"), "utf8"));
 notices.push(await readFile(join(root, "../third_party/onibi/LICENSE"), "utf8"));
-await writeFile(join(root, "licenses/DEPENDENCIES.txt"), notices.join(""));
+notices.push("\nOptional local speech runtime and model notices (not bundled executables or weights):\n");
+for (const name of ["README.md", "LICENSE-whisper.txt", "LICENSE-whisper.cpp.txt"]) {
+  notices.push(`\n${name}\n${await readFile(join(root, "../third_party/whisper", name), "utf8")}\n`);
+}
+await writeFile(join(root, "licenses/DEPENDENCIES.txt"), notices.join("").trimEnd() + "\n");

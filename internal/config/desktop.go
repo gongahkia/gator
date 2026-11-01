@@ -22,6 +22,7 @@ func (d DesktopSettings) LearnsFromChats() bool { return d.LearnFromChats == nil
 
 type VoiceSettings struct {
 	SpokenReplies bool    `json:"spoken_replies"`
+	SystemVoice   string  `json:"system_voice,omitempty"`
 	Provider      string  `json:"provider,omitempty"`
 	Model         string  `json:"model,omitempty"`
 	Language      string  `json:"language,omitempty"`
@@ -161,8 +162,14 @@ func (d DesktopSettings) Validate() error {
 		seen[physical] = action
 	}
 	v := d.Voice
-	if !slices.Contains([]string{"", "gemini", "openai"}, v.Provider) || len(v.Model) > 128 || strings.ContainsAny(v.Model, "/\\\r\n") || len(v.Language) > 35 || v.Rate < 0 || v.Rate > 2 || v.Rate > 0 && v.Rate < 0.5 {
+	if !slices.Contains([]string{"", "gemini", "openai", "whisper-local"}, v.Provider) || len(v.Model) > 128 || strings.ContainsAny(v.Model, "/\\\r\n") || len(v.Language) > 35 || v.Rate < 0 || v.Rate > 2 || v.Rate > 0 && v.Rate < 0.5 {
 		return errors.New("invalid voice preferences")
+	}
+	if len(v.SystemVoice) > 256 || strings.ContainsAny(v.SystemVoice, "\x00\r\n") {
+		return errors.New("invalid system voice")
+	}
+	if v.Provider == "whisper-local" && !slices.Contains([]string{"", "tiny", "base", "small"}, v.Model) {
+		return errors.New("choose Tiny, Base or Small for local Whisper")
 	}
 	if v.Language != "" && !regexp.MustCompile(`^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$`).MatchString(v.Language) {
 		return errors.New("voice language must be a language tag such as en or en-SG")
