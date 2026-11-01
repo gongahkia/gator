@@ -136,10 +136,33 @@ func (e Executor) Prepare(ctx context.Context, request Request) (*Prepared, erro
 }
 
 func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, request Request) (Outcome, error) {
+	// Preserve startup/setup evidence even when preparation fails before a
+	// usable harness is returned. The caller's existing event sink still owns it.
+	var startup []agent.Event
+	var startupMu sync.Mutex
+	collectStartup := true
+	originalSink := request.OnEvent
+	request.OnEvent = func(event agent.Event) {
+		startupMu.Lock()
+		if collectStartup {
+			startup = append(startup, event)
+		}
+		startupMu.Unlock()
+		if originalSink != nil {
+			originalSink(event)
+		}
+	}
 	prepared, err := e.prepare(ctx, isolated, request)
 	if err != nil {
-		return Outcome{Worktree: isolated}, err
+		startupMu.Lock()
+		events := append([]agent.Event(nil), startup...)
+		startupMu.Unlock()
+		return Outcome{Worktree: isolated, Events: events}, err
 	}
+	startupMu.Lock()
+	collectStartup = false
+	startup = nil // The prepared harness already retains these events.
+	startupMu.Unlock()
 	defer prepared.Close()
 	result, runErr := (agent.Runner{Model: e.Model, Tools: prepared.Tools, Now: e.Now}).Run(ctx, agent.RunOptions{
 		Task: request.Task, System: prepared.System, MaxSteps: prepared.MaxSteps, OnEvent: prepared.emit,

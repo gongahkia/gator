@@ -1,0 +1,29 @@
+{
+  "suite": "coding",
+  "phases": [
+    {
+      "name": "direct-two-module-implementation",
+      "milliseconds": 100659,
+      "candidate": "candidate-d47680d8c91b5e5487ab2f6c",
+      "changed": [
+        "budget.cjs",
+        "csv.cjs"
+      ],
+      "checked": true
+    },
+    {
+      "name": "delegated-repair-and-independent-review",
+      "milliseconds": 83662,
+      "candidate": "candidate-eae773f9ded8812a6f99e037",
+      "changed": [
+        "budget.cjs",
+        "csv.cjs"
+      ],
+      "checked": false
+    }
+  ],
+  "provider": "real OpenAI Responses via cumulative budget proxy",
+  "method": "guided disposable two-module implementation, changed tests, delegated repair, independent review",
+  "manual_quality": "not independently human graded",
+  "physical_device": "not tested"
+}

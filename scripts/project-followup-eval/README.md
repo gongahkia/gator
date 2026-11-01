@@ -181,7 +181,7 @@ protected test/spec files must remain unchanged in live source. See
 [the coding record](../../docs/SHARED-CODING-CAPABILITIES.md) for exact scope and results.
 
 The existing total allowance stays $10 ($9.50 conservative guard cutoff), with no
-ledger reset. Coding permits at most 32 proxy requests per run; ordinary project
+ledger reset. Coding permits at most 40 proxy requests per run; ordinary project
 UI journeys still permit eight. The finite aggregate ceiling is now 128 requests
 to accommodate coding tool loops; it does not raise the dollar limit. Reports and
 screenshots remain ignored private disposable artifacts where configured; the

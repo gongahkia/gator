@@ -60,11 +60,12 @@ func TestLiveDesktopUI(t *testing.T) {
 	timeout := 6 * time.Minute
 	script := "test:e2e:live"
 	if suite == "coding" {
-		maxCalls = 32
+		maxCalls = 40
 		timeout = 10 * time.Minute
 		script = "test:e2e:live:coding"
 	}
 	var calls atomic.Int32
+	var providerResponses atomic.Int32
 	guard := projectEvalTransport{directory: filepath.Dir(path)}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" || r.URL.Path != "/v1/responses" || r.Header.Get("Authorization") != "Bearer "+localToken {
@@ -89,6 +90,7 @@ func TestLiveDesktopUI(t *testing.T) {
 			http.Error(w, "live UI budget or upstream boundary rejected the request; inspect retained accounting", http.StatusForbidden)
 			return
 		}
+		providerResponses.Add(1)
 		defer response.Body.Close()
 		if response.StatusCode < 200 || response.StatusCode >= 300 {
 			http.Error(w, "live UI upstream request failed; raw diagnostics withheld", http.StatusForbidden)
@@ -126,13 +128,16 @@ func TestLiveDesktopUI(t *testing.T) {
 	data, _ := os.ReadFile(filepath.Join(filepath.Dir(path), "budget.json"))
 	_ = json.Unmarshal(data, &spend)
 	_ = json.NewEncoder(report).Encode(struct {
-		Calls         int32
-		Milliseconds  int64
-		Passed        bool
-		Spend         projectEvalSpend
-		TokenTiming   string
-		ManualQuality string
-	}{calls.Load(), time.Since(start).Milliseconds(), err == nil && calls.Load() >= 2, spend, "buffered live Responses; provider token timing not assessed", "unreviewed by a human"})
+		Suite             string
+		MaxRequests       int32
+		ProviderResponses int32
+		Calls             int32
+		Milliseconds      int64
+		Passed            bool
+		Spend             projectEvalSpend
+		TokenTiming       string
+		ManualQuality     string
+	}{suite, maxCalls, providerResponses.Load(), calls.Load(), time.Since(start).Milliseconds(), err == nil && calls.Load() >= 2, spend, "buffered live Responses; provider token timing not assessed", "unreviewed by a human"})
 	if err != nil {
 		t.Fatal("live Electron journey failed; browser report and cumulative accounting retained")
 	}

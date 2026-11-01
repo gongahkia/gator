@@ -129,8 +129,8 @@ func (b *nativeWorkBackend) codeSession(stateDir string) workrun.CodeSessionFact
 		code.Model = agent.WithBudget(agent.WithBudget(code.Model, request.Budget), usage)
 		code.Sandbox = request.Policy.Sandbox.Normalize()
 		verification := mergeCodeVerification(request.Policy.Verification)
-		// Hosted Code is one implementation assignment. Nested scouts/writers
-		// are a native Code-primary surface, not a Work specialist capability.
+		// The existing Work supervisor owns delegation. A prepared coding
+		// checkout cannot expand its own authority by creating nested agents.
 		omitted := hostedCodeNestedDelegationOmit()
 		for _, capability := range []struct{ name, omit string }{
 			{workrun.CodeCapabilityLSP, instructions.OmitLSP},

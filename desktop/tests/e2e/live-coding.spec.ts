@@ -68,7 +68,17 @@ test("live Electron coding implements two modules, then delegates a changed-requ
  expect(record.attempts.at(-1).review.passed).toBe(true);expect(record.attempts.at(-1).reviewed_paths).toEqual(expect.arrayContaining(["candidate/budget.cjs","candidate/csv.cjs"]));
  await page.waitForTimeout(3000);
  }finally{
- await writeFile(process.env.GATOR_LIVE_UI_BROWSER_REPORT!,JSON.stringify({suite:"coding",phases,provider:"real OpenAI Responses via cumulative budget proxy",method:"guided disposable two-module implementation, changed tests, delegated repair, independent review",manual_quality:"not independently human graded",physical_device:"not tested"},null,2),{mode:0o600});
+ // Retain bounded host completion metadata even if the parent hits an API
+ // allowance after the worker finished. Receipt inspection never dispatches.
+ const completions:unknown[]=[];
+ try {
+ const {readdir}=await import("node:fs/promises"),directory=join(f.root,"state/gator/completions");
+ for(const run of (await readdir(directory)).slice(0,4)) for(const name of (await readdir(join(directory,run))).filter(name=>name.endsWith(".json")).slice(0,3)) {
+ const value=JSON.parse(await readFile(join(directory,run,name),"utf8"));
+ completions.push({id:value.id,agent:value.agent,status:value.status,attempts:(value.attempts??[]).slice(0,3).map((attempt:{stage:string;candidate?:{status:string};review?:{passed:boolean};reviewed_paths?:string[]})=>({stage:attempt.stage,candidate:attempt.candidate?.status,reviewPassed:attempt.review?.passed,reviewedPaths:attempt.reviewed_paths?.slice(0,64)}))});
+ }
+ }catch { /* No checkpoint exists if admission failed before creating one. */ }
+ await writeFile(process.env.GATOR_LIVE_UI_BROWSER_REPORT!,JSON.stringify({suite:"coding",phases,completions,provider:"real OpenAI Responses via cumulative budget proxy",method:"guided disposable two-module implementation, changed tests, delegated repair, independent review",manual_quality:"not independently human graded",physical_device:"not tested"},null,2),{mode:0o600});
  await f.close();
  }
 });

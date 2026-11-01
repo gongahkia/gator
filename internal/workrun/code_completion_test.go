@@ -398,3 +398,11 @@ func TestCompletionToolRequiresEditableWorkerHostChecksAndReviewer(t *testing.T)
 		})
 	}
 }
+
+func TestCompletionRejectsUnverifiedInitialBaselineBeforeStartingWorker(t *testing.T) {
+	f := newCompletionFixture(t, []string{"fixed"}, false, false)
+	_, err := f.tool.Execute(context.Background(), []byte(`{"agent":"cli_codex","objective":"Fix note.txt","acceptance":["fixed"],"baseline_patch":"code/not-authorized.patch"}`))
+	if err == nil || len(f.assignments) != 0 {
+		t.Fatalf("unverified baseline dispatched: err=%v assignments=%d", err, len(f.assignments))
+	}
+}

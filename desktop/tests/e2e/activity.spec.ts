@@ -48,6 +48,13 @@ test("public activity interleaves, folds above the answer, and preserves the rea
     const history = page.getByRole("button", { name: /Worked for 12s/ });
     await expect(history).toHaveAttribute("aria-expanded", "false");
     await expect(page.getByText("You chose the compact direction.", { exact: true })).toBeVisible();
+    // Slow the transition when it begins. Waiting for several CDP assertions
+    // before changing its playback rate races the 180 ms animation on busy Macs.
+    await page.evaluate(() => {
+      document.querySelector(".activity-history .activity-collapse")?.addEventListener("transitionrun", () => {
+        document.getAnimations().filter(animation => animation.effect?.getComputedTiming().iterations !== Infinity).forEach(animation => { animation.playbackRate = .1; });
+      }, { once: true });
+    });
     await history.click();
     await expect(history).toHaveAttribute("aria-expanded", "true");
     await expect(page.getByText("I’ll check your notes first.", { exact: true })).toBeVisible();

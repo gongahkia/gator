@@ -148,7 +148,7 @@ resets that ledger. The authorized total remains $10, with the existing $9.50
 conservative cutoff, durable pre-request reservation and bounded output. The
 finite aggregate request ceiling is 128 (raised from 96 to accommodate multi-step
 coding, without raising the dollar allowance); the coding UI proxy permits at
-most 32 requests. Ordinary UI/CI tests do not consume a key merely because .env
+most 40 requests. Ordinary UI/CI tests do not consume a key merely because .env
 exists. Real keys stay in the Go proxy; Electron gets an ephemeral loopback token.
 No native external coding CLI is invoked by these paid tests.
 
@@ -185,3 +185,23 @@ phone acceptance, arbitrary runtime installation layouts, automatic dependency
 installation, unrestricted network access, or long-lived process survival after
 its actual owner exits. External tmux remains separately enrolled and authorized;
 these agent tools grant no access to unrelated terminals. Ghostty is out of scope.
+
+### November 1 coding evaluation evidence
+
+The first live Electron coding run is retained as
+`coding-ui-2026-11-01T12-00-29-020Z.json` plus its browser report. The main agent
+implemented both modules, passed actual npm acceptance checks and staged a
+verified two-file candidate in 100,659 ms. The changed-requirements phase produced
+another verified two-file candidate but the overall turn failed after the proxy's
+original 32-request limit was exhausted; its parent received HTTP 403. There was
+no independent-review checkpoint in the retained browser report, so that phase is
+**incomplete**, not a passed reviewed coding workflow. The disposable profile was
+cleaned up; no original source file was applied or mutation automatically replayed.
+
+That run admitted 32 provider requests (34 incoming proxy attempts). The
+cumulative ledger is 117 requests, $6.745135 estimated model allowance plus $1.92
+retained search allowance: $8.665135 total against the authorized $10 cap. No new
+paid run was started to hide the failure or reset accounting. Future explicitly
+invoked coding runs have a 40-request per-run bound and retain bounded completion
+metadata even when the parent cannot deliver its final answer. The shared
+128-request/$9.50 conservative admission limits remain unchanged.

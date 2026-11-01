@@ -152,3 +152,34 @@ func TestReviewerCoverageRequiresCompleteBytesAndHandlesOverlappingPages(t *test
 		t.Fatal("changed evidence size accepted")
 	}
 }
+
+type partialReviewModel struct{ step int }
+
+func (m *partialReviewModel) Complete(context.Context, agent.TurnRequest) (agent.Turn, error) {
+	m.step++
+	if m.step > 1 {
+		return agent.Turn{Text: "I reviewed the whole file."}, nil
+	}
+	return agent.Turn{ToolCalls: []agent.ToolCall{{ID: "partial", Name: "read_file", Arguments: json.RawMessage(`{"path":"candidate/change.txt","start_line":1,"end_line":1}`)}}}, nil
+}
+func TestReviewerOneLineReadCannotClaimWholeFileCoverage(t *testing.T) {
+	directory := t.TempDir()
+	if err := os.Mkdir(filepath.Join(directory, "candidate"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(directory, "candidate", "change.txt"), []byte("first\nchanged second line\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	root, err := workspace.Open(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reviewer := LLMSpecialist("artifact_reviewer", "Read a changed file", &partialReviewModel{}, []agent.Tool{tools.ReadFile{Root: root}}, "Review completely", 3, nil)
+	result, err := reviewer.Run(context.Background(), Invocation{Task: "Review candidate/change.txt"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.InspectedPaths) != 1 || len(result.FullyInspectedPaths) != 0 {
+		t.Fatalf("partial read was promoted: %#v", result)
+	}
+}

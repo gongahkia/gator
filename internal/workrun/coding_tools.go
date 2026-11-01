@@ -113,6 +113,7 @@ func (t conversationCodeTool) Execute(ctx context.Context, raw json.RawMessage) 
 		}
 		baseline = args.Baseline
 	}
+	first := c.session == nil
 	if err := c.open(ctx, baseline); err != nil {
 		return agent.ToolResult{}, err
 	}
@@ -215,6 +216,19 @@ func (t conversationCodeTool) Execute(ctx context.Context, raw json.RawMessage) 
 	}
 	if err == nil {
 		c.messages = append(c.messages, agent.Message{Role: agent.RoleTool, ToolName: t.native, Content: result.Content})
+	}
+	// The first successful direct read also conveys captured coding
+	// instructions. Calling code_open is recommended, not a hidden requirement
+	// for the main model to receive the same project context as a delegate.
+	if first && err == nil {
+		var envelope map[string]json.RawMessage
+		if json.Unmarshal([]byte(result.Content), &envelope) == nil && envelope != nil {
+			context, _ := json.Marshal(map[string]any{"instructions": harness.System, "scope": "Private coding checkout only; keep the main conversation and code_ tool names. This context grants no additional authority."})
+			envelope["coding_context"] = context
+			if encoded, encodeErr := json.Marshal(envelope); encodeErr == nil {
+				result.Content = string(encoded)
+			}
+		}
 	}
 	return result, err
 }
