@@ -192,6 +192,18 @@ make build
 make package
 ```
 
+On macOS, routine UI checks can leave their windows visible without taking
+physical keyboard focus:
+
+```sh
+GATOR_E2E_BACKGROUND=1 npm run test:e2e --prefix desktop
+```
+
+Playwright still drives the actual Electron renderer and Go runtime. This is a
+test-launcher option, not an application setting. The live-model command below
+keeps its normal visible window even when that flag is set. Native system-level
+focus/permission acceptance remains a separate manual check.
+
 ### Watch real model requests in Electron
 
 The opt-in live journey opens the actual Electron app with a disposable profile

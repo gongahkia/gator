@@ -134,7 +134,7 @@ not been executed on remote CI in this session.
 | Focused Go application-guide, editor, bridge and follow-up tests | PASS |
 | `go test -race ./internal/workrun ./internal/workapp -run 'ApplicationContext\|Conversation.*Knowledge\|RetiredFrontend\|ComposerEditor\|BridgeEditor\|Followup' -count=1` | PASS |
 | `npm run check --prefix desktop` | PASS |
-| `GATOR_INDEPENDENCE_BINARY="$PWD/desktop/runtime/gator-runtime" npm test --prefix desktop` | PASS: 11 desktop tests plus 73 shared-host tests; one existing opt-in skip in each suite |
+| `GATOR_INDEPENDENCE_BINARY="$PWD/desktop/runtime/gator-runtime" npm test --prefix desktop` | PASS: 18 desktop tests plus 73 shared-host tests; one existing opt-in skip in each suite |
 | Companion auth/server/recovery/inspection/mutation/external and Chromium clients, sequential Node runner | PASS: 25, one opt-in native-tmux skip |
 | Real-Go independence fixture with Onibi, tmux and Tailscale absent from `PATH` | PASS; ordinary Work succeeds and creates no external catalog |
 | New three Electron consolidation journeys | PASS: message reuse/arguments, Go-owned editor/error/empty/oversize recovery, exact export replacement |
@@ -161,6 +161,22 @@ the existing system Terminal handoff; it does not type into a developer terminal
 Memory fixtures now separately answer native semantic-comparison requests instead
 of accidentally returning unrelated user-chat tool calls. Production memory and
 evidence policy have not changed.
+
+Foreground regression runs retained failures involving unexpected typed/deleted
+characters, a disappearing voice popup, a missing approval and a detached
+follow-up card during resize. The voice and attachment scenarios passed when
+rerun with optional `GATOR_E2E_BACKGROUND=1`. The test-only `launchDesktop` helper
+then sets macOS/Windows fixture windows unfocusable and blurs them while retaining
+the actual CDP-controlled renderer. It also captures the child handle before
+shutdown to preserve accurate cleanup status. No production window policy or
+authentication changes were made. Linux keeps its existing display behavior;
+paid live demos explicitly bypass background mode. Final full-run results follow
+below rather than treating these preliminary foreground failures as a clean run.
+
+The initial new source/link fixture omitted its provider's required default model,
+which caused native startup alerts. That fixture is corrected and now validates
+its isolated configuration through the existing Go loader before launching Electron.
+The four focused source/link/effort journeys subsequently passed without alerts.
 
 ## Live UI evaluation
 
