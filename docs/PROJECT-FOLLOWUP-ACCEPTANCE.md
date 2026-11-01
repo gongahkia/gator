@@ -131,6 +131,22 @@ and preserve explicit query/source authority when addressing this gap; report
 missing search credentials and live verification honestly. Public URL reads and
 other workflow improvements can proceed independently.
 
+The Work search adapter is now implemented using that existing native tool. A
+configured host credential plus explicitly selected HTTPS origins are both
+required. The host adds site filters to queries, then independently filters
+returned URLs by exact scheme/host/port; query operators are not an authority
+boundary. Credential-bearing URLs and off-scope results are omitted. Discovery
+snippets never enter factual evidence automatically; `http_fetch` retains the
+actual page. Native search/fetch limits remain shared. Query disclosure to Brave
+is explicit in the tool description and capability documentation. The operator
+plans to configure an existing key locally; its presence and live access must
+be checked before claiming native-search acceptance.
+
+`go test ./internal/workrun -run 'Test(WorkSearch|EvolvingWeb|ResearchBrief)' -count=1`
+passed. New cases cover absent credentials/sites, extra/trailing arguments,
+invalid counts, adversarial site operators, scheme/port/credential URL filtering
+and exclusion of snippets from evidence.
+
 Initial evolving-transport regression passes:
 `go test ./internal/workrun -run 'Test(EvolvingWebEvidence|ResearchBrief)' -count=1`.
 The new sequence uses the production Work service and HTTP/evidence tools in one

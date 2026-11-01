@@ -42,10 +42,10 @@ func (g projectEvalTransport) RoundTrip(r *http.Request) (*http.Response, error)
 	if r.URL.Scheme != "https" || (r.URL.Host != "api.openai.com" && r.URL.Host != "us.api.openai.com") || r.URL.Path != "/v1/responses" {
 		return nil, errors.New("evaluation provider endpoint not allowed")
 	}
-	b, err := io.ReadAll(io.LimitReader(r.Body, 65537))
+	b, err := io.ReadAll(io.LimitReader(r.Body, 128*1024+1))
 	r.Body.Close()
-	if err != nil || len(b) > 65536 {
-		return nil, errors.New("evaluation input exceeds 64 KiB")
+	if err != nil || len(b) > 128*1024 {
+		return nil, errors.New("evaluation input exceeds 128 KiB")
 	}
 	var body map[string]json.RawMessage
 	if json.Unmarshal(b, &body) != nil || string(body["model"]) != `"gpt-5.6"` {
@@ -149,6 +149,11 @@ func (g projectEvalTransport) RoundTrip(r *http.Request) (*http.Response, error)
 		if err = save(); err != nil {
 			return nil, err
 		}
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		// Providers can echo credential fragments or input in error messages.
+		// Keep only status; unknown billing retains the existing reservation.
+		data = []byte(`{"error":{"message":"Evaluation provider rejected request; raw diagnostics withheld."}}`)
 	}
 	response.Body = io.NopCloser(bytes.NewReader(data))
 	return response, nil
@@ -261,7 +266,7 @@ func TestLiveProjectFollowup(t *testing.T) {
 	if !strings.Contains(changed.Draft, "17 November") || !strings.Contains(strings.ToLower(changed.Draft), "photo") {
 		t.Error("changed deadline/blocker missing")
 	}
-	if _, err := notes.ReviewNote(note.ID, "", note.Revision, "correct", "Use a neutral tone and at most 100 words for the client email. Never describe an unapproved budget as approved."); err != nil {
+	if _, err := notes.ReviewNote(note.ID, "", note.Revision(), "correct", "Use a neutral tone and at most 100 words for the client email. Never describe an unapproved budget as approved."); err != nil {
 		t.Fatal(err)
 	}
 	// Recreate the application service and resume the retained conversation.
@@ -270,4 +275,66 @@ func TestLiveProjectFollowup(t *testing.T) {
 		t.Error("corrected note was not read through knowledge tools")
 	}
 	t.Log(fmt.Sprintf("Live phases retained: %d", len(report.Phases)))
+}
+
+type projectEvalRoundTripper func(*http.Request) (*http.Response, error)
+
+func (f projectEvalRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestProjectEvaluationBudgetBoundary(t *testing.T) {
+	dir := t.TempDir()
+	calls := 0
+	transport := projectEvalTransport{directory: dir, base: projectEvalRoundTripper(func(r *http.Request) (*http.Response, error) {
+		calls++
+		data, _ := io.ReadAll(r.Body)
+		if !bytes.Contains(data, []byte(`"max_output_tokens":4096`)) || !bytes.Contains(data, []byte(`"store":false`)) {
+			t.Fatal("provider limits not enforced")
+		}
+		if _, err := os.Stat(filepath.Join(dir, "budget.json")); err != nil {
+			t.Fatal("dispatch before durable budget reservation")
+		}
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"usage":{"input_tokens":100,"output_tokens":20}}`))}, nil
+	})}
+	request := func(endpoint, body string) *http.Request {
+		r, _ := http.NewRequest("POST", endpoint, strings.NewReader(body))
+		return r
+	}
+	valid := `{"model":"gpt-5.6","tools":[{"type":"function"}]}`
+	for _, body := range []string{`{"model":"unpriced","tools":[]}`, `{"model":"gpt-5.6","tools":[{"type":"web_search"}]}`, strings.Repeat("x", 128*1024+1)} {
+		if _, err := transport.RoundTrip(request("https://us.api.openai.com/v1/responses", body)); err == nil {
+			t.Fatal("unbudgeted input accepted")
+		}
+	}
+	if _, err := transport.RoundTrip(request("https://unselected.invalid/v1/responses", valid)); err == nil {
+		t.Fatal("endpoint accepted")
+	}
+	if calls != 0 {
+		t.Fatal("rejected request dispatched")
+	}
+	if _, err := transport.RoundTrip(request("https://us.api.openai.com/v1/responses", valid)); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(filepath.Join(dir, "budget.json"))
+	var ledger projectEvalSpend
+	json.Unmarshal(data, &ledger)
+	if ledger.Calls != 1 || ledger.Reserved != 0 || ledger.Input != 100 || ledger.Estimated <= 0 {
+		t.Fatal("usage settlement", ledger)
+	}
+	transport.base = projectEvalRoundTripper(func(*http.Request) (*http.Response, error) { return nil, errors.New("fixture connection loss") })
+	if _, err := transport.RoundTrip(request("https://us.api.openai.com/v1/responses", valid)); err == nil {
+		t.Fatal("unknown response accepted")
+	}
+	data, _ = os.ReadFile(filepath.Join(dir, "budget.json"))
+	json.Unmarshal(data, &ledger)
+	if ledger.Calls != 2 || ledger.Reserved <= 0 {
+		t.Fatal("uncertainty discarded", ledger)
+	}
+	ledger.Estimated = 9.49
+	data, _ = json.Marshal(ledger)
+	if err := os.WriteFile(filepath.Join(dir, "budget.json"), data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := transport.RoundTrip(request("https://us.api.openai.com/v1/responses", valid)); err == nil {
+		t.Fatal("overspend permitted")
+	}
 }
