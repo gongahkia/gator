@@ -162,6 +162,7 @@ test("late citation responses cannot overwrite a newer selected source",async()=
   await first.click();const sidebar=page.getByRole("complementary",{name:"Source preview",exact:true});await expect(sidebar).toContainText("Opening retained source");
   await second.click();await expect(sidebar).toContainText("New B excerpt");
   await app.evaluate(()=>Reflect.get(globalThis,"releaseOldCitation")());
+  await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
   await expect(sidebar).toContainText("New B excerpt");await expect(sidebar).not.toContainText("Late A");
   await page.getByRole("button",{name:"Close source preview",exact:true}).click();
   await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setSize(800,650));await page.emulateMedia({reducedMotion:"reduce"});
