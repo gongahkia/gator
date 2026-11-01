@@ -12,9 +12,33 @@ import (
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/jobs"
+	"github.com/gongahkia/gator/internal/workhome"
 	"github.com/gongahkia/gator/internal/workrun"
 	"github.com/gongahkia/gator/internal/worksession"
 )
+
+func TestChatFollowupProjectsObservedHealthWithoutInventingSuccess(t *testing.T) {
+	at := time.Date(2026, 11, 1, 10, 0, 0, 0, time.UTC)
+	c := workhome.Check{ID: "job-health", State: "couldn't check", Issue: "Source unavailable", NextAction: "Review source access", LastSuccess: at.Add(-time.Hour), LastAttempt: at, NextDue: at.Add(-time.Minute), DueNow: true}
+	v := projectFollowup(c)
+	if !v.LastSuccess.Equal(c.LastSuccess) || !v.LastAttempt.Equal(at) || !v.DueNow || v.NextAction != c.NextAction || v.Issue != c.Issue {
+		t.Fatalf("lost health observations: %+v", v)
+	}
+	v = projectFollowup(workhome.Check{State: "offline"})
+	data, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fields map[string]any
+	if err = json.Unmarshal(data, &fields); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"last_successful_check", "last_attempt", "next_check"} {
+		if _, exists := fields[key]; exists {
+			t.Fatalf("unobserved health advertised: %s %s", key, data)
+		}
+	}
+}
 
 func followupControllerForTest(t *testing.T) gatorAppController {
 	t.Helper()

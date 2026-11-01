@@ -35,13 +35,17 @@ type followupChange struct {
 }
 
 type followupView struct {
-	ID        string    `json:"id"`
-	Digest    string    `json:"expected_digest"`
-	Title     string    `json:"title"`
-	State     string    `json:"state"`
-	Issue     string    `json:"issue,omitempty"`
-	NextCheck time.Time `json:"next_check,omitzero"`
-	Agreement []string  `json:"agreement"`
+	ID          string    `json:"id"`
+	Digest      string    `json:"expected_digest"`
+	Title       string    `json:"title"`
+	State       string    `json:"state"`
+	Issue       string    `json:"issue,omitempty"`
+	NextCheck   time.Time `json:"next_check,omitzero"`
+	DueNow      bool      `json:"due_now"`
+	LastSuccess time.Time `json:"last_successful_check,omitzero"`
+	LastAttempt time.Time `json:"last_attempt,omitzero"`
+	NextAction  string    `json:"next_action"`
+	Agreement   []string  `json:"agreement"`
 }
 
 func (c gatorAppController) followupConversation(id string) error {
@@ -94,7 +98,7 @@ func (c gatorAppController) inspectFollowups(query workrun.AppQuery) (any, error
 func projectFollowup(check workhome.Check) followupView {
 	draft, _ := followup.FromDefinition(check.Definition)
 	digest, _ := check.Definition.PolicyDigest()
-	return followupView{ID: check.ID, Digest: digest, Title: check.Title, State: check.State, Issue: check.Issue, NextCheck: check.NextDue, Agreement: draft.ReviewLines()}
+	return followupView{ID: check.ID, Digest: digest, Title: check.Title, State: check.State, Issue: check.Issue, NextCheck: check.NextDue, DueNow: check.DueNow, LastSuccess: check.LastSuccess, LastAttempt: check.LastAttempt, NextAction: check.NextAction, Agreement: draft.ReviewLines()}
 }
 
 func (c gatorAppController) prepareFollowup(ctx context.Context, change workrun.AppChange) (workrun.AppMutation, error) {

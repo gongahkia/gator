@@ -18,6 +18,7 @@ type Check struct {
 	ID, GoalID, Title, Outcome, State, Issue, NextAction string
 	LastSuccess, LastAttempt, NextDue                    time.Time
 	Enabled                                              bool
+	DueNow                                               bool
 	Definition                                           jobs.Definition
 	ChecksToday, ModelRequests                           int
 	Tokens                                               int64
@@ -122,6 +123,14 @@ func ReadChecks(stateDir string, supervisor bool, now time.Time) ([]Check, error
 				return nil, scheduleErr
 			}
 			check.NextDue = schedule.Next(now)
+			// Use the scheduler's missed-run policy rather than hiding an overdue
+			// check behind the next future cron slot. This is observation only;
+			// the supervisor still owns admission, limits and execution.
+			if due, ready, dueErr := jobs.Due(definition, now); dueErr != nil {
+				return nil, dueErr
+			} else if ready {
+				check.NextDue, check.DueNow = due, true
+			}
 			if definition.Expired(check.NextDue) {
 				check.NextDue = time.Time{}
 			}
@@ -145,5 +154,9 @@ func (c Check) HealthLine() string {
 	if !c.NextDue.IsZero() {
 		next = c.NextDue.Local().Format("Jan 2 15:04")
 	}
-	return fmt.Sprintf("%s · last successful check: %s · next due: %s", c.State, last, next)
+	label := "next due"
+	if c.DueNow {
+		label = "due since"
+	}
+	return fmt.Sprintf("%s · last successful check: %s · %s: %s", c.State, last, label, next)
 }
