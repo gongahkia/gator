@@ -84,7 +84,7 @@ func (m Model) ApplySourceSelection(action SourceAction) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	if action.Action != "select" || action.ID != current.ID || action.IDs == nil || len(action.IDs) > 32 {
+	if action.Action != "select" || action.ID != current.ID || action.IDs == nil || len(action.IDs) > 16 {
 		return fail("Sources changed. Review the current list and try again.")
 	}
 	seen := map[string]bool{}

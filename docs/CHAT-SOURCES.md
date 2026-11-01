@@ -10,7 +10,7 @@ Opening or refreshing the menu performs local metadata reads only. It never call
 
 ## Backend boundary
 
-`internal/workapp/composer_sources.go` owns the bounded display projection and finite refresh/select actions. The catalogue has at most 128 visible entries, with at most 32 selected connections. The opaque selection identity binds the exact host conversation, source folder, selected IDs, display metadata and host-only account fingerprints. The browser never receives those fingerprints, credentials, OAuth client details, executable paths or endpoints.
+`internal/workapp/composer_sources.go` owns the bounded display projection and finite refresh/select actions. The catalogue has at most 128 visible entries, with at most 16 selected connections, matching the native connector-tool limit. The opaque selection identity binds the exact host conversation, source folder, selected IDs, display metadata and host-only account fingerprints. The browser never receives those fingerprints, credentials, OAuth client details, executable paths or endpoints.
 
 `cmd/gator/work_composer_sources.go` reads existing settings/auth stores and uses `worksession.Preferences` with compare-and-swap persistence. The owner refreshes the catalogue before every selection and rejects stale identities, unknown/unavailable/repeated IDs and external changes to saved selections. No new registry, permission store, daemon or authentication system was added.
 

@@ -3,6 +3,7 @@ package workapp
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -83,5 +84,20 @@ func TestComposerSourcesRefreshIsReadOnlyAndBounded(t *testing.T) {
 	m = next.(Model)
 	if cmd != nil || calls != before+1 || len(m.composerSourceSettings().Choices) != 128 || m.sourcesIssue == "" || len(m.messages) > 0 {
 		t.Fatal("refresh was not a bounded local read")
+	}
+}
+
+func TestComposerSourcesRespectNativeSixteenConnectorLimit(t *testing.T) {
+	choices := []ComposerSource{}
+	ids := []string{}
+	for i := 0; i < 17; i++ {
+		id := fmt.Sprintf("source-%d", i)
+		choices = append(choices, ComposerSource{ID: id})
+		ids = append(ids, id)
+	}
+	m := New(Config{ComposerSources: func() ([]ComposerSource, error) { return choices, nil }})
+	next, _ := m.ApplySourceSelection(SourceAction{ID: m.composerSourceSettings().ID, RequestID: "too-many", Action: "select", IDs: ids})
+	if next.(Model).sourcesResult.Error == "" {
+		t.Fatal("seventeen selected sources exceed the native tool surface")
 	}
 }

@@ -100,7 +100,7 @@ test("receipt inspection only accepts exact retained identities and read-only ac
 test("source selection accepts only finite source IDs and no renderer authority", () => {
  const value={id:"a".repeat(64),request_id:"request",action:"select",ids:["reports"]};
  assert.equal(validateFrame({type:"sources",sources:value}).version,1);
- for(const change of [{ids:["../private"]},{ids:["reports","reports"]},{ids:new Array(33).fill("reports")},{grant:{operation:"write"}},{endpoint:"https://example.com"},{action:"enroll"},{id:"stale"}]) assert.throws(()=>validateFrame({type:"sources",sources:{...value,...change}}));
+ for(const change of [{ids:["../private"]},{ids:["reports","reports"]},{ids:Array.from({length:17},(_,i)=>`source-${i}`)},{grant:{operation:"write"}},{endpoint:"https://example.com"},{action:"enroll"},{id:"stale"}]) assert.throws(()=>validateFrame({type:"sources",sources:{...value,...change}}));
  assert.doesNotThrow(()=>validateFrame({type:"sources",sources:{...value,ids:[]}}));
  assert.throws(()=>validateFrame({type:"sources",sources:{...value,action:"refresh"}}));
 });
