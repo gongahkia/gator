@@ -86,7 +86,7 @@ func TestLiveProjectWatch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	chat, err := sessions.Create("Website project follow-up", source, "fixture-origin", time.Now())
+	chat, err := sessions.CreateChat(source, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
