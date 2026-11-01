@@ -118,3 +118,37 @@ func (t namedTool) Definition() agent.ToolDefinition {
 func (namedTool) Execute(context.Context, json.RawMessage) (agent.ToolResult, error) {
 	return agent.ToolResult{}, nil
 }
+
+func TestReviewerCoverageRequiresCompleteBytesAndHandlesOverlappingPages(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		ranges   [][2]int
+		complete bool
+	}{
+		{"one line isn't a full file", [][2]int{{0, 5}}, false},
+		{"truncated final line", [][2]int{{0, 9}}, false},
+		{"overlapping pages", [][2]int{{0, 6}, {5, 10}}, true},
+		{"unread middle", [][2]int{{0, 4}, {5, 10}}, false},
+		{"empty file", [][2]int{{0, 0}}, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			c := &readCoverage{total: 10}
+			for _, r := range test.ranges {
+				c.add(r[0], r[1], 10)
+			}
+			if c.complete() != test.complete {
+				t.Fatalf("coverage=%#v", c)
+			}
+		})
+	}
+	empty := &readCoverage{}
+	empty.add(0, 0, 0)
+	if !empty.complete() {
+		t.Fatal("actual empty-file read should complete")
+	}
+	changed := &readCoverage{total: 10}
+	changed.add(0, 10, 11)
+	if changed.complete() {
+		t.Fatal("changed evidence size accepted")
+	}
+}

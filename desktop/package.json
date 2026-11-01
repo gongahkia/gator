@@ -21,7 +21,9 @@
     "test:live": "node ../scripts/project-followup-eval/live-ui.mjs",
     "test:e2e:live": "playwright test live-model.spec.ts --retries=0",
     "pack": "npm run build && electron-builder --dir --publish never",
-    "dist": "npm run build && electron-builder --publish never"
+    "dist": "npm run build && electron-builder --publish never",
+    "test:live:coding": "node ../scripts/project-followup-eval/live-ui.mjs --coding",
+    "test:e2e:live:coding": "playwright test live-coding.spec.ts --retries=0"
   },
   "dependencies": {
     "electron-updater": "6.8.9",

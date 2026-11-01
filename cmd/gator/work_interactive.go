@@ -660,23 +660,11 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 	if err != nil {
 		return workapp.RunResult{Error: err.Error()}
 	}
-	disposition := action.Forbid
-	if mode == action.Draft {
-		disposition = action.Propose
-	} else if mode == action.Act {
-		disposition = action.Approve
+	contract, err := interactiveWorkContract(mode, paths)
+	if err != nil {
+		return workapp.RunResult{Error: err.Error()}
 	}
-	var contract artifact.Contract
-	if mode == action.Inspect || len(paths) == 0 {
-		contract = artifact.InspectionContract()
-		contract.AllowOptionalArtifacts = mode == action.Draft
-		contract.ExternalActions = disposition
-	} else {
-		contract, err = workContract(mode, disposition, artifactFlags(paths), nil)
-		if err != nil {
-			return workapp.RunResult{Error: err.Error()}
-		}
-	}
+
 	var appChanges []workrun.AppChange
 	var appScreen *workapp.ControlScreen
 	var appScreenFamily string
@@ -729,7 +717,7 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 		return result, nil
 	}
 	request.Code = workrun.CodePolicy{MaxSteps: options.Code.MaxSteps, Scopes: options.Code.Scopes, Profile: options.Code.Profile, Sandbox: sandbox.Policy{Mode: sandbox.Mode(options.Code.Sandbox), Network: sandbox.Network(options.Code.Network)}, Capabilities: options.Code.Capabilities, BrowserSession: options.Code.BrowserSession}
-	if request.EnableCode && len(options.Code.Capabilities) == 0 {
+	if request.EnableCode && options.Code.Capabilities == nil {
 		request.Code.Capabilities = []string{workrun.CodeCapabilityTerminal}
 	}
 	for _, pair := range []struct {
@@ -803,6 +791,26 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 	return result
 }
 
+// interactiveWorkContract keeps optional coding drafts read-only toward
+// connected services. Optional output must not broaden external authority.
+func interactiveWorkContract(mode action.Mode, paths []string) (artifact.Contract, error) {
+	disposition := action.Forbid
+	if mode == action.Draft {
+		disposition = action.Propose
+	} else if mode == action.Act {
+		disposition = action.Approve
+	}
+	if mode == action.Inspect || len(paths) == 0 {
+		contract := artifact.InspectionContract()
+		contract.AllowOptionalArtifacts = mode == action.Draft
+		if !contract.AllowOptionalArtifacts {
+			contract.ExternalActions = disposition
+		}
+		return contract, contract.Validate()
+	}
+	return workContract(mode, disposition, artifactFlags(paths), nil)
+}
+
 // resolveInteractiveWork spends one model request only when explicit controls
 // and clear language leave the desired output uncertain. A failed classifier
 // degrades to inspection; it cannot select act or connected capabilities.
@@ -867,6 +875,9 @@ func ambiguousInteractivePrompt(prompt string, options workapp.RunOptions) bool 
 		return false
 	}
 	lower := strings.ToLower(strings.TrimSpace(prompt))
+	if codingContinuation(lower, options.PreviousArtifacts) || codingFileRequest(lower) {
+		return false
+	}
 	if strings.HasSuffix(lower, "?") || containsAny(lower, "write ", "create ", "draft ", "produce ", "generate ", "prepare ", "build ", "reconcile ", "implement ", "fix ", "refactor ", "design ", ".md", ".json", ".csv", ".docx", ".xlsx", ".pdf", ".pptx", ".svg", ".html") {
 		return false
 	}
@@ -896,10 +907,16 @@ func inferInteractiveWork(prompt string, options workapp.RunOptions) (action.Mod
 		return action.Draft, paths, nil
 	}
 	lower := strings.ToLower(prompt)
+	// A verified coding follow-up must not turn its retained .patch files
+	// into required document outputs or depend on a separate classifier call.
+	if codingContinuation(lower, options.PreviousArtifacts) {
+		return action.Draft, nil, nil
+	}
+
 	if len(options.PreviousArtifacts) > 0 && containsAny(lower, "revise", "rewrite", "update it", "edit it", "tighten", "improve it", "change it", "continue working") {
 		return action.Draft, append([]string(nil), options.PreviousArtifacts...), nil
 	}
-	codeWork := containsAny(lower, "implement ", "fix ", "refactor ", "add a test", "create a test", "write code", "write a script", "add a feature", "add support", "change the code", "update the code", "patch ")
+	codeWork := codingFileRequest(lower) || containsAny(lower, "implement ", "fix ", "refactor ", "repair ", "add a test", "create a test", "write code", "write a script", "add a feature", "add support", "change the code", "update the code", "patch ")
 	createWork := containsAny(lower, "write ", "create ", "draft ", "produce ", "generate ", "prepare ", "build ", "reconcile ", "turn this into", "make a ")
 	// A question or a connection choice can mention "Reports", JSON, or a
 	// retained filename without asking for a new deliverable.
@@ -910,10 +927,39 @@ func inferInteractiveWork(prompt string, options workapp.RunOptions) (action.Mod
 	if !codeWork && !createWork && !documentWork {
 		return action.Inspect, nil, nil
 	}
-	if codeWork && !documentWork {
+	if codeWork {
+		// Mentioning a source SPEC.md, CSV importer or JSON parser does not
+		// request an output document. Preserve explicitly requested companion files.
+		for _, marker := range []string{"and write ", "and create ", "and draft ", "and produce "} {
+			if _, deliverable, found := strings.Cut(lower, marker); found {
+				return action.Draft, inferArtifactPaths(deliverable), nil
+			}
+		}
 		return action.Draft, nil, nil
 	}
 	return action.Draft, inferArtifactPaths(lower), nil
+}
+
+func codingContinuation(prompt string, previous []string) bool {
+	prior := false
+	for _, name := range previous {
+		prior = prior || strings.HasPrefix(name, "code/") && strings.HasSuffix(name, ".patch")
+	}
+	return prior && containsAny(prompt, "extend ", "support ", "handle ", "add ", "change ", "update ", "repair ", "continue working", "revise ")
+}
+
+func codingFileRequest(prompt string) bool {
+	if !containsAny(prompt, "create ", "write ", "build ", "update ", "edit ") {
+		return false
+	}
+	for _, word := range strings.Fields(prompt) {
+		name := strings.Trim(word, "`'\".,:;()[]{}")
+		switch strings.ToLower(filepath.Ext(name)) {
+		case ".go", ".py", ".js", ".jsx", ".cjs", ".mjs", ".ts", ".tsx", ".rs", ".java", ".c", ".cpp", ".h", ".hpp", ".rb", ".sh", ".sql", ".kt", ".swift", ".svelte", ".vue":
+			return true
+		}
+	}
+	return false
 }
 
 func containsAny(value string, needles ...string) bool {

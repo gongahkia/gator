@@ -63,3 +63,19 @@ func TestActivityBoundedAndInterruptedWithoutFalseSuccess(t *testing.T) {
 		t.Fatal("interrupted tool reported success")
 	}
 }
+
+func TestCodingCommandFailureIsVisibleWithoutLeakingCommandData(t *testing.T) {
+	trace := New(time.Now())
+	call := &agent.ToolCall{ID: "test", Name: "code_run_command", Arguments: json.RawMessage(`{"secret":"hidden-input"}`)}
+	trace.Record(agent.Event{Kind: agent.EventToolCalled, ToolCall: call})
+	trace.Record(agent.Event{Kind: agent.EventToolFinished, ToolCall: call, ToolResult: `{"ok":true,"result":{"exit_code":1,"output":"private-error-output","argv":["private-argv"]}}`})
+	if trace.Entries[0].State != "failed" {
+		t.Fatal("failed program was displayed as a successful check")
+	}
+	payload, _ := json.Marshal(trace)
+	for _, secret := range []string{"hidden-input", "private-error-output", "private-argv"} {
+		if strings.Contains(string(payload), secret) {
+			t.Fatalf("activity leaked %s", secret)
+		}
+	}
+}

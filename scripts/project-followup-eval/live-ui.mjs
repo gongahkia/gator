@@ -7,6 +7,9 @@ import { spawn } from "node:child_process";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const env = { ...process.env };
+const coding = process.argv.slice(2).includes("--coding");
+if (process.argv.slice(2).some(value => value !== "--coding")) throw new Error("Use only --coding to select the coding journeys.");
+if (coding) env.GATOR_LIVE_DESKTOP_SUITE = "coding";
 if (!env.OPENAI_API_KEY) {
   const text = await readFile(resolve(root, ".env"), "utf8");
   const line = text.split(/\r?\n/).find(line => /^\s*(?:export\s+)?OPENAI_API_KEY\s*=/.test(line));
@@ -17,7 +20,7 @@ if (!env.OPENAI_API_KEY) {
 }
 const results = resolve(root, "scripts/project-followup-eval/results");
 await mkdir(results, { recursive: true, mode: 0o700 });
-env.GATOR_LIVE_DESKTOP_REPORT = resolve(results, `ui-${new Date().toISOString().replaceAll(/[:.]/g, "-")}.json`);
-const child = spawn("go", ["test", "./cmd/gator", "-run", "^TestLiveDesktopUI$", "-count=1", "-v", "-timeout", "8m"], { cwd: root, env, stdio: "inherit" });
+env.GATOR_LIVE_DESKTOP_REPORT = resolve(results, `${coding ? "coding-ui" : "ui"}-${new Date().toISOString().replaceAll(/[:.]/g, "-")}.json`);
+const child = spawn("go", ["test", "./cmd/gator", "-run", "^TestLiveDesktopUI$", "-count=1", "-v", "-timeout", coding ? "12m" : "8m"], { cwd: root, env, stdio: "inherit" });
 child.once("error", () => { console.error("Could not start the existing Go toolchain."); process.exitCode = 1; });
 child.once("exit", code => { process.exitCode = code ?? 1; });

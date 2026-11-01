@@ -36,6 +36,10 @@ func TestInferInteractiveWorkKeepsConversationNatural(t *testing.T) {
 		{name: "html prototype", prompt: "Build a responsive dashboard prototype", mode: action.Draft, paths: []string{"prototype.html"}},
 		{name: "named svg", prompt: "Create poster.svg", mode: action.Draft, paths: []string{"poster.svg"}},
 		{name: "table workflow", prompt: "Reconcile these invoices", mode: action.Draft, paths: []string{"checked.xlsx", "memo.md"}},
+		{name: "code with source spec and CSV mentions", prompt: "Implement the CSV importer in source/SPEC.md", mode: action.Draft},
+		{name: "code with requested companion report", prompt: "Fix parser.go and write report.md", mode: action.Draft, paths: []string{"report.md"}},
+		{name: "named JavaScript code file", prompt: "Create normalize.cjs and test it", mode: action.Draft},
+		{name: "coding follow-up", prompt: "Extend the retained implementation to handle underscores", opts: workapp.RunOptions{PreviousArtifacts: []string{"code/retained.patch"}}, mode: action.Draft},
 		{name: "code without fake report", prompt: "Implement the missing parser", mode: action.Draft},
 		{name: "continued artifact", prompt: "Tighten it", opts: workapp.RunOptions{PreviousArtifacts: []string{"memo.md"}}, mode: action.Draft, paths: []string{"memo.md"}},
 	}

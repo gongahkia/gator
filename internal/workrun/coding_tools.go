@@ -28,6 +28,7 @@ type conversationCode struct {
 	messages    []agent.Message
 	dirty       bool
 	staged      int
+	operations  int
 	closed      bool
 }
 
@@ -186,6 +187,10 @@ func (t conversationCodeTool) Execute(ctx context.Context, raw json.RawMessage) 
 	if tool == nil {
 		return agent.ToolResult{}, errors.New("coding operation is omitted by the effective host/project policy")
 	}
+	if harness.MaxSteps > 0 && c.operations >= harness.MaxSteps {
+		return agent.ToolResult{}, errors.New("direct coding operation budget exhausted")
+	}
+	c.operations++
 	call := agent.ToolCall{Name: t.native, Arguments: raw}
 	if harness.BeforeTool != nil {
 		if err := harness.BeforeTool(ctx, call); err != nil {

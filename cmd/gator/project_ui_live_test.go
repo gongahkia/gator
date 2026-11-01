@@ -52,6 +52,18 @@ func TestLiveDesktopUI(t *testing.T) {
 		t.Fatal(err)
 	}
 	localToken := hex.EncodeToString(random[:])
+	suite := os.Getenv("GATOR_LIVE_DESKTOP_SUITE")
+	if suite != "" && suite != "coding" {
+		t.Fatal("unknown live UI suite")
+	}
+	maxCalls := int32(8)
+	timeout := 6 * time.Minute
+	script := "test:e2e:live"
+	if suite == "coding" {
+		maxCalls = 32
+		timeout = 10 * time.Minute
+		script = "test:e2e:live:coding"
+	}
 	var calls atomic.Int32
 	guard := projectEvalTransport{directory: filepath.Dir(path)}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -59,7 +71,7 @@ func TestLiveDesktopUI(t *testing.T) {
 			http.Error(w, "live UI fixture request denied", http.StatusForbidden)
 			return
 		}
-		if calls.Add(1) > 8 {
+		if calls.Add(1) > maxCalls {
 			http.Error(w, "live UI request bound reached; do not replay", http.StatusForbidden)
 			return
 		}
@@ -94,9 +106,9 @@ func TestLiveDesktopUI(t *testing.T) {
 		writeProjectUIResponse(w, body)
 	}))
 	defer server.Close()
-	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	command := exec.CommandContext(ctx, "npm", "run", "test:e2e:live", "--prefix", "../../desktop")
+	command := exec.CommandContext(ctx, "npm", "run", script, "--prefix", "../../desktop")
 	// cwd is cmd/gator under go test. Keep real credentials solely in this Go
 	// process; Electron receives only a short-lived local proxy token.
 	for _, entry := range os.Environ() {
@@ -106,7 +118,7 @@ func TestLiveDesktopUI(t *testing.T) {
 		}
 		command.Env = append(command.Env, entry)
 	}
-	command.Env = append(command.Env, "GATOR_LIVE_UI_ENDPOINT="+server.URL+"/v1/responses", "GATOR_LIVE_UI_TOKEN="+localToken, "GATOR_LIVE_UI_BROWSER_REPORT="+path+".browser.json", "GATOR_LIVE_UI_ARTIFACT_DIR="+path+".artifacts")
+	command.Env = append(command.Env, "GATOR_LIVE_UI_SUITE="+suite, "GATOR_LIVE_UI_ENDPOINT="+server.URL+"/v1/responses", "GATOR_LIVE_UI_TOKEN="+localToken, "GATOR_LIVE_UI_BROWSER_REPORT="+path+".browser.json", "GATOR_LIVE_UI_ARTIFACT_DIR="+path+".artifacts")
 	command.Stdout, command.Stderr = os.Stdout, os.Stderr
 	start := time.Now()
 	err = command.Run()

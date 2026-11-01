@@ -25,6 +25,22 @@ Gator's private storage.
 Product direction and the remaining capability gaps are recorded in the
 [22 October competitive audit](../docs/COMPETITIVE_GAP_AUDIT_2026-10-22.md).
 
+## Coding in chat
+
+Gator can use its coding harness directly in the conversation or delegate to a
+bounded coding worker with the same capabilities. Choose a project folder and ask
+for implementation or repair. Changes are made in a private captured checkout;
+review the changed-file proposal and recorded checks before applying anything to
+live source. Coding activity stays interleaved above the answer, code blocks have
+syntax colours, and change cards open the exact retained diff in the right sidebar.
+Explicit inspect mode stays read-only. External coding CLIs are optional.
+
+The [shared coding architecture and evaluation record](../docs/SHARED-CODING-CAPABILITIES.md)
+distinguishes tested behavior, live-model evidence and remaining limits. To run
+actual paid coding journeys in a disposable Electron profile, use
+`npm run test:live:coding --prefix desktop` from the repository root after building.
+It reuses the existing cumulative $10 evaluation budget; ordinary tests stay free.
+
 ## Run
 
 From the repository root, with Go 1.25.13 and Node.js 22.12+ installed:

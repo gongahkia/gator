@@ -6,6 +6,11 @@ The [architecture decision](PRODUCT_DEPTH_DECISION.md) gives the six-stage
 dependency order; [migration semantics](WORK_DEPTH_MIGRATIONS.md) describe old
 state and recovery limits.
 
+November 1 update: the [shared coding capability record](SHARED-CODING-CAPABILITIES.md)
+describes the current Electron/main-agent connection and stronger read-coverage
+gate. The September results below remain historical; retired CLI/TUI walkthroughs
+are not current product setup instructions.
+
 ## Repository and environment
 
 The research baseline is `70adf39b57e7bd5469d792e3674ca7f331f5512e`. Initial

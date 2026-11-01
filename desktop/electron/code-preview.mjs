@@ -13,7 +13,7 @@ export async function codePreview(request, { state, current = () => true }) {
   if (!bundle || !/^[a-f0-9]{64}$/.test(bundle.ManifestSHA256 || "")) throw new Error("The retained code evidence is unavailable.");
   const raw = await readBoundedFile(bundle.Path, "manifest.json", 2 * 1024 * 1024);
   if (hash(raw) !== bundle.ManifestSHA256) throw new Error("The retained manifest has changed.");
-  const manifest = JSON.parse(raw), candidate = manifest.candidates?.find(value => value.id === request.candidate);
+  const manifest = JSON.parse(raw), candidate = manifest.code_candidates?.find(value => value.id === request.candidate);
   if (manifest.run_id !== request.run || !candidate || !/^[a-f0-9]{64}$/.test(candidate.sha256 || "") || typeof candidate.patch_path !== "string" || !/^code\/[a-zA-Z0-9_-]+\.patch$/.test(candidate.patch_path)) throw new Error("This candidate has no available retained patch.");
   const bytes = await readBoundedFile(join(bundle.Path, "output"), candidate.patch_path, 16 * 1024 * 1024);
   if (hash(bytes) !== candidate.sha256) throw new Error("The retained patch has changed.");

@@ -18,6 +18,7 @@ func prepareLinux(ctx context.Context, root, scratch string, argv, environment [
 	if err != nil {
 		return nil, err
 	}
+	readRoots = append(readRoots, commandRuntimeRoots(argv)...)
 	readRoots = removeWritableRoots(readRoots, writeRoots)
 	arguments := []string{"--die-with-parent", "--new-session", "--unshare-all", "--proc", "/proc", "--dev", "/dev"}
 	// --unshare-all includes the network namespace. AllowNetwork must undo
@@ -43,7 +44,7 @@ func prepareLinux(ctx context.Context, root, scratch string, argv, environment [
 	arguments = append(arguments, argv[1:]...)
 	command := exec.CommandContext(ctx, bwrap, arguments...)
 	command.Dir = root
-	command.Env = environment
+	command.Env = runtimeEnvironment(environment, readRoots)
 	return command, nil
 }
 

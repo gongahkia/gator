@@ -123,7 +123,7 @@ export function WorkDetails({ state, identity, requestedOutput, open, presenceRe
           {selected.file ? <>
             {selected.file.Preview ? <><div className="output-preview-toolbar"><span>Retained preview</span><CopyButton text={selected.file.Preview} label="Copy preview" /></div>{selected.file.PreviewKind === "markdown" ? <Markdown text={selected.file.Preview} /> : <pre className="output-source">{selected.file.Preview}</pre>}{selected.file.Truncated && <p className="work-details-caption">Showing a shortened preview.</p>}</> : <p className="work-details-empty">No text preview is available for this file.</p>}
             <p className="work-details-caption">File checks do not confirm external delivery.</p>
-          </> : <CodeChanges key={selected.id} context={`conversation:${state.conversation_id}`} bundle={selected.bundle} candidate={selected.candidate!.ID} />}
+          </> : <CodeChanges key={selected.id} context={`conversation:${state.conversation_id}`} bundle={selected.bundle} candidate={selected.candidate!.ID} reportedPaths={selected.candidate!.ChangedPaths} />}
           {inChat.has(selected.id) && <button className="small-button show-in-chat" onClick={() => showInChat(selected.id)}><MessageSquare size={15} />Show in chat</button>}
           <details className="output-location"><summary>Retained location<ChevronDown size={14} /></summary><p>{selected.bundle.Path}</p>{selected.candidate?.PatchPath && <p>{selected.candidate.PatchPath}</p>}</details>
         </section> : <>

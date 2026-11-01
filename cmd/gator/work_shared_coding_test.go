@@ -112,3 +112,72 @@ func TestCodingSessionFactorySharesCoreToolsAndFailsClosedOnCommandApproval(t *t
 		t.Fatal("unapproved command had effects")
 	}
 }
+
+func TestInternalCodingCompletionUsesVerificationAndIndependentReadOnlyReview(t *testing.T) {
+	source, state := t.TempDir(), t.TempDir()
+	if err := os.WriteFile(filepath.Join(source, "greeting.txt"), []byte("base\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	worker := &workScriptedModel{turns: append(sharedCodeTurns(""), agent.Turn{Text: "Changed the greeting."})}
+	backend := &nativeWorkBackend{code: codeexec.Executor{Model: worker}}
+	reviewed := false
+	reviewer := depthModel(func(_ context.Context, r agent.TurnRequest) (agent.Turn, error) {
+		for _, definition := range r.Tools {
+			if definition.Name == "apply_patch" || definition.Name == "run_command" || definition.Name == "delegate_agents" {
+				t.Error("read-only reviewer received mutation/delegation authority")
+			}
+		}
+		if !reviewed {
+			reviewed = true
+			return depthCall("read_file", map[string]any{"path": "candidate/greeting.txt"}), nil
+		}
+		// The exact candidate digest comes from the host assignment, not a worker claim.
+		prompt := ""
+		for _, message := range r.Messages {
+			if message.Role == agent.RoleUser {
+				prompt = message.Content
+			}
+		}
+		marker := `"candidate_sha256":"`
+		i := strings.Index(prompt, marker)
+		if i < 0 {
+			return agent.Turn{}, errors.New("review assignment has no exact digest")
+		}
+		digest := strings.SplitN(prompt[i+len(marker):], `"`, 2)[0]
+		payload, _ := json.Marshal(map[string]any{"passed": true, "candidate_sha256": digest, "findings": []string{}})
+		return agent.Turn{Text: string(payload)}, nil
+	})
+	main := &workScriptedModel{turns: []agent.Turn{depthCall("complete_code", map[string]any{"agent": "code", "objective": "Fix greeting.txt", "acceptance": []string{"greeting is changed"}}), {Text: "Reviewed and staged."}}}
+	contract := artifact.InspectionContract()
+	contract.AllowOptionalArtifacts = true
+	request := workrun.Request{RunID: "shared-completion", SourcePath: source, Objective: "Fix greeting", Mode: action.Draft, EnableCode: true, Contract: contract, MaxSteps: 10, Code: workrun.CodePolicy{Sandbox: sandbox.Policy{Mode: sandbox.Off}, Verification: [][]string{{"git", "diff", "--check"}}}}
+	outcome, err := (workrun.Executor{Model: main, StateDir: state, Code: backend.codeDelegate(state), CodeSession: backend.codeSession(state), RoleModels: map[string]agent.Model{"artifact_reviewer": reviewer}}).Execute(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	records, err := workrun.ReadCompletions(state, "shared-completion")
+	if err != nil || len(records) != 1 || records[0].Status != "completed" {
+		t.Fatalf("completion=%#v error=%v result=%#v", records, err, outcome.Result)
+	}
+	if !reviewed || len(outcome.Manifest.Candidates) != 1 {
+		t.Fatal("verification/review path was skipped")
+	}
+	original, _ := os.ReadFile(filepath.Join(source, "greeting.txt"))
+	if string(original) != "base\n" {
+		t.Fatal("source changed")
+	}
+}
+
+func TestInteractiveCodingContractAllowsStagedPatchWithoutExternalAuthority(t *testing.T) {
+	contract, err := interactiveWorkContract(action.Draft, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !contract.AllowOptionalArtifacts || contract.ExternalActions != action.Forbid || len(contract.Artifacts) != 0 {
+		t.Fatalf("unsafe coding contract: %#v", contract)
+	}
+	inspect, err := interactiveWorkContract(action.Inspect, nil)
+	if err != nil || inspect.AllowOptionalArtifacts || inspect.ExternalActions != action.Forbid {
+		t.Fatalf("inspection contract=%#v %v", inspect, err)
+	}
+}

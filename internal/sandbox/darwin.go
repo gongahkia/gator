@@ -28,11 +28,12 @@ func prepareDarwin(ctx context.Context, root, scratch string, argv, environment 
 	if err != nil {
 		return nil, err
 	}
+	readRoots = append(readRoots, commandRuntimeRoots(argv)...)
 	profile := darwinProfile(readRoots, writeRoots, policy.Network)
 	command := exec.CommandContext(ctx, sandboxExec, "-p", profile, "--", executable)
 	command.Args = append(command.Args, argv[1:]...)
 	command.Dir = root
-	command.Env = environment
+	command.Env = runtimeEnvironment(environment, readRoots)
 	return command, nil
 }
 

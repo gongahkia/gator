@@ -1,8 +1,10 @@
 // Package workactivity projects public runner events into bounded display data.
-// It never includes tool arguments, tool results, provider payloads or reasoning.
+// It retains narration and finite outcomes, never tool arguments, command
+// output, provider payloads or private reasoning.
 package workactivity
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -115,7 +117,7 @@ func (t *Trace) Record(event agent.Event) {
 		}
 		if event.Kind == agent.EventToolFinished {
 			t.Entries[index].State = "completed"
-			if event.ToolError != "" {
+			if event.ToolError != "" || failedCommand(event) {
 				t.Entries[index].State = "failed"
 			}
 			t.Entries[index].FinishedAt = &at
@@ -170,4 +172,23 @@ func (t *Trace) Clone() *Trace {
 	copy.Entries = append([]Entry{}, t.Entries...)
 	copy.tools = nil
 	return &copy
+}
+
+// A command tool can finish normally while its program exits unsuccessfully.
+// Inspect only this typed outcome; never copy argv, output or diagnostics.
+func failedCommand(event agent.Event) bool {
+	if event.ToolCall == nil || (event.ToolCall.Name != "run_command" && event.ToolCall.Name != "code_run_command") || len(event.ToolResult) > 128*1024 {
+		return false
+	}
+	var result struct {
+		OK     bool `json:"ok"`
+		Result struct {
+			ExitCode *int `json:"exit_code"`
+			TimedOut bool `json:"timed_out"`
+		} `json:"result"`
+	}
+	if json.Unmarshal([]byte(event.ToolResult), &result) != nil || !result.OK {
+		return false
+	}
+	return result.Result.TimedOut || result.Result.ExitCode != nil && *result.Result.ExitCode != 0
 }

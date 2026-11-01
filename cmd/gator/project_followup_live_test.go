@@ -153,7 +153,7 @@ func (g projectEvalTransport) RoundTrip(r *http.Request) (*http.Response, error)
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
-	if ledger.Estimated < 0 || ledger.Reserved < 0 || ledger.SearchReserved < 0 || ledger.Calls >= 96 || ledger.Estimated+ledger.Reserved+ledger.SearchReserved+reserve > 9.5 {
+	if ledger.Estimated < 0 || ledger.Reserved < 0 || ledger.SearchReserved < 0 || ledger.Calls >= 128 || ledger.Estimated+ledger.Reserved+ledger.SearchReserved+reserve > 9.5 {
 		return nil, errors.New("evaluation dollar or request limit reached")
 	}
 	save := func() error {

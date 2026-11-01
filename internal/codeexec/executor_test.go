@@ -105,3 +105,40 @@ func codeRepository(t *testing.T) string {
 	}
 	return repository
 }
+
+func TestCompletionRejectsStaleOrFailedVerification(t *testing.T) {
+	tool := func(name, content string) agent.Message {
+		return agent.Message{Role: agent.RoleTool, ToolName: name, Content: content}
+	}
+	pass := tool("run_command", `{"ok":true,"result":{"argv":["git","diff","--check"],"exit_code":0}}`)
+	base := []agent.Message{tool("git_status", `{"ok":true}`), tool("git_diff", `{"ok":true}`), pass}
+	check := completionCheck([][]string{{"git", "diff", "--check"}})
+	if err := check(base); err != nil {
+		t.Fatal(err)
+	}
+	for _, change := range []agent.Message{
+		tool("apply_patch", `{"ok":true}`),
+		tool("run_command", `{"ok":true,"result":{"argv":["git","diff","--check"],"exit_code":1}}`),
+		tool("run_command", `{"ok":true,"result":{"argv":["sh","-c","change-files"],"exit_code":0}}`),
+		tool("terminal_write", `{"ok":true}`),
+	} {
+		if err := check(append(append([]agent.Message(nil), base...), change)); err == nil {
+			t.Fatalf("stale evidence accepted after %s", change.ToolName)
+		}
+	}
+	if err := check([]agent.Message{tool("git_status", `{"error":"denied"}`), tool("git_diff", `{"ok":true}`), pass}); err == nil {
+		t.Fatal("failed status read counted as evidence")
+	}
+}
+
+func TestPrepareNeverCallsModelAndCloseIsIdempotent(t *testing.T) {
+	prepared, err := (Executor{Sandbox: sandbox.Policy{Mode: sandbox.Off}}).Prepare(context.Background(), Request{RepositoryPath: codeRepository(t), RunID: "prepared-only", Task: "Expose tools", MaxSteps: 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(prepared.Tools) == 0 || prepared.System == "" {
+		t.Fatal("prepared harness is incomplete")
+	}
+	prepared.Close()
+	prepared.Close()
+}

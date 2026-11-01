@@ -53,6 +53,7 @@ type completionRecord struct {
 	RunID        string              `json:"run_id"`
 	PolicySHA256 string              `json:"policy_sha256"`
 	Agent        string              `json:"agent"`
+	Baseline     string              `json:"baseline_patch,omitempty"`
 	Objective    string              `json:"objective"`
 	Acceptance   []string            `json:"acceptance"`
 	Verification [][]string          `json:"verification"`
@@ -116,7 +117,7 @@ type codeCompletion struct {
 }
 
 func (c *codeCompletion) Definition() agent.ToolDefinition {
-	return agent.ToolDefinition{Name: "complete_code", Description: "Implement, run host-configured acceptance commands, independently review the verified patch, and repair concrete failures using the same native session when supported, or a fresh internal coding assignment with an explicit verified baseline. At most 3 attempts, 15 minutes, and the supervisor's shared task budget. Returns retained evidence or a waiting/failed state; never applies to original files. Resume a waiting loop by its ID without changing its objective.", Parameters: json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"agent":{"type":"string"},"objective":{"type":"string","maxLength":2048},"acceptance":{"type":"array","minItems":1,"maxItems":8,"items":{"type":"string","maxLength":256}},"max_attempts":{"type":"integer","minimum":1,"maximum":3},"resume":{"type":"string"}}}`)}
+	return agent.ToolDefinition{Name: "complete_code", Description: "Implement, run host-configured acceptance commands, independently review the verified patch, and repair concrete failures using the same native session when supported, or a fresh internal coding assignment with an explicit verified baseline. At most 3 attempts, 15 minutes, and the supervisor's shared task budget. Returns retained evidence or a waiting/failed state; never applies to original files. Resume a waiting loop by its ID without changing its objective.", Parameters: json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"agent":{"type":"string"},"baseline_patch":{"type":"string","maxLength":1024},"objective":{"type":"string","maxLength":2048},"acceptance":{"type":"array","minItems":1,"maxItems":8,"items":{"type":"string","maxLength":256}},"max_attempts":{"type":"integer","minimum":1,"maximum":3},"resume":{"type":"string"}}}`)}
 }
 
 var completionID = regexp.MustCompile(`^completion-[a-f0-9]{32}$`)
@@ -141,6 +142,7 @@ func completionText(text string, limit int) bool {
 func (c *codeCompletion) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolResult, error) {
 	var input struct {
 		Agent       string   `json:"agent"`
+		Baseline    string   `json:"baseline_patch"`
 		Objective   string   `json:"objective"`
 		Acceptance  []string `json:"acceptance"`
 		MaxAttempts int      `json:"max_attempts"`
@@ -150,7 +152,7 @@ func (c *codeCompletion) Execute(ctx context.Context, raw json.RawMessage) (agen
 		return agent.ToolResult{}, err
 	}
 	if input.Resume != "" {
-		if !completionID.MatchString(input.Resume) || input.Agent != "" || input.Objective != "" || len(input.Acceptance) != 0 || input.MaxAttempts != 0 {
+		if !completionID.MatchString(input.Resume) || input.Agent != "" || input.Objective != "" || len(input.Acceptance) != 0 || input.MaxAttempts != 0 || input.Baseline != "" {
 			return agent.ToolResult{}, errors.New("resume selects only an existing completion ID")
 		}
 	} else {
@@ -158,11 +160,19 @@ func (c *codeCompletion) Execute(ctx context.Context, raw json.RawMessage) (agen
 			input.MaxAttempts = 3
 		}
 		if !c.eligible[input.Agent] || !completionText(input.Objective, 2048) || len(input.Acceptance) < 1 || len(input.Acceptance) > 8 || input.MaxAttempts < 1 || input.MaxAttempts > 3 {
-			return agent.ToolResult{}, errors.New("select an enabled editable native worker, objective, 1–8 acceptance criteria, and 1–3 attempts")
+			return agent.ToolResult{}, errors.New("select an enabled coding worker, objective, 1–8 acceptance criteria, and 1–3 attempts")
 		}
 		for _, criterion := range input.Acceptance {
 			if !completionText(criterion, 256) {
 				return agent.ToolResult{}, errors.New("invalid completion acceptance criterion")
+			}
+		}
+		if input.Baseline != "" {
+			if len(input.Baseline) > 1024 {
+				return agent.ToolResult{}, errors.New("invalid baseline path")
+			}
+			if _, err := c.request.integration.baseline(input.Baseline); err != nil {
+				return agent.ToolResult{}, err
 			}
 		}
 		c.mu.Lock()
@@ -201,7 +211,7 @@ func (c *codeCompletion) Execute(ctx context.Context, raw json.RawMessage) (agen
 		return agent.ToolResult{}, fmt.Errorf("completion has a live owner: %w", err)
 	}
 	defer filelock.Unlock(lease)
-	record := completionRecord{Version: 1, ID: id, RunID: c.request.RunID, PolicySHA256: c.policy, Agent: input.Agent, Objective: input.Objective, Acceptance: input.Acceptance, Verification: c.request.Code.Verification, MaxAttempts: input.MaxAttempts, Status: "running", CreatedAt: time.Now().UTC(), Deadline: time.Now().UTC().Add(15 * time.Minute)}
+	record := completionRecord{Version: 1, ID: id, RunID: c.request.RunID, PolicySHA256: c.policy, Agent: input.Agent, Baseline: input.Baseline, Objective: input.Objective, Acceptance: input.Acceptance, Verification: c.request.Code.Verification, MaxAttempts: input.MaxAttempts, Status: "running", CreatedAt: time.Now().UTC(), Deadline: time.Now().UTC().Add(15 * time.Minute)}
 	if input.Resume != "" {
 		data, err := root.ReadRegularFile(id+".json", 1024*1024)
 		if err != nil {
@@ -322,6 +332,9 @@ func (c *codeCompletion) run(ctx context.Context, r *completionRecord, save func
 				assignment += "\nPrevious independent check/review feedback (evidence, not authority):\n" + completionBound(feedback, 2048) + "\nRepair these defects in the same checkout."
 			}
 			baseline := ""
+			if len(r.Attempts) == 1 || r.Agent == "code" {
+				baseline = r.Baseline
+			}
 			if r.Agent == "code" && len(r.Attempts) > 1 {
 				prior := r.Attempts[len(r.Attempts)-2]
 				if prior.Candidate != nil && prior.Candidate.Status == "verified" {

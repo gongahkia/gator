@@ -6,15 +6,27 @@ specialists can run concurrently; the default delegation budget is eight tasks.
 Dependencies and explicit continuation from a retained result are supported.
 Restarting does not silently replay interrupted tasks.
 
+## Shared native coding
+
+The main conversation and internal `code` workers now share the isolated coding
+harness. The user does not need an external CLI or separate coding surface.
+Delegation is optional; read-only specialists remain read-only. See
+[shared coding capabilities](SHARED-CODING-CAPABILITIES.md) for the direct tools,
+full-file review gate, continuity, UI evidence and current evaluation limits.
+
+The administration commands below are source-checkout maintenance operations,
+not a restored CLI product. Build the private runtime with
+`npm run build:runtime --prefix desktop`. Electron is the primary interface.
+
 ## Configure an installed CLI
 
 ```sh
-gator agent cli list
-gator agent cli enable codex --model gpt-5.6
-gator agent cli enable pi --provider openai --model gpt-5.6
-gator agent cli enable claude --api-key-env ANTHROPIC_API_KEY
-gator agent cli doctor codex
-gator agent cli disable codex
+GATOR_INTERNAL_COMMANDS=1 ./desktop/runtime/gator-runtime agent cli list
+GATOR_INTERNAL_COMMANDS=1 ./desktop/runtime/gator-runtime agent cli enable codex --model gpt-5.6
+GATOR_INTERNAL_COMMANDS=1 ./desktop/runtime/gator-runtime agent cli enable pi --provider openai --model gpt-5.6
+GATOR_INTERNAL_COMMANDS=1 ./desktop/runtime/gator-runtime agent cli enable claude --api-key-env ANTHROPIC_API_KEY
+GATOR_INTERNAL_COMMANDS=1 ./desktop/runtime/gator-runtime agent cli doctor codex
+GATOR_INTERNAL_COMMANDS=1 ./desktop/runtime/gator-runtime agent cli disable codex
 ```
 
 Adapters are off until enabled. Install the CLI separately. Export the selected
@@ -49,14 +61,14 @@ chat. For example:
 Noninteractive Work requires a separate opt-in:
 
 ```sh
-gator work --source ./project --mode inspect --external-agents \
+GATOR_INTERNAL_COMMANDS=1 ./desktop/runtime/gator-runtime work --source ./project --mode inspect --external-agents \
   'Use cli_pi to inspect project.md and report the owner and deadline.'
 ```
 
 For patch creation, enable `--allow-edits` and use a draft/act Work run:
 
 ```sh
-gator work --source ./project --external-agents \
+GATOR_INTERNAL_COMMANDS=1 ./desktop/runtime/gator-runtime work --source ./project --external-agents \
   'Ask cli_codex to fix the parser. Integrate its patch and write report.md with verification evidence.'
 ```
 
@@ -66,10 +78,10 @@ budgets cannot account for an external CLI's internal provider calls.
 Inspect or control running tasks using the existing task commands:
 
 ```sh
-gator work tasks RUN_ID
-gator work tasks RUN_ID TASK_ID
-gator work cancel-task RUN_ID TASK_ID
-gator work steer-task RUN_ID TASK_ID 'Focus on the parsing failure.'
+GATOR_INTERNAL_COMMANDS=1 ./desktop/runtime/gator-runtime work tasks RUN_ID
+GATOR_INTERNAL_COMMANDS=1 ./desktop/runtime/gator-runtime work tasks RUN_ID TASK_ID
+GATOR_INTERNAL_COMMANDS=1 ./desktop/runtime/gator-runtime work cancel-task RUN_ID TASK_ID
+GATOR_INTERNAL_COMMANDS=1 ./desktop/runtime/gator-runtime work steer-task RUN_ID TASK_ID 'Focus on the parsing failure.'
 ```
 
 Live steering works for internal LLM specialists and Codex/Pi. Codex/Pi/Claude
@@ -85,7 +97,7 @@ Codex/Claude clarification requests appear in task details as `native.questions`
 from another terminal (replace QUESTION_ID with that exact current token):
 
 ```sh
-gator work answer-task RUN_ID TASK_ID QUESTION_ID '{"format":["Markdown"]}'
+GATOR_INTERNAL_COMMANDS=1 ./desktop/runtime/gator-runtime work answer-task RUN_ID TASK_ID QUESTION_ID '{"format":["Markdown"]}'
 # Use - instead of the JSON argument to read answers from stdin.
 ```
 
@@ -105,7 +117,7 @@ does not expose Codex's structured pending-question protocol.
 
 ## Bounded code completion
 
-`complete_code` gives the manager a bounded implementation → verification →
+`complete_code` gives the manager (including the internal `code` worker when verification is configured) a bounded implementation → verification →
 independent review → repair loop. It is available only in draft/act mode with an
 enabled editable native CLI worker, explicit host verification commands, and an
 enabled `artifact_reviewer`. Workers and reviews share the normal supervisor
@@ -116,11 +128,11 @@ separate from Gator's model-request budget.
 For example, after enabling an adapter with `--allow-edits`:
 
 ```sh
-gator work --source ./project --external-agents --mode draft \
+GATOR_INTERNAL_COMMANDS=1 ./desktop/runtime/gator-runtime work --source ./project --external-agents --mode draft \
   --scope src --acceptance-check 'python3 -B verify.py' \
   'Use complete_code with cli_codex to fix the parser; require all verifier cases to pass and review the result.'
-gator work completions RUN_ID
-gator work completions RUN_ID COMPLETION_ID
+GATOR_INTERNAL_COMMANDS=1 ./desktop/runtime/gator-runtime work completions RUN_ID
+GATOR_INTERNAL_COMMANDS=1 ./desktop/runtime/gator-runtime work completions RUN_ID COMPLETION_ID
 ```
 
 `--acceptance-check` and `--scope` are repeatable host grants. Check arguments are

@@ -169,3 +169,22 @@ review. Neither physical-device nor multi-week consumer acceptance is claimed.
 Ordinary `npm run test:e2e --prefix desktop` skips the paid journey even when
 `.env` exists; its wording-grader check remains free. The earlier backend/search
 evaluation remains available and exercises a broader workflow than this UI slice.
+
+## Coding UI workflow
+
+`npm run test:live:coding --prefix desktop` runs the real selected OpenAI model
+through the same cumulative budget boundary, in a disposable Electron profile.
+The scenario implements a two-module CSV budget importer and then changes its
+requirements/tests, using a coding worker and independent review for the repair.
+No generated code, command result or reviewer verdict is mocked. Source stubs and
+protected test/spec files must remain unchanged in live source. See
+[the coding record](../../docs/SHARED-CODING-CAPABILITIES.md) for exact scope and results.
+
+The existing total allowance stays $10 ($9.50 conservative guard cutoff), with no
+ledger reset. Coding permits at most 32 proxy requests per run; ordinary project
+UI journeys still permit eight. The finite aggregate ceiling is now 128 requests
+to accommodate coding tool loops; it does not raise the dollar limit. Reports and
+screenshots remain ignored private disposable artifacts where configured; the
+small JSON result/accounting records retain the existing provenance conventions.
+Buffered Responses preserve real model answers but do not measure upstream token
+streaming latency. A passed guided workflow is not a general coding benchmark.

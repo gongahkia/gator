@@ -167,8 +167,8 @@ type Request struct {
 	DesktopSession string
 	ApproveDesktop func(context.Context, []string) (tools.CommandDecision, error)
 	// RequireCode is reserved for internal evaluation of patch evidence.
-	// EnableCode grants the internal patch specialist to a Work request without
-	// requiring a patch to complete. Ordinary file and data Work leaves it off.
+	// EnableCode grants isolated coding tools and the bounded coding specialist
+	// without requiring a patch for every turn. Inspect mode remains read-only.
 	EnableCode         bool
 	RequireCode        bool
 	Code               CodePolicy
