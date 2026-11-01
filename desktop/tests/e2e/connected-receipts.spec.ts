@@ -1,10 +1,10 @@
-import { _electron as electron, test, expect, type ElectronApplication, type Page } from "@playwright/test";
+import { test, expect, type ElectronApplication, type Page } from "@playwright/test";
 import { execFileSync } from "node:child_process";
 import { createServer } from "node:http";
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { closeDesktop, temporaryDirectory } from "./lifecycle";
+import { closeDesktop, temporaryDirectory, launchDesktop } from "./lifecycle";
 
 async function fixture(holdSend = false) {
   const root = await temporaryDirectory(join(tmpdir(), "gator-receipts-"));
@@ -45,7 +45,7 @@ async function fixture(holdSend = false) {
   let app: ElectronApplication;
   return {
     root, requests, releaseSend,
-    async launch() { const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE; app = await electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env }); return app; },
+    async launch() { const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE; app = await launchDesktop({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env }); return app; },
     async close() { releaseSend(); if (app) await closeDesktop(app); server.closeAllConnections(); await new Promise<void>(done => server.close(() => done())); await rm(root, { recursive: true, force: true }); },
   };
 }

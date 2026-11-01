@@ -1,8 +1,8 @@
-import { _electron as electron, test, expect } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { mkdir, rm, writeFile } from "node:fs/promises";
-import { closeDesktop, temporaryDirectory } from "./lifecycle";
+import { closeDesktop, temporaryDirectory, launchDesktop } from "./lifecycle";
 
 test("dated chat search highlights literal matches and opens the intended topic by keyboard", async () => {
   const directory = await temporaryDirectory(join(tmpdir(), "gator-chat-search-e2e-"));
@@ -17,7 +17,7 @@ test("dated chat search highlights literal matches and opens the intended topic 
     await writeFile(join(root, "conversation.json"), JSON.stringify({ version: 2, id, title, source_path: workspace, snapshot_id: "snap-search", created_at: dates[index].toISOString(), updated_at: dates[index].toISOString() }));
   }
   const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
-  const app = await electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env: { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop"), GATOR_DESKTOP_WORKSPACE: workspace } });
+  const app = await launchDesktop({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env: { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop"), GATOR_DESKTOP_WORKSPACE: workspace } });
   try {
     const page = await app.firstWindow();
     const recent = page.getByRole("region", { name: "Recent conversations", exact: true });

@@ -1,9 +1,9 @@
-import { _electron as electron, expect, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve, delimiter } from "node:path";
-import { closeDesktop, temporaryDirectory } from "./lifecycle";
+import { closeDesktop, temporaryDirectory, launchDesktop } from "./lifecycle";
 
 async function fixture() {
   const root = await temporaryDirectory(join(tmpdir(), "gator-electron-only-")), workspace = join(root, "workspace"), config = join(root, "config/gator");
@@ -27,7 +27,7 @@ async function fixture() {
   const quote = (value: string) => "'" + value.replaceAll("'", "'\\''") + "'";
   const env = { ...process.env, PATH: `${bin}${delimiter}${process.env.PATH}`, VISUAL: "", EDITOR: `${quote(process.execPath)} ${quote(editor)}`, GATOR_EDITOR_FIXTURE: control, GATOR_STATE_DIR: join(root, "state"), GATOR_CONFIG_DIR: join(root, "config"), GATOR_DESKTOP_USER_DATA: join(root, "desktop"), GATOR_DESKTOP_WORKSPACE: workspace, GATOR_INTERNAL_COMMANDS: "" };
   const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
-  const app = await electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env });
+  const app = await launchDesktop({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env });
   const page = await app.firstWindow(), composer = page.getByRole("textbox", { name: "Message Gator", exact: true });
   await expect(composer).toBeVisible();
   return { root, app, page, composer, control, requests: () => requests, close: async () => { try { await app.evaluate(({ dialog }) => { dialog.showMessageBox = async () => ({ response: 1, checkboxChecked: false }); }); await closeDesktop(app); } finally { server.closeAllConnections(); await new Promise<void>(done => server.close(() => done())); await rm(root, { recursive: true, force: true }); } } };

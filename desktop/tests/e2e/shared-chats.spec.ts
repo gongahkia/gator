@@ -1,10 +1,10 @@
 import { openCommandSearch } from "./navigation";
-import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
+import { expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { closeDesktop, temporaryDirectory } from "./lifecycle";
+import { closeDesktop, temporaryDirectory, launchDesktop } from "./lifecycle";
 import { memoryComparisonMessage } from "./memory-fixture";
 
 type Message = { role: string; content: unknown; tool_calls?: {function:{name:string;arguments:string}}[] };
@@ -50,7 +50,7 @@ async function fixture() {
   await writeFile(join(directory,"config/gator/config.json"),JSON.stringify({version:4,defaults:{provider:"chat-fixture",model:"fixture-model"},custom_providers:[{id:"chat-fixture",base_url:`http://127.0.0.1:${port}/v1/chat/completions`,models:["fixture-model"],default_model:"fixture-model"}]}),{mode:0o600});
   const env={...process.env,GATOR_STATE_DIR:join(directory,"state"),GATOR_CONFIG_DIR:join(directory,"config"),GATOR_DESKTOP_USER_DATA:join(directory,"desktop"),GATOR_DESKTOP_WORKSPACE:workspace};
   let app:ElectronApplication|undefined;
-  const launch=async()=>{const executablePath=process.env.GATOR_DESKTOP_TEST_EXECUTABLE;app=await electron.launch({executablePath,args:executablePath?[]:["."],cwd:resolve("."),env});return app;};
+  const launch=async()=>{const executablePath=process.env.GATOR_DESKTOP_TEST_EXECUTABLE;app=await launchDesktop({executablePath,args:executablePath?[]:["."],cwd:resolve("."),env});return app;};
   const memories=async()=>{const path=join(directory,"state/gator/memory");return Promise.all((await readdir(path)).filter(name=>name.endsWith(".json")).map(async name=>JSON.parse(await readFile(join(path,name),"utf8"))));};
   return {directory,requests,launch,memories,async restart(){const previous=app!;app=undefined;await closeDesktop(previous);return launch();},async close(){const previous=app;app=undefined;try{if(previous)await closeDesktop(previous);}finally{server.closeAllConnections();await new Promise<void>(done=>server.close(()=>done()));await rm(directory,{recursive:true,force:true});}}};
 }

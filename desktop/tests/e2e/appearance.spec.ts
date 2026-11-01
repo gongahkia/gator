@@ -1,9 +1,9 @@
-import { _electron as electron, test, expect } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import { createServer } from "node:http";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { closeDesktop, temporaryDirectory } from "./lifecycle";
+import { closeDesktop, temporaryDirectory, launchDesktop } from "./lifecycle";
 import { openCommandSearch } from "./navigation";
 
 test("light appearance covers chat, settings, palette and native chrome across restart and cached chats",async()=>{
@@ -21,7 +21,7 @@ test("light appearance covers chat, settings, palette and native chrome across r
  await writeFile(join(configRoot,"config.json"),JSON.stringify({version:4,defaults:{provider:"fixture",model:"fixture"},custom_providers:[{id:"fixture",base_url:base,models:["fixture"],default_model:"fixture"}]}),{mode:0o600});
  const env=Object.fromEntries(Object.entries({...process.env,GATOR_INTERNAL_COMMANDS:"",GATOR_STATE_DIR:join(directory,"state"),GATOR_CONFIG_DIR:join(directory,"config"),GATOR_DESKTOP_USER_DATA:join(directory,"desktop"),GATOR_DESKTOP_WORKSPACE:workspace}).filter((entry):entry is [string,string]=>typeof entry[1]==="string"));
  const executablePath=process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
- const launch=()=>electron.launch({executablePath,args:executablePath?[]:["."],cwd:resolve("."),env});
+ const launch=()=>launchDesktop({executablePath,args:executablePath?[]:["."],cwd:resolve("."),env});
  let app=await launch();
  try{
   let page=await app.firstWindow();

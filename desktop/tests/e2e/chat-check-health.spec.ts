@@ -1,9 +1,9 @@
-import { _electron as electron, expect, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { execFileSync } from "node:child_process";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { closeDesktop, temporaryDirectory } from "./lifecycle";
+import { closeDesktop, temporaryDirectory, launchDesktop } from "./lifecycle";
 
 test("chat health reports offline checks and observed gaps only in their owning chat", async () => {
   const root = await temporaryDirectory(join(tmpdir(), "gator-chat-health-"));
@@ -12,7 +12,7 @@ test("chat health reports offline checks and observed gaps only in their owning 
   await writeFile(join(config, "config.json"), JSON.stringify({ version: 4, defaults: { provider: "health-fixture", model: "fixture" }, custom_providers: [{ id: "health-fixture", base_url: "http://127.0.0.1:9/v1/chat/completions", models: ["fixture"], default_model: "fixture" }] }));
   const env = { ...process.env, GATOR_STATE_DIR: join(root, "state"), GATOR_CONFIG_DIR: join(root, "config"), GATOR_DESKTOP_USER_DATA: join(root, "desktop"), GATOR_DESKTOP_WORKSPACE: workspace };
   const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
-  const app = await electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env });
+  const app = await launchDesktop({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env });
   try {
     const page = await app.firstWindow();
     await expect(page.getByRole("textbox", { name: "Message Gator", exact: true })).toBeVisible();

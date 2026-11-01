@@ -1,5 +1,5 @@
-import { _electron as electron, test, expect } from "@playwright/test";
-import { closeDesktop, temporaryDirectory as mkdtemp } from "./lifecycle";
+import { test, expect } from "@playwright/test";
+import { closeDesktop, temporaryDirectory as mkdtemp, launchDesktop } from "./lifecycle";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
@@ -8,7 +8,7 @@ import type { BackendState, BackendBundle, BackendMessage } from "../../src/prot
 test("compact work details preserve conversation state and distinguish selections, evidence, and output checks", async () => {
   const directory = await mkdtemp(join(tmpdir(), "gator-work-details-e2e-"));
   const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
-  const application = await electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env: Object.fromEntries(Object.entries({ ...process.env, GATOR_INTERNAL_COMMANDS: "1", GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") }).filter((entry): entry is [string, string] => typeof entry[1] === "string")) });
+  const application = await launchDesktop({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env: Object.fromEntries(Object.entries({ ...process.env, GATOR_INTERNAL_COMMANDS: "1", GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") }).filter((entry): entry is [string, string] => typeof entry[1] === "string")) });
   try {
     const page = await application.firstWindow();
     const errors: string[] = []; page.on("pageerror", (error) => errors.push(String(error)));

@@ -1,9 +1,9 @@
-import { _electron as electron, test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { createServer } from "node:http";
 import { mkdir, readFile, writeFile, rm, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { closeDesktop, temporaryDirectory } from "./lifecycle";
+import { closeDesktop, temporaryDirectory, launchDesktop } from "./lifecycle";
 const state = (page: Page) => page.evaluate(async () => (await window.gator!.snapshot()).state!);
 
 test("chat reviews, saves, edits and pauses an origin-linked responsibility", async () => {
@@ -36,7 +36,7 @@ test("chat reviews, saves, edits and pauses an origin-linked responsibility", as
  await writeFile(join(configRoot,"config.json"),JSON.stringify({version:4,defaults:{provider:"followup-fixture",model:"fixture"},custom_providers:[{id:"followup-fixture",base_url:`http://127.0.0.1:${port}/v1/chat/completions`,models:["fixture"],default_model:"fixture"}]}),{mode:0o600});
  const env=Object.fromEntries(Object.entries({...process.env,GATOR_INTERNAL_COMMANDS:"",GATOR_STATE_DIR:join(directory,"state"),GATOR_CONFIG_DIR:join(directory,"config"),GATOR_DESKTOP_USER_DATA:join(directory,"desktop"),GATOR_DESKTOP_WORKSPACE:workspace}).filter((entry):entry is [string,string]=>typeof entry[1]==="string"));
  const executablePath=process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
- const app=await electron.launch({executablePath,args:executablePath?[]:["."],cwd:resolve("."),env});
+ const app=await launchDesktop({executablePath,args:executablePath?[]:["."],cwd:resolve("."),env});
  const definitions=join(directory,"state/gator/jobs/definitions");
  const saved=async()=>Promise.all((await readdir(definitions)).filter(name=>name.endsWith(".json")).map(async name=>JSON.parse(await readFile(join(definitions,name),"utf8"))));
  try {

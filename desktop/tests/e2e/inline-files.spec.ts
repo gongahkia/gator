@@ -1,10 +1,10 @@
-import { _electron as electron, test, expect, type ElectronApplication } from "@playwright/test";
+import { test, expect, type ElectronApplication } from "@playwright/test";
 import { mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import { join, resolve } from "node:path"; import { tmpdir } from "node:os";
 import { unzipSync, strFromU8 } from "fflate";
 import { wordFixture, workbookFixture, slidesFixture } from "../office-fixtures.mjs";
-import { closeDesktop, temporaryDirectory } from "./lifecycle";
+import { closeDesktop, temporaryDirectory, launchDesktop } from "./lifecycle";
 
 async function fixture(generated = false) {
   const directory=await temporaryDirectory(join(tmpdir(),"gator-inline-files-")), workspace=join(directory,"workspace");
@@ -18,7 +18,7 @@ async function fixture(generated = false) {
   await writeFile(join(directory,"config/gator/config.json"),JSON.stringify({version:4,defaults:{provider:"file-editor-fixture",model:"fixture-model"},custom_providers:[{id:"file-editor-fixture",base_url:`http://127.0.0.1:${port}/v1/chat/completions`,models:["fixture-model"],default_model:"fixture-model"}]}),{mode:0o600});
   const env={...process.env,GATOR_STATE_DIR:join(directory,"state"),GATOR_CONFIG_DIR:join(directory,"config"),GATOR_DESKTOP_USER_DATA:join(directory,"desktop"),GATOR_DESKTOP_WORKSPACE:workspace};
   let app: ElectronApplication;
-  const launch=async()=>{const executablePath=process.env.GATOR_DESKTOP_TEST_EXECUTABLE;app=await electron.launch({executablePath,args:executablePath?[]:["."],cwd:resolve("."),env});return app;};
+  const launch=async()=>{const executablePath=process.env.GATOR_DESKTOP_TEST_EXECUTABLE;app=await launchDesktop({executablePath,args:executablePath?[]:["."],cwd:resolve("."),env});return app;};
   return {directory,requests,launch,async close(){if(app!)await closeDesktop(app);server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));await rm(directory,{recursive:true,force:true});}};
 }
 const pick=(app:ElectronApplication,paths:string[])=>app.evaluate(({dialog},paths)=>{dialog.showOpenDialog=async()=>({canceled:false,filePaths:paths});},paths);

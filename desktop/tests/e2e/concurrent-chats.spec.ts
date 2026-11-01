@@ -1,10 +1,10 @@
-import { _electron as electron, expect, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { execFileSync } from "node:child_process";
 import { createServer } from "node:http";
 import { mkdir, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { closeDesktop, temporaryDirectory } from "./lifecycle";
+import { closeDesktop, temporaryDirectory, launchDesktop } from "./lifecycle";
 
 test("independent chats retain task ownership, drafts and queues while browsing and completing elsewhere", async () => {
   test.setTimeout(90_000);
@@ -28,7 +28,7 @@ test("independent chats retain task ownership, drafts and queues while browsing 
   cli(["provider", "add", "concurrent-fixture", "--base-url", `http://127.0.0.1:${(server.address() as { port: number }).port}/v1/chat/completions`, "--model", "fixture"]);
   cli(["config", "set", "default-provider", "concurrent-fixture"]);
   const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
-  const app = await electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env });
+  const app = await launchDesktop({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env });
   try {
     const page = await app.firstWindow(), composer = page.getByRole("textbox", { name: "Message Gator", exact: true });
     const snapshot = () => page.evaluate(() => window.gator!.snapshot());

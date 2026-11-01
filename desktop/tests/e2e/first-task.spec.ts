@@ -1,9 +1,9 @@
-import { _electron as electron, test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { createServer } from "node:http";
 import { mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { closeDesktop, temporaryDirectory } from "./lifecycle";
+import { closeDesktop, temporaryDirectory, launchDesktop } from "./lifecycle";
 const state=(page:Page)=>page.evaluate(async()=>(await window.gator!.snapshot()).state!);
 
 test("first task keeps a file and draft through model setup and sends only on request",async()=>{
@@ -18,7 +18,7 @@ test("first task keeps a file and draft through model setup and sends only on re
  await writeFile(join(directory,"config/gator/config.json"),JSON.stringify({version:4,defaults:{},custom_providers:[{id:"starter",base_url:base+"/v1/chat/completions",models:["fixture"],default_model:"fixture"}]}),{mode:0o600});
  const env=Object.fromEntries(Object.entries({...process.env,GATOR_INTERNAL_COMMANDS:"",GATOR_STATE_DIR:join(directory,"state"),GATOR_CONFIG_DIR:join(directory,"config"),GATOR_DESKTOP_USER_DATA:join(directory,"desktop"),GATOR_DESKTOP_WORKSPACE:workspace}).filter((entry):entry is [string,string]=>typeof entry[1]==="string"));
  const executablePath=process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
- const app=await electron.launch({executablePath,args:executablePath?[]:["."],cwd:resolve("."),env});
+ const app=await launchDesktop({executablePath,args:executablePath?[]:["."],cwd:resolve("."),env});
  try{
   const page=await app.firstWindow();await expect(page.getByRole("region",{name:"Get started with Gator"})).toBeVisible();
   await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setSize(760,560));

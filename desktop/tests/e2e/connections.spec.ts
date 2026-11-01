@@ -1,9 +1,9 @@
-import { _electron as electron, test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { createServer } from "node:http";
 import { mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { closeDesktop, temporaryDirectory } from "./lifecycle";
+import { closeDesktop, temporaryDirectory, launchDesktop } from "./lifecycle";
 const state = (page: Page) => page.evaluate(async () => (await window.gator!.snapshot()).state!);
 
 test("native account setup reviews credentials, verifies access and returns to browser sign-in", async () => {
@@ -22,7 +22,7 @@ test("native account setup reviews credentials, verifies access and returns to b
  await writeFile(join(configRoot,"config.json"),JSON.stringify({version:4,defaults:{provider:"fixture",model:"fixture"},custom_providers:[{id:"fixture",base_url:base+"/chat",models:["fixture"],default_model:"fixture"}],connectors:[{version:1,id:"google",name:"Personal Google",kind:"google_workspace",resource:base,authentication:"oauth",oauth_client_id:"desktop-client",oauth_authorize_url:base+"/authorize",oauth_token_url:base+"/token",oauth_redirect_url:"http://127.0.0.1:1457/oauth/callback",oauth_scopes:"openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/gmail.readonly"}]}),{mode:0o600});
  const env=Object.fromEntries(Object.entries({...process.env,GATOR_INTERNAL_COMMANDS:"",GATOR_STATE_DIR:join(directory,"state"),GATOR_CONFIG_DIR:join(directory,"config"),GATOR_DESKTOP_USER_DATA:join(directory,"desktop"),GATOR_DESKTOP_WORKSPACE:workspace}).filter((entry):entry is [string,string]=>typeof entry[1]==="string"));
  const executablePath=process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
- const app=await electron.launch({executablePath,args:executablePath?[]:["."],cwd:resolve("."),env});
+ const app=await launchDesktop({executablePath,args:executablePath?[]:["."],cwd:resolve("."),env});
  try {
   const page=await app.firstWindow();await expect.poll(async()=>Boolean(await state(page))).toBe(true);
   await page.getByRole("button",{name:"Settings",exact:true}).click();

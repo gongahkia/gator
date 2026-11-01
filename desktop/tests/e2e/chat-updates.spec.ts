@@ -1,10 +1,10 @@
-import { _electron as electron, expect, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { execFileSync } from "node:child_process";
 import { createServer } from "node:http";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { closeDesktop, temporaryDirectory } from "./lifecycle";
+import { closeDesktop, temporaryDirectory, launchDesktop } from "./lifecycle";
 
 test("failed and interrupted checks remain explicit after reading or marking done", async () => {
   const root = await temporaryDirectory(join(tmpdir(), "gator-check-status-"));
@@ -13,7 +13,7 @@ test("failed and interrupted checks remain explicit after reading or marking don
   await writeFile(join(config, "config.json"), JSON.stringify({ version: 4, defaults: { provider: "status-fixture", model: "fixture" }, custom_providers: [{ id: "status-fixture", base_url: "http://127.0.0.1:9/v1/chat/completions", models: ["fixture"], default_model: "fixture" }] }), { mode: 0o600 });
   const env = { ...process.env, GATOR_STATE_DIR: join(root, "state"), GATOR_CONFIG_DIR: join(root, "config"), GATOR_DESKTOP_USER_DATA: join(root, "desktop"), GATOR_DESKTOP_WORKSPACE: workspace };
   const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
-  const app = await electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env });
+  const app = await launchDesktop({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env });
   try {
     const page = await app.firstWindow();
     await expect(page.getByRole("textbox", { name: "Message Gator", exact: true })).toBeVisible();
@@ -69,7 +69,7 @@ test("update feedback waits for host acknowledgement, rejects stale edits and su
   await writeFile(join(config, "config.json"), JSON.stringify({ version: 4, defaults: { provider: "feedback-fixture", model: "fixture" }, custom_providers: [{ id: "feedback-fixture", base_url: "http://127.0.0.1:9/v1/chat/completions", models: ["fixture"], default_model: "fixture" }] }), { mode: 0o600 });
   const env = { ...process.env, GATOR_STATE_DIR: join(root, "state"), GATOR_CONFIG_DIR: join(root, "config"), GATOR_DESKTOP_USER_DATA: join(root, "desktop"), GATOR_DESKTOP_WORKSPACE: workspace };
   const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
-  const launch = () => electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env });
+  const launch = () => launchDesktop({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env });
   let app = await launch();
   // Delay only renderer notification delivery. The real Go write and IPC send
   // complete, proving that the UI waits for the matching durable result.
@@ -174,7 +174,7 @@ test("durable follow-up cards return to their chat and retain explicit reply own
   cli(["provider", "add", "updates-fixture", "--base-url", `http://127.0.0.1:${(server.address() as { port: number }).port}/v1/chat/completions`, "--model", "fixture"]);
   cli(["config", "set", "default-provider", "updates-fixture"]);
   const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
-  const launch = () => electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env });
+  const launch = () => launchDesktop({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env });
   let app = await launch();
   try {
     let page = await app.firstWindow();

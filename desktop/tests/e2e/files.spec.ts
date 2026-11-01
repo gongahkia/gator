@@ -1,14 +1,14 @@
-import { _electron as electron, test, expect } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { rm } from "node:fs/promises";
-import { closeDesktop, temporaryDirectory } from "./lifecycle";
+import { closeDesktop, temporaryDirectory, launchDesktop } from "./lifecycle";
 import type { BackendBundle, BackendState } from "../../src/protocol";
 
 test("contextual files reuse retained previews and show the exact origin in chat", async () => {
   const directory = await temporaryDirectory(join(tmpdir(), "gator-files-e2e-"));
   const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
-  const app = await electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env: { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") } });
+  const app = await launchDesktop({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env: { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") } });
   try {
     const page = await app.firstWindow();
     const composer = page.getByRole("textbox", { name: "Message Gator", exact: true });

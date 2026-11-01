@@ -1,16 +1,16 @@
-import { _electron as electron, test, expect } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { execFileSync } from "node:child_process";
-import { closeDesktop, temporaryDirectory } from "./lifecycle";
+import { closeDesktop, temporaryDirectory, launchDesktop } from "./lifecycle";
 import type { BackendActivity, BackendState } from "../../src/protocol";
 
 test("public activity interleaves, folds above the answer, and preserves the reader", async () => {
   const directory = await temporaryDirectory(join(tmpdir(), "gator-activity-e2e-"));
   const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
-  const app = await electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env: { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") } });
+  const app = await launchDesktop({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env: { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop") } });
   try {
     const page = await app.firstWindow();
     const errors: string[] = [];
@@ -135,7 +135,7 @@ test("real runner narration and tools survive a desktop restart without replayin
   cli(["provider", "add", "activity-fixture", "--base-url", `http://127.0.0.1:${port}/v1/chat/completions`, "--model", "fixture-model"]);
   cli(["config", "set", "default-provider", "activity-fixture"]);
   const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
-  const launch = () => electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env });
+  const launch = () => launchDesktop({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env });
   let app = await launch();
   try {
     let page = await app.firstWindow();

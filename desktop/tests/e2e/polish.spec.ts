@@ -1,10 +1,10 @@
 import { openCommandSearch } from "./navigation";
-import { _electron as electron, expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { execFileSync } from "node:child_process";
 import { access, mkdtemp, mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { closeDesktop } from "./lifecycle";
+import { closeDesktop, launchDesktop } from "./lifecycle";
 
 async function profile() {
   const directory = await realpath(await mkdtemp(join(tmpdir(), "gator-polish-e2e-")));
@@ -17,7 +17,7 @@ async function profile() {
 }
 async function launch(env: Record<string, string>) {
   const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
-  const app = await electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env: { ...env, GATOR_INTERNAL_COMMANDS: "" } });
+  const app = await launchDesktop({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env: { ...env, GATOR_INTERNAL_COMMANDS: "" } });
   const page = await app.firstWindow();
   await expect(page.getByRole("textbox", { name: "Message Gator", exact: true })).toBeVisible();
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 960));

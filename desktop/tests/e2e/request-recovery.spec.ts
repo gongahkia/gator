@@ -1,10 +1,10 @@
-import { _electron as electron, expect, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { execFileSync } from "node:child_process";
 import { createServer } from "node:http";
 import { mkdir, readFile, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { closeDesktop, temporaryDirectory } from "./lifecycle";
+import { closeDesktop, temporaryDirectory, launchDesktop } from "./lifecycle";
 
 test("admitted text and attachments survive session loss and resume only by explicit selection", async () => {
   const root = await temporaryDirectory(join(tmpdir(), "gator-request-recovery-"));
@@ -29,7 +29,7 @@ test("admitted text and attachments survive session loss and resume only by expl
   cli(["provider", "add", "recovery-fixture", "--base-url", `http://127.0.0.1:${(server.address() as { port: number }).port}/v1/chat/completions`, "--model", "fixture"]);
   cli(["config", "set", "default-provider", "recovery-fixture"]);
   const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
-  const launch = () => electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env });
+  const launch = () => launchDesktop({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env });
   let app = await launch();
   try {
     let page = await app.firstWindow();
@@ -95,7 +95,7 @@ test("a rejected admission keeps the composer draft and starts no request", asyn
   const cli = (args: string[]) => execFileSync(resolve("runtime", process.platform === "win32" ? "gator-runtime.exe" : "gator-runtime"), args, { env: { ...env, GATOR_INTERNAL_COMMANDS: "1" }, encoding: "utf8" });
   cli(["provider", "add", "admission-fixture", "--base-url", "http://127.0.0.1:1/v1/chat/completions", "--model", "fixture"]); cli(["config", "set", "default-provider", "admission-fixture"]);
   const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE;
-  const app = await electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env });
+  const app = await launchDesktop({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env });
   try {
     const page = await app.firstWindow(), composer = page.getByRole("textbox", { name: "Message Gator", exact: true });
     await expect(composer).toBeVisible();
