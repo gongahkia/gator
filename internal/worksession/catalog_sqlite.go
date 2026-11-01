@@ -450,24 +450,18 @@ func (s Store) syncCatalog(ctx context.Context, db *sql.DB, content bool, page *
 		cached, exists := prior[id]
 		c := cached.Conversation
 		if !exists || signature != cached.signature {
-			data, readErr := root.ReadRegularFile(paths[0], 32*1024)
-			metadataBytes += len(data)
+			var n int
+			c, signature, n, err = readIndexedMetadata(ctx, root, statRoot, id, paths)
+			metadataBytes += n
 			if metadataBytes > catalogMetadataBytes {
 				page.Incomplete = true
 				break
 			}
-			if readErr != nil || json.Unmarshal(data, &c) != nil || (c.Version != 1 && c.Version != Version) || c.ID != id || len(c.Title) > 256 || len(c.SourcePath) > 8192 || c.UpdatedAt.IsZero() {
+			if err != nil {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
 				page.Skipped++
-				continue
-			}
-			n, displayErr := readConversationDisplay(root, &c)
-			metadataBytes += n
-			if displayErr != nil {
-				page.Skipped++
-				continue
-			}
-			if after, e := catalogSignature(statRoot, paths...); e != nil || after != signature {
-				page.Incomplete = true
 				continue
 			}
 			_, err = tx.ExecContext(ctx, `INSERT INTO conversations(id,title,source,updated,seconds,nanos,pinned,archived,version,title_fold,source_fold,signature)
@@ -655,4 +649,52 @@ func catalogSnippet(text, term string) string {
 		snippet += "…"
 	}
 	return snippet
+}
+
+// Read the canonical metadata pair under the writer's existing lock. An atomic
+// rename of display.json followed by its compatibility mirror must not evict a
+// valid chat from the disposable index. Waiting is bounded by the query context.
+func readIndexedMetadata(ctx context.Context, root workspace.Root, statRoot *os.Root, id string, paths []string) (Conversation, string, int, error) {
+	var c Conversation
+	lock, err := filelock.OpenRootFile(statRoot, filepath.Join(id, ".metadata.lock"), os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		return c, "", 0, err
+	}
+	defer lock.Close()
+	for {
+		err = filelock.Lock(lock, filelock.Shared|filelock.Nonblocking)
+		if err == nil {
+			break
+		}
+		if !errors.Is(err, filelock.ErrWouldBlock) {
+			return c, "", 0, err
+		}
+		select {
+		case <-ctx.Done():
+			return c, "", 0, ctx.Err()
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
+	defer filelock.Unlock(lock)
+	signature, err := catalogSignature(statRoot, paths...)
+	if err != nil {
+		return c, "", 0, err
+	}
+	data, err := root.ReadRegularFile(paths[0], 32*1024)
+	n := len(data)
+	if err != nil {
+		return c, "", n, err
+	}
+	if json.Unmarshal(data, &c) != nil || (c.Version != 1 && c.Version != Version) || c.ID != id || len(c.Title) > 256 || len(c.SourcePath) > 8192 || c.UpdatedAt.IsZero() {
+		return c, "", n, errors.New("invalid indexed conversation")
+	}
+	size, err := readConversationDisplay(root, &c)
+	n += size
+	if err != nil {
+		return c, "", n, err
+	}
+	if after, e := catalogSignature(statRoot, paths...); e != nil || after != signature {
+		return c, "", n, errors.New("indexed metadata changed during read")
+	}
+	return c, signature, n, nil
 }

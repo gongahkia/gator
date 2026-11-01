@@ -3,6 +3,7 @@ package worksession
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -234,6 +235,33 @@ func TestSQLiteCatalogConcurrentReadersAndOrganization(t *testing.T) {
 	}
 	if page := indexedPage(t, s, ConversationQuery{}); len(page.Items) != 1 || page.Items[0].Title != "Topic 3" {
 		t.Fatal("last canonical organization not indexed", page)
+	}
+}
+
+func TestSQLiteCatalogMetadataWaitHonorsCancellation(t *testing.T) {
+	s, id, _ := requestTestStore(t)
+	indexedPage(t, s, ConversationQuery{})
+	c, err := s.Load(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.OrganizeConversation(ConversationChange{ID: id, Version: ConversationDisplayVersion(c), Action: "rename", Title: "Renamed"}); err != nil {
+		t.Fatal(err)
+	}
+	lock, err := s.requestLock(id, ".metadata.lock", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lock.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	if _, err := s.PageConversationsContext(ctx, ConversationQuery{}); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatal("metadata lock wait ignored cancellation", err)
+	}
+	lock.Close()
+	page := indexedPage(t, s, ConversationQuery{})
+	if len(page.Items) != 1 || page.Items[0].Title != "Renamed" {
+		t.Fatal("cancelled read lost canonical chat", page)
 	}
 }
 
