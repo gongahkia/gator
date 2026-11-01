@@ -33,7 +33,8 @@ async function fixture() {
   const env = { ...process.env, GATOR_STATE_DIR: join(root, "state"), GATOR_CONFIG_DIR: join(root, "config"), GATOR_DESKTOP_USER_DATA: join(root, "desktop"), GATOR_DESKTOP_WORKSPACE: workspace };
   // Validate the disposable profile before launching a GUI. A fixture error
   // should fail this test in the log, not repeatedly show native startup alerts.
-  execFileSync(resolve("runtime", process.platform === "win32" ? "gator-runtime.exe" : "gator-runtime"), ["config", "show"], { env: { ...env, GATOR_INTERNAL_COMMANDS: "1" }, stdio: "ignore" });
+  try { execFileSync(resolve("runtime", process.platform === "win32" ? "gator-runtime.exe" : "gator-runtime"), ["config", "show"], { env: { ...env, GATOR_INTERNAL_COMMANDS: "1" }, stdio: "ignore" }); }
+  catch { server.closeAllConnections(); await new Promise<void>(done => server.close(() => done())); await rm(root, { recursive: true, force: true }); throw new Error("The disposable test configuration is invalid. Electron was not launched."); }
   let app: ElectronApplication;
   return { workspace, calls: () => calls, async launch() { const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE; app = await electron.launch({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env }); return app; }, async close() { try { if (app!) { await app.evaluate(({ dialog }) => { dialog.showMessageBox = async () => ({ response: 1, checkboxChecked: false }); }).catch(() => {}); await closeDesktop(app); } } finally { server.closeAllConnections(); await new Promise<void>(done => server.close(() => done())); await rm(root, { recursive: true, force: true }); } } };
 }
@@ -85,6 +86,9 @@ test("pasted links have reviewed edit controls, survive drafts and render sent p
     await expect(composer).toHaveValue("https://github.com/pingdotgg/t3code");
     const link = () => page.locator(".composer-link-text").getByRole("link"); await link().click();
     const menu = () => page.getByRole("dialog", { name: "Link options" }); await expect(menu().getByRole("button", { name: "Open link", exact: true })).toBeVisible();
+    await page.screenshot({ path: "test-results/composer-link-options.png" });
+    await app.evaluate(({ shell }) => { shell.openExternal = async value => { process.env.GATOR_TEST_OPENED_LINK = value; }; });
+    await menu().getByRole("button", { name: "Open link", exact: true }).click(); await expect.poll(() => app.evaluate(() => process.env.GATOR_TEST_OPENED_LINK)).toBe("https://github.com/pingdotgg/t3code");
     await menu().getByRole("button", { name: "Edit text", exact: true }).click(); await menu().getByRole("textbox", { name: "Link text", exact: true }).fill("Project repository"); await menu().getByRole("button", { name: "Save link" }).click();
     await expect(composer).toHaveValue("[Project repository](https://github.com/pingdotgg/t3code)");
     await link().click(); await menu().getByRole("button", { name: "Edit link", exact: true }).click(); await menu().getByRole("textbox", { name: "Link address" }).fill("javascript:alert(1)"); await menu().getByRole("button", { name: "Save link" }).click(); await expect(menu().getByRole("alert")).toBeVisible();

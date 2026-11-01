@@ -1094,6 +1094,7 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .source-lines > div[data-read="true"] { border-left-color: var(--color-accent); }
 .source-line-number { flex-shrink: 0; min-width: 38px; padding: 0 9px; color: var(--color-muted); user-select: none; text-align: right; font-variant-numeric: tabular-nums; }
 .source-lines code { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; }
+.source-read-fragment { text-decoration: underline; text-decoration-color: var(--color-accent); text-underline-offset: 3px; }
 .user-message .markdown { color: var(--color-contrast); font-size: var(--text-ui); }
 .composer-input { position: relative; }
 .composer-input[data-leading-link="true"] { padding-left: 22px; }
@@ -1105,6 +1106,7 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .composer-link-text a { pointer-events: auto; cursor: pointer; color: var(--color-link, #7ca8ec); text-decoration: none; }
 .composer-input:has(textarea:disabled) .composer-link-text { opacity: .6; }
 .editable-link { color: var(--color-link, #7ca8ec); text-decoration: none; cursor: pointer; }
+.markdown .editable-link { color: var(--color-link); }
 .editable-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 .link-popover { position: fixed; z-index: 100; max-width: min(440px, calc(100vw - 24px)); border: 1px solid var(--color-line); border-radius: var(--radius-sm); background: var(--color-raised); box-shadow: 0 8px 28px #0003; color: var(--color-secondary); font-size: var(--text-ui); padding: 5px; }
 .link-menu-actions { display: flex; align-items: center; flex-wrap: wrap; }

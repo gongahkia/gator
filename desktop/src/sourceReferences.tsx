@@ -6,7 +6,7 @@ export const SourceReferenceContext = createContext<{ run?: string; open?(refere
 
 type Node = { type: string; value?: string; url?: string; children?: Node[] };
 function citation(value: string, following = "") {
-  const match = value.match(/^(source\/[^\s\x00-\x1f]+?)(?::(\d+)(?:[-–—](\d+))?)?$/);
+  const match = value.match(/^(source\/[^\x00-\x1f]+?)(?::(\d+)(?:[-–—](\d+))?)?$/);
   if (!match) return;
   const range = following.match(/^\s*,?\s*lines?\s+(\d+)(?:\s*[-–—]\s*(\d+))?/i);
   const start = match[2] ?? range?.[1], end = match[3] ?? range?.[2] ?? start;

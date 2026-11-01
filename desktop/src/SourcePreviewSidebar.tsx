@@ -27,13 +27,15 @@ export function SourcePreviewSidebar({ selection, open, presenceRef, close }: { 
         {!result && !issue && <p role="status"><LoaderCircle size={16} className="spin" />Opening retained source…</p>}
         {issue && <p role="alert" className="composer-error">{issue}</p>}
         {result && <>
-          <div className="source-read-summary">{result.cited && <p>Cited: lines {result.cited.start}–{result.cited.end}</p>}{!!result.reads.length && <p>Read by Gator: {result.reads.map(range => `${range.start}–${range.end}${range.truncated ? " (bounded read)" : ""}`).join(", ")}</p>}</div>
+          <div className="source-read-summary">{result.cited && <p>Cited: lines {result.cited.start}–{result.cited.end}</p>}{!!result.reads.length && <p>Read by Gator: {result.reads.map(range => `${range.start}–${range.end}${range.endColumn !== undefined ? ` (last line through character ${range.endColumn})` : range.truncated ? " (bounded read)" : ""}`).join(", ")}</p>}</div>
           {result.notice && <p role="status" className="work-details-notice">{result.notice}</p>}
           <div className="source-line-legend"><span>Cited lines</span><span>Read by Gator</span></div>
           <div className="source-lines" aria-label="Retained file contents">{result.text.split("\n").map((text, index) => {
             const line = result.firstLine + index, selected = !!result.cited && line >= result.cited.start && line <= result.cited.end;
             const read = result.reads.some(range => line >= range.start && line <= range.end);
-            return <div key={line} ref={line === (result.cited?.start ?? result.reads[0]?.start) ? cited : undefined} data-cited={selected} data-read={read}><span className="source-line-number" aria-hidden="true">{line}</span><code>{text || " "}</code></div>;
+            const ranges = result.reads.filter(range => line >= range.start && line <= range.end);
+            const partial = ranges.length && ranges.every(range => range.end === line && range.endColumn !== undefined) ? Math.max(...ranges.map(range => range.endColumn!)) : undefined;
+            return <div key={line} ref={line === (result.cited?.start ?? result.reads[0]?.start) ? cited : undefined} data-cited={selected} data-read={read}><span className="source-line-number" aria-hidden="true">{line}</span><code>{partial !== undefined ? <><span className="source-read-fragment">{text.slice(0, partial)}</span>{text.slice(partial)}</> : text || " "}</code></div>;
           })}</div>
           {result.truncated && <p className="work-details-caption">Bounded preview around the selected lines · {result.totalLines} lines in the retained file.</p>}
           <details className="output-location"><summary>Evidence identity</summary><p>{result.run}</p><p>{result.sha256}</p></details>

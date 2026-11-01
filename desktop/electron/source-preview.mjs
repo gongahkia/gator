@@ -41,7 +41,8 @@ export async function sourcePreview(request, { state, stateRoot, current = () =>
       const exact = lines.slice(result.start_line - 1, result.end_line).join("\n");
       if (result.truncated ? !exact.startsWith(result.content) : exact !== result.content) continue;
       const end = Math.min(result.end_line, result.start_line + result.content.split("\n").length - 1);
-      if (reads.length < 64) reads.push({ start: result.start_line, end, truncated: !!result.truncated });
+      const last = result.content.split("\n").at(-1), endColumn = last.length < lines[end - 1].length ? last.length : undefined;
+      if (reads.length < 64) reads.push({ start: result.start_line, end, truncated: !!result.truncated, ...(endColumn !== undefined ? { endColumn } : {}) });
     }
   } catch { /* Compacted/old replay may lack ranges; never invent a read claim. */ }
   const cited = request.start !== undefined ? { start: request.start, end: request.end ?? request.start } : undefined;

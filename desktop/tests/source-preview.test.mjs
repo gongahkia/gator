@@ -38,3 +38,14 @@ test("unverified or missing replay is explicit and never invented from a model's
 test("source authority is checked again after reading", () => fixture(async f => {
   let checks = 0; await assert.rejects(sourcePreview(f.request, { stateRoot: f.root, state: f.state, current: () => ++checks === 1 }), /conversation changed/); assert.equal(checks, 2);
 }));
+test("bounded tool reads retain the exact partial final line instead of claiming it was fully read", () => fixture(async f => {
+  f.revision.replay.messages[1].content = JSON.stringify({ ok: true, result: { path: "source/project.md", start_line: 2, end_line: 3, content: "Owner: Mina\nDead", truncated: true } });
+  await writeFile(join(f.revisions, "rev-one.json"), JSON.stringify(f.revision));
+  assert.deepEqual((await f.read()).reads, [{ start: 2, end: 3, truncated: true, endColumn: 4 }]);
+}));
+test("large retained text is bounded without splitting UTF-8", () => fixture(async f => {
+  const text = "λ🦦".repeat(12000), digest = hash(text), file = `evidence/${digest}.txt`;
+  const manifest = JSON.stringify({ run_id: "run-one", evidence: [{ locator: "source/project.md", sha256: digest, snapshot_path: file }] });
+  await writeFile(join(f.path, file), text); await writeFile(join(f.path, "manifest.json"), manifest); f.state.messages[0].bundle.ManifestSHA256 = hash(manifest);
+  const result = await f.read({ ...f.request, start: 1, end: 1 }); assert.ok(Buffer.byteLength(result.text) <= 65536); assert.ok(!result.text.includes("�")); assert.equal(result.truncated, true);
+}));
