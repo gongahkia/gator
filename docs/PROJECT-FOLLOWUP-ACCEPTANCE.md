@@ -157,6 +157,23 @@ is explicit in the tool description and capability documentation. The operator
 plans to configure an existing key locally; its presence and live access must
 be checked before claiming native-search acceptance.
 
+Subsequent user steering expanded host selection to TinyFish, Exa, Tavily and
+Brave. The four fixed HTTP adapters, environment selector, status diagnostics,
+per-provider contract tests and shared Work-origin filtering are implemented.
+See [actual setup and limits](WEB-SEARCH.md). TinyFish credentials are now
+configured and a real native search contract test passed. Exa/Tavily/Brave
+credentials remain absent; their live account acceptance is unverified.
+
+Attempt 03 found that a discovered large HTML page could overload the model
+request bound. Work now provides a bounded readable preview and paginated raw
+evidence reads while preserving exact source bytes and hashes. Attempt 04 passes
+the three live model phases with actual TinyFish discovery and official source
+reads, changing project facts and corrected knowledge. Cumulative accounting:
+52 model requests, 531,871 input and 8,348 output tokens, $2.826315 upper model
+estimate plus $1.92 reserved for search = $4.746315 accounted against $10. No
+unresolved model reservations. The scheduled/quiet/recovery/UI workflow and
+human output-repair judgments remain pending; this is not overall completion.
+
 `go test ./internal/workrun -run 'Test(WorkSearch|EvolvingWeb|ResearchBrief)' -count=1`
 passed. New cases cover absent credentials/sites, extra/trailing arguments,
 invalid counts, adversarial site operators, scheme/port/credential URL filtering

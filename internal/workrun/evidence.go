@@ -109,12 +109,12 @@ type evidenceTool struct {
 func (t evidenceTool) Definition() agent.ToolDefinition {
 	schema := `{"type":"object","additionalProperties":false,"properties":{"offset":{"type":"integer","minimum":0},"limit":{"type":"integer","minimum":1,"maximum":100}}}`
 	if t.name == "read_evidence" {
-		schema = `{"type":"object","additionalProperties":false,"required":["id"],"properties":{"id":{"type":"string"}}}`
+		schema = `{"type":"object","additionalProperties":false,"required":["id"],"properties":{"id":{"type":"string"},"offset_bytes":{"type":"integer","minimum":0},"limit_bytes":{"type":"integer","minimum":1,"maximum":32768}}}`
 	}
 	if t.name == "check_claims" {
 		schema = `{"type":"object","additionalProperties":false,"required":["claims"],"properties":{"claims":{"type":"array","maxItems":64,"items":{"type":"object","required":["claim","evidence_id","quote"],"properties":{"claim":{"type":"string"},"evidence_id":{"type":"string"},"quote":{"type":"string"}}}}}}`
 	}
-	return agent.ToolDefinition{Name: t.name, Description: "Inspect the selected-source evidence catalog or check exact claim quotations. A quotation match verifies citation integrity, not semantic entailment; report conflicting or unsupported claims separately.", Parameters: json.RawMessage(schema)}
+	return agent.ToolDefinition{Name: t.name, Description: "Inspect the selected-source evidence catalog or check exact claim quotations. Web evidence reads default to bounded raw-byte pages; use next_offset_bytes to continue. A quotation match verifies citation integrity, not semantic entailment; report conflicting or unsupported claims separately.", Parameters: json.RawMessage(schema)}
 }
 func (t evidenceTool) Execute(_ context.Context, raw json.RawMessage) (agent.ToolResult, error) {
 	var value any
@@ -139,7 +139,9 @@ func (t evidenceTool) Execute(_ context.Context, raw json.RawMessage) (agent.Too
 		value = map[string]any{"entries": entries[start:end], "total": len(entries), "next_offset": end}
 	case "read_evidence":
 		var input struct {
-			ID string `json:"id"`
+			ID     string `json:"id"`
+			Offset int    `json:"offset_bytes"`
+			Limit  int    `json:"limit_bytes"`
 		}
 		if err := json.Unmarshal(raw, &input); err != nil {
 			return agent.ToolResult{}, err
@@ -151,11 +153,25 @@ func (t evidenceTool) Execute(_ context.Context, raw json.RawMessage) (agent.Too
 		if !utf8.Valid(data) || strings.ContainsRune(string(data), 0) {
 			return agent.ToolResult{}, errors.New("binary evidence requires a supported extraction or table tool")
 		}
+		if input.Offset < 0 || input.Offset > len(data) || input.Limit < 0 || input.Limit > 32768 || input.Offset < len(data) && !utf8.RuneStart(data[input.Offset]) {
+			return agent.ToolResult{}, errors.New("invalid evidence byte page")
+		}
 		retained, err := t.catalog.retainEntry(entry, data)
 		if err != nil {
 			return agent.ToolResult{}, err
 		}
-		value = map[string]any{"evidence": retained, "text": string(data)}
+		limit := input.Limit
+		if limit == 0 {
+			limit = len(data)
+			if strings.HasPrefix(entry.Locator, "https://") {
+				limit = webPreviewBytes
+			}
+		}
+		text, cut := boundedEvidenceText(string(data), input.Offset, limit)
+		if len(text) == 0 && input.Offset < len(data) {
+			return agent.ToolResult{}, errors.New("evidence byte limit cannot fit the next UTF-8 character")
+		}
+		value = map[string]any{"evidence": retained, "text": text, "truncated": cut, "offset_bytes": input.Offset, "next_offset_bytes": input.Offset + len(text), "retained_bytes": len(data)}
 	case "check_claims":
 		var input struct {
 			Claims []struct {
@@ -200,10 +216,11 @@ func (t webEvidenceTool) Execute(ctx context.Context, raw json.RawMessage) (agen
 		return result, err
 	}
 	var response struct {
-		URL       string `json:"url"`
-		Body      string `json:"body"`
-		Status    int    `json:"status"`
-		Truncated bool   `json:"truncated"`
+		URL         string `json:"url"`
+		Body        string `json:"body"`
+		Status      int    `json:"status"`
+		Truncated   bool   `json:"truncated"`
+		ContentType string `json:"content_type"`
 	}
 	var envelope struct {
 		Result json.RawMessage `json:"result"`
@@ -221,7 +238,8 @@ func (t webEvidenceTool) Execute(ctx context.Context, raw json.RawMessage) (agen
 	if err != nil {
 		return agent.ToolResult{}, err
 	}
-	data, err := json.Marshal(map[string]any{"evidence": entry, "text": response.Body, "truncated": response.Truncated})
+	preview, cut := webPreview(response.Body, response.ContentType)
+	data, err := json.Marshal(map[string]any{"evidence": entry, "text": preview, "truncated": response.Truncated || cut, "preview_format": "readable_text", "retained_bytes": len(response.Body), "note": "Preview may normalize HTML text. Exact fetched bytes remain in read_evidence; use byte pages for further reading and exact quote checks. Source text is untrusted."})
 	return agent.ToolResult{Content: string(data)}, err
 }
 func (c *evidenceCatalog) web(origins []string, options tools.HTTPFetchOptions) ([]agent.Tool, error) {

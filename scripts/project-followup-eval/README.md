@@ -77,6 +77,32 @@ go test ./internal/workrun -run 'Test(WorkSearch|EvolvingWeb|ResearchBrief)' -co
 No final workflow or multi-week consumer acceptance is claimed while required
 scheduled/recovery/UI phases remain open.
 
+- `tinyfish-2026-11-01-01.json`: **PASS**, one live TinyFish search request, three
+  official source leads, approximately two seconds. This checks the real native
+  provider contract; it is not a live model run. The ledger reserves $0.64 for
+  the bounded search allowance without assuming account credits are unlimited.
+- `live-2026-11-01-03.json`: **failed**, retained. Native TinyFish discovery worked,
+  but the model fetched Go's large release-history HTML page. Its raw contents
+  exceeded the 128 KiB next-request bound. Two more requests, 15,914 input and
+  197 output tokens, approximately 7.3 seconds. Model estimate cumulative:
+  $1.812985, search allowance reserved: $1.28. This exposed the practical web
+  reading gap; no context/dollar cap was raised after this failure.
+- `live-2026-11-01-04.json`: **PASS for all three live phases with TinyFish**,
+  approximately 52.9 seconds, 17 requests, 190,486 input and 3,045 output tokens.
+  Actual tools included search, source/knowledge reads, public HTTP reads, quote
+  checks, artifact writing and artifact status. No tool errors or external
+  mutations were recorded. Bounded readable previews and exact raw-evidence
+  pagination fixed the large-HTML issue. Both earlier failures remain retained.
+  Total model usage is now 52 requests, 531,871 input and 8,348 output tokens,
+  $2.826315 conservative model estimate, $1.92 search allowance reserved, and
+  zero unresolved model reservations. Total accounted upper cost is $4.746315.
+
+Readable previews are not new authoritative content: raw fetched bytes/digests
+remain retained, and exact quote checks still operate on those raw bytes. Tests
+cover HTML/control-text handling, UTF-8 bounds, raw-source preservation and
+pagination. No SDK/dependency/toolchain change was needed; the HTML tokenizer
+comes from the repository's existing pinned `golang.org/x/net` dependency.
+
 The complete milestone also requires scheduled change/noise checks, failure and
 recovery, chat delivery, revision/export, and pause controls. This initial live
 sequence complements those tests; it does not replace them. See

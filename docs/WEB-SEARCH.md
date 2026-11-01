@@ -51,6 +51,15 @@ leads and do not become factual evidence. `http_fetch` retains the actual select
 page before its contents can be cited as checked evidence. There is no fetch or
 browser/agent fallback to TinyFish or another vendor.
 
+Work returns at most 8 KiB of readable page preview to the model. HTML previews
+omit script/style/navigation/footer text and normalize visible text; they do not
+execute scripts. Exact fetched bytes and their digest remain in the evidence
+catalog. `read_evidence` provides bounded raw-byte pages using `offset_bytes`,
+`limit_bytes` (at most 32 KiB) and `next_offset_bytes`; UTF-8 boundaries are checked.
+Truncation and preview normalization are explicit. Exact quote checks still use
+the original bytes, so a normalized preview is not evidence of a literal match
+across HTML tags. No full-page completeness or JavaScript rendering is claimed.
+
 All adapters normalize bounded title/URL/snippet/date metadata. At most ten
 results are returned, fields and response bodies are bounded, and search/fetch
 share the existing eight-request run budget. Production search uses the existing
@@ -99,3 +108,7 @@ seconds. The report is retained in
 Exa, Tavily and Brave live acceptance have not been performed in this milestone;
 their credentials are absent. The multi-step live-model search workflow is
 reported separately in the [evaluation record](../scripts/project-followup-eval/README.md).
+That workflow also passed with actual TinyFish discovery, official page reads,
+project changes and reopened/corrected saved context in attempt 04. One previous
+attempt failed at the evaluator's context bound after a large HTML page; the
+bounded preview/pagination correction and its regression cases are retained.

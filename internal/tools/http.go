@@ -359,17 +359,6 @@ func (t WebSearch) emitResolved(argv []string, decision CommandDecision) {
 	t.emit(agent.Event{Kind: agent.EventCommandApprovalResolved, ToolCall: &agent.ToolCall{Name: "web_search"}, Text: decision.String(), Argv: cloneArgv(argv)})
 }
 
-type braveWebSearchResponse struct {
-	Web struct {
-		Results []struct {
-			Title       string `json:"title"`
-			URL         string `json:"url"`
-			Description string `json:"description"`
-			Age         string `json:"age"`
-		} `json:"results"`
-	} `json:"web"`
-}
-
 type webSearchToolResult struct {
 	Query   string            `json:"query"`
 	Results []webSearchResult `json:"results"`
