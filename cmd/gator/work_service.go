@@ -133,6 +133,7 @@ func configuredWorkService(provider, modelName, stateDir string, request *workru
 	}
 	if native, ok := backend.(*nativeWorkBackend); ok {
 		executor.Code = native.codeDelegate(stateDir)
+		executor.CodeSession = native.codeSession(stateDir)
 	}
 	if err := configureWorkRoles(&executor, settings, stateDir); err != nil {
 		return workrun.Service{}, err

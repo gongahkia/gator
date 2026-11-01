@@ -13,6 +13,7 @@ import (
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/browser"
 	"github.com/gongahkia/gator/internal/cliagent"
+	"github.com/gongahkia/gator/internal/codeexec"
 	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/desktop"
 	"github.com/gongahkia/gator/internal/orchestrator"
@@ -236,6 +237,15 @@ type CodeResult struct {
 	Steps          int
 }
 
+// CodeSession exposes the same isolated harness to the conversation runner and
+// to bounded delegates. Finish exports evidence; it never applies to live source.
+type CodeSession struct {
+	Harness *codeexec.Prepared
+	Model   agent.Model
+	Finish  func(context.Context, agent.Result) (CodeResult, error)
+}
+type CodeSessionFactory func(context.Context, CodeRequest) (*CodeSession, error)
+
 // CodeDelegate adapts Gator's isolated coding workflow into a Work specialist.
 type CodeDelegate func(context.Context, CodeRequest) (CodeResult, error)
 
@@ -252,6 +262,7 @@ type Executor struct {
 	StateDir          string
 	Connectors        connector.Runtime
 	Code              CodeDelegate
+	CodeSession       CodeSessionFactory
 	// Browser is the private local controller for an explicitly granted Work
 	// browser session. A nil value fails closed if BrowserSession is requested.
 	Browser browser.Controller

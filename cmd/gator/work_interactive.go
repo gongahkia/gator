@@ -703,6 +703,7 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 			appChanges = append(appChanges, change)
 		},
 		ForegroundApp:      true,
+		EnableCode:         mode != action.Inspect,
 		RequestedAt:        requestedAt,
 		PreparationContext: ctx,
 		SourcePath:         source, ConversationID: conversationID, Objective: prompt,

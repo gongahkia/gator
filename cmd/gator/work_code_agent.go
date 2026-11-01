@@ -30,33 +30,55 @@ func hostedCodeNestedDelegationOmit() []string {
 }
 
 func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
+	factory := b.codeSession(stateDir)
 	return func(ctx context.Context, request workrun.CodeRequest) (workrun.CodeResult, error) {
+		session, err := factory(ctx, request)
+		if err != nil {
+			return workrun.CodeResult{}, err
+		}
+		defer session.Harness.Close()
+		harness := session.Harness
+		result, runErr := (agent.Runner{Model: session.Model, Tools: harness.Tools}).Run(ctx, agent.RunOptions{
+			Task: request.Task, System: harness.System, MaxSteps: harness.MaxSteps, OnEvent: request.OnEvent,
+			CompletionCheck: harness.CompletionCheck, BeforeTool: harness.BeforeTool, AfterTool: harness.AfterTool,
+		})
+		session.Harness.Close()
+		evidence, err := session.Finish(ctx, result)
+		if runErr != nil {
+			return evidence, fmt.Errorf("coding execution: %w", runErr)
+		}
+		return evidence, err
+	}
+}
+
+func (b *nativeWorkBackend) codeSession(stateDir string) workrun.CodeSessionFactory {
+	return func(ctx context.Context, request workrun.CodeRequest) (*workrun.CodeSession, error) {
 		policy := request.Policy.Sandbox.Normalize()
 		policy.WritablePaths = append([]string(nil), request.Policy.Scopes...)
 		if err := policy.Validate(); err != nil {
-			return workrun.CodeResult{}, err
+			return nil, err
 		}
 		ctx = sandbox.WithEnvelope(ctx, policy)
 		repository, err := prepareCodeSnapshotRepository(ctx, request.SourcePath, request.ScratchPath, request.ID, request.Project)
 		if err != nil {
-			return workrun.CodeResult{}, err
+			return nil, err
 		}
 
 		originalCommand := hostproc.CommandContext(ctx, "git", "rev-parse", "HEAD")
 		originalCommand.Dir = repository
 		original, err := originalCommand.Output()
 		if err != nil {
-			return workrun.CodeResult{}, err
+			return nil, err
 		}
 		if len(request.Baseline) > 0 {
 			if err := patch.ApplySnapshot(ctx, repository, request.Baseline); err != nil {
-				return workrun.CodeResult{}, err
+				return nil, err
 			}
 			for _, args := range [][]string{{"add", "--all"}, {"-c", "user.name=Gator", "-c", "user.email=gator@invalid", "commit", "--quiet", "--allow-empty", "-m", "selected staged candidate"}} {
 				command := hostproc.CommandContext(ctx, "git", args...)
 				command.Dir = repository
 				if output, err := command.CombinedOutput(); err != nil {
-					return workrun.CodeResult{}, fmt.Errorf("stage baseline: %w: %s", err, output)
+					return nil, fmt.Errorf("stage baseline: %w: %s", err, output)
 				}
 			}
 		}
@@ -64,7 +86,7 @@ func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 		baselineCommand.Dir = repository
 		baselineTree, err := baselineCommand.Output()
 		if err != nil {
-			return workrun.CodeResult{}, err
+			return nil, err
 		}
 		steps := request.Policy.MaxSteps
 		if steps <= 0 {
@@ -78,22 +100,22 @@ func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 		code := b.code
 		if request.Policy.BrowserSession != "" {
 			if !request.Policy.HasCapability(workrun.CodeCapabilityBrowser) || request.Policy.Sandbox.Normalize().Network != sandbox.AllowNetwork {
-				return workrun.CodeResult{}, errors.New("Code browser session requires explicit browser and network grants")
+				return nil, errors.New("Code browser session requires explicit browser and network grants")
 			}
 			store, err := browser.Open(stateDir)
 			if err != nil {
-				return workrun.CodeResult{}, err
+				return nil, err
 			}
 			client, err := browser.NewClient(store, request.Policy.BrowserSession)
 			if err != nil {
-				return workrun.CodeResult{}, err
+				return nil, err
 			}
 			session, err := client.Session(ctx, request.Policy.BrowserSession)
 			if err != nil {
-				return workrun.CodeResult{}, err
+				return nil, err
 			}
 			if len(session.SelectedTabs) == 0 {
-				return workrun.CodeResult{}, errors.New("Code browser session has no selected tabs")
+				return nil, errors.New("Code browser session has no selected tabs")
 			}
 			code.Browser = client
 		}
@@ -122,7 +144,7 @@ func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 				omitted = append(omitted, capability.omit)
 			}
 		}
-		outcome, runErr := code.Execute(ctx, codeexec.Request{
+		prepared, prepareErr := code.Prepare(ctx, codeexec.Request{
 			RepositoryPath: repository,
 			OnEvent:        request.OnEvent,
 			TrustIdentity: func() string {
@@ -148,39 +170,43 @@ func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 			},
 			System: `You are the internal Gator Code specialist called by the user-facing Gator manager. Implement only the bounded coding assignment against an isolated checkout of the parent's frozen source snapshot. The manager receives your summary and patch, not your full context. Never broaden the task, access live source, or claim the patch was applied. Use only capabilities explicitly present in this delegation and report exact changed paths and verification evidence.`,
 		})
-		baseline := sha256.Sum256([]byte(strings.TrimSpace(string(baselineTree))))
-		result := workrun.CodeResult{BaselineSHA256: hex.EncodeToString(baseline[:]), Usage: usage.Usage(), Summary: strings.TrimSpace(outcome.Result.FinalText), Steps: outcome.Result.Steps}
-		if outcome.Worktree.Path != "" {
-			result.Patch, err = patch.Export(ctx, outcome.Worktree.Path, strings.TrimSpace(string(original)))
-			if err == nil {
-				result.ChangedPaths, err = patch.Paths(ctx, outcome.Worktree.Path, outcome.Worktree.BaseCommit)
-			}
+		if prepareErr != nil {
+			return nil, prepareErr
 		}
 
-		if len(request.Policy.Scopes) > 0 {
-			for _, path := range result.ChangedPaths {
-				allowed := false
-				for _, scope := range request.Policy.Scopes {
-					scope = strings.TrimSuffix(filepath.ToSlash(filepath.Clean(scope)), "/")
-					if path == scope || strings.HasPrefix(path, scope+"/") {
-						allowed = true
-					}
-				}
-				if !allowed {
-					runErr = fmt.Errorf("Code changed path %q outside the assigned path envelope", path)
+		return &workrun.CodeSession{Harness: prepared, Model: code.Model, Finish: func(ctx context.Context, agentResult agent.Result) (workrun.CodeResult, error) {
+			var runErr error
+			baseline := sha256.Sum256([]byte(strings.TrimSpace(string(baselineTree))))
+			result := workrun.CodeResult{BaselineSHA256: hex.EncodeToString(baseline[:]), Usage: usage.Usage(), Summary: strings.TrimSpace(agentResult.FinalText), Steps: agentResult.Steps}
+			if prepared.Worktree.Path != "" {
+				result.Patch, err = patch.Export(ctx, prepared.Worktree.Path, strings.TrimSpace(string(original)))
+				if err == nil {
+					result.ChangedPaths, err = patch.Paths(ctx, prepared.Worktree.Path, prepared.Worktree.BaseCommit)
 				}
 			}
-		}
-		if err != nil && runErr != nil {
-			return result, fmt.Errorf("code specialist run: %v; export patch: %w", runErr, err)
-		}
-		if err != nil {
-			return result, fmt.Errorf("export code specialist patch: %w", err)
-		}
-		if runErr != nil {
-			return result, fmt.Errorf("code specialist run: %w", runErr)
-		}
-		return result, nil
+
+			if len(request.Policy.Scopes) > 0 {
+				for _, path := range result.ChangedPaths {
+					allowed := false
+					for _, scope := range request.Policy.Scopes {
+						scope = strings.TrimSuffix(filepath.ToSlash(filepath.Clean(scope)), "/")
+						if path == scope || strings.HasPrefix(path, scope+"/") {
+							allowed = true
+						}
+					}
+					if !allowed {
+						runErr = fmt.Errorf("Code changed path %q outside the assigned path envelope", path)
+					}
+				}
+			}
+			if err != nil {
+				return result, fmt.Errorf("export coding patch: %w", err)
+			}
+			if runErr != nil {
+				return result, runErr
+			}
+			return result, nil
+		}}, nil
 	}
 }
 

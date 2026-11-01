@@ -87,13 +87,23 @@ func (t ReadFile) Execute(_ context.Context, raw json.RawMessage) (agent.ToolRes
 		}
 		truncated = true
 	}
+	// Byte coverage describes what was actually returned, including byte-bound
+	// truncation inside a line. Consumers must not infer coverage from end_line.
+	startOffset := 0
+	for _, line := range lines[:start-1] {
+		startOffset += len(line) + 1
+	}
 	result, err := success(struct {
-		Path      string `json:"path"`
-		StartLine int    `json:"start_line"`
-		EndLine   int    `json:"end_line"`
-		Content   string `json:"content"`
-		Truncated bool   `json:"truncated"`
+		StartOffset int    `json:"start_offset"`
+		EndOffset   int    `json:"end_offset"`
+		TotalBytes  int    `json:"total_bytes"`
+		Path        string `json:"path"`
+		StartLine   int    `json:"start_line"`
+		EndLine     int    `json:"end_line"`
+		Content     string `json:"content"`
+		Truncated   bool   `json:"truncated"`
 	}{
+		StartOffset: startOffset, EndOffset: startOffset + len(selected), TotalBytes: len(contents),
 		Path:      displayPath,
 		StartLine: start,
 		EndLine:   end,

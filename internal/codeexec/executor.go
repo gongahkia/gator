@@ -63,7 +63,8 @@ type Outcome struct {
 }
 
 // Executor contains provider-neutral native code tools and their trusted
-// local integrations. It is invoked only as a bounded Work specialist.
+// local integrations. The same prepared harness serves the main agent and
+// bounded coding specialists; the caller owns conversation and model state.
 type Executor struct {
 	Model      agent.Model
 	Now        func() time.Time
@@ -85,6 +86,9 @@ type Executor struct {
 // user's selected source checkout.
 func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error) {
 	ctx = usage.WithCategory(ctx, "code")
+	if e.Model == nil {
+		return Outcome{}, errors.New("Code agent model is required")
+	}
 	if err := e.validate(request); err != nil {
 		return Outcome{}, err
 	}
@@ -95,27 +99,84 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 	return e.execute(ctx, isolation, request)
 }
 
+// Prepared is one owned coding tool session. Preparing or using it never calls
+// a model. Callers must Close it when their existing execution ends.
+type Prepared struct {
+	Worktree        worktree.Worktree
+	Tools           []agent.Tool
+	System          string
+	MaxSteps        int
+	BeforeTool      func(context.Context, agent.ToolCall) error
+	AfterTool       func(context.Context, agent.ToolCall, agent.ToolResult, error) error
+	CompletionCheck func([]agent.Message) error
+	Events          func() []agent.Event
+	emit            agent.EventSink
+	close           []func()
+	once            sync.Once
+}
+
+func (p *Prepared) Close() {
+	p.once.Do(func() {
+		for i := len(p.close) - 1; i >= 0; i-- {
+			p.close[i]()
+		}
+	})
+}
+
+// Prepare creates isolated tools without creating another agent or worker.
+func (e Executor) Prepare(ctx context.Context, request Request) (*Prepared, error) {
+	if err := e.validate(request); err != nil {
+		return nil, err
+	}
+	isolated, err := worktree.Create(ctx, request.RepositoryPath, request.RunID)
+	if err != nil {
+		return nil, err
+	}
+	return e.prepare(ctx, isolated, request)
+}
+
 func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, request Request) (Outcome, error) {
+	prepared, err := e.prepare(ctx, isolated, request)
+	if err != nil {
+		return Outcome{Worktree: isolated}, err
+	}
+	defer prepared.Close()
+	result, runErr := (agent.Runner{Model: e.Model, Tools: prepared.Tools, Now: e.Now}).Run(ctx, agent.RunOptions{
+		Task: request.Task, System: prepared.System, MaxSteps: prepared.MaxSteps, OnEvent: prepared.emit,
+		CompletionCheck: prepared.CompletionCheck, BeforeTool: prepared.BeforeTool, AfterTool: prepared.AfterTool,
+	})
+	prepared.Close()
+	return Outcome{Worktree: isolated, Result: result, Events: prepared.Events()}, runErr
+}
+
+func (e Executor) prepare(ctx context.Context, isolated worktree.Worktree, request Request) (_ *Prepared, err error) {
+	prepared := &Prepared{Worktree: isolated}
+	defer func() {
+		if err != nil {
+			prepared.Close()
+		}
+	}()
+
 	policy := e.Sandbox.Normalize()
 	if request.WritePaths != nil {
 		policy.WritablePaths = append([]string(nil), request.WritePaths...)
 	}
 	if err := policy.Validate(); err != nil {
-		return Outcome{Worktree: isolated}, fmt.Errorf("validate Code execution policy: %w", err)
+		return nil, fmt.Errorf("validate Code execution policy: %w", err)
 	}
 	projectInstructions, err := instructions.LoadWithProfile(isolated.Repository, request.Scopes, request.Profile)
 	if err != nil {
-		return Outcome{Worktree: isolated}, err
+		return nil, err
 	}
 	policy, _, steps, profile, err := instructions.Meet(policy, "execute", request.MaxSteps, projectInstructions.Policy)
 	if err != nil {
-		return Outcome{Worktree: isolated}, fmt.Errorf("apply Code profile policy: %w", err)
+		return nil, fmt.Errorf("apply Code profile policy: %w", err)
 	}
 	if overlay := request.RolePolicy; overlay.Mode != "" || overlay.Sandbox != "" || overlay.Network != "" || overlay.MaxSteps > 0 || len(overlay.Omit) > 0 {
 		var applied instructions.ProfilePolicy
 		policy, _, steps, applied, err = instructions.Meet(policy, "execute", steps, overlay)
 		if err != nil {
-			return Outcome{Worktree: isolated}, fmt.Errorf("apply Code capability policy: %w", err)
+			return nil, fmt.Errorf("apply Code capability policy: %w", err)
 		}
 		profile.Omit = append(profile.Omit, applied.Omit...)
 	}
@@ -128,10 +189,10 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	}
 	if request.BrowserSession != "" {
 		if policy.Network != sandbox.AllowNetwork {
-			return Outcome{Worktree: isolated}, errors.New("Code browser session requires network allow")
+			return nil, errors.New("Code browser session requires network allow")
 		}
 		if profile.HasOmit(instructions.OmitBrowser) {
-			return Outcome{Worktree: isolated}, errors.New("Code capability policy omits browser access")
+			return nil, errors.New("Code capability policy omits browser access")
 		}
 	}
 
@@ -141,26 +202,26 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	}
 	hookEngine, err := hooks.Load(isolated.Path, trustIdentity, e.hookTrust(trustIdentity))
 	if err != nil {
-		return Outcome{Worktree: isolated}, fmt.Errorf("load Code project hooks: %w", err)
+		return nil, fmt.Errorf("load Code project hooks: %w", err)
 	}
 	mcpSet, err := mcp.LoadWithCredentials(ctx, isolated.Path, e.mcpTrust(trustIdentity), e.MCPCredentials)
 	if err != nil {
-		return Outcome{Worktree: isolated}, fmt.Errorf("load Code project MCP servers: %w", err)
+		return nil, fmt.Errorf("load Code project MCP servers: %w", err)
 	}
-	defer mcpSet.Close()
+	prepared.close = append(prepared.close, func() { _ = mcpSet.Close() })
 	lspSet, err := lsp.Load(isolated.Path, e.lspTrust(trustIdentity))
 	if err != nil {
-		return Outcome{Worktree: isolated}, fmt.Errorf("load Code project LSP servers: %w", err)
+		return nil, fmt.Errorf("load Code project LSP servers: %w", err)
 	}
 	lspManager := lspSet.NewManager()
-	defer lspManager.Close()
+	prepared.close = append(prepared.close, func() { _ = lspManager.Close() })
 	extensions, err := e.Extensions.LoadCaptured(isolated.Repository, trustIdentity)
 	if err != nil {
-		return Outcome{Worktree: isolated}, fmt.Errorf("load Code extensions: %w", err)
+		return nil, fmt.Errorf("load Code extensions: %w", err)
 	}
 	extensionInstructions, err := extensions.Instructions()
 	if err != nil {
-		return Outcome{Worktree: isolated}, err
+		return nil, err
 	}
 
 	var events []agent.Event
@@ -190,7 +251,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		emit(agent.Event{Kind: agent.EventHook, At: e.now(), Text: "project LSP servers are disabled because their bundle hash is not explicitly trusted"})
 	}
 	if err := runSetup(ctx, isolated.Root, request.Setup, policy, e.now, emit); err != nil {
-		return Outcome{Worktree: isolated, Events: eventSnapshot(&eventsMu, events)}, fmt.Errorf("run Code worktree setup: %w", err)
+		return nil, fmt.Errorf("run Code worktree setup: %w", err)
 	}
 
 	remembered := tools.NewCommandMemory(request.AllowedCommands)
@@ -220,7 +281,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 			emit(agent.Event{Kind: agent.EventTerminal, At: e.now(), Text: terminalStatus(task)})
 		},
 	})
-	defer terminalManager.Close()
+	prepared.close = append(prepared.close, func() { terminalManager.Close() })
 	if !profile.HasOmit(instructions.OmitExtension) {
 		runTools = append(runTools, extensions.Tools(isolated.Root, extension.ToolPolicy{
 			Sandbox: policy, Approve: approval(remembered, request.Approve, emit, e.now, "extension", func(extensionID, tool string) []string { return []string{"extension", extensionID, tool} }),
@@ -254,26 +315,28 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		runTools = append(runTools, tools.BrowserSessionTools(tools.BrowserSessionOptions{SessionID: request.BrowserSession, Controller: controller, Policy: commandPolicy})...)
 	}
 
-	system := executionPrompt(joinInstructions(joinInstructions(projectInstructions.Content, extensionInstructions), request.System), request.Verification)
-	runner := agent.Runner{Model: e.Model, Tools: runTools, Now: e.Now}
-	result, runErr := runner.Run(ctx, agent.RunOptions{
-		Task: request.Task, System: system, MaxSteps: request.MaxSteps, OnEvent: emit,
-		CompletionCheck: completionCheck(request.Verification),
-		BeforeTool: func(ctx context.Context, call agent.ToolCall) error {
-			return hookEngine.Run(ctx, hooks.PreToolUse, call.Name, map[string]any{"tool_call_id": call.ID, "arguments": call.Arguments})
-		},
-		AfterTool: func(ctx context.Context, call agent.ToolCall, _ agent.ToolResult, toolErr error) error {
-			return hookEngine.Run(ctx, hooks.PostToolUse, call.Name, map[string]any{"tool_call_id": call.ID, "success": toolErr == nil})
-		},
-	})
-	terminalManager.Close()
-	return Outcome{Worktree: isolated, Result: result, Events: eventSnapshot(&eventsMu, events)}, runErr
+	prepared.Tools = runTools
+	prepared.System = executionPrompt(joinInstructions(joinInstructions(projectInstructions.Content, extensionInstructions), request.System), request.Verification)
+	prepared.MaxSteps = request.MaxSteps
+	prepared.CompletionCheck = completionCheck(request.Verification)
+	prepared.Events = func() []agent.Event {
+		eventsMu.Lock()
+		defer eventsMu.Unlock()
+		return append([]agent.Event(nil), events...)
+	}
+	prepared.BeforeTool = func(ctx context.Context, call agent.ToolCall) error {
+		return hookEngine.Run(ctx, hooks.PreToolUse, call.Name, map[string]any{"tool_call_id": call.ID, "arguments": call.Arguments})
+	}
+	prepared.AfterTool = func(ctx context.Context, call agent.ToolCall, _ agent.ToolResult, toolErr error) error {
+		return hookEngine.Run(ctx, hooks.PostToolUse, call.Name, map[string]any{"tool_call_id": call.ID, "success": toolErr == nil})
+	}
+	// Tool and lifecycle events use the same collector in both execution modes.
+	prepared.emit = emit
+	return prepared, nil
 }
 
 func (e Executor) validate(request Request) error {
-	if e.Model == nil {
-		return errors.New("Code agent model is required")
-	}
+
 	if strings.TrimSpace(request.RepositoryPath) == "" {
 		return errors.New("Code repository path is required")
 	}
@@ -469,7 +532,7 @@ func joinInstructions(project, request string) string {
 }
 
 func executionPrompt(additional string, verification [][]string) string {
-	prompt := `You are Gator's internal Code specialist working in an isolated Git worktree.
+	prompt := `You are Gator using coding tools in an isolated Git worktree.
 
 Treat the assigned task as an implementation request. Explore before changing code. Make the smallest coherent change, add or update focused tests, and use apply_patch rather than describing a patch in prose. Do not use paths outside the workspace. Inspect git_status and git_diff before completion. Report changed paths and exact verification results. Never claim a command passed unless its tool result shows exit code 0.
 
@@ -494,11 +557,32 @@ func completionCheck(verification [][]string) func([]agent.Message) error {
 			if message.Role != agent.RoleTool {
 				continue
 			}
-			seen[message.ToolName] = true
+			// Verification belongs to the current checkout, not an earlier
+			// patch. Failed checks must revoke earlier success as well.
+			if message.ToolName == "apply_patch" || message.ToolName == "terminal_start" || message.ToolName == "terminal_write" || message.ToolName == "terminal_stop" {
+				seen = map[string]bool{}
+				passed = map[string]bool{}
+			}
+			var envelope struct {
+				OK bool `json:"ok"`
+			}
+			successful := json.Unmarshal([]byte(message.Content), &envelope) == nil && envelope.OK
+			if successful {
+				seen[message.ToolName] = true
+			}
 			if message.ToolName == "run_command" {
 				argv, exitCode, ok := commandResult(message.Content)
-				if ok && exitCode == 0 {
-					passed[strings.Join(argv, "\x00")] = true
+				key := strings.Join(argv, "\x00")
+				required := false
+				for _, command := range verification {
+					required = required || key == strings.Join(command, "\x00")
+				}
+				if !ok || !required {
+					seen = map[string]bool{}
+					passed = map[string]bool{}
+				}
+				if ok && required {
+					passed[key] = exitCode == 0
 				}
 			}
 		}

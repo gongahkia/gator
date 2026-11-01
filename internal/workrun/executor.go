@@ -559,6 +559,12 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	if request.Mode != action.Inspect && ((e.Code != nil && request.codeEnabled()) || request.externalEditsEnabled()) {
 		surface = append(surface, integration)
 	}
+	var directCode *conversationCode
+	if request.Mode != action.Inspect && request.codeEnabled() && e.CodeSession != nil {
+		directCode = newConversationCode(e.CodeSession, request, work, emit)
+		defer directCode.Close()
+		surface = append(surface, directCode.Tools()...)
+	}
 	delegationSurface, closeSpecialists, err := e.subagentTools(ctx, request, work, previousRoot, emit, func(record orchestrator.Record) {
 		stateMu.Lock()
 		defer stateMu.Unlock()
@@ -605,6 +611,19 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		})
 	}
 
+	if directCode != nil {
+		previousCheck := check
+		check = func(messages []agent.Message) error {
+			if err := directCode.Check(); err != nil {
+				return err
+			}
+			if previousCheck != nil {
+				return previousCheck(messages)
+			}
+			return nil
+		}
+	}
+
 	initial, summary, compacted, compactErr := compactRetainedContext(ctx, e.Model, initial)
 	if compactErr != nil {
 		return outcome, compactErr
@@ -649,6 +668,9 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		MalformedCallFallback: malformedCallFallback,
 	})
 	closeSpecialists()
+	if directCode != nil {
+		directCode.Close()
+	}
 	if runErr == nil {
 		for _, pending := range afterReply {
 			if err := ctx.Err(); err != nil {

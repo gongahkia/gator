@@ -188,6 +188,9 @@ func (e Executor) subagentTools(ctx context.Context, request Request, work works
 		hasReviewer := false
 		for _, role := range specialists {
 			hasReviewer = hasReviewer || role.Name == "artifact_reviewer"
+			if role.Name == "code" && e.Code != nil && request.codeEnabled() {
+				eligible[role.Name] = true
+			}
 			for _, cfg := range request.ExternalAgents {
 				if role.Sessions && role.Name == cfg.Role() && cfg.AllowEdits {
 					eligible[role.Name] = true

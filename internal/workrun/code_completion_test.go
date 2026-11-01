@@ -102,7 +102,7 @@ func newCompletionFixture(t *testing.T, values []string, rejectFirst, ask bool) 
 	reviewer := orchestrator.HostedSpecialist("artifact_reviewer", "Read-only independent review fixture", func(_ context.Context, i orchestrator.Invocation) (orchestrator.Result, error) {
 		f.reviews++
 		if f.reviewOverride != "" {
-			return orchestrator.Result{Summary: f.reviewOverride, InspectedPaths: []string{"candidate/note.txt"}}, nil
+			return orchestrator.Result{Summary: f.reviewOverride, InspectedPaths: []string{"candidate/note.txt"}, FullyInspectedPaths: []string{"candidate/note.txt"}}, nil
 		}
 		payload, err := r.integration.baseline(i.Baseline)
 		if err != nil {
@@ -119,9 +119,9 @@ func newCompletionFixture(t *testing.T, values []string, rejectFirst, ask bool) 
 			paths = nil
 		}
 		if f.deletionEvidence {
-			return orchestrator.Result{Summary: string(data), InspectedPaths: []string{"source/note.txt"}, MissingPaths: []string{"candidate/note.txt"}}, nil
+			return orchestrator.Result{Summary: string(data), InspectedPaths: []string{"source/note.txt"}, FullyInspectedPaths: []string{"source/note.txt"}, MissingPaths: []string{"candidate/note.txt"}}, nil
 		}
-		return orchestrator.Result{Summary: string(data), InspectedPaths: paths}, nil
+		return orchestrator.Result{Summary: string(data), InspectedPaths: paths, FullyInspectedPaths: paths}, nil
 	})
 	s, err := orchestrator.NewSupervisor(context.Background(), []orchestrator.Specialist{worker, reviewer}, orchestrator.Options{StatePath: filepath.Join(state, "tasks"), ParentRun: r.RunID, Source: work.Source.Path()})
 	if err != nil {
@@ -198,7 +198,7 @@ func TestCompletionRequiresActualReviewerFileReads(t *testing.T) {
 	f := newCompletionFixture(t, []string{"fixed"}, false, false)
 	f.noReadEvidence = true
 	r := f.execute(t, context.Background(), completionArgs)
-	if r.Status != "failed" || !strings.Contains(r.Error, "did not inspect changed candidate file") {
+	if r.Status != "failed" || !strings.Contains(r.Error, "did not fully inspect changed candidate file") {
 		t.Fatalf("review without file inspection passed: %+v", r)
 	}
 }

@@ -40,6 +40,17 @@ func TerminalTools(manager *terminal.Manager, policy CommandPolicy, options ...T
 	return tools
 }
 
+// TerminalDefinitions describes the finite run-owned PTY surface without
+// allocating a manager, starting a process, or discovering external terminals.
+func TerminalDefinitions() []agent.ToolDefinition {
+	surface := []agent.Tool{terminalStart{}, terminalRead{}, terminalWrite{}, terminalList{}, terminalStop{}}
+	result := make([]agent.ToolDefinition, 0, len(surface))
+	for _, tool := range surface {
+		result = append(result, tool.Definition())
+	}
+	return result
+}
+
 type terminalStart struct {
 	manager *terminal.Manager
 	policy  CommandPolicy
