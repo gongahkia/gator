@@ -1,0 +1,56 @@
+{
+  "Phases": [
+    {
+      "Name": "initial-local-and-live-web",
+      "Milliseconds": 7100,
+      "Tools": [
+        "list_files",
+        "knowledge_search",
+        "web_search",
+        "read_file",
+        "knowledge_read",
+        "http_fetch"
+      ],
+      "ToolErrors": null,
+      "Draft": "",
+      "Response": "",
+      "Error": "model turn 3: request OpenAI response: Post \"https://us.api.openai.com/v1/responses\": evaluation input exceeds 128 KiB",
+      "Usage": {
+        "unknown_requests": 1,
+        "model_requests": 3,
+        "input_tokens": 15914,
+        "output_tokens": 197,
+        "reported": true,
+        "estimated": false
+      },
+      "Evidence": [
+        {
+          "id": "evidence-9e582da03dc214bfa4a75e91",
+          "locator": "https://go.dev/doc/devel/release",
+          "sha256": "a9b1368e8a56b49bbabe190f7c36813645ddfbc8d1469f739de9d231b0f3e168",
+          "snapshot_path": "evidence/a9b1368e8a56b49bbabe190f7c36813645ddfbc8d1469f739de9d231b0f3e168.txt",
+          "retrieved_at": "2026-11-01T04:02:42.945727Z"
+        },
+        {
+          "id": "local-5a7af4034409a899-0",
+          "locator": "source/project.md",
+          "sha256": "5a7af4034409a8997c6a1925f98bb1d225c54bc74b4809bf509190d13061e3f8",
+          "snapshot_path": "evidence/5a7af4034409a8997c6a1925f98bb1d225c54bc74b4809bf509190d13061e3f8.txt",
+          "retrieved_at": "2026-11-01T04:02:36.046393Z"
+        }
+      ],
+      "Checks": {}
+    }
+  ],
+  "ManualRepair": "unreviewed by a human",
+  "Spend": {
+    "calls": 35,
+    "unconfirmed_reserved_usd": 0,
+    "estimated_upper_usd": 1.812985,
+    "search_reserved_upper_usd": 1.28,
+    "Input": 341385,
+    "Output": 5303
+  },
+  "SearchConfigured": true,
+  "SearchProvider": "tinyfish"
+}

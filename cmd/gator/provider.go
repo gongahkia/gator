@@ -188,11 +188,19 @@ func executorConfigurationWithExtensions(backend agent.Model, settings config.Se
 		LSPTrusts:      settings.LSPTrusts,
 		MCPTrusts:      settings.MCPTrusts,
 		MCPCredentials: credentials,
-		HTTP: tools.HTTPFetchOptions{
-			BraveSearchAPIKey: strings.TrimSpace(os.Getenv("BRAVE_SEARCH_API_KEY")),
-		},
-		Sandbox: settings.Execution,
+		HTTP:           webResearchOptionsFromEnvironment(),
+		Sandbox:        settings.Execution,
 	}, nil
+}
+
+func webResearchOptionsFromEnvironment() tools.HTTPFetchOptions {
+	return tools.HTTPFetchOptions{
+		BraveSearchAPIKey:    strings.TrimSpace(os.Getenv("BRAVE_SEARCH_API_KEY")),
+		SearchProvider:       strings.TrimSpace(os.Getenv("GATOR_WEB_SEARCH_PROVIDER")),
+		TinyfishSearchAPIKey: strings.TrimSpace(os.Getenv("TINYFISH_API_KEY")),
+		ExaSearchAPIKey:      strings.TrimSpace(os.Getenv("EXA_API_KEY")),
+		TavilySearchAPIKey:   strings.TrimSpace(os.Getenv("TAVILY_API_KEY")),
+	}
 }
 
 func (configuration nativeExecutorConfiguration) codeExecutor() codeexec.Executor {

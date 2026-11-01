@@ -36,6 +36,7 @@ func TestDoctorReportsLocalModelHostAndDisabledCatalogEntries(t *testing.T) {
 func TestDoctorReportsConfiguredWebSearchWithoutToken(t *testing.T) {
 	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
 	t.Setenv("BRAVE_SEARCH_API_KEY", "do-not-print-this-search-token")
+	t.Setenv("GATOR_WEB_SEARCH_PROVIDER", "brave")
 	var output bytes.Buffer
 	if err := doctor(nil, &output); err != nil {
 		t.Fatalf("doctor: %v", err)
@@ -43,6 +44,24 @@ func TestDoctorReportsConfiguredWebSearchWithoutToken(t *testing.T) {
 	text := output.String()
 	if !strings.Contains(text, "Web search: configured (requires --network allow)") || strings.Contains(text, "do-not-print-this-search-token") {
 		t.Fatalf("doctor web search output = %q", text)
+	}
+}
+
+func TestWebResearchEnvironmentSelectsProvidersWithoutExposingKeys(t *testing.T) {
+	for _, name := range []string{"GATOR_WEB_SEARCH_PROVIDER", "BRAVE_SEARCH_API_KEY", "TINYFISH_API_KEY", "EXA_API_KEY", "TAVILY_API_KEY"} {
+		t.Setenv(name, "")
+	}
+	for provider, key := range map[string]string{"tinyfish": "TINYFISH_API_KEY", "exa": "EXA_API_KEY", "tavily": "TAVILY_API_KEY", "brave": "BRAVE_SEARCH_API_KEY"} {
+		t.Setenv("GATOR_WEB_SEARCH_PROVIDER", provider)
+		t.Setenv(key, "test-private-search-key")
+		p, err := webResearchOptionsFromEnvironment().SearchStatus()
+		if err != nil || p != provider {
+			t.Fatal("environment selection failed", p, err)
+		}
+	}
+	t.Setenv("GATOR_WEB_SEARCH_PROVIDER", "")
+	if _, err := webResearchOptionsFromEnvironment().SearchStatus(); err == nil {
+		t.Fatal("ambiguous environment silently chose vendor")
 	}
 }
 

@@ -81,14 +81,17 @@ func inspectDoctor(arguments []string) (doctorFacts, error) {
 	if customProvider {
 		providerDisplay = custom.ID
 	}
+	searchProvider, searchErr := webResearchOptionsFromEnvironment().SearchStatus()
 	facts = doctorFacts{Repository: gitStatus, Provider: providerDisplay, Authentication: authentication,
 		AuthenticationStatus: authenticationStatus, Sandbox: sandboxStatus, SandboxAvailable: sandboxErr == nil,
-		WebSearchConfigured: strings.TrimSpace(os.Getenv("BRAVE_SEARCH_API_KEY")) != "",
+		WebSearchConfigured: searchProvider != "" && searchErr == nil,
 		CustomLocal:         customProvider && custom.ID == localmodel.ProviderID,
 		Dependencies:        dependency.Detect(), Host: inspectLocalModelHost()}
-	facts.WebSearch = "not configured (set BRAVE_SEARCH_API_KEY)"
+	facts.WebSearch = "not configured (set a web search provider key)"
 	if facts.WebSearchConfigured {
-		facts.WebSearch = "configured (requires --network allow)"
+		facts.WebSearch = "configured (requires --network allow); provider: " + searchProvider
+	} else if searchErr != nil {
+		facts.WebSearch = "configuration error: " + searchErr.Error()
 	}
 	facts.SuggestionDirectory = workingDirectory
 	if gitStatus == "detected" {

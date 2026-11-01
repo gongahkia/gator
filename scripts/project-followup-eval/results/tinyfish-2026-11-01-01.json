@@ -1,0 +1,29 @@
+{
+  "Provider": "tinyfish",
+  "Milliseconds": 1999,
+  "Result": {
+    "ok": true,
+    "result": {
+      "query": "Go latest stable release site:go.dev",
+      "results": [
+        {
+          "title": "All releases",
+          "url": "https://go.dev/dl/",
+          "description": "As of Go 1.13, the go command by default downloads and authenticates modules. Stable versions¶ go1.27.3 go1.27.3"
+        },
+        {
+          "title": "Release History",
+          "url": "https://go.dev/doc/devel/release",
+          "description": "This page summarizes the changes between official stable releases of Go. The change log has the full details. To update to a specific release, use:"
+        },
+        {
+          "title": "Go 1.27 is released",
+          "url": "https://go.dev/blog/go1.27",
+          "description": "Today the Go team is pleased to release Go 1.27. You can find its binary archives and installers on the download page.",
+          "age": "Aug 19, 2026"
+        }
+      ]
+    }
+  },
+  "Error": ""
+}

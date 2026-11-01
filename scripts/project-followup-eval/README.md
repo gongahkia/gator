@@ -36,11 +36,16 @@ earlier repository evaluations. No endpoint is read from the source project.
 It must be available to the supplied account. A credential failure is not a
 workflow-quality result.
 
-If `BRAVE_SEARCH_API_KEY` is present, the same Work request also receives scoped
+With a configured search provider, the same Work request also receives scoped
 native search and the test requires a search call. Otherwise the report records
 that search is unconfigured; a successful page read is not described as search.
-Brave billing is separate from model token usage. Do not run against a billable
-search account without confirming its allowance/cost within the goal budget.
+Search billing is separate from model token usage. The ledger additionally
+reserves $0.64 for at most eight Work phases, each with up to eight native
+search/fetch requests, at a conservative $10/1000 search calls. This allowance is
+not refunded based on uncertain request results. Current live search uses
+TinyFish; validate account pricing before using any paid alternative. See
+[provider setup](../../docs/WEB-SEARCH.md). This test does not exercise paid
+Agent/Browser/Research endpoints or automatically switch vendors.
 
 ```sh
 go test ./cmd/gator -run '^TestProjectEvaluationBudgetBoundary$' -count=1

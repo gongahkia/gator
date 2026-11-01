@@ -15,17 +15,51 @@ import (
 )
 
 type searchFixture struct {
-	calls int
-	query string
+	calls    int
+	query    string
+	provider string
 }
 
 func (f *searchFixture) Do(r *http.Request) (*http.Response, error) {
 	f.calls++
-	if r.URL.Host == "api.search.brave.com" {
+	if r.URL.Host == "api.search.brave.com" || r.URL.Host == "api.search.tinyfish.ai" || r.URL.Host == "api.exa.ai" || r.URL.Host == "api.tavily.com" {
 		f.query = r.URL.Query().Get("q")
-		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"web":{"results":[{"title":"Primary","url":"https://research.invalid/venue","description":"unverified snippet"},{"title":"Other","url":"https://other.invalid/secret","description":"hidden"},{"title":"Credentials","url":"https://user:password@research.invalid/no"},{"title":"Insecure","url":"http://research.invalid/no"},{"title":"Wrong port","url":"https://research.invalid:444/no"}]}}`)), Request: r}, nil
+		body := `{"results":[{"title":"Primary","url":"https://research.invalid/venue","description":"unverified snippet"},{"title":"Other","url":"https://other.invalid/secret","description":"hidden"},{"title":"Credentials","url":"https://user:password@research.invalid/no"},{"title":"Insecure","url":"http://research.invalid/no"},{"title":"Wrong port","url":"https://research.invalid:444/no"}]}`
+		if r.URL.Host == "api.search.brave.com" {
+			body = `{"web":` + body + `}`
+		}
+		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(body)), Request: r}, nil
 	}
 	return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"text/plain"}}, Body: io.NopCloser(strings.NewReader("Verified source content.")), Request: r}, nil
+}
+
+func TestWorkSearchFiltersEveryProviderToSelectedOrigins(t *testing.T) {
+	for _, p := range []string{"brave", "tinyfish", "exa", "tavily"} {
+		t.Run(p, func(t *testing.T) {
+			f := &searchFixture{provider: p}
+			o := tools.HTTPFetchOptions{SearchProvider: p, BraveSearchAPIKey: "fixture", TinyfishSearchAPIKey: "fixture", ExaSearchAPIKey: "fixture", TavilySearchAPIKey: "fixture", Client: f, Resolver: researchResolver{}}
+			c := &evidenceCatalog{}
+			surface, err := c.web([]string{"https://research.invalid"}, o)
+			if err != nil {
+				t.Fatal(err)
+			}
+			result, err := surface[1].Execute(context.Background(), []byte(`{"query":"deadline OR site:other.invalid"}`))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var leads struct {
+				Results []struct {
+					URL string `json:"url"`
+				} `json:"results"`
+			}
+			if json.Unmarshal([]byte(result.Content), &leads) != nil || len(leads.Results) != 1 || leads.Results[0].URL != "https://research.invalid/venue" {
+				t.Fatal("provider escaped selected sites", result.Content)
+			}
+			if len(c.entries) != 0 {
+				t.Fatal("search wrote factual evidence")
+			}
+		})
+	}
 }
 
 func TestWorkSearchScopesDiscoveryAndRequiresPageEvidence(t *testing.T) {

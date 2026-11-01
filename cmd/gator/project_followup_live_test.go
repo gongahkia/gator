@@ -20,6 +20,7 @@ import (
 	"github.com/gongahkia/gator/internal/filelock"
 	"github.com/gongahkia/gator/internal/knowledge"
 	"github.com/gongahkia/gator/internal/model/openai"
+	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/workrun"
 	"github.com/gongahkia/gator/internal/workspace"
@@ -35,6 +36,59 @@ type projectEvalSpend struct {
 	SearchReserved float64 `json:"search_reserved_upper_usd"`
 	Input, Output  int64
 }
+
+func TestLiveTinyfishSearch(t *testing.T) {
+	path := os.Getenv("GATOR_LIVE_TINYFISH_REPORT")
+	if path == "" {
+		t.Skip("explicit opt-in live TinyFish search contract")
+	}
+	if os.Getenv("TINYFISH_API_KEY") == "" {
+		t.Fatal("TinyFish credential unavailable")
+	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if err := reserveProjectSearch(filepath.Dir(path)); err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now()
+	surface := tools.HTTPTools(tools.CommandPolicy{Sandbox: sandbox.Policy{Network: sandbox.AllowNetwork}, Approve: func(context.Context, []string) (tools.CommandDecision, error) { return tools.CommandAllowOnce, nil }}, tools.HTTPFetchOptions{SearchProvider: "tinyfish", TinyfishSearchAPIKey: os.Getenv("TINYFISH_API_KEY")})
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	result, err := surface[1].Execute(ctx, []byte(`{"query":"Go latest stable release site:go.dev","count":3}`))
+	report := struct {
+		Provider     string
+		Milliseconds int64
+		Result       json.RawMessage
+		Error        string
+	}{Provider: "tinyfish", Milliseconds: time.Since(start).Milliseconds()}
+	if err != nil {
+		report.Error = err.Error()
+	} else {
+		report.Result = json.RawMessage(result.Content)
+	}
+	e := json.NewEncoder(f)
+	e.SetIndent("", "  ")
+	if err := e.Encode(report); err != nil {
+		t.Fatal(err)
+	}
+	if err != nil {
+		t.Fatal("live search failed; bounded report retained:", err)
+	}
+	var data struct {
+		Result struct {
+			Results []struct {
+				URL string `json:"url"`
+			} `json:"results"`
+		} `json:"result"`
+	}
+	if json.Unmarshal([]byte(result.Content), &data) != nil || len(data.Result.Results) == 0 {
+		t.Fatal("no live search leads")
+	}
+}
+
 type projectEvalTransport struct {
 	directory string
 	base      http.RoundTripper
@@ -240,7 +294,14 @@ func TestLiveProjectFollowup(t *testing.T) {
 		ManualRepair     string
 		Spend            projectEvalSpend
 		SearchConfigured bool
-	}{ManualRepair: "unreviewed by a human", SearchConfigured: os.Getenv("BRAVE_SEARCH_API_KEY") != ""}
+		SearchProvider   string
+	}{ManualRepair: "unreviewed by a human"}
+	searchOptions := webResearchOptionsFromEnvironment()
+	searchProvider, searchErr := searchOptions.SearchStatus()
+	if searchErr != nil {
+		t.Fatal(searchErr)
+	}
+	report.SearchConfigured, report.SearchProvider = searchProvider != "", searchProvider
 	defer func() {
 		data, _ := os.ReadFile(filepath.Join(filepath.Dir(path), "budget.json"))
 		json.Unmarshal(data, &report.Spend)
@@ -279,7 +340,7 @@ func TestLiveProjectFollowup(t *testing.T) {
 		t.Log("Live project phase:", name)
 		p := phase{Name: name, Checks: map[string]bool{}}
 		start := time.Now()
-		out, err := (workrun.Service{Executor: workrun.Executor{Model: backend, StateDir: state, HTTP: tools.HTTPFetchOptions{BraveSearchAPIKey: os.Getenv("BRAVE_SEARCH_API_KEY")}}}).Execute(ctx, workrun.Request{SourcePath: source, ConversationID: chat, Objective: objective, RefreshSource: refresh, ForegroundApp: true, DisableBrowser: true, DisableDelegation: true, DisableChatHistory: true, Mode: action.Draft, Contract: artifact.DefaultContract("update.md"), WebOrigins: []string{"https://go.dev"}, Limits: agent.Limits{ModelRequests: 8, WallSeconds: 120}, OnEvent: func(e agent.Event) {
+		out, err := (workrun.Service{Executor: workrun.Executor{Model: backend, StateDir: state, HTTP: searchOptions}}).Execute(ctx, workrun.Request{SourcePath: source, ConversationID: chat, Objective: objective, RefreshSource: refresh, ForegroundApp: true, DisableBrowser: true, DisableDelegation: true, DisableChatHistory: true, Mode: action.Draft, Contract: artifact.DefaultContract("update.md"), WebOrigins: []string{"https://go.dev"}, Limits: agent.Limits{ModelRequests: 8, WallSeconds: 120}, OnEvent: func(e agent.Event) {
 			if e.ToolError != "" {
 				p.ToolErrors = append(p.ToolErrors, e.ToolError)
 			}
