@@ -138,6 +138,7 @@ not been executed on remote CI in this session.
 | Companion auth/server/recovery/inspection/mutation/external and Chromium clients, sequential Node runner | PASS: 25, one opt-in native-tmux skip |
 | Real-Go independence fixture with Onibi, tmux and Tailscale absent from `PATH` | PASS; ordinary Work succeeds and creates no external catalog |
 | New three Electron consolidation journeys | PASS: message reuse/arguments, Go-owned editor/error/empty/oversize recovery, exact export replacement |
+| `GATOR_E2E_BACKGROUND=1 npm run test:e2e --prefix desktop` | PASS: 62, one explicitly paid live-model skip, 8.7 minutes; includes the new source/link/effort checks |
 | Local `npm run pack --prefix desktop` and ASAR audit | PASS for unsigned macOS x64 package; no terminal renderer, OpenTUI/Solid or terminal-only Level dependency |
 | npm lockfile dry-run installation and workflow YAML parsing | PASS; no retained dependency version intentionally changed |
 | Paid live Electron source-change journey | PASS twice; details and failed preliminary attempts retained in the evaluation guide |
@@ -155,8 +156,8 @@ node --test --test-concurrency=1 \
 
 Earlier parallel host/companion runs hit fixture deadlines while independently
 compiling Go. Sequential reruns passed without increasing those timeouts.
-Additional ordinary Electron regression outcomes are recorded after the final
-run below. The native editor fixture uses a disposable launcher that imitates
+The final ordinary Electron run passed after the later source/link/effort work.
+The native editor fixture uses a disposable launcher that imitates
 the existing system Terminal handoff; it does not type into a developer terminal.
 Memory fixtures now separately answer native semantic-comparison requests instead
 of accidentally returning unrelated user-chat tool calls. Production memory and
@@ -170,8 +171,9 @@ then sets macOS/Windows fixture windows unfocusable and blurs them while retaini
 the actual CDP-controlled renderer. It also captures the child handle before
 shutdown to preserve accurate cleanup status. No production window policy or
 authentication changes were made. Linux keeps its existing display behavior;
-paid live demos explicitly bypass background mode. Final full-run results follow
-below rather than treating these preliminary foreground failures as a clean run.
+paid live demos explicitly bypass background mode. The final full background run
+passed all 62 free checks, including those four previously failing scenarios;
+the preliminary foreground failures remain recorded rather than counted as passes.
 
 The initial new source/link fixture omitted its provider's required default model,
 which caused native startup alerts. That fixture is corrected and now validates
