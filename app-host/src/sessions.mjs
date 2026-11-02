@@ -99,7 +99,7 @@ export class Sessions extends EventEmitter {
     if (profileAction && (this.current.state?.receipt_busy || this.current.state?.catalog_busy)) throw new Error("Wait for the current local operation before changing retained data or recovery settings.");
     const otherBusy = [...this.workers].some(worker => worker !== this.current && !worker.closed && (worker.state?.running || worker.state?.queued || (worker.state?.receipt_busy || worker.state?.catalog_busy) || worker.state?.pending_connection || worker.state?.pending_approval || worker.state?.external));
     if (otherBusy && (/^\/(data|recovery)(\s|$)/.test(frame.text ?? "") || ["/data", "/recovery"].includes(this.current.state?.destination))) throw new Error("Finish work in the other chats before changing retained data or recovery settings.");
-    const starting = frame.type === "upload_submit" || frame.type === "queue" && frame.queue?.action === "run" || frame.type === "submit" && !frame.text?.startsWith("/");
+    const starting = frame.type === "upload_submit" || frame.type === "queue" && frame.queue?.action === "run" || frame.type === "submit" && !frame.text?.startsWith("/") || frame.type === "task_plan" && ["approve", "start"].includes(frame.task_plan?.action);
     if (starting && !this.current.state?.running && [...this.workers].filter(worker => !worker.closed && worker.state?.running).length >= 3) throw new Error("Three chats are working. Wait for one to finish, or stop it before sending this message.");
   }
   async resumeConnection(frame) {

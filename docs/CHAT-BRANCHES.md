@@ -34,3 +34,11 @@ Retained bundle manifests and source bytes still require their existing integrit
 - New Electron branch/speech journeys: NOT YET PASS. Initial failures included a numeric queue-count assertion, an insufficient navigation wait and an incorrect citation accessibility label. These test issues were corrected, but the final rerun is deferred while app automation is disabled. The running-parent journey is added and awaits execution.
 
 No paid API evaluation, real microphone/device acceptance or native platform acceptance is claimed.
+
+## Resumed Electron acceptance
+
+After the operator explicitly resumed app tests, all three branch/speech journeys passed against the real Go runtime and private scripted model fixture (10.9 s / 5.7 s / 5.6 s in the focused run; all three also passed in the broader run). This verifies the exact fork boundary, parent-byte preservation, inherited retained source/read coverage, independent drafts, ancestry across restart, selected-response speech/stop/unavailable behavior, and branching while the actual parent worker remains running. Speech API output is simulated; native audio acceptance is not claimed.
+
+The resumed test found that **Open original chat** incorrectly used a host endpoint limited to activity rows. An idle parent is absent from that list. `Sessions.canOpen` now accepts only a projected activity target or the exact ancestry reference supplied by the current native owner, with finite identity validation. Arbitrary IDs, background ancestry and removed ancestry remain denied. The existing native saved-conversation catalogue remains the path for other idle chats; tests no longer misuse the activity endpoint to select them. No worker is transferred, restarted or created merely to inspect ancestry metadata. The existing session navigation still owns opening a selected retained chat.
+
+`node --test app-host/tests/sessions.test.mjs`: 11 PASS after the related plan admission check, including exact ancestry validation, fresh current-owner scope, existing chat ownership/capacity and profile-operation restrictions. The ancestry fix and its initial tests were captured in the separately created commit `8e34376ad`; that commit was preserved without amendment.

@@ -1,6 +1,6 @@
 # Reviewed task-plan gate
 
-Status: backend preparation, durable review/admission, scope enforcement, typed owner actions and the Electron composer/review cards are implemented. Noninteractive checks are recorded below. Final branch/plan Electron acceptance remains pending: app-opening tests are suspended at the operator's request. This is not a claim of completed UI acceptance.
+Status: backend preparation, durable review/admission, scope enforcement, typed owner actions and the Electron composer/review cards are implemented. The four focused real-Electron plan journeys passed after the operator resumed testing. Broader whole-application regression verification is in progress. Earlier suspended/unexecuted entries below are historical checkpoints, superseded by the resumed acceptance record at the end.
 
 ## Existing stores and owners
 
@@ -121,3 +121,13 @@ The initial new assertion incorrectly expected a mutation receipt for a service-
 `go test -race ./internal/workrun -run '^TestTaskPlan'`: PASS (6.445 s), covering the existing plan preparation/scope tests and both new approval tests (five allow/deny/unknown subcases). Final app review journeys remain required while app automation is paused.
 
 The broader focused regression `go test -race ./internal/workrun -run 'TestTaskPlan|TestServiceApproval|TestExecutorConnectedRequestNeedsNoInventedOutputFile|TestExecutorRetainsUnknownExternalOutcomeWithoutDerivingRetryLearning'` also passed (8.134 s); `go vet ./internal/workrun` passed. A fourth real-Go/scripted-model Electron plan journey was added for the later pending exact command review and cancellation before dispatch, but remains unexecuted under the operator's app-test restriction.
+
+## Resumed plan acceptance
+
+The operator explicitly resumed app tests. `GATOR_E2E_BACKGROUND=1 npm run test:e2e --prefix desktop -- task-plans.spec.ts --max-failures=1`: **4 PASS, 21.0 s**. The actual Electron app and Go owner perform the flow; only model replies are scripted. These cover preparation without implementation, full review, edits/new revision, stale approval rejection, single dispatch/duplicate completion approval, actual activity/result linking, retained review across restart, cancellation without execution, scope denial before a write, and a later pending exact coding-command review that Stop cancels before the fixture command can create a file.
+
+The run exposed an outcome label that accidentally included the textarea's default text. An explicit `htmlFor`/control identity now gives the field a stable accessible name. The completed-card test also now expands the deliberately collapsed retained plan before selecting its result link. No approval or dispatch semantics were weakened to make the journey pass.
+
+Host admission additionally classifies plan **approve/start** intents with ordinary new Work admission, preserving the existing maximum of three working chats. Read/edit/cancel plan actions remain available while that capacity is full. `node --test app-host/tests/sessions.test.mjs`: **11 PASS**, including this boundary. This is an admission guard, not plan authorization; exact owner/revision/digest and native scope checks still apply afterward.
+
+Desktop TypeScript passes. Final broader UI regression, actual light-theme plan/branch review and verification documentation are still being completed. No paid API evaluation or physical-device acceptance occurred.

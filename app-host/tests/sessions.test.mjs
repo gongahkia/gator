@@ -103,6 +103,19 @@ test("session capacity never evicts running or queued work and admissions are bo
   await sessions.stop();
 });
 
+test("reviewed plan starts share the existing three-working-chat admission limit", async () => {
+  const sessions = setup();
+  for (let i = 0; i < 3; i++) { await sessions.open({ new: true }); sessions.current.change({ running: true }); }
+  await sessions.open({ new: true });
+  for (const action of ["approve", "start"]) assert.throws(() => sessions.assertSend({ type: "task_plan", task_plan: { action } }), /Three chats/);
+  for (const action of ["inspect", "edit", "cancel"]) assert.doesNotThrow(() => sessions.assertSend({ type: "task_plan", task_plan: { action } }));
+  [...sessions.workers][0].change({ running: false });
+  for (const action of ["approve", "start"]) assert.doesNotThrow(() => sessions.assertSend({ type: "task_plan", task_plan: { action } }));
+  assert.equal([...sessions.workers].filter(worker => worker.state.running).length, 2);
+  assert.deepEqual(sessions.current.frames, []); // Validation never dispatches.
+  await sessions.stop();
+});
+
 test("failed chat startup restores focus and leaves original work running", async () => {
   const first = new Worker("original"), failed = new Worker("failed");
   failed.ready = async () => { throw new Error("unavailable conversation"); };

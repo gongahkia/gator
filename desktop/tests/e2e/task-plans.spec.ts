@@ -35,6 +35,7 @@ test("plan-first pauses, edits exact reviews, rejects stale approval, and links 
  await expect(review).toContainText("Read normalize.cjs and explain what it currently does.");
  await expect(review).toContainText("Total cost and specialist count are not estimated");
  await review.getByRole("button",{name:"Edit plan",exact:true}).click();
+ await page.screenshot({path:test.info().outputPath("plan-edit-dark.png"),fullPage:true});
  await review.getByLabel("Intended outcome",{exact:true}).fill("Explain the observed implementation with exact source evidence");
  await review.getByRole("textbox",{name:"Step 2",exact:true}).fill("Explain only the implementation actually read");
  await review.getByRole("button",{name:"Save revision for review",exact:true}).click();await expect(review).toHaveCount(0);
@@ -48,6 +49,8 @@ test("plan-first pauses, edits exact reviews, rejects stale approval, and links 
  await expect.poll(async()=>{const state=(await page.evaluate(()=>window.gator!.snapshot())).state;return !state?.running&&state?.task_plans?.[0].state==="completed";}).toBe(true);
  expect(fixture.calls()).toBe(3);
  await expect(page.getByText("Work ended · inspect results · revision 2",{exact:true})).toBeVisible();
+ // Completed plan cards collapse; expand the retained record before inspecting its run.
+ await page.locator(".task-plan-card > summary").click();
  await page.getByRole("button",{name:"Inspect run activity & results",exact:true}).click();
  await expect(page.getByRole("article",{name:"Gator message",exact:true}).filter({hasText:"returns the input unchanged"})).toBeVisible();
  const after=(await page.evaluate(()=>window.gator!.snapshot())).state!,completed=after.task_plans![0];
