@@ -1,6 +1,6 @@
 # Reviewed task-plan gate
 
-Status: backend preparation, durable review/admission, scope enforcement, typed owner actions and the Electron composer/review cards are implemented. The four focused real-Electron plan journeys passed after the operator resumed testing. Broader whole-application regression verification is in progress. Earlier suspended/unexecuted entries below are historical checkpoints, superseded by the resumed acceptance record at the end.
+Status: implemented and connected through the real Go owner, typed bridge and Electron interface. Final whole-application acceptance passed: 81 Electron journeys passed, 2 opt-in live API journeys skipped. After the final scoped list-marker fix, all four plan journeys passed again (18.2 s). See [final acceptance](CHAT-UX-ACCEPTANCE.md). Earlier verification sections preserve historical checkpoints; the resumed/final records supersede their pending status.
 
 ## Existing stores and owners
 
@@ -65,35 +65,37 @@ All tests below use disposable state and scripted models or private local HTTP f
 
 No physical microphone/phone, signed installer, or native Linux/WSL acceptance is claimed.
 
-## Added owner and UI verification
+## Added owner and UI verification (historical checkpoint)
 
 - `go test -race ./internal/workapp ./internal/worksession ./cmd/gator -run 'TestTaskPlan|TestDesktopTaskPlan'`: PASS (6.018 s / 7.496 s / 2.882 s). Includes queued frozen settings, cancellation, restart without replay, explicit retained start, wrong owner, bounded pending/terminal retention, and the ordinary profile data-export guard during model preparation.
 - `desktop/tests/e2e/task-plans.spec.ts`: four real-Go/private-model journeys added for edit/review/exact approval/idempotency, retained review across restart/cancellation, out-of-scope mutation rejection, and a separately pending exact coding-command review after plan approval. **NOT RUN** while app automation is suspended. TypeScript checking these tests is not acceptance of their UI behavior.
 - Branch journeys also still require their corrected final rerun; see [Chat branches](CHAT-BRANCHES.md).
 
-## Interface review boundary
+## Final interface review
 
-Full source review using the existing React, CSS/Tailwind tokens and Lucide icons. No second styling or animation library was introduced. Interactive state, keyboard and screenshot acceptance awaits permission to resume app tests.
+Full review of the implemented plan composer/card/review using existing React, CSS/Tailwind tokens and Lucide. Source inspection, real dark editing and light 820 × 740 screenshots, keyboard focus return, native review/edit/start/cancel journeys, and reduced-motion checks were completed. No second styling or animation library was introduced. See [test isolation](CHAT-UX-TESTING.md) for the ordinary OS-focus acceptance boundary.
 
 | Category | Evidence inspected | Result |
 | --- | --- | --- |
-| Typography | `TaskPlans.tsx` original request, proposed list, limits and status; theme font tokens | Plain untrusted text, wrapping and tabular revision numbers retained; actual rendering not verified |
-| Surfaces | Existing modal focus hook, bounded scrollable review, 40 px controls, narrow composer | Source checks complete; narrow/light/dark runtime acceptance pending |
-| Animations | Plan card/review implementation | No custom motion added; reduced-motion journey added but not run |
-| Icons | Existing Lucide clipboard/list/close/add and currentColor tokens | Source checks complete; visual acceptance pending |
-| Performance | Derived bounded journal summaries; selected full-review request; async owner result matching | No new background polling or worker; runtime responsiveness not verified |
+| Typography | Original request, outcome editor, proposed lists, limits and status; final light/dark screenshots | Explicit field names and numbered intentions; bounded wrapping and existing theme tokens verified |
+| Surfaces | Scrollable modal, narrow toolbar, full review/edit/start/cancel and focus return | Controls reachable, modal inside viewport, Escape restores review-button focus |
+| Animations | Plan review and existing motion journey with 10% playback/reversal/reduced motion | No new plan animation; reduced-motion review and existing motion journey pass |
+| Icons | Clipboard/list/close/add icons and currentColor in inspected light/dark states | Existing Lucide set retained; controls have accessible names |
+| Performance | Bounded owner summaries, selected full review, asynchronous result matching and four real owner journeys | No added polling/worker; final journeys pass in 18.2 s total |
 
 | Severity | Location | Before | After | Why |
 | --- | --- | --- | --- | --- |
-| HIGH | `desktop/src/TaskPlans.tsx` | No exact task-plan review surface | Owner-bound full review with explicit approve/start, changed-state rejection and uncertain-result guidance | Prevent approving abbreviated or stale intent |
-| MEDIUM | `desktop/src/App.tsx`, `desktop/src/styles.css` | Adding a labeled plan button could crowd the narrow toolbar | Keep its accessible name, collapse its visible label and permit toolbar wrapping below 1000 px | Preserve control reachability; visual confirmation remains pending |
-| MEDIUM | `desktop/src/TaskPlans.tsx` | Plan-only status would lack an observed result destination | Link retained Work identity to actual activity/results without inventing per-step completion | Distinguish intention, execution and evidence |
+| HIGH | `desktop/src/TaskPlans.tsx` | No exact task-plan review surface | Owner-bound full review, explicit approve/start, changed-state rejection and uncertain-result guidance | Prevent approving abbreviated or stale intent |
+| MEDIUM | `desktop/src/App.tsx`, `desktop/src/styles.css` | A labeled plan button could crowd the narrow toolbar | Accessible name retained, visible label collapses and toolbar can wrap below 1000 px | Controls remain reachable in narrow-window journeys |
+| MEDIUM | `desktop/src/TaskPlans.tsx` | Plan-only status lacked an observed-result destination | Exact retained Work link to actual activity/results | Distinguish intention, execution and evidence |
+| MEDIUM | `desktop/src/TaskPlans.tsx` | Outcome accessible name included the textarea's existing text | Explicit label/control association | The editor remains findable by its stable name |
+| LOW | `desktop/src/styles.css`, `desktop/src/TaskPlans.tsx` | CSS reset removed visible ordered-list markers | Scoped decimal markers on card/review lists and an accessible list name | Preserve readable ordered intentions without implying verified completion |
 
-Considered but rejected: a workflow canvas (adds another product surface); animated checkmarks (would imply unsupported per-step evidence); dollar estimates (no reliable complete cost projection). Interface verdict: **acceptance pending**, including actual focus return, stale selection responses, accessibility, narrow layout, themes and reduced motion. TypeScript/build success alone cannot resolve those checks.
+Considered but rejected: a workflow canvas (another product surface); animated checkmarks (unsupported per-step evidence); dollar estimates (no reliable complete cost projection). Interface verdict: **Approve** for the inspected scope. Final four plan journeys verify actual field editing, stale rejection, result navigation, restart, cancellation, keyboard focus and narrow/reduced-motion review. Native screen-reader software, physical speech and touch-device operation remain **not verified**; accessible naming checks are not a claim of full assistive-technology acceptance.
 
-## Consolidated noninteractive regression run
+## Consolidated noninteractive regression run (historical checkpoint)
 
-The operator asked to stop tests that open/click through the actual Mac app while taking a call. No further Electron window journeys were launched after that instruction. Existing companion browser journeys below use explicit `headless: true` and private local fixtures; they do not open the desktop app or establish physical-device acceptance.
+At this checkpoint the operator had asked to stop tests that open/click through the actual Mac app while taking a call. Electron journeys remained suspended until the later explicit resume instruction. Existing companion browser journeys below use explicit `headless: true` and private local fixtures; they do not open the desktop app or establish physical-device acceptance.
 
 | Check | Observed result |
 | --- | --- |
@@ -130,4 +132,4 @@ The run exposed an outcome label that accidentally included the textarea's defau
 
 Host admission additionally classifies plan **approve/start** intents with ordinary new Work admission, preserving the existing maximum of three working chats. Read/edit/cancel plan actions remain available while that capacity is full. `node --test app-host/tests/sessions.test.mjs`: **11 PASS**, including this boundary. This is an admission guard, not plan authorization; exact owner/revision/digest and native scope checks still apply afterward.
 
-Desktop TypeScript passes. Final broader UI regression, actual light-theme plan/branch review and verification documentation are still being completed. No paid API evaluation or physical-device acceptance occurred.
+Final broader regression passed: 81 Electron journeys / 2 opt-in paid journeys skipped, Go 72 packages passed / 11 without tests, vet clean, desktop Node 31 passed / 1 skipped and host Node 80 passed / 1 skipped. The final list-marker/accessibility polish was followed by TypeScript/build and all four plan journeys passing again in 18.2 s. Light narrow review and dark editing screenshots were inspected. No paid API evaluation or physical-device acceptance occurred. Full commands and limitations: [final acceptance](CHAT-UX-ACCEPTANCE.md).

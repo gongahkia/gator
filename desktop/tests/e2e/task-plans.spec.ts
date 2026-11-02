@@ -34,6 +34,11 @@ test("plan-first pauses, edits exact reviews, rejects stale approval, and links 
  let review=page.getByRole("dialog",{name:"Review task plan",exact:true});
  await expect(review).toContainText("Read normalize.cjs and explain what it currently does.");
  await expect(review).toContainText("Total cost and specialist count are not estimated");
+ const steps=review.getByRole("list",{name:"Proposed steps",exact:true});
+ await expect(steps.getByRole("listitem")).toHaveCount(2);
+ expect(await steps.evaluate(element=>getComputedStyle(element).listStyleType)).toBe("decimal");
+ const cardSteps=page.getByRole("region",{name:"Reviewed task plans",exact:true}).getByRole("list",{name:"Proposed steps",exact:true});
+ expect(await cardSteps.evaluate(element=>getComputedStyle(element).listStyleType)).toBe("decimal");
  await review.getByRole("button",{name:"Edit plan",exact:true}).click();
  await page.screenshot({path:test.info().outputPath("plan-edit-dark.png"),fullPage:true});
  await review.getByLabel("Intended outcome",{exact:true}).fill("Explain the observed implementation with exact source evidence");
