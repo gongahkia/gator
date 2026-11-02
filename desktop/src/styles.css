@@ -1222,3 +1222,4 @@ button.activity-source-chip, button.activity-file-chip { color: var(--color-link
 .task-plan-effects { border: 0; padding: 0; margin: 20px 0; }
 .task-plan-effects label { display: flex; align-items: center; gap: 8px; min-height: 40px; font-size: var(--text-sm); overflow-wrap: anywhere; }
 .task-plan-effects input { accent-color: var(--color-accent); }
+@media (max-width: 1000px) { .plan-first-toggle > span { display: none; } .composer-toolbar { flex-wrap: wrap; } .composer-actions { margin-left: auto; } }

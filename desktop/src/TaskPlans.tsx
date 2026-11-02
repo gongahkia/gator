@@ -53,22 +53,25 @@ function planStatus(plan: TaskPlanSummary) {
   return "Work admitted · observe activity below";
 }
 
-export function TaskPlans({ state, send, disabled, connectionIssue, onBusyChange, onReviewChange, stage }: {
+export function TaskPlans({ state, send, disabled, connectionIssue, onBusyChange, onReviewChange, stage, inspectWork }: {
   state: BackendState; send(frame: DesktopFrame): Promise<void>; disabled: boolean; connectionIssue?: string;
-  onBusyChange(busy: boolean): void; onReviewChange(open: boolean): void; stage(text: string): void;
+  onBusyChange(busy: boolean): void; onReviewChange(open: boolean): void; stage(text: string): void; inspectWork(run: string): void;
 }) {
   const { act, busy } = usePlanAction(state, send, connectionIssue);
   const [selected, setSelected] = useState<string>();
   const [review, setReview] = useState<TaskPlanReview>();
   const [issue, setIssue] = useState("");
   const sequence = useRef(0), mounted = useRef(true);
+  const returnTo = useRef<HTMLElement | null>(null);
   const current = state.task_plans?.find(plan => plan.id === selected);
-  useEffect(() => () => { mounted.current = false; sequence.current++; }, []);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; sequence.current++; }; }, []);
   useEffect(() => { onBusyChange(busy); return () => onBusyChange(false); }, [busy, onBusyChange]);
   useEffect(() => { onReviewChange(!!selected); return () => onReviewChange(false); }, [selected, onReviewChange]);
-  const close = () => { if (!busy) { sequence.current++; setSelected(undefined); setReview(undefined); setIssue(""); } };
+  const restoreFocus = () => requestAnimationFrame(() => { if (returnTo.current?.isConnected) returnTo.current.focus({ preventScroll: true }); });
+  const close = () => { if (!busy) { sequence.current++; setSelected(undefined); setReview(undefined); setIssue(""); restoreFocus(); } };
   const load = async (plan: TaskPlanSummary) => {
     const ticket = ++sequence.current;
+    returnTo.current = document.activeElement as HTMLElement | null;
     setSelected(plan.id); setReview(undefined); setIssue("");
     try {
       const value = await act({ conversation_id: state.conversation_id!, task_id: plan.id, revision: plan.revision, digest: plan.digest, action: "inspect" });
@@ -85,6 +88,7 @@ export function TaskPlans({ state, send, disabled, connectionIssue, onBusyChange
       await act({ conversation_id: state.conversation_id!, task_id: review.id, revision: review.revision, digest: review.digest, action, ...(content ? { content } : {}) });
       if (!mounted.current || ticket !== sequence.current) return;
       setReview(undefined); setSelected(undefined);
+      restoreFocus();
     } catch (error) { if (mounted.current && ticket === sequence.current) setIssue(error instanceof Error ? error.message : "Could not confirm the plan decision."); }
   };
   if (!state.task_plans?.length) return null;
@@ -94,11 +98,11 @@ export function TaskPlans({ state, send, disabled, connectionIssue, onBusyChange
       <div className="task-plan-body"><p className="task-plan-task">{plan.task}</p>
         {!!plan.steps?.length && <ol aria-label="Proposed steps">{plan.steps.map(step => <li key={step.id}>{step.text}</li>)}</ol>}
         <p className="task-plan-note">Proposed steps are intentions, not verified completion. {plan.work_id ? "Actual results and tool activity belong to the linked Work run." : "Preparing or reviewing does not start implementation."}</p>
-        {plan.work_id && <small className="task-plan-run">Work run: {plan.work_id}</small>}
+        {plan.work_id && <><small className="task-plan-run">Work run: {plan.work_id}</small>{state.messages.some(message => message.role === "Gator" && message.run_id === plan.work_id) && <button className="small-button" onClick={() => inspectWork(plan.work_id!)}>Inspect run activity &amp; results</button>}</>}
         <button className="small-button" disabled={disabled || busy || plan.phase === "preparing" && plan.state === "queued"} onClick={() => void load(plan)}>{plan.phase === "review" && plan.state === "queued" ? "Review plan" : "Inspect retained plan"}</button>
       </div>
     </details>)}
-    {selected && createPortal(<PlanReview key={`${selected}:${review?.revision ?? "loading"}`} review={review} current={current} issue={issue} busy={busy} disabled={disabled || state.running} close={close} change={change} stage={text => { close(); stage(text); }}/>, document.body)}
+    {selected && createPortal(<PlanReview key={`${selected}:${review?.revision ?? "loading"}`} review={review} current={current} issue={issue} busy={busy} disabled={disabled || state.running} close={close} change={change} stage={text => { sequence.current++; setSelected(undefined); setReview(undefined); setIssue(""); stage(text); }}/>, document.body)}
   </section>;
 }
 
@@ -123,6 +127,7 @@ function PlanReview({ review, current, issue, busy, disabled, close, change, sta
     {review && <>
       <p className="task-plan-note">This review belongs to this chat and task, revision {review.revision}. Approval starts only this reviewed intent. Later exact action, command and artifact reviews still apply.</p>
       <h3>Original request</h3><pre className="task-plan-original">{review.task}</pre>
+      {!!review.input_names?.length && <><h3>Attached inputs</h3><ul>{review.input_names.map((name,index) => <li key={index}>{name}</li>)}</ul><p className="task-plan-note">Files were selected with this request. They have not been inspected merely to prepare this proposal.</p></>}
       {display ? <>
         <label className="task-plan-field">Intended outcome{editing ? <textarea value={display.outcome} maxLength={4096} onChange={event => setDraft({ ...display, outcome: event.target.value })}/> : <p>{display.outcome}</p>}</label>
         <h3>Proposed steps</h3><ol className="task-plan-steps">{display.steps.map((step, index) => <li key={step.id}>{editing ? <div><label className="sr-only" htmlFor={`${title}-${step.id}`}>Step {index + 1}</label><textarea id={`${title}-${step.id}`} value={step.text} maxLength={1024} onChange={event => setDraft({ ...display, steps: display.steps.map(value => value.id === step.id ? { ...value, text: event.target.value } : value) })}/><button className="icon-button" aria-label={`Remove step ${index + 1}`} disabled={display.steps.length === 1} onClick={() => setDraft({ ...display, steps: display.steps.filter(value => value.id !== step.id) })}><X size={15}/></button></div> : step.text}</li>)}</ol>
