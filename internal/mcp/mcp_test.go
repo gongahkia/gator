@@ -15,7 +15,7 @@ import (
 func TestStreamableHTTPInitializesListsAndCallsTools(t *testing.T) {
 	var session string
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if request.Header.Get("MCP-Protocol-Version") != protocolVersion {
+		if request.Header.Get("MCP-Protocol-Version") != protocolVersion && request.Header.Get("Mcp-Method") != "server/discover" {
 			t.Errorf("protocol header = %q", request.Header.Get("MCP-Protocol-Version"))
 		}
 		if session != "" && request.Header.Get("Mcp-Session-Id") != session {
@@ -28,12 +28,23 @@ func TestStreamableHTTPInitializesListsAndCallsTools(t *testing.T) {
 		if err := json.NewDecoder(request.Body).Decode(&call); err != nil {
 			t.Fatal(err)
 		}
+		writer.Header().Set("Content-Type", "application/json")
+		if call.Method == "server/discover" {
+			json.NewEncoder(writer).Encode(map[string]any{"jsonrpc": "2.0", "id": call.ID, "error": map[string]any{"code": -32601}})
+			return
+		}
+		if call.Method == "notifications/initialized" {
+			writer.WriteHeader(http.StatusAccepted)
+			return
+		}
 		if call.Method == "initialize" {
 			session = "session-1"
 			writer.Header().Set("Mcp-Session-Id", session)
 		}
 		result := any(map[string]any{})
 		switch call.Method {
+		case "initialize":
+			result = map[string]any{"protocolVersion": protocolVersion, "capabilities": map[string]any{"tools": map[string]any{}}}
 		case "tools/list":
 			result = map[string]any{"tools": []map[string]any{{"name": "lookup", "description": "lookup data", "inputSchema": map[string]any{"type": "object"}}}}
 		case "tools/call":

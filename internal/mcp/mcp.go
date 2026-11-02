@@ -30,7 +30,7 @@ const (
 	manifestPath    = ".gator/mcp.json"
 	manifestVersion = 1
 	protocolVersion = "2025-11-25"
-	modernVersion = "2026-07-28"
+	modernVersion   = "2026-07-28"
 	maxManifest     = 64 * 1024
 	maxExecutable   = 128 * 1024 * 1024
 	maxServers      = 32
@@ -79,10 +79,10 @@ type loadedServer struct {
 // Streamable HTTP MCP endpoint. Connector policy and approvals remain owned by
 // the caller; this function only handles the protocol transport.
 func InvokeRemoteTool(ctx context.Context, endpoint, token, serverName, toolName string, arguments json.RawMessage) (json.RawMessage, error) {
-	if !namePattern.MatchString(serverName) || !toolNamePattern.MatchString(toolName) || !json.Valid(arguments) {
+	if !namePattern.MatchString(serverName) || !toolNamePattern.MatchString(toolName) || !objectJSON(arguments) {
 		return nil, errors.New("remote MCP call identity or arguments are invalid")
 	}
-	client := newAuthorizedHTTPClient(endpoint, token, serverName, token != "")
+	client := newAuthorizedHTTPClient(endpoint, token)
 	defer client.Close()
 	tools, err := listTools(ctx, client)
 	if err != nil {
@@ -155,6 +155,8 @@ func load(ctx context.Context, worktreePath, trustedHash string, credentials aut
 		return set, nil
 	}
 	set.trusted = true
+	aliases := map[string]bool{}
+	totalTools := 0
 	for _, specification := range document.Servers {
 		connected, err := connect(ctx, root, specification, credentials)
 		if err != nil {
@@ -166,6 +168,21 @@ func load(ctx context.Context, worktreePath, trustedHash string, credentials aut
 			_ = connected.Close()
 			_ = set.Close()
 			return Set{}, fmt.Errorf("list MCP tools from %q: %w", specification.Name, err)
+		}
+		totalTools += len(tools)
+		for _, tool := range tools {
+			alias := toolAlias(specification.Name, tool.Name)
+			if aliases[alias] {
+				_ = connected.Close()
+				_ = set.Close()
+				return Set{}, errors.New("MCP tool aliases collide across configured servers")
+			}
+			aliases[alias] = true
+		}
+		if totalTools > maxTools {
+			_ = connected.Close()
+			_ = set.Close()
+			return Set{}, errors.New("MCP configuration exceeds 256 total tools")
 		}
 		set.servers = append(set.servers, loadedServer{name: specification.Name, client: connected, tools: tools})
 	}
@@ -330,11 +347,11 @@ func connect(ctx context.Context, root workspace.Root, specification server, cre
 		if policy.Network != sandbox.AllowNetwork {
 			return nil, errors.New("Work policy denies remote MCP network access")
 		}
-		token, configured, err := accessToken(ctx, credentials, specification.URL, time.Now())
+		token, _, err := accessToken(ctx, credentials, specification.URL, time.Now())
 		if err != nil {
 			return nil, fmt.Errorf("load OAuth credential for MCP server %q: %w", specification.Name, err)
 		}
-		return newAuthorizedHTTPClient(specification.URL, token, specification.Name, configured), nil
+		return newAuthorizedHTTPClient(specification.URL, token), nil
 	}
 	policy := sandbox.DefaultPolicy()
 	if specification.Network == "allow" {
@@ -356,11 +373,11 @@ type Tool struct {
 }
 
 func (t Tool) Definition() agent.ToolDefinition {
-	return agent.ToolDefinition{Name: "mcp_" + strings.ReplaceAll(t.server.name, "-", "_") + "_" + strings.ReplaceAll(t.specification.Name, "-", "_"), Description: "MCP " + t.server.name + ": " + t.specification.Description, Parameters: append(json.RawMessage(nil), t.specification.InputSchema...)}
+	return agent.ToolDefinition{Name: toolAlias(t.server.name, t.specification.Name), Description: "MCP " + t.server.name + ": " + t.specification.Description, Parameters: append(json.RawMessage(nil), t.specification.InputSchema...)}
 }
 func (t Tool) Execute(ctx context.Context, arguments json.RawMessage) (agent.ToolResult, error) {
-	if !json.Valid(arguments) {
-		return agent.ToolResult{}, errors.New("MCP tool arguments must be valid JSON")
+	if !objectJSON(arguments) {
+		return agent.ToolResult{}, errors.New("MCP tool arguments must be a JSON object")
 	}
 	if t.approve == nil {
 		return agent.ToolResult{}, errors.New("MCP tool requires developer approval")
@@ -372,12 +389,18 @@ func (t Tool) Execute(ctx context.Context, arguments json.RawMessage) (agent.Too
 	if err != nil {
 		return agent.ToolResult{}, err
 	}
-	if err := validateToolResult(raw); err != nil { return agent.ToolResult{}, err }
+	if err := validateToolResult(raw); err != nil {
+		return agent.ToolResult{}, err
+	}
 	return agent.ToolResult{Content: string(raw)}, nil
 }
 
 func requireEOF(decoder *json.Decoder) error {
- if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
-  if err == nil { return errors.New("unexpected second JSON value") }; return err
- }; return nil
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return errors.New("unexpected second JSON value")
+		}
+		return err
+	}
+	return nil
 }

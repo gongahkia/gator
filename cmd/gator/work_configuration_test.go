@@ -22,6 +22,7 @@ import (
 	"github.com/gongahkia/gator/internal/mcp"
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/snapshot"
+	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workrun"
 )
@@ -31,22 +32,50 @@ func TestWorkCodeResolvesCapturedIntegrationsUsingOriginalTrust(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var initialized atomic.Int32
+	var initialized, mcpCalls, mcpApproved atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var call struct {
-			ID     int64  `json:"id"`
-			Method string `json:"method"`
+			ID     int64           `json:"id"`
+			Method string          `json:"method"`
+			Params json.RawMessage `json:"params"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&call); err != nil {
 			t.Error(err)
 			return
 		}
+		w.Header().Set("Content-Type", "application/json")
+		if call.Method == "server/discover" {
+			json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": call.ID, "error": map[string]any{"code": -32601}})
+			return
+		}
+		if call.Method == "notifications/initialized" {
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
 		if call.Method == "initialize" {
 			initialized.Add(1)
 		}
-		result := map[string]any{}
+		result := map[string]any{"protocolVersion": "2025-11-25", "capabilities": map[string]any{"tools": map[string]any{}}}
 		if call.Method == "tools/list" {
-			result["tools"] = []any{map[string]any{"name": "lookup", "description": "fixture lookup", "inputSchema": map[string]any{"type": "object"}}}
+			var params struct {
+				Cursor string `json:"cursor"`
+			}
+			json.Unmarshal(call.Params, &params)
+			if params.Cursor == "" {
+				result["tools"] = []any{}
+				result["nextCursor"] = "exact-last-page"
+			} else if params.Cursor == "exact-last-page" {
+				result["tools"] = []any{map[string]any{"name": "lookup", "description": "fixture lookup", "inputSchema": map[string]any{"type": "object"}}}
+			} else {
+				t.Error("wrong MCP cursor")
+			}
+		}
+		if call.Method == "tools/call" {
+			if mcpApproved.Load() != 1 {
+				t.Error("MCP dispatched before approval")
+			}
+			mcpCalls.Add(1)
+			result = map[string]any{"content": []any{map[string]any{"type": "text", "text": "retained fixture lookup"}}}
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": call.ID, "result": result})
@@ -100,7 +129,7 @@ func TestWorkCodeResolvesCapturedIntegrationsUsingOriginalTrust(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	codeScript := &eval.ScriptedModel{Turns: []agent.Turn{depthCall("apply_patch", map[string]string{"patch": "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-base\n+changed\n"}), depthCall("git_status", map[string]any{}), depthCall("git_diff", map[string]any{}), depthCall("run_command", map[string]any{"argv": []string{"git", "diff", "--check"}}), {Text: "Verified"}}}
+	codeScript := &eval.ScriptedModel{Turns: []agent.Turn{depthCall("mcp_fixture_lookup", map[string]any{}), depthCall("apply_patch", map[string]string{"patch": "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-base\n+changed\n"}), depthCall("git_status", map[string]any{}), depthCall("git_diff", map[string]any{}), depthCall("run_command", map[string]any{"argv": []string{"git", "diff", "--check"}}), {Text: "Verified"}}}
 	backend := &nativeWorkBackend{code: codeexec.Executor{HookTrusts: []hooks.Trust{{Repository: source, Hash: hookHash}}, MCPTrusts: []mcp.Trust{{Repository: source, Hash: mcpHash}}, LSPTrusts: []lsp.Trust{{Repository: source, Hash: lspHash}}, Extensions: extension.NewResolver(store, settings), Model: depthModel(func(ctx context.Context, r agent.TurnRequest) (agent.Turn, error) {
 		for _, text := range []string{"amber profile", "amber scoped", "amber extension"} {
 			if !strings.Contains(r.System, text) {
@@ -121,7 +150,14 @@ func TestWorkCodeResolvesCapturedIntegrationsUsingOriginalTrust(t *testing.T) {
 	})}}
 	state := t.TempDir()
 	manager := &eval.ScriptedModel{Turns: []agent.Turn{depthCall("delegate_agents", map[string]any{"tasks": []any{map[string]string{"agent": "code", "task": "Change a.txt"}}}), depthCall("write_artifact", map[string]string{"path": "report.md", "content": "Prepared a frozen-configuration patch"}), {Text: "Prepared"}}}
-	outcome, err := (workrun.Service{Executor: workrun.Executor{Model: manager, Code: backend.codeDelegate(state), StateDir: state}}).Execute(context.Background(), workrun.Request{RunID: "configuration", SourcePath: source, Objective: "Prepare a patch", RequireCode: true, Contract: artifact.DefaultContract("report.md"), Code: workrun.CodePolicy{Profile: "worker", Scopes: []string{"a.txt"}, Sandbox: sandbox.Policy{Network: sandbox.AllowNetwork}, Capabilities: []string{"hooks", "mcp", "lsp", "extension"}}, OnSnapshot: func(snapshot.Manifest) {
+	outcome, err := (workrun.Service{Executor: workrun.Executor{Model: manager, Code: backend.codeDelegate(state), StateDir: state}}).Execute(context.Background(), workrun.Request{RunID: "configuration", SourcePath: source, Objective: "Prepare a patch", RequireCode: true, ApproveCodeCommand: func(ctx context.Context, argv []string) (tools.CommandDecision, error) {
+		if strings.Join(argv, " ") != "mcp fixture lookup" {
+			t.Errorf("unexpected integration approval: %v", argv)
+			return tools.CommandDeny, nil
+		}
+		mcpApproved.Add(1)
+		return tools.CommandAllowOnce, nil
+	}, Contract: artifact.DefaultContract("report.md"), Code: workrun.CodePolicy{Profile: "worker", Scopes: []string{"a.txt"}, Sandbox: sandbox.Policy{Network: sandbox.AllowNetwork}, Capabilities: []string{"hooks", "mcp", "lsp", "extension"}}, OnSnapshot: func(snapshot.Manifest) {
 		for name := range files {
 			if strings.HasPrefix(name, ".gator/") {
 				if err := os.WriteFile(filepath.Join(source, name), []byte("mutable replacement"), 0600); err != nil {
@@ -133,7 +169,7 @@ func TestWorkCodeResolvesCapturedIntegrationsUsingOriginalTrust(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(outcome.Manifest.Subagents) != 1 || outcome.Manifest.Subagents[0].Status != "completed" || initialized.Load() != 1 {
+	if len(outcome.Manifest.Subagents) != 1 || outcome.Manifest.Subagents[0].Status != "completed" || initialized.Load() != 1 || mcpCalls.Load() != 1 || mcpApproved.Load() != 1 {
 		t.Fatalf("Code evidence: %+v; initialized=%d", outcome.Manifest.Subagents, initialized.Load())
 	}
 	history, err := workhistory.Open(state)

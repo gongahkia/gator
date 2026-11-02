@@ -465,3 +465,22 @@ func TestRetiredGoogleCalendarCannotSendRequestsEvenWithLegacyGrant(t *testing.T
 		t.Fatal("retired endpoint still routable")
 	}
 }
+
+func TestRemoteMCPMappingUsesNativeToolNamesWithoutWideningConnectorIDs(t *testing.T) {
+	for _, name := range []string{"Lookup.v2", "DATA_EXPORT_v2", strings.Repeat("a", 128)} {
+		d := Descriptor{Version: 1, ID: "mapped", Name: "Mapped", Kind: KindRemoteMCP, Resource: "https://mcp.example.test", Authentication: AuthNone, ReadTool: name}
+		if err := d.Validate(); err != nil {
+			t.Fatalf("valid native tool name %q: %v", name, err)
+		}
+		d.ID = "Invalid.ID"
+		if d.Validate() == nil {
+			t.Fatal("tool-name support widened connector identity")
+		}
+	}
+	for _, name := range []string{"bad name", "bad\nname", strings.Repeat("a", 129)} {
+		d := Descriptor{Version: 1, ID: "mapped", Name: "Mapped", Kind: KindRemoteMCP, Resource: "https://mcp.example.test", Authentication: AuthNone, ReadTool: name}
+		if d.Validate() == nil {
+			t.Fatal("invalid native tool name accepted")
+		}
+	}
+}

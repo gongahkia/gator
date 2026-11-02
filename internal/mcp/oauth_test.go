@@ -293,7 +293,16 @@ func TestLoadWithCredentialsSendsOAuthTokenOnlyToMatchingServer(t *testing.T) {
 		if err := json.NewDecoder(request.Body).Decode(&call); err != nil {
 			t.Fatal(err)
 		}
-		result := any(map[string]any{})
+		writer.Header().Set("Content-Type", "application/json")
+		if call.Method == "server/discover" {
+			json.NewEncoder(writer).Encode(map[string]any{"jsonrpc": "2.0", "id": call.ID, "error": map[string]any{"code": -32601}})
+			return
+		}
+		if call.Method == "notifications/initialized" {
+			writer.WriteHeader(http.StatusAccepted)
+			return
+		}
+		result := any(map[string]any{"protocolVersion": protocolVersion, "capabilities": map[string]any{"tools": map[string]any{}}})
 		if call.Method == "tools/list" {
 			result = map[string]any{"tools": []map[string]any{{"name": "lookup", "inputSchema": map[string]any{"type": "object"}}}}
 		}

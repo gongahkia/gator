@@ -18,8 +18,11 @@ prints an endpoint's access token, refresh token, or public client metadata.
 Trust records use the canonical repository path. Their hash covers the
 manifest and a streaming SHA-256 digest of each repository-local stdio
 executable (up to 128 MiB per executable). Editing a bundle disables it until
-it is trusted again. Every MCP tool call still asks
-for allow-once, allow-this-exact-tool, or deny approval.
+it is trusted again. Every MCP tool call still passes the existing allow-once,
+allow-this-exact-tool, or deny policy. A remembered exact-tool permission may
+satisfy later calls under that policy; this is not a promise of a new prompt or
+payload-specific approval for every project-tool call. Mapped connector mutations
+retain their separate exact-action approval and receipt path.
 
 ```json
 {
@@ -43,8 +46,13 @@ for allow-once, allow-this-exact-tool, or deny approval.
 Names use lower-case letters, digits, underscores, and hyphens. Stdio commands
 are an argv array whose executable is a regular, executable file inside the
 repository; Gator never resolves it through `PATH` or a shell. HTTP servers
-must use HTTPS unless they are a loopback development server. The current
-client uses MCP 2025-11-25 over stdio or Streamable HTTP.
+must use HTTPS unless they are a loopback development server. The client supports the tools subset of MCP `2025-11-25` and `2026-07-28`
+over stdio or Streamable HTTP. It first performs bounded, read-only modern
+`server/discover` setup, then uses a verified compatible modern response or a
+legacy `initialize` handshake and `notifications/initialized`. Unsupported
+versions fail before tools become available. Negotiation never repeats a tool
+mutation. See [MCP transport hardening](MCP-HARDENING.md) for exact bounds,
+compatibility, failure handling and verification.
 
 ## Remote OAuth
 
@@ -87,3 +95,46 @@ credentials through the sandbox's explicit environment policy instead.
 OAuth remains an external authorization grant. Gator can test protocol flow
 locally, but cannot verify a third-party authorization server's account,
 scope, consent page, or data handling.
+
+## Discovery, streaming and cancellation
+
+Tool discovery follows opaque cursors with bounds of 32 pages, 256 tools total
+across a project configuration and 1 MiB per server catalog. Duplicate tools,
+colliding public aliases, repeated/oversized cursors and incomplete discovery
+fail explicitly; a partial tool set is not silently enabled. Native tool names
+may use ASCII letters, digits, underscores, hyphens and dots (up to 128 bytes).
+Gator's model-facing names remain bounded safe aliases; original names are used
+on the wire. These rules do not widen connector or server identity syntax.
+
+HTTP streams are parsed incrementally through comments, notifications and
+multiline SSE data until the matching response arrives. Capturing a result does
+not wait for server EOF. Messages and requests are bounded to 128 KiB; tool
+results retain the existing 64 KiB limit. Streams consume at most 1 MiB and 256
+nonempty events. A request and its queue wait have a two-minute deadline or the
+caller's shorter deadline; setup discovery has a two-second probe deadline.
+
+Both transports have cancellable request gates. Cancelling a stdio operation
+attempts a bounded cancellation notification and closes its owned subprocess;
+stalled writes and ignored EOF cannot indefinitely block the owner. Closing
+stdin starts shutdown, followed by forced termination after 250 ms and a bounded
+250 ms reap wait. If exit cannot be observed, cleanup is deferred until exit and
+an explicit error is returned. Only read-only discovery may time out and fall
+back to legacy setup in the same process; late replies cannot match a new ID.
+HTTP cancellation closes its request stream. Neither transport automatically
+restarts or replays tool calls after failure.
+
+The newer stateless path sends per-request version/capability metadata and the
+required method/tool headers, without legacy session headers. Supported primitive
+`x-mcp-header` mappings are validated and encoded from the exact transmitted
+arguments; malformed, conflicting or unsupported annotations fail catalog
+admission. Derived headers are bounded to 16 KiB. Redirects are refused and
+server-authored RPC error text is excluded from ordinary diagnostics.
+
+This is a tools client, not an implementation of every MCP capability. Additional
+interaction (`input_required`), server-initiated sampling/elicitation, resources,
+prompts, subscriptions, tasks and stream resumption are not implemented. Such
+interactions do not gain approval or trigger automatic retry. Existing OAuth
+setup is retained; broad vendor compatibility and complete modern OAuth
+conformance are not certified by local fixture tests. A timeout or disconnect
+after dispatch can leave the remote outcome unknown. Approval and transport
+acknowledgement do not prove an external action completed.

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/mcp"
 )
 
 const (
@@ -158,7 +159,7 @@ func (d Descriptor) Validate() error {
 			return errors.New("remote MCP connector requires a search or read tool mapping")
 		}
 		for _, tool := range []string{d.SearchTool, d.ReadTool, d.ActionTool} {
-			if tool != "" && !idPattern.MatchString(strings.ReplaceAll(tool, "_", "-")) {
+			if tool != "" && !mcp.ValidToolName(tool) {
 				return errors.New("remote MCP connector tool mapping is invalid")
 			}
 		}
