@@ -20,6 +20,25 @@ const setup = () => {
   return new Sessions(request => new Worker(request.conversation_id || `chat-${++count}`));
 };
 
+test("direct ancestry navigation uses only the current owner's exact parent even when idle", async () => {
+  const sessions = setup(); await sessions.open(); const parent = sessions.current;
+  await sessions.open({ new: true }); const child = sessions.current;
+  child.change({ branch: { conversation_id: parent.state.conversation_id, revision_id: "saved-revision" } });
+  assert.deepEqual(sessions.activity(), []);
+  assert.equal(sessions.canOpen(parent.state.conversation_id), true);
+  for (const id of ["unrelated", parent.state.conversation_id + "-suffix", "../private", "", undefined, { id: parent.state.conversation_id }]) assert.equal(sessions.canOpen(id), false);
+  await sessions.open({ conversation_id: parent.state.conversation_id });
+  assert.equal(sessions.current, parent); assert.deepEqual(parent.frames, []);
+  assert.equal(sessions.canOpen(parent.state.conversation_id), false); // No cached ancestry authority.
+  await sessions.open({ conversation_id: child.state.conversation_id });
+  child.change({ branch: undefined });
+  assert.equal(sessions.canOpen(parent.state.conversation_id), false);
+  child.change({ branch: { conversation_id: parent.state.conversation_id, revision_id: "saved-revision" } });
+  await child.stop();
+  assert.equal(sessions.canOpen(parent.state.conversation_id), false);
+  await sessions.stop();
+});
+
 test("browser sign-in retains its owner and Connections returns to it", async () => {
   const sessions = setup(); await sessions.open(); const owner = sessions.current;
   owner.change({ pending_connection: "google" });

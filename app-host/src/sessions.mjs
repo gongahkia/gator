@@ -32,6 +32,13 @@ export class Sessions extends EventEmitter {
     }
     return [...rows.values()];
   }
+  // Direct renderer navigation is limited to projected activity or the exact
+  // ancestry supplied by the current native owner. An idle/retired parent is
+  // still a valid ancestry link, but arbitrary conversation IDs are not.
+  canOpen(id) {
+    if (typeof id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/.test(id)) return false;
+    return this.activity().some(item => item.id === id) || !this.current?.closed && this.current?.state?.branch?.conversation_id === id;
+  }
   #changed(worker) {
     const before = this.#previous.get(worker), state = worker.state;
     if (before?.running && !state?.running && state?.conversation_id && worker !== this.current) {

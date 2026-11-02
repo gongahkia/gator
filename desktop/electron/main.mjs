@@ -198,7 +198,7 @@ else {
     ipcMain.handle("gator:snapshot", (event) => { trusted(event); return snapshot(); });
     ipcMain.handle("gator:session", async (event, id) => {
       mutable(event);
-      if (typeof id !== "string" || !sessions.activity().some(item => item.id === id)) throw new Error("This task is no longer in the open-chat list.");
+      if (!sessions.canOpen(id)) throw new Error("This chat is no longer available from the current view.");
       await sessions.open({ conversation_id: id });
     });
     ipcMain.handle("gator:code-preview", async (event, request) => {

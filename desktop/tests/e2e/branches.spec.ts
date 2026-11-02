@@ -8,6 +8,11 @@ function turn(body:FixtureRequest){const last=body.messages.map(message=>message
 const answerOne="First retained answer. Source: `source/normalize.cjs`, line 1.";
 const answerTwo="Later parent answer must stay in the parent.";
 function respond(body:FixtureRequest){const current=turn(body);if(!current.results.length)return fixtureTool("read_file",{path:"source/normalize.cjs"});return {role:"assistant",content:current.question.includes("First")?answerOne:answerTwo};}
+async function openSaved(page:import("@playwright/test").Page,id:string){
+ const list=(await page.evaluate(()=>window.gator!.snapshot())).state!.recent_id!;
+ await page.evaluate(async({id,list})=>window.gator!.send({type:"conversation",conversation:{id,list_id:list}}),{id,list});
+ await expect.poll(async()=>{const snapshot=await page.evaluate(()=>window.gator!.snapshot());return snapshot.state?.conversation_id===id&&!snapshot.sessionSwitching;}).toBe(true);
+}
 async function inspectMode(page:import("@playwright/test").Page){await expect(page.getByRole("textbox",{name:"Message Gator",exact:true})).toBeEnabled();await page.evaluate(()=>window.gator!.send({type:"submit",text:"/mode inspect"}));await expect.poll(async()=>(await page.evaluate(()=>window.gator!.snapshot())).state?.work_details?.mode).toBe("inspect");}
 
 test("new-chat branch preserves the exact saved boundary, sources, ancestry and independent drafts",async()=>{
@@ -40,7 +45,7 @@ test("new-chat branch preserves the exact saved boundary, sources, ancestry and 
  await expect.poll(async()=>(await page.evaluate(()=>window.gator!.snapshot())).state?.conversation_id).toBe(parent);
  await expect(page.getByRole("textbox",{name:"Message Gator",exact:true})).toHaveValue("Parent draft stays here");
  await expect(page.getByText(answerTwo,{exact:true})).toBeVisible();
- await page.evaluate(id=>window.gator!.openSession(id),child.conversation_id!);
+ await openSaved(page,child.conversation_id!);
  await expect(page.getByRole("textbox",{name:"Message Gator",exact:true})).toHaveValue("Child draft only");
  await closeDesktop(app);app=await f.launch();page=await app.firstWindow();
  await expect(page.getByRole("button",{name:"Open original chat",exact:true})).toBeVisible();
@@ -78,7 +83,7 @@ test("per-message local speech reads only the chosen reply, stops, and reports u
  await expect(page.getByRole("button",{name:"Stop speaking",exact:true})).toHaveCount(0);
  expect(await page.evaluate(()=>(window as unknown as {cancelled:number}).cancelled)).toBeGreaterThanOrEqual(3);
  // Return through existing navigation; the old response is never auto-spoken.
- await page.evaluate(id=>window.gator!.openSession(id),parent);
+ await openSaved(page,parent);
  await page.evaluate(()=>{(window as unknown as {voicesAvailable:boolean}).voicesAvailable=false;});
  await first.getByRole("button",{name:"Response actions",exact:true}).click();
  await expect(page.getByRole("menuitem",{name:"Read aloud",exact:true})).toBeDisabled();
@@ -103,7 +108,7 @@ test("branching from an older answer leaves the actual parent worker running",as
  await page.getByRole("button",{name:"Open original chat",exact:true}).click();
  await expect.poll(async()=>(await page.evaluate(()=>window.gator!.snapshot())).state?.conversation_id).toBe(parent);
  expect((await page.evaluate(()=>window.gator!.snapshot())).state!.running).toBe(true);expect(f.calls()).toBe(3);
- await page.evaluate(id=>window.gator!.openSession(id),child.conversation_id!);
+ await openSaved(page,child.conversation_id!);
  release();await expect.poll(()=>f.calls()).toBe(4);
  await page.getByRole("button",{name:"Open original chat",exact:true}).click();
  await expect(page.getByText(answerTwo,{exact:true})).toBeVisible();
