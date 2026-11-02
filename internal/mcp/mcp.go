@@ -4,7 +4,6 @@
 package mcp
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -13,15 +12,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
@@ -34,6 +30,7 @@ const (
 	manifestPath    = ".gator/mcp.json"
 	manifestVersion = 1
 	protocolVersion = "2025-11-25"
+	modernVersion = "2026-07-28"
 	maxManifest     = 64 * 1024
 	maxExecutable   = 128 * 1024 * 1024
 	maxServers      = 32
@@ -82,7 +79,7 @@ type loadedServer struct {
 // Streamable HTTP MCP endpoint. Connector policy and approvals remain owned by
 // the caller; this function only handles the protocol transport.
 func InvokeRemoteTool(ctx context.Context, endpoint, token, serverName, toolName string, arguments json.RawMessage) (json.RawMessage, error) {
-	if !namePattern.MatchString(serverName) || !namePattern.MatchString(toolName) || !json.Valid(arguments) {
+	if !namePattern.MatchString(serverName) || !toolNamePattern.MatchString(toolName) || !json.Valid(arguments) {
 		return nil, errors.New("remote MCP call identity or arguments are invalid")
 	}
 	client := newAuthorizedHTTPClient(endpoint, token, serverName, token != "")
@@ -348,50 +345,7 @@ func connect(ctx context.Context, root workspace.Root, specification server, cre
 	if err != nil {
 		return nil, err
 	}
-	stdin, err := prepared.Command.StdinPipe()
-	if err != nil {
-		prepared.Cleanup()
-		return nil, err
-	}
-	stdout, err := prepared.Command.StdoutPipe()
-	if err != nil {
-		prepared.Cleanup()
-		return nil, err
-	}
-	if err := prepared.Command.Start(); err != nil {
-		prepared.Cleanup()
-		return nil, err
-	}
-	return &stdioClient{command: prepared.Command, input: stdin, output: bufio.NewScanner(stdout), cleanup: prepared.Cleanup}, nil
-}
-
-func listTools(ctx context.Context, client client) ([]toolDescription, error) {
-	if _, err := client.Call(ctx, "initialize", map[string]any{"protocolVersion": protocolVersion, "capabilities": map[string]any{}, "clientInfo": map[string]string{"name": "gator", "version": "dev"}}); err != nil {
-		return nil, err
-	}
-	if notifier, ok := client.(interface {
-		Notify(context.Context, string, any) error
-	}); ok {
-		if err := notifier.Notify(ctx, "notifications/initialized", map[string]any{}); err != nil {
-			return nil, err
-		}
-	}
-	raw, err := client.Call(ctx, "tools/list", map[string]any{})
-	if err != nil {
-		return nil, err
-	}
-	var result struct {
-		Tools []toolDescription `json:"tools"`
-	}
-	if err := json.Unmarshal(raw, &result); err != nil {
-		return nil, err
-	}
-	for _, tool := range result.Tools {
-		if !namePattern.MatchString(tool.Name) || len(tool.InputSchema) == 0 || !json.Valid(tool.InputSchema) {
-			return nil, errors.New("MCP server returned an invalid tool definition")
-		}
-	}
-	return result.Tools, nil
+	return startStdio(ctx, prepared.Command, prepared.Cleanup)
 }
 
 // Tool adapts one MCP remote tool to the agent tool contract.
@@ -418,191 +372,12 @@ func (t Tool) Execute(ctx context.Context, arguments json.RawMessage) (agent.Too
 	if err != nil {
 		return agent.ToolResult{}, err
 	}
-	if len(raw) > maxToolOutput {
-		return agent.ToolResult{}, errors.New("MCP tool response exceeds 64 KiB")
-	}
+	if err := validateToolResult(raw); err != nil { return agent.ToolResult{}, err }
 	return agent.ToolResult{Content: string(raw)}, nil
 }
 
-type stdioClient struct {
-	command *exec.Cmd
-	input   io.WriteCloser
-	output  *bufio.Scanner
-	cleanup func()
-	mu      sync.Mutex
-	next    int64
-}
-
-func (c *stdioClient) Call(ctx context.Context, method string, params any) (json.RawMessage, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.next++
-	return rpcExchange(ctx, method, params, c.next, func(value []byte) error { _, err := c.input.Write(append(value, '\n')); return err }, func() ([]byte, error) {
-		if !c.output.Scan() {
-			if err := c.output.Err(); err != nil {
-				return nil, err
-			}
-			return nil, io.EOF
-		}
-		return c.output.Bytes(), nil
-	})
-}
-func (c *stdioClient) Notify(_ context.Context, method string, params any) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	value, err := json.Marshal(map[string]any{"jsonrpc": "2.0", "method": method, "params": params})
-	if err != nil {
-		return err
-	}
-	_, err = c.input.Write(append(value, '\n'))
-	return err
-}
-func (c *stdioClient) Close() error {
-	_ = c.input.Close()
-	err := c.command.Wait()
-	c.cleanup()
-	return err
-}
-
-type httpClient struct {
-	endpoint string
-	client   *http.Client
-	access   string
-	server   string
-	oauth    bool
-	mu       sync.Mutex
-	next     int64
-	session  string
-}
-
-func newHTTPClient(endpoint string) *httpClient {
-	return &httpClient{endpoint: endpoint, client: &http.Client{Timeout: 2 * time.Minute}}
-}
-
-func newAuthorizedHTTPClient(endpoint, access, server string, oauth bool) *httpClient {
-	client := newHTTPClient(endpoint)
-	client.access = access
-	client.server = server
-	client.oauth = oauth
-	return client
-}
-func (c *httpClient) Call(ctx context.Context, method string, params any) (json.RawMessage, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.next++
-	id := c.next
-	value, err := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": params})
-	if err != nil {
-		return nil, err
-	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint, bytes.NewReader(value))
-	if err != nil {
-		return nil, err
-	}
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Accept", "application/json, text/event-stream")
-	request.Header.Set("MCP-Protocol-Version", protocolVersion)
-	if c.access != "" {
-		request.Header.Set("Authorization", "Bearer "+c.access)
-	}
-	if c.session != "" {
-		request.Header.Set("Mcp-Session-Id", c.session)
-	}
-	response, err := c.client.Do(request)
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close()
-	if response.StatusCode/100 != 2 {
-		if response.StatusCode == http.StatusUnauthorized && c.server != "" {
-			if c.oauth {
-				return nil, fmt.Errorf("MCP HTTP server returned 401 Unauthorized; its stored OAuth credential is invalid or expired, run 'gator mcp login %s'", c.server)
-			}
-			return nil, fmt.Errorf("MCP HTTP server returned 401 Unauthorized; authenticate it with 'gator mcp login %s'", c.server)
-		}
-		return nil, fmt.Errorf("MCP HTTP server returned %s", response.Status)
-	}
-	if session := response.Header.Get("Mcp-Session-Id"); session != "" {
-		c.session = session
-	}
-	body, err := io.ReadAll(io.LimitReader(response.Body, maxToolOutput+1024))
-	if err != nil {
-		return nil, err
-	}
-	if strings.HasPrefix(response.Header.Get("Content-Type"), "text/event-stream") {
-		body = firstSSEData(body)
-	}
-	return parseRPCResponse(body, id)
-}
-func (c *httpClient) Close() error { return nil }
-
-func rpcExchange(ctx context.Context, method string, params any, id int64, send func([]byte) error, receive func() ([]byte, error)) (json.RawMessage, error) {
-	value, err := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": params})
-	if err != nil {
-		return nil, err
-	}
-	if err := send(value); err != nil {
-		return nil, err
-	}
-	for {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
-		}
-		response, err := receive()
-		if err != nil {
-			return nil, err
-		}
-		raw, err := parseRPCResponse(response, id)
-		if errors.Is(err, errOtherResponse) {
-			continue
-		}
-		return raw, err
-	}
-}
-
-var errOtherResponse = errors.New("other RPC response")
-
-func parseRPCResponse(value []byte, id int64) (json.RawMessage, error) {
-	var response struct {
-		ID     any             `json:"id"`
-		Result json.RawMessage `json:"result"`
-		Error  *struct {
-			Code    int    `json:"code"`
-			Message string `json:"message"`
-		} `json:"error"`
-	}
-	if err := json.Unmarshal(value, &response); err != nil {
-		return nil, err
-	}
-	number, ok := response.ID.(float64)
-	if !ok || int64(number) != id {
-		return nil, errOtherResponse
-	}
-	if response.Error != nil {
-		return nil, fmt.Errorf("MCP RPC error %d: %s", response.Error.Code, response.Error.Message)
-	}
-	if len(response.Result) == 0 {
-		return nil, errors.New("MCP RPC response has no result")
-	}
-	return response.Result, nil
-}
-func firstSSEData(value []byte) []byte {
-	for _, line := range bytes.Split(value, []byte("\n")) {
-		line = bytes.TrimSpace(line)
-		if bytes.HasPrefix(line, []byte("data:")) {
-			return bytes.TrimSpace(bytes.TrimPrefix(line, []byte("data:")))
-		}
-	}
-	return value
-}
 func requireEOF(decoder *json.Decoder) error {
-	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
-		if err == nil {
-			return errors.New("unexpected second JSON value")
-		}
-		return err
-	}
-	return nil
+ if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+  if err == nil { return errors.New("unexpected second JSON value") }; return err
+ }; return nil
 }
