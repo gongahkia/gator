@@ -128,6 +128,8 @@ type BundleActionRequest struct {
 // one prompt. They configure Gator and bound its internal Code specialist;
 // they are never editable by the manager model itself.
 type RunOptions struct {
+	PlanFirst               bool   `json:"PlanFirst,omitempty"`
+	TaskPlanRequestID       string `json:"-"`
 	BrowserSession          string
 	BrowserPolicy           string
 	ReplyToUpdateID         string
@@ -177,6 +179,7 @@ type ModelStatus struct {
 type GoalState struct{ Title, SourcePath, ConversationID string }
 
 type Config struct {
+	PreparePlan              func(context.Context, worksession.Request) (worksession.PlanContent, error)
 	ForkConversation         func(parent, revision, run, request string) (worksession.Conversation, error)
 	ComposerSources          func() ([]ComposerSource, error)
 	SelectComposerSources    func(string, []string, []string) error

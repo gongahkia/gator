@@ -154,7 +154,15 @@ func (s Store) LoadRequests(id string) (RequestJournal, error) {
 	if decoder.Decode(new(any)) != io.EOF {
 		return RequestJournal{}, errors.New("invalid message journal trailer")
 	}
-	return journal, validateRequests(journal)
+	if err := validateRequests(journal); err != nil {
+		return RequestJournal{}, err
+	}
+	for _, r := range journal.Requests {
+		if r.Plan != nil && r.Plan.Binding.ConversationID != id {
+			return RequestJournal{}, errors.New("plan belongs to another conversation")
+		}
+	}
+	return journal, nil
 }
 
 // SaveRequests performs one atomic compare-and-swap, including reorder/edit and
@@ -164,6 +172,11 @@ func (s Store) SaveRequests(id string, next RequestJournal) (RequestJournal, err
 	defer requestsMu.Unlock()
 	if err := validateRequests(next); err != nil {
 		return RequestJournal{}, err
+	}
+	for _, r := range next.Requests {
+		if r.Plan != nil && r.Plan.Binding.ConversationID != id {
+			return RequestJournal{}, errors.New("plan belongs to another conversation")
+		}
 	}
 	lock, err := s.requestLock(id, ".requests.lock", false)
 	if err != nil {

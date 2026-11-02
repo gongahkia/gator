@@ -60,11 +60,12 @@ type InspectionResponse struct {
 
 // Live data belongs to the existing execution owner. Grants disappear with it.
 type liveInspection struct {
-	mu       sync.Mutex
-	value    Inspection
-	grants   map[string]executiontarget.Grant
-	pending  func() int
-	controls *remoteControls
+	planBound bool
+	mu        sync.Mutex
+	value     Inspection
+	grants    map[string]executiontarget.Grant
+	pending   func() int
+	controls  *remoteControls
 }
 
 func newLiveInspection(run, conversation string, started time.Time, pending func() int) *liveInspection {

@@ -226,3 +226,13 @@ func (b *connectorCallBudget) release() {
 	b.calls--
 	b.mu.Unlock()
 }
+
+// ConnectorOperationCapability exposes only the host descriptor's operation
+// class to a surrounding Work intent gate. It cannot widen connector policy.
+func ConnectorOperationCapability(tool agent.Tool) (string, action.Capability, bool) {
+	native, ok := tool.(connectorTool)
+	if !ok {
+		return "", "", false
+	}
+	return native.descriptor.ID, native.operation.Capability, true
+}

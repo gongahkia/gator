@@ -40,6 +40,11 @@ func bridgeQueuedRunID(item queuedRun) string {
 }
 
 func (m Model) bridgeGuidanceID() string {
+	for _, r := range m.requests.Requests {
+		if r.ID == m.activeRequest && r.Plan != nil {
+			return ""
+		}
+	}
 	if !m.running || m.cancelling || m.operation == nil {
 		return ""
 	}

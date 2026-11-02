@@ -23,6 +23,7 @@ import (
 	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/workactivity"
 	"github.com/gongahkia/gator/internal/workhistory"
+	"github.com/gongahkia/gator/internal/worksession"
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
@@ -66,6 +67,8 @@ func (p CodePolicy) HasCapability(name string) bool {
 
 // Request describes one bounded local work session.
 type Request struct {
+	TaskPlan                *TaskPlanReference `json:",omitempty"`
+	reviewedPlan            *worksession.TaskPlan
 	ExternalAgents          []cliagent.Config
 	ReplyToUpdateID         string
 	UpdateContext           string

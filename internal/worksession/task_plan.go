@@ -26,6 +26,7 @@ type TaskPlan struct {
 	Approval *PlanApproval `json:"approval,omitempty"`
 }
 type PlanBinding struct {
+	SnapshotID     string `json:"snapshot_id,omitempty"`
 	ConversationID string `json:"conversation_id"`
 	RequestID      string `json:"request_id"`
 	HeadRevision   string `json:"head_revision,omitempty"`
@@ -70,8 +71,19 @@ func optionsHash(raw json.RawMessage) string {
 func boundedPlanText(value string, limit int) bool {
 	return strings.TrimSpace(value) != "" && len(value) <= limit && utf8.ValidString(value) && !strings.ContainsRune(value, 0)
 }
+func planSourceID(id string) bool {
+	if len(id) == 0 || len(id) > 128 {
+		return false
+	}
+	for _, r := range id {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '_' || r == '-') {
+			return false
+		}
+	}
+	return true
+}
 func validPlanContent(content PlanContent, sources []string) bool {
-	if !boundedPlanText(content.Outcome, 4096) || len(content.Steps) < 1 || len(content.Steps) > 24 || len(content.Sources) > 16 || len(content.Effects) < 1 || len(content.Effects) > 6 {
+	if !boundedPlanText(content.Outcome, 4096) || len(content.Steps) < 1 || len(content.Steps) > 24 || len(content.Sources) > 16 || len(content.Effects) < 1 || len(content.Effects) > 7 {
 		return false
 	}
 	seen := map[string]bool{}
@@ -90,13 +102,22 @@ func validPlanContent(content PlanContent, sources []string) bool {
 	}
 	seen = map[string]bool{}
 	for _, effect := range content.Effects {
-		if !slices.Contains([]string{"read", "draft", "code", "checks", "connected_write", "settings"}, effect) || seen[effect] {
+		if !slices.Contains([]string{"read", "draft", "code", "checks", "connected_write", "settings", "browser"}, effect) || seen[effect] {
 			return false
 		}
 		seen[effect] = true
 	}
 	return true
 }
+
+// Validate checks a proposal against the frozen selected source identities.
+func (c PlanContent) Validate(sources []string) error {
+	if !validPlanContent(c, sources) {
+		return errors.New("invalid bounded plan content or source scope")
+	}
+	return nil
+}
+
 func (p TaskPlan) contentDigest() string {
 	data, _ := json.Marshal(struct {
 		Version  int
@@ -116,9 +137,16 @@ func validateTaskPlan(r Request) error {
 	if p.Version != 1 || !catalogIdentity.MatchString(p.Binding.ConversationID) || p.Binding.RequestID != r.ID || p.Binding.OptionsSHA256 != optionsHash(r.Options) || p.Binding.PromptSHA256 != planHash([]byte(r.Text)) || (len(p.Binding.SourceSHA256) != 64 || strings.Trim(p.Binding.SourceSHA256, "0123456789abcdef") != "") || len(p.Sources) > 16 || p.Budget.MaxSteps < 0 || p.Budget.MaxSteps > 100000 || p.Budget.CodeMaxSteps < 0 || p.Budget.CodeMaxSteps > 100000 {
 		return errors.New("invalid retained plan binding")
 	}
+	var frozen struct {
+		PlanFirst    bool
+		ConnectorIDs []string
+	}
+	if json.Unmarshal(r.Options, &frozen) != nil || !frozen.PlanFirst || !slices.Equal(p.Sources, frozen.ConnectorIDs) {
+		return errors.New("plan sources or opt-in differ from frozen request")
+	}
 	seen := map[string]bool{}
 	for _, id := range p.Sources {
-		if !catalogIdentity.MatchString(id) || len(id) > 128 || seen[id] {
+		if !planSourceID(id) || seen[id] {
 			return errors.New("invalid plan sources")
 		}
 		seen[id] = true
@@ -176,7 +204,7 @@ func (s Store) AdmitPlanRequest(id, text string, options json.RawMessage, client
 		return j, r, err
 	}
 	r.ClientID = clientID
-	r.Plan = &TaskPlan{Version: 1, Phase: "preparing", Sources: append([]string{}, sources...), Budget: budget, Binding: PlanBinding{ConversationID: id, RequestID: r.ID, HeadRevision: c.HeadRevision, SourceSHA256: planHash([]byte(c.SourcePath)), OptionsSHA256: optionsHash(r.Options), PromptSHA256: planHash([]byte(r.Text))}}
+	r.Plan = &TaskPlan{Version: 1, Phase: "preparing", Sources: append([]string{}, sources...), Budget: budget, Binding: PlanBinding{ConversationID: id, RequestID: r.ID, HeadRevision: c.HeadRevision, SnapshotID: c.SnapshotID, SourceSHA256: planHash([]byte(c.SourcePath)), OptionsSHA256: optionsHash(r.Options), PromptSHA256: planHash([]byte(r.Text))}}
 	j.Requests = append(j.Requests, r)
 	next, err := s.SaveRequests(id, j)
 	return next, r, err
@@ -190,7 +218,7 @@ func (s Store) CheckPlanBinding(id string, r Request) error {
 	if err != nil {
 		return err
 	}
-	if c.HeadRevision != r.Plan.Binding.HeadRevision || planHash([]byte(c.SourcePath)) != r.Plan.Binding.SourceSHA256 {
+	if c.SnapshotID != r.Plan.Binding.SnapshotID || c.HeadRevision != r.Plan.Binding.HeadRevision || planHash([]byte(c.SourcePath)) != r.Plan.Binding.SourceSHA256 {
 		return ErrPlanChanged
 	}
 	return nil
@@ -277,14 +305,17 @@ func (s Store) CancelTaskPlan(id, request string, revision uint64, digest string
 	if r.State == "discarded" {
 		return j, nil
 	}
-	if r.State != "queued" {
+	if r.State != "queued" && r.State != "interrupted" {
 		return j, errors.New("this plan has already dispatched; use Stop to request cancellation")
 	}
+	wasInterrupted := r.State == "interrupted"
 	r.State = "discarded"
 	r.UpdatedAt = time.Now().UTC()
 	p := *r.Plan
 	p.Phase = "interrupted"
-	p.Approval = nil
+	if !wasInterrupted {
+		p.Approval = nil
+	}
 	r.Plan = &p
 	return s.SaveRequests(id, j)
 }

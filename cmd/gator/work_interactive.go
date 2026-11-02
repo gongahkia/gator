@@ -453,6 +453,9 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			defer release()
 			return sessions.OrganizeConversation(change)
 		},
+		PreparePlan: func(ctx context.Context, r worksession.Request) (worksession.PlanContent, error) {
+			return prepareDesktopTaskPlan(ctx, stateDir, r)
+		},
 		ForkConversation: func(parent, revision, run, request string) (worksession.Conversation, error) {
 			release, err := state.Guard(stateDir, false)
 			if err != nil {
@@ -747,6 +750,9 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 	request.InputIDs = append([]string(nil), options.Uploads...)
 	request.Images, request.Attachments, err = loadWorkPromptAttachments(source, options.Attachments, options.Uploads)
 	if err != nil {
+		return workapp.RunResult{Error: err.Error()}
+	}
+	if err := bindDesktopTaskPlan(stateDir, options, &request); err != nil {
 		return workapp.RunResult{Error: err.Error()}
 	}
 	service, err := configuredWorkService(options.ModelProvider, options.ModelName, stateDir, &request)

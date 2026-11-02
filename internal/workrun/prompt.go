@@ -84,6 +84,9 @@ func systemPrompt(request Request) string {
 	if plan := strings.TrimSpace(request.GoalPlanContext); plan != "" {
 		parts = append(parts, "Current goal plan:\nThis is durable, user-reviewable progress data. Do not claim a step is completed merely because the plan proposes it. Prefer current evidence and the user's correction when facts conflict.\n"+plan)
 	}
+	if request.reviewedPlan != nil {
+		parts = append(parts, taskPlanPrompt(request.reviewedPlan))
+	}
 	if extra := strings.TrimSpace(request.System); extra != "" {
 		parts = append(parts, "Additional developer instructions:\n"+extra)
 	}

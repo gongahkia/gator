@@ -59,6 +59,15 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		return Outcome{}, guardErr
 	}
 	defer release()
+	request.reviewedPlan, err = loadReviewedTaskPlan(request)
+	if err != nil {
+		return Outcome{}, err
+	}
+	if request.reviewedPlan != nil {
+		request.Steering = nil
+		request.controlSteering = nil
+		request.controlSteerTask = nil
+	}
 	request.Decision, err = resolveDecision(request)
 	if err != nil {
 		return Outcome{}, err
@@ -193,6 +202,10 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	var inspection *liveInspection
 	if request.EnableControl {
 		inspection = newLiveInspection(request.RunID, request.ConversationID, startedAt, request.controlPending)
+		inspection.planBound = request.TaskPlan != nil
+		if inspection.planBound {
+			inspection.value.Limitations = append(inspection.value.Limitations, "Plan-bound work requires stopping and reviewing a new plan before steering.")
+		}
 		inspection.controls = newRemoteControls(request.StateDir, request.RunID, cancel, request.controlSteerTask, request.controlAnswerTask, request.controlRespond, request.controlInspectTask, request.controlReview)
 		control, steering, err := startWorkControl(ctx, request.StateDir, request.RunID, cancel, request.Steering, request.controlSteering, request.controlRespond, request.controlCancelTask, request.controlSteerTask, request.controlAnswerTask, inspection)
 		if err != nil {
@@ -586,6 +599,8 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		}{change, mutation})
 	}
 	surface = append(surface, applicationTools(e.App, request)...)
+	planSurface := surface
+	surface = filterTaskPlanTools(request, surface)
 	runner := agent.Runner{Model: e.Model, Tools: surface, Now: now}
 	var malformedCallFallback []string
 	if !request.codeEnabled() && !request.externalEditsEnabled() {
@@ -655,7 +670,29 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 			}
 		}
 	}
+	var scopeErr error
+	var beforeTool func(context.Context, agent.ToolCall) error
+	if check := taskPlanToolCheck(request, planSurface); check != nil {
+		scopeCtx, stopScope := context.WithCancel(ctx)
+		defer stopScope()
+		ctx = scopeCtx
+		beforeTool = func(ctx context.Context, call agent.ToolCall) error {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			if scopeErr != nil {
+				return scopeErr
+			}
+			if err := check(ctx, call); err != nil {
+				scopeErr = fmt.Errorf("plan scope changed: %w", err)
+				stopScope()
+				return scopeErr
+			}
+			return nil
+		}
+	}
 	result, runErr := runner.Run(ctx, agent.RunOptions{
+		BeforeTool:            beforeTool,
 		InitialMessages:       initial,
 		Task:                  request.Objective,
 		Images:                request.Images,
@@ -667,6 +704,9 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		CompletionCheck:       check,
 		MalformedCallFallback: malformedCallFallback,
 	})
+	if scopeErr != nil {
+		runErr = scopeErr
+	}
 	closeSpecialists()
 	if directCode != nil {
 		directCode.Close()

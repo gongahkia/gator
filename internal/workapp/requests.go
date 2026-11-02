@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -15,6 +16,9 @@ func (m Model) retainsRequests() bool { return m.config.SessionStore != nil && m
 
 func copyRequests(j worksession.RequestJournal) worksession.RequestJournal {
 	j.Requests = append([]worksession.Request(nil), j.Requests...)
+	for i := range j.Requests {
+		j.Requests[i].Plan = j.Requests[i].Plan.Clone()
+	}
 	return j
 }
 
@@ -72,6 +76,17 @@ func (m *Model) restoreRequests() {
 			r.Issue = "The session ended before completion was confirmed. Check retained work before sending again."
 			changed = true
 		}
+		if r.Plan != nil {
+			if r.State == "interrupted" || r.State == "queued" && r.Plan.Phase == "preparing" {
+				r.Plan = r.Plan.Clone()
+				r.Plan.Phase = "interrupted"
+				r.State = "interrupted"
+				r.UpdatedAt = time.Now().UTC()
+				r.Issue = "Plan preparation or execution ended without a confirmed result. Review retained work and prepare a new plan; it will not replay automatically."
+				changed = true
+			}
+			continue
+		}
 		if !r.Pending() {
 			continue
 		}
@@ -109,6 +124,9 @@ func (m *Model) persistQueue(queue []queuedRun) error {
 	queue = append([]queuedRun(nil), queue...)
 	for i := range queue {
 		q := &queue[i]
+		if prior, ok := byID[q.requestID]; ok && prior.Plan != nil {
+			return errors.New("use the plan review controls for this task")
+		}
 		options, err := json.Marshal(retainedRunOptions(q.options))
 		if err != nil {
 			return err
@@ -127,6 +145,10 @@ func (m *Model) persistQueue(queue []queuedRun) error {
 	}
 	j.Requests = nil
 	for _, r := range m.requests.Requests {
+		if r.Plan != nil {
+			j.Requests = append(j.Requests, r)
+			continue
+		}
 		if r.State == "queued" || r.State == "interrupted" {
 			kept := false
 			for _, q := range queue {
@@ -152,6 +174,9 @@ func (m *Model) persistQueue(queue []queuedRun) error {
 
 func (m *Model) admitRun(prompt string, options RunOptions) (func(), error) {
 	if !m.retainsRequests() {
+		if options.PlanFirst {
+			return nil, errors.New("plan-first execution requires durable request admission")
+		}
 		return func() {}, nil
 	}
 	if m.requestsIssue != "" {
@@ -199,6 +224,32 @@ func (m *Model) admitRun(prompt string, options RunOptions) (func(), error) {
 		index = len(j.Requests) - 1
 		j.Requests[index].ClientID = m.submissionID
 	}
+	retained := &j.Requests[index]
+	var boundOptions RunOptions
+	if json.Unmarshal(retained.Options, &boundOptions) != nil {
+		release()
+		return nil, errors.New("invalid retained request settings")
+	}
+	if retained.Plan != nil || options.PlanFirst || boundOptions.PlanFirst {
+		if prompt != retained.Text {
+			release()
+			return nil, errors.New("reviewed task text changed; prepare a new plan")
+		}
+		if retained.Plan == nil || retained.State != "queued" {
+			release()
+			return nil, worksession.ErrPlanChanged
+		}
+		if err := m.config.SessionStore.CheckPlanDispatch(m.conversation, *retained); err != nil {
+			release()
+			return nil, err
+		}
+		if !reflect.DeepEqual(retainedRunOptions(options), retainedRunOptions(boundOptions)) {
+			release()
+			return nil, errors.New("reviewed task settings changed; prepare a new plan")
+		}
+		retained.Plan = retained.Plan.Clone()
+		retained.Plan.Phase = "dispatching"
+	}
 	consumed := m.nextRequest
 	if j.Requests[index].State == "interrupted" {
 		prior := &j.Requests[index]
@@ -244,6 +295,14 @@ func (m *Model) finishRequest(value runDone, stopped bool) {
 		}
 		if stopped {
 			r.State = "stopped"
+		}
+		if r.Plan != nil {
+			r.Plan = r.Plan.Clone()
+			if r.Plan.Approval != nil {
+				r.Plan.Phase = "finished"
+			} else {
+				r.Plan.Phase = "interrupted"
+			}
 		}
 		r.WorkID, r.RevisionID = m.lastWorkID, value.RevisionID
 		r.UpdatedAt = time.Now().UTC()

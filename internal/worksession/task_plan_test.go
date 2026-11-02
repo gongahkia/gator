@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -11,7 +12,7 @@ import (
 func planFixture(t *testing.T) (Store, string, Request) {
 	t.Helper()
 	s, id, _ := requestTestStore(t)
-	_, r, err := s.AdmitPlanRequest(id, "Implement the parser", json.RawMessage(`{"PlanFirst":true,"MaxSteps":24}`), "plan-client-1", []string{"docs"}, PlanBudget{MaxSteps: 24, CodeMaxSteps: 16}, time.Now())
+	_, r, err := s.AdmitPlanRequest(id, "Implement the parser", json.RawMessage(`{"PlanFirst":true,"MaxSteps":24,"Code":{"MaxSteps":16},"ConnectorIDs":["docs"]}`), "plan-client-1", []string{"docs"}, PlanBudget{MaxSteps: 24, CodeMaxSteps: 16}, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,5 +150,55 @@ func TestTaskPlanScopeAndPayloadFailClosed(t *testing.T) {
 	j.Requests[0].Plan.Content.Outcome = "tampered"
 	if _, err := s.SaveRequests(id, j); err == nil {
 		t.Fatal("tampered reviewed content retained")
+	}
+}
+
+func TestTaskPlanConcurrentApprovalAdmitsOnceAndRetainsReceiptAfterCompletion(t *testing.T) {
+	s, id, r := planFixture(t)
+	j, err := s.ReviseTaskPlan(id, r.ID, 0, "", proposedPlan())
+	if err != nil {
+		t.Fatal(err)
+	}
+	r = j.Requests[0]
+	var wg sync.WaitGroup
+	changed := make(chan bool, 8)
+	failures := make(chan error, 8)
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, fresh, err := s.ApproveTaskPlan(id, r.ID, r.Plan.Revision, r.Plan.Digest)
+			if err != nil && !errors.Is(err, ErrRequestsChanged) {
+				failures <- err
+			}
+			changed <- fresh
+		}()
+	}
+	wg.Wait()
+	close(changed)
+	close(failures)
+	for err := range failures {
+		t.Fatal(err)
+	}
+	count := 0
+	for fresh := range changed {
+		if fresh {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatal("approval was admitted multiple times", count)
+	}
+	j, _ = s.LoadRequests(id)
+	j.Requests[0].State = "completed"
+	j.Requests[0].Plan.Phase = "finished"
+	if _, err = s.SaveRequests(id, j); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.AddRevision(id, Revision{ID: "completed-new-head", SnapshotID: "snap-new", Objective: "Completed reviewed work", FinalText: "Done", BundlePath: "/bundle/completed", Status: "completed"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, fresh, err := s.ApproveTaskPlan(id, r.ID, r.Plan.Revision, r.Plan.Digest); err != nil || fresh {
+		t.Fatal("reconciliation reauthorized completed work", err)
 	}
 }

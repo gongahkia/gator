@@ -147,6 +147,10 @@ func startWorkControl(ctx context.Context, stateDir, runID string, cancel contex
 			http.Error(writer, "method", http.StatusMethodNotAllowed)
 			return
 		}
+		if len(inspection) == 1 && inspection[0] != nil && inspection[0].planBound {
+			http.Error(writer, "stop and review a new plan before steering this work", http.StatusConflict)
+			return
+		}
 		body, err := io.ReadAll(io.LimitReader(request.Body, maxWorkSteeringBytes+1))
 		if err != nil || !validWorkSteering(string(body)) {
 			http.Error(writer, "invalid steering text", http.StatusBadRequest)

@@ -80,6 +80,7 @@ func PolicyDigest(request Request) (string, error) {
 
 func effectiveConfiguration(request Request) any {
 	return struct {
+		TaskPlan             *TaskPlanReference `json:",omitempty"`
 		Contract             artifact.Contract
 		Mode                 action.Mode
 		Code                 CodePolicy
@@ -113,7 +114,7 @@ func effectiveConfiguration(request Request) any {
 		MaintainMemory       bool              `json:",omitempty"`
 		DisableChatHistory   bool              `json:",omitempty"`
 		ExternalAgents       []cliagent.Config `json:",omitempty"`
-	}{request.Contract, request.Mode, request.Code, request.ConnectorIDs, request.OAuthRefreshPins, request.OAuthAccountPins, request.ConnectorPermissions, request.WebOrigins, request.IgnoredInstructionPaths, request.Limits, request.MaxSteps, request.Provider, request.GoalContext, request.GoalPlanContext, request.GoalID, request.MemoryContext, request.NoteContext, request.RoleConfiguration, func() string {
+	}{request.TaskPlan, request.Contract, request.Mode, request.Code, request.ConnectorIDs, request.OAuthRefreshPins, request.OAuthAccountPins, request.ConnectorPermissions, request.WebOrigins, request.IgnoredInstructionPaths, request.Limits, request.MaxSteps, request.Provider, request.GoalContext, request.GoalPlanContext, request.GoalID, request.MemoryContext, request.NoteContext, request.RoleConfiguration, func() string {
 		if request.Project != nil {
 			return request.Project.SHA256
 		}
@@ -144,6 +145,7 @@ type Completion struct {
 	Err     error
 }
 type Operation struct {
+	planBound    bool
 	RunID        string
 	tasks        *orchestrator.Supervisor
 	Events       <-chan agent.Event
@@ -165,6 +167,9 @@ type pendingInteraction struct {
 
 func (o *Operation) Cancel() { o.cancel() }
 func (o *Operation) Steer(text string) error {
+	if o.planBound {
+		return errors.New("stop and review a new plan before steering this work")
+	}
 	if text == "" || len(text) > 64*1024 {
 		return errors.New("invalid steering text")
 	}
@@ -236,7 +241,7 @@ func (s Service) Start(ctx context.Context, request Request) *Operation {
 	events := make(chan agent.Event, 128)
 	interactions := make(chan Interaction, 8)
 	done := make(chan Completion, 1)
-	o := &Operation{RunID: request.RunID, Events: events, Interactions: interactions, Done: done, cancel: cancel, steering: make(chan string, 16), pending: map[int]pendingInteraction{}, stopped: ctx.Done()}
+	o := &Operation{planBound: request.TaskPlan != nil, RunID: request.RunID, Events: events, Interactions: interactions, Done: done, cancel: cancel, steering: make(chan string, 16), pending: map[int]pendingInteraction{}, stopped: ctx.Done()}
 	var lockOnce sync.Once
 	var liveLock *os.File
 	var lockErr error
@@ -378,6 +383,9 @@ func (o *Operation) CancelTask(id string) error {
 }
 
 func (o *Operation) SteerTask(id, instruction string) error {
+	if o.planBound {
+		return errors.New("stop and review a new plan before steering this specialist")
+	}
 	o.mu.Lock()
 	tasks := o.tasks
 	o.mu.Unlock()
