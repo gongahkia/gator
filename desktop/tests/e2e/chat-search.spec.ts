@@ -20,6 +20,9 @@ test("dated chat search highlights literal matches and opens the intended topic 
   const app = await launchDesktop({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env: { ...process.env, GATOR_STATE_DIR: join(directory, "state"), GATOR_CONFIG_DIR: join(directory, "config"), GATOR_DESKTOP_USER_DATA: join(directory, "desktop"), GATOR_DESKTOP_WORKSPACE: workspace } });
   try {
     const page = await app.firstWindow();
+    if (process.env.GATOR_E2E_BACKGROUND === "1" && process.platform !== "linux") {
+      expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().every(window => !window.isFocusable()))).toBe(true);
+    }
     const recent = page.getByRole("region", { name: "Recent conversations", exact: true });
     await expect(recent.getByRole("heading", { name: "Today", exact: true })).toBeVisible();
     await expect(recent.getByRole("heading", { name: "Yesterday", exact: true })).toBeVisible();

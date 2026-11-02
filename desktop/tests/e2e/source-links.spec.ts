@@ -166,7 +166,9 @@ test("late citation responses cannot overwrite a newer selected source",async()=
   await expect(sidebar).toContainText("New B excerpt");await expect(sidebar).not.toContainText("Late A");
   await page.getByRole("button",{name:"Close source preview",exact:true}).click();
   await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setSize(800,650));await page.emulateMedia({reducedMotion:"reduce"});
-  await second.focus();await expect(page.getByRole("region",{name:"Source excerpt",exact:true})).toContainText("New B excerpt");
+  // Resize dismisses the excerpt while preserving focus. Leave and re-enter
+  // the chip, as a keyboard user would; focusing an already focused node is a no-op.
+  await composer.focus();await second.focus();await expect(page.getByRole("region",{name:"Source excerpt",exact:true})).toContainText("New B excerpt");
   await page.screenshot({path:"test-results/citation-excerpt-narrow.png"});
  } finally {await f.close();}
 });

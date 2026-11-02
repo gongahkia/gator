@@ -53,6 +53,8 @@ test("new-chat branch preserves the exact saved boundary, sources, ancestry and 
  await expect(page.getByRole("textbox",{name:"Message Gator",exact:true})).toHaveValue("Child draft only");
  expect(f.calls()).toBe(4);
  await page.setViewportSize({width:820,height:740});await page.emulateMedia({reducedMotion:"reduce",colorScheme:"light"});
+ await page.evaluate(()=>window.gator!.send({type:"submit",text:"/theme light"}));
+ await expect(page.locator(".app-shell")).toHaveAttribute("data-theme","light");
  await page.getByRole("article",{name:"Gator message",exact:true}).getByRole("button",{name:"Response actions",exact:true}).click();
  await page.getByRole("menuitem",{name:"Branch in new chat",exact:true}).click();
  const box=await page.getByRole("dialog",{name:"Branch in new chat",exact:true}).boundingBox();expect(box!.x).toBeGreaterThanOrEqual(0);expect(box!.x+box!.width).toBeLessThanOrEqual(820);
@@ -112,7 +114,7 @@ test("branching from an older answer leaves the actual parent worker running",as
  release();await expect.poll(()=>f.calls()).toBe(4);
  await page.getByRole("button",{name:"Open original chat",exact:true}).click();
  await expect(page.getByText(answerTwo,{exact:true})).toBeVisible();
- expect((await page.evaluate(()=>window.gator!.snapshot())).state!.running).toBe(false);
+ await expect.poll(async()=>{const snapshot=await page.evaluate(()=>window.gator!.snapshot());return snapshot.state?.conversation_id===parent&&!snapshot.state.running&&!snapshot.sessionSwitching;}).toBe(true);
  expect(f.calls()).toBe(4);
  }finally{release();await f.close();}
 });

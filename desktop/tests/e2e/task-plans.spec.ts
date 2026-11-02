@@ -67,6 +67,8 @@ test("an undispatched plan survives restart for explicit review and can be cance
  await closeDesktop(app);app=await fixture.launch();page=await app.firstWindow();
  await expect(page.getByRole("button",{name:"Review plan",exact:true})).toBeVisible();
  expect((await page.evaluate(()=>window.gator!.snapshot())).state?.conversation_id).toBe(before.conversation_id);expect(fixture.calls()).toBe(1);
+ await page.evaluate(()=>window.gator!.send({type:"submit",text:"/theme light"}));
+ await expect(page.locator(".app-shell")).toHaveAttribute("data-theme","light");
  await page.getByRole("button",{name:"Review plan",exact:true}).click();
  let review=page.getByRole("dialog",{name:"Review task plan",exact:true});
  await expect(review.getByRole("button",{name:"Approve plan & start",exact:true})).toBeEnabled();

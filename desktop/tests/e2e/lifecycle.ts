@@ -14,7 +14,11 @@ export async function launchDesktop(options: Parameters<typeof electron.launch>[
   const application = await electron.launch(options);
   applicationProcesses.set(application, application.process());
   if (process.env.GATOR_E2E_BACKGROUND === "1" && !process.env.GATOR_LIVE_UI_ENDPOINT && process.platform !== "linux") {
-    await application.evaluate(({ BrowserWindow }) => {
+    await application.evaluate(({ app, BrowserWindow }) => {
+      // launch() can return before the asynchronous backend is ready and its
+      // first window exists. Cover future windows too, so an operator's real
+      // keyboard input cannot enter a late-created fixture window.
+      app.on("browser-window-created", (_event, window) => { window.setFocusable(false); window.blur(); });
       for (const window of BrowserWindow.getAllWindows()) { window.setFocusable(false); window.blur(); }
     });
   }
