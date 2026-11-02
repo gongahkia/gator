@@ -382,6 +382,9 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 	if responseIndex < len(m.messages) {
 		m.messages[responseIndex].activity = activity
 		m.messages[responseIndex].runID = value.WorkID
+		if value.Error == "" {
+			m.messages[responseIndex].revisionID = value.RevisionID
+		}
 	}
 	m.refreshChatMemories()
 	m.refreshActionRecoveries()

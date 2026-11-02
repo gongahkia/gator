@@ -16,6 +16,7 @@ import (
 )
 
 type uiFrame struct {
+	Branch        *workapp.BranchAction             `json:"branch,omitempty"`
 	Receipt       *workapp.ReceiptAction            `json:"receipt,omitempty"`
 	Memory        *workapp.ChatMemoryAction         `json:"memory,omitempty"`
 	Update        *workapp.BridgeUpdateAction       `json:"update,omitempty"`
@@ -127,6 +128,10 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 		case "receipt":
 			if frame.Receipt != nil {
 				next, command = m.model.ApplyReceiptAction(*frame.Receipt)
+			}
+		case "branch":
+			if frame.Branch != nil {
+				next, command = m.model.BranchConversation(*frame.Branch)
 			}
 		case "sources":
 			if frame.Sources != nil {

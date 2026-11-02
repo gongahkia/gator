@@ -22,6 +22,7 @@ import (
 // An owner that disappears leaves an interrupted request for explicit review;
 // reading this journal never starts work.
 type Request struct {
+	Plan       *TaskPlan       `json:"plan,omitempty"`
 	ID         string          `json:"id"`
 	ClientID   string          `json:"client_id,omitempty"`
 	RetryOf    string          `json:"retry_of,omitempty"`
@@ -65,6 +66,9 @@ func (r Request) Pending() bool {
 }
 
 func validateRequest(r Request) error {
+	if err := validateTaskPlan(r); err != nil {
+		return err
+	}
 	if r.RetryOf != "" {
 		id, err := hex.DecodeString(r.RetryOf)
 		if err != nil || len(id) != 16 || r.RetryOf == r.ID {

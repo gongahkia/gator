@@ -21,6 +21,7 @@ export type BackendResult = {
 export type ActionReceipt = { Steps?: {Operation: string; Target: string; Status: string; ProviderResourceID?: string}[] | null; ID: string; ConnectorID: string; Operation: string; Target: string; Status: string; Recipient?: string; Subject?: string; Error?: string; CorrelationID?: string; ReceiptID?: string; ProviderResourceID?: string };
 export type ReceiptCheck = {status: "not_checked" | "found" | "ambiguous" | "unconfirmed"; provider_id?: string; checked_at?: string};
 export type BackendBundle = {
+ InheritedOrigin?: {revision_id:string; conversation_id:string; source_revision_id:string; sha256:string; run_id:string};
   Actions?: ActionReceipt[] | null; ActionsTruncated?: boolean; ManifestSHA256?: string;
   Path: string;
   Status: string;
@@ -40,7 +41,7 @@ export type BackendCommand = { name: string; description: string; advanced: bool
 export type ActivityDetail = {kind: "searched" | "fetched" | "read_file" | "read_code" | "changed_file" | "command" | "candidate"; path?: string; domain?: string; evidence_id?: string; candidate_id?: string; status?: "verified" | "failed" | "rejected"; exit_code?: number; timed_out?: boolean};
 export type ActivityEntry = { id: string; kind: "text" | "tool" | "status"; details?: ActivityDetail[]; partial?: boolean; text?: string; tool?: string; state: "running" | "waiting" | "completed" | "failed" | "stopped"; started_at: string; finished_at?: string };
 export type BackendActivity = { started_at: string; finished_at?: string; state: "running" | "completed" | "failed" | "stopped"; entries: ActivityEntry[]; truncated?: boolean };
-export type BackendMessage = { run_id?: string; created_at?: string; reply_to_update_id?: string; activity?: BackendActivity; inputs?: string[]; input_ids?: string[]; role: string; text: string; bundle?: BackendBundle; result?: BackendResult };
+export type BackendMessage = { revision_id?: string; run_id?: string; created_at?: string; reply_to_update_id?: string; activity?: BackendActivity; inputs?: string[]; input_ids?: string[]; role: string; text: string; bundle?: BackendBundle; result?: BackendResult };
 export type QueuedMessage = { reply_to_update_id?: string; id: string; text: string; inputs?: string[]; interrupted?: boolean };
 export type QueueAction = {
   request_id: string; id: string; action: "edit" | "remove" | "earlier" | "later" | "move" | "run" | "guide"; text?: string;
@@ -98,7 +99,11 @@ export type ComposerAction = { id: string; request_id: string } & ({ action: "mo
 export type ChatUpdate = { can_rate: boolean; rating?: "useful" | "noise" | "wrong"; rating_version: number; next_step?: string; evidence?: string[]; id: string; title: string; summary: string; status: string; job_id?: string; goal_id?: string; created_at: string; delivered: boolean; read: boolean; resolved: boolean; version: number };
 export type ChatMemoryReceipt = {id: string; run_id: string; text: string; quote?: string; updated: string; scope: string; corrected?: boolean; can_undo?: boolean};
 export type ChatMemoryAction = {conversation_id: string; id: string; updated: string; action: "correct"|"forget"|"undo"; text?: string; request_id: string};
+export type BranchAction = {conversation_id:string; revision_id:string; run_id:string; request_id:string};
+export type BranchResult = {request_id:string; conversation_id?:string; error?:string};
 export type BackendState = {
+ branch?: {conversation_id:string; revision_id:string};
+ branch_result?: BranchResult;
 	 catalog_busy?: boolean;
   action_recoveries?: {id: string; run_id: string; at: string; live: boolean; receipt: ActionReceipt}[]; action_recovery_issue?: string; action_recovery_truncated?: boolean;
   receipt_busy?: boolean; receipt_result?: {request_id: string; check?: ReceiptCheck; error?: string};
@@ -174,12 +179,13 @@ export type PanelAction = {
 };
 export type Frame = {
   version: 1;
-  type: "receipt" | "memory" | "update" | "submit" | "upload_submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "conversation" | "composer" | "sources";
+  type: "receipt" | "memory" | "update" | "submit" | "upload_submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "conversation" | "composer" | "sources" | "branch";
   memory?: ChatMemoryAction;
   receipt?: {conversation_id: string; run_id: string; action_id: string; correlation_id: string; manifest_sha256: string; action: "inspect" | "check_sent"; request_id: string};
   update?: { conversation_id: string; id: string; action: "delivered" | "read" | "resolve" | "reopen" | "older" | "newer" | "rate"; version: number; rating?: "useful" | "noise" | "wrong" | "clear"; rating_version?: number; request_id?: string };
   upload?: { request_id: string; context: string; text: string; files: string[]; reply_to_update_id?: string };
   text?: string; key?: string; error?: string; width?: number; height?: number;
+  branch?: BranchAction;
   sources?: SourceAction;
   composer?: ComposerAction;
   panel?: PanelAction; interaction_id?: number; approval_token?: string; approved?: boolean;

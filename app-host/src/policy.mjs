@@ -31,6 +31,7 @@ export function validateFrame(frame) {
     queue: ["type", "queue"],
     composer: ["type", "composer"],
     sources: ["type", "sources"],
+    branch: ["type", "branch"],
     conversation: ["type", "conversation"],
     upload_submit: ["type", "upload"],
     update: ["type", "update"],
@@ -67,6 +68,10 @@ export function validateFrame(frame) {
     if (!["edit", "remove", "earlier", "later", "move", "run", "guide"].includes(queue.action)) throw new Error("Invalid queue action");
     if (queue.action === "move" ? typeof queue.target_id !== "string" || !/^[a-f0-9]{64}$/.test(queue.target_id) || !["before", "after"].includes(queue.placement) : queue.target_id !== undefined || queue.placement !== undefined) throw new Error("Invalid queue destination");
     if (["edit", "guide"].includes(queue.action) ? typeof queue.text !== "string" || !queue.text.trim() || Buffer.byteLength(queue.text, "utf8") > (queue.action === "guide" ? 64 : 128) * 1024 : queue.text !== undefined) throw new Error("Invalid queued message");
+  }
+  if (frame.type === "branch") {
+    const v=frame.branch;
+    if(!v || typeof v!=="object" || Array.isArray(v) || Object.keys(v).some(key=>!["conversation_id","revision_id","run_id","request_id"].includes(key)) || ["conversation_id","revision_id","run_id"].some(key=>typeof v[key]!=="string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/.test(v[key])) || typeof v.request_id!=="string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{15,63}$/.test(v.request_id)) throw new Error("Invalid branch boundary");
   }
   if (frame.type === "sources") {
     const v = frame.sources;

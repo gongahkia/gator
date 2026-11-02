@@ -107,3 +107,18 @@ test("normalized fetched preview is identified separately from exact raw-byte re
  const result=await f.read({...f.request,path:"evidence:html-one",start:1,end:1});
  assert.equal(result.observed_preview,"Actual fetched content.");assert.deepEqual(result.reads,[]);assert.match(result.notice,/normalized preview/);
 }));
+
+test("inherited sources use only host-bound original provenance and cannot invent read ranges",()=>fixture(async f=>{
+ const bundle=f.state.messages[0].bundle;
+ bundle.InheritedOrigin={conversation_id:"chat-one",source_revision_id:"rev-one",revision_id:"rev-child",run_id:"run-one",sha256:hash(JSON.stringify(f.revision))};
+ f.state.conversation_id="chat-child";
+ const request={...f.request,context:"conversation:chat-child"};
+ const read=()=>sourcePreview(request,{stateRoot:f.root,state:f.state});
+ assert.deepEqual((await read()).reads,[{start:2,end:3,truncated:false}]);
+ bundle.InheritedOrigin.source_revision_id="rev-other";
+ assert.deepEqual((await read()).reads,[]);
+ bundle.InheritedOrigin.source_revision_id="rev-one";
+ await writeFile(join(f.revisions,"rev-one.json"),JSON.stringify({...f.revision,replay:{messages:[]}}));
+ assert.deepEqual((await read()).reads,[]);
+ assert.equal((await read()).text,f.text);
+}));

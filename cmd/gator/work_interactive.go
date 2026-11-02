@@ -453,6 +453,14 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			defer release()
 			return sessions.OrganizeConversation(change)
 		},
+		ForkConversation: func(parent, revision, run, request string) (worksession.Conversation, error) {
+			release, err := state.Guard(stateDir, false)
+			if err != nil {
+				return worksession.Conversation{}, err
+			}
+			defer release()
+			return sessions.ForkChatOnce(parent, revision, run, request, time.Now())
+		},
 		LoadConversation: func(conversationID string) (workapp.ConversationState, error) {
 			restored, err := loadWorkTUIConversation(sessions, conversationID)
 			if err != nil {
@@ -1259,6 +1267,13 @@ func loadWorkTUIConversation(store worksession.Store, conversationID string) (wo
 		RevisionID: conversation.HeadRevision,
 		SnapshotID: conversation.SnapshotID,
 	}
+	info, branchErr := store.Branch(conversationID)
+	if branchErr != nil {
+		return workapp.ConversationState{}, branchErr
+	}
+	if info != nil {
+		state.Branch = &workapp.BranchLink{ConversationID: info.ParentConversationID, RevisionID: info.ParentRevisionID}
+	}
 	if conversation.HeadRevision == "" {
 		return state, nil
 	}
@@ -1275,7 +1290,12 @@ func loadWorkTUIConversation(store worksession.Store, conversationID string) (wo
 		state.Messages = append(state.Messages, workapp.TranscriptMessage{CreatedAt: started, ReplyToUpdateID: revision.ReplyToUpdateID, Role: "You", Text: revision.Objective, InputIDs: append([]string(nil), revision.InputIDs...), Inputs: append([]string(nil), revision.InputNames...)})
 		activity := revision.Activity.Clone()
 		if strings.TrimSpace(revision.FinalText) != "" {
-			state.Messages = append(state.Messages, workapp.TranscriptMessage{RunID: filepath.Base(revision.BundlePath), Activity: activity, Role: "Gator", Text: revision.FinalText})
+			state.Messages = append(state.Messages, workapp.TranscriptMessage{RevisionID: func() string {
+				if revision.Status == "completed" {
+					return revision.ID
+				}
+				return ""
+			}(), RunID: filepath.Base(revision.BundlePath), Activity: activity, Role: "Gator", Text: revision.FinalText})
 		} else if revision.Status != string(artifact.Completed) {
 			state.Messages = append(state.Messages, workapp.TranscriptMessage{
 				RunID: filepath.Base(revision.BundlePath), Activity: activity, Role: "Gator", Text: "This retained Work revision ended with status " + revision.Status + ".",
@@ -1289,6 +1309,17 @@ func loadWorkTUIConversation(store worksession.Store, conversationID string) (wo
 				Role: "Gator", Text: "The retained deliverables for revision " + revision.ID + " cannot be displayed: " + bundleErr.Error(),
 			})
 			continue
+		}
+		if info != nil {
+			for _, origin := range info.Revisions {
+				if origin.RevisionID == revision.ID && origin.RunID == bundle.RunID {
+					copy := origin
+					bundle.InheritedOrigin = &copy
+					bundle.Actions = nil
+					bundle.ActionsTruncated = false
+					break
+				}
+			}
 		}
 		state.Messages = append(state.Messages, workapp.TranscriptMessage{Role: "Deliverables", Bundle: &bundle})
 		if revision.ID == conversation.HeadRevision {

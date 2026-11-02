@@ -13,16 +13,16 @@ export const codingTests = 'const { strict: assert } = require("node:assert");\n
 export function codingPatch(before: string, after: string) { return `diff --git a/normalize.cjs b/normalize.cjs\n--- a/normalize.cjs\n+++ b/normalize.cjs\n@@ -1 +1 @@\n-${before.trimEnd()}\n+${after.trimEnd()}\n`; }
 export type FixtureRequest = { messages: { role: string; content?: string; tool_calls?: { id: string; function: {name: string; arguments: string} }[] }[]; tools?: {function:{name:string}}[] };
 export function fixtureTool(name: string, args: unknown, content?: string) { return { role: "assistant", ...(content ? {content} : {}), tool_calls: [{ id: `call-${name}`, type: "function", function: { name, arguments: JSON.stringify(args) } }] }; }
-export async function codingFixture(respond?: (body: FixtureRequest) => object) {
+export async function codingFixture(respond?: (body: FixtureRequest) => object | Promise<object>) {
  const root = await temporaryDirectory(join(tmpdir(), "gator-coding-ui-")), workspace = join(root,"workspace"), config = join(root,"config/gator");
  await mkdir(workspace); await mkdir(config,{recursive:true});
  await writeFile(join(workspace,"package.json"),JSON.stringify({name:"disposable-gator-coding-fixture",private:true,scripts:{test:"node verify.cjs"}}));
  await writeFile(join(workspace,"normalize.cjs"),codingBase);await writeFile(join(workspace,"verify.cjs"),codingTests);
  let calls = 0;
  const server = createServer((request,response)=>{
-  let text="";request.on("data",chunk=>text+=chunk);request.on("end",()=>{
+  let text="";request.on("data",chunk=>text+=chunk);request.on("end",async()=>{
    calls++;const body=JSON.parse(text) as FixtureRequest;
-   try {const message=respond!(body);response.writeHead(200,{"Content-Type":"application/json"});response.end(JSON.stringify({choices:[{message,finish_reason:"tool_calls" in message?"tool_calls":"stop"}],usage:{prompt_tokens:20,completion_tokens:20}}));}
+   try {const message=await respond!(body);response.writeHead(200,{"Content-Type":"application/json"});response.end(JSON.stringify({choices:[{message,finish_reason:"tool_calls" in message?"tool_calls":"stop"}],usage:{prompt_tokens:20,completion_tokens:20}}));}
    catch (error) {response.writeHead(500);response.end(JSON.stringify({error:{message:String(error).slice(0,4000)}}));}
   });
  });

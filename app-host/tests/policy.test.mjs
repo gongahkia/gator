@@ -104,3 +104,9 @@ test("source selection accepts only finite source IDs and no renderer authority"
  assert.doesNotThrow(()=>validateFrame({type:"sources",sources:{...value,ids:[]}}));
  assert.throws(()=>validateFrame({type:"sources",sources:{...value,action:"refresh"}}));
 });
+
+test("branch creation accepts exact durable references but no replay or execution authority",()=>{
+ const branch={conversation_id:"work-parent",revision_id:"rev-saved",run_id:"run-saved",request_id:"branch-request-123456"};
+ assert.equal(validateFrame({type:"branch",branch}).version,1);
+ for(const change of [{conversation_id:"../private"},{revision_id:""},{request_id:"short"},{worker:"other"},{replay:[]},{approved:true},{grants:["inspect"]},{bundle_path:"/private"}]) assert.throws(()=>validateFrame({type:"branch",branch:{...branch,...change}}));
+});

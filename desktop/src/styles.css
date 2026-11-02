@@ -1172,3 +1172,19 @@ button.activity-source-chip, button.activity-file-chip { color: var(--color-link
 .activity-file-chip { font-family: var(--font-mono); }
 .activity-details [data-tone="warning"] { color: var(--color-warning); }
 .activity-tool-list li .activity-details, .activity-tool-list li > .activity-note { grid-column: 2 / -1; }
+.response-menu { position: fixed; z-index: 40; padding: 7px; border-radius: var(--radius-md); background: var(--color-raised); box-shadow: 0 0 0 1px var(--color-outline), 0 12px 32px var(--shadow-strong); }
+.response-menu > button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 42px; padding: 9px 12px; text-align: left; border-radius: var(--radius-sm); font-size: var(--text-sm); }
+.response-menu > button:hover:not(:disabled) { background: var(--color-surface); }
+.response-menu > small { display: block; padding: 8px 12px; color: var(--color-muted); }
+.branch-dialog { width: min(540px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow-y: auto; padding: 24px; border-radius: var(--radius-lg); background: var(--color-raised); box-shadow: 0 0 0 1px var(--color-outline), 0 20px 60px var(--shadow-strong); }
+.branch-dialog header, .branch-dialog h2, .branch-dialog footer, .branch-ancestry { display: flex; align-items: center; gap: 10px; }
+.branch-dialog header, .branch-dialog footer { justify-content: space-between; }
+.branch-dialog h2 { font-size: var(--text-lg); margin: 0; text-wrap: balance; }
+.branch-dialog p, .branch-dialog dl, .branch-dialog blockquote { font-size: var(--text-sm); line-height: 1.7; overflow-wrap: anywhere; }
+.branch-dialog p, .branch-dialog dt { color: var(--color-muted); }
+.branch-dialog blockquote { margin: 16px 0; padding-left: 12px; border-left: 2px solid var(--color-line); white-space: pre-wrap; }
+.branch-dialog dd { margin: 0; font-family: var(--font-mono); font-size: var(--text-xs); }
+.branch-ancestry { padding: 8px 20px; font-size: var(--text-xs); color: var(--color-muted); flex-wrap: wrap; }
+.branch-ancestry > svg { width: 15px; }
+.message-actions { flex-wrap: wrap; }
+.branch-backdrop { z-index: 45; align-items: center; padding: 16px; }

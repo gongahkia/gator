@@ -69,6 +69,7 @@ func (m *Model) beginChat(source string) bool {
 		m.title = conversation.Title
 	}
 	m.section, m.paletteQuery, m.launcherMode = "", "", ""
+	m.branchLink = nil
 	m.revision, m.snapshot = "", ""
 	m.clearPromptHistory()
 	m.messages, m.activity, m.queue = nil, nil, nil
@@ -138,6 +139,7 @@ func (m *Model) applyConversationState(conversationID string, state Conversation
 	if strings.TrimSpace(state.SourcePath) != "" {
 		m.source = state.SourcePath
 	}
+	m.branchLink = state.Branch
 	m.revision = state.RevisionID
 	m.snapshot = state.SnapshotID
 	m.lastOutput = state.OutputPath
@@ -145,7 +147,7 @@ func (m *Model) applyConversationState(conversationID string, state Conversation
 	m.messages = make([]message, 0, len(state.Messages))
 	for _, item := range state.Messages {
 		m.messages = append(m.messages, message{
-			runID: item.RunID, createdAt: item.CreatedAt, replyToUpdateID: item.ReplyToUpdateID,
+			revisionID: item.RevisionID, runID: item.RunID, createdAt: item.CreatedAt, replyToUpdateID: item.ReplyToUpdateID,
 			inputIDs: append([]string(nil), item.InputIDs...), inputs: append([]string(nil), item.Inputs...), activity: item.Activity.Clone(), role: item.Role, text: item.Text, bundle: cloneBundlePointer(item.Bundle),
 		})
 	}

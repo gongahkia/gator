@@ -45,6 +45,7 @@ type RunResult struct {
 // BundleSummary is the display-safe, verified projection of a retained Work
 // bundle. The application never trusts model prose to describe produced files.
 type BundleSummary struct {
+	InheritedOrigin  *worksession.InheritedRevision `json:",omitempty"`
 	Actions          []ActionReceipt
 	ActionsTruncated bool
 	ManifestSHA256   string
@@ -87,6 +88,7 @@ type CandidateSummary struct {
 // prose, so historical artifact cards retain the same trust boundary as new
 // cards produced in this application session.
 type TranscriptMessage struct {
+	RevisionID      string
 	RunID           string
 	CreatedAt       time.Time
 	ReplyToUpdateID string
@@ -102,6 +104,7 @@ type TranscriptMessage struct {
 // conversation revision. Messages must contain only the selected head's
 // ancestry; sibling revisions belong to other retained branches.
 type ConversationState struct {
+	Branch     *BranchLink
 	Title      string
 	SourcePath string
 	RevisionID string
@@ -174,6 +177,7 @@ type ModelStatus struct {
 type GoalState struct{ Title, SourcePath, ConversationID string }
 
 type Config struct {
+	ForkConversation         func(parent, revision, run, request string) (worksession.Conversation, error)
 	ComposerSources          func() ([]ComposerSource, error)
 	SelectComposerSources    func(string, []string, []string) error
 	SaveConnections          func(string, []string) error
@@ -304,6 +308,7 @@ type entry struct {
 	advanced                                   bool
 }
 type message struct {
+	revisionID      string
 	runID           string
 	createdAt       time.Time
 	replyToUpdateID string
@@ -433,6 +438,8 @@ type Model struct {
 	composerResult         *ComposerResult
 	sourceChoices          []ComposerSource
 	sourcesIssue           string
+	branchResult           *BranchResult
+	branchLink             *BranchLink
 	sourcesResult          *ComposerResult
 	bridgeNotice           string
 	bridgeUploadResult     *BridgeUploadResult

@@ -6,12 +6,11 @@ import { shortcutLabel } from "./shortcuts";
 import { localRecording } from "./localAudio";
 import { DictationWaveform } from "./DictationWaveform";
 
-export function spokenText(text: string) {
-  return text.replace(/```[\s\S]*?```/g, " Code block omitted. ").replace(/!\[[^\]]*\]\([^)]*\)/g, "").replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/[`#*>_]/g, " ").trim().slice(0, 12000);
-}
+import type { LocalSpeech } from "./useLocalSpeech";
+export { spokenText } from "./useLocalSpeech";
 
 type Phase = "idle" | "authorizing" | "recording" | "transcribing";
-type Props = { context?: string; speakingContext: string; disabled: boolean; preferences?: VoicePreferences; messages: BackendMessage[]; running: boolean; shortcuts?: Record<string, string>; onTranscript(text: string): void; onBusyChange(busy: boolean): void };
+type Props = { speech: LocalSpeech; context?: string; speakingContext: string; disabled: boolean; preferences?: VoicePreferences; messages: BackendMessage[]; running: boolean; shortcuts?: Record<string, string>; onTranscript(text: string): void; onBusyChange(busy: boolean): void };
 
 export function VoiceControls(props: Props) {
   const [open, setOpen] = useState(false);
@@ -20,13 +19,13 @@ export function VoiceControls(props: Props) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const voices=props.speech.voices;
   const [seconds, setSeconds] = useState(0);
   const [issue, setIssue] = useState("");
   const [announcement, setAnnouncement] = useState("");
-  const [speaking, setSpeaking] = useState(false);
+  const speaking=!!props.speech.active;
   const root = useRef<HTMLDivElement>(null);
-  const epoch = useRef(0), speechEpoch = useRef(0);
+  const epoch = useRef(0);
   const owner = useRef(props); owner.current = props;
   const recorder = useRef<MediaRecorder | undefined>(undefined);
   const stream = useRef<MediaStream | undefined>(undefined);
@@ -35,13 +34,7 @@ export function VoiceControls(props: Props) {
   const preferences: VoicePreferences = props.preferences ?? status?.preferences ?? { spoken_replies: false };
   const focusTrigger = () => requestAnimationFrame(() => root.current?.querySelector<HTMLButtonElement>(".voice-trigger")?.focus({ preventScroll: true }));
 
-  useEffect(() => {
-    const synth = window.speechSynthesis;
-    const read = () => setVoices((synth?.getVoices() ?? []).filter(voice => voice.localService).slice(0, 128));
-    read(); synth?.addEventListener?.("voiceschanged", read);
-    return () => synth?.removeEventListener?.("voiceschanged", read);
-  }, []);
-  const stopSpeaking = useCallback(() => { speechEpoch.current++; window.speechSynthesis?.cancel(); setSpeaking(false); }, []);
+  const stopSpeaking=props.speech.stop;
   const stopTracks = useCallback(() => {
     clearInterval(timers.current.interval); clearTimeout(timers.current.limit); timers.current = {};
     stream.current?.getTracks().forEach(track => track.stop()); stream.current = undefined;
@@ -73,7 +66,7 @@ export function VoiceControls(props: Props) {
     catch (error) { setIssue(error instanceof Error ? error.message : "Voice settings could not load."); }
     finally { setLoading(false); }
   }, []);
-  useEffect(() => { if (open) void refresh(); }, [open, props.preferences?.provider, props.preferences?.model, props.preferences?.language, refresh]);
+  useEffect(() => { if (open) {props.speech.refresh();void refresh();} }, [open, props.preferences?.provider, props.preferences?.model, props.preferences?.language, refresh]);
   useEffect(() => {
     if (!open && phase === "idle") return;
     const dismiss = (event: globalThis.KeyboardEvent) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); cancel(); setOpen(false); focusTrigger(); } };
@@ -153,23 +146,13 @@ export function VoiceControls(props: Props) {
   useEffect(() => {
     window.speechSynthesis?.getVoices();
     if (history.current.context !== props.speakingContext) { history.current = { context: props.speakingContext, count: props.messages.length }; stopSpeaking(); return; }
-    if (!preferences.spoken_replies) { stopSpeaking(); if (!props.running) history.current.count = props.messages.length; return; }
+    if (!preferences.spoken_replies) { if(props.speech.active?.startsWith("auto:"))stopSpeaking(); if (!props.running) history.current.count = props.messages.length; return; }
     if (props.running || phase !== "idle" || props.disabled) return;
     const fresh = props.messages.slice(history.current.count).filter(message => message.role === "Gator" && !message.result && message.text.trim());
     history.current.count = props.messages.length;
     if (!fresh.length) return;
-    const synth = window.speechSynthesis;
-    const voices = synth?.getVoices().filter(voice => voice.localService) ?? [];
-    const voice = voices.find(voice => preferences.system_voice && (voice.voiceURI || voice.name) === preferences.system_voice) ?? voices.find(voice => preferences.language && voice.lang.toLowerCase().startsWith(preferences.language.toLowerCase().split("-")[0])) ?? voices[0];
-    if (!synth || !voice) { setIssue("No local speech voice is available. Dictation still works; install a system voice to hear replies."); return; }
-    stopSpeaking(); const token = ++speechEpoch.current;
-    const utterance = new SpeechSynthesisUtterance(spokenText(fresh.map(message => message.text).join("\n\n")));
-    utterance.voice = voice; utterance.lang = preferences.system_voice ? voice.lang : preferences.language || voice.lang; utterance.rate = preferences.rate || 1;
-    utterance.onstart = () => { if (token === speechEpoch.current) setSpeaking(true); };
-    utterance.onend = () => { if (token === speechEpoch.current) setSpeaking(false); };
-    utterance.onerror = event => { if (token === speechEpoch.current) { setSpeaking(false); if (!["canceled", "interrupted"].includes(event.error)) setIssue("The system voice could not read this reply."); } };
-    synth.speak(utterance);
-  }, [props.messages, props.running, props.speakingContext, props.disabled, preferences.spoken_replies, preferences.language, preferences.rate, preferences.system_voice, phase, stopSpeaking]);
+    props.speech.speak("auto:"+(fresh.at(-1)?.run_id ?? props.messages.length),fresh.map(message=>message.text).join("\n\n"));
+  }, [props.messages, props.running, props.speakingContext, props.disabled, preferences.spoken_replies, preferences.language, preferences.rate, preferences.system_voice, phase, stopSpeaking, props.speech.speak]);
 
   return <div className="voice-controls" ref={root} data-active={phase !== "idle"}>
     {phase === "idle" ? <button className="icon-button voice-trigger" aria-label="Voice dictation" aria-expanded={open} aria-controls="voice-controls-panel" title={`Voice dictation (${shortcutLabel("voice_input", props.shortcuts)})`} disabled={props.disabled} onClick={() => setOpen(value => !value)}><Mic size={17} /></button> : <div className="dictation-pill" role="group" aria-label="Voice recording" data-phase={phase}>
@@ -193,7 +176,7 @@ export function VoiceControls(props: Props) {
       <label className="voice-toggle"><input type="checkbox" checked={preferences.spoken_replies} disabled={saving} onChange={event => void configure({ spoken_replies: event.target.checked })} />Read new replies aloud using a system voice</label>
       <label>System voice<select aria-label="Local system voice" value={preferences.system_voice || ""} disabled={saving} onChange={event=>void configure({system_voice:event.target.value})}><option value="">Automatic local voice</option>{voices.map(voice=><option key={voice.voiceURI||voice.name} value={voice.voiceURI||voice.name}>{voice.name} · {voice.lang}</option>)}</select></label>
       <p>Spoken replies use an installed local system voice, independently of dictation. No API key is needed.{!voices.length?" No local system voice is currently available on this device.":""}</p>
-      {(issue || status?.issue) && <p className="voice-issue" role="alert" tabIndex={-1}>{issue || status?.issue}</p>}
+      {(issue || status?.issue || props.speech.issue) && <p className="voice-issue" role="alert" tabIndex={-1}>{issue || status?.issue || props.speech.issue}</p>}
       <footer><button className="button" disabled={props.disabled || loading || saving || downloading || !status?.ready} onClick={() => void start()}><Mic size={16} />{loading ? "Loading…" : "Start recording"}</button></footer>
     </section>}
   </div>;
