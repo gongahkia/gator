@@ -36,7 +36,7 @@ function timestamp(value?: string) {
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(value));
 }
 
-export function WorkDetails({ state, identity, requestedOutput, open, presenceRef, close, navigate, filesOnly = false, showInChat, pendingFiles = [] }: { state: BackendState; identity: string; requestedOutput?: { conversation: string; output: string; request: number }; open: boolean; presenceRef: PresenceRef; close(): void; navigate(command: string): void; filesOnly?: boolean; showInChat(id: string): void; pendingFiles?: string[] }) {
+export function WorkDetails({ state, identity, requestedOutput, open, presenceRef, close, navigate, filesOnly = false, showInChat, pendingFiles = [] }: { state: BackendState; identity: string; requestedOutput?: { conversation: string; output: string; pathFilter?: string; run?: string; request: number }; open: boolean; presenceRef: PresenceRef; close(): void; navigate(command: string): void; filesOnly?: boolean; showInChat(id: string): void; pendingFiles?: string[] }) {
   const [query, setQuery] = useState("");
   const [sections, setSections] = useState(readSections);
   const [narrow, setNarrow] = useState(() => matchMedia("(max-width: 960px)").matches);
@@ -53,7 +53,7 @@ export function WorkDetails({ state, identity, requestedOutput, open, presenceRe
   const latest = details?.latest_bundle ?? bundles.at(-1);
   const outputs = useMemo(() => bundles.flatMap((bundle, index) => bundleOutputs(bundle, index + 1)).reverse(), [bundles]);
   const term = query.trim().toLocaleLowerCase();
-  const filtered = outputs.filter((output) => !term || `${output.file?.Path || ""} ${output.candidate?.ID || ""} ${output.candidate?.ChangedPaths.join(" ") || ""}`.toLocaleLowerCase().includes(term));
+  const filtered = outputs.filter((output) => (!requestedOutput?.run || requestedOutput.conversation!==identity || output.bundle.RunID===requestedOutput.run) && (!term || `${output.file?.Path || ""} ${output.candidate?.ID || ""} ${output.candidate?.ChangedPaths.join(" ") || ""}`.toLocaleLowerCase().includes(term)));
   const inChat = new Set(state.messages.flatMap((message) => message.bundle ? bundleOutputs(message.bundle).map((output) => output.id) : []));
   const railTitle = filesOnly ? "Files" : "Conversation information";
   const selected = selection?.conversation === identity ? outputs.find((output) => output.id === selection.output) : undefined;
@@ -63,7 +63,7 @@ export function WorkDetails({ state, identity, requestedOutput, open, presenceRe
   useEffect(() => {
     if (!open) return;
     if (!requestedOutput) setSelection(undefined);
-    else if (requestedOutput.conversation === identity) setSelection({ conversation: identity, output: requestedOutput.output });
+    else if (requestedOutput.conversation === identity) {setSelection({ conversation: identity, output: requestedOutput.output });if(requestedOutput.pathFilter)setQuery(requestedOutput.pathFilter);}
   }, [requestedOutput?.request, identity, open]);
 
   useEffect(() => {

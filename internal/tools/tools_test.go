@@ -73,7 +73,7 @@ func TestApplyPatchChangesOnlyWorktree(t *testing.T) {
 	patch := "--- a/hello.txt\n+++ b/hello.txt\n@@ -1 +1 @@\n-old\n+new\n"
 
 	result := executeTool(t, ApplyPatch{Root: root}, `{"patch":`+quoteJSON(patch)+`}`)
-	if !strings.Contains(result, `"applied":true`) {
+	if !strings.Contains(result, `"applied":true`) || !strings.Contains(result, `"changed_paths":["hello.txt"]`) {
 		t.Fatalf("patch result = %s", result)
 	}
 	contents, err := os.ReadFile(filepath.Join(root.Path(), "hello.txt"))

@@ -24,17 +24,20 @@ type Entry struct {
 	State      string     `json:"state"`
 	StartedAt  time.Time  `json:"started_at"`
 	FinishedAt *time.Time `json:"finished_at,omitempty"`
+	Details    []Detail   `json:"details,omitempty"`
+	Partial    bool       `json:"partial,omitempty"`
 }
 
 type Trace struct {
-	StartedAt  time.Time  `json:"started_at"`
-	FinishedAt *time.Time `json:"finished_at,omitempty"`
-	State      string     `json:"state"`
-	Entries    []Entry    `json:"entries"`
-	Truncated  bool       `json:"truncated,omitempty"`
-	textIndex  int
-	textBytes  int
-	tools      map[string]int
+	StartedAt   time.Time  `json:"started_at"`
+	FinishedAt  *time.Time `json:"finished_at,omitempty"`
+	State       string     `json:"state"`
+	Entries     []Entry    `json:"entries"`
+	Truncated   bool       `json:"truncated,omitempty"`
+	textIndex   int
+	textBytes   int
+	detailBytes int
+	tools       map[string]int
 }
 
 func New(at time.Time) *Trace {
@@ -121,6 +124,38 @@ func (t *Trace) Record(event agent.Event) {
 				t.Entries[index].State = "failed"
 			}
 			t.Entries[index].FinishedAt = &at
+			if event.ToolError == "" {
+				details, partial := toolDetails(event.ToolCall.Name, event.ToolResult)
+				data, _ := json.Marshal(details)
+				if len(details) == 0 || t.detailBytes+len(data) <= maxDetailBytes {
+					t.Entries[index].Details = details
+					if len(details) > 0 {
+						t.detailBytes += len(data)
+					}
+				} else {
+					partial = true
+				}
+				t.Entries[index].Partial = partial
+			}
+		}
+	case agent.EventCommandApprovalRequested, agent.EventCommandApprovalResolved:
+		// The parent runner dispatches sequentially. Never associate a pending
+		// decision with a row when concurrent/ambiguous state prevents a match.
+		active := -1
+		for i, entry := range t.Entries {
+			if entry.Kind == "tool" && (entry.State == "running" || entry.State == "waiting") {
+				if active >= 0 {
+					return
+				}
+				active = i
+			}
+		}
+		if active >= 0 {
+			if event.Kind == agent.EventCommandApprovalRequested {
+				t.Entries[active].State = "waiting"
+			} else {
+				t.Entries[active].State = "running"
+			}
 		}
 	case agent.EventSteeringApplied, agent.EventContextCompacted, agent.EventCompletionBlocked:
 		t.closeText(at)
@@ -156,7 +191,7 @@ func (t *Trace) Finish(at time.Time, state, finalText string) {
 		t.Entries = t.Entries[:n-1]
 	}
 	for i := range t.Entries {
-		if t.Entries[i].State == "running" {
+		if t.Entries[i].State == "running" || t.Entries[i].State == "waiting" {
 			t.Entries[i].State = "stopped"
 			t.Entries[i].FinishedAt = &at
 		}
@@ -170,6 +205,15 @@ func (t *Trace) Clone() *Trace {
 	}
 	copy := *t
 	copy.Entries = append([]Entry{}, t.Entries...)
+	for i := range copy.Entries {
+		copy.Entries[i].Details = append([]Detail(nil), t.Entries[i].Details...)
+		for j := range copy.Entries[i].Details {
+			if code := copy.Entries[i].Details[j].ExitCode; code != nil {
+				value := *code
+				copy.Entries[i].Details[j].ExitCode = &value
+			}
+		}
+	}
 	copy.tools = nil
 	return &copy
 }

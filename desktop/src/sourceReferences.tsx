@@ -3,7 +3,7 @@ import type { SourceRecord } from "@gator/application-host/contracts/sourcePrevi
 
 export type SourceReference = { run: string; path: string; start?: number; end?: number };
 export type SourceSelection = SourceReference & { context: string; request: number };
-export const SourceReferenceContext = createContext<{ context?: string; references?: SourceRecord[]; run?: string; open?(reference: SourceReference): void }>({});
+export const SourceReferenceContext = createContext<{ inspectCode?(path:string,candidate?:string):void; codeAvailable?(path:string,candidate?:string):boolean; context?: string; references?: SourceRecord[]; run?: string; open?(reference: SourceReference): void }>({});
 
 type Node = { type: string; value?: string; url?: string; children?: Node[] };
 function citation(value: string, following = "") {

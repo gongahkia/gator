@@ -37,7 +37,8 @@ export type Overview = {
   sections: { id: string; title: string; summary: string; total: number }[];
 };
 export type BackendCommand = { name: string; description: string; advanced: boolean; needs_input: boolean };
-export type ActivityEntry = { id: string; kind: "text" | "tool" | "status"; text?: string; tool?: string; state: "running" | "completed" | "failed" | "stopped"; started_at: string; finished_at?: string };
+export type ActivityDetail = {kind: "searched" | "fetched" | "read_file" | "read_code" | "changed_file" | "command" | "candidate"; path?: string; domain?: string; evidence_id?: string; candidate_id?: string; status?: "verified" | "failed" | "rejected"; exit_code?: number; timed_out?: boolean};
+export type ActivityEntry = { id: string; kind: "text" | "tool" | "status"; details?: ActivityDetail[]; partial?: boolean; text?: string; tool?: string; state: "running" | "waiting" | "completed" | "failed" | "stopped"; started_at: string; finished_at?: string };
 export type BackendActivity = { started_at: string; finished_at?: string; state: "running" | "completed" | "failed" | "stopped"; entries: ActivityEntry[]; truncated?: boolean };
 export type BackendMessage = { run_id?: string; created_at?: string; reply_to_update_id?: string; activity?: BackendActivity; inputs?: string[]; input_ids?: string[]; role: string; text: string; bundle?: BackendBundle; result?: BackendResult };
 export type QueuedMessage = { reply_to_update_id?: string; id: string; text: string; inputs?: string[]; interrupted?: boolean };

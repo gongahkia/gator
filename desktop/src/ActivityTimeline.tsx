@@ -1,4 +1,5 @@
-import { Check, ChevronDown, CircleAlert, CircleDashed, LoaderCircle, Wrench } from "lucide-react";
+import { ActivityDetails } from "./ActivityDetails";
+import { Check, ChevronDown, CircleAlert, CircleDashed, Clock3, LoaderCircle, Wrench } from "lucide-react";
 import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { ActivityEntry, BackendActivity } from "./protocol";
 import { Markdown } from "./Result";
@@ -17,7 +18,7 @@ function toolLabel(name = "") {
 }
 
 function Indicator({ state }: { state: ActivityEntry["state"] }) {
-  return state === "running" ? <LoaderCircle size={14} className="spin" /> : state === "failed" ? <CircleAlert size={14} /> : state === "stopped" ? <CircleDashed size={14} /> : <Check size={14} />;
+  return state === "waiting" ? <Clock3 size={14} /> : state === "running" ? <LoaderCircle size={14} className="spin" /> : state === "failed" ? <CircleAlert size={14} /> : state === "stopped" ? <CircleDashed size={14} /> : <Check size={14} />;
 }
 
 function Disclosure({ label, icon, children, className = "", tone, follow = false, initiallyOpen = false }: { label: ReactNode; icon?: ReactNode; children: ReactNode; className?: string; tone?: string; follow?: boolean; initiallyOpen?: boolean }) {
@@ -34,12 +35,12 @@ function Disclosure({ label, icon, children, className = "", tone, follow = fals
 
 function Tools({ entries }: { entries: ActivityEntry[] }) {
   const failed = entries.filter((entry) => entry.state === "failed").length;
-  const active = entries.some((entry) => entry.state === "running");
-  const state = active ? "running" : failed ? "failed" : entries.some((entry) => entry.state === "stopped") ? "stopped" : "completed";
+  const active = entries.some((entry) => entry.state === "running" || entry.state === "waiting");
+  const state = entries.some(entry=>entry.state==="waiting") ? "waiting" : active ? "running" : failed ? "failed" : entries.some((entry) => entry.state === "stopped") ? "stopped" : "completed";
   const label = entries.length === 1 ? toolLabel(entries[0].tool) : `${active ? "Using" : "Used"} ${entries.length} tools`;
-  return <Disclosure follow={active} className="activity-tools" icon={<Indicator state={state} />} tone={failed ? "warning" : undefined} label={<><span className={active ? "activity-shimmer" : undefined}>{label}</span>{failed > 0 && <small>{failed} failed</small>}</>}>
-    <ol className="activity-tool-list">{entries.map((entry) => <li key={entry.id} data-tone={entry.state === "failed" ? "warning" : undefined}><Wrench size={13} /><span>{toolLabel(entry.tool)}</span><span className="activity-tool-state"><Indicator state={entry.state} />{{ running: "Running", completed: "Finished", failed: "Failed", stopped: "Unfinished" }[entry.state]}</span></li>)}</ol>
-  </Disclosure>;
+  return <div className="activity-tool-group"><Disclosure follow={active} className="activity-tools" icon={<Indicator state={state} />} tone={failed ? "warning" : undefined} label={<><span className={active ? "activity-shimmer" : undefined}>{label}</span>{failed > 0 && <small>{failed} failed</small>}</>}>
+    <ol className="activity-tool-list">{entries.map((entry) => <li key={entry.id} data-tone={entry.state === "failed" ? "warning" : undefined}><Wrench size={13} /><span>{toolLabel(entry.tool)}</span><span className="activity-tool-state"><Indicator state={entry.state} />{{ running: "Running", waiting: "Waiting for approval", completed: "Finished", failed: "Failed", stopped: "Unfinished" }[entry.state]}</span>{!!entry.details?.length && <ActivityDetails details={entry.details} />}{entry.partial && <small className="activity-note">Partial details · some observations were shortened</small>}</li>)}</ol>
+  </Disclosure>{entries.some(entry=>entry.details?.length) && <ActivityDetails compact details={entries.flatMap(entry=>entry.details??[])}/>}</div>;
 }
 
 function Entries({ trace }: { trace: BackendActivity }) {

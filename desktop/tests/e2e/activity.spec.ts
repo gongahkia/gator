@@ -22,7 +22,7 @@ test("public activity interleaves, folds above the answer, and preserves the rea
     const activity: BackendActivity = { started_at: started, state: "running", entries: [
       { id: "text-1", kind: "text", text: "I’ll check your notes first.", state: "completed", started_at: started, finished_at: started },
       { id: "read-1", kind: "tool", tool: "read_file", state: "running", started_at: started },
-      { id: "read-2", kind: "tool", tool: "search_files", state: "completed", started_at: started, finished_at: started },
+      { id: "read-2", kind: "tool", tool: "web_search", state: "completed", started_at: started, finished_at: started, details:[{kind:"searched",domain:"research.example"}],partial:true },
       { id: "text-2", kind: "text", text: "The decision is recorded in the project notes.", state: "running", started_at: started },
     ] };
     const state: BackendState = { ...snapshot.state!, home: false, running: true, elapsed: "12s", status: "Reviewing selected sources", conversation_id: "activity-display", messages: [{ role: "You", text: "What did we decide?" }], activity };
@@ -35,6 +35,9 @@ test("public activity interleaves, folds above the answer, and preserves the rea
     await live.getByRole("button", { name: /Using 2 tools/ }).click();
     await expect(live.getByText("Running", { exact: true })).toBeVisible();
     await expect(live.locator(".activity-tool-list li")).toHaveCount(2);
+    await expect(live.getByText("Result · research.example",{exact:true}).first()).toBeVisible();
+    await expect(live.getByText("Partial details · some observations were shortened",{exact:true})).toBeVisible();
+    expect(await live.getByText("Result · research.example",{exact:true}).first().evaluate(element=>element.tagName)).toBe("SPAN");
     // Completion updates the same tool row without moving it past narration.
     activity.entries[1] = { ...activity.entries[1], state: "failed", finished_at: finished };
     await publish({ ...state, activity: structuredClone(activity) });
@@ -162,7 +165,7 @@ test("real runner narration and tools survive a desktop restart without replayin
     expect(trace?.state).toBe("completed");
     expect(trace?.entries.map((entry) => entry.kind)).toEqual(["text", "tool"]);
     expect(JSON.stringify(trace)).not.toContain("Internal fixture body");
-    expect(JSON.stringify(trace)).not.toContain("source/note.md");
+    expect(trace?.entries[1].details).toEqual([{kind:"read_file",path:"source/note.md"}]);
     // Run records are still retained, without empty file groups/context links.
     expect(snapshot.state?.messages.some((message) => message.bundle?.Path)).toBe(true);
     expect(snapshot.state?.messages.some((message) => message.role === "Context")).toBe(true);
@@ -177,6 +180,8 @@ test("real runner narration and tools survive a desktop restart without replayin
     await history.click();
     await expect(page.getByText("I’ll read the note.", { exact: true })).toBeVisible();
     await expect(page.getByText("Sage Tide is selected.", { exact: true })).toBeVisible();
+    await history.locator("..").getByRole("button",{name:"source/note.md",exact:true}).first().click();
+    await expect(page.getByLabel("Retained file contents",{exact:true})).toContainText("Decision: use sage Tide");
     await expect(page.getByRole("article", { name: "Deliverables message", exact: true })).toHaveCount(0);
     expect(await page.evaluate(async () => (await window.gator!.snapshot()).state?.messages.some((message) => message.bundle?.Path))).toBe(true);
     expect(requests).toBe(2);

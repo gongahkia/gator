@@ -56,6 +56,24 @@ func TestActivitySidecarPreservesRevisionSchemaAndSurvivesRestore(t *testing.T) 
 	if _, exists := fields["InputIDs"]; exists {
 		t.Fatal("input references changed replay schema")
 	}
+	// New metadata survives restart; unsafe display metadata cannot damage the
+	// canonical answer or smuggle raw arguments into a restored public trace.
+	activity.Entries[0].Details = []workactivity.Detail{{Kind: "changed_file", Path: "src/main.go"}}
+	if err := writeJSON(store.activityPath(conversation.ID, "rev-one"), activity); err != nil {
+		t.Fatal(err)
+	}
+	restored, err = store.LoadRevision(conversation.ID, "rev-one")
+	if err != nil || restored.Activity == nil || restored.Activity.Entries[0].Details[0].Path != "src/main.go" {
+		t.Fatal("observed details lost after restore", err)
+	}
+	activity.Entries[0].Details[0].Path = "/private/secret"
+	if err := writeJSON(store.activityPath(conversation.ID, "rev-one"), activity); err != nil {
+		t.Fatal(err)
+	}
+	restored, err = store.LoadRevision(conversation.ID, "rev-one")
+	if err != nil || restored.Activity != nil || restored.FinalText != "The answer" {
+		t.Fatal("unsafe display metadata affected canonical replay", err)
+	}
 	if err := os.WriteFile(store.activityPath(conversation.ID, "rev-one"), []byte("damaged display data"), 0600); err != nil {
 		t.Fatal(err)
 	}

@@ -33,7 +33,11 @@ for(const repair of [false,true])test(`actual coding tools ${repair?"repair fail
  const history=page.locator(".activity-history").last();await expect(history.getByText("I’ll implement normalization without changing your test file.")).toBeVisible();
  if(repair){await expect(history.getByText("The existing implementation fails its tests.",{exact:false})).toBeVisible();expect(JSON.stringify(state.messages)).toContain('"state":"failed"');}
  await expect(page.locator(".assistant-message .syntax-keyword").filter({hasText:"const"})).toBeVisible();
- await page.getByRole("button",{name:/Change /}).last().click();
+ const changed=history.getByRole("button",{name:"Inspect proposed changes to normalize.cjs",exact:true});
+ await expect(changed.first()).toBeVisible();
+ await expect(history.getByText("Program exit 0",{exact:true}).first()).toBeVisible();
+ if(repair)await expect(history.getByText("Program exit 1",{exact:true}).first()).toBeVisible();
+ await changed.first().click();
  const changes=page.getByRole("region",{name:"Code changes",exact:true});await expect(changes.getByRole("heading",{name:"1 changed file"})).toBeVisible();
  await expect(changes.getByLabel("Retained Git diff")).toContainText('+module.exports.normalize');await expect(changes.getByText("Recorded verification")).toBeVisible();
  await expect(changes.locator(".diff-added")).toHaveCount(1);await expect(changes.locator(".diff-removed")).toHaveCount(1);
@@ -108,6 +112,8 @@ test("cancelling while a coding command awaits approval never executes it",async
  const f=await codingFixture(()=>fixtureTool("code_run_command",{argv:["node","-e",'require("node:fs").writeFileSync("not-authorized.txt","should never run")']},"This exploratory command requires your approval."));try{
  const app=await f.launch(),page=await app.firstWindow(),composer=page.getByRole("textbox",{name:"Message Gator",exact:true});await expect(composer).toBeEnabled();await composer.fill("Implement normalization, but wait for approval before exploratory commands.");await page.getByRole("button",{name:"Send message",exact:true}).click();
  await expect(page.getByRole("button",{name:"Approve this action",exact:true})).toBeVisible();
+ await page.locator(".live-activity .activity-toggle").last().click();
+ await expect(page.getByText("Waiting for approval",{exact:true})).toBeVisible();
  await page.getByRole("button",{name:"Stop current work",exact:true}).click();await expect.poll(async()=>(await page.evaluate(()=>window.gator!.snapshot())).state!.running).toBe(false);
  expect(await f.original()).toBe(codingBase);expect(f.calls()).toBe(1);
  const {readdir}=await import("node:fs/promises");const walk=async(root:string):Promise<string[]>=>{const entries=await readdir(root,{withFileTypes:true});return(await Promise.all(entries.map(entry=>entry.isDirectory()?walk(join(root,entry.name)):[entry.name]))).flat();};expect(await walk(join(f.root,"state"))).not.toContain("not-authorized.txt");

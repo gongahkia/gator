@@ -49,5 +49,8 @@ func (s Store) readActivity(conversation, revision string) *workactivity.Trace {
 			return nil
 		}
 	}
+	if !trace.ValidDetails() {
+		return nil
+	}
 	return &trace
 }
