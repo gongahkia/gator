@@ -358,6 +358,8 @@ type pendingBundleAction struct {
 }
 
 type Model struct {
+	planPreparing          string
+	planResult             *TaskPlanResult
 	catalog                *conversationCatalog
 	catalogSequence        uint64
 	catalogSaving          uint64

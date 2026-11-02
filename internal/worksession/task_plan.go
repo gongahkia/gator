@@ -26,13 +26,14 @@ type TaskPlan struct {
 	Approval *PlanApproval `json:"approval,omitempty"`
 }
 type PlanBinding struct {
-	SnapshotID     string `json:"snapshot_id,omitempty"`
-	ConversationID string `json:"conversation_id"`
-	RequestID      string `json:"request_id"`
-	HeadRevision   string `json:"head_revision,omitempty"`
-	SourceSHA256   string `json:"source_sha256"`
-	OptionsSHA256  string `json:"options_sha256"`
-	PromptSHA256   string `json:"prompt_sha256"`
+	UpdatedAt      time.Time `json:"conversation_updated_at"`
+	SnapshotID     string    `json:"snapshot_id,omitempty"`
+	ConversationID string    `json:"conversation_id"`
+	RequestID      string    `json:"request_id"`
+	HeadRevision   string    `json:"head_revision,omitempty"`
+	SourceSHA256   string    `json:"source_sha256"`
+	OptionsSHA256  string    `json:"options_sha256"`
+	PromptSHA256   string    `json:"prompt_sha256"`
 }
 type PlanBudget struct {
 	MaxSteps     int `json:"max_steps"`
@@ -134,7 +135,7 @@ func validateTaskPlan(r Request) error {
 	if p == nil {
 		return nil
 	}
-	if p.Version != 1 || !catalogIdentity.MatchString(p.Binding.ConversationID) || p.Binding.RequestID != r.ID || p.Binding.OptionsSHA256 != optionsHash(r.Options) || p.Binding.PromptSHA256 != planHash([]byte(r.Text)) || (len(p.Binding.SourceSHA256) != 64 || strings.Trim(p.Binding.SourceSHA256, "0123456789abcdef") != "") || len(p.Sources) > 16 || p.Budget.MaxSteps < 0 || p.Budget.MaxSteps > 100000 || p.Budget.CodeMaxSteps < 0 || p.Budget.CodeMaxSteps > 100000 {
+	if p.Version != 1 || !catalogIdentity.MatchString(p.Binding.ConversationID) || p.Binding.UpdatedAt.IsZero() || p.Binding.RequestID != r.ID || p.Binding.OptionsSHA256 != optionsHash(r.Options) || p.Binding.PromptSHA256 != planHash([]byte(r.Text)) || (len(p.Binding.SourceSHA256) != 64 || strings.Trim(p.Binding.SourceSHA256, "0123456789abcdef") != "") || len(p.Sources) > 16 || p.Budget.MaxSteps < 0 || p.Budget.MaxSteps > 100000 || p.Budget.CodeMaxSteps < 0 || p.Budget.CodeMaxSteps > 100000 {
 		return errors.New("invalid retained plan binding")
 	}
 	var frozen struct {
@@ -204,7 +205,7 @@ func (s Store) AdmitPlanRequest(id, text string, options json.RawMessage, client
 		return j, r, err
 	}
 	r.ClientID = clientID
-	r.Plan = &TaskPlan{Version: 1, Phase: "preparing", Sources: append([]string{}, sources...), Budget: budget, Binding: PlanBinding{ConversationID: id, RequestID: r.ID, HeadRevision: c.HeadRevision, SnapshotID: c.SnapshotID, SourceSHA256: planHash([]byte(c.SourcePath)), OptionsSHA256: optionsHash(r.Options), PromptSHA256: planHash([]byte(r.Text))}}
+	r.Plan = newTaskPlan(c, r, sources, budget)
 	j.Requests = append(j.Requests, r)
 	next, err := s.SaveRequests(id, j)
 	return next, r, err
@@ -218,7 +219,10 @@ func (s Store) CheckPlanBinding(id string, r Request) error {
 	if err != nil {
 		return err
 	}
-	if c.SnapshotID != r.Plan.Binding.SnapshotID || c.HeadRevision != r.Plan.Binding.HeadRevision || planHash([]byte(c.SourcePath)) != r.Plan.Binding.SourceSHA256 {
+	// The first admission may update an empty chat's title/timestamp without
+	// changing its context. A retained head also binds its update epoch, so an
+	// intervening head move cannot restore old authority by moving back.
+	if (r.Plan.Binding.HeadRevision != "" && !c.UpdatedAt.Equal(r.Plan.Binding.UpdatedAt)) || c.SnapshotID != r.Plan.Binding.SnapshotID || c.HeadRevision != r.Plan.Binding.HeadRevision || planHash([]byte(c.SourcePath)) != r.Plan.Binding.SourceSHA256 {
 		return ErrPlanChanged
 	}
 	return nil
@@ -339,4 +343,38 @@ func (p *TaskPlan) Clone() *TaskPlan {
 	var next TaskPlan
 	_ = json.Unmarshal(raw, &next)
 	return &next
+}
+
+func newTaskPlan(c Conversation, r Request, sources []string, budget PlanBudget) *TaskPlan {
+	return &TaskPlan{Version: 1, Phase: "preparing", Sources: append([]string{}, sources...), Budget: budget, Binding: PlanBinding{UpdatedAt: c.UpdatedAt, ConversationID: c.ID, RequestID: r.ID, HeadRevision: c.HeadRevision, SnapshotID: c.SnapshotID, SourceSHA256: planHash([]byte(c.SourcePath)), OptionsSHA256: optionsHash(r.Options), PromptSHA256: planHash([]byte(r.Text))}}
+}
+
+// BeginQueuedTaskPlan preserves an already-admitted queue entry and its frozen
+// options. Its context boundary is captured only when planning actually starts.
+func (s Store) BeginQueuedTaskPlan(id, request string, sources []string, budget PlanBudget) (RequestJournal, Request, error) {
+	c, err := s.Load(id)
+	if err != nil {
+		return RequestJournal{}, Request{}, err
+	}
+	j, err := s.LoadRequests(id)
+	if err != nil {
+		return j, Request{}, err
+	}
+	for i, r := range j.Requests {
+		if r.ID != request {
+			continue
+		}
+		if r.State != "queued" {
+			return j, r, ErrPlanChanged
+		}
+		if r.Plan != nil {
+			return j, r, nil
+		}
+		r.Plan = newTaskPlan(c, r, sources, budget)
+		r.UpdatedAt = time.Now().UTC()
+		j.Requests[i] = r
+		next, err := s.SaveRequests(id, j)
+		return next, r, err
+	}
+	return j, Request{}, ErrPlanChanged
 }

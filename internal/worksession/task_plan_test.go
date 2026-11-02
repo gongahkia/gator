@@ -202,3 +202,37 @@ func TestTaskPlanConcurrentApprovalAdmitsOnceAndRetainsReceiptAfterCompletion(t 
 		t.Fatal("reconciliation reauthorized completed work", err)
 	}
 }
+
+func TestTaskPlanHeadReturningToOldRevisionDoesNotRestoreApprovalAuthority(t *testing.T) {
+	s, id, _ := requestTestStore(t)
+	for _, name := range []string{"one", "two"} {
+		parent := ""
+		if name == "two" {
+			parent = "rev-one"
+		}
+		if _, err := s.AddRevision(id, Revision{ID: "rev-" + name, ParentRevisionID: parent, SnapshotID: "snap-" + name, Objective: "Task " + name, FinalText: "Done", BundlePath: "/bundle/" + name, Status: "completed"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := s.MoveHead(id, "rev-one"); err != nil {
+		t.Fatal(err)
+	}
+	_, r, err := s.AdmitPlanRequest(id, "Plan against revision one", json.RawMessage(`{"PlanFirst":true,"ConnectorIDs":["docs"]}`), "plan-head-generation", []string{"docs"}, PlanBudget{}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	j, err := s.ReviseTaskPlan(id, r.ID, 0, "", proposedPlan())
+	if err != nil {
+		t.Fatal(err)
+	}
+	r = j.Requests[0]
+	if _, err := s.MoveHead(id, "rev-two"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.MoveHead(id, "rev-one"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := s.ApproveTaskPlan(id, r.ID, r.Plan.Revision, r.Plan.Digest); err == nil {
+		t.Fatal("returning to an old head revived stale authority")
+	}
+}

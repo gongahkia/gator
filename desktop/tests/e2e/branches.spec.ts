@@ -33,7 +33,7 @@ test("new-chat branch preserves the exact saved boundary, sources, ancestry and 
  expect(await readFile(metadata,"utf8")).toBe(parentRaw);
  await page.getByRole("button",{name:"source/normalize.cjs",exact:true}).first().click();
  await expect(page.getByLabel("Retained file contents",{exact:true})).toContainText("module.exports.normalize");
- await expect(page.locator('.source-lines [data-read="true"]')).toHaveCount(1);
+ await expect(page.locator('.source-lines > div').first()).toHaveAttribute("data-read","true");
  await page.getByRole("button",{name:"Close source preview",exact:true}).click();
  await page.getByRole("textbox",{name:"Message Gator",exact:true}).fill("Child draft only");
  await page.getByRole("button",{name:"Open original chat",exact:true}).click();

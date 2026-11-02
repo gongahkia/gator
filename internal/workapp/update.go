@@ -18,6 +18,8 @@ import (
 
 func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 	switch value := messageValue.(type) {
+	case taskPlanPrepared:
+		return m.finishTaskPlan(value)
 	case catalogLoaded:
 		return m.finishCatalog(value)
 	case receiptChecked:

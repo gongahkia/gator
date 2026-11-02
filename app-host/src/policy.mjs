@@ -32,6 +32,7 @@ export function validateFrame(frame) {
     composer: ["type", "composer"],
     sources: ["type", "sources"],
     branch: ["type", "branch"],
+    task_plan:["type","task_plan"],
     conversation: ["type", "conversation"],
     upload_submit: ["type", "upload"],
     update: ["type", "update"],
@@ -43,7 +44,7 @@ export function validateFrame(frame) {
   if (frame.type === "submit" && (typeof frame.text !== "string" || frame.text.length > 128 * 1024)) throw new Error("Invalid request");
   if (frame.type === "upload_submit") {
     const value = frame.upload;
-    if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some((key) => !["request_id", "context", "text", "files", "reply_to_update_id"].includes(key)) || (value.reply_to_update_id !== undefined && (typeof value.reply_to_update_id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(value.reply_to_update_id))) || typeof value.request_id !== "string" || !/^[a-zA-Z0-9-]{1,64}$/.test(value.request_id) || typeof value.context !== "string" || value.context.length > 8192 || typeof value.text !== "string" || Buffer.byteLength(value.text) > 128 * 1024 || !Array.isArray(value.files) || (!value.files.length && !value.text.trim()) || value.files.length > uploadLimits.count || new Set(value.files).size !== value.files.length || value.files.some((id) => !validUploadID(id))) throw new Error("Invalid attachment request");
+    if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some((key) => !["request_id", "context", "text", "files", "reply_to_update_id", "plan_first"].includes(key)) || (value.plan_first !== undefined && typeof value.plan_first!=="boolean") || (value.reply_to_update_id !== undefined && (typeof value.reply_to_update_id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(value.reply_to_update_id))) || typeof value.request_id !== "string" || !/^[a-zA-Z0-9-]{1,64}$/.test(value.request_id) || typeof value.context !== "string" || value.context.length > 8192 || typeof value.text !== "string" || Buffer.byteLength(value.text) > 128 * 1024 || !Array.isArray(value.files) || (!value.files.length && !value.text.trim()) || value.files.length > uploadLimits.count || new Set(value.files).size !== value.files.length || value.files.some((id) => !validUploadID(id))) throw new Error("Invalid attachment request");
   }
   if (frame.type === "update") {
     const value = frame.update;
@@ -68,6 +69,15 @@ export function validateFrame(frame) {
     if (!["edit", "remove", "earlier", "later", "move", "run", "guide"].includes(queue.action)) throw new Error("Invalid queue action");
     if (queue.action === "move" ? typeof queue.target_id !== "string" || !/^[a-f0-9]{64}$/.test(queue.target_id) || !["before", "after"].includes(queue.placement) : queue.target_id !== undefined || queue.placement !== undefined) throw new Error("Invalid queue destination");
     if (["edit", "guide"].includes(queue.action) ? typeof queue.text !== "string" || !queue.text.trim() || Buffer.byteLength(queue.text, "utf8") > (queue.action === "guide" ? 64 : 128) * 1024 : queue.text !== undefined) throw new Error("Invalid queued message");
+  }
+  if(frame.type==="task_plan") {
+    const v=frame.task_plan;
+    if(!v || typeof v!=="object" || Array.isArray(v) || Object.keys(v).some(key=>!["conversation_id","task_id","revision","digest","action","request_id","content"].includes(key)) || typeof v.conversation_id!=="string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/.test(v.conversation_id) || typeof v.task_id!=="string" || !/^[a-f0-9]{32}$/.test(v.task_id) || !Number.isSafeInteger(v.revision) || v.revision<0 || typeof v.digest!=="string" || (v.revision===0?v.digest!=="":!/^[a-f0-9]{64}$/.test(v.digest)) || !["inspect","edit","approve","start","cancel"].includes(v.action) || typeof v.request_id!=="string" || !/^[a-zA-Z0-9-]{1,64}$/.test(v.request_id)) throw new Error("Invalid task plan action");
+    if(v.action==="edit") {
+      const c=v.content;
+      const text=(value,max)=>typeof value==="string"&&value.trim()&&Buffer.byteLength(value)<=max&&!value.includes("\0");
+      if(!c || typeof c!=="object" || Array.isArray(c) || Object.keys(c).some(key=>!["outcome","steps","sources","effects"].includes(key)) || !text(c.outcome,4096) || !Array.isArray(c.steps) || c.steps.length<1 || c.steps.length>24 || new Set(c.steps.map(step=>step?.id)).size!==c.steps.length || c.steps.some(step=>!step || Object.keys(step).some(key=>!["id","text"].includes(key)) || typeof step.id!=="string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(step.id) || !text(step.text,1024)) || !Array.isArray(c.sources) || c.sources.length>16 || new Set(c.sources).size!==c.sources.length || c.sources.some(id=>typeof id!=="string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(id)) || !Array.isArray(c.effects) || c.effects.length<1 || c.effects.length>7 || new Set(c.effects).size!==c.effects.length || c.effects.some(effect=>!["read","draft","code","checks","connected_write","settings","browser"].includes(effect))) throw new Error("Invalid edited task plan");
+    } else if(v.content!==undefined) throw new Error("Only a plan edit can provide content");
   }
   if (frame.type === "branch") {
     const v=frame.branch;

@@ -38,6 +38,17 @@ func (m Model) workElapsed() string {
 }
 
 func (m Model) startWork(source, conversation, prompt string, options RunOptions) (tea.Model, tea.Cmd) {
+	if options.PlanFirst {
+		approved := false
+		for _, r := range m.requests.Requests {
+			if r.ID == m.nextRequest && r.Plan != nil && r.Plan.Phase == "approved" && r.State == "queued" {
+				approved = true
+			}
+		}
+		if !approved {
+			return m.prepareTaskPlan(prompt, options)
+		}
+	}
 	release, err := m.admitRun(prompt, options)
 	if err != nil {
 		m.admissionFailed(err)

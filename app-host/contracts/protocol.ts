@@ -99,9 +99,17 @@ export type ComposerAction = { id: string; request_id: string } & ({ action: "mo
 export type ChatUpdate = { can_rate: boolean; rating?: "useful" | "noise" | "wrong"; rating_version: number; next_step?: string; evidence?: string[]; id: string; title: string; summary: string; status: string; job_id?: string; goal_id?: string; created_at: string; delivered: boolean; read: boolean; resolved: boolean; version: number };
 export type ChatMemoryReceipt = {id: string; run_id: string; text: string; quote?: string; updated: string; scope: string; corrected?: boolean; can_undo?: boolean};
 export type ChatMemoryAction = {conversation_id: string; id: string; updated: string; action: "correct"|"forget"|"undo"; text?: string; request_id: string};
+export type PlanStep = {id:string;text:string};
+export type PlanContent = {outcome:string;steps:PlanStep[];sources:string[];effects:string[]};
+export type TaskPlanSummary = {id:string;revision:number;digest:string;task:string;outcome?:string;steps?:PlanStep[];state:string;phase:string;work_id?:string;at:string};
+export type TaskPlanReview = {id:string;revision:number;digest:string;task:string;state:string;phase:string;budget:{max_steps:number;code_max_steps:number};sources:string[];content?:PlanContent};
+export type TaskPlanAction = {conversation_id:string;task_id:string;revision:number;digest:string;action:"inspect"|"edit"|"approve"|"start"|"cancel";request_id:string;content?:PlanContent};
+export type TaskPlanResult = {request_id:string;error?:string;review?:TaskPlanReview};
 export type BranchAction = {conversation_id:string; revision_id:string; run_id:string; request_id:string};
 export type BranchResult = {request_id:string; conversation_id?:string; error?:string};
 export type BackendState = {
+ task_plans?:TaskPlanSummary[];
+ task_plan_result?:TaskPlanResult;
  branch?: {conversation_id:string; revision_id:string};
  branch_result?: BranchResult;
 	 catalog_busy?: boolean;
@@ -179,12 +187,13 @@ export type PanelAction = {
 };
 export type Frame = {
   version: 1;
-  type: "receipt" | "memory" | "update" | "submit" | "upload_submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "conversation" | "composer" | "sources" | "branch";
+  type: "receipt" | "memory" | "update" | "submit" | "upload_submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "conversation" | "composer" | "sources" | "branch" | "task_plan";
   memory?: ChatMemoryAction;
   receipt?: {conversation_id: string; run_id: string; action_id: string; correlation_id: string; manifest_sha256: string; action: "inspect" | "check_sent"; request_id: string};
   update?: { conversation_id: string; id: string; action: "delivered" | "read" | "resolve" | "reopen" | "older" | "newer" | "rate"; version: number; rating?: "useful" | "noise" | "wrong" | "clear"; rating_version?: number; request_id?: string };
-  upload?: { request_id: string; context: string; text: string; files: string[]; reply_to_update_id?: string };
+  upload?: { plan_first?:boolean; request_id: string; context: string; text: string; files: string[]; reply_to_update_id?: string };
   text?: string; key?: string; error?: string; width?: number; height?: number;
+  task_plan?:TaskPlanAction;
   branch?: BranchAction;
   sources?: SourceAction;
   composer?: ComposerAction;

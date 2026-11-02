@@ -110,3 +110,18 @@ test("branch creation accepts exact durable references but no replay or executio
  assert.equal(validateFrame({type:"branch",branch}).version,1);
  for(const change of [{conversation_id:"../private"},{revision_id:""},{request_id:"short"},{worker:"other"},{replay:[]},{approved:true},{grants:["inspect"]},{bundle_path:"/private"}]) assert.throws(()=>validateFrame({type:"branch",branch:{...branch,...change}}));
 });
+
+test("task plan actions bind exact reviews and cannot supply approval or native configuration",()=>{
+ const task_plan={conversation_id:"work-one",task_id:"a".repeat(32),revision:1,digest:"b".repeat(64),action:"approve",request_id:"review-1"};
+ assert.equal(validateFrame({type:"task_plan",task_plan}).version,1);
+ for(const change of [{task_id:"../private"},{revision:-1},{digest:""},{approved:true},{grant:{operation:"input"}},{budget:{max_steps:10000}},{action:"execute"},{content:{}}]) assert.throws(()=>validateFrame({type:"task_plan",task_plan:{...task_plan,...change}}));
+ const content={outcome:"A checked parser",steps:[{id:"step-1",text:"Implement and verify"}],sources:["docs"],effects:["read","code","checks"]};
+ assert.equal(validateFrame({type:"task_plan",task_plan:{...task_plan,action:"edit",content}}).version,1);
+ for(const change of [{approved:true},{sources:["../private"]},{effects:["shell"]},{steps:[{id:"step-1",text:"one"},{id:"step-1",text:"two"}]},{outcome:"🐊".repeat(1025)}]) assert.throws(()=>validateFrame({type:"task_plan",task_plan:{...task_plan,action:"edit",content:{...content,...change}}}));
+ assert.equal(validateFrame({type:"task_plan",task_plan:{...task_plan,action:"inspect",revision:0,digest:""}}).version,1);
+});
+test("plan-first message admission is a boolean opt-in with no renderer plan grant",()=>{
+ const upload={request_id:"message-1",context:"conversation:work-one",text:"Prepare a plan",files:[],plan_first:true};
+ assert.equal(validateFrame({type:"upload_submit",upload}).version,1);
+ for(const change of [{plan_first:"yes"},{plan:{approved:true}},{TaskPlanRequestID:"a".repeat(32)}]) assert.throws(()=>validateFrame({type:"upload_submit",upload:{...upload,...change}}));
+});

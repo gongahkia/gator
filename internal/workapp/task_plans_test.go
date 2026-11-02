@@ -1,6 +1,7 @@
 package workapp
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -101,5 +102,110 @@ func TestQueueChangesCannotConsumePendingPlanReview(t *testing.T) {
 	}
 	if err := m.persistQueue([]queuedRun{{id: 1, requestID: r.ID, prompt: "Changed reviewed task", options: opts}}); err == nil {
 		t.Fatal("generic queue editor changed plan task")
+	}
+}
+
+func TestTaskPlanOwnerPreparesPausesEditsAndStartsOnlyReviewedFrozenTask(t *testing.T) {
+	preparations, runs := 0, 0
+	var actual RunOptions
+	config, store := requestConfig(t, func(_, _, prompt string, options RunOptions) RunResult {
+		runs++
+		actual = options
+		if prompt != "Implement parser" {
+			t.Fatal("task redirected")
+		}
+		return RunResult{WorkID: "run-planned", RevisionID: "rev-planned", FinalText: "Prepared for review"}
+	})
+	config.PreparePlan = func(_ context.Context, r worksession.Request) (worksession.PlanContent, error) {
+		preparations++
+		return worksession.PlanContent{Outcome: "A checked parser", Steps: []worksession.PlanStep{{ID: "step-one", Text: "Implement and verify"}}, Effects: []string{"read", "code", "checks"}}, nil
+	}
+	m := New(config)
+	owner := m.conversation
+	next, cmd := m.SubmitBridgeUploads(BridgeUploadSubmission{RequestID: "plan-ui-123", Context: "conversation:" + owner, Text: "Implement parser", PlanFirst: true})
+	m = next.(Model)
+	if !m.running || cmd == nil || runs != 0 || m.planPreparing == "" || len(m.messages) != 0 {
+		t.Fatal("preparation ran implementation or duplicated transcript")
+	}
+	next, _ = m.Update(cmd())
+	m = next.(Model)
+	if m.running || runs != 0 || preparations != 1 || m.requests.Requests[0].Plan.Phase != "review" {
+		t.Fatal("preparation did not pause")
+	}
+	r := m.requests.Requests[0]
+	action := TaskPlanAction{ConversationID: owner, TaskID: r.ID, Revision: r.Plan.Revision, Digest: r.Plan.Digest, Action: "inspect", RequestID: "inspect-1"}
+	next, _ = m.ApplyTaskPlan(action)
+	m = next.(Model)
+	if m.planResult.Review == nil || m.planResult.Review.Task != "Implement parser" {
+		t.Fatal("exact review unavailable")
+	}
+	edited := *m.planResult.Review.Content
+	edited.Outcome = "A bounded, checked parser"
+	action.Action = "edit"
+	action.Content = &edited
+	next, _ = m.ApplyTaskPlan(action)
+	m = next.(Model)
+	if m.planResult.Error != "" || m.requests.Requests[0].Plan.Revision != 2 {
+		t.Fatal("edit not retained", m.planResult.Error)
+	}
+	action.Action = "approve"
+	action.Content = nil
+	next, _ = m.ApplyTaskPlan(action)
+	m = next.(Model)
+	if m.planResult.Error == "" || runs != 0 {
+		t.Fatal("stale approval started work")
+	}
+	r = m.requests.Requests[0]
+	action.Revision = r.Plan.Revision
+	action.Digest = r.Plan.Digest
+	m.options.MaxSteps = 99 // changes to future requests cannot rewrite this task.
+	next, cmd = m.ApplyTaskPlan(action)
+	m = next.(Model)
+	if m.planResult.Error != "" || !m.running || cmd == nil {
+		t.Fatal("current approval did not claim work", m.planResult.Error)
+	}
+	if m.bridgeGuidanceID() != "" {
+		t.Fatal("planned task advertised unreviewed steering")
+	}
+	_, duplicate := m.ApplyTaskPlan(action)
+	if duplicate != nil {
+		t.Fatal("concurrent approve produced a second command")
+	}
+	next, _ = m.Update(cmd())
+	m = next.(Model)
+	if runs != 1 || actual.MaxSteps == 99 || actual.TaskPlanRequestID != r.ID || !actual.PlanFirst {
+		t.Fatal("frozen task or single dispatch lost", runs, actual.MaxSteps)
+	}
+	next, duplicate = m.ApplyTaskPlan(action)
+	m = next.(Model)
+	if duplicate != nil || m.planResult.Error != "" || runs != 1 {
+		t.Fatal("completed approval replayed")
+	}
+	journal, err := store.LoadRequests(owner)
+	if err != nil || journal.Requests[0].State != "completed" || journal.Requests[0].Plan.Phase != "finished" {
+		t.Fatal("completion receipt lost", err)
+	}
+}
+func TestTaskPlanOwnerCancellationAndStalePreparationCannotRun(t *testing.T) {
+	config, _ := requestConfig(t, func(_, _, _ string, _ RunOptions) RunResult {
+		t.Fatal("cancelled preparation ran work")
+		return RunResult{}
+	})
+	config.PreparePlan = func(context.Context, worksession.Request) (worksession.PlanContent, error) {
+		return worksession.PlanContent{Outcome: "Not to be accepted", Steps: []worksession.PlanStep{{ID: "step-one", Text: "Proposed"}}, Effects: []string{"read"}}, nil
+	}
+	m := New(config)
+	next, cmd := m.SubmitBridgeUploads(BridgeUploadSubmission{RequestID: "plan-cancel", Context: "conversation:" + m.conversation, Text: "Prepare a task", PlanFirst: true})
+	m = next.(Model)
+	m.cancel()
+	next, _ = m.Update(cmd())
+	m = next.(Model)
+	if m.running || m.requests.Requests[0].State != "interrupted" || m.requests.Requests[0].Plan.Content != nil || len(m.queue) != 0 {
+		t.Fatal("cancelled proposal retained authority")
+	}
+	next, _ = m.Update(taskPlanPrepared{ID: "old-owner", Content: worksession.PlanContent{Outcome: "Wrong task"}})
+	after := next.(Model)
+	if after.requests.Requests[0].Plan.Content != nil {
+		t.Fatal("stale preparation overwrote current task")
 	}
 }

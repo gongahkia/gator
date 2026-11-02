@@ -12,6 +12,7 @@ import (
 )
 
 type BridgeUploadSubmission struct {
+	PlanFirst       bool     `json:"plan_first,omitempty"`
 	ReplyToUpdateID string   `json:"reply_to_update_id,omitempty"`
 	RequestID       string   `json:"request_id"`
 	Context         string   `json:"context"`
@@ -57,7 +58,7 @@ func (m Model) SubmitBridgeUploads(request BridgeUploadSubmission) (tea.Model, t
 			continue
 		}
 		var options RunOptions
-		if json.Unmarshal(retained.Options, &options) != nil || retained.Text != text || options.ReplyToUpdateID != request.ReplyToUpdateID || !slices.Equal(options.Uploads, request.Files) {
+		if json.Unmarshal(retained.Options, &options) != nil || retained.Text != text || options.ReplyToUpdateID != request.ReplyToUpdateID || options.PlanFirst != request.PlanFirst || !slices.Equal(options.Uploads, request.Files) {
 			return fail("This message identity was already used. Review the retained request before sending a different message.")
 		}
 		return m, nil
@@ -83,11 +84,14 @@ func (m Model) SubmitBridgeUploads(request BridgeUploadSubmission) (tea.Model, t
 			return fail(fmt.Sprintf("Couldn’t attach these files: %v", err))
 		}
 	}
+	oldPlanFirst := m.options.PlanFirst
+	m.options.PlanFirst = request.PlanFirst
 	m.options.Uploads = append([]string(nil), request.Files...)
 	m.submissionID = request.RequestID
 	m.submissionReply = request.ReplyToUpdateID
 	next, command := m.SubmitText(text)
 	m = next.(Model)
+	m.options.PlanFirst = oldPlanFirst
 	m.submissionID = ""
 	m.submissionReply = ""
 	return m, command
