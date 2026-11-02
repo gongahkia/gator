@@ -106,7 +106,8 @@ for (const name of (process.env.GATOR_COMPANION_BROWSERS || 'chromium').split(',
       await page.getByRole('button', { name: 'Refresh', exact: true }).click();
       await page.getByText('Check status: offline', { exact: true }).waitFor();
       await writeFile(tokenFile, 'b'.repeat(64) + '\n', { mode: 0o600 });
-      await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+      // Polling may invalidate the session and hide Refresh before a manual
+      // click reaches it. Observe revocation directly instead of racing it.
       await page.getByText('Access expired · enter the current host token', { exact: true }).waitFor();
       assert.equal(await page.locator('#checks').textContent(), '');
       assert.equal(await page.locator('#checks-issue').textContent(), '');
