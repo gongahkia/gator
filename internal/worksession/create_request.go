@@ -31,6 +31,10 @@ type chatCreation struct {
 // Publish a complete directory only after saving its receipt: a missing published
 // directory is never recreated after deletion. No source capture or work runs.
 func (s Store) CreateChatOnce(source, requestID string, now time.Time) (Conversation, error) {
+	return s.createChatOnce(source, requestID, now, nil)
+}
+
+func (s Store) createChatOnce(source, requestID string, now time.Time, fork *forkSeed) (Conversation, error) {
 	if !creationIdentity.MatchString(requestID) || !filepath.IsAbs(source) {
 		return Conversation{}, errors.New("invalid new-chat request")
 	}
@@ -53,7 +57,11 @@ func (s Store) CreateChatOnce(source, requestID string, now time.Time) (Conversa
 	}
 	sum := sha256.Sum256([]byte(requestID))
 	key := hex.EncodeToString(sum[:])
-	sourceSum := sha256.Sum256([]byte(source))
+	binding := source
+	if fork != nil {
+		binding += "\x00branch\x00" + fork.info.ParentConversationID + "\x00" + fork.info.ParentRevisionID + "\x00" + fork.digest
+	}
+	sourceSum := sha256.Sum256([]byte(binding))
 	sourceHash := hex.EncodeToString(sourceSum[:])
 	receiptPath, stage := filepath.Join(".creations", key+".json"), filepath.Join(".creations", "stage-"+key)
 	var receipt chatCreation
@@ -84,6 +92,11 @@ func (s Store) CreateChatOnce(source, requestID string, now time.Time) (Conversa
 		}
 		if err := creationDirectory(root, filepath.Join(stage, "revisions")); err != nil {
 			return Conversation{}, err
+		}
+		if fork != nil {
+			if err := fork.write(root, stage, &c); err != nil {
+				return Conversation{}, err
+			}
 		}
 		if err := writeCreationJSON(root, filepath.Join(stage, "conversation.json"), c); err != nil {
 			return Conversation{}, err
