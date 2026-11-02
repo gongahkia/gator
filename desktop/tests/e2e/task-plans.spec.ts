@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { join } from "node:path";
 import { codingFixture, fixtureTool, type FixtureRequest } from "./coding-fixture";
 import { closeDesktop } from "./lifecycle";
 
@@ -14,10 +15,10 @@ async function inspectMode(page:Page){
  await page.evaluate(()=>window.gator!.send({type:"submit",text:"/mode inspect"}));
  await expect.poll(async()=>(await page.evaluate(()=>window.gator!.snapshot())).state?.work_details?.mode).toBe("inspect");
 }
-async function prepare(page:Page){
+async function prepare(page:Page,text="Read normalize.cjs and explain what it currently does."){
  await page.getByRole("button",{name:"Plan first",exact:true}).click();
  await expect(page.getByRole("button",{name:"Plan first",exact:true})).toHaveAttribute("aria-pressed","true");
- await page.getByRole("textbox",{name:"Message Gator",exact:true}).fill("Read normalize.cjs and explain what it currently does.");
+ await page.getByRole("textbox",{name:"Message Gator",exact:true}).fill(text);
  await page.getByRole("button",{name:"Send message",exact:true}).click();
  await expect(page.getByRole("button",{name:"Review plan",exact:true})).toBeEnabled();
  await expect.poll(async()=>(await page.evaluate(()=>window.gator!.snapshot())).state?.running).toBe(false);
@@ -100,5 +101,33 @@ test("out-of-scope model effects stop before mutation and are never shown as com
  await expect(page.getByText("Work ended · results may be partial · revision 1",{exact:true})).toBeVisible();
  await expect(page.getByLabel("Reviewed task plans")).toContainText("Proposed steps are intentions, not verified completion");
  await expect(page.getByRole("article",{name:"Gator message",exact:true}).filter({hasText:"reviewed plan does not include draft"})).toBeVisible();
+ }finally{await fixture.close();}
+});
+
+
+test("plan approval leaves the exact coding-command review pending and Stop prevents dispatch",async()=>{
+ const fixture=await codingFixture(body=>{
+  if(!body.tools?.length)return {role:"assistant",content:JSON.stringify({outcome:"Review an exploratory coding command",steps:[{id:"review-command",text:"Request the exact command review before proceeding"}],sources:[],effects:["read","code","checks"]})};
+  return fixtureTool("code_run_command",{argv:["node","-e",'require("node:fs").writeFileSync("not-authorized.txt","must remain absent")']},"This exact exploratory command still requires your decision.");
+ });try{
+ const app=await fixture.launch(),page=await app.firstWindow();
+ await expect(page.getByRole("textbox",{name:"Message Gator",exact:true})).toBeEnabled();
+ await prepare(page,"Implement normalization in the isolated code workspace, but wait for the exact exploratory command decision.");
+ expect(fixture.calls()).toBe(1);
+ await page.getByRole("button",{name:"Review plan",exact:true}).click();
+ await page.getByRole("dialog",{name:"Review task plan",exact:true}).getByRole("button",{name:"Approve plan & start",exact:true}).click();
+ await expect(page.getByRole("button",{name:"Approve this action",exact:true})).toBeVisible();
+ const pending=(await page.evaluate(()=>window.gator!.snapshot())).state!;
+ expect(pending.pending_approval?.token).toBeTruthy();expect(pending.task_plans?.[0].state).toBe("running");
+ expect(pending.guidance_id).toBeUndefined();
+ expect(JSON.stringify(pending.messages.find(message=>message.result?.kind==="approval")?.result)).toContain("not-authorized.txt");
+ expect(fixture.calls()).toBe(2);
+ await page.getByRole("button",{name:"Stop current work",exact:true}).click();
+ await expect.poll(async()=>(await page.evaluate(()=>window.gator!.snapshot())).state?.running).toBe(false);
+ await expect(page.getByRole("button",{name:"Approve this action",exact:true})).toHaveCount(0);
+ expect(fixture.calls()).toBe(2);
+ const {readdir}=await import("node:fs/promises");
+ const walk=async(root:string):Promise<string[]>=>{const entries=await readdir(root,{withFileTypes:true});return(await Promise.all(entries.map(entry=>entry.isDirectory()?walk(join(root,entry.name)):[entry.name]))).flat();};
+ expect(await walk(fixture.root)).not.toContain("not-authorized.txt");
  }finally{await fixture.close();}
 });

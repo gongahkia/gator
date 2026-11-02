@@ -68,7 +68,7 @@ No physical microphone/phone, signed installer, or native Linux/WSL acceptance i
 ## Added owner and UI verification
 
 - `go test -race ./internal/workapp ./internal/worksession ./cmd/gator -run 'TestTaskPlan|TestDesktopTaskPlan'`: PASS (6.018 s / 7.496 s / 2.882 s). Includes queued frozen settings, cancellation, restart without replay, explicit retained start, wrong owner, bounded pending/terminal retention, and the ordinary profile data-export guard during model preparation.
-- `desktop/tests/e2e/task-plans.spec.ts`: three real-Go/private-model journeys added for edit/review/exact approval/idempotency, retained review across restart/cancellation, and out-of-scope mutation rejection. **NOT RUN** while app automation is suspended. TypeScript checking these tests is not acceptance of their UI behavior.
+- `desktop/tests/e2e/task-plans.spec.ts`: four real-Go/private-model journeys added for edit/review/exact approval/idempotency, retained review across restart/cancellation, out-of-scope mutation rejection, and a separately pending exact coding-command review after plan approval. **NOT RUN** while app automation is suspended. TypeScript checking these tests is not acceptance of their UI behavior.
 - Branch journeys also still require their corrected final rerun; see [Chat branches](CHAT-BRANCHES.md).
 
 ## Interface review boundary
@@ -111,3 +111,13 @@ The operator asked to stop tests that open/click through the actual Mac app whil
 Two first attempts under parallel load did not pass: the companion health fixture exceeded its 120 s timeout, and `TestExternalNativeSessionContinuesAcrossWorkConversationTurns` hit an existing Git-command context deadline in the Work race suite. No production timeout was widened. The health test passed separately with the already-built runtime (32.564 s), and the full Work race package passed separately (78.269 s). The complete companion and focused race suites then passed their final confirmation runs. This records the timing failures rather than treating the first attempts as green.
 
 Skipped Node checks are the opt-in Electron panel-secret journey and Windows-native argv handoff. Skipped companion checks are the two opt-in real-tmux fixtures, native Linux supervisor/user-manager fixtures, and native macOS launchd fixture. No ordinary user terminal session was inspected or controlled. No dependency/toolchain installation or additional paid model evaluation was performed.
+
+## Exact-action boundary audit
+
+`internal/workrun/task_plan_approval_test.go` additionally exercises an already durably approved/claimed plan through the real Work service and its retained interaction decisions. A private HTTP webhook verifies zero dispatch before the separate exact action review, rejects a mismatched preview digest, and covers denial, one approved dispatch, an HTTP-error unknown outcome, consumed-review rejection and repeated receipt reads without replay. A controlled coding adapter verifies a separate pending exact-argv command review, wrong-preview rejection, allow/deny behavior and a consumed decision. The model and coding adapter are simulations; this does not claim native coding-process, Electron or physical-device acceptance.
+
+The initial new assertion incorrectly expected a mutation receipt for a service-level denial. Existing behavior records a refusal in the resolved interaction before mutation admission; there is no dispatched action to receipt. The test now checks that established behavior explicitly. No production approval or receipt behavior was changed for the assertion.
+
+`go test -race ./internal/workrun -run '^TestTaskPlan'`: PASS (6.445 s), covering the existing plan preparation/scope tests and both new approval tests (five allow/deny/unknown subcases). Final app review journeys remain required while app automation is paused.
+
+The broader focused regression `go test -race ./internal/workrun -run 'TestTaskPlan|TestServiceApproval|TestExecutorConnectedRequestNeedsNoInventedOutputFile|TestExecutorRetainsUnknownExternalOutcomeWithoutDerivingRetryLearning'` also passed (8.134 s); `go vet ./internal/workrun` passed. A fourth real-Go/scripted-model Electron plan journey was added for the later pending exact command review and cancellation before dispatch, but remains unexecuted under the operator's app-test restriction.

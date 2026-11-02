@@ -4,7 +4,7 @@ Status: **implementation in progress**. Stages 1–3 (composer sources, retained
 
 References: Shape of AI’s [connectors](https://www.shapeof.ai/patterns/connectors), [action plans](https://www.shapeof.ai/patterns/action-plan), [citations](https://www.shapeof.ai/patterns/citations), [stream of thought](https://www.shapeof.ai/patterns/stream-of-thought), and [branches](https://www.shapeof.ai/patterns/branches). Adapt the interaction ideas to Gator’s existing visual language. Do not import example products’ application code, branding or screenshot assets.
 
-## Current support and gaps
+## Starting-point audit (before this implementation)
 
 | Pattern | Implemented foundation | Missing relative to the supplied examples |
 | --- | --- | --- |
@@ -14,7 +14,7 @@ References: Shape of AI’s [connectors](https://www.shapeof.ai/patterns/connect
 | Visible activity | Public narration interleaves with actual tool events; running/failed/stopped states, elapsed time and retained disclosures; coding diff and file inspection | Safely projected domain chips, exact changed-file links at the relevant activity event, richer research grouping and explicit links between plan, activity and evidence. No hidden reasoning display. |
 | Branches/message menu | Retained Work revisions have parents and support back/forward/child selection; separate chats and reuse-message tools exist; local spoken replies exist | Per-message “Branch in new chat,” stable cross-chat ancestry, and “Read aloud” for a chosen older response. Revision navigation within one chat is not yet the requested new-chat fork. |
 
-### Implementation evidence
+### Starting-point implementation evidence
 
 - Connections: `cmd/gator/work_connections.go:229`, `internal/connector/connector.go:220`, `desktop/src/SettingsNavigation.tsx:3`, `desktop/src/WorkDetails.tsx:138`.
 - Goal-plan projection: `cmd/gator/work_ui_results.go:206`; native plan inspection: `internal/tools/local_plans.go:15`; exact current action review: `desktop/src/Result.tsx:37`.
@@ -23,6 +23,20 @@ References: Shape of AI’s [connectors](https://www.shapeof.ai/patterns/connect
 - Existing revision graph: `internal/worksession/store.go:49`, navigation: `cmd/gator/work_interactive.go:539`. Current assistant-message actions expose Copy at `desktop/src/App.tsx:95`; `desktop/src/MessageTools.tsx:48` is composer-level draft reuse, not a per-response branch menu.
 
 Line numbers are audit anchors and may move during implementation.
+
+## Current acceptance state
+
+The table above is the original gap analysis, not a statement that the implemented features are still absent. Implementation and evidence now live in the five linked technical records below. Overall goal completion remains unproven until the pending application journeys pass against the final build.
+
+| Pattern | Implemented | Verification state |
+| --- | --- | --- |
+| Sources | Scoped composer picker, selected chips, account/access state, per-chat CAS and frozen queued selections | Focused real Electron journeys passed earlier; Go/host regressions passed. See [Sources](CHAT-SOURCES.md). Final UI regression after the later toolbar changes is pending. |
+| Citations | Number/name chips, hover/focus retained excerpts, source sidebar, exact read/cited ranges and integrity checks | Six focused Electron journeys passed earlier; retained-evidence host checks pass. PDF page mapping remains explicitly unsupported without extraction evidence. See [Citations](CHAT-CITATIONS.md). |
+| Activity | Ordered observable metadata, source domains, retained file/diff links and recorded check outcomes | Two focused Electron activity journeys and seven coding journeys passed earlier; Go/race regressions pass. See [Activity](CHAT-ACTIVITY.md). |
+| Branches and speech | Durable independent forks, ancestry, retained origin validation, chosen-response local speech and stop/unavailable states | Backend/host tests pass. The corrected three-journey branch/speech Electron run is still pending. See [Branches](CHAT-BRANCHES.md). |
+| Task plans | Per-request preparation, editable exact review, durable approval/admission, scope gates, interruption/no replay and observed-result links | Backend/host/TypeScript/build checks pass. Four plan Electron journeys are authored but unexecuted. Final post-plan exact-action UI review coverage remains to be verified. See [Task plans](CHAT-TASK-PLANS.md). |
+
+App-opening/clicking tests remain suspended at the operator's request. A goal continuation does not lift that restriction. No paid evaluation, native voice, physical phone, signed installer or native Linux/WSL acceptance is inferred from these automated results.
 
 ## Delivery order
 

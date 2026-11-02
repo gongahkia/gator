@@ -16,7 +16,7 @@ import (
 	"github.com/gongahkia/gator/internal/worksession"
 )
 
-func claimedPlanFixture(t *testing.T, effects []string) (string, worksession.Store, Request) {
+func claimedPlanFixture(t *testing.T, effects []string, sources ...string) (string, worksession.Store, Request) {
 	t.Helper()
 	state, source := t.TempDir(), t.TempDir()
 	store, err := worksession.Open(state)
@@ -27,12 +27,21 @@ func claimedPlanFixture(t *testing.T, effects []string) (string, worksession.Sto
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw := json.RawMessage(`{"PlanFirst":true,"MaxSteps":24,"Code":{"MaxSteps":32},"ConnectorIDs":[],"WebOrigins":[]}`)
-	j, r, err := store.AdmitPlanRequest(c.ID, "Create brief.md", raw, "plan-scope-client", nil, worksession.PlanBudget{MaxSteps: 24, CodeMaxSteps: 32}, time.Now())
+	raw, err := json.Marshal(struct {
+		PlanFirst    bool
+		MaxSteps     int
+		Code         struct{ MaxSteps int }
+		ConnectorIDs []string
+		WebOrigins   []string
+	}{true, 24, struct{ MaxSteps int }{32}, append([]string{}, sources...), []string{}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	content := worksession.PlanContent{Outcome: "A short brief", Steps: []worksession.PlanStep{{ID: "step-1", Text: "Inspect and summarize"}}, Sources: []string{}, Effects: effects}
+	j, r, err := store.AdmitPlanRequest(c.ID, "Create brief.md", raw, "plan-scope-client", sources, worksession.PlanBudget{MaxSteps: 24, CodeMaxSteps: 32}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := worksession.PlanContent{Outcome: "A short brief", Steps: []worksession.PlanStep{{ID: "step-1", Text: "Inspect and summarize"}}, Sources: append([]string{}, sources...), Effects: effects}
 	j, err = store.ReviseTaskPlan(c.ID, r.ID, 0, "", content)
 	if err != nil {
 		t.Fatal(err)
@@ -47,7 +56,7 @@ func claimedPlanFixture(t *testing.T, effects []string) (string, worksession.Sto
 	if _, err = store.SaveRequests(c.ID, j); err != nil {
 		t.Fatal(err)
 	}
-	return state, store, Request{StateDir: state, SourcePath: source, ConversationID: c.ID, Objective: r.Text, Mode: action.Draft, Contract: artifact.DefaultContract("brief.md"), MaxSteps: 24, TaskPlan: &TaskPlanReference{RequestID: r.ID, Revision: r.Plan.Revision, Digest: r.Plan.Digest}}
+	return state, store, Request{StateDir: state, SourcePath: source, ConversationID: c.ID, Objective: r.Text, Mode: action.Draft, Contract: artifact.DefaultContract("brief.md"), MaxSteps: 24, ConnectorIDs: append([]string{}, sources...), TaskPlan: &TaskPlanReference{RequestID: r.ID, Revision: r.Plan.Revision, Digest: r.Plan.Digest}}
 }
 func TestTaskPlanScopeStopsBeforeOutOfScopeWriteAndLaterCalls(t *testing.T) {
 	state, _, request := claimedPlanFixture(t, []string{"read"})
