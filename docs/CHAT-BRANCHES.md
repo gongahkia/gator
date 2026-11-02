@@ -1,6 +1,6 @@
 # Independent chat branches
 
-Backend implementation is in place. Electron acceptance of the new branch menu and per-message speech is still in progress; automated app-clicking journeys were stopped at the operator's request. This document does not claim those journeys passed.
+Implemented and verified against the real Go owner and Electron. All three branch/speech journeys passed after the operator resumed app testing, including the final whole-application run (81 passed / 2 opt-in paid tests skipped). Earlier checkpoints below are historical. Native audible speech remains separate manual acceptance. See [final acceptance](CHAT-UX-ACCEPTANCE.md).
 
 ## Durable boundary and publication
 
@@ -22,7 +22,7 @@ No pending approval, accepted-code permission, raw replay configuration, action 
 
 Retained bundle manifests and source bytes still require their existing integrity checks. Original observed-read ranges are used only when the host-bound origin, history record, bundle path and original canonical revision digest agree. Missing, expired or changed original replay cannot invent a read range. Missing retained source bytes remain unavailable. Branching does not guarantee indefinite retention of shared evidence.
 
-## Verification so far
+## Earlier verification checkpoint
 
 - `go test -race ./internal/worksession -run 'TestBranch|TestCreateChatOnce'`: PASS, 7.370 s. Covers exact boundary, fresh identities, parent preservation while its execution lease is held, independent admission/leases, no inherited authority, nested provenance, stable duplicate creation, concurrent claims, conflicting IDs and no resurrection after deletion. Existing cross-process chat-creation tests exercise the reused publication mechanism.
 - `go test -race ./internal/workapp ./internal/worksession`: PASS, 20.326 s / 28.288 s. Includes owner-side wrong-chat/revision/run and stale-background rejection.

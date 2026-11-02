@@ -31,3 +31,7 @@ The renderer scopes loaded metadata, hover results and sidebar results to the ex
 - Formatting/diff checks passed. Whole-product acceptance remains due after the activity, message-branch and action-plan stages.
 
 Interface review: existing React/CSS/Lucide conventions were retained. Typography uses existing sans/mono tokens and tabular citation numbers; surfaces use the shared raised/shadow tokens and bounded scrolling; no new animation was added; icons/labels preserve keyboard names; metadata and excerpt reads are bounded and do not trigger network activity. A large editor/HTML renderer and 40 px inline citation boxes were considered and rejected because they add runtime/authority or disrupt paragraph reading. The larger excerpt action remains available for inspection. Screenshot review covered the compact dark view; light-mode and whole-product regression coverage remains part of final acceptance.
+
+## Final regression acceptance
+
+The later whole-application run passed: **81 Electron journeys, 2 opt-in live API journeys skipped**. Go, race, Node, typed bridge, build and companion regressions passed as recorded in [Chat UX acceptance](CHAT-UX-ACCEPTANCE.md). Earlier stage-specific counts and pending statements above are historical checkpoints. No additional paid evaluation, real-account mutation or physical-device acceptance is inferred.

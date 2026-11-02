@@ -25,3 +25,7 @@ Selections apply to subsequent submissions, including queued messages submitted 
 - `git diff --check` and Go formatting: clean.
 
 The first source UI run found two test expectation mismatches: a stale catalogue is rejected before checking individual IDs, and a newly added descriptive label changed an exact button locator. The test expectation and redundant row description were corrected; all three final journeys passed. Whole-suite regression acceptance is still required after the remaining UX stages. Physical account/device and signed-installer acceptance are not claimed.
+
+## Final regression acceptance
+
+The later whole-application run passed: **81 Electron journeys, 2 opt-in live API journeys skipped**. Go, race, Node, typed bridge, build and companion regressions passed as recorded in [Chat UX acceptance](CHAT-UX-ACCEPTANCE.md). Earlier stage-specific counts and pending statements above are historical checkpoints. No additional paid evaluation, real-account mutation or physical-device acceptance is inferred.
