@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/config"
+	profilestate "github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/workapp"
 	"github.com/gongahkia/gator/internal/workrun"
 	"github.com/gongahkia/gator/internal/worksession"
@@ -26,6 +28,12 @@ func TestDesktopTaskPlanPreparationUsesConfiguredModelWithoutExecutingWork(t *te
 	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
+		if release, err := profilestate.Guard(state, true); !errors.Is(err, profilestate.ErrBusy) {
+			if release != nil {
+				release()
+			}
+			t.Error("plan preparation did not retain the normal profile guard", err)
+		}
 		var body struct {
 			Tools []any `json:"tools"`
 		}
@@ -58,6 +66,11 @@ func TestDesktopTaskPlanPreparationUsesConfiguredModelWithoutExecutingWork(t *te
 	content, err := prepareDesktopTaskPlan(context.Background(), state, request)
 	if err != nil || content.Outcome != "A tested parser" || calls.Load() != 1 {
 		t.Fatal("native proposal failed", err, calls.Load())
+	}
+	if release, err := profilestate.Guard(state, true); err != nil {
+		t.Fatal("plan preparation left the profile guard held", err)
+	} else {
+		release()
 	}
 	for _, directory := range []string{"work-history", "snapshots", "work", "actions"} {
 		if _, err := os.Stat(filepath.Join(state, "gator", directory)); !os.IsNotExist(err) {

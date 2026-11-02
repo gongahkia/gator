@@ -204,6 +204,10 @@ func (m Model) ApplyTaskPlan(action TaskPlanAction) (tea.Model, tea.Cmd) {
 	case "inspect":
 		p := r.Plan.Clone()
 		m.planResult.Review = &TaskPlanReview{ID: r.ID, Revision: p.Revision, Digest: p.Digest, Task: r.Text, State: r.State, Phase: p.Phase, Budget: p.Budget, Sources: append([]string{}, p.Sources...), Content: p.Content}
+		var frozen RunOptions
+		if json.Unmarshal(r.Options, &frozen) == nil {
+			m.planResult.Review.InputNames = uploadNames(frozen.Uploads)
+		}
 		return m, nil
 	case "edit":
 		if action.Content == nil {
@@ -276,15 +280,16 @@ type TaskPlanSummary struct {
 	At       time.Time              `json:"at"`
 }
 type TaskPlanReview struct {
-	ID       string                   `json:"id"`
-	Revision uint64                   `json:"revision"`
-	Digest   string                   `json:"digest"`
-	Task     string                   `json:"task"`
-	State    string                   `json:"state"`
-	Phase    string                   `json:"phase"`
-	Budget   worksession.PlanBudget   `json:"budget"`
-	Sources  []string                 `json:"sources"`
-	Content  *worksession.PlanContent `json:"content,omitempty"`
+	ID         string                   `json:"id"`
+	Revision   uint64                   `json:"revision"`
+	Digest     string                   `json:"digest"`
+	Task       string                   `json:"task"`
+	State      string                   `json:"state"`
+	Phase      string                   `json:"phase"`
+	Budget     worksession.PlanBudget   `json:"budget"`
+	Sources    []string                 `json:"sources"`
+	Content    *worksession.PlanContent `json:"content,omitempty"`
+	InputNames []string                 `json:"input_names,omitempty"`
 }
 
 func (m Model) taskPlanSummaries() []TaskPlanSummary {

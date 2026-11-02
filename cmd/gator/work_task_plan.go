@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/state"
 	sharedusage "github.com/gongahkia/gator/internal/usage"
 	"github.com/gongahkia/gator/internal/workapp"
 	"github.com/gongahkia/gator/internal/workrun"
@@ -15,6 +16,11 @@ import (
 // Planning uses the selected model without a Work runner, filesystem capture,
 // connector invocation, coding worker or permission-bearing tool surface.
 func prepareDesktopTaskPlan(ctx context.Context, stateDir string, r worksession.Request) (worksession.PlanContent, error) {
+	release, err := state.Guard(stateDir, false)
+	if err != nil {
+		return worksession.PlanContent{}, err
+	}
+	defer release()
 	store, err := worksession.Open(stateDir)
 	if err != nil {
 		return worksession.PlanContent{}, err

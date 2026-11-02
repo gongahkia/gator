@@ -200,6 +200,15 @@ func (s Store) AdmitPlanRequest(id, text string, options json.RawMessage, client
 			return j, r, nil
 		}
 	}
+	pending := 0
+	for _, r := range j.Requests {
+		if r.Pending() {
+			pending++
+		}
+	}
+	if pending >= 17 {
+		return j, Request{}, errors.New("review or remove a retained message before sending another")
+	}
 	r, err := NewRequest(text, options, now)
 	if err != nil {
 		return j, r, err
@@ -207,6 +216,15 @@ func (s Store) AdmitPlanRequest(id, text string, options json.RawMessage, client
 	r.ClientID = clientID
 	r.Plan = newTaskPlan(c, r, sources, budget)
 	j.Requests = append(j.Requests, r)
+	// Match ordinary request retention. Only terminal records can leave the
+	// bounded journal; pending/uncertain requests are never discarded for space.
+	for len(j.Requests) > MaxRetainedRequests {
+		index := slices.IndexFunc(j.Requests, func(candidate Request) bool { return !candidate.Pending() })
+		if index < 0 {
+			return j, Request{}, errors.New("too many retained pending messages")
+		}
+		j.Requests = slices.Delete(j.Requests, index, index+1)
+	}
 	next, err := s.SaveRequests(id, j)
 	return next, r, err
 }

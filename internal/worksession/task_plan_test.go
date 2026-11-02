@@ -236,3 +236,48 @@ func TestTaskPlanHeadReturningToOldRevisionDoesNotRestoreApprovalAuthority(t *te
 		t.Fatal("returning to an old head revived stale authority")
 	}
 }
+
+func TestTaskPlanAdmissionRetainsPendingAndBoundsTerminalHistory(t *testing.T) {
+	s, id, _ := requestTestStore(t)
+	j, err := s.LoadRequests(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < MaxRetainedRequests; i++ {
+		r, err := NewRequest("Earlier completed task", json.RawMessage(`{}`), time.Now())
+		if err != nil {
+			t.Fatal(err)
+		}
+		r.State = "completed"
+		j.Requests = append(j.Requests, r)
+	}
+	if _, err = s.SaveRequests(id, j); err != nil {
+		t.Fatal(err)
+	}
+	j, r, err := s.AdmitPlanRequest(id, "Prepare next", json.RawMessage(`{"PlanFirst":true}`), "next-plan", nil, PlanBudget{}, time.Now())
+	if err != nil || len(j.Requests) != MaxRetainedRequests || j.Requests[len(j.Requests)-1].ID != r.ID {
+		t.Fatal("terminal retention blocked new plan", err)
+	}
+	for i := 0; i < 16; i++ {
+		j, _, err = s.AdmitPlanRequest(id, "A separate intention", json.RawMessage(`{"PlanFirst":true}`), "", nil, PlanBudget{}, time.Now())
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, _, err = s.AdmitPlanRequest(id, "One too many", json.RawMessage(`{"PlanFirst":true}`), "", nil, PlanBudget{}, time.Now()); err == nil {
+		t.Fatal("pending bound bypassed")
+	}
+	retained, err := s.LoadRequests(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	count := 0
+	for _, record := range retained.Requests {
+		if record.Pending() {
+			count++
+		}
+	}
+	if count != 17 {
+		t.Fatal("pending records pruned or duplicated", count)
+	}
+}
