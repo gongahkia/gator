@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
 import type { BackendPanel } from "./protocol";
+import { empty_sources as emptySources } from "../../internal/productguide/capabilities.json";
 
 type Row = NonNullable<BackendPanel["rows"]>[number];
 
@@ -25,7 +26,7 @@ export function PanelField({ row, value, disabled, group, panelID, change }: { r
     : field.kind === "multi" ? <fieldset className="field-options" aria-describedby={describedBy} disabled={locked}><legend className="visually-hidden">{row.label}</legend>{field.options?.length ? field.options.map((option) => {
       let selected: string[] = []; try { selected = JSON.parse(value) || []; } catch { /* An empty saved choice means local files only. */ }
       return <label key={option.value}><input type="checkbox" checked={selected.includes(option.value)} onChange={(event) => change(JSON.stringify(event.target.checked ? [...selected, option.value] : selected.filter((item) => item !== option.value)))} /><span>{option.label}</span></label>;
-    }) : <p className="muted">Local files only. Configure a connection to include mail or calendar.</p>}</fieldset>
+    }) : <p className="muted">{emptySources}</p>}</fieldset>
     : field.kind === "budget" ? <fieldset className="field-budget" aria-describedby={describedBy} disabled={locked}><legend className="visually-hidden">{row.label}</legend>{field.parts?.map((part, index) => <label key={part.label}><span>{part.label}</span><input type="number" aria-label={part.label} min={part.min} max={part.max} step={1} value={value.split(",")[index] ?? ""} onChange={(event) => { const parts = value.split(","); parts[index] = event.target.value; change(parts.join(",")); }} /></label>)}</fieldset>
     : field.kind === "datetime" ? <input id={id} aria-label={row.label} aria-describedby={describedBy} disabled={locked} type="datetime-local" value={localDateTime(value)} onChange={event => { const date = new Date(event.target.value); change(event.target.value && Number.isFinite(date.getTime()) ? date.toISOString() : ""); }} />
     : field.multiline ? <textarea id={id} aria-label={row.label} aria-describedby={describedBy} disabled={locked} value={value} maxLength={field.limit} placeholder={field.placeholder} onChange={(event) => change(event.target.value)} rows={3} />

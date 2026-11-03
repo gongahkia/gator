@@ -38,7 +38,7 @@ page](https://developers.openai.com/api/docs/models/gpt-5.6-sol) and
 | 12. Deliverables | Representative template revisions and independently reviewed briefs, sheets and decks; factual/layout defects and repair time recorded | Open |
 | 13. Release/platform | Signed install/update/rollback lifecycle; supervisor drain/restart; acceptable Windows command isolation and native evidence | Open |
 | 14. Privacy/assurance | Precise threat/data-flow model, platform credential protection, and adversarial cross-tool/content evaluations before expanding authority | In progress: notification command text isolated from program source |
-| 15. Capability truth | Current shared capability descriptions for onboarding/help/model guidance; eliminate calendar contradictions and test user-visible claims | Open |
+| 15. Capability truth | Current shared capability descriptions for onboarding/help/model guidance; eliminate calendar contradictions and test user-visible claims | In progress: shared connected-account/availability guide and Google operation parity check |
 
 Acceptance depending on provider registrations, signing identities, physical
 devices, deployment or independent human judgment stays explicitly unverified
@@ -242,3 +242,31 @@ acceptance. General reconnect scope handling and the rest of the broader
 requirements are not certified by these permission-upgrade tests. The complete
 fifteen-item goal remains active; the subsequent responsiveness audit is retained
 above, with reproducible before/after measurements required.
+
+## Shared capability guide checkpoint — 3 November
+
+`internal/productguide/capabilities.json` now supplies the runtime's embedded
+self-knowledge, desktop onboarding, empty source selection, both help surfaces
+and the pilot's starting instruction. It removes unsupported Calendar offers
+and the unconditional user-owned-client requirement, describes native sending
+and the original-upload limitation, and reconciles the obsolete blanket claim
+that no remote companion exists with its experimental, separately hosted
+implementation. Nothing in the guide selects an account or grants authority.
+
+The guide's Google operation inventory is checked against production tool
+registration so future additions/removals require a corresponding review.
+Named JSON imports keep the desktop from bundling model-only guidance. See
+[shared capability descriptions](PRODUCT_CAPABILITY_GUIDE.md) for exact scope
+and rollback. Broader navigation/voice/file/release descriptions still need
+production-backed consistency checks; this does not close item 15.
+
+Validation: productguide/workrun/workapp full race suites pass; focused command
+pilot/app/connection tests pass; affected-package vet, TypeScript check and
+desktop runtime/UI builds pass. The existing first-task Electron journey is
+verified in 7.9 seconds with an isolated profile: it retains a file and draft
+through model setup/reload and submits only on request. Its model endpoint is a
+local fixture. No paid model/search call or real external action was used.
+
+The preceding native email permission change is commit `9075ae6d9`; rich message
+composition is `90f4c22d6`. The fifteen-item goal and the requested subsequent
+responsiveness work remain active. README files stay untouched.

@@ -1,4 +1,5 @@
 import { ChevronRight, FileText, MessageSquare, Plug, Settings2, Target } from "lucide-react";
+import { connections_title as connectionsTitle, connections_setup as connectionsSetup } from "../../internal/productguide/capabilities.json";
 
 // Suggestions only fill the existing draft. Sending, account access and ongoing
 // responsibilities keep their normal explicit setup/review paths.
@@ -14,6 +15,6 @@ export function FirstTaskSetup({ hasDraft, hasFiles, disabled, suggest, attach, 
     </div>}
     <div className="first-task-model"><Settings2 size={18} aria-hidden="true" /><div><h2>Choose a model to get started</h2><p>A cloud model uses your provider’s API key and billing. A local model runs on this computer and needs a download.</p><button className="button" disabled={disabled} onClick={models}>Choose a model<ChevronRight size={15} /></button></div></div>
     <p className="first-task-privacy">Cloud models receive the message, files and saved context supplied to a request. Your draft and attached files stay here during setup. Send when you’re ready.</p>
-    <details className="first-task-connections"><summary><Plug size={15} aria-hidden="true" />Need email or calendar for this task?</summary><p>Accounts are optional. Google setup currently needs your own desktop OAuth client. You’ll review access before connecting, then choose which chats or follow-ups can use it.</p><button className="small-button" disabled={disabled} onClick={connections}>Connect an account<ChevronRight size={14} /></button></details>
+    <details className="first-task-connections"><summary><Plug size={15} aria-hidden="true" />{connectionsTitle}</summary><p>{connectionsSetup}</p><button className="small-button" disabled={disabled} onClick={connections}>Connect an account<ChevronRight size={14} /></button></details>
   </section>;
 }

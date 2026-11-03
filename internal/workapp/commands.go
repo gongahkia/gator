@@ -11,6 +11,7 @@ import (
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/instructions"
 	"github.com/gongahkia/gator/internal/jobs"
+	"github.com/gongahkia/gator/internal/productguide"
 	"github.com/gongahkia/gator/internal/worksession"
 )
 
@@ -1475,6 +1476,8 @@ func workHelp() string {
 	return `Gator
   Start Work by writing your request below. Gator retains its output and follows
   the current workspace, model, and mode.
+
+` + productguide.Current().Help + `
 
   /model                         choose Cloud API key or Local model
   /source [PATH]                 choose the workspace

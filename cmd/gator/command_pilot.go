@@ -13,13 +13,15 @@ import (
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/pilot"
+	"github.com/gongahkia/gator/internal/productguide"
 	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/uisnapshot"
 )
 
-const pilotGuide = `Project follow-up pilot
+func pilotGuide() string {
+	return `Project follow-up pilot
 
-Start with /followup new: watch selected project files and optional planning mail/calendar, identify the next useful step, and prepare a response for review.
+` + productguide.Current().PilotStart + `
 Review the outcome, sources, notification conditions, frequency, and permitted actions before saving. Open /memory to inspect storage, retrieval, and chat processing.
 
 For each participant, observe setup without coaching; one material change; one unrelated update; a correction; and stopping/resuming work.
@@ -35,6 +37,7 @@ Rate shown alerts with gator job inbox rate ENTRY_ID useful|noise|wrong.
 Review quiet checks with gator job quiet-audit JOB_ID ATTEMPT_ID missed|correct.
 Unreviewed outcomes, failed provider calls, and scripted fixtures are not evidence of user success.
 See docs/PROJECT_FOLLOWUP_PILOT.md and examples/project-followup for the replay and review procedure.`
+}
 
 type pilotReport struct {
 	pilot.Report
@@ -46,7 +49,7 @@ type pilotReport struct {
 
 func pilotCommand(args []string, out io.Writer) error {
 	if len(args) == 0 || args[0] == "guide" {
-		_, err := fmt.Fprintln(out, pilotGuide)
+		_, err := fmt.Fprintln(out, pilotGuide())
 		return err
 	}
 	stateDir, err := state.ResolveDir(os.Getenv("GATOR_STATE_DIR"))
