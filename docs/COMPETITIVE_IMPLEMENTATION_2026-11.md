@@ -11,6 +11,15 @@ reused. New calls need durable conservative reservations before dispatch, actual
 usage afterward, and a cumulative ledger retaining failures and unknown charges.
 Free fixtures do not establish live-model or user acceptance.
 
+New allowance authority: `scripts/competitive-eval/authorization.json`; cumulative
+ledger: `scripts/competitive-eval/results/budget.json`. The existing opt-in Work
+evaluation transport is reused with this new directory, a US$9.50 admission
+ceiling and durable unknown-request reservations. Conservative model ceilings
+are US$6/M input and US$24/M output, covering cache-write and regional uplift.
+The selected `gpt-5.6` alias and rates were checked against [the official model
+page](https://developers.openai.com/api/docs/models/gpt-5.6-sol) and
+[API pricing](https://developers.openai.com/api/docs/pricing) on 3 November.
+
 ## Requirements and acceptance
 
 | Audit item | Implementation and required acceptance | State |

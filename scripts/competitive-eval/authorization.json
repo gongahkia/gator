@@ -1,0 +1,9 @@
+{
+  "authorized_at": "2026-11-03",
+  "purpose": "Implement and evaluate all fifteen personal-agent product findings",
+  "total_usd": 10,
+  "admission_ceiling_usd": 9.5,
+  "ledger": "results/budget.json",
+  "prior_allowances_reused": false,
+  "note": "All new model and search calls share this allowance; failures and uncertain charges remain accounted."
+}

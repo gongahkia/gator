@@ -37,6 +37,12 @@ type projectEvalSpend struct {
 	Input, Output  int64
 }
 
+// Verified 3 Nov 2026: gpt-5.6 aliases GPT-5.6 Sol. Standard input/output
+// $4/$20 per million, cache writes $5, regional processing +10%. These rounded
+// ceilings cover $5.50/$22 without assuming cache discounts or free retries.
+const projectEvalInputUSDPerMillion = 6.0
+const projectEvalOutputUSDPerMillion = 24.0
+
 func TestLiveTinyfishSearch(t *testing.T) {
 	path := os.Getenv("GATOR_LIVE_TINYFISH_REPORT")
 	if path == "" {
@@ -124,9 +130,8 @@ func (g projectEvalTransport) RoundTrip(r *http.Request) (*http.Response, error)
 	body["stream"] = json.RawMessage(`false`)
 	b, _ = json.Marshal(body)
 	// Text-only input is bounded by twice serialized bytes plus generous message
-	// overhead. Rates reserve $5/M input (includes cache-write premium) and $20/M
-	// output; this is below the long-context threshold. No built-in tool charges.
-	reserve := (float64(2*len(b)+4096)*5 + 4096*20) / 1e6
+	// overhead, below the long-context threshold. No built-in tool charges.
+	reserve := (float64(2*len(b)+4096)*projectEvalInputUSDPerMillion + 4096*projectEvalOutputUSDPerMillion) / 1e6
 	root, err := workspace.Open(g.directory)
 	if err != nil {
 		return nil, err
@@ -194,7 +199,7 @@ func (g projectEvalTransport) RoundTrip(r *http.Request) (*http.Response, error)
 		} `json:"usage"`
 	}
 	if json.Unmarshal(data, &usage) == nil && usage.Usage != nil && usage.Usage.Input >= 0 && usage.Usage.Output >= 0 {
-		cost := (float64(usage.Usage.Input)*5 + float64(usage.Usage.Output)*20) / 1e6
+		cost := (float64(usage.Usage.Input)*projectEvalInputUSDPerMillion + float64(usage.Usage.Output)*projectEvalOutputUSDPerMillion) / 1e6
 		if cost > reserve {
 			return nil, errors.New("provider usage exceeded reserved bound; stop and inspect billing")
 		}
