@@ -20,11 +20,14 @@ func workControls(stateDir string) func(context.Context, string, string, []strin
 	return workControlsWithConnections(stateDir, &connectionControls{stateDir: stateDir})
 }
 func workControlsWithConnections(stateDir string, connections *connectionControls) func(context.Context, string, string, []string) (workapp.ControlScreen, error) {
+	search := &searchControls{stateDir: stateDir}
 	return func(ctx context.Context, family, action string, args []string) (workapp.ControlScreen, error) {
 		if err := ctx.Err(); err != nil {
 			return workapp.ControlScreen{}, err
 		}
 		switch family {
+		case "search":
+			return search.call(ctx, action, args)
 		case "browser":
 			return browserControl(ctx, stateDir, action, args)
 		case "connections":
@@ -98,11 +101,11 @@ func usageControl(stateDir, action string, args []string) (workapp.ControlScreen
 	if p.Paused {
 		status = "All new provider requests paused; current requests may finish"
 	}
-	lines := []string{status, "Day: " + view.Day + " (UTC)", fmt.Sprintf("%d provider requests · %d active · %d failed attempts", view.Requests, view.ActiveRequests, view.Failed), fmt.Sprintf("%d charged tokens · %d requests have estimated or unreported usage", view.Tokens, view.EstimatedRequests), fmt.Sprintf("Limits: %s requests/day · %s tokens/day · %s concurrent requests", limitLabel(int64(p.DailyRequests)), limitLabel(p.DailyTokens), limitLabel(int64(p.ConcurrentRequests))), "Counters include chat, background jobs, routing, retrieval, Code, and repeated attempts.", "Request and concurrency limits are reserved atomically across local Gator processes using this state directory.", "Tokens use input-byte and response reservations until provider usage arrives. Missing usage keeps its reservation. Provider totals can exceed estimates; this is not a billing ceiling.", "A paused or exhausted shared budget also stops automatic routing and embeddings. Source-only polls can continue.", "No complete monetary cost is available when usage or pricing is missing."}
+	lines := []string{status, "Day: " + view.Day + " (UTC)", fmt.Sprintf("%d provider requests · %d active · %d failed attempts", view.Requests, view.ActiveRequests, view.Failed), fmt.Sprintf("%d charged tokens · %d requests have estimated or unreported usage", view.Tokens, view.EstimatedRequests), fmt.Sprintf("Limits: %s requests/day · %s tokens/day · %s concurrent requests", limitLabel(int64(p.DailyRequests)), limitLabel(p.DailyTokens), limitLabel(int64(p.ConcurrentRequests))), "Counters include chat, background jobs, routing, retrieval, Code, voice, web searches, and repeated attempts.", "Request and concurrency limits are reserved atomically across local Gator processes using this state directory.", "Tokens use input-byte and response reservations until provider usage arrives. Missing usage keeps its reservation. Provider totals can exceed estimates; this is not a billing ceiling.", "A paused or exhausted shared budget also stops automatic routing and embeddings. Source-only polls can continue.", "No complete monetary cost is available when usage or pricing is missing."}
 	if view.KnownCostUSD != nil {
 		lines = append(lines, fmt.Sprintf("Retained provider-reported cost: $%.4f", *view.KnownCostUSD))
 	}
-	for _, category := range []string{"chat", "work", "background", "routing", "retrieval", "code", "voice"} {
+	for _, category := range []string{"chat", "work", "background", "routing", "retrieval", "code", "voice", "search"} {
 		lines = append(lines, fmt.Sprintf("%s: %d requests", category, view.Categories[category]))
 		usage.Categories = append(usage.Categories, uisnapshot.UsageCategory{Name: category, Requests: view.Categories[category]})
 	}

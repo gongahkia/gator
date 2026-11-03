@@ -17,6 +17,9 @@ func (o HTTPFetchOptions) SearchStatus() (string, error) {
 }
 
 func (o HTTPFetchOptions) searchConfiguration() (string, string, error) {
+	if o.SearchDisabled {
+		return "", "", nil
+	}
 	keys := map[string]string{"brave": strings.TrimSpace(o.BraveSearchAPIKey), "tinyfish": strings.TrimSpace(o.TinyfishSearchAPIKey), "exa": strings.TrimSpace(o.ExaSearchAPIKey), "tavily": strings.TrimSpace(o.TavilySearchAPIKey)}
 	p := strings.ToLower(strings.TrimSpace(o.SearchProvider))
 	if p == "" {

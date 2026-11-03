@@ -35,6 +35,7 @@ type WorkRole struct {
 }
 
 type Settings struct {
+	Search         SearchSettings    `json:"search,omitzero"`
 	ExternalAgents []cliagent.Config `json:"external_agents,omitempty"`
 	Desktop        DesktopSettings   `json:"desktop,omitzero"`
 	WorkRoles      []WorkRole        `json:"work_roles,omitempty"`
@@ -65,6 +66,22 @@ type Settings struct {
 	Snapshots            SnapshotSettings           `json:"snapshots"`
 	Notifications        NotificationSettings       `json:"notifications"`
 	JobDefaults          JobDefaults                `json:"job_defaults"`
+}
+
+// SearchSettings selects a service, never a key or endpoint. Empty preserves
+// launch-environment compatibility; off explicitly disables search even when
+// that environment contains keys. API credentials remain in auth.Store.
+type SearchSettings struct {
+	Provider string `json:"provider,omitempty"`
+}
+
+func (s SearchSettings) Validate() error {
+	switch s.Provider {
+	case "", "environment", "off", "tinyfish", "exa", "tavily", "brave":
+		return nil
+	default:
+		return errors.New("choose a supported web search service")
+	}
 }
 
 // EmbeddingSettings selects a knowledge-retrieval backend independently of the
@@ -313,6 +330,9 @@ func (s Store) Save(settings Settings) error {
 }
 
 func validate(settings Settings) error {
+	if err := settings.Search.Validate(); err != nil {
+		return err
+	}
 	if err := cliagent.ValidateAll(settings.ExternalAgents); err != nil {
 		return err
 	}

@@ -382,7 +382,7 @@ func (m Model) RespondBridgeApproval(id int, token string, approved bool) (tea.M
 func (m Model) NavigateBridge(command string) (tea.Model, tea.Cmd) {
 	m.bridgeNotice = ""
 	switch command {
-	case "/gator", "/chat", "/knowledge", "/new", "/overview", "/goals", "/conversations", "/inbox", "/followup", "/history", "/memory", "/context", "/usage", "/data", "/recovery", "/connections", "/browser", "/model", "/settings", "/help":
+	case "/gator", "/chat", "/knowledge", "/new", "/overview", "/goals", "/conversations", "/inbox", "/followup", "/history", "/memory", "/context", "/usage", "/data", "/recovery", "/connections", "/browser", "/model", "/settings", "/help", "/search":
 	default:
 		known := false
 		for _, entry := range m.availableCommandEntries() {

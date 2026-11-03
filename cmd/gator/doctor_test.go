@@ -42,7 +42,7 @@ func TestDoctorReportsConfiguredWebSearchWithoutToken(t *testing.T) {
 		t.Fatalf("doctor: %v", err)
 	}
 	text := output.String()
-	if !strings.Contains(text, "Web search: configured (requires --network allow)") || strings.Contains(text, "do-not-print-this-search-token") {
+	if !strings.Contains(text, "Web search: configured") || !strings.Contains(text, "review web access in chat") || strings.Contains(text, "do-not-print-this-search-token") {
 		t.Fatalf("doctor web search output = %q", text)
 	}
 }

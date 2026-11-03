@@ -55,6 +55,11 @@ type HTTPFetchOptions struct {
 	// MaxRequests is a host-selected shared fetch/search ceiling (1–64).
 	// Zero preserves the default of eight. Models cannot set this field.
 	MaxRequests int
+	// BeginSearch is a host-owned shared-admission/accounting hook. It runs
+	// immediately before paid search dispatch, after URL/DNS validation.
+	// The returned settlement receives failure state, never query/key content.
+	BeginSearch    func(context.Context, string) (func(bool) error, error)
+	SearchDisabled bool
 	// BraveSearchAPIKey enables the optional native web_search tool. It is
 	// expected to come from BRAVE_SEARCH_API_KEY and is never persisted, logged,
 	// included in tool results, or exposed to the model.
@@ -241,7 +246,7 @@ func (t WebSearch) Definition() agent.ToolDefinition {
 	}
 }
 
-func (t WebSearch) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolResult, error) {
+func (t WebSearch) Execute(ctx context.Context, raw json.RawMessage) (result agent.ToolResult, returnErr error) {
 	var arguments struct {
 		Query string `json:"query"`
 		Count int    `json:"count"`
@@ -287,6 +292,16 @@ func (t WebSearch) Execute(ctx context.Context, raw json.RawMessage) (agent.Tool
 	}
 	if !t.budget.reserve() {
 		return agent.ToolResult{}, errors.New("web research run budget changed before search could start")
+	}
+	if t.Options.BeginSearch != nil {
+		finish, err := t.Options.BeginSearch(ctx, provider)
+		if err != nil {
+			return agent.ToolResult{}, err
+		}
+		if finish == nil {
+			return agent.ToolResult{}, errors.New("search admission returned no settlement")
+		}
+		defer func() { returnErr = errors.Join(returnErr, finish(returnErr != nil)) }()
 	}
 	request.Header.Set("Accept", "application/json")
 	request.Header.Set("User-Agent", "Gator/1.0 (+https://github.com/gongahkia/gator)")

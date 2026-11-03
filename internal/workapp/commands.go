@@ -208,6 +208,7 @@ func commandPaletteEntries() []entry {
 		{title: "/overview", subtitle: "Changes, decisions, next actions, and blockers", kind: "command", command: "/overview"},
 		{title: "/browser", subtitle: "Private sign-in, browser access and next-task grant", kind: "command", command: "/browser"},
 		{title: "/connections", subtitle: "Connect accounts and check access", kind: "command", command: "/connections"},
+		{title: "/search", subtitle: "Choose a web search service and check access", kind: "command", command: "/search"},
 		{title: "/recovery", subtitle: "Reconnect sources and review offline checks", kind: "command", command: "/recovery"},
 		{title: "/usage", subtitle: "Shared usage and limits across all work", kind: "command", command: "/usage"},
 		{title: "/data", subtitle: "Retention, private backups, and deletion", kind: "command", command: "/data"},
@@ -395,7 +396,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 	if len(fields) == 0 {
 		return m, nil
 	}
-	if m.config.BeforeLocalCommand != nil && fields[0] != "/data" && fields[0] != "/usage" && fields[0] != "/recovery" && fields[0] != "/overview" && fields[0] != "/connections" && fields[0] != "/browser" {
+	if m.config.BeforeLocalCommand != nil && fields[0] != "/data" && fields[0] != "/usage" && fields[0] != "/recovery" && fields[0] != "/overview" && fields[0] != "/connections" && fields[0] != "/browser" && fields[0] != "/search" {
 		release, err := m.config.BeforeLocalCommand()
 		if err != nil {
 			m.messages = append(m.messages, noticeMessage("Private data", err.Error(), "error"))
@@ -409,7 +410,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 	var result string
 	var err error
 	switch fields[0] {
-	case "/usage", "/data", "/recovery", "/overview", "/connections", "/browser":
+	case "/usage", "/data", "/recovery", "/overview", "/connections", "/browser", "/search":
 		if m.config.Controls == nil {
 			err = errorsUnavailable("product controls")
 			break

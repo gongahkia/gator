@@ -14,6 +14,7 @@ import (
 	"github.com/gongahkia/gator/internal/localmodel"
 	"github.com/gongahkia/gator/internal/model"
 	"github.com/gongahkia/gator/internal/sandbox"
+	"github.com/gongahkia/gator/internal/state"
 	"github.com/gongahkia/gator/internal/uisnapshot"
 )
 
@@ -81,15 +82,23 @@ func inspectDoctor(arguments []string) (doctorFacts, error) {
 	if customProvider {
 		providerDisplay = custom.ID
 	}
-	searchProvider, searchErr := webResearchOptionsFromEnvironment().SearchStatus()
+	searchCredentials, credentialsErr := gatorCredentials()
+	if credentialsErr != nil {
+		return facts, credentialsErr
+	}
+	searchState, err := state.ResolveDir("")
+	if err != nil {
+		return facts, err
+	}
+	searchProvider, searchErr := configuredWebSearch(settings, searchCredentials, searchState).SearchStatus()
 	facts = doctorFacts{Repository: gitStatus, Provider: providerDisplay, Authentication: authentication,
 		AuthenticationStatus: authenticationStatus, Sandbox: sandboxStatus, SandboxAvailable: sandboxErr == nil,
 		WebSearchConfigured: searchProvider != "" && searchErr == nil,
 		CustomLocal:         customProvider && custom.ID == localmodel.ProviderID,
 		Dependencies:        dependency.Detect(), Host: inspectLocalModelHost()}
-	facts.WebSearch = "not configured (set a web search provider key)"
+	facts.WebSearch = "not configured (open Settings → Search)"
 	if facts.WebSearchConfigured {
-		facts.WebSearch = "configured (requires --network allow); provider: " + searchProvider
+		facts.WebSearch = "configured; provider: " + searchProvider + "; review web access in chat"
 	} else if searchErr != nil {
 		facts.WebSearch = "configuration error: " + searchErr.Error()
 	}

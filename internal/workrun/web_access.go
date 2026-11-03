@@ -148,7 +148,9 @@ func newWebResearch(catalog *evidenceCatalog, request Request, options tools.HTT
 		return nil, nil, nil, err
 	}
 	provider, configErr := options.SearchStatus()
-	if configErr != nil {
+	if options.SearchDisabled {
+		provider = "disabled in Settings → Search"
+	} else if configErr != nil {
 		provider = "unavailable: search configuration needs attention"
 	} else if provider == "" {
 		provider = "unavailable: no search provider configured"

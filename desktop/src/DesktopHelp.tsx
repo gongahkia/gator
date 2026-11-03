@@ -11,6 +11,7 @@ const pages = [
   { name: "followup", label: "Follow-up checks", route: "/followup" },
   { name: "context", label: "Saved knowledge", route: "/knowledge" },
   { name: "model", label: "Models", route: "/model" },
+  { name: "search", label: "Web search", route: "/search" },
   { name: "usage", label: "Usage & limits", route: "/usage" },
   { name: "data", label: "Data & backups", route: "/data" },
   { name: "recovery", label: "Recovery", route: "/recovery" },
