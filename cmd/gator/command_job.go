@@ -1164,7 +1164,7 @@ func digestJobResult(finalText string, artifacts []artifact.File) string {
 }
 
 func jobNotificationPolicyHash(definition jobs.Definition) string {
-	digest, _ := definition.PolicyDigest()
+	digest, _ := definition.CheckPolicyDigest()
 	return digest
 }
 

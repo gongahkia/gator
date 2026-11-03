@@ -461,6 +461,15 @@ func (d Definition) PolicyDigest() (string, error) {
 	return hex.EncodeToString(digest[:]), nil
 }
 
+// CheckPolicyDigest identifies the settings under which evidence was checked.
+// Pausing does not invalidate a successful observation. Keep PolicyDigest for
+// reviewed edits: a concurrent pause must still make their review stale.
+// Normalizing to enabled preserves digests of existing scheduled attempts.
+func (d Definition) CheckPolicyDigest() (string, error) {
+	d.Enabled = true
+	return d.PolicyDigest()
+}
+
 func (s Store) Load(id string) (Definition, error) {
 	if invalidID(id) {
 		return Definition{}, errors.New("invalid job ID")
@@ -523,7 +532,7 @@ func (s Store) Claim(id string, scheduled time.Time) (Definition, bool, error) {
 		return Definition{}, false, err
 	}
 	scheduled = scheduled.UTC().Truncate(time.Minute)
-	if definition.Expired(time.Now()) || definition.Expired(scheduled) {
+	if !definition.Enabled || definition.Expired(time.Now()) || definition.Expired(scheduled) {
 		return definition, false, nil
 	}
 	if !definition.LastScheduledAt.IsZero() && !definition.LastScheduledAt.Before(scheduled) {
@@ -696,7 +705,7 @@ func (s locatedSchedule) Next(after time.Time) time.Time {
 }
 
 func Due(definition Definition, now time.Time) (time.Time, bool, error) {
-	if definition.Expired(now) {
+	if !definition.Enabled || definition.Expired(now) {
 		return time.Time{}, false, nil
 	}
 	schedule, err := Schedule(definition)

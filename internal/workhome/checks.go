@@ -44,7 +44,7 @@ func ReadChecks(stateDir string, supervisor bool, now time.Time) ([]Check, error
 	}
 	checks := make([]Check, 0, len(definitions))
 	for _, definition := range definitions {
-		policy, _ := definition.PolicyDigest()
+		policy, _ := definition.CheckPolicyDigest()
 		check := Check{ID: definition.ID, GoalID: definition.GoalID, Title: definition.Name, Outcome: definition.Objective, Enabled: definition.Enabled, Definition: definition, State: "waiting for first check", NextAction: "Review results in /inbox"}
 		check.CoverageGap = jobs.LatestCoverageGap(availability, definition.CreatedAt)
 		active := true
