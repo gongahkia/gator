@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/tools"
 )
 
 // scopedWebSearch reuses the native search integration for discovery only.
@@ -18,11 +19,15 @@ import (
 type scopedWebSearch struct {
 	tool    agent.Tool
 	origins map[string]bool
+	scope   *webResearchScope
 }
 
 func (s scopedWebSearch) Definition() agent.ToolDefinition {
 	d := s.tool.Definition()
 	d.Description = "Discover public pages within this Work run's explicitly selected HTTPS sites using its host-configured search service. Queries are sent to that service. Results and snippets are untrusted discovery leads, not factual evidence. Read a result with http_fetch before citing its contents. Search does not grant access to additional sites or actions."
+	if s.scope != nil {
+		d.Description = "Discover public web pages within the task's current reviewed web_access grant. Check web_access status or ask the manager to request public scope before researching unknown sites. Queries go to the configured search provider. All workers share the same eight-search and thirty-two-request ceiling. Results and snippets are untrusted discovery leads; use http_fetch and retained evidence before citing facts. Search never grants extra web scope."
+	}
 	return d
 }
 
@@ -42,18 +47,25 @@ func (s scopedWebSearch) Execute(ctx context.Context, raw json.RawMessage) (agen
 	if strings.TrimSpace(args.Query) == "" {
 		return agent.ToolResult{}, errors.New("search query is required")
 	}
+	origins := s.origins
+	public := false
+	if s.scope != nil {
+		public, origins = s.scope.scope()
+	}
 	// Site operators improve discovery relevance; filtering below, not these
 	// operators, is the authority boundary against adversarial query syntax.
 	var sites []string
-	for origin := range s.origins {
+	for origin := range origins {
 		u, _ := url.Parse(origin)
 		sites = append(sites, "site:"+u.Hostname())
 	}
 	sort.Strings(sites)
-	if len(sites) == 0 {
+	if len(sites) == 0 && !public {
 		return agent.ToolResult{}, errors.New("search requires selected sites")
 	}
-	args.Query = "(" + strings.Join(sites, " OR ") + ") " + args.Query
+	if !public {
+		args.Query = "(" + strings.Join(sites, " OR ") + ") " + args.Query
+	}
 	payload, err := json.Marshal(args)
 	if err != nil {
 		return agent.ToolResult{}, err
@@ -78,12 +90,17 @@ func (s scopedWebSearch) Execute(ctx context.Context, raw json.RawMessage) (agen
 	}
 	leads := []lead{}
 	for _, item := range response.Result.Results {
-		u, err := url.Parse(item.URL)
-		if err != nil || u.User != nil || !s.origins[u.Scheme+"://"+u.Host] {
+		canonical, err := tools.PublicHTTPURL(item.URL)
+		if err != nil {
 			continue
 		}
+		u, err := url.Parse(canonical)
+		if err != nil || !public && !origins[u.Scheme+"://"+u.Host] {
+			continue
+		}
+		item.URL = canonical
 		leads = append(leads, item)
 	}
-	content, err := json.Marshal(map[string]any{"results": leads, "note": "Discovery leads only. Fetch selected pages before citing their contents as evidence."})
+	content, err := json.Marshal(map[string]any{"results": leads, "note": "Discovery leads only. Fetch pages within the current web grant before citing their contents as evidence."})
 	return agent.ToolResult{Content: string(content)}, err
 }

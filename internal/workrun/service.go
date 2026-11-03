@@ -334,6 +334,9 @@ func (s Service) Start(ctx context.Context, request Request) *Operation {
 	request.ApproveAppChange = func(ctx context.Context, preview any) (bool, error) {
 		return ask(ctx, "app_change", preview)
 	}
+	request.ApproveWebAccess = func(ctx context.Context, preview WebAccessReview) (bool, error) {
+		return ask(ctx, "web_access", preview)
+	}
 	// external actions keep their exact request and digest at the domain boundary.
 	request.ApproveAction = func(ctx context.Context, proposal action.Proposal) (action.Decision, error) {
 		approved, err := ask(ctx, "action", proposal)

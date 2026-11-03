@@ -38,6 +38,7 @@ type Evidence struct {
 }
 
 type Manifest struct {
+	Research         *ResearchEvidence      `json:"research,omitempty"`
 	Usage            agent.Usage            `json:"usage"`
 	Evidence         []Evidence             `json:"evidence,omitempty"`
 	PolicySHA256     string                 `json:"policy_sha256,omitempty"`
@@ -59,6 +60,19 @@ type Manifest struct {
 	Failure          string                 `json:"failure,omitempty"`
 	StartedAt        time.Time              `json:"started_at"`
 	FinishedAt       time.Time              `json:"finished_at"`
+}
+
+// ResearchEvidence is a historical usage record, never a reusable web grant.
+// Counts include admitted attempts that can fail before network dispatch.
+type ResearchEvidence struct {
+	PublicWeb      bool     `json:"public_web"`
+	Origins        []string `json:"origins"`
+	SearchProvider string   `json:"search_provider"`
+	Requests       int      `json:"requests"`
+	Searches       int      `json:"searches"`
+	MaxRequests    int      `json:"max_requests"`
+	MaxSearches    int      `json:"max_searches"`
+	ScopeReviews   int      `json:"scope_reviews"`
 }
 
 // Source identifies the developer-selected input and its immutable snapshot.
@@ -121,6 +135,11 @@ type ValidationResult struct {
 // exported. It intentionally does not touch artifact bytes; Seal is the only
 // constructor that establishes their evidence.
 func (m Manifest) Validate() error {
+	if r := m.Research; r != nil {
+		if r.MaxRequests < 1 || r.MaxRequests > 64 || r.MaxSearches < 0 || r.MaxSearches > r.MaxRequests || r.Requests < 0 || r.Requests > r.MaxRequests || r.Searches < 0 || r.Searches > r.MaxSearches || r.Searches > r.Requests || r.ScopeReviews < 0 || r.ScopeReviews > 4 || len(r.Origins) > 16 || len(r.SearchProvider) > 128 {
+			return errors.New("invalid retained web research usage")
+		}
+	}
 	if (m.Version < 1 || m.Version > ManifestVersion) || m.Workflow != "work" {
 		return errors.New("artifact manifest has an unsupported version or workflow")
 	}

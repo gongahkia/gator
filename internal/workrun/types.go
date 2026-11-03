@@ -68,27 +68,30 @@ func (p CodePolicy) HasCapability(name string) bool {
 
 // Request describes one bounded local work session.
 type Request struct {
-	TaskPlan                *TaskPlanReference `json:",omitempty"`
-	reviewedPlan            *worksession.TaskPlan
-	ExternalAgents          []cliagent.Config
-	ReplyToUpdateID         string
-	UpdateContext           string
-	InputIDs                []string
-	ForegroundApp           bool
-	LearnFromChats          bool
-	MaintainMemory          bool
-	DisableChatHistory      bool
-	ApproveAppChange        func(context.Context, any) (bool, error)
-	OnAppChange             func(AppChange)
-	AfterAppRun             func(AppChange, AppMutation)
-	queueAppChange          func(AppChange, AppMutation)
-	DisabledRoles           []string
-	RoleConfiguration       map[string]orchestrator.RoleConfiguration
-	OnSupervisor            func(*orchestrator.Supervisor)
-	OTLPEndpoint            string
-	Limits                  agent.Limits
-	Budget                  *agent.Budget
-	WebOrigins              []string
+	TaskPlan           *TaskPlanReference `json:",omitempty"`
+	reviewedPlan       *worksession.TaskPlan
+	ExternalAgents     []cliagent.Config
+	ReplyToUpdateID    string
+	UpdateContext      string
+	InputIDs           []string
+	ForegroundApp      bool
+	LearnFromChats     bool
+	MaintainMemory     bool
+	DisableChatHistory bool
+	ApproveAppChange   func(context.Context, any) (bool, error)
+	OnAppChange        func(AppChange)
+	AfterAppRun        func(AppChange, AppMutation)
+	queueAppChange     func(AppChange, AppMutation)
+	DisabledRoles      []string
+	RoleConfiguration  map[string]orchestrator.RoleConfiguration
+	OnSupervisor       func(*orchestrator.Supervisor)
+	OTLPEndpoint       string
+	Limits             agent.Limits
+	Budget             *agent.Budget
+	WebOrigins         []string
+	// ApproveWebAccess reviews an additional read-only grant for this task.
+	// Only the foreground owner can supply it; it is never retained as a grant.
+	ApproveWebAccess        func(context.Context, WebAccessReview) (bool, error)
 	catalog                 *evidenceCatalog
 	researchTools           []agent.Tool
 	DisableDelegation       bool

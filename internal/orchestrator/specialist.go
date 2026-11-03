@@ -25,6 +25,7 @@ const (
 type Backend string
 
 var hostReservedTools = map[string]struct{}{
+	"web_access":        {},
 	"create_agent":      {},
 	"agent_profiles":    {},
 	"list_agents":       {},

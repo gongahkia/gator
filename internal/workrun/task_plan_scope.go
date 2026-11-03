@@ -72,6 +72,9 @@ func loadReviewedTaskPlan(request Request) (*worksession.TaskPlan, error) {
 }
 
 func planToolEffects(tool agent.Tool, call agent.ToolCall) ([]string, error) {
+	if call.Name == "web_access" {
+		return []string{"read"}, nil
+	}
 	if effects, known, err := orchestrator.ToolEffects(tool, call); known {
 		return effects, err
 	}

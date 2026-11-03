@@ -43,5 +43,16 @@ func approvalMessage(interaction workrun.Interaction) message {
 		result.result.Sections = []uisnapshot.ResultSection{details}
 		result.result.Footer = "Sending or publishing still needs separate approval."
 	}
+	if review, ok := interaction.Preview.(workrun.WebAccessReview); ok && interaction.Kind == "web_access" {
+		result.result.Title = "Review web research access"
+		result.result.Summary = review.Reason
+		result.result.Preview = nil
+		scope := "Public HTTPS websites, including newly discovered sites"
+		if review.Scope == "sites" {
+			scope = strings.Join(review.Origins, ", ")
+		}
+		result.result.Fields = []uisnapshot.Field{{Label: "Web scope", Value: scope}, {Label: "Search service", Value: review.SearchProvider}, {Label: "Shared limits", Value: fmt.Sprintf("%d search requests within %d total web requests", review.MaxSearches, review.MaxRequests)}}
+		result.result.Footer = review.Lifetime
+	}
 	return result
 }

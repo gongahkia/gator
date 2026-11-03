@@ -421,7 +421,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		}
 	}
 	surface = append(surface, catalog.tools()...)
-	webTools, err := catalog.web(request.WebOrigins, e.HTTP)
+	webTools, researchReads, researchScope, err := newWebResearch(catalog, request, e.HTTP)
 	if err != nil {
 		return outcome, err
 	}
@@ -526,7 +526,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		return outcome, err
 	}
 	surface = append(surface, connectorSurface...)
-	request.researchTools = append(catalog.tools(), webTools...)
+	request.researchTools = append(catalog.tools(), researchReads...)
 	readPolicy := connectorPolicy
 	readPolicy.Mode = action.Inspect
 	readPolicy.ExternalActions = action.Forbid
@@ -786,6 +786,9 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	manifest.Usage.OutputTokens -= usageBefore.OutputTokens
 	manifest.Candidates = integration.records
 	manifest.Evidence = catalog.selected()
+	if researchScope != nil {
+		manifest.Research = researchScope.evidence()
+	}
 	outcome.Manifest = manifest
 	if err := artifact.WriteManifest(work.ManifestPath, manifest); err != nil {
 		if runErr != nil {

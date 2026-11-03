@@ -52,6 +52,9 @@ type HTTPFetchOptions struct {
 	Resolver         HostResolver
 	Timeout          time.Duration
 	MaxResponseBytes int
+	// MaxRequests is a host-selected shared fetch/search ceiling (1–64).
+	// Zero preserves the default of eight. Models cannot set this field.
+	MaxRequests int
 	// BraveSearchAPIKey enables the optional native web_search tool. It is
 	// expected to come from BRAVE_SEARCH_API_KEY and is never persisted, logged,
 	// included in tool results, or exposed to the model.
@@ -73,7 +76,7 @@ func HTTPTools(policy CommandPolicy, options HTTPFetchOptions) []agent.Tool {
 		return nil
 	}
 	options = normalizeHTTPFetchOptions(options)
-	budget := &httpFetchBudget{remaining: maxHTTPFetchesPerRun}
+	budget := &httpFetchBudget{remaining: options.MaxRequests}
 	result := []agent.Tool{HTTPFetch{
 		Policy:  policy,
 		Options: options,
@@ -159,7 +162,7 @@ func (t HTTPFetch) Execute(ctx context.Context, raw json.RawMessage) (agent.Tool
 		return agent.ToolResult{}, err
 	}
 	if !t.budget.available() {
-		return agent.ToolResult{}, fmt.Errorf("http_fetch run budget exceeded; at most %d URLs may be fetched per primary run", maxHTTPFetchesPerRun)
+		return agent.ToolResult{}, errors.New("shared web research request budget exhausted")
 	}
 	if err := t.approve(ctx, canonicalURL); err != nil {
 		return agent.ToolResult{}, err
@@ -268,7 +271,7 @@ func (t WebSearch) Execute(ctx context.Context, raw json.RawMessage) (agent.Tool
 		return agent.ToolResult{}, errors.New("web search is not configured")
 	}
 	if !t.budget.available() {
-		return agent.ToolResult{}, fmt.Errorf("web research run budget exceeded; at most %d requests may be made per primary run", maxHTTPFetchesPerRun)
+		return agent.ToolResult{}, errors.New("shared web research request budget exhausted")
 	}
 	if err := t.approve(ctx, query); err != nil {
 		return agent.ToolResult{}, err
@@ -385,6 +388,10 @@ func boundedWebSearchText(value string) string {
 }
 
 func normalizeHTTPFetchOptions(options HTTPFetchOptions) HTTPFetchOptions {
+	if options.MaxRequests <= 0 {
+		options.MaxRequests = maxHTTPFetchesPerRun
+	}
+	options.MaxRequests = min(options.MaxRequests, 64)
 	options.BraveSearchAPIKey = strings.TrimSpace(options.BraveSearchAPIKey)
 	if options.Resolver == nil {
 		options.Resolver = net.DefaultResolver
@@ -429,6 +436,21 @@ func normalizeHTTPURL(value string) (*url.URL, string, error) {
 	parsed.Fragment = ""
 	parsed.Host = strings.ToLower(parsed.Host)
 	return parsed, parsed.String(), nil
+}
+
+// PublicHTTPURL validates discovery leads without making a DNS request. A
+// subsequent fetch still validates and pins every resolved address. Literal
+// private/reserved IPs, local names, credentials and non-443 ports are rejected.
+func PublicHTTPURL(value string) (string, error) {
+	u, canonical, err := normalizeHTTPURL(value)
+	if err != nil {
+		return "", err
+	}
+	host := strings.TrimSuffix(u.Hostname(), ".")
+	if address := net.ParseIP(host); address != nil && !isPublicHTTPAddress(address) {
+		return "", errors.New("public web URL cannot target a private or reserved address")
+	}
+	return canonical, nil
 }
 
 func resolvePublicHost(ctx context.Context, host string, resolver HostResolver) ([]net.IPAddr, error) {
