@@ -9,8 +9,9 @@ cannot grant tools or permissions.
 
 The shared descriptions distinguish supported Google tools from an individual
 run's selected account, scopes, access checks and exact action approval. They
-cover the new thread/recipient/attachment send behavior and native permission
-upgrade. Onboarding points to the build's actual Connections options, supporting
+cover thread/recipient/attachment sends, original-file selection through
+`list_input_files`, and native permission upgrades. Onboarding points to the
+build's actual Connections options, supporting
 both distributor-configured sign-in and a user-owned Desktop OAuth client. It no
 longer promises Calendar. Source selection and the pilot no longer offer it as
 an available connected source. Local plans can still track user-provided dates.

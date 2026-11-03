@@ -28,7 +28,7 @@ page](https://developers.openai.com/api/docs/models/gpt-5.6-sol) and
 | 2. Availability | Supported always-on installation, discoverable enrollment, health and recovery; client-off work and host restart verified; precise local-resource ownership | Open |
 | 3. Durable execution | Persist safe workflow boundaries, reconcile uncertain effects, resume eligible work without repeating confirmed effects; crash/update/provider-loss journeys | Open |
 | 4. First value | Task-led defaults, model/account/search readiness and inline recovery; clean installation to useful result without developer intervention | Open |
-| 5. Connected jobs | Complete calendar and email workflows, including threading, recipients, attachments, drafts, reviews, account scope, reconciliation and real-service acceptance | In progress: rich Gmail composition, thread reads and native send-permission controls |
+| 5. Connected jobs | Complete calendar and email workflows, including threading, recipients, attachments, drafts, reviews, account scope, reconciliation and real-service acceptance | In progress: rich Gmail sends, selected original uploads, thread reads and native send-permission controls |
 | 6. Research | Reviewed public discovery beyond preselected sites, sensible shared budgets and in-task scope expansion; unknown-source research with provenance and network protections | Open |
 | 7. Browser | Bounded task/session permissions, private sign-in and useful session continuity; representative multi-page jobs with measured interruption count | Open |
 | 8. Delivery | Durable notification outcomes/retry/reconciliation, channel choices and mobile delivery; disconnect, OS failure and actual-device acceptance | In progress: bounded OS handoff retry verified locally |
@@ -270,3 +270,48 @@ local fixture. No paid model/search call or real external action was used.
 The preceding native email permission change is commit `9075ae6d9`; rich message
 composition is `90f4c22d6`. The fifteen-item goal and the requested subsequent
 responsiveness work remain active. README files stay untouched.
+
+## Original input bytes in reviewed emails — 3 November
+
+The desktop Work loader preserves original bytes for only the files selected
+on the admitted request, deriving model input from the same bounded reads. Office
+extraction remains the provider view; original DOCX/XLSX/PPTX/ODT bytes stay
+separate. Per-task `list_input_files` returns names, media type hints, sizes,
+hashes and exact `input/...` references. The connector's resolver can look up
+only that frozen selection, never arbitrary uploads or filesystem paths.
+
+The existing exact send preview includes original-file metadata and the private
+bytes are frozen again before review. Source/staging/caller mutation cannot
+change an approved send. A later task without files cannot borrow the original
+from a retained tool result. The initial loader refactor and implementation were
+captured by the user's intervening commits `9f36591a3` and `e0f17d35d`; they are
+preserved. This checkpoint verifies and documents that implementation and adds
+the cross-request regression. See [connected email](CONNECTED_EMAIL.md) for
+combined input/output limits, lifetime and rollback boundaries.
+
+Verification includes independently parsed MIME from production Work and the
+actual Electron paperclip → task → exact approval → Gmail fixture route. The
+expanded Electron journey picks DOCX, XLSX and PPTX together and checks every
+received file against its selected bytes and approval hash/size; it passes in
+8.0 seconds. The production Work regression additionally checks caller/staging
+mutation, extracted model views, unselected references, denial and cross-request
+isolation. Existing attachment draft/reload/queue/validation journeys pass
+(three Electron cases, 55.5 seconds before expanding the email case).
+
+`go test ./... -timeout 6m` passes (command package 239.2 seconds under concurrent
+checks). Full attachment/tools/connector/workrun race suites pass; the later
+cross-request regression also passes under race separately. `go vet ./...`,
+TypeScript check and desktop runtime/UI builds pass. No real Gmail action or
+paid evaluation was used; the US$10 ledger remains at US$4.496448 upper estimate.
+
+Next connected-work requirements remain substantial: provider draft management,
+calendar and real-account acceptance. Google's draft API uses a stable draft ID
+but replaces its underlying message on edit, and requires `gmail.compose` for
+draft sends rather than the existing `gmail.send` permission. Implement native
+scope review, content/version-bound edits and exact send bytes, preserving
+existing draft attachments and uncertain outcomes. A mutable draft ID alone is
+insufficient authority to send its contents. Checked against
+[Google's draft guide](https://developers.google.com/workspace/gmail/api/guides/drafts)
+and [draft send contract](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.drafts/send).
+The whole fifteen-item goal remains active; responsiveness profiling stays
+queued after the current product work.

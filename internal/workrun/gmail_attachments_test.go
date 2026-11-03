@@ -207,8 +207,9 @@ func TestWorkGmailUploadOriginalIsPrivateAndSelectionBound(t *testing.T) {
 			contract := artifact.InspectionContract()
 			contract.ExternalActions = action.Approve
 			approvals := 0
-			out, err := (Executor{Model: model, StateDir: t.TempDir(), Connectors: connector.Runtime{Registry: registry, HTTPClient: server.Client()}}).Execute(context.Background(), Request{
-				SourcePath: t.TempDir(), Objective: "Email my explicitly selected original", Mode: action.Act, Contract: contract, ConnectorIDs: []string{"google"}, Attachments: views, OriginalFiles: originals, DisableBrowser: true, DisableDelegation: true, MaxSteps: 4,
+			stateDir, source := t.TempDir(), t.TempDir()
+			out, err := (Executor{Model: model, StateDir: stateDir, Connectors: connector.Runtime{Registry: registry, HTTPClient: server.Client()}}).Execute(context.Background(), Request{
+				SourcePath: source, Objective: "Email my explicitly selected original", Mode: action.Act, Contract: contract, ConnectorIDs: []string{"google"}, Attachments: views, OriginalFiles: originals, DisableBrowser: true, DisableDelegation: true, MaxSteps: 4,
 				ApproveAction: func(_ context.Context, p action.Proposal) (action.Decision, error) {
 					approvals++
 					if calls != 0 || !strings.Contains(p.Preview, `"source":"input/1/report.docx"`) || !strings.Contains(p.Preview, `"sha256":`) {
@@ -239,6 +240,30 @@ func TestWorkGmailUploadOriginalIsPrivateAndSelectionBound(t *testing.T) {
 			}
 			if !bytes.Contains(data, []byte("input/1/report.docx")) || len(model.requests[0].Messages[0].Attachments) != 1 || !bytes.Contains(model.requests[0].Messages[0].Attachments[0].Data, []byte("Body used for model understanding")) {
 				t.Fatal("missing selected metadata or extracted model view")
+			}
+			if c.want == action.Executed {
+				// Retained tool results can mention the old reference, but a new
+				// request without selected files cannot borrow its former authority.
+				nextModel := &scriptedModel{turns: []agent.Turn{
+					{ToolCalls: []agent.ToolCall{{ID: "borrow-old-input", Name: "connector_google_gmail_send", Arguments: arguments}}},
+					{Text: "The original needs to be selected for this request."},
+				}}
+				followupApprovals := 0
+				followup, err := (Executor{Model: nextModel, StateDir: stateDir, Connectors: connector.Runtime{Registry: registry, HTTPClient: server.Client()}}).Execute(context.Background(), Request{
+					SourcePath: source, ConversationID: out.ConversationID, ParentRevisionID: out.RevisionID, Objective: "Check the previous original without selecting a new file", Mode: action.Act, Contract: contract, ConnectorIDs: []string{"google"}, DisableBrowser: true, DisableDelegation: true, MaxSteps: 3,
+					ApproveAction: func(context.Context, action.Proposal) (action.Decision, error) {
+						followupApprovals++
+						return action.Allow, nil
+					},
+				})
+				if err != nil || followupApprovals != 0 || calls != 1 || len(followup.Manifest.Actions) != 0 {
+					t.Fatal("a later request borrowed a previous input selection", followupApprovals, calls, err)
+				}
+				for _, tool := range nextModel.requests[0].Tools {
+					if tool.Name == "list_input_files" {
+						t.Fatal("later request retained an old input inventory")
+					}
+				}
 			}
 		})
 	}

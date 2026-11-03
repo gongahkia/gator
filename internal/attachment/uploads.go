@@ -24,6 +24,8 @@ func LoadUploads(directory string, ids []string) ([]agent.Image, []agent.Attachm
 	return images, documents, err
 }
 
+// LoadUploadsWithOriginals preserves only the explicit selection's original
+// bytes alongside representations derived from the same bounded file reads.
 func LoadUploadsWithOriginals(directory string, ids []string) ([]agent.Image, []agent.Attachment, []Original, error) {
 	return loadUploads(directory, ids, true)
 }

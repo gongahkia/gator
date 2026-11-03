@@ -29,7 +29,8 @@ const (
 	// provider. Extracted Office text is bounded by MaxDocumentBytes too.
 	MaxImageBytes    = 4 * 1024 * 1024
 	MaxDocumentBytes = 8 * 1024 * 1024
-	// MaxTotalBytes bounds the provider-visible bytes across all inputs.
+	// MaxTotalBytes bounds original input bytes and provider-visible bytes
+	// separately across all inputs.
 	MaxTotalBytes = 16 * 1024 * 1024
 
 	maxArchiveEntries     = 4_096
