@@ -3,6 +3,7 @@ package workrun
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"strings"
 	"sync"
 	"testing"
@@ -28,7 +29,7 @@ func accessCall(t *testing.T, surface []agent.Tool, name string, args string) (a
 func TestPublicResearchWaitsForBoundForegroundReviewAndRetainsFetchedEvidence(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	state,source := t.TempDir(),t.TempDir()
+	state, source := t.TempDir(), t.TempDir()
 	http := &searchFixture{}
 	model := &scriptedModel{turns: []agent.Turn{
 		dynamicCall("web_access", map[string]any{"action": "request", "scope": "public", "reason": "Discover primary sources beyond the initially selected sites."}),
@@ -84,8 +85,13 @@ func TestPublicResearchWaitsForBoundForegroundReviewAndRetainsFetchedEvidence(t 
 	}
 	// An explicit continuation can retain old evidence but never its grant.
 	nextModel := &scriptedModel{turns: []agent.Turn{dynamicCall("http_fetch", map[string]any{"url": "https://other.invalid/new"}), {Text: "New web access needs review."}}}
-	second,err := (Executor{Model: nextModel, StateDir: state, HTTP: service.Executor.HTTP}).Execute(ctx, Request{SourcePath: source, ConversationID: out.ConversationID, ParentRevisionID: out.RevisionID, Objective: "Check again without a new grant", Mode: action.Inspect, Contract: artifact.InspectionContract(), MaxSteps: 3, DisableBrowser: true,ForegroundApp:true,ApproveWebAccess:func(context.Context,WebAccessReview)(bool,error){t.Error("direct read unexpectedly acquired consent");return false,nil}})
-	if err!=nil || http.calls!=2 || second.Manifest.Research==nil || second.Manifest.Research.PublicWeb || second.Manifest.Research.Requests!=0 { t.Fatal("retained grant authorized a later task",err,second.Manifest.Research) }
+	second, err := (Executor{Model: nextModel, StateDir: state, HTTP: service.Executor.HTTP}).Execute(ctx, Request{SourcePath: source, ConversationID: out.ConversationID, ParentRevisionID: out.RevisionID, Objective: "Check again without a new grant", Mode: action.Inspect, Contract: artifact.InspectionContract(), MaxSteps: 3, DisableBrowser: true, ForegroundApp: true, ApproveWebAccess: func(context.Context, WebAccessReview) (bool, error) {
+		t.Error("direct read unexpectedly acquired consent")
+		return false, nil
+	}})
+	if err != nil || http.calls != 2 || second.Manifest.Research == nil || second.Manifest.Research.PublicWeb || second.Manifest.Research.Requests != 0 {
+		t.Fatal("retained grant authorized a later task", err, second.Manifest.Research)
+	}
 }
 
 func TestWebScopeDenialInvalidRequestsAndRevocation(t *testing.T) {
@@ -204,5 +210,67 @@ func TestBackgroundResearchCannotRequestExpansion(t *testing.T) {
 	surface, _, scope, err := newWebResearch(&evidenceCatalog{}, r, tools.HTTPFetchOptions{})
 	if err != nil || len(surface) != 0 || scope != nil || called {
 		t.Fatal("background task acquired new research surface", err)
+	}
+}
+
+func TestManagerAndDynamicResearcherShareSearchCapacity(t *testing.T) {
+	http := &searchFixture{}
+	calls := []agent.ToolCall{}
+	for i := 0; i < 9; i++ {
+		calls = append(calls, agent.ToolCall{ID: strings.Repeat("q", i+1), Name: "web_search", Arguments: json.RawMessage(`{"query":"primary venue evidence"}`)})
+	}
+	child := &scriptedModel{turns: []agent.Turn{{ToolCalls: calls}, {Text: "Shared search budget reached; no factual claim made from snippets."}}}
+	manager := &scriptedModel{turns: []agent.Turn{
+		dynamicCall("web_access", map[string]any{"action": "request", "scope": "public", "reason": "Research primary sites"}),
+		dynamicCall("create_agent", map[string]any{"name": "public_researcher", "base": "connected_researcher", "description": "Research primary sources", "instructions": "Search for primary evidence, then read useful pages.", "task": "Investigate the venue"}),
+		dynamicCall("await_agent", map[string]any{"id": "subagent-001", "timeout_seconds": 5}),
+		dynamicCall("web_search", map[string]any{"query": "another primary source"}),
+		{Text: "No additional search capacity remains."},
+	}}
+	out, err := (Executor{Model: manager, RoleModels: map[string]agent.Model{"connected_researcher": child}, StateDir: t.TempDir(), HTTP: tools.HTTPFetchOptions{Client: http, Resolver: researchResolver{}, BraveSearchAPIKey: "fixture"}}).Execute(context.Background(), Request{SourcePath: t.TempDir(), Objective: "Use a research specialist", Mode: action.Inspect, Contract: artifact.InspectionContract(), MaxSteps: 6, ForegroundApp: true, ApproveWebAccess: func(context.Context, WebAccessReview) (bool, error) { return true, nil }, DisableBrowser: true})
+	if err != nil || http.calls != 8 || len(out.Manifest.Subagents) != 1 || out.Manifest.Research.Searches != 8 || out.Manifest.Research.Requests != 8 {
+		t.Fatal("worker reset shared research budget", http.calls, out.Manifest.Research, err)
+	}
+	for _, tool := range child.requests[0].Tools {
+		if tool.Name == "web_access" {
+			t.Fatal("worker gained authority to request new grants")
+		}
+	}
+	if !strings.Contains(manager.requests[len(manager.requests)-1].Messages[len(manager.requests[len(manager.requests)-1].Messages)-1].Content, "budget exhausted") {
+		t.Fatal("manager did not observe child's exhausted shared budget")
+	}
+}
+
+type privateResearchResolver struct{}
+
+func (privateResearchResolver) LookupIPAddr(context.Context, string) ([]net.IPAddr, error) {
+	return []net.IPAddr{{IP: net.ParseIP("10.1.2.3")}}, nil
+}
+
+func TestPublicGrantDoesNotBypassPrivateDNSOrCancelledReview(t *testing.T) {
+	http := &searchFixture{}
+	r := Request{ForegroundApp: true, ApproveWebAccess: func(context.Context, WebAccessReview) (bool, error) { return true, nil }}
+	surface, _, _, err := newWebResearch(&evidenceCatalog{}, r, tools.HTTPFetchOptions{Client: http, Resolver: privateResearchResolver{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := accessCall(t, surface, "web_access", `{"action":"request","scope":"public","reason":"Investigate"}`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := accessCall(t, surface, "http_fetch", `{"url":"https://internal.example/secret"}`); err == nil || !strings.Contains(err.Error(), "private or reserved") {
+		t.Fatal("public consent bypassed DNS protections", err)
+	}
+	if http.calls != 0 {
+		t.Fatal("private address reached transport")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	r.ApproveWebAccess = func(context.Context, WebAccessReview) (bool, error) { cancel(); return true, nil }
+	surface, _, scope, err := newWebResearch(&evidenceCatalog{}, r, tools.HTTPFetchOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = surface[len(surface)-1].Execute(ctx, json.RawMessage(`{"action":"request","scope":"public","reason":"Investigate"}`))
+	if err != context.Canceled || scope.evidence().PublicWeb {
+		t.Fatal("cancelled review granted access", err)
 	}
 }
