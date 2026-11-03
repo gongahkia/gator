@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/connector"
 )
 
@@ -57,6 +58,17 @@ func TestBundledGoogleSetupPreservesScopeAndManualOption(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("missing sign-in")
+	}
+	if err := credentials.Put(d.CredentialRef(), auth.Credential{Type: "oauth", Access: "fixture-access"}); err != nil {
+		t.Fatal(err)
+	}
+	screen, err = c.screen(d.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	enable := sendingControl(t, screen, "enable-email-sending")
+	if len(enable.Fields) != 0 || len(enable.Args) != 4 || enable.Args[3] != "" {
+		t.Fatal("bundled permission upgrade requests private client material")
 	}
 	for _, mutate := range []func(*connector.Descriptor){
 		func(d *connector.Descriptor) { d.OAuthTokenURL = "https://example.com/token" },

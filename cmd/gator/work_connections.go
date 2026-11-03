@@ -86,6 +86,44 @@ func (c *connectionControls) call(ctx context.Context, operation string, args []
 		if _, err := c.signIn.Begin(c.stateDir, id, args[1], args[2]); err != nil {
 			return workapp.ControlScreen{}, err
 		}
+	case "enable-email-sending":
+		if len(args) != 4 {
+			return workapp.ControlScreen{}, errors.New("review the connection and requested sending permission again")
+		}
+		if _, err := c.signIn.EnableGmailSending(c.stateDir, id, args[1], args[2], args[3]); err != nil {
+			return workapp.ControlScreen{}, err
+		}
+	case "disable-email-sending":
+		if len(args) != 3 {
+			return workapp.ControlScreen{}, errors.New("review the connection before changing sending permission")
+		}
+		d, credentials, err := configuredConnector(id)
+		if err != nil {
+			return workapp.ControlScreen{}, err
+		}
+		if connectorLoginReview(d) != args[1] {
+			return workapp.ControlScreen{}, errors.New("connection changed; review its permissions again")
+		}
+		prior, err := connectionCredential(credentials, d)
+		if err != nil {
+			return workapp.ControlScreen{}, err
+		}
+		if credentialReview(prior) != args[2] {
+			return workapp.ControlScreen{}, auth.ErrCredentialChanged
+		}
+		next, err := gmailSendingDescriptor(d, false)
+		if err != nil {
+			return workapp.ControlScreen{}, err
+		}
+		c.signIn.Cancel(id)
+		store, err := config.DefaultStore()
+		if err != nil {
+			return workapp.ControlScreen{}, err
+		}
+		if err := replaceReviewedConnection(store, d, next); err != nil {
+			return workapp.ControlScreen{}, err
+		}
+		notice = "Email sending turned off for new tasks. Active tasks keep their reviewed connection until they finish. To revoke Google's grant, use Google account settings."
 	case "cancel-signin":
 		c.signIn.Cancel(id)
 		notice = "Sign-in closed. No further authorization will be accepted."
@@ -329,7 +367,10 @@ func (c *connectionControls) screen(id string) (workapp.ControlScreen, error) {
 				screen.Panel.NoticeTone = "error"
 			}
 			if screen.Panel.Notice == "" {
-				screen.Panel.Notice = "Sign-in completed. Check access to verify this account."
+				screen.Panel.Notice = status.Notice
+				if screen.Panel.Notice == "" {
+					screen.Panel.Notice = "Sign-in completed. Check access to verify this account."
+				}
 			}
 		}
 		if d.Authentication == connector.AuthOAuth {
@@ -343,7 +384,22 @@ func (c *connectionControls) screen(id string) (workapp.ControlScreen, error) {
 				a.Fields = nil
 				a.Args = append(a.Args, "")
 			}
-
+			if d.Kind == connector.KindGoogle {
+				if slices.Contains(strings.Fields(d.OAuthScopes), connector.GoogleSendOAuthScope) {
+					screen.Actions = append(screen.Actions, workapp.ControlAction{Key: "E", Label: "Turn off email sending", Action: "disable-email-sending", Args: review, Review: true, Description: "Remove sending permission from this connection for new tasks. Active tasks retain their reviewed connection until they finish. Reading stays available. Google's grant remains until you revoke it in Google account settings."})
+				} else if prior != nil {
+					requested, err := gmailSendingDescriptor(d, true)
+					if err != nil {
+						return screen, err
+					}
+					a := workapp.ControlAction{Key: "E", Label: "Enable email sending", Action: "enable-email-sending", Args: review, Review: true, Description: "Sign in again to request sending alongside existing API permissions. Review the account in your browser. Existing access stays configured until authorization succeeds. Choosing this account in chat and approving each exact send are still required. Requested permissions: " + strings.Join(withoutGooglePlannerScopes(strings.Fields(requested.OAuthScopes)), " "), Fields: []workapp.ControlField{{Label: "OAuth client secret (optional)", Secret: true, Help: "Leave blank to keep the stored secret for your own desktop OAuth client."}}}
+					if usesBundledGoogle(d) {
+						a.Fields = nil
+						a.Args = append(append([]string(nil), a.Args...), "")
+					}
+					screen.Actions = append(screen.Actions, a)
+				}
+			}
 		} else if d.Authentication == connector.AuthBearer {
 			screen.Actions = append(screen.Actions, workapp.ControlAction{Key: "S", Label: "Set access token", Action: "token", Args: review, Review: true, Description: "Replace the private token for " + d.Name + " at " + d.Resource + ". No chat or follow-up permissions change.", Fields: []workapp.ControlField{{Label: "Access token", Secret: true, Help: "Enter a new access token. It is stored privately on this device."}}})
 		}

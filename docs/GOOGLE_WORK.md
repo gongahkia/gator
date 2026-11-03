@@ -35,7 +35,16 @@ detail scans so a changed account cannot inherit another account's cache.
 5. Choose **Check account & read access**. Gator verifies the account identity and makes bounded reads for the configured email and Drive metadata scopes. A failure on one service is reported as a failed check. A verified email is shown only if Google marks it verified.
 6. Select the connection in chat settings or in a follow-up agreement. Saving credentials does not select it for a chat or authorize writes.
 
-The native email setup requests OpenID, email and Gmail read scopes. It does not request document editing or email sending.
+The initial native email setup requests OpenID, email and Gmail read scopes.
+To send email, open the saved connection and choose **Enable email sending**.
+Review the added permission and finish browser consent. Existing API permissions
+and sending must be confirmed by the new token response before Gator publishes
+the sending surface; a cancelled, partial or stale upgrade keeps the previous
+local connection. Each email still needs exact foreground approval.
+**Turn off email sending** removes it from new tasks without revoking Google's
+grant or changing active tasks' reviewed connection snapshots. Use Google account
+settings for provider-side revocation. See [connected email](CONNECTED_EMAIL.md).
+
 Existing Google connections with other scopes can also be signed in and managed
 here. The advanced developer configuration below can create those connections.
 
@@ -60,7 +69,7 @@ client-ID form does not remove those requirements.
 ## User-owned Google desktop OAuth app
 
 Create or select a **Desktop** OAuth client in your Google Cloud project, then
-enable the Google Drive, Docs, Sheets, Calendar, and Gmail APIs:
+enable the Google Drive, Docs, Sheets and Gmail APIs as needed:
 
 ```sh
 GATOR_INTERNAL_COMMANDS=1 go run ./cmd/gator provider connector add google-work --kind google --oauth-client-id YOUR_CLIENT_ID --daily-context
@@ -74,12 +83,13 @@ uses PKCE and an ephemeral `127.0.0.1` loopback callback.
 
 The default OAuth scopes are OpenID and email for a live connection check,
 Drive metadata read, and Docs/Sheets read-write. `--daily-context` explicitly
-adds Calendar event read and Gmail read-only scopes. Without it, those operations
+adds Gmail read-only access. Without it, the Gmail read operations
 are absent from the agent tool list. For an existing connection, add a separate
 Google connector with `--daily-context` and run `connector login` for it.
-To enable sending, add `--send-email` during setup and log in with that new
-scope. It requests only `gmail.send` for the send operation; `--daily-context`
-is still needed if Gator should read Gmail and Calendar. Existing credentials
+To enable sending from the CLI, add `--send-email` during setup and log in with
+that new scope, or use **Enable email sending** on an existing native connection.
+The send operation requests `gmail.send`; `--daily-context`
+is still needed for CLI setup if Gator should also read Gmail. Existing credentials
 do not silently gain the send scope. Google classifies `gmail.send` as a
 sensitive scope, so a published OAuth app may need verification.
 Gmail read-only is a restricted Google scope,
@@ -105,9 +115,8 @@ identity check does not establish that a connected result is relevant or safe.
 ## Operations and approvals
 
 Read operations cover a live connection check, Drive metadata search and file
-metadata, Google Docs, Google Sheets, bounded Sheet ranges, a bounded Calendar
-event window, and Gmail search plus message detail. Calendar reads require
-`time_min` and `time_max` in RFC3339; Gmail list defaults to the last day of
+metadata, Google Docs, Google Sheets, bounded Sheet ranges, and Gmail search,
+message detail and thread context. Gmail list defaults to the last day of
 inbox messages and returns IDs that can be opened with `gmail_get`. Gator
 records each read with connector provenance and enforces the selected
 connector read permission policy. Mutations cover

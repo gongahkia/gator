@@ -28,7 +28,7 @@ page](https://developers.openai.com/api/docs/models/gpt-5.6-sol) and
 | 2. Availability | Supported always-on installation, discoverable enrollment, health and recovery; client-off work and host restart verified; precise local-resource ownership | Open |
 | 3. Durable execution | Persist safe workflow boundaries, reconcile uncertain effects, resume eligible work without repeating confirmed effects; crash/update/provider-loss journeys | Open |
 | 4. First value | Task-led defaults, model/account/search readiness and inline recovery; clean installation to useful result without developer intervention | Open |
-| 5. Connected jobs | Complete calendar and email workflows, including threading, recipients, attachments, drafts, reviews, account scope, reconciliation and real-service acceptance | In progress: typed rich Gmail composition and thread reads |
+| 5. Connected jobs | Complete calendar and email workflows, including threading, recipients, attachments, drafts, reviews, account scope, reconciliation and real-service acceptance | In progress: rich Gmail composition, thread reads and native send-permission controls |
 | 6. Research | Reviewed public discovery beyond preselected sites, sensible shared budgets and in-task scope expansion; unknown-source research with provenance and network protections | Open |
 | 7. Browser | Bounded task/session permissions, private sign-in and useful session continuity; representative multi-page jobs with measured interruption count | Open |
 | 8. Delivery | Durable notification outcomes/retry/reconciliation, channel choices and mobile delivery; disconnect, OS failure and actual-device acceptance | In progress: bounded OS handoff retry verified locally |
@@ -172,6 +172,13 @@ use in the actual app. Record reproducible measurements, improve the measured
 bottlenecks and commit verified changes separately. This is additional scope;
 it does not replace any of the fifteen requirements above.
 
+Include cold/warm process launch to a usable composer, navigation to each major
+screen, short/long conversation switching, typing and scrolling while output
+streams, file-preview opening, and idle/background CPU/memory. Measure the full
+interaction through the next rendered frame, retain environment/data-size/run
+counts and distributions, and compare the same journeys before and after each
+fix. Use isolated profiles so profiling cannot alter the user's conversations.
+
 ## Connected email checkpoint — 3 November
 
 Gmail now supports explicitly listed To/Cc/Bcc recipients, reply threading and
@@ -188,9 +195,50 @@ thread headers, frozen-buffer mutation and aggregate attachment limits. Real
 Work executor tests exercise generated and selected original files through the
 action broker/journal in approved, denied and draft-only modes. Full race suites
 for connector, workapp and workrun pass; command receipt/connection regressions
-pass. Repository-wide tests and vet are recorded below when complete.
+pass. `go test ./... -timeout 6m` passes for commit `90f4c22d6` (command package
+236.3 seconds under concurrent checks); `go vet ./...` passes.
 
 No paid request or real account action was used. Native send-permission upgrades,
 provider drafts, original upload selection, calendar and real-service acceptance
 remain open. Item 5 is in progress, not complete. The responsiveness audit remains
 queued after the active product work as requested.
+
+## Native email permission checkpoint — 3 November
+
+Connections now offers reviewed **Enable email sending** and **Turn off email
+sending** controls. The enable flow reauthorizes the existing installed-app
+scope set plus sending, checks explicitly reported API/identity scopes and a new
+offline grant, then publishes expanded settings. It preserves the old local
+connection on partial/missing grants, denial, cancellation and stale
+account/configuration. Failed configuration publication attempts a CAS restore
+without overwriting a concurrently replaced account. Local disable preserves
+reading and credentials, explicitly applies to new tasks, and does not claim to
+revoke Google's grant. Active tasks keep their reviewed connection snapshot.
+
+The tests also exposed an existing callback-close race that could show the
+browser an EOF instead of the result page. Pages are now length-delimited and
+flushed before the completion signal permits closing the listener. Success,
+denial, state mismatch and missing-code page bodies are verified over real local
+HTTP connections. Permission tests exercise the production controls, PKCE
+callback, token exchange and private stores. The Google workflow guide no longer
+advertises removed Calendar operations/scopes in its setup/operation sections.
+
+Validation: affected native permission/connection and callback race checks pass;
+full auth race tests pass; TypeScript check, desktop production build and
+`go vet ./...` pass. `go test ./... -timeout 6m` passes again with the native
+controls included (command package 222.5 seconds). The actual Electron
+`connections.spec.ts` journey passes in 16.4 seconds: it reviews the permission,
+cancels, rejects a partial grant, accepts a complete grant and turns off sending
+again, checking saved scopes and renderer credential privacy. An initial test
+selector missed the footer's keyboard-shortcut suffix; it was corrected without
+changing the interface or weakening the grant assertions. The native account
+screen was also inspected at 980 × 780.
+
+The browser fixtures use no real account, send no email and incur no new
+model/search spend. The cumulative evaluation upper estimate remains
+US$4.496448 of the US$10 allowance. No README files changed. Item 5 remains open
+for provider drafts, original upload selection, calendar and real-service
+acceptance. General reconnect scope handling and the rest of the broader
+requirements are not certified by these permission-upgrade tests. The complete
+fifteen-item goal remains active; the subsequent responsiveness audit is retained
+above, with reproducible before/after measurements required.

@@ -13,12 +13,17 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
 
 const oauthResponseLimit = 64 * 1024
+
+// ErrRequiredScopes means a reviewed permission upgrade was not explicitly
+// confirmed by the token response. It contains no credential material.
+var ErrRequiredScopes = errors.New("OAuth authorization did not confirm all required permissions; review the requested access and try again")
 
 // BrowserFlow describes an OAuth 2.0 authorization-code flow using PKCE. A
 // caller supplies its own client ID: this package never reuses a vendor CLI or
@@ -27,11 +32,15 @@ type BrowserFlow struct {
 	ClientID string
 	// ClientSecret is optional private material from a user-owned desktop
 	// OAuth app. PKCE remains enabled whether or not the provider requests it.
-	ClientSecret       string
-	AuthorizationURL   string
-	TokenURL           string
-	RedirectURL        string
-	Scopes             []string
+	ClientSecret     string
+	AuthorizationURL string
+	TokenURL         string
+	RedirectURL      string
+	Scopes           []string
+	// RequiredScopes, when set, require explicit token-response confirmation
+	// of each scope. Use for a reviewed permission upgrade; an omitted or
+	// partial grant must not replace the previously usable credential.
+	RequiredScopes     []string
 	AuthorizeParams    map[string]string
 	TokenParams        map[string]string
 	TokenRequestJSON   bool
@@ -201,23 +210,19 @@ func (a BrowserAttempt) startCallback(listener net.Listener, callbackURL *url.UR
 			return
 		}
 		if message := strings.TrimSpace(request.URL.Query().Get("error")); message != "" {
-			callback.finish(callbackResult{err: fmt.Errorf("OAuth authorization failed: %s", message)})
-			writeCallbackPage(writer, http.StatusBadRequest, "Authentication did not complete. Return to Gator.")
+			callback.respond(writer, callbackResult{err: fmt.Errorf("OAuth authorization failed: %s", message)}, http.StatusBadRequest, "Authentication did not complete. Return to Gator.")
 			return
 		}
 		if !a.flow.AllowMissingState && request.URL.Query().Get("state") != a.state {
-			callback.finish(callbackResult{err: errors.New("OAuth callback state mismatch")})
-			writeCallbackPage(writer, http.StatusBadRequest, "Authentication state did not match. Return to Gator.")
+			callback.respond(writer, callbackResult{err: errors.New("OAuth callback state mismatch")}, http.StatusBadRequest, "Authentication state did not match. Return to Gator.")
 			return
 		}
 		code := strings.TrimSpace(request.URL.Query().Get("code"))
 		if code == "" {
-			callback.finish(callbackResult{err: errors.New("OAuth callback did not include an authorization code")})
-			writeCallbackPage(writer, http.StatusBadRequest, "Authentication returned no code. Return to Gator.")
+			callback.respond(writer, callbackResult{err: errors.New("OAuth callback did not include an authorization code")}, http.StatusBadRequest, "Authentication returned no code. Return to Gator.")
 			return
 		}
-		callback.finish(callbackResult{code: code})
-		writeCallbackPage(writer, http.StatusOK, "Authentication completed. You can close this page and return to Gator.")
+		callback.respond(writer, callbackResult{code: code}, http.StatusOK, "Authentication completed. You can close this page and return to Gator.")
 	})}
 	go func() {
 		_ = callback.server.Serve(listener)
@@ -254,6 +259,16 @@ func (c *Callback) finish(result callbackResult) {
 	case c.result <- result:
 	default:
 	}
+}
+
+// Wait closes the listener as soon as a result is available. Deliver the
+// complete, length-delimited page first so that close cannot truncate it.
+func (c *Callback) respond(writer http.ResponseWriter, result callbackResult, status int, message string) {
+	writeCallbackPage(writer, status, message)
+	if flusher, ok := writer.(http.Flusher); ok {
+		flusher.Flush()
+	}
+	c.finish(result)
 }
 
 // Exchange converts the one-time authorization code into a stored OAuth
@@ -354,6 +369,7 @@ func (f BrowserFlow) exchangeToken(ctx context.Context, form url.Values, action 
 		RefreshToken string `json:"refresh_token"`
 		ExpiresIn    int64  `json:"expires_in"`
 		TokenType    string `json:"token_type"`
+		Scope        string `json:"scope"`
 	}
 	if err := json.Unmarshal(contents, &token); err != nil {
 		return Credential{}, fmt.Errorf("OAuth %s exchange returned invalid JSON", action)
@@ -363,6 +379,15 @@ func (f BrowserFlow) exchangeToken(ctx context.Context, form url.Values, action 
 	}
 	if f.RequireBearerToken && token.TokenType != "" && !strings.EqualFold(token.TokenType, "bearer") {
 		return Credential{}, fmt.Errorf("OAuth %s exchange returned unsupported token type %q", action, token.TokenType)
+	}
+	granted := make(map[string]bool)
+	for _, scope := range strings.Fields(token.Scope) {
+		granted[scope] = true
+	}
+	for _, scope := range f.RequiredScopes {
+		if !granted[scope] {
+			return Credential{}, ErrRequiredScopes
+		}
 	}
 	expires := int64(0)
 	if token.ExpiresIn > 0 {
@@ -422,8 +447,10 @@ func absoluteURL(value string) (*url.URL, error) {
 }
 
 func writeCallbackPage(writer http.ResponseWriter, status int, message string) {
+	page := "<!doctype html><title>Gator authentication</title><p>" + message + "</p>"
 	writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 	writer.Header().Set("Cache-Control", "no-store")
+	writer.Header().Set("Content-Length", strconv.Itoa(len(page)))
 	writer.WriteHeader(status)
-	_, _ = io.WriteString(writer, "<!doctype html><title>Gator authentication</title><p>"+message+"</p>")
+	_, _ = io.WriteString(writer, page)
 }

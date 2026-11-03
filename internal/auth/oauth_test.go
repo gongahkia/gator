@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -70,6 +71,25 @@ func TestBrowserFlowCallbackAndExchangeUsesPKCE(t *testing.T) {
 	}
 }
 
+func TestBrowserFlowRequiresExplicitPermissionUpgradeGrant(t *testing.T) {
+	for _, scope := range []string{"", "read", "send", "Read send", "read send"} {
+		t.Run(scope, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "private-access", "expires_in": 3600, "token_type": "Bearer", "scope": scope})
+			}))
+			defer server.Close()
+			flow := BrowserFlow{TokenURL: server.URL, RequiredScopes: []string{"read", "send"}, RequireBearerToken: true}
+			credential, err := flow.exchangeToken(context.Background(), url.Values{}, "authorization code")
+			if (err == nil) != (scope == "read send") {
+				t.Fatal("partial grant result", err)
+			}
+			if err != nil && (credential.Access != "" || strings.Contains(err.Error(), "private-access")) {
+				t.Fatal("failed grant exposed credentials")
+			}
+		})
+	}
+}
+
 func TestBrowserFlowRefreshRetainsUnrotatedRefreshToken(t *testing.T) {
 	tokens := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if err := request.ParseForm(); err != nil {
@@ -125,5 +145,51 @@ func TestBrowserFlowJSONExchangeIncludesState(t *testing.T) {
 func TestBrowserFlowRejectsUnsafeCallback(t *testing.T) {
 	if _, err := BeginBrowserFlow(BrowserFlow{ClientID: "client", AuthorizationURL: "https://example.test/authorize", TokenURL: "https://example.test/token", RedirectURL: "https://example.test/callback"}); err == nil {
 		t.Fatal("non-loopback callback was accepted")
+	}
+}
+
+func TestBrowserCallbackPageArrivesBeforeListenerCloses(t *testing.T) {
+	for _, c := range []struct {
+		name, code, state, authorizationError string
+		status                                int
+	}{
+		{"success", "code", "correct", "", http.StatusOK},
+		{"denied", "", "correct", "access_denied", http.StatusBadRequest},
+		{"wrong state", "code", "wrong", "", http.StatusBadRequest},
+		{"missing code", "", "correct", "", http.StatusBadRequest},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			attempt, callback, err := BeginEphemeralLoopbackFlow(BrowserFlow{ClientID: "client", AuthorizationURL: "https://example.test/authorize", TokenURL: "https://example.test/token"}, "/callback")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer callback.Close()
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			done := make(chan error, 1)
+			go func() { _, err := callback.Wait(ctx); done <- err }()
+			u, _ := url.Parse(attempt.RedirectURL())
+			q := u.Query()
+			if c.state == "correct" {
+				q.Set("state", attempt.State())
+			} else {
+				q.Set("state", c.state)
+			}
+			q.Set("code", c.code)
+			q.Set("error", c.authorizationError)
+			u.RawQuery = q.Encode()
+			response, err := http.Get(u.String())
+			if err != nil {
+				t.Fatal("browser received no result page", err)
+			}
+			defer response.Body.Close()
+			body, err := io.ReadAll(response.Body)
+			if err != nil || response.StatusCode != c.status || int64(len(body)) != response.ContentLength || !strings.HasSuffix(string(body), "</p>") {
+				t.Fatal("browser received an incomplete result page", response.StatusCode, err)
+			}
+			if err := <-done; (err == nil) != (c.status == http.StatusOK) {
+				t.Fatal("callback result", err)
+			}
+		})
 	}
 }

@@ -11,10 +11,10 @@ test("native account setup reviews credentials, verifies access and returns to b
  const directory = await temporaryDirectory(join(tmpdir(),"gator-connections-"));
  const workspace = join(directory,"workspace"), configRoot = join(directory,"config/gator");
  await mkdir(workspace); await mkdir(configRoot,{recursive:true});
- let reads=0,tokenRequests=0;
+ let reads=0,tokenRequests=0,grantSending=false;
  const server=createServer((req,res)=>{
   if(req.url==="/resource") {reads++;expect(req.headers.authorization).toBe("Bearer private-service-token");res.writeHead(200,{"Content-Type":"application/json"});res.end('{"value":1}');return;}
-  if(req.url==="/token") {tokenRequests++;res.writeHead(200,{"Content-Type":"application/json"});res.end('{"access_token":"private-oauth-access","refresh_token":"private-refresh","token_type":"Bearer","expires_in":3600}');return;}
+  if(req.url==="/token") {tokenRequests++;res.writeHead(200,{"Content-Type":"application/json"});res.end(JSON.stringify({access_token:`private-oauth-access-${tokenRequests}`,refresh_token:`private-refresh-${tokenRequests}`,token_type:"Bearer",expires_in:3600,scope:"openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/gmail.readonly"+(grantSending?" https://www.googleapis.com/auth/gmail.send":"")}));return;}
   res.writeHead(404);res.end();
  });
  await new Promise<void>(done=>server.listen(0,"127.0.0.1",done));
@@ -52,6 +52,48 @@ test("native account setup reviews credentials, verifies access and returns to b
   await page.getByRole("button",{name:/^Personal Google/}).click();await expect(page.getByRole("button",{name:"Cancel sign-in",exact:true})).toBeVisible();
   const authorize=new URL(authURL),callback=new URL(authorize.searchParams.get("redirect_uri")!);callback.searchParams.set("state",authorize.searchParams.get("state")!);callback.searchParams.set("code","authorized-fixture");await fetch(callback).catch(()=>{});
   await expect(page.getByRole("button",{name:"Reconnect account",exact:true})).toBeVisible();expect(tokenRequests).toBe(1);expect(JSON.stringify(await state(page))).not.toContain("private-oauth-access");
+
+  const scopes=async()=>JSON.parse(await readFile(join(configRoot,"config.json"),"utf8")).connectors.find((connection:{id:string})=>connection.id==="google").oauth_scopes as string;
+  const beginSending=async()=>{
+   await page.getByRole("button",{name:"Enable email sending",exact:true}).click();
+   await review();
+   expect(await scopes()).not.toContain("gmail.send");
+   await expect(page.getByText(/Requested permissions:.*gmail.send/)).toBeVisible();
+   await page.locator(".workflow-footer").getByRole("button",{name:/^Enable email sending/}).click();
+   await expect(page.getByRole("button",{name:"Continue in browser",exact:true})).toBeVisible();
+   const authorization=new URL((await state(page)).panel!.links![0].url);
+   expect(authorization.searchParams.get("scope")).toContain("gmail.send");
+   expect(authorization.searchParams.get("scope")).toContain("gmail.readonly");
+   expect(authorization.searchParams.get("code_challenge_method")).toBe("S256");
+   return authorization;
+  };
+  const completeConsent=async(authorization:URL)=>{
+   const callback=new URL(authorization.searchParams.get("redirect_uri")!);
+   callback.searchParams.set("state",authorization.searchParams.get("state")!);callback.searchParams.set("code","permission-fixture");
+   const response=await fetch(callback);expect(response.status).toBe(200);expect(await response.text()).toContain("return to Gator");
+  };
+  // Cancelling the reviewed browser flow changes neither saved access nor credentials.
+  await beginSending();
+  await page.getByRole("button",{name:"Cancel sign-in",exact:true}).click();
+  await expect(page.getByRole("button",{name:"Enable email sending",exact:true})).toBeVisible();
+  expect(tokenRequests).toBe(1);expect(await scopes()).not.toContain("gmail.send");
+  // A successful code exchange with only the old read scope is still an unsuccessful upgrade.
+  await completeConsent(await beginSending());
+  await expect.poll(async()=>(await state(page)).panel?.notice).toContain("Google did not confirm");
+  await expect(page.getByRole("button",{name:"Enable email sending",exact:true})).toBeVisible();
+  expect(tokenRequests).toBe(2);expect(await scopes()).not.toContain("gmail.send");
+  // Full consent publishes sending only after the new grant has been checked.
+  grantSending=true;
+  await completeConsent(await beginSending());
+  await expect(page.getByRole("button",{name:"Turn off email sending",exact:true})).toBeVisible();
+  expect(tokenRequests).toBe(3);expect(await scopes()).toContain("gmail.send");expect(await scopes()).toContain("gmail.readonly");
+  expect(JSON.stringify(await state(page))).not.toContain("private-oauth-access");
+  expect(JSON.stringify(await state(page))).not.toContain("private-refresh");
+  await page.getByRole("button",{name:"Turn off email sending",exact:true}).click();
+  expect(await scopes()).toContain("gmail.send");
+  await page.locator(".workflow-footer").getByRole("button",{name:/^Turn off email sending/}).click();
+  await expect(page.getByRole("button",{name:"Enable email sending",exact:true})).toBeVisible();
+  expect(await scopes()).not.toContain("gmail.send");expect(await scopes()).toContain("gmail.readonly");expect(tokenRequests).toBe(3);
   await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setSize(980,780));
   await page.screenshot({path:"test-results/connections-account.png"});
   await closeDesktop(app);
