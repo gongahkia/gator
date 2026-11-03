@@ -155,3 +155,27 @@ func TestDynamicWorkersConsumeTheParentModelBudget(t *testing.T) {
 		t.Fatal("dynamic worker bypassed aggregate request budget", len(manager.requests), len(child.requests))
 	}
 }
+
+func TestDynamicCodeAliasCannotEscapeReviewedReadScope(t *testing.T) {
+	for _, immediate := range []bool{true, false} {
+		t.Run(map[bool]string{true: "create_and_start", false: "start_after_create"}[immediate], func(t *testing.T) {
+			state, _, request := claimedPlanFixture(t, []string{"read"})
+			request.EnableCode = true
+			request.DisableBrowser = true
+			definition := map[string]any{"name": "friendly_researcher", "base": "code", "description": "A custom coder", "instructions": "Implement in the isolated workspace."}
+			if immediate {
+				definition["task"] = "Implement an edit."
+			}
+			turns := []agent.Turn{dynamicCall("create_agent", definition)}
+			if !immediate {
+				turns = append(turns, dynamicCall("start_agent", map[string]any{"agent": "friendly_researcher", "task": "Implement an edit."}))
+			}
+			calls := 0
+			model := &scriptedModel{turns: turns}
+			_, err := (Executor{Model: model, StateDir: state, Code: func(context.Context, CodeRequest) (CodeResult, error) { calls++; return CodeResult{}, nil }}).Execute(context.Background(), request)
+			if err == nil || !strings.Contains(err.Error(), "does not include code") || calls != 0 {
+				t.Fatal("custom alias escaped reviewed read scope", calls, err)
+			}
+		})
+	}
+}

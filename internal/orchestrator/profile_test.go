@@ -387,3 +387,127 @@ func TestDynamicWorkerStopsWithItsParent(t *testing.T) {
 		t.Fatal("parent shutdown left worker alive", task.Status, err)
 	}
 }
+
+func TestTaskSpecialistCanBeSavedAfterItsFirstAssignment(t *testing.T) {
+	store, _ := NewProfileStore(t.TempDir())
+	opts := profileOptions(t)
+	opts.ListProfiles = store.List
+	opts.SaveProfile = func(ctx context.Context, d AgentDefinition, expected, _ string) error {
+		return store.PutContext(ctx, d, expected)
+	}
+	s, err := NewSupervisor(context.Background(), []Specialist{profileBase(&profileModel{})}, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	r := definitionRequest("research")
+	r.Task = "Inspect the evidence"
+	created, err := s.Create(context.Background(), r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Await(context.Background(), created.Task.ID); err != nil {
+		t.Fatal(err)
+	}
+	args, _ := json.Marshal(map[string]any{"action": "save", "name": r.Name, "definition_digest": created.Profile.Digest, "user_quote": "Save this researcher"})
+	if _, err := (profileTool{s, "agent_profiles"}).Execute(context.Background(), args); err != nil {
+		t.Fatal(err)
+	}
+	definitions, err := ReadTaskProfiles(opts.StatePath)
+	if err != nil || len(definitions) != 0 {
+		t.Fatal("promoted role still had a task-local definition", definitions, err)
+	}
+	prior, err := s.Inspect(created.Task.ID)
+	if err != nil || prior.Profile.Saved {
+		t.Fatal("saving rewrote prior task evidence", err)
+	}
+	s.Close()
+	opts.Profiles, err = store.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := NewSupervisor(context.Background(), []Specialist{profileBase(&profileModel{})}, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	task, err := reopened.Start(StartRequest{Agent: r.Name, Task: "Use the saved instructions"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if done, err := reopened.Await(context.Background(), task.ID); err != nil || !done.Profile.Saved || done.Profile.Digest != created.Profile.Digest {
+		t.Fatal("saved definition not reused", done, err)
+	}
+}
+
+type profileProbe struct{ calls int }
+
+func (*profileProbe) Definition() agent.ToolDefinition {
+	return agent.ToolDefinition{Name: "read_file", Description: "Fixture evidence", Parameters: json.RawMessage(`{"type":"object","properties":{}}`)}
+}
+func (p *profileProbe) Execute(context.Context, json.RawMessage) (agent.ToolResult, error) {
+	p.calls++
+	return agent.ToolResult{Content: `{"ok":true}`}, nil
+}
+
+func TestDynamicStepCeilingActuallyStopsTheWorker(t *testing.T) {
+	probe := &profileProbe{}
+	model := &profileModel{run: func(context.Context, agent.TurnRequest) (agent.Turn, error) {
+		return agent.Turn{ToolCalls: []agent.ToolCall{{ID: "probe", Name: "read_file", Arguments: json.RawMessage(`{}`)}}}, nil
+	}}
+	base := LLMSpecialist("source_researcher", "Read evidence", model, []agent.Tool{probe}, "Read only", 3, nil)
+	base.Configuration.MaxSteps = 3
+	s, err := NewSupervisor(context.Background(), []Specialist{base}, profileOptions(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	r := definitionRequest("research")
+	r.MaxSteps = 1
+	r.Task = "Inspect evidence"
+	created, err := s.Create(context.Background(), r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	done, err := s.Await(context.Background(), created.Task.ID)
+	if err != nil || done.Status != "failed" || done.Result.Steps != 1 || probe.calls != 1 || len(model.requests) != 1 {
+		t.Fatal("narrowed step limit was not enforced", done, probe.calls, err)
+	}
+}
+
+func TestTaskOnlyRevisionOfSavedProfileSurvivesOwnerRestart(t *testing.T) {
+	d := AgentDefinition{Version: 1, Name: "research", Base: "source_researcher", Description: "Saved researcher", Instructions: "Original reusable instructions"}
+	opts := profileOptions(t)
+	opts.Profiles = []AgentDefinition{d}
+	s, err := NewSupervisor(context.Background(), []Specialist{profileBase(&profileModel{})}, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := definitionRequest(d.Name)
+	r.ReplaceDigest = d.Digest()
+	r.Instructions = "Temporary instructions for this task only"
+	if _, err := s.Create(context.Background(), r); err != nil {
+		s.Close()
+		t.Fatal(err)
+	}
+	s.Close()
+	reopened, err := NewSupervisor(context.Background(), []Specialist{profileBase(&profileModel{})}, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	profile := reopened.registry[d.Name].Profile
+	if profile == nil || profile.Saved || profile.Definition.Instructions != r.Instructions {
+		t.Fatal("restart lost task-only revision", profile)
+	}
+	newOptions := profileOptions(t)
+	newOptions.Profiles = opts.Profiles
+	fresh, err := NewSupervisor(context.Background(), []Specialist{profileBase(&profileModel{})}, newOptions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fresh.Close()
+	if profile := fresh.registry[d.Name].Profile; profile == nil || !profile.Saved || profile.Digest != d.Digest() {
+		t.Fatal("task revision changed reusable profile", profile)
+	}
+}

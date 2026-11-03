@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -77,12 +78,15 @@ func TestLiveDynamicAgents(t *testing.T) {
 			t.Fatal(err)
 		}
 		p := phase{Name: name}
+		var events sync.Mutex
 		start := time.Now()
 		runID := "work-live-dynamic-" + name
 		out, err := (workrun.Executor{Model: backend, StateDir: state}).Execute(ctx, workrun.Request{
 			RunID: runID, SourcePath: source, Objective: objective, Mode: action.Inspect, Contract: artifact.InspectionContract(), MaxSteps: 8, ForegroundApp: true, DisableBrowser: true, DisableChatHistory: true,
 			Limits: agent.Limits{ModelRequests: 12, Tokens: 120000, WallSeconds: 110},
 			OnEvent: func(e agent.Event) {
+				events.Lock()
+				defer events.Unlock()
 				if e.Kind == agent.EventToolCalled && e.ToolCall != nil {
 					p.Tools = append(p.Tools, e.ToolCall.Name)
 				}

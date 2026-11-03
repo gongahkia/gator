@@ -47,6 +47,53 @@ acceptance steps remain open. Do not treat a green narrow test as product parity
 
 ## Implementation evidence
 
+### Conversational dynamic specialists (additional user request)
+
+The user requested on-the-fly subagents and named specialists during the broader
+implementation. `create_agent` now defines a task-specific role from an available
+native template and optionally starts it immediately. `agent_profiles` manages
+explicitly saved reusable definitions through chat. This uses the existing task
+supervisor and its inspect/await/steer/answer/cancel controls, shared budget and
+three-worker concurrency ceiling. See
+[subagent behavior and boundaries](SUBAGENTS_AND_CLI_INTEROP.md#create-a-specialist-in-conversation).
+
+The host binds specialization to actual template tools/model/source permissions,
+captures the definition/digest in task evidence, rejects stale revisions and
+keeps running tasks immutable across profile edits/deletion. No recursive
+delegation, new provider selection, expanded research scope, automatic scheduling
+or background host is introduced. Saving/deleting requires foreground operation
+and current-user quotation evidence; semantic intent still depends on manager
+instruction following. Task-only reuse is explicitly selected from the same
+conversation lineage; saved roles use each later task's selected resources.
+
+The real Electron fixture passed create/run/save, restart, new-chat reuse and
+deletion. The retained live report
+`scripts/competitive-eval/results/agents-2026-11-03T06-52-02.326Z.json` passed all
+eight assertions across creation and reuse on two different project sources,
+with no tool errors. It added 16 requests, 95,840 input tokens and 984 output
+tokens, conservatively estimated at US$0.598656. The cumulative new allowance is
+now **86 requests, 823,892 input / 6,323 output tokens, US$5.095104 upper estimate**,
+with zero unknown-request or search reservations. The total authorization remains
+US$10. This narrow acceptance does not close any of the fifteen audit findings.
+
+Validation: `go test ./...`, `go vet ./...`, `go build ./cmd/gator`, the full
+orchestrator/workrun/lifecycle race suites, TypeScript checking, desktop build,
+desktop/application-host tests, and the Electron dynamic-agent journey pass.
+Additional focused race tests cover actual narrowed step limits, promotion after
+a first assignment, task-only revisions after owner restart, and reviewed-plan
+denial of custom coding aliases. Desktop/application-host tests retain two
+existing environment/platform skips. The UI build retains existing CSS,
+dependency-directive and bundle-size warnings; startup/navigation profiling
+remains queued under the separate user request. README files are unchanged.
+
+The core implementation was captured in intervening commit `43e5cf8b8` while
+verification continued; its history is preserved. The follow-up commit records
+the remaining admission/restart checks, help and verification documentation.
+
+Rollback: revert the dynamic-agent code, UI labels, tests and documentation
+together. User-created profiles remain private retained content and can be
+removed through knowledge deletion; historical task snapshots remain history.
+
 ### Paused scheduling and observed-success continuity (item 1)
 
 The retained live watch report exposed two independent defects: `Due` ignored

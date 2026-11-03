@@ -1477,6 +1477,10 @@ func workHelp() string {
   Start Work by writing your request below. Gator retains its output and follows
   the current workspace, model, and mode.
 
+  Ask in chat to create a focused research, analysis, review or coding specialist
+  and give it an assignment. Ask to save it for future chats, or show, revise or
+  delete a saved definition. Specialists use this task's available tools and budget.
+
 ` + productguide.Current().Help + `
 
   /model                         choose Cloud API key or Local model

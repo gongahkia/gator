@@ -141,8 +141,15 @@ func NewSupervisor(ctx context.Context, specialists []Specialist, options Option
 			cancel()
 			return nil, err
 		}
+		// A task-only revision shadows the reusable definition for this owner.
+		// Promoting it to the saved library removes the task-local copy.
 		for _, definition := range definitions {
-			if _, present := s.registry[definition.Name]; present {
+			if _, builtin := s.bases[definition.Name]; builtin {
+				continue
+			}
+			_, present := s.registry[definition.Name]
+			if !present && len(s.registry)-len(s.bases) >= MaxAgentProfiles {
+				s.unavailableProfiles[definition.Name] = "task specialist definition limit reached"
 				continue
 			}
 			role, err := s.derive(definition, false)
@@ -151,6 +158,7 @@ func NewSupervisor(ctx context.Context, specialists []Specialist, options Option
 				continue
 			}
 			s.registry[definition.Name] = role
+			delete(s.unavailableProfiles, definition.Name)
 		}
 	}
 	entries, err := os.ReadDir(options.StatePath)

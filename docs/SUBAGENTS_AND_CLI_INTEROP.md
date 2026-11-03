@@ -6,6 +6,82 @@ specialists can run concurrently; the default delegation budget is eight tasks.
 Dependencies and explicit continuation from a retained result are supported.
 Restarting does not silently replay interrupted tasks.
 
+## Create a specialist in conversation
+
+Ask Gator in ordinary chat, for example:
+
+> Create a research agent to compare these venue proposals. Have it check dates,
+> prices and missing evidence, then report back with sources.
+
+Gator can choose an available native template, define a named specialist with
+focused instructions, and launch it immediately through `create_agent`. It can
+run several independent specialists within each owning task's existing
+three-worker concurrency and eight-assignment default limit. Each worker has its own execution context;
+the manager can inspect, await, steer, answer or cancel it and remains responsible
+for the final response. Existing task/activity controls show custom role names.
+
+The default definition belongs to the task. A later request in the same
+conversation can explicitly reuse a retained definition ID from `list_agents`;
+task-only profiles do not automatically appear in unrelated chats. To make one
+available across chats, ask explicitly:
+
+> Save this venue researcher for future chats.
+
+`create_agent` with `save:true`, or `agent_profiles` with `action:save`, retains
+its name, base, description, instructions and optional lower step ceiling.
+`agent_profiles` supports list, inspect and delete as well. Saving/deleting is a
+foreground app operation requiring an exact quotation from the current user
+request, with model guidance requiring explicit intent. The quote check binds
+the evidence to the current request; it does not independently judge its meaning.
+Source documents, web pages and tool results cannot supply that evidence. These
+are local definition changes; they do not create a schedule or external action.
+Profiles are managed through chat; no separate editor has been added.
+
+Available templates include local source research, selected connected/web
+research, claim checking and spreadsheet inspection. Artifact review, native
+Code and goal review appear when their task prerequisites are met. Custom and
+external CLI roles cannot serve as templates. A profile inherits the base's
+actual tools, configured model, sources, permissions and shared model/token/time
+budget; it cannot grant tools, choose another provider, broaden access, publish,
+or delegate recursively. Connected research is still limited to the evidence
+and network scope already available to that task. The feature does not add open
+web discovery or always-on execution.
+
+Saved definitions reload against each new task's available templates and source
+selection. An unavailable base is reported rather than silently substituted.
+Revisions use content digests so competing chats cannot silently overwrite one
+another. A task-only revision of a saved specialist survives its owner's restart
+without changing the reusable definition in other chats. New starts reject a saved definition that another chat has revised or
+deleted; already-admitted workers retain their captured instructions. Changing
+instructions or execution configuration requires a fresh assignment instead of
+continuing an older task under a different identity. Deletion does not cancel a
+worker or erase retained evidence; use the task cancellation control to stop it.
+
+Reusable profiles live under private state `gator/agent-profiles/profiles.json`;
+task-only definitions live under their task's `roles/` directory. Task records
+capture the definition and digest used for execution. Treat instructions as
+private content: they are sent to the configured model when used and included in
+content backups. Knowledge deletion removes the reusable library; historical
+task definitions remain under history. Backup excludes profile locks and partial
+write files. Limits: 32 profiles per library/task, 8 KiB instructions per profile,
+and 1 MiB per library document. Workers still end with their owning request.
+
+Verification (3 November 2026): local tests cover inheritance, revision races,
+source isolation, shared request budgets, parent cancellation, scope checking,
+effective step limits, saving after a first assignment, storage bounds and
+lifecycle handling. The affected package race suites pass. A real Electron fixture covers create/run,
+save, app restart, new-chat reuse and deletion. The budgeted synthetic live run
+`scripts/competitive-eval/results/agents-2026-11-03T06-52-02.326Z.json` passed
+8/8 checks over two projects, using 16 model requests in 40.6 seconds. The first
+phase created and saved a deadline researcher; the second reused it on a new
+source and returned its new date. This is one acceptance example, not a quality
+benchmark or evidence of competitor parity. Reproduce within the cumulative
+authorized evaluation budget with `node scripts/competitive-eval/live-agents.mjs`.
+
+Rollback: revert the implementation and its consumers together. Existing task
+records retain their captured definitions as historical evidence. Older binaries
+ignore the new profile library; they cannot launch these custom roles.
+
 ## Shared native coding
 
 The main conversation and internal `code` workers now share the isolated coding
