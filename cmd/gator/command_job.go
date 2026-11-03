@@ -815,7 +815,9 @@ func runJobProcessWith(ctx context.Context, definition jobs.Definition, stateDir
 				}
 			}
 			references := newWatchReferenceSet(outcome.Manifest, definition.RuntimeWatchItems, plan, outcome.Work)
-			decision := evaluateGoalWatchResult(outcome.Result.FinalText, outcome.Result.Messages, outcome.Manifest.Artifacts, references, definition.RuntimeWatchChanges)
+			references.addOutputReferences("previous", outcome.ParentArtifacts, outcome.ParentOutput)
+			changedArtifacts, currentMessages := currentWatchEffects(outcome)
+			decision := evaluateGoalWatchResult(outcome.Result.FinalText, currentMessages, changedArtifacts, references, definition.RuntimeWatchChanges)
 			rawDecision, validDecision := parseGoalWatchDecision(outcome.Result.FinalText)
 			if validDecision {
 				decision = checkedGoalContinuation(decision, rawDecision, plan, definition, time.Now(), dependencyStates)
@@ -829,8 +831,8 @@ func runJobProcessWith(ctx context.Context, definition jobs.Definition, stateDir
 			result.WatchAttention = decision.Status != "quiet"
 			result.Summary = decision.Summary
 			result.Urgent = decision.Urgent
-			if definition.ChangeOnly && validDecision && len(rawDecision.Evidence) == len(decision.Evidence) && len(definition.WatchSources) == 0 && len(outcome.Manifest.Artifacts) == 0 {
-				if digest := localWatchDecisionDigest(decision, plan, time.Now(), outcome.Result.Messages, dependencyStates); digest != "" {
+			if definition.ChangeOnly && validDecision && len(rawDecision.Evidence) == len(decision.Evidence) && len(definition.WatchSources) == 0 && len(changedArtifacts) == 0 {
+				if digest := localWatchDecisionDigest(decision, plan, time.Now(), currentMessages, dependencyStates); digest != "" {
 					result.ResultSHA256 = digest
 				}
 			}

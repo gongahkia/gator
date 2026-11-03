@@ -48,6 +48,7 @@ func TestLiveProjectWatch(t *testing.T) {
 		Milliseconds  int64
 		Attempt       jobs.Attempt
 		Draft         string
+		Decision      string
 		Tools, Errors []string
 		ModelRuns     int
 		Update        inbox.Entry
@@ -136,6 +137,7 @@ func TestLiveProjectWatch(t *testing.T) {
 					}
 				}
 				out, err := (workrun.Service{Executor: workrun.Executor{Model: backend, StateDir: state}}).Execute(ctx, request)
+				p.Decision = out.Result.FinalText
 				check(name+": no external actions", len(out.Manifest.Actions) == 0)
 				if data, e := os.ReadFile(filepath.Join(out.Work.Path, "output", "update.md")); e == nil {
 					p.Draft = string(data)

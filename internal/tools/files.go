@@ -62,6 +62,12 @@ func (t ReadFile) Execute(_ context.Context, raw json.RawMessage) (agent.ToolRes
 	}
 
 	lines := strings.Split(string(contents), "\n")
+	terminated := len(contents) > 0 && contents[len(contents)-1] == '\n'
+	if terminated {
+		// A final newline terminates the last physical line; it does not create
+		// an extra citable line beyond the file's contents.
+		lines = lines[:len(lines)-1]
+	}
 	start := arguments.StartLine
 	if start == 0 {
 		start = 1
@@ -79,6 +85,9 @@ func (t ReadFile) Execute(_ context.Context, raw json.RawMessage) (agent.ToolRes
 	}
 	end = min(end, len(lines))
 	selected := strings.Join(lines[start-1:end], "\n")
+	if terminated && end == len(lines) {
+		selected += "\n"
+	}
 	truncated := end < len(lines)
 	if len(selected) > maxBytes {
 		selected = selected[:maxBytes]

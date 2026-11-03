@@ -1,0 +1,542 @@
+{
+  "Phases": [
+    {
+      "Name": "baseline",
+      "Milliseconds": 16272,
+      "Attempt": {
+        "runs": [
+          {
+            "try": 1,
+            "run_id": "attempt-20261103T045401-a79c791ab1c081af-try-1",
+            "conversation_id": "work-20261103T045401-6c0f89b8c2b39353",
+            "revision_id": "attempt-20261103T045401-a79c791ab1c081af-try-1",
+            "bundle_path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/TestLiveProjectWatch926977066/001/gator/workspaces/cbf260820c9c082f05742f6ad16205cf/attempt-20261103T045401-a79c791ab1c081af-try-1"
+          }
+        ],
+        "version": 2,
+        "id": "attempt-20261103T045401-a79c791ab1c081af",
+        "job_id": "job-7ba69f95548b155405a0d9c5",
+        "definition_sha256": "c922a2bc76f0e6d212da4f406e83860c90075629e3d582109693075f72781efd",
+        "scheduled_at": "2026-11-03T04:54:01.648279Z",
+        "started_at": "2026-11-03T04:54:01.648423Z",
+        "finished_at": "2026-11-03T04:54:17.829305Z",
+        "try": 1,
+        "status": "completed",
+        "conversation_id": "work-20261103T045401-6c0f89b8c2b39353",
+        "revision_id": "attempt-20261103T045401-a79c791ab1c081af-try-1",
+        "bundle_path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/TestLiveProjectWatch926977066/001/gator/workspaces/cbf260820c9c082f05742f6ad16205cf/attempt-20261103T045401-a79c791ab1c081af-try-1",
+        "summary": "Prepared the baseline update.md for review; the client review deadline is 20 November 2026, with no reported blockers and budget still unapproved. [evidence: source/project.md:1-5; goal plan step step-35ea2ea9653fb7dc]",
+        "result_sha256": "05a7fb5f3b0cc22c3ae508bbf1f11fdd9bdfe594ea04168aedafba0ae3ddf92a",
+        "input_sha256": "4fe7e1a40da85ec2bb394126e1e565c6997f8df4fd8274eb2957fa6ae0627176",
+        "watch_attention": true,
+        "watch_decision": {
+          "continuation": "idle",
+          "next_check_at": "0001-01-01T00:00:00Z",
+          "next_step_id": "step-35ea2ea9653fb7dc",
+          "status": "attention",
+          "summary": "Prepared the baseline update.md for review; the client review deadline is 20 November 2026, with no reported blockers and budget still unapproved. [evidence: source/project.md:1-5; goal plan step step-35ea2ea9653fb7dc]",
+          "next_step": "Review update.md; Mina should prepare the website draft for client review and flag any decision or blocker affecting the deadline.",
+          "rationale": "This is the first successful baseline check, and the validated draft is neutral, under 150 words, includes a next step and source references, and was not sent externally.",
+          "evidence": [
+            "source/project.md:1-5",
+            "goal plan step step-35ea2ea9653fb7dc"
+          ]
+        },
+        "watch_items": [
+          {
+            "source": "local/plan",
+            "id": "review",
+            "sha256": "13200483f6d0058446645b5e062f7148beb4fb01481f4087d3888657dff57feb"
+          },
+          {
+            "source": "local/plan",
+            "id": "step-35ea2ea9653fb7dc",
+            "sha256": "a930ec7d34b65351233bce9784a776de887370311c19f9dd7eeea491ce9b8f87"
+          }
+        ],
+        "watch_changes": [
+          {
+            "source": "local/plan",
+            "id": "review",
+            "kind": "added"
+          },
+          {
+            "source": "local/plan",
+            "id": "step-35ea2ea9653fb7dc",
+            "kind": "added"
+          }
+        ],
+        "notification_policy_sha256": "555593271b3517bb19e37867bb0288f27cce0825b0dc60abe4b470e9d99793e4"
+      },
+      "Draft": "# Website project update\n\nThe community website refresh is owned by Mina. Client review is due 20 November 2026. No blockers are reported. The budget remains unapproved and should not be treated as approved.\n\n**Next step:** Mina should prepare the current website draft for client review by the deadline and flag any decision or blocker that could affect it.\n\n**Sources:** `source/project.md:1-5`; goal plan step `step-35ea2ea9653fb7dc`.",
+      "Tools": [
+        "local_plan",
+        "list_files",
+        "read_file",
+        "write_artifact",
+        "artifact_status"
+      ],
+      "Errors": null,
+      "ModelRuns": 1,
+      "Update": {
+        "next_step": "Review update.md; Mina should prepare the website draft for client review and flag any decision or blocker affecting the deadline.",
+        "evidence": [
+          "source/project.md:1-5",
+          "goal plan step step-35ea2ea9653fb7dc"
+        ],
+        "origin_conversation_id": "work-20261103T045401-6d19dbf1b9ca01a4",
+        "attempt_id": "attempt-20261103T045401-a79c791ab1c081af",
+        "delivered_at": "0001-01-01T00:00:00Z",
+        "resolved_at": "0001-01-01T00:00:00Z",
+        "version": 1,
+        "id": "inbox-job-cf7509dbd1fc2f8c4758c4ad01fd4bf590dc5f083d2c5debc512c75c053fa007",
+        "kind": "job",
+        "title": "Project follow-up",
+        "summary": "Prepared the baseline update.md for review; the client review deadline is 20 November 2026, with no reported blockers and budget still unapproved. [evidence: source/project.md:1-5; goal plan step step-35ea2ea9653fb7dc]",
+        "job_id": "job-7ba69f95548b155405a0d9c5",
+        "goal_id": "goal-7ba69f95548b155405a0d9c5",
+        "conversation_id": "work-20261103T045401-6c0f89b8c2b39353",
+        "revision_id": "attempt-20261103T045401-a79c791ab1c081af-try-1",
+        "status": "completed",
+        "created_at": "2026-11-03T04:54:17.873626Z",
+        "read_at": "0001-01-01T00:00:00Z",
+        "rated_at": "0001-01-01T00:00:00Z",
+        "desktop_notified_at": "0001-01-01T00:00:00Z"
+      }
+    },
+    {
+      "Name": "identical-inputs",
+      "Milliseconds": 151,
+      "Attempt": {
+        "version": 2,
+        "id": "attempt-20261103T045417-3bf6ab62488eeb9b",
+        "job_id": "job-7ba69f95548b155405a0d9c5",
+        "definition_sha256": "c922a2bc76f0e6d212da4f406e83860c90075629e3d582109693075f72781efd",
+        "scheduled_at": "2026-11-03T04:54:17.919989Z",
+        "started_at": "2026-11-03T04:54:17.920055Z",
+        "finished_at": "2026-11-03T04:54:18.007343Z",
+        "try": 1,
+        "status": "unchanged",
+        "summary": "Watched inputs unchanged since the last completed run.",
+        "input_sha256": "4fe7e1a40da85ec2bb394126e1e565c6997f8df4fd8274eb2957fa6ae0627176",
+        "watch_decision": {
+          "next_check_at": "0001-01-01T00:00:00Z",
+          "status": "quiet",
+          "summary": "Watched inputs unchanged since the last completed run.",
+          "rationale": "Watched input fingerprints match the last completed run."
+        },
+        "watch_items": [
+          {
+            "source": "local/plan",
+            "id": "review",
+            "sha256": "13200483f6d0058446645b5e062f7148beb4fb01481f4087d3888657dff57feb"
+          },
+          {
+            "source": "local/plan",
+            "id": "step-35ea2ea9653fb7dc",
+            "sha256": "a930ec7d34b65351233bce9784a776de887370311c19f9dd7eeea491ce9b8f87"
+          }
+        ],
+        "notification_policy_sha256": "555593271b3517bb19e37867bb0288f27cce0825b0dc60abe4b470e9d99793e4"
+      },
+      "Draft": "",
+      "Tools": null,
+      "Errors": null,
+      "ModelRuns": 0,
+      "Update": {
+        "delivered_at": "0001-01-01T00:00:00Z",
+        "resolved_at": "0001-01-01T00:00:00Z",
+        "version": 0,
+        "id": "",
+        "kind": "",
+        "title": "",
+        "summary": "",
+        "status": "",
+        "created_at": "0001-01-01T00:00:00Z",
+        "read_at": "0001-01-01T00:00:00Z",
+        "rated_at": "0001-01-01T00:00:00Z",
+        "desktop_notified_at": "0001-01-01T00:00:00Z"
+      }
+    },
+    {
+      "Name": "cosmetic-edit",
+      "Milliseconds": 18280,
+      "Attempt": {
+        "runs": [
+          {
+            "try": 1,
+            "run_id": "attempt-20261103T045418-c63acc6b365af249-try-1",
+            "conversation_id": "work-20261103T045401-6c0f89b8c2b39353",
+            "revision_id": "attempt-20261103T045418-c63acc6b365af249-try-1",
+            "bundle_path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/TestLiveProjectWatch926977066/001/gator/workspaces/5c6cd198181889967eda6b132d110883/attempt-20261103T045418-c63acc6b365af249-try-1"
+          }
+        ],
+        "version": 2,
+        "id": "attempt-20261103T045418-c63acc6b365af249",
+        "job_id": "job-7ba69f95548b155405a0d9c5",
+        "definition_sha256": "c922a2bc76f0e6d212da4f406e83860c90075629e3d582109693075f72781efd",
+        "scheduled_at": "2026-11-03T04:54:18.071795Z",
+        "started_at": "2026-11-03T04:54:18.07187Z",
+        "finished_at": "2026-11-03T04:54:36.146137Z",
+        "try": 1,
+        "status": "completed",
+        "conversation_id": "work-20261103T045401-6c0f89b8c2b39353",
+        "revision_id": "attempt-20261103T045418-c63acc6b365af249-try-1",
+        "bundle_path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/TestLiveProjectWatch926977066/001/gator/workspaces/5c6cd198181889967eda6b132d110883/attempt-20261103T045418-c63acc6b365af249-try-1",
+        "summary": "No material project change; the only source update is explicitly cosmetic, so the retained baseline draft remains unchanged. [quiet rationale references unverified; review Work run]",
+        "result_sha256": "759967218104911f801f5a63edc4b8e75e35029b74144072bc38f05f117ebc29",
+        "input_sha256": "cbd95f52e035e8566d975c560aafc79acf29f67c662544326280ba577cc59a88",
+        "watch_attention": true,
+        "watch_decision": {
+          "next_check_at": "0001-01-01T00:00:00Z",
+          "status": "review",
+          "summary": "No material project change; the only source update is explicitly cosmetic, so the retained baseline draft remains unchanged. [quiet rationale references unverified; review Work run]",
+          "rationale": "The deadline, budget status, blocker status, and goal-plan step are unchanged; cosmetic edits do not meet the notification conditions."
+        },
+        "watch_items": [
+          {
+            "source": "local/plan",
+            "id": "review",
+            "sha256": "13200483f6d0058446645b5e062f7148beb4fb01481f4087d3888657dff57feb"
+          },
+          {
+            "source": "local/plan",
+            "id": "step-35ea2ea9653fb7dc",
+            "sha256": "a930ec7d34b65351233bce9784a776de887370311c19f9dd7eeea491ce9b8f87"
+          }
+        ],
+        "notification_policy_sha256": "555593271b3517bb19e37867bb0288f27cce0825b0dc60abe4b470e9d99793e4"
+      },
+      "Draft": "# Website project update\n\nThe community website refresh is owned by Mina. Client review is due 20 November 2026. No blockers are reported. The budget remains unapproved and should not be treated as approved.\n\n**Next step:** Mina should prepare the current website draft for client review by the deadline and flag any decision or blocker that could affect it.\n\n**Sources:** `source/project.md:1-5`; goal plan step `step-35ea2ea9653fb7dc`.",
+      "Tools": [
+        "local_plan",
+        "list_files",
+        "read_file",
+        "artifact_status"
+      ],
+      "Errors": null,
+      "ModelRuns": 1,
+      "Update": {
+        "origin_conversation_id": "work-20261103T045401-6d19dbf1b9ca01a4",
+        "attempt_id": "attempt-20261103T045418-c63acc6b365af249",
+        "delivered_at": "0001-01-01T00:00:00Z",
+        "resolved_at": "0001-01-01T00:00:00Z",
+        "version": 1,
+        "id": "inbox-job-83b59a0f27647575a79727974240a695e5c74589041221fbadb7db6a28c8ee34",
+        "kind": "job",
+        "title": "Project follow-up",
+        "summary": "No material project change; the only source update is explicitly cosmetic, so the retained baseline draft remains unchanged. [quiet rationale references unverified; review Work run]",
+        "job_id": "job-7ba69f95548b155405a0d9c5",
+        "goal_id": "goal-7ba69f95548b155405a0d9c5",
+        "conversation_id": "work-20261103T045401-6c0f89b8c2b39353",
+        "revision_id": "attempt-20261103T045418-c63acc6b365af249-try-1",
+        "status": "completed",
+        "created_at": "2026-11-03T04:54:36.270858Z",
+        "read_at": "0001-01-01T00:00:00Z",
+        "rated_at": "0001-01-01T00:00:00Z",
+        "desktop_notified_at": "0001-01-01T00:00:00Z"
+      }
+    },
+    {
+      "Name": "earlier-deadline-and-blocker",
+      "Milliseconds": 16931,
+      "Attempt": {
+        "runs": [
+          {
+            "try": 1,
+            "run_id": "attempt-20261103T045436-6737bb630e70ce13-try-1",
+            "conversation_id": "work-20261103T045401-6c0f89b8c2b39353",
+            "revision_id": "attempt-20261103T045436-6737bb630e70ce13-try-1",
+            "bundle_path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/TestLiveProjectWatch926977066/001/gator/workspaces/9fa1831810f310045327614787336c94/attempt-20261103T045436-6737bb630e70ce13-try-1"
+          }
+        ],
+        "version": 2,
+        "id": "attempt-20261103T045436-6737bb630e70ce13",
+        "job_id": "job-7ba69f95548b155405a0d9c5",
+        "definition_sha256": "c922a2bc76f0e6d212da4f406e83860c90075629e3d582109693075f72781efd",
+        "scheduled_at": "2026-11-03T04:54:36.3541Z",
+        "started_at": "2026-11-03T04:54:36.354172Z",
+        "finished_at": "2026-11-03T04:54:53.180067Z",
+        "try": 1,
+        "status": "completed",
+        "conversation_id": "work-20261103T045401-6c0f89b8c2b39353",
+        "revision_id": "attempt-20261103T045436-6737bb630e70ce13-try-1",
+        "bundle_path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/TestLiveProjectWatch926977066/001/gator/workspaces/9fa1831810f310045327614787336c94/attempt-20261103T045436-6737bb630e70ce13-try-1",
+        "summary": "Updated update.md because client review moved to 17 November 2026 and missing venue photos are now a blocker. [evidence: source/project.md:1-5; goal plan step step-35ea2ea9653fb7dc] [other references unverified; review Work run]",
+        "result_sha256": "da71a8356016b6aadfa094a1e8b3c7149674a79da7dc299344834acc18937f0f",
+        "input_sha256": "9cf5d0ec617c65dfe954575d8364cecfee84812609fb623b43324658fd655322",
+        "watch_attention": true,
+        "watch_decision": {
+          "next_check_at": "0001-01-01T00:00:00Z",
+          "status": "review",
+          "summary": "Updated update.md because client review moved to 17 November 2026 and missing venue photos are now a blocker. [evidence: source/project.md:1-5; goal plan step step-35ea2ea9653fb7dc] [other references unverified; review Work run]",
+          "next_step": "Review the draft; Mina should obtain or replace the missing photos and assess whether the earlier review date remains achievable.",
+          "rationale": "Both a deadline and blocker materially changed from the retained baseline; the new draft passed host validation, stays under 150 words, and treats the budget as unapproved.",
+          "evidence": [
+            "source/project.md:1-5",
+            "goal plan step step-35ea2ea9653fb7dc"
+          ],
+          "urgent": true
+        },
+        "urgent": true,
+        "watch_items": [
+          {
+            "source": "local/plan",
+            "id": "review",
+            "sha256": "13200483f6d0058446645b5e062f7148beb4fb01481f4087d3888657dff57feb"
+          },
+          {
+            "source": "local/plan",
+            "id": "step-35ea2ea9653fb7dc",
+            "sha256": "a930ec7d34b65351233bce9784a776de887370311c19f9dd7eeea491ce9b8f87"
+          }
+        ],
+        "notification_policy_sha256": "555593271b3517bb19e37867bb0288f27cce0825b0dc60abe4b470e9d99793e4"
+      },
+      "Draft": "# Website project update\n\nThe community website refresh remains owned by Mina. Client review has moved forward from 20 November to 17 November 2026. Venue photos are now reported missing and may block review readiness. The budget remains unapproved and must not be treated as approved.\n\n**Next step:** Mina should obtain or replace the missing venue photos and assess whether the 17 November review remains achievable.\n\n**Sources:** `source/project.md:1-5`; goal plan step `step-35ea2ea9653fb7dc`.",
+      "Tools": [
+        "local_plan",
+        "list_files",
+        "list_files",
+        "read_file",
+        "read_file",
+        "write_artifact",
+        "artifact_status"
+      ],
+      "Errors": null,
+      "ModelRuns": 1,
+      "Update": {
+        "next_step": "Review the draft; Mina should obtain or replace the missing photos and assess whether the earlier review date remains achievable.",
+        "evidence": [
+          "source/project.md:1-5",
+          "goal plan step step-35ea2ea9653fb7dc"
+        ],
+        "origin_conversation_id": "work-20261103T045401-6d19dbf1b9ca01a4",
+        "attempt_id": "attempt-20261103T045436-6737bb630e70ce13",
+        "delivered_at": "0001-01-01T00:00:00Z",
+        "resolved_at": "0001-01-01T00:00:00Z",
+        "version": 1,
+        "id": "inbox-job-a7ed49b5452cb83518c0b807da9520033daa87c39a41351247fb9163e6cbf186",
+        "kind": "job",
+        "title": "Project follow-up",
+        "summary": "Updated update.md because client review moved to 17 November 2026 and missing venue photos are now a blocker. [evidence: source/project.md:1-5; goal plan step step-35ea2ea9653fb7dc] [other references unverified; review Work run]",
+        "job_id": "job-7ba69f95548b155405a0d9c5",
+        "goal_id": "goal-7ba69f95548b155405a0d9c5",
+        "conversation_id": "work-20261103T045401-6c0f89b8c2b39353",
+        "revision_id": "attempt-20261103T045436-6737bb630e70ce13-try-1",
+        "status": "completed",
+        "urgent": true,
+        "created_at": "2026-11-03T04:54:53.24326Z",
+        "read_at": "0001-01-01T00:00:00Z",
+        "rated_at": "0001-01-01T00:00:00Z",
+        "desktop_notified_at": "0001-01-01T00:00:00Z"
+      }
+    },
+    {
+      "Name": "repeat-material-change",
+      "Milliseconds": 150,
+      "Attempt": {
+        "version": 2,
+        "id": "attempt-20261103T045453-a66de860538a1d8a",
+        "job_id": "job-7ba69f95548b155405a0d9c5",
+        "definition_sha256": "c922a2bc76f0e6d212da4f406e83860c90075629e3d582109693075f72781efd",
+        "scheduled_at": "2026-11-03T04:54:53.285269Z",
+        "started_at": "2026-11-03T04:54:53.285314Z",
+        "finished_at": "2026-11-03T04:54:53.375675Z",
+        "try": 1,
+        "status": "unchanged",
+        "summary": "Watched inputs unchanged since the last completed run.",
+        "input_sha256": "9cf5d0ec617c65dfe954575d8364cecfee84812609fb623b43324658fd655322",
+        "watch_decision": {
+          "next_check_at": "0001-01-01T00:00:00Z",
+          "status": "quiet",
+          "summary": "Watched inputs unchanged since the last completed run.",
+          "rationale": "Watched input fingerprints match the last completed run."
+        },
+        "watch_items": [
+          {
+            "source": "local/plan",
+            "id": "review",
+            "sha256": "13200483f6d0058446645b5e062f7148beb4fb01481f4087d3888657dff57feb"
+          },
+          {
+            "source": "local/plan",
+            "id": "step-35ea2ea9653fb7dc",
+            "sha256": "a930ec7d34b65351233bce9784a776de887370311c19f9dd7eeea491ce9b8f87"
+          }
+        ],
+        "notification_policy_sha256": "555593271b3517bb19e37867bb0288f27cce0825b0dc60abe4b470e9d99793e4"
+      },
+      "Draft": "",
+      "Tools": null,
+      "Errors": null,
+      "ModelRuns": 0,
+      "Update": {
+        "delivered_at": "0001-01-01T00:00:00Z",
+        "resolved_at": "0001-01-01T00:00:00Z",
+        "version": 0,
+        "id": "",
+        "kind": "",
+        "title": "",
+        "summary": "",
+        "status": "",
+        "created_at": "0001-01-01T00:00:00Z",
+        "read_at": "0001-01-01T00:00:00Z",
+        "rated_at": "0001-01-01T00:00:00Z",
+        "desktop_notified_at": "0001-01-01T00:00:00Z"
+      }
+    },
+    {
+      "Name": "source-unavailable",
+      "Milliseconds": 164,
+      "Attempt": {
+        "version": 2,
+        "id": "attempt-20261103T045453-d55f14f956b73d2d",
+        "job_id": "job-7ba69f95548b155405a0d9c5",
+        "definition_sha256": "c922a2bc76f0e6d212da4f406e83860c90075629e3d582109693075f72781efd",
+        "scheduled_at": "2026-11-03T04:54:53.436543Z",
+        "started_at": "2026-11-03T04:54:53.436596Z",
+        "finished_at": "2026-11-03T04:54:53.519203Z",
+        "try": 1,
+        "status": "failed",
+        "urgent": true,
+        "notification_policy_sha256": "555593271b3517bb19e37867bb0288f27cce0825b0dc60abe4b470e9d99793e4",
+        "error": "lstat /private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/TestLiveProjectWatch926977066/002/project: no such file or directory"
+      },
+      "Draft": "",
+      "Tools": null,
+      "Errors": null,
+      "ModelRuns": 0,
+      "Update": {
+        "origin_conversation_id": "work-20261103T045401-6d19dbf1b9ca01a4",
+        "attempt_id": "attempt-20261103T045453-d55f14f956b73d2d",
+        "delivered_at": "0001-01-01T00:00:00Z",
+        "resolved_at": "0001-01-01T00:00:00Z",
+        "version": 1,
+        "id": "inbox-job-244d0016fc232ec5730443db421ef1e5f9eed3897ca32c9aab8e3cf103a14f46",
+        "kind": "job",
+        "title": "Project follow-up",
+        "summary": "This check could not finish. lstat /private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/TestLiveProjectWatch926977066/002/project: no such file or directory",
+        "job_id": "job-7ba69f95548b155405a0d9c5",
+        "goal_id": "goal-7ba69f95548b155405a0d9c5",
+        "status": "failed",
+        "urgent": true,
+        "created_at": "2026-11-03T04:54:53.519203Z",
+        "read_at": "0001-01-01T00:00:00Z",
+        "rated_at": "0001-01-01T00:00:00Z",
+        "desktop_notified_at": "0001-01-01T00:00:00Z"
+      }
+    },
+    {
+      "Name": "source-restored",
+      "Milliseconds": 12287,
+      "Attempt": {
+        "runs": [
+          {
+            "try": 1,
+            "run_id": "attempt-20261103T045453-557b9036f94d494f-try-1",
+            "conversation_id": "work-20261103T045401-6c0f89b8c2b39353",
+            "revision_id": "attempt-20261103T045453-557b9036f94d494f-try-1",
+            "bundle_path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/TestLiveProjectWatch926977066/001/gator/workspaces/9fa1831810f310045327614787336c94/attempt-20261103T045453-557b9036f94d494f-try-1"
+          }
+        ],
+        "version": 2,
+        "id": "attempt-20261103T045453-557b9036f94d494f",
+        "job_id": "job-7ba69f95548b155405a0d9c5",
+        "definition_sha256": "c922a2bc76f0e6d212da4f406e83860c90075629e3d582109693075f72781efd",
+        "scheduled_at": "2026-11-03T04:54:53.601302Z",
+        "started_at": "2026-11-03T04:54:53.601353Z",
+        "finished_at": "2026-11-03T04:55:05.648817Z",
+        "try": 1,
+        "status": "completed",
+        "conversation_id": "work-20261103T045401-6c0f89b8c2b39353",
+        "revision_id": "attempt-20261103T045453-557b9036f94d494f-try-1",
+        "bundle_path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/TestLiveProjectWatch926977066/001/gator/workspaces/9fa1831810f310045327614787336c94/attempt-20261103T045453-557b9036f94d494f-try-1",
+        "summary": "No material change since the last update; the 17 November deadline, missing-photo blocker, and unapproved budget are unchanged. [quiet rationale references unverified; review Work run]",
+        "result_sha256": "bda9d16d0e17d6591ca04610a0ac82e0887253b323289ebf39deaf87e022838b",
+        "input_sha256": "9cf5d0ec617c65dfe954575d8364cecfee84812609fb623b43324658fd655322",
+        "watch_attention": true,
+        "watch_decision": {
+          "next_check_at": "0001-01-01T00:00:00Z",
+          "status": "review",
+          "summary": "No material change since the last update; the 17 November deadline, missing-photo blocker, and unapproved budget are unchanged. [quiet rationale references unverified; review Work run]",
+          "rationale": "Current project evidence matches the retained update.md, and the plan step remains pending, so no revised draft or plan suggestion is justified."
+        },
+        "watch_items": [
+          {
+            "source": "local/plan",
+            "id": "review",
+            "sha256": "13200483f6d0058446645b5e062f7148beb4fb01481f4087d3888657dff57feb"
+          },
+          {
+            "source": "local/plan",
+            "id": "step-35ea2ea9653fb7dc",
+            "sha256": "a930ec7d34b65351233bce9784a776de887370311c19f9dd7eeea491ce9b8f87"
+          }
+        ],
+        "notification_policy_sha256": "555593271b3517bb19e37867bb0288f27cce0825b0dc60abe4b470e9d99793e4"
+      },
+      "Draft": "# Website project update\n\nThe community website refresh remains owned by Mina. Client review has moved forward from 20 November to 17 November 2026. Venue photos are now reported missing and may block review readiness. The budget remains unapproved and must not be treated as approved.\n\n**Next step:** Mina should obtain or replace the missing venue photos and assess whether the 17 November review remains achievable.\n\n**Sources:** `source/project.md:1-5`; goal plan step `step-35ea2ea9653fb7dc`.",
+      "Tools": [
+        "local_plan",
+        "list_files",
+        "list_files",
+        "read_file",
+        "read_file",
+        "artifact_status"
+      ],
+      "Errors": null,
+      "ModelRuns": 1,
+      "Update": {
+        "origin_conversation_id": "work-20261103T045401-6d19dbf1b9ca01a4",
+        "attempt_id": "attempt-20261103T045453-557b9036f94d494f",
+        "delivered_at": "0001-01-01T00:00:00Z",
+        "resolved_at": "0001-01-01T00:00:00Z",
+        "version": 1,
+        "id": "inbox-job-503f798ccd546e84b2c20a76b30f3253babb260a53ba542d4fb534e0eba75044",
+        "kind": "job",
+        "title": "Project follow-up",
+        "summary": "No material change since the last update; the 17 November deadline, missing-photo blocker, and unapproved budget are unchanged. [quiet rationale references unverified; review Work run]",
+        "job_id": "job-7ba69f95548b155405a0d9c5",
+        "goal_id": "goal-7ba69f95548b155405a0d9c5",
+        "conversation_id": "work-20261103T045401-6c0f89b8c2b39353",
+        "revision_id": "attempt-20261103T045453-557b9036f94d494f-try-1",
+        "status": "completed",
+        "created_at": "2026-11-03T04:55:05.807709Z",
+        "read_at": "0001-01-01T00:00:00Z",
+        "rated_at": "0001-01-01T00:00:00Z",
+        "desktop_notified_at": "0001-01-01T00:00:00Z"
+      }
+    }
+  ],
+  "Checks": {
+    "baseline completed with useful draft": true,
+    "baseline: no external actions": true,
+    "changed draft concise": true,
+    "changed update bound to origin": true,
+    "cosmetic edit judged quiet": false,
+    "cosmetic-edit: no external actions": true,
+    "earlier-deadline-and-blocker: no external actions": true,
+    "identical inputs quiet without model": true,
+    "initial draft under 150 words": true,
+    "material change noticed": true,
+    "paused agreement cannot become due": true,
+    "paused health retains successful check": true,
+    "recovery reports observation gap": true,
+    "repeat alert suppressed without model": true,
+    "restoration rechecks after failure": true,
+    "retained conversation resumed": true,
+    "source-restored: no external actions": true,
+    "unavailable source is failure not quiet": true,
+    "update returns to requesting chat": true
+  },
+  "Spend": {
+    "calls": 36,
+    "unconfirmed_reserved_usd": 0,
+    "estimated_upper_usd": 2.329116000000001,
+    "search_reserved_upper_usd": 0,
+    "Input": 377078,
+    "Output": 2777
+  },
+  "ManualRepair": "unreviewed by a human"
+}

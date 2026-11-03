@@ -431,6 +431,8 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		if err := artifact.VerifyBundle(bundle); err != nil {
 			return outcome, err
 		}
+		outcome.ParentArtifacts = append([]artifact.File(nil), bundle.Manifest.Artifacts...)
+		outcome.ParentOutput = bundle.Output
 		for _, entry := range bundle.Manifest.Evidence {
 			if entry.SnapshotPath == "" {
 				continue

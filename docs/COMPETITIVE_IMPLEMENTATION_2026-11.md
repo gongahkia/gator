@@ -67,3 +67,58 @@ race suites pass. Focused command integration tests matching
 Rollback: revert its code/documentation commit. No new persisted fields or data
 migration are introduced. An already admitted check may finish after pause; this
 change prevents future scheduler admission, not cancellation of active work.
+
+### Current-run effects and source/citation continuity (item 1)
+
+Three retained live attempts passed 18/19 checks and preserved the remaining
+cosmetic-change failure. The model was already staying quiet and not rewriting
+the draft. Inspection exposed host defects: all inherited artifacts forced
+attention, replayed suggestions could do the same, and carried-forward evidence
+could shadow the freshly read source at the same locator. A further mismatch
+exposed a phantom final line in `read_file` after a terminating newline.
+
+Work outcomes now expose the verified parent's artifact identities/root. Watches
+compare output hashes/sizes and use current execution tool events, preserving
+new/changed/removed output and fresh suggestions as reviewable effects. Existing
+drafts stay retained without forcing another alert. Current file reads bind
+evidence to current frozen bytes. Line references can use verified current/parent
+drafts; every path, content hash and physical line bound is checked. The reader
+reports physical lines while preserving the terminating newline and full byte
+coverage. Invalid references still require review.
+
+`goal_watch_revision_test.go` exercises real Work execution across a baseline,
+cosmetic refresh and changed deadline, with actual artifacts, replay and evidence.
+Additional regressions cover historical/current suggestions, removed output,
+changed parent bytes and unowned/out-of-bounds references. Physical-line tests
+also check full byte coverage needed by coding review.
+
+The live run `watch-2026-11-03T05-00-54.138Z.json` passes **19/19 checks** in
+approximately 52.2 seconds. Baseline and material changes surface; identical and
+cosmetic changes stay quiet; source failures report honestly, recovery rechecks
+without another concern, and pause/health checks pass. All three earlier failed
+reports remain beside it. Cumulative new accounting is 70 model requests,
+728,052 input / 5,339 output tokens, **US$4.496448 upper estimate**, zero search
+charges/reservations and zero unresolved model reservations. These estimates
+include failed attempts and conservative regional/cache-write rates; they are
+not a provider invoice. No connected accounts or real user data were loaded.
+
+The original engineering projection checkpoint was included in the user's
+intervening commit `cbbf6d7ac`; it is preserved. This implementation extends it
+with measured fixes. Item 1 remains open for the coding completion journey,
+unseen cases, independent human draft-repair assessment and multi-day usefulness.
+No README files are changed.
+
+Verification for this slice: full `internal/tools` and `internal/workrun` race
+suites pass; command watch/change-only race checks pass; physical-line,
+multi-revision and retained-output reference regressions pass. Repository-wide
+verification is also running for the combined current changes and will be
+recorded separately. The live sequence tests real model/tool behavior but remains
+an engineer-authored synthetic responsibility, not a consumer success-rate study.
+
+## Additional user request
+
+After the current product/engineering implementation, profile startup to usable
+chat, screen/chat switching, input latency, rendering and background resource
+use in the actual app. Record reproducible measurements, improve the measured
+bottlenecks and commit verified changes separately. This is additional scope;
+it does not replace any of the fifteen requirements above.

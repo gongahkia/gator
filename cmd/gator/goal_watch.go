@@ -14,8 +14,39 @@ import (
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/jobs"
+	"github.com/gongahkia/gator/internal/workrun"
 	"github.com/gongahkia/gator/internal/workspace"
 )
+
+// A resumed Work bundle includes inherited files and transcript replay. Only
+// changed output and this execution's tool results can force a fresh alert.
+func currentWatchEffects(outcome workrun.Outcome) ([]artifact.File, []agent.Message) {
+	before := make(map[string]artifact.File, len(outcome.ParentArtifacts))
+	for _, file := range outcome.ParentArtifacts {
+		before[file.Path] = file
+	}
+	var changed []artifact.File
+	for _, file := range outcome.Manifest.Artifacts {
+		prior, exists := before[file.Path]
+		if !exists || prior.SHA256 != file.SHA256 || prior.Bytes != file.Bytes {
+			changed = append(changed, file)
+		}
+		delete(before, file.Path)
+	}
+	for _, removed := range before {
+		changed = append(changed, removed)
+	}
+	if len(outcome.Events) == 0 {
+		return changed, outcome.Result.Messages // Missing trace stays conservative.
+	}
+	var messages []agent.Message
+	for _, event := range outcome.Events {
+		if event.Kind == agent.EventToolFinished && event.ToolCall != nil {
+			messages = append(messages, agent.Message{Role: agent.RoleTool, ToolName: event.ToolCall.Name, Content: event.ToolResult})
+		}
+	}
+	return changed, messages
+}
 
 type goalWatchDecision struct {
 	Continuation string    `json:"continuation,omitempty"`
@@ -153,15 +184,29 @@ type watchReferenceSet struct {
 	items     map[string]bool
 	plan      map[string]bool
 	source    workspace.Root
+	files     map[string]artifact.File
+	roots     map[string]workspace.Root
 }
 
 func newWatchReferenceSet(manifest artifact.Manifest, items []jobs.WatchItem, plan goal.Plan, work workspace.Work) watchReferenceSet {
 	refs := watchReferenceSet{
 		evidence: map[string]artifact.Evidence{}, connected: map[string]bool{},
 		items: map[string]bool{}, plan: map[string]bool{}, source: work.Source,
+		files: map[string]artifact.File{}, roots: map[string]workspace.Root{},
 	}
+	refs.addOutputReferences("output", manifest.Artifacts, work.Output)
 	for _, entry := range manifest.Evidence {
 		refs.evidence[entry.ID] = entry
+		if strings.HasPrefix(entry.Locator, "source/") {
+			data, err := work.Source.ReadRegularFile(strings.TrimPrefix(entry.Locator, "source/"), 512*1024)
+			if err != nil || entry.SnapshotPath == "" {
+				continue
+			}
+			digest := sha256.Sum256(data)
+			if entry.SHA256 != hex.EncodeToString(digest[:]) {
+				continue
+			}
+		}
 		refs.evidence[entry.Locator] = entry
 	}
 	workRoot, rootErr := workspace.Open(work.Path)
@@ -229,6 +274,16 @@ func newWatchReferenceSet(manifest artifact.Manifest, items []jobs.WatchItem, pl
 	return refs
 }
 
+func (refs *watchReferenceSet) addOutputReferences(prefix string, files []artifact.File, root workspace.Root) {
+	if root.Path() == "" {
+		return
+	}
+	refs.roots[prefix] = root
+	for _, file := range files {
+		refs.files[prefix+"/"+file.Path] = file
+	}
+}
+
 func (refs watchReferenceSet) allows(reference string) bool {
 	if refs.items[reference] || refs.connected[reference] || refs.plan[reference] {
 		return true
@@ -242,11 +297,12 @@ func (refs watchReferenceSet) allows(reference string) bool {
 		return false
 	}
 	path, lineText := reference[:colon], reference[colon+1:]
-	if !strings.HasPrefix(path, "source/") {
+	file, output := refs.files[path]
+	if !strings.HasPrefix(path, "source/") && !output {
 		return false
 	}
 	entry, found = refs.evidence[path]
-	if !found || entry.Locator != path || entry.SnapshotPath == "" {
+	if !output && (!found || entry.Locator != path || entry.SnapshotPath == "") {
 		return false
 	}
 	first, last, ranged := strings.Cut(lineText, "-")
@@ -261,12 +317,17 @@ func (refs watchReferenceSet) allows(reference string) bool {
 			return false
 		}
 	}
-	data, err := refs.source.ReadRegularFile(strings.TrimPrefix(path, "source/"), 512*1024)
+	root, relative, expected := refs.source, strings.TrimPrefix(path, "source/"), entry.SHA256
+	if output {
+		prefix, _, _ := strings.Cut(path, "/")
+		root, relative, expected = refs.roots[prefix], file.Path, file.SHA256
+	}
+	data, err := root.ReadRegularFile(relative, 512*1024)
 	if err != nil {
 		return false
 	}
 	digest := sha256.Sum256(data)
-	if hex.EncodeToString(digest[:]) != entry.SHA256 {
+	if hex.EncodeToString(digest[:]) != expected {
 		return false
 	}
 	lineCount := bytes.Count(data, []byte{'\n'})

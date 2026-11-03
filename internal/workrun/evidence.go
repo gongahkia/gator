@@ -329,13 +329,16 @@ func (t cataloguedTool) Execute(ctx context.Context, raw json.RawMessage) (agent
 		return result, nil
 	}
 	locator := "source/" + strings.TrimPrefix(input.Path, "source/")
+	// A refreshed source and historical evidence may share a locator. Bind the
+	// current file read to the current frozen bytes, never the first old entry.
+	data, readErr := t.catalog.work.Source.ReadRegularFile(strings.TrimPrefix(input.Path, "source/"), 512*1024)
+	if readErr != nil {
+		return result, nil // Large/non-text sources keep their existing extraction path.
+	}
+	digest := sha256.Sum256(data)
 	for _, entry := range t.catalog.list() {
-		if entry.Locator != locator {
+		if entry.Locator != locator || entry.SHA256 != hex.EncodeToString(digest[:]) {
 			continue
-		}
-		_, data, readErr := t.catalog.read(entry.ID)
-		if readErr != nil {
-			return agent.ToolResult{}, readErr
 		}
 		_, retainErr := t.catalog.retainEntry(entry, data)
 		if retainErr != nil {
