@@ -379,6 +379,9 @@ type Model struct {
 	desktop                appconfig.DesktopSettings
 	models                 ModelPanel
 	tasks                  map[string]string
+	specialists            map[string]BridgeSpecialist
+	specialistActions      map[string]specialistActionReceipt
+	bridgeSpecialistResult *BridgeSpecialistResult
 	quitting               bool
 	live                   <-chan tea.Msg
 	cancel                 context.CancelFunc

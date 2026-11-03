@@ -382,6 +382,9 @@ func (m *Model) clearRemovedData(screen ControlScreen) {
 	m.followupForm = nil
 	m.entries = nil
 	m.tasks = map[string]string{}
+	m.specialists = nil
+	m.specialistActions = nil
+	m.bridgeSpecialistResult = nil
 	m.contextState = ContextState{}
 	m.contextDetail = nil
 	m.inboxDetail = ""

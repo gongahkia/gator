@@ -24,6 +24,9 @@ import (
 const TaskVersion = 1
 
 type Task struct {
+	Description      string                `json:"description,omitempty"`
+	Assignment       string                `json:"assignment,omitempty"`
+	Steerable        bool                  `json:"steerable,omitempty"`
 	Profile          *AgentProfile         `json:"profile,omitempty"`
 	Native           *cliagent.NativeState `json:"native,omitempty"`
 	AnswersQueued    int                   `json:"answers_queued,omitempty"`
@@ -333,6 +336,9 @@ func (s *Supervisor) startLocked(request StartRequest) (Task, error) {
 	ctx, cancel := context.WithCancel(s.ctx)
 	task := Task{Version: TaskVersion, ID: id, GlobalID: s.options.ParentRun + "/" + id, ParentRun: s.options.ParentRun, ParentTask: request.Parent, Role: request.Agent, RoleVersion: 1, Source: s.options.Source, PolicySHA256: s.options.PolicySHA256, InputSHA256: digest(selected), Dependencies: append([]string(nil), request.Dependencies...), Attempt: attempt, Previous: request.Continue, Status: "queued", CreatedAt: s.options.Now().UTC()}
 	task.SourceCapture = s.options.SourceCapture
+	task.Description = s.registry[request.Agent].Description
+	task.Assignment = request.Task
+	task.Steerable = s.registry[request.Agent].Backend == BackendLLM || s.registry[request.Agent].Steering
 	task.SessionID = sessionID
 	task.Configuration = s.registry[request.Agent].Configuration
 	task.Profile = cloneProfile(s.registry[request.Agent].Profile)

@@ -171,6 +171,8 @@ export type BackendState = {
   requests_issue?: string;
   queue_result?: { request_id: string; error?: string };
   guidance_id?: string;
+  specialists?: SpecialistTask[];
+  specialist_result?: { request_id: string; error?: string };
   home: boolean;
   first_run: boolean;
   supervisor_needs_start: boolean;
@@ -185,9 +187,17 @@ export type PanelAction = {
   id: string; action: "select" | "activate" | "key" | "query" | "filter" | "next" | "previous" | "refresh" | "rename" | "pin" | "unpin" | "archive" | "restore";
   row?: number; fields?: Record<number, string>; text?: string;
 };
+export type SpecialistTask = {
+  id: string; token?: string; name: string; description?: string; assignment?: string;
+  status: string; can_guide: boolean; can_stop: boolean;
+};
+export type SpecialistAction = {
+  request_id: string; id: string; token: string; action: "guide" | "stop"; text?: string;
+};
 export type Frame = {
   version: 1;
-  type: "receipt" | "memory" | "update" | "submit" | "upload_submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "conversation" | "composer" | "sources" | "branch" | "task_plan";
+  type: "receipt" | "memory" | "update" | "submit" | "upload_submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "specialist" | "conversation" | "composer" | "sources" | "branch" | "task_plan";
+  specialist?: SpecialistAction;
   memory?: ChatMemoryAction;
   receipt?: {conversation_id: string; run_id: string; action_id: string; correlation_id: string; manifest_sha256: string; action: "inspect" | "check_sent"; request_id: string};
   update?: { conversation_id: string; id: string; action: "delivered" | "read" | "resolve" | "reopen" | "older" | "newer" | "rate"; version: number; rating?: "useful" | "noise" | "wrong" | "clear"; rating_version?: number; request_id?: string };

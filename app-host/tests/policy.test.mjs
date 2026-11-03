@@ -3,6 +3,15 @@ import assert from "node:assert/strict";
 import { assetPath, externalURL, shellQuote, validateFrame } from "../src/policy.mjs";
 import { resolve, join } from "node:path";
 
+test("specialist controls accept bounded actions without renderer-supplied authority", () => {
+  const specialist = { id: "subagent-001", token: "a".repeat(64), request_id: "guide-one", action: "guide", text: "Use primary sources" };
+  assert.equal(validateFrame({ type: "specialist", specialist }).version, 1);
+  assert.equal(validateFrame({ type: "specialist", specialist: { ...specialist, action: "stop", text: undefined } }).version, 1);
+  for (const change of [{ id: "../subagent-001" }, { token: "old" }, { request_id: "" }, { action: "start" }, { text: " " }, { text: "x".repeat(8193) }, { text: "a\0b" }, { command: "sh" }, { conversation_id: "other" }, { action: "stop" }]) {
+    assert.throws(() => validateFrame({ type: "specialist", specialist: { ...specialist, ...change } }));
+  }
+});
+
 test("update receipts and replies accept identities but never renderer-supplied authority", () => {
   const update = { conversation_id: "work-one", id: "inbox-one", action: "read", version: 0 };
   assert.equal(validateFrame({ type: "update", update }).version, 1);

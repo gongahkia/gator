@@ -33,6 +33,7 @@ type uiFrame struct {
 	Height        int                               `json:"height,omitempty"`
 	Panel         *workapp.BridgePanelAction        `json:"panel,omitempty"`
 	Queue         *workapp.BridgeQueueAction        `json:"queue,omitempty"`
+	Specialist    *workapp.BridgeSpecialistAction   `json:"specialist,omitempty"`
 	Upload        *workapp.BridgeUploadSubmission   `json:"upload,omitempty"`
 	Conversation  *workapp.BridgeConversationAction `json:"conversation,omitempty"`
 	InteractionID int                               `json:"interaction_id,omitempty"`
@@ -118,6 +119,11 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			next, command = m.model.ApplyBridgeQueue(*frame.Queue)
+		case "specialist":
+			if frame.Specialist == nil {
+				return m, nil
+			}
+			next, command = m.model.ApplyBridgeSpecialist(*frame.Specialist)
 		case "update":
 			if frame.Update != nil {
 				next = m.model.ApplyBridgeUpdate(*frame.Update)

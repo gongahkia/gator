@@ -29,6 +29,7 @@ export function validateFrame(frame) {
     submit: ["type", "text"], navigate: ["type", "text"], key: ["type", "key", "text"],
     panel: ["type", "key", "panel"], approval: ["type", "interaction_id", "approval_token", "approved"],
     queue: ["type", "queue"],
+    specialist: ["type", "specialist"],
     composer: ["type", "composer"],
     sources: ["type", "sources"],
     branch: ["type", "branch"],
@@ -69,6 +70,10 @@ export function validateFrame(frame) {
     if (!["edit", "remove", "earlier", "later", "move", "run", "guide"].includes(queue.action)) throw new Error("Invalid queue action");
     if (queue.action === "move" ? typeof queue.target_id !== "string" || !/^[a-f0-9]{64}$/.test(queue.target_id) || !["before", "after"].includes(queue.placement) : queue.target_id !== undefined || queue.placement !== undefined) throw new Error("Invalid queue destination");
     if (["edit", "guide"].includes(queue.action) ? typeof queue.text !== "string" || !queue.text.trim() || Buffer.byteLength(queue.text, "utf8") > (queue.action === "guide" ? 64 : 128) * 1024 : queue.text !== undefined) throw new Error("Invalid queued message");
+  }
+  if (frame.type === "specialist") {
+    const v = frame.specialist;
+    if (!v || typeof v !== "object" || Array.isArray(v) || Object.keys(v).some(key => !["request_id", "id", "token", "action", "text"].includes(key)) || typeof v.request_id !== "string" || !/^[a-zA-Z0-9-]{1,64}$/.test(v.request_id) || typeof v.id !== "string" || !/^subagent-[0-9]{3,}$/.test(v.id) || typeof v.token !== "string" || !/^[a-f0-9]{64}$/.test(v.token) || !["guide", "stop"].includes(v.action) || (v.action === "guide" ? typeof v.text !== "string" || !v.text.trim() || Buffer.byteLength(v.text) > 8192 || v.text.includes("\0") : v.text !== undefined)) throw new Error("Invalid specialist action");
   }
   if(frame.type==="task_plan") {
     const v=frame.task_plan;

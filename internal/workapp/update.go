@@ -244,12 +244,13 @@ func (m Model) updateAgentEvent(value agent.Event) (tea.Model, tea.Cmd) {
 	if value.Kind == agent.EventSubagent && value.TaskID != "" {
 		var task struct{ ID, Role, Status, Error string }
 		if json.Unmarshal([]byte(value.Text), &task) == nil {
+			m.recordBridgeSpecialist(value)
 			if m.tasks == nil {
 				m.tasks = map[string]string{}
 			}
 			m.tasks[task.ID] = task.Role + ": " + task.Status
 			m.status = specialistProgress(task.Role, task.Status)
-			if task.Error != "" {
+			if task.Error != "" && task.Status != "cancelled" {
 				m.messages = append(m.messages, noticeMessage("Part of this work needs review", "Gator retained progress. Inspect /activity for the outcome or /tasks for diagnostics.", "warning"))
 			}
 			return m, waitWorkEvent(m.live)

@@ -72,6 +72,9 @@ func (m Model) startWork(source, conversation, prompt string, options RunOptions
 	events := make(chan tea.Msg, 128)
 	m.cancel = cancel
 	m.tasks = map[string]string{}
+	m.specialists = map[string]BridgeSpecialist{}
+	m.specialistActions = nil
+	m.bridgeSpecialistResult = nil
 	m.live = events
 	m.loadingFrame = 0
 	m.loadingRun++
