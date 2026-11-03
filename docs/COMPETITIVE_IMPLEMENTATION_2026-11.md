@@ -142,6 +142,28 @@ account action or paid model call was used for this slice. Physical display,
 mobile push, channel escalation, and new field layout in a running Electron app
 remain unverified. The broader items remain open.
 
+## Verification checkpoint — 3 November
+
+- `go test ./... -timeout 6m`: all packages pass on this macOS checkout. The
+  command package completed in 331.6 seconds while other checks were concurrent.
+- `go vet ./...`: passes.
+- Full affected race suites pass for jobs, workhome, tools, workrun, inbox,
+  lifecycle and workapp; focused command race checks pass. Tests added after the
+  broad run began were additionally run in their affected focused suites.
+- Live evolving watch: 19/19 checks; all failed attempts retained; US$4.496448
+  accounted upper cost of the new US$10 allowance; no unknown reservations.
+- No README files changed. No real account action, deployment, service activation,
+  signing change or release publication was performed.
+
+Completed commits from this session: `30a2f7880` (paused scheduling/evidence),
+`a55ae7bd0` (new evaluation allowance), `80f7d1995` (current-run effects and
+citations), `8edc672c4` (notification outcome/retry and command isolation).
+The intervening user commit `cbbf6d7ac` is preserved. The complete fifteen-item
+goal and subsequent responsiveness request remain active. Next engineering work
+continues the unresolved acceptance rows, including complete connected workflows,
+execution/availability, onboarding, research/browser authority, memory/costs,
+deliverables and release/privacy assurance.
+
 ## Additional user request
 
 After the current product/engineering implementation, profile startup to usable
