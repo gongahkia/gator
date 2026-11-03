@@ -81,6 +81,10 @@ func LoadImage(root workspace.Root, path string, maxBytes int) (agent.Image, err
 		return agent.Image{}, err
 	}
 	mediaType := http.DetectContentType(contents)
+	return loadImageBytes(path, contents, mediaType)
+}
+
+func loadImageBytes(path string, contents []byte, mediaType string) (agent.Image, error) {
 	if !supportedImageMediaType(mediaType) {
 		return agent.Image{}, fmt.Errorf("image @%s must be PNG, JPEG, or WebP", path)
 	}
@@ -91,59 +95,96 @@ func LoadImage(root workspace.Root, path string, maxBytes int) (agent.Image, err
 // and document attachments. It is shared by terminal and automation callers so
 // they use the same byte, type, duplicate, and workspace-boundary rules.
 func LoadInputs(root workspace.Root, inputs []Input) ([]agent.Image, []agent.Attachment, error) {
+	images, documents, _, err := loadInputs(root, inputs, false)
+	return images, documents, err
+}
+
+// LoadInputsWithOriginals derives the provider representation and private
+// original from the same bounded read. Extracted Office text is never mistaken
+// for the original file when preparing a reviewed outbound attachment.
+func LoadInputsWithOriginals(root workspace.Root, inputs []Input) ([]agent.Image, []agent.Attachment, []Original, error) {
+	return loadInputs(root, inputs, true)
+}
+
+func loadInputs(root workspace.Root, inputs []Input, originals bool) ([]agent.Image, []agent.Attachment, []Original, error) {
 	if len(inputs) > MaxInputs {
-		return nil, nil, fmt.Errorf("attach at most %d files per task", MaxInputs)
+		return nil, nil, nil, fmt.Errorf("attach at most %d files per task", MaxInputs)
 	}
 	images := make([]agent.Image, 0, len(inputs))
 	attachments := make([]agent.Attachment, 0, len(inputs))
 	seen := make(map[string]struct{}, len(inputs))
-	totalBytes := 0
+	totalBytes, originalBytes := 0, 0
+	var files []Original
 	for _, input := range inputs {
 		if strings.TrimSpace(input.Path) == "" {
-			return nil, nil, errors.New("attachment path must not be empty")
+			return nil, nil, nil, errors.New("attachment path must not be empty")
 		}
 		cleanPath := filepath.Clean(input.Path)
 		if _, duplicate := seen[cleanPath]; duplicate {
-			return nil, nil, fmt.Errorf("attachment %q was supplied more than once", input.Path)
+			return nil, nil, nil, fmt.Errorf("attachment %q was supplied more than once", input.Path)
 		}
 		seen[cleanPath] = struct{}{}
 
+		limit := MaxDocumentBytes
+		if input.Kind == ImageInput {
+			limit = MaxImageBytes
+		}
+		if input.Kind != ImageInput && input.Kind != DocumentInput {
+			return nil, nil, nil, fmt.Errorf("attachment @%s has an unsupported input kind", input.Path)
+		}
+		if input.Kind == ImageInput && !IsImage(input.Path) {
+			return nil, nil, nil, fmt.Errorf("image @%s must be PNG, JPEG, or WebP", input.Path)
+		}
+		if input.Kind == DocumentInput && !IsSupported(input.Path) {
+			return nil, nil, nil, fmt.Errorf("attachment @%s must be a supported document or UTF-8 text file", input.Path)
+		}
+		data, err := readRegularFile(root, input.Path, limit)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		originalBytes += len(data)
+		if originalBytes > MaxTotalBytes {
+			return nil, nil, nil, fmt.Errorf("original attached files exceed the %d MiB total limit", MaxTotalBytes/(1024*1024))
+		}
+		if originals {
+			files = append(files, Original{Name: filepath.Base(input.Path), Data: bytes.Clone(data)})
+		}
 		switch input.Kind {
 		case ImageInput:
-			image, err := LoadImage(root, input.Path, MaxImageBytes)
+			image, err := loadImageBytes(input.Path, data, http.DetectContentType(data))
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
 			if totalBytes+len(image.Data) > MaxTotalBytes {
-				return nil, nil, fmt.Errorf("attached files exceed the %d MiB total limit", MaxTotalBytes/(1024*1024))
+				return nil, nil, nil, fmt.Errorf("attached files exceed the %d MiB total limit", MaxTotalBytes/(1024*1024))
 			}
 			images = append(images, image)
 			totalBytes += len(image.Data)
 		case DocumentInput:
 			remaining := MaxTotalBytes - totalBytes
 			if remaining < 1 {
-				return nil, nil, fmt.Errorf("attached files exceed the %d MiB total limit", MaxTotalBytes/(1024*1024))
+				return nil, nil, nil, fmt.Errorf("attached files exceed the %d MiB total limit", MaxTotalBytes/(1024*1024))
 			}
-			loaded, supported, err := Load(root, input.Path, min(MaxDocumentBytes, remaining))
+			loaded, supported, err := loadDocumentBytes(input.Path, data, min(MaxDocumentBytes, remaining))
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
 			if !supported {
-				return nil, nil, fmt.Errorf("attachment @%s must be a supported document or UTF-8 text file", input.Path)
+				return nil, nil, nil, fmt.Errorf("attachment @%s must be a supported document or UTF-8 text file", input.Path)
 			}
 			if totalBytes+len(loaded.Data) > MaxTotalBytes {
-				return nil, nil, fmt.Errorf("attached files exceed the %d MiB total limit", MaxTotalBytes/(1024*1024))
+				return nil, nil, nil, fmt.Errorf("attached files exceed the %d MiB total limit", MaxTotalBytes/(1024*1024))
 			}
 			attachments = append(attachments, loaded)
 			totalBytes += len(loaded.Data)
 		default:
-			return nil, nil, fmt.Errorf("attachment @%s has an unsupported input kind", input.Path)
+			return nil, nil, nil, fmt.Errorf("attachment @%s has an unsupported input kind", input.Path)
 		}
 	}
 	if err := ValidateLoaded(images, attachments); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return images, attachments, nil
+	return images, attachments, files, nil
 }
 
 // ValidateLoaded enforces the prompt-input boundary for callers that already
@@ -226,6 +267,13 @@ func Load(root workspace.Root, path string, maxBytes int) (agent.Attachment, boo
 	contents, err := readRegularFile(root, path, maxBytes)
 	if err != nil {
 		return agent.Attachment{}, true, err
+	}
+	return loadDocumentBytes(path, contents, maxBytes)
+}
+
+func loadDocumentBytes(path string, contents []byte, maxBytes int) (agent.Attachment, bool, error) {
+	if maxBytes < 1 || len(contents) > maxBytes {
+		return agent.Attachment{}, true, fmt.Errorf("attachment @%s exceeds its size limit", path)
 	}
 	ext := strings.ToLower(filepath.Ext(path))
 	attachment := agent.Attachment{Name: path}

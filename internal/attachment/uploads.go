@@ -20,20 +20,29 @@ func ValidUploadID(id string) bool {
 // LoadUploads reads bounded copies under the host-selected upload root.
 // Renderer identities never grant access to arbitrary absolute paths.
 func LoadUploads(directory string, ids []string) ([]agent.Image, []agent.Attachment, error) {
+	images, documents, _, err := loadUploads(directory, ids, false)
+	return images, documents, err
+}
+
+func LoadUploadsWithOriginals(directory string, ids []string) ([]agent.Image, []agent.Attachment, []Original, error) {
+	return loadUploads(directory, ids, true)
+}
+
+func loadUploads(directory string, ids []string, originals bool) ([]agent.Image, []agent.Attachment, []Original, error) {
 	if len(ids) == 0 {
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 	if strings.TrimSpace(directory) == "" {
-		return nil, nil, errors.New("desktop attachments are unavailable")
+		return nil, nil, nil, errors.New("desktop attachments are unavailable")
 	}
 	root, err := workspace.Open(directory)
 	if err != nil {
-		return nil, nil, errors.New("selected files are no longer available; remove them and attach them again")
+		return nil, nil, nil, errors.New("selected files are no longer available; remove them and attach them again")
 	}
 	inputs := make([]Input, 0, len(ids))
 	for _, id := range ids {
 		if !ValidUploadID(id) {
-			return nil, nil, errors.New("invalid desktop attachment identity")
+			return nil, nil, nil, errors.New("invalid desktop attachment identity")
 		}
 		kind := DocumentInput
 		if IsImage(id) {
@@ -41,14 +50,14 @@ func LoadUploads(directory string, ids []string) ([]agent.Image, []agent.Attachm
 		}
 		inputs = append(inputs, Input{Path: id, Kind: kind})
 	}
-	images, documents, err := LoadInputs(root, inputs)
+	images, documents, files, err := loadInputs(root, inputs, originals)
 	if err != nil {
 		message := err.Error()
 		for _, id := range ids {
 			message = strings.ReplaceAll(message, "@"+id, fmt.Sprintf("%q", filepath.Base(id)))
 			message = strings.ReplaceAll(message, id, filepath.Base(id))
 		}
-		return nil, nil, errors.New(message)
+		return nil, nil, nil, errors.New(message)
 	}
 	for i := range images {
 		images[i].Name = filepath.Base(images[i].Name)
@@ -56,5 +65,5 @@ func LoadUploads(directory string, ids []string) ([]agent.Image, []agent.Attachm
 	for i := range documents {
 		documents[i].Name = filepath.Base(documents[i].Name)
 	}
-	return images, documents, err
+	return images, documents, files, err
 }
