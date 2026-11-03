@@ -11,6 +11,7 @@ import (
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/attachment"
 	"github.com/gongahkia/gator/internal/browser"
 	"github.com/gongahkia/gator/internal/cliagent"
 	"github.com/gongahkia/gator/internal/codeexec"
@@ -154,6 +155,9 @@ type Request struct {
 	OnSnapshot           func(snapshot.Manifest)
 	Images               []agent.Image
 	Attachments          []agent.Attachment
+	// OriginalFiles contains only this admitted request's explicitly selected
+	// inputs. Raw originals never enter provider messages or serialized requests.
+	OriginalFiles []attachment.Original `json:"-"`
 	// BrowserSession is an explicit developer-selected local browser session
 	// granted to the Work manager itself. It is intentionally separate from
 	// Code.BrowserSession: the manager cannot silently borrow a Code grant.

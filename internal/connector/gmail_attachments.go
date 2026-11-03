@@ -36,7 +36,7 @@ type gmailAttachment struct {
 
 func validGmailAttachmentSource(source string) bool {
 	prefix, _, found := strings.Cut(source, "/")
-	return found && (prefix == "source" || prefix == "output" || prefix == "previous") && len(source) <= 1024 && fs.ValidPath(source) && !strings.ContainsAny(source, "\\\x00\r\n")
+	return found && (prefix == "source" || prefix == "output" || prefix == "previous" || prefix == "input") && len(source) <= 1024 && fs.ValidPath(source) && !strings.ContainsAny(source, "\\\x00\r\n")
 }
 
 func validGmailFilename(name string) bool {
@@ -69,7 +69,7 @@ func (r Runtime) prepareGmailAttachments(payload []byte) ([]byte, []gmailAttachm
 	seen := map[string]bool{}
 	for i, ref := range input.Attachments {
 		if !validGmailAttachmentSource(ref.Source) {
-			return nil, nil, errors.New("Gmail attachment source must be a selected source, output or previous file")
+			return nil, nil, errors.New("Gmail attachment source must be a selected input, source, output or previous file")
 		}
 		if ref.Filename == "" {
 			ref.Filename = path.Base(ref.Source)

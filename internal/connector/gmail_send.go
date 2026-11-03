@@ -35,7 +35,7 @@ func gmailSendSchema() json.RawMessage {
 "bcc":{"type":"array","maxItems":50,"items":{"type":"string","minLength":3,"maxLength":254}},
 "subject":{"type":"string","minLength":1,"maxLength":200},"body":{"type":"string","minLength":1,"maxLength":10000},
 "reply":{"type":"object","required":["thread_id","in_reply_to","references"],"additionalProperties":false,"properties":{"thread_id":{"type":"string","minLength":1,"maxLength":128},"in_reply_to":{"type":"string","minLength":3,"maxLength":254},"references":{"type":"array","minItems":1,"maxItems":32,"items":{"type":"string","maxLength":254}}}},
-"attachments":{"type":"array","maxItems":10,"items":{"type":"object","additionalProperties":false,"required":["source"],"properties":{"source":{"type":"string","maxLength":1024,"description":"Selected source/... file, staged output/... file, or retained previous/... file. No absolute paths or encoded bytes."},"filename":{"type":"string","maxLength":200},"media_type":{"type":"string","maxLength":128},"sha256":{"type":"string","maxLength":64},"bytes":{"type":"integer","minimum":0,"maximum":8388608}}}}
+"attachments":{"type":"array","maxItems":10,"items":{"type":"object","additionalProperties":false,"required":["source"],"properties":{"source":{"type":"string","maxLength":1024,"description":"Selected input/... original from list_input_files, selected source/... file, staged output/... file, or retained previous/... file. No absolute paths or encoded bytes."},"filename":{"type":"string","maxLength":200},"media_type":{"type":"string","maxLength":128},"sha256":{"type":"string","maxLength":64},"bytes":{"type":"integer","minimum":0,"maximum":8388608}}}}
 }}}}`)
 }
 

@@ -748,7 +748,7 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 		request.Code.Verification = parseSuggestedVerification(suggestedVerificationCommands(source))
 	}
 	request.InputIDs = append([]string(nil), options.Uploads...)
-	request.Images, request.Attachments, err = loadWorkPromptAttachments(source, options.Attachments, options.Uploads)
+	request.Images, request.Attachments, request.OriginalFiles, err = loadWorkPromptAttachmentSelection(source, options.Attachments, options.Uploads)
 	if err != nil {
 		return workapp.RunResult{Error: err.Error()}
 	}

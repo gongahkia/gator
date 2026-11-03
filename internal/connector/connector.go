@@ -302,7 +302,7 @@ func googleOperations() []Operation {
 		{"sheets_create", "Prepare Google Sheet creation for exact approval.", action.ConnectedMutate},
 		{"sheets_values_update", "Prepare a Google Sheet range update for exact approval.", action.ConnectedMutate},
 		{"sheets_batch_update", "Prepare Google Sheet batch updates for exact approval.", action.ConnectedMutate},
-		{"gmail_send", "Send email with a plain-text body, explicitly listed To/Cc/Bcc recipients and selected-file attachments after exact foreground approval. Attachment source paths use source/..., output/... or previous/...; the host freezes bytes and adds size/hash metadata to the review. For a reply, read the original thread and preserve its subject; supply thread_id, parent Message-ID and References together in reply. Never retry an uncertain send automatically.", action.Publish},
+		{"gmail_send", "Send email with a plain-text body, explicitly listed To/Cc/Bcc recipients and selected-file attachments after exact foreground approval. For original uploaded files, call list_input_files and use its exact input/... references. Other source paths use source/..., output/... or previous/.... The host freezes bytes and adds size/hash metadata to the review. For a reply, read the original thread and preserve its subject; supply thread_id, parent Message-ID and References together in reply. Never retry an uncertain send automatically.", action.Publish},
 		{"batch", "Prepare an ordered batch of Google Docs and Sheets mutations for one exact approval. Gator never retries an ambiguous batch outcome.", action.ConnectedMutate},
 	})...)
 	for index := range operations {

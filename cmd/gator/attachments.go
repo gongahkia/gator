@@ -13,27 +13,40 @@ import (
 )
 
 func loadWorkPromptAttachments(source string, paths, uploads []string) ([]agent.Image, []agent.Attachment, error) {
-	var images, documents []string
+	images, documents, _, err := loadWorkPromptAttachmentSelection(source, paths, uploads)
+	return images, documents, err
+}
+
+func loadWorkPromptAttachmentSelection(source string, paths, uploads []string) ([]agent.Image, []agent.Attachment, []attachment.Original, error) {
+	var inputs []attachment.Input
 	for _, path := range paths {
+		kind := attachment.DocumentInput
 		if attachment.IsImage(path) {
-			images = append(images, path)
-		} else {
-			documents = append(documents, path)
+			kind = attachment.ImageInput
 		}
+		inputs = append(inputs, attachment.Input{Path: path, Kind: kind})
 	}
-	visual, text, err := loadPromptAttachments(source, images, documents)
+	root, err := workspace.Open(source)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	addedImages, addedDocuments, err := attachment.LoadUploads(os.Getenv("GATOR_DESKTOP_UPLOAD_DIR"), uploads)
+	visual, text, originals, err := attachment.LoadInputsWithOriginals(root, inputs)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
+	}
+	addedImages, addedDocuments, addedOriginals, err := attachment.LoadUploadsWithOriginals(os.Getenv("GATOR_DESKTOP_UPLOAD_DIR"), uploads)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 	visual, text = append(visual, addedImages...), append(text, addedDocuments...)
+	originals = append(originals, addedOriginals...)
 	if err := attachment.ValidateLoaded(visual, text); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return visual, text, nil
+	if err := attachment.ValidateOriginals(originals); err != nil {
+		return nil, nil, nil, err
+	}
+	return visual, text, originals, nil
 }
 
 // attachmentFlags accepts one explicit repository-relative path per flag.

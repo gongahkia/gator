@@ -79,7 +79,8 @@ type Runtime struct {
 	HTTPClient  *http.Client
 	Now         func() time.Time
 	// ResolveAttachment is a host-bound reader of this Work run's selected
-	// source/output/previous roots. It never accepts arbitrary local paths.
+	// source/output/previous roots or selected input originals. It never accepts
+	// arbitrary local paths or unrestricted access to the private upload store.
 	ResolveAttachment func(source string, maxBytes int64) ([]byte, error)
 	// OAuthRefreshPins bind unattended reads to the grant selected when a
 	// recurring job was created. The check occurs on the credential used for

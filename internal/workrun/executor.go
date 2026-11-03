@@ -53,6 +53,10 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	if err != nil {
 		return Outcome{}, err
 	}
+	selectedInputs, err := attachment.SelectOriginals(request.OriginalFiles)
+	if err != nil {
+		return Outcome{}, err
+	}
 	ctx = usage.WithState(ctx, request.StateDir)
 	release, guardErr := state.Guard(request.StateDir, false)
 	if guardErr != nil {
@@ -345,6 +349,9 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	if err != nil {
 		return outcome, err
 	}
+	if len(request.OriginalFiles) > 0 {
+		surface = append(surface, tools.ListInputFiles{Files: selectedInputs.Files()})
+	}
 	catalog := newCatalog(work, sourceSnapshot)
 	for _, a := range request.Attachments {
 		if a.MediaType == "text/plain" && len(a.Data) <= 512*1024 {
@@ -489,6 +496,9 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	}
 	connectedRuntime := e.Connectors
 	connectedRuntime.ResolveAttachment = func(source string, limit int64) ([]byte, error) {
+		if strings.HasPrefix(source, "input/") {
+			return selectedInputs.Read(source, limit)
+		}
 		mount, relative, found := strings.Cut(source, "/")
 		if !found {
 			return nil, errors.New("attachment needs a selected file mount")
