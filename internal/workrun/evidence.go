@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -18,7 +17,6 @@ import (
 
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
-	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/snapshot"
 	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/workspace"
@@ -52,7 +50,11 @@ func (c *evidenceCatalog) retain(locator string, data []byte, at time.Time) (art
 	if err := os.MkdirAll(filepath.Join(c.work.Path, "evidence"), 0700); err != nil {
 		return entry, err
 	}
-	if err := os.WriteFile(filepath.Join(c.work.Path, entry.SnapshotPath), data, 0600); err != nil {
+	root, err := workspace.Open(c.work.Path)
+	if err != nil {
+		return entry, err
+	}
+	if err := root.WriteRegularFileAtomic(entry.SnapshotPath, data, 512*1024); err != nil {
 		return entry, err
 	}
 	c.mu.Lock()
@@ -201,7 +203,7 @@ func (t evidenceTool) Execute(_ context.Context, raw json.RawMessage) (agent.Too
 	return agent.ToolResult{Content: string(data)}, err
 }
 func (c *evidenceCatalog) tools() []agent.Tool {
-	return []agent.Tool{evidenceTool{c, "list_evidence"}, evidenceTool{c, "read_evidence"}, evidenceTool{c, "check_claims"}}
+	return []agent.Tool{evidenceTool{c, "list_evidence"}, evidenceTool{c, "read_evidence"}, evidenceSearchTool{c}, evidenceTool{c, "check_claims"}}
 }
 
 type webEvidenceTool struct {
@@ -243,41 +245,8 @@ func (t webEvidenceTool) Execute(ctx context.Context, raw json.RawMessage) (agen
 	return agent.ToolResult{Content: string(data)}, err
 }
 func (c *evidenceCatalog) web(origins []string, options tools.HTTPFetchOptions) ([]agent.Tool, error) {
-	if len(origins) == 0 {
-		return nil, nil
-	}
-	allowed := map[string]bool{}
-	for _, origin := range origins {
-		parsed, err := url.Parse(origin)
-		if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || (parsed.Path != "" && parsed.Path != "/") {
-			return nil, errors.New("web selection must be an HTTPS origin")
-		}
-		allowed[parsed.Scheme+"://"+parsed.Host] = true
-	}
-	policy := tools.CommandPolicy{Sandbox: sandbox.Policy{Network: sandbox.AllowNetwork}, Approve: func(_ context.Context, argv []string) (tools.CommandDecision, error) {
-		if len(argv) != 2 {
-			return tools.CommandDeny, nil
-		}
-		// The search wrapper scopes discovery and filters all returned URLs.
-		// This branch is reachable only with selected origins and a host key.
-		if argv[0] == "web_search" {
-			return tools.CommandAllowOnce, nil
-		}
-		parsed, err := url.Parse(argv[1])
-		if err != nil {
-			return tools.CommandDeny, err
-		}
-		if allowed[parsed.Scheme+"://"+parsed.Host] {
-			return tools.CommandAllowOnce, nil
-		}
-		return tools.CommandDeny, errors.New("origin is not selected for this Work run")
-	}}
-	surface := tools.HTTPTools(policy, options)
-	result := []agent.Tool{webEvidenceTool{surface[0], c}}
-	if len(surface) > 1 {
-		result = append(result, scopedWebSearch{tool: surface[1], origins: allowed})
-	}
-	return result, nil
+	_, read, _, err := newWebResearch(c, Request{WebOrigins: origins}, options)
+	return read, err
 }
 
 func (c *evidenceCatalog) privateAttachment(name string, data []byte, at time.Time) {

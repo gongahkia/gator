@@ -311,6 +311,7 @@ type entry struct {
 	advanced                                   bool
 }
 type message struct {
+	approvalID      int
 	revisionID      string
 	runID           string
 	createdAt       time.Time

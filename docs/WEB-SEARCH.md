@@ -43,29 +43,78 @@ choose a provider, API endpoint, key, browser action, agent or research mode.
 Queries are sent to the explicitly configured search service.
 
 Native coding tools retain their existing network and query-approval boundaries.
-Work additionally requires explicitly selected HTTPS origins. Its search wrapper
-adds site operators and independently filters returned URLs by exact selected
-scheme/host/port; operators are relevance hints, not authorization. Credential
-URLs and off-scope results are omitted. Search snippets are untrusted discovery
-leads and do not become factual evidence. `http_fetch` retains the actual selected
+In desktop Work, ask Gator to research the public web. `web_access` checks the
+current task's scope/usage, requests additional scope, or revokes it. A request
+opens the native **Review web research access** card with the requested sites or
+public-web scope, purpose, host-selected service, shared limits and data-sharing
+terms. Approving it permits credential-free public HTTPS reads for that task,
+including its connected researchers. A public grant can discover previously
+unknown sites; a sites grant expands only the named origins. The grant never
+selects an account, allows browser login, approves external writes, or applies
+to another task. Background checks cannot request an interactive expansion.
+
+Before expansion, Work uses its explicitly selected HTTPS origins. Its search
+wrapper adds site operators and independently filters returned URLs by exact
+selected scheme/host/port; operators are relevance hints, not authorization.
+After a public grant, queries need no site prefix and safe public leads can come
+from new sites. Credential URLs, literal private/reserved IPs, insecure schemes,
+local names and non-443 ports are omitted. Search snippets are untrusted discovery
+leads and do not become factual evidence. `http_fetch` retains an actually read
 page before its contents can be cited as checked evidence. There is no fetch or
-browser/agent fallback to TinyFish or another vendor.
+browser/agent fallback to TinyFish or another vendor. Missing search configuration
+still permits reviewed page reads; the status/card reports that search is unavailable.
+
+Scope requests require the live foreground owner. Denied scopes cannot be
+requested again within that task, and at most four scope reviews can be opened.
+A narrower site request can follow a public-scope denial. Revocation prevents
+new admissions without resetting capacity; an already admitted request may finish.
+Revocation/cancellation while a review is pending prevents its late approval from
+reinstating access. Plan-first execution rechecks the same live reviewed plan
+before and after consent. Its additional read grant is recorded as a separate
+interaction; it does not change the plan's write, coding or connected-action scope.
 
 Work returns at most 8 KiB of readable page preview to the model. HTML previews
 omit script/style/navigation/footer text and normalize visible text; they do not
 execute scripts. Exact fetched bytes and their digest remain in the evidence
 catalog. `read_evidence` provides bounded raw-byte pages using `offset_bytes`,
 `limit_bytes` (at most 32 KiB) and `next_offset_bytes`; UTF-8 boundaries are checked.
+`search_evidence` finds an exact case-sensitive literal in retained bytes without
+another network request. It returns first/last matching contexts, total/omitted
+counts and exact UTF-8-safe offsets, so large HTML does not require scanning
+every page into the model context. Defaults are four matches and 400 context
+bytes on each side; hard limits are eight matches, a 512-byte query and 1,024
+context bytes per side. Only captured bytes are searched, so an upstream page
+cut at the fetch limit may need a more focused source. Both evidence reading
+paths verify the retained hash. Content-addressed captures are published
+atomically so parallel researchers cannot observe another writer's partial file.
 Truncation and preview normalization are explicit. Exact quote checks still use
 the original bytes, so a normalized preview is not evidence of a literal match
 across HTML tags. No full-page completeness or JavaScript rendering is claimed.
 
 All adapters normalize bounded title/URL/snippet/date metadata. At most ten
-results are returned, fields and response bodies are bounded, and search/fetch
-share the existing eight-request run budget. Production search uses the existing
+results are returned, fields and response bodies are bounded. Work allows at most
+**eight searches within 32 total admitted web attempts**, shared across manager
+and workers. Failed attempts can consume capacity, and a new worker or grant
+does not reset it. Native coding HTTP tools keep their eight-request default;
+only the host can change their bounded limit. Production search uses the existing
 HTTP deadline and public-address connection checks. Fixed provider endpoints
 receive keys through headers only. Raw provider error bodies and transport
 errors are not exposed; errors retain HTTP status where available.
+
+Public scope preserves private/reserved-address rejection for IPv4/IPv6,
+mixed DNS responses, DNS-pinned connections, proxy-free transport and refusal to
+follow redirects. These protections were reviewed against the
+[OWASP SSRF guidance](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html).
+This is not a complete guarantee against indirect disclosure: queries and URL
+paths chosen by the model leave the computer. The review says so and model
+guidance prohibits sharing private source content without user intent, but the
+host does not semantically inspect outbound text for every possible secret.
+Do not interpret network isolation as a prompt-injection or DLP certification.
+
+The interaction journal retains the exact scope review and decision. Work
+manifests retain historical scope, service and admitted request/search counts;
+those fields do not authorize another run. They do not infer an invoice from a
+count. Search charges, free allowances and model fees remain provider-specific.
 
 Tavily explicitly requests `basic` depth, disables automatic parameter selection,
 answers, raw content and images. Exa uses standard `auto` search and requests no
@@ -74,12 +123,48 @@ Agent, Browser or Monitor APIs. Provider pricing, free allowances and account
 limits remain provider-specific; changing search provider does not change the
 configured language model or its API charges.
 
-TinyFish's pricing page describes free Search, while its API documentation also
+Checked again on 3 November 2026: TinyFish's pricing page describes free Search, while its API documentation also
 describes a daily allowance and possible wallet behavior beyond it. Do not infer
 unlimited free service from the marketing page. A 402/429 is reported as a failed
 search, not no results; no automatic top-up or vendor switch occurs.
 
+Rollback: revert Work grant handling, its review projection, shared usage,
+model guidance and tests together. Historical interactions and optional manifest
+usage remain evidence only. Older builds retain explicit-site research and
+ignore the additional usage field; they do not recover any public grant.
+
 ## Verification and provenance
+
+3 November foreground acceptance: the real Electron review journey approves
+one public grant, completes its request, then requires a fresh review and denies
+the second request. It passes in 6.0 seconds with a local model fixture and no
+external traffic. The related Gmail original-attachment and conversational
+follow-up approval journeys pass too. Those checks exposed and fixed a layout
+dependency: active review identity is now bound to a host-owned message field
+and exact message index, instead of a displayed `Request` row. Custom review
+layouts retain the same live interaction ID, token and owner checks.
+
+The opt-in live test `TestLivePublicWebResearch` starts without selected sites,
+uses real TinyFish search and public HTTPS, retains an official Go documentation
+page, searches its exact captured bytes and returns a cited answer. The retained
+report `scripts/competitive-eval/results/research-2026-11-03T07-23-01.419Z.json`
+passes 8/8 checks in 19.5 seconds, using five model requests, one search and one
+fetch. The earlier failed attempt remains beside it: it reached the correct
+source but hit the evaluator's unchanged 128 KiB request bound after raw-page
+pagination, including an incorrect local-files search for retained evidence.
+Bounded evidence search and path guidance fixed that observed failure.
+
+Run `node scripts/competitive-eval/live-research.mjs` only within the cumulative
+authorized allowance. Each attempt reserves all eight possible search charges
+before network dispatch. A retained reservation is a conservative ceiling, not
+a claim that every reserved query was used or billed. One engineer-authored
+question is not a general research-quality or competitor-parity benchmark.
+
+Free production-path tests exercise stale/wrong preview identities, denied/repeated
+scope requests, narrow expansion, revoked/cancelled reviews, changed plan state,
+later-task isolation, background non-expansion, private DNS, concurrent budgets
+and actual manager/custom-worker sharing. Evidence tests check late HTML terms,
+bounded contexts/UTF-8 offsets, hash tampering and concurrent immutable reads.
 
 Adapter contracts checked against first-party references on 1 November 2026:
 

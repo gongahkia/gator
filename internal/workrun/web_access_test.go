@@ -274,3 +274,27 @@ func TestPublicGrantDoesNotBypassPrivateDNSOrCancelledReview(t *testing.T) {
 		t.Fatal("cancelled review granted access", err)
 	}
 }
+
+func TestWebExpansionChecksReviewedPlanAgainAfterConsent(t *testing.T) {
+	_, store, request := claimedPlanFixture(t, []string{"read"})
+	request.ForegroundApp = true
+	request.ApproveWebAccess = func(context.Context, WebAccessReview) (bool, error) {
+		journal, err := store.LoadRequests(request.ConversationID)
+		if err != nil {
+			return false, err
+		}
+		journal.Requests[0].Plan.Phase = "cancelled"
+		_, err = store.SaveRequests(request.ConversationID, journal)
+		return true, err
+	}
+	surface, _, scope, err := newWebResearch(&evidenceCatalog{}, request, tools.HTTPFetchOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := accessCall(t, surface, "web_access", `{"action":"request","scope":"public","reason":"Research the reviewed task"}`); err == nil {
+		t.Fatal("stale reviewed plan gained new scope")
+	}
+	if scope.evidence().PublicWeb {
+		t.Fatal("consent bypassed invalidated task plan")
+	}
+}

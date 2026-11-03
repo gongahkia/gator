@@ -1,0 +1,61 @@
+{
+  "Milliseconds": 19516,
+  "Reviews": [
+    {
+      "scope": "public",
+      "reason": "Find and read the official Go net/http documentation about Client redirect behavior and how callers can stop redirects, using credential-free public web access.",
+      "search_provider": "tinyfish",
+      "max_requests": 32,
+      "max_searches": 8,
+      "lifetime": "This task only, including its connected researchers. Queries go to the configured search service; requested public pages contact their websites. Search may incur provider charges. No saved login, private-network access or external writes."
+    }
+  ],
+  "Tools": [
+    "web_access",
+    "web_search",
+    "http_fetch",
+    "search_evidence",
+    "search_evidence",
+    "search_evidence"
+  ],
+  "Errors": null,
+  "Answer": "Yes. Go’s `net/http.Client` follows redirects by default. When `CheckRedirect` is `nil`, it uses the default policy and stops after 10 consecutive requests.\n\nTo stop following redirects, set `Client.CheckRedirect` to return `http.ErrUseLastResponse`:\n\n```go\nclient := \u0026http.Client{\n    CheckRedirect: func(req *http.Request, via []*http.Request) error {\n        return http.ErrUseLastResponse\n    },\n}\n```\n\nThis prevents the next redirect request and returns the latest response with its body still open and a `nil` error. Returning another error also stops the redirect, but that error is returned wrapped in `url.Error`, and the prior response body is closed.\n\nSource: [official Go `net/http` documentation](gator-evidence:evidence-0527c2fd3014b92337a85dee).",
+  "Error": "",
+  "Evidence": [
+    {
+      "id": "evidence-0527c2fd3014b92337a85dee",
+      "locator": "https://pkg.go.dev/net/http",
+      "sha256": "344a070f4bd0ae84d0a8c8d2efb742cd76a74d64e64e483feb23ea31738f82c6",
+      "snapshot_path": "evidence/344a070f4bd0ae84d0a8c8d2efb742cd76a74d64e64e483feb23ea31738f82c6.txt",
+      "retrieved_at": "2026-11-03T07:23:24.076178Z"
+    }
+  ],
+  "Research": {
+    "public_web": true,
+    "origins": [],
+    "search_provider": "tinyfish",
+    "requests": 2,
+    "searches": 1,
+    "max_requests": 32,
+    "max_searches": 8,
+    "scope_reviews": 1
+  },
+  "Checks": {
+    "answer cites retrieved evidence": true,
+    "answer identifies redirect control": true,
+    "foreground public scope reviewed once": true,
+    "historical scope and shared usage retained": true,
+    "no external action recorded": true,
+    "no tool errors": true,
+    "previously unselected official page retained": true,
+    "real search and page fetch used": true
+  },
+  "Spend": {
+    "calls": 98,
+    "unconfirmed_reserved_usd": 0,
+    "estimated_upper_usd": 6.087389999999999,
+    "search_reserved_upper_usd": 0.16,
+    "Input": 986397,
+    "Output": 7042
+  }
+}

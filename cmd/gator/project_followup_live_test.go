@@ -221,10 +221,17 @@ func (g projectEvalTransport) RoundTrip(r *http.Request) (*http.Response, error)
 }
 
 // Reserve all possible search fees for at most eight Work phases before any
-// live activity. Native HTTPTools caps search+fetch at eight requests per phase.
+// live activity. Work caps search at eight requests per phase.
 // $10/1000 requests is twice Brave's verified 1 Nov 2026 public Search rate.
 // Never credit unused search allowance back based on uncertain request results.
 func reserveProjectSearch(directory string) error {
+	return reserveProjectSearchCalls(directory, 64)
+}
+
+func reserveProjectSearchCalls(directory string, queries int) error {
+	if queries < 1 || queries > 64 {
+		return errors.New("invalid bounded search reservation")
+	}
 	root, err := workspace.Open(directory)
 	if err != nil {
 		return err
@@ -251,7 +258,7 @@ func reserveProjectSearch(directory string) error {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	const allowance = 8 * 8 * 0.01
+	allowance := float64(queries) * 0.01
 	if ledger.Estimated < 0 || ledger.Reserved < 0 || ledger.SearchReserved < 0 || ledger.Estimated+ledger.Reserved+ledger.SearchReserved+allowance > 9.5 {
 		return errors.New("search allowance would exceed goal budget")
 	}

@@ -15,8 +15,9 @@ func approvalMessage(interaction workrun.Interaction) message {
 		preview = json.RawMessage(`{"error":"Preview could not be encoded"}`)
 	}
 	result := message{
-		role: "Approval",
-		text: fmt.Sprintf("%s #%d\n%s\nUse /approve or /deny.", interaction.Kind, interaction.ID, preview),
+		approvalID: interaction.ID,
+		role:       "Approval",
+		text:       fmt.Sprintf("%s #%d\n%s\nUse /approve or /deny.", interaction.Kind, interaction.ID, preview),
 		result: &uisnapshot.Result{
 			Kind: "approval", Title: "Review requested action", Tone: "warning",
 			Fields:  []uisnapshot.Field{{Label: "Request", Value: fmt.Sprint(interaction.ID)}, {Label: "Action", Value: interaction.Kind}},

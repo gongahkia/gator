@@ -52,6 +52,9 @@ func webOrigins(values []string) (map[string]bool, error) {
 	}
 	result := map[string]bool{}
 	for _, value := range values {
+		if len(value) > 2048 {
+			return nil, errors.New("web origin exceeds the 2048-byte limit")
+		}
 		canonical, err := tools.PublicHTTPURL(value)
 		if err != nil {
 			return nil, errors.New("web selection requires a public HTTPS origin on port 443")

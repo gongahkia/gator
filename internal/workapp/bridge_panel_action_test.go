@@ -110,6 +110,19 @@ func TestDesktopApprovalCannotRespondToAnotherLiveRequest(t *testing.T) {
 	}
 }
 
+func TestWebResearchReviewIdentityDoesNotDependOnDisplayFields(t *testing.T) {
+	m := New(Config{})
+	interaction := workrun.Interaction{ID: 23, Kind: "web_access", Preview: workrun.WebAccessReview{Scope: "public", Reason: "Find public primary sources", MaxRequests: 32, MaxSearches: 8}}
+	m.interaction = &interaction
+	m.messages = append(m.messages, approvalMessage(interaction))
+	if m.messages[0].result.Fields[0].Label != "Web scope" {
+		t.Fatal("fixture no longer exercises a custom review layout")
+	}
+	if p := m.BridgeState().PendingApproval; p == nil || p.ID != 23 || p.MessageIndex != 0 {
+		t.Fatal("custom review lost its live approval controls", p)
+	}
+}
+
 func TestDesktopNavigationDoesNotAcceptPromptsOrInterruptWork(t *testing.T) {
 	m := New(Config{})
 	m.openCommandPalette()

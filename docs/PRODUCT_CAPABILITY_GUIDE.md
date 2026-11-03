@@ -32,5 +32,11 @@ identified in competitive finding 15. Other navigation, voice, file-format and
 release descriptions still need their own production-backed consistency checks.
 This change does not restore Calendar or complete always-on deployment.
 
+The 3 November public-research addition updates shared help with task-only web
+review and the distinction between configured search and direct page reading.
+The empty connected-account field now says no accounts are selected; it does not
+claim all available resources are local. Actual web scope is still checked by
+`web_access` and its foreground review, never by these descriptions.
+
 Rollback: revert the guide and its consumers together. No user data or settings
 migration is introduced; previously retained conversations remain unchanged.

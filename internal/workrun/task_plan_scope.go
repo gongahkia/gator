@@ -72,7 +72,10 @@ func loadReviewedTaskPlan(request Request) (*worksession.TaskPlan, error) {
 }
 
 func planToolEffects(tool agent.Tool, call agent.ToolCall) ([]string, error) {
-	if call.Name == "web_access" {
+	if _, native := tool.(evidenceSearchTool); native {
+		return []string{"read"}, nil
+	}
+	if _, native := tool.(webAccessTool); native {
 		return []string{"read"}, nil
 	}
 	if effects, known, err := orchestrator.ToolEffects(tool, call); known {

@@ -329,7 +329,7 @@ func (m Model) BridgeState() BridgeState {
 		index := -1
 		for i := len(m.messages) - 1; i >= 0; i-- {
 			result := m.messages[i].result
-			if result != nil && result.Kind == "approval" && len(result.Fields) > 0 && result.Fields[0].Value == fmt.Sprint(m.interaction.ID) {
+			if result != nil && result.Kind == "approval" && m.messages[i].approvalID == m.interaction.ID {
 				index = i
 				break
 			}

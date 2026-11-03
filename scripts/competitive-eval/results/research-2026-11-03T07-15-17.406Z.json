@@ -1,0 +1,64 @@
+{
+  "Milliseconds": 28368,
+  "Reviews": [
+    {
+      "scope": "public",
+      "reason": "Find and read the official Go net/http documentation needed to verify Client redirect behavior and how callers can disable redirect following.",
+      "search_provider": "tinyfish",
+      "max_requests": 32,
+      "max_searches": 8,
+      "lifetime": "This task only, including its connected researchers. Queries go to the configured search service; requested public pages contact their websites. Search may incur provider charges. No saved login, private-network access or external writes."
+    }
+  ],
+  "Tools": [
+    "web_access",
+    "web_search",
+    "http_fetch",
+    "read_evidence",
+    "read_evidence",
+    "search_files",
+    "read_evidence"
+  ],
+  "Errors": [
+    "tool \"search_files\": search workspace files: open workspace directory \"evidence\": openat evidence: no such file or directory"
+  ],
+  "Answer": "",
+  "Error": "model turn 8: request OpenAI response: Post \"https://us.api.openai.com/v1/responses\": evaluation input exceeds 128 KiB",
+  "Evidence": [
+    {
+      "id": "evidence-53c7bf46732286ba491ce5cc",
+      "locator": "https://pkg.go.dev/net/http",
+      "sha256": "344a070f4bd0ae84d0a8c8d2efb742cd76a74d64e64e483feb23ea31738f82c6",
+      "snapshot_path": "evidence/344a070f4bd0ae84d0a8c8d2efb742cd76a74d64e64e483feb23ea31738f82c6.txt",
+      "retrieved_at": "2026-11-03T07:15:50.126043Z"
+    }
+  ],
+  "Research": {
+    "public_web": true,
+    "origins": [],
+    "search_provider": "tinyfish",
+    "requests": 2,
+    "searches": 1,
+    "max_requests": 32,
+    "max_searches": 8,
+    "scope_reviews": 1
+  },
+  "Checks": {
+    "answer cites retrieved evidence": false,
+    "answer identifies redirect control": false,
+    "foreground public scope reviewed once": true,
+    "historical scope and shared usage retained": true,
+    "no external action recorded": true,
+    "no tool errors": false,
+    "previously unselected official page retained": true,
+    "real search and page fetch used": true
+  },
+  "Spend": {
+    "calls": 93,
+    "unconfirmed_reserved_usd": 0,
+    "estimated_upper_usd": 5.762753999999998,
+    "search_reserved_upper_usd": 0.08,
+    "Input": 934107,
+    "Output": 6588
+  }
+}

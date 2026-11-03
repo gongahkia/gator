@@ -29,7 +29,7 @@ page](https://developers.openai.com/api/docs/models/gpt-5.6-sol) and
 | 3. Durable execution | Persist safe workflow boundaries, reconcile uncertain effects, resume eligible work without repeating confirmed effects; crash/update/provider-loss journeys | Open |
 | 4. First value | Task-led defaults, model/account/search readiness and inline recovery; clean installation to useful result without developer intervention | Open |
 | 5. Connected jobs | Complete calendar and email workflows, including threading, recipients, attachments, drafts, reviews, account scope, reconciliation and real-service acceptance | In progress: rich Gmail sends, selected original uploads, thread reads and native send-permission controls |
-| 6. Research | Reviewed public discovery beyond preselected sites, sensible shared budgets and in-task scope expansion; unknown-source research with provenance and network protections | Open |
+| 6. Research | Reviewed public discovery beyond preselected sites, sensible shared budgets and in-task scope expansion; unknown-source research with provenance and network protections | In progress: task-only public/site grants, shared 32-attempt/eight-search limits, bounded evidence search and live primary-source acceptance |
 | 7. Browser | Bounded task/session permissions, private sign-in and useful session continuity; representative multi-page jobs with measured interruption count | Open |
 | 8. Delivery | Durable notification outcomes/retry/reconciliation, channel choices and mobile delivery; disconnect, OS failure and actual-device acceptance | In progress: bounded OS handoff retry verified locally |
 | 9. Conversation | Responsive questions and task routing during work, preserving owner-bound steering, approvals and resource limits | Open |
@@ -46,6 +46,61 @@ until that evidence exists. Implement independent engineering work while those
 acceptance steps remain open. Do not treat a green narrow test as product parity.
 
 ## Implementation evidence
+
+### Reviewed public research and bounded evidence lookup (items 6, 9 and 15)
+
+Foreground Work can now discover sources beyond manually selected origins.
+`web_access` opens a native review of public-web or additional-site scope, actual
+search readiness, data sharing and task-only limits. Eight searches fit within
+32 total admitted web attempts, shared across the manager and connected/custom
+researchers. Workers cannot ask for wider grants or reset the counters. Existing
+site selection remains bounded; background checks cannot acquire a new grant.
+Denial, revocation, cancellation, invalidated plan reviews and later requests
+do not inherit authority. The journal retains scope decisions, and manifests
+retain historical usage without making it a reusable capability.
+
+The first real-model/public-search attempt found the right primary page but
+failed at the unchanged evaluator context ceiling while paging raw HTML. A
+bounded `search_evidence` tool now finds literal terms in verified retained bytes
+with exact UTF-8-safe contexts/offsets and first/last matching ranges. It avoids
+guessing local paths for web evidence. Concurrent captures use atomic publication
+so multiple researchers cannot observe partial content-addressed files.
+
+The actual Electron journey also exposed a review binding defect: both host and
+renderer inferred the active approval from displayed `Request` fields. Reviews
+now carry a private host-owned message identity and use the exact projected
+message index; custom scope/limit layouts keep their approval controls without
+weakening the live interaction token/owner checks. The web grant journey passes
+in 6.0 seconds; Gmail selected-original sends and chat follow-up approval/save/edit/
+pause journeys pass in 8.0 and 16.1 seconds. Shared help describes public research
+and no longer equates an empty connected-account selection with local-only access.
+
+Live report `research-2026-11-03T07-23-01.419Z.json` passes 8/8 assertions in
+19.5 seconds, with five model requests, one actual TinyFish search, one public
+page fetch and three local evidence searches. It starts without selected sites
+and returns a retained-source citation to the official Go documentation. The
+failed first report remains alongside it. These two attempts add twelve model
+requests, 162,505 input / 719 output tokens, US$0.992286 estimated model ceiling
+and US$0.16 conservatively retained search allowance.
+
+New cumulative accounting: **98 model requests, 986,397 input / 7,042 output
+tokens, US$6.087390 estimated model ceiling plus US$0.16 search reservation =
+US$6.247390 total upper allowance usage**, with no unresolved model reservation.
+The US$10 total authorization is unchanged. Search reservations are not billed
+charges; TinyFish's current pricing/docs disagree about behavior beyond free
+limits, so the conservative allowance remains retained. See
+[web research](WEB-SEARCH.md) for behavior, source references, reproduction and
+privacy limits. Public reads preserve DNS pinning, private-address checks,
+credential separation, no automatic redirects and bounded responses. They do
+not establish semantic filtering of every possible private query or URL payload.
+
+The user captured the initial engineering changes in intervening commits
+`61b6b60f4` and `7389df4e0`; those histories are preserved. Roll back the complete
+research feature and its UI/prompt/test consumers together, including the
+follow-up verification commit. Historical optional manifest usage and interaction
+records grant no continuing access. README files remain untouched. Item 6 retains
+limited live acceptance rather than a claimed general quality benchmark; the
+full fifteen-item goal and later performance audit remain active.
 
 ### Conversational dynamic specialists (additional user request)
 
