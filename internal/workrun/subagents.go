@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -97,6 +98,15 @@ func (e Executor) subagentTools(ctx context.Context, request Request, work works
 		if cfg, ok := request.RoleConfiguration[specialists[i].Name]; ok {
 			specialists[i].Configuration = cfg
 		}
+		if specialists[i].Configuration.Version == 0 {
+			specialists[i].Configuration.Version = 1
+		}
+		if specialists[i].Configuration.Provider == "" {
+			specialists[i].Configuration.Provider = request.Provider
+		}
+		if specialists[i].Backend == orchestrator.BackendLLM {
+			specialists[i].Configuration.MaxSteps = e.roleSteps(specialists[i].Name, steps)
+		}
 		if specialists[i].Name == "artifact_reviewer" {
 			ordinary := specialists[i].Run
 			specialists[i].Run = func(ctx context.Context, invocation orchestrator.Invocation) (orchestrator.Result, error) {
@@ -149,6 +159,40 @@ func (e Executor) subagentTools(ctx context.Context, request Request, work works
 		return nil, nil, err
 	}
 	options := orchestrator.Options{SourceCapture: request.SnapshotID, Limits: request.Limits, MaxDelegations: 8, MaxParallel: 3, Now: e.Now, OnEvent: onEvent, OnRecord: onRecord, StatePath: filepath.Join(request.StateDir, "gator", "tasks", request.RunID), ParentRun: request.RunID, Source: work.Source.Path(), PolicySHA256: digest}
+	options.CustomAgents = true
+	profileStore, err := orchestrator.NewProfileStore(request.StateDir)
+	if err != nil {
+		return nil, nil, err
+	}
+	options.Profiles, err = profileStore.List()
+	if err != nil {
+		options.ProfileIssue = "Saved specialist profiles could not be loaded; built-in and task-specific agents remain available."
+		options.Profiles = nil
+	}
+	options.ListProfiles = profileStore.List
+	if request.ForegroundApp {
+		validateQuote := func(ctx context.Context, quote string) error {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			if strings.TrimSpace(quote) == "" || len(quote) > 4096 || !strings.Contains(request.Objective, quote) {
+				return errors.New("saving or deleting a specialist requires an exact quote from the current user's explicit request")
+			}
+			return nil
+		}
+		options.SaveProfile = func(ctx context.Context, definition orchestrator.AgentDefinition, expected, quote string) error {
+			if err := validateQuote(ctx, quote); err != nil {
+				return err
+			}
+			return profileStore.PutContext(ctx, definition, expected)
+		}
+		options.DeleteProfile = func(ctx context.Context, name, expected, quote string) error {
+			if err := validateQuote(ctx, quote); err != nil {
+				return err
+			}
+			return profileStore.DeleteContext(ctx, name, expected)
+		}
+	}
 	if request.ParentRevisionID != "" {
 		sessions, err := worksession.Open(request.StateDir)
 		if err != nil {
@@ -159,13 +203,35 @@ func (e Executor) subagentTools(ctx context.Context, request Request, work works
 			return nil, nil, err
 		}
 		options.Retained = map[string]orchestrator.Task{}
+		options.RetainedProfiles = map[string]orchestrator.AgentDefinition{}
+		profileOrder := []string{}
+		rememberProfile := func(id string, d orchestrator.AgentDefinition) {
+			if _, present := options.RetainedProfiles[id]; !present {
+				profileOrder = append(profileOrder, id)
+			}
+			options.RetainedProfiles[id] = d
+			if len(profileOrder) > 128 {
+				delete(options.RetainedProfiles, profileOrder[0])
+				profileOrder = profileOrder[1:]
+			}
+		}
 		for _, revision := range lineage {
+			definitions, err := orchestrator.ReadTaskProfiles(filepath.Join(request.StateDir, "gator", "tasks", revision.ID))
+			if err != nil {
+				return nil, nil, err
+			}
+			for _, definition := range definitions {
+				rememberProfile(revision.ID+"/roles/"+definition.Name, definition)
+			}
 			tasks, err := orchestrator.ReadTasks(filepath.Join(request.StateDir, "gator", "tasks", revision.ID))
 			if err != nil {
 				return nil, nil, err
 			}
 			for _, task := range tasks {
 				options.Retained[task.GlobalID] = task
+				if task.Profile != nil && !task.Profile.Saved {
+					rememberProfile(task.GlobalID+"/profile", task.Profile.Definition)
+				}
 			}
 		}
 	}
@@ -213,11 +279,20 @@ func (e Executor) hostedCodeSpecialist(request Request, work workspace.Work) orc
 			if err != nil {
 				return orchestrator.Result{}, err
 			}
+			maxSteps, codePolicy := request.MaxSteps, request.Code
+			if invocation.MaxSteps > 0 {
+				if maxSteps <= 0 || invocation.MaxSteps < maxSteps {
+					maxSteps = invocation.MaxSteps
+				}
+				if codePolicy.MaxSteps <= 0 || invocation.MaxSteps < codePolicy.MaxSteps {
+					codePolicy.MaxSteps = invocation.MaxSteps
+				}
+			}
 			result, err := e.Code(ctx, CodeRequest{
 				Baseline: baseline, Budget: request.Budget, OnEvent: invocation.OnEvent,
 				ID: invocation.ID, SourcePath: work.Source.Path(), ScratchPath: work.Scratch.Path(),
-				Task: invocation.Task, ParentRunID: request.RunID, MaxSteps: request.MaxSteps,
-				Project: request.Project, Policy: request.Code, Approve: request.ApproveCodeCommand,
+				Task: invocation.Task, ParentRunID: request.RunID, MaxSteps: maxSteps,
+				Project: request.Project, Policy: codePolicy, Approve: request.ApproveCodeCommand,
 			})
 			orchestrated := orchestrator.Result{BaselineSHA256: result.BaselineSHA256, Usage: result.Usage, Summary: strings.TrimSpace(result.Summary), Steps: result.Steps}
 			if len(result.Patch) > 0 {

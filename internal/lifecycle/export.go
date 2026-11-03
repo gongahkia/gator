@@ -280,6 +280,9 @@ func backupContent(name string) bool {
 	if strings.HasPrefix(rel, "inbox/") && strings.HasSuffix(rel, ".lock") {
 		return false
 	}
+	if (strings.HasPrefix(rel, "agent-profiles/") || strings.HasPrefix(rel, "tasks/")) && (strings.HasSuffix(rel, ".lock") || strings.HasSuffix(rel, ".tmp")) {
+		return false
+	}
 	if strings.HasPrefix(rel, "external-actions/") && (strings.HasSuffix(rel, ".lock") || strings.HasPrefix(path.Base(rel), ".gator-write-")) {
 		return false
 	}

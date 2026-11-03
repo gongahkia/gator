@@ -44,14 +44,16 @@ var ErrDelegationBudget = errors.New("aggregate invocation budget exhausted")
 
 // Invocation is the isolated assignment passed to one specialist.
 type Invocation struct {
-	Controls  <-chan cliagent.SessionControl
-	OnState   func(string, cliagent.NativeState) error
-	SessionID string
-	Baseline  string
-	OnEvent   agent.EventSink
-	ID        string
-	Task      string
-	Steering  <-chan string
+	Instructions string
+	MaxSteps     int
+	Controls     <-chan cliagent.SessionControl
+	OnState      func(string, cliagent.NativeState) error
+	SessionID    string
+	Baseline     string
+	OnEvent      agent.EventSink
+	ID           string
+	Task         string
+	Steering     <-chan string
 }
 
 // Result is the bounded information returned from a specialist to its manager.
@@ -73,6 +75,7 @@ type Result struct {
 // specialists may resume host-selected context; others start fresh.
 // Backend selects LLM tools or a hosted engine; it is not a second manager API.
 type Specialist struct {
+	Profile       *AgentProfile
 	Sessions      bool
 	Steering      bool
 	Configuration RoleConfiguration
@@ -100,25 +103,34 @@ type Record struct {
 
 // Options configures one manager's bounded delegation surface.
 type Options struct {
-	SourceCapture  string
-	Retained       map[string]Task
-	Limits         agent.Limits
-	StatePath      string
-	ParentRun      string
-	Source         string
-	PolicySHA256   string
-	Supervisor     *Supervisor
-	MaxDelegations int
-	MaxParallel    int
-	Now            func() time.Time
-	OnEvent        agent.EventSink
-	OnRecord       func(Record)
+	CustomAgents     bool
+	Profiles         []AgentDefinition
+	ProfileIssue     string
+	RetainedProfiles map[string]AgentDefinition
+	SaveProfile      func(context.Context, AgentDefinition, string, string) error
+	DeleteProfile    func(context.Context, string, string, string) error
+	ListProfiles     func() ([]AgentDefinition, error)
+	SourceCapture    string
+	Retained         map[string]Task
+	Limits           agent.Limits
+	StatePath        string
+	ParentRun        string
+	Source           string
+	PolicySHA256     string
+	Supervisor       *Supervisor
+	MaxDelegations   int
+	MaxParallel      int
+	Now              func() time.Time
+	OnEvent          agent.EventSink
+	OnRecord         func(Record)
 }
 
 type RoleConfiguration struct {
-	Version  int    `json:"version"`
-	Provider string `json:"provider"`
-	MaxSteps int    `json:"max_steps"`
+	Base             string `json:"base,omitempty"`
+	DefinitionSHA256 string `json:"definition_sha256,omitempty"`
+	Version          int    `json:"version"`
+	Provider         string `json:"provider"`
+	MaxSteps         int    `json:"max_steps"`
 }
 
 // Tools returns the model-callable delegation surface for a small specialist
@@ -184,6 +196,11 @@ func (t *delegateTool) Definition() agent.ToolDefinition {
 		names = append(names, specialist.Name)
 		lines = append(lines, specialist.Name+": "+specialist.Description)
 	}
+	agentSchema := map[string]any{"type": "string", "enum": names}
+	if t.supervisor != nil && t.supervisor.options.CustomAgents {
+		delete(agentSchema, "enum")
+		agentSchema["description"] = "An available name from list_agents, including a specialist created with create_agent."
+	}
 	schema, _ := json.Marshal(map[string]any{
 		"type": "object", "additionalProperties": false, "required": []string{"tasks"},
 		"properties": map[string]any{"tasks": map[string]any{
@@ -191,7 +208,7 @@ func (t *delegateTool) Definition() agent.ToolDefinition {
 			"items": map[string]any{
 				"type": "object", "additionalProperties": false, "required": []string{"agent", "task"},
 				"properties": map[string]any{
-					"agent":          map[string]any{"type": "string", "enum": names},
+					"agent":          agentSchema,
 					"baseline_patch": map[string]any{"type": "string"},
 					"task":           map[string]any{"type": "string", "minLength": 1, "maxLength": maxTaskBytes},
 				},

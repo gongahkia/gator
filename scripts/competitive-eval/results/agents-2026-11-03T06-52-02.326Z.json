@@ -1,0 +1,202 @@
+{
+  "Phases": [
+    {
+      "Name": "create",
+      "Milliseconds": 21572,
+      "Tools": [
+        "list_agents",
+        "create_agent",
+        "await_agent",
+        "list_files",
+        "read_file",
+        "read_file"
+      ],
+      "Errors": null,
+      "Answer": "Saved **deadline_researcher** for future chats and used it now.\n\n- **Actual client review deadline:** **18 November 2026**. This is the confirmed update, replacing the original 20 November date. [`source/project.md:2-3`](source/project.md)\n- **Unresolved blocker:** **Venue photographs**. No owner or resolution date is documented. [`source/project.md:4`](source/project.md)\n\nNo scheduling or external contact occurred.",
+      "Tasks": [
+        {
+          "profile": {
+            "definition": {
+              "version": 1,
+              "name": "deadline_researcher",
+              "base": "source_researcher",
+              "description": "Checks selected local project files for deadlines, dated claims, contradictions, and unresolved blockers.",
+              "instructions": "Inspect only the frozen selected local source. For deadline investigations: identify every relevant dated claim with exact path and line/page/cell references; distinguish proposals, plans, approvals, and confirmed commitments; compare contradictions without resolving them by assumption; identify unresolved blockers and their latest documented status; report uncertainty concisely. Never modify files, schedule work, or contact anyone.",
+              "max_steps": 8
+            },
+            "digest": "51c56991ffb29c7fb8958634457c0af00619d55ce7809e1c3f77d064e7959596",
+            "saved": true
+          },
+          "source_capture": "snap-ed774d903a7e08549a9b02a4",
+          "configuration": {
+            "base": "source_researcher",
+            "definition_sha256": "51c56991ffb29c7fb8958634457c0af00619d55ce7809e1c3f77d064e7959596",
+            "version": 1,
+            "provider": "",
+            "max_steps": 8
+          },
+          "limits": {
+            "model_requests": 12,
+            "tokens": 120000,
+            "wall_seconds": 110
+          },
+          "selected_input": "Investigate the selected local files to determine the actual client review deadline and the unresolved blocker. Find and compare all relevant dated claims, distinguish tentative dates from confirmed commitments, and provide concise findings with exact local source references. Read-only; do not schedule or contact anyone.",
+          "version": 1,
+          "id": "subagent-001",
+          "global_id": "work-live-dynamic-create/subagent-001",
+          "parent_run": "work-live-dynamic-create",
+          "role": "deadline_researcher",
+          "role_version": 1,
+          "source": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/TestLiveDynamicAgents3287969420/001/gator/snapshots/trees/snap-f5d538487c2ac5046c533c74",
+          "policy_sha256": "da62540d7e38c87004764fb0c94b84561b114c0ced37ba37d766b8da7d9b59df",
+          "input_sha256": "87666df512559ed5e273b2dd61acad9232bee14abb64e74f7f8b086477cd2cfa",
+          "attempt": 1,
+          "status": "completed",
+          "created_at": "2026-11-03T06:52:22.087751Z",
+          "started_at": "2026-11-03T06:52:22.128639Z",
+          "finished_at": "2026-11-03T06:52:30.731002Z",
+          "result": {
+            "InspectedPaths": [
+              "source/project.md"
+            ],
+            "FullyInspectedPaths": [
+              "source/project.md"
+            ],
+            "MissingPaths": [],
+            "SessionID": "",
+            "BaselineSHA256": "",
+            "Usage": {
+              "unknown_requests": 0,
+              "model_requests": 3,
+              "input_tokens": 1674,
+              "output_tokens": 190,
+              "reported": true,
+              "estimated": false
+            },
+            "Summary": "- **Actual client review deadline:** **18 November 2026** — explicitly documented as a **confirmed update**, superseding the original date.  \n  - Original date: **20 November 2026** — `source/project.md:2`  \n  - Confirmed revised date: **18 November 2026** — `source/project.md:3`\n\n- **Unresolved blocker:** **Venue photographs** — `source/project.md:4`\n\n**Uncertainty:** None stated in the selected source. No tentative or merely proposed dates appear; the only revised date is labeled confirmed. The blocker’s owner, resolution date, and detailed status are not documented.",
+            "Steps": 3,
+            "ArtifactPath": "",
+            "ArtifactSHA256": ""
+          }
+        }
+      ],
+      "Usage": {
+        "unknown_requests": 0,
+        "model_requests": 8,
+        "input_tokens": 48344,
+        "output_tokens": 579,
+        "reported": true,
+        "estimated": false
+      },
+      "Error": ""
+    },
+    {
+      "Name": "reuse",
+      "Milliseconds": 19028,
+      "Tools": [
+        "list_agents",
+        "start_agent",
+        "await_agent",
+        "list_files",
+        "read_file",
+        "read_file"
+      ],
+      "Errors": null,
+      "Answer": "- **Confirmed client-review deadline:** **21 November 2026**. [source/project.md, lines 1–2](source/project.md#L1-L2)\n- **Blockers:** None reported. [source/project.md, line 3](source/project.md#L3)\n\nNo tentative dates, contradictions, or dependencies are documented. The source is only a brief project note, so no supporting approval history is available.",
+      "Tasks": [
+        {
+          "profile": {
+            "definition": {
+              "version": 1,
+              "name": "deadline_researcher",
+              "base": "source_researcher",
+              "description": "Checks selected local project files for deadlines, dated claims, contradictions, and unresolved blockers.",
+              "instructions": "Inspect only the frozen selected local source. For deadline investigations: identify every relevant dated claim with exact path and line/page/cell references; distinguish proposals, plans, approvals, and confirmed commitments; compare contradictions without resolving them by assumption; identify unresolved blockers and their latest documented status; report uncertainty concisely. Never modify files, schedule work, or contact anyone.",
+              "max_steps": 8
+            },
+            "digest": "51c56991ffb29c7fb8958634457c0af00619d55ce7809e1c3f77d064e7959596",
+            "saved": true
+          },
+          "source_capture": "snap-4ba398bb2609ca59d220b72d",
+          "configuration": {
+            "base": "source_researcher",
+            "definition_sha256": "51c56991ffb29c7fb8958634457c0af00619d55ce7809e1c3f77d064e7959596",
+            "version": 1,
+            "provider": "",
+            "max_steps": 8
+          },
+          "limits": {
+            "model_requests": 12,
+            "tokens": 120000,
+            "wall_seconds": 110
+          },
+          "selected_input": "Investigate the newly selected project's review deadline and blockers. Inspect only the selected frozen local source. Report concise findings with exact source paths and line ranges or document page references. Distinguish confirmed dates, tentative dates, contradictions, dependencies, and unresolved blockers. Do not schedule anything or contact anyone.",
+          "version": 1,
+          "id": "subagent-001",
+          "global_id": "work-live-dynamic-reuse/subagent-001",
+          "parent_run": "work-live-dynamic-reuse",
+          "role": "deadline_researcher",
+          "role_version": 1,
+          "source": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/TestLiveDynamicAgents3287969420/001/gator/snapshots/trees/snap-849f3d7847e5045989a24d2b",
+          "policy_sha256": "da62540d7e38c87004764fb0c94b84561b114c0ced37ba37d766b8da7d9b59df",
+          "input_sha256": "dd948cb7d99919f8e53bc242c2bf860bde6e8e4388638e2f337a1f742b1332b6",
+          "attempt": 1,
+          "status": "completed",
+          "created_at": "2026-11-03T06:52:41.164968Z",
+          "started_at": "2026-11-03T06:52:41.206465Z",
+          "finished_at": "2026-11-03T06:52:50.366401Z",
+          "result": {
+            "InspectedPaths": [
+              "source/project.md"
+            ],
+            "FullyInspectedPaths": [
+              "source/project.md"
+            ],
+            "MissingPaths": [],
+            "SessionID": "",
+            "BaselineSHA256": "",
+            "Usage": {
+              "unknown_requests": 0,
+              "model_requests": 3,
+              "input_tokens": 1677,
+              "output_tokens": 161,
+              "reported": true,
+              "estimated": false
+            },
+            "Summary": "- **Confirmed review deadline:** **21 November 2026** — explicitly labeled “Confirmed client review.” (`source/project.md`, lines 1–2)\n- **Tentative dates:** None documented.\n- **Contradictions:** None found in the selected source.\n- **Dependencies:** None documented.\n- **Unresolved blockers:** None reported. (`source/project.md`, line 3)\n\n**Uncertainty:** The frozen source contains only this brief project note; no supporting approval history or additional status details are available.",
+            "Steps": 3,
+            "ArtifactPath": "",
+            "ArtifactSHA256": ""
+          }
+        }
+      ],
+      "Usage": {
+        "unknown_requests": 0,
+        "model_requests": 8,
+        "input_tokens": 47496,
+        "output_tokens": 405,
+        "reported": true,
+        "estimated": false
+      },
+      "Error": ""
+    }
+  ],
+  "Checks": {
+    "created specialist actually completed": true,
+    "definition captured with execution identity": true,
+    "explicit reusable profile persisted": true,
+    "manager returned dated findings": true,
+    "new source used without stale prior date": true,
+    "reuse did not redefine specialist": true,
+    "saved specialist executed in new conversation": true,
+    "worker inspected selected source": true
+  },
+  "Spend": {
+    "calls": 86,
+    "unconfirmed_reserved_usd": 0,
+    "estimated_upper_usd": 5.095103999999998,
+    "search_reserved_upper_usd": 0,
+    "Input": 823892,
+    "Output": 6323
+  }
+}

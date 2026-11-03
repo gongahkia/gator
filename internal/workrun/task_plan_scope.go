@@ -11,6 +11,7 @@ import (
 
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/worksession"
 )
@@ -71,6 +72,9 @@ func loadReviewedTaskPlan(request Request) (*worksession.TaskPlan, error) {
 }
 
 func planToolEffects(tool agent.Tool, call agent.ToolCall) ([]string, error) {
+	if effects, known, err := orchestrator.ToolEffects(tool, call); known {
+		return effects, err
+	}
 	if _, capability, ok := tools.ConnectorOperationCapability(tool); ok {
 		if action.RequiresFreshApproval(capability) {
 			return []string{"connected_write"}, nil
@@ -79,7 +83,7 @@ func planToolEffects(tool agent.Tool, call agent.ToolCall) ([]string, error) {
 	}
 	name := call.Name
 	switch name {
-	case "read_file", "list_files", "search_files", "extract_document", "inspect_table", "web_search", "http_fetch", "web_fetch", "list_evidence", "read_evidence", "check_claims", "artifact_status", "knowledge_read", "knowledge_search", "chat_read", "chat_search", "skill_list", "skill_read", "local_agenda", "gator_app_inspect":
+	case "read_file", "list_files", "search_files", "list_input_files", "extract_document", "inspect_table", "web_search", "http_fetch", "web_fetch", "list_evidence", "read_evidence", "check_claims", "artifact_status", "knowledge_read", "knowledge_search", "chat_read", "chat_search", "skill_list", "skill_read", "local_agenda", "gator_app_inspect":
 		return []string{"read"}, nil
 	case "write_artifact", "write_json_artifact", "write_table_artifact", "work_write_document", "work_write_workbook", "work_write_presentation", "reconcile_tables":
 		return []string{"draft"}, nil

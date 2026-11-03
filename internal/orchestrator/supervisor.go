@@ -24,6 +24,7 @@ import (
 const TaskVersion = 1
 
 type Task struct {
+	Profile          *AgentProfile         `json:"profile,omitempty"`
 	Native           *cliagent.NativeState `json:"native,omitempty"`
 	AnswersQueued    int                   `json:"answers_queued,omitempty"`
 	SessionID        string                `json:"session_id,omitempty"`
@@ -63,6 +64,7 @@ type StartRequest struct {
 	Continue     string   `json:"continue,omitempty"`
 }
 type taskExecution struct {
+	role     Specialist
 	task     Task
 	cancel   context.CancelFunc
 	done     chan struct{}
@@ -71,17 +73,19 @@ type taskExecution struct {
 }
 
 type Supervisor struct {
-	mu       sync.Mutex
-	ctx      context.Context
-	cancel   context.CancelFunc
-	tasks    map[string]*taskExecution
-	registry map[string]Specialist
-	options  Options
-	slots    chan struct{}
-	next     int
-	used     int
-	wg       sync.WaitGroup
-	closed   bool
+	mu                  sync.Mutex
+	ctx                 context.Context
+	cancel              context.CancelFunc
+	tasks               map[string]*taskExecution
+	registry            map[string]Specialist
+	bases               map[string]Specialist
+	unavailableProfiles map[string]string
+	options             Options
+	slots               chan struct{}
+	next                int
+	used                int
+	wg                  sync.WaitGroup
+	closed              bool
 }
 
 func NewSupervisor(ctx context.Context, specialists []Specialist, options Options) (*Supervisor, error) {
@@ -104,7 +108,7 @@ func NewSupervisor(ctx context.Context, specialists []Specialist, options Option
 		return nil, err
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	s := &Supervisor{ctx: ctx, cancel: cancel, tasks: map[string]*taskExecution{}, registry: map[string]Specialist{}, options: options, slots: make(chan struct{}, options.MaxParallel)}
+	s := &Supervisor{ctx: ctx, cancel: cancel, tasks: map[string]*taskExecution{}, registry: map[string]Specialist{}, bases: map[string]Specialist{}, unavailableProfiles: map[string]string{}, options: options, slots: make(chan struct{}, options.MaxParallel)}
 	for _, role := range specialists {
 		role.Name = strings.TrimSpace(role.Name)
 		role.Description = strings.TrimSpace(role.Description)
@@ -117,6 +121,37 @@ func NewSupervisor(ctx context.Context, specialists []Specialist, options Option
 			return nil, fmt.Errorf("specialist %q is repeated", role.Name)
 		}
 		s.registry[role.Name] = role
+		s.bases[role.Name] = role
+	}
+	if options.CustomAgents {
+		for _, definition := range options.Profiles {
+			role, err := s.derive(definition, true)
+			if err != nil {
+				s.unavailableProfiles[definition.Name] = err.Error()
+				continue
+			}
+			if _, collision := s.registry[definition.Name]; collision {
+				s.unavailableProfiles[definition.Name] = "name collides with a built-in role"
+				continue
+			}
+			s.registry[definition.Name] = role
+		}
+		definitions, err := s.taskProfiles().List()
+		if err != nil {
+			cancel()
+			return nil, err
+		}
+		for _, definition := range definitions {
+			if _, present := s.registry[definition.Name]; present {
+				continue
+			}
+			role, err := s.derive(definition, false)
+			if err != nil {
+				s.unavailableProfiles[definition.Name] = err.Error()
+				continue
+			}
+			s.registry[definition.Name] = role
+		}
 	}
 	entries, err := os.ReadDir(options.StatePath)
 	if err != nil {
@@ -133,7 +168,7 @@ func NewSupervisor(ctx context.Context, specialists []Specialist, options Option
 			return nil, err
 		}
 		var task Task
-		if err := json.Unmarshal(data, &task); err != nil || task.Version != TaskVersion {
+		if err := json.Unmarshal(data, &task); err != nil || task.Version != TaskVersion || !validTaskProfile(task) {
 			cancel()
 			return nil, errors.New("invalid retained task")
 		}
@@ -213,7 +248,25 @@ func (s *Supervisor) startLocked(request StartRequest) (Task, error) {
 	if _, ok := s.registry[request.Agent]; !ok {
 		return Task{}, errors.New("unknown specialist")
 	}
-	if request.Task == "" || len(request.Task) > maxTaskBytes {
+	// A second foreground task can revise or delete the same saved profile.
+	// Admission checks the current library; active workers retain their snapshot.
+	if role := s.registry[request.Agent]; role.Profile != nil && role.Profile.Saved && s.options.ListProfiles != nil {
+		profiles, err := s.options.ListProfiles()
+		if err != nil {
+			return Task{}, errors.New("cannot verify the saved specialist revision")
+		}
+		current := false
+		for _, definition := range profiles {
+			if definition.Name == request.Agent && definition.Digest() == role.Profile.Digest {
+				current = true
+				break
+			}
+		}
+		if !current {
+			return Task{}, ErrAgentProfileChanged
+		}
+	}
+	if strings.TrimSpace(request.Task) == "" || len(request.Task) > maxTaskBytes || !utf8.ValidString(request.Task) || strings.ContainsRune(request.Task, 0) {
 		return Task{}, errors.New("invalid task input")
 	}
 	if s.used >= s.options.MaxDelegations {
@@ -234,6 +287,9 @@ func (s *Supervisor) startLocked(request StartRequest) (Task, error) {
 		}
 		if !ok || prior.task.Role != request.Agent {
 			return Task{}, errors.New("invalid continuation role/task")
+		}
+		if prior.task.Profile != nil && (s.registry[request.Agent].Profile == nil || prior.task.Profile.Digest != s.registry[request.Agent].Profile.Digest || prior.task.Configuration != s.registry[request.Agent].Configuration) {
+			return Task{}, errors.New("specialist definition or execution configuration changed; start a fresh assignment")
 		}
 		select {
 		case <-prior.done:
@@ -271,12 +327,13 @@ func (s *Supervisor) startLocked(request StartRequest) (Task, error) {
 	task.SourceCapture = s.options.SourceCapture
 	task.SessionID = sessionID
 	task.Configuration = s.registry[request.Agent].Configuration
+	task.Profile = cloneProfile(s.registry[request.Agent].Profile)
 	task.Limits, task.SelectedInput, task.Baseline = s.options.Limits, selected, request.Baseline
 	if err := s.persist(task); err != nil {
 		cancel()
 		return Task{}, err
 	}
-	execution := &taskExecution{task: task, cancel: cancel, done: make(chan struct{})}
+	execution := &taskExecution{role: s.registry[request.Agent], task: task, cancel: cancel, done: make(chan struct{})}
 	if s.registry[request.Agent].Sessions {
 		execution.controls = make(chan cliagent.SessionControl, 16)
 	}
@@ -287,6 +344,7 @@ func (s *Supervisor) startLocked(request StartRequest) (Task, error) {
 	s.used++
 	s.wg.Add(1)
 	go s.run(ctx, execution, selected, request.Baseline)
+	task.Profile = cloneProfile(task.Profile)
 	return task, nil
 }
 func (s *Supervisor) run(ctx context.Context, execution *taskExecution, input, baseline string) {
@@ -321,7 +379,7 @@ func (s *Supervisor) run(ctx context.Context, execution *taskExecution, input, b
 		return
 	}
 	s.emit(task)
-	result, err := s.registry[task.Role].Run(ctx, Invocation{SessionID: task.SessionID, Controls: execution.controls, OnState: func(id string, state cliagent.NativeState) error {
+	result, err := execution.role.Run(ctx, Invocation{SessionID: task.SessionID, Controls: execution.controls, OnState: func(id string, state cliagent.NativeState) error {
 		s.mu.Lock()
 		updated := execution.task
 		updated.SessionID, updated.Native = id, &state
@@ -400,6 +458,7 @@ func (s *Supervisor) Inspect(id string) (Task, error) {
 	}
 	task := execution.task
 	task.Dependencies = append([]string(nil), task.Dependencies...)
+	task.Profile = cloneProfile(task.Profile)
 	return task, nil
 }
 func (s *Supervisor) Await(ctx context.Context, id string) (Task, error) {
@@ -552,11 +611,22 @@ func (t taskTool) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolR
 			Description string  `json:"description"`
 			Backend     Backend `json:"backend"`
 			Steering    bool    `json:"steering"`
+			Base        string  `json:"base,omitempty"`
+			Digest      string  `json:"definition_digest,omitempty"`
+			Saved       bool    `json:"saved,omitempty"`
+			MaxSteps    int     `json:"max_steps,omitempty"`
+			Provider    string  `json:"provider,omitempty"`
 		}
 		roles := []role{}
 		tasks := []Task{}
 		for _, r := range t.s.registry {
-			roles = append(roles, role{r.Name, r.Description, r.Backend, r.Backend == BackendLLM || r.Steering})
+			item := role{Name: r.Name, Description: r.Description, Backend: r.Backend, Steering: r.Backend == BackendLLM || r.Steering, MaxSteps: r.Configuration.MaxSteps, Provider: r.Configuration.Provider}
+			if r.Profile != nil {
+				item.Base = r.Profile.Definition.Base
+				item.Digest = r.Profile.Digest
+				item.Saved = r.Profile.Saved
+			}
+			roles = append(roles, item)
 		}
 		for _, item := range t.s.tasks {
 			tasks = append(tasks, item.task)
@@ -564,7 +634,7 @@ func (t taskTool) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolR
 		sort.Slice(roles, func(i, j int) bool { return roles[i].Name < roles[j].Name })
 		sort.Slice(tasks, func(i, j int) bool { return tasks[i].ID < tasks[j].ID })
 		retained, more := t.s.retainedThreads()
-		data, err := json.Marshal(map[string]any{"agents": roles, "tasks": tasks, "retained_threads": retained, "more_retained_threads": more, "remaining": t.s.options.MaxDelegations - t.s.used, "max_parallel": t.s.options.MaxParallel})
+		data, err := json.Marshal(map[string]any{"agents": roles, "tasks": tasks, "retained_threads": retained, "more_retained_threads": more, "retained_profiles": t.s.retainedProfileIndex(), "unavailable_profiles": t.s.unavailableProfiles, "profile_issue": t.s.options.ProfileIssue, "remaining": t.s.options.MaxDelegations - t.s.used, "max_parallel": t.s.options.MaxParallel})
 		return agent.ToolResult{Content: string(data)}, err
 	}
 	var task Task
@@ -681,7 +751,11 @@ func decodeTask(raw []byte, value any) error {
 	return nil
 }
 func (s *Supervisor) Tools() []agent.Tool {
-	return []agent.Tool{taskTool{s, "list_agents"}, taskTool{s, "start_agent"}, taskTool{s, "inspect_agent"}, taskTool{s, "await_agent"}, taskTool{s, "steer_agent"}, taskTool{s, "answer_agent"}, taskTool{s, "cancel_agent"}}
+	result := []agent.Tool{taskTool{s, "list_agents"}, taskTool{s, "start_agent"}, taskTool{s, "inspect_agent"}, taskTool{s, "await_agent"}, taskTool{s, "steer_agent"}, taskTool{s, "answer_agent"}, taskTool{s, "cancel_agent"}}
+	if s.options.CustomAgents {
+		result = append(result, profileTool{s, "create_agent"}, profileTool{s, "agent_profiles"})
+	}
+	return result
 }
 
 // StartBatch validates the complete fresh-context batch before any child starts.
@@ -735,7 +809,7 @@ func ReadTasks(directory string) ([]Task, error) {
 			return nil, err
 		}
 		var task Task
-		if err := json.Unmarshal(data, &task); err != nil || task.Version != TaskVersion || task.ID+".json" != entry.Name() {
+		if err := json.Unmarshal(data, &task); err != nil || task.Version != TaskVersion || task.ID+".json" != entry.Name() || !validTaskProfile(task) {
 			return nil, errors.New("invalid retained task checkpoint")
 		}
 		tasks = append(tasks, task)
