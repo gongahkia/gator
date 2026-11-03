@@ -237,7 +237,7 @@ func (d Descriptor) Operations() []Operation {
 		}
 		filtered := operations[:0]
 		for _, operation := range operations {
-			if (operation.ID == "gmail_list" || operation.ID == "gmail_get") && !granted["https://www.googleapis.com/auth/gmail.readonly"] {
+			if (operation.ID == "gmail_list" || operation.ID == "gmail_get" || operation.ID == "gmail_thread_get") && !granted["https://www.googleapis.com/auth/gmail.readonly"] {
 				continue
 			}
 			if operation.ID == "gmail_send" && !granted[GoogleSendOAuthScope] {
@@ -293,6 +293,7 @@ func googleOperations() []Operation {
 		{"sheets_values_get", "Read a bounded range from one Google Sheet.", action.ConnectedRead},
 		{"gmail_list", "List recent Gmail message IDs; use gmail_get to read a selected message.", action.ConnectedRead},
 		{"gmail_get", "Read one selected Gmail message, including headers, snippet, and bounded body data.", action.ConnectedRead},
+		{"gmail_thread_get", "Read a selected Gmail thread with messages and original headers before replying. Large threads may exceed the bounded response size; use individual message reads when needed.", action.ConnectedRead},
 	}
 	operations := serviceOperations(read)
 	operations = append(operations, serviceOperations([]serviceOperation{
@@ -301,7 +302,7 @@ func googleOperations() []Operation {
 		{"sheets_create", "Prepare Google Sheet creation for exact approval.", action.ConnectedMutate},
 		{"sheets_values_update", "Prepare a Google Sheet range update for exact approval.", action.ConnectedMutate},
 		{"sheets_batch_update", "Prepare Google Sheet batch updates for exact approval.", action.ConnectedMutate},
-		{"gmail_send", "Send one plain-text email to one recipient after exact foreground approval. Never retry an uncertain send automatically.", action.Publish},
+		{"gmail_send", "Send email with a plain-text body, explicitly listed To/Cc/Bcc recipients and selected-file attachments after exact foreground approval. Attachment source paths use source/..., output/... or previous/...; the host freezes bytes and adds size/hash metadata to the review. For a reply, read the original thread and preserve its subject; supply thread_id, parent Message-ID and References together in reply. Never retry an uncertain send automatically.", action.Publish},
 		{"batch", "Prepare an ordered batch of Google Docs and Sheets mutations for one exact approval. Gator never retries an ambiguous batch outcome.", action.ConnectedMutate},
 	})...)
 	for index := range operations {
@@ -314,11 +315,11 @@ func googleOperations() []Operation {
 		if operations[index].ID == "gmail_list" {
 			operations[index].InputSchema = json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","maxLength":4096},"limit":{"type":"integer","minimum":1,"maximum":100},"cursor":{"type":"string","maxLength":2048}},"additionalProperties":false}`)
 		}
-		if operations[index].ID == "gmail_get" {
+		if operations[index].ID == "gmail_get" || operations[index].ID == "gmail_thread_get" {
 			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["resource_id"],"properties":{"resource_id":{"type":"string","minLength":1,"maxLength":2048}},"additionalProperties":false}`)
 		}
 		if operations[index].ID == "gmail_send" {
-			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["payload"],"properties":{"payload":{"type":"object","required":["from","to","subject","body"],"properties":{"from":{"type":"string","minLength":3,"maxLength":254},"to":{"type":"string","minLength":3,"maxLength":254},"subject":{"type":"string","minLength":1,"maxLength":200},"body":{"type":"string","minLength":1,"maxLength":10000}},"additionalProperties":false}},"additionalProperties":false}`)
+			operations[index].InputSchema = gmailSendSchema()
 		}
 		if operations[index].ID == "batch" {
 			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["payload"],"properties":{"payload":{"type":"object","required":["actions"],"properties":{"actions":{"type":"array","minItems":1,"maxItems":25,"items":{"type":"object","required":["operation","payload"],"properties":{"operation":{"type":"string"},"payload":{"type":"object"}},"additionalProperties":false}}},"additionalProperties":false}},"additionalProperties":false}`)

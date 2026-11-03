@@ -488,6 +488,27 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		OnAction: func(record action.Record) { stateMu.Lock(); defer stateMu.Unlock(); actions = append(actions, record) },
 	}
 	connectedRuntime := e.Connectors
+	connectedRuntime.ResolveAttachment = func(source string, limit int64) ([]byte, error) {
+		mount, relative, found := strings.Cut(source, "/")
+		if !found {
+			return nil, errors.New("attachment needs a selected file mount")
+		}
+		var root workspace.Root
+		switch mount {
+		case "source":
+			root = work.Source
+		case "output":
+			root = work.Output
+		case "previous":
+			root = previousRoot
+		default:
+			return nil, errors.New("attachment mount is unavailable")
+		}
+		if root.Path() == "" {
+			return nil, errors.New("attachment mount is unavailable")
+		}
+		return root.ReadRegularFile(relative, limit)
+	}
 	connectedRuntime.OAuthRefreshPins = request.OAuthRefreshPins
 	connectedRuntime.OAuthAccountPins = request.OAuthAccountPins
 	connectorSurface, err := tools.ConnectorTools(connectedRuntime, request.ConnectorIDs, connectorPolicy)

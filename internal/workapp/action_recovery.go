@@ -6,6 +6,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/gongahkia/gator/internal/actionlog"
+	"github.com/gongahkia/gator/internal/connector"
 )
 
 type RecoveredAction struct {
@@ -84,11 +85,8 @@ func projectRecoveredAction(entry actionlog.Entry) ActionReceipt {
 	// The journal keeps the full approved preview privately. Only the useful
 	// email envelope, bounded outcome text and batch receipts enter chat state.
 	if item.Operation == "gmail_send" {
-		var fields struct{ To, Subject string }
-		if json.Unmarshal([]byte(r.Proposal.Preview), &fields) == nil {
-			item.Recipient = cropReceiptText(fields.To, 254)
-			item.Subject = cropReceiptText(fields.Subject, 200)
-		}
+		recipients, subject := connector.GmailPreviewEnvelope(r.Proposal.Preview)
+		item.Recipient, item.Subject = cropReceiptText(recipients, 254), cropReceiptText(subject, 200)
 	}
 	item.Error = cropReceiptText(r.Error, 240)
 	for _, step := range r.BatchSteps {

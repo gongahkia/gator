@@ -1,11 +1,11 @@
 package main
 
 import (
-	"encoding/json"
 	"time"
 	"unicode/utf8"
 
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/workapp"
 )
 
@@ -21,11 +21,8 @@ func projectWorkBundleDetails(bundle artifact.Bundle, summary *workapp.BundleSum
 		text := func(value string, limit int) string { result, _ := boundedDetailPreview(value, limit); return result }
 		item := workapp.ActionReceipt{ID: record.Proposal.ID, ConnectorID: record.Proposal.ConnectorID, Operation: record.Proposal.Operation, Target: text(record.Proposal.Target, 256), Status: string(record.Status), Error: text(record.Error, 240), CorrelationID: record.Proposal.CorrelationID, ReceiptID: record.ReceiptID, ProviderResourceID: record.ProviderResourceID}
 		if item.Operation == "gmail_send" {
-			var fields struct{ To, Subject string }
-			if json.Unmarshal([]byte(record.Proposal.Preview), &fields) == nil {
-				item.Recipient = text(fields.To, 254)
-				item.Subject = text(fields.Subject, 200)
-			}
+			recipients, subject := connector.GmailPreviewEnvelope(record.Proposal.Preview)
+			item.Recipient, item.Subject = text(recipients, 254), text(subject, 200)
 		}
 		for _, step := range record.BatchSteps {
 			item.Steps = append(item.Steps, workapp.ReceiptStep{Operation: step.Operation, Target: text(step.Target, 256), Status: string(step.Status), ProviderResourceID: step.ProviderResourceID})

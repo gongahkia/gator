@@ -136,10 +136,14 @@ the batch is still marked uncertain because earlier steps may already have
 changed remote state. Batches are not transactional and are never retried
 automatically; a response digest is not a provider-issued mutation ID.
 
-`gmail_send` accepts exactly `from`, `to`, `subject`, and `body` in its action
-payload. It creates a plain-text MIME message for one recipient, with no
-attachments, Cc, or Bcc. The `from` address must be a sender Gmail accepts for
-the connected account. Gator shows the exact fields and target for approval;
+`gmail_send` accepts `from`, `to`, `subject`, `body`, optional `cc`/`bcc`,
+reply-thread metadata, and selected-file attachment references. `to` may retain
+the legacy one-address string or use an explicit array; Cc/Bcc use arrays. The
+host freezes attachment bytes and includes their names, sizes and hashes in the
+review. See [connected email composition](CONNECTED_EMAIL.md) for the payload,
+thread requirements and file limits. `gmail_thread_get` reads thread context and
+inherits message-content permission restrictions. The `from` address must be a
+sender Gmail accepts for the connected account. Gator shows the fields and target for approval;
 an unattended goal check cannot use this operation. A successful send retains
 Gmail's message ID in the action record in the Work bundle. Every prepared send
 also has a unique reconciliation ID, embedded in its MIME `Message-ID` header

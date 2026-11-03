@@ -28,7 +28,7 @@ page](https://developers.openai.com/api/docs/models/gpt-5.6-sol) and
 | 2. Availability | Supported always-on installation, discoverable enrollment, health and recovery; client-off work and host restart verified; precise local-resource ownership | Open |
 | 3. Durable execution | Persist safe workflow boundaries, reconcile uncertain effects, resume eligible work without repeating confirmed effects; crash/update/provider-loss journeys | Open |
 | 4. First value | Task-led defaults, model/account/search readiness and inline recovery; clean installation to useful result without developer intervention | Open |
-| 5. Connected jobs | Complete calendar and email workflows, including threading, recipients, attachments, drafts, reviews, account scope, reconciliation and real-service acceptance | Open |
+| 5. Connected jobs | Complete calendar and email workflows, including threading, recipients, attachments, drafts, reviews, account scope, reconciliation and real-service acceptance | In progress: typed rich Gmail composition and thread reads |
 | 6. Research | Reviewed public discovery beyond preselected sites, sensible shared budgets and in-task scope expansion; unknown-source research with provenance and network protections | Open |
 | 7. Browser | Bounded task/session permissions, private sign-in and useful session continuity; representative multi-page jobs with measured interruption count | Open |
 | 8. Delivery | Durable notification outcomes/retry/reconciliation, channel choices and mobile delivery; disconnect, OS failure and actual-device acceptance | In progress: bounded OS handoff retry verified locally |
@@ -171,3 +171,26 @@ chat, screen/chat switching, input latency, rendering and background resource
 use in the actual app. Record reproducible measurements, improve the measured
 bottlenecks and commit verified changes separately. This is additional scope;
 it does not replace any of the fifteen requirements above.
+
+## Connected email checkpoint — 3 November
+
+Gmail now supports explicitly listed To/Cc/Bcc recipients, reply threading and
+attachments from this run's selected source/output/previous file mounts. The
+host freezes attachment bytes before exact review and includes names, sizes and
+SHA-256 identities in the approved payload. Draft-only and denied requests make
+no send request. Full thread reads inherit existing message-content restrictions.
+Rich envelope receipts survive sealed-result and interrupted-action projection
+without copying bodies or file bytes into chat receipt summaries. See
+[connected email](CONNECTED_EMAIL.md) for limits, rollback and open requirements.
+
+Independent MIME parsing checks Unicode, binary content, recipient folding,
+thread headers, frozen-buffer mutation and aggregate attachment limits. Real
+Work executor tests exercise generated and selected original files through the
+action broker/journal in approved, denied and draft-only modes. Full race suites
+for connector, workapp and workrun pass; command receipt/connection regressions
+pass. Repository-wide tests and vet are recorded below when complete.
+
+No paid request or real account action was used. Native send-permission upgrades,
+provider drafts, original upload selection, calendar and real-service acceptance
+remain open. Item 5 is in progress, not complete. The responsiveness audit remains
+queued after the active product work as requested.

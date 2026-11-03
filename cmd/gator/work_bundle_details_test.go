@@ -96,6 +96,15 @@ func TestWorkBundleDetailsBoundsPreviewReadsAndMatchesSelectedPaths(t *testing.T
 	}
 }
 
+func TestWorkBundleDetailsProjectsRichGmailEnvelope(t *testing.T) {
+	var summary workapp.BundleSummary
+	bundle := artifact.Bundle{Manifest: artifact.Manifest{Actions: []action.Record{{Proposal: action.Proposal{ID: "send-rich", ConnectorID: "google", Operation: "gmail_send", Preview: `{"to":["one@example.com","two@example.com"],"cc":["cc@example.com"],"subject":"Report","body":"private-body"}`}, Status: action.Executed}}}}
+	projectWorkBundleDetails(bundle, &summary)
+	if len(summary.Actions) != 1 || summary.Actions[0].Recipient != "3 recipients (To 2, Cc 1, Bcc 0)" || summary.Actions[0].Subject != "Report" {
+		t.Fatal("rich receipt envelope lost", summary.Actions)
+	}
+}
+
 func TestWorkBundleDetailsProjectsBoundedReceiptsWithoutSendBody(t *testing.T) {
 	var bundle artifact.Bundle
 	for i := 0; i < 129; i++ {

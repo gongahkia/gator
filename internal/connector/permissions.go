@@ -48,6 +48,19 @@ type PermissionSet []PermissionRule
 
 // Resolve applies every matching rule monotonically. Rules can narrow authority but never restore it.
 func (p PermissionSet) Resolve(connectorID, operation string, capability action.Capability) Permission {
+	result := p.resolveOperation(connectorID, operation, capability)
+	// A thread contains individual messages. Adding thread reads must not
+	// bypass a pre-existing denial or review requirement on message content.
+	if operation == "gmail_thread_get" {
+		messagePermission := p.resolveOperation(connectorID, "gmail_get", capability)
+		if permissionRank(messagePermission, false) < permissionRank(result, false) {
+			result = messagePermission
+		}
+	}
+	return result
+}
+
+func (p PermissionSet) resolveOperation(connectorID, operation string, capability action.Capability) Permission {
 	write := action.RequiresFreshApproval(capability)
 	result := PermissionAllow
 	if write {

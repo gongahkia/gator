@@ -1,14 +1,29 @@
 package workapp
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/actionlog"
 )
+
+func TestRecoveredGmailEnvelopeSupportsRecipientListsWithoutPrivateContent(t *testing.T) {
+	entry := recoveryFixture("chat", "send-one")
+	entry.Action.Proposal.Preview = `{"to":["one@example.com","two@example.com"],"cc":["cc@example.com"],"bcc":["hidden@example.com"],"subject":"Team report","body":"private-body-sentinel","attachments":[{"source":"source/private-filename.bin"}]}`
+	receipt := projectRecoveredAction(entry)
+	if receipt.Recipient != "4 recipients (To 2, Cc 1, Bcc 1)" || receipt.Subject != "Team report" {
+		t.Fatal("rich envelope dropped during recovery", receipt)
+	}
+	data, _ := json.Marshal(receipt)
+	if strings.Contains(string(data), "private-body-sentinel") || strings.Contains(string(data), "private-filename") {
+		t.Fatal("private email content entered recovery projection")
+	}
+}
 
 func recoveryFixture(owner, id string) actionlog.Entry {
 	return actionlog.Entry{ID: id, ConversationID: owner, RunID: "run-one", StartedAt: time.Now(), Action: action.Record{Proposal: action.Proposal{ID: "action-one", ConnectorID: "google", Operation: "gmail_send", CorrelationID: id, Preview: `{"to":"one@example.com","subject":"Hello","body":"private"}`}, Status: action.Unknown, Error: "Original outcome unconfirmed"}}

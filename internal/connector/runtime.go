@@ -40,14 +40,15 @@ func (e HTTPStatusError) Error() string {
 // can review the proposal but can execute the payload only through Runtime,
 // which revalidates their binding before any network request.
 type PreparedAction struct {
-	Proposal       action.Proposal
-	descriptor     Descriptor
-	operation      Operation
-	target         string
-	payload        []byte // approval-bound payload, including any ETag
-	requestPayload []byte // endpoint-specific body, never exposed to the approver
-	ifMatch        string
-	googleSteps    []googlePreparedStep
+	Proposal         action.Proposal
+	descriptor       Descriptor
+	operation        Operation
+	target           string
+	payload          []byte // approval-bound payload, including any ETag
+	requestPayload   []byte // endpoint-specific body, never exposed to the approver
+	ifMatch          string
+	googleSteps      []googlePreparedStep
+	gmailAttachments []gmailAttachment
 }
 
 // ExecutionEvidence records what a provider returned after an action. A
@@ -77,6 +78,9 @@ type Runtime struct {
 	Credentials auth.Store
 	HTTPClient  *http.Client
 	Now         func() time.Time
+	// ResolveAttachment is a host-bound reader of this Work run's selected
+	// source/output/previous roots. It never accepts arbitrary local paths.
+	ResolveAttachment func(source string, maxBytes int64) ([]byte, error)
 	// OAuthRefreshPins bind unattended reads to the grant selected when a
 	// recurring job was created. The check occurs on the credential used for
 	// each request, rather than only at job startup.
@@ -174,6 +178,13 @@ func (r Runtime) PrepareAction(connectorID, operationID string, input json.RawMe
 			return PreparedAction{}, err
 		}
 	}
+	var gmailAttachments []gmailAttachment
+	if descriptor.Kind == KindGoogle && operation.ID == "gmail_send" {
+		payload, gmailAttachments, err = r.prepareGmailAttachments(payload)
+		if err != nil {
+			return PreparedAction{}, err
+		}
+	}
 	target := descriptor.Resource
 	requestPayload := append([]byte(nil), payload...)
 	ifMatch := ""
@@ -198,7 +209,7 @@ func (r Runtime) PrepareAction(connectorID, operationID string, input json.RawMe
 			if preconditionErr != nil {
 				return PreparedAction{}, preconditionErr
 			}
-			target, requestPayload, err = serviceAction(descriptor, operation.ID, preconditionPayload, correlationID)
+			target, requestPayload, err = serviceAction(descriptor, operation.ID, preconditionPayload, correlationID, gmailAttachments...)
 			if err != nil {
 				return PreparedAction{}, err
 			}
@@ -221,7 +232,7 @@ func (r Runtime) PrepareAction(connectorID, operationID string, input json.RawMe
 	}
 	return PreparedAction{
 		Proposal: proposal, descriptor: descriptor, operation: operation,
-		target: target, payload: append([]byte(nil), payload...), requestPayload: append([]byte(nil), requestPayload...), ifMatch: ifMatch, googleSteps: googleSteps,
+		target: target, payload: append([]byte(nil), payload...), requestPayload: append([]byte(nil), requestPayload...), ifMatch: ifMatch, googleSteps: googleSteps, gmailAttachments: gmailAttachments,
 	}, nil
 }
 
@@ -263,7 +274,7 @@ func (r Runtime) ExecutePreparedWithEvidence(ctx context.Context, mode action.Mo
 		return ExecutionEvidence{}, errors.New("prepared connector action payload does not match its proposal")
 	}
 	if descriptor.Kind == KindGoogle && operation.ID == "gmail_send" {
-		expected, err := prepareGmailMessage(prepared.payload, prepared.Proposal.CorrelationID)
+		expected, err := prepareGmailMessage(prepared.payload, prepared.Proposal.CorrelationID, prepared.gmailAttachments...)
 		if err != nil || !bytes.Equal(expected, prepared.requestPayload) {
 			return ExecutionEvidence{}, errors.New("prepared Gmail message does not match its reconciliation identity")
 		}
@@ -295,10 +306,15 @@ func (r Runtime) ExecutePreparedWithEvidence(ctx context.Context, mode action.Mo
 	evidence := ExecutionEvidence{ResponseSHA256: result.Provenance.SHA256}
 	if descriptor.Kind == KindGoogle && operation.ID == "gmail_send" {
 		var receipt struct {
-			ID string `json:"id"`
+			ID       string `json:"id"`
+			ThreadID string `json:"threadId"`
 		}
 		if err := json.Unmarshal(result.Data, &receipt); err != nil || !validGmailReceiptID(receipt.ID) {
 			return ExecutionEvidence{}, action.MarkUncertain(errors.New("Gmail accepted the send but returned no valid message ID; check Sent before trying again"))
+		}
+		input, _ := decodeGmailInput(prepared.payload)
+		if input.Reply != nil && receipt.ThreadID != input.Reply.ThreadID {
+			return ExecutionEvidence{}, action.MarkUncertain(errors.New("Gmail accepted the request but did not confirm the requested reply thread; inspect Sent before trying again"))
 		}
 		evidence.ReceiptID = receipt.ID
 		return evidence, nil
@@ -520,6 +536,12 @@ func serviceRead(descriptor Descriptor, operation string, input serviceInput) (s
 		}
 		path = "/gmail/v1/users/me/messages/" + url.PathEscape(input.ResourceID)
 		query.Set("format", "full")
+	case KindGoogle + "/gmail_thread_get":
+		if !validGmailReceiptID(input.ResourceID) {
+			return "", "", nil, errors.New("Gmail thread read requires a valid resource_id")
+		}
+		path = "/gmail/v1/users/me/threads/" + url.PathEscape(input.ResourceID)
+		query.Set("format", "full")
 	case KindAtlassian + "/jira_search":
 		path = "/rest/api/3/search/jql"
 		query.Set("jql", input.Query)
@@ -577,7 +599,7 @@ func serviceRead(descriptor Descriptor, operation string, input serviceInput) (s
 	return endpoint, method, body, nil
 }
 
-func serviceAction(descriptor Descriptor, operation string, payload []byte, correlationID string) (string, []byte, error) {
+func serviceAction(descriptor Descriptor, operation string, payload []byte, correlationID string, gmailAttachments ...gmailAttachment) (string, []byte, error) {
 	path := ""
 	switch descriptor.Kind + "/" + operation {
 	case KindSlack + "/post_message":
@@ -620,7 +642,7 @@ func serviceAction(descriptor Descriptor, operation string, payload []byte, corr
 		}
 		path, payload = "/v4/spreadsheets/"+url.PathEscape(id)+":batchUpdate", sanitized
 	case KindGoogle + "/gmail_send":
-		message, err := prepareGmailMessage(payload, correlationID)
+		message, err := prepareGmailMessage(payload, correlationID, gmailAttachments...)
 		if err != nil {
 			return "", nil, err
 		}
