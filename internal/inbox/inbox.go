@@ -26,30 +26,31 @@ const Version = 1
 var idPattern = regexp.MustCompile(`\A[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}\z`)
 
 type Entry struct {
-	NextStep             string    `json:"next_step,omitempty"`
-	Evidence             []string  `json:"evidence,omitempty"`
-	OriginConversationID string    `json:"origin_conversation_id,omitempty"`
-	AttemptID            string    `json:"attempt_id,omitempty"`
-	DeliveredAt          time.Time `json:"delivered_at,omitempty"`
-	ResolvedAt           time.Time `json:"resolved_at,omitempty"`
-	ResolutionVersion    uint64    `json:"resolution_version,omitempty"`
-	Version              int       `json:"version"`
-	ID                   string    `json:"id"`
-	Kind                 string    `json:"kind"`
-	Title                string    `json:"title"`
-	Summary              string    `json:"summary"`
-	JobID                string    `json:"job_id,omitempty"`
-	GoalID               string    `json:"goal_id,omitempty"`
-	ConversationID       string    `json:"conversation_id,omitempty"`
-	RevisionID           string    `json:"revision_id,omitempty"`
-	Status               string    `json:"status"`
-	Urgent               bool      `json:"urgent,omitempty"`
-	CreatedAt            time.Time `json:"created_at"`
-	ReadAt               time.Time `json:"read_at,omitempty"`
-	Rating               string    `json:"rating,omitempty"`
-	RatedAt              time.Time `json:"rated_at,omitempty"`
-	RatingVersion        uint64    `json:"rating_version,omitempty"`
-	DesktopNotifiedAt    time.Time `json:"desktop_notified_at,omitempty"`
+	DesktopDelivery      *DesktopDelivery `json:"desktop_delivery,omitempty"`
+	NextStep             string           `json:"next_step,omitempty"`
+	Evidence             []string         `json:"evidence,omitempty"`
+	OriginConversationID string           `json:"origin_conversation_id,omitempty"`
+	AttemptID            string           `json:"attempt_id,omitempty"`
+	DeliveredAt          time.Time        `json:"delivered_at,omitempty"`
+	ResolvedAt           time.Time        `json:"resolved_at,omitempty"`
+	ResolutionVersion    uint64           `json:"resolution_version,omitempty"`
+	Version              int              `json:"version"`
+	ID                   string           `json:"id"`
+	Kind                 string           `json:"kind"`
+	Title                string           `json:"title"`
+	Summary              string           `json:"summary"`
+	JobID                string           `json:"job_id,omitempty"`
+	GoalID               string           `json:"goal_id,omitempty"`
+	ConversationID       string           `json:"conversation_id,omitempty"`
+	RevisionID           string           `json:"revision_id,omitempty"`
+	Status               string           `json:"status"`
+	Urgent               bool             `json:"urgent,omitempty"`
+	CreatedAt            time.Time        `json:"created_at"`
+	ReadAt               time.Time        `json:"read_at,omitempty"`
+	Rating               string           `json:"rating,omitempty"`
+	RatedAt              time.Time        `json:"rated_at,omitempty"`
+	RatingVersion        uint64           `json:"rating_version,omitempty"`
+	DesktopNotifiedAt    time.Time        `json:"desktop_notified_at,omitempty"`
 }
 
 type RatingSummary struct {
@@ -318,6 +319,14 @@ func (s Store) RatingsForGoal(goalID string) (RatingSummary, error) {
 }
 
 func validateEntry(entry Entry) error {
+	if entry.DesktopDelivery != nil {
+		if err := entry.DesktopDelivery.validate(); err != nil {
+			return err
+		}
+		if (entry.DesktopDelivery.State == "handed_off") != !entry.DesktopNotifiedAt.IsZero() {
+			return errors.New("desktop handoff timestamp does not match delivery state")
+		}
+	}
 	if len(entry.NextStep) > 1024 || len(entry.Evidence) > 8 {
 		return errors.New("update evidence is too large")
 	}

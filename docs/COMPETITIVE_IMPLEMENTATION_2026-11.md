@@ -31,13 +31,13 @@ page](https://developers.openai.com/api/docs/models/gpt-5.6-sol) and
 | 5. Connected jobs | Complete calendar and email workflows, including threading, recipients, attachments, drafts, reviews, account scope, reconciliation and real-service acceptance | Open |
 | 6. Research | Reviewed public discovery beyond preselected sites, sensible shared budgets and in-task scope expansion; unknown-source research with provenance and network protections | Open |
 | 7. Browser | Bounded task/session permissions, private sign-in and useful session continuity; representative multi-page jobs with measured interruption count | Open |
-| 8. Delivery | Durable notification outcomes/retry/reconciliation, channel choices and mobile delivery; disconnect, OS failure and actual-device acceptance | Open |
+| 8. Delivery | Durable notification outcomes/retry/reconciliation, channel choices and mobile delivery; disconnect, OS failure and actual-device acceptance | In progress: bounded OS handoff retry verified locally |
 | 9. Conversation | Responsive questions and task routing during work, preserving owner-bound steering, approvals and resource limits | Open |
 | 10. Memory/adoption | Scalable scoped reconciliation, outage/ambiguity behavior, realistic accumulated profiles, multilingual history and reviewed competitor-data import | Open |
 | 11. Costs | Task/recurring money estimates, shared enforceable ceilings and visible unknown costs across model/search/delegation | Open |
 | 12. Deliverables | Representative template revisions and independently reviewed briefs, sheets and decks; factual/layout defects and repair time recorded | Open |
 | 13. Release/platform | Signed install/update/rollback lifecycle; supervisor drain/restart; acceptable Windows command isolation and native evidence | Open |
-| 14. Privacy/assurance | Precise threat/data-flow model, platform credential protection, and adversarial cross-tool/content evaluations before expanding authority | Open |
+| 14. Privacy/assurance | Precise threat/data-flow model, platform credential protection, and adversarial cross-tool/content evaluations before expanding authority | In progress: notification command text isolated from program source |
 | 15. Capability truth | Current shared capability descriptions for onboarding/help/model guidance; eliminate calendar contradictions and test user-visible claims | Open |
 
 Acceptance depending on provider registrations, signing identities, physical
@@ -114,6 +114,33 @@ multi-revision and retained-output reference regressions pass. Repository-wide
 verification is also running for the combined current changes and will be
 recorded separately. The live sequence tests real model/tool behavior but remains
 an engineer-authored synthetic responsibility, not a consumer success-rate study.
+
+### Notification handoff, bounded retry and command text (items 8 and 14)
+
+The production sender now records pending/failed/accepted OS handoff separately
+from chat delivery/read/resolution. Existing supervisor passes retry admitted
+unread/unresolved notices with backoff, current per-goal policy checks, per-entry
+leases and a five-attempt limit. Failed commands no longer mark handoff successful;
+historical unread entries are not newly admitted. Inbox details expose the state.
+The OS call does not hold the global inbox lock. Backup includes delivery state
+and excludes process locks. Legacy notification receipts remain readable.
+
+The old macOS command interpolated the model-authored summary into AppleScript.
+Fixed program source plus argv now keeps that text inert; Linux likewise places
+text after an option terminator. The same delivery path covers scheduled job
+results, manual job results and local plan-review reminders. See
+[notification delivery](NOTIFICATION_DELIVERY.md) for exact retry semantics,
+rollback behavior, platform limits and the possible duplicate after a crash
+between OS handoff and durable settlement.
+
+Validation: full inbox/lifecycle/workapp race suites pass. Focused race tests
+across those packages and the command adapter cover delivery, concurrent receipts,
+backoff/restart, retry exhaustion, backup, projection, goal-review policy and
+hostile-looking text through the native macOS argument parser. New backup and
+projection regressions also pass separately. No actual OS notification, real
+account action or paid model call was used for this slice. Physical display,
+mobile push, channel escalation, and new field layout in a running Electron app
+remain unverified. The broader items remain open.
 
 ## Additional user request
 

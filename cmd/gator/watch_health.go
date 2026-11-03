@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
@@ -54,13 +53,4 @@ func recordWatchHealthInbox(stateDir string, definition jobs.Definition, attempt
 		return inbox.Entry{}, nil
 	}
 	return entry, nil
-}
-
-func claimJobNotification(stateDir, entryID string) bool {
-	store, err := inbox.Open(stateDir)
-	if err != nil {
-		return false
-	}
-	claimed, err := store.ClaimDesktopNotification(entryID, time.Now())
-	return err == nil && claimed
 }

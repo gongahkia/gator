@@ -277,6 +277,9 @@ func backupContent(name string) bool {
 	if (strings.HasPrefix(rel, "work-history/") || strings.HasPrefix(rel, "goals/plans/")) && strings.HasSuffix(rel, ".lock") {
 		return false
 	}
+	if strings.HasPrefix(rel, "inbox/") && strings.HasSuffix(rel, ".lock") {
+		return false
+	}
 	if strings.HasPrefix(rel, "external-actions/") && (strings.HasSuffix(rel, ".lock") || strings.HasPrefix(path.Base(rel), ".gator-write-")) {
 		return false
 	}

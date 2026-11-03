@@ -68,3 +68,21 @@ func TestInboxFeedbackViewBindsRevisionEvenWhenAssessmentLooksIdentical(t *testi
 		t.Fatal("stale assessment changed feedback")
 	}
 }
+
+func TestInboxNotificationStatusDoesNotImplyDeliveredOrRead(t *testing.T) {
+	now := time.Now().UTC()
+	e := inbox.Entry{ID: "result-one", Kind: "job", Title: "Update", Status: "completed", CreatedAt: now,
+		DesktopDelivery: &inbox.DesktopDelivery{State: "failed", Attempts: 1, AttemptedAt: now, NextAttemptAt: now.Add(time.Minute)}}
+	m := New(Config{Inbox: []inbox.Entry{e}})
+	m.section, m.inboxDetail = "inbox", e.ID
+	panel := m.BridgeState().Panel
+	status := ""
+	for _, field := range panel.Summary {
+		if field.Label == "Desktop notification" {
+			status = field.Value
+		}
+	}
+	if !strings.Contains(status, "unconfirmed") || !strings.Contains(status, "retry") || !m.config.Inbox[0].ReadAt.IsZero() || !m.config.Inbox[0].DeliveredAt.IsZero() {
+		t.Fatal("failed handoff presented as delivery", status)
+	}
+}

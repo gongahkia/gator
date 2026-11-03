@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -17,7 +18,7 @@ func runDueGoalReviews(stateDir string, notify bool, now time.Time) {
 	runDueGoalReviewsWith(stateDir, notify, now, desktopNotification)
 }
 
-func runDueGoalReviewsWith(stateDir string, notify bool, now time.Time, deliver func(string, string)) {
+func runDueGoalReviewsWith(stateDir string, notify bool, now time.Time, deliver desktopSender) {
 	release, guardErr := state.Guard(stateDir, false)
 	if guardErr != nil {
 		return
@@ -73,7 +74,7 @@ func runDueGoalReviewsWith(stateDir string, notify bool, now time.Time, deliver 
 		}
 		entry, err := mailbox.Add(inbox.Entry{ID: id, Kind: "goal_review", Title: record.Title, Summary: summary, GoalID: record.ID, ConversationID: record.ConversationID, Status: "review_due"})
 		if err == nil && notify && record.Notifications.AllowsDesktop(now) {
-			deliver(entry.Title, entry.Summary)
+			_ = sendJobNotification(context.Background(), stateDir, entry.ID, now, deliver)
 		}
 	}
 }

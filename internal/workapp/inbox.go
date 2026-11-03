@@ -101,6 +101,7 @@ func (m Model) inboxDetailPanel() uisnapshot.Panel {
 		read = "Read"
 	}
 	p.Summary = []uisnapshot.Field{{Label: "Read status", Value: read}, {Label: "Rating", Value: valueOrDefault(entry.Rating, "Not rated")}}
+	p.Summary = append(p.Summary, uisnapshot.Field{Label: "Desktop notification", Value: entry.DesktopDeliveryStatus()})
 	p.Blocks = []uisnapshot.Block{{Title: "Retained update", Role: "content", Lines: []string{safeInboxText(entry.Summary)}},
 		{Title: "Result details", Collapsible: true, Lines: []string{read, "Rating: " + valueOrDefault(entry.Rating, "Not rated"),
 			fmt.Sprintf("Urgent: %t", entry.Urgent), "Result ID: " + entry.ID,

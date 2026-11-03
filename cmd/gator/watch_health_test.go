@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -44,7 +45,13 @@ func TestWatchHealthDeliveryDeduplicatesAcrossRestartAndRetainsQuietRecovery(t *
 	if e.ID == "" {
 		t.Fatal("first failure missing")
 	}
-	if !claimJobNotification(state, e.ID) || claimJobNotification(state, e.ID) {
+	callbacks := 0
+	for i := 0; i < 2; i++ {
+		if err := sendJobNotification(context.Background(), state, e.ID, time.Now(), func(context.Context, string, string) error { callbacks++; return nil }); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if callbacks != 1 {
 		t.Fatal("notification handoff not deduplicated")
 	}
 	if _, err := mailbox.Receipt("origin", e.ID, "resolve", 0, time.Now()); err != nil {

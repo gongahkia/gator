@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -67,7 +68,10 @@ func TestDueGoalReviewHonorsDesktopPolicyWithoutLosingInbox(t *testing.T) {
 	}
 	now, _ := time.Parse(time.RFC3339, "2026-10-18T00:00:00Z") // 08:00 Singapore
 	var delivered []string
-	visit := func(title, summary string) { delivered = append(delivered, title+": "+summary) }
+	visit := func(_ context.Context, title, summary string) error {
+		delivered = append(delivered, title+": "+summary)
+		return nil
+	}
 	setDue := func(name string, policy goal.NotificationPolicy) {
 		t.Helper()
 		record, err := goals.Add(name, "", t.TempDir())

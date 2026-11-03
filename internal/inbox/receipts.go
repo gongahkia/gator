@@ -20,6 +20,9 @@ func (s Store) ClaimDesktopNotification(entryID string, now time.Time) (bool, er
 	if err != nil {
 		return false, err
 	}
+	if entry.DesktopDelivery != nil {
+		return false, errors.New("tracked desktop delivery requires OS outcome settlement")
+	}
 	if !entry.DesktopNotifiedAt.IsZero() {
 		return false, nil
 	}

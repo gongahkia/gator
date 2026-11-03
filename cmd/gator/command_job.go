@@ -20,7 +20,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"runtime"
@@ -431,8 +430,8 @@ func manageJob(command, id string, arguments []string, out io.Writer) error {
 		}
 		entry, inboxErr := recordJobInbox(stateDir, definition, attempt)
 		settings, settingsErr := loadSettings()
-		if inboxErr == nil && settingsErr == nil && settings.Notifications.Desktop && entry.ID != "" && goalAllowsDesktopNotification(stateDir, definition.GoalID, time.Now(), entry.Urgent) && claimJobNotification(stateDir, entry.ID) {
-			desktopNotification(definition.Name, entry.Summary)
+		if inboxErr == nil && settingsErr == nil && settings.Notifications.Desktop && entry.ID != "" && goalAllowsDesktopNotification(stateDir, definition.GoalID, time.Now(), entry.Urgent) {
+			_ = sendJobNotification(context.Background(), stateDir, entry.ID, time.Now(), desktopNotification)
 		}
 		encoder := json.NewEncoder(out)
 		return encoder.Encode(attempt)
@@ -1031,6 +1030,9 @@ func runDueJobsContextWith(ctx context.Context, store jobs.Store, stateDir strin
 		return
 	}
 	defer release()
+	if notify {
+		retryJobNotifications(ctx, stateDir, now, desktopNotification)
+	}
 	definitions, err := store.List()
 	if err != nil {
 		return
@@ -1062,8 +1064,8 @@ func runDueJobsContextWith(ctx context.Context, store jobs.Store, stateDir strin
 			continue
 		}
 		entry, err := recordJobInbox(stateDir, claimed, attempt)
-		if err == nil && notify && entry.ID != "" && goalAllowsDesktopNotification(stateDir, claimed.GoalID, now, entry.Urgent) && claimJobNotification(stateDir, entry.ID) {
-			desktopNotification(claimed.Name, entry.Summary)
+		if err == nil && notify && entry.ID != "" && goalAllowsDesktopNotification(stateDir, claimed.GoalID, now, entry.Urgent) {
+			_ = sendJobNotification(ctx, stateDir, entry.ID, time.Now(), desktopNotification)
 		}
 	}
 }
@@ -1416,18 +1418,6 @@ func writePrivateFileAtomic(path string, contents []byte) error {
 	}
 	defer directory.Close()
 	return privatefs.SyncDir(directory)
-}
-
-func desktopNotification(name, status string) {
-	if runtime.GOOS == "darwin" {
-		_ = hostproc.Command("osascript", "-e", fmt.Sprintf(`display notification %q with title "Gator: %s"`, name, status)).Run()
-		return
-	}
-	if runtime.GOOS == "linux" {
-		if _, err := exec.LookPath("notify-send"); err == nil {
-			_ = hostproc.Command("notify-send", "Gator: "+status, name).Run()
-		}
-	}
 }
 
 func boundedJobError(value string) string {
