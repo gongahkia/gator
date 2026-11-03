@@ -94,8 +94,26 @@ privacy limits. Public reads preserve DNS pinning, private-address checks,
 credential separation, no automatic redirects and bounded responses. They do
 not establish semantic filtering of every possible private query or URL payload.
 
+A final range review against IANA also closed existing HTTP gaps for special
+purpose IPv6 and translated private IPv4. Literal discovery and DNS-resolved
+targets are tested before transport, with positive public IPv4/IPv6 controls.
+The well-known DNS64 `/96` prefix checks its embedded IPv4 destination rather
+than disabling public translation. Local-use translation, protocol-only and
+deprecated tunnel destinations remain excluded. This is focused network
+assurance for item 14, not a complete security certification.
+
+Validation: full `go test ./...` and `go vet ./...` pass (command package 232.7
+seconds). Full affected workrun/workapp/tools/artifact/orchestrator race suites
+pass; final evidence concurrency, scope/review and address-range regressions
+also pass separately. TypeScript, desktop runtime/UI builds and desktop/host
+tests pass with their two existing environment/platform skips. Product-guide
+text added after the broad build was additionally checked through its complete
+package and focused runtime/help checks. One broad run raced Playwright deleting
+its temporary output directory during Go package discovery; the full rerun
+after that test process completed passed. Existing UI build warnings remain.
+
 The user captured the initial engineering changes in intervening commits
-`61b6b60f4` and `7389df4e0`; those histories are preserved. Roll back the complete
+`61b6b60f4`, `7389df4e0` and `f07fbc673`; those histories are preserved. Roll back the complete
 research feature and its UI/prompt/test consumers together, including the
 follow-up verification commit. Historical optional manifest usage and interaction
 records grant no continuing access. README files remain untouched. Item 6 retains

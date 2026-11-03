@@ -105,6 +105,13 @@ Public scope preserves private/reserved-address rejection for IPv4/IPv6,
 mixed DNS responses, DNS-pinned connections, proxy-free transport and refusal to
 follow redirects. These protections were reviewed against the
 [OWASP SSRF guidance](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html).
+The address review also rejects special-purpose/tunnel destinations that a basic
+global-unicast check admits, including private IPv4 hidden in transition forms;
+see the [IANA IPv6 registry](https://www.iana.org/assignments/iana-ipv6-special-registry).
+Well-known `/96` DNS64 destinations validate the embedded IPv4 address, preserving
+public translation while rejecting private/loopback/metadata targets. Local-use
+translation prefixes, deprecated tunnels and protocol-only ranges are excluded;
+ordinary public IPv4/IPv6 and public IPv4-mapped addresses remain supported.
 This is not a complete guarantee against indirect disclosure: queries and URL
 paths chosen by the model leave the computer. The review says so and model
 guidance prohibits sharing private source content without user intent, but the

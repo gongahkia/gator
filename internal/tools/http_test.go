@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net"
 	"net/http"
@@ -177,6 +178,33 @@ func TestNormalizeHTTPURLAndPublicAddressValidation(t *testing.T) {
 }
 
 type staticResolver map[string][]net.IPAddr
+
+func TestPublicWebRejectsTranslatedAndSpecialPurposeDestinations(t *testing.T) {
+	for _, address := range []string{"192.88.99.1", "::192.168.1.1", "64:ff9b::7f00:1", "64:ff9b::a00:1", "64:ff9b::a9fe:a9fe", "64:ff9b::c000:201", "64:ff9b:1::1", "100::1", "100:0:0:1::1", "2001::1", "2001:2::1", "2002:7f00:1::1", "3fff::1", "5f00::1"} {
+		t.Run(address, func(t *testing.T) {
+			if isPublicHTTPAddress(net.ParseIP(address)) {
+				t.Fatal("special-purpose address admitted", address)
+			}
+			host := address
+			if strings.Contains(address, ":") {
+				host = "[" + address + "]"
+			}
+			if _, err := PublicHTTPURL("https://" + host + "/"); err == nil {
+				t.Fatal("discovery accepted literal unsafe target", address)
+			}
+			client := &fakeHTTPClient{status: 200, contentType: "text/plain", body: "must not be read"}
+			surface := HTTPTools(CommandPolicy{Sandbox: sandbox.Policy{Network: sandbox.AllowNetwork}, Approve: allowOnce}, HTTPFetchOptions{Client: client, Resolver: staticResolver{"transition.test": {{IP: net.ParseIP(address)}}}})
+			if _, err := surface[0].Execute(context.Background(), json.RawMessage(`{"url":"https://transition.test/"}`)); err == nil || client.calls != 0 {
+				t.Fatal("DNS transition target reached transport", address, err)
+			}
+		})
+	}
+	for _, address := range []string{"93.184.216.34", "2001:4860:4860::8888", "2606:4700:4700::1111", "::ffff:93.184.216.34", "64:ff9b::5db8:d822"} {
+		if !isPublicHTTPAddress(net.ParseIP(address)) {
+			t.Fatal("ordinary public destination rejected", address)
+		}
+	}
+}
 
 func (r staticResolver) LookupIPAddr(_ context.Context, host string) ([]net.IPAddr, error) {
 	addresses, found := r[host]

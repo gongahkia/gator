@@ -491,6 +491,13 @@ func isPublicHTTPAddress(address net.IP) bool {
 	if !ok {
 		return false
 	}
+	// The well-known /96 DNS64 prefix embeds its IPv4 destination in the
+	// final 32 bits. Preserve public DNS64 connectivity without accepting
+	// translated private, loopback, metadata or documentation destinations.
+	if netip.MustParsePrefix("64:ff9b::/96").Contains(parsed) {
+		translated := parsed.As16()
+		return isPublicHTTPAddress(net.IP(translated[12:]))
+	}
 	// Carrier-grade NAT, benchmarking, documentation, and future-reserved
 	// ranges are not public web targets even where IsGlobalUnicast is true.
 	for _, blocked := range privateHTTPPrefixes {
@@ -508,6 +515,7 @@ var privateHTTPPrefixes = []netip.Prefix{
 	netip.MustParsePrefix("169.254.0.0/16"),
 	netip.MustParsePrefix("192.0.0.0/24"),
 	netip.MustParsePrefix("192.0.2.0/24"),
+	netip.MustParsePrefix("192.88.99.0/24"), // Deprecated 6to4 relay space.
 	netip.MustParsePrefix("198.18.0.0/15"),
 	netip.MustParsePrefix("198.51.100.0/24"),
 	netip.MustParsePrefix("203.0.113.0/24"),
@@ -515,6 +523,17 @@ var privateHTTPPrefixes = []netip.Prefix{
 	netip.MustParsePrefix("240.0.0.0/4"),
 	netip.MustParsePrefix("::/128"),
 	netip.MustParsePrefix("::1/128"),
+	// Special-purpose/transition destinations are not ordinary public web
+	// hosts. Translation can otherwise conceal a private IPv4 destination.
+	// Reviewed against IANA's IPv6 special-purpose registry, 3 Nov 2026.
+	netip.MustParsePrefix("::/96"),
+	netip.MustParsePrefix("64:ff9b:1::/48"),
+	netip.MustParsePrefix("100::/64"),
+	netip.MustParsePrefix("100:0:0:1::/64"),
+	netip.MustParsePrefix("2001::/23"),
+	netip.MustParsePrefix("2002::/16"),
+	netip.MustParsePrefix("3fff::/20"),
+	netip.MustParsePrefix("5f00::/16"),
 	netip.MustParsePrefix("fc00::/7"),
 	netip.MustParsePrefix("fe80::/10"),
 	netip.MustParsePrefix("2001:db8::/32"),
