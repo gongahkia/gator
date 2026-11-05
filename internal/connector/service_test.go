@@ -18,6 +18,26 @@ import (
 	"github.com/gongahkia/gator/internal/auth"
 )
 
+func TestAtlassianCloudOperationsUseTheCorrectProductAndPinnedSite(t *testing.T) {
+	for _, base := range []string{"https://api.atlassian.com/ex/jira/site-123", "https://api.atlassian.com/ex/confluence/site-123"} {
+		d := Descriptor{Kind: KindAtlassian, Resource: base}
+		for _, operation := range []string{"jira_search", "jira_create", "confluence_search", "confluence_create"} {
+			product := "jira"
+			if strings.HasPrefix(operation, "confluence_") {
+				product = "confluence"
+			}
+			if got := serviceBase(d, operation); got != "https://api.atlassian.com/ex/"+product+"/site-123" {
+				t.Fatalf("%s used wrong cloud site or product: %s", operation, got)
+			}
+		}
+	}
+	for _, base := range []string{"https://team.atlassian.net", "http://127.0.0.1:1234", "https://api.atlassian.com.evil.example/ex/jira/site-123", "https://api.atlassian.com/ex/jira/site-123?custom=1"} {
+		if got := serviceBase(Descriptor{Kind: KindAtlassian, Resource: base}, "confluence_search"); got != base {
+			t.Fatalf("rewrote an unrelated configured endpoint: %s", got)
+		}
+	}
+}
+
 func TestGoogleActionEvidenceNamesAffectedResource(t *testing.T) {
 	for _, test := range []struct {
 		operation string

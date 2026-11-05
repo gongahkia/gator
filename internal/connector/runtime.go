@@ -696,6 +696,22 @@ func GmailSendTarget(descriptor Descriptor) (string, error) {
 
 func serviceBase(descriptor Descriptor, operation string) string {
 	base := strings.TrimRight(descriptor.Resource, "/")
+	if descriptor.Kind == KindAtlassian {
+		// A single approved cloud grant can cover Jira and Confluence. Keep
+		// the configured site ID, while using each product's documented API base.
+		parsed, err := url.Parse(base)
+		if err == nil && parsed.Scheme == "https" && parsed.Host == "api.atlassian.com" && parsed.RawQuery == "" {
+			parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+			if len(parts) == 3 && parts[0] == "ex" && (parts[1] == "jira" || parts[1] == "confluence") && parts[2] != "" {
+				if strings.HasPrefix(operation, "jira_") {
+					return "https://api.atlassian.com/ex/jira/" + parts[2]
+				}
+				if strings.HasPrefix(operation, "confluence_") {
+					return "https://api.atlassian.com/ex/confluence/" + parts[2]
+				}
+			}
+		}
+	}
 	if descriptor.Kind != KindGoogle || base != "https://www.googleapis.com" {
 		return base
 	}

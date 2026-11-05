@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"regexp"
 	"sort"
@@ -467,7 +468,10 @@ func connectorTestInvocation(descriptor connector.Descriptor) (string, []byte) {
 	case connector.KindGoogle:
 		return "drive_search", []byte(`{}`)
 	case connector.KindAtlassian:
-		return "jira_search", []byte(`{}`)
+		if resource, err := url.Parse(descriptor.Resource); err == nil && strings.HasPrefix(resource.Path, "/ex/confluence/") {
+			return "confluence_search", []byte(`{"query":"type = page","limit":1}`)
+		}
+		return "jira_search", []byte(`{"query":"updated >= -30d ORDER BY updated DESC","limit":1}`)
 	case connector.KindNotion:
 		return "search", []byte(`{}`)
 	case connector.KindRemoteMCP:

@@ -331,6 +331,7 @@ func (m Model) controlsPanel() uisnapshot.Panel {
 
 func controlReviewLabel(action, fallback string) string {
 	labels := map[string]string{"limits": "Save limits", "retention": "Save retention", "backup": "Export backup", "verify": "Verify backup",
+		"add-slack": "Connect Slack", "add-notion": "Connect Notion", "add-atlassian": "Connect Atlassian", "add-json": "Connect JSON API",
 		"restore-plan": "Preview restore", "relink-plan": "Preview source changes", "install": "Enable start at login", "remove": "Disable start at login",
 		"token": "Replace credentials", "finish-restore-review": "Mark setup reviewed"}
 	if label := labels[action]; label != "" {

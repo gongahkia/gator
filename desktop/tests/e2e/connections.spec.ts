@@ -28,12 +28,27 @@ test("native account setup reviews credentials, verifies access and returns to b
   await page.getByRole("button",{name:"Settings",exact:true}).click();
   await page.getByRole("button",{name:"Connection settings",exact:true}).click();
   await expect(page.getByRole("heading",{name:"Connections",exact:true})).toBeVisible();
-  await page.getByRole("button",{name:/^Advanced connections/}).click();
-  await page.getByRole("button",{name:"Add a service token connection",exact:true}).click();
-  await page.getByLabel("Connection ID",{exact:true}).fill("metrics");await page.getByLabel("Display name",{exact:true}).fill("Team metrics");await page.getByLabel("Service",{exact:true}).selectOption("http_json");await page.getByLabel("Resource URL",{exact:true}).fill(base+"/resource");
+  await expect(page.getByRole("button",{name:/^Advanced connections/})).toHaveCount(0);
+  for(const name of [/^Connect Google email/,/^Slack/,/^Notion/,/^Atlassian/]) {
+   const row=page.locator(".panel-row").filter({has:page.getByText(name).first()});
+   await expect(row).toBeVisible();
+   await expect.poll(()=>row.locator(".connection-logo img").evaluate((image:HTMLImageElement)=>image.complete&&image.naturalWidth>0)).toBe(true);
+   expect(await row.locator(".connection-logo img").getAttribute("src")).not.toMatch(/^https?:/);
+  }
+  await page.screenshot({path:"test-results/connections-services-dark.png"});
+  for(const name of ["Slack","Notion","Atlassian"]){
+   await page.locator(".panel-row").filter({has:page.getByText(name,{exact:true})}).click();
+   await expect(page.getByRole("heading",{name,exact:true})).toBeVisible();
+   await expect(page.getByRole("button",{name:`${name} setup guide`,exact:true})).toBeVisible();
+   await expect(page.getByLabel("Service",{exact:true})).toHaveCount(0);
+   if(name!=="Atlassian")await expect(page.getByLabel("Resource URL",{exact:true})).toHaveCount(0);
+   await page.locator(".workflow-footer").getByRole("button",{name:/^Cancel/}).click();
+  }
+  await page.locator(".panel-row").filter({has:page.getByText("JSON API",{exact:true})}).click();
+  await page.getByLabel("Connection ID",{exact:true}).fill("metrics");await page.getByLabel("Display name",{exact:true}).fill("Team metrics");await page.getByLabel("Resource URL",{exact:true}).fill(base+"/resource");
   const review=()=>page.getByRole("button",{name:/^Review/}).click();
   await review();expect(JSON.parse(await readFile(join(configRoot,"config.json"),"utf8")).connectors).toHaveLength(1);
-  await page.locator(".workflow-footer").getByRole("button",{name:/^Add a service token connection/}).click();
+  await page.locator(".workflow-footer").getByRole("button",{name:/^Connect JSON API/}).click();
   await page.getByRole("button",{name:"Set access token",exact:true}).click();await page.getByLabel("Access token",{exact:true}).fill("private-service-token");
   await review();expect(JSON.stringify(await state(page))).not.toContain("private-service-token");expect(reads).toBe(0);
   await page.locator(".workflow-footer").getByRole("button",{name:/^Replace credentials/}).click();

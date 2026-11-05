@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -74,6 +75,19 @@ func TestConnectorCommandTestsConfiguredJSONSourceWithoutPrintingData(t *testing
 	}
 	if !strings.Contains(output.String(), "is reachable") || !strings.Contains(output.String(), "sha256:") || strings.Contains(output.String(), "payload") {
 		t.Fatalf("connector test output = %q", output.String())
+	}
+}
+
+func TestConnectorAccessCheckUsesTheConfiguredAtlassianProduct(t *testing.T) {
+	for _, product := range []string{"jira", "confluence"} {
+		op, input := connectorTestInvocation(connector.Descriptor{Kind: connector.KindAtlassian, Resource: "https://api.atlassian.com/ex/" + product + "/site-123"})
+		var request struct {
+			Query string `json:"query"`
+			Limit int    `json:"limit"`
+		}
+		if op != product+"_search" || json.Unmarshal(input, &request) != nil || request.Query == "" || request.Limit != 1 {
+			t.Fatalf("wrong or unbounded %s access check: %s %s", product, op, input)
+		}
 	}
 }
 
