@@ -63,6 +63,7 @@ type Hint struct {
 }
 
 type Row struct {
+	Icon       string  `json:"icon,omitempty"`
 	Identity   string  `json:"identity,omitempty"`
 	Label      string  `json:"label"`
 	Group      string  `json:"group,omitempty"`

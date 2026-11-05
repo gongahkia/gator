@@ -246,7 +246,7 @@ test("composer model picker preserves drafts, changes actual defaults and honors
     await expect.poll(() => page.locator(".effort-fill").evaluate(element => { const fill = element.getBoundingClientRect(), track = element.parentElement!.getBoundingClientRect(); return Math.abs(fill.right - (track.left + track.width / 2)); })).toBeLessThan(1.5);
     await page.screenshot({ path: "test-results/model-picker-effort.png" });
     await dialog.getByRole("button", { name: "model-one", exact: true }).click();
-    await expect(dialog.getByRole("option", { name: /unavailable-model/ })).toBeDisabled();
+    await expect(dialog.getByRole("option", { name: /unavailable-model/ })).toHaveCount(0);
     await page.screenshot({ path: "test-results/model-picker-models.png" });
     const filter = dialog.getByRole("searchbox", { name: "Find a model" });
     await filter.fill("Careful");
@@ -290,7 +290,7 @@ test("composer model picker preserves drafts, changes actual defaults and honors
   } finally { release(); await f.close(); }
 });
 
-test("composer exposes missing provider setup and preserves the message until a usable model is selected", async () => {
+test("composer hides unconfigured selections and opens Settings while preserving the message", async () => {
   const f = await fixture();
   const configFile = join(f.directory, "config/gator/config.json");
   const config = JSON.parse(await readFile(configFile, "utf8"));
@@ -301,22 +301,21 @@ test("composer exposes missing provider setup and preserves the message until a 
   try {
     const app = await f.launch({ OPENCODE_API_KEY: "" }), page = await app.firstWindow();
     const trigger = page.getByRole("button", { name: /^Model and work effort:/ });
+    const configure = page.getByRole("button", { name: "Configure models in Settings", exact: true });
     const composer = page.getByRole("textbox", { name: "Message Gator", exact: true });
-    await expect(trigger).toHaveAccessibleName(/kimi-k2.7-code, Standard, OpenCode Zen, setup required/);
-    await expect(trigger).toContainText("OpenCode Zen · Setup required");
-    expect((await state(page)).composer?.model_issue).toContain("Set up this provider");
+    await expect(configure).toBeVisible();
+    await expect(trigger).toHaveCount(0);
+    await expect(page.locator(".composer-area")).not.toContainText("kimi-k2.7-code");
+    await expect(page.locator(".composer-area")).not.toContainText("OpenCode");
+    expect((await state(page)).composer?.models.some(choice => choice.provider === "opencode")).toBe(false);
+    expect((await state(page)).composer?.model_issue).toContain("Configure models in Settings");
     await composer.fill("What is my usage?");
     await app.evaluate(({ dialog }, file) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] }); }, file);
     await page.getByRole("button", { name: "Attach files", exact: true }).click();
     const attachment = page.getByRole("button", { name: "Remove attachment note.txt", exact: true });
     await expect(attachment).toBeVisible();
-    await trigger.click();
-    const picker = page.getByRole("dialog", { name: "Model and work effort", exact: true });
-    await expect(picker.getByText("OpenCode Zen", { exact: true })).toBeVisible();
-    await expect(picker.getByRole("status").filter({ hasText: "Set up this provider" })).toBeVisible();
-    await page.keyboard.press("Escape");
-    await page.screenshot({ path: "test-results/model-picker-setup-required.png" });
-    await page.getByRole("button", { name: "Send message", exact: true }).click();
+    await page.screenshot({ path: "test-results/model-picker-configure-settings.png" });
+    await configure.click();
     await page.getByRole("button", { name: /^Cloud API key/ }).click();
     await page.getByRole("searchbox", { name: "Filter models" }).fill("control-fixture");
     await page.getByRole("button", { name: /^control-fixture · model-one/ }).click();

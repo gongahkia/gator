@@ -277,8 +277,8 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .picker-trigger-model { min-width: 0; display: grid; text-align: left; }
 .picker-trigger-model > span, .picker-trigger-model > small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .picker-trigger-model > small { color: var(--color-muted); font-size: 10px; line-height: 1.4; }
-.model-picker-trigger[data-unavailable="true"] { box-shadow: inset 0 0 0 1px var(--color-warning); }
-.model-picker-trigger[data-unavailable="true"] .picker-trigger-model > small { color: var(--color-warning); }
+.picker-configure { text-align: left; line-height: 1.4; }
+.picker-configure > svg { flex-shrink: 0; }
 .picker-trigger-effort { flex-shrink: 0; white-space: nowrap; }
 .picker-trigger-chevron { transition: rotate 140ms ease-out; }
 .picker-trigger-chevron[data-open="true"] { rotate: 180deg; }
@@ -505,6 +505,9 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .panel-row strong { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .workflow[data-kind="inbox"] .panel-row p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .panel-row p { margin-top: 6px; color: var(--color-muted); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.panel-row-with-logo { padding-left: 64px; min-height: 76px; }
+.connection-logo { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; display: grid; place-items: center; border-radius: 8px; padding: 5px; background: #fff; color: #454545; box-shadow: inset 0 0 0 1px #00000012; }
+.connection-logo img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .panel-block { margin-top: 24px; }
 .panel-block h2 { color: var(--color-secondary); font-size: var(--text-ui); font-weight: 500; margin-bottom: 10px; }
 .panel-block p { font-size: var(--text-sm); color: var(--color-muted); line-height: 1.9; margin-top: 5px; }

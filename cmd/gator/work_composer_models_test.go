@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/config"
 )
 
@@ -34,14 +35,54 @@ func TestComposerModelsKeepAliasesSeparateFromIdentityAndHidePrivateConfiguratio
 			seenAlias = choice.Label == "Friendly model" && choice.Unavailable == ""
 		}
 		if choice.Provider == "locked" {
-			seenLocked = choice.Unavailable != ""
+			seenLocked = true
 		}
 	}
-	if !seenAlias || !seenLocked {
+	if !seenAlias || seenLocked {
 		t.Fatal("incorrect configured model metadata")
 	}
 	encoded, _ := json.Marshal(choices)
 	if strings.Contains(string(encoded), "private-endpoint") || strings.Contains(string(encoded), "GATOR_COMPOSER_TEST_KEY") {
 		t.Fatal("picker exposed private configuration")
 	}
+}
+
+func TestComposerModelsOmitUnconfiguredSavedSelection(t *testing.T) {
+	t.Setenv("OPENCODE_API_KEY", "")
+	store, err := config.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings := config.Default()
+	settings.Defaults = config.Defaults{Provider: "opencode", Model: "kimi-k2.7-code"}
+	if err := store.Save(settings); err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	choices, err := workComposerModels(store, stateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, choice := range choices {
+		if choice.Provider == "opencode" {
+			t.Fatal("saved defaults exposed an unconfigured provider in the picker")
+		}
+	}
+	credentials, err := auth.New(stateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := credentials.Put("opencode", auth.Credential{Type: "api_key", Key: "composer-fixture-key"}); err != nil {
+		t.Fatal(err)
+	}
+	choices, err = workComposerModels(store, stateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, choice := range choices {
+		if choice.Provider == "opencode" && choice.Model == "kimi-k2.7-code" && choice.Unavailable == "" {
+			return
+		}
+	}
+	t.Fatal("configured selection did not become available after setup")
 }

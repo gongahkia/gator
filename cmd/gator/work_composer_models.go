@@ -23,7 +23,7 @@ func workComposerModels(store config.Store, stateDir string) ([]workapp.Composer
 		return nil, err
 	}
 	choices := []workapp.ComposerModel{}
-	add := func(provider, name, unavailable string) {
+	add := func(provider, name string) {
 		for _, choice := range choices {
 			if choice.Provider == provider && choice.Model == name {
 				return
@@ -33,7 +33,7 @@ func workComposerModels(store config.Store, stateDir string) ([]workapp.Composer
 		if label == "" {
 			label = name
 		}
-		choices = append(choices, workapp.ComposerModel{Provider: provider, Model: name, Label: label, Unavailable: unavailable})
+		choices = append(choices, workapp.ComposerModel{Provider: provider, Model: name, Label: label})
 	}
 	for _, id := range model.Names() {
 		provider, err := model.ParseProvider(id)
@@ -47,27 +47,22 @@ func workComposerModels(store config.Store, stateDir string) ([]workapp.Composer
 		} else if found {
 			ready = credential.IsAPIKey() && !credential.Expired(time.Now())
 		}
-		if !ready && id != settings.Defaults.Provider {
+		if !ready {
 			continue
 		}
-		unavailable := ""
-		if !ready {
-			unavailable = "Set up this provider in Manage models."
-		}
 		for _, name := range model.CuratedModels(provider) {
-			add(id, name, unavailable)
+			add(id, name)
 		}
 		if id == settings.Defaults.Provider {
-			add(id, model.EffectiveModel(provider, settings.Defaults.Model), unavailable)
+			add(id, model.EffectiveModel(provider, settings.Defaults.Model))
 		}
 	}
 	for _, provider := range settings.CustomProviders {
-		unavailable := ""
 		if provider.APIKeyEnv != "" && strings.TrimSpace(os.Getenv(provider.APIKeyEnv)) == "" {
-			unavailable = "Set up this provider in Manage models."
+			continue
 		}
 		for _, name := range provider.Models {
-			add(provider.ID, name, unavailable)
+			add(provider.ID, name)
 		}
 	}
 	return choices, nil

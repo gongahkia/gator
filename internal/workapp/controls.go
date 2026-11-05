@@ -20,6 +20,8 @@ type ControlField struct {
 	Options      []uisnapshot.Option
 }
 type ControlAction struct {
+	Icon                            string
+	Links                           []uisnapshot.Link
 	Key, Label, Action, Description string
 	Detail, Command, GoalID, WorkID string
 	Family                          string
@@ -257,7 +259,7 @@ func (m Model) controlsPanel() uisnapshot.Panel {
 		p.Kind = "controls"
 	}
 	if f := m.controlForm; f != nil {
-		p = uisnapshot.Panel{Title: f.Label, Kind: "settings-form", Selected: m.controlField, Notice: m.sectionNotice, Subtitle: f.Description}
+		p = uisnapshot.Panel{Title: f.Label, Kind: "settings-form", Selected: m.controlField, Notice: m.sectionNotice, Subtitle: f.Description, Links: f.Links}
 		if m.controlReview {
 			p.Kind = "confirmation"
 			fields := []uisnapshot.Field{}
@@ -301,7 +303,7 @@ func (m Model) controlsPanel() uisnapshot.Panel {
 		return p
 	}
 	for _, a := range m.controlScreen.Actions {
-		row := uisnapshot.Row{Label: a.Label, Detail: a.Detail}
+		row := uisnapshot.Row{Label: a.Label, Detail: a.Detail, Icon: a.Icon}
 		if a.Action == "seen" || a.Action == "start" || a.Action == "retry" {
 			row.Affordance = "action"
 		}

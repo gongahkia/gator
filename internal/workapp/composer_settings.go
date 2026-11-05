@@ -61,7 +61,7 @@ func (m Model) composerModelIssue() string {
 			return choice.Unavailable
 		}
 	}
-	return "The selected model is unavailable. Open Manage models to choose a model."
+	return "Configure models in Settings before sending a message."
 }
 
 // ApplyComposerSettings reuses canonical defaults and task budgets. It never

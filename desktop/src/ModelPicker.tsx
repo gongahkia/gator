@@ -24,11 +24,10 @@ export function ModelPicker({ state, disabled, send, manage, onBusyChange }: Pro
   const owner = useRef({ state, disabled, send }); owner.current = { state, disabled, send };
   const id = useId();
   const settings = state.composer;
-  const choices = settings?.models ?? [];
-  const current = choices.find(choice => choice.provider === state.provider && choice.model === state.model);
-  const modelLabel = current?.label || state.model || "Choose model";
-  const providerName = state.provider ? providerLabel(state.provider) : "";
-  const modelIssue = settings?.model_issue;
+  const choices = (settings?.models ?? []).filter(choice => !choice.unavailable);
+  const current = !settings?.model_issue ? choices.find(choice => choice.provider === state.provider && choice.model === state.model) : undefined;
+  const modelLabel = current?.label || current?.model || "Choose model";
+  const providerName = current ? providerLabel(current.provider) : "";
   const effort = Math.max(0, efforts.indexOf(settings?.effort ?? "standard"));
   const locked = disabled || !!pending || !!settings?.disabled;
   const filtered = choices.filter(choice => `${choice.label} ${choice.model} ${providerLabel(choice.provider)}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
@@ -39,7 +38,7 @@ export function ModelPicker({ state, disabled, send, manage, onBusyChange }: Pro
   useEffect(() => { onBusyChange(!!pending); }, [pending, onBusyChange]);
   useEffect(() => () => onBusyChange(false), [onBusyChange]);
   useEffect(() => { setOpen(false); setIssue(""); }, [state.source, state.conversation_id]);
-  useEffect(() => { if (disabled) setOpen(false); }, [disabled]);
+  useEffect(() => { if (disabled || !current) setOpen(false); }, [disabled, current]);
   useEffect(() => {
     if (!pending) return;
     if (state.composer_result?.request_id === pending.id) {
@@ -134,12 +133,15 @@ export function ModelPicker({ state, disabled, send, manage, onBusyChange }: Pro
         </div>
         <p className="picker-effort-help">How much work Gator can do on a request.</p>
       </div>}
-      {(issue || modelIssue || settings?.issue || settings?.disabled) && <p className="picker-issue" role={issue ? "alert" : "status"}>{issue || modelIssue || settings?.issue || settings?.disabled}</p>}
+      {(issue || settings?.issue || settings?.disabled) && <p className="picker-issue" role={issue ? "alert" : "status"}>{issue || settings?.issue || settings?.disabled}</p>}
       <button className="picker-manage" disabled={!!pending || !!settings?.disabled || disabled} onClick={() => { close(false); manage(); }}><Settings2 size={15} />Manage models</button>
     </div>
   </div>;
+  if (!current) return <div ref={root} className="model-picker">
+    <button ref={trigger} className="model-picker-trigger picker-configure" disabled={locked} onClick={manage}><Settings2 size={16} /><span>Configure models in Settings</span></button>
+  </div>;
   return <div ref={root} className="model-picker">
-    <button ref={trigger} className="model-picker-trigger" data-unavailable={!!modelIssue} aria-label={`Model and work effort: ${modelLabel}, ${labels[effort]}${providerName ? `, ${providerName}` : ""}${modelIssue ? ", setup required" : ""}`} title={`${modelLabel}${providerName ? ` · ${providerName}` : ""} · ${labels[effort]} work effort${modelIssue ? ` · ${modelIssue}` : ""}`} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? id : undefined} disabled={disabled} onClick={() => { setView("effort"); setQuery(""); setOpen(!open); }}><Cpu size={16} /><span className="picker-trigger-model"><span>{modelLabel}</span>{providerName && <small>{providerName}{modelIssue ? " · Setup required" : ""}</small>}</span><span className="picker-trigger-effort">· {labels[effort]}</span><ChevronDown size={14} className="picker-trigger-chevron" data-open={open} /></button>
+    <button ref={trigger} className="model-picker-trigger" aria-label={`Model and work effort: ${modelLabel}, ${labels[effort]}${providerName ? `, ${providerName}` : ""}`} title={`${modelLabel}${providerName ? ` · ${providerName}` : ""} · ${labels[effort]} work effort`} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? id : undefined} disabled={disabled} onClick={() => { setView("effort"); setQuery(""); setOpen(!open); }}><Cpu size={16} /><span className="picker-trigger-model"><span>{modelLabel}</span>{providerName && <small>{providerName}</small>}</span><span className="picker-trigger-effort">· {labels[effort]}</span><ChevronDown size={14} className="picker-trigger-chevron" data-open={open} /></button>
     {createPortal(<Presence open={open}>{panel}</Presence>, root.current?.closest(".app-shell") ?? document.body)}
   </div>;
 }

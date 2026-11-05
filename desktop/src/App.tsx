@@ -432,7 +432,6 @@ export function App() {
           </div></div></div>
           {attachments.dragging && <p className="attachment-status" role="status">Drop files to attach to this message</p>}
           {(draftError || attachments.issue) && <p className="composer-error" role="alert">{draftError || attachments.issue}</p>}
-          {!state.running && state.composer?.model_issue && <p className="composer-error" role="status">{state.composer.model_issue}</p>}
           {queueFull && <p className="composer-error" role="status">Queue full. Edit or remove a message to make room.</p>}
         </div>
       </>}

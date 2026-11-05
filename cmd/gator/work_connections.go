@@ -52,6 +52,15 @@ func (c *connectionControls) call(ctx context.Context, operation string, args []
 	}
 	switch operation {
 	case "status", "select":
+	case "add-slack", "add-notion", "add-atlassian", "add-json":
+		d, err := serviceConnectionDescriptor(operation, args)
+		if err != nil {
+			return workapp.ControlScreen{}, err
+		}
+		if err := addNativeConnection(d); err != nil {
+			return workapp.ControlScreen{}, err
+		}
+		id, notice = d.ID, "Connection added. Set its access token, then check access."
 	case "add-google", "add-google-bundled":
 		if operation == "add-google-bundled" {
 			if !bundledGoogleAvailable() || len(args) != 2 {
@@ -292,14 +301,13 @@ func (c *connectionControls) screen(id string) (workapp.ControlScreen, error) {
 			if err != nil {
 				detail = "Credential status unavailable"
 			}
-			screen.Actions = append(screen.Actions, workapp.ControlAction{Label: d.Name, Detail: detail, Action: "select", Args: []string{d.ID}})
+			screen.Actions = append(screen.Actions, workapp.ControlAction{Label: d.Name, Icon: d.Kind, Detail: connectionServiceLabel(d.Kind) + " · " + detail, Action: "select", Args: []string{d.ID}})
 		}
 		if status.ID != "" && !status.Done {
 			screen.Panel.Notice = "A browser sign-in is waiting. Open its connection to continue or cancel."
 		}
 		screen.Actions = append(screen.Actions,
-			workapp.ControlAction{Key: "G", Label: "Connect Google email", Action: "add-google", Description: "Read email. This setup requires your own Google Cloud desktop OAuth client; Gator does not yet provide a managed Google sign-in app. You will sign in after saving, and choose access per chat or follow-up.", Review: true, Fields: []workapp.ControlField{{Label: "Connection ID", Value: "google", Help: "A unique lowercase name, for example google-personal."}, {Label: "Display name", Value: "Google"}, {Label: "Desktop OAuth client ID", Help: "From a Google Cloud OAuth client of type Desktop app. No client secret here."}}},
-			workapp.ControlAction{Key: "T", Label: "Add a service token connection", Action: "add-token", Description: "For an existing Slack, Notion, Atlassian or JSON API account. Add the service and resource first, then enter its token privately.", Review: true, Fields: []workapp.ControlField{{Label: "Connection ID"}, {Label: "Display name"}, {Label: "Service", Kind: "select", Value: connector.KindHTTPJSON, Options: []uisnapshot.Option{{Value: connector.KindHTTPJSON, Label: "JSON API"}, {Value: connector.KindSlack, Label: "Slack"}, {Value: connector.KindNotion, Label: "Notion"}, {Value: connector.KindAtlassian, Label: "Atlassian"}}}, {Label: "Resource URL", Help: "The HTTPS API resource for this account. Do not include tokens in the URL."}}},
+			workapp.ControlAction{Key: "G", Label: "Connect Google email", Icon: connector.KindGoogle, Detail: "Read Gmail and optionally enable reviewed email sending.", Action: "add-google", Description: "Read email. This setup requires your own Google Cloud desktop OAuth client; Gator does not yet provide a managed Google sign-in app. You will sign in after saving, and choose access per chat or follow-up.", Links: []uisnapshot.Link{{Label: "Google desktop sign-in guide", URL: "https://developers.google.com/identity/protocols/oauth2/native-app"}}, Review: true, Fields: []workapp.ControlField{{Label: "Connection ID", Value: "google", Help: "A unique lowercase name, for example google-personal."}, {Label: "Display name", Value: "Google"}, {Label: "Desktop OAuth client ID", Help: "From a Google Cloud OAuth client of type Desktop app. No client secret here."}}},
 			workapp.ControlAction{Key: "R", Label: "Refresh", Action: "status"})
 		if bundledGoogleAvailable() {
 			for i := range screen.Actions {
@@ -312,26 +320,7 @@ func (c *connectionControls) screen(id string) (workapp.ControlScreen, error) {
 			screen.Actions = append([]workapp.ControlAction{bundledGoogleAction()}, screen.Actions...)
 		}
 		screen.Panel.Blocks = []uisnapshot.Block{{Title: "Access stays scoped", Lines: []string{"Connecting an account makes it available. Choose it in chat settings or a follow-up agreement before Gator uses it.", "You can start with a message or attached file without connecting any accounts."}}}
-		if id == "@advanced" {
-			screen.Panel.Title = "Advanced connections"
-			screen.Panel.BackLabel = "Back to connections"
-			screen.Panel.Subtitle = "Bring your own service token and exact API resource. Existing access policies and action approvals still apply."
-			actions := []workapp.ControlAction{}
-			for _, a := range screen.Actions {
-				if a.Action == "add-token" {
-					actions = append(actions, a)
-				}
-			}
-			screen.Actions = actions
-		} else {
-			actions := []workapp.ControlAction{}
-			for _, a := range screen.Actions {
-				if a.Action != "add-token" {
-					actions = append(actions, a)
-				}
-			}
-			screen.Actions = append(actions, workapp.ControlAction{Key: "T", Label: "Advanced connections", Detail: "Slack, Notion, Atlassian and JSON APIs · bring your own credentials", Action: "select", Args: []string{"@advanced"}})
-		}
+		screen.Actions = append(screen.Actions, serviceConnectionActions()...)
 		return screen, nil
 	}
 	d, credentials, err := configuredConnector(id)
