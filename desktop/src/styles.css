@@ -141,8 +141,7 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .status-dot[data-tone="muted"] { background: var(--color-muted); }
 .status-dot[data-tone="warning"] { background: var(--color-warning); }
 .status-dot[data-tone="error"] { background: var(--color-danger); }
-.gator-logo { flex-shrink: 0; display: inline-flex; width: 35px; height: 35px; align-items: center; justify-content: center; font-size: 25px; line-height: 1; }
-.gator-logo.small { width: 28px; height: 28px; font-size: 21px; }
+.gator-logo { flex-shrink: 0; display: inline-block; width: 35px; height: 35px; object-fit: contain; user-select: none; }
 .boot-screen { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 40px; text-align: center; }
 .boot-screen h1 { font-size: 22px; font-weight: 500; }
 .boot-screen p { max-width: 480px; color: var(--color-muted); }
@@ -238,7 +237,7 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .home-scroll { display: flex; align-items: center; }
 .home-content { position: relative; max-width: 700px; margin: auto; padding: 32px 48px; text-align: center; }
 .home-art { position: relative; display: grid; place-items: center; width: min(100%, 460px); height: 138px; margin: 0 auto 14px; }
-.home-art > .gator-logo { position: relative; width: 48px; height: 48px; font-size: 36px; }
+.home-art > .gator-logo { position: relative; width: 48px; height: 48px; }
 .ascii-waves { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; user-select: none; color: var(--color-accent); mask-image: radial-gradient(ellipse 58% 46% at 50% 52%, transparent 0%, transparent 45%, #000 100%), linear-gradient(to bottom, transparent, #000 16%, #000 80%, transparent); mask-composite: intersect; }
 .home-content > p { color: var(--color-muted); margin-top: 12px; line-height: 1.7; }
 .home-content .setup-callout { margin: 24px 0 0; text-align: left; }
@@ -275,7 +274,11 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .model-picker { min-width: 0; max-width: 240px; }
 .model-picker-trigger { display: flex; align-items: center; gap: 6px; min-height: 40px; max-width: 100%; padding: 6px 10px; border: 0; border-radius: 999px; background: transparent; color: var(--color-muted); box-shadow: inset 0 0 0 1px var(--color-line); font-size: var(--text-xs); }
 .model-picker-trigger:hover, .model-picker-trigger[aria-expanded="true"] { background: var(--color-hover); color: var(--color-contrast); }
-.picker-trigger-model { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker-trigger-model { min-width: 0; display: grid; text-align: left; }
+.picker-trigger-model > span, .picker-trigger-model > small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker-trigger-model > small { color: var(--color-muted); font-size: 10px; line-height: 1.4; }
+.model-picker-trigger[data-unavailable="true"] { box-shadow: inset 0 0 0 1px var(--color-warning); }
+.model-picker-trigger[data-unavailable="true"] .picker-trigger-model > small { color: var(--color-warning); }
 .picker-trigger-effort { flex-shrink: 0; white-space: nowrap; }
 .picker-trigger-chevron { transition: rotate 140ms ease-out; }
 .picker-trigger-chevron[data-open="true"] { rotate: 180deg; }
@@ -306,6 +309,7 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .picker-model-select { display: flex; align-items: center; justify-content: center; gap: 7px; margin: 0 auto; padding: 7px 9px; min-height: 40px; max-width: 100%; border: 0; border-radius: 8px; background: transparent; color: var(--color-muted); }
 .picker-model-select span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .picker-model-select:hover { color: var(--color-contrast); background: var(--color-hover); }
+.picker-provider { color: var(--color-muted); font-size: var(--text-xs); }
 .effort-slider { position: relative; height: 44px; margin: 8px 0 0; }
 .effort-track { position: absolute; inset: 8px 0; overflow: hidden; border-radius: 999px; background: var(--color-hover); box-shadow: inset 0 0 0 1px var(--color-line); }
 .effort-fill { position: absolute; inset: 0; transform-origin: left; transform: scaleX(var(--effort-position)); background: var(--color-accent); transition: transform 200ms cubic-bezier(.2, 0, 0, 1); }
@@ -698,7 +702,7 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .draft-manager footer { border-top: 1px solid var(--color-line); padding-top: 16px; flex-wrap: wrap; }
 .update-dialog { width: min(470px, calc(100vw - 40px)); }
 .update-identity { display: flex; align-items: center; gap: 14px; padding: 25px 0; }
-.update-identity > span { font-size: 32px; line-height: 1; }
+.update-identity > .gator-logo { width: 40px; height: 40px; }
 .update-identity strong { font-size: 18px; font-weight: 500; }
 .update-identity p, .update-status > span { font-size: var(--text-sm); color: var(--color-muted); }
 .update-status { display: grid; gap: 5px; margin-bottom: 14px; }
@@ -852,7 +856,8 @@ kbd { display: inline-flex; align-items: center; color: var(--color-muted); font
 .activity-tool-state { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; font-size: var(--text-xs); }
 .activity-note { display: flex; align-items: center; gap: 8px; margin: 10px 0; color: var(--color-muted); font-size: var(--text-sm); }
 .activity-shimmer { background: linear-gradient(110deg, var(--color-muted) 35%, var(--color-contrast) 48%, var(--color-muted) 61%) 120% 0 / 260% 100%; background-clip: text; -webkit-text-fill-color: transparent; animation: activity-shimmer 2.6s linear infinite; }
-.gator-working-mark { display: inline-grid; place-items: center; flex-shrink: 0; font-size: 20px; width: 24px; height: 24px; animation: gator-working 2.8s ease-in-out infinite; }
+.gator-working-mark { display: inline-grid; place-items: center; flex-shrink: 0; width: 24px; height: 24px; animation: gator-working 2.8s ease-in-out infinite; }
+.gator-working-mark > .gator-logo { width: 100%; height: 100%; }
 .gator-working-mark[data-attention="true"] { animation: none; opacity: .7; }
 @keyframes activity-shimmer { to { background-position: -120% 0; } }
 @keyframes gator-working { 0%, 100% { opacity: .55; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-2px); } }

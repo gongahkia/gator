@@ -18,11 +18,12 @@ type ComposerModel struct {
 }
 
 type ComposerSettings struct {
-	ID       string          `json:"id"`
-	Effort   string          `json:"effort"`
-	Models   []ComposerModel `json:"models"`
-	Issue    string          `json:"issue,omitempty"`
-	Disabled string          `json:"disabled,omitempty"`
+	ID         string          `json:"id"`
+	Effort     string          `json:"effort"`
+	Models     []ComposerModel `json:"models"`
+	ModelIssue string          `json:"model_issue,omitempty"`
+	Issue      string          `json:"issue,omitempty"`
+	Disabled   string          `json:"disabled,omitempty"`
 }
 
 type ComposerAction struct {
@@ -40,15 +41,27 @@ type ComposerResult struct {
 }
 
 func (m Model) composerSettings() ComposerSettings {
-	state := ComposerSettings{Effort: effortName(m.options.MaxSteps), Models: append([]ComposerModel{}, m.composerModels...), Issue: m.composerModelsIssue}
+	state := ComposerSettings{Effort: effortName(m.options.MaxSteps), Models: append([]ComposerModel{}, m.composerModels...), ModelIssue: m.composerModelIssue(), Issue: m.composerModelsIssue}
 	if m.running || len(m.queue) > 0 {
 		state.Disabled = "Available after current and queued work finishes."
 	} else if m.models != nil || m.launcher || m.section != "" || m.bridgeExternal != nil || m.pendingBundleAction != nil || m.controlBusy || m.recallBusy {
 		state.Disabled = "Return to the conversation to change these settings."
 	}
-	data, _ := json.Marshal([]any{m.source, m.conversation, m.modelStatus.Provider, m.modelStatus.Model, state.Effort, state.Models, state.Issue, state.Disabled})
+	data, _ := json.Marshal([]any{m.source, m.conversation, m.modelStatus.Provider, m.modelStatus.Model, state.Effort, state.Models, state.ModelIssue, state.Issue, state.Disabled})
 	state.ID = fmt.Sprintf("%x", sha256.Sum256(data))
 	return state
+}
+
+func (m Model) composerModelIssue() string {
+	if m.config.ComposerModels == nil || m.modelStatus.Provider == "" {
+		return ""
+	}
+	for _, choice := range m.composerModels {
+		if choice.Provider == m.modelStatus.Provider && choice.Model == m.modelStatus.Model {
+			return choice.Unavailable
+		}
+	}
+	return "The selected model is unavailable. Open Manage models to choose a model."
 }
 
 // ApplyComposerSettings reuses canonical defaults and task budgets. It never

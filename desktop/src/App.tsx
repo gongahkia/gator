@@ -35,6 +35,7 @@ import { OutputCards } from "./OutputCards";
 import { bundleOutputs, conversationBundles } from "./conversationOutputs";
 import { DesktopHelp } from "./DesktopHelp";
 import { UpdateDialog } from "./UpdateDialog";
+import { Logo } from "./Logo";
 import { AsciiWaves } from "./AsciiWaves";
 import { ActivityHistory, LiveActivity } from "./ActivityTimeline";
 import { AttachButton, InputFiles, PendingAttachments, useAttachmentPicker } from "./Attachments";
@@ -50,10 +51,6 @@ import type { UploadedFile } from "./bridge";
 import { shortcutMatches, shortcutLabel } from "./shortcuts";
 
 type Navigation = { command: string; draft?: string } | { conversation: NonNullable<DesktopFrame["conversation"]> } | { session: string };
-
-function Logo({ small = false }: { small?: boolean }) {
-  return <span className={`gator-logo ${small ? "small" : ""}`} aria-hidden="true">🐊</span>;
-}
 
 function useBackend() {
   const [snapshot, setSnapshot] = useState<DesktopSnapshot>({});
@@ -347,7 +344,7 @@ export function App() {
     if (guide && planChoice.context === drafts.context && planChoice.enabled) { setDraftError("Send Plan first as a new request or queued follow-up, rather than steering current work."); return; }
     if (drafts.replyToUpdateID && (guide || draft.trimStart().startsWith("/"))) { setDraftError("Send this update reply as a message or queued follow-up."); return; }
     if (drafts.uploads.length && (guide || draft.trimStart().startsWith("/"))) { setDraftError("Send attachments with a message or queued follow-up."); return; }
-    if (!state.running && !state.provider && !draft.trimStart().startsWith("/")) { navigate("/model"); return; }
+    if (!state.running && (!state.provider || state.composer?.model_issue) && !draft.trimStart().startsWith("/")) { navigate("/model"); return; }
     setSending(true);
     setDraftError("");
     const files = drafts.uploads, context = drafts.context!;
@@ -435,6 +432,7 @@ export function App() {
           </div></div></div>
           {attachments.dragging && <p className="attachment-status" role="status">Drop files to attach to this message</p>}
           {(draftError || attachments.issue) && <p className="composer-error" role="alert">{draftError || attachments.issue}</p>}
+          {!state.running && state.composer?.model_issue && <p className="composer-error" role="status">{state.composer.model_issue}</p>}
           {queueFull && <p className="composer-error" role="status">Queue full. Edit or remove a message to make room.</p>}
         </div>
       </>}

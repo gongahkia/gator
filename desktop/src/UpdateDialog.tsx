@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { UpdateRequest, UpdateState } from "./bridge";
 import { useModalFocus } from "./useModalFocus";
 import type { PresenceRef } from "./motion";
+import { Logo } from "./Logo";
 
 export function UpdateDialog({ open, presenceRef, state, blocked, close }: { open: boolean; presenceRef: PresenceRef; state: UpdateState; blocked: string; close(): void }) {
   const focus = useModalFocus(open);
@@ -20,7 +21,7 @@ export function UpdateDialog({ open, presenceRef, state, blocked, close }: { ope
   return <div ref={presenceRef} className="modal-backdrop" data-open={open} inert={!open} aria-hidden={!open} onClick={() => { if (phase !== "installing") close(); }}>
     <section ref={focus} className="draft-manager update-dialog" role="dialog" aria-modal="true" aria-labelledby="update-title" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => { event.stopPropagation(); if (event.key === "Escape" && phase !== "installing") { event.preventDefault(); close(); } }}>
       <header><h2 id="update-title">About &amp; updates</h2><button className="icon-button" aria-label="Close updates" disabled={phase === "installing"} onClick={close}><X size={18} /></button></header>
-      <div className="update-identity"><span aria-hidden="true">🐊</span><div><strong>Gator</strong><p>Version {state.installed}</p></div></div>
+      <div className="update-identity"><Logo /><div><strong>Gator</strong><p>Version {state.installed}</p></div></div>
       <div className="update-status" role="status" aria-live="polite"><strong>{pending && <LoaderCircle className="spin" size={15} />}{label}</strong>{state.version && <span>Version {state.version}</span>}</div>
       {phase === "downloading" && <div className="update-progress"><progress aria-label="Update download" value={state.percent ?? 0} max={100} /><span>{state.percent ?? 0}%</span></div>}
       {state.reason && <p className="muted">{state.reason}</p>}

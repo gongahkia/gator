@@ -3,6 +3,7 @@ import { Check, ChevronDown, CircleAlert, CircleDashed, Clock3, LoaderCircle, Wr
 import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { ActivityEntry, BackendActivity } from "./protocol";
 import { Markdown } from "./Result";
+import { Logo } from "./Logo";
 
 function duration(trace: BackendActivity) {
   const milliseconds = Date.parse(trace.finished_at || "") - Date.parse(trace.started_at);
@@ -77,6 +78,6 @@ export function ActivityHistory({ trace }: { trace: BackendActivity }) {
 export function LiveActivity({ trace, status, elapsed, attention }: { trace?: BackendActivity; status: string; elapsed?: string; attention: boolean }) {
   return <section className="live-activity" aria-label="Gator activity">
     {trace && <Entries trace={trace} />}
-    <div className="run-progress" role="status"><span className="gator-working-mark" data-attention={attention} aria-hidden="true">🐊</span><span className={attention ? undefined : "activity-shimmer"}>{status}</span><span className="elapsed">{elapsed}</span></div>
+    <div className="run-progress" role="status"><span className="gator-working-mark" data-attention={attention} aria-hidden="true"><Logo /></span><span className={attention ? undefined : "activity-shimmer"}>{status}</span><span className="elapsed">{elapsed}</span></div>
   </section>;
 }

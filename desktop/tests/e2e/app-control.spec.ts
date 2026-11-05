@@ -55,7 +55,7 @@ async function fixture(waitForReply?: Promise<void>, waitForVoice?: () => Promis
   let application: ElectronApplication | undefined;
   return {
     directory, payloads, voiceRequests: () => voiceRequests,
-    async launch() { const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE; application = await launchDesktop({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env }); return application; },
+    async launch(overrides: Record<string, string> = {}) { const executablePath = process.env.GATOR_DESKTOP_TEST_EXECUTABLE; application = await launchDesktop({ executablePath, args: executablePath ? [] : ["."], cwd: resolve("."), env: { ...env, ...overrides } }); return application; },
     async close() { try { if (application) await closeDesktop(application); } finally { server.closeAllConnections(); await new Promise<void>(done => server.close(() => done())); await rm(directory, { recursive: true, force: true }); } },
   };
 }
@@ -288,6 +288,51 @@ test("composer model picker preserves drafts, changes actual defaults and honors
     release(); await expect.poll(async () => (await page.evaluate(() => window.gator!.snapshot())).state!.running).toBe(false);
     expect(errors).toEqual([]);
   } finally { release(); await f.close(); }
+});
+
+test("composer exposes missing provider setup and preserves the message until a usable model is selected", async () => {
+  const f = await fixture();
+  const configFile = join(f.directory, "config/gator/config.json");
+  const config = JSON.parse(await readFile(configFile, "utf8"));
+  config.defaults = { provider: "opencode", model: "kimi-k2.7-code" };
+  await writeFile(configFile, JSON.stringify(config), { mode: 0o600 });
+  const file = join(f.directory, "note.txt");
+  await writeFile(file, "Keep this attachment while configuring a model.");
+  try {
+    const app = await f.launch({ OPENCODE_API_KEY: "" }), page = await app.firstWindow();
+    const trigger = page.getByRole("button", { name: /^Model and work effort:/ });
+    const composer = page.getByRole("textbox", { name: "Message Gator", exact: true });
+    await expect(trigger).toHaveAccessibleName(/kimi-k2.7-code, Standard, OpenCode Zen, setup required/);
+    await expect(trigger).toContainText("OpenCode Zen · Setup required");
+    expect((await state(page)).composer?.model_issue).toContain("Set up this provider");
+    await composer.fill("What is my usage?");
+    await app.evaluate(({ dialog }, file) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] }); }, file);
+    await page.getByRole("button", { name: "Attach files", exact: true }).click();
+    const attachment = page.getByRole("button", { name: "Remove attachment note.txt", exact: true });
+    await expect(attachment).toBeVisible();
+    await trigger.click();
+    const picker = page.getByRole("dialog", { name: "Model and work effort", exact: true });
+    await expect(picker.getByText("OpenCode Zen", { exact: true })).toBeVisible();
+    await expect(picker.getByRole("status").filter({ hasText: "Set up this provider" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await page.screenshot({ path: "test-results/model-picker-setup-required.png" });
+    await page.getByRole("button", { name: "Send message", exact: true }).click();
+    await page.getByRole("button", { name: /^Cloud API key/ }).click();
+    await page.getByRole("searchbox", { name: "Filter models" }).fill("control-fixture");
+    await page.getByRole("button", { name: /^control-fixture · model-one/ }).click();
+    await page.getByRole("button", { name: "Back to app", exact: true }).click();
+    await expect(trigger).toHaveAccessibleName(/model-one, Standard, control fixture$/);
+    expect((await state(page)).composer?.model_issue).toBeUndefined();
+    await expect(composer).toHaveValue("What is my usage?");
+    await expect(attachment).toBeVisible();
+    expect(f.payloads).toHaveLength(0);
+    expect((await state(page)).messages).toHaveLength(0);
+    await page.getByRole("button", { name: "Send message", exact: true }).click();
+    await expect.poll(() => f.payloads.length).toBeGreaterThan(0);
+    expect(f.payloads[0].model).toBe("model-one");
+    await expect.poll(async () => (await state(page)).running).toBe(false);
+    expect((await state(page)).messages.some(message => message.result?.title === "Work failed")).toBe(false);
+  } finally { await f.close(); }
 });
 
 test("local voice setup offers explicit model download and converts browser audio without cloud fallback", async () => {

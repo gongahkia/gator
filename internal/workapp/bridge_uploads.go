@@ -63,6 +63,16 @@ func (m Model) SubmitBridgeUploads(request BridgeUploadSubmission) (tea.Model, t
 		}
 		return m, nil
 	}
+	if !m.running {
+		previous := m.modelStatus
+		m.refreshModelStatus()
+		if previous.Provider != m.modelStatus.Provider || previous.Model != m.modelStatus.Model {
+			return fail("The selected model changed. Review the model picker before sending again.")
+		}
+		if issue := m.composerModelIssue(); issue != "" {
+			return fail(issue)
+		}
+	}
 	if m.running && len(m.queue) >= 16 {
 		return fail("The queue is full. Remove a message before adding another.")
 	}
