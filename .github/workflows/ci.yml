@@ -25,13 +25,21 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: desktop/package-lock.json
-      - name: Check desktop frontend and host
+          cache-dependency-path: |
+            app-host/package-lock.json
+            companion/package-lock.json
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: ui/.bun-version
+      - name: Check terminal frontend and host
         run: |
           npm ci --prefix app-host
-          npm ci --prefix desktop
-          npm run check --prefix desktop
-          npm test --prefix desktop
+          (cd ui && bun install --frozen-lockfile)
+          node ui/scripts/build-runtime.mjs
+          (cd ui && bun run build)
+          (cd ui && bun run check && bun run test)
+          GATOR_INDEPENDENCE_BINARY="$PWD/ui/runtime/gator-runtime${{ runner.os == 'Windows' && '.exe' || '' }}" npm test --prefix app-host
+          node --test ui/scripts/install.test.mjs ui/scripts/uninstall.test.mjs
           node --test scripts/google-oauth-build.test.mjs
           node --test companion/auth.test.mjs companion/server.test.mjs companion/macos-service.test.mjs companion/linux-service.test.mjs companion/health.test.mjs
       - name: Check Linux companion user-service lifecycle
@@ -54,14 +62,14 @@ jobs:
           name: companion-boot-evidence
           path: ${{ runner.temp }}/gator-companion-boot/
           if-no-files-found: ignore
-      - name: Check browser journeys and credential forms
+      - name: Check companion browser journeys
         if: runner.os == 'Linux'
         env:
           GATOR_COMPANION_BROWSERS: chromium,webkit
         run: |
-          npm exec --prefix desktop -- playwright install --with-deps chromium webkit
+          npm ci --prefix companion
+          npm exec --prefix companion -- playwright install --with-deps chromium webkit
           node --test companion/client.test.mjs
-          GATOR_PANEL_BROWSER=1 node --test desktop/tests/panel-secrets.test.mjs
       - name: Check formatting
         shell: bash
         run: |
@@ -77,14 +85,11 @@ jobs:
         run: go test -race ./internal/agent ./internal/orchestrator ./internal/workrun ./internal/worksession ./internal/jobs ./internal/workapp ./internal/telemetry ./cmd/gator
       - name: Vet
         run: go vet ./...
-      - name: Build
-        run: make build
-
-      - name: Check packaged desktop workflows
+      - name: Check packaged terminal workflows
         if: runner.os == 'macOS'
         run: |
-          npm run pack --prefix desktop
-          GATOR_DESKTOP_TEST_EXECUTABLE="$PWD/desktop/release/mac/Gator.app/Contents/MacOS/Gator" npm run test:e2e --prefix desktop
+          node ui/scripts/package.mjs terminal-artifact
+          node ui/scripts/verify-install.mjs terminal-artifact
 
   office:
     name: Office packages, calculations and layout
@@ -158,7 +163,7 @@ jobs:
         run: go test -count=1 -timeout=3m -run 'TestSidecar(Cancellation|Close|Frozen|Stalled|DaemonCrash)|TestControllerLease|TestDuplicateController|TestService|TestWindows' ./internal/browser
 
   windows:
-    name: Windows desktop preview
+    name: Windows terminal
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
@@ -169,7 +174,9 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: desktop/package-lock.json
+          cache-dependency-path: |
+            app-host/package-lock.json
+            companion/package-lock.json
       - name: Use canonical temporary paths for native fixtures
         shell: pwsh
         run: |
@@ -185,7 +192,7 @@ jobs:
         run: |
           go test ./internal/filelock ./internal/privatefs ./internal/usage ./internal/hostproc
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          go test ./cmd/gator -run 'TestWindows|TestDesktopRuntime|TestDesktopUpdate|TestUIBridgeUpdate|TestSupportedPlatforms'
+          go test ./cmd/gator -run 'TestWindows|TestRuntime|TestDesktopUpdate|TestUIBridgeUpdate|TestSupportedPlatforms'
           go test ./internal/workapp -run 'TestRestartReadiness'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           go test ./internal/lifecycle -run 'TestPublishProfile|TestProfilePublication|TestRestore|TestEmptyBackup|TestSourceRelink|TestRelink'
@@ -199,27 +206,28 @@ jobs:
           go test ./internal/sandbox -run 'TestWindows'
       - name: Vet Windows source
         run: go vet ./...
-      - name: Check desktop frontend and host
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: ui/.bun-version
+      - name: Check terminal frontend and host
         shell: bash
         run: |
           set -euo pipefail
           npm ci --prefix app-host
-          npm ci --prefix desktop
-          npm run check --prefix desktop
-          npm test --prefix desktop
+          (cd ui && bun install --frozen-lockfile)
+          node ui/scripts/build-runtime.mjs
+          (cd ui && bun run build)
+          (cd ui && bun run check && bun run test)
+          GATOR_INDEPENDENCE_BINARY="$PWD/ui/runtime/gator-runtime${{ runner.os == 'Windows' && '.exe' || '' }}" npm test --prefix app-host
+          node --test ui/scripts/install.test.mjs ui/scripts/uninstall.test.mjs
           node --test scripts/google-oauth-build.test.mjs
           node --test companion/auth.test.mjs companion/server.test.mjs companion/macos-service.test.mjs companion/linux-service.test.mjs companion/health.test.mjs
-      - name: Package Windows x64 and verify native app workflows
+      - name: Package Windows x64 and verify native terminal workflows
         shell: bash
-        env:
-          GOOS: windows
-          GOARCH: amd64
-          CGO_ENABLED: "0"
         run: |
           set -euo pipefail
-          npm run pack --prefix desktop
-          export GATOR_DESKTOP_TEST_EXECUTABLE="$(cygpath -w "$PWD/desktop/release/win-unpacked/Gator.exe")"
-          npm run test:e2e --prefix desktop
+          node ui/scripts/package.mjs terminal-artifact
+          node ui/scripts/verify-install.mjs terminal-artifact
       - name: Build Windows ARM64 runtime
         shell: bash
         env:
@@ -230,7 +238,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: windows-desktop-failures
+          name: windows-terminal-failures
           path: |
-            desktop/test-results/
-            desktop/playwright-report/
+            ui/test-results/

@@ -1,5 +1,10 @@
 # Compact work details
 
+> Interface status, 7 November 2026: Gator is CLI/TUI only. Electron and earlier
+> standalone-CLI retirement instructions below are historical. Current commands
+> and verification are in [the terminal port](CLI-TUI-PORT.md) and
+> [development](DEVELOPMENT.md).
+
 **22 October follow-up:** the inspector is now also accessible through a
 contextual Files view, with filename search and Show in chat. The current
 chat, search and activity decisions are recorded in

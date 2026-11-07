@@ -1,4 +1,4 @@
-name: Native application services
+name: Native terminal and application services
 
 on:
   pull_request:
@@ -23,6 +23,9 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: ui/.bun-version
       - name: Verify native memory and tracking lifecycle
         shell: bash
         run: |
@@ -39,9 +42,35 @@ jobs:
           set -euo pipefail
           go test ./internal/orchestrator ./internal/cliagent
           go test ./internal/workrun -run 'ExternalAgent|ExternalPatch|ExternalNativeSession|WorkTaskAnswer|Completion|ApplicationContext|RetiredFrontend'
-          go test ./cmd/gator -run 'AgentCLI|ExternalAgents|WorkTaskAnswer|Completion|RetiredCodePolicyFlags|DesktopRuntime'
+          go test ./cmd/gator -run 'AgentCLI|ExternalAgents|WorkTaskAnswer|Completion|RetiredCodePolicyFlags|Runtime'
       - name: Verify shared host and companion recovery
         run: |
           npm ci --prefix app-host
           npm test --prefix app-host
           node --test companion/recovery.test.mjs
+      - name: Build and verify the terminal product
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --prefix app-host
+          (cd ui && bun install --frozen-lockfile)
+          node ui/scripts/build-runtime.mjs
+          (cd ui && bun run build)
+          (cd ui && bun run check && bun run test)
+          node --test ui/scripts/install.test.mjs ui/scripts/uninstall.test.mjs
+          node ui/scripts/package.mjs terminal-artifact
+          node ui/scripts/verify-install.mjs terminal-artifact
+          bun ui/scripts/verify-upgrade.mjs terminal-artifact terminal-artifact terminal-upgrade-report.json
+      - name: Verify the installed application in a real terminal
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          python3 -m venv .pty-venv
+          .pty-venv/bin/pip install -r ui/scripts/requirements-pty.txt
+          .pty-venv/bin/python ui/scripts/verify-package.py terminal-artifact --editor --untrusted-file
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: terminal-native-${{ matrix.runner }}
+          path: terminal-upgrade-report.json
+          if-no-files-found: ignore

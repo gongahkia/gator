@@ -1,5 +1,10 @@
 # Desktop message attachments
 
+> Interface status, 7 November 2026: Gator is CLI/TUI only. Electron and earlier
+> standalone-CLI retirement instructions below are historical. Current commands
+> and verification are in [the terminal port](CLI-TUI-PORT.md) and
+> [development](DEVELOPMENT.md).
+
 Decision: 22 October 2026. Add file selection to the continuing chat rather
 than requiring users to move files into a project folder or enter `/attach`.
 Keep the existing React/CSS presentation, command palette and agent services.

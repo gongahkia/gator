@@ -1,5 +1,10 @@
 # Electron product consolidation
 
+> Interface status, 7 November 2026: Gator is CLI/TUI only. Electron and earlier
+> standalone-CLI retirement instructions below are historical. Current commands
+> and verification are in [the terminal port](CLI-TUI-PORT.md) and
+> [development](DEVELOPMENT.md).
+
 1 November 2026. Source inventory: `eb105ca13`, clean worktree. The owner
 requested this inventory before removing the terminal product. Electron is the
 sole primary application; the terminal migration is cancelled. The authenticated

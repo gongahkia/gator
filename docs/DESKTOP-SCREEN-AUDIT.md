@@ -1,5 +1,10 @@
 # Desktop screen audit: compact visual direction (baseline)
 
+> Interface status, 7 November 2026: Gator is CLI/TUI only. Electron and earlier
+> standalone-CLI retirement instructions below are historical. Current commands
+> and verification are in [the terminal port](CLI-TUI-PORT.md) and
+> [development](DEVELOPMENT.md).
+
 21 October 2026. Source baseline: `a14182fb9`. **Full review** using the
 `make-interfaces-feel-better` skill. This is an audit of the existing application;
 the findings below describe the baseline before implementation.

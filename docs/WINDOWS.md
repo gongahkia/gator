@@ -1,5 +1,10 @@
 # Windows desktop port
 
+> Interface status, 7 November 2026: Gator is CLI/TUI only. Electron and earlier
+> standalone-CLI retirement instructions below are historical. Current commands
+> and verification are in [the terminal port](CLI-TUI-PORT.md) and
+> [development](DEVELOPMENT.md).
+
 Status: **Windows preview implementation; native verification pending.**
 Decision: 22 October 2026. The desktop app remains the user entry point.
 

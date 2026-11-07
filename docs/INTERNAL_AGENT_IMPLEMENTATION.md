@@ -1,5 +1,10 @@
 # Gator's internal agent: implementation and verification
 
+> Interface status, 7 November 2026: Gator is CLI/TUI only. Electron and earlier
+> standalone-CLI retirement instructions below are historical. Current commands
+> and verification are in [the terminal port](CLI-TUI-PORT.md) and
+> [development](DEVELOPMENT.md).
+
 > Current product scope, 1 November 2026: Electron is the sole primary app.
 > Terminal migration checkpoints below are historical; the terminal product
 > was retired after capability consolidation. See

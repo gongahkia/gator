@@ -13,12 +13,12 @@ import { Backend } from '../app-host/src/backend.mjs';
 
 const execute = promisify(execFile);
 const waitFor = async predicate => { for (let i = 0; i < 300; i++) { const value = await predicate(); if (value) return value; await new Promise(r => setTimeout(r, 50)); } throw new Error('Fixture did not reach expected state'); };
-test('real Go owners behind Electron/companion transports are inspected without replacement workers', { timeout: 240000 }, async () => {
+test('real Go owners behind terminal/companion transports are inspected without replacement workers', { timeout: 240000 }, async () => {
   const root = await mkdtemp(join(tmpdir(), 'gator-inspection-real-'));
   const binary = join(root, process.platform === 'win32' ? 'runtime.exe' : 'runtime');
   try {
     await execute('go', ['build', '-o', binary, './cmd/gator'], { timeout: 90000 });
-    for (const frontend of ['desktop', 'companion']) {
+    for (const frontend of ['terminal', 'companion']) {
       const dir = join(root, frontend), workspace = join(dir, 'workspace'), config = join(dir, 'config'), state = join(dir, 'state'), tokenFile = join(dir, 'token');
       await mkdir(dir, { mode: 0o700 });
       await mkdir(workspace, { recursive: true }); await mkdir(join(config, 'gator'), { recursive: true });
@@ -58,7 +58,7 @@ test('real Go owners behind Electron/companion transports are inspected without 
         assert.deepEqual((await get('/v1/work')).targets, [], 'conversation/device access is not an inspection grant');
         // Exercise the actual host-local enrollment-aware grant helper.
         await execute(process.execPath, [resolve('companion/inspection-access.mjs'), binary, tokenFile, owner.run_id, device.id, '60'], { env });
-        if (frontend === 'desktop') {
+        if (frontend === 'terminal') {
           // A second real live conversation is not covered by the first grant.
           await execute(binary, ['work', '--source', workspace, '--mode', 'inspect', 'Another seed conversation'], { env, timeout: 30000 });
           const otherID = (await readdir(join(state, 'gator/conversations'))).find(n => n.startsWith('work-') && n !== id);

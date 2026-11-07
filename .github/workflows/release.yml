@@ -1,4 +1,4 @@
-name: Release desktop
+name: Release terminal
 
 on:
   push:
@@ -6,12 +6,12 @@ on:
   pull_request:
     paths:
       - .github/workflows/release.yml
-      - desktop/package.json
-      - desktop/scripts/build-runtime.mjs
-      - desktop/scripts/release-config.cjs
-      - desktop/scripts/verify-release.mjs
-      - desktop/electron-builder.release.cjs
-      - desktop/build/**
+      - ui/package.json
+      - ui/bun.lock
+      - ui/launcher/**
+      - ui/scripts/**
+      - app-host/package.json
+      - app-host/package-lock.json
   workflow_dispatch:
 
 permissions:
@@ -19,73 +19,26 @@ permissions:
 
 jobs:
   build:
-    name: desktop-${{ matrix.goos }}-${{ matrix.goarch }}
+    name: terminal-${{ matrix.goos }}-${{ matrix.goarch }}
     runs-on: ${{ matrix.runner }}
+    # Preserve the existing protected environment and its OAuth client material.
     environment: ${{ github.ref_type == 'tag' && 'desktop-release' || 'desktop-preview' }}
     env:
-      VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '0.0.0-dev' }}
+      VERSION: ${{ github.ref_type == 'tag' && github.ref_name || 'dev' }}
       COMMIT: ${{ github.sha }}
-      # Installed Desktop client material only, never a web-app secret or user token.
+      # Installed OAuth client material, never user credentials or a web secret.
       GATOR_GOOGLE_DESKTOP_CLIENT_ID: ${{ github.ref_type == 'tag' && vars.GOOGLE_DESKTOP_CLIENT_ID || '' }}
       GATOR_GOOGLE_DESKTOP_CLIENT_SECRET: ${{ github.ref_type == 'tag' && secrets.GOOGLE_DESKTOP_CLIENT_SECRET || '' }}
-      DESKTOP_PLATFORM: ${{ matrix.platform }}
-      DESKTOP_ARCH: ${{ matrix.arch }}
-      CSC_LINK: ${{ github.ref_type == 'tag' && matrix.goos == 'darwin' && secrets.MAC_CSC_LINK || '' }}
-      CSC_KEY_PASSWORD: ${{ github.ref_type == 'tag' && matrix.goos == 'darwin' && secrets.MAC_CSC_KEY_PASSWORD || '' }}
-      GATOR_MAC_IDENTITY: ${{ vars.MAC_SIGNING_IDENTITY }}
-      APPLE_ID: ${{ github.ref_type == 'tag' && matrix.goos == 'darwin' && secrets.APPLE_ID || '' }}
-      APPLE_APP_SPECIFIC_PASSWORD: ${{ github.ref_type == 'tag' && matrix.goos == 'darwin' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
-      APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
-      WIN_CSC_LINK: ${{ github.ref_type == 'tag' && matrix.goos == 'windows' && secrets.WINDOWS_CSC_LINK || '' }}
-      WIN_CSC_KEY_PASSWORD: ${{ github.ref_type == 'tag' && matrix.goos == 'windows' && secrets.WINDOWS_CSC_KEY_PASSWORD || '' }}
-      GATOR_WINDOWS_PUBLISHER: ${{ vars.WINDOWS_PUBLISHER }}
-      GATOR_WINDOWS_SIGNING: ${{ vars.WINDOWS_SIGNING_PROVIDER }}
-      AZURE_TENANT_ID: ${{ github.ref_type == 'tag' && matrix.goos == 'windows' && secrets.SIGNING_AZURE_TENANT_ID || '' }}
-      AZURE_CLIENT_ID: ${{ github.ref_type == 'tag' && matrix.goos == 'windows' && secrets.SIGNING_AZURE_CLIENT_ID || '' }}
-      AZURE_CLIENT_SECRET: ${{ github.ref_type == 'tag' && matrix.goos == 'windows' && secrets.SIGNING_AZURE_CLIENT_SECRET || '' }}
-      GATOR_SIGNING_ENDPOINT: ${{ vars.WINDOWS_SIGNING_ENDPOINT }}
-      GATOR_SIGNING_ACCOUNT: ${{ vars.WINDOWS_SIGNING_ACCOUNT }}
-      GATOR_SIGNING_PROFILE: ${{ vars.WINDOWS_SIGNING_PROFILE }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - goos: darwin
-            goarch: arm64
-            arch: arm64
-            platform: mac
-            runner: macos-15
-            cgo: "1"
-          - goos: darwin
-            goarch: amd64
-            arch: x64
-            platform: mac
-            runner: macos-15-intel
-            cgo: "1"
-          - goos: linux
-            goarch: amd64
-            arch: x64
-            platform: linux
-            runner: ubuntu-latest
-            cgo: "0"
-          - goos: linux
-            goarch: arm64
-            arch: arm64
-            platform: linux
-            runner: ubuntu-latest
-            cgo: "0"
-          - goos: windows
-            goarch: amd64
-            arch: x64
-            platform: win
-            runner: windows-latest
-            cgo: "0"
-          - goos: windows
-            goarch: arm64
-            arch: arm64
-            platform: win
-            runner: windows-latest
-            cgo: "0"
+          - { goos: darwin, goarch: arm64, runner: macos-15 }
+          - { goos: darwin, goarch: amd64, runner: macos-15-intel }
+          - { goos: linux, goarch: amd64, runner: ubuntu-latest }
+          - { goos: linux, goarch: arm64, runner: ubuntu-24.04-arm }
+          - { goos: windows, goarch: amd64, runner: windows-latest }
+          - { goos: windows, goarch: arm64, runner: windows-11-arm }
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
@@ -94,99 +47,32 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
-          cache: npm
-          cache-dependency-path: desktop/package-lock.json
-      - name: Require signing setup for a tagged release
-        if: github.ref_type == 'tag'
-        env:
-          GOOS: ${{ matrix.goos }}
-        run: node desktop/scripts/release-config.cjs
-      - name: Check desktop source
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: ui/.bun-version
+      - name: Build native terminal package
         shell: bash
         run: |
           set -euo pipefail
+          export BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           npm ci --prefix app-host
-          npm ci --prefix desktop
-          npm run check --prefix desktop
-          npm test --prefix desktop
-      - name: Use canonical Windows temporary paths for native fixtures
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $directory = Join-Path $env:RUNNER_TEMP 'gator-native-tests'
-          New-Item -ItemType Directory -Force -Path $directory | Out-Null
-          $canonical = node -e "process.stdout.write(require('node:fs').realpathSync.native(process.argv[1]))" $directory
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          "TEMP=$canonical" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "TMP=$canonical" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-      - name: Test release source on macOS
-        if: runner.os == 'macOS'
-        run: go test ./...
-      # Hosted Linux runners cannot create Bubblewrap's network namespace.
-      - name: Compile release tests on Linux
-        if: runner.os == 'Linux'
-        run: go test ./... -run '^$'
-      - name: Test Windows runtime boundaries
-        if: runner.os == 'Windows'
+          (cd ui && bun install --frozen-lockfile)
+          node ui/scripts/build-runtime.mjs
+          (cd ui && bun run build)
+          (cd ui && bun run check)
+          node --test ui/scripts/install.test.mjs ui/scripts/uninstall.test.mjs scripts/google-oauth-build.test.mjs
+          node ui/scripts/package.mjs terminal-artifact
+          node ui/scripts/verify-install.mjs terminal-artifact
+      - name: Archive the complete native runtime and frontend
         shell: bash
         run: |
           set -euo pipefail
-          go test ./... -run '^$'
-          go test ./internal/filelock ./internal/privatefs ./internal/usage
-          go test ./cmd/gator -run 'TestWindows|TestDesktopRuntime|TestDesktopUpdate|TestUIBridgeUpdate|TestSupportedPlatforms'
-          go test ./internal/workapp -run 'TestRestartReadiness'
-          go test ./internal/lifecycle -run 'TestPublishProfile|TestProfilePublication|TestRestore|TestEmptyBackup|TestSourceRelink|TestRelink'
-          go test ./internal/browser -run 'TestService|TestWindows'
-          go test ./internal/localmodel -run 'TestWindows|TestAssess|TestFormatBytes'
-          go test ./internal/workspace -run 'TestWindows'
-          go test ./internal/sandbox -run 'TestWindows'
-      - name: Build preview installers with the matching private runtime
-        if: github.ref_type != 'tag'
-        shell: bash
-        env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: ${{ matrix.cgo }}
-        run: |
-          set -euo pipefail
-          export BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          cd desktop
-          npm version --no-git-tag-version --allow-same-version "${VERSION#v}"
-          npm run build
-          npx electron-builder --publish never --"$DESKTOP_PLATFORM" --"$DESKTOP_ARCH"
-      - name: Build and verify signed release installers and update feeds
-        if: github.ref_type == 'tag'
-        shell: bash
-        env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: ${{ matrix.cgo }}
-        run: |
-          set -euo pipefail
-          export BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          cd desktop
-          npm version --no-git-tag-version --allow-same-version "${VERSION#v}"
-          npm run build
-          npx electron-builder --config electron-builder.release.cjs --publish never --"$DESKTOP_PLATFORM" --"$DESKTOP_ARCH"
-          node scripts/verify-release.mjs
-      - name: Check packaged Windows x64 workflows
-        if: matrix.goos == 'windows' && matrix.goarch == 'amd64'
-        shell: bash
-        run: |
-          set -euo pipefail
-          export GATOR_DESKTOP_TEST_EXECUTABLE="$(cygpath -w "$PWD/desktop/release/win-unpacked/Gator.exe")"
-          npm run test:e2e --prefix desktop
+          mkdir -p release
+          tar -czf "release/gator-terminal_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz" terminal-artifact
       - uses: actions/upload-artifact@v4
         with:
-          name: desktop-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: |
-            desktop/release/Gator-*.dmg
-            desktop/release/Gator-*.zip
-            desktop/release/Gator-*.AppImage
-            desktop/release/Gator-*.deb
-            desktop/release/Gator-*.exe
-            desktop/release/Gator-*.blockmap
-            desktop/release/stable-*.yml
+          name: terminal-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: release/*.tar.gz
           if-no-files-found: error
           retention-days: 7
 
@@ -199,15 +85,12 @@ jobs:
     steps:
       - uses: actions/download-artifact@v5
         with:
-          path: dist
+          path: release
           merge-multiple: true
-      - name: Create desktop checksums
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd dist
-          sha256sum Gator-* stable-*.yml > checksums.txt
-      - name: Prepare desktop release for review
+      - name: Create checksums
+        working-directory: release
+        run: sha256sum gator-terminal_*.tar.gz > checksums.txt
+      - name: Prepare terminal release for review
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --draft --generate-notes --verify-tag
+        run: gh release create "$GITHUB_REF_NAME" release/* --draft --generate-notes --verify-tag

@@ -1,5 +1,10 @@
 # Conversational chat presentation
 
+> Interface status, 7 November 2026: Gator is CLI/TUI only. Electron and earlier
+> standalone-CLI retirement instructions below are historical. Current commands
+> and verification are in [the terminal port](CLI-TUI-PORT.md) and
+> [development](DEVELOPMENT.md).
+
 Decision recorded 22 October 2026. The user selected **A / A / A** in the
 three design questions: Tide, hybrid activity, and all three additional
 improvements (dated chat search, contextual files, and activity polish).

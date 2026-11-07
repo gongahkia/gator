@@ -1,5 +1,10 @@
 # CLI architecture audit
 
+> Interface status, 7 November 2026: Gator is CLI/TUI only. Electron and earlier
+> standalone-CLI retirement instructions below are historical. Current commands
+> and verification are in [the terminal port](CLI-TUI-PORT.md) and
+> [development](DEVELOPMENT.md).
+
 **Historical record.** The standalone CLI and terminal renderer were retired on 22 October 2026. See [the desktop decision](DESKTOP-PRIMARY.md) and [current development instructions](DEVELOPMENT.md). Original observations below are retained.
 
 Recorded 2026-10-18. The question is whether Gator should keep its Go Work

@@ -1,5 +1,10 @@
 # Desktop polish: implementation and verification
 
+> Interface status, 7 November 2026: Gator is CLI/TUI only. Electron and earlier
+> standalone-CLI retirement instructions below are historical. Current commands
+> and verification are in [the terminal port](CLI-TUI-PORT.md) and
+> [development](DEVELOPMENT.md).
+
 **22 October 2026 follow-up:** the terminal frontend and its status-line
 settings were subsequently retired when desktop became the primary interface.
 This report records the preceding polish pass; see

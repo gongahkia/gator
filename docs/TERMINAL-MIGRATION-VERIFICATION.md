@@ -1,5 +1,10 @@
 # Terminal migration verification
 
+> Interface status, 7 November 2026: Gator is CLI/TUI only. Electron and earlier
+> standalone-CLI retirement instructions below are historical. Current commands
+> and verification are in [the terminal port](CLI-TUI-PORT.md) and
+> [development](DEVELOPMENT.md).
+
 > **Historical, superseded 1 November 2026.** The terminal product and migration
 > are cancelled. Electron is the sole primary app. The original implementation
 > and test evidence below is retained as history, not current launch/install

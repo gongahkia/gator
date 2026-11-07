@@ -1,5 +1,10 @@
 # Codex Desktop presentation audit
 
+> Interface status, 7 November 2026: Gator is CLI/TUI only. Electron and earlier
+> standalone-CLI retirement instructions below are historical. Current commands
+> and verification are in [the terminal port](CLI-TUI-PORT.md) and
+> [development](DEVELOPMENT.md).
+
 Latest app-wide check: [Desktop screen audit](DESKTOP-SCREEN-AUDIT.md), against
 `a14182fb9`. It records remaining gaps across the whole application; the scoped
 iteration approvals below should not be read as an app-wide polish approval.

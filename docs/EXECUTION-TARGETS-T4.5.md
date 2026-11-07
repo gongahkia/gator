@@ -1,5 +1,10 @@
 # Final execution integration scope — T4.5
 
+> Interface status, 7 November 2026: Gator is CLI/TUI only. Electron and earlier
+> standalone-CLI retirement instructions below are historical. Current commands
+> and verification are in [the terminal port](CLI-TUI-PORT.md) and
+> [development](DEVELOPMENT.md).
+
 > Product-surface update, 1 November 2026: Electron is the sole primary app;
 > the OpenTUI product has been removed. The backend/companion guarantees and
 > historical verification below are retained. See

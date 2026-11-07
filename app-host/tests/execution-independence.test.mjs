@@ -11,7 +11,7 @@ import {createServer} from 'node:http';
 import {Backend} from '../src/backend.mjs';
 const execute=promisify(execFile),source=fileURLToPath(new URL('../../',import.meta.url));
 
-test('ordinary Work and desktop host need no tmux, Onibi, phone or external catalog',{skip:process.platform==='win32',timeout:180000},async()=>{
+test('ordinary Work and terminal host need no tmux, Onibi, phone or external catalog',{skip:process.platform==='win32',timeout:180000},async()=>{
  const root=await mkdtemp(join(tmpdir(),'gator-independent-')),bin=join(root,'bin'),workspace=join(root,'workspace'),config=join(root,'config'),state=join(root,'state');let host,requests=0;
  const provider=createServer(async(req,res)=>{let body='';for await(const part of req)body+=part;const p=JSON.parse(body);requests++;
   const classify=p.messages?.some(m=>m.role==='system'&&m.content?.includes("Classify the user's immediate request"));
