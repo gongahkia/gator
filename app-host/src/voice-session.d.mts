@@ -5,6 +5,8 @@ export type { VoiceStatus } from "../contracts/voice"
 export class VoiceSession extends EventEmitter {
   constructor(application: Application)
   phase: string; playing: boolean; context?: string; issue?: string
+  read(text: string): Promise<void>
+  download(model: string): Promise<VoiceStatus>
   start(): Promise<void>
   stop(): Promise<{ context: string; text: string }>
   status(): Promise<VoiceStatus>

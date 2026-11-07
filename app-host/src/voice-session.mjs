@@ -12,8 +12,9 @@ export class VoiceSession extends EventEmitter {
   #seen = new Map();
   #playback;
   #visibleContext;
+  #download;
   constructor(application, { capture = recordAudio, call = runSpeechRequest, playback = speak } = {}) {
-    super(); this.application = application; this.capture = capture; this.call = call; this.playback = playback;
+    super(); this.application = application; this.playback = playback; this.capture = capture; this.call = call; this.playback = playback;
     this.changed = () => {
       const context = application.context, state = application.snapshot().state;
       if (context !== this.#visibleContext || !state?.desktop?.voice?.spoken_replies) this.stopPlayback();
@@ -33,6 +34,24 @@ export class VoiceSession extends EventEmitter {
   async request(request, signal) { return this.call(this.application.binary, this.application.workspace, this.application.env, request, signal); }
   status() { return this.request({ action: "status" }); }
   async configure(preferences) { const status = await this.request({ action: "configure", preferences }); if (preferences.spoken_replies === false) this.stopPlayback(); this.application.backend?.refreshPreferences(); return status; }
+  async download(model) {
+    this.application.mutable();
+    if (this.phase !== "idle") throw new Error("Finish the current voice operation first.");
+    const controller = new AbortController(); this.#download = controller;
+    this.phase = "downloading"; this.emit("change");
+    try { return await this.request({ action: "download", model }, controller.signal); }
+    finally { if (this.#download === controller) { this.#download = undefined; this.phase = "idle"; this.emit("change"); } }
+  }
+  async read(text) {
+    this.application.mutable();
+    if (this.phase !== "idle") throw new Error("Finish dictation before reading a message aloud.");
+    this.stopPlayback();
+    const context = this.application.context, status = await this.status();
+    if (context !== this.application.context) throw new Error("The chat changed before playback.");
+    const controller = new AbortController(); this.#playback = controller; this.playing = true; this.emit("change");
+    try { await this.playback(text, status.preferences, controller.signal); }
+    finally { if (this.#playback === controller) { this.#playback = undefined; this.playing = false; this.emit("change"); } }
+  }
   async start() {
     this.application.mutable();
     if (this.phase !== "idle" || this.application.snapshot().state?.panel) throw new Error("Return to the conversation and finish the current dictation first.");
@@ -58,6 +77,6 @@ export class VoiceSession extends EventEmitter {
     } finally { if (generation === this.#generation) { this.phase = "idle"; this.#recording = undefined; this.#abort = undefined; this.emit("change"); } }
   }
   stopPlayback() { this.#playback?.abort(); this.#playback = undefined; if (this.playing) { this.playing = false; this.emit("change"); } }
-  cancel() { this.#generation++; this.#recording?.cancel(); this.#abort?.abort(); this.#recording = undefined; this.#abort = undefined; this.context = undefined; this.phase = "idle"; this.stopPlayback(); this.emit("change"); }
+  cancel() { this.#download?.abort(); this.#download = undefined; this.#generation++; this.#recording?.cancel(); this.#abort?.abort(); this.#recording = undefined; this.#abort = undefined; this.context = undefined; this.phase = "idle"; this.stopPlayback(); this.emit("change"); }
   close() { this.cancel(); this.application.off("change", this.changed); }
 }

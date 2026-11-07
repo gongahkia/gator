@@ -52,6 +52,41 @@ test("cancelling voice enumeration prevents native playback", async () => {
   assert.equal(calls, 1);
 });
 
+test("explicit system voices use installed names and keep speech text out of arguments", async () => {
+  const calls = [];
+  const speak = speechPlayer({ platform: "darwin", run: async (program, args, options) => {
+    calls.push({ program, args, options });
+    return Buffer.from('[{"name":"Samantha","language":"en_US"}]');
+  } });
+  await speak("Private reply", { system_voice: "Samantha" });
+  assert.deepEqual(calls.at(-1).args, ["-r", "175", "-v", "Samantha", "-f", "-"]);
+  assert.equal(calls.at(-1).options.input, "Private reply");
+  await assert.rejects(speak("Private reply", { system_voice: "Unknown voice" }), /No installed speech voice/);
+});
+
+test("local voice model downloads can be cancelled and manual reading stops with its chat", async () => {
+  const application = new App(); let cancelled = false, playback;
+  const session = new VoiceSession(application, {
+    call: async (_binary, _cwd, _env, request, signal) => {
+      if (request.action === "status") return { preferences: { system_voice: "Samantha" } };
+      assert.deepEqual(request, { action: "download", model: "tiny" });
+      await new Promise((resolve, reject) => signal.addEventListener("abort", () => { cancelled = true; reject(new Error("Cancelled")); }, { once: true }));
+    },
+    playback: async (text, preferences, signal) => {
+      playback = { text, preferences, signal };
+      await new Promise(resolve => signal.addEventListener("abort", resolve, { once: true }));
+    },
+  });
+  try {
+    const downloading = session.download("tiny"); assert.equal(session.phase, "downloading");
+    session.cancel(); await assert.rejects(downloading, /Cancelled/); assert.ok(cancelled); assert.equal(session.phase, "idle");
+    const reading = session.read("A saved answer"); await new Promise(resolve => setImmediate(resolve));
+    assert.equal(playback.text, "A saved answer"); assert.equal(playback.preferences.system_voice, "Samantha");
+    application.context = "conversation:b"; application.emit("change"); await reading;
+    assert.ok(playback.signal.aborted); assert.equal(session.playing, false);
+  } finally { session.close(); }
+});
+
 class App extends EventEmitter {
   context = "conversation:a";
   state = { messages: [], desktop: { voice: { spoken_replies: true } } };

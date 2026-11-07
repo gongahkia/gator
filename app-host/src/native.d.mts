@@ -5,4 +5,5 @@ export function clipboardWrite(text: string): Promise<void>
 export function clipboardImage(): Promise<Uint8Array>
 export function recordingArguments(platform: string, device?: string): string[]
 export function recordAudio(device?: string): { audio: Promise<Uint8Array>; stop(): void; cancel(): void }
-export function speak(text: string, preferences?: { language?: string; rate?: number }, signal?: AbortSignal): Promise<void>
+export function speechVoices(): Promise<{name: string; language: string}[]>
+export function speak(text: string, preferences?: { language?: string; rate?: number; system_voice?: string }, signal?: AbortSignal): Promise<void>
