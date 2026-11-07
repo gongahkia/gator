@@ -76,6 +76,7 @@ export function Transcript() {
     { bind: "ctrl+end", title: "Jump to latest", run: () => scroll?.scrollTo(scroll.scrollHeight) },
   ] }))
   return <scrollbox id="transcript" ref={node => { scroll = node }} flexGrow={1} minHeight={0} stickyScroll stickyStart="bottom" paddingX={2}>
+    <Show when={data.state?.branch}><text fg={theme.text.muted} onMouseUp={() => void client.navigate("/original-chat")}>Branched chat · /original-chat returns to its source</text></Show>
     <Show when={!data.state?.messages?.length}><box paddingY={2} gap={1}><text fg={theme.accent}><b>What would you like to get done?</b></text>
       <text fg={theme.text.muted}>Ask anything, or type / for commands.</text><Show when={!data.state?.provider}><text fg={theme.text.muted}>Connect a model with /model to get started.</text></Show></box></Show>
     <For each={timeline()}>{item => <Show when={item.kind === "message" ? item : undefined} fallback={item.kind === "update" ? <box id={`update-${item.update.id}`} ref={node => { const id = item.update.id; cards.set(id, node); onCleanup(() => { if (cards.get(id) === node) cards.delete(id) }) }} paddingY={1}>
@@ -93,6 +94,11 @@ export function Transcript() {
       <Show when={message.inputs?.length}><text fg={theme.text.muted}>Inputs: {message.inputs?.map(literal).join(" · ")}</text></Show>
       <For each={message.bundle?.Artifacts}>{artifact => <text fg={theme.accent}>File: {literal(artifact.Path)} · {literal(artifact.MediaType)}</text>}</For>
     </box> }}</Show>}</For>
+    <For each={data.state?.task_plans}>{plan => <box paddingY={1}>
+      <text fg={theme.accent} onMouseUp={() => void client.navigate("/task-plans")}>{literal(plan.outcome || plan.task)}</text>
+      <text fg={theme.text.muted}>{literal(plan.state)} · {literal(plan.phase)}{plan.phase === "review" ? " · /task-plans to review before work starts" : " · /task-plans for details"}</text>
+    </box>}</For>
+    <For each={data.state?.specialists}>{task => <text fg={theme.text.muted} onMouseUp={() => void client.navigate("/specialists")}>{literal(task.name)} · {literal(task.status)} · /specialists</text>}</For>
     <Show when={data.state?.activity}>{trace => <Activity live trace={trace()} identity={client.context + ":live:" + trace().started_at} expanded={data.activityExpanded} />}</Show>
     <Show when={data.state?.running}><WorkingStatus status={data.state?.status} elapsed={data.state?.elapsed} attention={!!data.state?.pending_approval} cancelling={!!data.state?.cancelling} /></Show>
     

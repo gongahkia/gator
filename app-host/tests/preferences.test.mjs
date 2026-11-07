@@ -26,10 +26,10 @@ test("frontend preferences import latest Chromium keys once without changing the
     await database.put(key("gator:sidebar-collapsed", "https://other.example"), dom("false"));
     await database.close();
     const before = await digest(source), store = new FrontendPreferences(root), first = await store.read();
-    assert.equal(first.sidebarCollapsed, true); assert.equal(first.groupChatsByFolder, true);
+    assert.equal(first.theme, "terminal"); assert.equal(first.sidebarCollapsed, true); assert.equal(first.groupChatsByFolder, true);
     assert.deepEqual(first.workDetailsSections, { outputs: false, context: true, connections: false, workspace: false });
     assert.deepEqual(await digest(source), before);
-    const saved = await readFile(store.file, "utf8"); assert.ok(!saved.includes("DO NOT IMPORT") && !saved.includes("theme"));
+    const saved = await readFile(store.file, "utf8"); assert.ok(!saved.includes("DO NOT IMPORT") && !saved.includes("obsolete-local-theme"));
     await new FrontendPreferences(root).read(); assert.equal(await readFile(store.file, "utf8"), saved);
     await store.configure({ sidebarCollapsed: false });
     assert.equal((await new FrontendPreferences(root).read()).sidebarCollapsed, false);

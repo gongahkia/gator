@@ -7,7 +7,7 @@ import { Application } from "@gator/application-host/application"
 import { App } from "../src/app"
 import { GatorClient } from "../src/gator/client"
 
-test("terminal defaults survive desktop theme changes, cached chats, compact dialogs and restart", async () => {
+test("terminal colors and explicit Gator presets survive cached chats, compact dialogs and restart", async () => {
   const root = await mkdtemp(join(tmpdir(), "gator-terminal-appearance-")), config = join(root, "config/gator")
   let requests = 0
   const server = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(request) {
@@ -23,13 +23,13 @@ test("terminal defaults survive desktop theme changes, cached chats, compact dia
   const until = async (predicate: () => boolean) => { const end = Date.now() + 10000; while (!predicate()) { if (Date.now() > end) throw new Error(client.issue + "\n" + setup.captureCharFrame()); await flush() } }
   const color = (label: string) => {
     const spans = setup.captureSpans().lines.flatMap(line => line.spans), span = spans.find(span => span.text.includes(label))
-    expect(span).toBeDefined(); expect(span!.bg.intent).toBe("default")
+    expect(span).toBeDefined(); if (client.preferences.theme === "terminal" || process.env.NO_COLOR) expect(span!.bg.intent).toBe("default"); else expect(span!.bg.intent).not.toBe("default")
   }
   const choose = async (label: string, theme: string) => {
-    await client.navigate("/appearance"); await flush()
+    await client.send({ type: "navigate", text: "/appearance" }); await flush()
     const target = client.state!.panel!.rows!.findIndex(row => row.label === label); expect(target).toBeGreaterThanOrEqual(0)
     for (let n = 0; (client.state!.panel!.selected ?? 0) !== target && n < 8; n++) { setup.mockInput.pressArrow((client.state!.panel!.selected ?? 0) < target ? "down" : "up"); await flush() }
-    setup.mockInput.pressEnter(); await until(() => client.state?.theme === theme); await flush()
+    setup.mockInput.pressEnter(); await until(() => client.state?.theme === theme && client.preferences.theme === theme); await flush()
     expect(JSON.parse(await readFile(join(config, "config.json"), "utf8")).theme).toBe(theme)
   }
   try {

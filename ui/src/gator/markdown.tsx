@@ -1,12 +1,12 @@
 import { SyntaxStyle } from "@opentui/core"
 import { useRenderer } from "@opentui/solid"
-import { onCleanup } from "solid-js"
+import { createMemo, onCleanup } from "solid-js"
 import { useTheme } from "../context/theme"
 import { literal } from "./text"
 
 export function Markdown(props: { text?: string; streaming?: boolean }) {
   const theme = useTheme(), renderer = useRenderer()
-  const style = SyntaxStyle.fromStyles({
+  const style = createMemo(() => { const value = SyntaxStyle.fromStyles({
     default: { fg: theme.text.base },
     "markup.heading": { fg: theme.text.base, bold: true },
     ...Object.fromEntries([1, 2, 3, 4, 5, 6].map(level => [`markup.heading.${level}`, { fg: theme.text.base, bold: true }])),
@@ -24,6 +24,6 @@ export function Markdown(props: { text?: string; streaming?: boolean }) {
     comment: { fg: theme.text.muted, italic: true },
     number: { fg: theme.accent },
   }, renderer.nativeScene)
-  onCleanup(() => style.destroy())
-  return <markdown content={literal(props.text)} syntaxStyle={style} fg={theme.text.base} conceal streaming={props.streaming ?? false} tableOptions={{ style: "columns", wrapMode: "word", cellPaddingX: 1 }} />
+  onCleanup(() => value.destroy()); return value })
+  return <markdown content={literal(props.text)} syntaxStyle={style()} fg={theme.text.base} conceal streaming={props.streaming ?? false} tableOptions={{ style: "columns", wrapMode: "word", cellPaddingX: 1 }} />
 }

@@ -27,6 +27,9 @@ export class GatorClient extends EventEmitter {
   readingPositions = new Map<string, number>()
   activityExpanded = new Set<string>()
   updateFeedback = new Map<string, { id: string; saving: boolean; message: string }>()
+  actions: Record<string, () => unknown> = {}
+  planFirst = new Set<string>()
+  isLocalCommand(text: string) { return text !== "/activity" && /^\/[\w-]+$/.test(text) && (Object.hasOwn(this.actions, text.slice(1)) || ["/following", "/saved", "/settings"].includes(text)) }
   route: "chat" | "following" | "saved" | "settings" = "chat"
   requestQuit?: () => Promise<void>
   navigationGuard?: () => Promise<boolean>
@@ -35,7 +38,17 @@ export class GatorClient extends EventEmitter {
   #admissions = new Map<string, { key: string; request: string }>()
   #closing?: Promise<void>
   #closed = false
-  #listener = () => { this.snapshot = this.host.snapshot(); this.emit("change"); if (!this.#closed) void this.loadDraft().catch(error => this.fail(error)) }
+  #listener = () => {
+    const before = this.state
+    this.snapshot = this.host.snapshot(); this.emit("change")
+    if (!this.#closed) {
+      void this.loadDraft().catch(error => this.fail(error))
+      const theme = this.state?.theme
+      if (before?.theme && before.conversation_id === this.state?.conversation_id && theme !== before.theme && ["gator", "light", "contrast", "mono"].includes(theme || "")) {
+        void this.configurePreferences({ theme: theme as "gator" | "light" | "contrast" | "mono" }).catch(error => this.fail(error))
+      }
+    }
+  }
   constructor(readonly host: Application) { super(); this.snapshot = host.snapshot(); host.on("change", this.#listener) }
   get state() { return this.snapshot.state }
   get context() { return this.host.context }
@@ -101,6 +114,7 @@ export class GatorClient extends EventEmitter {
   async guide() {
     if (["recording", "transcribing"].includes(this.voicePhase)) throw new Error("Finish or cancel dictation before guiding active work.")
     const draft = this.draft, context = draft.context, id = this.state?.guidance_id
+    if (this.planFirst.has(context)) throw new Error("Turn off plan-first before guiding active work, or send a new reviewed request.")
     if (!id || !this.state?.running) throw new Error("There is no active task to guide.")
     if (!draft.text.trim() || draft.uploads?.length || draft.reply_to_update_id) throw new Error("Guide active work with text only. Send attachments and update replies as a queued follow-up.")
     if (this.pending.has(context)) throw new Error("Wait for the current message acknowledgement.")
@@ -125,16 +139,16 @@ export class GatorClient extends EventEmitter {
     this.pending.add(context); this.issue = ""; this.emit("change")
     try {
       if (command) {
-        if (/^\/(following|saved|settings|models|files|drafts|queue|updates|memories|receipts|about|voice|chats|attach-file|help|prompt-history)$/.test(draft.text.trim())) await this.navigate(draft.text.trim())
+        if (this.isLocalCommand(draft.text.trim())) await this.navigate(draft.text.trim())
         else await this.send({ type: "submit", text: draft.text })
       }
       else {
-        const files = draft.uploads?.map(f => f.id) ?? [], key = JSON.stringify([draft.text, files, draft.reply_to_update_id])
+        const files = draft.uploads?.map(f => f.id) ?? [], plan_first = this.planFirst.has(context), key = JSON.stringify([draft.text, files, draft.reply_to_update_id, plan_first])
         // An uncertain acknowledgement can be explicitly retried with the same
         // admission ID. Go's durable request journal prevents duplicate work.
         if (this.#admissions.get(context)?.key !== key) this.#admissions.set(context, { key, request: randomUUID() })
-        await this.send({ type: "upload_submit", upload: { request_id: this.#admissions.get(context)!.request, context, text: draft.text, files, reply_to_update_id: draft.reply_to_update_id } })
-        this.#admissions.delete(context)
+        await this.send({ type: "upload_submit", upload: { request_id: this.#admissions.get(context)!.request, context, text: draft.text, files, reply_to_update_id: draft.reply_to_update_id, ...(plan_first ? { plan_first: true } : {}) } })
+        this.#admissions.delete(context); this.planFirst.delete(context)
       }
       // An acknowledgement only clears the submitted snapshot, never newer input.
       await this.clearAdmitted(draft)
@@ -162,9 +176,10 @@ export class GatorClient extends EventEmitter {
   async navigate(text: string) {
     if (/^\/(exit|quit)$/.test(text.trim()) && this.requestQuit) { await this.requestQuit(); return }
     if (!await this.mayLeave()) return
+    this.emit("navigation")
     if (text === "/chat") { if (this.state?.panel) await this.send({ type: "navigate", text: "/chat" }); this.route = "chat"; this.emit("change"); return }
     if (text === "/following" || text === "/saved" || text === "/settings") { this.route = text === "/following" ? "following" : text === "/saved" ? "saved" : "settings"; this.emit("change"); return }
-    if (/^\/(models|files|drafts|queue|updates|memories|receipts|about|voice|chats|attach-file|help|prompt-history)$/.test(text)) { this.emit("action", text.slice(1)); return }
+    if (this.isLocalCommand(text)) { this.emit("action", text.slice(1)); return }
     this.route = "chat"; this.emit("change"); await this.send({ type: "navigate", text })
   }
   async result<T extends { request_id: string; error?: string }>(frame: FrontendFrame, requestID: string, read: (state: BackendState) => T | undefined): Promise<T> {

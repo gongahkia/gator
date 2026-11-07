@@ -14,7 +14,7 @@ export function activitySummary(trace: BackendActivity) {
   return label + (duration ? `${trace.state === "completed" ? " for" : " after"} ${duration}` : "") + (failed ? ` · ${failed} failed ${failed === 1 ? "tool" : "tools"}` : "")
 }
 export function activityText(trace: BackendActivity) {
-  return [activitySummary(trace), ...trace.entries.map(entry => entry.kind === "tool" ? `${entry.tool} · ${entry.state === "stopped" ? "unfinished" : entry.state}` : entry.text || ""), trace.truncated ? "Some activity was shortened to keep this conversation responsive." : ""].filter(Boolean).join("\n")
+  return [activitySummary(trace), ...trace.entries.map(entry => entry.kind === "tool" ? `${entry.tool} · ${entry.state === "stopped" ? "unfinished" : entry.state}${entry.details?.length ? " · " + entry.details.map(detail => [detail.kind.replaceAll("_", " "), detail.path || detail.domain, detail.status, detail.exit_code !== undefined ? "exit " + detail.exit_code : "", detail.timed_out ? "timed out" : ""].filter(Boolean).join(": ")).join("; ") : ""}${entry.partial ? " (partial)" : ""}` : entry.text || ""), trace.truncated ? "Some activity was shortened to keep this conversation responsive." : ""].filter(Boolean).join("\n")
 }
 export function searchableMessage(message: BackendMessage, expanded: boolean) { return [message.text, expanded && message.activity ? activityText(message.activity) : ""].filter(Boolean).join("\n") }
 export function Activity(props: { trace: BackendActivity; identity: string; expanded: ReadonlySet<string>; live?: boolean }) {

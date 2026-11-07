@@ -12,6 +12,7 @@ export function Progress() {
     if (data.snapshot.terminalBusy || data.state?.external) return ""
     if (data.snapshot.sessionSwitching) return "Opening chat…"
     if (data.snapshot.connection === "starting") return "Connecting to Gator…"
+    if (data.voicePhase === "downloading") return "Downloading local voice model…"
     if (data.voicePhase === "transcribing") return "Transcribing audio…"
     if (data.voicePhase === "recording" || data.voicePhase === "speaking" || data.state?.pending_approval) return ""
     if (data.state?.pending_operation) return literal(data.state.pending_operation)

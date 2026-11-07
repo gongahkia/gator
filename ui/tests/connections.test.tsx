@@ -33,9 +33,8 @@ test("connection forms review private tokens, verify access and retain browser s
   const field = async (label: string, value: string, secret = false) => { await choose(label); if (!secret) setup.mockInput.pressKey("u", { ctrl: true }); await setup.mockInput.typeText(value); expect(setup.captureCharFrame()).not.toContain("private-service-token"); setup.mockInput.pressEnter(); await flush() }
   try {
     await client.start(); await client.edit("Keep connection setup draft"); const original = client.context
-    await client.navigate("/connections"); await choose("Add a service token connection")
+    await client.navigate("/connections"); await choose("JSON API")
     await field("Connection ID", "metrics"); await field("Display name", "Team metrics")
-    await choose("Service"); await setup.mockInput.typeText("JSON API"); await flush(); setup.mockInput.pressEnter(); await flush()
     await field("Resource URL", base + "/resource")
     setup.mockInput.pressKey("F2"); await flush(); expect(JSON.parse(await readFile(configPath, "utf8")).connectors).toHaveLength(1)
     setup.mockInput.pressEnter(); await until(() => !!client.state?.panel?.rows?.some(row => row.label === "Set access token"), "saved connection")

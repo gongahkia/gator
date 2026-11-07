@@ -1,7 +1,8 @@
+import { draftLinks, markdownLink } from "./draft-links"
 import { onCleanup } from "solid-js"
 import { NativeImage } from "@opentui/core"
 import { useRenderer } from "@opentui/solid"
-import { openLink, clipboardRead, clipboardWrite, clipboardImage } from "@gator/application-host/native"
+import { openLink, clipboardRead, clipboardWrite, clipboardImage, speechVoices } from "@gator/application-host/native"
 import { VoiceSession } from "@gator/application-host/voice-session"
 import { useClient } from "../context/client"
 import type { Choice } from "./actions"
@@ -27,19 +28,49 @@ export function useNative(controls: { actions: Record<string, () => unknown>; me
   controls.actions.voice = async () => {
     const status = await voice.status()
     controls.menu(`Voice · ${voice.phase}`, [
-      { title: "Start dictation", description: status.issue || `${status.provider} / ${status.model}; explicit microphone capture, at most 120 seconds`, disabled: !status.ready || voice.phase !== "idle", run: () => controls.confirm("Start microphone recording?", "Audio is sent to your configured voice provider only when you stop and transcribe. Review the resulting draft before sending. OS microphone permission and ffmpeg are required.", () => voice.start()) },
+      { title: "Start dictation", description: status.issue || `${status.provider} / ${status.model}; explicit microphone capture, at most 120 seconds`, disabled: !status.ready || voice.phase !== "idle", run: () => controls.confirm("Start microphone recording?", status.provider === "whisper-local" ? "Audio is transcribed locally using your installed Whisper model. Review the draft before sending. OS microphone permission and ffmpeg are required." : "Audio is sent to your configured voice provider when you stop and transcribe. Review the resulting draft before sending. OS microphone permission and ffmpeg are required.", () => voice.start()) },
       { title: "Stop and transcribe into this draft", disabled: voice.phase !== "recording", run: async () => { const result = await voice.stop(); if (result.context !== client.context) throw new Error("The conversation changed during dictation."); await client.edit(client.draft.text + (client.draft.text ? "\n" : "") + result.text) } },
       { title: "Cancel recording / transcription", disabled: voice.phase === "idle", run: () => voice.cancel() },
       { title: "Stop spoken reply", disabled: !voice.playing, run: () => voice.stopPlayback() },
       { title: status.preferences.spoken_replies ? "Disable spoken replies" : "Enable spoken replies", run: () => voice.configure({ spoken_replies: !status.preferences.spoken_replies }) },
-      { title: "Voice provider", run: () => controls.menu("Dictation provider", ["openai", "gemini"].map(provider => ({ title: provider, run: () => voice.configure({ provider }) }))) },
+      { title: "Voice provider", run: () => controls.menu("Dictation provider", ["whisper-local", "openai", "gemini"].map(provider => ({ title: provider, run: () => voice.configure({ provider }) }))) },
+      ...(status.local?.models ?? []).map(model => ({ title: `${model.available ? "Select" : "Download"} local Whisper ${model.label}`, description: `${Math.ceil(model.bytes / 1024 / 1024)} MiB${status.local?.runtime_ready ? "" : " · Install whisper-cli to transcribe locally"}`, disabled: voice.phase !== "idle", run: async () => {
+        if (model.available) await voice.configure({ provider: "whisper-local", model: model.id })
+        else controls.confirm("Download local voice model?", `${model.label} · ${Math.ceil(model.bytes / 1024 / 1024)} MiB. Gator verifies the downloaded model. Audio stays local when using Whisper.`, async () => { await voice.download(model.id); await voice.configure({ provider: "whisper-local", model: model.id }) })
+      } })),
+      { title: "System voice", run: async () => controls.menu("Installed speech voices", [{ title: "Use system default", run: () => voice.configure({ system_voice: "" }) }, ...(await speechVoices()).map(item => ({ title: item.name, description: item.language, run: () => voice.configure({ system_voice: item.name }) }))]) },
       { title: "Voice model", description: status.model, run: () => controls.prompt("Voice model", status.model, model => voice.configure({ model })) },
       { title: "Language", description: status.preferences.language, run: () => controls.prompt("Voice language", status.preferences.language || "", language => voice.configure({ language })) },
       { title: "Speech rate", description: String(status.preferences.rate || 1), run: () => controls.prompt("Speech rate (0.5–2)", String(status.preferences.rate || 1), rate => voice.configure({ rate: Number(rate) })) },
       { title: "Configure provider credentials", run: () => client.navigate("/model") },
     ])
   }
-  controls.actions.links = () => controls.menu("Links in the current page", (client.state?.panel?.links ?? []).map(link => ({ title: link.label, description: link.url, run: () => openLink(link.url) })))
+  controls.actions["read-aloud"] = () => controls.menu("Read a reply aloud", (client.state?.messages ?? []).filter(message => message.role === "Gator" && message.text && !message.result).map(message => ({ title: message.text.slice(0, 100), run: () => voice.read(message.text.replace(/```[\s\S]*?```/g, " Code block omitted. ").replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/[`#*>_]/g, " ").trim().slice(0, 12000)) })))
+  controls.actions["stop-reading"] = () => voice.stopPlayback()
+  controls.actions.links = () => {
+    const context = client.context, draft = client.draft.text
+    const groups = [{ text: draft, label: "Message draft", draft: true }, ...(client.state?.messages ?? []).map((message, index) => ({ text: message.text, label: `${message.role} · message ${index + 1}`, draft: false }))]
+    controls.menu("Links", [
+      ...(client.state?.panel?.links ?? []).map(link => ({ title: link.label, description: link.url, run: () => openLink(link.url) })),
+      ...groups.flatMap(group => draftLinks(group.text).map(link => ({ title: link.label, description: group.label, run: () => {
+        const stage = async (label: string, url: string) => {
+          if (context !== client.context) throw new Error("Return to the original conversation before editing this link.")
+          const value = markdownLink(label, url)
+          if (group.draft) {
+            if (client.draft.text !== group.text) throw new Error("The draft changed. Open /links again to edit its current text.")
+            await client.edit(group.text.slice(0, link.start) + value + group.text.slice(link.end))
+          } else await client.edit([client.draft.text, value].filter(Boolean).join("\n\n"))
+        }
+        controls.menu("Link actions", [
+          { title: "Open in browser", description: link.url, run: () => openLink(link.url) },
+          { title: "Copy link", run: () => clipboardWrite(link.url) },
+          { title: "Edit address in draft", run: () => controls.prompt("Link address", link.url, url => stage(link.label, url)) },
+          { title: "Edit label in draft", run: () => controls.prompt("Link label", link.label, label => stage(label, link.url)) },
+        ])
+      } }))),
+    ])
+  }
+
   const continueExternal = async () => {
     const draft = client.draft
     await renderer.suspend()

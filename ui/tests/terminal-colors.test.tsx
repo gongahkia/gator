@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import { createSignal } from "solid-js"
 import { testRender } from "@opentui/solid"
-import { ThemeProvider, terminalPalette } from "../src/context/theme"
+import { ThemeProvider, terminalPalette, presetPalette } from "../src/context/theme"
 import { ConnectionStatus } from "../src/gator/connection-status"
 import { displayDate, folderLabel } from "../src/gator/display"
 
@@ -34,4 +34,14 @@ test("display labels omit missing dates and shorten both Windows and Mac paths",
   expect(folderLabel("C:\\Users\\Alex\\work\\Gator\\")).toBe("Gator")
   expect(folderLabel("/Users/Alex/work/Gator/")).toBe("Gator")
   expect(displayDate("2025-03-14T12:00:00Z", new Date("2026-10-29T12:00:00Z"))).toContain("2025")
+})
+
+
+test("explicit theme presets color terminal surfaces while the default and NO_COLOR preserve native colors", () => {
+  expect(presetPalette("terminal", false).background.base.intent).toBe("default")
+  for (const name of ["gator", "light", "contrast", "mono"]) {
+    expect(presetPalette(name, false).background.base.intent).not.toBe("default")
+    expect(presetPalette(name, false).text.base.intent).not.toBe("default")
+    expect(presetPalette(name, true).background.base.intent).toBe("default")
+  }
 })

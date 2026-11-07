@@ -32,7 +32,7 @@ test("real public tool activity folds before the answer, remains searchable when
     await until(() => calls === 2 && !!client.state?.activity?.entries.some(entry => entry.kind === "tool"), "public tool completion")
     await client.edit("Keep the next question"); await flush()
     expect(setup.captureCharFrame()).toContain("I will check your notes first.")
-    expect(JSON.stringify(client.state?.activity)).not.toContain("Internal fixture body"); expect(JSON.stringify(client.state?.activity)).not.toContain("source/note.md")
+    expect(JSON.stringify(client.state?.activity)).not.toContain("Internal fixture body"); expect(JSON.stringify(client.state?.activity)).toContain("source/note.md")
     await activity(true); expect(setup.captureCharFrame()).toContain("read_file"); setup.mockInput.pressEscape(); await flush()
     release(); await until(() => !client.state?.running, "completed answer"); await flush()
     expect(setup.captureCharFrame()).toContain("Worked for"); expect(setup.captureCharFrame()).not.toContain("I will check your notes first.")

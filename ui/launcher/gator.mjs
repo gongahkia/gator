@@ -31,7 +31,7 @@ Requires Bun 1.4.2 or newer. Native helpers are described in TERMINAL.md.`)
 } else if (args.length && args[0] !== "resume" && args[0] !== "--goal") {
   if (["ui-backend", "desktop-speech", "desktop-update-guard"].includes(args[0])) throw new Error("This is a private application service.")
   const result = spawnSync(runtime, args, { stdio: args.length === 1 && ["--version", "-v"].includes(args[0]) ? ["inherit", "pipe", "inherit"] : "inherit", env: { ...process.env, GATOR_UI_FRONTEND: "terminal" }, windowsHide: false })
-  if (result.stdout) process.stdout.write(result.stdout.toString().replace("Gator desktop runtime", "gator terminal"))
+  if (result.stdout) process.stdout.write(result.stdout.toString().replace(/^gator /, "gator terminal "))
   if (result.error) console.error("Gator:", result.error.message)
   process.exitCode = result.status ?? 1
 } else {

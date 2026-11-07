@@ -23,6 +23,7 @@ import { Panel } from "./gator/panel"
 import { literal } from "./gator/text"
 import { Hub } from "./gator/hub"
 import { useActions } from "./gator/actions"
+import { useProductActions } from "./gator/product-actions"
 import { useNative } from "./gator/native"
 import { commandGroup } from "./gator/command-groups"
 import type { GatorClient } from "./gator/client"
@@ -31,6 +32,7 @@ import type { ClipboardService } from "./context/clipboard"
 function Shell(props: { quit(): Promise<void> }) {
   const client = useClient(), data = useData(), theme = useTheme(), dialog = useDialog()
   const controls = useActions()
+  useProductActions(controls)
   const voice = useNative(controls)
   const attempt = (operation: Promise<unknown>) => { void operation.catch(error => client.fail(error)) }
   const palette = () => dialog.replace(() => <CommandPaletteDialog />)
@@ -94,7 +96,7 @@ function Shell(props: { quit(): Promise<void> }) {
 }
 function Themed(props: { client: GatorClient; quit(): Promise<void>; clipboard: ClipboardService }) {
   const data = useData()
-  return <ThemeProvider><ConfigProvider bindings={terminalShortcuts(data.state?.desktop?.shortcuts)}>
+  return <ThemeProvider theme={data.preferences.theme}><ConfigProvider bindings={terminalShortcuts(data.state?.desktop?.shortcuts)}>
     <ClipboardProvider value={props.clipboard}><Keymap.Provider><ToastProvider><DialogProvider><Shell quit={props.quit} /></DialogProvider></ToastProvider></Keymap.Provider></ClipboardProvider>
   </ConfigProvider></ThemeProvider>
 }

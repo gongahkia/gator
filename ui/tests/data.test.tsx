@@ -49,7 +49,8 @@ test("private data keyboard reviews export verify and restore into a separate pa
     setup.mockInput.pressEnter(); await until(() => client.state?.panel?.title === "Review restore into a fresh profile", "restore plan")
     expect(await exists(restored)).toBe(false); expect(JSON.stringify(client.state?.panel)).toContain(JSON.stringify(restored).slice(1, -1)); expect(JSON.stringify(client.state?.panel)).toContain(JSON.stringify(replacement).slice(1, -1))
     await writeFile(backup, Buffer.concat([bytes, Buffer.from("changed after review")]))
-    setup.mockInput.pressEnter(); await until(() => !!client.state?.panel?.notice, "changed archive refusal")
+    const reviewedID = client.state?.panel?.id
+    setup.mockInput.pressEnter(); await until(() => !client.state?.pending_operation && client.state?.panel?.id !== reviewedID && !!client.state?.panel?.notice, "changed archive refusal"); await flush()
     expect(await exists(restored)).toBe(false); expect(client.draft.text).toBe("Keep private data draft")
     await writeFile(backup, bytes); await client.navigate("/data"); await choose("Restore into a new profile"); await path("Existing backup archive", backup); await path("New profile directory", restored); await mapping(); await review()
     setup.mockInput.pressEnter(); await until(() => client.state?.panel?.title === "Review restore into a fresh profile", "fresh restore plan")

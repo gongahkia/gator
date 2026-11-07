@@ -177,7 +177,7 @@ export function Panel(props: { panel: BackendPanel }) {
   return <box flexGrow={1} minHeight={0} paddingX={2} gap={1}>
     <text fg={theme.accent}><b>{literal(props.panel.title)}</b></text>
     <Show when={busy() || props.panel.catalog?.loading}><Spinner delay={150}>{props.panel.catalog ? "Loading chats…" : "Updating…"}</Spinner></Show>
-    <Show when={props.panel.kind === "appearance"} fallback={<Show when={props.panel.subtitle}><text fg={theme.text.muted}>{literal(props.panel.subtitle)}</text></Show>}><text fg={theme.text.muted}>Terminal colors and transparency follow your terminal settings. These presets apply to the desktop app.</text></Show>
+    <Show when={props.panel.kind === "appearance"} fallback={<Show when={props.panel.subtitle}><text fg={theme.text.muted}>{literal(props.panel.subtitle)}</text></Show>}><text fg={theme.text.muted}>Use /appearance to choose terminal colors or a Gator preset. Shortcuts below apply to this app.</text></Show>
     <Show when={props.panel.filter && !props.panel.catalog}><text fg={theme.text.muted}>Filter: {literal(props.panel.filter?.value)} · Ctrl+L changes</text></Show>
     <Show when={props.panel.catalog}><text fg={theme.text.muted}>{props.panel.filter?.options.find(option => option.value === props.panel.filter?.value)?.label || "Chats"} · {`${props.panel.rows?.length ?? 0} chats`}{props.panel.catalog?.has_previous || props.panel.catalog?.has_next ? ` · Page ${props.panel.catalog?.page} · Ctrl+←/→` : ""}</text></Show>
     <Show when={props.panel.catalog && props.panel.query}><text fg={theme.text.muted}>Search retained messages: {literal(props.panel.query)}</text></Show>

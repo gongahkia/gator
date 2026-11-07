@@ -27,7 +27,8 @@ export function Prompt() {
       ["receipts", "Inspect connected requests"], ["about", "Version and installation"],
       ["prompt-history", "Reuse a retained message"], ["exit", "Exit Gator"], ["quit", "Exit Gator"],
     ].map(([name, description]) => ({ name: name!, description: description!, needs_input: false }))
-    return [...local, ...(data.state?.commands ?? []).filter(command => !local.some(item => item.name === command.name))]
+    const additional = Object.keys(client.actions).filter(name => name !== "activity" && !local.some(item => item.name === name)).map(name => ({ name, description: name.replaceAll("-", " "), needs_input: false }))
+    return [...local, ...additional, ...(data.state?.commands ?? []).filter(command => !local.some(item => item.name === command.name) && !additional.some(item => item.name === command.name))]
       .sort((a, b) => a.name.localeCompare(b.name))
   })
   const matches = createMemo(() => {
@@ -58,7 +59,7 @@ export function Prompt() {
     { bind: "return", run: () => { void complete(true).catch(error => client.fail(error)) } },
     { bind: "escape", run: () => { setDismissed(data.draft.text) } },
   ] }))
-  createEffect(() => { const text = data.draft.text; if (textarea && textarea.plainText !== text) textarea.setText(text) })
+  createEffect(() => { const text = data.draft.text; if (textarea && textarea.plainText !== text) { textarea.setText(text); textarea.gotoLineEnd() } })
   createEffect(() => { if (dialog.stack.length || data.state?.panel) textarea?.blur(); else textarea?.focus() })
   const guide = () => { void client.guide().catch(error => client.fail(error)) }
   Keymap.createLayer(() => ({ priority: 2, enabled: dialog.stack.length === 0, commands: [
@@ -79,6 +80,7 @@ export function Prompt() {
       </box>
     </Show>
     <Show when={data.state?.running}><text fg={theme.text.muted}>Enter queues · Ctrl+G guides · Ctrl+C stops</text></Show>
+    <Show when={client.planFirst.has(data.draft.context)}><text fg={theme.accent}>Plan first · review before implementation · /plan-first to change</text></Show>
     <Show when={data.draft.uploads?.length}><text fg={theme.accent}>Attached: {data.draft.uploads?.map(f => literal(f.name)).join(" · ")}</text></Show>
     <Show when={data.draft.reply_to_update_id}><text fg={theme.accent}>Replying to: {literal(data.state?.chat_updates?.find(update => update.id === data.draft.reply_to_update_id)?.title || data.draft.reply_to_update_id)} · “cancel-update-reply” in commands clears the link.</text></Show>
     <textarea ref={value => { textarea = value }} focused height={3} minHeight={1} maxHeight={8}
