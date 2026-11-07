@@ -16,6 +16,8 @@ import { renderPDF } from "./pdf.mjs";
 import { importPastedImages } from "./pasted-images.mjs";
 import { helper } from "./native.mjs";
 import { ExportStore } from "./export.mjs";
+import { sourceCatalog, sourcePreview } from "./source-preview.mjs";
+import { codePreview } from "./code-preview.mjs";
 import { FrontendPreferences } from "./preferences.mjs";
 
 // Local application services. No renderer, IPC, HTTP server, or second agent.
@@ -118,6 +120,25 @@ export class Application extends EventEmitter {
     }
     return result;
   }
+  async branch(action) {
+    this.mutable();
+    const owner = this.backend;
+    await this.send({ type: "branch", branch: action });
+    const result = owner.state?.branch_result;
+    if (result?.request_id !== action.request_id) throw new Error("Branch status is unconfirmed. Inspect Conversations before trying again.");
+    if (result.error) throw new Error(result.error);
+    return result;
+  }
+  evidenceOwner(context) {
+    this.mutable();
+    const owner = this.backend;
+    const current = () => this.backend === owner && !owner.closed && !this.sessions.switching && !owner.state?.external && this.context === context;
+    if (!current()) throw new Error("Return to the original conversation to inspect retained evidence.");
+    return { state: owner.state, stateRoot: this.stateRoot, current };
+  }
+  sourceCatalog(request) { return sourceCatalog(request, this.evidenceOwner(request?.context)); }
+  sourcePreview(request) { return sourcePreview(request, this.evidenceOwner(request?.context)); }
+  codePreview(request) { return codePreview(request, this.evidenceOwner(request?.context)); }
   async reviewExport(destination) { this.mutable(); return this.exports.review(destination); }
   async exportFile(request, destination, review) {
     const owner = this.backend, context = this.context;
@@ -144,7 +165,7 @@ export class Application extends EventEmitter {
     return selected;
   }
   async openSession(id) {
-    if (typeof id !== "string" || !this.sessions.activity().some(row => row.id === id)) throw new Error("This chat is no longer in the open-chat list.");
+    if (!this.sessions.canOpen(id)) throw new Error("This chat is no longer in the open-chat list.");
     await this.sessions.open({ conversation_id: id });
   }
   async version() { return (await helper(this.binary, ["--version"], { maxBytes: 4096 })).toString("utf8").trim().replace("gator ", "Gator terminal "); }

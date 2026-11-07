@@ -16,6 +16,10 @@ export class Application extends EventEmitter {
   file(request: FileRequest & { action: "attach" }): Promise<UploadedFile>
   file(request: FileRequest & { action: "compare" }): Promise<FileComparison>
   file(request: FileRequest): Promise<FileView>
+  branch(action: import("../contracts/protocol").BranchAction): Promise<import("../contracts/protocol").BranchResult>
+  sourceCatalog(request: {context: string; run: string}): Promise<import("../contracts/sourcePreview").SourceCatalog>
+  sourcePreview(request: import("../contracts/sourcePreview").SourcePreviewRequest): Promise<import("../contracts/sourcePreview").SourcePreview>
+  codePreview(request: import("../contracts/codePreview").CodePreviewRequest): Promise<import("../contracts/codePreview").CodePreview>
   reviewExport(destination: string): Promise<{ path: string; exists: boolean; bytes?: number; modified?: string; token?: string }>
   exportFile(request: FileRequest, destination: string, review?: string): Promise<void>
   pdf(request: FileRequest, page: number, width?: number): Promise<{ pages: number; page: number; image: Uint8Array }>
