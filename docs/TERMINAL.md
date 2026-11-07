@@ -5,6 +5,13 @@ is hidden by default. Ask Gator to help through its app tools, or type `/` for
 controls. Ctrl+P searches commands; Ctrl+B optionally opens navigation.
 See [development](DEVELOPMENT.md) and the [port inventory](CLI-TUI-PORT.md).
 
+A small ASCII Gator sits beside the message box. It blinks while idle, moves
+during current work, and waits when a review or handoff needs attention. `/mascot`
+chooses Animated, Still or Hidden and remembers the setting. Terminals narrower
+than 70 columns keep the message box clear by hiding it automatically.
+`GATOR_REDUCED_MOTION=1` keeps the mascot still. Its colors follow the current
+terminal or Gator appearance preset.
+
 Use Go 1.25.13+, Node 22.12+ for build scripts/shared-host tests, and Bun 1.4.2.
 The selected frontend uses Solid 1.9.15 and OpenTUI 0.6.8 with native platform
 assets; a Node-only terminal launch is not claimed.

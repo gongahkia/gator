@@ -1,6 +1,7 @@
 // Gator adaptation of OpenCode component/prompt/index.tsx. Retains the bottom
 // textarea/composer structure; replaces upstream prompt parts, API submission,
 // agent variants and local stash with Gator's acknowledged drafts and queues.
+import { Mascot } from "../mascot"
 import { TextareaRenderable } from "@opentui/core"
 import { createEffect, createMemo, createSignal, For, on, Show } from "solid-js"
 import { useTerminalDimensions } from "@opentui/solid"
@@ -83,11 +84,16 @@ export function Prompt() {
     <Show when={client.planFirst.has(data.draft.context)}><text fg={theme.accent}>Plan first · review before implementation · /plan-first to change</text></Show>
     <Show when={data.draft.uploads?.length}><text fg={theme.accent}>Attached: {data.draft.uploads?.map(f => literal(f.name)).join(" · ")}</text></Show>
     <Show when={data.draft.reply_to_update_id}><text fg={theme.accent}>Replying to: {literal(data.state?.chat_updates?.find(update => update.id === data.draft.reply_to_update_id)?.title || data.draft.reply_to_update_id)} · “cancel-update-reply” in commands clears the link.</text></Show>
+    <box flexDirection="row" gap={2} minHeight={3}>
+      <Mascot />
+      <box flexGrow={1} flexBasis={0} minWidth={0}>
     <textarea ref={value => { textarea = value }} focused height={3} minHeight={1} maxHeight={8}
       placeholderColor={theme.text.muted} initialValue={data.draft.text} placeholder="Send a message… / for commands"
       textColor={theme.text.base} focusedTextColor={theme.text.base} backgroundColor={theme.background.base}
       keyBindings={[{ name: "return", action: "submit" }, { name: "return", shift: true, action: "newline" }, { name: "j", ctrl: true, action: "newline" }]}
       onContentChange={() => { if (textarea && textarea.plainText !== client.draft.text) void client.edit(textarea.plainText).catch(e => client.fail(e)) }}
       onSubmit={() => { if (!dialog.stack.length) void client.submit().catch(e => client.fail(e)) }} />
+      </box>
+    </box>
   </box>
 }

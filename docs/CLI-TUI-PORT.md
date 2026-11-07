@@ -52,8 +52,8 @@ Observed locally on Intel macOS; no paid model calls were made.
 - Terminal renderer and real-Go tests cover chat, exact reviews, branches,
   source selection, plan edits/stale approval rejection, specialist tokens,
   connections, memory, data, Office files, draft ownership and recovery.
-  The final full run passes 71 tests with three explicit platform/OS-helper
-  skips (74 total). Seven focused navigation/form checks also pass.
+  The final full run, including the mascot, passes 72 tests with three explicit platform/OS-helper
+  skips (75 total). Seven focused navigation/form checks also pass.
 - A colored terminal appearance run passes alongside NO_COLOR/native-color tests.
 - 14 installer/uninstaller unit checks pass. The production package verifies its
   dependency closure, real Go host, PDF pages, native Office/text edits and exports.
@@ -97,3 +97,18 @@ microphone and other-platform visual verification remain unverified.
 No actionable interface-polish findings remain in the verified scope. Verdict:
 Approve for the local terminal port; physical microphone and other-platform
 visual checks remain unverified as listed above.
+
+## Optional mascot
+
+The ASCII Gator uses four fixed-width rows beside the composer. Idle blinking
+wakes briefly every five seconds; work uses a 360ms frame interval. Review and
+handoff states use a static attention expression. All timers stop when hidden,
+when motion is reduced, or when the component closes. `/mascot` persists Animated,
+Still or Hidden; widths under 70 columns automatically hide it. The existing
+chat draft and keyboard focus remain the input authority.
+
+Renderer checks cover observed work, attention, animation, still/hidden modes,
+persistence, compact terminals and draft ownership. Reduced-motion checks pass.
+The 100×24 character preview was inspected; the mascot shares the existing
+terminal tokens and preserves the composer geometry while its frame changes.
+Installed production PTY/editor/file-preview checks also pass with the mascot.
