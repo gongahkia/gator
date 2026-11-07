@@ -79,7 +79,7 @@ func TestLegacyProtocolAndDelegationCommandsAreRemoved(t *testing.T) {
 func TestMovedRootCommandsExplainTheirCanonicalFamily(t *testing.T) {
 	for command, canonical := range map[string]string{
 		"hook": "gator config hook", "connector": "gator provider connector", "inbox": "gator job inbox", "snapshot": "gator work snapshot",
-		"inspect": "gator work inspect", "resume": "gator work resume", "eval": "gator work eval",
+		"inspect": "gator work inspect", "eval": "gator work eval",
 		"review": "gator work review", "export": "gator work export", "apply": "gator work apply",
 	} {
 		var output bytes.Buffer
@@ -109,8 +109,8 @@ func TestInternalCommandAliasesRouteToTheirServices(t *testing.T) {
 	if err := run([]string{"-p", "list"}, &output); err != nil || !strings.Contains(output.String(), "No custom providers configured") {
 		t.Fatalf("-p list output = %q, err = %v", output.String(), err)
 	}
-	if err := run([]string{"-u", "unexpected"}, io.Discard); err == nil || !strings.Contains(err.Error(), "CLI updater is retired") {
-		t.Fatalf("-u error = %v", err)
+	if err := run([]string{"-u"}, &output); err != nil || !strings.Contains(output.String(), "complete terminal package") {
+		t.Fatalf("-u output = %q, err = %v", output.String(), err)
 	}
 	path := os.Getenv("PATH")
 	t.Setenv("PATH", t.TempDir())

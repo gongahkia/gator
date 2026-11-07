@@ -162,7 +162,7 @@ func TestTerminalSettingsRouteOpensStatusLineEditor(t *testing.T) {
 		model := New(Config{CurrentFolder: t.TempDir()})
 		next, command := model.runLocalCommand(text)
 		model = next.(Model)
-		if command != nil || model.panel == nil {
+		if command != nil || !model.launcher || model.launcherMode != "status-line" {
 			t.Fatalf("status line route %q: %s", text, model.snapshotText())
 		}
 	}

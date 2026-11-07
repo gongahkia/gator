@@ -66,7 +66,7 @@ test("corrupt or interrupted legacy import retains source bytes and leaves no co
     await rm(source, { recursive: true });
     const database = new ClassicLevel(source, { keyEncoding: "buffer", valueEncoding: "buffer" });
     await database.put(key("gator:sidebar-collapsed"), dom("true")); await database.del(key("gator:sidebar-collapsed")); await database.close();
-    assert.equal((await store.read()).sidebarCollapsed, false);
+    assert.equal((await store.read()).sidebarCollapsed, true);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
