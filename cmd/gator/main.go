@@ -20,14 +20,21 @@ var (
 	date    = "unknown"
 )
 
-const usage = `Gator desktop runtime
+const usage = `Gator — personal agent in your terminal
 
-Open the Gator desktop application to use Gator.
-This bundled process is an internal app component, not a standalone CLI.
-Development setup: npm ci --prefix desktop && make desktop`
+gator                         Open the chat TUI
+gator resume <chat-id>         Reopen a retained conversation
+gator work "task"              Run a scripted task
+gator work-rpc                JSON-lines automation
+gator config|provider|agent|job|goal|memory|note|data|usage|doctor ...
+                              Manage Gator from the command line
+gator --version               Show build information
+
+In chat: / for commands, Ctrl+P to search, Ctrl+Q to quit.
+From a checkout: make run. See docs/TERMINAL.md.`
 
 func main() {
-	if err := runDesktopRuntime(os.Args[1:], os.Stdout); err != nil {
+	if err := runRuntime(os.Args[1:], os.Stdout); err != nil {
 		fmt.Fprintln(os.Stderr, "Gator:", err)
 		os.Exit(1)
 	}
@@ -38,7 +45,7 @@ func run(args []string, out io.Writer) error {
 		return fmt.Errorf("Gator supports Linux, macOS, and Windows; %s is not supported", runtime.GOOS)
 	}
 	if len(args) == 0 {
-		return errors.New(desktopOnlyMessage)
+		return launchTerminal(nil)
 	}
 	if args[0] == "--help" || args[0] == "-h" {
 		_, err := fmt.Fprintln(out, usage)
@@ -64,6 +71,11 @@ func run(args []string, out io.Writer) error {
 		defer release()
 	}
 	switch args[0] {
+	case "resume":
+		if len(args) != 2 || !validIdentifier(args[1]) {
+			return errors.New("usage: gator resume <chat-id>")
+		}
+		return launchTerminal(args)
 	case "overview":
 		return overviewCommand(args[1:], out)
 	case "data":
@@ -75,7 +87,8 @@ func run(args []string, out io.Writer) error {
 	case "agent", "-a":
 		return agentFamilyCommand(args[1:], out)
 	case "update", "-u":
-		return errors.New("Gator desktop updates are installed through the desktop application distribution; the CLI updater is retired")
+		_, err := fmt.Fprintln(out, "Update the complete terminal package from https://github.com/gongahkia/gator/releases. Finish active work and stop background services before switching installations; profiles are retained.")
+		return err
 	case "doctor", "-d":
 		return doctor(args[1:], out)
 	case "extension", "-e":
@@ -119,7 +132,7 @@ func run(args []string, out io.Writer) error {
 		return workCommand(args[1:], out)
 	case "acp":
 		return errors.New("ACP Code mode is retired; use Gator conversations or work-rpc for automation")
-	case "hook", "connector", "inbox", "snapshot", "inspect", "resume", "eval", "review", "export", "apply":
+	case "hook", "connector", "inbox", "snapshot", "inspect", "eval", "review", "export", "apply":
 		return movedCommand(args[0])
 	default:
 		if isQuotedWorkRequest(args) {

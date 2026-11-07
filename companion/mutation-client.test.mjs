@@ -4,7 +4,7 @@ import { mkdtemp,writeFile,rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createCompanion } from './server.mjs';
-const {chromium}=await import(process.env.GATOR_PLAYWRIGHT_MODULE||'../desktop/node_modules/playwright/index.mjs');
+const {chromium}=await import(process.env.GATOR_PLAYWRIGHT_MODULE||'./node_modules/playwright/index.mjs');
 
 test('semantic phone controls bind review to selection, invalidate revoked grants and reconcile unknown receipts without replay', {timeout:90000},async()=>{
   const root=await mkdtemp(join(tmpdir(),'gator-control-browser-')),tokenFile=join(root,'owner.token'),token='a'.repeat(64);let companion,browser,granted=true,online=true,dispatches=0,reads=0,sent,receipt;

@@ -116,7 +116,7 @@ func TestConversationReceivesCurrentAppKnowledgeAfterModelChange(t *testing.T) {
 	if currentState["snapshot_id"] != first.SnapshotID || currentState["effective_mode"] != "inspect" || currentState["external_actions"] != "forbid" {
 		t.Fatalf("app state did not reflect the actual run: %v", currentState)
 	}
-	for _, guide := range []string{"personal agent", "Settings (the bottom-left sliders icon) → Models", "send /model in Gator's message box", "Correct earlier assistant replies", "Use gator_app_update", "available tools"} {
+	for _, guide := range []string{"personal agent", "Ctrl+P opens searchable commands", "/model", "Correct earlier assistant replies", "Use gator_app_update", "available tools"} {
 		if !strings.Contains(current.System, guide) {
 			t.Errorf("conversation omitted app guidance %q", guide)
 		}
@@ -129,11 +129,11 @@ func TestConversationReceivesCurrentAppKnowledgeAfterModelChange(t *testing.T) {
 	}
 }
 
-func TestRetiredFrontendEnvironmentCannotChangeApplicationIdentity(t *testing.T) {
+func TestApplicationUsesTerminalIdentity(t *testing.T) {
 	t.Setenv("GATOR_UI_FRONTEND", "terminal")
 	prompt := applicationContext(Request{Provider: "fixture/current"})
-	if !strings.Contains(prompt, "Electron") || strings.Contains(prompt, "OpenCode-derived") || strings.Contains(prompt, "Ctrl+P opens searchable commands") {
-		t.Fatal("retired frontend environment revived terminal help")
+	if strings.Contains(prompt, "Electron") || !strings.Contains(prompt, "OpenCode-derived") || !strings.Contains(prompt, "Ctrl+P opens searchable commands") {
+		t.Fatal("application help did not describe the terminal")
 	}
 	if got := readApplicationState(t, prompt)["provider_model"]; got != "fixture/current" {
 		t.Fatalf("changed model authority: %v", got)

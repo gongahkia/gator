@@ -1,5 +1,5 @@
 import type { VoicePreferences } from "./voice";
-// Desktop and companion display contracts. Go owns workflow state.
+// Terminal and companion display contracts. Go owns workflow state.
 export type { OwnedWorkInspection, OwnedWorkResponse, WorkControlOffer, WorkRemoteAction, WorkControlReceipt } from "./inspection";
 export type ResultTone = "success" | "warning" | "error" | "muted" | "";
 export type ResultField = { label: string; value: string; tone?: ResultTone };

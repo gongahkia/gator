@@ -157,13 +157,13 @@ func TestStatusLineRequiresExplicitEnable(t *testing.T) {
 	}
 }
 
-func TestTerminalSettingsRouteIsRetired(t *testing.T) {
+func TestTerminalSettingsRouteOpensStatusLineEditor(t *testing.T) {
 	for _, text := range []string{"/settings statusline", "/statusline"} {
 		model := New(Config{CurrentFolder: t.TempDir()})
 		next, command := model.runLocalCommand(text)
 		model = next.(Model)
-		if command != nil || model.launcher || !strings.Contains(model.snapshotText(), "terminal interface is retired") {
-			t.Fatalf("retired route %q: %s", text, model.snapshotText())
+		if command != nil || model.panel == nil {
+			t.Fatalf("status line route %q: %s", text, model.snapshotText())
 		}
 	}
 }

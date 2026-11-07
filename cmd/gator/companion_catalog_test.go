@@ -18,7 +18,7 @@ func TestCompanionCatalogPagesRetainedChatsWithoutStartingWork(t *testing.T) {
 	t.Setenv("GATOR_INTERNAL_COMMANDS", "")
 	t.Setenv("GATOR_COMPANION_CATALOG", "")
 	args := []string{"companion-catalog", "", "active", ""}
-	if err := runDesktopRuntime(args, io.Discard); err == nil {
+	if err := runRuntime(args, io.Discard); err == nil {
 		t.Fatal("catalog accepted without host routing")
 	}
 	t.Setenv("GATOR_COMPANION_CATALOG", "1")
@@ -34,7 +34,7 @@ func TestCompanionCatalogPagesRetainedChatsWithoutStartingWork(t *testing.T) {
 	read := func(args []string) worksession.ConversationPage {
 		t.Helper()
 		var out bytes.Buffer
-		if err := runDesktopRuntime(args, &out); err != nil {
+		if err := runRuntime(args, &out); err != nil {
 			t.Fatal(err)
 		}
 		var page worksession.ConversationPage
@@ -64,7 +64,7 @@ func TestCompanionCatalogPagesRetainedChatsWithoutStartingWork(t *testing.T) {
 		t.Fatalf("search: %+v", page)
 	}
 	args[3] = first.Next
-	if err := runDesktopRuntime(args, io.Discard); err == nil {
+	if err := runRuntime(args, io.Discard); err == nil {
 		t.Fatal("accepted a cursor from a different search")
 	}
 	if items, err := store.List(100); err != nil || len(items) != 53 {

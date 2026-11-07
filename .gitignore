@@ -5,12 +5,6 @@ bin/
 coverage.out
 AGENTS.md
 node_modules
-/desktop/dist/
-/desktop/runtime/
-/desktop/release/
-/desktop/test-results/
-/desktop/playwright-report/
-# Unshipped build remnants from the retired terminal product.
 /ui/dist/
 /ui/runtime/
 /.pty-venv/

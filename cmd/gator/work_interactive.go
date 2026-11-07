@@ -60,7 +60,13 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 	originalWorkingDirectory := workingDirectory
 	backend := os.Getenv("GATOR_UI_BACKEND") == "1"
 	if !backend {
-		return errors.New(desktopOnlyMessage)
+		if goalID != "" {
+			return launchTerminal([]string{"--goal", goalID})
+		}
+		if startConversationID != "" {
+			return launchTerminal([]string{"resume", startConversationID})
+		}
+		return launchTerminal(nil)
 	}
 	stateDir, err := state.ResolveDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {

@@ -1,42 +1,50 @@
-.PHONY: build setup runtime run desktop package dist check fmt test vet help
+.PHONY: build setup runtime run terminal terminal-setup terminal-build terminal-check package dist install check fmt test vet help
 
 VERSION ?= dev
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
 BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+PACKAGE_DIR ?= $(CURDIR)/ui/release/gator-terminal
+PREFIX ?= $(HOME)/.local
 export VERSION COMMIT BUILD_DATE
 
-# The application is the product. Its Go executable is a private bundled runtime.
-build: setup
-	npm run build --prefix desktop
+# One terminal product: OpenTUI chat with the current Go agent runtime.
+build: setup runtime
+	cd ui && bun run build
 
-# Reinstall pinned dependencies after a fresh checkout or a manifest change.
-setup: app-host/node_modules/.package-lock.json desktop/node_modules/.package-lock.json
+setup: app-host/node_modules/.package-lock.json ui/node_modules/.gator-ready
 
 app-host/node_modules/.package-lock.json: app-host/package.json app-host/package-lock.json
 	npm ci --prefix app-host
 	@touch $@
 
-desktop/node_modules/.package-lock.json: desktop/package.json desktop/package-lock.json app-host/node_modules/.package-lock.json
-	npm ci --prefix desktop
+ui/node_modules/.gator-ready: ui/package.json ui/bun.lock app-host/package.json
+	cd ui && bun install --frozen-lockfile
 	@touch $@
 
 runtime:
-	npm run build:runtime --prefix desktop
+	node ui/scripts/build-runtime.mjs
 
-run: desktop
+run: build
+	bun ui/launcher/gator.mjs
 
-desktop: setup
-	npm start --prefix desktop
+terminal: run
+terminal-setup: setup
+terminal-build: build
+terminal-check: check
 
-package: setup
-	npm run pack --prefix desktop
+package: build
+	node ui/scripts/package.mjs "$(PACKAGE_DIR)"
 
-dist: setup
-	npm run dist --prefix desktop
+dist: package
 
-check: fmt test vet build
-	npm run check --prefix desktop
-	npm test --prefix desktop
+install: package
+	node ui/scripts/install.mjs "$(PACKAGE_DIR)" "$(PREFIX)"
+
+check: build test vet
+	cd ui && bun run check
+	npm test --prefix app-host
+	cd ui && bun run test
+	node --test ui/scripts/install.test.mjs ui/scripts/uninstall.test.mjs scripts/google-oauth-build.test.mjs
 
 fmt:
 	gofmt -w cmd internal
@@ -49,9 +57,9 @@ vet:
 
 help:
 	@printf '%s\n' \
-	  'make run      Build and launch Gator (same as make desktop)' \
-	  'make build    Build the private Go runtime and frontend' \
-	  'make setup    Install pinned desktop dependencies if needed' \
-	  'make package  Build an unpacked app in desktop/release/' \
-	  'make dist     Build installers in desktop/release/' \
-	  'make check    Format Go code, run tests, vet, typecheck and build'
+	  'make run      Build and open the chat TUI' \
+	  'make build    Build the Go runtime and OpenTUI frontend' \
+	  'make setup    Install pinned host and terminal dependencies' \
+	  'make package  Create a fresh terminal package (PACKAGE_DIR=...)' \
+	  'make install  Install a fresh package into PREFIX (default ~/.local)' \
+	  'make check    Build, typecheck, test and vet the terminal product'

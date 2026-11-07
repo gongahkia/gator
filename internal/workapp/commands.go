@@ -620,12 +620,12 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 	case "/status":
 		result = m.workStatus()
 	case "/statusline":
-		err = fmt.Errorf("the terminal interface is retired; use Settings in Gator desktop")
+		m.openStatusLineEditor()
 	case "/permissions":
 		result = m.workPermissions()
 	case "/settings":
 		if len(fields) == 2 && fields[1] == "statusline" {
-			err = fmt.Errorf("the terminal interface is retired; use Settings in Gator desktop")
+			m.openStatusLineEditor()
 			break
 		}
 		if len(fields) != 1 {

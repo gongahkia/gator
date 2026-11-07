@@ -1,5 +1,5 @@
 // Package workapp owns Gator's conversation application state and display-safe
-// projections. The desktop host runs its message loop without a terminal renderer.
+// projections. The terminal host renders its projections over the JSON-lines bridge.
 package workapp
 
 import (
@@ -612,7 +612,7 @@ func New(config Config) Model {
 	return model
 }
 
-// Init loads the initial application projections. The desktop owns rendering.
+// Init loads the initial application projections. The terminal frontend owns rendering.
 func (m Model) Init() tea.Cmd {
 	if m.config.ReadChecks != nil {
 		return tea.Batch(m.refreshChecksCommand(), m.readOverviewCommand(), nextChecksTick())

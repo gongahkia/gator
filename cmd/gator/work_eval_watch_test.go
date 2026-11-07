@@ -186,7 +186,7 @@ func TestWatchReplayBudgetAndCancellationRemainUnscored(t *testing.T) {
 		t.Fatalf("cancelled replay fabricated misses: %#v %v", score, err)
 	}
 	t.Setenv("GATOR_INTERNAL_COMMANDS", "0")
-	if err := runDesktopRuntime([]string{"work", "eval", "watch", "validate", path}, &bytes.Buffer{}); err == nil {
-		t.Fatal("watch evaluation bypassed the developer-only command guard")
+	if err := runRuntime([]string{"work", "eval", "watch", "validate", path}, &bytes.Buffer{}); err != nil {
+		t.Fatalf("public CLI watch validation: %v", err)
 	}
 }

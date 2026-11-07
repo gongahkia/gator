@@ -48,11 +48,11 @@ func TestWindowsProfileRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	if err := runDesktopRuntime([]string{"note", "add", "--title", "Windows note 🐊", "--body", "A literal saved note."}, &out); err != nil {
+	if err := runRuntime([]string{"note", "add", "--title", "Windows note 🐊", "--body", "A literal saved note."}, &out); err != nil {
 		t.Fatal(err)
 	}
 	out.Reset()
-	if err := runDesktopRuntime([]string{"note", "list"}, &out); err != nil || !strings.Contains(out.String(), "Windows note 🐊") {
+	if err := runRuntime([]string{"note", "list"}, &out); err != nil || !strings.Contains(out.String(), "Windows note 🐊") {
 		t.Fatalf("knowledge: %s, %v", out.String(), err)
 	}
 	ledger, err := sharedusage.Open(root)

@@ -4,7 +4,7 @@ import {mkdtemp,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createCompanion} from './server.mjs';
-const {chromium}=await import('../desktop/node_modules/playwright/index.mjs');
+const {chromium}=await import(process.env.GATOR_PLAYWRIGHT_MODULE || './node_modules/playwright/index.mjs');
 const item=(d,snapshot)=>({target:{binding:{id:'target-'+d.repeat(32),backend:'external_tmux',owner:'tmux-instance-'+d.repeat(32),generation:d.repeat(32),incarnation:d.repeat(64)},label:'Pane '+d,available:true,capabilities:['inspect']},controls:['text_input','key_input','interrupt'],text:snapshot?'<script>untrusted output</script>':'',captured_at:snapshot?'2026-10-31T00:00:00Z':undefined,truncated:false,stale:false});
 test('review binds exact target; drafts stay isolated; unknown receipts reconcile without replay',{timeout:90000},async()=>{
  const root=await mkdtemp(join(tmpdir(),'gt4-browser-')),tokenFile=join(root,'token'),token='a'.repeat(64);let c,browser,hidden=false;const dispatched=[],receipts=new Map();

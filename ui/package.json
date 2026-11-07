@@ -1,0 +1,29 @@
+{
+  "name": "@gator/terminal",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "build": "bun scripts/build.ts",
+    "start": "bun --preload ./scripts/preload.ts src/index.tsx",
+    "test": "bun test --preload ./scripts/preload.ts tests"
+  },
+  "dependencies": {
+    "@gator/application-host": "file:../app-host",
+    "@opentui/core": "0.6.8",
+    "@opentui/solid": "0.6.8",
+    "@opentui/keymap": "0.6.8",
+    "solid-js": "1.9.15",
+    "remeda": "2.30.0",
+    "fuzzysort": "3.1.0",
+    "string-width": "8.1.0"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.10",
+    "typescript": "5.9.3"
+  },
+  "patchedDependencies": {
+    "solid-js@1.9.15": "patches/solid-js@1.9.15.patch"
+  }
+}

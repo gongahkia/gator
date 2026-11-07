@@ -12,23 +12,18 @@ import (
 	"github.com/gongahkia/gator/internal/state"
 )
 
-const desktopOnlyMessage = "the standalone Gator CLI is retired; open the Gator desktop application (development: make desktop)"
-
-// runDesktopRuntime is the executable boundary. The command handlers in this
-// package remain shared application services and an explicit developer fixture
-// harness; they are not a second user interface. The environment opt-in is a
-// routing convention, not an authorization boundary or a replacement for reviews.
-func runDesktopRuntime(args []string, out io.Writer) error {
+// runRuntime routes public commands and authenticated application services.
+func runRuntime(args []string, out io.Writer) error {
 	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
 		_, err := fmt.Fprintln(out, usage)
 		return err
 	}
 	if len(args) == 1 && (args[0] == "--version" || args[0] == "-v") {
-		_, err := fmt.Fprintf(out, "Gator desktop runtime %s (%s, %s)\n", version, commit, date)
+		_, err := fmt.Fprintf(out, "gator %s (%s, %s)\n", version, commit, date)
 		return err
 	}
 	if len(args) == 0 {
-		return errors.New(desktopOnlyMessage)
+		return launchTerminal(nil)
 	}
 	if len(args) == 1 && args[0] == "desktop-speech" && os.Getenv("GATOR_DESKTOP_SPEECH") == "1" {
 		if err := preparePlatformProfile(); err != nil {
@@ -66,25 +61,17 @@ func runDesktopRuntime(args []string, out io.Writer) error {
 	if len(args) == 2 && args[0] == "companion-create-chat" && os.Getenv("GATOR_COMPANION_CREATE") == "1" {
 		return companionCreateChat(args[1], out)
 	}
-	desktop := args[0] == "ui-backend" && len(args) == 3 && os.Getenv("GATOR_UI_BACKEND") == "1"
-	supervisor := len(args) >= 2 && args[0] == "job" && args[1] == "supervisor"
-	internal := os.Getenv("GATOR_INTERNAL_COMMANDS") == "1"
-	if !desktop && !supervisor && !internal {
-		return errors.New(desktopOnlyMessage)
+	// Private transport roles require their explicit host marker. Public CLI
+	// commands do not require a developer opt-in.
+	if args[0] == "ui-backend" && (len(args) != 3 || os.Getenv("GATOR_UI_BACKEND") != "1") {
+		return errors.New("ui-backend is an internal Gator transport")
 	}
-	if desktop || supervisor {
-		previous, present := os.LookupEnv("GATOR_INTERNAL_COMMANDS")
-		if err := os.Setenv("GATOR_INTERNAL_COMMANDS", "1"); err != nil {
-			return err
+	for _, role := range []string{"desktop-speech", "desktop-update-guard", "companion-catalog", "companion-external-control", "companion-external", "companion-inspect", "companion-control", "companion-create-chat", "control-access", "inspection-access", "external-tmux"} {
+		if args[0] == role {
+			return errors.New("this application service requires its host marker")
 		}
-		defer func() {
-			if present {
-				_ = os.Setenv("GATOR_INTERNAL_COMMANDS", previous)
-			} else {
-				_ = os.Unsetenv("GATOR_INTERNAL_COMMANDS")
-			}
-		}()
 	}
+	supervisor := len(args) >= 2 && args[0] == "job" && args[1] == "supervisor"
 	// A login supervisor selects its profile before opening configuration or
 	// maintenance. Its own workers use the same private command routing.
 	if supervisor {

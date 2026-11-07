@@ -6,9 +6,9 @@ import { join } from 'node:path';
 import { createCompanion } from './server.mjs';
 import { addDevice, revokeDevice } from './auth.mjs';
 
-// Uses the desktop's pinned Playwright. A path override supports an existing
+// Uses the companion's pinned Playwright. A path override supports an existing
 // isolated installation without changing this checkout's dependency tree.
-const { chromium, webkit } = await import(process.env.GATOR_PLAYWRIGHT_MODULE || '../desktop/node_modules/playwright/index.mjs');
+const { chromium, webkit } = await import(process.env.GATOR_PLAYWRIGHT_MODULE || './node_modules/playwright/index.mjs');
 for (const name of (process.env.GATOR_COMPANION_BROWSERS || 'chromium').split(',')) {
   test(`${name}: recurring check health stays read-only, scoped and explicitly stale offline`, { timeout: 90000 }, async () => {
     const root = await mkdtemp(join(tmpdir(), 'gator-phone-health-')), tokenFile = join(root, 'owner.token'), token = 'a'.repeat(64);

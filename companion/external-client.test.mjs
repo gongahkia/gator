@@ -4,7 +4,7 @@ import {mkdtemp,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createCompanion} from './server.mjs';
-const {chromium}=await import(process.env.GATOR_PLAYWRIGHT_MODULE||'../desktop/node_modules/playwright/index.mjs');
+const {chromium}=await import(process.env.GATOR_PLAYWRIGHT_MODULE||'./node_modules/playwright/index.mjs');
 const item=(d,snapshot=false)=>({target:{binding:{id:'target-'+d.repeat(32),backend:'external_tmux',owner:'tmux-instance-'+d.repeat(32),generation:d.repeat(32),incarnation:d.repeat(64)},label:'Pane '+d,capabilities:['inspect'],available:true},text:snapshot?`<script>window.injected=true</script> pane-${d} 猫`:'',truncated:snapshot,stale:false,...(snapshot?{captured_at:'2026-10-31T03:00:00Z'}:{})});
 test('external mobile snapshots stay text, obey A/B selection, clear revoked content and pause polling',{timeout:60000},async()=>{
  const root=await mkdtemp(join(tmpdir(),'gator-external-browser-')),tokenFile=join(root,'token'),token='a'.repeat(64);let c,browser,release,held=false,hold=false,reads=0,shared=true;
