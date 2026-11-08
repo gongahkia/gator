@@ -18,7 +18,7 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 | 10 | Back restores menu/filter/selection, draft and reading position consistently; backend pages and file workflows retain context; rail marks the active page. | Pending | |
 | 11 | Ctrl+C cancels/stops without implicit quit; Ctrl+Q quits through guards; help/hints reflect configured bindings; no function-key shortcuts are introduced. | In progress | Idle stop/draft preservation, explicit quit, remapped help/composer/rail verified; voice/approval/contextual hints remain for later slices. |
 | 12 | Disconnected/error states offer contextual reconnect/recovery with intact drafts/request identity; safe admission retries and uncertain external effects stay distinct. | Implemented; final journey pending | `d00952219`; `interaction-recovery.test.tsx`: real Go accepted request + lost acknowledgement retries once, reconnect keeps draft/owner, no model replay; receipts tests preserve unknown external outcomes. |
-| 13 | New-content/latest/catch-up affordances preserve stable reading anchors across navigation/restart; long-history rendering is benchmarked and optimized when justified. | Pending | |
+| 13 | New-content/latest/catch-up affordances preserve stable reading anchors across navigation/restart; long-history rendering is benchmarked and optimized when justified. | In progress | Reproducible native benchmark and reports in `docs/benchmarks/`; unchanged entries retain DOM identity across complete Go snapshots. 5,000-message append improved 4,051→747 ms in single samples. Startup/scroll remain too slow; bounded rendering, persistent anchors, catch-up/latest UI still required. |
 | 14 | Voice has direct record/stop/cancel/transcribe/edit flow, visible processing destination and explicit consent; transcript is editable before sending. | Implemented; final journey pending | `09e74ef39`; `voice-controls.test.tsx`: all four sizes, native VoiceSession with controlled capture/transcription, route/chat consent, changed-route rejection, editable draft/no send, recording/transcription cancellation. Physical audio remains unverified on this host. |
 | 15 | Shared native typography/spacing/selection/focus/disabled treatments and readable summaries work with terminal colors, NO_COLOR and reduced motion; exact technical details remain inspectable. | Pending | |
 
@@ -77,3 +77,13 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
   Failed revision test plus commands/panel checks: 7 pass after the fix; typecheck passes.
   Go config/workrun tests pass; runtime rebuilt. Full final suite remains due
   after the remaining product slices; no claim that all 15 are complete.
+
+- Transcript performance slice: the old timeline recreated every wrapper on every
+  complete state snapshot. Content reconciliation now preserves unchanged native
+  message views (including during fresh JSON snapshots) and their selection/scroll state.
+  Transcript/update/activity/working-status checks: 5 pass; additional native identity
+  test passes; typecheck passes. Benchmark samples show 5,000-message startup
+  14,075→5,761 ms, append 4,051→747 ms. This remains insufficient for a smooth
+  long history: retain item 13 as in progress and implement bounded rendering.
+  Native syntax-style cleanup warnings surfaced during view teardown; inspect
+  resource lifetime under item 15 rather than treating plain-text fallback as resolved.

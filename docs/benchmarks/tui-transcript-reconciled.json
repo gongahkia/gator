@@ -1,0 +1,39 @@
+{
+  "runtime": "Bun 1.4.2",
+  "platform": "darwin/x64",
+  "viewport": "110x34 then 80x24",
+  "frame_settle_ms": 10,
+  "measurements": [
+    {
+      "messages": 100,
+      "startup_ms": 385,
+      "scroll_ms": 34,
+      "append_ms": 59,
+      "resize_ms": 34,
+      "js_heap_mib": 39,
+      "rss_mib": 250
+    },
+    {
+      "messages": 1000,
+      "startup_ms": 1175,
+      "scroll_ms": 70,
+      "append_ms": 159,
+      "resize_ms": 117,
+      "js_heap_mib": 111,
+      "rss_mib": 429
+    },
+    {
+      "messages": 5000,
+      "startup_ms": 5761,
+      "scroll_ms": 338,
+      "append_ms": 747,
+      "resize_ms": 607,
+      "js_heap_mib": 276,
+      "rss_mib": 938
+    }
+  ],
+  "implementation": "Timeline reconciliation; measured with the source changes in the commit containing this report.",
+  "baseline": "tui-transcript-baseline.json",
+  "command": "cd ui && bun --preload ./scripts/preload.ts scripts/bench-transcript.tsx",
+  "notes": "One sample per size, sequential datasets in one process. RSS includes native memory and allocator capacity. Synthetic history, no model/account calls. Frame settling is included. Syntax-style cleanup warnings were observed and remain to investigate."
+}

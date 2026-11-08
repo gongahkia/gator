@@ -1,6 +1,26 @@
 import type { BackendMessage, ChatUpdate } from "@gator/application-host/contracts/protocol"
 
 export type TimelineItem = { kind: "message"; message: BackendMessage; index: number } | { kind: "update"; update: ChatUpdate }
+
+// Go sends complete JSON snapshots, so unchanged messages arrive as new objects.
+// Preserve identity for Solid's keyed list instead of remounting every Markdown
+// view on each status tick, acknowledgement, update receipt or appended message.
+export function createTimelineReconciler() {
+  let context = "", previous = new Map<string, { serialized: string; item: TimelineItem }>()
+  return (owner: string, items: TimelineItem[]): TimelineItem[] => {
+    if (owner !== context) { previous.clear(); context = owner }
+    const next = new Map<string, { serialized: string; item: TimelineItem }>()
+    const retained = items.map(item => {
+      const key = item.kind === "message" ? `message:${item.index}` : `update:${item.update.id}`
+      const serialized = JSON.stringify(item), before = previous.get(key)
+      const entry = before?.serialized === serialized ? before : { serialized, item }
+      next.set(key, entry)
+      return entry.item
+    })
+    previous = next
+    return retained
+  }
+}
 const time = (value?: string) => Math.max(0, Date.parse(value ?? "") || 0)
 // Preserve Gator's message indexes and put an explicitly replied-to card before
 // its reply, including after clocks change. This ports the reference timeline.

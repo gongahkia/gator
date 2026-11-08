@@ -9,7 +9,7 @@ import { TextAttributes } from "@opentui/core"
 import type { ScrollBoxRenderable, Renderable } from "@opentui/core"
 import { useRenderer } from "@opentui/solid"
 import { useDialog } from "../ui/dialog"
-import { chatTimeline, updateStatus, updateWarning } from "./timeline"
+import { chatTimeline, createTimelineReconciler, updateStatus, updateWarning } from "./timeline"
 import { Activity, activityKey } from "./activity"
 import { Markdown } from "./markdown"
 import { displayDate } from "./display"
@@ -32,7 +32,8 @@ function Result(props: { value: BackendResult }) {
 }
 export function Transcript() {
   const data = useData(), client = useClient(), theme = useTheme(), renderer = useRenderer(), dialog = useDialog()
-  const timeline = createMemo(() => chatTimeline(data.state?.messages ?? [], data.state?.chat_updates ?? []).filter(item => item.kind !== "message" || item.message.role !== "Deliverables" || !!(item.message.text || item.message.result || item.message.activity || item.message.bundle?.Artifacts?.length)))
+  const reconcile = createTimelineReconciler()
+  const timeline = createMemo(() => reconcile(client.context, chatTimeline(data.state?.messages ?? [], data.state?.chat_updates ?? []).filter(item => item.kind !== "message" || item.message.role !== "Deliverables" || !!(item.message.text || item.message.result || item.message.activity || item.message.bundle?.Artifacts?.length))))
   const cards = new Map<string, Renderable>(), delivered = new Set<string>()
   let scroll: ScrollBoxRenderable | undefined
   let previous = ""

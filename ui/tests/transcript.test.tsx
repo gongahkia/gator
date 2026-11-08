@@ -19,6 +19,11 @@ test("long transcript keeps its reading position through hubs and activity; sear
   try {
     await client.start(); await flush()
     const subscriptions = client.listenerCount("change")
+    const retained = setup.renderer.root.findDescendantById("message-55")
+    // Match Go's transport: every poll deserializes fresh objects even if the
+    // answer is unchanged. Rebuilding views here loses selection and is costly.
+    host.change(JSON.parse(JSON.stringify(host.current))); await flush()
+    expect(setup.renderer.root.findDescendantById("message-55")).toBe(retained)
     host.change({ ...host.current, messages: host.current.messages.map(message => ({ ...message, activity: { state: "completed", started_at: "2026-10-26T00:00:00Z", finished_at: "2026-10-26T00:00:12Z", entries: [{ id: "public-note", kind: "text", text: "Retained public narration", state: "completed", started_at: "2026-10-26T00:00:00Z" }] } })) }); await flush()
     expect(client.listenerCount("change")).toBe(subscriptions)
     expect(transcript().scrollTop).toBeGreaterThan(10)
@@ -26,7 +31,9 @@ test("long transcript keeps its reading position through hubs and activity; sear
     setup.mockInput.pressKey("\x1b[5~"); await flush()
     const position = transcript().scrollTop
     expect(position).toBeLessThan(latest)
-    host.change({ ...host.current, messages: [...host.current.messages, { role: "Gator", text: "New activity while reading" }] }); await flush()
+    const readingNode = setup.renderer.root.findDescendantById("message-55")
+    host.change(JSON.parse(JSON.stringify({ ...host.current, messages: [...host.current.messages, { role: "Gator", text: "New activity while reading" }] }))); await flush()
+    expect(setup.renderer.root.findDescendantById("message-55")).toBe(readingNode)
     expect(transcript().scrollTop).toBe(position)
     await client.navigate("/saved"); await flush(); expect(client.readingPositions.get("first")).toBe(position)
     await client.navigate("/chat"); await flush()

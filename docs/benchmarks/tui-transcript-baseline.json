@@ -1,0 +1,38 @@
+{
+  "runtime": "Bun 1.4.2",
+  "platform": "darwin/x64",
+  "viewport": "110x34 then 80x24",
+  "frame_settle_ms": 10,
+  "measurements": [
+    {
+      "messages": 100,
+      "startup_ms": 834,
+      "scroll_ms": 45,
+      "append_ms": 130,
+      "resize_ms": 36,
+      "js_heap_mib": 58,
+      "rss_mib": 279
+    },
+    {
+      "messages": 1000,
+      "startup_ms": 3139,
+      "scroll_ms": 75,
+      "append_ms": 949,
+      "resize_ms": 157,
+      "js_heap_mib": 76,
+      "rss_mib": 509
+    },
+    {
+      "messages": 5000,
+      "startup_ms": 14075,
+      "scroll_ms": 369,
+      "append_ms": 4051,
+      "resize_ms": 631,
+      "js_heap_mib": 360,
+      "rss_mib": 1435
+    }
+  ],
+  "source_commit": "ae2f0d7fbc2cdafaf99fda670a1ce343ad9c08b1",
+  "command": "cd ui && bun --preload ./scripts/preload.ts scripts/bench-transcript.tsx",
+  "notes": "One sample per size, sequential datasets in one process. RSS includes native memory and allocator capacity. Synthetic history, no model or account calls. Frame settling is included in timings."
+}
