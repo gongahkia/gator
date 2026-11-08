@@ -39,6 +39,8 @@ test("exact live approval is required before a connected send and stale tokens c
     expect(effects).toBe(0)
     setup.mockInput.pressKey("y", { ctrl: true }); await setup.flush(); await Bun.sleep(25)
     expect(setup.captureCharFrame()).toContain("Approve this exact action?")
+    expect(setup.captureCharFrame()).toContain("venue@example.com")
+    expect(setup.captureCharFrame()).toContain("Exact reviewed body")
     setup.mockInput.pressEnter()
     await until(() => !client.state?.running && effects === 1, "owned external result")
     expect(client.state?.messages.some(message => message.bundle?.Actions?.some(receipt => receipt.Status === "unknown"))).toBe(true)

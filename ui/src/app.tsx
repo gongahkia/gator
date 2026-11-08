@@ -26,6 +26,7 @@ import { useActions } from "./gator/actions"
 import { useProductActions } from "./gator/product-actions"
 import { useNative } from "./gator/native"
 import { commandGroup } from "./gator/command-groups"
+import { ApprovalReview } from "./gator/approval-review"
 import type { GatorClient } from "./gator/client"
 import type { ClipboardService } from "./context/clipboard"
 
@@ -53,7 +54,8 @@ function Shell(props: { quit(): Promise<void> }) {
     if (!pending) return
     const decide = () => attempt(client.send({ type: "approval", interaction_id: pending.id, approval_token: pending.token, approved }))
     if (!approved) { decide(); return }
-    dialog.replace(() => <DialogConfirm title="Approve this exact action?" message="Confirm only after reviewing the current request in this chat. This decision applies to its live token." onConfirm={decide} />)
+    const context = client.context, message = client.state?.messages[pending.message_index]
+    dialog.replace(() => <ApprovalReview pending={pending} message={message} context={context} />, undefined, { size: "xlarge" })
   }
   Keymap.createLayer(() => ({ mode: "global", commands: [
     { id: "command.palette.show", title: "Search commands", bind: "ctrl+p", run: palette },
@@ -67,8 +69,8 @@ function Shell(props: { quit(): Promise<void> }) {
     { id: "gator.search", title: "Search current transcript", bind: "ctrl+f", palette: true, enabled: !data.state?.panel, run: () => controls.trigger("search") },
     { id: "gator.help", title: "Gator help", bind: "ctrl+o", palette: true, enabled: !data.state?.panel, run: () => navigate("/help") },
     { id: "gator.voice", title: "Voice controls", bind: "ctrl+shift+v", palette: true, run: () => controls.trigger("voice") },
-    { id: "gator.approve", title: "Review current approval", bind: "ctrl+y", palette: true, run: () => approve(true) },
-    { id: "gator.decline", title: "Decline current approval", bind: "ctrl+d", palette: true, run: () => approve(false) },
+    { id: "gator.approve", title: "Review current approval", bind: "ctrl+y", palette: true, enabled: dialog.stack.length === 0, run: () => approve(true) },
+    { id: "gator.decline", title: "Decline current approval", bind: "ctrl+d", palette: true, enabled: dialog.stack.length === 0, run: () => approve(false) },
     { id: "gator.reconnect", title: "Reconnect selected chat", palette: true, run: () => attempt(client.host.sessions.restart()) },
     ...Object.keys(controls.actions).map(name => ({ id: `gator.local.${name}`, title: name, group: commandGroup(name), palette: true as const, run: () => controls.trigger(name) })),
     ...["following", "saved", "settings"].map(name => ({ id: `gator.${name}`, title: name[0].toUpperCase() + name.slice(1), palette: true as const, run: () => navigate(`/${name}`) })),
