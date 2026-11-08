@@ -10,6 +10,9 @@ import { FixtureHost } from "./fixture"
 test("combined draft context leaves input and transcript usable through narrow resizes", async () => {
   const root = await mkdtemp(join(tmpdir(), "gator-composer-budget-"))
   const host = new FixtureHost({ binary: "/unused", workspace: root, userData: root, env: { GATOR_STATE_DIR: root } }), client = new GatorClient(host)
+  let connected = true
+  const snapshot = host.snapshot.bind(host)
+  host.snapshot = () => ({ ...snapshot(), connection: connected ? "connected" : "disconnected" })
   const setup = await testRender(() => <App client={client} quit={() => client.close()} clipboard={{ read: async () => ({ data: "", mime: "text/plain" }), write: async () => {} }} />, { width: 110, height: 34 })
   const flush = async () => { await setup.flush(); await Bun.sleep(20); await setup.flush() }
   try {
@@ -32,6 +35,11 @@ test("combined draft context leaves input and transcript usable through narrow r
       expect(completing.screenY + completing.height).toBeLessThanOrEqual(height!)
       expect(setup.renderer.root.findDescendantById("transcript")!.height).toBeGreaterThanOrEqual(4)
       expect(setup.captureCharFrame()).toContain("Tab complete")
+      connected = false; host.emit("change"); await flush()
+      const offlineInput = setup.renderer.root.findDescendantById("message-input")!
+      expect(offlineInput.screenY + offlineInput.height).toBeLessThanOrEqual(height!)
+      expect(setup.renderer.root.findDescendantById("transcript")!.height).toBeGreaterThanOrEqual(4)
+      connected = true; host.emit("change")
       client.drafts.set(client.context, { ...client.draft, text: "Keep the input visible\nSecond line" }); client.emit("change")
     }
     setup.resize(110, 34); await flush(); setup.mockInput.pressKey("t", { ctrl: true }); await flush()

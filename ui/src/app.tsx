@@ -28,6 +28,7 @@ import { useNative } from "./gator/native"
 import { commandGroup, commandAliases } from "./gator/command-groups"
 import { ApprovalReview } from "./gator/approval-review"
 import { runBackendCommand } from "./gator/command-actions"
+import { RecoveryNotice } from "./gator/recovery-notice"
 import type { GatorClient } from "./gator/client"
 import type { ClipboardService } from "./context/clipboard"
 
@@ -72,7 +73,7 @@ function Shell(props: { quit(): Promise<void> }) {
     { id: "gator.voice", title: "Voice controls", bind: "ctrl+shift+v", palette: true, run: () => controls.trigger("voice") },
     { id: "gator.approve", title: "Review current approval", bind: "ctrl+y", palette: true, enabled: dialog.stack.length === 0, run: () => approve(true) },
     { id: "gator.decline", title: "Decline current approval", bind: "ctrl+d", palette: true, enabled: dialog.stack.length === 0, run: () => approve(false) },
-    { id: "gator.reconnect", title: "Reconnect selected chat", palette: true, run: () => attempt(client.host.sessions.restart()) },
+    { id: "gator.reconnect", title: "Reconnect selected chat", palette: true, run: () => attempt(client.reconnect()) },
     ...Object.keys(controls.actions).map(name => ({ id: `gator.local.${name}`, title: name, group: commandGroup(name), palette: true as const, run: () => controls.trigger(name) })),
     ...["following", "saved", "settings"].map(name => ({ id: `gator.${name}`, title: name[0].toUpperCase() + name.slice(1), palette: true as const, run: () => navigate(`/${name}`) })),
     // Only collapse known equivalent actions. Go's goal activity and the local
@@ -86,7 +87,7 @@ function Shell(props: { quit(): Promise<void> }) {
     <SessionFrame sidebar={!data.preferences.sidebarCollapsed} search={palette}>
       <Show when={data.route === "chat"} fallback={<Hub />}><Show when={data.state?.panel} fallback={<><Transcript /><Prompt /></>}>{panel => <Panel panel={panel()} />}</Show></Show>
     </SessionFrame>
-    <Show when={data.issue || data.snapshot.error || data.snapshot.sessionIssue}><text fg={theme.text.feedback.error.base}>{literal(data.issue || data.snapshot.error || data.snapshot.sessionIssue)}</text></Show>
+    <RecoveryNotice open={() => controls.trigger("recover")} />
     <Show when={data.voicePhase !== "idle"}><text fg={theme.text.feedback.warning.base}>Voice: {data.voicePhase} · Ctrl+Shift+V opens stop/cancel controls.</text></Show>
     <Show when={data.state?.external}><text fg={theme.accent}>A reviewed external step is ready. Use “continue-external” in Ctrl+P to continue and return to this chat.</text></Show>
     <Progress />

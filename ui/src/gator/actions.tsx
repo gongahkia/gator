@@ -182,6 +182,18 @@ export function useActions() {
   }
   const actions: Record<string, () => unknown> = {
     drafts, queue, updates, memories, receipts, models,
+    recover: () => {
+      const context = client.context, disconnected = client.snapshot.connection === "disconnected"
+      const sameChat = () => { if (client.context !== context) throw new Error("The conversation changed. Reopen recovery in the intended chat.") }
+      menu(disconnected ? "Reconnect this chat" : "Recover this action", [
+        ...(disconnected ? [{ title: "Reconnect and review", description: "Keep the draft. Recovered tasks stay paused; external actions are not resent.", run: () => { sameChat(); return client.reconnect() } }] : []),
+        ...(!disconnected && client.canRetrySubmission ? [{ title: "Retry this message acknowledgement", description: "Uses the original request identity. An already accepted message will not start a second task.", run: () => { sameChat(); if (!client.canRetrySubmission) throw new Error("The draft changed. Send it as a new message when ready."); return client.submit() } }] : []),
+        ...(!disconnected ? [{ title: "Inspect retained requests", description: "Review queued or interrupted work before resuming.", run: () => { sameChat(); return queue() } },
+          { title: "Inspect external receipts", description: "Check uncertain sends before considering another action.", run: () => { sameChat(); return receipts() } }] : []),
+        { title: "Inspect error details", run: () => details("Action details", client.issue || client.snapshot.error || client.snapshot.sessionIssue || "The connection is unavailable.") },
+        ...(!disconnected && client.issue ? [{ title: "Dismiss error and keep editing", run: () => { sameChat(); client.issue = ""; client.emit("change") } }] : []),
+      ])
+    },
     "draft-context": () => menu("Draft details", [
       { title: `Plan first: ${client.planFirst.has(client.context) ? "on" : "off"}`, description: "Review a proposal before implementation; external actions still require approval.", run: () => client.navigate("/plan-first") },
       { title: `Attachments: ${client.draft.uploads?.length || 0}`, description: client.draft.uploads?.map(file => file.name).join(" · ") || "No private files attached", run: () => actions.attachments() },

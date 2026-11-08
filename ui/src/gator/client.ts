@@ -36,6 +36,14 @@ export class GatorClient extends EventEmitter {
   #loads = new Map<string, Promise<void>>()
   #results = new Set<() => void>()
   #admissions = new Map<string, { key: string; request: string }>()
+  #admissionKey(draft = this.draft) { return JSON.stringify([draft.text, draft.uploads?.map(file => file.id) ?? [], draft.reply_to_update_id, this.planFirst.has(draft.context)]) }
+  get canRetrySubmission() { return !this.pending.has(this.context) && this.#admissions.get(this.context)?.key === this.#admissionKey() }
+  async reconnect() {
+    if (!await this.mayLeave()) return
+    await this.track("Reconnecting this chat…", this.host.sessions.restart())
+    await this.loadDraft()
+    this.issue = ""; this.emit("change")
+  }
   #closing?: Promise<void>
   #closed = false
   #listener = () => {
@@ -143,7 +151,7 @@ export class GatorClient extends EventEmitter {
         else await this.send({ type: "submit", text: draft.text })
       }
       else {
-        const files = draft.uploads?.map(f => f.id) ?? [], plan_first = this.planFirst.has(context), key = JSON.stringify([draft.text, files, draft.reply_to_update_id, plan_first])
+        const files = draft.uploads?.map(f => f.id) ?? [], plan_first = this.planFirst.has(context), key = this.#admissionKey(draft)
         // An uncertain acknowledgement can be explicitly retried with the same
         // admission ID. Go's durable request journal prevents duplicate work.
         if (this.#admissions.get(context)?.key !== key) this.#admissions.set(context, { key, request: randomUUID() })
