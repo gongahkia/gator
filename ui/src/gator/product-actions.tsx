@@ -15,7 +15,6 @@ export function useProductActions(controls: ReturnType<typeof useActions>) {
     if (!id) throw new Error("Wait for this conversation to open.")
     return id
   }
-  actions.mascot = () => menu("Gator mascot", ([ ["Animated", "animated"], ["Still", "still"], ["Hidden", "hidden"] ] as const).map(([title, mascot]) => ({ title, description: client.preferences.mascot === mascot ? "Current setting" : undefined, run: () => client.configurePreferences({ mascot }) })))
   actions.appearance = () => menu("Appearance", [
     ...([ ["Follow terminal colors", "terminal"], ["Dark", "gator"], ["Light", "light"], ["High contrast", "contrast"], ["Monochrome", "mono"] ] as const).map(([title, theme]) => ({ title, description: client.preferences.theme === theme ? "Current appearance" : undefined, run: async () => {
       if (theme !== "terminal") await client.send({ type: "submit", text: `/theme ${theme}` })

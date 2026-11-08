@@ -3,10 +3,10 @@ import { mkdir, mkdtemp, open, link, readFile, readdir, rename, rm, stat, writeF
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 
-export const frontendDefaults = () => ({ sidebarCollapsed: true, theme: "terminal", mascot: "animated", groupChatsByFolder: false, workDetailsSections: { outputs: true, context: false, connections: false, workspace: false } });
-const keys = { mascot: "gator:terminal-mascot", theme: "gator:terminal-theme", sidebarCollapsed: "gator:sidebar-collapsed", groupChatsByFolder: "gator:group-topics-by-folder", workDetailsSections: "gator:work-details-sections" };
+export const frontendDefaults = () => ({ sidebarCollapsed: true, theme: "terminal", groupChatsByFolder: false, workDetailsSections: { outputs: true, context: false, connections: false, workspace: false } });
+const keys = { theme: "gator:terminal-theme", sidebarCollapsed: "gator:sidebar-collapsed", groupChatsByFolder: "gator:group-topics-by-folder", workDetailsSections: "gator:work-details-sections" };
 const fingerprint = stat => [stat.dev, stat.ino, stat.size, stat.mtimeNs, stat.ctimeNs].join(":");
-const valid = value => value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).every(key => Object.hasOwn(keys, key)) && Object.entries(value).every(([key, item]) => key === "mascot" ? ["animated", "still", "hidden"].includes(item) : key === "theme" ? ["terminal", "gator", "light", "contrast", "mono"].includes(item) : key === "workDetailsSections" ? item && typeof item === "object" && !Array.isArray(item) && Object.keys(item).every(key => ["outputs", "context", "connections", "workspace"].includes(key)) && Object.values(item).every(value => typeof value === "boolean") : typeof item === "boolean");
+const valid = value => value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).every(key => Object.hasOwn(keys, key)) && Object.entries(value).every(([key, item]) => key === "theme" ? ["terminal", "gator", "light", "contrast", "mono"].includes(item) : key === "workDetailsSections" ? item && typeof item === "object" && !Array.isArray(item) && Object.keys(item).every(key => ["outputs", "context", "connections", "workspace"].includes(key)) && Object.values(item).every(value => typeof value === "boolean") : typeof item === "boolean");
 
 // Copy just the LevelDB files, then open/recover the copy. Opening the original
 // would lock it and can change its logs even when only performing get().
@@ -96,6 +96,8 @@ export class FrontendPreferences {
         const raw = await readFile(this.file, "utf8");
         if (Buffer.byteLength(raw) > 16384) throw new Error("Oversized frontend preferences.");
         data = JSON.parse(raw);
+        // Drop the removed display option when reopening an existing profile.
+        if (data?.version === 1 && data.preferences && typeof data.preferences === "object") delete data.preferences.mascot;
         if (data.version !== 1 || !valid(data.preferences)) throw new Error("Invalid frontend preferences.");
       } catch (error) {
         if (error.code !== "ENOENT") throw error;

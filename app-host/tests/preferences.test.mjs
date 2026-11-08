@@ -55,6 +55,23 @@ test("preference patches serialize, reject extra authority and recover an abando
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
+test("removing the mascot preference preserves the rest of an existing terminal profile", async () => {
+  const root = await mkdtemp(join(tmpdir(), "gator-preference-retired-display-"));
+  try {
+    const store = new FrontendPreferences(root);
+    const expected = { ...await store.read(), theme: "light", sidebarCollapsed: false, groupChatsByFolder: true };
+    await writeFile(store.file, JSON.stringify({ version: 1, legacyImport: "absent", preferences: { ...expected, mascot: "animated" } }));
+    assert.deepEqual(await new FrontendPreferences(root).read(), expected);
+    const saved = JSON.parse(await readFile(store.file, "utf8"));
+    assert.deepEqual(saved.preferences, expected);
+    assert.equal(saved.legacyImport, "absent");
+    assert.equal(Object.hasOwn(saved.preferences, "mascot"), false);
+    await assert.rejects(store.configure({ mascot: "hidden" }), /Invalid frontend/);
+    await store.configure({ sidebarCollapsed: true });
+    assert.deepEqual(await new FrontendPreferences(root).read(), { ...expected, sidebarCollapsed: true });
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
 test("corrupt or interrupted legacy import retains source bytes and leaves no completed migration marker", async () => {
   const root = await mkdtemp(join(tmpdir(), "gator-preference-corrupt-")), source = join(root, "Local Storage/leveldb");
   try {
