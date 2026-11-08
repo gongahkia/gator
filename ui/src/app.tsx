@@ -25,8 +25,9 @@ import { Hub } from "./gator/hub"
 import { useActions } from "./gator/actions"
 import { useProductActions } from "./gator/product-actions"
 import { useNative } from "./gator/native"
-import { commandGroup } from "./gator/command-groups"
+import { commandGroup, commandAliases } from "./gator/command-groups"
 import { ApprovalReview } from "./gator/approval-review"
+import { runBackendCommand } from "./gator/command-actions"
 import type { GatorClient } from "./gator/client"
 import type { ClipboardService } from "./context/clipboard"
 
@@ -77,14 +78,8 @@ function Shell(props: { quit(): Promise<void> }) {
     // Only collapse known equivalent actions. Go's goal activity and the local
     // public-work trace share a name but are distinct capabilities.
     ...(data.state?.commands ?? []).filter(command => !["help", "queue", "following", "saved", "settings", "new", "exit", "cancel", "approve", "deny"].includes(command.name)).map(command => ({ id: `gator.command.${encodeURIComponent(command.name)}`, title: literal(command.description), group: command.name === "activity" ? "Following" : commandGroup(command.name), palette: true as const,
-      run: () => {
-        if (command.needs_input) controls.prompt(literal(command.description), "", async args => {
-          if (!await client.mayLeave()) return
-          await client.navigate("/chat")
-          await client.send({ type: "submit", text: `/${command.name} ${args}` })
-        }, `Arguments for /${command.name}. Your current message stays in the composer.`)
-        else navigate(`/${command.name}`)
-      } })),
+      slash: { name: command.name, aliases: commandAliases(command.name), ...(command.needs_input ? { arguments: true as const } : {}) },
+      run: () => { const operation = runBackendCommand(client, controls, command); if (operation instanceof Promise) attempt(operation) } })),
   ] }))
   return <box width="100%" height="100%" backgroundColor={theme.background.base}>
     <box height={1} marginY={1} paddingX={2} gap={2} flexDirection="row" justifyContent="space-between"><text flexGrow={1} flexShrink={1} minWidth={0} height={1} wrapMode="none" truncate fg={theme.text.muted}><b style={{ fg: theme.text.base }}>🐊 Gator</b>  {literal(data.state?.title) || "Opening chat…"}</text><ConnectionStatus connection={data.snapshot.connection} error={!!data.snapshot.error} /></box>

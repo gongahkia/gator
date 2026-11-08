@@ -51,8 +51,8 @@ test("commands have nested menus and composer completion never sends on paste or
     await client.edit("Keep menu argument draft"); setup.resize(100, 32); await flush()
     setup.mockInput.pressKey("p", { ctrl: true }); await flush(); await setup.mockInput.typeText("Settings"); await flush(); setup.mockInput.pressEnter(); await flush()
     await setup.mockInput.typeText("Choose a color theme"); await flush(); setup.mockInput.pressEnter(); await flush()
-    expect(setup.captureCharFrame()).toContain("Arguments for /theme")
-    await setup.mockInput.typeText("light"); setup.mockInput.pressEnter(); await flush()
+    expect(setup.captureCharFrame()).toContain("Appearance"); expect(setup.captureCharFrame()).not.toContain("Arguments for")
+    await setup.mockInput.typeText("Light"); await flush(); setup.mockInput.pressEnter(); await flush()
     expect(host.sent.at(-1)).toEqual({ type: "submit", text: "/theme light" })
     expect(client.draft.text).toBe("Keep menu argument draft")
     setup.mockInput.pressKey("p", { ctrl: true }); await flush(); await setup.mockInput.typeText("Following"); await flush(); setup.mockInput.pressEnter(); await flush()
@@ -61,3 +61,39 @@ test("commands have nested menus and composer completion never sends on paste or
     expect(client.draft.text).toBe("Keep menu argument draft")
   } finally { await client.close(); await setup.dispose(); await rm(root, { recursive: true, force: true }) }
 })
+
+
+test("root command search finds backend names, descriptions and aliases and uses scoped choices", async () => {
+  const root = await mkdtemp(join(tmpdir(), "gator-global-commands-"))
+  const host = new FixtureHost({ binary: "/unused", workspace: root, userData: root, env: { GATOR_STATE_DIR: root } }), client = new GatorClient(host)
+  host.current.commands = [
+    { name: "mode", description: "Choose work permissions", needs_input: true, advanced: false },
+    { name: "source ignore", description: "Ignore a project instruction", needs_input: true, advanced: true },
+  ]
+  const setup = await testRender(() => <App client={client} quit={() => client.close()} clipboard={{ read: async () => ({ data: "", mime: "text/plain" }), write: async () => {} }} />, { width: 110, height: 34 })
+  const flush = async () => { await setup.flush(); await Bun.sleep(30); await setup.flush() }
+  const search = async (query: string) => { setup.mockInput.pressKey("p", { ctrl: true }); await flush(); await setup.mockInput.typeText(query); await flush() }
+  try {
+    await client.start(); await client.edit("Keep original draft")
+    for (const query of ["Choose work permissions", "mode", "read only"]) {
+      await search(query)
+      expect(setup.captureCharFrame()).toContain("CHOOSE WORK PERMISSIONS")
+      setup.mockInput.pressEscape(); await flush()
+    }
+    await search("read only"); setup.mockInput.pressEnter(); await flush()
+    expect(setup.captureCharFrame()).toContain("Permissions for future work")
+    expect(setup.captureCharFrame()).toContain("Inspect")
+    expect(setup.captureCharFrame()).not.toContain("Advanced /")
+    setup.mockInput.pressEnter(); await flush()
+    expect(host.sent.at(-1)).toEqual({ type: "submit", text: "/mode inspect" })
+    expect(client.draft.text).toBe("Keep original draft")
+    await search("source ignore"); setup.mockInput.pressEnter(); await flush()
+    expect(setup.captureCharFrame()).toContain("Workspace-relative file path")
+    await setup.mockInput.typeText("../outside.md"); setup.mockInput.pressEnter(); await flush()
+    expect(setup.captureCharFrame()).toContain("Enter a path inside this workspace")
+    expect(host.sent.filter(frame => frame.type === "submit")).toHaveLength(1)
+    setup.mockInput.pressKey("u", { ctrl: true }); await setup.mockInput.typeText("notes/brief.md"); setup.mockInput.pressEnter(); await flush()
+    expect(host.sent.at(-1)).toEqual({ type: "submit", text: "/source ignore notes/brief.md" })
+    expect(client.draft.text).toBe("Keep original draft")
+  } finally { await client.close(); await setup.dispose(); await rm(root, { recursive: true, force: true }) }
+}, 20000)

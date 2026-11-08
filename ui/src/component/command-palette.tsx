@@ -11,12 +11,12 @@ export function CommandPaletteDialog() {
   const [query, setQuery] = createSignal("")
   const options = createMemo(() => commands().flatMap(command => !command.id || !command.palette || command.id === COMMAND_PALETTE_COMMAND ? [] : [{
     title: (command.title ?? command.id).replaceAll("-", " ").toUpperCase(), description: command.description?.toUpperCase(), category: (command.group || commandGroup(command.id.replace(/^gator\./, ""))).toUpperCase(),
-    searchText: `${command.id} ${command.title ?? ""}`, footer: shortcuts.all(command.id), value: command.id,
+    searchText: [decodeURIComponent(command.id), command.title, command.description, command.slash?.name, ...(command.slash?.aliases ?? [])].filter(Boolean).join(" "), footer: shortcuts.all(command.id), value: command.id,
     onSelect: () => { dialog.clear(); void command.run() },
   }]))
   const roots = () => commandGroups.map(group => ({ title: group.toUpperCase(), description: "OPEN MENU →", value: `menu:${group}`, onSelect: () => { setQuery(""); setSection(group) } }))
   return <Show when={section()} keyed fallback={<DialogSelect title="GATOR COMMANDS" searchInTitle titlePlaceholder="Search Gator commands"
-    onFilter={setQuery} options={[...roots(), ...(query().trim() ? options().filter(option => !option.value.startsWith("gator.command.") && !commandGroups.some(group => group.toLowerCase() === option.title.toLowerCase())) : [])]} flat />}>
+    onFilter={setQuery} options={[...roots(), ...(query().trim() ? options().filter(option => !commandGroups.some(group => group.toLowerCase() === option.title.toLowerCase())) : [])]} flat />}>
     {group => <DialogSelect title={`GATOR › ${group.toUpperCase()}`} placeholder={`Search ${group.toLowerCase()}`} onCancel={() => { setQuery(""); setSection(undefined) }}
       options={options().filter(option => option.category === group.toUpperCase())} flat />}
   </Show>
