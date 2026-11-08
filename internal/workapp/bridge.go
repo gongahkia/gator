@@ -20,15 +20,17 @@ import (
 // BridgeState is a display-only projection for the desktop.
 // The Go model remains the sole owner of commands, runs, approvals and history.
 type BridgeState struct {
-	TaskPlans               []TaskPlanSummary `json:"task_plans,omitempty"`
-	TaskPlanResult          *TaskPlanResult   `json:"task_plan_result,omitempty"`
-	Branch                  *BranchLink       `json:"branch,omitempty"`
-	BranchResult            *BranchResult     `json:"branch_result,omitempty"`
-	PendingOperation        string            `json:"pending_operation,omitempty"`
-	CatalogBusy             bool              `json:"catalog_busy,omitempty"`
-	ActionRecoveries        []RecoveredAction `json:"action_recoveries,omitempty"`
-	ActionRecoveryIssue     string            `json:"action_recovery_issue,omitempty"`
-	ActionRecoveryTruncated bool              `json:"action_recovery_truncated,omitempty"`
+	CheckResult             *BridgeCheckResult `json:"check_result,omitempty"`
+	SupervisorRunning       bool               `json:"supervisor_running"`
+	TaskPlans               []TaskPlanSummary  `json:"task_plans,omitempty"`
+	TaskPlanResult          *TaskPlanResult    `json:"task_plan_result,omitempty"`
+	Branch                  *BranchLink        `json:"branch,omitempty"`
+	BranchResult            *BranchResult      `json:"branch_result,omitempty"`
+	PendingOperation        string             `json:"pending_operation,omitempty"`
+	CatalogBusy             bool               `json:"catalog_busy,omitempty"`
+	ActionRecoveries        []RecoveredAction  `json:"action_recoveries,omitempty"`
+	ActionRecoveryIssue     string             `json:"action_recovery_issue,omitempty"`
+	ActionRecoveryTruncated bool               `json:"action_recovery_truncated,omitempty"`
 
 	ReceiptBusy           bool                       `json:"receipt_busy,omitempty"`
 	ReceiptResult         *ReceiptResult             `json:"receipt_result,omitempty"`
@@ -153,17 +155,32 @@ type BridgeCommand struct {
 	NeedsInput  bool   `json:"needs_input"`
 }
 type BridgeCheck struct {
-	GoalID string `json:"goal_id,omitempty"`
-	Title  string `json:"title"`
-	Health string `json:"health"`
-	State  string `json:"state"`
-	Tone   string `json:"tone"`
+	ID          string   `json:"id"`
+	Digest      string   `json:"digest"`
+	Outcome     string   `json:"outcome"`
+	Source      string   `json:"source"`
+	Connectors  []string `json:"connectors,omitempty"`
+	Timezone    string   `json:"timezone"`
+	Schedule    string   `json:"schedule"`
+	NextDue     string   `json:"next_due,omitempty"`
+	LastSuccess string   `json:"last_success,omitempty"`
+	NextAction  string   `json:"next_action"`
+	Issue       string   `json:"issue,omitempty"`
+	EndsAt      string   `json:"ends_at,omitempty"`
+	Enabled     bool     `json:"enabled"`
+	Editable    bool     `json:"editable"`
+	GoalID      string   `json:"goal_id,omitempty"`
+	Title       string   `json:"title"`
+	Health      string   `json:"health"`
+	State       string   `json:"state"`
+	Tone        string   `json:"tone"`
 }
 
 type BridgeFollowingGoal struct {
-	ID     string `json:"id"`
-	Title  string `json:"title"`
-	Status string `json:"status"`
+	ID      string `json:"id"`
+	Title   string `json:"title"`
+	Status  string `json:"status"`
+	Outcome string `json:"outcome,omitempty"`
 }
 
 // BridgeWorkDetails contains selections for new requests and the latest
@@ -265,7 +282,7 @@ func (m Model) BridgeState() BridgeState {
 	if m.bridgeFollowingIssue == "" {
 		for _, record := range m.config.Goals {
 			if record.Status == "active" || record.Status == "paused" {
-				state.FollowingGoals = append(state.FollowingGoals, BridgeFollowingGoal{ID: record.ID, Title: singleLine(record.Title), Status: string(record.Status)})
+				state.FollowingGoals = append(state.FollowingGoals, BridgeFollowingGoal{ID: record.ID, Title: singleLine(record.Title), Status: string(record.Status), Outcome: record.Context})
 			}
 		}
 	}
@@ -274,8 +291,10 @@ func (m Model) BridgeState() BridgeState {
 		state.Overview = &copy
 	}
 	state.OverviewIssue = m.overviewIssue
+	state.CheckResult, state.SupervisorRunning = m.bridgeCheckResult, m.config.SupervisorRunning
 	for _, check := range m.checks {
-		state.Checks = append(state.Checks, BridgeCheck{GoalID: check.GoalID, Title: singleLine(check.Title), Health: check.HealthLine(), State: check.State, Tone: checkTone(check.State)})
+		digest, _ := check.Definition.PolicyDigest()
+		state.Checks = append(state.Checks, BridgeCheck{ID: check.ID, Digest: digest, GoalID: check.GoalID, Title: singleLine(check.Title), Outcome: check.Outcome, Health: check.HealthLine(), State: check.State, Tone: checkTone(check.State), Source: check.Definition.SourcePath, Connectors: append([]string(nil), check.Definition.ConnectorIDs...), Timezone: check.Definition.Timezone, Schedule: check.Definition.Schedule, NextDue: bridgeCheckTime(check.NextDue), LastSuccess: bridgeCheckTime(check.LastSuccess), NextAction: check.NextAction, Issue: check.Issue, EndsAt: bridgeCheckTime(check.Definition.EndsAt), Enabled: check.Enabled, Editable: check.Definition.GoalWatch})
 		if m.conversation != "" && check.Definition.OriginConversationID == m.conversation {
 			state.ChatChecks = append(state.ChatChecks, BridgeChatCheck{ID: check.ID, Title: singleLine(check.Title), State: check.State, Issue: check.Issue, NextAction: check.NextAction, LastSuccess: bridgeCheckTime(check.LastSuccess), NextDue: bridgeCheckTime(check.NextDue), GapFrom: bridgeCheckTime(check.CoverageGap.From), GapTo: bridgeCheckTime(check.CoverageGap.To), Unsuccessful: check.Unsuccessful})
 		}

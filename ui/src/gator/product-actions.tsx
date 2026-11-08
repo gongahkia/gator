@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 import { useClient } from "../context/client"
 import { useData } from "../context/data"
 import type { useActions } from "./actions"
-import type { PlanContent, TaskPlanReview, TaskPlanSummary } from "@gator/application-host/contracts/protocol"
+import type { CheckAction, FollowingCheck, PlanContent, TaskPlanReview, TaskPlanSummary } from "@gator/application-host/contracts/protocol"
 
 // Optional management stays behind commands. All mutations use the current
 // Go protocol, including its live tokens, revisions and acknowledgements.
@@ -133,4 +133,32 @@ export function useProductActions(controls: ReturnType<typeof useActions>) {
       details("Code changes", [change.status, ...change.verification.map(check => `${check.passed ? "Passed" : "Failed"}: ${check.argv.join(" ")}`), change.truncated ? "Showing part of the retained patch." : "", change.patch].filter(Boolean).join("\n\n"))
     } }))))
   }
+  async function checkAction(check: FollowingCheck | undefined, action: CheckAction["action"]) {
+    // Managed views have their own owner while a foreground task is busy.
+    // The existing session host keeps that task and its approval in place.
+    if (client.state?.running) await client.navigate("/followup")
+    if (client.state?.running) throw new Error("Wait for the check management view to open.")
+    const request_id = randomUUID()
+    const value: CheckAction = action === "refresh" ? { request_id, action } : { request_id, action, id: check!.id, digest: check!.digest }
+    await client.result({ type: "check", check: value }, request_id, s => s.check_result)
+    if (action === "inspect" || action === "edit") { client.route = "chat"; client.emit("change") }
+  }
+  function commitment(check: FollowingCheck) {
+    const current = () => client.state?.checks?.find(item => item.id === check.id)
+    const exact = () => { const value = current(); if (!value || value.digest !== check.digest) throw new Error("This check changed. Refresh Following and review its current agreement."); return value }
+    menu(check.title, [
+      { title: "Inspect agreement and check health", description: check.issue || check.health, run: () => checkAction(exact(), "inspect") },
+      { title: "Edit outcome, sources and timing", description: check.editable ? "Review changes before saving" : "This schedule uses advanced settings; open /jobs", disabled: !check.editable, run: () => checkAction(exact(), "edit") },
+      { title: check.enabled ? "Pause this check" : "Resume this check", description: check.state === "goal paused" ? "Resume the goal first" : check.enabled ? "Stops future checks; a running check may finish" : "Uses the same saved agreement and existing service",
+        disabled: !check.enabled && check.state === "goal paused", run: () => {
+          const value = exact(), pause = value.enabled
+          confirm(`${pause ? "Pause" : "Resume"} ${value.title}?`, [value.outcome, `Sources: ${[value.source, ...(value.connectors ?? [])].filter(Boolean).join(", ") || "None"}`, `Timing: ${value.schedule} · ${value.timezone}`, pause ? "Future checks will stop. A check already running may finish. Its retained results remain available." : "Resume future checks using this saved agreement. This does not start the local service or run a check immediately. Checks require this computer to be awake and their sources accessible."].join("\n\n"), async () => {
+            await checkAction(value, pause ? "pause" : "resume")
+            details(value.title, pause ? "Check paused. Future checks are stopped; a check already running may finish." : client.state?.supervisor_running ? "Check enabled. The local service will evaluate its next due time while this computer is awake and its sources are accessible." : "Check enabled, but the local service is offline. Open /recovery to review starting it.")
+          })
+        } },
+      { title: "Review local service", run: () => client.navigate("/recovery") },
+    ], true)
+  }
+  return { commitment, refreshChecks: () => checkAction(undefined, "refresh") }
 }

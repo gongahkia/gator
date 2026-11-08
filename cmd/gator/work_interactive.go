@@ -351,6 +351,19 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		},
 		SaveFollowup: func(draft followup.Draft) (goal.Record, jobs.Definition, error) { return saveFollowup(stateDir, draft) },
 		ReadChecks:   func() ([]workhome.Check, bool, error) { return readFollowupChecks(stateDir) },
+		SetCheckEnabled: func(id string, enabled bool, expected string) error {
+			release, err := state.Guard(stateDir, false)
+			if err != nil {
+				return err
+			}
+			defer release()
+			store, err := jobs.Open(stateDir)
+			if err != nil {
+				return err
+			}
+			_, err = store.SetEnabledReviewed(id, enabled, expected)
+			return err
+		},
 		ReadQuietChecks: func(jobID string) (jobs.QuietAudit, error) {
 			store, err := jobs.Open(stateDir)
 			if err != nil {

@@ -505,6 +505,18 @@ func (s Store) List() ([]Definition, error) {
 }
 
 func (s Store) SetEnabled(id string, enabled bool) (Definition, error) {
+	return s.setEnabledReviewed(id, enabled, "")
+}
+
+// SetEnabledReviewed binds a UI pause/resume to the exact displayed agreement.
+func (s Store) SetEnabledReviewed(id string, enabled bool, expected string) (Definition, error) {
+	if expected == "" {
+		return Definition{}, errors.New("review the current check before changing it")
+	}
+	return s.setEnabledReviewed(id, enabled, expected)
+}
+
+func (s Store) setEnabledReviewed(id string, enabled bool, expected string) (Definition, error) {
 	unlock, err := s.lockDefinitions()
 	if err != nil {
 		return Definition{}, err
@@ -513,6 +525,12 @@ func (s Store) SetEnabled(id string, enabled bool) (Definition, error) {
 	definition, err := s.Load(id)
 	if err != nil {
 		return Definition{}, err
+	}
+	if expected != "" {
+		digest, err := definition.PolicyDigest()
+		if err != nil || digest != expected {
+			return Definition{}, errors.New("this check changed; refresh and review it again")
+		}
 	}
 	if enabled && definition.Expired(time.Now()) {
 		return Definition{}, errors.New("this check has ended; review a new end date before resuming")

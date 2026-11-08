@@ -243,6 +243,7 @@ type Config struct {
 	ChangeKnowledge          func(id, action, text, goalID, revision string) (string, error)
 	SaveFollowup             func(followup.Draft) (goal.Record, jobs.Definition, error)
 	ReadChecks               func() ([]workhome.Check, bool, error)
+	SetCheckEnabled          func(id string, enabled bool, expectedDigest string) error
 	ReadQuietChecks          func(jobID string) (jobs.QuietAudit, error)
 	ReviewQuietCheck         func(jobID, attemptID, verdict, note, revision string) error
 	StartSupervisor          func() error
@@ -359,6 +360,7 @@ type pendingBundleAction struct {
 }
 
 type Model struct {
+	bridgeCheckResult      *BridgeCheckResult
 	planPreparing          string
 	planResult             *TaskPlanResult
 	catalog                *conversationCatalog

@@ -16,6 +16,7 @@ import (
 )
 
 type uiFrame struct {
+	Check         *workapp.BridgeCheckAction        `json:"check,omitempty"`
 	TaskPlan      *workapp.TaskPlanAction           `json:"task_plan,omitempty"`
 	Branch        *workapp.BranchAction             `json:"branch,omitempty"`
 	Receipt       *workapp.ReceiptAction            `json:"receipt,omitempty"`
@@ -139,6 +140,10 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 		case "task_plan":
 			if frame.TaskPlan != nil {
 				next, command = m.model.ApplyTaskPlan(*frame.TaskPlan)
+			}
+		case "check":
+			if frame.Check != nil {
+				next, command = m.model.ApplyBridgeCheck(*frame.Check)
 			}
 		case "branch":
 			if frame.Branch != nil {

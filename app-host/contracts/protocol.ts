@@ -108,7 +108,15 @@ export type TaskPlanAction = {conversation_id:string;task_id:string;revision:num
 export type TaskPlanResult = {request_id:string;error?:string;review?:TaskPlanReview};
 export type BranchAction = {conversation_id:string; revision_id:string; run_id:string; request_id:string};
 export type BranchResult = {request_id:string; conversation_id?:string; error?:string};
+export type FollowingCheck = {
+  id: string; digest: string; goal_id?: string; title: string; outcome: string; health: string; state: string; tone?: ResultTone;
+  source: string; connectors?: string[]; timezone: string; schedule: string; next_due?: string; last_success?: string;
+  next_action: string; issue?: string; ends_at?: string; enabled: boolean; editable: boolean;
+};
+export type CheckAction = {request_id: string} & ({action: "refresh"} | {action: "inspect" | "edit" | "pause" | "resume"; id: string; digest: string});
 export type BackendState = {
+ check_result?: {request_id: string; error?: string};
+ supervisor_running?: boolean;
  task_plans?:TaskPlanSummary[];
  task_plan_result?:TaskPlanResult;
  branch?: {conversation_id:string; revision_id:string};
@@ -149,9 +157,9 @@ export type BackendState = {
     browser_session?: string;
     latest_bundle?: BackendBundle;
   };
-  checks?: { goal_id?: string; title: string; health: string; state: string; tone?: ResultTone }[];
+  checks?: FollowingCheck[];
   checks_issue?: string;
-  following_goals?: { id: string; title: string; status: string }[];
+  following_goals?: { id: string; title: string; status: string; outcome?: string }[];
   following_issue?: string;
   provider?: string;
   model?: string;
@@ -197,7 +205,8 @@ export type SpecialistAction = {
 };
 export type Frame = {
   version: 1;
-  type: "receipt" | "memory" | "update" | "submit" | "upload_submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "specialist" | "conversation" | "composer" | "sources" | "branch" | "task_plan";
+  type: "receipt" | "memory" | "update" | "submit" | "upload_submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "specialist" | "conversation" | "composer" | "sources" | "branch" | "task_plan" | "check";
+  check?: CheckAction;
   specialist?: SpecialistAction;
   memory?: ChatMemoryAction;
   receipt?: {conversation_id: string; run_id: string; action_id: string; correlation_id: string; manifest_sha256: string; action: "inspect" | "check_sent"; request_id: string};

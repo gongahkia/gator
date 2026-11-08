@@ -39,10 +39,16 @@ export function validateFrame(frame) {
     update: ["type", "update"],
     memory: ["type", "memory"],
     receipt: ["type", "receipt"],
+    check: ["type", "check"],
   }[frame.type];
   if (!allowed || Object.keys(frame).some((key) => !allowed.includes(key))) throw new Error("Unsupported desktop action");
   if (JSON.stringify(frame).length > 256 * 1024) throw new Error("Desktop action is too large");
   if (frame.type === "submit" && (typeof frame.text !== "string" || frame.text.length > 128 * 1024)) throw new Error("Invalid request");
+  if (frame.type === "check") {
+    const v = frame.check;
+    if (!v || typeof v !== "object" || Array.isArray(v) || Object.keys(v).some(key => !["request_id", "action", "id", "digest"].includes(key)) || typeof v.request_id !== "string" || !/^[a-zA-Z0-9-]{1,64}$/.test(v.request_id) || !["refresh", "inspect", "edit", "pause", "resume"].includes(v.action)) throw new Error("Invalid check action");
+    if (v.action === "refresh" ? v.id !== undefined || v.digest !== undefined : typeof v.id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/.test(v.id) || typeof v.digest !== "string" || !/^[a-f0-9]{64}$/.test(v.digest)) throw new Error("Invalid check identity");
+  }
   if (frame.type === "upload_submit") {
     const value = frame.upload;
     if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some((key) => !["request_id", "context", "text", "files", "reply_to_update_id", "plan_first"].includes(key)) || (value.plan_first !== undefined && typeof value.plan_first!=="boolean") || (value.reply_to_update_id !== undefined && (typeof value.reply_to_update_id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(value.reply_to_update_id))) || typeof value.request_id !== "string" || !/^[a-zA-Z0-9-]{1,64}$/.test(value.request_id) || typeof value.context !== "string" || value.context.length > 8192 || typeof value.text !== "string" || Buffer.byteLength(value.text) > 128 * 1024 || !Array.isArray(value.files) || (!value.files.length && !value.text.trim()) || value.files.length > uploadLimits.count || new Set(value.files).size !== value.files.length || value.files.some((id) => !validUploadID(id))) throw new Error("Invalid attachment request");
