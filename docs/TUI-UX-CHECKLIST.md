@@ -6,7 +6,7 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 
 | # | Acceptance criteria | Status | Evidence / commit |
 |---|---|---|---|
-| 1 | Conversation remains available during execution; ordinary messages can steer a specific live task or start independent work; ambiguous routing is clarified without losing task identity, files, or drafts. | Pending | |
+| 1 | Conversation remains available during execution; ordinary messages can steer a specific live task or start independent work; ambiguous routing is clarified without losing task identity, files, or drafts. | In progress | Tool-free conversation router and independent paged turn store implemented; identity/capability validation, active-operation independence, idempotent admission and versioned dispatch tests pass. Not yet wired to ordinary composer submissions or background task delegation. |
 | 2 | Following unifies commitments with outcome/state/next action, next and last successful checks, sources/timezone, pause/edit, and truthful foreground/service/offline limits. | Pending | |
 | 3 | Relevant answers expose supplied memory/provenance/correction; noise feedback offers a reviewed, scoped check/notification change and reports its actual outcome. | Pending | |
 | 4 | First task leads through only missing setup; host connectivity and model readiness are distinct; local/cloud processing, capabilities, and work budget are explained. | Pending | |
@@ -87,3 +87,17 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
   long history: retain item 13 as in progress and implement bounded rendering.
   Native syntax-style cleanup warnings surfaced during view teardown; inspect
   resource lifetime under item 15 rather than treating plain-text fallback as resolved.
+
+- Conversation/execution foundation: `workrun.RouteConversation` answers or returns
+  guide/stop/new-task/clarification intent with no tools or approval authority.
+  Host-provided task IDs and capabilities are validated; no premature action acknowledgement.
+  `worksession` dialogue turns retain original input/options independently of execution
+  leases/revisions. Pages retain older turns, retries are idempotent, updates use
+  compare-and-swap, and terminal dispatches cannot be revived by reading or updating.
+  `go test ./internal/worksession ./internal/workrun` passes; dialogue race tests pass.
+  This foundation is deliberately not advertised as a working composer flow yet.
+  Remaining integration for item 1: durable asynchronous turn admission, configured
+  routing model/accounting, task delegation through the existing host session owners,
+  accepted guidance acknowledgements, parent/child result routing with original scope,
+  restart/pruning retention, and real protocol/UI tests. Do not substitute auto-switching
+  to another chat or a queue/guide picker as the completed conversational experience.
