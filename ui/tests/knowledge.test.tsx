@@ -30,10 +30,10 @@ test("saved knowledge filters preserve identity and guarded corrections, omissio
     await filter("Sentosa"); setup.mockInput.pressEnter(); await flush(); expect(client.state?.panel?.title).toBe("Offsite planning notes"); expect(JSON.stringify(client.state?.panel)).toContain("planning-brief.md")
     setup.mockInput.pressKey("o"); await flush(); expect(client.state?.panel?.notice).toContain("Omitted"); setup.mockInput.pressKey("o"); await flush(); expect(client.state?.panel?.notice).toContain("Included again")
     const stale = "Keep the correction after a concurrent note edit."
-    await edit(stale); cli("note", "edit", note, "--body", "Concurrent saved note is authoritative."); setup.mockInput.pressKey("F2"); await until(() => !!client.state?.panel?.notice?.includes("changed"), "stale knowledge refusal"); await flush()
+    await edit(stale); cli("note", "edit", note, "--body", "Concurrent saved note is authoritative."); setup.mockInput.pressKey("r", { ctrl: true }); await until(() => !!client.state?.panel?.notice?.includes("changed"), "stale knowledge refusal"); await flush()
     expect(client.state?.panel?.kind).toBe("knowledge-form"); expect(client.state?.panel?.rows?.[0].input?.value).toBe(stale); expect(cli("note", "show", note)).toContain("Concurrent saved note is authoritative.")
     setup.mockInput.pressEscape(); await flush(); setup.mockInput.pressEnter(); await flush(); await open()
-    await edit("Corrected shortlist: East Coast.\nConfirm capacity first."); setup.mockInput.pressKey("F2"); await until(() => client.state?.panel?.title === "Offsite planning notes", "saved correction")
+    await edit("Corrected shortlist: East Coast.\nConfirm capacity first."); setup.mockInput.pressKey("r", { ctrl: true }); await until(() => client.state?.panel?.title === "Offsite planning notes", "saved correction")
     expect(cli("note", "show", note)).toContain("Corrected shortlist: East Coast.\nConfirm capacity first."); expect(cli("note", "show", note)).toContain("planning-brief.md")
     setup.mockInput.pressKey("f"); await until(() => client.state?.panel?.title === "Forget saved knowledge?", "explicit forget review"); setup.mockInput.pressEscape(); await flush(); expect(cli("note", "list")).toContain(note)
     await client.close(); await setup.dispose(); client = new GatorClient(new Application(options)); setup = await render(); await client.start(); await open(); await flush()

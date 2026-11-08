@@ -95,7 +95,7 @@ func TestPanelUsesWorkVisualLanguage(t *testing.T) {
 
 	view := panelSnapshotText(panel.UISnapshot())
 	plain := ansi.Strip(view)
-	for _, required := range []string{"Cloud models", "gemini", "↑/↓ choose", "Esc back", "F1 help"} {
+	for _, required := range []string{"Cloud models", "gemini", "↑/↓ choose", "Esc back", "Ctrl+O help"} {
 		if !strings.Contains(plain, required) {
 			t.Fatalf("work-native model panel omitted %q:\n%s", required, plain)
 		}

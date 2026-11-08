@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestDesktopShortcutValidationPreservesTypingAndConflicts(t *testing.T) {
 	for _, binding := range []string{"K", "Mod+Q", "Tab", "Escape", "Mod+K+K", "Ctrl+Ctrl+K", "Mod+" + physicalShortcut("Mod") + "+K"} {
@@ -8,10 +11,10 @@ func TestDesktopShortcutValidationPreservesTypingAndConflicts(t *testing.T) {
 			t.Errorf("accepted %q", binding)
 		}
 	}
-	if got, err := NormalizeShortcut("cmd + shift + p"); err != nil || got != "Meta+Shift+P" {
+	if got, err := NormalizeShortcut("cmd + shift + p"); err != nil || got != "Ctrl+Shift+P" {
 		t.Fatalf("normalized=%q %v", got, err)
 	}
-	d := DesktopSettings{Shortcuts: map[string]string{"command_search": "Mod+F"}}
+	d := DesktopSettings{Shortcuts: map[string]string{"command_search": "Mod+F", "conversation_search": "Ctrl+F"}}
 	if err := d.Validate(); err == nil {
 		t.Fatal("conflicting shortcut accepted")
 	}
@@ -29,7 +32,7 @@ func TestDesktopPreferencesSurviveConfigRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	loaded, err := store.Load()
-	if err != nil || loaded.Desktop.ResolvedShortcuts()["voice_input"] != "Mod+Shift+D" || !loaded.Desktop.Voice.SpokenReplies {
+	if err != nil || loaded.Desktop.ResolvedShortcuts()["voice_input"] != "Ctrl+Shift+D" || !loaded.Desktop.Voice.SpokenReplies {
 		t.Fatalf("preferences lost: %#v %v", loaded.Desktop, err)
 	}
 }
@@ -57,11 +60,37 @@ func TestNewChatShortcutPreservesExistingCustomBinding(t *testing.T) {
 		t.Fatal("adding new chat invalidated an older profile", err)
 	}
 	r := d.ResolvedShortcuts()
-	if r["command_search"] != "Mod+N" || r["new_chat"] != "Mod+Shift+N" {
+	if r["command_search"] != "Ctrl+N" || r["new_chat"] != "Ctrl+Shift+N" {
 		t.Fatal(r)
 	}
 	d.Shortcuts["new_chat"] = "Mod+N"
 	if d.Validate() == nil {
 		t.Fatal("explicit conflicting shortcuts accepted")
+	}
+}
+
+func TestTerminalShortcutsMigrateFunctionKeysAndPrimaryModifiers(t *testing.T) {
+	d := DesktopSettings{Shortcuts: map[string]string{"help": "F1", "new_chat": "Ctrl+F3", "command_search": "Cmd+O"}}
+	if err := d.Validate(); err != nil {
+		t.Fatal("legacy settings no longer load", err)
+	}
+	resolved := d.ResolvedShortcuts()
+	if resolved["command_search"] != "Ctrl+O" || resolved["help"] != "Ctrl+Shift+O" || resolved["new_chat"] != "Ctrl+N" {
+		t.Fatal("migration lost a custom binding or introduced a conflict", resolved)
+	}
+	for action, binding := range resolved {
+		if binding != "Enter" && !strings.HasPrefix(binding, "Ctrl+") {
+			t.Errorf("%s resolved to %q", action, binding)
+		}
+	}
+	for _, binding := range []string{"F1", "F12", "Ctrl+F3", "Alt+F4", "Shift+F7"} {
+		if _, err := NormalizeShortcut(binding); err == nil {
+			t.Errorf("accepted retired function shortcut %q", binding)
+		}
+	}
+	// Migration must not conceal invalid action names in the settings file.
+	d.Shortcuts["unknown"] = "F1"
+	if err := d.Validate(); err == nil {
+		t.Fatal("unknown shortcut action accepted")
 	}
 }

@@ -80,7 +80,7 @@ export function Dialog(
           width={dialogWidth(props.size ?? "medium")}
           maxWidth={Math.max(1, dimensions().width - 2)}
           backgroundColor={theme.background.base}
-          border={["top"]}
+          border={["left"]}
           borderColor={theme.accent}
           paddingTop={0}
         >

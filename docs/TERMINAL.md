@@ -26,23 +26,26 @@ composer: type `/`, use ↑/↓ to choose, Tab to complete, Enter to select, or 
 to dismiss. Commands needing arguments stay editable. The menu sections retain
 the same capabilities without a flat slash-command list. `/following`, `/saved`, `/settings`, `/files`, `/queue`,
 `/chats`, `/drafts`, `/updates`, `/memories`, `/receipts`, and `/voice` expose Gator
-workflows. F1 or `/help` shows terminal help; `/prompt-history` stages retained
-message text without sending it. Ctrl+J adds a line where Shift+Enter is unavailable. F2 opens file
-versions/export/Ask Gator, F3 edits Office/table content, Ctrl+S saves an immutable
-working version, and F4 discards edits. F6 selects saved cell/paragraph content
+workflows. Ctrl+O or `/help` shows terminal help; `/prompt-history` stages retained
+message text without sending it. Ctrl+J adds a line where Shift+Enter is unavailable. Ctrl+O opens file
+versions/export/Ask Gator, Ctrl+E edits Office/table content, Ctrl+S saves an immutable
+working version, and Ctrl+D discards edits. Ctrl+L selects saved cell/paragraph content
 for Ask Gator. Tables page with Ctrl+Up/Down (rows) and Ctrl+Left/Right (columns);
-F7 switches worksheets. Returning to chat retains the draft. Exporting to an
+Ctrl+T switches worksheets. Returning to chat retains the draft. Exporting to an
 existing file shows a separate replacement review; changed destinations require
 a fresh review. Export outside Gator's private storage.
 Settings → Models and providers (also `/models`) separates model selection,
 effort, and provider/local-model setup. Escape in a model or effort list returns
 to that parent menu. Panels show one consolidated keyboard hint bar.
-In forms, F2 and Ctrl+R perform the displayed save/review action; Enter edits
+The optional left rail marks the current page, including nested settings and
+reviews. The inset composer shows the selected model and effort; click that
+line or use `/models` to change them. Ctrl+B shows or hides the rail.
+In forms, Ctrl+R performs the displayed save/review action; Enter edits
 the selected field. Ctrl+Enter also works in terminals that distinguish it.
 Provider configuration and model rename forms use their existing Go save action;
 a custom provider still requires its separate confirmation review. Unsaved form edits require an explicit discard decision.
 In Conversations, Ctrl+F searches indexed messages, Ctrl+L changes scope,
-Ctrl+Left/Right pages results, F3 manages the selected chat, and Ctrl+R/F5 refreshes.
+Ctrl+Left/Right pages results, Ctrl+E manages the selected chat, and Ctrl+R refreshes.
 Choose `external-editor` in Ctrl+P to edit the idle draft with `$VISUAL`, `$EDITOR`
 or the existing `nvim` fallback. Gator suspends terminal rendering and restores
 text and attachments after exit. The current Go editor command requires POSIX
@@ -165,7 +168,7 @@ their working versions; unavailable originals report an error.
 
 Drag the sidebar divider to resize it, or use Ctrl+Shift+Left/Right. Ctrl+B hides
 or restores it. The width is retained for the current process. Chat rows show
-local date/time and workspace folder; F3 retains the full details. Command
+local date/time and workspace folder; Ctrl+E retains the full details. Command
 palette labels are uppercase, with original command names still searchable.
 
 `/exit`, `/quit` and Ctrl+Q close the application through the same unsaved-work

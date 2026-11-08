@@ -83,7 +83,7 @@ native("managed browser opens paused, grants one task, supports takeover and sto
     expect(f.client.state?.work_details?.browser_session).toBeUndefined()
     await f.choose("Add allowed site"); await f.choose("Site URL")
     await f.setup.mockInput.typeText(f.origin); f.setup.mockInput.pressEnter(); await f.flush()
-    f.setup.mockInput.pressKey("F2"); await f.flush(); await f.confirm()
+    f.setup.mockInput.pressKey("r", { ctrl: true }); await f.flush(); await f.confirm()
     await f.choose("Resume agent access"); await f.confirm()
     await f.choose("Use for next task"); await f.confirm()
     await f.until(() => f.client.state?.work_details?.browser_session === initial.id, "next-task selection")

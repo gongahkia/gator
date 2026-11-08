@@ -62,7 +62,7 @@ function Shell(props: { quit(): Promise<void> }) {
     { id: "gator.cancel", title: "Stop active work", bind: "ctrl+c", palette: true, run: () => data.state?.running ? attempt(client.send({ type: "key", key: "esc" })) : quit() },
     { id: "gator.new", title: "New independent chat", bind: "ctrl+n", palette: true, run: () => navigate("/new") },
     { id: "gator.search", title: "Search current transcript", bind: "ctrl+f", palette: true, enabled: !data.state?.panel, run: () => controls.trigger("search") },
-    { id: "gator.help", title: "Gator help", bind: "f1", palette: true, enabled: !data.state?.panel, run: () => navigate("/help") },
+    { id: "gator.help", title: "Gator help", bind: "ctrl+o", palette: true, enabled: !data.state?.panel, run: () => navigate("/help") },
     { bind: "ctrl+p", title: "Command palette fallback", run: palette },
     { id: "gator.voice", title: "Voice controls", bind: "ctrl+shift+v", palette: true, run: () => controls.trigger("voice") },
     { id: "gator.approve", title: "Review current approval", bind: "ctrl+y", palette: true, run: () => approve(true) },
@@ -83,7 +83,7 @@ function Shell(props: { quit(): Promise<void> }) {
       } })),
   ] }))
   return <box width="100%" height="100%" backgroundColor={theme.background.base}>
-    <box height={1} paddingX={1} gap={2} flexDirection="row" justifyContent="space-between"><text flexGrow={1} flexShrink={1} minWidth={0} height={1} wrapMode="none" truncate fg={theme.text.base}><b>🐊 Gator</b> · {literal(data.state?.title) || "Opening chat…"}</text><ConnectionStatus connection={data.snapshot.connection} error={!!data.snapshot.error} /></box>
+    <box height={1} marginY={1} paddingX={2} gap={2} flexDirection="row" justifyContent="space-between"><text flexGrow={1} flexShrink={1} minWidth={0} height={1} wrapMode="none" truncate fg={theme.text.muted}><b style={{ fg: theme.text.base }}>🐊 Gator</b>  {literal(data.state?.title) || "Opening chat…"}</text><ConnectionStatus connection={data.snapshot.connection} error={!!data.snapshot.error} /></box>
     <SessionFrame sidebar={!data.preferences.sidebarCollapsed} search={palette}>
       <Show when={data.route === "chat"} fallback={<Hub />}><Show when={data.state?.panel} fallback={<><Transcript /><Prompt /></>}>{panel => <Panel panel={panel()} />}</Show></Show>
     </SessionFrame>

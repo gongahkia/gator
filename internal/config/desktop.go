@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"runtime"
 	"slices"
 	"strings"
 )
@@ -30,33 +29,49 @@ type VoiceSettings struct {
 }
 
 var DefaultShortcuts = map[string]string{
-	"new_chat": "Mod+N", "command_search": "Mod+K", "conversation_search": "Mod+F", "settings": "Mod+,",
-	"send_message": "Enter", "newline": "Shift+Enter", "guide_work": "Mod+Enter",
-	"voice_input": "Mod+Shift+V", "help": "F1",
+	"new_chat": "Ctrl+N", "command_search": "Ctrl+P", "conversation_search": "Ctrl+F", "settings": "Ctrl+,",
+	"send_message": "Enter", "newline": "Ctrl+J", "guide_work": "Ctrl+G",
+	"voice_input": "Ctrl+Shift+V", "help": "Ctrl+O",
 }
+
+var retiredFunctionShortcut = regexp.MustCompile(`(?i)(^|\+)f([1-9]|1[0-2])$`)
 
 func (d DesktopSettings) ResolvedShortcuts() map[string]string {
 	result := make(map[string]string, len(DefaultShortcuts))
-	for action, shortcut := range DefaultShortcuts {
-		result[action] = shortcut
-	}
-	for action, shortcut := range d.Shortcuts {
-		result[action] = shortcut
-	}
-	// Existing profiles may already use Mod+N for another action. Preserve
-	// that binding and choose an available default for the newly added action.
-	if _, custom := d.Shortcuts["new_chat"]; !custom {
-		occupied := map[string]bool{}
-		for action, binding := range result {
-			if action != "new_chat" {
-				if canonical, err := NormalizeShortcut(binding); err == nil {
-					occupied[physicalShortcut(canonical)] = true
-				}
-			}
+	occupied := map[string]bool{}
+	for action, binding := range d.Shortcuts {
+		// Old GUI profiles may contain function keys. Resolve those actions to
+		// current defaults while keeping the stored profile readable.
+		if retiredFunctionShortcut.MatchString(strings.Join(strings.Fields(binding), "")) {
+			continue
 		}
-		for _, candidate := range []string{"Mod+N", "Mod+Shift+N", "Mod+Alt+N", "Mod+Alt+Shift+N", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"} {
-			if !occupied[physicalShortcut(candidate)] {
-				result["new_chat"] = candidate
+		canonical, err := NormalizeShortcut(binding)
+		if err != nil {
+			result[action] = binding
+			continue
+		}
+		result[action] = physicalShortcut(canonical)
+		occupied[result[action]] = true
+	}
+	actions := make([]string, 0, len(DefaultShortcuts))
+	for action := range DefaultShortcuts {
+		actions = append(actions, action)
+	}
+	slices.Sort(actions)
+	for _, action := range actions {
+		if _, custom := result[action]; custom {
+			continue
+		}
+		binding := DefaultShortcuts[action]
+		key := binding[strings.LastIndex(binding, "+")+1:]
+		choices := []string{binding, "Ctrl+Shift+" + key, "Ctrl+Alt+" + key, "Ctrl+Alt+Shift+" + key}
+		for letter := 'A'; letter <= 'Z'; letter++ {
+			choices = append(choices, "Ctrl+Shift+"+string(letter))
+		}
+		for _, candidate := range choices {
+			if _, err := NormalizeShortcut(candidate); err == nil && !occupied[candidate] {
+				result[action] = candidate
+				occupied[candidate] = true
 				break
 			}
 		}
@@ -73,11 +88,7 @@ func NormalizeShortcut(value string) (string, error) {
 	for _, part := range parts[:len(parts)-1] {
 		var name string
 		switch strings.ToLower(strings.TrimSpace(part)) {
-		case "mod", "cmdorctrl":
-			name = "Mod"
-		case "cmd", "command", "meta":
-			name = "Meta"
-		case "ctrl", "control":
+		case "mod", "cmdorctrl", "cmd", "command", "meta", "ctrl", "control":
 			name = "Ctrl"
 		case "option", "alt":
 			name = "Alt"
@@ -92,13 +103,6 @@ func NormalizeShortcut(value string) (string, error) {
 		mods[name] = true
 	}
 	key := strings.TrimSpace(parts[len(parts)-1])
-	primary := "Ctrl"
-	if runtime.GOOS == "darwin" {
-		primary = "Meta"
-	}
-	if mods["Mod"] && mods[primary] {
-		return "", errors.New("Mod already includes the primary modifier")
-	}
 	lower := strings.ToLower(key)
 	switch lower {
 	case "enter", "return":
@@ -110,17 +114,15 @@ func NormalizeShortcut(value string) (string, error) {
 	default:
 		if regexp.MustCompile(`^[a-z0-9]$`).MatchString(lower) {
 			key = strings.ToUpper(key)
-		} else if regexp.MustCompile(`^f([1-9]|1[0-2])$`).MatchString(lower) {
-			key = strings.ToUpper(key)
 		} else {
-			return "", errors.New("use a letter, number, comma, Enter, Space or F1–F12")
+			return "", errors.New("use a Ctrl shortcut with a letter, number, comma, Enter or Space")
 		}
 	}
-	if len(mods) == 0 && key != "Enter" && key != "F1" {
+	if len(mods) == 0 && key != "Enter" {
 		return "", errors.New("single letters and other typing keys need a modifier")
 	}
 	ordered := []string{}
-	for _, name := range []string{"Mod", "Meta", "Ctrl", "Alt", "Shift"} {
+	for _, name := range []string{"Ctrl", "Alt", "Shift"} {
 		if mods[name] {
 			ordered = append(ordered, name)
 		}
@@ -128,8 +130,8 @@ func NormalizeShortcut(value string) (string, error) {
 	ordered = append(ordered, key)
 	canonical := strings.Join(ordered, "+")
 	physical := physicalShortcut(canonical)
-	if slices.Contains([]string{"Meta+Q", "Meta+W", "Meta+R", "Meta+H", "Ctrl+Q", "Ctrl+W", "Ctrl+R", "Alt+F4", "Meta+Alt+I", "Ctrl+Shift+I"}, physical) {
-		return "", errors.New("this shortcut is reserved by the operating system or app menu")
+	if slices.Contains([]string{"Ctrl+Q", "Ctrl+W", "Ctrl+R", "Ctrl+Alt+I", "Ctrl+Shift+I"}, physical) {
+		return "", errors.New("this shortcut is reserved by Gator or the terminal")
 	}
 	if key == "Enter" && mods["Alt"] && len(mods) == 1 {
 		return "", errors.New("Alt+Enter is reserved")
@@ -138,14 +140,15 @@ func NormalizeShortcut(value string) (string, error) {
 }
 
 func physicalShortcut(value string) string {
-	modifier := "Ctrl"
-	if runtime.GOOS == "darwin" {
-		modifier = "Meta"
-	}
-	return strings.ReplaceAll(value, "Mod", modifier)
+	return strings.NewReplacer("Mod", "Ctrl", "Meta", "Ctrl").Replace(value)
 }
 
 func (d DesktopSettings) Validate() error {
+	for action := range d.Shortcuts {
+		if _, exists := DefaultShortcuts[action]; !exists {
+			return fmt.Errorf("unknown shortcut action %q", action)
+		}
+	}
 	seen := map[string]string{}
 	for action, shortcut := range d.ResolvedShortcuts() {
 		if _, exists := DefaultShortcuts[action]; !exists {

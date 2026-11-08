@@ -22,7 +22,12 @@ test("model and effort keyboard choices preserve drafts and respect configured i
   const choose = async (label: string) => { setup.mockInput.pressKey("u", { ctrl: true }); await setup.mockInput.typeText(label); await flush(); setup.mockInput.pressEnter(); await flush() }
   try {
     await client.start(); await client.edit("Keep the model selection draft."); const context = client.context
-    await menu(); await choose("Choose effort"); await choose("Effort: high"); await until(() => client.state?.composer?.effort === "high", "high effort")
+    await flush(); expect(setup.captureCharFrame()).toContain("standard effort")
+    const modelLine = setup.renderer.root.findDescendantById("composer-model")!
+    await setup.mockMouse.click(modelLine.screenX + 3, modelLine.screenY); await flush()
+    expect(setup.captureCharFrame()).toContain("Model and effort for future messages")
+    await choose("Choose effort"); await choose("Effort: high"); await until(() => client.state?.composer?.effort === "high", "high effort"); await flush()
+    expect(setup.captureCharFrame()).toContain("high effort")
     await menu(); await choose("Choose effort"); await choose("Effort: standard"); await until(() => client.state?.composer?.effort === "standard", "reset effort")
     await menu(); await choose("Choose model"); await choose("Careful model"); await until(() => client.state?.model === "two", "configured model identity")
     expect(JSON.parse(await readFile(config, "utf8")).defaults.model).toBe("two")

@@ -33,11 +33,21 @@ func (c gatorAppController) prepareDesktopPreferences(change workrun.AppChange) 
 				return workrun.AppMutation{}, err
 			}
 		}
+		for action, binding := range prior.Desktop.ResolvedShortcuts() {
+			if action != v.Action && binding == next {
+				return workrun.AppMutation{}, errors.New("shortcut conflicts with " + action)
+			}
+		}
 		expected := prior.Desktop.ResolvedShortcuts()[v.Action]
 		return workrun.AppMutation{Preview: map[string]any{"action": v.Action, "before": expected, "after": next}, Apply: func(context.Context) (any, error) {
 			err := c.settings.Update(func(s *config.Settings) error {
 				if s.Desktop.ResolvedShortcuts()[v.Action] != expected {
 					return errors.New("shortcut changed; inspect shortcuts and try again")
+				}
+				for action, binding := range s.Desktop.ResolvedShortcuts() {
+					if action != v.Action && binding == next {
+						return errors.New("shortcut conflicts with " + action)
+					}
 				}
 				if s.Desktop.Shortcuts == nil {
 					s.Desktop.Shortcuts = map[string]string{}

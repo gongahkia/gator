@@ -494,14 +494,14 @@ func (m Model) updateKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if m.productHelp {
-		if value.String() == "esc" || value.String() == "f1" {
+		if value.String() == "esc" || value.String() == "ctrl+o" {
 			m.productHelp = false
 		} else if value.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
 		return m, nil
 	}
-	if value.String() == "f1" && (m.section != "" || m.launcher) {
+	if value.String() == "ctrl+o" && (m.section != "" || m.launcher) {
 		m.productHelp = true
 		return m, nil
 	}

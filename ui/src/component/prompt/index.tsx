@@ -1,7 +1,7 @@
 // Gator adaptation of OpenCode component/prompt/index.tsx. Retains the bottom
 // textarea/composer structure; replaces upstream prompt parts, API submission,
 // agent variants and local stash with Gator's acknowledged drafts and queues.
-import { TextareaRenderable } from "@opentui/core"
+import { TextareaRenderable, TextAttributes } from "@opentui/core"
 import { createEffect, createMemo, createSignal, For, on, Show } from "solid-js"
 import { useTerminalDimensions } from "@opentui/solid"
 import { useClient } from "../../context/client"
@@ -15,6 +15,8 @@ export function Prompt() {
   const client = useClient(), data = useData(), theme = useTheme(), dialog = useDialog()
   let textarea: TextareaRenderable | undefined
   const dimensions = useTerminalDimensions()
+  const compact = () => dimensions().height < 26
+  const model = () => data.state?.composer?.models.find(model => model.provider === data.state?.provider && model.model === data.state?.model)?.label || data.state?.model || data.state?.provider || "Choose a model"
   const [selection, setSelection] = createSignal(0), [dismissed, setDismissed] = createSignal<string>()
   const commands = createMemo(() => {
     const local = [
@@ -69,7 +71,7 @@ export function Prompt() {
     { id: "gator.guide", bind: "ctrl+g", title: "Guide active work with draft", palette: true, run: guide },
     { bind: "ctrl+g", title: "Guide work fallback", run: guide },
   ] }))
-  return <box flexShrink={0} border={["top"]} borderColor={theme.accent} paddingX={1} paddingY={1}>
+  return <box id="composer" flexShrink={0} marginX={dimensions().width < 60 ? 1 : 2} marginTop={1} marginBottom={1}>
     <Show when={matches().length}>
       <box id="slash-completions" paddingX={1} backgroundColor={theme.background.raised.high}>
         <For each={matches().slice(start(), start() + count())}>{(command, index) => <box flexDirection="row" backgroundColor={start() + index() === selected() ? theme.background.action.primary.focused : undefined}
@@ -79,15 +81,22 @@ export function Prompt() {
         <text fg={theme.text.muted}>↑/↓ choose · Tab complete · Enter select · Esc dismiss ({selected() + 1}/{matches().length})</text>
       </box>
     </Show>
-    <Show when={data.state?.running}><text fg={theme.text.muted}>Enter queues · Ctrl+G guides · Ctrl+C stops</text></Show>
+    <box border={["left"]} borderColor={theme.accent} backgroundColor={theme.background.raised.base} paddingX={2} paddingY={1} gap={1}>
     <Show when={client.planFirst.has(data.draft.context)}><text fg={theme.accent}>Plan first · review before implementation · /plan-first to change</text></Show>
     <Show when={data.draft.uploads?.length}><text fg={theme.accent}>Attached: {data.draft.uploads?.map(f => literal(f.name)).join(" · ")}</text></Show>
     <Show when={data.draft.reply_to_update_id}><text fg={theme.accent}>Replying to: {literal(data.state?.chat_updates?.find(update => update.id === data.draft.reply_to_update_id)?.title || data.draft.reply_to_update_id)} · “cancel-update-reply” in commands clears the link.</text></Show>
-    <textarea ref={value => { textarea = value }} focused height={3} minHeight={1} maxHeight={8}
-      placeholderColor={theme.text.muted} initialValue={data.draft.text} placeholder="Send a message… / for commands"
-      textColor={theme.text.base} focusedTextColor={theme.text.base} backgroundColor={theme.background.base}
+    <textarea id="message-input" ref={value => { textarea = value }} focused width="100%" minHeight={1} maxHeight={Math.max(2, Math.min(8, Math.floor(dimensions().height / 3)))}
+      placeholderColor={theme.text.muted} initialValue={data.draft.text} placeholder="Ask anything…"
+      textColor={theme.text.base} focusedTextColor={theme.text.base} backgroundColor={theme.background.raised.base} focusedBackgroundColor={theme.background.raised.base}
       keyBindings={[{ name: "return", action: "submit" }, { name: "return", shift: true, action: "newline" }, { name: "j", ctrl: true, action: "newline" }]}
       onContentChange={() => { if (textarea && textarea.plainText !== client.draft.text) void client.edit(textarea.plainText).catch(e => client.fail(e)) }}
       onSubmit={() => { if (!dialog.stack.length) void client.submit().catch(e => client.fail(e)) }} />
+    <text id="composer-model" height={1} wrapMode="none" truncate selectable={false} fg={theme.text.muted} onMouseDown={event => event.stopPropagation()}
+      onMouseUp={event => { if (event.button !== 0) return; event.stopPropagation(); void client.navigate("/models").catch(e => client.fail(e)) }}><b style={{ fg: theme.accent }}>Gator</b>  {literal(model())}{data.state?.composer?.effort ? ` · ${data.state.composer.effort} effort` : ""}</text>
+    </box>
+    <box paddingX={1} paddingTop={compact() ? 0 : 1} flexDirection="row" justifyContent="space-between" gap={2}>
+      <text fg={theme.text.muted} attributes={TextAttributes.DIM} flexShrink={1} minWidth={0} height={1} wrapMode="none" truncate>{data.state?.running ? "Enter queue · Ctrl+G guide · Ctrl+C stop" : "Enter send · Ctrl+J new line"}</text>
+      <text fg={theme.text.muted} attributes={TextAttributes.DIM} flexShrink={0}>{dimensions().width < 60 ? "/ commands" : "/ commands · Ctrl+P"}</text>
+    </box>
   </box>
 }

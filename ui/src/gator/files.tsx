@@ -112,7 +112,7 @@ function FileEditor(props: { view: FileView; request: FileRequest; reopen(versio
     if (props.view.kind === "table") chooseCell()
     else if (props.view.sheets) props.menu("Select worksheet content", props.view.sheets.map(sheet => ({ title: sheet.name, run: () => chooseCell(sheet.id) })))
     else if (paragraphs().length) props.menu("Select paragraph for Ask Gator", paragraphs().map(paragraph => ({ title: paragraph.text, run: () => stage({ kind: "paragraph", id: paragraph.id }) })))
-    else setNotice("Select text in the editor or preview, then use F2 to choose a saved version.")
+    else setNotice("Select text in the editor or preview, then use Ctrl+O to choose a saved version.")
   }
   function editContent() {
     if (!editable()) return
@@ -156,11 +156,11 @@ function FileEditor(props: { view: FileView; request: FileRequest; reopen(versio
   Keymap.createLayer(() => ({ mode: "modal", priority: 3, commands: [
     { bind: "escape", title: "Close file with draft review", run: close },
     { bind: "ctrl+s", title: "Save file version", enabled: editable, run: () => attempt(save(), "Saving file version…") },
-    { bind: "f3", title: "Edit Office/table content", run: editContent },
-    { bind: "f2", title: "File versions", run: () => { attempt(retain().then(versions), "Loading file versions…") } },
-    { bind: "f4", title: "Discard file edits", run: () => attempt(discard(), "Discarding file edits…") },
-    { bind: "f6", title: "Select saved content for Ask Gator", run: selectContent },
-    { bind: "f7", title: "Choose displayed worksheet", enabled: !!props.view.sheets, run: () => props.menu("Display worksheet", (props.view.sheets ?? []).map(sheet => ({ title: sheet.name, run: async () => { client.filePositions.set(props.view.id, { sheet: sheet.id, row: 0, col: 0 }); await props.reopen(props.view.revision) } }))) },
+    { bind: "ctrl+e", title: "Edit Office/table content", run: editContent },
+    { bind: "ctrl+o", title: "File versions", run: () => { attempt(retain().then(versions), "Loading file versions…") } },
+    { bind: "ctrl+d", title: "Discard file edits", run: () => attempt(discard(), "Discarding file edits…") },
+    { bind: "ctrl+l", title: "Select saved content for Ask Gator", run: selectContent },
+    { bind: "ctrl+t", title: "Choose displayed worksheet", enabled: !!props.view.sheets, run: () => props.menu("Display worksheet", (props.view.sheets ?? []).map(sheet => ({ title: sheet.name, run: async () => { client.filePositions.set(props.view.id, { sheet: sheet.id, row: 0, col: 0 }); await props.reopen(props.view.revision) } }))) },
     { bind: "ctrl+down", title: "Next table rows", enabled: grid, run: () => setPosition(p => ({ ...p, row: Math.min(Math.floor(Math.max(0, size().rows - 1) / 50), p.row + 1) })) },
     { bind: "ctrl+up", title: "Previous table rows", enabled: grid, run: () => setPosition(p => ({ ...p, row: Math.max(0, p.row - 1) })) },
     { bind: "ctrl+right", title: "Next table columns", enabled: grid, run: () => setPosition(p => ({ ...p, col: Math.min(Math.floor(Math.max(0, size().cols - 1) / 20), p.col + 1) })) },
@@ -175,7 +175,7 @@ function FileEditor(props: { view: FileView; request: FileRequest; reopen(versio
           <Show when={grid()}><box id="file-grid-page"><text fg={theme.accent}>{literal(sheet()?.name || props.view.name)}{sheet()?.protected ? " · Protected" : ""} · Rows {position().row * 50 + 1}–{Math.min(size().rows, (position().row + 1) * 50)} of {size().rows} · Columns {columnName(position().col * 20)}–{columnName(Math.min(size().cols, (position().col + 1) * 20) - 1)}</text>
             <Show when={sheet()?.merges.length}><text fg={theme.text.base}>Merged cells: {sheet()?.merges.join(", ")}</text></Show>
             <For each={Array.from({ length: Math.min(50, Math.max(0, size().rows - position().row * 50)) }, (_, offset) => position().row * 50 + offset)}>{row => <text fg={theme.text.base}>{row + 1}: {Array.from({ length: Math.min(20, Math.max(0, size().cols - position().col * 20)) }, (_, offset) => { const col = position().col * 20 + offset, value = literal(gridValue(row, col)); return `${columnName(col)}${row + 1}=${value.slice(0, 160)}${value.length > 160 ? "…" : ""}` }).join(" │ ")}</text>}</For>
-            <text fg={theme.text.muted}>Ctrl+↑/↓ rows · Ctrl+←/→ columns · F7 worksheet · F3 edits any cell, including a new row or column.</text>
+            <text fg={theme.text.muted}>Ctrl+↑/↓ rows · Ctrl+←/→ columns · Ctrl+T worksheet · Ctrl+E edits any cell, including a new row or column.</text>
           </box></Show>
           <For each={paragraphs()}>{paragraph => <box marginBottom={1}><text fg={theme.text.muted}>{literal(paragraph.id)} · {literal(paragraph.style)}</text><text fg={theme.text.base}>{literal(edit().paragraphs?.[paragraph.id] ?? paragraph.text)}</text><For each={paragraph.images}>{image => <image source={image} height={8} width="100%" fit="fit" />}</For></box>}</For>
         </scrollbox>}>{bytes => <image id="file-visual-preview" source={bytes()} flexGrow={1} width="100%" fit="fit" onError={error => setNotice(String(error))} />}</Show>
@@ -186,6 +186,6 @@ function FileEditor(props: { view: FileView; request: FileRequest; reopen(versio
     </box>
     <Show when={props.view.kind === "pdf"}><Show when={busy()} fallback={<text fg={theme.text.base}>PDF page {page()} of {pages()} · Ctrl+←/→ pages</text>}><Spinner delay={150}>Rendering PDF page {page()}…</Spinner></Show></Show>
     <text fg={theme.text.muted}>{literal(notice())}</text>
-    <text fg={theme.text.muted}>Ctrl+S save · F3 edit Office/cell · F2 versions/export/Ask Gator · F6 select content · F4 discard · Esc close</text>
+    <text fg={theme.text.muted}>Ctrl+S save · Ctrl+E edit Office/cell · Ctrl+O versions/export/Ask Gator · Ctrl+L select content · Ctrl+D discard · Esc close</text>
   </DialogLayout>
 }

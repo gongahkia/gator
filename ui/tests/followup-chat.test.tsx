@@ -57,7 +57,7 @@ test("chat creates edits and pauses an origin-linked recurring check only after 
     setup.mockInput.pressEnter(); await flush(); setup.mockInput.pressKey("q"); await until(() => client.state?.panel?.title === "Quiet checks", "quiet decisions")
     expect(client.state?.panel?.rows).toHaveLength(1); await flush(); setup.mockInput.pressEnter(); await flush(); setup.mockInput.pressKey("m")
     await until(() => client.state?.panel?.kind === "quiet-review-form", "missed-change form"); await flush(); setup.mockInput.pressEnter(); await flush()
-    await setup.mockInput.pasteBracketedText("The venue moved the deadline to Thursday."); setup.mockInput.pressKey("s", { ctrl: true }); await flush(); setup.mockInput.pressKey("F2")
+    await setup.mockInput.pasteBracketedText("The venue moved the deadline to Thursday."); setup.mockInput.pressKey("s", { ctrl: true }); await flush(); setup.mockInput.pressKey("r", { ctrl: true })
     await until(() => client.state?.panel?.title === "Review a quiet check", "saved assessment"); await flush()
     const reviewPath = join(root, "state/gator/jobs/history", original.id, attempt, "quiet-review.json")
     expect(JSON.parse(await readFile(reviewPath, "utf8")).verdict).toBe("missed"); expect(JSON.parse(await readFile(reviewPath, "utf8")).note).toBe("The venue moved the deadline to Thursday.")
@@ -66,7 +66,7 @@ test("chat creates edits and pauses an origin-linked recurring check only after 
     const unsaved = "Keep my unsaved assessment after a concurrent review."
     await setup.mockInput.pasteBracketedText(unsaved); setup.mockInput.pressKey("s", { ctrl: true }); await flush()
     const concurrent = JSON.parse(await readFile(reviewPath, "utf8")); await writeFile(reviewPath, JSON.stringify({ ...concurrent, version: 2, sequence: concurrent.sequence + 1, rated_at: new Date().toISOString() }))
-    setup.mockInput.pressKey("F2"); await until(() => !!client.state?.panel?.notice?.includes("feedback changed"), "stale assessment rejection"); await flush()
+    setup.mockInput.pressKey("r", { ctrl: true }); await until(() => !!client.state?.panel?.notice?.includes("feedback changed"), "stale assessment rejection"); await flush()
     expect(client.state?.panel?.rows?.find(row => row.label === "Change that should have been reported")?.input?.value).toBe(unsaved)
     expect(setup.captureCharFrame()).toContain("Keep my unsaved assessment after a concurrent")
     const leaving = client.navigate("/new"); await flush(); expect(setup.captureCharFrame()).toContain("Leave this unsaved form?"); setup.mockInput.pressEscape(); await leaving; await flush()

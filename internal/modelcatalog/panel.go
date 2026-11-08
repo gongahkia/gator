@@ -43,7 +43,7 @@ func (p *ModelCatalogPanel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	var next tea.Model
 	var command tea.Cmd
 	if key, ok := message.(tea.KeyMsg); ok {
-		if key.String() == "f1" {
+		if key.String() == "ctrl+o" {
 			p.help = !p.help
 			return p, nil
 		}

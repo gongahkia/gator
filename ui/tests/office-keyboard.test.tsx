@@ -31,7 +31,7 @@ test("keyboard Office and CSV edits save and export real native content while or
       await client.navigate("/files"); await flush(); await setup.mockInput.typeText(item.name); await flush(); setup.mockInput.pressEnter(); await flush()
       const opened = await client.host.file(request)
       await until(async () => { await flush(); return !!setup.renderer.root.findDescendantById(`file-editor-${opened.revision}`) }, item.name + " opened editor")
-      setup.mockInput.pressKey("F3"); await flush()
+      setup.mockInput.pressKey("e", { ctrl: true }); await flush()
       if (item.match) { await setup.mockInput.typeText(item.match); await flush(); setup.mockInput.pressEnter(); await flush() }
       else { if (item.name.endsWith("xlsx")) { setup.mockInput.pressEnter(); await flush() }; await replacePrompt(item.name.endsWith("xlsx") ? "C1" : "2:2") }
       await replacePrompt(item.value)
@@ -41,7 +41,7 @@ test("keyboard Office and CSV edits save and export real native content while or
       setup.mockInput.pressKey("s", { ctrl: true }); await until(async () => (await client.host.file(request)).versions.length === 2, item.name + " saved version")
       const saved = await client.host.file(request)
       await until(async () => { await flush(); return !!setup.renderer.root.findDescendantById(`file-editor-${saved.revision}`) }, item.name + " saved view")
-      setup.mockInput.pressKey("F2"); await flush(); await setup.mockInput.typeText("Version 2"); await flush(); setup.mockInput.pressEnter(); await flush()
+      setup.mockInput.pressKey("o", { ctrl: true }); await flush(); await setup.mockInput.typeText("Version 2"); await flush(); setup.mockInput.pressEnter(); await flush()
       await setup.mockInput.typeText("Export exact selected bytes"); await flush(); setup.mockInput.pressEnter(); await flush()
       const destination = join(root, "export-" + item.name); await replacePrompt(destination)
       await until(async () => !!await stat(destination).catch(() => undefined), item.name + " export")
@@ -55,7 +55,7 @@ test("keyboard Office and CSV edits save and export real native content while or
       expect(client.state?.messages).toHaveLength(0)
       if (item.name.endsWith("xlsx")) {
         await client.navigate("/files"); await flush(); await setup.mockInput.typeText(item.name); await flush(); setup.mockInput.pressEnter(); await flush()
-        setup.mockInput.pressKey("F2"); await flush(); await setup.mockInput.typeText("Version 2"); await flush(); setup.mockInput.pressEnter(); await flush()
+        setup.mockInput.pressKey("o", { ctrl: true }); await flush(); await setup.mockInput.typeText("Version 2"); await flush(); setup.mockInput.pressEnter(); await flush()
         await setup.mockInput.typeText("Ask Gator"); await flush(); setup.mockInput.pressEnter()
         await until(async () => (client.draft.uploads?.length ?? 0) === 5, "selected saved formula handoff")
         expect(client.draft.text).toContain("Budget · C1: =B1*5"); expect(client.draft.text).not.toContain("=B1*2")

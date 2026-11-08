@@ -143,7 +143,7 @@ test("update paging only acknowledges visible cards and check health stays with 
     const screen = await setup.waitForFrame(frame => frame.includes("No successful check recorded"))
     expect(screen).toContain("offline"); expect(screen).toContain("No successful check recorded")
     expect(screen).toContain("Daily model request limit reached"); expect(screen).toContain("Observed supervisor gap")
-    expect(screen).toMatch(/does not establish what\s+changed/)
+    expect(screen.replaceAll("│", "")).toMatch(/does not establish what\s+changed/)
     setup.mockInput.pressEscape(); await Bun.sleep(75); await client.navigate("/new"); await flush()
     expect(client.state?.chat_checks ?? []).toHaveLength(0); expect(client.state?.chat_updates ?? []).toHaveLength(0)
     expect(client.drafts.get("conversation:" + origin)?.text).toBe("Keep independent draft")

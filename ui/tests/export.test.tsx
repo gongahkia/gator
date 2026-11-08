@@ -15,7 +15,7 @@ test("keyboard export reviews replacements, cancels safely and refuses a changed
   const flush = async () => { await setup.flush(); await Bun.sleep(40); await setup.flush() }
   const review = async () => {
     await client.navigate("/files"); await flush(); setup.mockInput.pressEnter(); await flush()
-    setup.mockInput.pressKey("F2"); await flush(); setup.mockInput.pressEnter(); await flush()
+    setup.mockInput.pressKey("o", { ctrl: true }); await flush(); setup.mockInput.pressEnter(); await flush()
     await setup.mockInput.typeText("Export exact"); await flush(); setup.mockInput.pressEnter(); await flush()
     setup.mockInput.pressKey("u", { ctrl: true }); await setup.mockInput.typeText(destination); setup.mockInput.pressEnter(); await flush()
     expect(setup.captureCharFrame()).toContain("Replace existing export?")

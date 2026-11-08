@@ -24,7 +24,9 @@ export function Panel(props: { panel: BackendPanel }) {
   const [fields, setFields] = createSignal<Record<number, string>>({}), [busy, setBusy] = createSignal(false), [query, setQuery] = createSignal("")
   const selectedRow = () => Math.max(0, Math.min(props.panel.selected ?? 0, (props.panel.rows?.length ?? 1) - 1))
   const footer = () => {
-    if (props.panel.catalog) return "Enter open · Ctrl+F search · F3 actions · F1 help"
+    if (props.panel.catalog) return "Enter open · Ctrl+F search · Ctrl+E actions · Ctrl+O help"
+    const submit = formSubmit()
+    if (submit) return `↑/↓ select · Enter edit · Ctrl+R ${submit.label} · Esc back · Ctrl+O help`
     const parts = (props.panel.footer ?? "").split("·").map(part => part.trim()).filter(Boolean)
     for (const hint of props.panel.hints ?? []) {
       if (!parts.some(part => part.toLowerCase().startsWith(hint.shortcut.toLowerCase() + " "))) parts.push(`${hint.shortcut} ${hint.action}`)
@@ -133,14 +135,14 @@ export function Panel(props: { panel: BackendPanel }) {
     if (dialog.stack.length || busy()) return
     const name = ({ escape: "esc", return: "enter" }[event.name] ?? event.name)
     const key = event.ctrl ? `ctrl+${name}` : event.shift && name === "tab" ? "shift+tab" : name
-    if (key === "f1" && props.panel.catalog) {
-      event.preventDefault(); dialog.replace(() => <Details title="Chat shortcuts" text={"↑/↓ select · Enter open · Esc back\nCtrl+F or / search all retained messages\nCtrl+L filter active, pinned or archived\nCtrl+←/→ previous/next page\nCtrl+R or F5 refresh\nF3 details, rename, pin or archive"} />); return
+    if (key === "ctrl+o" && props.panel.catalog) {
+      event.preventDefault(); dialog.replace(() => <Details title="Chat shortcuts" text={"↑/↓ select · Enter open · Esc back\nCtrl+F or / search all retained messages\nCtrl+L filter active, pinned or archived\nCtrl+←/→ previous/next page\nCtrl+R refresh\nCtrl+E details, rename, pin or archive"} />); return
     }
-    if (key === "f3" && props.panel.catalog?.can_organize) { event.preventDefault(); client.emit("action", "catalog-actions"); return }
-    if (["ctrl+r", "f5"].includes(key) && props.panel.catalog) { event.preventDefault(); void action({ action: "refresh" }); return }
+    if (key === "ctrl+e" && props.panel.catalog?.can_organize) { event.preventDefault(); client.emit("action", "catalog-actions"); return }
+    if (key === "ctrl+r" && props.panel.catalog) { event.preventDefault(); void action({ action: "refresh" }); return }
     if (key === "esc" && Object.keys(fields()).length) { event.preventDefault(); void guard().then(leave => { if (leave) void action({ action: "key", fields: undefined }, "esc") }); return }
     const submit = formSubmit()
-    if (["f2", "ctrl+enter", "ctrl+r"].includes(key) && submit) {
+    if (["ctrl+enter", "ctrl+r"].includes(key) && submit) {
       event.preventDefault()
       // Match the reference host's form submission: Enter on the final field
       // submits the complete form instead of advancing to its next field.
@@ -171,11 +173,11 @@ export function Panel(props: { panel: BackendPanel }) {
     }
     if (key === "ctrl+right" && props.panel.catalog?.has_next) { void action({ action: "next" }); return }
     if (key === "ctrl+left" && props.panel.catalog?.has_previous) { void action({ action: "previous" }); return }
-    const allowed = new Set(["up", "down", "left", "right", "tab", "shift+tab", "enter", "esc", "space", "ctrl+r", "ctrl+u", "f1", ...(props.panel.hints ?? []).flatMap(h => h.shortcut.toLowerCase().replaceAll(" ", "").split("/"))])
+    const allowed = new Set(["up", "down", "left", "right", "tab", "shift+tab", "enter", "esc", "space", "ctrl+r", "ctrl+u", "ctrl+o", ...(props.panel.hints ?? []).flatMap(h => h.shortcut.toLowerCase().replaceAll(" ", "").split("/"))])
     if (allowed.has(key)) { event.preventDefault(); void action({ action: "key", fields: key === "esc" ? undefined : fields() }, key) }
   })
-  return <box flexGrow={1} minHeight={0} paddingX={2} gap={1}>
-    <text fg={theme.accent}><b>{literal(props.panel.title)}</b></text>
+  return <box flexGrow={1} minHeight={0} paddingX={2} paddingY={1} gap={1}>
+    <text fg={theme.text.base}><b>{literal(props.panel.title)}</b></text>
     <Show when={busy() || props.panel.catalog?.loading}><Spinner delay={150}>{props.panel.catalog ? "Loading chats…" : "Updating…"}</Spinner></Show>
     <Show when={props.panel.kind === "appearance"} fallback={<Show when={props.panel.subtitle}><text fg={theme.text.muted}>{literal(props.panel.subtitle)}</text></Show>}><text fg={theme.text.muted}>Use /appearance to choose terminal colors or a Gator preset. Shortcuts below apply to this app.</text></Show>
     <Show when={props.panel.filter && !props.panel.catalog}><text fg={theme.text.muted}>Filter: {literal(props.panel.filter?.value)} · Ctrl+L changes</text></Show>
@@ -187,7 +189,7 @@ export function Panel(props: { panel: BackendPanel }) {
       <Show when={query() && !visible().length}><text fg={theme.text.muted}>No matching loaded items. Clear the filter to choose an entry.</text></Show>
       <Show when={props.panel.catalog && !props.panel.catalog.loading && !props.panel.rows?.length}><text fg={theme.text.muted}>{props.panel.query ? "No chats match this search. Ctrl+F to change it." : "No chats in this view. Ctrl+L to change the filter."}</text></Show>
       <For each={visible()}>{({ row, index }) => <box id={`panel-row-${index}`} marginBottom={props.panel.catalog ? 1 : 0} backgroundColor={index === selectedRow() ? theme.background.raised.high : undefined} paddingY={0} onMouseUp={() => row.input ? edit(index) : void action({ action: "activate", row: index })}>
-        <text wrapMode={props.panel.catalog ? "none" : "word"} truncate={!!props.panel.catalog} height={props.panel.catalog ? 1 : undefined} fg={index === selectedRow() ? theme.accent : theme.text.base}>{index === selectedRow() ? "› " : "  "}{literal(row.label)}{row.state ? ` · ${literal(row.state_label || row.state)}` : ""}{row.input ? `: ${row.input.secret ? "[credential]" : literal(fields()[index] ?? row.input.value)}` : ""}</text>
+        <text attributes={index === selectedRow() ? TextAttributes.BOLD : undefined} wrapMode={props.panel.catalog ? "none" : "word"} truncate={!!props.panel.catalog} height={props.panel.catalog ? 1 : undefined} fg={index === selectedRow() ? theme.accent : theme.text.base}>{index === selectedRow() ? "› " : "  "}{literal(row.label)}{row.state ? ` · ${literal(row.state_label || row.state)}` : ""}{row.input ? `: ${row.input.secret ? "[credential]" : literal(fields()[index] ?? row.input.value)}` : ""}</text>
         <Show when={props.panel.catalog}><text height={1} wrapMode="none" truncate attributes={TextAttributes.DIM} fg={theme.text.muted}>  {[row.pinned ? "Pinned" : "", row.archived ? "Archived" : "", displayDate(row.updated_at, new Date(), true), folderLabel(row.source)].filter(Boolean).map(literal).join(" · ")}{row.detail ? " · " : ""}<Highlight text={row.detail} query={props.panel.query} /></text></Show>
         <Show when={!props.panel.catalog && row.detail}><text fg={theme.text.muted}>  <Highlight text={row.detail} query={props.panel.catalog ? props.panel.query : query()} /></text></Show>
         <Show when={!props.panel.catalog && (row.source || row.updated_at || row.pinned || row.archived)}><text fg={theme.text.muted}>  {[row.pinned ? "Pinned" : "", row.archived ? "Archived" : "", row.updated_at, row.source].filter(Boolean).map(literal).join(" · ")}</text></Show>
@@ -199,9 +201,8 @@ export function Panel(props: { panel: BackendPanel }) {
       <Show when={props.panel.notice}><text fg={props.panel.notice_tone === "error" ? theme.text.feedback.error.base : theme.text.muted}>{literal(props.panel.notice)}</text></Show>
       <Show when={props.panel.usage}><text fg={theme.text.base}>{JSON.stringify(props.panel.usage, null, 2)}</text></Show>
     </scrollbox>
-    <text fg={theme.text.muted}>{footer()}</text>
+    <text fg={theme.text.muted} attributes={TextAttributes.DIM}>{footer()}</text>
     <Show when={data.state?.notice}><text fg={theme.text.feedback.warning.base}>{literal(data.state?.notice)}</text></Show>
-    <Show when={formSubmit()}>{submit => <text fg={theme.text.muted}>F2 or Ctrl+R: {submit().label} form · Enter edits the selected field · Ctrl+Enter also works where supported.</text>}</Show>
   </box>
 }
 

@@ -77,7 +77,7 @@ export function Transcript() {
   ] }))
   return <scrollbox id="transcript" ref={node => { scroll = node }} flexGrow={1} minHeight={0} stickyScroll stickyStart="bottom" paddingX={2}>
     <Show when={data.state?.branch}><text fg={theme.text.muted} onMouseUp={() => void client.navigate("/original-chat")}>Branched chat · /original-chat returns to its source</text></Show>
-    <Show when={!data.state?.messages?.length}><box paddingY={2} gap={1}><text fg={theme.accent}><b>What would you like to get done?</b></text>
+    <Show when={!data.state?.messages?.length}><box paddingY={3} paddingX={3} gap={1}><text fg={theme.text.base}><b>What would you like to get done?</b></text>
       <text fg={theme.text.muted}>Ask anything, or type / for commands.</text><Show when={!data.state?.provider}><text fg={theme.text.muted}>Connect a model with /model to get started.</text></Show></box></Show>
     <For each={timeline()}>{item => <Show when={item.kind === "message" ? item : undefined} fallback={item.kind === "update" ? <box id={`update-${item.update.id}`} ref={node => { const id = item.update.id; cards.set(id, node); onCleanup(() => { if (cards.get(id) === node) cards.delete(id) }) }} paddingY={1}>
       <text fg={theme.accent}><b>{literal(item.update.title)}</b> · {literal(updateStatus(item.update.status))} · {item.update.read ? "read" : "unread"} · {item.update.resolved ? "done" : "open"}</text>
@@ -86,8 +86,9 @@ export function Transcript() {
       <Show when={item.update.rating}><text fg={theme.text.base}>Feedback: {item.update.rating}</text></Show>
       <Show when={data.updateFeedback?.id === item.update.id}><Show when={data.updateFeedback?.saving} fallback={<text fg={theme.text.muted}>{literal(data.updateFeedback?.message)}</text>}><Spinner>{literal(data.updateFeedback?.message)}</Spinner></Show></Show>
       <text fg={theme.text.muted}>Use “updates” in Ctrl+P to inspect evidence, read, reply, mark done or give feedback.</text>
-    </box> : undefined}>{messageItem => { const { message, index } = messageItem(); return <box id={`message-${index}`} paddingY={1} gap={0} border={revealed() === index ? ["left"] : false} borderColor={revealed() === index ? theme.accent : undefined}>
-      <text fg={message.role === "You" ? theme.accent : theme.text.muted}><b>{literal(message.role)}</b><span style={{ attributes: TextAttributes.DIM }}> {displayDate(message.created_at)}</span></text>
+    </box> : undefined}>{messageItem => { const { message, index } = messageItem(); return <box id={`message-${index}`} marginY={1} paddingY={message.role === "You" ? 1 : 0} paddingLeft={message.role === "You" || revealed() === index ? 2 : 3} paddingRight={2} gap={1}
+      backgroundColor={message.role === "You" ? theme.background.raised.base : undefined} border={message.role === "You" || revealed() === index ? ["left"] : false} borderColor={message.role === "You" || revealed() === index ? theme.accent : undefined}>
+      <text fg={message.role === "You" ? theme.accent : theme.text.muted}><b>{literal(message.role)}</b><span style={{ attributes: TextAttributes.DIM }}>  {displayDate(message.created_at)}</span></text>
       <Show when={message.activity}>{trace => <Activity trace={trace()} identity={activityKey(client.context, message, index)} expanded={data.activityExpanded} />}</Show>
       <Show when={message.text}><Show when={message.role !== "You"} fallback={<text fg={theme.text.base}>{literal(message.text)}</text>}><Markdown text={message.text} /></Show></Show>
       <Show when={message.result}>{result => <Result value={result()} />}</Show>

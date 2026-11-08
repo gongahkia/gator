@@ -447,5 +447,5 @@ func (m Model) withPanelHelp(panel uisnapshot.Panel) uisnapshot.Panel {
 	for _, hint := range panel.Hints {
 		lines = append(lines, hint.Shortcut+" · "+hint.Action)
 	}
-	return uisnapshot.Panel{Kind: "help", Title: panel.Title + " · shortcuts", Blocks: []uisnapshot.Block{{Lines: lines}}, Hints: []uisnapshot.Hint{{Shortcut: "F1/Esc", Action: "back"}}}
+	return uisnapshot.Panel{Kind: "help", Title: panel.Title + " · shortcuts", Blocks: []uisnapshot.Block{{Lines: lines}}, Hints: []uisnapshot.Hint{{Shortcut: "Ctrl+O/Esc", Action: "back"}}}
 }

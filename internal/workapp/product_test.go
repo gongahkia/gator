@@ -213,7 +213,7 @@ func TestFollowupShortcutsReturnToTheSameDraft(t *testing.T) {
 	m := New(Config{CurrentFolder: t.TempDir()})
 	m.newFollowup()
 	m.followupForm.Draft.Outcome = "Keep the revised launch on track"
-	m, _ = productKey(m, tea.KeyMsg{Type: tea.KeyF1})
+	m, _ = productKey(m, tea.KeyMsg{Type: tea.KeyCtrlO})
 	panel := m.BridgeState().Panel
 	if panel.Kind != "help" || !strings.Contains(strings.Join(panel.Blocks[0].Lines, "\n"), "Ctrl+R") {
 		t.Fatal("form shortcuts are unreachable")

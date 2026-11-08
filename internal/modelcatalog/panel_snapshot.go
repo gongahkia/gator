@@ -17,8 +17,8 @@ func (p *ModelCatalogPanel) UISnapshot() uisnapshot.Panel {
 			{Title: "Cloud API key", Lines: []string{"C configure API key · N new provider · G discover", "D remove credential · X remove provider · E rename"}},
 			{Title: "Local", Lines: []string{"P download · X remove · E rename · S start Ollama", "I installation help"}},
 		}
-		panel.Footer = "F1 or Esc close help"
-		panel.Hints = []uisnapshot.Hint{{Shortcut: "F1/Esc", Action: "close"}}
+		panel.Footer = "Ctrl+O or Esc close help"
+		panel.Hints = []uisnapshot.Hint{{Shortcut: "Ctrl+O/Esc", Action: "close"}}
 		return panel
 	}
 	if p.model.screen == chooseModelScreen {
@@ -35,8 +35,8 @@ func (p *ModelCatalogPanel) UISnapshot() uisnapshot.Panel {
 		if p.model.localModels.section == localModelSection {
 			panel.Selected = 1
 		}
-		panel.Footer = "↑/↓ choose · Enter continue · Esc back · F1 help"
-		panel.Hints = []uisnapshot.Hint{{Shortcut: "↑/↓", Action: "choose"}, {Shortcut: "Enter", Action: "continue"}, {Shortcut: "Esc", Action: "back"}, {Shortcut: "F1", Action: "help"}}
+		panel.Footer = "↑/↓ choose · Enter continue · Esc back · Ctrl+O help"
+		panel.Hints = []uisnapshot.Hint{{Shortcut: "↑/↓", Action: "choose"}, {Shortcut: "Enter", Action: "continue"}, {Shortcut: "Esc", Action: "back"}, {Shortcut: "Ctrl+O", Action: "help"}}
 		return panel
 	}
 	if p.focused() {
@@ -48,7 +48,7 @@ func (p *ModelCatalogPanel) UISnapshot() uisnapshot.Panel {
 		for _, entry := range p.model.cloudModels() {
 			panel.Rows = append(panel.Rows, uisnapshot.Row{Label: entry.name, Detail: entry.status})
 		}
-		panel.Footer = "↑/↓ choose · Enter use · C configure key · D forget · N provider · G discover · Esc back · F1 help"
+		panel.Footer = "↑/↓ choose · Enter use · C configure key · D forget · N provider · G discover · Esc back · Ctrl+O help"
 		panel.Hints = []uisnapshot.Hint{{Shortcut: "↑/↓", Action: "choose"}, {Shortcut: "Enter", Action: "use"}, {Shortcut: "C", Action: "configure"}, {Shortcut: "N", Action: "new provider"}, {Shortcut: "G", Action: "discover"}, {Shortcut: "E", Action: "rename"}, {Shortcut: "D", Action: "forget credential"}, {Shortcut: "X", Action: "remove provider"}, {Shortcut: "Esc", Action: "back"}}
 	} else {
 		panel.Title = "Local models"
@@ -70,7 +70,7 @@ func (p *ModelCatalogPanel) UISnapshot() uisnapshot.Panel {
 			}
 			panel.Rows = append(panel.Rows, uisnapshot.Row{Label: model.Name, Detail: state, State: model.Category})
 		}
-		panel.Footer = "↑/↓ choose · Enter use · P download · X remove · S start · I setup · R refresh · Esc back · F1 help"
+		panel.Footer = "↑/↓ choose · Enter use · P download · X remove · S start · I setup · R refresh · Esc back · Ctrl+O help"
 		panel.Hints = []uisnapshot.Hint{{Shortcut: "↑/↓", Action: "choose"}, {Shortcut: "Enter", Action: "use"}, {Shortcut: "P", Action: "download"}, {Shortcut: "S", Action: "start Ollama"}, {Shortcut: "I", Action: "setup"}, {Shortcut: "E", Action: "rename"}, {Shortcut: "X", Action: "remove model"}, {Shortcut: "R", Action: "refresh"}, {Shortcut: "Esc", Action: "back"}}
 	}
 	if p.model.localModels.action != localModelIdle {
@@ -97,7 +97,7 @@ func (p *ModelCatalogPanel) focusedSnapshot(panel uisnapshot.Panel) uisnapshot.P
 		title, hint, detail := p.model.modelCatalogConfirmationContent()
 		panel.Title = title
 		panel.Blocks = []uisnapshot.Block{snapshotContent("", hint, detail)}
-		panel.Footer = p.confirmationFooter(state.confirmation) + " · F1 help"
+		panel.Footer = p.confirmationFooter(state.confirmation) + " · Ctrl+O help"
 		panel.Hints = []uisnapshot.Hint{{Shortcut: "Enter", Action: "confirm"}, {Shortcut: "Esc", Action: "cancel"}}
 		switch state.confirmation {
 		case localModelConfirmStart:

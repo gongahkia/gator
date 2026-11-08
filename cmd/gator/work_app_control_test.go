@@ -65,19 +65,32 @@ func TestGatorAppChatRebindsShortcutsAndVoicePreferences(t *testing.T) {
 		}
 	}
 	saved, _ := c.settings.Load()
-	if saved.Desktop.ResolvedShortcuts()["command_search"] != "Mod+P" || !saved.Desktop.Voice.SpokenReplies || saved.Desktop.Voice.Language != "en-SG" {
+	if saved.Desktop.ResolvedShortcuts()["command_search"] != "Ctrl+P" || !saved.Desktop.Voice.SpokenReplies || saved.Desktop.Voice.Language != "en-SG" {
 		t.Fatalf("preferences not saved: %#v", saved.Desktop)
 	}
-	conflict, err := c.Prepare(context.Background(), workrun.AppChange{Setting: "shortcuts", Value: json.RawMessage(`{"action":"command_search","shortcut":"Mod+F"}`)})
+	if _, err := c.Prepare(context.Background(), workrun.AppChange{Setting: "shortcuts", Value: json.RawMessage(`{"action":"command_search","shortcut":"Mod+F"}`)}); err == nil {
+		t.Fatal("conflicting keybind prepared")
+	}
+	saved, _ = c.settings.Load()
+	if saved.Desktop.ResolvedShortcuts()["command_search"] != "Ctrl+P" {
+		t.Fatal("failed rebind altered the saved binding")
+	}
+}
+
+func TestGatorAppShortcutReviewRejectsNewConcurrentConflict(t *testing.T) {
+	c := appControllerForTest(t)
+	mutation, err := c.Prepare(context.Background(), workrun.AppChange{Setting: "shortcuts", Value: json.RawMessage(`{"action":"command_search","shortcut":"Ctrl+L"}`)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conflict.Apply(context.Background()); err == nil {
-		t.Fatal("conflicting keybind saved")
+	if err := c.settings.Update(func(s *config.Settings) error {
+		s.Desktop.Shortcuts = map[string]string{"conversation_search": "Ctrl+L"}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
 	}
-	saved, _ = c.settings.Load()
-	if saved.Desktop.ResolvedShortcuts()["command_search"] != "Mod+P" {
-		t.Fatal("failed rebind altered the saved binding")
+	if _, err := mutation.Apply(context.Background()); err == nil {
+		t.Fatal("review applied after another action took the shortcut")
 	}
 }
 

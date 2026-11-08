@@ -25,14 +25,14 @@ test("saved guidance uses typed choices and full text, retains scope on edit, fi
     await field("Type"); await choose("Procedure"); await field("Scope"); await choose("This workspace")
     await field("Key"); await choose("offsite-review")
     await field("Text"); await setup.mockInput.pasteBracketedText(body); setup.mockInput.pressKey("s", { ctrl: true }); await flush()
-    setup.mockInput.pressKey("F2"); await until(() => client.state?.panel?.title === "Guidance details", "saved full guidance"); await flush()
+    setup.mockInput.pressKey("r", { ctrl: true }); await until(() => client.state?.panel?.title === "Guidance details", "saved full guidance"); await flush()
     expect(JSON.stringify(client.state?.panel)).toContain("procedure"); expect(JSON.stringify(client.state?.panel)).toContain("offsite-review")
     expect(client.state?.panel?.blocks?.find(block => block.title === "Guidance")?.lines).toEqual([body])
     const scope = client.state?.panel?.summary?.find(field => field.label === "Scope")?.value
     setup.mockInput.pressKey("e"); await until(() => client.state?.panel?.kind === "learning-form", "edit saved guidance"); await flush()
     expect(client.state?.panel?.rows?.[0].input?.read_only).toBe(true); expect(client.state?.panel?.rows?.[1].input?.read_only).toBe(true)
     const updated = body + "\nReport capacity before cost."
-    await field("Text"); setup.mockInput.pressKey("\x1b[F"); await setup.mockInput.pasteBracketedText("\nReport capacity before cost."); setup.mockInput.pressKey("s", { ctrl: true }); await flush(); setup.mockInput.pressKey("F2")
+    await field("Text"); setup.mockInput.pressKey("\x1b[F"); await setup.mockInput.pasteBracketedText("\nReport capacity before cost."); setup.mockInput.pressKey("s", { ctrl: true }); await flush(); setup.mockInput.pressKey("r", { ctrl: true })
     await until(() => client.state?.panel?.title === "Guidance details", "edited guidance"); await flush()
     expect(client.state?.panel?.summary?.find(field => field.label === "Scope")?.value).toBe(scope)
     // Verify complete content after editing, including retained line breaks.

@@ -26,7 +26,7 @@ test("terminal files save exact versions, preserve originals and stage a selecte
     await until(async () => (await client.host.file(request)).versions.length === 2, "saved version")
     const saved = await client.host.file(request)
     expect(saved.text).toContain("Added content"); expect(await readFile(path, "utf8")).toBe("Original file body")
-    await setup.flush(); await Bun.sleep(25); setup.mockInput.pressKey("F2"); await setup.flush(); await Bun.sleep(25)
+    await setup.flush(); await Bun.sleep(25); setup.mockInput.pressKey("o", { ctrl: true }); await setup.flush(); await Bun.sleep(25)
     await setup.mockInput.typeText("Version 2"); await setup.flush(); await Bun.sleep(25); setup.mockInput.pressEnter(); await setup.flush(); await Bun.sleep(25)
     await setup.mockInput.typeText("Ask Gator"); await setup.flush(); await Bun.sleep(25); setup.mockInput.pressEnter()
     await until(() => (client.draft.uploads?.length ?? 0) === 2, "staged version")
@@ -48,7 +48,7 @@ test("all native Office content remains accessible through the same file workflo
     for (const name of ["document.docx", "budget.xlsx", "slides.pptx"]) {
       await client.navigate("/files"); await setup.flush(); await Bun.sleep(25); await setup.mockInput.typeText(name); await setup.flush(); await Bun.sleep(25); setup.mockInput.pressEnter(); await Bun.sleep(60); await setup.flush(); await Bun.sleep(25)
       expect(setup.captureCharFrame()).toContain(name)
-      setup.mockInput.pressKey("F3"); await setup.flush(); await Bun.sleep(25)
+      setup.mockInput.pressKey("e", { ctrl: true }); await setup.flush(); await Bun.sleep(25)
       expect(setup.captureCharFrame()).toContain(name === "budget.xlsx" ? "Choose worksheet" : "Choose existing text")
       setup.mockInput.pressEscape(); await setup.flush(); await Bun.sleep(25)
     }

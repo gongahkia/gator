@@ -46,7 +46,7 @@ test("keyboard pages preserve the draft and recurring checks review exact typed 
     await select("Checks per UTC day"); await prompt("6")
     await select("End date (optional)"); await prompt("2030-10-25T18:30:00Z")
     expect(await definitions()).toHaveLength(0)
-    setup.mockInput.pressKey("F2"); await until(() => client.state?.panel?.title === "Review ongoing check", "exact agreement review"); await flush()
+    setup.mockInput.pressKey("r", { ctrl: true }); await until(() => client.state?.panel?.title === "Review ongoing check", "exact agreement review"); await flush()
     const review = JSON.stringify(client.state?.panel)
     for (const text of ["Watch the offsite plan", picked, "every 30 minutes", "6 Work checks/day", "16 requests", "Read and recommend"]) expect(review).toContain(JSON.stringify(text).slice(1, -1))
     expect(await definitions()).toHaveLength(0)

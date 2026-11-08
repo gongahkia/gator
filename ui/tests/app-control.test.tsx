@@ -43,7 +43,7 @@ test("chat app controls preserve reviews for limits retention and deletion and p
   }
   try {
     await client.start(); await client.send({ type: "submit", text: "/mode inspect" })
-    await ask("Please rebind command search to Mod+P"); await until(() => client.state?.desktop?.shortcuts.command_search === "Mod+P", "saved shortcut")
+    await ask("Please rebind command search to Mod+P"); await until(() => client.state?.desktop?.shortcuts.command_search === "Ctrl+P", "saved shortcut")
     setup.mockInput.pressKey("p", { ctrl: true }); await flush(); expect(setup.captureCharFrame()).toContain("Gator commands"); setup.mockInput.pressEscape(); await Bun.sleep(80); await flush()
     await ask("Please switch to model-two"); await until(() => client.state?.model === "model-two", "future model")
     await ask("What is my usage?"); expect(calls.at(-1)?.model).toBe("model-two")
@@ -53,7 +53,7 @@ test("chat app controls preserve reviews for limits retention and deletion and p
     await ask("Keep completed history for 30 days", true); expect(JSON.parse(await readFile(join(root, "state/gator/data-control/retention.json"), "utf8")).HistoryDays).toBe(30)
     await ask("Select Reports for future messages"); await until(() => client.state?.work_details?.connector_ids.join(",") === "reports", "future connection")
     await client.close(); await setup.dispose(); client = new GatorClient(new Application(options)); setup = await render(); await client.start()
-    expect(client.state?.desktop?.shortcuts.command_search).toBe("Mod+P"); expect(client.state?.work_details?.connector_ids).toEqual(["reports"])
+    expect(client.state?.desktop?.shortcuts.command_search).toBe("Ctrl+P"); expect(client.state?.work_details?.connector_ids).toEqual(["reports"])
     const knowledge = join(root, "state/gator/knowledge"); await mkdir(knowledge, { recursive: true }); const kept = join(knowledge, "kept.md"); await writeFile(kept, "Keep until final review.")
     await client.send({ type: "submit", text: "/mode inspect" }); await ask("Help me delete saved knowledge")
     await until(() => client.state?.panel?.title === "Review private data removal", "canonical deletion review")

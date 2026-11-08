@@ -12,7 +12,7 @@ export type Preferences = { animations: boolean; terminal: { copy: string }; cur
 const Context = createContext<Preferences>()
 export function terminalShortcuts(shortcuts: Record<string, string> = {}): Record<string, string> {
   const names: Record<string, string> = { command_search: "command.palette.show", conversation_search: "gator.search", guide_work: "gator.guide", help: "gator.help", new_chat: "gator.new", send_message: "gator.send", newline: "gator.newline", settings: "gator.settings", voice_input: "gator.voice" }
-  return Object.fromEntries(Object.entries(shortcuts).flatMap(([name, value]) => names[name] ? [[names[name], value.toLowerCase().replaceAll("mod+", "ctrl+").replaceAll("enter", "return").replaceAll("+,", "+comma")]] : []))
+  return Object.fromEntries(Object.entries(shortcuts).flatMap(([name, value]) => names[name] ? [[names[name], value.toLowerCase().replaceAll("mod+", "ctrl+").replaceAll("meta+", "ctrl+").replaceAll("enter", "return").replaceAll("+,", "+comma")]] : []))
 }
 export function ConfigProvider(props: ParentProps<{ bindings?: Record<string, string> }>) {
   const data: Preferences = { animations: !process.env.NO_COLOR && !process.env.GATOR_REDUCED_MOTION,

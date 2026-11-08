@@ -92,6 +92,11 @@ path.write_text("Editor returned draft 🐊\\nSecond retained line")
         wait_for(lambda: not saved_draft("/mode "), "clear completed command")
         os.write(master, "\x1b[200~Installed draft 🐊\nRetain across navigation\x1b[201~".encode())
         wait_for(saved_draft, "private persisted draft")
+        os.write(master, b"\x0f")  # Ctrl+O opens contextual help without a function key.
+        wait_for(lambda: visible("Gator terminal help"), "Ctrl+O terminal help")
+        os.write(master, b"\x1b")
+        wait_for(lambda: not visible("Gator terminal help"), "help closed with draft retained")
+        assert saved_draft(), "Opening help changed the unsent draft"
         os.write(master, b"\x10")  # Ctrl+P, independent of desktop key preferences.
         wait_for(lambda: visible("Gator commands"), "command palette")
         if args.editor:
@@ -139,8 +144,11 @@ path.write_text("Editor returned draft 🐊\\nSecond retained line")
             assert b"\x1b]52;c;R0FUT1JfUFJJVkFURV9DTElQQk9BUkQ=" not in output, "Untrusted OSC 52 reached terminal output"
             assert b"\x1b]0;GATOR_UNTRUSTED_TITLE" not in output, "Untrusted title command reached terminal output"
             assert (root / "untrusted.txt").read_bytes() == payload, "Viewing changed original file bytes"
+            os.write(master, b"\x0f")  # The file's modal binding takes precedence over help.
+            wait_for(lambda: visible("Saved file versions"), "Ctrl+O file versions")
+            assert not visible("Gator terminal help"), "File shortcut opened global help"
             os.write(master, b"\x1b")
-            wait_for(lambda: not visible("Retained final line"), "file view closed before quit")
+            wait_for(lambda: not visible("Saved file versions") and not visible("Retained final line"), "file controls closed before quit")
         os.write(master, b"\x11")
         wait_for(lambda: child.poll() is not None, "clean terminal exit", timeout=10)
         assert child.returncode == 0, child.returncode

@@ -39,7 +39,7 @@ test("chat commands retain exact plan reviews, frozen evidence and independent b
   try {
     await client.start(); await flush()
     expect(setup.renderer.root.findDescendantById("navigation-rail")).toBeUndefined()
-    expect(setup.captureCharFrame()).toContain("Send a message")
+    expect(setup.captureCharFrame()).toContain("Ask anything…")
     await client.send({ type: "submit", text: "/mode inspect" })
     await client.navigate("/plan-first"); await flush(); await choose("Prepare a plan")
     await client.edit("Read project.md and explain its owner and deadline"); await client.submit()

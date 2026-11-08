@@ -20,7 +20,7 @@ test("file comparison and restoration keep full versions while stale recovered e
   const choose = async (label: string) => { await setup.mockInput.typeText(label); await flush(); setup.mockInput.pressEnter(); await flush() }
   const editor = () => { const value = setup.renderer.root.findDescendantById("file-text-editor"); if (!(value instanceof TextareaRenderable)) throw new Error("File editor is not open"); return value }
   const open = async () => { await client.navigate("/files"); await flush(); await choose("long-notes.md"); await until(() => !!setup.renderer.root.findDescendantById("file-text-editor"), "complete text editor"); await flush() }
-  const versions = async (version: number, action: string) => { setup.mockInput.pressKey("F2"); await flush(); await choose(`Version ${version}`); await choose(action) }
+  const versions = async (version: number, action: string) => { setup.mockInput.pressKey("o", { ctrl: true }); await flush(); await choose(`Version ${version}`); await choose(action) }
   try {
     await client.start(); await client.attach([source]); await client.edit("Keep independent composer"); const ref = { kind: "upload" as const, id: client.draft.uploads![0].id }, context = client.context
     const view = () => client.host.file({ action: "open", context, ref })
@@ -37,7 +37,7 @@ test("file comparison and restoration keep full versions while stale recovered e
     const before = await view(); await client.host.file({ action: "save", context, ref, expected: before.current, edit: { text: "Concurrent latest saved version." } })
     setup.mockInput.pressKey("s", { ctrl: true }); await until(() => !!client.issue, "stale file save refusal"); await flush()
     expect(editor().plainText).toBe(original + "\nUncommitted recovery text."); expect((await view()).text).toBe("Concurrent latest saved version."); expect((await view()).versions).toHaveLength(4)
-    setup.mockInput.pressKey("F4"); await until(() => editor().plainText === "Concurrent latest saved version.", "explicit discard reloads latest")
+    setup.mockInput.pressKey("d", { ctrl: true }); await until(() => editor().plainText === "Concurrent latest saved version.", "explicit discard reloads latest")
     expect((await view()).draft).toBeFalsy(); expect(client.draft.text).toBe("Keep independent composer"); expect(client.state?.messages).toHaveLength(0); expect(await readFile(source, "utf8")).toBe(original)
   } finally { await client.close(); if (!setup.renderer.isDestroyed) await setup.dispose(); await rm(root, { recursive: true, force: true }) }
 }, 45000)

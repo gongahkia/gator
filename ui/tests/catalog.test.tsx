@@ -28,18 +28,18 @@ test("keyboard indexed catalog pages, renames, pins and archives by original ide
   let setup = await render()
   const flush = async () => { await setup.flush(); await Bun.sleep(40); await setup.flush() }
   const loaded = () => !!client.state?.panel?.catalog && !client.state.catalog_busy && !client.state.panel.catalog.loading
-  const chooseAction = async (title: string) => { setup.mockInput.pressKey("F3"); await flush(); await setup.mockInput.typeText(title); await flush(); setup.mockInput.pressEnter(); await flush() }
+  const chooseAction = async (title: string) => { setup.mockInput.pressKey("e", { ctrl: true }); await flush(); await setup.mockInput.typeText(title); await flush(); setup.mockInput.pressEnter(); await flush() }
   const filter = async (title: string) => { setup.mockInput.pressKey("l", { ctrl: true }); await flush(); await setup.mockInput.typeText(title); await flush(); setup.mockInput.pressEnter(); await until(() => loaded() && client.state?.panel?.filter?.value === title.toLowerCase(), "filter loaded"); await flush() }
   const search = async () => { setup.mockInput.pressKey("f", { ctrl: true }); await flush(); await setup.mockInput.typeText("jade orchid"); setup.mockInput.pressEnter(); await until(() => loaded() && client.state?.panel?.rows?.length === 1, "indexed old-message result"); await flush() }
   try {
     await client.start(); const originalContext = client.context; await client.edit("Keep the catalog draft"); await client.navigate("/conversations")
     await until(() => loaded() && client.state?.panel?.rows?.length === 50, "first page")
     await flush(); expect(setup.captureCharFrame()).not.toContain(workspace)
-    expect(setup.captureCharFrame()).toContain("F1 help")
+    expect(setup.captureCharFrame()).toContain("Ctrl+O help")
     expect(setup.renderer.root.findDescendantById("panel-row-0")?.height).toBe(2)
     setup.resize(60, 24); await flush()
     expect(setup.renderer.root.findDescendantById("panel-row-0")?.height).toBe(2)
-    setup.mockInput.pressKey("F1"); await flush(); expect(setup.captureCharFrame()).toContain("Chat shortcuts")
+    setup.mockInput.pressKey("o", { ctrl: true }); await flush(); expect(setup.captureCharFrame()).toContain("Chat shortcuts")
     setup.mockInput.pressEscape(); await flush(); setup.resize(110, 36); await flush()
     await chooseAction("Conversation details"); expect(setup.captureCharFrame()).toContain(workspace)
     setup.mockInput.pressEscape(); await flush()
@@ -61,7 +61,7 @@ test("keyboard indexed catalog pages, renames, pins and archives by original ide
     expect(setup.captureCharFrame()).toContain("Keep this uncommitted title"); expect(JSON.parse(await readFile(displayPath, "utf8")).title).toBe("Garden plans")
     setup.mockInput.pressEscape(); await Bun.sleep(75); await flush()
     const stalePanel = client.state?.panel?.id
-    setup.mockInput.pressKey("F5"); await until(() => loaded() && client.state?.panel?.id !== stalePanel, "acknowledged refresh after conflict"); await flush(); setup.mockInput.pressEnter()
+    setup.mockInput.pressKey("r", { ctrl: true }); await until(() => loaded() && client.state?.panel?.id !== stalePanel, "acknowledged refresh after conflict"); await flush(); setup.mockInput.pressEnter()
     await until(() => client.state?.conversation_id === oldID && !client.snapshot.sessionSwitching, "open original retained chat")
     expect(JSON.stringify(client.state?.messages)).toContain("jade orchid decision"); expect(client.drafts.get(originalContext)?.text).toBe("Keep the catalog draft")
     await client.close(); await setup.dispose(); client = new GatorClient(new Application(options)); setup = await render(); await client.start(); await client.navigate("/conversations"); await until(loaded, "restart catalog"); await search()

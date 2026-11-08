@@ -29,7 +29,7 @@ test("private data keyboard reviews export verify and restore into a separate pa
     setup.mockInput.pressEnter(); await flush()
   }
   const path = async (label: string, value: string) => { await choose(label); setup.mockInput.pressKey("l", { ctrl: true }); await flush(); setup.mockInput.pressKey("u", { ctrl: true }); await setup.mockInput.typeText(value); setup.mockInput.pressEnter(); await flush() }
-  const review = async () => { const id = client.state?.panel?.id; setup.mockInput.pressKey("F2"); await until(() => !!client.state?.panel && client.state.panel.id !== id, "review form"); await flush() }
+  const review = async () => { const id = client.state?.panel?.id; setup.mockInput.pressKey("r", { ctrl: true }); await until(() => !!client.state?.panel && client.state.panel.id !== id, "review form"); await flush() }
   const result = (text: string) => until(() => JSON.stringify(client.state?.panel?.blocks).includes(text), text)
   const exists = async (path: string) => !!await stat(path).catch(() => undefined)
   const mapping = async () => {

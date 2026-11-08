@@ -39,7 +39,7 @@ test("Go-generated outputs retain sealed bytes while edited versions survive res
     expect(await readFile(path)).toEqual(sealed); expect(await readFile(manifest)).toEqual(sealedManifest)
     const count = requests.length; setup.mockInput.pressEscape(); await flush(); await client.close(); await setup.dispose(); client = new GatorClient(new Application(options)); setup = await render(); await client.start(); await open(); await flush()
     expect(setup.captureCharFrame()).toContain("Edited output: silver otter."); expect(requests).toHaveLength(count); expect(client.draft.text).toBe("Please review my edits.")
-    setup.mockInput.pressKey("F2"); await flush(); await choose("Version 2"); await choose("Ask Gator")
+    setup.mockInput.pressKey("o", { ctrl: true }); await flush(); await choose("Version 2"); await choose("Ask Gator")
     await until(() => client.draft.uploads?.length === 1, "staged edited output"); expect(requests).toHaveLength(count)
     const attached = client.draft.uploads![0], view = await client.host.file({ action: "open", context: client.context, ref: { kind: "upload", id: attached.id } }); expect(view.text).toBe(saved.text)
     await client.send({ type: "submit", text: "/artifact clear" }); await client.send({ type: "submit", text: "/mode inspect" }); await flush(); setup.mockInput.pressEnter()
