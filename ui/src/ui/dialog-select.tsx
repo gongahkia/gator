@@ -224,7 +224,10 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
     const result = fuzzysort
       .go(needle, options, {
         keys: ["title", "category", "searchText"],
-        scoreFn: (r) => r[0].score * 2 + r[1].score + r[2].score,
+        // An exact visible label must win over combined category/alias scores.
+        // Otherwise typing "Files" can run an action inside Files instead of
+        // opening the category the user explicitly named.
+        scoreFn: (r) => (r.obj.title.toLowerCase() === needle ? 10 : 0) + r[0].score * 2 + r[1].score + r[2].score,
         threshold: props.filterThreshold,
       })
       .map((x) => x.obj)

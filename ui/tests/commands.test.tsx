@@ -69,12 +69,17 @@ test("root command search finds backend names, descriptions and aliases and uses
   host.current.commands = [
     { name: "mode", description: "Choose work permissions", needs_input: true, advanced: false },
     { name: "source ignore", description: "Ignore a project instruction", needs_input: true, advanced: true },
+    { name: "artifact", description: "Set expected output files", needs_input: true, advanced: true },
   ]
   const setup = await testRender(() => <App client={client} quit={() => client.close()} clipboard={{ read: async () => ({ data: "", mime: "text/plain" }), write: async () => {} }} />, { width: 110, height: 34 })
   const flush = async () => { await setup.flush(); await Bun.sleep(30); await setup.flush() }
   const search = async (query: string) => { setup.mockInput.pressKey("p", { ctrl: true }); await flush(); await setup.mockInput.typeText(query); await flush() }
   try {
     await client.start(); await client.edit("Keep original draft")
+    await search("Files"); setup.mockInput.pressEnter(); await flush()
+    expect(setup.captureCharFrame()).toContain("GATOR › FILES")
+    expect(setup.captureCharFrame()).not.toContain("Advanced /artifact")
+    setup.mockInput.pressEscape(); await flush(); setup.mockInput.pressEscape(); await flush()
     for (const query of ["Choose work permissions", "mode", "read only"]) {
       await search(query)
       expect(setup.captureCharFrame()).toContain("CHOOSE WORK PERMISSIONS")

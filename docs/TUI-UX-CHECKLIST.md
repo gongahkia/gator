@@ -19,7 +19,7 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 | 11 | Ctrl+C cancels/stops without implicit quit; Ctrl+Q quits through guards; help/hints reflect configured bindings; no function-key shortcuts are introduced. | In progress | Idle stop/draft preservation, explicit quit, remapped help/composer/rail verified; voice/approval/contextual hints remain for later slices. |
 | 12 | Disconnected/error states offer contextual reconnect/recovery with intact drafts/request identity; safe admission retries and uncertain external effects stay distinct. | Implemented; final journey pending | `d00952219`; `interaction-recovery.test.tsx`: real Go accepted request + lost acknowledgement retries once, reconnect keeps draft/owner, no model replay; receipts tests preserve unknown external outcomes. |
 | 13 | New-content/latest/catch-up affordances preserve stable reading anchors across navigation/restart; long-history rendering is benchmarked and optimized when justified. | Pending | |
-| 14 | Voice has direct record/stop/cancel/transcribe/edit flow, visible processing destination and explicit consent; transcript is editable before sending. | Implemented; final journey pending | `voice-controls.test.tsx`: all four sizes, native VoiceSession with controlled capture/transcription, route/chat consent, changed-route rejection, editable draft/no send, recording/transcription cancellation. Physical audio remains unverified on this host. |
+| 14 | Voice has direct record/stop/cancel/transcribe/edit flow, visible processing destination and explicit consent; transcript is editable before sending. | Implemented; final journey pending | `09e74ef39`; `voice-controls.test.tsx`: all four sizes, native VoiceSession with controlled capture/transcription, route/chat consent, changed-route rejection, editable draft/no send, recording/transcription cancellation. Physical audio remains unverified on this host. |
 | 15 | Shared native typography/spacing/selection/focus/disabled treatments and readable summaries work with terminal colors, NO_COLOR and reduced motion; exact technical details remain inspectable. | Pending | |
 
 ## Implementation rules
@@ -70,3 +70,10 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
   Voice controls/composer/navigation: 7 pass; TUI typecheck and config tests pass;
   native host tests: 9 pass. Controlled native capture is separate from physical
   microphone/speaker and real-provider verification; Linux audio integration remains platform-gated.
+
+- Broad regression pass: host suite 110 pass / 1 platform skip. Native TUI suite
+  77 pass / 3 skips / 1 failure: exact `Files` category search was outranked by
+  a command with both title/category matches. Exact visible labels now win.
+  Failed revision test plus commands/panel checks: 7 pass after the fix; typecheck passes.
+  Go config/workrun tests pass; runtime rebuilt. Full final suite remains due
+  after the remaining product slices; no claim that all 15 are complete.
