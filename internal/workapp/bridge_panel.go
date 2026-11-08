@@ -12,6 +12,7 @@ import (
 func (m Model) bridgePanel() (result *uisnapshot.Panel) {
 	defer func() {
 		if result != nil {
+			result.Navigation = m.panelNavigation(*result)
 			if result.BackLabel == "" || m.controlBusy {
 				result.BackLabel = m.bridgeBackLabel(*result)
 			}
@@ -39,6 +40,36 @@ func (m Model) bridgePanel() (result *uisnapshot.Panel) {
 		}
 	}
 	return nil
+}
+
+// Root navigation is a display projection. Generic forms and exact reviews keep
+// the section that owns them, including help and nested connection/model pages.
+func (m Model) panelNavigation(panel uisnapshot.Panel) string {
+	if m.models != nil {
+		return "settings"
+	}
+	if panel.Catalog != nil {
+		return "chats"
+	}
+	family := m.section
+	if family == "controls" {
+		family = m.controlFamily
+	}
+	if m.launcher && m.launcherMode == "status-line" {
+		return "settings"
+	}
+	switch family {
+	case "conversations":
+		return "chats"
+	case "goals", "agenda", "plan", "suggestions", "followup", "inbox", "overview", "jobs":
+		return "following"
+	case "context", "knowledge", "history", "learnings":
+		return "saved"
+	case "models", "appearance", "memory", "settings", "connections", "browser", "usage", "data", "recovery":
+		return "settings"
+	default:
+		return "chat"
+	}
 }
 
 func (m Model) bridgeBackLabel(panel uisnapshot.Panel) string {

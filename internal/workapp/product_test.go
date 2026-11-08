@@ -32,12 +32,15 @@ func TestFollowupRequiresSeparateReviewAndSave(t *testing.T) {
 	if m.followupForm == nil || calls != 0 {
 		t.Fatal("opening setup performed a write")
 	}
+	if m.BridgeState().Panel.Navigation != "following" {
+		t.Fatal("followup form lost its navigation section")
+	}
 	m, _ = productKey(m, tea.KeyMsg{Type: tea.KeyCtrlR})
 	if !m.followupForm.Review || calls != 0 {
 		t.Fatal("review performed a write")
 	}
 	panel := m.BridgeState().Panel
-	if panel.Kind != "confirmation" {
+	if panel.Kind != "confirmation" || panel.Navigation != "following" {
 		t.Fatal("agreement is not a confirmation")
 	}
 	for _, want := range []string{"Outcome:", "Sources:", "When:", "Notify when:", "Permitted actions:", "Limits:"} {
@@ -80,6 +83,9 @@ func TestCloudRecallNeedsExplicitUploadReview(t *testing.T) {
 		t.Fatal("cloud choice bypassed review")
 	}
 	p := m.BridgeState().Panel
+	if p.Navigation != "settings" {
+		t.Fatal("memory review lost its navigation section")
+	}
 	if !strings.Contains(strings.Join(p.Blocks[0].Lines, "\n"), "uploads eligible saved memory and note text") {
 		t.Fatal("missing upload explanation")
 	}

@@ -7,6 +7,28 @@ import { App } from "../src/app"
 import { GatorClient } from "../src/gator/client"
 import { FixtureHost } from "./fixture"
 
+test("rail highlights the displayed page through nested forms and contextual help", async () => {
+  const root = await mkdtemp(join(tmpdir(), "gator-current-page-")), host = new FixtureHost({ binary: "/unused", workspace: root, userData: root, env: { GATOR_STATE_DIR: root } }), client = new GatorClient(host)
+  const setup = await testRender(() => <App client={client} quit={() => client.close()} clipboard={{ read: async () => ({ data: "", mime: "text/plain" }), write: async () => {} }} />, { width: 110, height: 32 })
+  const flush = async () => { await setup.flush(); await Bun.sleep(30); await setup.flush() }
+  const selected = () => setup.captureCharFrame().split("\n").map(line => line.slice(0, 22)).filter(line => line.includes("› ")).map(line => line.trim())
+  try {
+    await client.start(); await client.configurePreferences({ sidebarCollapsed: false }); await flush()
+    expect(selected()).toEqual(["› Chat"])
+    await client.navigate("/settings"); await flush(); expect(selected()).toEqual(["› Settings"])
+    await client.navigate("/chat")
+    host.change({ ...host.current, panel: { id: "form", kind: "settings-form", title: "Edit limits", navigation: "settings", rows: [] } }); await flush()
+    expect(selected()).toEqual(["› Settings"])
+    host.change({ ...host.current, panel: { id: "help", kind: "help", title: "Form shortcuts", navigation: "settings", rows: [] } }); await flush()
+    expect(selected()).toEqual(["› Settings"])
+    host.change({ ...host.current, panel: { id: "chats", kind: "conversations", title: "Conversations", navigation: "chats", rows: [] } }); await flush()
+    expect(selected()).toEqual(["› Chats"])
+    await client.navigate("/following"); await flush(); expect(selected()).toEqual(["› Following"])
+    await client.navigate("/saved"); await flush(); expect(selected()).toEqual(["› Saved"])
+    host.change({ ...host.current, panel: undefined }); await client.navigate("/chat"); await flush(); expect(selected()).toEqual(["› Chat"])
+  } finally { await client.close(); await setup.dispose(); await rm(root, { recursive: true, force: true }) }
+})
+
 test("rail removes repeated branding, supports pointer resizing and keeps chat space", async () => {
   const root = await mkdtemp(join(tmpdir(), "gator-rail-")), host = new FixtureHost({ binary: "/unused", workspace: root, userData: root, env: { GATOR_STATE_DIR: root } }), client = new GatorClient(host)
   const setup = await testRender(() => <App client={client} quit={() => client.close()} clipboard={{ read: async () => ({ data: "", mime: "text/plain" }), write: async () => {} }} />, { width: 110, height: 32 })
