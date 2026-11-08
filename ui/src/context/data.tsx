@@ -7,6 +7,6 @@ export function useData() {
   return { get progress() { revision(); return [...client.operations.values()].reverse().find(operation => operation.context === client.context)?.label },
     get admitting() { revision(); return client.pending.has(client.context) },
     get state() { revision(); return client.state }, get snapshot() { revision(); return client.snapshot },
-    get activityExpanded() { revision(); return client.activityExpanded },
+    get activityExpanded() { revision(); return client.activityExpanded }, get voiceDestination() { revision(); return client.voiceDestination },
     get draft() { revision(); return client.draft }, get preferences() { revision(); return client.preferences }, get updateFeedback() { revision(); return client.updateFeedback.get(client.context) }, get route() { revision(); return client.route }, get voicePhase() { revision(); return client.voicePhase }, get issue() { revision(); return client.issue } }
 }

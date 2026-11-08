@@ -35,7 +35,7 @@ test.skipIf(process.platform !== "linux")("keyboard dictation reviews audio in i
     await client.navigate("/voice"); await until(() => setup.captureCharFrame().includes("Voice ·"), "voice controls")
     await setup.mockInput.typeText(label); await flush(); setup.mockInput.pressEnter(); await flush()
   }
-  const start = async () => { await action("Start dictation"); await until(() => setup.captureCharFrame().includes("Start microphone recording?"), "explicit microphone review"); setup.mockInput.pressEnter(); await until(() => client.voicePhase === "recording", "capture"); await until(async () => (await readFile(captured, "utf8").catch(() => "")) === "yes", "helper ready") }
+  const start = async () => { await action("Start dictation"); await until(() => client.voicePhase === "recording" || setup.captureCharFrame().includes("Start microphone recording?"), "explicit microphone review or existing scoped consent"); if (client.voicePhase !== "recording") setup.mockInput.pressEnter(); await until(() => client.voicePhase === "recording", "capture"); await until(async () => (await readFile(captured, "utf8").catch(() => "")) === "yes", "helper ready") }
   try {
     await client.start(); await client.edit("Keep my draft."); const original = client.context
     await start(); expect(requests).toBe(0)
@@ -52,7 +52,7 @@ test.skipIf(process.platform !== "linux")("keyboard dictation reviews audio in i
     const draft = client.draft.text
     await start(); await action("Cancel recording"); await until(() => client.voicePhase === "idle", "cancel capture")
     expect(requests).toBe(1); expect(client.draft.text).toBe(draft)
-    await writeFile(denied, "yes"); await action("Start dictation"); setup.mockInput.pressEnter()
+    await writeFile(denied, "yes"); await action("Start dictation")
     await until(() => client.issue.includes("Microphone permission denied") && client.voicePhase === "idle", "permission error")
     expect(client.draft.text).toBe(draft); await rm(denied)
     await start(); gate = new Promise(resolve => { release = resolve }); await action("Stop and transcribe")

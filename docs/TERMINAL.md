@@ -143,6 +143,11 @@ Native adapters:
   `GATOR_MICROPHONE_DEVICE` selects a device (on Windows, its DirectShow audio
   device name). Audio is transient and transcription is explicitly reviewed in
   its original draft. Configure the provider/key through Models and Voice.
+  Ctrl+V starts/finishes dictation by default; Ctrl+C cancels. Help reflects custom
+  bindings. The microphone review grants explicit recordings only for this chat,
+  app session and provider route; /voice can revoke it. Changing the destination
+  requires another review. Recording and transcription show the processing
+  destination and never send the resulting text automatically.
 - Spoken replies use `say` on macOS, System.Speech on Windows, or `espeak-ng` on
   Linux. They speak only newly received replies when enabled. macOS and Windows
   choose an installed voice matching the configured language (exact locale first,

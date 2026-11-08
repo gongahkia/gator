@@ -29,14 +29,16 @@ import { commandGroup, commandAliases } from "./gator/command-groups"
 import { ApprovalReview } from "./gator/approval-review"
 import { runBackendCommand } from "./gator/command-actions"
 import { RecoveryNotice } from "./gator/recovery-notice"
+import { VoiceNotice } from "./gator/voice-notice"
+import type { VoiceSession } from "@gator/application-host/voice-session"
 import type { GatorClient } from "./gator/client"
 import type { ClipboardService } from "./context/clipboard"
 
-function Shell(props: { quit(): Promise<void> }) {
+function Shell(props: { quit(): Promise<void>; voice?: VoiceSession }) {
   const client = useClient(), data = useData(), theme = useTheme(), dialog = useDialog()
   const controls = useActions()
   useProductActions(controls)
-  const voice = useNative(controls)
+  const voice = useNative(controls, props.voice)
   const attempt = (operation: Promise<unknown>) => { void operation.catch(error => client.fail(error)) }
   const palette = () => dialog.replace(() => <CommandPaletteDialog />)
   const navigate = (command: string) => attempt(client.navigate(command))
@@ -65,12 +67,13 @@ function Shell(props: { quit(): Promise<void> }) {
     { id: "gator.quit", title: "Quit Gator", bind: "ctrl+q", palette: true, run: quit },
     { id: "gator.cancel", title: "Cancel dialog or stop active work", bind: "ctrl+c", palette: true, run: () => {
       if (dialog.stack.length) dialog.clear()
+      else if (data.voicePhase !== "idle") voice.cancel()
       else if (data.state?.running) attempt(client.send({ type: "key", key: "esc" }))
     } },
     { id: "gator.new", title: "New independent chat", bind: "ctrl+n", palette: true, run: () => navigate("/new") },
     { id: "gator.search", title: "Search current transcript", bind: "ctrl+f", palette: true, enabled: !data.state?.panel, run: () => controls.trigger("search") },
     { id: "gator.help", title: "Gator help", bind: "ctrl+o", palette: true, enabled: !data.state?.panel, run: () => navigate("/help") },
-    { id: "gator.voice", title: "Voice controls", bind: "ctrl+shift+v", palette: true, run: () => controls.trigger("voice") },
+    { id: "gator.voice", title: "Start or finish dictation", bind: "ctrl+v", palette: true, run: () => controls.trigger("toggle-dictation") },
     { id: "gator.approve", title: "Review current approval", bind: "ctrl+y", palette: true, enabled: dialog.stack.length === 0, run: () => approve(true) },
     { id: "gator.decline", title: "Decline current approval", bind: "ctrl+d", palette: true, enabled: dialog.stack.length === 0, run: () => approve(false) },
     { id: "gator.reconnect", title: "Reconnect selected chat", palette: true, run: () => attempt(client.reconnect()) },
@@ -88,18 +91,18 @@ function Shell(props: { quit(): Promise<void> }) {
       <Show when={data.route === "chat"} fallback={<Hub />}><Show when={data.state?.panel} fallback={<><Transcript /><Prompt /></>}>{panel => <Panel panel={panel()} />}</Show></Show>
     </SessionFrame>
     <RecoveryNotice open={() => controls.trigger("recover")} />
-    <Show when={data.voicePhase !== "idle"}><text fg={theme.text.feedback.warning.base}>Voice: {data.voicePhase} · Ctrl+Shift+V opens stop/cancel controls.</text></Show>
+    <VoiceNotice />
     <Show when={data.state?.external}><text fg={theme.accent}>A reviewed external step is ready. Use “continue-external” in Ctrl+P to continue and return to this chat.</text></Show>
     <Progress />
     <Show when={data.state?.status_line_enabled}><text fg={theme.text.muted}>{data.state?.status_line.map(literal).join(" · ")}</text></Show>
   </box>
 }
-function Themed(props: { client: GatorClient; quit(): Promise<void>; clipboard: ClipboardService }) {
+function Themed(props: { client: GatorClient; quit(): Promise<void>; clipboard: ClipboardService; voice?: VoiceSession }) {
   const data = useData()
   return <ThemeProvider theme={data.preferences.theme}><ConfigProvider bindings={terminalShortcuts(data.state?.desktop?.shortcuts)}>
-    <ClipboardProvider value={props.clipboard}><Keymap.Provider><ToastProvider><DialogProvider><Shell quit={props.quit} /></DialogProvider></ToastProvider></Keymap.Provider></ClipboardProvider>
+    <ClipboardProvider value={props.clipboard}><Keymap.Provider><ToastProvider><DialogProvider><Shell quit={props.quit} voice={props.voice} /></DialogProvider></ToastProvider></Keymap.Provider></ClipboardProvider>
   </ConfigProvider></ThemeProvider>
 }
-export function App(props: { client: GatorClient; quit(): Promise<void>; clipboard: ClipboardService }) {
+export function App(props: { client: GatorClient; quit(): Promise<void>; clipboard: ClipboardService; voice?: VoiceSession }) {
   return <ClientProvider client={props.client}><Themed {...props} /></ClientProvider>
 }

@@ -31,7 +31,7 @@ type VoiceSettings struct {
 var DefaultShortcuts = map[string]string{
 	"new_chat": "Ctrl+N", "command_search": "Ctrl+P", "conversation_search": "Ctrl+F", "settings": "Ctrl+,",
 	"send_message": "Enter", "newline": "Ctrl+J", "guide_work": "Ctrl+G",
-	"voice_input": "Ctrl+Shift+V", "help": "Ctrl+O",
+	"voice_input": "Ctrl+V", "help": "Ctrl+O",
 }
 
 var retiredFunctionShortcut = regexp.MustCompile(`(?i)(^|\+)f([1-9]|1[0-2])$`)

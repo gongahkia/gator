@@ -22,6 +22,7 @@ export class GatorClient extends EventEmitter {
   issue = ""
   preferences = frontendDefaults()
   voicePhase = "idle"
+  voiceDestination = ""
   fileSelections = new Map<string, FileSelection>()
   filePositions = new Map<string, { sheet: number; row: number; col: number }>()
   readingPositions = new Map<string, number>()

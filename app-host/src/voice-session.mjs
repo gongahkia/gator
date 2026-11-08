@@ -52,12 +52,13 @@ export class VoiceSession extends EventEmitter {
     try { await this.playback(text, status.preferences, controller.signal); }
     finally { if (this.#playback === controller) { this.#playback = undefined; this.playing = false; this.emit("change"); } }
   }
-  async start() {
+  async start(expectedRoute) {
     this.application.mutable();
     if (this.phase !== "idle" || this.application.snapshot().state?.panel) throw new Error("Return to the conversation and finish the current dictation first.");
     const generation = ++this.#generation, context = this.application.context;
     const status = await this.status();
     if (!status.ready) throw new Error(status.issue || "Choose local Whisper or an API provider for dictation first.");
+    if (expectedRoute !== undefined && status.route !== expectedRoute) throw new Error("The voice destination changed. Review the microphone request again before recording.");
     if (generation !== this.#generation || context !== this.application.context) throw new Error("The conversation changed before microphone capture started.");
     this.context = context; this.route = status.route; this.issue = "";
     this.#recording = this.capture(); this.phase = "recording"; this.emit("change");
