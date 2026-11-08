@@ -9,9 +9,10 @@ import { SessionTabsRailControls } from "./session-tabs-rail"
 import { Spinner } from "./spinner"
 import { literal } from "../gator/text"
 import { navigationPage } from "../gator/navigation"
+import { useKeyHints } from "../gator/key-hints"
 export type SessionTabsController = { search?: () => void }
 export function SessionTabs(props: { width: number; search(): void }) {
-  const data = useData(), client = useClient(), theme = useTheme()
+  const data = useData(), client = useClient(), theme = useTheme(), hint = useKeyHints()
   const current = createMemo(() => navigationPage(data.route, data.state?.panel))
   return <box width={props.width} flexShrink={0} backgroundColor={theme.background.base} paddingY={1} paddingX={1} gap={1}>
     <SessionTabsRailControls width={props.width - 2} tabs={{ search: props.search }} belowHighlighted={false} />
@@ -25,6 +26,6 @@ export function SessionTabs(props: { width: number; search(): void }) {
         <Show when={chat().running && chat().status === "Working" && chat().id !== data.state?.conversation_id} fallback={<text fg={theme.text.muted}>{literal(chat().status)}</text>}><Spinner delay={150}>Working</Spinner></Show>
       </box>}</Index>
     </scrollbox>
-    <text fg={theme.text.muted}>Ctrl+P commands</text><text fg={theme.text.muted}>Ctrl+B hide rail</text>
+    <text fg={theme.text.muted}>{hint("command.palette.show")} commands</text><text fg={theme.text.muted}>{hint("gator.sidebar")} hide rail</text>
   </box>
 }

@@ -59,11 +59,13 @@ function Shell(props: { quit(): Promise<void> }) {
     { id: "command.palette.show", title: "Search commands", bind: "ctrl+p", run: palette },
     { id: "gator.sidebar", title: "Toggle navigation", bind: "ctrl+b", palette: true, run: () => attempt(client.configurePreferences({ sidebarCollapsed: !client.preferences.sidebarCollapsed })) },
     { id: "gator.quit", title: "Quit Gator", bind: "ctrl+q", palette: true, run: quit },
-    { id: "gator.cancel", title: "Stop active work", bind: "ctrl+c", palette: true, run: () => data.state?.running ? attempt(client.send({ type: "key", key: "esc" })) : quit() },
+    { id: "gator.cancel", title: "Cancel dialog or stop active work", bind: "ctrl+c", palette: true, run: () => {
+      if (dialog.stack.length) dialog.clear()
+      else if (data.state?.running) attempt(client.send({ type: "key", key: "esc" }))
+    } },
     { id: "gator.new", title: "New independent chat", bind: "ctrl+n", palette: true, run: () => navigate("/new") },
     { id: "gator.search", title: "Search current transcript", bind: "ctrl+f", palette: true, enabled: !data.state?.panel, run: () => controls.trigger("search") },
     { id: "gator.help", title: "Gator help", bind: "ctrl+o", palette: true, enabled: !data.state?.panel, run: () => navigate("/help") },
-    { bind: "ctrl+p", title: "Command palette fallback", run: palette },
     { id: "gator.voice", title: "Voice controls", bind: "ctrl+shift+v", palette: true, run: () => controls.trigger("voice") },
     { id: "gator.approve", title: "Review current approval", bind: "ctrl+y", palette: true, run: () => approve(true) },
     { id: "gator.decline", title: "Decline current approval", bind: "ctrl+d", palette: true, run: () => approve(false) },

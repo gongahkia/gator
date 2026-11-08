@@ -15,10 +15,11 @@ import { ActionPrompt } from "./action-prompt"
 import { useData } from "../context/data"
 import { activityKey, activitySummary, activityText, searchableMessage } from "./activity"
 import { conversationBundles } from "./outputs"
+import { useKeyHints } from "./key-hints"
 
 export type Choice = { title: string; key?: string; description?: string; category?: string; disabled?: boolean; run(): unknown }
 export function useActions() {
-  const client = useClient(), dialog = useDialog(), data = useData()
+  const client = useClient(), dialog = useDialog(), data = useData(), hint = useKeyHints()
   let previousContext = client.context
   createEffect(() => {
     data.snapshot
@@ -181,6 +182,11 @@ export function useActions() {
   }
   const actions: Record<string, () => unknown> = {
     drafts, queue, updates, memories, receipts, models,
+    "draft-context": () => menu("Draft details", [
+      { title: `Plan first: ${client.planFirst.has(client.context) ? "on" : "off"}`, description: "Review a proposal before implementation; external actions still require approval.", run: () => client.navigate("/plan-first") },
+      { title: `Attachments: ${client.draft.uploads?.length || 0}`, description: client.draft.uploads?.map(file => file.name).join(" · ") || "No private files attached", run: () => actions.attachments() },
+      ...(client.draft.reply_to_update_id ? [{ title: "Clear reply link", description: client.state?.chat_updates?.find(update => update.id === client.draft.reply_to_update_id)?.title || "Replying to a retained update", run: () => client.edit(client.draft.text, client.draft.uploads, null) }] : []),
+    ]),
     activity: () => {
       const context = client.context, live = client.state?.activity
       menu("Public work activity", [
@@ -196,7 +202,7 @@ export function useActions() {
     },
     "catalog-actions": catalog,
     "check-health": () => details("Check health in this chat", [(client.state?.chat_checks_issue ?? ""), ...(client.state?.chat_checks ?? []).flatMap(check => [check.title + " · " + check.state, check.last_success ? `Last successful check for current settings: ${check.last_success}.` : "No successful check recorded for current settings.", check.next_due ? `Next scheduled: ${check.next_due}.` : "No check is currently scheduled.", check.unsuccessful ? `${check.unsuccessful} consecutive unsuccessful checks. ${check.issue || ""}` : check.issue || "", check.next_action, "Checks depend on this computer being on.", check.gap_from && check.gap_to ? `Observed supervisor gap: ${check.gap_from}–${check.gap_to}. This does not establish what changed while checks were unavailable.` : "", ""])].filter(Boolean).join("\n")),
-    help: () => details("Gator terminal help", ["Ctrl+P commands · Ctrl+B navigation rail · Ctrl+N new independent chat · Ctrl+Q quit", "Enter sends or queues · Shift+Enter/Ctrl+J new line · Ctrl+G guides the live task · Ctrl+C stops work", "Ctrl+F searches the transcript or loaded panel · PgUp/PgDn scroll or move selection", "Ctrl+Y reviews the live approval · Ctrl+D declines · Paste never sends or approves", "/following tracks goals/checks/updates · /saved opens knowledge/history/files · /settings configures Gator", "/sources selects connections · /plan-first proposes before working · /task-plans reviews retained plans", "/specialists guides or stops one worker · /branch starts a separate chat · /evidence and /changes inspect exact retained sources", "/links edits links into drafts · /read-aloud reads a saved reply with a system voice", "/chats switches chats · /queue manages retained messages · /drafts recovers drafts · /prompt-history reuses sent text", "/files opens full files · Ctrl+S saves · Ctrl+E edits Office/cells · Ctrl+O versions/export/Ask Gator", "/voice explicitly records/transcribes or configures new-reply playback · /attach-file selects a private input", "Forms: Enter edits a field · Ctrl+R saves or reviews · Esc backs out", "Customized shortcuts are shown in the command palette. Use slash commands or Ctrl shortcuts to open actions.", "", "Gator commands", ...(client.state?.commands ?? []).map(command => `/${command.name} — ${command.description}`)].join("\n")),
+    help: () => details("Gator terminal help", [`${hint("command.palette.show")} commands · ${hint("gator.sidebar")} navigation rail · ${hint("gator.new")} new independent chat · ${hint("gator.quit")} quit`, `${hint("gator.send")} sends or queues · ${hint("gator.newline")} new line · ${hint("gator.guide")} guides the live task · ${hint("gator.cancel")} cancels/stops`, `${hint("gator.search")} searches the transcript · ${hint("gator.draft-context")} draft details · PgUp/PgDn scroll or move selection`, `${hint("gator.approve")} reviews the live approval · ${hint("gator.decline")} declines · Paste never sends or approves`, "/following tracks goals/checks/updates · /saved opens knowledge/history/files · /settings configures Gator", "/sources selects connections · /plan-first proposes before working · /task-plans reviews retained plans", "/specialists guides or stops one worker · /branch starts a separate chat · /evidence and /changes inspect exact retained sources", "/links edits links into drafts · /read-aloud reads a saved reply with a system voice", "/chats switches chats · /queue manages retained messages · /drafts recovers drafts · /prompt-history reuses sent text", "/files opens full files · Ctrl+S saves · Ctrl+E edits Office/cells · Ctrl+O versions/export/Ask Gator", "/voice explicitly records/transcribes or configures new-reply playback · /attach-file selects a private input", "Forms: Enter edits a field · Ctrl+R saves or reviews · Esc backs out", "Customized shortcuts are shown in the command palette. Use slash commands or Ctrl shortcuts to open actions.", "", "Gator commands", ...(client.state?.commands ?? []).map(command => `/${command.name} — ${command.description}`)].join("\n")),
     "prompt-history": () => menu("Reuse a retained message", (client.state?.messages ?? []).filter(message => message.role === "You" && message.text).slice().reverse().map(message => ({ title: message.text.slice(0, 100), description: message.created_at, run: () => menu("Stage previous message text", [
       { title: "Append text to current draft", run: () => client.edit([client.draft.text, message.text].filter(Boolean).join("\n\n")) },
       { title: "Edit text before replacing the composer", run: () => prompt("Reuse message (files in current draft stay attached)", message.text, text => client.edit(text)) },

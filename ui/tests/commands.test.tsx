@@ -46,7 +46,7 @@ test("commands have nested menus and composer completion never sends on paste or
     await client.edit("/unknown"); await flush(); expect(setup.captureCharFrame()).not.toContain("Tab complete")
     await client.edit("ordinary /mo text"); await flush(); expect(setup.captureCharFrame()).not.toContain("Tab complete")
     await client.edit("/"); setup.resize(50, 18); await flush(); expect(setup.captureCharFrame()).toContain("Tab complete")
-    setup.mockInput.pressArrow("up"); await flush(); expect(setup.captureCharFrame()).toContain("/voice")
+    setup.mockInput.pressArrow("up"); await flush(); expect(setup.captureCharFrame()).toContain("› /work-details")
     setup.mockInput.pressEscape(); await flush(); expect(client.draft.text).toBe("/"); expect(host.sent).toHaveLength(2)
     await client.edit("Keep menu argument draft"); setup.resize(100, 32); await flush()
     setup.mockInput.pressKey("p", { ctrl: true }); await flush(); await setup.mockInput.typeText("Settings"); await flush(); setup.mockInput.pressEnter(); await flush()

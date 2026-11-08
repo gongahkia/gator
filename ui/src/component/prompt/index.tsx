@@ -10,12 +10,15 @@ import { useTheme } from "../../context/theme"
 import { useDialog } from "../../ui/dialog"
 import { Keymap } from "../../context/keymap"
 import { literal } from "../../gator/text"
+import { useKeyHints } from "../../gator/key-hints"
 
 export function Prompt() {
   const client = useClient(), data = useData(), theme = useTheme(), dialog = useDialog()
   let textarea: TextareaRenderable | undefined
   const dimensions = useTerminalDimensions()
+  const hint = useKeyHints()
   const compact = () => dimensions().height < 26
+  const short = () => dimensions().height < 18
   const model = () => data.state?.composer?.models.find(model => model.provider === data.state?.provider && model.model === data.state?.model)?.label || data.state?.model || data.state?.provider || "Choose a model"
   const [selection, setSelection] = createSignal(0), [dismissed, setDismissed] = createSignal<string>()
   const commands = createMemo(() => {
@@ -40,7 +43,10 @@ export function Prompt() {
   })
   createEffect(on(() => data.draft.text, () => { setSelection(0); setDismissed(undefined) }))
   const selected = () => Math.min(selection(), Math.max(0, matches().length - 1))
-  const count = () => Math.max(1, Math.min(6, dimensions().height - 12))
+  const count = () => Math.max(1, Math.min(6, dimensions().height - 18))
+  const metadata = () => [client.planFirst.has(data.draft.context) ? "Plan first" : "",
+    data.draft.uploads?.length ? `${data.draft.uploads.length} ${data.draft.uploads.length === 1 ? "file" : "files"}` : "",
+    data.draft.reply_to_update_id ? `Reply: ${literal(data.state?.chat_updates?.find(update => update.id === data.draft.reply_to_update_id)?.title || "update")}` : ""].filter(Boolean).join(" · ")
   const start = () => Math.max(0, selected() - count() + 1)
   async function complete(execute: boolean) {
     const command = matches()[selected()]
@@ -69,23 +75,21 @@ export function Prompt() {
     { id: "gator.newline", bind: "shift+return", title: "New line", run: () => { textarea?.newLine() } },
     { bind: "ctrl+j", title: "New line fallback", run: () => { textarea?.newLine() } },
     { id: "gator.guide", bind: "ctrl+g", title: "Guide active work with draft", palette: true, run: guide },
-    { bind: "ctrl+g", title: "Guide work fallback", run: guide },
+    { id: "gator.draft-context", bind: "ctrl+t", title: "Inspect draft files, reply and plan mode", palette: true, run: () => { void client.navigate("/draft-context").catch(error => client.fail(error)) } },
   ] }))
-  return <box id="composer" flexShrink={0} marginX={dimensions().width < 60 ? 1 : 2} marginTop={1} marginBottom={1}>
+  return <box id="composer" flexShrink={0} marginX={dimensions().width < 60 ? 1 : 2} marginTop={short() ? 0 : 1} marginBottom={short() ? 0 : 1}>
     <Show when={matches().length}>
       <box id="slash-completions" paddingX={1} backgroundColor={theme.background.raised.high}>
         <For each={matches().slice(start(), start() + count())}>{(command, index) => <box flexDirection="row" backgroundColor={start() + index() === selected() ? theme.background.action.primary.focused : undefined}
           onMouseUp={() => { setSelection(start() + index()); void complete(false).catch(error => client.fail(error)) }}>
           <text fg={theme.text.base} wrapMode="none" overflow="hidden">{start() + index() === selected() ? "› " : "  "}/{literal(command.name)}  {literal(command.description)}</text>
         </box>}</For>
-        <text fg={theme.text.muted}>↑/↓ choose · Tab complete · Enter select · Esc dismiss ({selected() + 1}/{matches().length})</text>
+        <text fg={theme.text.muted} height={1} wrapMode="none" truncate>{dimensions().width < 60 ? "Tab complete · Enter select · Esc close" : `↑/↓ choose · Tab complete · Enter select · Esc dismiss (${selected() + 1}/${matches().length})`}</text>
       </box>
     </Show>
-    <box border={["left"]} borderColor={theme.accent} backgroundColor={theme.background.raised.base} paddingX={2} paddingY={1} gap={1}>
-    <Show when={client.planFirst.has(data.draft.context)}><text fg={theme.accent}>Plan first · review before implementation · /plan-first to change</text></Show>
-    <Show when={data.draft.uploads?.length}><text fg={theme.accent}>Attached: {data.draft.uploads?.map(f => literal(f.name)).join(" · ")}</text></Show>
-    <Show when={data.draft.reply_to_update_id}><text fg={theme.accent}>Replying to: {literal(data.state?.chat_updates?.find(update => update.id === data.draft.reply_to_update_id)?.title || data.draft.reply_to_update_id)} · “cancel-update-reply” in commands clears the link.</text></Show>
-    <textarea id="message-input" ref={value => { textarea = value }} focused width="100%" minHeight={1} maxHeight={Math.max(2, Math.min(8, Math.floor(dimensions().height / 3)))}
+    <box border={["left"]} borderColor={theme.accent} backgroundColor={theme.background.raised.base} paddingX={short() ? 1 : 2} paddingY={compact() ? 0 : 1} gap={compact() ? 0 : 1}>
+    <Show when={metadata()}><text id="draft-context-summary" fg={theme.accent} height={1} wrapMode="none" truncate onMouseUp={() => void client.navigate("/draft-context").catch(error => client.fail(error))}>{hint("gator.draft-context")} · {metadata()}</text></Show>
+    <textarea id="message-input" ref={value => { textarea = value }} focused width="100%" minHeight={1} maxHeight={short() ? 2 : Math.max(2, Math.min(8, Math.floor(dimensions().height / 4)))}
       placeholderColor={theme.text.muted} initialValue={data.draft.text} placeholder="Ask anything…"
       textColor={theme.text.base} focusedTextColor={theme.text.base} backgroundColor={theme.background.raised.base} focusedBackgroundColor={theme.background.raised.base}
       keyBindings={[{ name: "return", action: "submit" }, { name: "return", shift: true, action: "newline" }, { name: "j", ctrl: true, action: "newline" }]}
@@ -95,8 +99,8 @@ export function Prompt() {
       onMouseUp={event => { if (event.button !== 0) return; event.stopPropagation(); void client.navigate("/models").catch(e => client.fail(e)) }}><b style={{ fg: theme.accent }}>Gator</b>  {literal(model())}{data.state?.composer?.effort ? ` · ${data.state.composer.effort} effort` : ""}</text>
     </box>
     <box paddingX={1} paddingTop={compact() ? 0 : 1} flexDirection="row" justifyContent="space-between" gap={2}>
-      <text fg={theme.text.muted} attributes={TextAttributes.DIM} flexShrink={1} minWidth={0} height={1} wrapMode="none" truncate>{data.state?.running ? "Enter queue · Ctrl+G guide · Ctrl+C stop" : "Enter send · Ctrl+J new line"}</text>
-      <text fg={theme.text.muted} attributes={TextAttributes.DIM} flexShrink={0}>{dimensions().width < 60 ? "/ commands" : "/ commands · Ctrl+P"}</text>
+      <text fg={theme.text.muted} attributes={TextAttributes.DIM} flexShrink={1} minWidth={0} height={1} wrapMode="none" truncate>{data.state?.running ? `${hint("gator.send")} queue · ${hint("gator.guide")} guide · ${hint("gator.cancel")} stop` : `${hint("gator.send")} send · ${hint("gator.newline")} new line`}</text>
+      <text fg={theme.text.muted} attributes={TextAttributes.DIM} flexShrink={0}>{dimensions().width < 60 ? "/ commands" : `/ commands · ${hint("command.palette.show")}`}</text>
     </box>
   </box>
 }
