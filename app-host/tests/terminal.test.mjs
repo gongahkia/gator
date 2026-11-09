@@ -1,11 +1,24 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, writeFile, readFile, rm, access } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 import { terminalScript, windowsTerminalScript } from "../src/terminal.mjs";
-import { powershellPath, windowsArguments, runtimeName, stateDirectory } from "../src/platform.mjs";
+import { powershellPath, windowsArguments, runtimeName, stateDirectory, backendStateDirectory } from "../src/platform.mjs";
+
+test("native journal and maintenance roots follow relative Unix profiles without relocating host inputs",()=>{
+  const workspace=join(tmpdir(),"gator-workspace");
+  for(const key of ["GATOR_STATE_DIR","XDG_STATE_HOME"]){
+    const env={[key]:"relative-profile"};
+    assert.equal(backendStateDirectory(env,workspace,"darwin"),join(workspace,"relative-profile"));
+    assert.equal(backendStateDirectory(env,workspace,"linux"),join(workspace,"relative-profile"));
+    assert.equal(stateDirectory(env,"darwin"),resolve("relative-profile"));
+    assert.equal(backendStateDirectory(env,workspace,"win32"),stateDirectory(env,"win32"));
+  }
+  const env={GATOR_STATE_DIR:join(tmpdir(),"absolute-profile")};
+  assert.equal(backendStateDirectory(env,workspace,"darwin"),stateDirectory(env,"darwin"));
+});
 
 test("terminal handoff preserves literal arguments and records success or an early failure", { skip: process.platform === "win32" }, async () => {
   const directory = await mkdtemp(join(tmpdir(), "gator terminal 'test-"));

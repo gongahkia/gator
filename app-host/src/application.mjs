@@ -9,7 +9,7 @@ import { DraftStore } from "./drafts.mjs";
 import { UploadStore, uploadContext } from "./uploads.mjs";
 import { FileStore, readBoundedFile, validateFileRequest } from "./files.mjs";
 import { selectedFileSource } from "./file-sources.mjs";
-import { stateDirectory } from "./platform.mjs";
+import { backendStateDirectory, stateDirectory } from "./platform.mjs";
 import { validateFrame } from "./policy.mjs";
 import { retainedRequestUploads } from "./request-retention.mjs";
 import { withProfileMaintenance } from "./profile-maintenance.mjs";
@@ -31,6 +31,7 @@ export class Application extends EventEmitter {
     this.workspace = resolve(workspace);
     this.userData = resolve(userData);
     this.stateRoot = stateDirectory(env);
+    this.backendStateRoot = backendStateDirectory(env, this.workspace);
     this.uploads = new UploadStore(join(this.stateRoot, "gator", "uploads"));
     this.files = new FileStore(join(this.stateRoot, "gator", "files"));
     this.exports = new ExportStore([join(this.stateRoot, "gator"), this.userData]);
@@ -63,8 +64,8 @@ export class Application extends EventEmitter {
     await mkdir(this.workspace, { recursive: true, mode: 0o700 });
     // Malformed journals defer cleanup rather than deleting potentially admitted inputs.
     try {
-		await withProfileMaintenance(this.binary, this.env, async assertOwned => {
-      const retained = await retainedRequestUploads(join(this.stateRoot, "gator", "conversations"));
+		await withProfileMaintenance(this.binary, { ...this.env, GATOR_STATE_DIR: this.backendStateRoot }, async assertOwned => {
+      const retained = await retainedRequestUploads(join(this.backendStateRoot, "gator", "conversations"));
       const saved = await this.drafts.request({ action: "list" });
       for (const draft of saved.drafts) for (const file of draft.uploads ?? []) retained.add(file.id);
       assertOwned(); await this.uploads.prune(Date.now(), retained, assertOwned);

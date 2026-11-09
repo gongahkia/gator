@@ -64,6 +64,7 @@ test("relative profile overrides keep the existing Unix/Windows backend interpre
   // Go behavior, matching the retained desktop rather than silently relocating it.
   const stateRoot = process.platform === "win32" ? resolve(env.GATOR_STATE_DIR) : join(workspace, env.GATOR_STATE_DIR)
   const configRoot = process.platform === "win32" ? resolve(env.GATOR_CONFIG_DIR) : join(workspace, env.GATOR_CONFIG_DIR)
+  expect(host.backendStateRoot).toBe(stateRoot)
   execFileSync(binary, ["note", "add", "--title", "Kept relative profile", "--body", "Existing profile remains selected."], { env: { ...env, GATOR_STATE_DIR: stateRoot, GATOR_CONFIG_DIR: configRoot, GATOR_INTERNAL_COMMANDS: "1" } })
   const client = new GatorClient(host)
   try { await client.start(); await client.send({ type: "submit", text: "/note list" }); expect(JSON.stringify(client.state?.messages)).toContain("Kept relative profile") }

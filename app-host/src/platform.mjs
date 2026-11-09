@@ -15,6 +15,14 @@ export function stateDirectory(env = process.env, platform = process.platform) {
   return join(homedir(), ".local", "state");
 }
 
+// Unix Go owners retain workspace-relative overrides. The host's existing
+// upload/draft namespace remains launch-relative for compatibility, so use this
+// location specifically for authoritative native journals and profile guards.
+export function backendStateDirectory(env, workspace, platform = process.platform) {
+  const override = env.GATOR_STATE_DIR?.trim() || env.XDG_STATE_HOME?.trim();
+  return platform !== "win32" && override ? resolve(workspace, override) : stateDirectory(env, platform);
+}
+
 // Windows native programs use the CommandLineToArgvW/CRT quoting rules. This
 // string is passed straight to ProcessStartInfo, never to cmd.exe or a shell.
 export function windowsArguments(args) {

@@ -250,6 +250,14 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
   unavailable, cleanup keeps attachments. This reuses the existing retention
   reader and seven-day pruning policy; it does not add another retention store.
 
+- Relative-profile follow-up: the native Unix profile resolves relative to the
+  selected workspace, while retained host upload/draft locations preserve their
+  earlier launch-relative namespace. Cleanup now locks/scans that actual native
+  profile explicitly and keeps existing private inputs in their original location.
+  Platform tests cover both relative overrides, absolute paths and Windows;
+  the real-Go relative-profile reopen test passes. This also avoids creating a
+  spurious launch-directory profile solely to obtain a maintenance lease.
+
 - Native resource follow-up: identical theme names from fresh backend snapshots
   now retain the same palette and syntax resources. A native identity test checks
   ten updates without destroying/remounting its code consumer. Markdown keeps an
