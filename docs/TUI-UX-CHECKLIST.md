@@ -317,3 +317,18 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
   the host's authoritative-profile location to its existing type declaration.
   The default full TUI suite must be rerun after this layout fix; the earlier
   failure remains evidence and is not counted as resolved by focused tests alone.
+
+- Default native regression after `d4b06d8d0`/`b1660ecd1`: ordinary `bun run test`
+  passes, with 86 tests passed, three unchanged platform/opt-in skips and no
+  failures (89 tests, 60 files, 310.02 seconds). The previously timing-out real-Go
+  conversation journey passes inside that shared-global run in 10.20 seconds;
+  native pre-layout draft synchronization and relative-profile reopening also
+  pass. No runner, deadline, assertion or skip was changed. Relevant Go app
+  controls, follow-up ownership, update-reply context, task-plan and maintenance
+  boundary checks pass, and the complete workapp package passes after the changes.
+  The full fifteen-item acceptance journey is still pending.
+  Next conversation checks include pending plans/exact approvals and continuity
+  after completed work: returned result cards are implemented, but the router's
+  bounded context does not yet include those task summaries, and an idle parent
+  currently returns to direct Work admission after its last owner finishes.
+  Verify/fix that boundary before claiming a continuous conversational experience.
