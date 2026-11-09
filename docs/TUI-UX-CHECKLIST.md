@@ -45,6 +45,18 @@ finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
 
+- Fresh full terminal regression after `3ba57d307` (10 November): default
+  `bun run test` passes **94 tests, 3 unchanged skips, 0 failures**, 1,550
+  assertions across 62 files in 249.63 seconds. The command deadline remains
+  unchanged; the former preview/context and field-subscription failures pass.
+  Runtime rebuilt from this checkout; final TUI typecheck passes. Log:
+  `/tmp/gator-ux-20261110-terminal-full-verified.log`. No source/test changes
+  were made during this fresh run. Existing skipped image-paste, old dictation
+  and managed-browser journeys remain skips; focused native voice/browser/file
+  evidence elsewhere is not relabeled as physical verification. All fifteen
+  findings remain in the ledger: this passing regression is not completion of
+  the unresolved acceptance criteria or the final combined journey.
+
 - Context-specific overlay reset (10 November): the first broad terminal run
   after field/shortcut sharing found that an output preview could remain open
   after a chat change. That reset had depended on reading an entire snapshot
