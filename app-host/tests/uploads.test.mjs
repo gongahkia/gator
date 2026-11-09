@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { UploadStore, validUploadID, uploadContext, uploadLimits } from "../src/uploads.mjs";
@@ -72,10 +72,46 @@ test("cleanup keeps files belonging to admitted messages and defers unreadable j
     await uploads.prune(Date.now(), await retainedRequestUploads(chats));
     await uploads.check([pending.id]);
     await assert.rejects(uploads.check([unused.id]));
-    await writeFile(path, "broken");
-    await assert.rejects(retainedRequestUploads(chats));
+    for (const content of ["broken", "null", "false", "[]", '{"version":1,"requests":null}']) {
+      await writeFile(path, content);
+      await assert.rejects(retainedRequestUploads(chats));
+    }
     await uploads.check([pending.id]);
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("dialogue-only and completed turns retain captured inputs across pruning without a Work journal", async () => {
+  const root = await mkdtemp(join(tmpdir(), "gator-dialogue-uploads-"));
+  try {
+    const uploads = new UploadStore(join(root, "uploads")), chats = join(root, "conversations"), directory = join(chats, "work-parent", "dialogue");
+    await mkdir(directory, {recursive: true});
+    const first = await uploads.importContent("conversation.txt", Buffer.from("Original conversation input"));
+    const second = await uploads.importContent("task.txt", Buffer.from("Captured independent task input"));
+    const unused = await uploads.importContent("unused.txt", Buffer.from("Never admitted"));
+    for (const file of [first, second, unused]) await utimes(join(uploads.root, file.id.split("/")[0]), 0, 0);
+    const turn = (sequence, state, options) => ({version: 1, sequence, id: String(sequence).repeat(64), conversation_id: "work-parent", state, options});
+    for (const value of [turn(1, "answered", {Uploads: [first.id]}), turn(2, "dispatching", {source: "/captured/workspace", run_options: {Uploads: [second.id]}})]) await writeFile(join(directory, String(value.sequence).padStart(20, "0") + "-" + value.id + ".json"), JSON.stringify(value));
+    const retained = await retainedRequestUploads(chats); assert.deepEqual(retained, new Set([first.id, second.id]));
+    await uploads.prune(Date.now(), retained); await uploads.check([first.id, second.id]); await assert.rejects(uploads.check([unused.id]));
+    await rm(join(directory, "00000000000000000001-" + "1".repeat(64) + ".json"));
+    await uploads.prune(Date.now(), await retainedRequestUploads(chats)); await assert.rejects(uploads.check([first.id])); await uploads.check([second.id]);
+  } finally { await rm(root, {recursive: true, force: true}); }
+});
+
+test("invalid or linked dialogue storage defers cleanup instead of losing uncertain inputs", async () => {
+  const root = await mkdtemp(join(tmpdir(), "gator-dialogue-retention-"));
+  try {
+    const chats = join(root, "conversations"), directory = join(chats, "work-parent", "dialogue"), filename = "00000000000000000001-" + "a".repeat(64) + ".json";
+    await mkdir(directory, {recursive: true});
+    const turn = {version: 1, sequence: 1, id: "a".repeat(64), conversation_id: "work-parent", state: "received", options: {Uploads: []}};
+    for (const change of [{version: 2}, {conversation_id: "other"}, {sequence: 2}, {state: "unknown"}, {options: {Uploads: ["/private/file"]}}, {options: {run_options: null}}]) {
+      await writeFile(join(directory, filename), JSON.stringify({...turn, ...change}));
+      await assert.rejects(retainedRequestUploads(chats));
+    }
+    await writeFile(join(directory, filename), "broken"); await assert.rejects(retainedRequestUploads(chats));
+    await rm(directory, {recursive: true}); const outside = join(root, "outside"); await mkdir(outside);
+    await symlink(outside, directory, process.platform === "win32" ? "junction" : "dir"); await assert.rejects(retainedRequestUploads(chats));
+  } finally { await rm(root, {recursive: true, force: true}); }
 });
 
 

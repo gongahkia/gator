@@ -6,7 +6,7 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 
 | # | Acceptance criteria | Status | Evidence / commit |
 |---|---|---|---|
-| 1 | Conversation remains available during execution; ordinary messages can steer a specific live task or start independent work; ambiguous routing is clarified without losing task identity, files, or drafts. | In progress | Tool-free conversation router and independent paged turn store implemented; identity/capability validation, active-operation independence, idempotent admission and versioned dispatch tests pass. Not yet wired to ordinary composer submissions or background task delegation. |
+| 1 | Conversation remains available during execution; ordinary messages can steer a specific live task or start independent work; ambiguous routing is clarified without losing task identity, files, or drafts. | In progress | Router, independent paged turns, and durable child-task bindings implemented. Concurrent retries claim one dispatch; original decisions/owners cannot be changed; source/input provenance is checked; reads/retries do not launch work; pruning retains dialogue inputs. Core/race tests pass. Composer routing, background launch and result/control return remain unwired. |
 | 2 | Following unifies commitments with outcome/state/next action, next and last successful checks, sources/timezone, pause/edit, and truthful foreground/service/offline limits. | In progress | `4b9edf091`: commitment cards and exact check controls. Active goal cards now open their exact canonical picker row and prepare a check for that goal's current workspace, including duplicate titles, other-chat origins and busy owners. Focused Go/host/native integration checks pass. Advanced non-project schedule editing and paused-goal controls remain; final integrated journey pending. |
 | 3 | Relevant answers expose supplied memory/provenance/correction; noise feedback offers a reviewed, scoped check/notification change and reports its actual outcome. | Pending | |
 | 4 | First task leads through only missing setup; host connectivity and model readiness are distinct; local/cloud processing, capabilities, and work budget are explained. | Pending | |
@@ -187,3 +187,36 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
   check creation use real Go, and busy navigation preserves the original task and
   draft. Model execution is controlled in the concurrency case. Advanced schedule
   editing and paused-goal management remain open; this is not item 2 completion.
+
+- Default native regression after `5f81ac8de`/`a95289265`: ordinary `bun run test`
+  passes with 83 tests passed, three unchanged platform/opt-in skips and no
+  syntax-style warnings (86 tests, 58 files, 271.76s). No test runner, assertion,
+  deadline or skip was changed. The earlier failing shared-global run remains
+  historical evidence; the host navigation acknowledgement race is now fixed,
+  and the default run is green at this point. Final regression remains due after
+  the other product slices.
+
+- Conversation task ownership: a ready task decision can now bind one independent
+  empty child conversation without taking the parent's execution lease or changing
+  the active chat. The original turn/options/source are bound through a validated
+  child sidecar; only the winning ready→dispatching transition claims a launch.
+  Concurrent retries return the same owner without another claim. Retained
+  decisions and task owners are immutable, and missing/deleted/forged/linked
+  origins fail rather than reviving work. Go worksession/workrun checks pass;
+  dialogue tests also pass under the race detector. These APIs do not yet route
+  ordinary composer messages or launch background work.
+  Startup upload retention now reads dialogue-only and completed turn references
+  as well as pending Work requests. Invalid or linked dialogue storage defers
+  cleanup. Host uploads tests: seven pass, including actual age-based pruning.
+
+- Item 1 integration still required: capture an explicit source/goal/options/public
+  context envelope; persist admission before acknowledgement; route independently
+  of Work and revalidate a live RunID before guide/stop; launch only a newly claimed
+  child through the existing host owners without changing focus or last-active
+  navigation. A child needs its own durable Work admission, execution lease and
+  exact approval owner. Do not pass it through the parent's goal-chat Run closure:
+  that closure is bound to the canonical goal conversation. Verify task scope and
+  input retention through admission, pruning, restart and result projection;
+  return statuses/results with validated parent-child links instead of forging
+  artifact membership. Unconfirmed dispatches must not automatically replay.
+  Keep this item open until real protocol/native journeys exercise that behavior.

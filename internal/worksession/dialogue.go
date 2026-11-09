@@ -308,6 +308,12 @@ func (store Store) UpdateDialogue(next DialogueTurn, expected uint64) (DialogueT
 	if err != nil {
 		return DialogueTurn{}, err
 	}
+	if len(next.Decision) != 0 {
+		next.Decision, err = dialogueOptions(next.Decision)
+		if err != nil {
+			return DialogueTurn{}, errors.New("invalid retained conversation decision")
+		}
+	}
 	if err := validateDialogueTurn(next); err != nil || expected == 0 || expected == ^uint64(0) {
 		return DialogueTurn{}, errors.New("invalid conversation message update")
 	}
@@ -331,6 +337,16 @@ func (store Store) UpdateDialogue(next DialogueTurn, expected uint64) (DialogueT
 	}
 	if prior.Revision != expected || next.Revision != expected || prior.ID != next.ID || prior.ClientID != next.ClientID || prior.Text != next.Text || !bytes.Equal(prior.Options, next.Options) || !prior.CreatedAt.Equal(next.CreatedAt) || next.UpdatedAt.Before(prior.UpdatedAt) {
 		return DialogueTurn{}, ErrDialogueChanged
+	}
+	var priorDecision json.RawMessage
+	if len(prior.Decision) != 0 {
+		priorDecision, err = dialogueOptions(prior.Decision)
+		if err != nil {
+			return DialogueTurn{}, errors.New("invalid original conversation decision")
+		}
+	}
+	if len(priorDecision) != 0 && !bytes.Equal(priorDecision, next.Decision) || prior.TaskChat != "" && prior.TaskChat != next.TaskChat {
+		return DialogueTurn{}, errors.New("a retained decision or task owner cannot be replaced")
 	}
 	if !dialogueTransition(prior.State, next.State) {
 		return DialogueTurn{}, errors.New("conversation message cannot repeat or revive a completed dispatch")
