@@ -6,8 +6,8 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 
 | # | Acceptance criteria | Status | Evidence / commit |
 |---|---|---|---|
-| 1 | Conversation remains available during execution; ordinary messages can steer a specific live task or start independent work; ambiguous routing is clarified without losing task identity, files, or drafts. | In progress | Router, independent paged turns, and durable child-task bindings implemented. Concurrent retries claim one dispatch; original decisions/owners cannot be changed; source/input provenance is checked; reads/retries do not launch work; pruning retains dialogue inputs. Core/race tests pass. Composer routing, background launch and result/control return remain unwired. |
-| 2 | Following unifies commitments with outcome/state/next action, next and last successful checks, sources/timezone, pause/edit, and truthful foreground/service/offline limits. | In progress | `4b9edf091`: commitment cards and exact check controls. Active goal cards now open their exact canonical picker row and prepare a check for that goal's current workspace, including duplicate titles, other-chat origins and busy owners. Focused Go/host/native integration checks pass. Advanced non-project schedule editing and paused-goal controls remain; final integrated journey pending. |
+| 1 | Conversation remains available during execution; ordinary messages can steer a specific live task or start independent work; ambiguous routing is clarified without losing task identity, files, or drafts. | In progress | `1dbc77741`/`49e27ef06`: router, independent paged turns, and durable child-task bindings. Concurrent retries claim one dispatch; original decisions/owners cannot be changed; source/input provenance is checked; reads/retries do not launch work; pruning retains dialogue inputs. Core/race tests pass. Composer routing, background launch and result/control return remain unwired. |
+| 2 | Following unifies commitments with outcome/state/next action, next and last successful checks, sources/timezone, pause/edit, and truthful foreground/service/offline limits. | In progress | `4b9edf091`/`a95289265`: commitment cards and exact check controls. Active goal cards open their exact canonical picker row and prepare a check for that goal's current workspace, including duplicate titles, other-chat origins and busy owners. Focused Go/host/native integration checks pass. Advanced non-project schedule editing and paused-goal controls remain; final integrated journey pending. |
 | 3 | Relevant answers expose supplied memory/provenance/correction; noise feedback offers a reviewed, scoped check/notification change and reports its actual outcome. | Pending | |
 | 4 | First task leads through only missing setup; host connectivity and model readiness are distinct; local/cloud processing, capabilities, and work budget are explained. | Pending | |
 | 5 | Workspace/account/source scope is inspectable near input; conversational/manual settings agree, including terminal preferences, with confirmed outcomes. | Pending | |
@@ -220,3 +220,9 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
   return statuses/results with validated parent-child links instead of forging
   artifact membership. Unconfirmed dispatches must not automatically replay.
   Keep this item open until real protocol/native journeys exercise that behavior.
+
+- After the task-origin/retention slice `49e27ef06`, the full host suite passes:
+  115 pass, one platform skip. Real-Go contextual recovery and Following journeys
+  also pass (two tests), with the new startup retention reader in use. Task binding
+  itself remains core/race-tested API work; neither those journeys nor the green
+  host suite prove ordinary-message routing or background delegation is wired.
