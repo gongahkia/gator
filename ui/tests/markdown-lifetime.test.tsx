@@ -5,6 +5,22 @@ import { CodeRenderable, getTreeSitterClient, type Renderable } from "@opentui/c
 import { ThemeProvider } from "../src/context/theme"
 import { Markdown } from "../src/gator/markdown"
 
+test("unchanged theme snapshots retain native syntax resources and remove them once",async()=>{
+  let tick=()=>{};const warnings:string[]=[]
+  const warning=spyOn(console,"warn").mockImplementation((...args)=>{warnings.push(args.map(String).join(" "))})
+  const setup=await testRender(()=>{
+    const [snapshot,setSnapshot]=createSignal({theme:"gator",tick:0});tick=()=>setSnapshot(value=>({...value,tick:value.tick+1}))
+    return <ThemeProvider theme={snapshot().theme}><Markdown text={"```json\n{\"budget\":2000}\n```"}/></ThemeProvider>
+  },{width:80,height:24})
+  const codes=(node:Renderable):CodeRenderable[]=>[...(node instanceof CodeRenderable?[node]:[]),...node.getChildren().flatMap(codes)]
+  try{
+    await setup.flush();const node=codes(setup.renderer.root)[0]!,style=node.syntaxStyle
+    expect(node).toBeDefined()
+    for(let index=0;index<10;index++){tick();await setup.flush();expect(codes(setup.renderer.root)[0]).toBe(node);expect(node.syntaxStyle).toBe(style);expect(node.isDestroyed).toBe(false)}
+    await setup.dispose();expect(node.isDestroyed).toBe(true);expect(warnings).toHaveLength(0)
+  }finally{if(!setup.renderer.isDestroyed)await setup.dispose();warning.mockRestore()}
+})
+
 test("native markdown consumers are destroyed before styles during navigation and theme changes with pending highlighting", async () => {
   const warnings: string[] = [], pending: (() => void)[] = []
   const warning = spyOn(console, "warn").mockImplementation((...args) => { warnings.push(args.map(String).join(" ")) })

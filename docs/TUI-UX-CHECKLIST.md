@@ -249,3 +249,16 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
   released states pass a real Go lock test. If the helper or its ownership is
   unavailable, cleanup keeps attachments. This reuses the existing retention
   reader and seven-day pruning policy; it does not add another retention store.
+
+- Native resource follow-up: identical theme names from fresh backend snapshots
+  now retain the same palette and syntax resources. A native identity test checks
+  ten updates without destroying/remounting its code consumer. Markdown keeps an
+  owning parent for Solid's later removal while destroying style consumers first;
+  the real-Go dialogue journey no longer emits duplicate-removal warnings. The
+  existing delayed-highlighting/theme-change checks still pass. Composer buffer
+  synchronization now ignores intermediate programmatic content events instead
+  of persisting them as user edits. The native harness renders its initial layout
+  before interacting; an unflushed initial layout was not a usable terminal frame.
+  Native composer/resource checks: four pass; the existing long-transcript test
+  reached its unchanged five-second deadline during simultaneous Go race builds
+  and is being rerun independently. No deadline or assertion was weakened.

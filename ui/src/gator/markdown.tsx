@@ -34,6 +34,9 @@ export function Markdown(props: { text?: string; streaming?: boolean }) {
       try { if (node && !node.isDestroyed) node.destroyRecursively() }
       finally { value.destroy() }
     })
-    return <markdown ref={value => { node = value }} content={literal(props.text)} syntaxStyle={value} fg={theme.text.base} conceal streaming={props.streaming ?? false} tableOptions={{ style: "columns", wrapMode: "word", cellPaddingX: 1 }} />
+    // Keep a native parent for Solid's later removal. Destroying the consumer
+    // detaches it immediately; removing that same consumer again would leave
+    // the renderer and native child list out of step.
+    return <box><markdown ref={value => { node = value }} content={literal(props.text)} syntaxStyle={value} fg={theme.text.base} conceal streaming={props.streaming ?? false} tableOptions={{ style: "columns", wrapMode: "word", cellPaddingX: 1 }} /></box>
   }}</Show>
 }

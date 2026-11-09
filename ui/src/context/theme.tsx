@@ -33,7 +33,11 @@ export function presetPalette(name: string, noColor = !!process.env.NO_COLOR): R
 type Theme = ReturnType<typeof terminalPalette>
 const Context = createContext<Theme>()
 export function ThemeProvider(props: ParentProps<{ theme?: string }>) {
-  const palette = createMemo(() => presetPalette(props.theme || "terminal"))
+  // A backend snapshot may change while its selected theme stays the same.
+  // Keep palette identity stable so native syntax resources are not recreated
+  // on every work tick, draft edit or receipt acknowledgement.
+  const name = createMemo(() => props.theme || "terminal")
+  const palette = createMemo(() => presetPalette(name()))
   const value: Theme = { get text() { return palette().text }, get background() { return palette().background }, get hue() { return palette().hue }, get accent() { return palette().accent } }
   return <Context.Provider value={value}>{props.children}</Context.Provider>
 }
