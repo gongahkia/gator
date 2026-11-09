@@ -296,3 +296,24 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
   delegated approval review/edit/rejection, router/admission failure and capacity
   recovery, selected-account/goal changes, and older-turn navigation/search.
   The full fifteen-item integrated acceptance journey remains incomplete.
+
+- Broad native regression at `485cd007c`: 84 pass, three unchanged skips, one
+  failure (the new conversation journey exceeded its original 60-second deadline;
+  496.41 seconds for the full run). It passes in focused runs, but that did not
+  establish a green default suite. No test runner, deadline, assertion or skip was
+  changed. The existing long-transcript test independently passes in 4.09 seconds
+  with its original five-second deadline after its earlier concurrent-build timeout.
+
+- Composer layout follow-up: restored/editor/voice draft replacements now wait
+  for a computed native frame, request that frame explicitly, coalesce to the
+  latest text and cancel pending callbacks at unmount. They do not reenter
+  native/Solid layout mutations or treat intermediate buffer replacement events
+  as user edits. A native test admits no work and checks an initial pre-layout
+  draft plus ten running snapshots/replacements at all four sizes, including the
+  actual editor buffer and persisted draft. It passes alongside the real-Go
+  conversation journey and composer/keyboard checks (four tests). Full workapp
+  checks pass; existing native app-control, check ownership, update-reference,
+  task-plan and maintenance Go boundary tests pass. Typecheck passes after adding
+  the host's authoritative-profile location to its existing type declaration.
+  The default full TUI suite must be rerun after this layout fix; the earlier
+  failure remains evidence and is not counted as resolved by focused tests alone.

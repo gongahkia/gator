@@ -2,8 +2,8 @@
 // textarea/composer structure; replaces upstream prompt parts, API submission,
 // agent variants and local stash with Gator's acknowledged drafts and queues.
 import { TextareaRenderable, TextAttributes } from "@opentui/core"
-import { createEffect, createMemo, createSignal, For, on, Show } from "solid-js"
-import { useTerminalDimensions } from "@opentui/solid"
+import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from "solid-js"
+import { useRenderer, useTerminalDimensions } from "@opentui/solid"
 import { useClient } from "../../context/client"
 import { useData } from "../../context/data"
 import { useTheme } from "../../context/theme"
@@ -16,6 +16,7 @@ export function Prompt() {
   const client = useClient(), data = useData(), theme = useTheme(), dialog = useDialog()
   let textarea: TextareaRenderable | undefined
   const dimensions = useTerminalDimensions()
+  const renderer = useRenderer()
   const hint = useKeyHints()
   const compact = () => dimensions().height < 26
   const short = () => dimensions().height < 18
@@ -71,7 +72,25 @@ export function Prompt() {
   // Those are synchronization, not edits; feeding them back into the client
   // can alternate old/new drafts indefinitely during live state updates.
   let syncingDraft = false
-  createEffect(() => { const text = data.draft.text; if (textarea && textarea.plainText !== text) { syncingDraft = true; try { textarea.setText(text); textarea.gotoLineEnd() } finally { syncingDraft = false } } })
+  let pendingDraft: string | undefined, synchronize: (() => void) | undefined
+  const scheduleDraft = () => {
+    if (synchronize) return
+    synchronize = () => {
+      synchronize = undefined
+      if (!textarea || textarea.isDestroyed || pendingDraft === undefined) return
+      // The editor's wrapping/cursor operations need a computed native layout.
+      // Draft replacement must not reenter a Solid/native layout mutation.
+      if (textarea.width < 1 || textarea.height < 1) { scheduleDraft(); return }
+      const text = pendingDraft; pendingDraft = undefined
+      if (textarea.plainText === text) return
+      syncingDraft = true
+      try { textarea.setText(text); textarea.gotoLineEnd() } finally { syncingDraft = false }
+    }
+    renderer.once("frame", synchronize)
+    renderer.requestRender()
+  }
+  createEffect(() => { const text = data.draft.text; pendingDraft = text; scheduleDraft() })
+  onCleanup(() => { if (synchronize) renderer.off("frame", synchronize); synchronize = undefined; pendingDraft = undefined })
   createEffect(() => { if (dialog.stack.length || data.state?.panel) textarea?.blur(); else textarea?.focus() })
   const guide = () => { void client.guide().catch(error => client.fail(error)) }
   Keymap.createLayer(() => ({ priority: 2, enabled: dialog.stack.length === 0, commands: [
