@@ -12,6 +12,7 @@ import { selectedFileSource } from "./file-sources.mjs";
 import { stateDirectory } from "./platform.mjs";
 import { validateFrame } from "./policy.mjs";
 import { retainedRequestUploads } from "./request-retention.mjs";
+import { withProfileMaintenance } from "./profile-maintenance.mjs";
 import { renderPDF } from "./pdf.mjs";
 import { importPastedImages } from "./pasted-images.mjs";
 import { helper } from "./native.mjs";
@@ -62,10 +63,12 @@ export class Application extends EventEmitter {
     await mkdir(this.workspace, { recursive: true, mode: 0o700 });
     // Malformed journals defer cleanup rather than deleting potentially admitted inputs.
     try {
+		await withProfileMaintenance(this.binary, this.env, async assertOwned => {
       const retained = await retainedRequestUploads(join(this.stateRoot, "gator", "conversations"));
       const saved = await this.drafts.request({ action: "list" });
       for (const draft of saved.drafts) for (const file of draft.uploads ?? []) retained.add(file.id);
-      await this.uploads.prune(Date.now(), retained);
+      assertOwned(); await this.uploads.prune(Date.now(), retained, assertOwned);
+		});
     } catch (error) { this.cleanupIssue = error.message; }
     await this.sessions.open(request);
     return this.snapshot();

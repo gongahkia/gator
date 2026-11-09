@@ -241,3 +241,11 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
   result restoration, native transcript projection and integrated controlled-model
   journeys are still being implemented/verified; item 1 remains open. The other
   fourteen rows retain their remaining criteria and final-journey requirements.
+
+- Attachment maintenance now holds the existing exclusive profile guard across
+  the host's reference scan and actual prune, using a private pipe-owned lease;
+  busy profiles defer cleanup. Composer admission holds the matching shared guard
+  across validation and durable persistence. The guard's busy/deferred/retained/
+  released states pass a real Go lock test. If the helper or its ownership is
+  unavailable, cleanup keeps attachments. This reuses the existing retention
+  reader and seven-day pruning policy; it does not add another retention store.

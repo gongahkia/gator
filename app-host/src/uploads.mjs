@@ -71,14 +71,14 @@ export class UploadStore {
     }
     if (total > uploadLimits.total) throw new Error(`Attachments must total no more than ${uploadLimits.total / 1048576} MiB per message.`);
   }
-  async prune(now = Date.now(), retained = new Set()) {
+  async prune(now = Date.now(), retained = new Set(), assertOwned = () => {}) {
   const protectedDirectories = new Set([...retained].filter(validUploadID).map(id => id.split("/")[0]));
     await mkdir(this.root, { recursive: true, mode: 0o700 });
     for (const entry of await readdir(this.root, { withFileTypes: true })) {
       if (!entry.isDirectory() || !/^[a-f0-9]{32}$/.test(entry.name)) continue;
       if (protectedDirectories.has(entry.name)) continue;
       const path = join(this.root, entry.name);
-      if ((await stat(path)).mtimeMs < now - 7 * 86400000) await rm(path, { recursive: true, force: true });
+      if ((await stat(path)).mtimeMs < now - 7 * 86400000) { assertOwned(); await rm(path, { recursive: true, force: true }); }
     }
   }
 }

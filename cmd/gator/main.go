@@ -128,6 +128,8 @@ func run(args []string, out io.Writer) error {
 			return errors.New("ui-backend is an internal Gator transport")
 		}
 		return workInteractiveConversationForGoal(args[1], args[2])
+	case "ui-maintenance-lease":
+		return uiMaintenanceLease(os.Stdin, out)
 	case "work", "-w":
 		return workCommand(args[1:], out)
 	case "acp":
