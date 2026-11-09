@@ -142,3 +142,14 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
   together in a focused run (8.35s and 7.86s); the broad-run timeout cause remains
   unresolved, so this is not recorded as a green full-suite result. Do not raise
   deadlines or skip these journeys to claim completion.
+
+- Following terminal verification: the built checkout launcher and real Go
+  runtime passed a PTY check with an isolated, seeded goal/check profile at
+  110×34, 80×24, 60×20 and 42×14. With `NO_COLOR=1` and reduced motion, keyboard
+  review/cancellation left the agreement unchanged at every size; confirmed
+  pause/resume persisted exact state, offline resume disclosed the service
+  requirement, and quit retained an unsent draft and restored terminal modes.
+  No model request or scheduled check was executed. The two broad-run timeout
+  journeys also pass three consecutive focused repetitions each (six tests);
+  a full run with per-file global isolation is being investigated, without
+  changing timeouts or dropping checks. The broad-run timeout cause is still open.
