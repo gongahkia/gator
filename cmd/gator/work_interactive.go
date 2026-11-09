@@ -179,6 +179,16 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 	defer localModels.Close()
 	connections := &connectionControls{stateDir: stateDir}
 	application := workapp.New(workapp.Config{
+		CaptureConversationInput: captureConversationInput,
+		RouteConversation:        routeInteractiveConversation(stateDir),
+		BindConversationTask: func(parent, turn, source string, revision uint64) (worksession.DialogueTurn, worksession.Conversation, bool, error) {
+			release, err := state.Guard(stateDir, false)
+			if err != nil {
+				return worksession.DialogueTurn{}, worksession.Conversation{}, false, err
+			}
+			defer release()
+			return sessions.BindDialogueTask(parent, turn, source, revision, time.Now())
+		},
 		ComposerSources: func() ([]workapp.ComposerSource, error) { return connections.composerSources(settingsStore) },
 		SelectComposerSources: func(id string, expected, ids []string) error {
 			return selectComposerSources(settingsStore, stateDir, id, expected, ids)
@@ -541,6 +551,13 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			return inboxStore.List(false, 20)
 		},
 		Run: func(source, conversationID, prompt string, options workapp.RunOptions) workapp.RunResult {
+			if options.DialogueParent != "" || options.DialogueTurn != "" {
+				_, record, err := resolveDialogueExecution(stateDir, source, conversationID, prompt, options)
+				if err != nil {
+					return workapp.RunResult{Error: err.Error()}
+				}
+				return runInteractiveWorkGoal(source, conversationID, prompt, stateDir, options, record)
+			}
 			// runInteractiveWorkGoal owns the run's data lease and releases it
 			// before reviewed maintenance. Do not wrap it in a second lease.
 			if goalID != "" {
@@ -690,6 +707,10 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 		ctx = context.Background()
 	}
 	ctx = sharedusage.WithState(sharedusage.WithCategory(ctx, "chat"), stateDir)
+	dialogue, _, err := resolveDialogueExecution(stateDir, source, conversationID, prompt, options)
+	if err != nil {
+		return workapp.RunResult{Error: err.Error()}
+	}
 	mode, paths, decisionOrigin, decisionReason, err := resolveInteractiveWork(ctx, prompt, options)
 	if err != nil {
 		return workapp.RunResult{Error: err.Error()}
@@ -740,6 +761,15 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 		IgnoredInstructionPaths: append([]string(nil), options.IgnoredInstructionPaths...),
 		RefreshSource:           options.RefreshSource || currentGoal.ID != "",
 		OnEvent:                 options.OnEvent, Steering: options.Steering,
+	}
+	if dialogue != nil {
+		request.OriginConversationID = options.DialogueParent
+		request.OAuthRefreshPins = dialogue.OAuthRefreshPins
+		data, err := json.Marshal(dialogue.Recent)
+		if err != nil {
+			return workapp.RunResult{Error: err.Error()}
+		}
+		request.ConversationContext = string(data)
 	}
 	parse := func(values []string) ([][]string, error) {
 		var result verificationFlags

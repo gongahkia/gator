@@ -20,17 +20,27 @@ import (
 // BridgeState is a display-only projection for the desktop.
 // The Go model remains the sole owner of commands, runs, approvals and history.
 type BridgeState struct {
-	CheckResult             *BridgeCheckResult `json:"check_result,omitempty"`
-	SupervisorRunning       bool               `json:"supervisor_running"`
-	TaskPlans               []TaskPlanSummary  `json:"task_plans,omitempty"`
-	TaskPlanResult          *TaskPlanResult    `json:"task_plan_result,omitempty"`
-	Branch                  *BranchLink        `json:"branch,omitempty"`
-	BranchResult            *BranchResult      `json:"branch_result,omitempty"`
-	PendingOperation        string             `json:"pending_operation,omitempty"`
-	CatalogBusy             bool               `json:"catalog_busy,omitempty"`
-	ActionRecoveries        []RecoveredAction  `json:"action_recoveries,omitempty"`
-	ActionRecoveryIssue     string             `json:"action_recovery_issue,omitempty"`
-	ActionRecoveryTruncated bool               `json:"action_recovery_truncated,omitempty"`
+	Dialogue                []DialogueMessage       `json:"dialogue,omitempty"`
+	DialogueMore            bool                    `json:"dialogue_more,omitempty"`
+	DialogueIssue           string                  `json:"dialogue_issue,omitempty"`
+	DialogueBusy            bool                    `json:"dialogue_busy,omitempty"`
+	DialogueActive          bool                    `json:"dialogue_active,omitempty"`
+	DialogueDispatch        *DialogueDispatch       `json:"dialogue_dispatch,omitempty"`
+	DialogueBootstrapResult *DialogueDispatchResult `json:"dialogue_bootstrap_result,omitempty"`
+	DialogueControlResult   *DialogueControlResult  `json:"dialogue_control_result,omitempty"`
+	DialogueTask            *DialogueTaskState      `json:"dialogue_task,omitempty"`
+	DialoguePeers           []DialoguePeer          `json:"dialogue_peers,omitempty"`
+	CheckResult             *BridgeCheckResult      `json:"check_result,omitempty"`
+	SupervisorRunning       bool                    `json:"supervisor_running"`
+	TaskPlans               []TaskPlanSummary       `json:"task_plans,omitempty"`
+	TaskPlanResult          *TaskPlanResult         `json:"task_plan_result,omitempty"`
+	Branch                  *BranchLink             `json:"branch,omitempty"`
+	BranchResult            *BranchResult           `json:"branch_result,omitempty"`
+	PendingOperation        string                  `json:"pending_operation,omitempty"`
+	CatalogBusy             bool                    `json:"catalog_busy,omitempty"`
+	ActionRecoveries        []RecoveredAction       `json:"action_recoveries,omitempty"`
+	ActionRecoveryIssue     string                  `json:"action_recovery_issue,omitempty"`
+	ActionRecoveryTruncated bool                    `json:"action_recovery_truncated,omitempty"`
 
 	ReceiptBusy           bool                       `json:"receipt_busy,omitempty"`
 	ReceiptResult         *ReceiptResult             `json:"receipt_result,omitempty"`
@@ -199,6 +209,10 @@ func (m Model) BridgeState() BridgeState {
 	desktop := m.desktop
 	desktop.Shortcuts = m.desktop.ResolvedShortcuts()
 	state := BridgeState{
+		Dialogue: m.dialogueMessages(), DialogueMore: m.dialogueMore, DialogueIssue: m.dialogueIssue,
+		DialogueActive: m.conversationActive(), DialogueBusy: m.dialogueRouting != "" || len(m.dialogueQueue) > 0 || m.dialogueDispatch != nil,
+		DialogueDispatch: m.dialogueDispatch, DialogueBootstrapResult: m.dialogueBootstrapResult, DialogueControlResult: m.dialogueControlResult,
+		DialogueTask: m.dialogueTaskState(), DialoguePeers: append([]DialoguePeer(nil), m.dialoguePeers...),
 		CatalogBusy: m.catalogSaving != 0,
 		TaskPlans:   m.taskPlanSummaries(), TaskPlanResult: m.planResult,
 		Branch: m.branchLink, BranchResult: m.branchResult,

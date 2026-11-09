@@ -13,6 +13,10 @@ import (
 // Renderer text never supplies the job, goal, summary or execution reference.
 func applyUpdateContext(stateDir string, request *workrun.Request) error {
 	request.UpdateContext = ""
+	conversation := request.ConversationID
+	if request.OriginConversationID != "" {
+		conversation = request.OriginConversationID
+	}
 	if !request.ForegroundApp || request.ConversationID == "" {
 		return nil
 	}
@@ -26,12 +30,12 @@ func applyUpdateContext(stateDir string, request *workrun.Request) error {
 		if err != nil {
 			return err
 		}
-		if entry.OriginConversationID != request.ConversationID {
+		if entry.OriginConversationID != conversation {
 			return errors.New("the selected update belongs to another conversation")
 		}
 		entries = []inbox.Entry{entry}
 	} else {
-		entries, err = store.ForConversation(request.ConversationID, 50)
+		entries, err = store.ForConversation(conversation, 50)
 		if err != nil {
 			return err
 		}

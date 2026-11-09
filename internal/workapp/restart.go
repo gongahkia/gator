@@ -3,6 +3,9 @@ package workapp
 // RestartBlockReason is checked inside the application message loop, after
 // earlier submitted actions. A stale host snapshot cannot authorize shutdown.
 func (m Model) RestartBlockReason() string {
+	if m.dialogueRouting != "" || len(m.dialogueQueue) != 0 || m.dialogueDispatch != nil {
+		return "Wait for the pending conversation message before restarting."
+	}
 	if m.running || m.cancelling || m.interaction != nil || len(m.pendingInteractions) != 0 {
 		return "Finish or stop the current work before restarting."
 	}

@@ -54,6 +54,8 @@ func (m Model) FocusBridgeSession(foreground bool) Model {
 
 func (m Model) submissionOptions() RunOptions {
 	options := cloneRunOptions(m.options)
+	// A new user submission never inherits an earlier delegation's authority.
+	options.DialogueParent, options.DialogueTurn = "", ""
 	options.ReplyToUpdateID = m.submissionReply
 	options.ModelProvider, options.ModelName = m.modelStatus.Provider, m.modelStatus.Model
 	return options

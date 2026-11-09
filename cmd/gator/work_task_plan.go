@@ -35,6 +35,13 @@ func prepareDesktopTaskPlan(ctx context.Context, stateDir string, r worksession.
 	if json.Unmarshal(r.Options, &options) != nil || !options.PlanFirst {
 		return worksession.PlanContent{}, errors.New("invalid plan preparation settings")
 	}
+	chat, err := store.Load(r.Plan.Binding.ConversationID)
+	if err != nil {
+		return worksession.PlanContent{}, err
+	}
+	if _, _, err := resolveDialogueExecution(stateDir, chat.SourcePath, r.Plan.Binding.ConversationID, r.Text, options); err != nil {
+		return worksession.PlanContent{}, err
+	}
 	defaults, err := configuredDefaults()
 	if err != nil {
 		return worksession.PlanContent{}, err

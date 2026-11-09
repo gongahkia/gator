@@ -128,6 +128,8 @@ type BundleActionRequest struct {
 // one prompt. They configure Gator and bound its internal Code specialist;
 // they are never editable by the manager model itself.
 type RunOptions struct {
+	DialogueParent          string `json:"DialogueParent,omitempty"`
+	DialogueTurn            string `json:"DialogueTurn,omitempty"`
 	PlanFirst               bool   `json:"PlanFirst,omitempty"`
 	TaskPlanRequestID       string `json:"-"`
 	BrowserSession          string
@@ -179,6 +181,9 @@ type ModelStatus struct {
 type GoalState struct{ Title, SourcePath, ConversationID string }
 
 type Config struct {
+	CaptureConversationInput func(ConversationInput) (ConversationInput, error)
+	RouteConversation        func(context.Context, workrun.ConversationRequest, ConversationInput) (workrun.ConversationDecision, error)
+	BindConversationTask     func(conversation, turn, source string, revision uint64) (worksession.DialogueTurn, worksession.Conversation, bool, error)
 	PreparePlan              func(context.Context, worksession.Request) (worksession.PlanContent, error)
 	ForkConversation         func(parent, revision, run, request string) (worksession.Conversation, error)
 	ComposerSources          func() ([]ComposerSource, error)
@@ -360,140 +365,155 @@ type pendingBundleAction struct {
 }
 
 type Model struct {
-	bridgeCheckResult      *BridgeCheckResult
-	planPreparing          string
-	planResult             *TaskPlanResult
-	catalog                *conversationCatalog
-	catalogSequence        uint64
-	catalogSaving          uint64
-	catalogCancel          context.CancelFunc
-	chatUpdates            []inbox.Entry
-	chatUpdatesIssue       string
-	chatUpdatesTotal       int
-	updateConversations    []BridgeUpdateConversation
-	updatePageChat         string
-	updatePageAnchors      []string
-	updatesHaveOlder       bool
-	submissionReply        string
-	background             bool
-	sessionRequest         *BridgeSessionRequest
-	sessionSequence        uint64
-	desktop                appconfig.DesktopSettings
-	models                 ModelPanel
-	tasks                  map[string]string
-	specialists            map[string]BridgeSpecialist
-	specialistActions      map[string]specialistActionReceipt
-	bridgeSpecialistResult *BridgeSpecialistResult
-	quitting               bool
-	live                   <-chan tea.Msg
-	cancel                 context.CancelFunc
-	operation              *workrun.Operation
-	interaction            *workrun.Interaction
-	pendingInteractions    []workrun.Interaction
-	config                 Config
-	width                  int
-	height                 int
-	home                   bool
-	overview               workhome.Overview
-	overviewGeneration     uint64
-	overviewBusy           bool
-	overviewIssue          string
-	controlReturnHome      bool
-	launcher               bool
-	launcherMode           string
-	paletteQuery           string
-	section                string
-	selected               int
-	entries                []entry
-	source                 string
-	goalID                 string
-	conversation           string
-	revision               string
-	snapshot               string
-	title                  string
-	input                  string
-	promptHistory          []string
-	historyIndex           int
-	historyDraft           string
-	composerEditorPath     string
-	bridgeExternal         *BridgeExternal
-	messages               []message
-	running                bool
-	cancelling             bool
-	status                 string
-	firstRun               bool
-	pendingPrompt          string
-	scroll                 int
-	options                RunOptions
-	queue                  []queuedRun
-	queueSequence          uint64
-	requests               worksession.RequestJournal
-	activeRequest          string
-	nextRequest            string
-	submissionID           string
-	requestsRecovered      bool
-	requestsIssue          string
-	bridgeQueueResult      *BridgeQueueResult
-	lastOutput             string
-	lastBundle             BundleSummary
-	pendingBundleAction    *pendingBundleAction
-	pendingConnectorCmd    tea.Cmd
-	theme                  string
-	loadingFrame           int
-	loadingRun             uint64
-	runStarted             time.Time
-	activity               *workactivity.Trace
-	modelStatus            ModelStatus
-	composerModels         []ComposerModel
-	composerModelsIssue    string
-	composerResult         *ComposerResult
-	sourceChoices          []ComposerSource
-	sourcesIssue           string
-	branchResult           *BranchResult
-	branchLink             *BranchLink
-	sourcesResult          *ComposerResult
-	bridgeNotice           string
-	bridgeUploadResult     *BridgeUploadResult
-	bridgeRecentIssue      string
-	bridgeFollowingIssue   string
-	checksIssue            string
-	statusLine             []string
-	statusLineConfigured   bool
-	statusLineEnabled      bool
-	statusLineDraft        []string
-	statusLineDraftSet     bool
-	statusLineDraftEnabled bool
-	historyItems           []historyItem
-	historyDetail          *historyDetail
-	historyFilter          workhistory.Status
-	inboxDetail            string
-	learningItems          []learning.Record
-	learningDetail         *learning.Record
-	learningFilter         learning.Status
-	learningForm           *learningForm
-	sectionNotice          string
-	productHelp            bool
-	controlFamily          string
-	controlRootArgs        []string
-	controlScreen          ControlScreen
-	controlForm            *ControlAction
-	controlField           int
-	controlReview          bool
-	controlBusy            bool
-	controlBackground      bool
-	connectionPolling      bool
-	controlResultNotice    string
-	controlCancel          context.CancelFunc
-	controlGeneration      uint64
-	followupForm           *followupForm
-	followupSaving         bool
-	checks                 []workhome.Check
-	checkDetail            *workhome.Check
-	quietChecks            *quietChecksView
-	chatMemories           []ChatMemoryReceipt
-	chatMemoriesOwner      string
-	chatMemoryResult       *ChatMemoryResult
-	chatUpdateResult       *BridgeUpdateResult
+	dialogueTurns           []worksession.DialogueTurn
+	dialogueMore            bool
+	dialogueIssue           string
+	dialogueQueue           []string
+	dialogueRouting         string
+	dialogueCancel          context.CancelFunc
+	dialogueHost            bool
+	dialogueCanStart        bool
+	dialogueOtherBusy       bool
+	dialoguePeers           []DialoguePeer
+	dialogueDispatch        *DialogueDispatch
+	dialogueSequence        uint64
+	dialogueControlResult   *DialogueControlResult
+	dialogueBootstrapResult *DialogueDispatchResult
+	dialogueControls        map[string]DialogueControlResult
+	bridgeCheckResult       *BridgeCheckResult
+	planPreparing           string
+	planResult              *TaskPlanResult
+	catalog                 *conversationCatalog
+	catalogSequence         uint64
+	catalogSaving           uint64
+	catalogCancel           context.CancelFunc
+	chatUpdates             []inbox.Entry
+	chatUpdatesIssue        string
+	chatUpdatesTotal        int
+	updateConversations     []BridgeUpdateConversation
+	updatePageChat          string
+	updatePageAnchors       []string
+	updatesHaveOlder        bool
+	submissionReply         string
+	background              bool
+	sessionRequest          *BridgeSessionRequest
+	sessionSequence         uint64
+	desktop                 appconfig.DesktopSettings
+	models                  ModelPanel
+	tasks                   map[string]string
+	specialists             map[string]BridgeSpecialist
+	specialistActions       map[string]specialistActionReceipt
+	bridgeSpecialistResult  *BridgeSpecialistResult
+	quitting                bool
+	live                    <-chan tea.Msg
+	cancel                  context.CancelFunc
+	operation               *workrun.Operation
+	interaction             *workrun.Interaction
+	pendingInteractions     []workrun.Interaction
+	config                  Config
+	width                   int
+	height                  int
+	home                    bool
+	overview                workhome.Overview
+	overviewGeneration      uint64
+	overviewBusy            bool
+	overviewIssue           string
+	controlReturnHome       bool
+	launcher                bool
+	launcherMode            string
+	paletteQuery            string
+	section                 string
+	selected                int
+	entries                 []entry
+	source                  string
+	goalID                  string
+	conversation            string
+	revision                string
+	snapshot                string
+	title                   string
+	input                   string
+	promptHistory           []string
+	historyIndex            int
+	historyDraft            string
+	composerEditorPath      string
+	bridgeExternal          *BridgeExternal
+	messages                []message
+	running                 bool
+	cancelling              bool
+	status                  string
+	firstRun                bool
+	pendingPrompt           string
+	scroll                  int
+	options                 RunOptions
+	queue                   []queuedRun
+	queueSequence           uint64
+	requests                worksession.RequestJournal
+	activeRequest           string
+	nextRequest             string
+	submissionID            string
+	requestsRecovered       bool
+	requestsIssue           string
+	bridgeQueueResult       *BridgeQueueResult
+	lastOutput              string
+	lastBundle              BundleSummary
+	pendingBundleAction     *pendingBundleAction
+	pendingConnectorCmd     tea.Cmd
+	theme                   string
+	loadingFrame            int
+	loadingRun              uint64
+	runStarted              time.Time
+	activity                *workactivity.Trace
+	modelStatus             ModelStatus
+	composerModels          []ComposerModel
+	composerModelsIssue     string
+	composerResult          *ComposerResult
+	sourceChoices           []ComposerSource
+	sourcesIssue            string
+	branchResult            *BranchResult
+	branchLink              *BranchLink
+	sourcesResult           *ComposerResult
+	bridgeNotice            string
+	bridgeUploadResult      *BridgeUploadResult
+	bridgeRecentIssue       string
+	bridgeFollowingIssue    string
+	checksIssue             string
+	statusLine              []string
+	statusLineConfigured    bool
+	statusLineEnabled       bool
+	statusLineDraft         []string
+	statusLineDraftSet      bool
+	statusLineDraftEnabled  bool
+	historyItems            []historyItem
+	historyDetail           *historyDetail
+	historyFilter           workhistory.Status
+	inboxDetail             string
+	learningItems           []learning.Record
+	learningDetail          *learning.Record
+	learningFilter          learning.Status
+	learningForm            *learningForm
+	sectionNotice           string
+	productHelp             bool
+	controlFamily           string
+	controlRootArgs         []string
+	controlScreen           ControlScreen
+	controlForm             *ControlAction
+	controlField            int
+	controlReview           bool
+	controlBusy             bool
+	controlBackground       bool
+	connectionPolling       bool
+	controlResultNotice     string
+	controlCancel           context.CancelFunc
+	controlGeneration       uint64
+	followupForm            *followupForm
+	followupSaving          bool
+	checks                  []workhome.Check
+	checkDetail             *workhome.Check
+	quietChecks             *quietChecksView
+	chatMemories            []ChatMemoryReceipt
+	chatMemoriesOwner       string
+	chatMemoryResult        *ChatMemoryResult
+	chatUpdateResult        *BridgeUpdateResult
 
 	actionRecoveries        []RecoveredAction
 	actionRecoveryOwner     string
@@ -611,6 +631,7 @@ func New(config Config) Model {
 	model.refreshChatUpdates()
 	model.refreshChatMemories()
 	model.refreshActionRecoveries()
+	model.restoreDialogue()
 	return model
 }
 

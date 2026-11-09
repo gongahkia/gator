@@ -16,31 +16,37 @@ import (
 )
 
 type uiFrame struct {
-	Check         *workapp.BridgeCheckAction        `json:"check,omitempty"`
-	TaskPlan      *workapp.TaskPlanAction           `json:"task_plan,omitempty"`
-	Branch        *workapp.BranchAction             `json:"branch,omitempty"`
-	Receipt       *workapp.ReceiptAction            `json:"receipt,omitempty"`
-	Memory        *workapp.ChatMemoryAction         `json:"memory,omitempty"`
-	Update        *workapp.BridgeUpdateAction       `json:"update,omitempty"`
-	Foreground    bool                              `json:"foreground,omitempty"`
-	Sources       *workapp.SourceAction             `json:"sources,omitempty"`
-	Composer      *workapp.ComposerAction           `json:"composer,omitempty"`
-	Version       int                               `json:"version"`
-	Type          string                            `json:"type"`
-	Text          string                            `json:"text,omitempty"`
-	Key           string                            `json:"key,omitempty"`
-	Error         string                            `json:"error,omitempty"`
-	Width         int                               `json:"width,omitempty"`
-	Height        int                               `json:"height,omitempty"`
-	Panel         *workapp.BridgePanelAction        `json:"panel,omitempty"`
-	Queue         *workapp.BridgeQueueAction        `json:"queue,omitempty"`
-	Specialist    *workapp.BridgeSpecialistAction   `json:"specialist,omitempty"`
-	Upload        *workapp.BridgeUploadSubmission   `json:"upload,omitempty"`
-	Conversation  *workapp.BridgeConversationAction `json:"conversation,omitempty"`
-	InteractionID int                               `json:"interaction_id,omitempty"`
-	ApprovalToken string                            `json:"approval_token,omitempty"`
-	Approved      bool                              `json:"approved,omitempty"`
-	Nonce         string                            `json:"nonce,omitempty"`
+	DialogueHost    *workapp.DialogueHost             `json:"dialogue_host,omitempty"`
+	DialogueResult  *workapp.DialogueDispatchResult   `json:"dialogue_result,omitempty"`
+	DialogueControl *workapp.DialogueControl          `json:"dialogue_control,omitempty"`
+	DialogueParent  string                            `json:"dialogue_parent,omitempty"`
+	DialogueTurn    string                            `json:"dialogue_turn,omitempty"`
+	DialogueBefore  uint64                            `json:"dialogue_before,omitempty"`
+	Check           *workapp.BridgeCheckAction        `json:"check,omitempty"`
+	TaskPlan        *workapp.TaskPlanAction           `json:"task_plan,omitempty"`
+	Branch          *workapp.BranchAction             `json:"branch,omitempty"`
+	Receipt         *workapp.ReceiptAction            `json:"receipt,omitempty"`
+	Memory          *workapp.ChatMemoryAction         `json:"memory,omitempty"`
+	Update          *workapp.BridgeUpdateAction       `json:"update,omitempty"`
+	Foreground      bool                              `json:"foreground,omitempty"`
+	Sources         *workapp.SourceAction             `json:"sources,omitempty"`
+	Composer        *workapp.ComposerAction           `json:"composer,omitempty"`
+	Version         int                               `json:"version"`
+	Type            string                            `json:"type"`
+	Text            string                            `json:"text,omitempty"`
+	Key             string                            `json:"key,omitempty"`
+	Error           string                            `json:"error,omitempty"`
+	Width           int                               `json:"width,omitempty"`
+	Height          int                               `json:"height,omitempty"`
+	Panel           *workapp.BridgePanelAction        `json:"panel,omitempty"`
+	Queue           *workapp.BridgeQueueAction        `json:"queue,omitempty"`
+	Specialist      *workapp.BridgeSpecialistAction   `json:"specialist,omitempty"`
+	Upload          *workapp.BridgeUploadSubmission   `json:"upload,omitempty"`
+	Conversation    *workapp.BridgeConversationAction `json:"conversation,omitempty"`
+	InteractionID   int                               `json:"interaction_id,omitempty"`
+	ApprovalToken   string                            `json:"approval_token,omitempty"`
+	Approved        bool                              `json:"approved,omitempty"`
+	Nonce           string                            `json:"nonce,omitempty"`
 }
 
 type uiBridgeModel struct {
@@ -60,6 +66,25 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 	switch frame := value.(type) {
 	case uiFrame:
 		switch frame.Type {
+		case "dialogue_host":
+			if frame.DialogueHost == nil {
+				return m, nil
+			}
+			next = m.model.ConfigureDialogueHost(*frame.DialogueHost)
+		case "dialogue_result":
+			if frame.DialogueResult == nil {
+				return m, nil
+			}
+			next, command = m.model.FinishDialogueDispatch(*frame.DialogueResult)
+		case "dialogue_bootstrap":
+			next, command = m.model.BootstrapDialogue(frame.DialogueParent, frame.DialogueTurn)
+		case "dialogue_control":
+			if frame.DialogueControl == nil {
+				return m, nil
+			}
+			next = m.model.ControlDialogue(*frame.DialogueControl)
+		case "dialogue_page":
+			next = m.model.LoadOlderDialogue(frame.DialogueBefore)
 		case "focus_session":
 			m.model = m.model.FocusBridgeSession(frame.Foreground)
 			m.sendState()

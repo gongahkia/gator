@@ -51,6 +51,20 @@ func (m Model) SubmitBridgeUploads(request BridgeUploadSubmission) (tea.Model, t
 	if text == "" {
 		text = "Please take a look at the attached files."
 	}
+	// Maintenance cannot delete an aged input between validation and either
+	// Work or dialogue admission. The asynchronous run has its own data guard.
+	if m.config.BeforeLocalCommand != nil {
+		release, err := m.config.BeforeLocalCommand()
+		if err != nil {
+			return fail(err.Error())
+		}
+		defer release()
+	}
+	if retained, err := m.retryDialogueAdmission(request, text); err != nil {
+		return fail("Couldn't confirm the retained message: " + err.Error())
+	} else if retained {
+		return m, nil
+	}
 	// A transport retry acknowledges the original admission rather than creating
 	// a second task. The client retains this identity until it sees acceptance.
 	for _, retained := range m.requests.Requests {
@@ -73,7 +87,7 @@ func (m Model) SubmitBridgeUploads(request BridgeUploadSubmission) (tea.Model, t
 			return fail(issue)
 		}
 	}
-	if m.running && len(m.queue) >= 16 {
+	if m.running && !m.conversationActive() && len(m.queue) >= 16 {
 		return fail("The queue is full. Remove a message before adding another.")
 	}
 	seen := map[string]bool{}
@@ -93,6 +107,9 @@ func (m Model) SubmitBridgeUploads(request BridgeUploadSubmission) (tea.Model, t
 		if err := m.config.ValidateUploads(m.source, m.options.Attachments, request.Files); err != nil {
 			return fail(fmt.Sprintf("Couldn’t attach these files: %v", err))
 		}
+	}
+	if m.conversationActive() {
+		return m.admitConversation(request, text)
 	}
 	oldPlanFirst := m.options.PlanFirst
 	m.options.PlanFirst = request.PlanFirst

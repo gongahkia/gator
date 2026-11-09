@@ -226,3 +226,18 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
   also pass (two tests), with the new startup retention reader in use. Task binding
   itself remains core/race-tested API work; neither those journeys nor the green
   host suite prove ordinary-message routing or background delegation is wired.
+
+- Conversation owner integration in progress: ordinary upload/composer admission
+  can now persist and route a separate conversational turn when its native host
+  enables the lane. Replies do not acquire the Work lease; guide/stop decisions
+  revalidate their live targets. Independent task bootstrap reloads the immutable
+  parent envelope and admits into the exact child's own Work journal. Duplicate
+  bootstrap and restored turns do not replay. Configured native routing uses the
+  captured model and existing usage accounting; delegated work validates source,
+  goal, selected accounts, permission and processing configuration, while keeping
+  its own execution/approval identity. Public parent context and update origins
+  remain references, not replay or approval grants.
+  Focused workapp/workrun/native-boundary Go tests pass. Host dispatch, durable
+  result restoration, native transcript projection and integrated controlled-model
+  journeys are still being implemented/verified; item 1 remains open. The other
+  fourteen rows retain their remaining criteria and final-journey requirements.

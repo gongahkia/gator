@@ -18,6 +18,8 @@ import (
 
 func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 	switch value := messageValue.(type) {
+	case conversationRouted:
+		return m.finishConversationRoute(value)
 	case taskPlanPrepared:
 		return m.finishTaskPlan(value)
 	case catalogLoaded:
@@ -375,7 +377,7 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 		if text == "" {
 			text = "Finished the Work revision."
 		}
-		m.messages = append(m.messages, message{role: "Gator", text: text})
+		m.messages = append(m.messages, message{role: "Gator", text: text, createdAt: time.Now().UTC()})
 	}
 	// A failed or stopped task can still have verified partial files and
 	// external request evidence. Keep that bundle attached to its owning turn

@@ -97,6 +97,9 @@ func (t appTool) Execute(ctx context.Context, args json.RawMessage) (agent.ToolR
 			return agent.ToolResult{}, err
 		}
 		query.ConversationID = t.request.ConversationID
+		if t.request.OriginConversationID != "" {
+			query.ConversationID = t.request.OriginConversationID
+		}
 		result, err = t.controller.Inspect(ctx, query)
 	} else {
 		var change AppChange
@@ -104,6 +107,9 @@ func (t appTool) Execute(ctx context.Context, args json.RawMessage) (agent.ToolR
 			return agent.ToolResult{}, err
 		}
 		change.ConversationID = t.request.ConversationID
+		if t.request.OriginConversationID != "" {
+			change.ConversationID = t.request.OriginConversationID
+		}
 		prepared, prepareErr := t.controller.Prepare(ctx, change)
 		if prepareErr != nil {
 			return agent.ToolResult{}, prepareErr

@@ -78,6 +78,7 @@ func (m *Model) beginChat(source string) bool {
 	m.pendingBundleAction = nil
 	m.options = RunOptions{MaxSteps: 24, Mode: "auto", Code: CodeOptions{MaxSteps: 16, Sandbox: "strict", Network: "deny"}}
 	m.restoreRequests()
+	m.restoreDialogue()
 	m.rememberChat()
 	m.refreshChatUpdates()
 	m.refreshChatMemories()
@@ -124,6 +125,7 @@ func (m *Model) restoreConversation(conversationID, announcement string) {
 		m.home = len(m.messages) == 0
 	}
 	m.restoreRequests()
+	m.restoreDialogue()
 	m.rememberChat()
 	m.refreshChatUpdates()
 	m.refreshChatMemories()
