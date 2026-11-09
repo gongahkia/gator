@@ -46,8 +46,8 @@ export function validateFrame(frame) {
   if (frame.type === "submit" && (typeof frame.text !== "string" || frame.text.length > 128 * 1024)) throw new Error("Invalid request");
   if (frame.type === "check") {
     const v = frame.check;
-    if (!v || typeof v !== "object" || Array.isArray(v) || Object.keys(v).some(key => !["request_id", "action", "id", "digest"].includes(key)) || typeof v.request_id !== "string" || !/^[a-zA-Z0-9-]{1,64}$/.test(v.request_id) || !["refresh", "inspect", "edit", "pause", "resume"].includes(v.action)) throw new Error("Invalid check action");
-    if (v.action === "refresh" ? v.id !== undefined || v.digest !== undefined : typeof v.id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/.test(v.id) || typeof v.digest !== "string" || !/^[a-f0-9]{64}$/.test(v.digest)) throw new Error("Invalid check identity");
+    if (!v || typeof v !== "object" || Array.isArray(v) || Object.keys(v).some(key => !["request_id", "action", "id", "digest"].includes(key)) || typeof v.request_id !== "string" || !/^[a-zA-Z0-9-]{1,64}$/.test(v.request_id) || !["refresh", "setup", "inspect", "edit", "pause", "resume"].includes(v.action)) throw new Error("Invalid check action");
+    if (v.action === "refresh" ? v.id !== undefined || v.digest !== undefined : typeof v.id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/.test(v.id) || (v.action === "setup" ? v.digest !== undefined : typeof v.digest !== "string" || !/^[a-f0-9]{64}$/.test(v.digest))) throw new Error("Invalid check identity");
   }
   if (frame.type === "upload_submit") {
     const value = frame.upload;

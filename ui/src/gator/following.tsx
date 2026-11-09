@@ -23,8 +23,8 @@ export function Following(props: { inspect(check: FollowingCheck): void; refresh
   const cards = createMemo(() => {
     const checks = data.state?.checks ?? [], goals = data.state?.following_goals ?? [], known = new Set(goals.map(goal => goal.id))
     return [
-      ...goals.map(goal => ({ key: `goal-${goal.id}`, title: goal.title, outcome: goal.outcome || checks.find(check => check.goal_id === goal.id)?.outcome, status: goal.status, goal: goal.id, checks: checks.filter(check => check.goal_id === goal.id) })),
-      ...checks.filter(check => !check.goal_id || !known.has(check.goal_id)).map(check => ({ key: `check-${check.id}`, title: check.title, outcome: check.outcome, status: check.state, goal: check.goal_id, checks: [check] })),
+      ...goals.map(goal => ({ key: `goal-${goal.id}`, kind: "goal", title: goal.title, outcome: goal.outcome || checks.find(check => check.goal_id === goal.id)?.outcome, status: goal.status, goal: goal.id, checks: checks.filter(check => check.goal_id === goal.id) })),
+      ...checks.filter(check => !check.goal_id || !known.has(check.goal_id)).map(check => ({ key: `check-${check.id}`, kind: "check", title: check.title, outcome: check.outcome, status: check.state, goal: check.goal_id, checks: [check] })),
     ]
   })
   const utilities = () => [
@@ -47,8 +47,8 @@ export function Following(props: { inspect(check: FollowingCheck): void; refresh
       if (card.checks.length === 1) props.inspect(card.checks[0])
       else controls.menu(card.title, [
         ...card.checks.map(check => ({ title: check.title, description: `${check.state} · ${check.next_action}`, run: () => props.inspect(check) })),
-        { title: "Goal and plan", description: card.checks.length ? "Intended work and retained progress" : "Not monitored automatically", run: () => client.navigate("/goals") },
-        ...(!card.checks.length ? [{ title: "Attach a recurring check", description: "Choose its goal, sources, timing and notification conditions, then review", run: () => client.navigate("/followup") }] : []),
+        { title: "Goal and plan", description: card.checks.length ? "Intended work and retained progress" : "Not monitored automatically", run: () => client.openGoal(card.goal!) },
+        ...(!card.checks.length ? [{ title: "Attach a recurring check", description: "Review sources and timing for this goal", run: () => client.prepareGoalCheck(card.goal!) }] : []),
       ], true)
       return
     }
@@ -82,7 +82,7 @@ export function Following(props: { inspect(check: FollowingCheck): void; refresh
       <For each={cards()}>{(card, index) => <box id={`following-item-${index()}`} paddingX={1} paddingBottom={1} backgroundColor={selectedColor(index())} onMouseUp={() => { setSelected(index()); open(index()) }}>
         <text height={1} wrapMode="none" truncate fg={selected() === index() ? theme.accent : theme.text.base}><b>{selected() === index() ? "› " : "  "}{literal(card.title)}</b></text>
         <Show when={card.outcome}><text fg={theme.text.base} maxHeight={2}>Outcome: {literal(card.outcome)}</text></Show>
-        <Show when={card.goal && card.checks.length}><text fg={theme.text.muted}>Goal: {literal(card.status)}</text></Show>
+        <Show when={card.kind === "goal" && card.checks.length}><text fg={theme.text.muted}>Goal: {literal(card.status)}</text></Show>
         <Show when={!card.checks.length}><text fg={theme.text.muted}>{literal(card.status)} · {data.state?.checks_issue ? "Check status unavailable" : "No recurring check attached"}</text><text fg={theme.text.muted}>Next: review the goal or attach a check.</text></Show>
         <For each={card.checks}>{check => <box>
           <Show when={check.outcome && check.outcome !== card.outcome}><text fg={theme.text.base} maxHeight={2}>Checks for: {literal(check.outcome)}</text></Show>

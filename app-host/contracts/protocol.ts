@@ -113,7 +113,7 @@ export type FollowingCheck = {
   source: string; connectors?: string[]; timezone: string; schedule: string; next_due?: string; last_success?: string;
   next_action: string; issue?: string; ends_at?: string; enabled: boolean; editable: boolean;
 };
-export type CheckAction = {request_id: string} & ({action: "refresh"} | {action: "inspect" | "edit" | "pause" | "resume"; id: string; digest: string});
+export type CheckAction = {request_id: string} & ({action: "refresh"} | {action: "setup"; id: string} | {action: "inspect" | "edit" | "pause" | "resume"; id: string; digest: string});
 export type BackendState = {
  check_result?: {request_id: string; error?: string};
  supervisor_running?: boolean;

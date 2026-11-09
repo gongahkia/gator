@@ -7,7 +7,7 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 | # | Acceptance criteria | Status | Evidence / commit |
 |---|---|---|---|
 | 1 | Conversation remains available during execution; ordinary messages can steer a specific live task or start independent work; ambiguous routing is clarified without losing task identity, files, or drafts. | In progress | Tool-free conversation router and independent paged turn store implemented; identity/capability validation, active-operation independence, idempotent admission and versioned dispatch tests pass. Not yet wired to ordinary composer submissions or background task delegation. |
-| 2 | Following unifies commitments with outcome/state/next action, next and last successful checks, sources/timezone, pause/edit, and truthful foreground/service/offline limits. | In progress | `4b9edf091`: native commitment cards group goals with their checks; exact-ID/digest controls reuse canonical inspection, reviewed edits, and persisted pause/resume. Four-size fixtures and real Go create/inspect/pause/resume/edit/stale/restart/busy-owner journeys pass. Advanced non-project schedule editing and exact goal-card navigation remain; final integrated journey pending. |
+| 2 | Following unifies commitments with outcome/state/next action, next and last successful checks, sources/timezone, pause/edit, and truthful foreground/service/offline limits. | In progress | `4b9edf091`: commitment cards and exact check controls. Active goal cards now open their exact canonical picker row and prepare a check for that goal's current workspace, including duplicate titles, other-chat origins and busy owners. Focused Go/host/native integration checks pass. Advanced non-project schedule editing and paused-goal controls remain; final integrated journey pending. |
 | 3 | Relevant answers expose supplied memory/provenance/correction; noise feedback offers a reviewed, scoped check/notification change and reports its actual outcome. | Pending | |
 | 4 | First task leads through only missing setup; host connectivity and model readiness are distinct; local/cloud processing, capabilities, and work budget are explained. | Pending | |
 | 5 | Workspace/account/source scope is inspectable near input; conversational/manual settings agree, including terminal preferences, with confirmed outcomes. | Pending | |
@@ -118,9 +118,9 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
   inspection, pause/resume persistence, stale digest rejection, reviewed edit,
   management while another owner runs, draft retention and restart without replay.
   The model is controlled for the busy-owner check; this is not live-model quality
-  verification or an always-on service test. Advanced schedules still expose a
+  verification or an always-on service test. At this slice, advanced schedules expose a
   disabled edit choice and require typed management (items 2/9); unscheduled goal
-  actions still open the goals list rather than the exact selected goal (item 2/10).
+  actions open the goals list rather than the exact selected goal (item 2/10).
   NativeSyntaxStyle teardown warnings reproduced in followup-chat; item 15 remains
   open and the warnings are not treated as a successful highlighting fallback.
 
@@ -171,3 +171,19 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
   Full host regression: 113 pass, one platform skip. Unisolated pages/recovery/
   followup-chat rerun: three pass, with unchanged test deadlines.
   General back/filter/selection restoration remains unfinished (item 10).
+
+- Exact goal-card navigation and setup: goal rows now carry stable identities in
+  the existing panel digest, so reordering identical titles/source labels makes
+  stale selections invalid. Cards select the canonical current row by goal ID;
+  they do not search by title or start work. Check setup is a typed request that
+  reads the selected active goal from Go and opens the existing reviewed form.
+  Opening it neither saves a check nor retargets the current chat/workspace.
+  Foreign-chat/managed-view setup uses the goal's actual workspace and update
+  origin, with save-time goal/source validation retained. Missing/paused goals,
+  failed goal reads and unavailable setup acknowledge errors without stuck busy
+  state. Expired checks show why resume is unavailable. Go workapp/jobs tests,
+  host frame validation and TUI typecheck pass. Native goal/concurrent/Following/
+  client integration: 11 pass; duplicate-title navigation and foreign-workspace
+  check creation use real Go, and busy navigation preserves the original task and
+  draft. Model execution is controlled in the concurrency case. Advanced schedule
+  editing and paused-goal management remain open; this is not item 2 completion.

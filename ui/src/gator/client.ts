@@ -182,14 +182,39 @@ export class GatorClient extends EventEmitter {
   }
   async openSession(id: string) { if (await this.mayLeave()) await this.host.openSession(id) }
   async openConversation(id: string, list_id: string) { if (await this.mayLeave()) await this.send({ type: "conversation", conversation: { id, list_id } }) }
+  async openGoal(id: string) {
+    const goal = this.state?.following_goals?.find(goal => goal.id === id)
+    if (!goal) throw new Error("This goal is no longer available. Refresh Following before opening it.")
+    if (goal.status !== "active") throw new Error("Resume this goal before opening its conversation.")
+    if (!await this.navigate("/goals")) return false
+    const panel = this.state?.panel, row = panel?.rows?.findIndex(row => row.identity === id) ?? -1
+    if (!panel?.id || panel.title !== "Ongoing goals" || row < 0) throw new Error("This goal changed or is unavailable. Refresh Following and select it again.")
+    // Reuse the canonical picker and its live panel digest. Equal-looking goals
+    // never select each other, and opening one does not start a task or check.
+    await this.send({ type: "panel", panel: { id: panel.id, action: "activate", row } })
+    return true
+  }
+  async prepareGoalCheck(id: string) {
+    const goal = this.state?.following_goals?.find(goal => goal.id === id)
+    if (!goal || goal.status !== "active") throw new Error("Refresh Following and choose an active goal before setting up its check.")
+    // Busy conversations open the existing isolated management owner. Go then
+    // reads the selected goal, rather than inheriting that owner's workspace.
+    if (!await this.navigate("/followup")) return false
+    if (this.state?.running) throw new Error("Wait for the check management view to open.")
+    const request_id = randomUUID()
+    await this.result({ type: "check", check: { request_id, action: "setup", id } }, request_id, state => state.check_result)
+    this.route = "chat"; this.emit("change")
+    return true
+  }
   async navigate(text: string) {
-    if (/^\/(exit|quit)$/.test(text.trim()) && this.requestQuit) { await this.requestQuit(); return }
-    if (!await this.mayLeave()) return
+    if (/^\/(exit|quit)$/.test(text.trim()) && this.requestQuit) { await this.requestQuit(); return true }
+    if (!await this.mayLeave()) return false
     this.emit("navigation")
-    if (text === "/chat") { if (this.state?.panel) await this.send({ type: "navigate", text: "/chat" }); this.route = "chat"; this.emit("change"); return }
-    if (text === "/following" || text === "/saved" || text === "/settings") { this.route = text === "/following" ? "following" : text === "/saved" ? "saved" : "settings"; this.emit("change"); return }
-    if (this.isLocalCommand(text)) { this.emit("action", text.slice(1)); return }
+    if (text === "/chat") { if (this.state?.panel) await this.send({ type: "navigate", text: "/chat" }); this.route = "chat"; this.emit("change"); return true }
+    if (text === "/following" || text === "/saved" || text === "/settings") { this.route = text === "/following" ? "following" : text === "/saved" ? "saved" : "settings"; this.emit("change"); return true }
+    if (this.isLocalCommand(text)) { this.emit("action", text.slice(1)); return true }
     this.route = "chat"; this.emit("change"); await this.send({ type: "navigate", text })
+    return true
   }
   async result<T extends { request_id: string; error?: string }>(frame: FrontendFrame, requestID: string, read: (state: BackendState) => T | undefined): Promise<T> {
     return this.observe(state => {

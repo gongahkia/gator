@@ -7,8 +7,76 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/followup"
+	"github.com/gongahkia/gator/internal/goal"
+	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/workhome"
 )
+
+func TestCommitmentSetupUsesTheFreshGoalWithoutRetargetingTheConversation(t *testing.T) {
+	current, target := t.TempDir(), t.TempDir()
+	record := goal.Record{ID: "goal-selected", Title: "Same title", Context: "Track accessibility changes", SourcePath: target, ConversationID: "work-goal", Status: goal.Active}
+	writes := 0
+	m := New(Config{BridgeMode: true, CurrentFolder: current, Goals: []goal.Record{{ID: record.ID, SourcePath: "/stale/source"}},
+		ReadChecks: func() ([]workhome.Check, bool, error) { return nil, false, nil },
+		ListGoals: func() ([]goal.Record, error) {
+			return []goal.Record{{ID: "goal-other", Title: record.Title, SourcePath: current, Status: goal.Active}, record}, nil
+		},
+		SaveFollowup: func(followup.Draft) (goal.Record, jobs.Definition, error) {
+			writes++
+			return goal.Record{}, jobs.Definition{}, nil
+		},
+	})
+	m.conversation, m.goalID = "work-current", "goal-current"
+	beforeSource := m.source
+	next, command := m.ApplyBridgeCheck(BridgeCheckAction{RequestID: "setup-1", ID: record.ID, Action: "setup"})
+	if command == nil {
+		t.Fatal("missing setup read")
+	}
+	next, _ = next.(Model).Update(command())
+	m = next.(Model)
+	if m.followupForm == nil || m.followupForm.Review || m.followupSaving || m.bridgeCheckResult.Error != "" {
+		t.Fatalf("setup failed: %+v", m.bridgeCheckResult)
+	}
+	draft := m.followupForm.Draft
+	if draft.GoalID != record.ID || draft.SourcePath != target || draft.Title != record.Title || draft.Outcome != record.Context || draft.OriginConversationID != record.ConversationID {
+		t.Fatalf("setup used a different goal or source: %+v", draft)
+	}
+	if writes != 0 || m.source != beforeSource || m.conversation != "work-current" || m.goalID != "goal-current" {
+		t.Fatal("opening setup saved or retargeted the original conversation")
+	}
+}
+
+func TestCommitmentSetupRejectsUnavailableGoalsAndAlwaysClearsBusyState(t *testing.T) {
+	for _, scenario := range []string{"missing", "paused", "read failed", "unavailable"} {
+		t.Run(scenario, func(t *testing.T) {
+			m := New(Config{BridgeMode: true, CurrentFolder: t.TempDir(), ReadChecks: func() ([]workhome.Check, bool, error) { return nil, false, nil },
+				ListGoals: func() ([]goal.Record, error) {
+					if scenario == "read failed" {
+						return nil, errors.New("goal store unavailable")
+					}
+					if scenario == "missing" {
+						return nil, nil
+					}
+					return []goal.Record{{ID: "goal-selected", Status: goal.Paused}}, nil
+				}, SaveFollowup: func(followup.Draft) (goal.Record, jobs.Definition, error) {
+					t.Fatal("setup saved a check")
+					return goal.Record{}, jobs.Definition{}, nil
+				},
+			})
+			if scenario == "unavailable" {
+				m.config.SaveFollowup = nil
+			}
+			next, command := m.ApplyBridgeCheck(BridgeCheckAction{RequestID: "setup-2", ID: "goal-selected", Action: "setup"})
+			if command != nil {
+				next, _ = next.(Model).Update(command())
+			}
+			m = next.(Model)
+			if m.followupSaving || m.followupForm != nil || m.bridgeCheckResult.Error == "" {
+				t.Fatalf("unsafe or stuck setup: %+v", m.bridgeCheckResult)
+			}
+		})
+	}
+}
 
 func cardCheck(t *testing.T) workhome.Check {
 	t.Helper()

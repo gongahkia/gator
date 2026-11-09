@@ -3,8 +3,11 @@ package workapp
 import (
 	"fmt"
 	"regexp"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/gongahkia/gator/internal/followup"
+	"github.com/gongahkia/gator/internal/goal"
 )
 
 type BridgeCheckAction struct {
@@ -23,6 +26,7 @@ type bridgeCheckDone struct {
 	Action    BridgeCheckAction
 	Refreshed checksRefreshed
 	Err       error
+	Goal      *goal.Record
 }
 
 var bridgeCheckIdentity = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$`)
@@ -40,21 +44,44 @@ func (m Model) ApplyBridgeCheck(action BridgeCheckAction) (tea.Model, tea.Cmd) {
 	if !bridgeCheckRequest.MatchString(action.RequestID) || m.config.ReadChecks == nil {
 		return fail("Check controls are unavailable.")
 	}
-	if action.Action != "refresh" && action.Action != "inspect" && action.Action != "edit" && action.Action != "pause" && action.Action != "resume" {
+	if action.Action != "refresh" && action.Action != "setup" && action.Action != "inspect" && action.Action != "edit" && action.Action != "pause" && action.Action != "resume" {
 		return fail("Invalid check action.")
 	}
-	if action.Action == "refresh" && (action.ID != "" || action.Digest != "") || action.Action != "refresh" && (!bridgeCheckIdentity.MatchString(action.ID) || !bridgeCheckDigest.MatchString(action.Digest)) {
+	if action.Action == "refresh" && (action.ID != "" || action.Digest != "") || action.Action == "setup" && (!bridgeCheckIdentity.MatchString(action.ID) || action.Digest != "") || action.Action != "refresh" && action.Action != "setup" && (!bridgeCheckIdentity.MatchString(action.ID) || !bridgeCheckDigest.MatchString(action.Digest)) {
 		return fail("Review the current check before changing it.")
 	}
 	if m.running || m.followupSaving || m.controlBusy || m.bridgeExternal != nil || m.followupForm != nil {
 		return fail("Finish the current operation before managing this check.")
 	}
+	if action.Action == "setup" && (m.config.ListGoals == nil || m.config.SaveFollowup == nil) {
+		return fail("Goal check setup is unavailable.")
+	}
 	m.followupSaving = true
-	read, setEnabled := m.config.ReadChecks, m.config.SetCheckEnabled
+	read, setEnabled, readGoals := m.config.ReadChecks, m.config.SetCheckEnabled, m.config.ListGoals
 	return m, func() tea.Msg {
 		checks, online, err := read()
 		result := bridgeCheckDone{Action: action, Refreshed: checksRefreshed{Checks: checks, Running: online, Err: err}, Err: err}
 		if err != nil || action.Action == "refresh" {
+			return result
+		}
+		if action.Action == "setup" {
+			records, err := readGoals()
+			if err != nil {
+				result.Err = fmt.Errorf("couldn't read this goal: %w", err)
+				return result
+			}
+			for _, record := range records {
+				if record.ID != action.ID {
+					continue
+				}
+				if record.Status != goal.Active {
+					result.Err = fmt.Errorf("resume this goal before creating its check")
+					return result
+				}
+				result.Goal = &record
+				return result
+			}
+			result.Err = fmt.Errorf("this goal no longer exists; refresh Following")
 			return result
 		}
 		for _, check := range checks {
@@ -106,6 +133,31 @@ func (m Model) finishBridgeCheck(value bridgeCheckDone) (tea.Model, tea.Cmd) {
 	m.bridgeCheckResult = &BridgeCheckResult{RequestID: value.Action.RequestID}
 	if value.Err != nil {
 		m.bridgeCheckResult.Error = value.Err.Error()
+		return m, nil
+	}
+	if value.Action.Action == "setup" {
+		if value.Goal == nil || value.Goal.ID != value.Action.ID {
+			m.bridgeCheckResult.Error = "The selected goal is unavailable."
+			return m, nil
+		}
+		draft, err := followup.New(value.Goal.SourcePath, value.Goal.ID)
+		if err != nil {
+			m.bridgeCheckResult.Error = err.Error()
+			return m, nil
+		}
+		draft.Title = value.Goal.Title
+		if strings.TrimSpace(value.Goal.Context) != "" {
+			draft.Outcome = value.Goal.Context
+		}
+		draft.OriginConversationID = value.Goal.ConversationID
+		if draft.OriginConversationID == "" {
+			draft.OriginConversationID = m.config.ViewOriginConversationID
+		}
+		if draft.OriginConversationID == "" {
+			draft.OriginConversationID = m.conversation
+		}
+		m.followupForm = &followupForm{Draft: draft}
+		m.section, m.launcher, m.home, m.sectionNotice = "followup", false, false, ""
 		return m, nil
 	}
 	if value.Action.Action == "inspect" || value.Action.Action == "edit" {

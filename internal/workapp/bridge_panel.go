@@ -186,6 +186,9 @@ func (m Model) bridgeLauncherPanel() uisnapshot.Panel {
 				}
 			}
 		} else if item.kind == "goal" {
+			// Titles and even source folders can match. Keep the exact goal in
+			// the reviewed panel identity so stale rows cannot open a peer.
+			row.Identity = item.id
 			for _, goal := range m.config.Goals {
 				if goal.ID == item.id {
 					row.Source = goal.SourcePath

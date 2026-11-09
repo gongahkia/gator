@@ -133,7 +133,7 @@ export function useProductActions(controls: ReturnType<typeof useActions>) {
       details("Code changes", [change.status, ...change.verification.map(check => `${check.passed ? "Passed" : "Failed"}: ${check.argv.join(" ")}`), change.truncated ? "Showing part of the retained patch." : "", change.patch].filter(Boolean).join("\n\n"))
     } }))))
   }
-  async function checkAction(check: FollowingCheck | undefined, action: CheckAction["action"]) {
+  async function checkAction(check: FollowingCheck | undefined, action: Exclude<CheckAction["action"], "setup">) {
     // Managed views have their own owner while a foreground task is busy.
     // The existing session host keeps that task and its approval in place.
     if (client.state?.running) await client.navigate("/followup")
@@ -149,8 +149,8 @@ export function useProductActions(controls: ReturnType<typeof useActions>) {
     menu(check.title, [
       { title: "Inspect agreement and check health", description: check.issue || check.health, run: () => checkAction(exact(), "inspect") },
       { title: "Edit outcome, sources and timing", description: check.editable ? "Review changes before saving" : "This schedule uses advanced settings; open /jobs", disabled: !check.editable, run: () => checkAction(exact(), "edit") },
-      { title: check.enabled ? "Pause this check" : "Resume this check", description: check.state === "goal paused" ? "Resume the goal first" : check.enabled ? "Stops future checks; a running check may finish" : "Uses the same saved agreement and existing service",
-        disabled: !check.enabled && check.state === "goal paused", run: () => {
+      { title: check.enabled ? "Pause this check" : "Resume this check", description: check.state === "goal paused" ? "Resume the goal first" : !check.enabled && check.state === "ended" ? "Review a new end date before resuming" : check.enabled ? "Stops future checks; a running check may finish" : "Uses the same saved agreement and existing service",
+        disabled: !check.enabled && ["goal paused", "ended"].includes(check.state), run: () => {
           const value = exact(), pause = value.enabled
           confirm(`${pause ? "Pause" : "Resume"} ${value.title}?`, [value.outcome, `Sources: ${[value.source, ...(value.connectors ?? [])].filter(Boolean).join(", ") || "None"}`, `Timing: ${value.schedule} · ${value.timezone}`, pause ? "Future checks will stop. A check already running may finish. Its retained results remain available." : "Resume future checks using this saved agreement. This does not start the local service or run a check immediately. Checks require this computer to be awake and their sources accessible."].join("\n\n"), async () => {
             await checkAction(value, pause ? "pause" : "resume")
@@ -158,6 +158,7 @@ export function useProductActions(controls: ReturnType<typeof useActions>) {
           })
         } },
       { title: "Review local service", run: () => client.navigate("/recovery") },
+      ...(check.goal_id ? [{ title: "Goal and plan", description: "Open this commitment's own conversation", run: () => client.openGoal(check.goal_id!) }] : []),
     ], true)
   }
   return { commitment, refreshChecks: () => checkAction(undefined, "refresh") }

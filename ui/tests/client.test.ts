@@ -16,6 +16,27 @@ async function fixture() {
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>(done => { resolve = done }); return { resolve, promise } }
 afterEach(async () => { for (const client of clients.splice(0)) { if (client.host instanceof FixtureHost) client.host.closeIssue = ""; await client.close() }; for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }) })
 
+test("goal cards select the exact frozen picker row, retain drafts and respect cancelled navigation", async () => {
+  const { host, client } = await fixture()
+  host.current = { ...state(), following_goals: [{id: "goal-one", title: "Same title", status: "active"}, {id: "goal-two", title: "Same title", status: "active"}, {id: "goal-paused", title: "Paused", status: "paused"}] }
+  await client.start(); await client.edit("Keep goal-card draft")
+  host.dispatch = async frame => {
+    if (frame.type === "navigate") host.change({ ...host.current, panel: { id: "a".repeat(64), kind: "picker", title: "Ongoing goals", rows: [{label: "Same title", identity: "goal-two"}, {label: "Same title", identity: "goal-one"}] } })
+  }
+  expect(await client.openGoal("goal-one")).toBe(true)
+  expect(host.sent.at(-1)).toEqual({ type: "panel", panel: { id: "a".repeat(64), action: "activate", row: 1 } })
+  expect(client.draft.text).toBe("Keep goal-card draft")
+  const sent = host.sent.length
+  client.navigationGuard = async () => false
+  expect(await client.openGoal("goal-two")).toBe(false); expect(host.sent).toHaveLength(sent)
+  client.navigationGuard = undefined
+  await expect(client.openGoal("goal-paused")).rejects.toThrow("Resume this goal")
+  await expect(client.openGoal("missing")).rejects.toThrow("no longer available"); expect(host.sent).toHaveLength(sent)
+  host.dispatch = async () => { host.change({ ...host.current, panel: { id: "b".repeat(64), kind: "picker", title: "Ongoing goals", rows: [{ label: "Same title", identity: "goal-two" }] } }) }
+  await expect(client.openGoal("goal-one")).rejects.toThrow("changed or is unavailable")
+  expect(host.sent.at(-1)).toEqual({ type: "navigate", text: "/goals" })
+})
+
 test("draft loads keep their original chat identity and never overwrite newer input", async () => {
   const { host, client } = await fixture(), first = deferred<DraftSnapshot>(), second = deferred<DraftSnapshot>()
   let reads = 0
