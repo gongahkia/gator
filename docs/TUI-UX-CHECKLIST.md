@@ -6,7 +6,7 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 
 | # | Acceptance criteria | Status | Evidence / commit |
 |---|---|---|---|
-| 1 | Conversation remains available during execution; ordinary messages can steer a specific live task or start independent work; ambiguous routing is clarified without losing task identity, files, or drafts. | In progress | `92cd471f4`/`485cd007c` plus result continuity: ordinary messages reply, steer, clarify, delegate and stop specific independent owners without moving focus. Recent original-task summaries reach follow-up conversation, new work and planning even after work finishes/restarts; they confer no controls. Files/context and durable results survive return/restart; explicit queues remain available. Controlled-provider native and Go checks pass. Plan-bound/pending-review corrections, delegated exact approvals, broader failure/retry/account/goal journeys and live-model routing quality remain to verify/finish. |
+| 1 | Conversation remains available during execution; ordinary messages can steer a specific live task or start independent work; ambiguous routing is clarified without losing task identity, files, or drafts. | In progress | `92cd471f4`/`485cd007c` plus result continuity: ordinary messages reply, steer, clarify, delegate and stop specific independent owners without moving focus. Preparing/reviewed plans can now be cancelled conversationally through their original owner; changed control epochs are rejected. Recent original-task summaries reach follow-up conversation, new work and planning after work finishes/restarts; they confer no controls. Files/context and durable results survive return/restart; explicit queues remain available. Controlled-provider native and Go checks pass. Plan-bound/pending-review corrections, delegated exact approvals, broader failure/retry/account/goal journeys and live-model routing quality remain to verify/finish. |
 | 2 | Following unifies commitments with outcome/state/next action, next and last successful checks, sources/timezone, pause/edit, and truthful foreground/service/offline limits. | In progress | `4b9edf091`/`a95289265`: commitment cards and exact check controls. Active goal cards open their exact canonical picker row and prepare a check for that goal's current workspace, including duplicate titles, other-chat origins and busy owners. Focused Go/host/native integration checks pass. Advanced non-project schedule editing and paused-goal controls remain; final integrated journey pending. |
 | 3 | Relevant answers expose supplied memory/provenance/correction; noise feedback offers a reviewed, scoped check/notification change and reports its actual outcome. | Pending | |
 | 4 | First task leads through only missing setup; host connectivity and model readiness are distinct; local/cloud processing, capabilities, and work budget are explained. | Pending | |
@@ -45,7 +45,24 @@ finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
 
-- Native snapshot subscription correction (10 November): repeated full backend
+- Conversational plan cancellation (`acc45f9e4`, 10 November; the changes were
+  included in the user's local commit while verification was underway): preparing, review and approved
+  undispatched plans are projected by their actual native owner. Ordinary stop
+  messages use the existing canonical plan cancellation and revision/digest CAS;
+  they cannot steer a reviewed plan, cancel a replacement revision, or stop an
+  unrelated owner. Host-only control epochs also bind ordinary guidance to the
+  operation seen during routing. The owner confirms a cancelled-plan receipt
+  before the conversation says no implementation started; cancellation survives
+  restart without reviving work. Full Go workapp/workrun/worksession checks pass;
+  host session checks: 16 pass; native conversation/plan journeys: 2 pass and 82
+  assertions, including all four composer sizes and restart. These use a real Go
+  runtime and controlled HTTP model; no physical account/model validation is
+  claimed. Logs: `/tmp/gator-ux-20261110-plan-stop-{final-go,host}.log` and
+  `/tmp/gator-ux-20261110-field-subscriptions-native.log`. Conversational plan
+  correction, pending exact-action changes, and the remaining item 1 journeys
+  are still open; cancellation is not evidence that those are complete.
+
+- Native snapshot subscription correction (`1759f95d1`, 10 November): repeated full backend
   snapshots could leave a native frame rendering while the backend continued
   responding; the ordinary conversation journey stalled and eventually lost its
   test connection. A single renderer-owned data provider now selects immutable
