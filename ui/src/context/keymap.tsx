@@ -19,6 +19,7 @@ import {
   createMemo,
   createSignal,
   onCleanup,
+  onMount,
   useContext,
   type Accessor,
   type ParentProps,
@@ -57,6 +58,7 @@ const Context = createContext<{
   readonly mode: Mode
   readonly dispatch: (id: string, input?: string) => void
   readonly input: (id: string) => string | undefined
+  readonly shortcuts: Accessor<ReturnType<typeof shortcutProjection>>
 }>()
 
 function Provider(props: ParentProps<{ config?: KeymapConfig }>) {
@@ -64,6 +66,23 @@ function Provider(props: ParentProps<{ config?: KeymapConfig }>) {
   const config: KeymapConfig = props.config ?? useConfig().data
   const keymap = createDefaultOpenTuiKeymap(renderer)
   const mode = createMode(keymap)
+  // Several always-mounted widgets show configurable hints. Formatting every
+  // command separately for each widget on every registry event makes ordinary
+  // typing and menu navigation needlessly expensive.
+  const [shortcutRevision, setShortcutRevision] = createSignal(0)
+  let stopShortcutUpdates: (() => void) | undefined
+  onMount(() => {
+    stopShortcutUpdates = keymap.on("state", () => setShortcutRevision(value => value + 1))
+    setShortcutRevision(value => value + 1)
+  })
+  const shortcuts = createMemo<ReturnType<typeof shortcutProjection>>((previous) => {
+    shortcutRevision()
+    try { return shortcutProjection(keymap, config) }
+    catch (error) {
+      if (previous && error instanceof Error && error.message === "Cannot use a keymap after its host was destroyed") return previous
+      throw error
+    }
+  })
   let invocation: { readonly id: string; readonly input?: string } | undefined
   const dispatch = (id: string, input?: string) => {
     const previous = invocation
@@ -144,6 +163,7 @@ function Provider(props: ParentProps<{ config?: KeymapConfig }>) {
     )
   }
   onCleanup(() => {
+    stopShortcutUpdates?.()
     dispose.reverse().forEach((item) => item())
     mode.dispose()
   })
@@ -156,6 +176,7 @@ function Provider(props: ParentProps<{ config?: KeymapConfig }>) {
           mode,
           dispatch,
           input: (id) => (invocation?.id === id ? invocation.input : undefined),
+          shortcuts,
         }}
       >
         {props.children}
@@ -273,27 +294,29 @@ function groupCommands(commands: readonly KeymapCommand[] = []) {
   )
 }
 
+function shortcutProjection(keymap: OpenTuiKeymap, config: KeymapConfig) {
+  const commands = keymap.getCommands({ visibility: "registered" }).map((command) => command.name)
+  const bindings = keymap.getCommandBindings({ visibility: "registered", commands })
+  const formatting = formatOptions(config)
+  return new Map(
+    commands.map((id) => {
+      const current = bindings.get(id) ?? []
+      return [
+        id,
+        {
+          first: formatKeySequence(current[0]?.sequence, formatting),
+          all: formatCommandBindings(current, formatting),
+          list: current
+            .map((binding) => formatKeySequence(binding.sequence, formatting))
+            .filter((shortcut): shortcut is string => shortcut !== undefined),
+        },
+      ]
+    }),
+  )
+}
+
 function useShortcuts() {
-  const value = useValue()
-  const shortcuts = useKeymapSelector((keymap) => {
-    const commands = keymap.getCommands({ visibility: "registered" }).map((command) => command.name)
-    const bindings = keymap.getCommandBindings({ visibility: "registered", commands })
-    return new Map(
-      commands.map((id) => {
-        const current = bindings.get(id) ?? []
-        return [
-          id,
-          {
-            first: formatKeySequence(current[0]?.sequence, formatOptions(value.config)),
-            all: formatCommandBindings(current, formatOptions(value.config)),
-            list: current
-              .map((binding) => formatKeySequence(binding.sequence, formatOptions(value.config)))
-              .filter((shortcut): shortcut is string => shortcut !== undefined),
-          },
-        ]
-      }),
-    )
-  })
+  const { shortcuts } = useValue()
   return {
     get(id: string) {
       return shortcuts().get(id)?.first

@@ -45,7 +45,21 @@ finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
 
-- Explicit keyboard queue (10 November): Tab submits the current owner's draft
+- Shared shortcut projection (10 November): the six always-mounted keyboard-hint
+  consumers and palette each formatted the complete registered command map on
+  registry changes. The renderer now shares one immutable projection, subscribes
+  after initial layer registration, and formats common options once per map.
+  The unchanged command-completion test passes in 3,141 ms with its original
+  5,000 ms deadline; pre-queue baseline in an isolated checkout passed in
+  4,521 ms, while the new queue build previously exceeded 5,000 ms. These are
+  individual diagnostic timings, not a calibrated long-history benchmark.
+  Combined commands, composer, exact approvals, all four queue sizes, and legacy/
+  enhanced Ctrl remaps: 11 pass, 188 assertions in 11.54 seconds. Typecheck passes.
+  Logs: `/tmp/gator-ux-20261110-shared-shortcuts-{verified,typecheck}.log`.
+  Earlier command failures remain recorded; their relevant rerun now passes.
+  A full terminal regression run is still required after this correction.
+
+- Explicit keyboard queue (`6dae42b1c`, 10 November): Tab submits the current owner's draft
   through the established durable queue, with its exact files, update reply and
   plan mode. Enter continues the ordinary conversation/correction router; Ctrl+G
   remains direct guidance. No task picker or automatic chat switch substitutes
@@ -60,9 +74,10 @@ finished after only the terminal phase or a mobile scaffold.
   1 pass, 24 assertions; a queued private file reaches only its intended owner.
   Go config/controller checks and TUI typecheck pass. Logs:
   `/tmp/gator-ux-20261110-tab-queue-{controls-final,concurrent,config,settings-go,verified-typecheck}.log`.
-  The broader controls run still fails the existing default 5-second command
-  completion test (also reproduced alone); it must be resolved before a clean
-  full regression claim. No deadline has been increased and no check removed.
+  The broader controls run initially failed the existing default 5-second command
+  completion test (also reproduced alone); the shared shortcut projection above
+  resolves the relevant rerun. Full regression remains required. No deadline
+  has been increased and no check removed.
 
 - Conversational plan cancellation (`acc45f9e4`, 10 November; the changes were
   included in the user's local commit while verification was underway): preparing, review and approved
