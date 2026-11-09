@@ -31,6 +31,18 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
   physical terminal interaction, and live model/account verification.
 - Track blockers precisely; continue independent items. Do not mark the goal complete with missing criteria.
 
+## Queued follow-on: mobile access
+
+The user's 9 November follow-up requests mobile research and implementation
+**after these fifteen criteria are finished**. The recommendation and researched
+implementation scope are in [mobile access](MOBILE-ACCESS-RESEARCH.md): reuse the
+existing optional companion for a responsive/installable PWA; keep Telegram as an
+optional messaging channel. The terminal remains the primary local application,
+with no Electron restoration. This does not replace or narrow any row above.
+Mobile implementation is queued; research is not implementation or completion.
+Preserve both phases across continuations and do not declare the expanded work
+finished after only the terminal phase or a mobile scaffold.
+
 ## Verification journal
 
 - Start: working tree clean; HEAD `7750df414`; no repository/ancestor AGENTS.md found.
