@@ -62,6 +62,28 @@ test("an unconfirmed background admission or control is reported and never autom
   }finally{await sessions.stop()}
 });
 
+test("plan cancellation reports the original owner's confirmed receipt without moving focus", async () => {
+  const parent = new DialogueWorker("parent"), child = new DialogueWorker("child");
+  const sessions = new Sessions(request => request.conversation_id === "child" ? child : parent);
+  try {
+    await sessions.open();
+    parent.change({ running: true, dialogue_dispatch: { sequence: 1, kind: "task", turn_id: "plan-turn", child_id: "child" } });
+    await sessions.settled();
+    child.controlDialogue = async control => { child.controls.push(control); return { request_id: control.request_id, cancelled_plan: true }; };
+    parent.change({ dialogue_dispatch: { sequence: 2, kind: "stop", turn_id: "stop-plan", child_id: "child", target_run: "exact-plan-revision" } });
+    await sessions.settled();
+    assert.deepEqual(parent.results.at(-1), { turn_id: "stop-plan", child_id: "child", cancelled_plan: true });
+    assert.equal(child.controls.at(-1).run_id, "exact-plan-revision");
+    assert.equal(sessions.current, parent);
+    assert.equal(parent.state.running, true);
+    child.controlDialogue = async () => { throw new Error("Plan revision changed"); };
+    parent.change({ dialogue_dispatch: { sequence: 3, kind: "stop", turn_id: "stale-stop", child_id: "child", target_run: "stale-plan-revision" } });
+    await sessions.settled();
+    assert.match(parent.results.at(-1).error, /Plan revision changed/);
+    assert.equal(parent.results.at(-1).cancelled_plan, undefined);
+  } finally { await sessions.stop(); }
+});
+
 test("managed navigation waits for the new owner's applied view and preserves original execution", async () => {
   const original = new Worker("original"), view = new Worker("view");
   let release, applied;

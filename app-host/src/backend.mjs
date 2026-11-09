@@ -78,6 +78,7 @@ export class Backend extends EventEmitter {
     const result = this.state?.dialogue_control_result;
     if (result?.request_id !== dialogue_control.request_id) throw new Error("The task control was not confirmed. Inspect the original task before trying again.");
     if (result.error) throw new Error(result.error);
+    return result;
   }
   finishDialogue(dialogue_result) { return this.#apply({ version: 1, type: "dialogue_result", dialogue_result }); }
 

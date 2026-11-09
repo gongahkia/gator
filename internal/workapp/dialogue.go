@@ -54,9 +54,10 @@ type DialogueDispatch struct {
 	Instruction string `json:"instruction,omitempty"`
 }
 type DialogueDispatchResult struct {
-	TurnID  string `json:"turn_id"`
-	ChildID string `json:"child_id"`
-	Error   string `json:"error,omitempty"`
+	TurnID        string `json:"turn_id"`
+	ChildID       string `json:"child_id"`
+	CancelledPlan bool   `json:"cancelled_plan,omitempty"`
+	Error         string `json:"error,omitempty"`
 }
 type DialogueControl struct {
 	ParentID    string `json:"parent_id"`
@@ -67,9 +68,10 @@ type DialogueControl struct {
 	Instruction string `json:"instruction,omitempty"`
 }
 type DialogueControlResult struct {
-	RequestID string `json:"request_id"`
-	Error     string `json:"error,omitempty"`
-	control   DialogueControl
+	RequestID     string `json:"request_id"`
+	CancelledPlan bool   `json:"cancelled_plan,omitempty"`
+	Error         string `json:"error,omitempty"`
+	control       DialogueControl
 }
 type conversationRouted struct {
 	Conversation string
@@ -88,6 +90,11 @@ func (m Model) conversationActive() bool {
 	}
 	if m.running || len(m.dialogueTurns) > 0 || m.planPreparing != "" || m.dialogueRouting != "" || len(m.dialogueQueue) > 0 || m.dialogueOtherBusy {
 		return true
+	}
+	for _, request := range m.requests.Requests {
+		if _, ok := m.localConversationTask(request); ok {
+			return true
+		}
 	}
 	for _, peer := range m.dialoguePeers {
 		if peer.State == "running" || peer.State == "review" || peer.State == "queued" {
@@ -185,19 +192,20 @@ func boundedConversation(text string, limit int) string {
 func (m Model) conversationTasks() []workrun.ConversationTask {
 	var tasks []workrun.ConversationTask
 	seen := map[string]bool{}
-	if m.running && m.activeRequest != "" {
-		for _, request := range m.requests.Requests {
-			if request.ID == m.activeRequest {
-				state := "running"
-				if m.interaction != nil {
-					state = "waiting for review"
-				}
-				if m.cancelling {
-					state = "stopping"
-				}
-				tasks = append(tasks, workrun.ConversationTask{ID: request.ID, Title: boundedConversation(request.Text, 256), State: state, CanGuide: m.bridgeGuidanceID() != "" && m.interaction == nil && !m.cancelling, CanStop: m.cancel != nil && !m.cancelling})
+	// The executing owner comes first, followed by its undispatched reviews.
+	for _, request := range m.requests.Requests {
+		if request.ID == m.activeRequest {
+			if task, ok := m.localConversationTask(request); ok {
+				tasks = append(tasks, task)
 				seen[request.ID] = true
-				break
+			}
+		}
+	}
+	for _, request := range m.requests.Requests {
+		if !seen[request.ID] && len(tasks) < 16 {
+			if task, ok := m.localConversationTask(request); ok {
+				tasks = append(tasks, task)
+				seen[request.ID] = true
 			}
 		}
 	}
@@ -210,7 +218,7 @@ func (m Model) conversationTasks() []workrun.ConversationTask {
 			if err != nil || turn.TaskChat != peer.ConversationID {
 				continue
 			}
-			tasks = append(tasks, workrun.ConversationTask{ID: peer.ConversationID, Title: boundedConversation(turn.Text, 256), State: peer.State, CanGuide: peer.CanGuide && peer.RunID != "", CanStop: peer.CanStop && peer.RunID != ""})
+			tasks = append(tasks, workrun.ConversationTask{ID: peer.ConversationID, Title: boundedConversation(turn.Text, 256), State: peer.State, Summary: boundedConversation(peer.Summary, 2048), CanGuide: peer.CanGuide && peer.RunID != "", CanStop: peer.CanStop && peer.RunID != "", ControlID: peer.RunID})
 			seen[peer.ConversationID] = true
 		}
 	}
@@ -403,6 +411,23 @@ func (m Model) finishConversationRoute(value conversationRouted) (tea.Model, tea
 	if err := value.Decision.Validate(current); err != nil {
 		return m.failConversation(turn, "The task or available controls changed while Gator considered this message. Send a new message after reviewing its current state.")
 	}
+	var controlID string
+	if value.Decision.Kind == "guide" || value.Decision.Kind == "stop" {
+		for _, task := range value.Request.Tasks {
+			if task.ID == value.Decision.Target {
+				controlID = task.ControlID
+			}
+		}
+		matched := false
+		for _, task := range current.Tasks {
+			if task.ID == value.Decision.Target && controlID != "" && task.ControlID == controlID {
+				matched = true
+			}
+		}
+		if !matched {
+			return m.failConversation(turn, "That task's operation or reviewed plan changed while Gator considered your message. No task was changed. Review its current state before trying again.")
+		}
+	}
 	decision, _ := json.Marshal(value.Decision)
 	turn.Decision = decision
 	if value.Decision.Kind == "reply" || value.Decision.Kind == "clarify" {
@@ -443,11 +468,12 @@ func (m Model) finishConversationRoute(value conversationRouted) (tea.Model, tea
 		m.dialogueIssue = err.Error()
 		return m.startConversationRoute()
 	}
-	if value.Decision.Target == m.activeRequest {
+	if m.ownsConversationTask(value.Decision.Target) {
+		cancelledPlan := false
 		if value.Decision.Kind == "guide" {
 			err = m.operation.Steer(value.Decision.Instruction)
 		} else {
-			m.interruptRun()
+			cancelledPlan, err = m.stopConversationTask(value.Decision.Target, controlID)
 		}
 		if err != nil {
 			return m.failConversation(turn, err.Error())
@@ -455,6 +481,9 @@ func (m Model) finishConversationRoute(value conversationRouted) (tea.Model, tea
 		turn.State, turn.Response = "guided", "I passed that correction to the running task."
 		if value.Decision.Kind == "stop" {
 			turn.State, turn.Response = "stopped", "I'm stopping that task. Any external action already in progress may still need its receipt checked."
+			if cancelledPlan {
+				turn.Response = "I cancelled that plan. No implementation was started."
+			}
 		}
 		if _, err := m.saveDialogue(turn); err != nil {
 			m.dialogueIssue = "The control was accepted, but its receipt could not be confirmed. Do not replay it automatically: " + err.Error()
@@ -464,7 +493,7 @@ func (m Model) finishConversationRoute(value conversationRouted) (tea.Model, tea
 	for _, peer := range m.dialoguePeers {
 		if peer.ConversationID == value.Decision.Target {
 			m.dialogueSequence++
-			m.dialogueDispatch = &DialogueDispatch{Sequence: m.dialogueSequence, Kind: value.Decision.Kind, TurnID: turn.ID, ChildID: peer.ConversationID, TargetRun: peer.RunID, Instruction: value.Decision.Instruction}
+			m.dialogueDispatch = &DialogueDispatch{Sequence: m.dialogueSequence, Kind: value.Decision.Kind, TurnID: turn.ID, ChildID: peer.ConversationID, TargetRun: controlID, Instruction: value.Decision.Instruction}
 			return m, nil
 		}
 	}
@@ -491,6 +520,9 @@ func (m Model) FinishDialogueDispatch(result DialogueDispatchResult) (tea.Model,
 		turn.State, turn.Response = "guided", "I passed that correction to the selected task."
 	case "stop":
 		turn.State, turn.Response = "stopped", "I'm stopping the selected task. Retained results and external-action receipts remain available."
+		if result.CancelledPlan {
+			turn.Response = "I cancelled the selected plan. No implementation was started."
+		}
 	default:
 		return m.failConversation(turn, "Unknown task dispatch result.")
 	}

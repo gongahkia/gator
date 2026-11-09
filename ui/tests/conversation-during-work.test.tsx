@@ -112,3 +112,92 @@ test("ordinary messages converse, steer an original task and delegate work witho
   }catch(error){process.stderr.write("JOURNEY FAILED: "+String(error)+"\n"+JSON.stringify({work:work.length,routes:routes.length,peers:client.state?.dialogue_peers})+"\n");throw new Error(String(error)+"\n"+JSON.stringify({issue:client.issue,state:client.state,work:work.length,routes:routes.length})+"\n"+setup.captureCharFrame())}
   finally{releaseMain();releaseChild();releaseStop();await client.close();if(!setup.renderer.isDestroyed)await setup.dispose();server.stop(true);warning.mockRestore();await rm(root,{recursive:true,force:true})}
 },60000)
+
+test("ordinary conversation cancels a preparing plan and a delegated review through their exact native owners", async () => {
+  const root = await mkdtemp(join(tmpdir(), "gator-dialogue-plans-"))
+  let releasePreparation!: () => void
+  const preparationGate = new Promise<void>(resolve => { releasePreparation = resolve })
+  let plans = 0, executions = 0
+  const routes: any[] = []
+  const server = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(request) {
+    const body = await request.json() as any
+    const system = body.messages.find((message: any) => message.role === "system")?.content || ""
+    let content = ""
+    if (system.includes("You handle the conversation with Gator")) {
+      const context = JSON.parse(body.messages.at(-1).content); routes.push(context)
+      content = JSON.stringify(context.message.startsWith("Cancel")
+        ? { kind: "stop", target: context.tasks.find((task: any) => task.title === (context.message.includes("venue") ? "Compare venues" : "Compare trains")).id }
+        : { kind: "task" })
+    } else if (system.includes("Propose a plan")) {
+      plans++
+      if (plans === 1) await preparationGate
+      content = JSON.stringify({ outcome: "A reviewed train comparison", steps: [{ id: "compare", text: "Compare options within the original scope" }], sources: [], effects: ["read"] })
+    } else { executions++; content = "Unexpected implementation" }
+    return Response.json({ choices: [{ message: { role: "assistant", content }, finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 10 } })
+  } })
+  const binary = process.env.GATOR_TEST_BINARY || resolve(import.meta.dir, "../runtime/" + (process.platform === "win32" ? "gator-runtime.exe" : "gator-runtime"))
+  const env = { ...process.env, GATOR_STATE_DIR: join(root, "state"), GATOR_CONFIG_DIR: join(root, "config") }
+  const cli = (args: string[]) => execFileSync(binary, args, { env: { ...env, GATOR_INTERNAL_COMMANDS: "1" } })
+  cli(["provider", "add", "plan-dialogue-fixture", "--base-url", `http://127.0.0.1:${server.port}/v1/chat/completions`, "--model", "fixture"])
+  cli(["config", "set", "default-provider", "plan-dialogue-fixture"])
+  const options = { binary, env, userData: join(root, "app"), workspace: join(root, "workspace") }
+  const client = new GatorClient(new Application(options))
+  const setup = await testRender(() => <App client={client} quit={() => client.close()} clipboard={{ read: async () => ({ data: "", mime: "text/plain" }), write: async () => {} }} />, { width: 110, height: 34 })
+  const flush = async () => { await setup.flush(); await Bun.sleep(30); await setup.flush() }
+  const plan = async (text: string) => {
+    await client.navigate("/plan-first"); await flush(); await setup.mockInput.typeText("Prepare a plan"); setup.mockInput.pressEnter(); await flush()
+    await client.edit(text); await client.submit()
+  }
+  const send = async (text: string) => {
+    await client.edit(text); await client.submit(); await until(() => !client.state?.dialogue_busy, text)
+    if (client.state?.dialogue?.at(-1)?.issue) throw new Error(client.state.dialogue.at(-1)!.issue)
+    await flush()
+  }
+  let parent = "", child = ""
+  try {
+    await client.start(); await flush(); await client.send({ type: "submit", text: "/mode inspect" })
+    parent = client.state!.conversation_id!
+    await plan("Compare venues")
+    await until(() => plans === 1 && client.state?.task_plans?.[0]?.phase === "preparing", "preparing plan")
+    await send("Cancel the venue plan")
+    await until(() => !client.state?.running, "cancelled planner stopped")
+    expect(client.state?.dialogue?.at(-1)?.state).toBe("stopped")
+    expect(client.state?.dialogue?.at(-1)?.response).toContain("No implementation was started")
+    expect(client.state?.task_plans?.[0]?.state).toBe("discarded")
+    expect(routes[0].tasks[0].can_stop).toBe(true)
+    expect(routes[0].tasks[0].can_guide).toBe(false)
+    expect(routes[0].tasks[0].control_id).toBeUndefined()
+    releasePreparation()
+    await plan("Compare trains")
+    await until(() => !client.state?.dialogue_busy, "independent plan admitted")
+    child = client.state!.dialogue!.at(-1)!.task_chat!
+    await until(() => !!client.state?.dialogue_peers?.some(peer => peer.conversation_id === child && peer.summary?.includes("reviewed train comparison") && peer.can_stop), "independent plan awaiting exact review")
+    expect(child).toBeTruthy(); expect(child).not.toBe(parent)
+    expect(client.state?.conversation_id).toBe(parent)
+    await send("Cancel the train plan")
+    await until(() => client.state?.dialogue_peers?.find(peer => peer.conversation_id === child)?.state === "stopped", "original plan owner cancelled")
+    expect(client.state?.dialogue?.at(-1)?.state).toBe("stopped")
+    expect(client.state?.dialogue?.at(-1)?.response).toContain("No implementation was started")
+    expect(executions).toBe(0)
+    await client.edit("Keep my next question")
+    for (const [width, height] of [[110, 34], [80, 24], [60, 20], [42, 14]]) {
+      setup.resize(width, height); await flush()
+      expect(setup.captureCharFrame()).toContain("Keep my next question")
+      expect(setup.captureCharFrame()).not.toContain("[object Object]")
+    }
+    const journal = JSON.parse(await readFile(join(env.GATOR_STATE_DIR, "gator/conversations", child, "requests.json"), "utf8"))
+    expect(journal.requests).toHaveLength(1); expect(journal.requests[0].state).toBe("discarded")
+    expect(journal.requests[0].plan.approval).toBeUndefined()
+    expect(journal.requests[0].options.DialogueParent).toBe(parent)
+    await client.close(); await setup.dispose()
+    const count = plans + routes.length
+    const restarted = new GatorClient(new Application(options))
+    try {
+      await restarted.start(); expect(restarted.state?.conversation_id).toBe(parent)
+      await until(() => restarted.state?.dialogue_peers?.some(peer => peer.conversation_id === child) || false, "retained cancellation")
+      expect(restarted.state?.dialogue_peers?.find(peer => peer.conversation_id === child)?.state).toBe("stopped")
+      expect(restarted.draft.text).toBe("Keep my next question")
+      expect(plans + routes.length).toBe(count); expect(executions).toBe(0)
+    } finally { await restarted.close() }
+  } finally { releasePreparation(); await client.close(); if (!setup.renderer.isDestroyed) await setup.dispose(); server.stop(true); await rm(root, { recursive: true, force: true }) }
+}, 60000)

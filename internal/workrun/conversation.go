@@ -23,6 +23,9 @@ type ConversationTask struct {
 	Summary  string `json:"summary,omitempty"`
 	CanGuide bool   `json:"can_guide"`
 	CanStop  bool   `json:"can_stop"`
+	// ControlID is a host-only epoch for the projected operation or exact plan.
+	// It is never supplied by the model or retained as execution authority.
+	ControlID string `json:"-"`
 }
 
 type ConversationMessage struct {

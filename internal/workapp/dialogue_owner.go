@@ -59,19 +59,24 @@ func (m Model) dialogueTaskState() *DialogueTaskState {
 			return result
 		}
 		result.State = r.State
+		if r.State == "discarded" {
+			result.State = "stopped"
+			if r.Plan != nil {
+				result.Summary = "Plan cancelled before implementation."
+			}
+		}
 		if r.Plan != nil && r.State == "queued" {
 			result.State = "review"
+		}
+		if task, ok := m.localConversationTask(r); ok {
+			result.RunID, result.CanGuide, result.CanStop = task.ControlID, task.CanGuide, task.CanStop
+			result.Summary = task.Summary
 		}
 		if r.ID == m.activeRequest && m.running {
 			result.State = "running"
 			if m.interaction != nil {
 				result.State = "review"
 			}
-			if m.operation != nil {
-				result.RunID = m.operation.RunID
-			}
-			result.CanGuide = result.RunID != "" && m.bridgeGuidanceID() != "" && m.interaction == nil && !m.cancelling
-			result.CanStop = result.RunID != "" && m.cancel != nil && !m.cancelling
 		}
 		if !r.Pending() {
 			if r.RevisionID != "" {
@@ -109,7 +114,13 @@ func (m Model) retainedDialoguePeer(turn worksession.DialogueTurn) *DialoguePeer
 		if r.ClientID == turn.ID {
 			if !r.Pending() {
 				peer.State = r.State
+				if r.State == "discarded" {
+					peer.State = "stopped"
+				}
 				peer.Summary = boundedConversation(r.Issue, 8192)
+				if peer.Summary == "" && r.State == "discarded" && r.Plan != nil {
+					peer.Summary = "Plan cancelled before implementation."
+				}
 				if r.RevisionID != "" {
 					if revision, err := m.config.SessionStore.LoadRevision(turn.TaskChat, r.RevisionID); err == nil {
 						peer.Summary = boundedConversation(revision.FinalText, 8192)
@@ -238,7 +249,21 @@ func (m Model) ControlDialogue(control DialogueControl) Model {
 		if !state.CanStop || control.Instruction != "" {
 			return fail("this task cannot be stopped by this control")
 		}
-		m.interruptRun()
+		found := false
+		for _, r := range m.requests.Requests {
+			if r.ClientID == state.TurnID {
+				var err error
+				result.CancelledPlan, err = m.stopConversationTask(r.ID, control.RunID)
+				if err != nil {
+					return fail(err.Error())
+				}
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fail("the original task admission is unavailable")
+		}
 	default:
 		return fail("unknown task control")
 	}

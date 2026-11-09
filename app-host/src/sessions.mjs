@@ -100,7 +100,8 @@ export class Sessions extends EventEmitter {
 				const owner = [...this.workers].find(worker => !worker.closed && worker.state?.conversation_id === request.child_id);
 				const origin = owner?.state?.dialogue_task;
 				if (!origin || origin.parent_id !== parent.state.conversation_id) throw new Error("The original task owner is unavailable; inspect it before sending another control.");
-				await owner.controlDialogue({ parent_id: origin.parent_id, turn_id: origin.turn_id, request_id: request.turn_id, run_id: request.target_run, action: request.kind, instruction: request.instruction || "" });
+				const receipt = await owner.controlDialogue({ parent_id: origin.parent_id, turn_id: origin.turn_id, request_id: request.turn_id, run_id: request.target_run, action: request.kind, instruction: request.instruction || "" });
+				if (receipt?.cancelled_plan === true && request.kind === "stop") result.cancelled_plan = true;
 			} else throw new Error("Unknown conversation task request.");
 		} catch (error) { result.error = error.message; }
 		// Never repeat an unconfirmed bootstrap/control. The original owner retains
