@@ -11,6 +11,7 @@ class Worker extends EventEmitter {
   async ready() {}
   async focus(foreground) { this.focuses.push(foreground); this.change({ foreground, session_request: undefined }); }
   send(frame) { this.frames.push(frame); }
+  async apply(frame) { this.send(frame); }
   change(patch) { this.state = { ...this.state, ...patch }; this.emit("state", this.state); }
   async stop() { this.closed = true; this.emit("closed"); }
   async prepareUpdate() { await this.stop(); }
@@ -19,6 +20,34 @@ const setup = () => {
   let count = 0;
   return new Sessions(request => new Worker(request.conversation_id || `chat-${++count}`));
 };
+
+test("managed navigation waits for the new owner's applied view and preserves original execution", async () => {
+  const original = new Worker("original"), view = new Worker("view");
+  let release, applied;
+  const gate = new Promise(resolve => { release = resolve; }), dispatched = new Promise(resolve => { applied = resolve; });
+  view.apply = async frame => { view.send(frame); applied(); await gate; view.change({panel: {title: "Ongoing goals"}}); };
+  const sessions = new Sessions(request => request.view ? view : original);
+  await sessions.open(); original.change({running: true, pending_approval: {id: 7, token: "original-only"}});
+  let finished = false;
+  const opening = sessions.open({view: "/goals"}).then(() => { finished = true; });
+  await dispatched;
+  assert.equal(finished, false); assert.equal(sessions.switching, true); assert.equal(view.state.panel, undefined);
+  assert.equal(original.state.running, true); assert.equal(original.state.pending_approval.token, "original-only");
+  release(); await opening;
+  assert.equal(sessions.current, view); assert.equal(view.state.panel.title, "Ongoing goals"); assert.equal(sessions.switching, false);
+  assert.deepEqual(original.frames, []); await sessions.stop();
+});
+
+test("a failed managed view acknowledgement retires only the new view and restores the original owner", async () => {
+  const original = new Worker("original"), failed = new Worker("failed");
+  failed.apply = async () => { throw new Error("view was not confirmed"); };
+  const sessions = new Sessions(request => request.view ? failed : original);
+  await sessions.open(); original.change({running: true, queued: 2});
+  await assert.rejects(sessions.open({view: "/goals"}), /not confirmed/);
+  assert.equal(sessions.current, original); assert.equal(original.state.foreground, true); assert.equal(original.state.running, true); assert.equal(original.state.queued, 2);
+  assert.equal(failed.closed, true); assert.equal(sessions.workers.size, 1); assert.equal(sessions.switching, false);
+  await sessions.stop();
+});
 
 test("direct ancestry navigation uses only the current owner's exact parent even when idle", async () => {
   const sessions = setup(); await sessions.open(); const parent = sessions.current;

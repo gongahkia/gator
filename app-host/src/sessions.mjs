@@ -72,18 +72,21 @@ export class Sessions extends EventEmitter {
       if (this.#stopping) throw new Error("Gator is closing.");
       this.switching = true; this.issue = ""; this.emit("change");
       const previous = this.current;
-      let next;
+      let next, created = false;
       try {
         if (previous && !previous.closed) await previous.focus(false);
         next = [...this.workers].find(worker => !worker.closed && request.conversation_id && (request.goal ? worker.state?.goal_id === request.conversation_id : worker.state?.conversation_id === request.conversation_id));
         if (request.view === "/connections") next ??= [...this.workers].find(worker => !worker.closed && worker.state?.pending_connection);
-        next ??= await this.#create(request);
+        if (!next) { next = await this.#create(request); created = true; }
         await next.focus(true);
         this.current = next;
         this.#unread.delete(next.state?.conversation_id);
-        if (request.view) next.send({ type: "navigate", text: request.view });
-        else if (next.state?.panel) next.send({ type: "navigate", text: "/chat" });
+        if (request.view) await next.apply({ type: "navigate", text: request.view });
+        else if (next.state?.panel) await next.apply({ type: "navigate", text: "/chat" });
       } catch (error) {
+        if (created && next && next !== previous) {
+          this.#retiring.add(next); await next.stop(); this.workers.delete(next);
+        } else if (next && next !== previous && !next.closed) await next.focus(false).catch(() => {});
         if (previous && !previous.closed) await previous.focus(true).catch(() => {});
         this.current = previous; this.issue = error.message;
         throw error;

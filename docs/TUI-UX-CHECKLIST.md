@@ -15,12 +15,12 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 | 7 | Input and useful transcript remain visible at 110×34, 80×24, 60×20, 42×14 with combined attachments/reply/plan/slash states and multiline drafts. | Implemented; final journey pending | `204386564`; `composer-budget.test.tsx`: 8 file names + plan/reply + multiline input and slash completion, ≥4 transcript rows at all four sizes. |
 | 8 | Approval surface shows exact live action/account/destination/content/consequences; long reviews scroll; changed/stale tokens cannot execute; edits require fresh review. | Implemented; final journey pending | `8ba3a9cb8`; `approval-review.test.tsx`: four sizes, scrolling/exact data, stale and missing previews; `approvals.test.tsx`: real Go token protection and controlled connected send. |
 | 9 | Root command search includes local/backend descriptions/names/aliases, grouped browsing remains usable, and commands requiring values have meaningful typed controls. | In progress | `5f54f7f17`; root search and common permission/theme/source/attachment controls verified in `commands.test.tsx`. Remaining advanced command families still expose explicit advanced syntax; typed controls remain required. |
-| 10 | Back restores menu/filter/selection, draft and reading position consistently; backend pages and file workflows retain context; rail marks the active page. | Pending | |
+| 10 | Back restores menu/filter/selection, draft and reading position consistently; backend pages and file workflows retain context; rail marks the active page. | In progress | Host-managed navigation now waits for the Go view acknowledgement; a failed new view is retired and original work/focus is restored. Delayed/failing acknowledgement unit tests pass. Menu/filter/selection/back restoration across all flows remains open; active-page rail tests already pass. |
 | 11 | Ctrl+C cancels/stops without implicit quit; Ctrl+Q quits through guards; help/hints reflect configured bindings; no function-key shortcuts are introduced. | In progress | Idle stop/draft preservation, explicit quit, remapped help/composer/rail verified; voice/approval/contextual hints remain for later slices. |
 | 12 | Disconnected/error states offer contextual reconnect/recovery with intact drafts/request identity; safe admission retries and uncertain external effects stay distinct. | Implemented; final journey pending | `d00952219`; `interaction-recovery.test.tsx`: real Go accepted request + lost acknowledgement retries once, reconnect keeps draft/owner, no model replay; receipts tests preserve unknown external outcomes. |
 | 13 | New-content/latest/catch-up affordances preserve stable reading anchors across navigation/restart; long-history rendering is benchmarked and optimized when justified. | In progress | Reproducible native benchmark and reports in `docs/benchmarks/`; unchanged entries retain DOM identity across complete Go snapshots. 5,000-message append improved 4,051→747 ms in single samples. Startup/scroll remain too slow; bounded rendering, persistent anchors, catch-up/latest UI still required. |
 | 14 | Voice has direct record/stop/cancel/transcribe/edit flow, visible processing destination and explicit consent; transcript is editable before sending. | Implemented; final journey pending | `09e74ef39`; `voice-controls.test.tsx`: all four sizes, native VoiceSession with controlled capture/transcription, route/chat consent, changed-route rejection, editable draft/no send, recording/transcription cancellation. Physical audio remains unverified on this host. |
-| 15 | Shared native typography/spacing/selection/focus/disabled treatments and readable summaries work with terminal colors, NO_COLOR and reduced motion; exact technical details remain inspectable. | In progress | Markdown cleanup destroys native consumers before their borrowed syntax style, including theme changes. Delayed-highlighting regression and previously warning-producing real-Go followup journey pass without warnings. Shared visual/state audit and full acceptance journey remain. |
+| 15 | Shared native typography/spacing/selection/focus/disabled treatments and readable summaries work with terminal colors, NO_COLOR and reduced motion; exact technical details remain inspectable. | In progress | `20e9b7cde`: Markdown cleanup destroys native consumers before their borrowed syntax style, including theme changes. Delayed-highlighting regression and previously warning-producing real-Go followup journey pass without warnings. Shared visual/state audit and full acceptance journey remain. |
 
 ## Implementation rules
 
@@ -153,3 +153,21 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
   journeys also pass three consecutive focused repetitions each (six tests);
   a full run with per-file global isolation is being investigated, without
   changing timeouts or dropping checks. The broad-run timeout cause is still open.
+
+- Per-file-isolation verification at `12176a315`: the complete native TUI suite
+  passed with `bun test --isolate --preload ./scripts/preload.ts tests`:
+  82 pass, three unchanged platform/opt-in skips, no failures and no syntax-style
+  warnings. All 85 tests and their existing deadlines/assertions were retained.
+  The default shared-global run's two timeouts remain recorded above; this result
+  suggests fixture lifetime/state interference but does not establish its cause.
+
+- Host navigation race: a busy owner's managed view previously returned after
+  focus, before its Go navigation frame had been applied. Dependent actions could
+  inspect an empty/startup panel and fail even though the requested page appeared
+  afterward. The session host now waits for `action_applied` before resolving
+  opening or clearing a view. A failed new view is retired, restoring the original
+  owner's focus without moving its task, queue or approval. Delayed/failing view
+  acknowledgement tests and the real-Go busy-owner/goal navigation journey pass.
+  Full host regression: 113 pass, one platform skip. Unisolated pages/recovery/
+  followup-chat rerun: three pass, with unchanged test deadlines.
+  General back/filter/selection restoration remains unfinished (item 10).
