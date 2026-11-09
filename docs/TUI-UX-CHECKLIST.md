@@ -45,6 +45,20 @@ finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
 
+- Context-specific overlay reset (10 November): the first broad terminal run
+  after field/shortcut sharing found that an output preview could remain open
+  after a chat change. That reset had depended on reading an entire snapshot
+  for invalidation. It now observes an explicit memoized conversation context;
+  repeated work ticks do not reset dialogs, while an actual context change
+  closes the old preview and keeps the original chat's draft. Work details,
+  shared data, exact approvals, navigation and rail checks: 7 pass, 110
+  assertions; typecheck passes. The broad run recorded 92 pass / 3 existing
+  skips / 2 fail (97 tests): the preview regression and the new context assertion
+  loaded against the already-running process's cached pre-fix provider. It is
+  not a clean final regression result. Both cases pass in the fresh focused run:
+  `/tmp/gator-ux-20261110-context-reset-{native,typecheck}.log`. A fresh complete
+  run of the committed code follows; no checks were skipped or weakened.
+
 - Shared shortcut projection (10 November): the six always-mounted keyboard-hint
   consumers and palette each formatted the complete registered command map on
   registry changes. The renderer now shares one immutable projection, subscribes

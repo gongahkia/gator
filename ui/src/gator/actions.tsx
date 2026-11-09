@@ -22,8 +22,7 @@ export function useActions() {
   const client = useClient(), dialog = useDialog(), data = useData(), hint = useKeyHints()
   let previousContext = client.context
   createEffect(() => {
-    data.snapshot
-    const context = client.context
+    const context = data.context
     if (context !== previousContext) { previousContext = context; dialog.clear() }
   })
   const attempt = (operation: unknown, label = "Working…") => { if (operation instanceof Promise) void client.track(label, operation).catch(e => client.fail(e)) }

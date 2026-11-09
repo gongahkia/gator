@@ -32,7 +32,8 @@ function createData() {
   }
   const state = fields<BackendState>(() => client.state), snapshot = fields(() => client.snapshot)
   const present = createMemo(() => { revision(); return client.state !== undefined })
-  return { get progress() { revision(); return [...client.operations.values()].reverse().find(operation => operation.context === client.context)?.label },
+  const context = createMemo(() => { revision(); return client.context })
+  return { get context() { return context() }, get progress() { revision(); return [...client.operations.values()].reverse().find(operation => operation.context === client.context)?.label },
     get admitting() { revision(); return client.pending.has(client.context) },
     get state() { return present() ? state : undefined }, get snapshot() { return snapshot },
     get activityExpanded() { revision(); return client.activityExpanded }, get voiceDestination() { revision(); return client.voiceDestination },
