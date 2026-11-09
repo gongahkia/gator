@@ -7,7 +7,7 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 | # | Acceptance criteria | Status | Evidence / commit |
 |---|---|---|---|
 | 1 | Conversation remains available during execution; ordinary messages can steer a specific live task or start independent work; ambiguous routing is clarified without losing task identity, files, or drafts. | In progress | Tool-free conversation router and independent paged turn store implemented; identity/capability validation, active-operation independence, idempotent admission and versioned dispatch tests pass. Not yet wired to ordinary composer submissions or background task delegation. |
-| 2 | Following unifies commitments with outcome/state/next action, next and last successful checks, sources/timezone, pause/edit, and truthful foreground/service/offline limits. | Pending | |
+| 2 | Following unifies commitments with outcome/state/next action, next and last successful checks, sources/timezone, pause/edit, and truthful foreground/service/offline limits. | In progress | Native commitment cards group goals with their checks; exact-ID/digest controls reuse canonical inspection, reviewed edits, and persisted pause/resume. Four-size fixtures and real Go create/inspect/pause/resume/edit/stale/restart/busy-owner journeys pass. Advanced non-project schedule editing and exact goal-card navigation remain; final integrated journey pending. |
 | 3 | Relevant answers expose supplied memory/provenance/correction; noise feedback offers a reviewed, scoped check/notification change and reports its actual outcome. | Pending | |
 | 4 | First task leads through only missing setup; host connectivity and model readiness are distinct; local/cloud processing, capabilities, and work budget are explained. | Pending | |
 | 5 | Workspace/account/source scope is inspectable near input; conversational/manual settings agree, including terminal preferences, with confirmed outcomes. | Pending | |
@@ -101,3 +101,25 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
   accepted guidance acknowledgements, parent/child result routing with original scope,
   restart/pruning retention, and real protocol/UI tests. Do not substitute auto-switching
   to another chat or a queue/guide picker as the completed conversational experience.
+
+- Following commitment slice (builds on `444ed2e87`): native cards combine goal
+  outcome/status with associated check health, next action/time, last successful
+  check, selected sources and timezone. Standalone checks appear once; goals with
+  no check explicitly say so. Service errors remain visible above the scrolling
+  cards, and stale service observations are not reported as verified online.
+  Readable local-service/sleep/foreground limits are available from the same page.
+  Pause/resume binds the exact saved agreement under the jobs-store lock;
+  changed agreements and expired resumes are rejected. A saved change followed
+  by a failed health refresh explicitly reports that partial outcome.
+  `go test ./internal/workapp ./internal/jobs` passes. Host policy: 17 pass.
+  TUI typecheck passes; Following/hubs/work-details/pages/followup-chat/navigation:
+  10 pass. Four-size native fixtures cover selection, controls and cancellation.
+  `following-integration.test.tsx` passes against real Go: reviewed creation,
+  inspection, pause/resume persistence, stale digest rejection, reviewed edit,
+  management while another owner runs, draft retention and restart without replay.
+  The model is controlled for the busy-owner check; this is not live-model quality
+  verification or an always-on service test. Advanced schedules still expose a
+  disabled edit choice and require typed management (items 2/9); unscheduled goal
+  actions still open the goals list rather than the exact selected goal (item 2/10).
+  NativeSyntaxStyle teardown warnings reproduced in followup-chat; item 15 remains
+  open and the warnings are not treated as a successful highlighting fallback.

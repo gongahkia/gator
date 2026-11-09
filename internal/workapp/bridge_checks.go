@@ -2,6 +2,7 @@ package workapp
 
 import (
 	"fmt"
+	"regexp"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -24,6 +25,10 @@ type bridgeCheckDone struct {
 	Err       error
 }
 
+var bridgeCheckIdentity = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$`)
+var bridgeCheckRequest = regexp.MustCompile(`^[a-zA-Z0-9-]{1,64}$`)
+var bridgeCheckDigest = regexp.MustCompile(`^[a-f0-9]{64}$`)
+
 // Card controls use the same check store/forms as the existing application.
 // No renderer fields can change an agreement or select unchecked execution.
 func (m Model) ApplyBridgeCheck(action BridgeCheckAction) (tea.Model, tea.Cmd) {
@@ -32,13 +37,13 @@ func (m Model) ApplyBridgeCheck(action BridgeCheckAction) (tea.Model, tea.Cmd) {
 		m.bridgeCheckResult = &BridgeCheckResult{RequestID: action.RequestID, Error: text}
 		return m, nil
 	}
-	if action.RequestID == "" || len(action.RequestID) > 64 || m.config.ReadChecks == nil {
+	if !bridgeCheckRequest.MatchString(action.RequestID) || m.config.ReadChecks == nil {
 		return fail("Check controls are unavailable.")
 	}
 	if action.Action != "refresh" && action.Action != "inspect" && action.Action != "edit" && action.Action != "pause" && action.Action != "resume" {
 		return fail("Invalid check action.")
 	}
-	if action.Action == "refresh" && (action.ID != "" || action.Digest != "") || action.Action != "refresh" && (action.ID == "" || len(action.ID) > 96 || len(action.Digest) != 64) {
+	if action.Action == "refresh" && (action.ID != "" || action.Digest != "") || action.Action != "refresh" && (!bridgeCheckIdentity.MatchString(action.ID) || !bridgeCheckDigest.MatchString(action.Digest)) {
 		return fail("Review the current check before changing it.")
 	}
 	if m.running || m.followupSaving || m.controlBusy || m.bridgeExternal != nil || m.followupForm != nil {
@@ -61,6 +66,10 @@ func (m Model) ApplyBridgeCheck(action BridgeCheckAction) (tea.Model, tea.Cmd) {
 				result.Err = fmt.Errorf("this check changed; refresh and review it again")
 				return result
 			}
+			if action.Action == "edit" && !check.Definition.GoalWatch {
+				result.Err = fmt.Errorf("this schedule uses advanced settings; open /jobs to edit it")
+				return result
+			}
 			if action.Action == "pause" || action.Action == "resume" {
 				if setEnabled == nil {
 					result.Err = fmt.Errorf("check changes are unavailable")
@@ -74,6 +83,13 @@ func (m Model) ApplyBridgeCheck(action BridgeCheckAction) (tea.Model, tea.Cmd) {
 				if result.Err == nil {
 					result.Refreshed.Checks, result.Refreshed.Running, result.Refreshed.Err = read()
 					result.Err = result.Refreshed.Err
+					if result.Err != nil {
+						verb := "paused"
+						if action.Action == "resume" {
+							verb = "enabled"
+						}
+						result.Err = fmt.Errorf("check %s, but refreshed health is unavailable: %w", verb, result.Err)
+					}
 				}
 			}
 			return result
@@ -101,6 +117,9 @@ func (m Model) finishBridgeCheck(value bridgeCheckDone) (tea.Model, tea.Cmd) {
 			m.section, m.checkDetail, m.selected, m.launcher, m.home = "followup", &copy, 0, false, false
 			if value.Action.Action == "edit" {
 				m.editFollowup()
+				if m.followupForm == nil {
+					m.bridgeCheckResult.Error = m.sectionNotice
+				}
 			}
 			break
 		}

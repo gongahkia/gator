@@ -3,6 +3,13 @@ import assert from "node:assert/strict";
 import { assetPath, externalURL, shellQuote, validateFrame } from "../src/policy.mjs";
 import { resolve, join } from "node:path";
 
+test("commitment controls accept only current identities, never replacement policy or execution", () => {
+  const check = {request_id: "review-1", id: "job-one", digest: "a".repeat(64), action: "pause"};
+  for (const action of ["inspect", "edit", "pause", "resume"]) assert.equal(validateFrame({type: "check", check: {...check, action}}).version, 1);
+  assert.equal(validateFrame({type: "check", check: {request_id: "refresh-1", action: "refresh"}}).version, 1);
+  for (const change of [{id: "../job"}, {id: ""}, {digest: "old"}, {digest: "A".repeat(64)}, {request_id: ""}, {action: "run"}, {action: "refresh"}, {source: "/other"}, {enabled: true}, {connector_ids: ["other"]}, {approved: true}]) assert.throws(() => validateFrame({type: "check", check: {...check, ...change}}));
+});
+
 test("specialist controls accept bounded actions without renderer-supplied authority", () => {
   const specialist = { id: "subagent-001", token: "a".repeat(64), request_id: "guide-one", action: "guide", text: "Use primary sources" };
   assert.equal(validateFrame({ type: "specialist", specialist }).version, 1);

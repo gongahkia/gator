@@ -20,7 +20,7 @@ test("compact hubs reveal selected destinations and reset selection when switchi
     expect(scroll.scrollTop).toBeGreaterThan(0); expect(setup.captureCharFrame()).toContain("› About and updates")
     setup.resize(42, 14); await flush(); expect(setup.captureCharFrame()).toContain("› About and updates")
     setup.mockInput.pressEnter(); await flush(); expect(setup.captureCharFrame()).toContain("About Gator terminal"); setup.mockInput.pressEscape(); await flush()
-    await client.navigate("/following"); await flush(); expect(setup.captureCharFrame()).toContain("› Ongoing goals")
+    await client.navigate("/following"); await flush(); expect(setup.captureCharFrame()).toContain("› Goals and plans")
     setup.mockInput.pressEnter(); await flush(); expect(host.sent.at(-1)).toEqual({ type: "navigate", text: "/goals" })
     await client.navigate("/saved"); await flush(); setup.resize(42, 14); await flush()
     for (let i = 0; i < 6; i++) { setup.mockInput.pressArrow("down"); await flush() }

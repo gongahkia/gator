@@ -141,7 +141,7 @@ export function useProductActions(controls: ReturnType<typeof useActions>) {
     const request_id = randomUUID()
     const value: CheckAction = action === "refresh" ? { request_id, action } : { request_id, action, id: check!.id, digest: check!.digest }
     await client.result({ type: "check", check: value }, request_id, s => s.check_result)
-    if (action === "inspect" || action === "edit") { client.route = "chat"; client.emit("change") }
+    client.route = action === "inspect" || action === "edit" ? "chat" : "following"; client.emit("change")
   }
   function commitment(check: FollowingCheck) {
     const current = () => client.state?.checks?.find(item => item.id === check.id)
