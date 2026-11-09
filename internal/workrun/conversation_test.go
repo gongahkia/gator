@@ -158,6 +158,31 @@ func TestConversationCanAnswerWhileWorkWaitsAndOnlyGuidesItsOriginalOperation(t 
 	}
 }
 
+func TestConversationTaskResultsAreBoundedContextAndNeverLiveControlAuthority(t *testing.T) {
+	request := ConversationRequest{Text: "What did the brief say?", Tasks: []ConversationTask{{ID: "original-task", Title: "Read brief", State: "completed", Summary: "The brief says jade heron."}}}
+	backend := &conversationModel{turn: agent.Turn{Text: `{"kind":"reply","text":"The brief task found jade heron."}`}}
+	if _, err := RouteConversation(context.Background(), backend, request); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(backend.request.Messages[0].Content, "jade heron") {
+		t.Fatal("public result did not reach conversational context")
+	}
+	for _, kind := range []string{"guide", "stop"} {
+		decision := ConversationDecision{Kind: kind, Target: "original-task"}
+		if kind == "guide" {
+			decision.Instruction = "Change it"
+		}
+		if decision.Validate(request) == nil {
+			t.Fatal("completed result granted control", kind)
+		}
+	}
+	request.Tasks[0].Summary = strings.Repeat("x", 4097)
+	before := backend.calls
+	if _, err := RouteConversation(context.Background(), backend, request); err == nil || backend.calls != before {
+		t.Fatal("unbounded result reached provider")
+	}
+}
+
 func fmtConversationGuide(id string) string {
 	data, _ := json.Marshal(ConversationDecision{Kind: "guide", Target: id, Instruction: "Keep the comparison under $2,000."})
 	return string(data)

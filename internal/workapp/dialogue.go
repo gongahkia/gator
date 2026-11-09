@@ -24,6 +24,7 @@ type ConversationInput struct {
 	GoalID           string                        `json:"goal_id,omitempty"`
 	RunOptions       RunOptions                    `json:"run_options"`
 	Recent           []workrun.ConversationMessage `json:"recent,omitempty"`
+	TaskContext      []workrun.ConversationTask    `json:"task_context,omitempty"`
 	ScopeDigest      string                        `json:"scope_digest,omitempty"`
 	OAuthRefreshPins map[string]string             `json:"oauth_refresh_pins,omitempty"`
 }
@@ -85,7 +86,7 @@ func (m Model) conversationActive() bool {
 	if !m.conversationAvailable() {
 		return false
 	}
-	if m.running || m.planPreparing != "" || m.dialogueRouting != "" || len(m.dialogueQueue) > 0 || m.dialogueOtherBusy {
+	if m.running || len(m.dialogueTurns) > 0 || m.planPreparing != "" || m.dialogueRouting != "" || len(m.dialogueQueue) > 0 || m.dialogueOtherBusy {
 		return true
 	}
 	for _, peer := range m.dialoguePeers {
@@ -183,6 +184,7 @@ func boundedConversation(text string, limit int) string {
 }
 func (m Model) conversationTasks() []workrun.ConversationTask {
 	var tasks []workrun.ConversationTask
+	seen := map[string]bool{}
 	if m.running && m.activeRequest != "" {
 		for _, request := range m.requests.Requests {
 			if request.ID == m.activeRequest {
@@ -194,18 +196,42 @@ func (m Model) conversationTasks() []workrun.ConversationTask {
 					state = "stopping"
 				}
 				tasks = append(tasks, workrun.ConversationTask{ID: request.ID, Title: boundedConversation(request.Text, 256), State: state, CanGuide: m.bridgeGuidanceID() != "" && m.interaction == nil && !m.cancelling, CanStop: m.cancel != nil && !m.cancelling})
+				seen[request.ID] = true
 				break
 			}
 		}
 	}
 	for _, peer := range m.dialoguePeers {
 		if peer.State == "running" || peer.State == "review" || peer.State == "queued" {
+			if seen[peer.ConversationID] || len(tasks) >= 16 {
+				continue
+			}
 			turn, err := m.dialogueByID(peer.TurnID)
 			if err != nil || turn.TaskChat != peer.ConversationID {
 				continue
 			}
 			tasks = append(tasks, workrun.ConversationTask{ID: peer.ConversationID, Title: boundedConversation(turn.Text, 256), State: peer.State, CanGuide: peer.CanGuide && peer.RunID != "", CanStop: peer.CanStop && peer.RunID != ""})
+			seen[peer.ConversationID] = true
 		}
+	}
+	// Keep recent results inspectable by the conversational model as well as
+	// the human. Terminal outcomes never inherit a live control capability.
+	peers := map[string]DialoguePeer{}
+	for _, peer := range m.dialoguePeers {
+		peers[peer.ConversationID] = peer
+	}
+	for index := len(m.dialogueTurns) - 1; index >= 0 && len(tasks) < 16; index-- {
+		turn := m.dialogueTurns[index]
+		peer, ok := peers[turn.TaskChat]
+		if !ok || turn.TaskChat == "" || seen[turn.TaskChat] || peer.TurnID != turn.ID {
+			continue
+		}
+		current, err := m.dialogueByID(turn.ID)
+		if err != nil || current.TaskChat != peer.ConversationID {
+			continue
+		}
+		tasks = append(tasks, workrun.ConversationTask{ID: peer.ConversationID, Title: boundedConversation(current.Text, 256), State: peer.State, Summary: boundedConversation(peer.Summary, 2048)})
+		seen[peer.ConversationID] = true
 	}
 	return tasks
 }
@@ -282,7 +308,10 @@ func (m Model) admitConversation(request BridgeUploadSubmission, text string) (t
 	options.Uploads = append([]string(nil), request.Files...)
 	options.ReplyToUpdateID = request.ReplyToUpdateID
 	options.PlanFirst = request.PlanFirst
-	input := ConversationInput{Version: 1, Source: m.source, GoalID: m.goalID, RunOptions: retainedRunOptions(options), Recent: m.conversationRecent()}
+	input := ConversationInput{Version: 1, Source: m.source, GoalID: m.goalID, RunOptions: retainedRunOptions(options), Recent: m.conversationRecent(), TaskContext: m.conversationTasks()}
+	for index := range input.TaskContext {
+		input.TaskContext[index].CanGuide, input.TaskContext[index].CanStop = false, false
+	}
 	if m.config.CaptureConversationInput != nil {
 		var err error
 		input, err = m.config.CaptureConversationInput(input)

@@ -81,7 +81,7 @@ func (m Model) dialogueTaskState() *DialogueTaskState {
 			}
 			for i := len(m.messages) - 1; result.Summary == "" && i >= 0; i-- {
 				message := m.messages[i]
-				if message.role == "Gator" && message.text != "" && (r.RevisionID != "" && message.revisionID == r.RevisionID || r.RevisionID == "" && len(m.requests.Requests) == 1) {
+				if message.role == "Gator" && message.text != "" && (r.RevisionID != "" && message.revisionID == r.RevisionID || message.requestID == r.ID) {
 					result.Summary = boundedConversation(message.text, 8192)
 					break
 				}

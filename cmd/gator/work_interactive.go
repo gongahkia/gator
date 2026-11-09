@@ -765,11 +765,11 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 	if dialogue != nil {
 		request.OriginConversationID = options.DialogueParent
 		request.OAuthRefreshPins = dialogue.OAuthRefreshPins
-		data, err := json.Marshal(dialogue.Recent)
+		context, err := dialogueReferenceContext(dialogue)
 		if err != nil {
 			return workapp.RunResult{Error: err.Error()}
 		}
-		request.ConversationContext = string(data)
+		request.ConversationContext = context
 	}
 	parse := func(values []string) ([][]string, error) {
 		var result verificationFlags

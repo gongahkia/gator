@@ -6,7 +6,7 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 
 | # | Acceptance criteria | Status | Evidence / commit |
 |---|---|---|---|
-| 1 | Conversation remains available during execution; ordinary messages can steer a specific live task or start independent work; ambiguous routing is clarified without losing task identity, files, or drafts. | In progress | `92cd471f4` plus host/native integration: ordinary messages reply, steer, clarify, delegate and stop specific independent owners without moving focus. Files/context and durable results survive return/restart; explicit queues remain available. Real-Go controlled-provider native journey and core/race checks pass. Plan-bound/pending-review corrections, delegated exact approvals, broader failure/retry/account/goal journeys and live-model routing quality remain to verify/finish. |
+| 1 | Conversation remains available during execution; ordinary messages can steer a specific live task or start independent work; ambiguous routing is clarified without losing task identity, files, or drafts. | In progress | `92cd471f4`/`485cd007c` plus result continuity: ordinary messages reply, steer, clarify, delegate and stop specific independent owners without moving focus. Recent original-task summaries reach follow-up conversation, new work and planning even after work finishes/restarts; they confer no controls. Files/context and durable results survive return/restart; explicit queues remain available. Controlled-provider native and Go checks pass. Plan-bound/pending-review corrections, delegated exact approvals, broader failure/retry/account/goal journeys and live-model routing quality remain to verify/finish. |
 | 2 | Following unifies commitments with outcome/state/next action, next and last successful checks, sources/timezone, pause/edit, and truthful foreground/service/offline limits. | In progress | `4b9edf091`/`a95289265`: commitment cards and exact check controls. Active goal cards open their exact canonical picker row and prepare a check for that goal's current workspace, including duplicate titles, other-chat origins and busy owners. Focused Go/host/native integration checks pass. Advanced non-project schedule editing and paused-goal controls remain; final integrated journey pending. |
 | 3 | Relevant answers expose supplied memory/provenance/correction; noise feedback offers a reviewed, scoped check/notification change and reports its actual outcome. | Pending | |
 | 4 | First task leads through only missing setup; host connectivity and model readiness are distinct; local/cloud processing, capabilities, and work budget are explained. | Pending | |
@@ -344,3 +344,27 @@ finished after only the terminal phase or a mobile scaffold.
   bounded context does not yet include those task summaries, and an idle parent
   currently returns to direct Work admission after its last owner finishes.
   Verify/fix that boundary before claiming a continuous conversational experience.
+
+- Completed-task continuity: a conversation with retained dialogue now keeps its
+  conversational admission path after owners finish. The router receives bounded,
+  original-task summaries, with active owners prioritized and terminal results
+  carrying no guide/stop capability. New work captures those public references in
+  its immutable envelope; planning and execution share the same read-only context
+  projection, without replay, tool results or inherited approval/control authority.
+  Transient result text now also carries its internal admission identity, preventing
+  a later unrelated local message from replacing the original task's summary.
+  Core tests check bounds, identity, no inherited controls, idle follow-up admission
+  and no replay. A controlled native planning integration verifies the reference
+  reaches the configured model without executable tools or self-granted approval.
+  Full workapp/workrun/worksession checks pass. Expanded real-Go terminal journey
+  verifies a result question after all work finishes without starting another Work,
+  a new task with the original result as context and no silently inherited files,
+  and another result question after restart. That journey passes in a six-test
+  focused concurrency/recovery/plan regression, and passes again after the transient
+  result-identity fix (53 assertions). TUI typecheck passes. These are controlled
+  providers, not live-model/account or physical-phone evidence. The prior default
+  89-test green run predates this slice; final broad regression remains required.
+
+- Mobile follow-on research is recorded separately in `MOBILE-ACCESS-RESEARCH.md`
+  (`543a74e81`/`e13f60292`). No mobile implementation, deployment, account setup or
+  Telegram message was performed; it remains sequenced after all fifteen criteria.

@@ -81,6 +81,23 @@ func verifyConversationScope(input workapp.ConversationInput) error {
 	return nil
 }
 
+// Both planning and execution receive the same admitted public references.
+// Past task controls, tool replay and approval tokens are never inherited.
+func dialogueReferenceContext(input *workapp.ConversationInput) (string, error) {
+	if input == nil {
+		return "", nil
+	}
+	tasks := append([]workrun.ConversationTask(nil), input.TaskContext...)
+	for index := range tasks {
+		tasks[index].CanGuide, tasks[index].CanStop = false, false
+	}
+	data, err := json.Marshal(struct {
+		Messages []workrun.ConversationMessage `json:"messages,omitempty"`
+		Tasks    []workrun.ConversationTask    `json:"tasks,omitempty"`
+	}{input.Recent, tasks})
+	return string(data), err
+}
+
 func routeInteractiveConversation(stateDir string) func(context.Context, workrun.ConversationRequest, workapp.ConversationInput) (workrun.ConversationDecision, error) {
 	return func(ctx context.Context, request workrun.ConversationRequest, input workapp.ConversationInput) (workrun.ConversationDecision, error) {
 		if err := verifyConversationScope(input); err != nil {

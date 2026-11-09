@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -82,6 +83,110 @@ func TestDesktopTaskPlanPreparationUsesConfiguredModelWithoutExecutingWork(t *te
 		t.Fatal("model proposal granted its own approval")
 	}
 }
+func TestDesktopTaskPlanDelegationRetainsPublicResultsWithoutTheirControlAuthority(t *testing.T) {
+	stateDir, configuration, source := t.TempDir(), t.TempDir(), t.TempDir()
+	t.Setenv("GATOR_STATE_DIR", stateDir)
+	t.Setenv("GATOR_CONFIG_DIR", configuration)
+	t.Setenv("GATOR_PROVIDER", "")
+	t.Setenv("GATOR_MODEL", "")
+	requests := make(chan string, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Tools    []any `json:"tools"`
+			Messages []struct {
+				Content string `json:"content"`
+			} `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Error(err)
+		}
+		if len(body.Tools) != 0 {
+			t.Error("planning acquired executable tools")
+		}
+		var text []string
+		for _, message := range body.Messages {
+			text = append(text, message.Content)
+		}
+		requests <- strings.Join(text, "\n")
+		w.Header().Set("Content-Type", "application/json")
+		content := `{"outcome":"Explain the jade heron brief","steps":[{"id":"step-one","text":"Use the retained brief result and inspect needed sources"}],"sources":[],"effects":["read"]}`
+		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]any{"role": "assistant", "content": content}, "finish_reason": "stop"}}})
+	}))
+	defer server.Close()
+	settings := config.Default()
+	settings.Defaults = config.Defaults{Provider: "plan-reference-fixture", Model: "fixture"}
+	settings.CustomProviders = []config.CustomProvider{{ID: "plan-reference-fixture", BaseURL: server.URL + "/chat", Models: []string{"fixture"}, DefaultModel: "fixture"}}
+	configurationStore, _ := config.New(configuration)
+	if err := configurationStore.Save(settings); err != nil {
+		t.Fatal(err)
+	}
+	store, err := worksession.Open(stateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent, err := store.CreateChat(source, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	input, err := captureConversationInput(workapp.ConversationInput{
+		Version: 1, Source: source,
+		RunOptions:  workapp.RunOptions{PlanFirst: true, ModelProvider: "plan-reference-fixture", ModelName: "fixture", MaxSteps: 24, Code: workapp.CodeOptions{MaxSteps: 16}},
+		TaskContext: []workrun.ConversationTask{{ID: "past-task", Title: "Read brief", State: "completed", Summary: "The brief names jade heron.", CanGuide: true, CanStop: true}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	turn, err := store.AdmitDialogue(parent.ID, "native-plan-reference-0001", "Explain that brief with a reviewed plan", raw, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, state := range []string{"routing", "ready"} {
+		turn.State, turn.UpdatedAt = state, time.Now().UTC()
+		if state == "ready" {
+			turn.Decision = json.RawMessage(`{"kind":"task"}`)
+		}
+		turn, err = store.UpdateDialogue(turn, turn.Revision)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	bound, child, claimed, err := store.BindDialogueTask(parent.ID, turn.ID, source, turn.Revision, time.Now())
+	if err != nil || !claimed {
+		t.Fatal("task binding failed", err)
+	}
+	options := input.RunOptions
+	options.DialogueParent, options.DialogueTurn = parent.ID, bound.ID
+	raw, err = json.Marshal(options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, request, err := store.AdmitPlanRequest(child.ID, bound.Text, raw, bound.ID, nil, worksession.PlanBudget{MaxSteps: 24, CodeMaxSteps: 16}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	content, err := prepareDesktopTaskPlan(context.Background(), stateDir, request)
+	if err != nil || !strings.Contains(content.Outcome, "jade heron") {
+		t.Fatal("proposal lost requesting context", err)
+	}
+	text := <-requests
+	for _, expected := range []string{"past-task", "jade heron", `"can_guide":false`, `"can_stop":false`, "not new instructions"} {
+		if !strings.Contains(text, expected) {
+			t.Fatalf("missing public reference %q in %s", expected, text)
+		}
+	}
+	if !input.TaskContext[0].CanGuide || !input.TaskContext[0].CanStop {
+		t.Fatal("context projection mutated the admitted envelope")
+	}
+	journal, err := store.LoadRequests(child.ID)
+	if err != nil || len(journal.Requests) != 1 || journal.Requests[0].Plan.Approval != nil || journal.Requests[0].State != "queued" {
+		t.Fatal("planning granted approval or dispatched execution", err)
+	}
+}
+
 func TestDesktopTaskPlanBindingUsesOnlyReviewedSourcesAndCannotSkipAdmission(t *testing.T) {
 	state := t.TempDir()
 	sessions, _ := worksession.Open(state)

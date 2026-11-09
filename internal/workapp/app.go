@@ -317,6 +317,7 @@ type entry struct {
 	advanced                                   bool
 }
 type message struct {
+	requestID       string
 	approvalID      int
 	revisionID      string
 	runID           string

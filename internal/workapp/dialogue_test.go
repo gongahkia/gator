@@ -159,6 +159,33 @@ func TestDialogueTaskLaunchHasIndependentDurableAdmissionAndNoRetryReplay(t *tes
 	if state := child.dialogueTaskState(); state == nil || state.State != "completed" || state.Summary != "A retained result" {
 		t.Fatalf("result not attached to original task: %+v", state)
 	}
+	child.messages = append(child.messages, message{role: "Gator", text: "Unrelated settings changed."})
+	if state := child.dialogueTaskState(); state == nil || state.Summary != "A retained result" {
+		t.Fatal("a later local message replaced the original task result", state)
+	}
+	m.running = false
+	peer := child.dialogueTaskState().DialoguePeer
+	peer.CanGuide, peer.CanStop = true, true // A terminal projection cannot restore controls.
+	m = m.ConfigureDialogueHost(DialogueHost{CanStart: true, Peers: []DialoguePeer{peer}})
+	if !m.conversationActive() {
+		t.Fatal("finished work disabled conversational continuity")
+	}
+	tasks := m.conversationTasks()
+	if len(tasks) != 1 || tasks[0].Summary != "A retained result" || tasks[0].ID != dispatch.ChildID || tasks[0].CanGuide || tasks[0].CanStop {
+		t.Fatalf("result context lost its owner or acquired controls: %+v", tasks)
+	}
+	config.RouteConversation = func(_ context.Context, request workrun.ConversationRequest, input ConversationInput) (workrun.ConversationDecision, error) {
+		if len(request.Tasks) != 1 || request.Tasks[0].Summary != "A retained result" || len(input.TaskContext) != 1 || input.TaskContext[0].CanGuide || input.TaskContext[0].CanStop {
+			t.Fatalf("result not retained for follow-up execution: %+v %+v", request, input)
+		}
+		return workrun.ConversationDecision{Kind: "reply", Text: "That task returned a retained result."}, nil
+	}
+	m.config.RouteConversation = config.RouteConversation
+	m, follow := dialogueSubmit(t, m, "result-followup-0001", "What did it find?")
+	m = routeDialogue(t, m, follow)
+	if m.running || m.dialogueTurns[len(m.dialogueTurns)-1].State != "answered" || len(m.requests.Requests) != 0 {
+		t.Fatal("idle follow-up started unrelated Work")
+	}
 	restored := New(childConfig)
 	next, retry = restored.BootstrapDialogue(m.conversation, dispatch.TurnID)
 	if retry != nil || next.(Model).dialogueBootstrapResult.Error != "" {

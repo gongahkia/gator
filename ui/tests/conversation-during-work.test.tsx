@@ -27,11 +27,16 @@ test("ordinary messages converse, steer an original task and delegate work witho
       else if(context.message==="Keep the venues under $2,000")content=JSON.stringify({kind:"guide",target:context.tasks.find((task:any)=>task.title.includes("Compare venues")).id,instruction:"Keep the venues under $2,000"})
       else if(context.message==="Stop it")content=JSON.stringify({kind:"clarify",text:"Should I stop the venue comparison or the separate brief task?"})
       else if(context.message==="Stop the research task")content=JSON.stringify({kind:"stop",target:context.tasks.find((task:any)=>task.title.includes("Research a stop target")).id})
+      else if(context.message==="What did the separate brief say?"){
+        const result=context.tasks.find((task:any)=>task.title==="Read the separate brief" && task.state==="completed")
+        content=JSON.stringify({kind:"reply",text:result?.summary?.includes("jade heron")?"The separate brief task found jade heron.":"That result is unavailable."})
+      }
       else content=JSON.stringify({kind:"task"})
     }else{
       work.push(serialized)
       const raw=body.messages.find((message:any)=>message.role==="user")?.content;const objective=typeof raw==="string"?raw:(raw || []).map((part:any)=>part.text || "").join("\n")
       if(objective==="Research a stop target"){await stopGate;content="Research stopped without an external action."}
+      else if(objective==="Explain the brief in more detail"){content="The previous brief result identifies jade heron."}
       else if(objective.startsWith("Read the separate brief")){await childGate;content="The separate brief says jade heron."}
       else {if(work.length===1)await mainGate;content=serialized.includes("$2,000")?"Venue comparison respects the $2,000 budget.":"Venue comparison prepared."}
     }
@@ -77,6 +82,19 @@ test("ordinary messages converse, steer an original task and delegate work witho
     await client.loadDraft();expect(client.draft.text).toBe("Keep this draft while inspecting")
     releaseMain();await until(()=>!client.snapshot.allChatsBusy,"main result finished")
     expect(work.some(body=>body.includes("$2,000"))).toBe(true)
+    expect(client.state?.dialogue_active).toBe(true)
+    const completedWork=work.length
+    await send("What did the separate brief say?")
+    expect(client.state?.dialogue?.at(-1)?.response).toContain("jade heron");expect(work.length).toBe(completedWork);expect(client.state?.running).toBe(false)
+    await send("Explain the brief in more detail")
+    const detail=client.state!.dialogue!.at(-1)!
+    await until(()=>!!client.state?.dialogue_peers?.some(peer=>peer.conversation_id===detail.task_chat && peer.state==="completed"),"follow-up work completed")
+    expect(work.at(-1)).toContain(child);expect(work.at(-1)).toContain("jade heron")
+    const captured=JSON.parse(await readFile(join(env.GATOR_STATE_DIR,"gator/conversations",parent,"dialogue",String(detail.sequence).padStart(20,"0")+"-"+detail.id+".json"),"utf8")).options
+    const reference=captured.task_context.find((task:any)=>task.id===child)
+    expect(reference.summary).toContain("jade heron");expect(reference.can_guide).toBe(false);expect(reference.can_stop).toBe(false)
+    expect(captured.run_options.Uploads || []).toEqual([])
+    await client.edit("Keep this draft while inspecting")
     const original=JSON.parse(await readFile(join(env.GATOR_STATE_DIR,"gator/conversations",parent,"requests.json"),"utf8"))
     const independent=JSON.parse(await readFile(join(env.GATOR_STATE_DIR,"gator/conversations",child,"requests.json"),"utf8"))
     expect(original.requests).toHaveLength(1);expect(independent.requests).toHaveLength(1)
@@ -85,7 +103,12 @@ test("ordinary messages converse, steer an original task and delegate work witho
     const count=work.length+routes.length
     await client.close();await setup.dispose();expect(warnings).toHaveLength(0)
     const restarted=new GatorClient(new Application(options))
-    try{await restarted.start();expect(restarted.state?.conversation_id).toBe(parent);expect(restarted.state?.dialogue?.some(message=>message.response?.includes("I'm here"))).toBe(true);expect(restarted.state?.dialogue_peers?.find(peer=>peer.conversation_id===child)?.summary).toContain("jade heron");expect(restarted.draft.text).toBe("Keep this draft while inspecting");expect(work.length+routes.length).toBe(count)}finally{await restarted.close()}
+    try{await restarted.start();expect(restarted.state?.conversation_id).toBe(parent);expect(restarted.state?.dialogue?.some(message=>message.response?.includes("I'm here"))).toBe(true);expect(restarted.state?.dialogue_peers?.find(peer=>peer.conversation_id===child)?.summary).toContain("jade heron");expect(restarted.draft.text).toBe("Keep this draft while inspecting");expect(work.length+routes.length).toBe(count)
+      await until(()=>!!restarted.state?.dialogue_active,"restored conversation routing")
+      await restarted.edit("What did the separate brief say?");await restarted.submit()
+      await until(()=>!restarted.state?.dialogue_busy,"restored result answer")
+      expect(restarted.state?.dialogue?.at(-1)?.response).toContain("jade heron");expect(work.length).toBe(completedWork+1)
+    }finally{await restarted.close()}
   }catch(error){process.stderr.write("JOURNEY FAILED: "+String(error)+"\n"+JSON.stringify({work:work.length,routes:routes.length,peers:client.state?.dialogue_peers})+"\n");throw new Error(String(error)+"\n"+JSON.stringify({issue:client.issue,state:client.state,work:work.length,routes:routes.length})+"\n"+setup.captureCharFrame())}
   finally{releaseMain();releaseChild();releaseStop();await client.close();if(!setup.renderer.isDestroyed)await setup.dispose();server.stop(true);warning.mockRestore();await rm(root,{recursive:true,force:true})}
 },60000)

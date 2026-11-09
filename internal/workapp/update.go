@@ -284,6 +284,7 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 		m.lastWorkID = m.operation.RunID
 	}
 	wasCancelling := m.cancelling
+	requestID := m.activeRequest
 	m.finishRequest(value, wasCancelling)
 	if m.cancel != nil {
 		m.cancel()
@@ -387,6 +388,7 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 		m.messages = append(m.messages, message{role: "Deliverables", bundle: &bundle})
 	}
 	if responseIndex < len(m.messages) {
+		m.messages[responseIndex].requestID = requestID
 		m.messages[responseIndex].activity = activity
 		m.messages[responseIndex].runID = value.WorkID
 		if value.Error == "" {
