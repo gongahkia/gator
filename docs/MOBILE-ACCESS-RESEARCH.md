@@ -1,6 +1,6 @@
 # Mobile access after the terminal experience audit
 
-Research date: 9 November 2026. Status: recommendation and queued implementation,
+Research dates: 9–10 November 2026. Status: recommendation and queued implementation,
 not a completed mobile product or a deployed service.
 
 The user's follow-up authorizes researching and implementing a logical mobile
@@ -26,6 +26,14 @@ based on the sources and repository inspection below, not a platform requirement
 | Telegram Mini App | A web interface opened within Telegram | Reuse the web companion if later wanted; it still needs a hosted web endpoint and Telegram identity validation. |
 | Phone SSH/Mosh client | Access to the actual existing terminal application | Power-user fallback; terminal keys, narrow screens and a retained host session are less approachable than touch controls. |
 | Native iOS/Android apps | Strong OS integration and app-store distribution | Defer until demonstrated web limitations justify separate app packaging and platform maintenance. |
+
+OpenCode's own documentation also describes a browser UI sharing its server and
+session state with terminal clients. That supports the architectural direction;
+its coding UI/API is not a drop-in replacement for Gator's Go services. Reuse the
+shared-client pattern and Gator's existing companion, rather than introducing an
+OpenCode execution engine alongside Work. Command names differ across OpenCode
+documentation versions, so revalidate any setup instructions during implementation.
+[OpenCode web/client-server documentation](https://opencode.ai/docs/cli/web/)
 
 ## Repository evidence
 
