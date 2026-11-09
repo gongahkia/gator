@@ -7,7 +7,7 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 | # | Acceptance criteria | Status | Evidence / commit |
 |---|---|---|---|
 | 1 | Conversation remains available during execution; ordinary messages can steer a specific live task or start independent work; ambiguous routing is clarified without losing task identity, files, or drafts. | In progress | Tool-free conversation router and independent paged turn store implemented; identity/capability validation, active-operation independence, idempotent admission and versioned dispatch tests pass. Not yet wired to ordinary composer submissions or background task delegation. |
-| 2 | Following unifies commitments with outcome/state/next action, next and last successful checks, sources/timezone, pause/edit, and truthful foreground/service/offline limits. | In progress | Native commitment cards group goals with their checks; exact-ID/digest controls reuse canonical inspection, reviewed edits, and persisted pause/resume. Four-size fixtures and real Go create/inspect/pause/resume/edit/stale/restart/busy-owner journeys pass. Advanced non-project schedule editing and exact goal-card navigation remain; final integrated journey pending. |
+| 2 | Following unifies commitments with outcome/state/next action, next and last successful checks, sources/timezone, pause/edit, and truthful foreground/service/offline limits. | In progress | `4b9edf091`: native commitment cards group goals with their checks; exact-ID/digest controls reuse canonical inspection, reviewed edits, and persisted pause/resume. Four-size fixtures and real Go create/inspect/pause/resume/edit/stale/restart/busy-owner journeys pass. Advanced non-project schedule editing and exact goal-card navigation remain; final integrated journey pending. |
 | 3 | Relevant answers expose supplied memory/provenance/correction; noise feedback offers a reviewed, scoped check/notification change and reports its actual outcome. | Pending | |
 | 4 | First task leads through only missing setup; host connectivity and model readiness are distinct; local/cloud processing, capabilities, and work budget are explained. | Pending | |
 | 5 | Workspace/account/source scope is inspectable near input; conversational/manual settings agree, including terminal preferences, with confirmed outcomes. | Pending | |
@@ -20,7 +20,7 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 | 12 | Disconnected/error states offer contextual reconnect/recovery with intact drafts/request identity; safe admission retries and uncertain external effects stay distinct. | Implemented; final journey pending | `d00952219`; `interaction-recovery.test.tsx`: real Go accepted request + lost acknowledgement retries once, reconnect keeps draft/owner, no model replay; receipts tests preserve unknown external outcomes. |
 | 13 | New-content/latest/catch-up affordances preserve stable reading anchors across navigation/restart; long-history rendering is benchmarked and optimized when justified. | In progress | Reproducible native benchmark and reports in `docs/benchmarks/`; unchanged entries retain DOM identity across complete Go snapshots. 5,000-message append improved 4,051→747 ms in single samples. Startup/scroll remain too slow; bounded rendering, persistent anchors, catch-up/latest UI still required. |
 | 14 | Voice has direct record/stop/cancel/transcribe/edit flow, visible processing destination and explicit consent; transcript is editable before sending. | Implemented; final journey pending | `09e74ef39`; `voice-controls.test.tsx`: all four sizes, native VoiceSession with controlled capture/transcription, route/chat consent, changed-route rejection, editable draft/no send, recording/transcription cancellation. Physical audio remains unverified on this host. |
-| 15 | Shared native typography/spacing/selection/focus/disabled treatments and readable summaries work with terminal colors, NO_COLOR and reduced motion; exact technical details remain inspectable. | Pending | |
+| 15 | Shared native typography/spacing/selection/focus/disabled treatments and readable summaries work with terminal colors, NO_COLOR and reduced motion; exact technical details remain inspectable. | In progress | Markdown cleanup destroys native consumers before their borrowed syntax style, including theme changes. Delayed-highlighting regression and previously warning-producing real-Go followup journey pass without warnings. Shared visual/state audit and full acceptance journey remain. |
 
 ## Implementation rules
 
@@ -123,3 +123,22 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
   actions still open the goals list rather than the exact selected goal (item 2/10).
   NativeSyntaxStyle teardown warnings reproduced in followup-chat; item 15 remains
   open and the warnings are not treated as a successful highlighting fallback.
+
+- Markdown resource lifetime: Solid may defer native node removal until a render
+  pass. A component cleanup previously destroyed its syntax style immediately,
+  leaving pending highlights with live code blocks borrowing a freed resource.
+  Markdown now owns a native subtree for each style and explicitly destroys its
+  consumers before releasing that style. `markdown-lifetime.test.tsx` gates the
+  native parser across navigation and five theme changes, verifies old consumers
+  and styles are destroyed and replacement styles remain usable, and rejects any
+  fallback warnings. Typecheck and markdown-lifetime/followup-chat/transcript pass
+  (3 tests); the recurring-check journey no longer emits NativeSyntaxStyle warnings.
+  Host regression suite: 111 pass, one platform-specific skip. Remaining item 15
+  work includes the shared typography, focus, disabled and empty/error treatments
+  across surfaces; resource cleanup alone does not complete the visual audit.
+  Full native TUI regression: 80 pass, three platform/opt-in skips, two timeouts
+  (interrupted-request recovery at 45s and recurring-check chat at 60s). No
+  NativeSyntaxStyle warnings occurred in that run. Both timed-out files pass
+  together in a focused run (8.35s and 7.86s); the broad-run timeout cause remains
+  unresolved, so this is not recorded as a green full-suite result. Do not raise
+  deadlines or skip these journeys to claim completion.
