@@ -4,7 +4,7 @@
 import { Show, For, onCleanup } from "solid-js"
 import { useRenderer } from "@opentui/solid"
 import { ClientProvider, useClient } from "./context/client"
-import { useData } from "./context/data"
+import { DataProvider, useData } from "./context/data"
 import { ConfigProvider, terminalShortcuts } from "./config"
 import { ThemeProvider, useTheme } from "./context/theme"
 import { Keymap } from "./context/keymap"
@@ -105,5 +105,5 @@ function Themed(props: { client: GatorClient; quit(): Promise<void>; clipboard: 
   </ConfigProvider></ThemeProvider>
 }
 export function App(props: { client: GatorClient; quit(): Promise<void>; clipboard: ClipboardService; voice?: VoiceSession }) {
-  return <ClientProvider client={props.client}><Themed {...props} /></ClientProvider>
+  return <ClientProvider client={props.client}><DataProvider><Themed {...props} /></DataProvider></ClientProvider>
 }

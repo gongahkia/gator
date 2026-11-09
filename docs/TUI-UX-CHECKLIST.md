@@ -20,7 +20,7 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 | 12 | Disconnected/error states offer contextual reconnect/recovery with intact drafts/request identity; safe admission retries and uncertain external effects stay distinct. | Implemented; final journey pending | `d00952219`; `interaction-recovery.test.tsx`: real Go accepted request + lost acknowledgement retries once, reconnect keeps draft/owner, no model replay; receipts tests preserve unknown external outcomes. |
 | 13 | New-content/latest/catch-up affordances preserve stable reading anchors across navigation/restart; long-history rendering is benchmarked and optimized when justified. | In progress | Reproducible native benchmark and reports in `docs/benchmarks/`; unchanged entries retain DOM identity across complete Go snapshots. 5,000-message append improved 4,051→747 ms in single samples. Startup/scroll remain too slow; bounded rendering, persistent anchors, catch-up/latest UI still required. |
 | 14 | Voice has direct record/stop/cancel/transcribe/edit flow, visible processing destination and explicit consent; transcript is editable before sending. | Implemented; final journey pending | `09e74ef39`; `voice-controls.test.tsx`: all four sizes, native VoiceSession with controlled capture/transcription, route/chat consent, changed-route rejection, editable draft/no send, recording/transcription cancellation. Physical audio remains unverified on this host. |
-| 15 | Shared native typography/spacing/selection/focus/disabled treatments and readable summaries work with terminal colors, NO_COLOR and reduced motion; exact technical details remain inspectable. | In progress | `20e9b7cde`: Markdown cleanup destroys native consumers before their borrowed syntax style, including theme changes. Delayed-highlighting regression and previously warning-producing real-Go followup journey pass without warnings. Shared visual/state audit and full acceptance journey remain. |
+| 15 | Shared native typography/spacing/selection/focus/disabled treatments and readable summaries work with terminal colors, NO_COLOR and reduced motion; exact technical details remain inspectable. | In progress | `20e9b7cde`: Markdown cleanup destroys native consumers before their borrowed syntax style, including theme changes. Shared immutable field subscriptions now prevent routine snapshots from invalidating unchanged native content; the reproduced conversation render stall clears without changing deadlines or the renderer. Exact review objects remain frozen. Shared visual/state audit and full acceptance journey remain. |
 
 ## Implementation rules
 
@@ -44,6 +44,19 @@ Preserve both phases across continuations and do not declare the expanded work
 finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
+
+- Native snapshot subscription correction (10 November): repeated full backend
+  snapshots could leave a native frame rendering while the backend continued
+  responding; the ordinary conversation journey stalled and eventually lost its
+  test connection. A single renderer-owned data provider now selects immutable
+  top-level fields and retains unchanged values. It does not mutate a previously
+  displayed approval when a new pending action arrives. Native field/approval/
+  draft/composer regression: 5 pass, 108 assertions; real Go + controlled-provider
+  conversation and pending-plan journeys: 2 pass, 82 assertions, 17.52 seconds.
+  Earlier stalled runs and inspector-induced Bun crash are diagnostic failures,
+  not passing evidence; no timeout, runner, or product fallback was substituted.
+  Logs: `/tmp/gator-ux-20261110-field-subscriptions-{native,regression}.log`.
+  Long-history benchmarking and the final full journey still remain.
 
 - Start: working tree clean; HEAD `7750df414`; no repository/ancestor AGENTS.md found.
 - Audit reproductions: root command filter excludes backend entries; composer metadata
