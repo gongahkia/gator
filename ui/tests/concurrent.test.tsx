@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { testRender } from "@opentui/solid"
-import { mkdtemp, readFile, rm } from "node:fs/promises"
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { execFileSync } from "node:child_process"
@@ -31,7 +31,12 @@ test("independent real Go chats retain work, queues, live guidance and drafts ac
     await client.start(); await flush(); const first = client.state!.conversation_id!
     await client.send({ type: "submit", text: "/mode inspect" })
     await setup.mockInput.typeText("First concurrent task"); setup.mockInput.pressEnter(); await until(() => calls.length === 1, "first running")
-    await client.edit("First queued follow-up"); await client.submit(true); expect(client.state?.queue).toHaveLength(1)
+    const queuedFile = join(root, "queued-brief.txt")
+    await writeFile(queuedFile, "queue-only file: silver otter")
+    await client.attach([queuedFile]); const queuedInput = client.draft.uploads![0]!.id
+    await client.edit("First queued follow-up"); await flush(); setup.mockInput.pressTab()
+    await until(() => client.state?.queue?.length === 1 && client.draft.text === "", "Tab queue admission")
+    expect(client.state?.queue).toHaveLength(1)
     await client.edit("Keep first chat draft")
     setup.mockInput.pressKey("n", { ctrl: true }); await until(() => !!client.state?.conversation_id && client.state.conversation_id !== first && !client.snapshot.sessionSwitching, "new independent chat")
     await client.loadDraft(); await flush(); const second = client.state!.conversation_id!
@@ -53,10 +58,12 @@ test("independent real Go chats retain work, queues, live guidance and drafts ac
     release(); await until(() => !client.snapshot.allChatsBusy, "all work finished")
     expect(client.state?.conversation_id).toBe(second); expect(client.draft.text).toBe("Keep second chat draft")
     expect(calls).toHaveLength(4); expect(calls[2]).toContain("Focus the original request"); expect(calls[3]).toContain("First queued follow-up")
+    expect(calls[3]).toContain("silver otter"); expect(calls[1]).not.toContain("silver otter")
     for (const body of calls.slice(2)) expect(body).not.toContain("Second independent task")
     expect(client.snapshot.chatActivity.some(row => row.id === first && row.status === "Finished")).toBe(true)
     const journal = JSON.parse(await readFile(join(env.GATOR_STATE_DIR, "gator/conversations", first, "requests.json"), "utf8"))
     expect(journal.requests.map((item: { state: string }) => item.state)).toEqual(["completed", "completed"])
+    expect(journal.requests[1].options.Uploads).toEqual([queuedInput])
     await client.close(); await setup.dispose()
     const restarted = new GatorClient(new Application(options))
     try { await restarted.start(); expect(restarted.state?.running).toBe(false); expect(restarted.draft.text).toBe("Keep second chat draft"); expect(calls).toHaveLength(4) }

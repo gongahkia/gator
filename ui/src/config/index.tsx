@@ -11,7 +11,7 @@ const defaults: Record<string, string> = {
 export type Preferences = { animations: boolean; terminal: { copy: string }; cursor: { style: "block" }; scroll: { speed: number }; keybinds: { get(id: string): readonly Binding<Renderable, KeyEvent>[] } }
 const Context = createContext<Preferences>()
 export function terminalShortcuts(shortcuts: Record<string, string> = {}): Record<string, string> {
-  const names: Record<string, string> = { command_search: "command.palette.show", conversation_search: "gator.search", guide_work: "gator.guide", help: "gator.help", new_chat: "gator.new", send_message: "gator.send", newline: "gator.newline", settings: "gator.settings", voice_input: "gator.voice" }
+  const names: Record<string, string> = { command_search: "command.palette.show", conversation_search: "gator.search", guide_work: "gator.guide", help: "gator.help", new_chat: "gator.new", send_message: "gator.send", queue_message: "gator.queue", newline: "gator.newline", settings: "gator.settings", voice_input: "gator.voice" }
   return Object.fromEntries(Object.entries(shortcuts).flatMap(([name, value]) => names[name] ? [[names[name], value.toLowerCase().replaceAll("mod+", "ctrl+").replaceAll("meta+", "ctrl+").replaceAll("enter", "return").replaceAll("+,", "+comma")]] : []))
 }
 export function ConfigProvider(props: ParentProps<{ bindings?: Record<string, string> }>) {

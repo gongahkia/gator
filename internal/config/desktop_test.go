@@ -79,7 +79,7 @@ func TestTerminalShortcutsMigrateFunctionKeysAndPrimaryModifiers(t *testing.T) {
 		t.Fatal("migration lost a custom binding or introduced a conflict", resolved)
 	}
 	for action, binding := range resolved {
-		if binding != "Enter" && !strings.HasPrefix(binding, "Ctrl+") {
+		if binding != "Enter" && !(action == "queue_message" && binding == "Tab") && !strings.HasPrefix(binding, "Ctrl+") {
 			t.Errorf("%s resolved to %q", action, binding)
 		}
 	}
@@ -92,5 +92,24 @@ func TestTerminalShortcutsMigrateFunctionKeysAndPrimaryModifiers(t *testing.T) {
 	d.Shortcuts["unknown"] = "F1"
 	if err := d.Validate(); err == nil {
 		t.Fatal("unknown shortcut action accepted")
+	}
+}
+
+func TestQueueShortcutUsesTabOnlyForItsContextualAction(t *testing.T) {
+	settings := DesktopSettings{}
+	if err := settings.Validate(); err != nil || settings.ResolvedShortcuts()["queue_message"] != "Tab" {
+		t.Fatal("queue default did not resolve", err)
+	}
+	settings.Shortcuts = map[string]string{"queue_message": "Ctrl+Shift+K"}
+	if err := settings.Validate(); err != nil || settings.ResolvedShortcuts()["queue_message"] != "Ctrl+Shift+K" {
+		t.Fatal("custom queue binding did not resolve", err)
+	}
+	settings.Shortcuts["queue_message"] = "tab"
+	if err := settings.Validate(); err != nil || settings.ResolvedShortcuts()["queue_message"] != "Tab" {
+		t.Fatal(err)
+	}
+	settings.Shortcuts["help"] = "Tab"
+	if err := settings.Validate(); err == nil {
+		t.Fatal("Tab became a global action")
 	}
 }

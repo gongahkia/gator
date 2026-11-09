@@ -16,7 +16,7 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 | 8 | Approval surface shows exact live action/account/destination/content/consequences; long reviews scroll; changed/stale tokens cannot execute; edits require fresh review. | Implemented; final journey pending | `8ba3a9cb8`; `approval-review.test.tsx`: four sizes, scrolling/exact data, stale and missing previews; `approvals.test.tsx`: real Go token protection and controlled connected send. |
 | 9 | Root command search includes local/backend descriptions/names/aliases, grouped browsing remains usable, and commands requiring values have meaningful typed controls. | In progress | `5f54f7f17`; root search and common permission/theme/source/attachment controls verified in `commands.test.tsx`. Remaining advanced command families still expose explicit advanced syntax; typed controls remain required. |
 | 10 | Back restores menu/filter/selection, draft and reading position consistently; backend pages and file workflows retain context; rail marks the active page. | In progress | Host-managed navigation now waits for the Go view acknowledgement; a failed new view is retired and original work/focus is restored. Delayed/failing acknowledgement unit tests pass. Menu/filter/selection/back restoration across all flows remains open; active-page rail tests already pass. |
-| 11 | Ctrl+C cancels/stops without implicit quit; Ctrl+Q quits through guards; help/hints reflect configured bindings; no function-key shortcuts are introduced. | In progress | Idle stop/draft preservation, explicit quit, remapped help/composer/rail verified; voice/approval/contextual hints remain for later slices. |
+| 11 | Ctrl+C cancels/stops without implicit quit; Ctrl+Q quits through guards; help/hints reflect configured bindings; no function-key shortcuts are introduced. | In progress | Idle stop/draft preservation, explicit quit, remapped help/composer/rail verified. Tab now explicitly queues a draft after the active task in its current owner; Enter remains conversational and routes clear corrections. Slash completion/forms retain Tab. The queue shortcut uses the same Go settings backend; four sizes, Ctrl remapping and real-Go queued attachments are checked. Voice/approval/contextual hints and terminal modifier limitations remain. |
 | 12 | Disconnected/error states offer contextual reconnect/recovery with intact drafts/request identity; safe admission retries and uncertain external effects stay distinct. | Implemented; final journey pending | `d00952219`; `interaction-recovery.test.tsx`: real Go accepted request + lost acknowledgement retries once, reconnect keeps draft/owner, no model replay; receipts tests preserve unknown external outcomes. |
 | 13 | New-content/latest/catch-up affordances preserve stable reading anchors across navigation/restart; long-history rendering is benchmarked and optimized when justified. | In progress | Reproducible native benchmark and reports in `docs/benchmarks/`; unchanged entries retain DOM identity across complete Go snapshots. 5,000-message append improved 4,051→747 ms in single samples. Startup/scroll remain too slow; bounded rendering, persistent anchors, catch-up/latest UI still required. |
 | 14 | Voice has direct record/stop/cancel/transcribe/edit flow, visible processing destination and explicit consent; transcript is editable before sending. | Implemented; final journey pending | `09e74ef39`; `voice-controls.test.tsx`: all four sizes, native VoiceSession with controlled capture/transcription, route/chat consent, changed-route rejection, editable draft/no send, recording/transcription cancellation. Physical audio remains unverified on this host. |
@@ -44,6 +44,25 @@ Preserve both phases across continuations and do not declare the expanded work
 finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
+
+- Explicit keyboard queue (10 November): Tab submits the current owner's draft
+  through the established durable queue, with its exact files, update reply and
+  plan mode. Enter continues the ordinary conversation/correction router; Ctrl+G
+  remains direct guidance. No task picker or automatic chat switch substitutes
+  for conversational routing. Idle drafts, slash completion and overlays do not
+  queue via Tab. `queue_message` is persisted/inspected/changed through the Go
+  shortcut authority; only this contextual action accepts bare Tab. Native fixture
+  checks pass at 110×34, 80×24, 60×20, 42×14, plus Ctrl+K and enhanced-protocol
+  Ctrl+Shift+K: six passing cases. Ctrl+Shift is not distinguishable in the legacy
+  test terminal; the test now declares enhanced protocol explicitly, rather than
+  claiming legacy support. Explanations of such terminal limitations remain in
+  item 11. Real Go + controlled provider queue/guide/chat-switch/restart journey:
+  1 pass, 24 assertions; a queued private file reaches only its intended owner.
+  Go config/controller checks and TUI typecheck pass. Logs:
+  `/tmp/gator-ux-20261110-tab-queue-{controls-final,concurrent,config,settings-go,verified-typecheck}.log`.
+  The broader controls run still fails the existing default 5-second command
+  completion test (also reproduced alone); it must be resolved before a clean
+  full regression claim. No deadline has been increased and no check removed.
 
 - Conversational plan cancellation (`acc45f9e4`, 10 November; the changes were
   included in the user's local commit while verification was underway): preparing, review and approved

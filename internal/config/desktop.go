@@ -30,7 +30,7 @@ type VoiceSettings struct {
 
 var DefaultShortcuts = map[string]string{
 	"new_chat": "Ctrl+N", "command_search": "Ctrl+P", "conversation_search": "Ctrl+F", "settings": "Ctrl+,",
-	"send_message": "Enter", "newline": "Ctrl+J", "guide_work": "Ctrl+G",
+	"send_message": "Enter", "queue_message": "Tab", "newline": "Ctrl+J", "guide_work": "Ctrl+G",
 	"voice_input": "Ctrl+V", "help": "Ctrl+O",
 }
 
@@ -45,7 +45,7 @@ func (d DesktopSettings) ResolvedShortcuts() map[string]string {
 		if retiredFunctionShortcut.MatchString(strings.Join(strings.Fields(binding), "")) {
 			continue
 		}
-		canonical, err := NormalizeShortcut(binding)
+		canonical, err := NormalizeActionShortcut(action, binding)
 		if err != nil {
 			result[action] = binding
 			continue
@@ -69,7 +69,7 @@ func (d DesktopSettings) ResolvedShortcuts() map[string]string {
 			choices = append(choices, "Ctrl+Shift+"+string(letter))
 		}
 		for _, candidate := range choices {
-			if _, err := NormalizeShortcut(candidate); err == nil && !occupied[candidate] {
+			if _, err := NormalizeActionShortcut(action, candidate); err == nil && !occupied[candidate] {
 				result[action] = candidate
 				occupied[candidate] = true
 				break
@@ -139,6 +139,15 @@ func NormalizeShortcut(value string) (string, error) {
 	return canonical, nil
 }
 
+// Tab queues only in the non-command conversation composer during active work.
+// It remains completion/navigation elsewhere and cannot become a global action.
+func NormalizeActionShortcut(action, value string) (string, error) {
+	if action == "queue_message" && strings.EqualFold(strings.TrimSpace(value), "Tab") {
+		return "Tab", nil
+	}
+	return NormalizeShortcut(value)
+}
+
 func physicalShortcut(value string) string {
 	return strings.NewReplacer("Mod", "Ctrl", "Meta", "Ctrl").Replace(value)
 }
@@ -154,7 +163,7 @@ func (d DesktopSettings) Validate() error {
 		if _, exists := DefaultShortcuts[action]; !exists {
 			return fmt.Errorf("unknown shortcut action %q", action)
 		}
-		normalized, err := NormalizeShortcut(shortcut)
+		normalized, err := NormalizeActionShortcut(action, shortcut)
 		if err != nil {
 			return fmt.Errorf("%s shortcut: %w", action, err)
 		}

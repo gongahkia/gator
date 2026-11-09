@@ -28,7 +28,7 @@ func (c gatorAppController) prepareDesktopPreferences(change workrun.AppChange) 
 		reset := strings.EqualFold(v.Shortcut, "default")
 		next := config.DefaultShortcuts[v.Action]
 		if !reset {
-			next, err = config.NormalizeShortcut(v.Shortcut)
+			next, err = config.NormalizeActionShortcut(v.Action, v.Shortcut)
 			if err != nil {
 				return workrun.AppMutation{}, err
 			}

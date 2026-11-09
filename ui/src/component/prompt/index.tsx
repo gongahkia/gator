@@ -94,7 +94,10 @@ export function Prompt() {
   createEffect(() => { if (dialog.stack.length || data.state?.panel) textarea?.blur(); else textarea?.focus() })
   const guide = () => { void client.guide().catch(error => client.fail(error)) }
   Keymap.createLayer(() => ({ priority: 2, enabled: dialog.stack.length === 0, commands: [
-    { id: "gator.send", bind: "return", title: "Send or queue message", run: () => { void client.submit().catch(e => client.fail(e)) } },
+    { id: "gator.send", bind: "return", title: "Talk, correct or start work", run: () => { void client.submit().catch(e => client.fail(e)) } },
+    { id: "gator.queue", bind: "tab", title: "Queue draft after the current task", palette: true,
+      enabled: () => !!data.state?.running && !data.state?.cancelling && !data.draft.text.trimStart().startsWith("/") && !!(data.draft.text.trim() || data.draft.uploads?.length),
+      run: () => { void client.submit(true).catch(e => client.fail(e)) } },
     { id: "gator.newline", bind: "shift+return", title: "New line", run: () => { textarea?.newLine() } },
     { bind: "ctrl+j", title: "New line fallback", run: () => { textarea?.newLine() } },
     { id: "gator.guide", bind: "ctrl+g", title: "Guide active work with draft", palette: true, run: guide },
@@ -122,7 +125,7 @@ export function Prompt() {
       onMouseUp={event => { if (event.button !== 0) return; event.stopPropagation(); void client.navigate("/models").catch(e => client.fail(e)) }}><b style={{ fg: theme.accent }}>Gator</b>  {literal(model())}{data.state?.composer?.effort ? ` · ${data.state.composer.effort} effort` : ""}</text>
     </box>
     <box paddingX={1} paddingTop={compact() ? 0 : 1} flexDirection="row" justifyContent="space-between" gap={2}>
-      <text fg={theme.text.muted} attributes={TextAttributes.DIM} flexShrink={1} minWidth={0} height={1} wrapMode="none" truncate>{data.snapshot.connection !== "connected" ? "Reconnect before sending" : ["recording", "transcribing"].includes(data.voicePhase) ? "Finish dictation before sending" : data.state?.dialogue_active ? `${hint("gator.send")} send · Talk, correct or start work` : data.state?.running ? `${hint("gator.send")} queue · ${hint("gator.guide")} guide · ${hint("gator.cancel")} stop` : `${hint("gator.send")} send · ${hint("gator.newline")} new line`}</text>
+      <text fg={theme.text.muted} attributes={TextAttributes.DIM} flexShrink={1} minWidth={0} height={1} wrapMode="none" truncate>{data.snapshot.connection !== "connected" ? "Reconnect before sending" : ["recording", "transcribing"].includes(data.voicePhase) ? "Finish dictation before sending" : data.state?.running ? `${hint("gator.send")} ${dimensions().width < 60 ? "talk" : "talk / steer"} · ${hint("gator.queue")} queue` : data.state?.dialogue_active ? `${hint("gator.send")} send · Talk, correct or start work` : `${hint("gator.send")} send · ${hint("gator.newline")} new line`}</text>
       <text fg={theme.text.muted} attributes={TextAttributes.DIM} flexShrink={0}>{dimensions().width < 60 ? "/ commands" : `/ commands · ${hint("command.palette.show")}`}</text>
     </box>
   </box>

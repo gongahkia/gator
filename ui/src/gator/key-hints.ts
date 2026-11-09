@@ -6,5 +6,6 @@ export function useKeyHints() {
   return (id: string) => (shortcuts.get(id) || "Unbound")
     .replace(/\bctrl\b/gi, "Ctrl").replace(/\bshift\b/gi, "Shift")
     .replace(/\balt\b/gi, "Alt").replace(/\bmeta\b/gi, "Meta")
+    .replace(/\btab\b/gi, "Tab")
     .replace(/\b(return|enter)\b/gi, "Enter").replace(/\+([a-z])\b/g, (_, key: string) => "+" + key.toUpperCase())
 }

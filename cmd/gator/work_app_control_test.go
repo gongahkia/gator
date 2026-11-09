@@ -54,6 +54,8 @@ func TestGatorAppChatRebindsShortcutsAndVoicePreferences(t *testing.T) {
 	c := appControllerForTest(t)
 	for _, change := range []workrun.AppChange{
 		{Setting: "shortcuts", Value: json.RawMessage(`{"action":"command_search","shortcut":"Mod+P"}`)},
+		{Setting: "shortcuts", Value: json.RawMessage(`{"action":"queue_message","shortcut":"Ctrl+Shift+K"}`)},
+		{Setting: "shortcuts", Value: json.RawMessage(`{"action":"queue_message","shortcut":"Tab"}`)},
 		{Setting: "voice", Value: json.RawMessage(`{"spoken_replies":true,"language":"en-SG"}`)},
 	} {
 		mutation, err := c.Prepare(context.Background(), change)
@@ -65,7 +67,7 @@ func TestGatorAppChatRebindsShortcutsAndVoicePreferences(t *testing.T) {
 		}
 	}
 	saved, _ := c.settings.Load()
-	if saved.Desktop.ResolvedShortcuts()["command_search"] != "Ctrl+P" || !saved.Desktop.Voice.SpokenReplies || saved.Desktop.Voice.Language != "en-SG" {
+	if saved.Desktop.ResolvedShortcuts()["command_search"] != "Ctrl+P" || saved.Desktop.ResolvedShortcuts()["queue_message"] != "Tab" || !saved.Desktop.Voice.SpokenReplies || saved.Desktop.Voice.Language != "en-SG" {
 		t.Fatalf("preferences not saved: %#v", saved.Desktop)
 	}
 	if _, err := c.Prepare(context.Background(), workrun.AppChange{Setting: "shortcuts", Value: json.RawMessage(`{"action":"command_search","shortcut":"Mod+F"}`)}); err == nil {
