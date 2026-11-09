@@ -115,6 +115,9 @@ export type FollowingCheck = {
 };
 export type CheckAction = {request_id: string} & ({action: "refresh"} | {action: "setup"; id: string} | {action: "inspect" | "edit" | "pause" | "resume"; id: string; digest: string});
 export type BackendState = {
+ dialogue?: DialogueMessage[]; dialogue_more?: boolean; dialogue_issue?: string; dialogue_busy?: boolean; dialogue_active?: boolean;
+ dialogue_peers?: DialoguePeer[];
+ dialogue_task?: DialoguePeer & {parent_id:string};
  check_result?: {request_id: string; error?: string};
  supervisor_running?: boolean;
  task_plans?:TaskPlanSummary[];
@@ -192,6 +195,9 @@ export type BackendState = {
   notice?: string;
   destination?: string;
 };
+
+export type DialogueMessage = {id:string;sequence:number;text:string;response?:string;state:string;issue?:string;task_chat?:string;input_ids?:string[];reply_to_update_id?:string;created_at:string;updated_at:string};
+export type DialoguePeer = {conversation_id:string;turn_id:string;run_id?:string;state:string;can_guide:boolean;can_stop:boolean;summary?:string};
 export type PanelAction = {
   id: string; action: "select" | "activate" | "key" | "query" | "filter" | "next" | "previous" | "refresh" | "rename" | "pin" | "unpin" | "archive" | "restore";
   row?: number; fields?: Record<number, string>; text?: string;
@@ -205,13 +211,14 @@ export type SpecialistAction = {
 };
 export type Frame = {
   version: 1;
-  type: "receipt" | "memory" | "update" | "submit" | "upload_submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "specialist" | "conversation" | "composer" | "sources" | "branch" | "task_plan" | "check";
+  type: "dialogue_page" | "receipt" | "memory" | "update" | "submit" | "upload_submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "specialist" | "conversation" | "composer" | "sources" | "branch" | "task_plan" | "check";
+ dialogue_before?:number;
   check?: CheckAction;
   specialist?: SpecialistAction;
   memory?: ChatMemoryAction;
   receipt?: {conversation_id: string; run_id: string; action_id: string; correlation_id: string; manifest_sha256: string; action: "inspect" | "check_sent"; request_id: string};
   update?: { conversation_id: string; id: string; action: "delivered" | "read" | "resolve" | "reopen" | "older" | "newer" | "rate"; version: number; rating?: "useful" | "noise" | "wrong" | "clear"; rating_version?: number; request_id?: string };
-  upload?: { plan_first?:boolean; request_id: string; context: string; text: string; files: string[]; reply_to_update_id?: string };
+  upload?: { queue_only?:boolean; plan_first?:boolean; request_id: string; context: string; text: string; files: string[]; reply_to_update_id?: string };
   text?: string; key?: string; error?: string; width?: number; height?: number;
   task_plan?:TaskPlanAction;
   branch?: BranchAction;

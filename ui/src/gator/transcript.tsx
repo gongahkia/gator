@@ -15,6 +15,7 @@ import { Markdown } from "./markdown"
 import { displayDate } from "./display"
 import { Spinner } from "../component/spinner"
 import { WorkingStatus } from "./working-status"
+import { ConversationTurn } from "./conversation-turn"
 
 function Result(props: { value: BackendResult }) {
   const theme = useTheme()
@@ -33,7 +34,7 @@ function Result(props: { value: BackendResult }) {
 export function Transcript() {
   const data = useData(), client = useClient(), theme = useTheme(), renderer = useRenderer(), dialog = useDialog()
   const reconcile = createTimelineReconciler()
-  const timeline = createMemo(() => reconcile(client.context, chatTimeline(data.state?.messages ?? [], data.state?.chat_updates ?? []).filter(item => item.kind !== "message" || item.message.role !== "Deliverables" || !!(item.message.text || item.message.result || item.message.activity || item.message.bundle?.Artifacts?.length))))
+  const timeline = createMemo(() => reconcile(client.context, chatTimeline(data.state?.messages ?? [], data.state?.chat_updates ?? [], data.state?.dialogue ?? []).filter(item => item.kind !== "message" || item.message.role !== "Deliverables" || !!(item.message.text || item.message.result || item.message.activity || item.message.bundle?.Artifacts?.length))))
   const cards = new Map<string, Renderable>(), delivered = new Set<string>()
   let scroll: ScrollBoxRenderable | undefined
   let previous = ""
@@ -78,7 +79,7 @@ export function Transcript() {
   ] }))
   return <scrollbox id="transcript" ref={node => { scroll = node }} flexGrow={1} minHeight={0} stickyScroll stickyStart="bottom" paddingX={2}>
     <Show when={data.state?.branch}><text fg={theme.text.muted} onMouseUp={() => void client.navigate("/original-chat")}>Branched chat · /original-chat returns to its source</text></Show>
-    <Show when={!data.state?.messages?.length}><box paddingY={3} paddingX={3} gap={1}><text fg={theme.text.base}><b>What would you like to get done?</b></text>
+    <Show when={!data.state?.messages?.length && !data.state?.dialogue?.length}><box paddingY={3} paddingX={3} gap={1}><text fg={theme.text.base}><b>What would you like to get done?</b></text>
       <text fg={theme.text.muted}>Ask anything, or type / for commands.</text><Show when={!data.state?.provider}><text fg={theme.text.muted}>Connect a model with /model to get started.</text></Show></box></Show>
     <For each={timeline()}>{item => <Show when={item.kind === "message" ? item : undefined} fallback={item.kind === "update" ? <box id={`update-${item.update.id}`} ref={node => { const id = item.update.id; cards.set(id, node); onCleanup(() => { if (cards.get(id) === node) cards.delete(id) }) }} paddingY={1}>
       <text fg={theme.accent}><b>{literal(item.update.title)}</b> · {literal(updateStatus(item.update.status))} · {item.update.read ? "read" : "unread"} · {item.update.resolved ? "done" : "open"}</text>
@@ -87,7 +88,7 @@ export function Transcript() {
       <Show when={item.update.rating}><text fg={theme.text.base}>Feedback: {item.update.rating}</text></Show>
       <Show when={data.updateFeedback?.id === item.update.id}><Show when={data.updateFeedback?.saving} fallback={<text fg={theme.text.muted}>{literal(data.updateFeedback?.message)}</text>}><Spinner>{literal(data.updateFeedback?.message)}</Spinner></Show></Show>
       <text fg={theme.text.muted}>Use “updates” in Ctrl+P to inspect evidence, read, reply, mark done or give feedback.</text>
-    </box> : undefined}>{messageItem => { const { message, index } = messageItem(); return <box id={`message-${index}`} marginY={1} paddingY={message.role === "You" ? 1 : 0} paddingLeft={message.role === "You" || revealed() === index ? 2 : 3} paddingRight={2} gap={1}
+    </box> : item.kind === "dialogue" ? <ConversationTurn turn={item.turn} task={data.state?.dialogue_peers?.find(peer=>peer.conversation_id===item.turn.task_chat)} busy={data.state?.dialogue_busy} /> : undefined}>{messageItem => { const { message, index } = messageItem(); return <box id={`message-${index}`} marginY={1} paddingY={message.role === "You" ? 1 : 0} paddingLeft={message.role === "You" || revealed() === index ? 2 : 3} paddingRight={2} gap={1}
       backgroundColor={message.role === "You" ? theme.background.raised.base : undefined} border={message.role === "You" || revealed() === index ? ["left"] : false} borderColor={message.role === "You" || revealed() === index ? theme.accent : undefined}>
       <text fg={message.role === "You" ? theme.accent : theme.text.muted}><b>{literal(message.role)}</b><span style={{ attributes: TextAttributes.DIM }}>  {displayDate(message.created_at)}</span></text>
       <Show when={message.activity}>{trace => <Activity trace={trace()} identity={activityKey(client.context, message, index)} expanded={data.activityExpanded} />}</Show>
@@ -104,7 +105,8 @@ export function Transcript() {
     <Show when={data.state?.activity}>{trace => <Activity live trace={trace()} identity={client.context + ":live:" + trace().started_at} expanded={data.activityExpanded} />}</Show>
     <Show when={data.state?.running}><WorkingStatus status={data.state?.status} elapsed={data.state?.elapsed} attention={!!data.state?.pending_approval} cancelling={!!data.state?.cancelling} /></Show>
     
-    <For each={[data.state?.notice, data.state?.requests_issue, data.state?.action_recovery_issue, data.state?.chat_checks_issue, data.state?.chat_updates_issue, data.state?.chat_memory_issue].filter(Boolean)}>{issue => <text fg={theme.text.feedback.warning.base}>{literal(issue)}</text>}</For>
+    <Show when={data.state?.dialogue_more}><text fg={theme.text.muted}>Earlier conversation messages are retained · /earlier-messages</text></Show>
+    <For each={[data.state?.notice, data.state?.dialogue_issue, data.state?.requests_issue, data.state?.action_recovery_issue, data.state?.chat_checks_issue, data.state?.chat_updates_issue, data.state?.chat_memory_issue].filter(Boolean)}>{issue => <text fg={theme.text.feedback.warning.base}>{literal(issue)}</text>}</For>
     <Show when={data.state?.pending_approval}><text fg={theme.text.feedback.warning.base}>Review the exact request above. Ctrl+Y opens the approval decision; Ctrl+D declines.</text></Show>
     <Show when={data.state?.requests_recovered}><text fg={theme.text.feedback.warning.base}>Recovered requests are paused. Review the queue before resuming.</text></Show>
     <Show when={data.state?.action_recoveries?.length}><text fg={theme.text.feedback.warning.base}>Saved request receipts · {data.state?.action_recoveries?.length}{data.state?.action_recovery_truncated ? "+" : ""} · /receipts inspects them. Reopening does not retry an external action.</text></Show>

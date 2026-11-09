@@ -21,6 +21,47 @@ const setup = () => {
   return new Sessions(request => new Worker(request.conversation_id || `chat-${++count}`));
 };
 
+class DialogueWorker extends Worker {
+  configured = [];
+  bootstraps = [];
+  controls = [];
+  results = [];
+  configureDialogue(host) { this.configured.push(host); }
+  async bootstrapDialogue(parent,turn) { this.bootstraps.push({parent,turn}); this.change({running:true,dialogue_task:{parent_id:parent,conversation_id:this.state.conversation_id,turn_id:turn,state:"running",run_id:"child-operation",can_guide:true,can_stop:true}}); }
+  async controlDialogue(control) { this.controls.push(control); }
+  async finishDialogue(result) { this.results.push(result); this.change({dialogue_dispatch:undefined,dialogue_busy:false}); }
+}
+
+test("dialogue dispatch starts one background owner and returns results without moving focus",async()=>{
+  const parent=new DialogueWorker("parent"),child=new DialogueWorker("child"),spawned=[];
+  const sessions=new Sessions(request=>{spawned.push(request);return request.conversation_id==="child"?child:parent});
+  try{
+    await sessions.open();parent.change({running:true,dialogue_busy:true,dialogue:[{id:"original-turn",task_chat:"child"}],dialogue_dispatch:{sequence:1,kind:"task",turn_id:"original-turn",child_id:"child"}});
+    await sessions.settled();await new Promise(resolve=>queueMicrotask(resolve));
+    assert.equal(sessions.current,parent);assert.deepEqual(child.focuses,[]);assert.deepEqual(child.bootstraps,[{parent:"parent",turn:"original-turn"}]);
+    assert.deepEqual(parent.results,[{turn_id:"original-turn",child_id:"child"}]);
+    assert.equal(parent.configured.at(-1).peers[0].run_id,"child-operation");
+    parent.change({dialogue_dispatch:{sequence:1,kind:"task",turn_id:"original-turn",child_id:"child"}});await sessions.settled();assert.equal(child.bootstraps.length,1);
+    parent.change({dialogue_dispatch:{sequence:2,kind:"guide",turn_id:"correction",child_id:"child",target_run:"child-operation",instruction:"Use the new budget"}});await sessions.settled();
+    assert.deepEqual(child.controls,[{parent_id:"parent",turn_id:"original-turn",request_id:"correction",run_id:"child-operation",action:"guide",instruction:"Use the new budget"}]);
+    assert.equal(sessions.current,parent);assert.equal(sessions.canOpen("child"),true);assert.equal(sessions.canOpen("unrelated"),false);
+    assert.equal(spawned.length,2);
+  }finally{await sessions.stop()}
+});
+
+test("an unconfirmed background admission or control is reported and never automatically replayed",async()=>{
+  const parent=new DialogueWorker("parent"),child=new DialogueWorker("child");
+  child.bootstrapDialogue=async()=>{throw new Error("Admission acknowledgement lost; inspect retained work")};
+  const sessions=new Sessions(request=>request.conversation_id==="child"?child:parent);
+  try{
+    await sessions.open();parent.change({running:true,dialogue_dispatch:{sequence:1,kind:"task",turn_id:"turn",child_id:"child"}});await sessions.settled();
+    assert.match(parent.results[0].error,/acknowledgement lost/);assert.equal(sessions.current,parent);
+    parent.change({title:"Another snapshot"});await sessions.settled();assert.equal(parent.results.length,1);
+    parent.change({dialogue_dispatch:{sequence:2,kind:"stop",turn_id:"stop-turn",child_id:"missing",target_run:"old-operation"}});await sessions.settled();
+    assert.match(parent.results[1].error,/original task owner is unavailable/);assert.equal(child.controls.length,0);
+  }finally{await sessions.stop()}
+});
+
 test("managed navigation waits for the new owner's applied view and preserves original execution", async () => {
   const original = new Worker("original"), view = new Worker("view");
   let release, applied;

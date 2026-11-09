@@ -6,7 +6,7 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 
 | # | Acceptance criteria | Status | Evidence / commit |
 |---|---|---|---|
-| 1 | Conversation remains available during execution; ordinary messages can steer a specific live task or start independent work; ambiguous routing is clarified without losing task identity, files, or drafts. | In progress | `1dbc77741`/`49e27ef06`: router, independent paged turns, and durable child-task bindings. Concurrent retries claim one dispatch; original decisions/owners cannot be changed; source/input provenance is checked; reads/retries do not launch work; pruning retains dialogue inputs. Core/race tests pass. Composer routing, background launch and result/control return remain unwired. |
+| 1 | Conversation remains available during execution; ordinary messages can steer a specific live task or start independent work; ambiguous routing is clarified without losing task identity, files, or drafts. | In progress | `92cd471f4` plus host/native integration: ordinary messages reply, steer, clarify, delegate and stop specific independent owners without moving focus. Files/context and durable results survive return/restart; explicit queues remain available. Real-Go controlled-provider native journey and core/race checks pass. Plan-bound/pending-review corrections, delegated exact approvals, broader failure/retry/account/goal journeys and live-model routing quality remain to verify/finish. |
 | 2 | Following unifies commitments with outcome/state/next action, next and last successful checks, sources/timezone, pause/edit, and truthful foreground/service/offline limits. | In progress | `4b9edf091`/`a95289265`: commitment cards and exact check controls. Active goal cards open their exact canonical picker row and prepare a check for that goal's current workspace, including duplicate titles, other-chat origins and busy owners. Focused Go/host/native integration checks pass. Advanced non-project schedule editing and paused-goal controls remain; final integrated journey pending. |
 | 3 | Relevant answers expose supplied memory/provenance/correction; noise feedback offers a reviewed, scoped check/notification change and reports its actual outcome. | Pending | |
 | 4 | First task leads through only missing setup; host connectivity and model readiness are distinct; local/cloud processing, capabilities, and work budget are explained. | Pending | |
@@ -262,3 +262,29 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
   Native composer/resource checks: four pass; the existing long-transcript test
   reached its unchanged five-second deadline during simultaneous Go race builds
   and is being rerun independently. No deadline or assertion was weakened.
+
+- Host/native conversation integration: the host consumes only newly claimed
+  native dispatches, starts a separately admitted owner without switching focus,
+  and returns original-task controls/results through validated durable links.
+  Failed/unconfirmed handoffs do not replay. Confirmed summaries restore from the
+  original request's revision, rather than borrowing another task's latest answer.
+  `/tasks` opens original reviews/outputs and returns to the requesting conversation;
+  `/earlier-messages` pages retained dialogue and `/files` recognizes its original
+  selected inputs. `/queue-message` explicitly retains the existing queue workflow;
+  ordinary Enter submissions remain conversational. Queue/recovery tests now
+  explicitly request queue placement and keep their immutable-file/identity checks.
+  Host regression: 117 pass, one unchanged platform skip. Native real-Go controlled
+  provider journeys: five pass (conversation, concurrent owners, interrupted queue,
+  lost admission/reconnect, and syntax lifetime). The conversation journey holds
+  the primary provider call, answers a greeting, accepts its budget correction,
+  runs another task with a real private input, clarifies two possible targets,
+  stops a separately named task without stopping the primary, opens/returns from
+  the original child, restores summaries/drafts on restart, and verifies no replay.
+  Its final draft is rendered at all four sizes; this is not a repeated full live
+  approval journey at each size or live-model/account-quality verification.
+  Native warnings are asserted absent through disposal. Go workapp dialogue tests
+  also pass under the race detector. README remains unchanged; nothing was pushed.
+  Remaining item 1 work includes pending-plan/review steering/cancellation, exact
+  delegated approval review/edit/rejection, router/admission failure and capacity
+  recovery, selected-account/goal changes, and older-turn navigation/search.
+  The full fifteen-item integrated acceptance journey remains incomplete.

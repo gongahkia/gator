@@ -12,6 +12,7 @@ import (
 )
 
 type BridgeUploadSubmission struct {
+	QueueOnly       bool     `json:"queue_only,omitempty"`
 	PlanFirst       bool     `json:"plan_first,omitempty"`
 	ReplyToUpdateID string   `json:"reply_to_update_id,omitempty"`
 	RequestID       string   `json:"request_id"`
@@ -87,7 +88,7 @@ func (m Model) SubmitBridgeUploads(request BridgeUploadSubmission) (tea.Model, t
 			return fail(issue)
 		}
 	}
-	if m.running && !m.conversationActive() && len(m.queue) >= 16 {
+	if m.running && (request.QueueOnly || !m.conversationActive()) && len(m.queue) >= 16 {
 		return fail("The queue is full. Remove a message before adding another.")
 	}
 	seen := map[string]bool{}
@@ -108,7 +109,7 @@ func (m Model) SubmitBridgeUploads(request BridgeUploadSubmission) (tea.Model, t
 			return fail(fmt.Sprintf("Couldn’t attach these files: %v", err))
 		}
 	}
-	if m.conversationActive() {
+	if m.conversationActive() && !request.QueueOnly {
 		return m.admitConversation(request, text)
 	}
 	oldPlanFirst := m.options.PlanFirst

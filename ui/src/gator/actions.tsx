@@ -181,6 +181,12 @@ export function useActions() {
     })
   }
   const actions: Record<string, () => unknown> = {
+    "queue-message":()=>prompt("Message to run after current work",client.draft.text.startsWith("/")?"":client.draft.text,async text=>{await client.edit(text);await client.submit(true)},"Keep this task and its selected files in the current owner's explicit queue. Ordinary messages stay conversational."),
+    tasks: () => menu("Work in this conversation", () => [
+      ...(client.state?.dialogue_task ? [{title:"Return to the requesting conversation",run:()=>client.openSession(client.state!.dialogue_task!.parent_id)}] : []),
+      ...(client.state?.dialogue ?? []).filter(turn=>turn.task_chat).map(turn=>({key:turn.id,title:turn.text,description:client.state?.dialogue_peers?.find(peer=>peer.conversation_id===turn.task_chat)?.state || "Outcome unconfirmed",run:()=>client.openSession(turn.task_chat!)})),
+    ]),
+    "earlier-messages":async()=>{const state=client.state,before=state?.dialogue?.[0]?.sequence;if(!state?.dialogue_more || !before) return details("Earlier messages","All retained conversation messages are loaded.");await client.send({type:"dialogue_page",dialogue_before:before})},
     drafts, queue, updates, memories, receipts, models,
     recover: () => {
       const context = client.context, disconnected = client.snapshot.connection === "disconnected"

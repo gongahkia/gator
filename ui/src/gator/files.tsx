@@ -31,6 +31,7 @@ export function useFiles(menu: (title: string, choices: Choice[]) => void, promp
     for (const message of client.state?.messages ?? []) {
       for (const [index, id] of (message.input_ids ?? []).entries()) if (!seen.has(id)) { seen.add(id); choices.push({ title: message.inputs?.[index] || id.split("/").at(-1) || id, description: "Retained input", run: () => open({ kind: "upload", id }, undefined, context) }) }
     }
+    for (const turn of client.state?.dialogue ?? []) for (const id of turn.input_ids ?? []) if (!seen.has(id)) { seen.add(id); choices.push({title:id.split("/").at(-1) || id,description:"Retained conversation input",run:()=>open({kind:"upload",id},undefined,context)}) }
     for (const result of conversationBundles(client.state)) {
       for (const file of result.Artifacts ?? []) {
         const bundle = result.Path, identity = JSON.stringify([bundle, file.Path])

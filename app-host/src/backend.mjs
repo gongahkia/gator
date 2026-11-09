@@ -66,6 +66,21 @@ export class Backend extends EventEmitter {
 
   refreshPreferences() { this.#write({ version: 1, type: "refresh_preferences" }); }
 
+  configureDialogue(dialogue_host) { this.#write({ version: 1, type: "dialogue_host", dialogue_host }); }
+  async bootstrapDialogue(parent, turn) {
+    await this.#apply({ version: 1, type: "dialogue_bootstrap", dialogue_parent: parent, dialogue_turn: turn });
+    const result = this.state?.dialogue_bootstrap_result;
+    if (result?.turn_id !== turn || result?.child_id !== this.state?.conversation_id) throw new Error("The task owner did not confirm the original admission. Inspect its retained state.");
+    if (result.error) throw new Error(result.error);
+  }
+  async controlDialogue(dialogue_control) {
+    await this.#apply({ version: 1, type: "dialogue_control", dialogue_control });
+    const result = this.state?.dialogue_control_result;
+    if (result?.request_id !== dialogue_control.request_id) throw new Error("The task control was not confirmed. Inspect the original task before trying again.");
+    if (result.error) throw new Error(result.error);
+  }
+  finishDialogue(dialogue_result) { return this.#apply({ version: 1, type: "dialogue_result", dialogue_result }); }
+
   apply(frame) {
     return this.#apply(validateFrame(frame));
   }

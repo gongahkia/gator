@@ -4,7 +4,7 @@ import { fileReference, readBoundedFile } from "./files.mjs";
 export async function selectedFileSource(reference, { state, context, drafts, imported, uploads, files }) {
   const ref = fileReference(reference);
   if (ref.kind === "upload") {
-    const sent = state.messages?.some(message => message.input_ids?.includes(ref.id));
+    const sent = state.messages?.some(message => message.input_ids?.includes(ref.id)) || state.dialogue?.some(turn => turn.input_ids?.includes(ref.id));
     const pending = drafts.drafts?.some(draft => draft.context === context && draft.uploads?.some(file => file.id === ref.id));
     if (!sent && !pending && imported.get(ref.id) !== context) throw new Error("This attachment is not selected in the current conversation.");
     let bytes;

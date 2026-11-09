@@ -40,8 +40,10 @@ export function validateFrame(frame) {
     memory: ["type", "memory"],
     receipt: ["type", "receipt"],
     check: ["type", "check"],
+    dialogue_page: ["type", "dialogue_before"],
   }[frame.type];
   if (!allowed || Object.keys(frame).some((key) => !allowed.includes(key))) throw new Error("Unsupported desktop action");
+  if (frame.type === "dialogue_page" && (!Number.isSafeInteger(frame.dialogue_before) || frame.dialogue_before < 1)) throw new Error("Invalid conversation page cursor");
   if (JSON.stringify(frame).length > 256 * 1024) throw new Error("Desktop action is too large");
   if (frame.type === "submit" && (typeof frame.text !== "string" || frame.text.length > 128 * 1024)) throw new Error("Invalid request");
   if (frame.type === "check") {
@@ -51,7 +53,7 @@ export function validateFrame(frame) {
   }
   if (frame.type === "upload_submit") {
     const value = frame.upload;
-    if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some((key) => !["request_id", "context", "text", "files", "reply_to_update_id", "plan_first"].includes(key)) || (value.plan_first !== undefined && typeof value.plan_first!=="boolean") || (value.reply_to_update_id !== undefined && (typeof value.reply_to_update_id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(value.reply_to_update_id))) || typeof value.request_id !== "string" || !/^[a-zA-Z0-9-]{1,64}$/.test(value.request_id) || typeof value.context !== "string" || value.context.length > 8192 || typeof value.text !== "string" || Buffer.byteLength(value.text) > 128 * 1024 || !Array.isArray(value.files) || (!value.files.length && !value.text.trim()) || value.files.length > uploadLimits.count || new Set(value.files).size !== value.files.length || value.files.some((id) => !validUploadID(id))) throw new Error("Invalid attachment request");
+    if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some((key) => !["request_id", "context", "text", "files", "reply_to_update_id", "plan_first", "queue_only"].includes(key)) || (value.queue_only !== undefined && typeof value.queue_only!=="boolean") || (value.plan_first !== undefined && typeof value.plan_first!=="boolean") || (value.reply_to_update_id !== undefined && (typeof value.reply_to_update_id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(value.reply_to_update_id))) || typeof value.request_id !== "string" || !/^[a-zA-Z0-9-]{1,64}$/.test(value.request_id) || typeof value.context !== "string" || value.context.length > 8192 || typeof value.text !== "string" || Buffer.byteLength(value.text) > 128 * 1024 || !Array.isArray(value.files) || (!value.files.length && !value.text.trim()) || value.files.length > uploadLimits.count || new Set(value.files).size !== value.files.length || value.files.some((id) => !validUploadID(id))) throw new Error("Invalid attachment request");
   }
   if (frame.type === "update") {
     const value = frame.update;

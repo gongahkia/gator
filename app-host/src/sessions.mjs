@@ -14,8 +14,11 @@ export class Sessions extends EventEmitter {
   #transition = Promise.resolve();
   #stopping = false;
   #retiring = new WeakSet();
+	#dialogueSeen = new WeakMap();
+	#dialogueConfig = new WeakMap();
+	#dialogueScheduled = false;
   constructor(spawn) { super(); this.#spawn = spawn; }
-  get busy() { return [...this.workers].some(worker => !worker.closed && (worker.state?.running || (worker.state?.receipt_busy || worker.state?.catalog_busy) || worker.state?.pending_connection || worker.state?.pending_approval || worker.state?.external)); }
+  get busy() { return [...this.workers].some(worker => !worker.closed && (worker.state?.running || worker.state?.dialogue_busy || (worker.state?.receipt_busy || worker.state?.catalog_busy) || worker.state?.pending_connection || worker.state?.pending_approval || worker.state?.external)); }
   get pending() { return [...this.workers].some(worker => !worker.closed && worker.state?.queued); }
   settled() { return this.#transition; }
   activity() {
@@ -37,7 +40,7 @@ export class Sessions extends EventEmitter {
   // still a valid ancestry link, but arbitrary conversation IDs are not.
   canOpen(id) {
     if (typeof id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/.test(id)) return false;
-    return this.activity().some(item => item.id === id) || !this.current?.closed && this.current?.state?.branch?.conversation_id === id;
+    return !!(this.activity().some(item => item.id === id) || !this.current?.closed && (this.current?.state?.branch?.conversation_id === id || this.current?.state?.dialogue_task?.parent_id === id || this.current?.state?.dialogue?.some(turn => turn.task_chat === id)));
   }
   #changed(worker) {
     const before = this.#previous.get(worker), state = worker.state;
@@ -47,6 +50,13 @@ export class Sessions extends EventEmitter {
     }
     if (this.#unread.size > 64) this.#unread.delete(this.#unread.keys().next().value);
     this.#previous.set(worker, state);
+	const dispatch = state?.dialogue_dispatch;
+	if (!this.#stopping && !worker.closed && dispatch && this.#dialogueSeen.get(worker) !== dispatch.sequence) {
+		this.#dialogueSeen.set(worker, dispatch.sequence);
+		const operation = this.#transition.then(() => this.#dispatchDialogue(worker, dispatch));
+		this.#transition = operation.catch(error => { this.issue = error.message; this.emit("change"); });
+	}
+	this.#scheduleDialogue();
     const request = state?.session_request;
     if (!this.#stopping && worker === this.current && request && this.#seen.get(worker) !== request.sequence) {
       this.#seen.set(worker, request.sequence);
@@ -54,9 +64,52 @@ export class Sessions extends EventEmitter {
     }
     this.emit("change");
   }
+	#scheduleDialogue() {
+		if (this.#dialogueScheduled || this.#stopping) return;
+		this.#dialogueScheduled = true;
+		queueMicrotask(() => {
+			this.#dialogueScheduled = false;
+			if (this.#stopping) return;
+			const live = [...this.workers].filter(worker => !worker.closed && !this.#retiring.has(worker));
+			for (const worker of live) {
+				if (!worker.configureDialogue) continue;
+				const host = {
+					can_start: live.filter(owner => owner.state?.running).length < 3,
+					other_busy: live.some(owner => owner !== worker && owner.state?.running),
+					peers: live.filter(owner => !!worker.state?.conversation_id && !!owner.state?.dialogue_task && owner.state.dialogue_task.parent_id === worker.state.conversation_id).map(owner => {
+						const { parent_id, ...peer } = owner.state.dialogue_task; return peer;
+					}),
+				};
+				const signature = JSON.stringify(host);
+				if (this.#dialogueConfig.get(worker) === signature) continue;
+				this.#dialogueConfig.set(worker, signature); worker.configureDialogue(host);
+			}
+		});
+	}
+	async #dispatchDialogue(parent, request) {
+		if (this.#stopping || parent.closed || parent.state?.dialogue_dispatch?.sequence !== request.sequence) return;
+		const result = { turn_id: request.turn_id, child_id: request.child_id };
+		try {
+			if (request.kind === "task") {
+				if ([...this.workers].filter(worker => !worker.closed && worker.state?.running).length >= 3) throw new Error("Three tasks are working. Wait for one to finish or stop the selected task.");
+				let owner = [...this.workers].find(worker => !worker.closed && worker.state?.conversation_id === request.child_id);
+				// Creation is background-only: no focus, current-chat or active-chat change.
+				owner ??= await this.#create({ conversation_id: request.child_id });
+				await owner.bootstrapDialogue(parent.state.conversation_id, request.turn_id);
+			} else if (request.kind === "guide" || request.kind === "stop") {
+				const owner = [...this.workers].find(worker => !worker.closed && worker.state?.conversation_id === request.child_id);
+				const origin = owner?.state?.dialogue_task;
+				if (!origin || origin.parent_id !== parent.state.conversation_id) throw new Error("The original task owner is unavailable; inspect it before sending another control.");
+				await owner.controlDialogue({ parent_id: origin.parent_id, turn_id: origin.turn_id, request_id: request.turn_id, run_id: request.target_run, action: request.kind, instruction: request.instruction || "" });
+			} else throw new Error("Unknown conversation task request.");
+		} catch (error) { result.error = error.message; }
+		// Never repeat an unconfirmed bootstrap/control. The original owner retains
+		// its admission and exact external-action receipts for explicit inspection.
+		if (!parent.closed) await parent.finishDialogue(result);
+	}
   async #create(request) {
     if (this.workers.size >= 4) {
-      const idle = [...this.workers].find(worker => worker !== this.current && (worker.closed || !worker.state?.running && !worker.state?.queued && !worker.state?.external && !worker.state?.pending_connection && !worker.state?.pending_approval && !worker.state?.receipt_busy && !worker.state?.catalog_busy));
+      const idle = [...this.workers].find(worker => worker !== this.current && (worker.closed || !worker.state?.running && !worker.state?.dialogue_busy && !worker.state?.queued && !worker.state?.external && !worker.state?.pending_connection && !worker.state?.pending_approval && !worker.state?.receipt_busy && !worker.state?.catalog_busy));
       if (!idle) throw new Error("Four chats are open. Finish a task or review a paused queue before opening another.");
       this.#retiring.add(idle); await idle.stop(); this.workers.delete(idle);
     }
@@ -103,7 +156,7 @@ export class Sessions extends EventEmitter {
     const otherBusy = [...this.workers].some(worker => worker !== this.current && !worker.closed && (worker.state?.running || worker.state?.queued || (worker.state?.receipt_busy || worker.state?.catalog_busy) || worker.state?.pending_connection || worker.state?.pending_approval || worker.state?.external));
     if (otherBusy && (/^\/(data|recovery)(\s|$)/.test(frame.text ?? "") || ["/data", "/recovery"].includes(this.current.state?.destination))) throw new Error("Finish work in the other chats before changing retained data or recovery settings.");
     const starting = frame.type === "upload_submit" || frame.type === "queue" && frame.queue?.action === "run" || frame.type === "submit" && !frame.text?.startsWith("/") || frame.type === "task_plan" && ["approve", "start"].includes(frame.task_plan?.action);
-    if (starting && !this.current.state?.running && [...this.workers].filter(worker => !worker.closed && worker.state?.running).length >= 3) throw new Error("Three chats are working. Wait for one to finish, or stop it before sending this message.");
+    if (starting && !(frame.type === "upload_submit" && this.current.state?.dialogue_active) && !this.current.state?.running && [...this.workers].filter(worker => !worker.closed && worker.state?.running).length >= 3) throw new Error("Three chats are working. Wait for one to finish, or stop it before sending this message.");
   }
   async resumeConnection(frame) {
     if (frame.type !== "navigate" || frame.text !== "/connections") return false;

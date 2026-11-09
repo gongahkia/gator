@@ -29,7 +29,7 @@ test("restart leaves interrupted requests paused and keyboard resume uses the ad
   const flush = async () => { await setup.flush(); await Bun.sleep(30); await setup.flush() }
   try {
     await client.start(); await client.send({ type: "submit", text: "/mode inspect" }); await client.edit("Prepare report"); await client.submit(); await until(() => calls.length === 1, "first active request")
-    await client.attach([source]); await client.edit("Read brief next"); await client.submit(); await client.edit("Summarize afterwards"); await client.submit()
+    await client.attach([source]); await client.edit("Read brief next"); await client.submit(true); await client.edit("Summarize afterwards"); await client.submit(true)
     expect(client.state?.queue).toHaveLength(2)
     await client.edit("Keep the unsent recovery draft")
     const queueAction = async (message: string, action: string) => {

@@ -31,12 +31,12 @@ test("independent real Go chats retain work, queues, live guidance and drafts ac
     await client.start(); await flush(); const first = client.state!.conversation_id!
     await client.send({ type: "submit", text: "/mode inspect" })
     await setup.mockInput.typeText("First concurrent task"); setup.mockInput.pressEnter(); await until(() => calls.length === 1, "first running")
-    await client.edit("First queued follow-up"); await client.submit(); expect(client.state?.queue).toHaveLength(1)
+    await client.edit("First queued follow-up"); await client.submit(true); expect(client.state?.queue).toHaveLength(1)
     await client.edit("Keep first chat draft")
     setup.mockInput.pressKey("n", { ctrl: true }); await until(() => !!client.state?.conversation_id && client.state.conversation_id !== first && !client.snapshot.sessionSwitching, "new independent chat")
     await client.loadDraft(); await flush(); const second = client.state!.conversation_id!
     expect(client.draft.text).toBe(""); expect(client.snapshot.allChatsBusy).toBe(true)
-    await client.send({ type: "submit", text: "/mode inspect" }); await client.edit("Second independent task"); await client.submit()
+    await client.send({ type: "submit", text: "/mode inspect" }); await client.send({ type: "submit", text: "Second independent task" })
     await until(() => !!client.state?.messages.some(m => m.text.includes("Finished isolated request 2")) && !client.state.running, "second complete")
     expect(calls[1]).not.toContain("First concurrent task"); await client.edit("Keep second chat draft")
     await client.navigate("/chats"); await flush(); await setup.mockInput.typeText("First concurrent task"); await flush(); setup.mockInput.pressEnter()

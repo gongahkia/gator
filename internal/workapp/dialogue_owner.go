@@ -6,6 +6,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/gongahkia/gator/internal/worksession"
 )
 
 // DialogueMessage projects public content and input references, never captured
@@ -73,9 +74,14 @@ func (m Model) dialogueTaskState() *DialogueTaskState {
 			result.CanStop = result.RunID != "" && m.cancel != nil && !m.cancelling
 		}
 		if !r.Pending() {
-			for i := len(m.messages) - 1; i >= 0; i-- {
+			if r.RevisionID != "" {
+				if revision, err := m.config.SessionStore.LoadRevision(m.conversation, r.RevisionID); err == nil {
+					result.Summary = boundedConversation(revision.FinalText, 8192)
+				}
+			}
+			for i := len(m.messages) - 1; result.Summary == "" && i >= 0; i-- {
 				message := m.messages[i]
-				if message.role == "Gator" && message.text != "" {
+				if message.role == "Gator" && message.text != "" && (r.RevisionID != "" && message.revisionID == r.RevisionID || r.RevisionID == "" && len(m.requests.Requests) == 1) {
 					result.Summary = boundedConversation(message.text, 8192)
 					break
 				}
@@ -87,6 +93,33 @@ func (m Model) dialogueTaskState() *DialogueTaskState {
 		break
 	}
 	return result
+}
+
+func (m Model) retainedDialoguePeer(turn worksession.DialogueTurn) *DialoguePeer {
+	origin, err := m.config.SessionStore.DialogueTask(turn.TaskChat)
+	if err != nil || origin == nil || origin.ParentConversationID != m.conversation || origin.TurnID != turn.ID {
+		return nil
+	}
+	peer := &DialoguePeer{ConversationID: turn.TaskChat, TurnID: turn.ID, State: "unconfirmed"}
+	journal, err := m.config.SessionStore.LoadRequests(turn.TaskChat)
+	if err != nil {
+		return peer
+	}
+	for _, r := range journal.Requests {
+		if r.ClientID == turn.ID {
+			if !r.Pending() {
+				peer.State = r.State
+				peer.Summary = boundedConversation(r.Issue, 8192)
+				if r.RevisionID != "" {
+					if revision, err := m.config.SessionStore.LoadRevision(turn.TaskChat, r.RevisionID); err == nil {
+						peer.Summary = boundedConversation(revision.FinalText, 8192)
+					}
+				}
+			}
+			break
+		}
+	}
+	return peer
 }
 
 // BootstrapDialogue only admits the immutable request bound to this exact

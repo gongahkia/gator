@@ -232,6 +232,16 @@ func (m Model) ConfigureDialogueHost(host DialogueHost) Model {
 		seen[peer.ConversationID] = true
 		m.dialoguePeers = append(m.dialoguePeers, peer)
 	}
+	// On restart, project only confirmed durable results. Stored running/queued
+	// states without a live owner remain unconfirmed and are never relaunched.
+	for _, turn := range m.dialogueTurns {
+		if turn.TaskChat != "" && !seen[turn.TaskChat] {
+			peer := m.retainedDialoguePeer(turn)
+			if peer != nil {
+				m.dialoguePeers = append(m.dialoguePeers, *peer)
+			}
+		}
+	}
 	return m
 }
 

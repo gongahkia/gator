@@ -67,7 +67,11 @@ export function Prompt() {
     { bind: "return", run: () => { void complete(true).catch(error => client.fail(error)) } },
     { bind: "escape", run: () => { setDismissed(data.draft.text) } },
   ] }))
-  createEffect(() => { const text = data.draft.text; if (textarea && textarea.plainText !== text) { textarea.setText(text); textarea.gotoLineEnd() } })
+  // OpenTUI may emit intermediate content changes while replacing the buffer.
+  // Those are synchronization, not edits; feeding them back into the client
+  // can alternate old/new drafts indefinitely during live state updates.
+  let syncingDraft = false
+  createEffect(() => { const text = data.draft.text; if (textarea && textarea.plainText !== text) { syncingDraft = true; try { textarea.setText(text); textarea.gotoLineEnd() } finally { syncingDraft = false } } })
   createEffect(() => { if (dialog.stack.length || data.state?.panel) textarea?.blur(); else textarea?.focus() })
   const guide = () => { void client.guide().catch(error => client.fail(error)) }
   Keymap.createLayer(() => ({ priority: 2, enabled: dialog.stack.length === 0, commands: [
@@ -90,16 +94,16 @@ export function Prompt() {
     <box border={["left"]} borderColor={theme.accent} backgroundColor={theme.background.raised.base} paddingX={short() ? 1 : 2} paddingY={compact() ? 0 : 1} gap={compact() ? 0 : 1}>
     <Show when={metadata()}><text id="draft-context-summary" fg={theme.accent} height={1} wrapMode="none" truncate onMouseUp={() => void client.navigate("/draft-context").catch(error => client.fail(error))}>{hint("gator.draft-context")} · {metadata()}</text></Show>
     <textarea id="message-input" ref={value => { textarea = value }} focused width="100%" minHeight={1} maxHeight={short() ? 2 : Math.max(2, Math.min(8, Math.floor(dimensions().height / 4)))}
-      placeholderColor={theme.text.muted} initialValue={data.draft.text} placeholder="Ask anything…"
+      placeholderColor={theme.text.muted} initialValue={client.draft.text} placeholder="Ask anything…"
       textColor={theme.text.base} focusedTextColor={theme.text.base} backgroundColor={theme.background.raised.base} focusedBackgroundColor={theme.background.raised.base}
       keyBindings={[{ name: "return", action: "submit" }, { name: "return", shift: true, action: "newline" }, { name: "j", ctrl: true, action: "newline" }]}
-      onContentChange={() => { if (textarea && textarea.plainText !== client.draft.text) void client.edit(textarea.plainText).catch(e => client.fail(e)) }}
+      onContentChange={() => { if (!syncingDraft && textarea && textarea.plainText !== client.draft.text) void client.edit(textarea.plainText).catch(e => client.fail(e)) }}
       onSubmit={() => { if (!dialog.stack.length) void client.submit().catch(e => client.fail(e)) }} />
     <text id="composer-model" height={1} wrapMode="none" truncate selectable={false} fg={theme.text.muted} onMouseDown={event => event.stopPropagation()}
       onMouseUp={event => { if (event.button !== 0) return; event.stopPropagation(); void client.navigate("/models").catch(e => client.fail(e)) }}><b style={{ fg: theme.accent }}>Gator</b>  {literal(model())}{data.state?.composer?.effort ? ` · ${data.state.composer.effort} effort` : ""}</text>
     </box>
     <box paddingX={1} paddingTop={compact() ? 0 : 1} flexDirection="row" justifyContent="space-between" gap={2}>
-      <text fg={theme.text.muted} attributes={TextAttributes.DIM} flexShrink={1} minWidth={0} height={1} wrapMode="none" truncate>{data.snapshot.connection !== "connected" ? "Reconnect before sending" : ["recording", "transcribing"].includes(data.voicePhase) ? "Finish dictation before sending" : data.state?.running ? `${hint("gator.send")} queue · ${hint("gator.guide")} guide · ${hint("gator.cancel")} stop` : `${hint("gator.send")} send · ${hint("gator.newline")} new line`}</text>
+      <text fg={theme.text.muted} attributes={TextAttributes.DIM} flexShrink={1} minWidth={0} height={1} wrapMode="none" truncate>{data.snapshot.connection !== "connected" ? "Reconnect before sending" : ["recording", "transcribing"].includes(data.voicePhase) ? "Finish dictation before sending" : data.state?.dialogue_active ? `${hint("gator.send")} send · Talk, correct or start work` : data.state?.running ? `${hint("gator.send")} queue · ${hint("gator.guide")} guide · ${hint("gator.cancel")} stop` : `${hint("gator.send")} send · ${hint("gator.newline")} new line`}</text>
       <text fg={theme.text.muted} attributes={TextAttributes.DIM} flexShrink={0}>{dimensions().width < 60 ? "/ commands" : `/ commands · ${hint("command.palette.show")}`}</text>
     </box>
   </box>
