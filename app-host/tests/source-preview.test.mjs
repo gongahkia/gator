@@ -22,6 +22,15 @@ async function fixture(run) {
 test("source preview shows verified retained bytes, cited lines and independently recorded read ranges", () => fixture(async f => {
   const result = await f.read(); assert.equal(result.text, f.text); assert.equal(result.sha256, hash(f.text)); assert.deepEqual(result.cited, { start: 2, end: 3 }); assert.deepEqual(result.reads, [{ start: 2, end: 3, truncated: false }]); assert.equal(result.notice, undefined);
 }));
+test("latest retained results expose the same sealed evidence without a transcript bundle", () => fixture(async f => {
+  const bundle = f.state.messages[0].bundle;
+  f.state.messages = [];
+  f.state.work_details = { latest_bundle: bundle };
+  assert.equal((await f.read()).text, f.text);
+  await assert.rejects(f.read({ ...f.request, run: "run-other" }), /unavailable/);
+  await writeFile(join(f.path, "manifest.json"), JSON.stringify({ run_id: "run-one", evidence: [] }));
+  await assert.rejects(f.read(), /manifest has changed/);
+}));
 test("current byte-range file reads include the terminating newline without inventing an extra read line", () => fixture(async f => {
   const read = { path: "source/project.md", start_line: 1, end_line: 4, start_offset: 0, end_offset: Buffer.byteLength(f.text), content: f.text, truncated: false };
   f.revision.replay.messages[1].content = JSON.stringify({ ok: true, result: read });

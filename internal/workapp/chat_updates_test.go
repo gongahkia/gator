@@ -3,11 +3,60 @@ package workapp
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/gongahkia/gator/internal/inbox"
 )
+
+func TestChatUpdateReceiptsConfirmTheirOwnOutcomeAndRejectChangedTargets(t *testing.T) {
+	store, err := inbox.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry, err := store.Add(inbox.Entry{Title: "Deadline", Status: "completed", OriginConversationID: "chat"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := New(Config{InboxStore: &store})
+	m.conversation = "chat"
+	m.refreshChatUpdates()
+	m.chatUpdatesIssue = "Previous request failed"
+	action := BridgeUpdateAction{ConversationID: "chat", ID: entry.ID, Action: "resolve", RequestID: "done-1"}
+	m = m.ApplyBridgeUpdate(action)
+	if result := m.BridgeState().ChatUpdateResult; result == nil || result.RequestID != "done-1" || result.Error != "" {
+		t.Fatal("missing exact outcome", result)
+	}
+	if got := m.bridgeChatUpdates()[0]; !got.Resolved || got.Version != 1 || got.Read {
+		t.Fatal("wrong item state", got)
+	}
+	// The old menu's version cannot undo a newer decision.
+	action.Action, action.RequestID = "reopen", "reopen-stale"
+	m = m.ApplyBridgeUpdate(action)
+	if result := m.BridgeState().ChatUpdateResult; result.RequestID != action.RequestID || result.Error == "" {
+		t.Fatal("stale receipt claimed success", result)
+	}
+	for _, change := range []BridgeUpdateAction{
+		{ConversationID: "other", ID: entry.ID, Action: "reopen", Version: 1, RequestID: "wrong-owner"},
+		{ConversationID: "chat", ID: "missing", Action: "resolve", RequestID: "missing-item"},
+		{ConversationID: "chat", ID: entry.ID, Action: "reopen", Version: 1, RequestID: strings.Repeat("a", 65)},
+		{ConversationID: "chat", ID: entry.ID, Action: "reopen", Version: 1, RequestID: "bad identity"},
+	} {
+		m = m.ApplyBridgeUpdate(change)
+		if result := m.BridgeState().ChatUpdateResult; result.RequestID != change.RequestID || result.Error == "" {
+			t.Fatal("invalid target claimed success", result)
+		}
+	}
+	if !m.bridgeChatUpdates()[0].Resolved {
+		t.Fatal("rejected requests changed the update")
+	}
+	action.Version, action.RequestID = 1, "reopen-2"
+	m = m.ApplyBridgeUpdate(action)
+	if result := m.BridgeState().ChatUpdateResult; result.Error != "" || result.RequestID != "reopen-2" || m.bridgeChatUpdates()[0].Resolved {
+		t.Fatal("valid retry did not confirm its outcome", result)
+	}
+}
 
 func TestChatFeedbackReturnsOwnedAcknowledgementAndCurrentAssessment(t *testing.T) {
 	store, err := inbox.Open(t.TempDir())

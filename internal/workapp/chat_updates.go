@@ -2,6 +2,7 @@ package workapp
 
 import (
 	"fmt"
+	"regexp"
 	"time"
 )
 
@@ -112,7 +113,24 @@ func (m Model) bridgeChatUpdates() []BridgeChatUpdate {
 	return result
 }
 
+var updateRequestID = regexp.MustCompile(`^[a-zA-Z0-9-]{1,64}$`)
+
 func (m Model) ApplyBridgeUpdate(action BridgeUpdateAction) Model {
+	// Explicit item controls need the outcome of their own receipt, not a
+	// transport acknowledgement or an issue left by a different update. Older
+	// clients may still submit passive delivery receipts without a request ID.
+	if action.RequestID != "" && !updateRequestID.MatchString(action.RequestID) {
+		m.chatUpdateResult = &BridgeUpdateResult{RequestID: action.RequestID, Error: "Invalid update request identity."}
+		return m
+	}
+	next := m.applyBridgeUpdate(action)
+	if action.RequestID != "" && action.Action != "rate" {
+		next.chatUpdateResult = &BridgeUpdateResult{RequestID: action.RequestID, Error: next.chatUpdatesIssue}
+	}
+	return next
+}
+
+func (m Model) applyBridgeUpdate(action BridgeUpdateAction) Model {
 	if action.Action == "rate" {
 		m.chatUpdateResult = &BridgeUpdateResult{RequestID: action.RequestID}
 		if action.RequestID == "" || len(action.RequestID) > 64 || m.config.InboxStore == nil || m.conversation == "" || action.ConversationID != m.conversation {
@@ -126,12 +144,14 @@ func (m Model) ApplyBridgeUpdate(action BridgeUpdateAction) Model {
 		m.refreshChatUpdates()
 		return m
 	}
+	m.chatUpdatesIssue = ""
 	if m.config.InboxStore == nil || m.conversation == "" || action.ConversationID != m.conversation {
 		m.chatUpdatesIssue = "Return to the update’s conversation before changing it."
 		return m
 	}
 	if action.Action == "older" || action.Action == "newer" {
 		if len(m.chatUpdates) == 0 {
+			m.chatUpdatesIssue = "Updates changed; use the current page controls."
 			return m
 		}
 		if action.Action == "older" && m.updatesHaveOlder && action.ID == m.chatUpdates[len(m.chatUpdates)-1].ID {

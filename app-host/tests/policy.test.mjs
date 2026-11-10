@@ -49,6 +49,12 @@ test("update feedback requires a bounded nonce and independent reviewed version"
   for (const change of [{ rating: "good" }, { rating_version: undefined }, { rating_version: -1 }, { rating_version: 1.5 }, { request_id: "" }, { request_id: "a".repeat(65) }, { action: "read" }]) assert.throws(() => validateFrame({ type: "update", update: { ...update, ...change } }));
 });
 
+test("update item actions accept a bounded outcome nonce without feedback or replacement authority", () => {
+  const update = { conversation_id: "work-one", id: "inbox-one", action: "resolve", version: 3, request_id: "done-1" };
+  for (const action of ["read", "resolve", "reopen", "delivered", "older", "newer"]) assert.equal(validateFrame({ type: "update", update: { ...update, action } }).version, 1);
+  for (const change of [{ request_id: "" }, { request_id: "a".repeat(65) }, { request_id: "bad id" }, { request_id: 7 }, { rating: "useful" }, { rating_version: 2 }, { origin_conversation_id: "other" }, { account: "other" }]) assert.throws(() => validateFrame({ type: "update", update: { ...update, ...change } }));
+});
+
 test("composer choices carry only bounded identities and canonical work effort", () => {
   const composer = { id: "a".repeat(64), request_id: "picker-1", action: "model", provider: "fixture", model: "model-one" };
   assert.equal(validateFrame({ type: "composer", composer }).version, 1);

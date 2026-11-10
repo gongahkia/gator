@@ -21,7 +21,8 @@ function describe(entry) {
 async function retainedManifest(request, {state,current}) {
   if (!state?.conversation_id || request.context !== `conversation:${state.conversation_id}` || !current()) throw new Error("Return to the original conversation before opening its source.");
   if (!identifier(request.run)) throw new Error("Invalid source run.");
-  const bundle = state.messages?.find(message => message.bundle?.RunID === request.run)?.bundle;
+  const latest = state.work_details?.latest_bundle;
+  const bundle = latest?.RunID === request.run ? latest : state.messages?.find(message => message.bundle?.RunID === request.run)?.bundle;
   if (!bundle || !/^[a-f0-9]{64}$/.test(bundle.ManifestSHA256 || "")) throw new Error("The retained evidence for this answer is unavailable.");
   const raw = await readBoundedFile(bundle.Path, "manifest.json", 2 * 1024 * 1024);
   if (hash(raw) !== bundle.ManifestSHA256) throw new Error("The retained source manifest has changed.");
