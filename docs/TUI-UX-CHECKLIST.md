@@ -45,6 +45,18 @@ finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
 
+- Fresh complete terminal regression after `fdd10b37f` (11 November): **116 pass,
+  3 unchanged skips, 0 failures**, 1,983 assertions across 119 tests / 66 files
+  in 254.75 seconds. No implementation or test files changed during this run.
+  The command workflow now checks actual saved appearance and absence of an
+  extra task submission. All settings/first-task/plan/cached-owner/recovery
+  checks pass together with the unchanged command deadline. Log:
+  `/tmp/gator-ux-20261111-terminal-settings-full-tui-verified.log`.
+  The existing image-paste/old-voice/managed-browser skips are retained as skips;
+  separate controlled integrations do not become physical verification.
+  All fifteen findings remain in scope; this regression does not complete the
+  remaining product criteria or the final combined acceptance journey.
+
 - Unified conversational/manual terminal settings (10–11 November): terminal
   appearance has one authoritative value, `Settings.Theme`; layout preferences
   live in the same Go configuration document. The native host imports retained
