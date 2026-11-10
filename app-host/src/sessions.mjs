@@ -96,12 +96,15 @@ export class Sessions extends EventEmitter {
 				// Creation is background-only: no focus, current-chat or active-chat change.
 				owner ??= await this.#create({ conversation_id: request.child_id });
 				await owner.bootstrapDialogue(parent.state.conversation_id, request.turn_id);
-			} else if (request.kind === "guide" || request.kind === "stop") {
+			} else if (request.kind === "guide" || request.kind === "stop" || request.kind === "revise_plan") {
+				if (request.kind === "revise_plan" && [...this.workers].filter(worker => !worker.closed && worker.state?.running).length >= 3) throw new Error("Three tasks are working. Wait for one to finish before revising this plan.");
 				const owner = [...this.workers].find(worker => !worker.closed && worker.state?.conversation_id === request.child_id);
-				const origin = owner?.state?.dialogue_task;
+				const localRevision = request.kind === "revise_plan" && owner === parent && typeof request.owner_task === "string";
+				const origin = localRevision ? { parent_id: parent.state.conversation_id, turn_id: request.owner_task } : owner?.state?.dialogue_task;
 				if (!origin || origin.parent_id !== parent.state.conversation_id) throw new Error("The original task owner is unavailable; inspect it before sending another control.");
 				const receipt = await owner.controlDialogue({ parent_id: origin.parent_id, turn_id: origin.turn_id, request_id: request.turn_id, run_id: request.target_run, action: request.kind, instruction: request.instruction || "" });
 				if (receipt?.cancelled_plan === true && request.kind === "stop") result.cancelled_plan = true;
+				if (receipt?.revising_plan === true && request.kind === "revise_plan") result.revising_plan = true;
 			} else throw new Error("Unknown conversation task request.");
 		} catch (error) { result.error = error.message; }
 		// Never repeat an unconfirmed bootstrap/control. The original owner retains

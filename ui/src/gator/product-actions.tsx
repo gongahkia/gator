@@ -57,9 +57,11 @@ export function useProductActions(controls: ReturnType<typeof useActions>) {
     const result = await client.result({ type: "task_plan", task_plan: { conversation_id: owner(), task_id: plan.id, revision: plan.revision, digest: plan.digest, request_id, action, content } }, request_id, s => s.task_plan_result)
     return result.review
   }
-  const planText = (plan: TaskPlanReview) => [plan.task, plan.content?.outcome,
+  const planText = (plan: TaskPlanReview) => [plan.phase === "revising" ? "A revision is being prepared. The previous proposal below is retained for reference; approval is disabled." : "", plan.task, plan.content?.outcome,
+    plan.correction ? `${plan.edit_state === "applied" ? "Retained user correction" : "Requested correction (not applied)"}:\n${plan.correction}` : "", plan.issue,
     ...(plan.content?.steps ?? []).map((step, i) => `${i + 1}. ${step.text}`),
     `Effects: ${plan.content?.effects.join(", ") || "None"}`, `Sources: ${plan.content?.sources.join(", ") || "None"}`,
+    `Original inputs: ${plan.input_names?.join(", ") || "None"}`,
     `Execution limits: manager ${plan.budget.max_steps || "default"} steps; coding assignment ${plan.budget.code_max_steps || "default"} steps.`,
     `Revision ${plan.revision} · ${plan.state} · ${plan.phase}`,
     "A plan describes intended work. Activity and retained outputs show actual results. External actions keep their separate approvals.",
@@ -93,7 +95,7 @@ export function useProductActions(controls: ReturnType<typeof useActions>) {
       { title: "Reuse request in message box", run: () => client.edit([client.draft.text, plan.task].filter(Boolean).join("\n\n")) },
     ], true)
   }
-  actions["task-plans"] = () => menu("Reviewed task plans", (data.state?.task_plans ?? []).map(plan => ({ title: plan.outcome || plan.task, description: `${plan.state} · ${plan.phase} · revision ${plan.revision}`, run: async () => { const review = await planAction(plan, "inspect"); if (review) reviewPlan(review) } })))
+  actions["task-plans"] = () => menu("Reviewed task plans", (data.state?.task_plans ?? []).map(plan => ({ title: plan.outcome || plan.task, description: `${plan.state} · ${plan.phase} · revision ${plan.revision}${plan.issue ? " · " + plan.issue : ""}`, run: async () => { const review = await planAction(plan, "inspect"); if (review) reviewPlan(review) } })))
   actions.specialists = () => menu("Specialists in this task", (data.state?.specialists ?? []).map(task => ({ title: task.name, description: task.status, run: () => {
     const act = (action: "guide" | "stop", text?: string) => {
       if (!task.token) throw new Error("This worker no longer accepts live controls.")

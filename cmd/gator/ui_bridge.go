@@ -82,7 +82,7 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 			if frame.DialogueControl == nil {
 				return m, nil
 			}
-			next = m.model.ControlDialogue(*frame.DialogueControl)
+			next, command = m.model.ControlDialogue(*frame.DialogueControl)
 		case "dialogue_page":
 			next = m.model.LoadOlderDialogue(frame.DialogueBefore)
 		case "focus_session":

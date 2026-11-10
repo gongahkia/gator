@@ -485,6 +485,9 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		PreparePlan: func(ctx context.Context, r worksession.Request) (worksession.PlanContent, error) {
 			return prepareDesktopTaskPlan(ctx, stateDir, r)
 		},
+		RevisePlan: func(ctx context.Context, r worksession.Request) (worksession.PlanContent, error) {
+			return reviseDesktopTaskPlan(ctx, stateDir, r)
+		},
 		ForkConversation: func(parent, revision, run, request string) (worksession.Conversation, error) {
 			release, err := state.Guard(stateDir, false)
 			if err != nil {

@@ -38,6 +38,7 @@ type DialoguePeer struct {
 	State          string `json:"state"`
 	CanGuide       bool   `json:"can_guide"`
 	CanStop        bool   `json:"can_stop"`
+	CanRevisePlan  bool   `json:"can_revise_plan"`
 	Summary        string `json:"summary,omitempty"`
 }
 type DialogueHost struct {
@@ -52,11 +53,13 @@ type DialogueDispatch struct {
 	ChildID     string `json:"child_id"`
 	TargetRun   string `json:"target_run,omitempty"`
 	Instruction string `json:"instruction,omitempty"`
+	OwnerTask   string `json:"owner_task,omitempty"`
 }
 type DialogueDispatchResult struct {
 	TurnID        string `json:"turn_id"`
 	ChildID       string `json:"child_id"`
 	CancelledPlan bool   `json:"cancelled_plan,omitempty"`
+	RevisingPlan  bool   `json:"revising_plan,omitempty"`
 	Error         string `json:"error,omitempty"`
 }
 type DialogueControl struct {
@@ -70,6 +73,7 @@ type DialogueControl struct {
 type DialogueControlResult struct {
 	RequestID     string `json:"request_id"`
 	CancelledPlan bool   `json:"cancelled_plan,omitempty"`
+	RevisingPlan  bool   `json:"revising_plan,omitempty"`
 	Error         string `json:"error,omitempty"`
 	control       DialogueControl
 }
@@ -218,7 +222,7 @@ func (m Model) conversationTasks() []workrun.ConversationTask {
 			if err != nil || turn.TaskChat != peer.ConversationID {
 				continue
 			}
-			tasks = append(tasks, workrun.ConversationTask{ID: peer.ConversationID, Title: boundedConversation(turn.Text, 256), State: peer.State, Summary: boundedConversation(peer.Summary, 2048), CanGuide: peer.CanGuide && peer.RunID != "", CanStop: peer.CanStop && peer.RunID != "", ControlID: peer.RunID})
+			tasks = append(tasks, workrun.ConversationTask{ID: peer.ConversationID, Title: boundedConversation(turn.Text, 256), State: peer.State, Summary: boundedConversation(peer.Summary, 2048), CanGuide: peer.CanGuide && peer.RunID != "", CanStop: peer.CanStop && peer.RunID != "", CanRevisePlan: peer.CanRevisePlan && peer.RunID != "", ControlID: peer.RunID})
 			seen[peer.ConversationID] = true
 		}
 	}
@@ -247,6 +251,7 @@ func (m Model) conversationTasks() []workrun.ConversationTask {
 // ConfigureDialogueHost accepts no workflow state from the renderer. The host
 // reports only native owner capabilities; durable provenance filters each peer.
 func (m Model) ConfigureDialogueHost(host DialogueHost) Model {
+	m.refreshPlanEditMessages()
 	m.dialogueHost = true
 	m.dialogueCanStart = host.CanStart
 	m.dialogueOtherBusy = host.OtherBusy
@@ -319,6 +324,7 @@ func (m Model) admitConversation(request BridgeUploadSubmission, text string) (t
 	input := ConversationInput{Version: 1, Source: m.source, GoalID: m.goalID, RunOptions: retainedRunOptions(options), Recent: m.conversationRecent(), TaskContext: m.conversationTasks()}
 	for index := range input.TaskContext {
 		input.TaskContext[index].CanGuide, input.TaskContext[index].CanStop = false, false
+		input.TaskContext[index].CanRevisePlan = false
 	}
 	if m.config.CaptureConversationInput != nil {
 		var err error
@@ -383,6 +389,7 @@ func (m Model) startConversationRoute() (tea.Model, tea.Cmd) {
 }
 func (m Model) failConversation(turn worksession.DialogueTurn, issue string) (tea.Model, tea.Cmd) {
 	turn.State, turn.Issue = "failed", boundedConversation(issue, 4000)
+	turn.Response = ""
 	if _, err := m.saveDialogue(turn); err != nil {
 		m.dialogueIssue = "Couldn't confirm the message outcome: " + err.Error()
 	}
@@ -412,7 +419,7 @@ func (m Model) finishConversationRoute(value conversationRouted) (tea.Model, tea
 		return m.failConversation(turn, "The task or available controls changed while Gator considered this message. Send a new message after reviewing its current state.")
 	}
 	var controlID string
-	if value.Decision.Kind == "guide" || value.Decision.Kind == "stop" {
+	if value.Decision.Kind == "guide" || value.Decision.Kind == "stop" || value.Decision.Kind == "revise_plan" {
 		for _, task := range value.Request.Tasks {
 			if task.ID == value.Decision.Target {
 				controlID = task.ControlID
@@ -463,12 +470,22 @@ func (m Model) finishConversationRoute(value conversationRouted) (tea.Model, tea
 		return m, nil
 	}
 	turn.State = "dispatching"
+	if value.Decision.Kind == "revise_plan" {
+		turn.State, turn.Response = "editing_plan", "Requesting a revised plan for review…"
+	}
 	turn, err = m.saveDialogue(turn)
 	if err != nil {
 		m.dialogueIssue = err.Error()
 		return m.startConversationRoute()
 	}
 	if m.ownsConversationTask(value.Decision.Target) {
+		if value.Decision.Kind == "revise_plan" {
+			// Both current-chat and delegated revisions cross the same host
+			// admission boundary before their owner starts the model call.
+			m.dialogueSequence++
+			m.dialogueDispatch = &DialogueDispatch{Sequence: m.dialogueSequence, Kind: "revise_plan", TurnID: turn.ID, ChildID: m.conversation, OwnerTask: value.Decision.Target, TargetRun: controlID, Instruction: value.Decision.Instruction}
+			return m, nil
+		}
 		cancelledPlan := false
 		if value.Decision.Kind == "guide" {
 			err = m.operation.Steer(value.Decision.Instruction)
@@ -510,8 +527,21 @@ func (m Model) FinishDialogueDispatch(result DialogueDispatchResult) (tea.Model,
 		m.dialogueIssue = err.Error()
 		return m.startConversationRoute()
 	}
+	if request.Kind == "revise_plan" && (turn.State == "guided" || turn.State == "failed" || turn.State == "interrupted") {
+		// The model may have completed and retained its result before an owner
+		// acknowledgement was lost. Prefer that exact durable outcome; never
+		// overwrite it with a transport error or repeat the proposal.
+		m.rememberDialogue(turn)
+		return m.startConversationRoute()
+	}
 	if result.Error != "" {
 		return m.failConversation(turn, "The task request was not confirmed: "+result.Error+". Inspect its retained state before trying again.")
+	}
+	if request.Kind == "revise_plan" && result.RevisingPlan {
+		// Admission is acknowledged immediately; the owner retains the actual
+		// proposal outcome in this same turn after the asynchronous model call.
+		m.rememberDialogue(turn)
+		return m.startConversationRoute()
 	}
 	switch request.Kind {
 	case "task":

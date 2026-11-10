@@ -90,6 +90,7 @@ func dialogueReferenceContext(input *workapp.ConversationInput) (string, error) 
 	tasks := append([]workrun.ConversationTask(nil), input.TaskContext...)
 	for index := range tasks {
 		tasks[index].CanGuide, tasks[index].CanStop = false, false
+		tasks[index].CanRevisePlan = false
 	}
 	data, err := json.Marshal(struct {
 		Messages []workrun.ConversationMessage `json:"messages,omitempty"`

@@ -6,7 +6,7 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 
 | # | Acceptance criteria | Status | Evidence / commit |
 |---|---|---|---|
-| 1 | Conversation remains available during execution; ordinary messages can steer a specific live task or start independent work; ambiguous routing is clarified without losing task identity, files, or drafts. | In progress | `92cd471f4`/`485cd007c` plus result continuity: ordinary messages reply, steer, clarify, delegate and stop specific independent owners without moving focus. Preparing/reviewed plans can now be cancelled conversationally through their original owner; changed control epochs are rejected. Recent original-task summaries reach follow-up conversation, new work and planning after work finishes/restarts; they confer no controls. Files/context and durable results survive return/restart; explicit queues remain available. Controlled-provider native and Go checks pass. Plan-bound/pending-review corrections, delegated exact approvals, broader failure/retry/account/goal journeys and live-model routing quality remain to verify/finish. |
+| 1 | Conversation remains available during execution; ordinary messages can steer a specific live task or start independent work; ambiguous routing is clarified without losing task identity, files, or drafts. | In progress | `92cd471f4`/`485cd007c` plus result continuity: ordinary messages reply, steer, clarify, delegate and stop specific independent owners without moving focus. Pending-review text corrections now revise the same task asynchronously, preserve its frozen inputs/limits, and require fresh approval; failures/cancellation and restart retain the outcome. Preparing/reviewed plans can be cancelled conversationally; changed control epochs are rejected. Recent original-task summaries reach follow-up conversation/work/planning without acquiring controls. Explicit queues remain available. Corrections during initial preparation or plan-bound execution, changes to pending exact actions/new inputs, delegated exact-approval journeys, broader failure/account/goal journeys and live-model routing quality remain open. |
 | 2 | Following unifies commitments with outcome/state/next action, next and last successful checks, sources/timezone, pause/edit, and truthful foreground/service/offline limits. | In progress | `4b9edf091`/`a95289265`: commitment cards and exact check controls. Active goal cards open their exact canonical picker row and prepare a check for that goal's current workspace, including duplicate titles, other-chat origins and busy owners. Focused Go/host/native integration checks pass. Advanced non-project schedule editing and paused-goal controls remain; final integrated journey pending. |
 | 3 | Relevant answers expose supplied memory/provenance/correction; noise feedback offers a reviewed, scoped check/notification change and reports its actual outcome. | Pending | |
 | 4 | First task leads through only missing setup; host connectivity and model readiness are distinct; local/cloud processing, capabilities, and work budget are explained. | Pending | |
@@ -45,13 +45,41 @@ finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
 
-- Pending-plan correction boundary (10 November): the canonical plan store now
+- Conversational pending-review corrections: ordinary composer messages now reach
+  the original native owner, including the current chat and independently owned
+  tasks. Both paths use host admission and its three-task limit; steering/stopping
+  remain available at capacity. Conversation continues during the tool-free model
+  call. Actual success/failure is retained in the requesting dialogue rather than
+  inferred from admission; a completed durable result survives a lost owner ACK.
+  The retained correction joins the freshly reviewed execution prompt, while
+  unsubmitted future draft files/text remain outside the task's model context.
+  Original task IDs, file references, scope and work limits are preserved. Old
+  plan approvals fail, and no implementation runs before a fresh keyboard review.
+  Plan inspection shows the correction, its status/issue and original input names.
+  Provider failure requires an explicit new correction message; cancellation and
+  orphan recovery never revive a proposal. Native Go + controlled HTTP provider:
+  current/delegated correction, failure/retry, cancellation, all four sizes with
+  a separate multiline/file/plan draft, fresh review, actual execution and restart.
+  Related terminal regressions: **12 pass, 237 assertions**; host sessions: **18
+  pass**. Logs: `/tmp/gator-ux-20261110-plan-edit-terminal-regression.log`,
+  `/tmp/gator-ux-20261110-plan-edit-admission-{go,host}.log`; TUI typecheck passes.
+  These are controlled-provider/native-renderer journeys, not physical terminal
+  or live-account/model verification. This completes pending-review text edits;
+  initial-preparation/plan-bound-execution and pending exact-action edits still
+  remain under item 1. It does not complete the fifteen-item goal.
+
+- Draft-restoration gap observed while verifying corrections: text and file
+  references survive restart, but the next-message plan-first flag is kept only
+  in `GatorClient.planFirst`, outside the retained draft format. Preserve that
+  review intent across restart and newer-draft/admission races under item 10.
+
+- Pending-plan correction boundary (`e04c74883`, 10 November): the canonical plan store now
   admits a tool-free edit against an exact task/revision/digest and immutable
   requesting dialogue. Admission revokes the old review; success requires a new
   human review, while failure/cancellation retains the original task text,
   options, sources and budgets. The original conversation retains the actual
   result, including after owner restart. Read-only conversation references do
-  not acquire the new correction capability. Full Go workspan checks pass:
+  not acquire the new correction capability. Full Go package checks pass:
   `go test ./internal/worksession ./internal/workapp ./internal/workrun ./cmd/gator`;
   log `/tmp/gator-ux-20261110-plan-edit-go-full.log`. Native owner/host wiring and
   its capacity check are being finished separately; this backend boundary alone

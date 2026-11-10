@@ -185,6 +185,7 @@ type Config struct {
 	RouteConversation        func(context.Context, workrun.ConversationRequest, ConversationInput) (workrun.ConversationDecision, error)
 	BindConversationTask     func(conversation, turn, source string, revision uint64) (worksession.DialogueTurn, worksession.Conversation, bool, error)
 	PreparePlan              func(context.Context, worksession.Request) (worksession.PlanContent, error)
+	RevisePlan               func(context.Context, worksession.Request) (worksession.PlanContent, error)
 	ForkConversation         func(parent, revision, run, request string) (worksession.Conversation, error)
 	ComposerSources          func() ([]ComposerSource, error)
 	SelectComposerSources    func(string, []string, []string) error
@@ -383,6 +384,8 @@ type Model struct {
 	dialogueControls        map[string]DialogueControlResult
 	bridgeCheckResult       *BridgeCheckResult
 	planPreparing           string
+	planRevising            string
+	planEditTurn            string
 	planResult              *TaskPlanResult
 	catalog                 *conversationCatalog
 	catalogSequence         uint64

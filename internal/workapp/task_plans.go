@@ -180,7 +180,8 @@ func (m Model) ApplyTaskPlan(action TaskPlanAction) (tea.Model, tea.Cmd) {
 	if action.ConversationID != m.conversation || !branchIdentity.MatchString(action.ConversationID) || len(action.TaskID) != 32 || !branchIdentity.MatchString(action.TaskID) || !branchIdentity.MatchString(action.RequestID) || len(action.RequestID) > 64 {
 		return fail(errors.New("invalid plan owner or identity"))
 	}
-	if !m.retainsRequests() || m.background || m.section != "" || m.launcher || m.models != nil || m.controlBusy || m.followupSaving || m.recallBusy || m.bridgeExternal != nil || m.pendingBundleAction != nil || m.receiptBusy || m.running && action.Action != "inspect" {
+	cancelPreparation := action.Action == "cancel" && (action.TaskID == m.planPreparing || action.TaskID == m.planRevising)
+	if !m.retainsRequests() || m.background || m.section != "" || m.launcher || m.models != nil || m.controlBusy || m.followupSaving || m.recallBusy || m.bridgeExternal != nil || m.pendingBundleAction != nil || m.receiptBusy || m.running && action.Action != "inspect" && !cancelPreparation {
 		return fail(errors.New("return to the idle conversation before changing this plan"))
 	}
 	j, err := m.config.SessionStore.LoadRequests(m.conversation)
@@ -204,6 +205,10 @@ func (m Model) ApplyTaskPlan(action TaskPlanAction) (tea.Model, tea.Cmd) {
 	case "inspect":
 		p := r.Plan.Clone()
 		m.planResult.Review = &TaskPlanReview{ID: r.ID, Revision: p.Revision, Digest: p.Digest, Task: r.Text, State: r.State, Phase: p.Phase, Budget: p.Budget, Sources: append([]string{}, p.Sources...), Content: p.Content}
+		m.planResult.Review.Issue = r.Issue
+		if p.Edit != nil {
+			m.planResult.Review.Correction, m.planResult.Review.EditState = p.Edit.Instruction, p.Edit.State
+		}
 		var frozen RunOptions
 		if json.Unmarshal(r.Options, &frozen) == nil {
 			m.planResult.Review.InputNames = uploadNames(frozen.Uploads)
@@ -240,6 +245,9 @@ func (m Model) ApplyTaskPlan(action TaskPlanAction) (tea.Model, tea.Cmd) {
 		return fail(err)
 	}
 	m.requests = j
+	if cancelPreparation {
+		m.interruptRun()
+	}
 	m.status = "Plan review updated."
 	return m, nil
 }
@@ -278,6 +286,7 @@ type TaskPlanSummary struct {
 	Phase    string                 `json:"phase"`
 	WorkID   string                 `json:"work_id,omitempty"`
 	At       time.Time              `json:"at"`
+	Issue    string                 `json:"issue,omitempty"`
 }
 type TaskPlanReview struct {
 	ID         string                   `json:"id"`
@@ -290,6 +299,9 @@ type TaskPlanReview struct {
 	Sources    []string                 `json:"sources"`
 	Content    *worksession.PlanContent `json:"content,omitempty"`
 	InputNames []string                 `json:"input_names,omitempty"`
+	Issue      string                   `json:"issue,omitempty"`
+	Correction string                   `json:"correction,omitempty"`
+	EditState  string                   `json:"edit_state,omitempty"`
 }
 
 func (m Model) taskPlanSummaries() []TaskPlanSummary {
@@ -299,6 +311,7 @@ func (m Model) taskPlanSummaries() []TaskPlanSummary {
 			continue
 		}
 		summary := TaskPlanSummary{ID: r.ID, Revision: r.Plan.Revision, Digest: r.Plan.Digest, Task: truncate(r.Text, 256), State: r.State, Phase: r.Plan.Phase, WorkID: r.WorkID, At: r.CreatedAt}
+		summary.Issue = boundedConversation(r.Issue, 1024)
 		if r.Plan.Content != nil {
 			summary.Outcome = truncate(r.Plan.Content.Outcome, 512)
 			for _, step := range r.Plan.Content.Steps {

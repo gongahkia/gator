@@ -69,7 +69,7 @@ func (m Model) dialogueTaskState() *DialogueTaskState {
 			result.State = "review"
 		}
 		if task, ok := m.localConversationTask(r); ok {
-			result.RunID, result.CanGuide, result.CanStop = task.ControlID, task.CanGuide, task.CanStop
+			result.RunID, result.CanGuide, result.CanStop, result.CanRevisePlan = task.ControlID, task.CanGuide, task.CanStop, task.CanRevisePlan
 			result.Summary = task.Summary
 		}
 		if r.ID == m.activeRequest && m.running {
@@ -77,6 +77,9 @@ func (m Model) dialogueTaskState() *DialogueTaskState {
 			if m.interaction != nil {
 				result.State = "review"
 			}
+		}
+		if r.ID == m.planRevising && m.running {
+			result.State = "running"
 		}
 		if !r.Pending() {
 			if r.RevisionID != "" {
@@ -215,8 +218,9 @@ func (m Model) validateDialogueInputs(input ConversationInput) error {
 }
 
 // ControlDialogue checks provenance and the live operation in its own owner.
-// It cannot grant approval or change a pending exact review.
-func (m Model) ControlDialogue(control DialogueControl) Model {
+// It cannot grant approval or change an exact external-action review. A pending
+// plan correction revokes the old plan review before preparing new content.
+func (m Model) ControlDialogue(control DialogueControl) (Model, tea.Cmd) {
 	result := DialogueControlResult{RequestID: control.RequestID, control: control}
 	if m.dialogueControls == nil {
 		m.dialogueControls = map[string]DialogueControlResult{}
@@ -224,20 +228,58 @@ func (m Model) ControlDialogue(control DialogueControl) Model {
 	if prior, ok := m.dialogueControls[control.RequestID]; ok {
 		if prior.control != control {
 			m.dialogueControlResult = &DialogueControlResult{RequestID: control.RequestID, Error: "this control identity already belongs to a different action"}
-			return m
+			return m, nil
 		}
 		m.dialogueControlResult = &prior
-		return m
+		return m, nil
 	}
-	fail := func(text string) Model { result.Error = text; m.dialogueControlResult = &result; return m }
+	fail := func(text string) (Model, tea.Cmd) {
+		result.Error = text
+		m.dialogueControlResult = &result
+		return m, nil
+	}
 	if control.RequestID == "" || len(control.RequestID) > 96 || len(m.dialogueControls) >= 128 {
 		return fail("this task-control session is unavailable; inspect the original task")
 	}
 	state := m.dialogueTaskState()
+	ownerRequest := ""
+	if control.Action == "revise_plan" && control.ParentID == m.conversation {
+		state = nil
+		for _, r := range m.requests.Requests {
+			if r.ID == control.TurnID {
+				if task, ok := m.localConversationTask(r); ok {
+					state = &DialogueTaskState{ParentID: m.conversation, DialoguePeer: DialoguePeer{ConversationID: m.conversation, TurnID: r.ID, RunID: task.ControlID, CanRevisePlan: task.CanRevisePlan}}
+					ownerRequest = r.ID
+				}
+				break
+			}
+		}
+	} else if state != nil {
+		for _, r := range m.requests.Requests {
+			if r.ClientID == state.TurnID {
+				ownerRequest = r.ID
+				break
+			}
+		}
+	}
 	if !m.config.ManagedSessions || state == nil || state.ParentID != control.ParentID || state.TurnID != control.TurnID || state.RunID == "" || state.RunID != control.RunID {
 		return fail("the selected task or operation changed; no different task was controlled")
 	}
+	var command tea.Cmd
 	switch control.Action {
+	case "revise_plan":
+		if !state.CanRevisePlan {
+			return fail("the selected plan cannot be revised in its current state")
+		}
+		if ownerRequest == "" {
+			return fail("the original plan admission is unavailable")
+		}
+		var err error
+		m, command, err = m.startTaskPlanRevision(ownerRequest, control.RunID, control.ParentID, control.RequestID, control.Instruction)
+		if err != nil {
+			return fail(err.Error())
+		}
+		result.RevisingPlan = true
 	case "guide":
 		if !state.CanGuide {
 			return fail("this task cannot accept corrections during its current review or plan")
@@ -269,7 +311,7 @@ func (m Model) ControlDialogue(control DialogueControl) Model {
 	}
 	m.dialogueControls[control.RequestID] = result
 	m.dialogueControlResult = &result
-	return m
+	return m, command
 }
 
 // LoadOlderDialogue extends inspection only; it cannot revive in-flight turns.

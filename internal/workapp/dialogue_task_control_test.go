@@ -170,17 +170,17 @@ func TestDialogueStopsDelegatedPlanThroughItsActualOwner(t *testing.T) {
 				t.Fatal("lost exact target", stop)
 			}
 			control := DialogueControl{ParentID: parent.conversation, TurnID: state.TurnID, RequestID: stop.TurnID, RunID: stop.TargetRun, Action: "stop"}
-			child = child.ControlDialogue(control)
+			child, _ = child.ControlDialogue(control)
 			if child.dialogueControlResult.Error != "" {
 				t.Fatal(child.dialogueControlResult.Error)
 			}
-			child = child.ControlDialogue(control)
+			child, _ = child.ControlDialogue(control)
 			if child.dialogueControlResult.Error != "" {
 				t.Fatal("same-control retry lost its receipt")
 			}
 			changed := control
 			changed.Instruction = "different request"
-			child = child.ControlDialogue(changed)
+			child, _ = child.ControlDialogue(changed)
 			if child.dialogueControlResult.Error == "" {
 				t.Fatal("reused control ID changed its meaning")
 			}

@@ -33,6 +33,11 @@ func (m Model) localConversationTask(request worksession.Request) (workrun.Conve
 		return task, false
 	}
 	switch p.Phase {
+	case "revising":
+		if request.ID != m.planRevising || !m.running {
+			return task, false
+		}
+		task.State, task.CanStop = "preparing a revised plan", m.cancel != nil && !m.cancelling
 	case "preparing":
 		if request.ID != m.planPreparing || !m.running {
 			return task, false // Stored preparation is not evidence of a live owner.
@@ -45,6 +50,7 @@ func (m Model) localConversationTask(request worksession.Request) (workrun.Conve
 			task.State = "reviewed plan awaiting dispatch"
 		}
 		task.CanStop = true
+		task.CanRevisePlan = m.config.RevisePlan != nil && !m.running && !m.controlBusy && !m.followupSaving && !m.receiptBusy && m.requestsIssue == "" && (!m.dialogueHost || m.dialogueCanStart)
 	default:
 		return task, false
 	}
@@ -90,7 +96,7 @@ func (m *Model) stopConversationTask(id, controlID string) (bool, error) {
 				return false, err
 			}
 			m.requests = journal
-			if id == m.planPreparing {
+			if id == m.planPreparing || id == m.planRevising {
 				m.interruptRun()
 			}
 			m.status = "Plan cancelled. No implementation was started."

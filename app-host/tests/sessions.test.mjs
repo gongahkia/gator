@@ -84,6 +84,51 @@ test("plan cancellation reports the original owner's confirmed receipt without m
   } finally { await sessions.stop(); }
 });
 
+test("plan revision admission releases the parent conversation while its original owner prepares", async () => {
+  const parent = new DialogueWorker("parent"), child = new DialogueWorker("child");
+  const sessions = new Sessions(request => request.conversation_id === "child" ? child : parent);
+  try {
+    await sessions.open();
+    parent.change({ running: true, dialogue_dispatch: { sequence: 1, kind: "task", turn_id: "plan-turn", child_id: "child" } });
+    await sessions.settled();
+    child.controlDialogue = async control => { child.controls.push(control); return { request_id: control.request_id, revising_plan: true }; };
+    parent.change({ dialogue_busy: true, dialogue_dispatch: { sequence: 2, kind: "revise_plan", turn_id: "correction-turn", child_id: "child", target_run: "exact-plan-epoch", instruction: "Keep the comparison small" } });
+    await sessions.settled();
+    assert.equal(parent.state.dialogue_busy, false);
+    assert.equal(sessions.current, parent);
+    assert.deepEqual(parent.results.at(-1), { turn_id: "correction-turn", child_id: "child", revising_plan: true });
+    assert.deepEqual(child.controls.at(-1), { parent_id: "parent", turn_id: "plan-turn", request_id: "correction-turn", run_id: "exact-plan-epoch", action: "revise_plan", instruction: "Keep the comparison small" });
+  } finally { await sessions.stop(); }
+});
+
+test("a plan correction rechecks the task limit while stop remains available", async () => {
+  const parent = new DialogueWorker("parent"), child = new DialogueWorker("child"), others = [new DialogueWorker("other-a"), new DialogueWorker("other-b")];
+  const sessions = new Sessions(request => request.conversation_id === "child" ? child : others.find(worker => worker.state.conversation_id === request.conversation_id) || parent);
+  try {
+    await sessions.open();
+    parent.change({ running: true, dialogue_dispatch: { sequence: 1, kind: "task", turn_id: "plan-turn", child_id: "child" } });
+    await sessions.settled(); child.change({ running: false });
+    for (const other of others) { await sessions.open({ conversation_id: other.state.conversation_id }); other.change({ running: true }); }
+    await sessions.open({ conversation_id: "parent" });
+    parent.change({ dialogue_dispatch: { sequence: 2, kind: "revise_plan", turn_id: "over-capacity", child_id: "child", target_run: "plan-epoch", instruction: "Keep it small" } });
+    await sessions.settled();
+    assert.match(parent.results.at(-1).error, /Three tasks are working/); assert.equal(child.controls.length, 0);
+    parent.change({ dialogue_dispatch: { sequence: 3, kind: "stop", turn_id: "stop-plan", child_id: "child", target_run: "plan-epoch" } });
+    await sessions.settled();
+    assert.equal(child.controls.at(-1).action, "stop"); assert.equal(parent.results.at(-1).error, undefined);
+    parent.change({ running: false }); child.change({ running: true });
+    parent.change({ dialogue_dispatch: { sequence: 4, kind: "revise_plan", turn_id: "local-over-capacity", child_id: "parent", owner_task: "local-plan", target_run: "local-plan-epoch", instruction: "Keep it small" } });
+    await sessions.settled();
+    assert.match(parent.results.at(-1).error, /Three tasks are working/); assert.equal(parent.controls.length, 0);
+    child.change({ running: false });
+    parent.controlDialogue = async control => { parent.controls.push(control); return { request_id: control.request_id, revising_plan: true }; };
+    parent.change({ dialogue_dispatch: { sequence: 5, kind: "revise_plan", turn_id: "local-with-capacity", child_id: "parent", owner_task: "local-plan", target_run: "local-plan-epoch", instruction: "Keep it small" } });
+    await sessions.settled();
+    assert.deepEqual(parent.controls.at(-1), { parent_id: "parent", turn_id: "local-plan", request_id: "local-with-capacity", run_id: "local-plan-epoch", action: "revise_plan", instruction: "Keep it small" });
+    assert.equal(parent.results.at(-1).revising_plan, true); assert.equal(sessions.current, parent);
+  } finally { await sessions.stop(); }
+});
+
 test("managed navigation waits for the new owner's applied view and preserves original execution", async () => {
   const original = new Worker("original"), view = new Worker("view");
   let release, applied;

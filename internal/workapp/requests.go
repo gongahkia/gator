@@ -77,6 +77,14 @@ func (m *Model) restoreRequests() {
 			changed = true
 		}
 		if r.Plan != nil {
+			if r.State == "queued" && r.Plan.Phase == "revising" && r.Plan.Edit != nil {
+				r.Plan = r.Plan.Clone()
+				r.Plan.Phase, r.Plan.Edit.State = "review", "failed"
+				r.Plan.Edit.Issue = "The session ended while preparing the revised plan. It will not replay automatically."
+				r.Issue = r.Plan.Edit.Issue
+				r.UpdatedAt = time.Now().UTC()
+				changed = true
+			}
 			if r.State == "interrupted" || r.State == "queued" && r.Plan.Phase == "preparing" {
 				r.Plan = r.Plan.Clone()
 				r.Plan.Phase = "interrupted"
@@ -100,6 +108,13 @@ func (m *Model) restoreRequests() {
 	}
 	if changed {
 		_ = m.saveRequests(j)
+	}
+	if m.requestsIssue == "" {
+		for _, r := range m.requests.Requests {
+			if r.Plan != nil && r.Plan.Edit != nil && r.Plan.Edit.State != "preparing" {
+				m.publishPlanEditOutcome(r.ID)
+			}
+		}
 	}
 	m.requestsRecovered = len(m.queue) > 0
 }

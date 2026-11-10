@@ -102,8 +102,8 @@ export type ChatMemoryReceipt = {id: string; run_id: string; text: string; quote
 export type ChatMemoryAction = {conversation_id: string; id: string; updated: string; action: "correct"|"forget"|"undo"; text?: string; request_id: string};
 export type PlanStep = {id:string;text:string};
 export type PlanContent = {outcome:string;steps:PlanStep[];sources:string[];effects:string[]};
-export type TaskPlanSummary = {id:string;revision:number;digest:string;task:string;outcome?:string;steps?:PlanStep[];state:string;phase:string;work_id?:string;at:string};
-export type TaskPlanReview = {id:string;revision:number;digest:string;task:string;state:string;phase:string;budget:{max_steps:number;code_max_steps:number};sources:string[];content?:PlanContent;input_names?:string[]};
+export type TaskPlanSummary = {id:string;revision:number;digest:string;task:string;outcome?:string;steps?:PlanStep[];state:string;phase:string;work_id?:string;at:string;issue?:string};
+export type TaskPlanReview = {id:string;revision:number;digest:string;task:string;state:string;phase:string;budget:{max_steps:number;code_max_steps:number};sources:string[];content?:PlanContent;input_names?:string[];issue?:string;correction?:string;edit_state?:string};
 export type TaskPlanAction = {conversation_id:string;task_id:string;revision:number;digest:string;action:"inspect"|"edit"|"approve"|"start"|"cancel";request_id:string;content?:PlanContent};
 export type TaskPlanResult = {request_id:string;error?:string;review?:TaskPlanReview};
 export type BranchAction = {conversation_id:string; revision_id:string; run_id:string; request_id:string};
@@ -197,7 +197,7 @@ export type BackendState = {
 };
 
 export type DialogueMessage = {id:string;sequence:number;text:string;response?:string;state:string;issue?:string;task_chat?:string;input_ids?:string[];reply_to_update_id?:string;created_at:string;updated_at:string};
-export type DialoguePeer = {conversation_id:string;turn_id:string;run_id?:string;state:string;can_guide:boolean;can_stop:boolean;summary?:string};
+export type DialoguePeer = {conversation_id:string;turn_id:string;run_id?:string;state:string;can_guide:boolean;can_stop:boolean;can_revise_plan?:boolean;summary?:string};
 export type PanelAction = {
   id: string; action: "select" | "activate" | "key" | "query" | "filter" | "next" | "previous" | "refresh" | "rename" | "pin" | "unpin" | "archive" | "restore";
   row?: number; fields?: Record<number, string>; text?: string;

@@ -22,6 +22,8 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		return m.finishConversationRoute(value)
 	case taskPlanPrepared:
 		return m.finishTaskPlan(value)
+	case taskPlanRevised:
+		return m.finishTaskPlanRevision(value)
 	case catalogLoaded:
 		return m.finishCatalog(value)
 	case receiptChecked:

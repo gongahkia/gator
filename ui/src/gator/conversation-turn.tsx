@@ -24,6 +24,7 @@ export function ConversationTurn(props: { turn: DialogueMessage; task?:DialogueP
         <Show when={task()?.summary}><Markdown text={task()!.summary!} /></Show>
       </Show>
       <Show when={props.turn.issue}><text fg={theme.text.feedback.warning.base}>{literal(props.turn.issue)}</text></Show>
+      <Show when={props.turn.state === "editing_plan"}><text fg={theme.text.muted}>Preparing a revised plan; you can keep talking here. It will need a fresh review.</text></Show>
       <Show when={["received", "routing", "ready", "dispatching"].includes(props.turn.state)}><text fg={theme.text.muted}>{props.busy ? "Considering this message…" : "Response unconfirmed. Your message and inputs are kept; reopening does not replay it."}</text></Show>
     </box>
   </box>
