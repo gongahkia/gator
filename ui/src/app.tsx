@@ -25,6 +25,7 @@ import { Hub } from "./gator/hub"
 import { Following } from "./gator/following"
 import { useActions } from "./gator/actions"
 import { useProductActions } from "./gator/product-actions"
+import { useResultActions } from "./gator/result-actions"
 import { useNative } from "./gator/native"
 import { commandGroup, commandAliases } from "./gator/command-groups"
 import { ApprovalReview } from "./gator/approval-review"
@@ -39,6 +40,7 @@ function Shell(props: { quit(): Promise<void>; voice?: VoiceSession }) {
   const client = useClient(), data = useData(), theme = useTheme(), dialog = useDialog()
   const controls = useActions()
   const product = useProductActions(controls)
+  useResultActions(controls)
   const voice = useNative(controls, props.voice)
   const attempt = (operation: Promise<unknown>) => { void operation.catch(error => client.fail(error)) }
   const palette = () => dialog.replace(() => <CommandPaletteDialog />)
@@ -73,6 +75,7 @@ function Shell(props: { quit(): Promise<void>; voice?: VoiceSession }) {
     } },
     { id: "gator.new", title: "New independent chat", bind: "ctrl+n", palette: true, run: () => navigate("/new") },
     { id: "gator.search", title: "Search current transcript", bind: "ctrl+f", palette: true, enabled: !data.state?.panel, run: () => controls.trigger("search") },
+    { id: "gator.context-actions", title: "Actions for visible result", bind: "ctrl+e", palette: true, enabled: data.route === "chat" && !data.state?.panel && dialog.stack.length === 0, run: () => client.emit("request-item-actions") },
     { id: "gator.help", title: "Gator help", bind: "ctrl+o", palette: true, enabled: !data.state?.panel, run: () => navigate("/help") },
     { id: "gator.voice", title: "Start or finish dictation", bind: "ctrl+v", palette: true, run: () => controls.trigger("toggle-dictation") },
     { id: "gator.approve", title: "Review current approval", bind: "ctrl+y", palette: true, enabled: dialog.stack.length === 0, run: () => approve(true) },

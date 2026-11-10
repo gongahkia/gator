@@ -69,6 +69,20 @@ func TestNewChatShortcutPreservesExistingCustomBinding(t *testing.T) {
 	}
 }
 
+func TestContextActionsPreserveExistingShortcutAndConfiguredBinding(t *testing.T) {
+	d := DesktopSettings{Shortcuts: map[string]string{"command_search": "Ctrl+E"}}
+	if err := d.Validate(); err != nil {
+		t.Fatal("new item action invalidated an older profile", err)
+	}
+	if got := d.ResolvedShortcuts(); got["command_search"] != "Ctrl+E" || got["context_actions"] != "Ctrl+Shift+E" {
+		t.Fatal("existing shortcut was stolen", got)
+	}
+	d.Shortcuts["context_actions"] = "Ctrl+K"
+	if err := d.Validate(); err != nil || d.ResolvedShortcuts()["context_actions"] != "Ctrl+K" {
+		t.Fatal("configured item shortcut was lost", err)
+	}
+}
+
 func TestTerminalShortcutsMigrateFunctionKeysAndPrimaryModifiers(t *testing.T) {
 	d := DesktopSettings{Shortcuts: map[string]string{"help": "F1", "new_chat": "Ctrl+F3", "command_search": "Cmd+O"}}
 	if err := d.Validate(); err != nil {

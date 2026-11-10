@@ -6,7 +6,7 @@ import { useDialog } from "../ui/dialog"
 import { DialogSelect } from "../ui/dialog-select"
 import { DialogPrompt } from "../ui/dialog-prompt"
 import { DialogConfirm } from "../ui/dialog-confirm"
-import type { ChatUpdate, BackendBundle, ActionReceipt } from "@gator/application-host/contracts/protocol"
+import type { BackendBundle, ActionReceipt } from "@gator/application-host/contracts/protocol"
 import { literal } from "./text"
 import { useFiles } from "./files"
 import { PathPicker } from "./path-picker"
@@ -14,7 +14,6 @@ import { Details } from "./details"
 import { ActionPrompt } from "./action-prompt"
 import { useData } from "../context/data"
 import { activityKey, activitySummary, activityText, searchableMessage } from "./activity"
-import { conversationBundles } from "./outputs"
 import { useKeyHints } from "./key-hints"
 import { requestContext } from "./request-context"
 import productGuide from "../../../internal/productguide/capabilities.json"
@@ -33,19 +32,8 @@ export function useActions() {
     onSelect: () => { dialog.clear(); try { attempt(item.run(), literal(item.title) + "…") } catch (error) { client.fail(error) } },
   }))} />)
   const prompt = (title: string, value: string, save: (text: string) => unknown, description?: string) => { const token = Symbol(title); dialog.replace(() => <ActionPrompt token={token} title={title} value={value} save={save} description={description} />, undefined, { key: token }) }
-  const details = (title: string, text: string) => dialog.replace(() => <Details title={title} text={text} />, undefined, { size: "xlarge" })
+  const details = (title: string, text: string, back?: () => void) => dialog.replace(() => <Details title={title} text={text} back={back} />, undefined, { size: "xlarge" })
   const confirm = (title: string, message: string, run: () => unknown) => dialog.replace(() => <DialogConfirm title={title} message={literal(message)} onConfirm={() => { try { attempt(run(), literal(title) + "…") } catch (error) { client.fail(error) } }} />)
-  function outputs() {
-    const context = client.context
-    menu("Retained outputs and proposed changes", () => conversationBundles(data.state).flatMap((bundle, group) => [
-      ...(bundle.Artifacts ?? []).map(file => ({ title: file.Path, description: `${file.Valid ? "Checks passed" : "Needs review"} · ${bundle.Status} run · Result ${group + 1}`, run: () => menu(file.Path, [
-        { title: "Inspect retained preview and checks", run: () => details(file.Path, [file.Valid ? "Checks passed" : "Needs review", `Result ${group + 1} · ${bundle.RunID || bundle.Path}`, `Retained from a ${bundle.Status} run.`, bundle.FinishedAt || "", `${file.MediaType} · ${file.Bytes ?? "Unknown"} bytes`, file.Preview || "No text preview is available for this file.", file.Truncated ? "Showing a shortened preview." : "", "File checks do not confirm external delivery.", `Retained location: ${bundle.Path}`].filter(Boolean).join("\n\n")) },
-        { title: "Open complete file / edit working version", run: () => fileWorkflows.open({ kind: "output", bundle: bundle.Path, path: file.Path }, undefined, context) },
-        ...((client.state?.messages.findIndex(message => message.bundle?.Path === bundle.Path) ?? -1) >= 0 ? [{ title: "Show origin in chat", run: () => { const index = client.state?.messages.findIndex(message => message.bundle?.Path === bundle.Path) ?? -1; if (client.context !== context || index < 0) throw new Error("Return to the original conversation to inspect this result."); client.route = "chat"; client.emit("change"); client.emit("reveal-message", index) } }] : []),
-      ]) })),
-      ...(bundle.Candidates ?? []).map(candidate => ({ title: `Change ${candidate.ID}`, description: `Proposal · ${candidate.Status || "unreported checks"} · Result ${group + 1}`, run: () => details(`Change ${candidate.ID}`, ["Proposed changes; this view does not apply them.", `Checks: ${candidate.Status || "Not reported"}`, `Run: ${bundle.RunID || bundle.Path} · ${bundle.Status}`, ...candidate.ChangedPaths, `Retained location: ${bundle.Path}`, candidate.PatchPath || ""].join("\n\n")) })),
-    ]))
-  }
   async function drafts() {
     const saved = await client.host.drafts.request({ action: "list" })
     menu("Unsent drafts", [
@@ -75,27 +63,6 @@ export function useActions() {
         { title: "Guide active work with this text (keep queued copy)", disabled: !client.state?.guidance_id || !!item.inputs?.length || !!item.reply_to_update_id, run: () => act("guide", item.text) },
       ])
     } })))
-  }
-  function updates() {
-    const state = client.state
-    if (!state?.conversation_id) return
-    const conversation_id = state.conversation_id
-    const updateAction = async (update: ChatUpdate, action: "read" | "resolve" | "reopen" | "delivered" | "older" | "newer") => {
-      await client.send({ type: "update", update: { conversation_id, id: update.id, version: update.version, action } })
-      if (client.state?.chat_updates_issue) throw new Error(client.state.chat_updates_issue)
-    }
-    menu("This chat's updates", [
-      ...(state.chat_updates ?? []).map(update => ({ title: update.title, description: `${update.status} · ${update.read ? "read" : "unread"} · ${update.resolved ? "done" : "open"}`, run: () => menu(update.title, [
-        { title: "Inspect update", description: update.summary, run: () => details(update.title, `${update.summary}\n${update.evidence?.join("\n") ?? ""}\n${update.next_step ?? ""}`) },
-        { title: "Mark read", disabled: update.read, run: () => updateAction(update, "read") },
-        { title: update.resolved ? "Reopen" : "Mark done", run: () => updateAction(update, update.resolved ? "reopen" : "resolve") },
-        { title: "Reply in original chat", run: async () => { client.route = "chat"; await client.edit(client.draft.text, client.draft.uploads, update.id) } },
-        ...(["useful", "noise", "wrong", "clear"] as const).map(rating => ({ title: `Feedback: ${rating}`, description: "Saved for review; this does not change your checks automatically.", disabled: !update.can_rate || !!client.updateFeedback.get(client.context)?.saving, run: () => client.rateUpdate(update, rating) })),
-      ]) })),
-      ...[state.updates_have_older ? "older" : undefined, state.updates_have_newer ? "newer" : undefined].filter((direction): direction is "older" | "newer" => !!direction).map(direction => ({ title: `${direction} updates`, run: () => {
-        const update = direction === "older" ? state.chat_updates?.[0] : state.chat_updates?.at(-1); if (update) return updateAction(update, direction)
-      } })),
-    ])
   }
   function memories() {
     const conversation_id = client.state?.conversation_id
@@ -190,7 +157,7 @@ export function useActions() {
       ...(client.state?.dialogue ?? []).filter(turn=>turn.task_chat).map(turn=>({key:turn.id,title:turn.text,description:client.state?.dialogue_peers?.find(peer=>peer.conversation_id===turn.task_chat)?.state || "Outcome unconfirmed",run:()=>client.openSession(turn.task_chat!)})),
     ]),
     "earlier-messages":async()=>{const state=client.state,before=state?.dialogue?.[0]?.sequence;if(!state?.dialogue_more || !before) return details("Earlier messages","All retained conversation messages are loaded.");await client.send({type:"dialogue_page",dialogue_before:before})},
-    drafts, queue, updates, memories, receipts, models,
+    drafts, queue, memories, receipts, models,
     recover: () => {
       const context = client.context, disconnected = client.snapshot.connection === "disconnected"
       const sameChat = () => { if (client.context !== context) throw new Error("The conversation changed. Reopen recovery in the intended chat.") }
@@ -235,7 +202,7 @@ export function useActions() {
     },
     "catalog-actions": catalog,
     "check-health": () => details("Check health in this chat", [(client.state?.chat_checks_issue ?? ""), ...(client.state?.chat_checks ?? []).flatMap(check => [check.title + " · " + check.state, check.last_success ? `Last successful check for current settings: ${check.last_success}.` : "No successful check recorded for current settings.", check.next_due ? `Next scheduled: ${check.next_due}.` : "No check is currently scheduled.", check.unsuccessful ? `${check.unsuccessful} consecutive unsuccessful checks. ${check.issue || ""}` : check.issue || "", check.next_action, "Checks depend on this computer being on.", check.gap_from && check.gap_to ? `Observed supervisor gap: ${check.gap_from}–${check.gap_to}. This does not establish what changed while checks were unavailable.` : "", ""])].filter(Boolean).join("\n")),
-    help: () => details("Gator terminal help", [`${hint("command.palette.show")} commands · ${hint("gator.sidebar")} navigation rail · ${hint("gator.new")} new independent chat · ${hint("gator.quit")} quit`, `${hint("gator.send")} talks / steers · ${hint("gator.newline")} new line · ${hint("gator.guide")} guides the live task · ${hint("gator.cancel")} cancels/stops`, `${hint("gator.queue")} queues a draft after current work in this chat; Tab completes slash commands and navigates forms`, `${hint("gator.search")} searches the transcript · ${hint("gator.draft-context")} draft details · PgUp/PgDn scroll or move selection`, `${hint("gator.approve")} reviews the live approval · ${hint("gator.decline")} declines · Paste never sends or approves`, "/following tracks goals/checks/updates · /saved opens knowledge/history/files · /settings configures Gator", "/sources selects connections · /plan-first proposes before working · /task-plans reviews retained plans", "/specialists guides or stops one worker · /branch starts a separate chat · /evidence and /changes inspect exact retained sources", "/links edits links into drafts · /read-aloud reads a saved reply with a system voice", "/chats switches chats · /queue manages retained messages · /drafts recovers drafts · /prompt-history reuses sent text", "/files opens full files · Ctrl+S saves · Ctrl+E edits Office/cells · Ctrl+O versions/export/Ask Gator", "/voice explicitly records/transcribes or configures new-reply playback · /attach-file selects a private input", "Forms: Enter edits a field · Ctrl+R saves or reviews · Esc backs out", "Customized shortcuts are shown in the command palette. Use slash commands or Ctrl shortcuts to open actions.", "", "Gator commands", ...(client.state?.commands ?? []).map(command => `/${command.name} — ${command.description}`)].join("\n")),
+    help: () => details("Gator terminal help", [`${hint("command.palette.show")} commands · ${hint("gator.sidebar")} navigation rail · ${hint("gator.new")} new independent chat · ${hint("gator.quit")} quit`, `${hint("gator.send")} talks / steers · ${hint("gator.newline")} new line · ${hint("gator.guide")} guides the live task · ${hint("gator.cancel")} cancels/stops`, `${hint("gator.queue")} queues a draft after current work in this chat; Tab completes slash commands and navigates forms`, `${hint("gator.context-actions")} item actions · /actions chooses a result`, `${hint("gator.search")} searches the transcript · ${hint("gator.draft-context")} draft details · PgUp/PgDn scroll or move selection`, `${hint("gator.approve")} reviews the live approval · ${hint("gator.decline")} declines · Paste never sends or approves`, "/following tracks goals/checks/updates · /saved opens knowledge/history/files · /settings configures Gator", "/sources selects connections · /plan-first proposes before working · /task-plans reviews retained plans", "/specialists guides or stops one worker · /branch starts a separate chat · /evidence and /changes inspect exact retained sources", "/links edits links into drafts · /read-aloud reads a saved reply with a system voice", "/chats switches chats · /queue manages retained messages · /drafts recovers drafts · /prompt-history reuses sent text", "/files opens full files · Ctrl+S saves · Ctrl+E edits Office/cells · Ctrl+O versions/export/Ask Gator", "/voice explicitly records/transcribes or configures new-reply playback · /attach-file selects a private input", "Forms: Enter edits a field · Ctrl+R saves or reviews · Esc backs out", "Customized shortcuts are shown in the command palette. Use slash commands or Ctrl shortcuts to open actions.", "", "Gator commands", ...(client.state?.commands ?? []).map(command => `/${command.name} — ${command.description}`)].join("\n")),
     "prompt-history": () => menu("Reuse a retained message", (client.state?.messages ?? []).filter(message => message.role === "You" && message.text).slice().reverse().map(message => ({ title: message.text.slice(0, 100), description: message.created_at, run: () => menu("Stage previous message text", [
       { title: "Append text to current draft", run: () => client.edit([client.draft.text, message.text].filter(Boolean).join("\n\n")) },
       { title: "Edit text before replacing the composer", run: () => prompt("Reuse message (files in current draft stay attached)", message.text, text => client.edit(text)) },
@@ -253,11 +220,10 @@ export function useActions() {
         { title: "Connections", run: () => client.navigate("/connections") },
         { title: "Choose workspace", run: () => client.navigate("/source") },
         { title: "Files and outputs", run: () => actions.files() },
-        { title: "Retained output previews and proposed changes", run: outputs },
+        { title: "Retained output previews and proposed changes", run: () => actions.outputs() },
         { title: "Model and effort for future messages", run: models },
       ])
     },
-    outputs,
     "cancel-update-reply": () => client.edit(client.draft.text, client.draft.uploads, null),
     about: () => menu("About Gator terminal", [{ title: "Installed version and runtime", description: "OpenCode-derived Solid/OpenTUI frontend; Gator Go execution and storage", run: async () => details("About Gator terminal", `${await client.host.version()}\nFrontend: OpenCode f669c46c9604ea3d70b8a7ed1f0c10f3a5ac1f61\nOpenTUI 0.6.8 · Solid 1.9.15 · Bun ${Bun.version}\nProfile: ${client.host.stateRoot}\nInstallation updates are explicit; see docs/TERMINAL.md. Existing profiles are retained.`) }, { title: "Release and installation information", run: () => client.emit("open-releases") }]),
   }
@@ -269,5 +235,5 @@ export function useActions() {
   client.on("navigation", clearNavigation); onCleanup(() => client.off("navigation", clearNavigation))
   client.on("action", trigger); onCleanup(() => client.off("action", trigger))
   client.actions = actions
-  return { menu, prompt, details, confirm, actions, trigger }
+  return { menu, prompt, details, confirm, actions, trigger, openFile: fileWorkflows.open }
 }

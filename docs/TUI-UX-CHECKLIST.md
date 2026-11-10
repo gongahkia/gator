@@ -11,7 +11,7 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 | 3 | Relevant answers expose supplied memory/provenance/correction; noise feedback offers a reviewed, scoped check/notification change and reports its actual outcome. | Pending | |
 | 4 | First task leads through only missing setup; host connectivity and model readiness are distinct; local/cloud processing, capabilities, and work budget are explained. | In progress | `d0fd58e48` provides Go-owned prerequisite/processing/budget projection. Ordinary first submissions offer missing setup while preserving private files/text and plan intent; Host connectivity and model setup have separate labels. Native fresh-profile → invalid provider form → repair → persisted selection → inspect context/limits → explicit useful task passes at all four sizes. Missing and subsequently changed credentials recover without replaying/admitting the rejected task. Request-specific connected-account/access setup handoffs and recovery after provider rejection during an admitted task remain; final integrated journey and live-account/model verification remain. |
 | 5 | Workspace/account/source scope is inspectable near input; conversational/manual settings agree, including terminal preferences, with confirmed outcomes. | In progress | Ctrl+T and /request-context inspect workspace/model processing, selected accounts, inputs, mode and actual Go budgets. Missing account display metadata retains the selected identity. Appearance, navigation and recent-chat grouping now share Go configuration across manual controls, conversational tools, cached owners, CLI theme changes and restart. Legacy frontend values import once; failures do not report saved values. Native four-size settings journeys plus unreadable-import recovery and live-task preservation pass. Full permission explanations, broader account/settings integration and live-model/account verification remain; final combined acceptance journey pending. |
-| 6 | Results/files/updates expose keyboard contextual actions to open/edit/reply/inspect evidence/mark done while retaining original identities and conversation context. | In progress | Update receipts now return request-correlated outcomes for explicit item controls, retaining original owner/version checks; sealed evidence is available for latest-only retained results. Native contextual entry points and integrated original-item file/update/evidence journeys remain. |
+| 6 | Results/files/updates expose keyboard contextual actions to open/edit/reply/inspect evidence/mark done while retaining original identities and conversation context. | In progress | Configurable Ctrl+E and /actions expose original-item result/file/update controls. Answers join deliverables only by exact run identity. Native four-size journeys inspect retained evidence, copy answers, edit/save working file versions without changing sealed originals, reject other-chat targets, mark done with a correlated Go outcome, restore the original owner and explicitly send an update-bound reply while retaining the newer draft/review intent. Connected-account contextual request/receipt journeys, delayed-read cancellation and broader failure states remain; final combined journey pending. |
 | 7 | Input and useful transcript remain visible at 110×34, 80×24, 60×20, 42×14 with combined attachments/reply/plan/slash states and multiline drafts. | Implemented; final journey pending | `204386564`; `composer-budget.test.tsx`: 8 file names + plan/reply + multiline input and slash completion, ≥4 transcript rows at all four sizes. |
 | 8 | Approval surface shows exact live action/account/destination/content/consequences; long reviews scroll; changed/stale tokens cannot execute; edits require fresh review. | Implemented; final journey pending | `8ba3a9cb8`; `approval-review.test.tsx`: four sizes, scrolling/exact data, stale and missing previews; `approvals.test.tsx`: real Go token protection and controlled connected send. |
 | 9 | Root command search includes local/backend descriptions/names/aliases, grouped browsing remains usable, and commands requiring values have meaningful typed controls. | In progress | `5f54f7f17`; root search and common permission/theme/source/attachment controls verified in `commands.test.tsx`. Remaining advanced command families still expose explicit advanced syntax; typed controls remain required. |
@@ -45,7 +45,53 @@ finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
 
-- Result-action backend boundary (11 November): explicit update read/done/reopen
+- Contextual terminal result actions (11 November): Ctrl+E opens a visible item;
+  an explicitly revealed message stays the target until reading moves. `/actions`
+  searches other items, and message/file/update labels open their own controls.
+  Go owns the configurable shortcut, preserves older conflicting custom bindings
+  and projects the actual hint. Narrow composer hints reserve their own width.
+  The answer joins its separately retained deliverables by exact run ID. File,
+  source and code controls validate the retained bundle and original context;
+  update controls validate identity/version and await their own Go outcome.
+  Original account/operation/source metadata remains inspectable. Older code
+  proposal records remain inspectable when an exact sealed patch is unavailable.
+  Supported update replies retain their exact original update ID in the editable
+  draft and durable admission; no generic external reply path is introduced.
+  File editing reuses the host's working-version store and preserves the sealed
+  bytes/manifest. Read-only evidence returns through its original item menus.
+  The short file editor reserves space for editing and save/version controls.
+  Native Go + controlled provider journeys pass at **110×34, 80×24, 60×20 and
+  42×14: 4 tests, 116 assertions**, including a configured Ctrl+K shortcut,
+  source paging, copying, immutable file edits, a rejected other-chat target,
+  versioned history-picker restoration, acknowledged done and explicit contextual
+  reply. Log: `/tmp/gator-ux-20261111-result-actions-native-final.log`.
+  Earlier native runs exposed selection of an adjacent notice, hidden/clipped
+  narrow hints and assumptions about asynchronous source loading and visible
+  menu rows. The selection/hint layout is fixed; the journey waits for actual
+  detail/render/receipt transitions and searches a bounded menu rather than
+  assuming every item fits. Original test deadlines remain unchanged. Earlier
+  `result-actions-native*.log` failures are retained. Typecheck passes in
+  `/tmp/gator-ux-20261111-result-actions-verified-typecheck.log`.
+  These are native/controlled-provider checks, not physical terminal, audio or
+  live account/model verification. Item 6's contextual connected-account receipts
+  and delayed-read cancellation/failure journeys remain, as do the other open
+  criteria and the full final acceptance journey.
+  Related command/composer/update/evidence/branch/generated-file/Office journeys
+  pass together: **16 tests, 329 assertions**, 133.70 seconds, in
+  `/tmp/gator-ux-20261111-result-actions-combined.log`. The earlier related run
+  recorded **11 pass / 1 fail** because the new footer omitted a remapped command
+  shortcut. The footer now retains the actual command binding at wider sizes;
+  the existing assertion and deadline remain unchanged. Go configuration tests
+  pass, including preservation of an older conflicting binding and explicit
+  item-action remapping. Opening visible-item actions indexes native message
+  boxes once instead of repeatedly descending the transcript tree; this does
+  not claim completion of the long-history benchmarks or reading-anchor work.
+  After that lookup change, the native four-size result journeys and composer
+  regressions pass again: **6 tests, 168 assertions**, 69.11 seconds, in
+  `/tmp/gator-ux-20261111-result-actions-final-native.log`; final typecheck passes
+  in `/tmp/gator-ux-20261111-result-actions-final-check.log`.
+
+- Result-action backend boundary (`a5403905f`, 11 November): explicit update read/done/reopen
   and paging controls may carry a bounded request nonce and receive their own
   Go outcome. Legacy passive delivery receipts remain valid. Rejected stale,
   missing, cross-conversation and malformed targets cannot claim success;

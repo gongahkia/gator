@@ -23,12 +23,20 @@ export function Prompt() {
   const model = () => data.state?.composer?.models.find(model => model.provider === data.state?.provider && model.model === data.state?.model)?.label || data.state?.model || data.state?.provider || "Choose a model"
   const modelState = () => data.state?.composer?.readiness?.state
   const modelSummary = () => modelState() && modelState() !== "configured" ? "Model setup needed" : model()
+  const contextualHint = () => {
+    const hasItems = !!data.state?.messages.length || !!data.state?.chat_updates?.length
+    const actions = `${hint("gator.context-actions")} actions`, context = `${hint("gator.draft-context")} context`, commands = `/ ${hint("command.palette.show")}`
+    if (dimensions().width < 60) return hasItems ? actions : "/ commands"
+    if (!hasItems) return `${context} · ${commands}`
+    return dimensions().width < 100 ? `${actions} · ${commands}` : `${actions} · ${context} · ${commands}`
+  }
   const [selection, setSelection] = createSignal(0), [dismissed, setDismissed] = createSignal<string>()
   const commands = createMemo(() => {
     const local = [
       ["following", "Goals, checks and updates"], ["saved", "Knowledge, history and retained files"],
       ["settings", "Configure Gator"], ["models", "Choose model, effort or provider setup"],
       ["files", "Open files and working versions"], ["chats", "Switch conversations"],
+      ["actions", "Open, edit, copy or inspect a conversation item"],
       ["drafts", "Recover unsent messages"], ["queue", "Manage queued messages"],
       ["voice", "Dictation and spoken replies"], ["attach-file", "Choose a private attachment"],
       ["updates", "Review this chat's updates"], ["memories", "Review saved memory receipts"],
@@ -127,8 +135,8 @@ export function Prompt() {
       onMouseUp={event => { if (event.button !== 0) return; event.stopPropagation(); void client.navigate(modelState() && modelState() !== "configured" ? "/setup" : "/models").catch(e => client.fail(e)) }}><b style={{ fg: theme.accent }}>Gator</b>  {literal(modelSummary())}{(!modelState() || modelState() === "configured") && data.state?.composer?.effort ? ` · ${data.state.composer.effort} effort` : ""}</text>
     </box>
     <box paddingX={1} paddingTop={compact() ? 0 : 1} flexDirection="row" justifyContent="space-between" gap={2}>
-      <text fg={theme.text.muted} attributes={TextAttributes.DIM} flexShrink={1} minWidth={0} height={1} wrapMode="none" truncate>{data.snapshot.connection !== "connected" ? "Reconnect before sending" : ["recording", "transcribing"].includes(data.voicePhase) ? "Finish dictation before sending" : data.state?.running ? `${hint("gator.send")} ${dimensions().width < 60 ? "talk" : "talk / steer"} · ${hint("gator.queue")} queue` : data.state?.dialogue_active ? `${hint("gator.send")} send · Talk, correct or start work` : `${hint("gator.send")} send · ${hint("gator.newline")} new line`}</text>
-      <text fg={theme.text.muted} attributes={TextAttributes.DIM} flexShrink={0}>{dimensions().width < 60 ? "/ commands" : `${hint("gator.draft-context")} context · / · ${hint("command.palette.show")}`}</text>
+      <text fg={theme.text.muted} attributes={TextAttributes.DIM} flexGrow={1} flexBasis={0} flexShrink={1} minWidth={0} height={1} wrapMode="none" truncate>{data.snapshot.connection !== "connected" ? "Reconnect before sending" : ["recording", "transcribing"].includes(data.voicePhase) ? "Finish dictation before sending" : data.state?.running ? `${hint("gator.send")} ${dimensions().width < 60 ? "talk" : "talk / steer"} · ${hint("gator.queue")} queue` : data.state?.dialogue_active ? `${hint("gator.send")} send · Talk, correct or start work` : `${hint("gator.send")} send · ${hint("gator.newline")} new line`}</text>
+      <text fg={theme.text.muted} attributes={TextAttributes.DIM} flexShrink={0}>{contextualHint()}</text>
     </box>
   </box>
 }

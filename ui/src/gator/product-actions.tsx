@@ -130,23 +130,6 @@ export function useProductActions(controls: ReturnType<typeof useActions>) {
       client.route = "chat"; client.emit("change")
     }) })))
   }
-  actions.evidence = () => {
-    const context = client.context
-    menu("Sources retained for an answer", (client.state?.messages ?? []).filter(message => message.bundle?.RunID && message.bundle.ManifestSHA256).map(message => ({ title: message.text.slice(0, 100) || message.bundle!.RunID!, run: async () => {
-      const run = message.bundle!.RunID!, catalog = await client.host.sourceCatalog({ context, run })
-      menu("Retained sources", catalog.references.map(reference => ({ title: reference.label, description: reference.locator, run: async () => {
-        const source = await client.host.sourcePreview({ context, run, path: "evidence:" + reference.id })
-        details(reference.label, [source.notice, `Captured: ${source.captured_at || "Unknown"}`, source.reads.length ? "Observed reads: " + source.reads.map(read => `${read.start}–${read.end}${read.truncated ? " (partial)" : ""}`).join(", ") : "Exact read ranges unavailable.", source.truncated ? "Showing part of the retained source." : "", source.text.split("\n").map((line, index) => `${source.firstLine + index}  ${line}`).join("\n")].filter(Boolean).join("\n\n"))
-      } })))
-    } })))
-  }
-  actions.changes = () => {
-    const context = client.context
-    menu("Retained code changes", (client.state?.messages ?? []).flatMap(message => (message.bundle?.Candidates ?? []).map(candidate => ({ title: candidate.ID, description: `${candidate.Status} · ${candidate.ChangedPaths.join(", ")}`, run: async () => {
-      const change = await client.host.codePreview({ context, run: message.bundle!.RunID!, candidate: candidate.ID })
-      details("Code changes", [change.status, ...change.verification.map(check => `${check.passed ? "Passed" : "Failed"}: ${check.argv.join(" ")}`), change.truncated ? "Showing part of the retained patch." : "", change.patch].filter(Boolean).join("\n\n"))
-    } }))))
-  }
   async function checkAction(check: FollowingCheck | undefined, action: Exclude<CheckAction["action"], "setup">) {
     // Managed views have their own owner while a foreground task is busy.
     // The existing session host keeps that task and its approval in place.

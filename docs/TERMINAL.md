@@ -5,6 +5,20 @@ is hidden by default. Ask Gator to help through its app tools, or type `/` for
 controls. Ctrl+P searches commands; Ctrl+B optionally opens navigation.
 See [development](DEVELOPMENT.md) and the [port inventory](CLI-TUI-PORT.md).
 
+Ctrl+E opens actions for a visible conversation item. After searching or revealing
+a particular message, it keeps that target until the reading position moves.
+`/actions` lets you search other messages, results and updates. The shortcut can
+be changed in Appearance; hints follow the configured binding. File names and
+message headings also open their own contextual actions.
+
+Results offer their exact retained sources, files and proposed code changes.
+Opening a file uses the existing working-version editor: Ctrl+S saves a new
+version, while Ctrl+O exposes versions, export and Ask Gator. The original result
+stays retained. An update can be inspected, marked read/done, reopened or added
+as reply context to the current draft. Replies and attached file versions remain
+editable before an explicit send. Changed or unavailable item identities require
+selecting the current item again.
+
 Use Go 1.25.13+, Node 22.12+ for build scripts/shared-host tests, and Bun 1.4.2.
 The selected frontend uses Solid 1.9.15 and OpenTUI 0.6.8 with native platform
 assets; a Node-only terminal launch is not claimed.

@@ -16,6 +16,7 @@ import { displayDate } from "./display"
 import { Spinner } from "../component/spinner"
 import { WorkingStatus } from "./working-status"
 import { ConversationTurn } from "./conversation-turn"
+import { useKeyHints } from "./key-hints"
 
 function Result(props: { value: BackendResult }) {
   const theme = useTheme()
@@ -33,6 +34,7 @@ function Result(props: { value: BackendResult }) {
 }
 export function Transcript() {
   const data = useData(), client = useClient(), theme = useTheme(), renderer = useRenderer(), dialog = useDialog()
+  const hint = useKeyHints()
   const reconcile = createTimelineReconciler()
   const timeline = createMemo(() => reconcile(client.context, chatTimeline(data.state?.messages ?? [], data.state?.chat_updates ?? [], data.state?.dialogue ?? []).filter(item => item.kind !== "message" || item.message.role !== "Deliverables" || !!(item.message.text || item.message.result || item.message.activity || item.message.bundle?.Artifacts?.length))))
   const cards = new Map<string, Renderable>(), delivered = new Set<string>()
@@ -40,12 +42,13 @@ export function Transcript() {
   let previous = ""
   let restore: (() => void) | undefined
   let revealAfterLayout: (() => void) | undefined
+  let revealedScrollTop: number | undefined
   const [revealed, setRevealed] = createSignal(-1)
   const remember = () => { if (previous && scroll) client.readingPositions.set(previous, scroll.scrollTop) }
   createEffect(() => {
     const id = data.state?.conversation_id ?? data.state?.source ?? ""
     if (id === previous) return
-    remember(); previous = id; setRevealed(-1); if (restore) renderer.off("frame", restore)
+    remember(); previous = id; setRevealed(-1); revealedScrollTop = undefined; if (restore) renderer.off("frame", restore)
     const saved = client.readingPositions.get(id)
     // Native layout establishes the scroll range during the first frame. A timer
     // can run earlier and clamp a retained position to zero.
@@ -55,7 +58,7 @@ export function Transcript() {
   const reveal = (index: number) => {
     setRevealed(index)
     if (revealAfterLayout) renderer.off("frame", revealAfterLayout)
-    revealAfterLayout = () => { scroll?.scrollChildIntoView(`message-${index}`); remember(); revealAfterLayout = undefined }
+    revealAfterLayout = () => { scroll?.scrollChildIntoView(`message-${index}`); revealedScrollTop = scroll?.scrollTop; remember(); revealAfterLayout = undefined }
     renderer.once("frame", revealAfterLayout)
   }
   const acknowledgeVisible = () => {
@@ -70,8 +73,25 @@ export function Transcript() {
     }
   }
   client.on("reveal-message", reveal)
+  const visibleActions = () => {
+    const viewport = scroll?.viewport
+    // Message boxes are direct transcript children. Index them once instead
+    // of recursively searching the full native tree for every older message.
+    const nodes = new Map((scroll?.content.getChildren() ?? []).map(node => [node.id, node]))
+    // Explicit search/reveal chooses a particular message. Keep that target
+    // until reading moves, rather than choosing a neighbouring footer/notice.
+    const selected = scroll?.scrollTop === revealedScrollTop ? timeline().find(item => item.kind === "message" && item.index === revealed()) : undefined
+    for (const item of [...(selected ? [selected] : []), ...timeline().toReversed()]) {
+      const node = item.kind === "message" ? nodes.get(`message-${item.index}`) : item.kind === "update" ? cards.get(item.update.id) : undefined
+      if (!viewport || !node || node.isDestroyed || node.height < 1 || node.screenY >= viewport.screenY + viewport.height || node.screenY + node.height <= viewport.screenY) continue
+      if (item.kind === "message") { client.emit("item-actions", { kind: "message", context: client.context, message: item.message, index: item.index }); return }
+      if (item.kind === "update") { client.emit("item-actions", { kind: "update", context: client.context, update: item.update }); return }
+    }
+    client.emit("item-actions")
+  }
+  client.on("request-item-actions", visibleActions)
   renderer.on("frame", acknowledgeVisible)
-  onCleanup(() => { remember(); if (restore) renderer.off("frame", restore); if (revealAfterLayout) renderer.off("frame", revealAfterLayout); client.off("reveal-message", reveal); renderer.off("frame", acknowledgeVisible) })
+  onCleanup(() => { remember(); if (restore) renderer.off("frame", restore); if (revealAfterLayout) renderer.off("frame", revealAfterLayout); client.off("reveal-message", reveal); client.off("request-item-actions", visibleActions); renderer.off("frame", acknowledgeVisible) })
   Keymap.createLayer(() => ({ commands: [
     { bind: "pageup", title: "Scroll earlier", run: () => scroll?.scrollBy(-10) },
     { bind: "pagedown", title: "Scroll later", run: () => scroll?.scrollBy(10) },
@@ -81,22 +101,22 @@ export function Transcript() {
     <Show when={data.state?.branch}><text fg={theme.text.muted} onMouseUp={() => void client.navigate("/original-chat")}>Branched chat · /original-chat returns to its source</text></Show>
     <Show when={!data.state?.messages?.length && !data.state?.dialogue?.length}><box paddingY={3} paddingX={3} gap={1}><text fg={theme.text.base}><b>What would you like to get done?</b></text>
       <text fg={theme.text.muted}>Ask a question, work with files, or follow an ongoing task.</text><Show when={!data.state?.provider || data.state?.composer?.readiness?.state !== undefined && data.state.composer.readiness.state !== "configured"} fallback={<text fg={theme.text.muted}>/request-context shows processing, sources and work limits.</text>}><text fg={theme.text.muted}>Write your first request. I’ll help with the missing model setup and keep your draft.</text></Show></box></Show>
-    <For each={timeline()}>{item => <Show when={item.kind === "message" ? item : undefined} fallback={item.kind === "update" ? <box id={`update-${item.update.id}`} ref={node => { const id = item.update.id; cards.set(id, node); onCleanup(() => { if (cards.get(id) === node) cards.delete(id) }) }} paddingY={1}>
+    <For each={timeline()}>{item => { const context = client.context; return <Show when={item.kind === "message" ? item : undefined} fallback={item.kind === "update" ? <box id={`update-${item.update.id}`} ref={node => { const id = item.update.id; cards.set(id, node); onCleanup(() => { if (cards.get(id) === node) cards.delete(id) }) }} paddingY={1}>
       <text fg={theme.accent}><b>{literal(item.update.title)}</b> · {literal(updateStatus(item.update.status))} · {item.update.read ? "read" : "unread"} · {item.update.resolved ? "done" : "open"}</text>
       <text fg={theme.text.base}>{literal(item.update.summary)}</text>
       <Show when={updateWarning(item.update.status)}>{warning => <text fg={theme.text.feedback.warning.base}>{warning()} Earlier results don’t confirm that nothing changed.</text>}</Show>
       <Show when={item.update.rating}><text fg={theme.text.base}>Feedback: {item.update.rating}</text></Show>
       <Show when={data.updateFeedback?.id === item.update.id}><Show when={data.updateFeedback?.saving} fallback={<text fg={theme.text.muted}>{literal(data.updateFeedback?.message)}</text>}><Spinner>{literal(data.updateFeedback?.message)}</Spinner></Show></Show>
-      <text fg={theme.text.muted}>Use “updates” in Ctrl+P to inspect evidence, read, reply, mark done or give feedback.</text>
+      <text fg={theme.text.muted} onMouseUp={() => { if (!renderer.getSelection()?.getSelectedText()) client.emit("item-actions", { kind: "update", context, update: item.update }) }}>{hint("gator.context-actions")} actions · /actions chooses an item</text>
     </box> : item.kind === "dialogue" ? <ConversationTurn turn={item.turn} task={data.state?.dialogue_peers?.find(peer=>peer.conversation_id===item.turn.task_chat)} busy={data.state?.dialogue_busy} /> : undefined}>{messageItem => { const { message, index } = messageItem(); return <box id={`message-${index}`} marginY={1} paddingY={message.role === "You" ? 1 : 0} paddingLeft={message.role === "You" || revealed() === index ? 2 : 3} paddingRight={2} gap={1}
       backgroundColor={message.role === "You" ? theme.background.raised.base : undefined} border={message.role === "You" || revealed() === index ? ["left"] : false} borderColor={message.role === "You" || revealed() === index ? theme.accent : undefined}>
-      <text fg={message.role === "You" ? theme.accent : theme.text.muted}><b>{literal(message.role)}</b><span style={{ attributes: TextAttributes.DIM }}>  {displayDate(message.created_at)}</span></text>
+      <text fg={message.role === "You" ? theme.accent : theme.text.muted} onMouseUp={() => { if (!renderer.getSelection()?.getSelectedText()) client.emit("item-actions", { kind: "message", context, message, index }) }}><b>{literal(message.role)}</b><span style={{ attributes: TextAttributes.DIM }}>  {displayDate(message.created_at)} · {hint("gator.context-actions")} actions</span></text>
       <Show when={message.activity}>{trace => <Activity trace={trace()} identity={activityKey(client.context, message, index)} expanded={data.activityExpanded} />}</Show>
       <Show when={message.text}><Show when={message.role !== "You"} fallback={<text fg={theme.text.base}>{literal(message.text)}</text>}><Markdown text={message.text} /></Show></Show>
       <Show when={message.result}>{result => <Result value={result()} />}</Show>
       <Show when={message.inputs?.length}><text fg={theme.text.muted}>Inputs: {message.inputs?.map(literal).join(" · ")}</text></Show>
-      <For each={message.bundle?.Artifacts}>{artifact => <text fg={theme.accent}>File: {literal(artifact.Path)} · {literal(artifact.MediaType)}</text>}</For>
-    </box> }}</Show>}</For>
+      <For each={message.bundle?.Artifacts}>{artifact => <text fg={theme.accent} onMouseUp={() => { if (!renderer.getSelection()?.getSelectedText()) client.emit("item-actions", { kind: "file", context, bundle: message.bundle, file: artifact }) }}>File: {literal(artifact.Path)} · {literal(artifact.MediaType)}</text>}</For>
+    </box> }}</Show> }}</For>
     <For each={data.state?.task_plans}>{plan => <box paddingY={1}>
       <text fg={theme.accent} onMouseUp={() => void client.navigate("/task-plans")}>{literal(plan.outcome || plan.task)}</text>
       <text fg={theme.text.muted}>{literal(plan.state)} · {literal(plan.phase)}{plan.phase === "review" ? " · /task-plans to review before work starts" : " · /task-plans for details"}</text>

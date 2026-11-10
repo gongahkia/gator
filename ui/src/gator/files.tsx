@@ -170,7 +170,7 @@ function FileEditor(props: { view: FileView; request: FileRequest; reopen(versio
     { bind: "ctrl+left", title: "Previous PDF page", enabled: props.view.kind === "pdf", run: () => { setPage(p => Math.max(1, p - 1)) } },
   ] }))
   return <DialogLayout header={<DialogHeader title={`${literal(props.view.name)}${dirty() ? " · Unsaved" : ""}`} onClose={close} />}>
-    <box id={`file-editor-${props.view.revision}`} ref={node => { body = node }} height={Math.max(8, dimensions().height - 14)} minHeight={0}>
+    <box id={`file-editor-${props.view.revision}`} ref={node => { body = node }} height={Math.max(2, dimensions().height - (dimensions().height < 24 ? 8 : 14))} minHeight={0}>
       <Show when={props.view.kind === "text" || props.view.kind === "markdown"} fallback={
         <Show when={image()} fallback={<scrollbox flexGrow={1}>
           <Show when={grid()}><box id="file-grid-page"><text fg={theme.accent}>{literal(sheet()?.name || props.view.name)}{sheet()?.protected ? " · Protected" : ""} · Rows {position().row * 50 + 1}–{Math.min(size().rows, (position().row + 1) * 50)} of {size().rows} · Columns {columnName(position().col * 20)}–{columnName(Math.min(size().cols, (position().col + 1) * 20) - 1)}</text>
@@ -187,6 +187,6 @@ function FileEditor(props: { view: FileView; request: FileRequest; reopen(versio
     </box>
     <Show when={props.view.kind === "pdf"}><Show when={busy()} fallback={<text fg={theme.text.base}>PDF page {page()} of {pages()} · Ctrl+←/→ pages</text>}><Spinner delay={150}>Rendering PDF page {page()}…</Spinner></Show></Show>
     <text fg={theme.text.muted}>{literal(notice())}</text>
-    <text fg={theme.text.muted}>Ctrl+S save · Ctrl+E edit Office/cell · Ctrl+O versions/export/Ask Gator · Ctrl+L select content · Ctrl+D discard · Esc close</text>
+    <text fg={theme.text.muted}>{dimensions().height < 24 ? "Ctrl+S save · Ctrl+O more · Esc" : "Ctrl+S save · Ctrl+E edit Office/cell · Ctrl+O versions/export/Ask Gator · Ctrl+L select content · Ctrl+D discard · Esc close"}</text>
   </DialogLayout>
 }
