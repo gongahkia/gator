@@ -93,6 +93,15 @@ func TestWorkModelReadinessExplainsMissingCredentialsAndProviderConfiguration(t 
 	if err != nil || status.Issue != "" {
 		t.Fatalf("repaired provider = %#v, %v", status, err)
 	}
+	settings.ProviderEndpoints = nil
+	if err := store.Save(settings); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("AZURE_OPENAI_BASE_URL", "http://127.0.0.1:9000/openai/v1")
+	status, err = currentWorkModelStatus(store, t.TempDir())
+	if err != nil || status.Issue != "" || status.Processing.Kind != "local_endpoint" || status.Processing.Destination != "127.0.0.1:9000" {
+		t.Fatalf("actual environment-resolved endpoint = %#v, %v", status, err)
+	}
 }
 
 func TestCurrentWorkModelStatusReportsConfiguredLocalModel(t *testing.T) {

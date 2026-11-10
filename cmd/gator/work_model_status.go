@@ -12,6 +12,7 @@ import (
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/localmodel"
 	"github.com/gongahkia/gator/internal/model"
+	"github.com/gongahkia/gator/internal/model/openai"
 	"github.com/gongahkia/gator/internal/workapp"
 )
 
@@ -69,8 +70,13 @@ func currentWorkModelStatus(settingsStore config.Store, stateDir string) (workap
 			// Construct the same adapter configuration as execution, without
 			// extensions or inference/network calls. Credentials alone do not
 			// satisfy provider-specific endpoint/deployment requirements.
-			if _, err := model.New(model.Config{Provider: provider, Model: status.Model, BaseURL: settings.ProviderEndpoint(status.Provider), Credentials: &credentials, ProviderOptions: settings.OptionsForProvider(status.Provider)}); err != nil {
+			backend, err := model.New(model.Config{Provider: provider, Model: status.Model, BaseURL: settings.ProviderEndpoint(status.Provider), Credentials: &credentials, ProviderOptions: settings.OptionsForProvider(status.Provider)})
+			if err != nil {
 				status.Issue = "Model configuration is incomplete. Open Models to inspect its endpoint, credentials and provider options."
+			} else if responses, ok := backend.Model.(openai.Responses); ok && responses.BaseURL != "" {
+				// Azure can resolve its endpoint from environment configuration.
+				// Project the adapter's actual route, not an inferred cloud label.
+				status.Processing = workModelProcessing(status.Provider, responses.BaseURL)
 			}
 		}
 		return status, nil
