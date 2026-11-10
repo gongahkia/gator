@@ -7,6 +7,7 @@ import { useToast } from "../ui/toast"
 import type { useActions } from "./actions"
 import { conversationBundles } from "./outputs"
 import { displayDate } from "./display"
+import { useReadView } from "./read-view"
 
 export type ResultTarget =
   | { kind: "message"; context: string; index: number; message: BackendMessage }
@@ -16,7 +17,7 @@ export type ResultTarget =
 // Every callback retains its original conversation and immutable result. An
 // equal-looking item, newer snapshot or switched chat never supplies authority.
 export function useResultActions(controls: ReturnType<typeof useActions>) {
-  const client = useClient(), clipboard = useClipboard(), toast = useToast()
+  const client = useClient(), clipboard = useClipboard(), toast = useToast(), readView = useReadView()
   const { menu, details, actions, openFile } = controls
   const contextIsCurrent = (context: string) => {
     if (context !== client.context) throw new Error("Return to the original conversation and select this item again.")
@@ -45,15 +46,17 @@ export function useResultActions(controls: ReturnType<typeof useActions>) {
   async function sources(bundle: BackendBundle, context: string, back?: () => void) {
     bundleIsCurrent(bundle, context)
     const run = bundle.RunID!
-    const catalog = await client.host.sourceCatalog({ context, run })
+    await readView({ title: "Retained sources", context, description: "Reading sealed source references on this device.", back, read: () => client.host.sourceCatalog({ context, run }), show: catalog => {
     bundleIsCurrent(bundle, context)
-    menu("Retained sources", catalog.references.map(reference => ({ key: reference.id, title: reference.label, description: `${reference.kind} · ${reference.locator}`, run: async () => {
+    menu("Retained sources", catalog.references.map(reference => ({ key: reference.id, title: reference.label, description: `${reference.kind} · ${reference.locator}`, run: () => {
       bundleIsCurrent(bundle, context)
-      const source = await client.host.sourcePreview({ context, run, path: "evidence:" + reference.id })
+      return readView({ title: reference.label, context, description: `Reading retained evidence: ${reference.locator}`, back: () => sources(bundle, context, back), read: () => client.host.sourcePreview({ context, run, path: "evidence:" + reference.id }), show: source => {
       bundleIsCurrent(bundle, context)
       details(reference.label, [`Source: ${source.locator}`, `Evidence: ${source.id} · ${source.sha256}`, source.notice, `Captured: ${source.captured_at || "Unknown"}`, source.reads.length ? "Observed reads: " + source.reads.map(read => `${read.start}–${read.end}${read.truncated ? " (partial)" : ""}`).join(", ") : "Exact read ranges unavailable.", source.truncated ? "Showing part of the retained source." : "", source.text.split("\n").map((line, index) => `${source.firstLine + index}  ${line}`).join("\n")].filter(Boolean).join("\n\n"), () => attempt(() => sources(bundle, context, back)))
+      } })
     } })), false, back)
     if (!catalog.references.length) details("Retained sources", "This result has no supported retained source references. No current account or workspace was queried.", back)
+    } })
   }
   async function change(bundle: BackendBundle, candidate: NonNullable<BackendBundle["Candidates"]>[number], context: string, back?: () => void) {
     bundleIsCurrent(bundle, context)
@@ -61,9 +64,10 @@ export function useResultActions(controls: ReturnType<typeof useActions>) {
       details("Code changes", [origin(bundle), `Checks: ${candidate.Status || "Not reported"}`, ...candidate.ChangedPaths, candidate.PatchPath, "This older proposal has no verifiable sealed patch preview. This record does not apply changes."].filter(Boolean).join("\n\n"), back)
       return
     }
-    const result = await client.host.codePreview({ context, run: bundle.RunID!, candidate: candidate.ID })
+    await readView({ title: "Code changes", context, description: "Reading the retained patch on this device. This does not apply changes.", back, read: () => client.host.codePreview({ context, run: bundle.RunID!, candidate: candidate.ID }), show: result => {
     bundleIsCurrent(bundle, context)
     details("Code changes", [origin(bundle), result.status, ...result.verification.map(check => `${check.passed ? "Passed" : "Failed"}: ${check.argv.join(" ")}`), "Inspecting this retained patch does not apply it.", result.truncated ? "Showing part of the retained patch." : "", result.patch].filter(Boolean).join("\n\n"), back)
+    } })
   }
   function fileMenu(bundle: BackendBundle, file: NonNullable<BackendBundle["Artifacts"]>[number], context: string, back?: () => void) {
     const check = () => {

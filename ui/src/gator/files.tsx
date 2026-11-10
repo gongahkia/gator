@@ -15,15 +15,16 @@ import { literal } from "./text"
 import { cellCoordinates, columnName, fileParagraphs, selectedContent, type FileSelection } from "./file-selection"
 import { resolve } from "node:path"
 import { conversationBundles } from "./outputs"
+import { useReadView } from "./read-view"
 
 export function useFiles(menu: (title: string, choices: Choice[]) => void, prompt: (title: string, value: string, save: (text: string) => unknown, description?: string) => void) {
-  const client = useClient(), dialog = useDialog()
+  const client = useClient(), dialog = useDialog(), readView = useReadView()
   async function open(ref: FileReference, version?: string, context = client.context) {
     if (context !== client.context) throw new Error("Return to the original conversation before opening this file.")
     const request: FileRequest = { action: "open", context, ref, version }
-    const view = await client.host.file(request)
-    if (context !== client.context) throw new Error("The conversation changed before opening this file.")
-    dialog.replace(() => <FileEditor view={view} request={request} reopen={version => open(ref, version, context)} menu={menu} prompt={prompt} />, undefined, { size: "xlarge" })
+    await readView({ title: "Open file", context, description: "Reading the retained file on this device. Your draft and original file are kept.", read: () => client.host.file(request), show: view => {
+      dialog.replace(() => <FileEditor view={view} request={request} reopen={version => open(ref, version, context)} menu={menu} prompt={prompt} />, undefined, { size: "xlarge" })
+    } })
   }
   function files() {
     const choices: Choice[] = [], seen = new Set<string>(), context = client.context
