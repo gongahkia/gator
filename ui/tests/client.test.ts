@@ -191,3 +191,16 @@ test("first model setup and local hub navigation preserve drafts and do not subm
   await client.navigate("/saved"); await client.navigate("/chat")
   expect(host.sent).toHaveLength(1); expect(client.route).toBe("chat"); expect(client.draft.plan_first).toBe(true)
 })
+
+test("a selected provider with unmet host prerequisites opens setup without admitting or losing a request", async () => {
+  const { host, client } = await fixture(); await client.start()
+  host.change({ ...host.current, composer: { id: "setup", effort: "standard", models: [], readiness: { state: "needs_setup", issue: "Missing provider credential", processing: { kind: "remote", description: "Requests go to the provider" } } } })
+  let setup = 0
+  client.actions.setup = () => { setup++ }
+  client.on("action", name => client.actions[name]?.())
+  await client.setPlanFirst(true); await client.edit("Keep my first request")
+  await client.submit()
+  expect(setup).toBe(1); expect(host.sent).toHaveLength(0)
+  expect(client.draft.text).toBe("Keep my first request"); expect(client.draft.plan_first).toBe(true)
+  expect(client.pending.size).toBe(0)
+})

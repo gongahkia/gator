@@ -9,8 +9,8 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 | 1 | Conversation remains available during execution; ordinary messages can steer a specific live task or start independent work; ambiguous routing is clarified without losing task identity, files, or drafts. | In progress | `92cd471f4`/`485cd007c` plus result continuity: ordinary messages reply, steer, clarify, delegate and stop specific independent owners without moving focus. Pending-review text corrections now revise the same task asynchronously, preserve its frozen inputs/limits, and require fresh approval; failures/cancellation and restart retain the outcome. Preparing/reviewed plans can be cancelled conversationally; changed control epochs are rejected. Recent original-task summaries reach follow-up conversation/work/planning without acquiring controls. Explicit queues remain available. Corrections during initial preparation or plan-bound execution, changes to pending exact actions/new inputs, delegated exact-approval journeys, broader failure/account/goal journeys and live-model routing quality remain open. |
 | 2 | Following unifies commitments with outcome/state/next action, next and last successful checks, sources/timezone, pause/edit, and truthful foreground/service/offline limits. | In progress | `4b9edf091`/`a95289265`: commitment cards and exact check controls. Active goal cards open their exact canonical picker row and prepare a check for that goal's current workspace, including duplicate titles, other-chat origins and busy owners. Focused Go/host/native integration checks pass. Advanced non-project schedule editing and paused-goal controls remain; final integrated journey pending. |
 | 3 | Relevant answers expose supplied memory/provenance/correction; noise feedback offers a reviewed, scoped check/notification change and reports its actual outcome. | Pending | |
-| 4 | First task leads through only missing setup; host connectivity and model readiness are distinct; local/cloud processing, capabilities, and work budget are explained. | Pending | |
-| 5 | Workspace/account/source scope is inspectable near input; conversational/manual settings agree, including terminal preferences, with confirmed outcomes. | Pending | |
+| 4 | First task leads through only missing setup; host connectivity and model readiness are distinct; local/cloud processing, capabilities, and work budget are explained. | In progress | `d0fd58e48` provides Go-owned prerequisite/processing/budget projection. Ordinary first submissions offer missing setup while preserving private files/text and plan intent; Host connectivity and model setup have separate labels. Native fresh-profile → invalid provider form → repair → persisted selection → inspect context/limits → explicit useful task passes at all four sizes. Missing and subsequently changed credentials recover without replaying/admitting the rejected task. Request-specific connected-account/access setup handoffs and recovery after provider rejection during an admitted task remain; final integrated journey and live-account/model verification remain. |
+| 5 | Workspace/account/source scope is inspectable near input; conversational/manual settings agree, including terminal preferences, with confirmed outcomes. | In progress | Ctrl+T and /request-context inspect current workspace, model processing, selected accounts, draft inputs, work mode and actual Go work budgets. Missing account display metadata retains the selected identity instead of claiming no accounts. Scope changes do not rewrite existing task inputs. Full permission explanations and conversational/manual terminal preferences, authoritative persisted outcomes and the combined account/settings journey remain to be finished/verified. |
 | 6 | Results/files/updates expose keyboard contextual actions to open/edit/reply/inspect evidence/mark done while retaining original identities and conversation context. | Pending | |
 | 7 | Input and useful transcript remain visible at 110×34, 80×24, 60×20, 42×14 with combined attachments/reply/plan/slash states and multiline drafts. | Implemented; final journey pending | `204386564`; `composer-budget.test.tsx`: 8 file names + plan/reply + multiline input and slash completion, ≥4 transcript rows at all four sizes. |
 | 8 | Approval surface shows exact live action/account/destination/content/consequences; long reviews scroll; changed/stale tokens cannot execute; edits require fresh review. | Implemented; final journey pending | `8ba3a9cb8`; `approval-review.test.tsx`: four sizes, scrolling/exact data, stale and missing previews; `approvals.test.tsx`: real Go token protection and controlled connected send. |
@@ -20,7 +20,7 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 | 12 | Disconnected/error states offer contextual reconnect/recovery with intact drafts/request identity; safe admission retries and uncertain external effects stay distinct. | Implemented; final journey pending | `d00952219`; `interaction-recovery.test.tsx`: real Go accepted request + lost acknowledgement retries once, reconnect keeps draft/owner, no model replay; receipts tests preserve unknown external outcomes. |
 | 13 | New-content/latest/catch-up affordances preserve stable reading anchors across navigation/restart; long-history rendering is benchmarked and optimized when justified. | In progress | Reproducible native benchmark and reports in `docs/benchmarks/`; unchanged entries retain DOM identity across complete Go snapshots. 5,000-message append improved 4,051→747 ms in single samples. Startup/scroll remain too slow; bounded rendering, persistent anchors, catch-up/latest UI still required. |
 | 14 | Voice has direct record/stop/cancel/transcribe/edit flow, visible processing destination and explicit consent; transcript is editable before sending. | Implemented; final journey pending | `09e74ef39`; `voice-controls.test.tsx`: all four sizes, native VoiceSession with controlled capture/transcription, route/chat consent, changed-route rejection, editable draft/no send, recording/transcription cancellation. Physical audio remains unverified on this host. |
-| 15 | Shared native typography/spacing/selection/focus/disabled treatments and readable summaries work with terminal colors, NO_COLOR and reduced motion; exact technical details remain inspectable. | In progress | `20e9b7cde`: Markdown cleanup destroys native consumers before their borrowed syntax style, including theme changes. Shared immutable field subscriptions now prevent routine snapshots from invalidating unchanged native content; the reproduced conversation render stall clears without changing deadlines or the renderer. Exact review objects remain frozen. Shared visual/state audit and full acceptance journey remain. |
+| 15 | Shared native typography/spacing/selection/focus/disabled treatments and readable summaries work with terminal colors, NO_COLOR and reduced motion; exact technical details remain inspectable. | In progress | `20e9b7cde`: Markdown cleanup destroys native consumers before their borrowed syntax style, including theme changes. Shared immutable field subscriptions prevent routine snapshots from invalidating unchanged native content; the reproduced conversation render stall clears without changing deadlines or renderer. Exact review objects remain frozen. Detail views reserve their scrollbar column and page by viewport height, retaining readable processing/budget text at all four sizes. Shared visual/state audit and full acceptance journey remain. |
 
 ## Implementation rules
 
@@ -45,7 +45,61 @@ finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
 
-- Retained next-message review intent (10 November): the existing private draft
+- Guided first-request model setup (`d0fd58e48` / `20ef9a298` backend, 10 November): the Go
+  configuration boundary projects missing prerequisites, a display-safe model
+  processing destination and actual Work/Code step limits. It distinguishes
+  managed Ollama, a potentially forwarding loopback endpoint, a remote service,
+  and an unknown destination. Environment-resolved Azure destinations come from
+  the constructed adapter's actual route. URL credentials/paths/queries are not projected.
+  Configured means prerequisites are present, not verified endpoint connectivity.
+  The same provider adapter constructor checks provider-specific configuration
+  without inference or extension execution; a controlled endpoint gets no calls
+  during readiness projection. No new settings store or execution path is added.
+  Ordinary composer submissions use this state to offer only missing model setup;
+  an already configured model is also selectable. Setup never sends the draft.
+  The header says Host connected; the composer reports Model setup needed,
+  without effort text obscuring it on a narrow terminal. Full setup issues are
+  inspectable, including missing environment-key instructions. Recovery after
+  a prerequisite changes at admission offers model repair with the original
+  draft and request identity retained. Actual execution then has one durable
+  task admission; orchestration may legitimately use several inference calls.
+  Ctrl+T / /request-context expose processing, workspace/saved-context scope,
+  selected account identities and access metadata, inputs, mode and budgets.
+  Unavailable metadata does not erase a selected account. Step limits explicitly
+  do not promise token or monetary caps. Optional capabilities/account setup
+  descriptions come from the existing shared product guide.
+  Native Go + controlled HTTP provider: a completely fresh profile, first
+  request with private input, invalid provider URL, repair, exact metadata review,
+  persisted selection, keyboard context inspection, and explicit useful result
+  pass at 110×34, 80×24, 60×20 and 42×14. A separate journey starts with missing
+  credentials, selects another model, changes its prerequisites before admission,
+  repairs them via contextual recovery, and submits without duplicate admission.
+  Model setup's multiline editor reserves space for its title and save/cancel
+  instructions; native input bounds and the visible Ctrl+S hint are checked at
+  all four sizes. Detail views reserve their scrollbar column and page by the
+  visible height so exact context explanations remain readable.
+  Final native/client/scope/approval/model/command/composer regressions: **38 pass,
+  561 assertions**. NO_COLOR label/scope checks:
+  **4 pass, 38 assertions**. Final TUI typecheck and targeted Go composer/model
+  status/first-run/admission-readiness regressions pass. Runtime rebuilt from
+  this checkout. Logs: `/tmp/gator-ux-20261110-setup-{verified-regression,
+  no-color,commit-typecheck,final-go,final-runtime}.log`.
+  Earlier new-test runs recorded 0/5 passes: they exposed a narrow setup label
+  truncation and a scrollbar column clipping detail text; both are fixed. The
+  test harness now emits real legacy PageDown sequences and compares readable
+  paged text without decoration, and checks durable admissions rather than
+  treating all model calls as distinct tasks. The first regression after editor
+  sizing recorded **33 pass / 5 fail** because its new dimensions hook import
+  was missing; typecheck caught the same error. The import is fixed and the
+  fresh 38-test run above passes. Earlier failure logs remain in
+  `/tmp/gator-ux-20261110-setup-{first-task,first-task-rerun,final-regression}.log`.
+  No deadline or check was skipped.
+  These are controlled-provider/native renderer journeys, not physical terminal
+  or live-account/model verification. Connected-account first-request setup and
+  recovery after an admitted task's provider failure remain under item 4; this
+  is not completion of that item or the full fifteen-item journey.
+
+- Retained next-message review intent (`e6ec73e89`, 10 November): the existing private draft
   store now owns `plan_first` alongside text, uploaded-file references and update
   replies; the transient client set was removed. Empty plan-first drafts survive
   restart and obey the same seven-day retention, disable and clear controls.

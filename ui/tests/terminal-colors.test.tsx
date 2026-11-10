@@ -12,12 +12,12 @@ test("connection dots keep semantic terminal palette slots and a readable label"
   try {
     for (const [state, label, slot] of [["starting", "connecting", 3], ["connected", "connected", 2], ["disconnected", "disconnected", 1]] as const) {
       setConnection(state); await setup.flush()
-      expect(setup.captureCharFrame()).toContain(`● ${label}`)
+      expect(setup.captureCharFrame()).toContain(`● Host ${label}`)
       const dot = setup.captureSpans().lines.flatMap(line => line.spans).find(span => span.text.includes("●"))!
       expect(dot.fg.intent).toBe(process.env.NO_COLOR ? "default" : "indexed")
       if (!process.env.NO_COLOR) expect(dot.fg.slot).toBe(slot)
     }
-    setConnection("connected"); setError(true); await setup.flush(); expect(setup.captureCharFrame()).toContain("● disconnected")
+    setConnection("connected"); setError(true); await setup.flush(); expect(setup.captureCharFrame()).toContain("● Host disconnected")
     for (const noColor of [true, false]) {
       const palette = terminalPalette(noColor)
       expect(palette.text.base.intent).toBe("default")

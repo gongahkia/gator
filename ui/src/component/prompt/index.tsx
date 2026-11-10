@@ -21,6 +21,8 @@ export function Prompt() {
   const compact = () => dimensions().height < 26
   const short = () => dimensions().height < 18
   const model = () => data.state?.composer?.models.find(model => model.provider === data.state?.provider && model.model === data.state?.model)?.label || data.state?.model || data.state?.provider || "Choose a model"
+  const modelState = () => data.state?.composer?.readiness?.state
+  const modelSummary = () => modelState() && modelState() !== "configured" ? "Model setup needed" : model()
   const [selection, setSelection] = createSignal(0), [dismissed, setDismissed] = createSignal<string>()
   const commands = createMemo(() => {
     const local = [
@@ -101,7 +103,7 @@ export function Prompt() {
     { id: "gator.newline", bind: "shift+return", title: "New line", run: () => { textarea?.newLine() } },
     { bind: "ctrl+j", title: "New line fallback", run: () => { textarea?.newLine() } },
     { id: "gator.guide", bind: "ctrl+g", title: "Guide active work with draft", palette: true, run: guide },
-    { id: "gator.draft-context", bind: "ctrl+t", title: "Inspect draft files, reply and plan mode", palette: true, run: () => { void client.navigate("/draft-context").catch(error => client.fail(error)) } },
+    { id: "gator.draft-context", bind: "ctrl+t", title: "Inspect draft, processing, sources and work limits", palette: true, run: () => { void client.navigate("/draft-context").catch(error => client.fail(error)) } },
   ] }))
   return <box id="composer" flexShrink={0} marginX={dimensions().width < 60 ? 1 : 2} marginTop={short() ? 0 : 1} marginBottom={short() ? 0 : 1}>
     <Show when={matches().length}>
@@ -122,11 +124,11 @@ export function Prompt() {
       onContentChange={() => { if (!syncingDraft && textarea && textarea.plainText !== client.draft.text) void client.edit(textarea.plainText).catch(e => client.fail(e)) }}
       onSubmit={() => { if (!dialog.stack.length) void client.submit().catch(e => client.fail(e)) }} />
     <text id="composer-model" height={1} wrapMode="none" truncate selectable={false} fg={theme.text.muted} onMouseDown={event => event.stopPropagation()}
-      onMouseUp={event => { if (event.button !== 0) return; event.stopPropagation(); void client.navigate("/models").catch(e => client.fail(e)) }}><b style={{ fg: theme.accent }}>Gator</b>  {literal(model())}{data.state?.composer?.effort ? ` · ${data.state.composer.effort} effort` : ""}</text>
+      onMouseUp={event => { if (event.button !== 0) return; event.stopPropagation(); void client.navigate(modelState() && modelState() !== "configured" ? "/setup" : "/models").catch(e => client.fail(e)) }}><b style={{ fg: theme.accent }}>Gator</b>  {literal(modelSummary())}{(!modelState() || modelState() === "configured") && data.state?.composer?.effort ? ` · ${data.state.composer.effort} effort` : ""}</text>
     </box>
     <box paddingX={1} paddingTop={compact() ? 0 : 1} flexDirection="row" justifyContent="space-between" gap={2}>
       <text fg={theme.text.muted} attributes={TextAttributes.DIM} flexShrink={1} minWidth={0} height={1} wrapMode="none" truncate>{data.snapshot.connection !== "connected" ? "Reconnect before sending" : ["recording", "transcribing"].includes(data.voicePhase) ? "Finish dictation before sending" : data.state?.running ? `${hint("gator.send")} ${dimensions().width < 60 ? "talk" : "talk / steer"} · ${hint("gator.queue")} queue` : data.state?.dialogue_active ? `${hint("gator.send")} send · Talk, correct or start work` : `${hint("gator.send")} send · ${hint("gator.newline")} new line`}</text>
-      <text fg={theme.text.muted} attributes={TextAttributes.DIM} flexShrink={0}>{dimensions().width < 60 ? "/ commands" : `/ commands · ${hint("command.palette.show")}`}</text>
+      <text fg={theme.text.muted} attributes={TextAttributes.DIM} flexShrink={0}>{dimensions().width < 60 ? "/ commands" : `${hint("gator.draft-context")} context · / · ${hint("command.palette.show")}`}</text>
     </box>
   </box>
 }

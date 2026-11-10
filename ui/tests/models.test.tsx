@@ -65,6 +65,7 @@ test("first task retains its attachment and draft through model setup and restar
   const until = async (predicate: () => boolean, label: string) => { const end = Date.now() + 10000; while (!predicate()) { if (Date.now() > end) throw new Error(label + ": " + JSON.stringify(client.state?.panel)); await flush() } }
   try {
     await client.start(); await client.edit("Help me understand this file."); await client.attach([path]); await client.submit()
+    await flush(); expect(setup.captureCharFrame()).toContain("Set up a model for this request"); setup.mockInput.pressEnter()
     await until(() => !!client.state?.panel?.rows?.some(row => row.label === "Cloud API key"), "first setup")
     expect(calls).toBe(0); expect(client.draft.uploads).toHaveLength(1); expect(client.draft.text).toBe("Help me understand this file.")
     await flush(); setup.mockInput.pressEnter(); await until(() => client.state?.panel?.title === "Cloud models", "cloud models"); await flush()

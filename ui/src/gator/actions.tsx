@@ -16,6 +16,8 @@ import { useData } from "../context/data"
 import { activityKey, activitySummary, activityText, searchableMessage } from "./activity"
 import { conversationBundles } from "./outputs"
 import { useKeyHints } from "./key-hints"
+import { requestContext } from "./request-context"
+import productGuide from "../../../internal/productguide/capabilities.json"
 
 export type Choice = { title: string; key?: string; description?: string; category?: string; disabled?: boolean; run(): unknown }
 export function useActions() {
@@ -148,6 +150,7 @@ export function useActions() {
     menu("Model and effort for future messages", () => [
       { title: "Choose model", description: data.state?.composer?.disabled || `${data.state?.provider || "No provider"} / ${data.state?.model || "Not selected"}`, run: chooseModel },
       { title: "Choose effort", description: data.state?.composer?.disabled || data.state?.composer?.effort || "standard", run: chooseEffort },
+      { title: "Processing and work limits", description: data.state?.composer?.readiness?.issue || "Where requests go and what effort limits mean", run: () => details("Request context and limits", requestContext(client.state, client.draft)) },
       { title: "Configure providers and local models", run: () => client.navigate("/model") },
     ])
   }
@@ -193,6 +196,7 @@ export function useActions() {
       const sameChat = () => { if (client.context !== context) throw new Error("The conversation changed. Reopen recovery in the intended chat.") }
       menu(disconnected ? "Reconnect this chat" : "Recover this action", [
         ...(disconnected ? [{ title: "Reconnect and review", description: "Keep the draft. Recovered tasks stay paused; external actions are not resent.", run: () => { sameChat(); return client.reconnect() } }] : []),
+        ...(!disconnected && client.state?.composer?.readiness && client.state.composer.readiness.state !== "configured" ? [{ title: "Repair model setup", description: client.state.composer.readiness.issue, run: () => { sameChat(); return client.navigate("/setup") } }] : []),
         ...(!disconnected && client.canRetrySubmission ? [{ title: "Retry this message acknowledgement", description: "Uses the original request identity. An already accepted message will not start a second task.", run: () => { sameChat(); if (!client.canRetrySubmission) throw new Error("The draft changed. Send it as a new message when ready."); return client.submit() } }] : []),
         ...(!disconnected ? [{ title: "Inspect retained requests", description: "Review queued or interrupted work before resuming.", run: () => { sameChat(); return queue() } },
           { title: "Inspect external receipts", description: "Check uncertain sends before considering another action.", run: () => { sameChat(); return receipts() } }] : []),
@@ -200,7 +204,17 @@ export function useActions() {
         ...(!disconnected && client.issue ? [{ title: "Dismiss error and keep editing", run: () => { sameChat(); client.issue = ""; client.emit("change") } }] : []),
       ])
     },
+    setup: () => menu("Set up a model for this request", [
+      { title: "Connect or repair a model", description: client.state?.composer?.readiness?.issue || "Choose a local model or a cloud provider. Your draft is kept.", run: () => client.navigate("/model") },
+      { title: "Why setup is needed", description: "Read the complete issue and recovery instructions", run: () => details("Model setup issue", (client.state?.composer?.readiness?.issue || "Choose a model for this request.") + "\n\nYour draft and attachments stay in this chat. Setup does not submit the request.") },
+      ...((client.state?.composer?.models.length ?? 0) ? [{ title: "Choose an already configured model", run: models }] : []),
+      { title: "Request context and limits", description: "Processing destination, selected sources and work budgets", run: () => details("Request context and limits", requestContext(client.state, client.draft)) },
+      { title: "What can Gator help with?", description: "Files, web research, optional accounts and reviewed changes", run: () => details("Capabilities and optional setup", productGuide.connections_setup + "\n\n" + productGuide.help) },
+      { title: "Return to my draft", run: () => client.navigate("/chat") },
+    ]),
+    "request-context": () => details("Request context and limits", requestContext(client.state, client.draft)),
     "draft-context": () => menu("Draft details", [
+      { title: "Request context and limits", description: client.state?.composer?.readiness?.issue || "Model processing, workspace, accounts and work budgets", run: () => details("Request context and limits", requestContext(client.state, client.draft)) },
       { title: `Plan first: ${client.draft.plan_first ? "on" : "off"}`, description: "Review a proposal before implementation; external actions still require approval.", run: () => client.navigate("/plan-first") },
       { title: `Attachments: ${client.draft.uploads?.length || 0}`, description: client.draft.uploads?.map(file => file.name).join(" · ") || "No private files attached", run: () => actions.attachments() },
       ...(client.draft.reply_to_update_id ? [{ title: "Clear reply link", description: client.state?.chat_updates?.find(update => update.id === client.draft.reply_to_update_id)?.title || "Replying to a retained update", run: () => client.edit(client.draft.text, client.draft.uploads, null) }] : []),

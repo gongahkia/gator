@@ -1,9 +1,9 @@
 # Shared product capability descriptions
 
-The runtime and desktop now consume
+The runtime and native terminal interface consume
 `internal/productguide/capabilities.json` for connected-account onboarding,
 empty source selection, everyday help, pilot setup and assistant self-knowledge.
-The Go binary embeds it; Vite bundles the same JSON. No runtime file or network
+The Go binary embeds it; Bun bundles the same JSON for the TUI. No runtime file or network
 lookup is needed. The guide contains no user configuration or credentials and
 cannot grant tools or permissions.
 

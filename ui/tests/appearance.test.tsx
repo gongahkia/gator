@@ -33,7 +33,7 @@ test("terminal colors and explicit Gator presets survive cached chats, compact d
     expect(JSON.parse(await readFile(join(config, "config.json"), "utf8")).theme).toBe(theme)
   }
   try {
-    await client.start(); await flush(); expect(setup.captureCharFrame()).toContain("🐊 Gator"); expect(setup.captureCharFrame()).toContain("● connected"); await client.send({ type: "submit", text: "/mode inspect" }); await client.edit("Help me plan my week"); await client.submit(); await until(() => !client.state?.running && requests === 1)
+    await client.start(); await flush(); expect(setup.captureCharFrame()).toContain("🐊 Gator"); expect(setup.captureCharFrame()).toContain("● Host connected"); await client.send({ type: "submit", text: "/mode inspect" }); await client.edit("Help me plan my week"); await client.submit(); await until(() => !client.state?.running && requests === 1)
     const original = client.state!.conversation_id!; await client.edit("Keep first draft"); await client.navigate("/new"); await client.edit("Keep second draft")
     await choose("Light", "light"); color("Appearance"); color("Gator")
     await client.navigate("/chats"); await flush(); await setup.mockInput.typeText("Help me plan my week"); await flush(); setup.mockInput.pressEnter(); await until(() => client.state?.conversation_id === original); await flush()

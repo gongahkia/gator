@@ -149,7 +149,9 @@ export class GatorClient extends EventEmitter {
     const command = draft.text.trimStart().startsWith("/")
     if (!command && ["recording", "transcribing"].includes(this.voicePhase)) throw new Error("Finish or cancel dictation before sending the draft.")
     if (command && (draft.uploads?.length || draft.reply_to_update_id)) throw new Error("Send attachments and update replies with a message or queued follow-up.")
-    if (!command && !this.state?.running && !this.state?.provider) { await this.navigate("/model"); return }
+    if (!command && !this.state?.running && (!this.state?.provider || this.state?.composer?.readiness && this.state.composer.readiness.state !== "configured")) {
+      await this.navigate(this.actions.setup ? "/setup" : "/model"); return
+    }
     this.pending.add(context); this.issue = ""; this.emit("change")
     try {
       if (command) {

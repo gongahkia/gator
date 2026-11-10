@@ -2,7 +2,7 @@ import { For, Show, createEffect, createSignal, onCleanup } from "solid-js"
 import { TextAttributes } from "@opentui/core"
 import type { TextareaRenderable, ScrollBoxRenderable } from "@opentui/core"
 import { Keymap } from "../context/keymap"
-import { useKeyboard, useRenderer } from "@opentui/solid"
+import { useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/solid"
 import { useClient } from "../context/client"
 import { useData } from "../context/data"
 import { useTheme } from "../context/theme"
@@ -207,7 +207,10 @@ export function Panel(props: { panel: BackendPanel }) {
 }
 
 function MultilineField(props: { title: string; value: string; limit: number; save(value: string): void }) {
-  const theme = useTheme(), client = useClient(); let editor: TextareaRenderable | undefined
+  const theme = useTheme(), client = useClient(), dimensions = useTerminalDimensions(); let editor: TextareaRenderable | undefined
+  const inset = () => dimensions().height < 20 ? 1 : 3
+  const gap = () => dimensions().height < 20 ? 0 : 1
+  const rows = () => Math.max(2, Math.min(8, dimensions().height - (dimensions().height >= 24 ? Math.floor(dimensions().height / 4) : 0) - 2 * inset() - 1 - 2 - 2 * gap()))
   Keymap.createLayer(() => ({ mode: "modal", priority: 3, commands: [{ bind: "ctrl+s", title: "Keep field value", run: () => { const value = editor?.plainText ?? ""; if (value.length > props.limit) client.fail(new Error("This value exceeds the field limit.")); else props.save(value) } }] }))
-  return <box padding={3} gap={1}><text fg={theme.accent}>{props.title}</text><textarea ref={value => { editor = value }} focused initialValue={props.value} height={8} wrapMode="word" textColor={theme.text.base} focusedTextColor={theme.text.base} onSubmit={() => { editor?.newLine() }} /><text fg={theme.text.muted}>Enter adds a line · Ctrl+S keeps this field · Esc cancels</text></box>
+  return <box padding={inset()} gap={gap()}><text height={1} wrapMode="none" truncate fg={theme.accent}>{props.title}</text><textarea id="multiline-field-input" ref={value => { editor = value }} focused initialValue={props.value} height={rows()} wrapMode="word" textColor={theme.text.base} focusedTextColor={theme.text.base} onSubmit={() => { editor?.newLine() }} /><text height={2} wrapMode="word" fg={theme.text.muted}>Enter adds a line · Ctrl+S keeps this field · Esc cancels</text></box>
 }
