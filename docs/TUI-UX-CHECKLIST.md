@@ -45,6 +45,18 @@ finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
 
+- Pending-plan correction boundary (10 November): the canonical plan store now
+  admits a tool-free edit against an exact task/revision/digest and immutable
+  requesting dialogue. Admission revokes the old review; success requires a new
+  human review, while failure/cancellation retains the original task text,
+  options, sources and budgets. The original conversation retains the actual
+  result, including after owner restart. Read-only conversation references do
+  not acquire the new correction capability. Full Go workspan checks pass:
+  `go test ./internal/worksession ./internal/workapp ./internal/workrun ./cmd/gator`;
+  log `/tmp/gator-ux-20261110-plan-edit-go-full.log`. Native owner/host wiring and
+  its capacity check are being finished separately; this backend boundary alone
+  does not complete item 1 or the full audit.
+
 - Fresh full terminal regression after `3ba57d307` (10 November): default
   `bun run test` passes **94 tests, 3 unchanged skips, 0 failures**, 1,550
   assertions across 62 files in 249.63 seconds. The command deadline remains

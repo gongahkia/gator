@@ -173,7 +173,12 @@ func taskPlanPrompt(plan *worksession.TaskPlan) string {
 		return ""
 	}
 	raw, _ := json.Marshal(plan.Content)
-	return "Human-reviewed task intent (revision and digest are host-bound). Follow this outcome and steps; stop and ask for a revised plan if the scope changes. These are proposed steps, not verified completion. Effect scope never grants command, connected-service, browser, external-terminal or artifact-application permission. Later exact-action reviews and verification remain required.\n" + strings.TrimSpace(string(raw))
+	text := "Human-reviewed task intent (revision and digest are host-bound). Follow this outcome and steps; stop and ask for a revised plan if the scope changes. These are proposed steps, not verified completion. Effect scope never grants command, connected-service, browser, external-terminal or artifact-application permission. Later exact-action reviews and verification remain required.\n" + strings.TrimSpace(string(raw))
+	if plan.Edit != nil && plan.Edit.State == "applied" {
+		correction, _ := json.Marshal(plan.Edit.Instruction)
+		text += "\nRetained user correction incorporated before this plan's fresh review (JSON): " + string(correction) + "\nThe original task text is retained for provenance. Resolve conflicting original details using the current reviewed outcome and steps. This correction does not grant new inputs, source access, execution budget or external-action permission."
+	}
+	return text
 }
 
 // Advertise the supported subset; retain the full host registry in the runtime

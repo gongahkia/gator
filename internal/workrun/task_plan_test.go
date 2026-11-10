@@ -72,3 +72,51 @@ func TestTaskPlanPreparationHonorsCancellationAndDoesNotReplanApprovedWork(t *te
 		t.Fatal("approved work silently replanned")
 	}
 }
+
+func TestTaskPlanRevisionUsesOriginalBudgetAndPublicProposalWithoutControlAuthority(t *testing.T) {
+	request := planningRequest()
+	request.State, request.Plan.Phase = "queued", "revising"
+	var previous worksession.PlanContent
+	if json.Unmarshal([]byte(validPlan), &previous) != nil {
+		t.Fatal("invalid fixture")
+	}
+	request.Plan.Content = &previous
+	request.Plan.Edit = &worksession.PlanEdit{PlanEditReference: worksession.PlanEditReference{ParentID: "host-private-parent", TurnID: "host-private-control", Instruction: "Keep the parser small"}, State: "preparing"}
+	calls := 0
+	model := taskPlanModel(func(_ context.Context, turn agent.TurnRequest) (agent.Turn, error) {
+		calls++
+		if len(turn.Tools) != 0 || turn.Computer != nil {
+			t.Fatal("revision received execution tools")
+		}
+		raw, _ := json.Marshal(turn)
+		if strings.Contains(string(raw), "host-private-") {
+			t.Fatal("control references entered the model context")
+		}
+		var meta struct {
+			Task       string                   `json:"task"`
+			Correction string                   `json:"correction"`
+			Previous   *worksession.PlanContent `json:"previous_plan"`
+			Budget     worksession.PlanBudget   `json:"work_limits"`
+			Sources    []string                 `json:"selected_source_ids"`
+		}
+		if json.Unmarshal([]byte(turn.Messages[len(turn.Messages)-1].Content), &meta) != nil || meta.Task != request.Text || meta.Correction != request.Plan.Edit.Instruction || meta.Previous == nil || meta.Previous.Outcome != previous.Outcome || meta.Budget != request.Plan.Budget || len(meta.Sources) != 1 || meta.Sources[0] != "docs" {
+			t.Fatal("original proposal or frozen scope lost")
+		}
+		return agent.Turn{Text: validPlan}, nil
+	})
+	if _, err := ReviseTaskPlan(context.Background(), model, request, nil); err != nil || calls != 1 {
+		t.Fatal("tool-free correction failed", err)
+	}
+	request.Plan.Edit.State = "applied"
+	if _, err := ReviseTaskPlan(context.Background(), model, request, nil); err == nil || calls != 1 {
+		t.Fatal("completed edit was proposed again")
+	}
+	text := taskPlanPrompt(request.Plan)
+	if !strings.Contains(text, "Keep the parser small") || !strings.Contains(text, "original task text is retained") {
+		t.Fatal("execution lost the actual user correction")
+	}
+	request.Plan.Edit.State = "failed"
+	if strings.Contains(taskPlanPrompt(request.Plan), "Keep the parser small") {
+		t.Fatal("an unapplied correction changed execution intent")
+	}
+}

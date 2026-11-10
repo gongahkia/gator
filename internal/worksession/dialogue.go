@@ -89,6 +89,10 @@ func validateDialogueTurn(turn DialogueTurn) error {
 		if len(turn.Decision) == 0 {
 			return errors.New("conversation dispatch requires its retained decision")
 		}
+	case "editing_plan":
+		if len(turn.Decision) == 0 || strings.TrimSpace(turn.Response) == "" {
+			return errors.New("plan revision requires its decision and status")
+		}
 	case "clarification", "answered":
 		if strings.TrimSpace(turn.Response) == "" {
 			return errors.New("conversation reply is missing")
@@ -292,7 +296,9 @@ func dialogueTransition(from, to string) bool {
 	case "clarification":
 		return to == "answered" || to == "interrupted" || to == "failed"
 	case "ready":
-		return to == "dispatching" || to == "interrupted" || to == "failed"
+		return to == "dispatching" || to == "editing_plan" || to == "interrupted" || to == "failed"
+	case "editing_plan":
+		return to == "guided" || to == "interrupted" || to == "failed"
 	case "dispatching":
 		return to == "guided" || to == "delegated" || to == "stopped" || to == "interrupted" || to == "failed"
 	default:

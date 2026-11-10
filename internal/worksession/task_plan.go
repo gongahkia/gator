@@ -24,6 +24,7 @@ type TaskPlan struct {
 	Budget   PlanBudget    `json:"budget"`
 	Content  *PlanContent  `json:"content,omitempty"`
 	Approval *PlanApproval `json:"approval,omitempty"`
+	Edit     *PlanEdit     `json:"edit,omitempty"`
 }
 type PlanBinding struct {
 	UpdatedAt      time.Time `json:"conversation_updated_at"`
@@ -120,6 +121,11 @@ func (c PlanContent) Validate(sources []string) error {
 }
 
 func (p TaskPlan) contentDigest() string {
+	var edit *PlanEditReference
+	if p.Edit != nil {
+		ref := p.Edit.PlanEditReference
+		edit = &ref
+	}
 	data, _ := json.Marshal(struct {
 		Version  int
 		Revision uint64
@@ -127,7 +133,8 @@ func (p TaskPlan) contentDigest() string {
 		Sources  []string
 		Budget   PlanBudget
 		Content  *PlanContent
-	}{p.Version, p.Revision, p.Binding, p.Sources, p.Budget, p.Content})
+		Edit     *PlanEditReference `json:",omitempty"`
+	}{p.Version, p.Revision, p.Binding, p.Sources, p.Budget, p.Content, edit})
 	return planHash(data)
 }
 func validateTaskPlan(r Request) error {
@@ -163,12 +170,15 @@ func validateTaskPlan(r Request) error {
 		return errors.New("invalid retained plan content")
 	}
 	switch p.Phase {
-	case "preparing", "review", "approved", "dispatching", "interrupted", "finished":
+	case "preparing", "revising", "review", "approved", "dispatching", "interrupted", "finished":
 	default:
 		return errors.New("invalid plan phase")
 	}
 	if p.Content == nil && p.Phase != "preparing" && p.Phase != "interrupted" {
 		return errors.New("missing reviewed plan")
+	}
+	if err := validatePlanEdit(r); err != nil {
+		return err
 	}
 	if p.Approval != nil {
 		if p.Approval.Revision != p.Revision || p.Approval.Digest != p.Digest || p.Approval.At.IsZero() {
@@ -335,6 +345,10 @@ func (s Store) CancelTaskPlan(id, request string, revision uint64, digest string
 	r.UpdatedAt = time.Now().UTC()
 	p := *r.Plan
 	p.Phase = "interrupted"
+	if p.Edit != nil && p.Edit.State == "preparing" {
+		p.Edit = p.Edit.clone()
+		p.Edit.State, p.Edit.Issue = "cancelled", "Plan revision cancelled before implementation."
+	}
 	if !wasInterrupted {
 		p.Approval = nil
 	}
