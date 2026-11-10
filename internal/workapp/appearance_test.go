@@ -20,17 +20,24 @@ func TestAppearanceSelectionPersistsAndKeepsOldThemeOnFailure(t *testing.T) {
 	next, _ := m.NavigateBridge("/appearance")
 	m = next.(Model)
 	panel := m.BridgeState().Panel
-	if panel == nil || panel.Title != "Appearance" || len(panel.Rows) != 4 {
+	if panel == nil || panel.Title != "Appearance" || len(panel.Rows) != 5 || panel.Rows[0].Label != "Follow terminal colors" {
 		t.Fatal("appearance settings unavailable", panel)
 	}
-	row := 1
+	row := 0
 	next, _ = m.ApplyBridgePanel(BridgePanelAction{ID: panel.ID, Action: "activate", Row: &row}, tea.KeyMsg{})
 	m = next.(Model)
-	if saved != "light" || m.BridgeState().Theme != "light" || !m.BridgeState().Panel.Rows[1].Checked {
+	if saved != "terminal" || m.BridgeState().Theme != "terminal" || !m.BridgeState().Panel.Rows[0].Checked {
+		t.Fatal("native terminal colors not saved or projected")
+	}
+	panel = m.BridgeState().Panel
+	row = 2
+	next, _ = m.ApplyBridgePanel(BridgePanelAction{ID: panel.ID, Action: "activate", Row: &row}, tea.KeyMsg{})
+	m = next.(Model)
+	if saved != "light" || m.BridgeState().Theme != "light" || !m.BridgeState().Panel.Rows[2].Checked {
 		t.Fatal("light mode not saved or projected")
 	}
 	saveErr = errors.New("disk unavailable")
-	row = 0
+	row = 1
 	panel = m.BridgeState().Panel
 	next, _ = m.ApplyBridgePanel(BridgePanelAction{ID: panel.ID, Action: "activate", Row: &row}, tea.KeyMsg{})
 	m = next.(Model)

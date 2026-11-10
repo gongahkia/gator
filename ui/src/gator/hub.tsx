@@ -31,7 +31,7 @@ export function Hub() {
     ["Models and providers", "Choose model, effort, credentials or local installation", "/models"],
     ["Connections", "Sign in, verify, reconnect and disconnect accounts", "/connections"],
     ["Memory and privacy", "Personal memory, learning and earlier-chat recall", "/memory"],
-    ["Appearance and shortcuts", "Theme and keyboard preferences", "/appearance"],
+    ["Appearance and navigation", "Colors, navigation, recent-chat grouping and shortcuts", "/terminal-settings"],
     ["Voice", "Dictation, spoken replies and provider preferences", "/voice"],
     ["Usage and limits", "Accounting, limits, pause and resume", "/usage"],
     ["Data and backups", "Retention, reviewed deletion, export, restore and relink", "/data"],

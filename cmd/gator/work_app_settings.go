@@ -24,6 +24,8 @@ func (c gatorAppController) prepareSettings(ctx context.Context, change workrun.
 		return c.prepareManagement(ctx, change)
 	case "shortcuts", "voice":
 		return c.prepareDesktopPreferences(change)
+	case "terminal":
+		return c.prepareTerminalPreferences(change)
 	case "usage_limits", "usage_pause":
 		return c.prepareUsage(change)
 	case "retention":
@@ -117,25 +119,7 @@ func (c gatorAppController) prepareSettings(ctx context.Context, change workrun.
 			return map[string]any{"refer_to_chats": enabled}, err
 		}}, nil
 	case "theme":
-		var next struct {
-			Theme string `json:"theme"`
-		}
-		if err := workrun.DecodeAppArguments(change.Value, &next); err != nil {
-			return workrun.AppMutation{}, err
-		}
-		if !slices.Contains([]string{"gator", "light", "mono", "contrast"}, next.Theme) {
-			return workrun.AppMutation{}, errors.New("theme must be gator, light, mono or contrast")
-		}
-		return workrun.AppMutation{Preview: map[string]any{"setting": "theme", "before": prior.Theme, "after": next.Theme}, Apply: func(context.Context) (any, error) {
-			err := c.settings.Update(func(current *config.Settings) error {
-				if current.Theme != prior.Theme {
-					return errors.New("theme changed; inspect settings and try again")
-				}
-				current.Theme = next.Theme
-				return nil
-			})
-			return next, err
-		}}, nil
+		return c.prepareTerminalPreferences(change)
 	default:
 		return workrun.AppMutation{}, fmt.Errorf("app setting %q is not available through chat", change.Setting)
 	}

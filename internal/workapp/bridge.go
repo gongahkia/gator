@@ -65,6 +65,8 @@ type BridgeState struct {
 	SourcesResult         *ComposerResult            `json:"sources_result,omitempty"`
 	Composer              ComposerSettings           `json:"composer"`
 	ComposerResult        *ComposerResult            `json:"composer_result,omitempty"`
+	Terminal              TerminalPreferencesState   `json:"terminal_preferences"`
+	TerminalResult        *TerminalPreferencesResult `json:"terminal_preferences_result,omitempty"`
 	Desktop               appconfig.DesktopSettings  `json:"desktop"`
 	UploadResult          *BridgeUploadResult        `json:"upload_result,omitempty"`
 	Mode                  string                     `json:"mode"`
@@ -245,6 +247,8 @@ func (m Model) BridgeState() BridgeState {
 		SourcesResult:         m.sourcesResult,
 		Composer:              m.composerSettings(),
 		ComposerResult:        m.composerResult,
+		Terminal:              m.terminal,
+		TerminalResult:        m.terminalResult,
 		Model:                 m.modelStatus.Model,
 		Theme:                 m.theme,
 		Status:                m.status,

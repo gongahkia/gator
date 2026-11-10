@@ -96,8 +96,10 @@ type EmbeddingSettings struct {
 // opt-in: older configurations that only contain StatusLine remain hidden
 // until their owner explicitly enables the surface.
 type TUISettings struct {
-	StatusLine        *[]string `json:"status_line,omitempty"`
-	StatusLineEnabled bool      `json:"status_line_enabled,omitempty"`
+	StatusLine        *[]string                  `json:"status_line,omitempty"`
+	StatusLineEnabled bool                       `json:"status_line_enabled,omitempty"`
+	Preferences       *TerminalLayoutPreferences `json:"preferences,omitempty"`
+	ThemeConfigured   bool                       `json:"theme_configured,omitempty"`
 }
 
 type SnapshotSettings struct {
@@ -366,7 +368,7 @@ func validate(settings Settings) error {
 	if len(settings.Defaults.Provider) > 128 || len(settings.Defaults.Model) > 512 {
 		return errors.New("configuration default exceeds its size limit")
 	}
-	if settings.Theme != "" && settings.Theme != "gator" && settings.Theme != "contrast" && settings.Theme != "mono" && settings.Theme != "light" {
+	if settings.Theme != "" && settings.Theme != "terminal" && settings.Theme != "gator" && settings.Theme != "contrast" && settings.Theme != "mono" && settings.Theme != "light" {
 		return fmt.Errorf("unknown theme %q", settings.Theme)
 	}
 	if settings.TUI.StatusLine != nil {

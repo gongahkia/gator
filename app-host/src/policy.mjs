@@ -1,5 +1,6 @@
 import { resolve, sep } from "node:path";
 import { validUploadID, uploadLimits } from "./uploads.mjs";
+import { validFrontendPreferences } from "./preferences.mjs";
 
 export const APP_URL = "gator://app/index.html";
 
@@ -31,6 +32,7 @@ export function validateFrame(frame) {
     queue: ["type", "queue"],
     specialist: ["type", "specialist"],
     composer: ["type", "composer"],
+    terminal_preferences: ["type", "terminal_preferences"],
     sources: ["type", "sources"],
     branch: ["type", "branch"],
     task_plan:["type","task_plan"],
@@ -109,6 +111,16 @@ export function validateFrame(frame) {
     } else if (value.action === "effort") {
       if (!["low", "standard", "high"].includes(value.effort) || value.provider !== undefined || value.model !== undefined) throw new Error("Invalid work effort");
     } else throw new Error("Invalid composer action");
+  }
+  if (frame.type === "terminal_preferences") {
+    const value = frame.terminal_preferences;
+    if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some(key => !["id", "request_id", "action", "patch", "legacy"].includes(key)) || !/^[a-f0-9]{64}$/.test(value.id ?? "") || !/^[a-zA-Z0-9-]{1,64}$/.test(value.request_id ?? "")) throw new Error("Invalid terminal preference identity");
+    if (value.action === "configure") {
+      if (!validFrontendPreferences(value.patch) || !Object.keys(value.patch).length || value.legacy !== undefined) throw new Error("Invalid terminal preference patch");
+    } else if (value.action === "migrate") {
+      const legacy = value.legacy;
+      if (!validFrontendPreferences(legacy) || Object.keys(legacy).length !== 4 || !legacy.workDetailsSections || Object.keys(legacy.workDetailsSections).length !== 4 || value.patch !== undefined) throw new Error("Invalid terminal preference import");
+    } else throw new Error("Invalid terminal preference action");
   }
   if (frame.type === "conversation") {
     const value = frame.conversation;

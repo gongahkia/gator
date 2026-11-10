@@ -44,6 +44,11 @@ export class Sessions extends EventEmitter {
   }
   #changed(worker) {
     const before = this.#previous.get(worker), state = worker.state;
+    if (before?.terminal_preferences?.id && state?.terminal_preferences?.initialized && !state.terminal_preferences.issue && before.terminal_preferences.id !== state.terminal_preferences.id) {
+      for (const other of this.workers) if (other !== worker && !other.closed && other.refreshPreferences) {
+        void other.refreshPreferences().catch(error => { this.issue = "Terminal preferences changed, but a cached chat could not refresh: " + error.message; this.emit("change"); });
+      }
+    }
     if (before?.running && !state?.running && state?.conversation_id && worker !== this.current) {
       const completion = [...(state.messages ?? [])].reverse().find(message => message.activity)?.activity?.state;
       this.#unread.set(state.conversation_id, { id: state.conversation_id, title: state.title, status: completion === "failed" ? "Needs attention" : completion === "stopped" ? "Stopped" : "Finished", running: false });

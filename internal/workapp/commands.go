@@ -655,17 +655,18 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "/theme":
 		if len(fields) != 2 || m.config.SetTheme == nil {
-			err = fmt.Errorf("usage: /theme gator|light|contrast|mono")
+			err = fmt.Errorf("usage: /theme terminal|gator|light|contrast|mono")
 			break
 		}
 		name := normalizeTheme(fields[1])
 		if name != strings.ToLower(fields[1]) {
-			err = fmt.Errorf("usage: /theme gator|light|contrast|mono")
+			err = fmt.Errorf("usage: /theme terminal|gator|light|contrast|mono")
 			break
 		}
 		err = m.config.SetTheme(name)
 		if err == nil {
 			m.theme, result = name, "Theme set to "+name+"."
+			m.refreshTerminalPreferences()
 		}
 	case "/copy":
 		if m.config.Copy == nil {

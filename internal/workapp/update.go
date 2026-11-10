@@ -322,12 +322,8 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 		m.messages = append(m.messages, reportMessage("Gator app updated", text, "success"))
 	}
 	if len(value.AppChanges) > 0 {
+		m = m.RefreshDesktopPreferences()
 		m.refreshModelStatus()
-		if m.config.ReadDesktop != nil {
-			if preferences, err := m.config.ReadDesktop(); err == nil {
-				m.desktop = preferences
-			}
-		}
 	}
 	activity := m.activity
 	activityState := "completed"

@@ -196,6 +196,7 @@ export function useActions() {
       const sameChat = () => { if (client.context !== context) throw new Error("The conversation changed. Reopen recovery in the intended chat.") }
       menu(disconnected ? "Reconnect this chat" : "Recover this action", [
         ...(disconnected ? [{ title: "Reconnect and review", description: "Keep the draft. Recovered tasks stay paused; external actions are not resent.", run: () => { sameChat(); return client.reconnect() } }] : []),
+        ...(!disconnected && client.state?.terminal_preferences && !client.state.terminal_preferences.initialized ? [{ title: "Recover terminal settings", run: () => { sameChat(); return client.navigate("/terminal-settings") } }] : []),
         ...(!disconnected && client.state?.composer?.readiness && client.state.composer.readiness.state !== "configured" ? [{ title: "Repair model setup", description: client.state.composer.readiness.issue, run: () => { sameChat(); return client.navigate("/setup") } }] : []),
         ...(!disconnected && client.canRetrySubmission ? [{ title: "Retry this message acknowledgement", description: "Uses the original request identity. An already accepted message will not start a second task.", run: () => { sameChat(); if (!client.canRetrySubmission) throw new Error("The draft changed. Send it as a new message when ready."); return client.submit() } }] : []),
         ...(!disconnected ? [{ title: "Inspect retained requests", description: "Review queued or interrupted work before resuming.", run: () => { sameChat(); return queue() } },

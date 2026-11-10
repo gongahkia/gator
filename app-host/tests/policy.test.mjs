@@ -2,6 +2,17 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { assetPath, externalURL, shellQuote, validateFrame } from "../src/policy.mjs";
 import { resolve, join } from "node:path";
+import { frontendDefaults } from "../src/preferences.mjs";
+
+test("terminal preferences accept bounded display changes and complete imports without authority fields", () => {
+  const identity = { id: "a".repeat(64), request_id: "preference-1" };
+  const change = { ...identity, action: "configure", patch: { theme: "terminal", sidebarCollapsed: false } };
+  assert.equal(validateFrame({ type: "terminal_preferences", terminal_preferences: change }).version, 1);
+  assert.equal(validateFrame({ type: "terminal_preferences", terminal_preferences: { ...identity, action: "migrate", legacy: frontendDefaults() } }).version, 1);
+  for (const patch of [{ theme: "bad" }, { sidebarCollapsed: "yes" }, { api_key: "secret" }, { approved: true }, { workDetailsSections: { command: "run" } }]) assert.throws(() => validateFrame({ type: "terminal_preferences", terminal_preferences: { ...change, patch } }));
+  for (const extra of [{ id: "old" }, { request_id: "" }, { legacy: frontendDefaults() }, { action: "run" }, { path: "/other" }]) assert.throws(() => validateFrame({ type: "terminal_preferences", terminal_preferences: { ...change, ...extra } }));
+  assert.throws(() => validateFrame({ type: "terminal_preferences", terminal_preferences: { ...identity, action: "migrate", legacy: { theme: "terminal" } } }));
+});
 
 test("commitment controls accept only current identities, never replacement policy or execution", () => {
   const check = {request_id: "review-1", id: "job-one", digest: "a".repeat(64), action: "pause"};

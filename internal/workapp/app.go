@@ -194,6 +194,9 @@ type Config struct {
 	SaveConnections          func(string, []string) error
 	Desktop                  appconfig.DesktopSettings
 	ReadDesktop              func() (appconfig.DesktopSettings, error)
+	ReadTerminal             func() (appconfig.TerminalPreferences, bool, error)
+	SaveTerminal             func(appconfig.TerminalPreferencesPatch, *appconfig.TerminalPreferences) (appconfig.TerminalPreferences, error)
+	ImportTerminal           func(appconfig.TerminalPreferences) (appconfig.TerminalPreferences, error)
 	ValidateUploads          func(source string, paths, uploads []string) error
 	Models                   func() (ModelPanel, error)
 	ComposerModels           func() ([]ComposerModel, error)
@@ -473,6 +476,8 @@ type Model struct {
 	composerModels          []ComposerModel
 	composerModelsIssue     string
 	composerResult          *ComposerResult
+	terminal                TerminalPreferencesState
+	terminalResult          *TerminalPreferencesResult
 	sourceChoices           []ComposerSource
 	sourcesIssue            string
 	branchResult            *BranchResult
@@ -583,6 +588,7 @@ func New(config Config) Model {
 	model.statusLine, model.statusLineConfigured = resolveStatusLine(config.StatusLine)
 	model.statusLineEnabled = config.StatusLineEnabled
 	model.refreshModelStatus()
+	model.refreshTerminalPreferences()
 	model.primarySource = config.CurrentFolder
 	if !config.StartNew && !config.StartView && config.LastConversation != nil && config.StartConversationID == "" && config.GoalID == "" {
 		id, err := config.LastConversation()

@@ -123,12 +123,16 @@ cannot pass this check; use a current terminal build before uninstalling.
 Other files or unselected profiles placed inside the installation are not
 discovered automatically. Keep private data outside the package tree. Tests must
 use isolated roots. Active-profile and background-service guards still apply.
-On first terminal use, sidebar and recent-chat grouping preferences are imported
-from a private copy of Gator's Chromium Local Storage into
-`frontend-preferences.json`. The original database remains unchanged. Subsequent
-terminal choices take precedence; the Go profile remains authoritative for theme,
-shortcuts and other application settings. Work-details disclosure choices are
-retained, while terminal conversation information uses explicit menus.
+On first terminal use, existing `frontend-preferences.json` values (or values
+read from a private copy of Chromium Local Storage) import into Go configuration.
+The original database remains unchanged; the frontend file is retained as an
+inactive import source. Appearance uses the authoritative Go theme, including
+`terminal` for native colors; navigation/grouping live under `tui.preferences`.
+Manual controls, conversational changes and CLI theme choices share this backend.
+An explicit newer theme wins a migration race. `/terminal-settings` exposes
+appearance/navigation, reload and reviewed recovery if old preferences cannot
+be read. Recovery keeps the original file and all drafts/history. Old work-details
+disclosure values are retained; terminal conversation information uses menus.
 
 Native adapters:
 

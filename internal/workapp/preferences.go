@@ -10,5 +10,6 @@ func (m Model) RefreshDesktopPreferences() Model {
 			m.bridgeNotice = "Could not reload desktop preferences: " + err.Error()
 		}
 	}
+	m.refreshTerminalPreferences()
 	return m
 }

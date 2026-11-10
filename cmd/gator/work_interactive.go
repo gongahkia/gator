@@ -203,6 +203,12 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			return sessions.SavePreferences(id, worksession.Preferences{ConnectorIDs: &selected}, nil)
 		},
 		Desktop: settings.Desktop,
+		ReadTerminal: func() (config.TerminalPreferences, bool, error) {
+			current, err := settingsStore.Load()
+			return current.TerminalPreferences(), current.TUI.Preferences != nil, err
+		},
+		SaveTerminal:   settingsStore.UpdateTerminalPreferences,
+		ImportTerminal: settingsStore.ImportTerminalPreferences,
 		ReadDesktop: func() (config.DesktopSettings, error) {
 			current, err := settingsStore.Load()
 			return current.Desktop, err

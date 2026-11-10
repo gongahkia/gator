@@ -1,6 +1,7 @@
 import { Application } from "@gator/application-host/application"
 import type { BackendState } from "@gator/application-host/contracts/protocol"
 import type { FrontendFrame } from "@gator/application-host/contracts/frontend"
+import { FrontendPreferences } from "@gator/application-host/preferences"
 
 export function state(id = "first"): BackendState {
   return { mode: "chat", messages: [], commands: [], actions: [], title: id, source: "topic:" + id, conversation_id: id,
@@ -8,6 +9,7 @@ export function state(id = "first"): BackendState {
     queued: 0, queue: [], home: false, first_run: false, supervisor_needs_start: false }
 }
 export class FixtureHost extends Application {
+  constructor(options: ConstructorParameters<typeof Application>[0]) { super(options); this.preferences = new FrontendPreferences(options.userData) }
   current = state()
   closeIssue = ""
   closed = false

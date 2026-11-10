@@ -15,12 +15,24 @@ export function useProductActions(controls: ReturnType<typeof useActions>) {
     if (!id) throw new Error("Wait for this conversation to open.")
     return id
   }
-  actions.appearance = () => menu("Appearance", [
+  actions.appearance = async () => {
+    client.preferences = await client.host.preferences.read(); client.emit("change")
+    menu("Appearance", [
     ...([ ["Follow terminal colors", "terminal"], ["Dark", "gator"], ["Light", "light"], ["High contrast", "contrast"], ["Monochrome", "mono"] ] as const).map(([title, theme]) => ({ title, description: client.preferences.theme === theme ? "Current appearance" : undefined, run: async () => {
-      if (theme !== "terminal") await client.send({ type: "submit", text: `/theme ${theme}` })
       await client.configurePreferences({ theme })
     } })),
     { title: "Keyboard shortcuts", run: () => client.send({ type: "navigate", text: "/appearance" }) },
+    ])
+  }
+  actions["terminal-settings"] = () => menu("Terminal appearance and navigation", [
+    { title: "Appearance", description: client.preferences.theme, run: () => client.navigate("/appearance") },
+    { title: client.preferences.sidebarCollapsed ? "Show navigation rail" : "Hide navigation rail", description: "Shown when the terminal has enough room", run: () => client.configurePreferences({ sidebarCollapsed: !client.preferences.sidebarCollapsed }) },
+    { title: client.preferences.groupChatsByFolder ? "Show flat recent chats" : "Group recent chats by folder", run: () => client.configurePreferences({ groupChatsByFolder: !client.preferences.groupChatsByFolder }) },
+    { title: "Reload saved terminal settings", run: async () => { client.preferences = await client.host.preferences.read(); client.issue = ""; client.emit("change") } },
+    ...(!client.state?.terminal_preferences?.initialized ? [{ title: "Use default display settings", description: "Review defaults while keeping the original retained settings file", run: () => confirm("Use default display settings?", "Use default display and navigation preferences. A theme explicitly saved through Gator is preserved. The original retained settings file is kept; conversations, tasks, approvals and drafts stay intact.", async () => {
+      if (!client.host.preferences.initializeDefaults) throw new Error("Display recovery is unavailable in this runtime.")
+      client.preferences = await client.host.preferences.initializeDefaults(); client.issue = ""; client.emit("change")
+    }) }] : []),
   ])
   actions.sources = async () => {
     let sources = client.state?.sources

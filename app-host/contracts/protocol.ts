@@ -95,6 +95,9 @@ export type ComposerSource = {id: string; label: string; service: string; status
 export type ComposerSources = {id: string; choices: ComposerSource[]; selected: string[]; issue?: string; disabled?: string};
 export type SourceAction = {id: string; request_id: string} & ({action: "refresh"} | {action: "select"; ids: string[]});
 export type ComposerModel = { provider: string; model: string; label: string; unavailable?: string };
+export type TerminalPreferences = { theme: "terminal" | "gator" | "light" | "contrast" | "mono"; sidebarCollapsed: boolean; groupChatsByFolder: boolean; workDetailsSections: { outputs: boolean; context: boolean; connections: boolean; workspace: boolean } };
+export type TerminalPreferencesPatch = Partial<Omit<TerminalPreferences, "workDetailsSections">> & { workDetailsSections?: Partial<TerminalPreferences["workDetailsSections"]> };
+export type TerminalPreferencesAction = { id: string; request_id: string } & ({ action: "configure"; patch: TerminalPreferencesPatch } | { action: "migrate"; legacy: TerminalPreferences });
 export type ModelProcessing = { kind: "local" | "local_endpoint" | "remote" | "unknown"; destination?: string; description: string };
 export type ModelReadiness = { state: "configured" | "needs_model" | "needs_setup"; issue?: string; processing: ModelProcessing };
 export type ComposerSettings = { id: string; effort: "low" | "standard" | "high"; models: ComposerModel[]; model_issue?: string; issue?: string; disabled?: string; readiness?: ModelReadiness; budget?: { work_steps: number; code_steps: number } };
@@ -138,6 +141,8 @@ export type BackendState = {
   sources?: ComposerSources;
   sources_result?: {request_id: string; error?: string};
   composer?: ComposerSettings;
+  terminal_preferences?: { id: string; initialized: boolean; values: TerminalPreferences; issue?: string };
+  terminal_preferences_result?: { request_id: string; values?: TerminalPreferences; error?: string };
   composer_result?: { request_id: string; error?: string };
   desktop?: { shortcuts: Record<string,string>; voice?: VoicePreferences };
   mode: "chat" | "panel";
@@ -213,7 +218,7 @@ export type SpecialistAction = {
 };
 export type Frame = {
   version: 1;
-  type: "dialogue_page" | "receipt" | "memory" | "update" | "submit" | "upload_submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "specialist" | "conversation" | "composer" | "sources" | "branch" | "task_plan" | "check";
+  type: "terminal_preferences" | "dialogue_page" | "receipt" | "memory" | "update" | "submit" | "upload_submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "specialist" | "conversation" | "composer" | "sources" | "branch" | "task_plan" | "check";
  dialogue_before?:number;
   check?: CheckAction;
   specialist?: SpecialistAction;
@@ -226,6 +231,7 @@ export type Frame = {
   branch?: BranchAction;
   sources?: SourceAction;
   composer?: ComposerAction;
+  terminal_preferences?: TerminalPreferencesAction;
   panel?: PanelAction; interaction_id?: number; approval_token?: string; approved?: boolean;
   queue?: QueueAction;
   conversation?: { id: string; list_id: string };

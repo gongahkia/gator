@@ -33,7 +33,7 @@ export class VoiceSession extends EventEmitter {
   }
   async request(request, signal) { return this.call(this.application.binary, this.application.workspace, this.application.env, request, signal); }
   status() { return this.request({ action: "status" }); }
-  async configure(preferences) { const status = await this.request({ action: "configure", preferences }); if (preferences.spoken_replies === false) this.stopPlayback(); this.application.backend?.refreshPreferences(); return status; }
+  async configure(preferences) { const status = await this.request({ action: "configure", preferences }); if (preferences.spoken_replies === false) this.stopPlayback(); await this.application.backend?.refreshPreferences(); return status; }
   async download(model) {
     this.application.mutable();
     if (this.phase !== "idle") throw new Error("Finish the current voice operation first.");

@@ -85,6 +85,8 @@ func boundedSectionText(value string) string {
 
 func normalizeTheme(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "terminal":
+		return "terminal"
 	case "light":
 		return "light"
 	case "contrast":

@@ -64,7 +64,7 @@ export class Backend extends EventEmitter {
     this.#write({ version: 1, type: "external_done", error });
   }
 
-  refreshPreferences() { this.#write({ version: 1, type: "refresh_preferences" }); }
+  refreshPreferences() { return this.#apply({ version: 1, type: "refresh_preferences" }); }
 
   configureDialogue(dialogue_host) { this.#write({ version: 1, type: "dialogue_host", dialogue_host }); }
   async bootstrapDialogue(parent, turn) {

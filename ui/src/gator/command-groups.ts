@@ -5,7 +5,7 @@ const groups: Record<string, string[]> = {
   Saved: ["saved", "knowledge", "history", "drafts", "memories", "receipts", "note", "skill", "learnings", "suggestions", "prompt-history"],
   Files: ["files", "outputs", "attach", "attach-file", "attachments", "detach", "draft-context", "review", "save", "apply", "retry", "artifact", "paste-image", "source", "source-refresh", "source ignore", "source unignore", "source ignored"],
   Settings: ["settings", "models", "model", "mode", "effort", "sources", "connections", "connector", "browser", "memory", "appearance", "theme", "usage", "data", "recovery", "voice", "web-origin", "permissions", "statusline"],
-  "Help and application": ["help", "about", "doctor", "exit", "quit", "sidebar", "reconnect", "recover", "links", "continue-external", "setup", "request-context"],
+  "Help and application": ["help", "about", "doctor", "exit", "quit", "sidebar", "reconnect", "recover", "links", "continue-external", "setup", "request-context", "terminal-settings"],
 }
 export function commandAliases(name: string): string[] {
   return ({ mode: ["permissions", "work mode", "read only", "authority"], theme: ["color scheme", "dark", "light", "contrast"],

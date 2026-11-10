@@ -8,7 +8,7 @@ export class Application extends EventEmitter {
   readonly context: string
   sessions: { busy: boolean; pending: boolean; restart(): Promise<void>; settled(): Promise<void>; open(request?: { new?: boolean; conversation_id?: string; view?: string; source?: string }): Promise<void> }
   drafts: { request(request: DraftRequest): Promise<DraftSnapshot>; flush(): Promise<void> }
-  preferences: { read(): Promise<FrontendPreferenceValues>; configure(patch: Partial<FrontendPreferenceValues>): Promise<FrontendPreferenceValues>; flush(): Promise<void> }
+  preferences: { read(): Promise<FrontendPreferenceValues>; configure(patch: Partial<FrontendPreferenceValues>): Promise<FrontendPreferenceValues>; initializeDefaults?(): Promise<FrontendPreferenceValues>; flush(): Promise<void> }
   snapshot(): HostSnapshot
   start(request?: { conversation_id?: string; goal?: boolean }): Promise<HostSnapshot>
   send(frame: FrontendFrame): Promise<void>

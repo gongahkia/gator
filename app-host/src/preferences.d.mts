@@ -1,4 +1,5 @@
-export type FrontendPreferenceValues = { theme: "terminal" | "gator" | "light" | "contrast" | "mono"; sidebarCollapsed: boolean; groupChatsByFolder: boolean; workDetailsSections: { outputs: boolean; context: boolean; connections: boolean; workspace: boolean } }
+export type FrontendPreferenceValues = import("../contracts/protocol").TerminalPreferences
+export function validFrontendPreferences(value: unknown): boolean
 export function frontendDefaults(): FrontendPreferenceValues
 export class FrontendPreferences {
   constructor(userData: string)

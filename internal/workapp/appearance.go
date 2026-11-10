@@ -6,6 +6,7 @@ import (
 )
 
 var appearanceThemes = []struct{ id, label, detail string }{
+	{"terminal", "Follow terminal colors", "Use this terminal's native colors."},
 	{"gator", "Dark", "Gator’s dark canvas and soft green accent."},
 	{"light", "Light", "A soft white canvas and deep green accent."},
 	{"contrast", "High contrast", "Brighter text and stronger outlines on a dark canvas."},
@@ -45,6 +46,7 @@ func (m Model) updateAppearanceKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.theme = selected.id
+		m.refreshTerminalPreferences()
 		m.sectionNotice = ""
 	}
 	return m, nil

@@ -10,7 +10,7 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 | 2 | Following unifies commitments with outcome/state/next action, next and last successful checks, sources/timezone, pause/edit, and truthful foreground/service/offline limits. | In progress | `4b9edf091`/`a95289265`: commitment cards and exact check controls. Active goal cards open their exact canonical picker row and prepare a check for that goal's current workspace, including duplicate titles, other-chat origins and busy owners. Focused Go/host/native integration checks pass. Advanced non-project schedule editing and paused-goal controls remain; final integrated journey pending. |
 | 3 | Relevant answers expose supplied memory/provenance/correction; noise feedback offers a reviewed, scoped check/notification change and reports its actual outcome. | Pending | |
 | 4 | First task leads through only missing setup; host connectivity and model readiness are distinct; local/cloud processing, capabilities, and work budget are explained. | In progress | `d0fd58e48` provides Go-owned prerequisite/processing/budget projection. Ordinary first submissions offer missing setup while preserving private files/text and plan intent; Host connectivity and model setup have separate labels. Native fresh-profile → invalid provider form → repair → persisted selection → inspect context/limits → explicit useful task passes at all four sizes. Missing and subsequently changed credentials recover without replaying/admitting the rejected task. Request-specific connected-account/access setup handoffs and recovery after provider rejection during an admitted task remain; final integrated journey and live-account/model verification remain. |
-| 5 | Workspace/account/source scope is inspectable near input; conversational/manual settings agree, including terminal preferences, with confirmed outcomes. | In progress | Ctrl+T and /request-context inspect current workspace, model processing, selected accounts, draft inputs, work mode and actual Go work budgets. Missing account display metadata retains the selected identity instead of claiming no accounts. Scope changes do not rewrite existing task inputs. Full permission explanations and conversational/manual terminal preferences, authoritative persisted outcomes and the combined account/settings journey remain to be finished/verified. |
+| 5 | Workspace/account/source scope is inspectable near input; conversational/manual settings agree, including terminal preferences, with confirmed outcomes. | In progress | Ctrl+T and /request-context inspect workspace/model processing, selected accounts, inputs, mode and actual Go budgets. Missing account display metadata retains the selected identity. Appearance, navigation and recent-chat grouping now share Go configuration across manual controls, conversational tools, cached owners, CLI theme changes and restart. Legacy frontend values import once; failures do not report saved values. Native four-size settings journeys plus unreadable-import recovery and live-task preservation pass. Full permission explanations, broader account/settings integration and live-model/account verification remain; final combined acceptance journey pending. |
 | 6 | Results/files/updates expose keyboard contextual actions to open/edit/reply/inspect evidence/mark done while retaining original identities and conversation context. | Pending | |
 | 7 | Input and useful transcript remain visible at 110×34, 80×24, 60×20, 42×14 with combined attachments/reply/plan/slash states and multiline drafts. | Implemented; final journey pending | `204386564`; `composer-budget.test.tsx`: 8 file names + plan/reply + multiline input and slash completion, ≥4 transcript rows at all four sizes. |
 | 8 | Approval surface shows exact live action/account/destination/content/consequences; long reviews scroll; changed/stale tokens cannot execute; edits require fresh review. | Implemented; final journey pending | `8ba3a9cb8`; `approval-review.test.tsx`: four sizes, scrolling/exact data, stale and missing previews; `approvals.test.tsx`: real Go token protection and controlled connected send. |
@@ -44,6 +44,58 @@ Preserve both phases across continuations and do not declare the expanded work
 finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
+
+- Unified conversational/manual terminal settings (10–11 November): terminal
+  appearance has one authoritative value, `Settings.Theme`; layout preferences
+  live in the same Go configuration document. The native host imports retained
+  frontend/Chromium values once, preserving the original database and retaining
+  the frontend file as an inactive import source. A newer explicit theme wins an
+  import race without losing old navigation/grouping choices. No active second
+  settings store or execution path is introduced. Partial settings transactions
+  preserve unrelated acknowledged edits and reject a changed target field.
+  Manual controls and `gator_app_inspect` / `gator_app_update terminal` use this
+  boundary. The legacy `theme` setting and CLI theme command use it too, including
+  following terminal colors. Unsupported old work-details expansion preferences
+  are retained as data rather than advertised as active terminal controls.
+  The UI follows Go's acknowledged projection, refreshes cached owners without
+  replaying work, and no longer copies old chat themes into a frontend file.
+  Import failures offer retry or reviewed default display recovery that keeps
+  the original retained file. Cancelling that review makes no change. An
+  unimported foreground cannot claim a conversational preference was saved.
+  The existing app-inspection privacy regression caught an exact processing
+  hostname entering the model-facing settings response; it is now omitted
+  there while the trusted local context view retains its inspectable destination.
+  Native Go + controlled provider: manual appearance → conversational actual
+  inspection/change → canonical history-picker restoration of the same cached
+  owner → offline rejected change → reconnect/save → restart, at all four sizes.
+  Additional journeys verify cancelled/confirmed recovery from an unreadable
+  legacy file, and appearance/navigation edits during executing Work without
+  changing owner/control/scope or losing a newer multiline draft. Related native
+  settings/app-controls/setup/model/composer regressions: **17 pass, 414
+  assertions**. Host policy, legacy imports, sessions and voice helpers: **51
+  pass**. Targeted Go settings/controller/privacy/foreground checks and final
+  typecheck pass. Full Go config, workrun and command packages pass; workapp's
+  full rerun passes after updating its appearance test to exercise the fifth
+  native-colors choice while preserving light-mode and failed-save assertions.
+  The first broad Go run recorded that one outdated four-choice assertion; its
+  failure is retained in `terminal-settings-full-go.log` and passing rerun in
+  `terminal-settings-workapp-rerun.log`. The first full terminal run recorded
+  **115 pass / 3 existing skips / 1 fail** (119 tests): the command fixture still
+  expected the removed extra `/theme` submission. It now checks persisted values
+  and no extra task message; both command tests pass with the original deadline.
+  NO_COLOR settings/semantic-color journeys pass **9 tests, 159 assertions**.
+  Logs: `/tmp/gator-ux-20261111-terminal-settings-{full-tui,commands,no-color}.log`.
+  A fresh full terminal run follows this committed implementation.
+  Logs: `/tmp/gator-ux-20261110-terminal-settings-{integrated,host,final-go,
+  final-typecheck,runtime}.log`. Initial native settings runs recorded 0/4
+  because the restoration test used restricted direct navigation and then
+  omitted the history row's version suffix; the actual versioned picker now
+  restores the retained owner without weakening navigation checks. Initial
+  typecheck caught fixture types before execution. The earlier Go privacy
+  failure remains in `terminal-settings-go.log`; its current targeted rerun
+  passes. These are native/controlled-provider checks, not physical terminal or
+  live-account/model proof. Item 5's full permission explanations and combined
+  account/settings journey remain; all fifteen criteria stay in scope.
 
 - Guided first-request model setup (`d0fd58e48` / `20ef9a298` backend, 10 November): the Go
   configuration boundary projects missing prerequisites, a display-safe model

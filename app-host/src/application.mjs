@@ -19,7 +19,7 @@ import { helper } from "./native.mjs";
 import { ExportStore } from "./export.mjs";
 import { sourceCatalog, sourcePreview } from "./source-preview.mjs";
 import { codePreview } from "./code-preview.mjs";
-import { FrontendPreferences } from "./preferences.mjs";
+import { TerminalPreferences } from "./terminal-preferences.mjs";
 
 // Local application services. No renderer, IPC, HTTP server, or second agent.
 export class Application extends EventEmitter {
@@ -35,7 +35,7 @@ export class Application extends EventEmitter {
     this.uploads = new UploadStore(join(this.stateRoot, "gator", "uploads"));
     this.files = new FileStore(join(this.stateRoot, "gator", "files"));
     this.exports = new ExportStore([join(this.stateRoot, "gator"), this.userData]);
-    this.preferences = new FrontendPreferences(this.userData);
+    this.preferences = new TerminalPreferences(this);
     const draftRoot = join(this.userData, "drafts");
     this.drafts = new DraftStore(join(draftRoot, `${createHash("sha256").update(this.stateRoot).digest("hex")}.json`));
     this.env = { ...env, GATOR_DESKTOP_DRAFT_DIR: draftRoot, GATOR_DESKTOP_UPLOAD_DIR: this.uploads.root };

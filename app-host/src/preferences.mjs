@@ -7,6 +7,7 @@ export const frontendDefaults = () => ({ sidebarCollapsed: true, theme: "termina
 const keys = { theme: "gator:terminal-theme", sidebarCollapsed: "gator:sidebar-collapsed", groupChatsByFolder: "gator:group-topics-by-folder", workDetailsSections: "gator:work-details-sections" };
 const fingerprint = stat => [stat.dev, stat.ino, stat.size, stat.mtimeNs, stat.ctimeNs].join(":");
 const valid = value => value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).every(key => Object.hasOwn(keys, key)) && Object.entries(value).every(([key, item]) => key === "theme" ? ["terminal", "gator", "light", "contrast", "mono"].includes(item) : key === "workDetailsSections" ? item && typeof item === "object" && !Array.isArray(item) && Object.keys(item).every(key => ["outputs", "context", "connections", "workspace"].includes(key)) && Object.values(item).every(value => typeof value === "boolean") : typeof item === "boolean");
+export { valid as validFrontendPreferences };
 
 // Copy just the LevelDB files, then open/recover the copy. Opening the original
 // would lock it and can change its logs even when only performing get().

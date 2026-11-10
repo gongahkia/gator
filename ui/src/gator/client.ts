@@ -47,14 +47,12 @@ export class GatorClient extends EventEmitter {
   #closing?: Promise<void>
   #closed = false
   #listener = () => {
-    const before = this.state
-    this.snapshot = this.host.snapshot(); this.emit("change")
+    this.snapshot = this.host.snapshot()
+    const terminal = this.state?.terminal_preferences
+    if (terminal?.initialized && !terminal.issue) this.preferences = terminal.values
+    this.emit("change")
     if (!this.#closed) {
       void this.loadDraft().catch(error => this.fail(error))
-      const theme = this.state?.theme
-      if (before?.theme && before.conversation_id === this.state?.conversation_id && theme !== before.theme && ["gator", "light", "contrast", "mono"].includes(theme || "")) {
-        void this.configurePreferences({ theme: theme as "gator" | "light" | "contrast" | "mono" }).catch(error => this.fail(error))
-      }
     }
   }
   constructor(readonly host: Application) { super(); this.snapshot = host.snapshot(); host.on("change", this.#listener) }
@@ -68,7 +66,11 @@ export class GatorClient extends EventEmitter {
     try { this.preferences = await this.host.preferences.read(); this.emit("change") }
     catch (error) { this.fail(error) }
   }
-  async configurePreferences(patch: Partial<FrontendPreferenceValues>) { this.preferences = await this.host.preferences.configure(patch); this.emit("change") }
+  async configurePreferences(patch: Partial<FrontendPreferenceValues>) {
+    const saved = await this.host.preferences.configure(patch), current = this.state?.terminal_preferences
+    this.preferences = current?.initialized && !current.issue ? current.values : saved
+    this.emit("change")
+  }
   async loadDraft() {
     const context = this.context
     if (!context || this.drafts.has(context) || this.#closed) return

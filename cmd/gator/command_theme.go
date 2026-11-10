@@ -9,11 +9,11 @@ import (
 	"github.com/gongahkia/gator/internal/config"
 )
 
-const themeUsage = "usage: gator theme list | gator theme set gator|light|contrast|mono"
+const themeUsage = "usage: gator theme list | gator theme set terminal|gator|light|contrast|mono"
 
 func themeCommand(arguments []string, out io.Writer) error {
 	if len(arguments) == 1 && arguments[0] == "list" {
-		_, err := fmt.Fprintln(out, "gator\nlight\ncontrast\nmono")
+		_, err := fmt.Fprintln(out, "terminal\ngator\nlight\ncontrast\nmono")
 		return err
 	}
 	if len(arguments) != 2 || arguments[0] != "set" {
@@ -31,8 +31,7 @@ func saveTheme(name string) error {
 	if err != nil {
 		return err
 	}
-	return store.Update(func(settings *config.Settings) error {
-		settings.Theme = strings.ToLower(strings.TrimSpace(name))
-		return nil
-	})
+	name = strings.ToLower(strings.TrimSpace(name))
+	_, err = store.UpdateTerminalPreferences(config.TerminalPreferencesPatch{Theme: &name}, nil)
+	return err
 }

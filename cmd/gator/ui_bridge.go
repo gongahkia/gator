@@ -16,37 +16,38 @@ import (
 )
 
 type uiFrame struct {
-	DialogueHost    *workapp.DialogueHost             `json:"dialogue_host,omitempty"`
-	DialogueResult  *workapp.DialogueDispatchResult   `json:"dialogue_result,omitempty"`
-	DialogueControl *workapp.DialogueControl          `json:"dialogue_control,omitempty"`
-	DialogueParent  string                            `json:"dialogue_parent,omitempty"`
-	DialogueTurn    string                            `json:"dialogue_turn,omitempty"`
-	DialogueBefore  uint64                            `json:"dialogue_before,omitempty"`
-	Check           *workapp.BridgeCheckAction        `json:"check,omitempty"`
-	TaskPlan        *workapp.TaskPlanAction           `json:"task_plan,omitempty"`
-	Branch          *workapp.BranchAction             `json:"branch,omitempty"`
-	Receipt         *workapp.ReceiptAction            `json:"receipt,omitempty"`
-	Memory          *workapp.ChatMemoryAction         `json:"memory,omitempty"`
-	Update          *workapp.BridgeUpdateAction       `json:"update,omitempty"`
-	Foreground      bool                              `json:"foreground,omitempty"`
-	Sources         *workapp.SourceAction             `json:"sources,omitempty"`
-	Composer        *workapp.ComposerAction           `json:"composer,omitempty"`
-	Version         int                               `json:"version"`
-	Type            string                            `json:"type"`
-	Text            string                            `json:"text,omitempty"`
-	Key             string                            `json:"key,omitempty"`
-	Error           string                            `json:"error,omitempty"`
-	Width           int                               `json:"width,omitempty"`
-	Height          int                               `json:"height,omitempty"`
-	Panel           *workapp.BridgePanelAction        `json:"panel,omitempty"`
-	Queue           *workapp.BridgeQueueAction        `json:"queue,omitempty"`
-	Specialist      *workapp.BridgeSpecialistAction   `json:"specialist,omitempty"`
-	Upload          *workapp.BridgeUploadSubmission   `json:"upload,omitempty"`
-	Conversation    *workapp.BridgeConversationAction `json:"conversation,omitempty"`
-	InteractionID   int                               `json:"interaction_id,omitempty"`
-	ApprovalToken   string                            `json:"approval_token,omitempty"`
-	Approved        bool                              `json:"approved,omitempty"`
-	Nonce           string                            `json:"nonce,omitempty"`
+	DialogueHost    *workapp.DialogueHost              `json:"dialogue_host,omitempty"`
+	DialogueResult  *workapp.DialogueDispatchResult    `json:"dialogue_result,omitempty"`
+	DialogueControl *workapp.DialogueControl           `json:"dialogue_control,omitempty"`
+	DialogueParent  string                             `json:"dialogue_parent,omitempty"`
+	DialogueTurn    string                             `json:"dialogue_turn,omitempty"`
+	DialogueBefore  uint64                             `json:"dialogue_before,omitempty"`
+	Check           *workapp.BridgeCheckAction         `json:"check,omitempty"`
+	TaskPlan        *workapp.TaskPlanAction            `json:"task_plan,omitempty"`
+	Branch          *workapp.BranchAction              `json:"branch,omitempty"`
+	Receipt         *workapp.ReceiptAction             `json:"receipt,omitempty"`
+	Memory          *workapp.ChatMemoryAction          `json:"memory,omitempty"`
+	Update          *workapp.BridgeUpdateAction        `json:"update,omitempty"`
+	Foreground      bool                               `json:"foreground,omitempty"`
+	Sources         *workapp.SourceAction              `json:"sources,omitempty"`
+	Composer        *workapp.ComposerAction            `json:"composer,omitempty"`
+	Terminal        *workapp.TerminalPreferencesAction `json:"terminal_preferences,omitempty"`
+	Version         int                                `json:"version"`
+	Type            string                             `json:"type"`
+	Text            string                             `json:"text,omitempty"`
+	Key             string                             `json:"key,omitempty"`
+	Error           string                             `json:"error,omitempty"`
+	Width           int                                `json:"width,omitempty"`
+	Height          int                                `json:"height,omitempty"`
+	Panel           *workapp.BridgePanelAction         `json:"panel,omitempty"`
+	Queue           *workapp.BridgeQueueAction         `json:"queue,omitempty"`
+	Specialist      *workapp.BridgeSpecialistAction    `json:"specialist,omitempty"`
+	Upload          *workapp.BridgeUploadSubmission    `json:"upload,omitempty"`
+	Conversation    *workapp.BridgeConversationAction  `json:"conversation,omitempty"`
+	InteractionID   int                                `json:"interaction_id,omitempty"`
+	ApprovalToken   string                             `json:"approval_token,omitempty"`
+	Approved        bool                               `json:"approved,omitempty"`
+	Nonce           string                             `json:"nonce,omitempty"`
 }
 
 type uiBridgeModel struct {
@@ -90,9 +91,7 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 			m.sendState()
 			return m, nil
 		case "refresh_preferences":
-			m.model = m.model.RefreshDesktopPreferences()
-			m.sendState()
-			return m, nil
+			next = m.model.RefreshDesktopPreferences()
 		case "prepare_update":
 			if frame.Nonce == "" || len(frame.Nonce) > 128 {
 				return m, nil
@@ -183,6 +182,11 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			next, command = m.model.ApplyComposerSettings(*frame.Composer)
+		case "terminal_preferences":
+			if frame.Terminal == nil {
+				return m, nil
+			}
+			next, command = m.model.ApplyTerminalPreferences(*frame.Terminal)
 		case "conversation":
 			if frame.Conversation == nil {
 				return m, nil
