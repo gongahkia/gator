@@ -5,6 +5,41 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DraftStore } from "../src/drafts.mjs";
 
+test("plan-first intent survives an empty draft restart and follows retention controls", async () => {
+  const root = await mkdtemp(join(tmpdir(), "gator-plan-drafts-"));
+  try {
+    const file = join(root, "drafts.json"), store = new DraftStore(file);
+    const draft = { context: "conversation:one", text: "", title: "One", source: "/project", plan_first: true };
+    await store.request({ action: "save", draft });
+    assert.equal((await new DraftStore(file).request({ action: "list" })).drafts[0].plan_first, true);
+    for (const plan_first of ["true", 1, null]) await assert.rejects(store.request({ action: "save", draft: { ...draft, plan_first } }), /Invalid draft/);
+    assert.equal((await store.request({ action: "list" })).drafts[0].plan_first, true);
+    await store.request({ action: "save", draft: { ...draft, plan_first: false } });
+    assert.equal((await store.request({ action: "list" })).drafts.length, 0);
+    await store.request({ action: "save", draft });
+    await store.request({ action: "configure", enabled: false });
+    await store.request({ action: "save", draft });
+    assert.deepEqual(await new DraftStore(file).request({ action: "list" }), { enabled: false, drafts: [] });
+    await store.request({ action: "configure", enabled: true });
+    await store.request({ action: "save", draft });
+    assert.equal((await store.request({ action: "clear" })).drafts.length, 0);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("old drafts remain readable and malformed review intent never silently becomes direct work", async () => {
+  const root = await mkdtemp(join(tmpdir(), "gator-plan-draft-format-"));
+  try {
+    const file = join(root, "drafts.json"), store = new DraftStore(file);
+    const draft = { context: "conversation:one", text: "Keep my original text", title: "One", source: "/project", updated: Date.now() };
+    await writeFile(file, JSON.stringify({ version: 1, enabled: true, drafts: [draft] }));
+    assert.equal((await store.request({ action: "list" })).drafts[0].text, draft.text);
+    const malformed = JSON.stringify({ version: 1, enabled: true, drafts: [{ ...draft, plan_first: "yes" }] });
+    await writeFile(file, malformed);
+    await assert.rejects(new DraftStore(file).request({ action: "list" }), /Saved drafts could not be read/);
+    assert.equal(await readFile(file, "utf8"), malformed);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
 test("update reply drafts retain their referent independently of text across restart", async () => {
   const root = await mkdtemp(join(tmpdir(), "gator-reply-drafts-"));
   try {

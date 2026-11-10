@@ -45,7 +45,7 @@ export function Prompt() {
   createEffect(on(() => data.draft.text, () => { setSelection(0); setDismissed(undefined) }))
   const selected = () => Math.min(selection(), Math.max(0, matches().length - 1))
   const count = () => Math.max(1, Math.min(6, dimensions().height - 18))
-  const metadata = () => [client.planFirst.has(data.draft.context) ? "Plan first" : "",
+  const metadata = () => [data.draft.plan_first ? "Plan first" : "",
     data.draft.uploads?.length ? `${data.draft.uploads.length} ${data.draft.uploads.length === 1 ? "file" : "files"}` : "",
     data.draft.reply_to_update_id ? `Reply: ${literal(data.state?.chat_updates?.find(update => update.id === data.draft.reply_to_update_id)?.title || "update")}` : ""].filter(Boolean).join(" · ")
   const start = () => Math.max(0, selected() - count() + 1)

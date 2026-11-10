@@ -21,7 +21,7 @@ for (const [width, height, queueBinding, kittyKeyboard] of [[110, 34, "Tab", fal
       expect(client.draft.text).toBe("/models "); expect(host.sent).toHaveLength(0)
       const input = "a".repeat(32) + "/brief.txt"
       await client.edit("Queue the next step", [{ id: input, name: "brief.txt", size: 8 }], "update-original")
-      client.planFirst.add(client.context); client.emit("change"); await flush()
+      await client.setPlanFirst(true); await flush()
       expect(setup.captureCharFrame()).toContain(queueBinding + " queue")
       await client.navigate("/draft-context"); await flush(); setup.mockInput.pressTab(); await flush()
       expect(host.sent).toHaveLength(0); expect(client.draft.text).toBe("Queue the next step")

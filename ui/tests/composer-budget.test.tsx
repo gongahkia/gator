@@ -18,7 +18,7 @@ test("combined draft context leaves input and transcript usable through narrow r
   try {
     await client.start()
     host.change({ ...host.current, running: true, messages: [{ role: "Gator", text: "Your itinerary stays readable while you compose." }] })
-    client.planFirst.add(client.context)
+    await client.setPlanFirst(true)
     // Render-only file metadata: this test makes no claim about upload admission.
     client.drafts.set(client.context, { ...client.draft, text: "Keep the input visible\nSecond line", reply_to_update_id: "booking",
       uploads: Array.from({ length: 8 }, (_, index) => ({ id: `fixture-${index}`, name: `Reservation-confirmation-with-a-long-filename-${index}.pdf`, size: 1024, mime: "application/pdf" })) })

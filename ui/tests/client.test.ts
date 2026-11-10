@@ -9,9 +9,10 @@ import { FixtureHost, state } from "./fixture"
 const roots: string[] = [], clients: GatorClient[] = []
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), "gator-client-")); roots.push(root)
-  const host = new FixtureHost({ binary: "/unused", workspace: join(root, "workspace"), userData: join(root, "app"), env: { GATOR_STATE_DIR: join(root, "state") } })
+  const options = { binary: "/unused", workspace: join(root, "workspace"), userData: join(root, "app"), env: { GATOR_STATE_DIR: join(root, "state") } }
+  const host = new FixtureHost(options)
   const client = new GatorClient(host); clients.push(client)
-  return { host, client }
+  return { host, client, options }
 }
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>(done => { resolve = done }); return { resolve, promise } }
 afterEach(async () => { for (const client of clients.splice(0)) { if (client.host instanceof FixtureHost) client.host.closeIssue = ""; await client.close() }; for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }) })
@@ -75,6 +76,62 @@ test("admission clears only the submitted snapshot; rejection preserves the draf
   expect(client.draft.text).toBe("Newer typing"); expect(client.pending.size).toBe(0)
 })
 
+test("draft review intent restores with its files, reply and text and rejects a stale chat toggle", async () => {
+  const { client, options } = await fixture(); await client.start()
+  await client.setPlanFirst(true)
+  const uploads = [{ id: "a".repeat(32) + "/brief.txt", name: "brief.txt", size: 8 }]
+  await client.edit("Keep my next question\nSecond line", uploads, "update-original")
+  await client.close()
+  const host = new FixtureHost(options), restored = new GatorClient(host); clients.push(restored)
+  await restored.start()
+  expect(restored.draft).toMatchObject({ text: "Keep my next question\nSecond line", uploads, reply_to_update_id: "update-original", plan_first: true })
+  await restored.navigate("/settings"); await restored.navigate("/chat")
+  expect(restored.draft.plan_first).toBe(true)
+  const context = restored.context
+  host.change(state("second")); await restored.loadDraft()
+  await expect(restored.setPlanFirst(false, context)).rejects.toThrow("conversation changed")
+  expect(restored.draft.plan_first).toBeUndefined()
+  host.change(state()); await restored.loadDraft()
+  expect(restored.draft.plan_first).toBe(true)
+})
+
+for (const originalPlan of [false, true]) test(`acknowledging a ${originalPlan ? "reviewed" : "direct"} draft preserves newer review intent`, async () => {
+  const { host, client } = await fixture(); await client.start()
+  await client.edit("Original request"); await client.setPlanFirst(originalPlan)
+  const admission = deferred<void>(); host.dispatch = async () => admission.promise
+  const submitted = client.submit()
+  const uploads = [{ id: "b".repeat(32) + "/next.txt", name: "next.txt", size: 8 }]
+  await client.edit("Newer question\nwith details", uploads, "update-new")
+  await client.setPlanFirst(!originalPlan)
+  admission.resolve(); await submitted
+  expect(!!host.sent[0]?.upload?.plan_first).toBe(originalPlan)
+  const next = { text: "Newer question\nwith details", uploads, reply_to_update_id: "update-new" }
+  expect(client.draft).toMatchObject(next); expect(!!client.draft.plan_first).toBe(!originalPlan)
+  const saved = (await host.drafts.request({ action: "list" })).drafts[0]!
+  expect(saved).toMatchObject(next); expect(!!saved.plan_first).toBe(!originalPlan)
+  host.dispatch = async () => {}
+  await client.submit()
+  expect(!!host.sent[1]?.upload?.plan_first).toBe(!originalPlan)
+  expect(client.draft.text).toBe(""); expect(client.draft.plan_first).toBeUndefined()
+  expect((await host.drafts.request({ action: "list" })).drafts).toEqual([])
+})
+
+test("slash commands preserve next-message review intent while admission failures retain it", async () => {
+  const { host, client } = await fixture(); await client.start()
+  await client.setPlanFirst(true); await client.edit("/saved"); await client.submit()
+  expect(client.route).toBe("saved"); expect(client.draft.text).toBe(""); expect(client.draft.plan_first).toBe(true)
+  expect((await host.drafts.request({ action: "list" })).drafts[0].plan_first).toBe(true)
+  await client.edit("Review this task")
+  host.dispatch = async () => { throw new Error("Lost acknowledgement") }
+  await expect(client.submit()).rejects.toThrow("Lost acknowledgement")
+  await expect(client.submit()).rejects.toThrow("Lost acknowledgement")
+  expect(client.canRetrySubmission).toBe(true); expect(client.draft.plan_first).toBe(true)
+  expect(host.sent[0]?.upload?.request_id).toBe(host.sent[1]?.upload?.request_id)
+  expect(host.sent[1]?.upload?.plan_first).toBe(true)
+  await client.setPlanFirst(false)
+  expect(client.canRetrySubmission).toBe(false)
+})
+
 test("action results match nonce and owner, ignore duplicates and clean up on close", async () => {
   const { host, client } = await fixture(); await client.start()
   const baseline = client.listenerCount("change")
@@ -129,8 +186,8 @@ test("uncertain admissions reuse their identity and guide acknowledges the live 
 
 test("first model setup and local hub navigation preserve drafts and do not submit work", async () => {
   const { host, client } = await fixture(); await client.start(); host.change({ ...host.current, provider: undefined })
-  await client.edit("First task draft"); await client.submit()
+  await client.setPlanFirst(true); await client.edit("First task draft"); await client.submit()
   expect(host.sent).toEqual([{ type: "navigate", text: "/model" }]); expect(client.draft.text).toBe("First task draft")
   await client.navigate("/saved"); await client.navigate("/chat")
-  expect(host.sent).toHaveLength(1); expect(client.route).toBe("chat")
+  expect(host.sent).toHaveLength(1); expect(client.route).toBe("chat"); expect(client.draft.plan_first).toBe(true)
 })

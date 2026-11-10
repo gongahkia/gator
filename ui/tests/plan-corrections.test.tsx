@@ -53,6 +53,41 @@ async function fixture(respond: (body: any) => string | Response | Promise<strin
   return { root, env, options, client, setup, requests, flush, choose, send, plan, review, close }
 }
 
+test("an empty plan-first draft survives restart and keyboard submission still prepares review", async () => {
+  let proposals = 0, executions = 0
+  const f = await fixture(body => {
+    if (system(body).includes("Propose a plan")) { proposals++; return JSON.stringify(originalPlan) }
+    executions++; return "Unexpected execution before review"
+  })
+  let restarted: GatorClient | undefined, setup: Awaited<ReturnType<typeof testRender>> | undefined
+  try {
+    await f.client.start(); await f.flush()
+    const owner = f.client.state!.conversation_id!
+    await f.client.navigate("/plan-first"); await f.flush(); await f.choose("Prepare a plan")
+    expect(f.client.draft.text).toBe(""); expect(f.client.draft.plan_first).toBe(true)
+    await f.client.close(); await f.setup.dispose()
+    const client = restarted = new GatorClient(new Application(f.options))
+    setup = await testRender(() => <App client={client} quit={() => client.close()} clipboard={{ read: async () => ({ data: "", mime: "text/plain" }), write: async () => {} }} />, { width: 110, height: 34 })
+    const flush = async () => { await setup!.flush(); await Bun.sleep(25); await setup!.flush() }
+    await client.start(); await flush()
+    expect(client.state?.conversation_id).toBe(owner); expect(client.draft.plan_first).toBe(true)
+    expect(proposals).toBe(0); expect(executions).toBe(0)
+    await setup.mockInput.typeText("Compare venues after restart"); await flush()
+    for (const [width, height] of [[110, 34], [80, 24], [60, 20], [42, 14]]) {
+      setup.resize(width, height); await flush()
+      expect(setup.captureCharFrame()).toContain("Plan first")
+      expect(setup.renderer.root.findDescendantById("transcript")!.height).toBeGreaterThanOrEqual(4)
+      expect(client.draft.text).toBe("Compare venues after restart")
+    }
+    setup.mockInput.pressEnter(); await flush()
+    await until(() => client.state?.task_plans?.[0]?.phase === "review" && !client.state.running, "restored draft prepares review")
+    expect(proposals).toBe(1); expect(executions).toBe(0)
+    expect(client.state?.task_plans?.[0]?.task).toBe("Compare venues after restart")
+    expect(client.draft.text).toBe(""); expect(client.draft.plan_first).toBeUndefined()
+    expect((await client.host.drafts.request({ action: "list" })).drafts).toHaveLength(0)
+  } finally { if (restarted) await restarted.close(); if (setup && !setup.renderer.isDestroyed) await setup.dispose(); await f.close() }
+}, 60000)
+
 test("ordinary corrections revise the same plan while conversation continues, then require a fresh keyboard review", async () => {
   let release!: () => void
   const gate = new Promise<void>(resolve => { release = resolve })
@@ -83,7 +118,7 @@ test("ordinary corrections revise the same plan while conversation continues, th
     const futureBrief = join(f.root, "future-note.txt"); await writeFile(futureBrief, "Future draft only: amber finch")
     await f.client.attach([futureBrief]); const futureInput = f.client.draft.uploads![0]!.id
     const nextDraft = "Keep my next question\nSecond line for the next task"
-    await f.client.edit(nextDraft); f.client.planFirst.add(f.client.context); f.client.emit("change")
+    await f.client.edit(nextDraft); await f.client.setPlanFirst(true)
     for (const [width, height] of [[110, 34], [80, 24], [60, 20], [42, 14]]) { f.setup.resize(width, height); await f.flush(); expect(f.setup.captureCharFrame()).toContain("Keep my next question"); expect(f.setup.renderer.root.findDescendantById("transcript")!.height).toBeGreaterThanOrEqual(4) }
     f.setup.resize(110, 34); release()
     await until(() => !f.client.state?.running && f.client.state?.task_plans?.[0]?.revision === 3 && f.client.state?.dialogue?.[0]?.state === "guided", "revised proposal saved")
@@ -102,10 +137,10 @@ test("ordinary corrections revise the same plan while conversation continues, th
     const journal = JSON.parse(await readFile(join(f.env.GATOR_STATE_DIR, "gator/conversations", owner, "requests.json"), "utf8"))
     expect(journal.requests).toHaveLength(1); expect(journal.requests[0].id).toBe(original.id)
     expect(journal.requests[0].options.Uploads).toEqual([input]); expect(journal.requests[0].text).toBe("Compare venues")
-    expect(f.client.draft.text).toBe(nextDraft); expect(f.client.draft.uploads?.map(file => file.id)).toEqual([futureInput]); expect(f.client.planFirst.has(f.client.context)).toBe(true)
+    expect(f.client.draft.text).toBe(nextDraft); expect(f.client.draft.uploads?.map(file => file.id)).toEqual([futureInput]); expect(f.client.draft.plan_first).toBe(true)
     await f.client.close(); await f.setup.dispose()
     const count = f.requests.length, restarted = new GatorClient(new Application(f.options))
-    try { await restarted.start(); expect(restarted.state?.conversation_id).toBe(owner); expect(restarted.state?.dialogue?.[0]?.state).toBe("guided"); expect(restarted.draft.text).toBe(nextDraft); expect(restarted.draft.uploads?.map(file => file.id)).toEqual([futureInput]); expect(f.requests).toHaveLength(count) }
+    try { await restarted.start(); expect(restarted.state?.conversation_id).toBe(owner); expect(restarted.state?.dialogue?.[0]?.state).toBe("guided"); expect(restarted.draft.text).toBe(nextDraft); expect(restarted.draft.uploads?.map(file => file.id)).toEqual([futureInput]); expect(restarted.draft.plan_first).toBe(true); expect(f.requests).toHaveLength(count) }
     finally { await restarted.close() }
   } finally { release(); await f.close() }
 }, 60000)

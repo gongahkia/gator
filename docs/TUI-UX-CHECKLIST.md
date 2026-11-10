@@ -15,7 +15,7 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 | 7 | Input and useful transcript remain visible at 110×34, 80×24, 60×20, 42×14 with combined attachments/reply/plan/slash states and multiline drafts. | Implemented; final journey pending | `204386564`; `composer-budget.test.tsx`: 8 file names + plan/reply + multiline input and slash completion, ≥4 transcript rows at all four sizes. |
 | 8 | Approval surface shows exact live action/account/destination/content/consequences; long reviews scroll; changed/stale tokens cannot execute; edits require fresh review. | Implemented; final journey pending | `8ba3a9cb8`; `approval-review.test.tsx`: four sizes, scrolling/exact data, stale and missing previews; `approvals.test.tsx`: real Go token protection and controlled connected send. |
 | 9 | Root command search includes local/backend descriptions/names/aliases, grouped browsing remains usable, and commands requiring values have meaningful typed controls. | In progress | `5f54f7f17`; root search and common permission/theme/source/attachment controls verified in `commands.test.tsx`. Remaining advanced command families still expose explicit advanced syntax; typed controls remain required. |
-| 10 | Back restores menu/filter/selection, draft and reading position consistently; backend pages and file workflows retain context; rail marks the active page. | In progress | Host-managed navigation now waits for the Go view acknowledgement; a failed new view is retired and original work/focus is restored. Delayed/failing acknowledgement unit tests pass. Menu/filter/selection/back restoration across all flows remains open; active-page rail tests already pass. |
+| 10 | Back restores menu/filter/selection, draft and reading position consistently; backend pages and file workflows retain context; rail marks the active page. | In progress | Host-managed navigation waits for the Go view acknowledgement; failed views retire and original work/focus is restored. Next-message plan-first intent now persists with text/files/reply context, including empty drafts, restart, commands and newer-draft admission races. Native restart → keyboard submission prepares review without starting work. Menu/filter/selection/back restoration across all flows remains open; active-page rail tests already pass. |
 | 11 | Ctrl+C cancels/stops without implicit quit; Ctrl+Q quits through guards; help/hints reflect configured bindings; no function-key shortcuts are introduced. | In progress | Idle stop/draft preservation, explicit quit, remapped help/composer/rail verified. Tab now explicitly queues a draft after the active task in its current owner; Enter remains conversational and routes clear corrections. Slash completion/forms retain Tab. The queue shortcut uses the same Go settings backend; four sizes, Ctrl remapping and real-Go queued attachments are checked. Voice/approval/contextual hints and terminal modifier limitations remain. |
 | 12 | Disconnected/error states offer contextual reconnect/recovery with intact drafts/request identity; safe admission retries and uncertain external effects stay distinct. | Implemented; final journey pending | `d00952219`; `interaction-recovery.test.tsx`: real Go accepted request + lost acknowledgement retries once, reconnect keeps draft/owner, no model replay; receipts tests preserve unknown external outcomes. |
 | 13 | New-content/latest/catch-up affordances preserve stable reading anchors across navigation/restart; long-history rendering is benchmarked and optimized when justified. | In progress | Reproducible native benchmark and reports in `docs/benchmarks/`; unchanged entries retain DOM identity across complete Go snapshots. 5,000-message append improved 4,051→747 ms in single samples. Startup/scroll remain too slow; bounded rendering, persistent anchors, catch-up/latest UI still required. |
@@ -44,6 +44,31 @@ Preserve both phases across continuations and do not declare the expanded work
 finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
+
+- Retained next-message review intent (10 November): the existing private draft
+  store now owns `plan_first` alongside text, uploaded-file references and update
+  replies; the transient client set was removed. Empty plan-first drafts survive
+  restart and obey the same seven-day retention, disable and clear controls.
+  Old draft records remain readable; malformed review intent leaves the file
+  intact and reports recovery rather than silently selecting direct work.
+  Admission uses the submitted snapshot's intent; its acknowledgement clears
+  only that snapshot, preserving a newer draft's independent text/files/reply and
+  mode. Commands and missing-model setup retain next-message review intent.
+  Stale chat toggles fail. The recovered-draft picker identifies plan-first
+  drafts and strips disk-only timestamps before restoring editable state.
+  Native Go + controlled provider: choose plan-first on an empty draft, restart,
+  resize through all four sizes, type and submit with Enter → exactly one plan
+  proposal, no implementation before review. The existing correction/execution
+  journey now also asserts the future draft's review intent after restart.
+  Focused native/client/composer/queue checks: **25 pass, 314 assertions**;
+  related commands/draft sync/editor/product/recovery regressions: **8 pass,
+  130 assertions**; host draft storage: **7 pass**; final TUI typecheck passes.
+  Logs: `/tmp/gator-ux-20261110-draft-plan-{native,related,host,final-typecheck}.log`.
+  The initial client run had one assertion mismatch between an absent optional
+  JSON key and an in-memory `undefined`; explicit semantic mode assertions pass
+  in the fresh focused run. These are native/controlled-provider checks, not
+  physical terminal or live-model verification. This closes the draft gap below,
+  not the remaining navigation criteria or the fifteen-item acceptance journey.
 
 - Conversational pending-review corrections: ordinary composer messages now reach
   the original native owner, including the current chat and independently owned

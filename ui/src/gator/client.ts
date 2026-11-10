@@ -29,7 +29,6 @@ export class GatorClient extends EventEmitter {
   activityExpanded = new Set<string>()
   updateFeedback = new Map<string, { id: string; saving: boolean; message: string }>()
   actions: Record<string, () => unknown> = {}
-  planFirst = new Set<string>()
   isLocalCommand(text: string) { return text !== "/activity" && /^\/[\w-]+$/.test(text) && (Object.hasOwn(this.actions, text.slice(1)) || ["/following", "/saved", "/settings"].includes(text)) }
   route: "chat" | "following" | "saved" | "settings" = "chat"
   requestQuit?: () => Promise<void>
@@ -37,7 +36,7 @@ export class GatorClient extends EventEmitter {
   #loads = new Map<string, Promise<void>>()
   #results = new Set<() => void>()
   #admissions = new Map<string, { key: string; request: string; queueOnly?:boolean }>()
-  #admissionKey(draft = this.draft) { return JSON.stringify([draft.text, draft.uploads?.map(file => file.id) ?? [], draft.reply_to_update_id, this.planFirst.has(draft.context)]) }
+  #admissionKey(draft = this.draft) { return JSON.stringify([draft.text, draft.uploads?.map(file => file.id) ?? [], draft.reply_to_update_id, !!draft.plan_first]) }
   get canRetrySubmission() { return !this.pending.has(this.context) && this.#admissions.get(this.context)?.key === this.#admissionKey() }
   async reconnect() {
     if (!await this.mayLeave()) return
@@ -80,19 +79,24 @@ export class GatorClient extends EventEmitter {
       if (this.#closed || this.drafts.has(context)) return
       const draft = saved.drafts.find(d => d.context === context)
       // `updated` belongs to the disk record, not the editable/save contract.
-      this.drafts.set(context, draft ? { context, title: draft.title, source: draft.source, text: draft.text, uploads: draft.uploads, reply_to_update_id: draft.reply_to_update_id } : empty)
+      this.drafts.set(context, draft ? { context, title: draft.title, source: draft.source, text: draft.text, uploads: draft.uploads, reply_to_update_id: draft.reply_to_update_id, plan_first: draft.plan_first } : empty)
       this.emit("change")
     })()
     this.#loads.set(context, load)
     try { await load } finally { this.#loads.delete(context) }
   }
-  async edit(text: string, uploads = this.draft.uploads ?? [], reply: string | null | undefined = this.draft.reply_to_update_id) {
+  async edit(text: string, uploads = this.draft.uploads ?? [], reply: string | null | undefined = this.draft.reply_to_update_id, planFirst = this.draft.plan_first) {
     if (Buffer.byteLength(text) > 128 * 1024 || uploads.length > uploadLimits.count || new Set(uploads.map(f => f.id)).size !== uploads.length || uploads.reduce((n, f) => n + f.size, 0) > uploadLimits.total) throw new Error("Draft exceeds Gator's text or attachment limits.")
     const current = this.draft
-    const draft = { context: current.context, title: current.title, source: current.source, text, uploads, reply_to_update_id: reply ?? undefined }
+    const draft = { context: current.context, title: current.title, source: current.source, text, uploads, reply_to_update_id: reply ?? undefined, plan_first: planFirst || undefined }
     if (!draft.context) throw new Error("Wait for this chat to open before editing.")
     this.drafts.set(draft.context, draft); this.emit("change")
     await this.host.drafts.request({ action: "save", draft })
+  }
+  async setPlanFirst(enabled: boolean, context = this.context) {
+    const sameChat = () => { if (this.context !== context) throw new Error("The conversation changed. Set plan-first in the intended chat.") }
+    sameChat(); await this.loadDraft(); sameChat()
+    await this.edit(this.draft.text, this.draft.uploads, this.draft.reply_to_update_id, enabled)
   }
   async attach(paths: string[]) {
     const context = this.context
@@ -115,15 +119,16 @@ export class GatorClient extends EventEmitter {
     await this.edit(this.draft.text, [...this.draft.uploads ?? [], ...files])
   }
   async stage(file: UploadedFile, selection = "") { await this.edit(selection ? [this.draft.text, selection].filter(Boolean).join("\n\n") : this.draft.text, [...this.draft.uploads ?? [], file]) }
-  async clearAdmitted(draft: Draft) {
+  async clearAdmitted(draft: Draft, preservePlan = false) {
     if (this.drafts.get(draft.context) !== draft) return
-    this.drafts.set(draft.context, { ...draft, text: "", uploads: [], reply_to_update_id: undefined })
-    await this.host.drafts.request({ action: "remove", context: draft.context })
+    const next = { ...draft, text: "", uploads: [], reply_to_update_id: undefined, plan_first: preservePlan ? draft.plan_first : undefined }
+    this.drafts.set(draft.context, next)
+    await this.host.drafts.request({ action: "save", draft: next })
   }
   async guide() {
     if (["recording", "transcribing"].includes(this.voicePhase)) throw new Error("Finish or cancel dictation before guiding active work.")
     const draft = this.draft, context = draft.context, id = this.state?.guidance_id
-    if (this.planFirst.has(context)) throw new Error("Turn off plan-first before guiding active work, or send a new reviewed request.")
+    if (draft.plan_first) throw new Error("Turn off plan-first before guiding active work, or send a new reviewed request.")
     if (!id || !this.state?.running) throw new Error("There is no active task to guide.")
     if (!draft.text.trim() || draft.uploads?.length || draft.reply_to_update_id) throw new Error("Guide active work with text only. Send attachments and update replies as a queued follow-up.")
     if (this.pending.has(context)) throw new Error("Wait for the current message acknowledgement.")
@@ -152,16 +157,16 @@ export class GatorClient extends EventEmitter {
         else await this.send({ type: "submit", text: draft.text })
       }
       else {
-        const files = draft.uploads?.map(f => f.id) ?? [], plan_first = this.planFirst.has(context), key = this.#admissionKey(draft)
+        const files = draft.uploads?.map(f => f.id) ?? [], plan_first = draft.plan_first, key = this.#admissionKey(draft)
         // An uncertain acknowledgement can be explicitly retried with the same
         // admission ID. Go's durable request journal prevents duplicate work.
         if (this.#admissions.get(context)?.key !== key) this.#admissions.set(context, { key, request: randomUUID(), queueOnly })
         const admission=this.#admissions.get(context)!
         await this.send({ type: "upload_submit", upload: { request_id: admission.request, context, text: draft.text, files, reply_to_update_id: draft.reply_to_update_id, ...(plan_first ? { plan_first: true } : {}), ...(admission.queueOnly ? {queue_only:true}: {}) } })
-        this.#admissions.delete(context); this.planFirst.delete(context)
+        this.#admissions.delete(context)
       }
       // An acknowledgement only clears the submitted snapshot, never newer input.
-      await this.clearAdmitted(draft)
+      await this.clearAdmitted(draft, command)
     } finally { this.pending.delete(context); this.emit("change") }
   }
   async send(frame: FrontendFrame) { await this.host.send(frame) }

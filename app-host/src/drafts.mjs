@@ -8,6 +8,7 @@ const limit = 32;
 const textLimit = 128 * 1024;
 const validContext = (value) => typeof value === "string" && /^(conversation|workspace|topic):.+$/.test(value) && value.length <= 8192;
 const validReply = value => value === undefined || typeof value === "string" && /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(value);
+const validPlanFirst = value => value === undefined || typeof value === "boolean";
 const canonicalContext = (value) => value.startsWith("topic:") ? `workspace:${value}` : value;
 const validUploads = (value) => value === undefined || Array.isArray(value) && value.length <= uploadLimits.count && value.every(validUpload) && new Set(value.map((file) => file.id)).size === value.length && value.reduce((sum, file) => sum + file.size, 0) <= uploadLimits.total;
 
@@ -33,7 +34,7 @@ export class DraftStore {
     if (!allowed || Object.keys(request).some((key) => !allowed.includes(key))) throw new Error("Invalid draft action");
     if (request.action === "save") {
       const draft = request.draft;
-      if (!draft || typeof draft !== "object" || Array.isArray(draft) || Object.keys(draft).some((key) => !["context", "text", "title", "source", "uploads", "reply_to_update_id"].includes(key)) || !validUploads(draft.uploads) || !validReply(draft.reply_to_update_id) || !validContext(draft.context) || typeof draft.text !== "string" || Buffer.byteLength(draft.text) > textLimit || typeof draft.title !== "string" || draft.title.length > 512 || typeof draft.source !== "string" || draft.source.length > 8192) throw new Error("Invalid draft");
+      if (!draft || typeof draft !== "object" || Array.isArray(draft) || Object.keys(draft).some((key) => !["context", "text", "title", "source", "uploads", "reply_to_update_id", "plan_first"].includes(key)) || !validUploads(draft.uploads) || !validReply(draft.reply_to_update_id) || !validPlanFirst(draft.plan_first) || !validContext(draft.context) || typeof draft.text !== "string" || Buffer.byteLength(draft.text) > textLimit || typeof draft.title !== "string" || draft.title.length > 512 || typeof draft.source !== "string" || draft.source.length > 8192) throw new Error("Invalid draft");
     }
     if (request.action === "remove" && !validContext(request.context)) throw new Error("Invalid draft identity");
     if (request.action === "configure" && typeof request.enabled !== "boolean") throw new Error("Invalid draft preference");
@@ -43,7 +44,7 @@ export class DraftStore {
       const raw = await readFile(this.#file, "utf8");
       if (Buffer.byteLength(raw) > 6 * 1024 * 1024) throw new Error("Oversized draft file");
       data = JSON.parse(raw);
-      if (data.version !== 1 || typeof data.enabled !== "boolean" || !Array.isArray(data.drafts)) throw new Error("Invalid draft file");
+      if (data.version !== 1 || typeof data.enabled !== "boolean" || !Array.isArray(data.drafts) || data.drafts.some(draft => !validPlanFirst(draft?.plan_first))) throw new Error("Invalid draft file");
     } catch (error) {
       if (error.code !== "ENOENT" && request.action !== "clear" && !(request.action === "configure" && !request.enabled)) throw new Error("Saved drafts could not be read. Clear saved drafts to reset them.");
       if (request.action === "clear" || request.action === "configure") data = { version: 1, enabled: request.action === "clear", drafts: [] };
@@ -62,7 +63,7 @@ export class DraftStore {
     if (["save", "remove"].includes(request.action)) {
       const context = canonicalContext(request.draft?.context ?? request.context);
       data.drafts = data.drafts.filter((draft) => draft.context !== context);
-      if (request.action === "save" && data.enabled && (request.draft.text.trim() || request.draft.uploads?.length || request.draft.reply_to_update_id)) data.drafts.unshift({ ...request.draft, context, updated: now });
+      if (request.action === "save" && data.enabled && (request.draft.text.trim() || request.draft.uploads?.length || request.draft.reply_to_update_id || request.draft.plan_first)) data.drafts.unshift({ ...request.draft, context, updated: now });
       data.drafts = data.drafts.slice(0, limit);
     }
     if (previous !== JSON.stringify(data) || ["clear", "configure"].includes(request.action)) {

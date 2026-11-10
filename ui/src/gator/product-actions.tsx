@@ -48,8 +48,8 @@ export function useProductActions(controls: ReturnType<typeof useActions>) {
   actions["plan-first"] = () => {
     const context = client.context
     menu("Plan before work", [
-      { title: "Prepare a plan for my next message", description: "Review the proposal before implementation. Later external actions still require approval.", run: () => { client.planFirst.add(context); client.emit("change") } },
-      { title: "Work directly on my next message", run: () => { client.planFirst.delete(context); client.emit("change") } },
+      { title: "Prepare a plan for my next message", description: "Review the proposal before implementation. Later external actions still require approval.", run: () => client.setPlanFirst(true, context) },
+      { title: "Work directly on my next message", run: () => client.setPlanFirst(false, context) },
     ])
   }
   async function planAction(plan: TaskPlanSummary | TaskPlanReview, action: "inspect" | "edit" | "approve" | "start" | "cancel", content?: PlanContent) {

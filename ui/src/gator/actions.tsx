@@ -48,11 +48,12 @@ export function useActions() {
     const saved = await client.host.drafts.request({ action: "list" })
     menu("Unsent drafts", [
       { title: saved.enabled ? "Disable draft retention" : "Enable draft retention", run: () => confirm("Change draft retention?", saved.enabled ? "All retained composer drafts will be cleared from disk. Current unsent input remains editable until this session closes." : "Keep unsent drafts on this device for up to seven days.", async () => { await client.host.drafts.request({ action: "configure", enabled: !saved.enabled }); client.emit("change") }) },
-      ...saved.drafts.map(draft => ({ title: draft.title || draft.context, description: draft.text.slice(0, 120) || `${draft.uploads?.length ?? 0} attachments`, run: () => menu("Saved draft", [
+      ...saved.drafts.map(draft => ({ title: draft.title || draft.context, description: [draft.plan_first ? "Plan first" : "", draft.text.slice(0, 120) || (draft.uploads?.length ? `${draft.uploads.length} attachments` : "No message yet")].filter(Boolean).join(" · "), run: () => menu("Saved draft", [
         { title: "Recover in original chat", run: async () => {
           if (draft.context.startsWith("conversation:")) await client.host.sessions.open({ conversation_id: draft.context.slice(13) })
           else if (client.context !== draft.context) throw new Error("Open this workspace's original chat to recover its draft.")
-          client.drafts.set(draft.context, draft); client.route = "chat"; client.emit("change")
+          const { updated, ...editable } = draft
+          client.drafts.set(draft.context, editable); client.route = "chat"; client.emit("change")
         } },
         { title: "Remove this draft", run: () => confirm("Remove unsent draft?", draft.text, async () => { await client.host.drafts.request({ action: "remove", context: draft.context }); client.drafts.delete(draft.context); client.emit("change") }) },
       ]) })),
@@ -200,7 +201,7 @@ export function useActions() {
       ])
     },
     "draft-context": () => menu("Draft details", [
-      { title: `Plan first: ${client.planFirst.has(client.context) ? "on" : "off"}`, description: "Review a proposal before implementation; external actions still require approval.", run: () => client.navigate("/plan-first") },
+      { title: `Plan first: ${client.draft.plan_first ? "on" : "off"}`, description: "Review a proposal before implementation; external actions still require approval.", run: () => client.navigate("/plan-first") },
       { title: `Attachments: ${client.draft.uploads?.length || 0}`, description: client.draft.uploads?.map(file => file.name).join(" · ") || "No private files attached", run: () => actions.attachments() },
       ...(client.draft.reply_to_update_id ? [{ title: "Clear reply link", description: client.state?.chat_updates?.find(update => update.id === client.draft.reply_to_update_id)?.title || "Replying to a retained update", run: () => client.edit(client.draft.text, client.draft.uploads, null) }] : []),
     ]),
