@@ -54,6 +54,7 @@ func (m *Model) refreshModelStatus() {
 	}
 	if err != nil {
 		status.Access = "status unavailable: " + singleLine(err.Error())
+		status.Issue = "Model configuration could not be read. Open Models to inspect and retry."
 	}
 	m.modelStatus = status
 	if m.config.ComposerModels != nil {

@@ -1,12 +1,99 @@
 package main
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/localmodel"
 )
+
+func TestWorkModelProcessingDistinguishesLocalEndpointAndRemoteWithoutURLSecrets(t *testing.T) {
+	for _, test := range []struct{ provider, endpoint, kind, destination string }{
+		{localmodel.ProviderID, "http://127.0.0.1:11434/v1/chat/completions", "local", "127.0.0.1:11434"},
+		{"custom", "http://localhost:9000/v1/chat/completions", "local_endpoint", "localhost:9000"},
+		{"custom", "http://[::1]:9000/v1/chat/completions", "local_endpoint", "[::1]:9000"},
+		{"custom", "https://user:private-password@model.example/private-path?key=private-query", "remote", "model.example"},
+		{"custom", "https://localhost.model.example/v1/chat/completions", "remote", "localhost.model.example"},
+		{"openai", "", "remote", "openai"},
+		{"custom", "not-an-endpoint", "unknown", ""},
+	} {
+		t.Run(test.endpoint, func(t *testing.T) {
+			got := workModelProcessing(test.provider, test.endpoint)
+			if got.Kind != test.kind || got.Destination != test.destination || got.Description == "" {
+				t.Fatalf("processing = %#v", got)
+			}
+			encoded, _ := json.Marshal(got)
+			for _, secret := range []string{"private-password", "private-path", "private-query", "user:"} {
+				if strings.Contains(string(encoded), secret) {
+					t.Fatal("processing exposed URL material", string(encoded))
+				}
+			}
+		})
+	}
+}
+
+func TestWorkModelReadinessChecksConfigurationWithoutCallingTheEndpoint(t *testing.T) {
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { calls.Add(1) }))
+	defer server.Close()
+	t.Setenv("OPENAI_API_KEY", "fixture-private-key")
+	store, err := config.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings := config.Default()
+	settings.Defaults = config.Defaults{Provider: "openai", Model: "gpt-5.6"}
+	settings.ProviderEndpoints = map[string]string{"openai": server.URL}
+	if err := store.Save(settings); err != nil {
+		t.Fatal(err)
+	}
+	status, err := currentWorkModelStatus(store, t.TempDir())
+	if err != nil || status.Issue != "" || status.Processing.Kind != "local_endpoint" || calls.Load() != 0 {
+		t.Fatalf("readiness = %#v, %v; calls=%d", status, err, calls.Load())
+	}
+}
+
+func TestWorkModelReadinessExplainsMissingCredentialsAndProviderConfiguration(t *testing.T) {
+	t.Setenv("OPENAI_API_KEY", "")
+	store, err := config.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings := config.Default()
+	settings.Defaults = config.Defaults{Provider: "openai", Model: "gpt-5.6"}
+	if err := store.Save(settings); err != nil {
+		t.Fatal(err)
+	}
+	status, err := currentWorkModelStatus(store, t.TempDir())
+	if err != nil || !strings.Contains(status.Issue, "OPENAI_API_KEY") {
+		t.Fatalf("missing credential = %#v, %v", status, err)
+	}
+	t.Setenv("AZURE_OPENAI_API_KEY", "fixture-private-key")
+	t.Setenv("AZURE_OPENAI_BASE_URL", "")
+	t.Setenv("AZURE_OPENAI_RESOURCE_NAME", "")
+	settings.Defaults = config.Defaults{Provider: "azure-openai-responses", Model: "deployment"}
+	if err := store.Save(settings); err != nil {
+		t.Fatal(err)
+	}
+	status, err = currentWorkModelStatus(store, t.TempDir())
+	if err != nil || status.Issue == "" {
+		t.Fatalf("incomplete provider = %#v, %v", status, err)
+	}
+	settings.ProviderEndpoints = map[string]string{"azure-openai-responses": "https://resource.example/openai/v1"}
+	if err := store.Save(settings); err != nil {
+		t.Fatal(err)
+	}
+	status, err = currentWorkModelStatus(store, t.TempDir())
+	if err != nil || status.Issue != "" {
+		t.Fatalf("repaired provider = %#v, %v", status, err)
+	}
+}
 
 func TestCurrentWorkModelStatusReportsConfiguredLocalModel(t *testing.T) {
 	store, err := config.New(t.TempDir())

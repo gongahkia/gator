@@ -24,6 +24,27 @@ type ComposerSettings struct {
 	ModelIssue string          `json:"model_issue,omitempty"`
 	Issue      string          `json:"issue,omitempty"`
 	Disabled   string          `json:"disabled,omitempty"`
+	Readiness  ModelReadiness  `json:"readiness"`
+	Budget     ComposerBudget  `json:"budget"`
+}
+
+// These are configuration checks, not a claim that a remote or local endpoint
+// is online. No inference request is made while projecting the composer.
+type ModelProcessing struct {
+	Kind        string `json:"kind"`
+	Destination string `json:"destination,omitempty"`
+	Description string `json:"description"`
+}
+
+type ModelReadiness struct {
+	State      string          `json:"state"`
+	Issue      string          `json:"issue,omitempty"`
+	Processing ModelProcessing `json:"processing"`
+}
+
+type ComposerBudget struct {
+	WorkSteps int `json:"work_steps"`
+	CodeSteps int `json:"code_steps"`
 }
 
 type ComposerAction struct {
@@ -42,17 +63,35 @@ type ComposerResult struct {
 
 func (m Model) composerSettings() ComposerSettings {
 	state := ComposerSettings{Effort: effortName(m.options.MaxSteps), Models: append([]ComposerModel{}, m.composerModels...), ModelIssue: m.composerModelIssue(), Issue: m.composerModelsIssue}
+	state.Readiness = ModelReadiness{State: "configured", Processing: m.modelStatus.Processing, Issue: state.ModelIssue}
+	if state.Readiness.Processing.Kind == "" {
+		state.Readiness.Processing = ModelProcessing{Kind: "unknown", Description: "Choose a model to inspect where its requests are processed."}
+	}
+	if m.modelStatus.Provider == "" {
+		state.Readiness.State = "needs_model"
+		if state.ModelIssue != "" {
+			state.Readiness.State = "needs_setup"
+		} else {
+			state.Readiness.Issue = "Choose a local model or connect a model provider. Your draft stays here during setup."
+		}
+	} else if state.ModelIssue != "" {
+		state.Readiness.State = "needs_setup"
+	}
+	state.Budget = ComposerBudget{WorkSteps: m.options.MaxSteps, CodeSteps: m.options.Code.MaxSteps}
 	if m.running || len(m.queue) > 0 {
 		state.Disabled = "Available after current and queued work finishes."
 	} else if m.models != nil || m.launcher || m.section != "" || m.bridgeExternal != nil || m.pendingBundleAction != nil || m.controlBusy || m.recallBusy {
 		state.Disabled = "Return to the conversation to change these settings."
 	}
-	data, _ := json.Marshal([]any{m.source, m.conversation, m.modelStatus.Provider, m.modelStatus.Model, state.Effort, state.Models, state.ModelIssue, state.Issue, state.Disabled})
+	data, _ := json.Marshal([]any{m.source, m.conversation, m.modelStatus.Provider, m.modelStatus.Model, state.Effort, state.Models, state.ModelIssue, state.Issue, state.Disabled, state.Readiness, state.Budget})
 	state.ID = fmt.Sprintf("%x", sha256.Sum256(data))
 	return state
 }
 
 func (m Model) composerModelIssue() string {
+	if m.modelStatus.Issue != "" {
+		return m.modelStatus.Issue
+	}
 	if m.config.ComposerModels == nil || m.modelStatus.Provider == "" {
 		return ""
 	}

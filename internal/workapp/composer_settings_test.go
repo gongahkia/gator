@@ -6,6 +6,42 @@ import (
 	"testing"
 )
 
+func TestComposerProjectsReadinessAndActualBudgetsWithoutClaimingConnectivity(t *testing.T) {
+	status := ModelStatus{}
+	m := New(Config{ModelStatus: func() (ModelStatus, error) { return status, nil }, ComposerModels: func() ([]ComposerModel, error) {
+		return []ComposerModel{{Provider: "custom", Model: "first"}}, nil
+	}})
+	if state := m.BridgeState().Composer; state.Readiness.State != "needs_model" || state.Readiness.Issue == "" || state.Budget.WorkSteps != 24 || state.Budget.CodeSteps != 16 {
+		t.Fatalf("first task readiness = %#v", state)
+	}
+	status = ModelStatus{Provider: "custom", Model: "first", Issue: "Connect the missing API key", Processing: ModelProcessing{Kind: "remote", Destination: "service.example", Description: "Task context goes to the provider"}}
+	m.refreshModelStatus()
+	before := m.composerSettings()
+	if before.Readiness.State != "needs_setup" || before.ModelIssue != status.Issue || before.Readiness.Processing != status.Processing {
+		t.Fatalf("missing setup = %#v", before)
+	}
+	status.Issue = ""
+	m.refreshModelStatus()
+	after := m.composerSettings()
+	if after.Readiness.State != "configured" || after.Readiness.Issue != "" || after.ID == before.ID {
+		t.Fatalf("configured model / stale control identity = %#v", after)
+	}
+	if err := m.setWorkEffort("high"); err != nil {
+		t.Fatal(err)
+	}
+	if state := m.composerSettings(); state.Budget.WorkSteps != 48 || state.Budget.CodeSteps != 32 {
+		t.Fatalf("effort budget = %#v", state.Budget)
+	}
+}
+
+func TestComposerRetainsConfigurationReadFailureInsteadOfOfferingWork(t *testing.T) {
+	m := New(Config{ModelStatus: func() (ModelStatus, error) { return ModelStatus{}, errors.New("private store unavailable") }})
+	state := m.composerSettings()
+	if state.Readiness.State != "needs_setup" || state.Readiness.Issue == "" {
+		t.Fatalf("configuration failure = %#v", state)
+	}
+}
+
 func TestComposerBoundsLargeCatalogAndKeepsCurrentChoice(t *testing.T) {
 	choices := make([]ComposerModel, 300)
 	for i := range choices {
