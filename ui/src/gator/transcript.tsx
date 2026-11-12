@@ -17,6 +17,7 @@ import { Spinner } from "../component/spinner"
 import { WorkingStatus } from "./working-status"
 import { ConversationTurn } from "./conversation-turn"
 import { useKeyHints } from "./key-hints"
+import { useTranscriptReader } from "./transcript-reader"
 
 function Result(props: { value: BackendResult }) {
   const theme = useTheme()
@@ -36,25 +37,14 @@ export function Transcript() {
   const data = useData(), client = useClient(), theme = useTheme(), renderer = useRenderer(), dialog = useDialog()
   const hint = useKeyHints()
   const reconcile = createTimelineReconciler()
-  const timeline = createMemo(() => reconcile(client.context, chatTimeline(data.state?.messages ?? [], data.state?.chat_updates ?? [], data.state?.dialogue ?? []).filter(item => item.kind !== "message" || item.message.role !== "Deliverables" || !!(item.message.text || item.message.result || item.message.activity || item.message.bundle?.Artifacts?.length))))
+  const timeline = createMemo(() => reconcile(data.context, chatTimeline(data.state?.messages ?? [], data.state?.chat_updates ?? [], data.state?.dialogue ?? []).filter(item => item.kind !== "message" || item.message.role !== "Deliverables" || !!(item.message.text || item.message.result || item.message.activity || item.message.bundle?.Artifacts?.length))))
   const cards = new Map<string, Renderable>(), delivered = new Set<string>()
   let scroll: ScrollBoxRenderable | undefined
-  let previous = ""
-  let restore: (() => void) | undefined
+  const reading = useTranscriptReader(timeline, () => scroll)
   let revealAfterLayout: (() => void) | undefined
   let revealedScrollTop: number | undefined
   const [revealed, setRevealed] = createSignal(-1)
-  const remember = () => { if (previous && scroll) client.readingPositions.set(previous, scroll.scrollTop) }
-  createEffect(() => {
-    const id = data.state?.conversation_id ?? data.state?.source ?? ""
-    if (id === previous) return
-    remember(); previous = id; setRevealed(-1); revealedScrollTop = undefined; if (restore) renderer.off("frame", restore)
-    const saved = client.readingPositions.get(id)
-    // Native layout establishes the scroll range during the first frame. A timer
-    // can run earlier and clamp a retained position to zero.
-    restore = () => { if (scroll && !scroll.isDestroyed) scroll.scrollTo(saved ?? scroll.scrollHeight); restore = undefined }
-    renderer.once("frame", restore)
-  })
+  createEffect(() => { data.context; setRevealed(-1); revealedScrollTop = undefined })
   const reveal = (index: number) => {
     setRevealed(index)
     if (revealAfterLayout) renderer.off("frame", revealAfterLayout)
@@ -63,12 +53,12 @@ export function Transcript() {
       // Explicit reveal aligns the requested item's start. Native nearest-edge
       // scrolling currently does nothing when item and viewport heights match.
       if (scroll && node && !node.isDestroyed) scroll.scrollBy(node.screenY - scroll.viewport.screenY)
-      revealedScrollTop = scroll?.scrollTop; remember(); revealAfterLayout = undefined
+      revealedScrollTop = scroll?.scrollTop; reading.moved(); revealAfterLayout = undefined
     }
     renderer.once("frame", revealAfterLayout)
   }
   const acknowledgeVisible = () => {
-    if (!scroll || scroll.isDestroyed || restore || revealAfterLayout || dialog.stack.length || client.route !== "chat" || client.state?.panel || client.state?.external || client.snapshot.terminalBusy || client.snapshot.sessionSwitching || client.snapshot.connection !== "connected") return
+    if (!scroll || scroll.isDestroyed || reading.restoring() || revealAfterLayout || dialog.stack.length || client.route !== "chat" || client.state?.panel || client.state?.external || client.snapshot.terminalBusy || client.snapshot.sessionSwitching || client.snapshot.connection !== "connected") return
     const conversation_id = client.state?.conversation_id, viewport = scroll.viewport
     if (!conversation_id || viewport.height < 1) return
     for (const update of client.state?.chat_updates ?? []) {
@@ -98,11 +88,11 @@ export function Transcript() {
   }
   client.on("request-item-actions", visibleActions)
   renderer.on("frame", acknowledgeVisible)
-  onCleanup(() => { remember(); if (restore) renderer.off("frame", restore); if (revealAfterLayout) renderer.off("frame", revealAfterLayout); client.off("reveal-message", reveal); client.off("request-item-actions", visibleActions); renderer.off("frame", acknowledgeVisible) })
+  onCleanup(() => { if (revealAfterLayout) renderer.off("frame", revealAfterLayout); client.off("reveal-message", reveal); client.off("request-item-actions", visibleActions); renderer.off("frame", acknowledgeVisible) })
   Keymap.createLayer(() => ({ commands: [
-    { bind: "pageup", title: "Scroll earlier", run: () => scroll?.scrollBy(-10) },
-    { bind: "pagedown", title: "Scroll later", run: () => scroll?.scrollBy(10) },
-    { bind: "ctrl+end", title: "Jump to latest", run: () => scroll?.scrollTo(scroll.scrollHeight) },
+    { bind: "pageup", title: "Scroll earlier", run: () => { scroll?.scrollBy(-10); reading.moved() } },
+    { bind: "pagedown", title: "Scroll later", run: () => { scroll?.scrollBy(10); reading.moved() } },
+    { bind: "ctrl+end", title: "Jump to latest", run: reading.latest },
   ] }))
   return <scrollbox id="transcript" ref={node => { scroll = node }} flexGrow={1} minHeight={0} stickyScroll stickyStart="bottom" paddingX={2}>
     <Show when={data.state?.branch}><text fg={theme.text.muted} onMouseUp={() => void client.navigate("/original-chat")}>Branched chat · /original-chat returns to its source</text></Show>

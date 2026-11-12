@@ -1,5 +1,6 @@
 import type { BackendState, Frame } from "./protocol"
 export type UploadedFile = { id: string; name: string; size: number }
+export type ReadingAnchor = { key: string; index: number; offset: number; following: boolean; seen: string; seen_version: string }
 export type Draft = { context: string; title: string; source: string; text: string; uploads?: UploadedFile[]; reply_to_update_id?: string; plan_first?: boolean; updated?: number }
 export type DraftSnapshot = { enabled: boolean; drafts: (Draft & { updated: number })[] }
 export type DraftRequest = { action: "list" | "clear" } | { action: "remove"; context: string } | { action: "configure"; enabled: boolean } | { action: "save"; draft: Draft }

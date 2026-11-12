@@ -32,6 +32,7 @@ var DefaultShortcuts = map[string]string{
 	"new_chat": "Ctrl+N", "command_search": "Ctrl+P", "conversation_search": "Ctrl+F", "settings": "Ctrl+,",
 	"send_message": "Enter", "queue_message": "Tab", "newline": "Ctrl+J", "guide_work": "Ctrl+G",
 	"voice_input": "Ctrl+V", "help": "Ctrl+O", "context_actions": "Ctrl+E",
+	"jump_latest": "Ctrl+L",
 }
 
 var retiredFunctionShortcut = regexp.MustCompile(`(?i)(^|\+)f([1-9]|1[0-2])$`)

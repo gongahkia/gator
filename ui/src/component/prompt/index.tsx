@@ -11,6 +11,7 @@ import { useDialog } from "../../ui/dialog"
 import { Keymap } from "../../context/keymap"
 import { literal } from "../../gator/text"
 import { useKeyHints } from "../../gator/key-hints"
+import { readingSummary } from "../../gator/transcript-reading"
 
 export function Prompt() {
   const client = useClient(), data = useData(), theme = useTheme(), dialog = useDialog()
@@ -138,9 +139,11 @@ export function Prompt() {
     <text id="composer-model" height={1} wrapMode="none" truncate selectable={false} fg={theme.text.muted} onMouseDown={event => event.stopPropagation()}
       onMouseUp={event => { if (event.button !== 0) return; event.stopPropagation(); void client.navigate(modelState() && modelState() !== "configured" ? "/setup" : "/models").catch(e => client.fail(e)) }}><b style={{ fg: theme.accent }}>Gator</b>  {literal(modelSummary())}{(!modelState() || modelState() === "configured") && data.state?.composer?.effort ? ` · ${data.state.composer.effort} effort` : ""}</text>
     </box>
-    <box paddingX={1} paddingTop={compact() ? 0 : 1} flexDirection="row" justifyContent="space-between" gap={2}>
+    <box paddingX={dimensions().width < 60 ? 0 : 1} paddingTop={compact() ? 0 : 1} flexDirection="row" justifyContent="space-between" gap={2}>
+    <Show when={data.reading && (!data.reading.following || data.reading.count || data.reading.notice)} fallback={<>
       <text fg={theme.text.muted} attributes={TextAttributes.DIM} flexGrow={1} flexBasis={0} flexShrink={1} minWidth={0} height={1} wrapMode="none" truncate>{data.snapshot.connection !== "connected" ? "Reconnect before sending" : ["recording", "transcribing"].includes(data.voicePhase) ? "Finish dictation before sending" : data.state?.running ? `${hint("gator.send")} ${dimensions().width < 60 ? "talk" : "talk / steer"} · ${hint("gator.queue")} queue` : data.state?.dialogue_active ? `${hint("gator.send")} send · Talk, correct or start work` : `${hint("gator.send")} send · ${hint("gator.newline")} new line`}</text>
       <text fg={theme.text.muted} attributes={TextAttributes.DIM} flexShrink={0}>{contextualHint()}</text>
+    </>}><text id="transcript-catch-up" flexGrow={1} flexShrink={1} minWidth={0} height={1} wrapMode="none" truncate fg={theme.accent} onMouseUp={() => { if (!renderer.getSelection()?.getSelectedText()) client.emit(data.reading?.count ? "transcript-catch-up" : "transcript-latest") }}>{readingSummary(data.reading?.count ?? 0, hint("gator.latest"), data.reading?.notice, dimensions().width - (dimensions().width < 60 ? 2 : 6))}</text></Show>
     </box>
   </box>
 }

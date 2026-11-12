@@ -1,0 +1,39 @@
+{
+  "runtime": "Bun 1.4.2",
+  "platform": "darwin/x64",
+  "viewport": "110x34 then 80x24",
+  "frame_settle_ms": 10,
+  "measurements": [
+    {
+      "messages": 100,
+      "startup_ms": 329,
+      "scroll_ms": 44,
+      "append_ms": 21,
+      "resize_ms": 62,
+      "js_heap_mib": 38,
+      "rss_mib": 258
+    },
+    {
+      "messages": 1000,
+      "startup_ms": 940,
+      "scroll_ms": 82,
+      "append_ms": 58,
+      "resize_ms": 161,
+      "js_heap_mib": 92,
+      "rss_mib": 374
+    },
+    {
+      "messages": 5000,
+      "startup_ms": 4098,
+      "scroll_ms": 395,
+      "append_ms": 267,
+      "resize_ms": 750,
+      "js_heap_mib": 323,
+      "rss_mib": 841
+    }
+  ],
+  "implementation": "Durable item anchors/catch-up with cached immutable fingerprints, bounded native geometry lookup and stable local-field projections; source is in the commit containing this report.",
+  "command": "cd ui && bun --preload ./scripts/preload.ts scripts/bench-transcript.tsx",
+  "notes": "One sample per size, sequential datasets in one process. Synthetic history and a native renderer, no model/account calls. Frame settling is included. The unchanged benchmark asserts the exact reading row survives an append. RSS includes native memory and allocator capacity. All messages still mount: startup/scroll/resize and bounded rendering remain open.",
+  "baseline": "tui-transcript-reading-before.json"
+}

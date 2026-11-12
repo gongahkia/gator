@@ -27,7 +27,7 @@ import { useActions } from "./gator/actions"
 import { useProductActions } from "./gator/product-actions"
 import { useResultActions } from "./gator/result-actions"
 import { useNative } from "./gator/native"
-import { commandGroup, commandAliases } from "./gator/command-groups"
+import { commandGroup, commandAliases, commandDescription } from "./gator/command-groups"
 import { ApprovalReview } from "./gator/approval-review"
 import { runBackendCommand } from "./gator/command-actions"
 import { RecoveryNotice } from "./gator/recovery-notice"
@@ -75,13 +75,14 @@ function Shell(props: { quit(): Promise<void>; voice?: VoiceSession }) {
     } },
     { id: "gator.new", title: "New independent chat", bind: "ctrl+n", palette: true, run: () => navigate("/new") },
     { id: "gator.search", title: "Search current transcript", bind: "ctrl+f", palette: true, enabled: !data.state?.panel, run: () => controls.trigger("search") },
+    { id: "gator.latest", title: "Jump to latest content", bind: "ctrl+l", palette: true, enabled: data.route === "chat" && !data.state?.panel && dialog.stack.length === 0, run: () => client.emit("transcript-latest") },
     { id: "gator.context-actions", title: "Actions for visible result", bind: "ctrl+e", palette: true, enabled: data.route === "chat" && !data.state?.panel && dialog.stack.length === 0, run: () => client.emit("request-item-actions") },
     { id: "gator.help", title: "Gator help", bind: "ctrl+o", palette: true, enabled: !data.state?.panel, run: () => navigate("/help") },
     { id: "gator.voice", title: "Start or finish dictation", bind: "ctrl+v", palette: true, run: () => controls.trigger("toggle-dictation") },
     { id: "gator.approve", title: "Review current approval", bind: "ctrl+y", palette: true, enabled: dialog.stack.length === 0, run: () => approve(true) },
     { id: "gator.decline", title: "Decline current approval", bind: "ctrl+d", palette: true, enabled: dialog.stack.length === 0, run: () => approve(false) },
     { id: "gator.reconnect", title: "Reconnect selected chat", palette: true, run: () => attempt(client.reconnect()) },
-    ...Object.keys(controls.actions).map(name => ({ id: `gator.local.${name}`, title: name, group: commandGroup(name), palette: true as const, run: () => controls.trigger(name) })),
+    ...Object.keys(controls.actions).map(name => ({ id: `gator.local.${name}`, title: name, description: commandDescription(name), group: commandGroup(name), palette: true as const, run: () => controls.trigger(name) })),
     ...["following", "saved", "settings"].map(name => ({ id: `gator.${name}`, title: name[0].toUpperCase() + name.slice(1), palette: true as const, run: () => navigate(`/${name}`) })),
     // Only collapse known equivalent actions. Go's goal activity and the local
     // public-work trace share a name but are distinct capabilities.

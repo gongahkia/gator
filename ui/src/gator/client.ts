@@ -7,6 +7,7 @@ import type { BackendState, ChatUpdate } from "@gator/application-host/contracts
 import { uploadLimits } from "@gator/application-host/attachment-limits"
 import type { FileSelection } from "./file-selection"
 import { frontendDefaults, type FrontendPreferenceValues } from "@gator/application-host/preferences"
+import type { ReadingAnchor } from "./transcript-reading"
 
 // All views read this projection. IDs, admission, permissions and persistence
 // remain Gator-owned; there is no upstream client, server or session database.
@@ -26,6 +27,39 @@ export class GatorClient extends EventEmitter {
   fileSelections = new Map<string, FileSelection>()
   filePositions = new Map<string, { sheet: number; row: number; col: number }>()
   readingPositions = new Map<string, number>()
+  readingAnchors = new Map<string, ReadingAnchor>()
+  readingStatus?: { context: string; following: boolean; count: number; notice: string }
+  setReadingStatus(value?: GatorClient["readingStatus"]) {
+    if (JSON.stringify(this.readingStatus) === JSON.stringify(value)) return
+    this.readingStatus = value
+    if (!this.#closed) this.emit("change")
+  }
+  #readingLoaded = new Map<string, Promise<void>>()
+  #readingWrites = new Map<string, ReadingAnchor>()
+  #readingTimer?: ReturnType<typeof setTimeout>
+  loadReading(context: string) {
+    const previous = this.#readingLoaded.get(context)
+    if (previous) return previous
+    const pending = this.host.reading.read(context).then(anchor => {
+      if (anchor && !this.readingAnchors.has(context)) this.readingAnchors.set(context, anchor)
+    }).catch(error => { if (!this.#closed) this.fail(error) })
+    this.#readingLoaded.set(context, pending)
+    return pending
+  }
+  rememberReading(context: string, anchor: ReadingAnchor) {
+    if (this.#closed || JSON.stringify(this.readingAnchors.get(context)) === JSON.stringify(anchor)) return
+    this.readingAnchors.set(context, anchor); this.#readingWrites.set(context, anchor)
+    if (!this.#readingTimer) this.#readingTimer = setTimeout(() => { void this.flushReading() }, 200)
+  }
+  async flushReading() {
+    clearTimeout(this.#readingTimer); this.#readingTimer = undefined
+    const writes = [...this.#readingWrites]; this.#readingWrites.clear()
+    await Promise.all(writes.map(async ([context, anchor]) => {
+      try { await this.host.reading.save(context, anchor) }
+      catch { if (!this.#closed) this.fail(new Error("Reading position could not be saved. History and drafts are kept; /latest returns to the newest content.")) }
+    }))
+    await this.host.reading.flush()
+  }
   activityExpanded = new Set<string>()
   updateFeedback = new Map<string, { id: string; saving: boolean; message: string }>()
   actions: Record<string, () => unknown> = {}
@@ -258,6 +292,8 @@ export class GatorClient extends EventEmitter {
     if (this.#closing) return this.#closing
     this.#closing = (async () => {
       // A failed draft flush or live external step leaves the UI subscribed.
+      this.emit("remember-reading")
+      await this.flushReading()
       await this.host.close()
       this.#closed = true
       this.host.off("change", this.#listener)

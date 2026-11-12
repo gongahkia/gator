@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events"
-import type { DraftRequest, DraftSnapshot, FrontendFrame, HostSnapshot, UploadedFile } from "../contracts/frontend"
+import type { DraftRequest, DraftSnapshot, FrontendFrame, HostSnapshot, UploadedFile, ReadingAnchor } from "../contracts/frontend"
 import type { FileRequest, FileView, FileComparison } from "../contracts/fileProtocol"
 import type { FrontendPreferenceValues } from "./preferences.mjs"
 export class Application extends EventEmitter {
@@ -8,6 +8,7 @@ export class Application extends EventEmitter {
   readonly context: string
   sessions: { busy: boolean; pending: boolean; restart(): Promise<void>; settled(): Promise<void>; open(request?: { new?: boolean; conversation_id?: string; view?: string; source?: string }): Promise<void> }
   drafts: { request(request: DraftRequest): Promise<DraftSnapshot>; flush(): Promise<void> }
+  reading: { read(context: string): Promise<ReadingAnchor | undefined>; save(context: string, anchor: ReadingAnchor): Promise<void>; flush(): Promise<void> }
   preferences: { read(): Promise<FrontendPreferenceValues>; configure(patch: Partial<FrontendPreferenceValues>): Promise<FrontendPreferenceValues>; initializeDefaults?(): Promise<FrontendPreferenceValues>; flush(): Promise<void> }
   snapshot(): HostSnapshot
   start(request?: { conversation_id?: string; goal?: boolean }): Promise<HostSnapshot>

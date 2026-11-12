@@ -17,18 +17,20 @@ test("combined draft context leaves input and transcript usable through narrow r
   const flush = async () => { await setup.flush(); await Bun.sleep(20); await setup.flush() }
   try {
     await client.start()
-    host.change({ ...host.current, running: true, messages: [{ role: "Gator", text: "Your itinerary stays readable while you compose." }] })
+    host.change({ ...host.current, running: true, messages: Array.from({ length: 60 }, (_, n) => ({ role: "Gator", text: `Itinerary ${n} stays readable while you compose.`, created_at: new Date(1700000000000 + n * 60000).toISOString() })) })
     await client.setPlanFirst(true)
     // Render-only file metadata: this test makes no claim about upload admission.
     client.drafts.set(client.context, { ...client.draft, text: "Keep the input visible\nSecond line", reply_to_update_id: "booking",
       uploads: Array.from({ length: 8 }, (_, index) => ({ id: `fixture-${index}`, name: `Reservation-confirmation-with-a-long-filename-${index}.pdf`, size: 1024, mime: "application/pdf" })) })
     client.emit("change")
+    await flush(); setup.mockInput.pressKey("\x1b[5~"); await flush()
     for (const [width, height] of [[110, 34], [80, 24], [60, 20], [42, 14]]) {
       setup.resize(width!, height!); await flush()
       const input = setup.renderer.root.findDescendantById("message-input")!, transcript = setup.renderer.root.findDescendantById("transcript")!
       expect(input.screenY).toBeGreaterThanOrEqual(0)
       expect(input.screenY + input.height).toBeLessThanOrEqual(height!)
       expect(transcript.height).toBeGreaterThanOrEqual(4)
+      expect(setup.captureCharFrame()).toContain("/catch-up")
       expect(setup.captureCharFrame()).toContain("Keep the input visible")
       client.drafts.set(client.context, { ...client.draft, text: "/" }); client.emit("change"); await flush()
       const completing = setup.renderer.root.findDescendantById("message-input")!

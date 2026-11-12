@@ -33,11 +33,17 @@ function createData() {
   const state = fields<BackendState>(() => client.state), snapshot = fields(() => client.snapshot)
   const present = createMemo(() => { revision(); return client.state !== undefined })
   const context = createMemo(() => { revision(); return client.context })
-  return { get context() { return context() }, get progress() { revision(); return [...client.operations.values()].reverse().find(operation => operation.context === client.context)?.label },
+  // Local presentation updates must not rebuild the global key registry and
+  // every retained message's hints when route/draft/voice/error are unchanged.
+  const select = <T,>(read: () => T) => createMemo(() => { revision(); return read() }, undefined, { equals: sameField })
+  const route = select(() => client.route), draft = select(() => client.draft), preferences = select(() => client.preferences)
+  const voicePhase = select(() => client.voicePhase), voiceDestination = select(() => client.voiceDestination), issue = select(() => client.issue)
+  const reading = select(() => client.readingStatus?.context === client.context ? client.readingStatus : undefined)
+  return { get context() { return context() }, get reading() { return reading() }, get progress() { revision(); return [...client.operations.values()].reverse().find(operation => operation.context === client.context)?.label },
     get admitting() { revision(); return client.pending.has(client.context) },
     get state() { return present() ? state : undefined }, get snapshot() { return snapshot },
-    get activityExpanded() { revision(); return client.activityExpanded }, get voiceDestination() { revision(); return client.voiceDestination },
-    get draft() { revision(); return client.draft }, get preferences() { revision(); return client.preferences }, get updateFeedback() { revision(); return client.updateFeedback.get(client.context) }, get route() { revision(); return client.route }, get voicePhase() { revision(); return client.voicePhase }, get issue() { revision(); return client.issue } }
+    get activityExpanded() { revision(); return client.activityExpanded }, get voiceDestination() { return voiceDestination() },
+    get draft() { return draft() }, get preferences() { return preferences() }, get updateFeedback() { revision(); return client.updateFeedback.get(client.context) }, get route() { return route() }, get voicePhase() { return voicePhase() }, get issue() { return issue() } }
 }
 
 const Context = createContext<ReturnType<typeof createData>>()

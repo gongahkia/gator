@@ -1,0 +1,39 @@
+{
+  "runtime": "Bun 1.4.2",
+  "platform": "darwin/x64",
+  "viewport": "110x34 then 80x24",
+  "frame_settle_ms": 10,
+  "measurements": [
+    {
+      "messages": 100,
+      "startup_ms": 380,
+      "scroll_ms": 40,
+      "append_ms": 22,
+      "resize_ms": 49,
+      "js_heap_mib": 38,
+      "rss_mib": 254
+    },
+    {
+      "messages": 1000,
+      "startup_ms": 933,
+      "scroll_ms": 74,
+      "append_ms": 82,
+      "resize_ms": 126,
+      "js_heap_mib": 83,
+      "rss_mib": 370
+    },
+    {
+      "messages": 5000,
+      "startup_ms": 3944,
+      "scroll_ms": 361,
+      "append_ms": 371,
+      "resize_ms": 597,
+      "js_heap_mib": 310,
+      "rss_mib": 866
+    }
+  ],
+  "implementation": "Before durable item anchors, catch-up controls and stable local-field projections.",
+  "command": "cd ui && bun --preload ./scripts/preload.ts scripts/bench-transcript.tsx",
+  "notes": "One sample per size, sequential datasets in one process. Synthetic history and a native renderer, no model/account calls. Frame settling is included. The unchanged benchmark asserts the exact reading row survives an append. RSS includes native memory and allocator capacity. All messages still mount: startup/scroll/resize and bounded rendering remain open.",
+  "source_commit": "d258953b9"
+}

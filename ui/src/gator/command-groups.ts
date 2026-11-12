@@ -1,5 +1,8 @@
 // Navigation labels are frontend concerns; availability and execution stay in Go.
 export const commandGroups = ["Chats", "Following", "Saved", "Files", "Settings", "Help and application"] as const
+export function commandDescription(name: string): string | undefined {
+  return ({ latest: "Jump to the newest content in this chat", "catch-up": "Read from the first unseen message in this chat" } as Record<string, string>)[name]
+}
 const groups: Record<string, string[]> = {
   Following: ["following", "goals", "followup", "jobs", "inbox", "overview", "updates", "pilot", "plan", "notifications", "check-health", "cancel-update-reply"],
   Saved: ["saved", "knowledge", "history", "drafts", "memories", "receipts", "note", "skill", "learnings", "suggestions", "prompt-history"],

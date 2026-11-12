@@ -5,6 +5,24 @@ import (
 	"testing"
 )
 
+func TestJumpLatestShortcutUsesAuthoritativeBindingsAndResolvesExistingOverrides(t *testing.T) {
+	settings := DesktopSettings{}
+	if got := settings.ResolvedShortcuts()["jump_latest"]; got != "Ctrl+L" {
+		t.Fatalf("default latest shortcut = %q", got)
+	}
+	settings.Shortcuts = map[string]string{"command_search": "Ctrl+L"}
+	if err := settings.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if got := settings.ResolvedShortcuts()["jump_latest"]; got != "Ctrl+Shift+L" {
+		t.Fatalf("existing binding was not preserved: latest=%q", got)
+	}
+	settings.Shortcuts["jump_latest"] = "Ctrl+K"
+	if err := settings.Validate(); err != nil || settings.ResolvedShortcuts()["jump_latest"] != "Ctrl+K" {
+		t.Fatalf("custom latest binding failed: %v", err)
+	}
+}
+
 func TestDesktopShortcutValidationPreservesTypingAndConflicts(t *testing.T) {
 	for _, binding := range []string{"K", "Mod+Q", "Tab", "Escape", "Mod+K+K", "Ctrl+Ctrl+K", "Mod+" + physicalShortcut("Mod") + "+K"} {
 		if _, err := NormalizeShortcut(binding); err == nil {
