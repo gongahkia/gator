@@ -24,6 +24,10 @@ import (
 const Version = 1
 const maxNoteBytes = 64 * 1024
 const maxSkillBytes = 32 * 1024
+
+// Sixteen valid 512-byte source labels may need six JSON bytes per character.
+// Keep metadata bounded while permitting every value accepted by validate.
+const maxMetadataBytes = 64 * 1024
 const maxEntries = 2048
 
 var skillIDPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,63}$`)
@@ -404,7 +408,7 @@ func (s Store) loadRaw(kind, id string) (Document, error) {
 	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		return Document{}, errors.New("knowledge entry is not a regular directory")
 	}
-	meta, err := readRegular(filepath.Join(dir, "meta.json"), 16*1024)
+	meta, err := readRegular(filepath.Join(dir, "meta.json"), maxMetadataBytes)
 	if err != nil {
 		return Document{}, err
 	}

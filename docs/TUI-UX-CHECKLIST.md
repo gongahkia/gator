@@ -45,6 +45,16 @@ finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
 
+- Saved-note metadata bounds (12 November): a new source-preview regression
+  exposed that sixteen valid escaped source labels could be written successfully
+  but exceed the 16 KB metadata reader limit. The reader now permits bounded
+  64 KB metadata, enough for the validated label contract and JSON escaping.
+  Body/label limits, regular-file and directory/symlink checks remain enforced.
+  Maximum escaped labels round-trip through loading and correction without
+  truncation; oversized metadata still fails. `go test ./internal/knowledge`
+  passes in 2.882 seconds. Log:
+  `/tmp/gator-ux-20261112-knowledge-metadata-go.log`.
+
 - Reviewed noise feedback (12 November): only a successfully acknowledged
   noise rating opens the original update's linked check controls. The user can
   edit notification conditions/timing in the canonical form, review a pause,

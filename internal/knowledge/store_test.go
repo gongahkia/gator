@@ -188,3 +188,38 @@ func TestKnowledgeRootRejectsSymlinkAndCreatesMissingState(t *testing.T) {
 		t.Fatal("symlinked Gator state root accepted")
 	}
 }
+
+func TestMaximumEscapedSourceLabelsRemainReadableAndMetadataStaysBounded(t *testing.T) {
+	store, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	refs := make([]string, 16)
+	for i := range refs {
+		refs[i] = "s" + strings.Repeat("\x01", 511)
+	}
+	note, err := store.AddNoteWithRefs("Source label roundtrip", "Keep complete source provenance.", "", refs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := store.LoadNote(note.ID)
+	if err != nil {
+		t.Fatal("a successfully saved valid note became unreadable", err)
+	}
+	if len(loaded.SourceRefs) != len(refs) || loaded.SourceRefs[0] != refs[0] {
+		t.Fatal("saved source labels were truncated")
+	}
+	if _, err := store.UpdateNote(note.ID, note.Title, "A corrected note with the same source labels."); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err = store.LoadNote(note.ID)
+	if err != nil || loaded.SourceRefs[15] != refs[15] {
+		t.Fatal("correction lost source provenance", err)
+	}
+	if err := os.WriteFile(filepath.Join(store.dir("note", note.ID), "meta.json"), []byte(strings.Repeat("x", maxMetadataBytes+1)), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.LoadNote(note.ID); err == nil {
+		t.Fatal("metadata became unbounded")
+	}
+}
