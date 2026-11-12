@@ -7,7 +7,7 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 | # | Acceptance criteria | Status | Evidence / commit |
 |---|---|---|---|
 | 1 | Conversation remains available during execution; ordinary messages can steer a specific live task or start independent work; ambiguous routing is clarified without losing task identity, files, or drafts. | In progress | `92cd471f4`/`485cd007c` plus result continuity: ordinary messages reply, steer, clarify, delegate and stop specific independent owners without moving focus. Pending-review text corrections now revise the same task asynchronously, preserve its frozen inputs/limits, and require fresh approval; failures/cancellation and restart retain the outcome. Preparing/reviewed plans can be cancelled conversationally; changed control epochs are rejected. Recent original-task summaries reach follow-up conversation/work/planning without acquiring controls. Explicit queues remain available. Corrections during initial preparation or plan-bound execution, changes to pending exact actions/new inputs, delegated exact-approval journeys, broader failure/account/goal journeys and live-model routing quality remain open. |
-| 2 | Following unifies commitments with outcome/state/next action, next and last successful checks, sources/timezone, pause/edit, and truthful foreground/service/offline limits. | In progress | `4b9edf091`/`a95289265`: commitment cards and exact check controls. Active goal cards open their exact canonical picker row and prepare a check for that goal's current workspace, including duplicate titles, other-chat origins and busy owners. Focused Go/host/native integration checks pass. Advanced non-project schedule editing and paused-goal controls remain; final integrated journey pending. |
+| 2 | Following unifies commitments with outcome/state/next action, next and last successful checks, sources/timezone, pause/edit, and truthful foreground/service/offline limits. | In progress | `4b9edf091`/`a95289265`: commitment cards and exact check controls. Active goal cards open their exact canonical picker row and prepare a check for that goal's current workspace, including duplicate titles, other-chat origins and busy owners. Focused Go/host/native integration checks pass. `08bc8aea1`/`1bb9e8994`: active/paused goals now expose canonical inspected plans and reviewed pause/resume controls. They bind exact saved goal identity, preserve other edits/check definitions, retain selection through refreshed ordering, and keep task ownership/drafts during real-Go controlled-provider work. Read cancellation retires late results without changing pages or stopping work. Advanced non-project schedule editing and the final combined journey remain. |
 | 3 | Relevant answers expose supplied memory/provenance/correction; noise feedback offers a reviewed, scoped check/notification change and reports its actual outcome. | Implemented; final journey pending | `cb095fcc4`/`08c12a19d`/`bda11baf3`: original, dynamic and carried memory are inspectable and correctable; noise feedback leads to scoped reviewed changes through the authoritative check controller. Continuations now receive a bounded current-status snapshot for previously referenced knowledge, preserving historical messages while supplying corrections and withdrawal/omission/scope/review status. Private replay retains validated IDs through compaction/restart. Exact refresh input is sealed and inspectable; it cannot widen a reviewed plan or spend an extra model request. Native four-size provider/input, correction, forgetting, privacy, snapshot inspection and restart checks pass. Final combined acceptance journey remains. |
 | 4 | First task leads through only missing setup; host connectivity and model readiness are distinct; local/cloud processing, capabilities, and work budget are explained. | In progress | `d0fd58e48` provides Go-owned prerequisite/processing/budget projection. Ordinary first submissions offer missing setup while preserving private files/text and plan intent; Host connectivity and model setup have separate labels. Native fresh-profile → invalid provider form → repair → persisted selection → inspect context/limits → explicit useful task passes at all four sizes. Missing and subsequently changed credentials recover without replaying/admitting the rejected task. Request-specific connected-account/access setup handoffs and recovery after provider rejection during an admitted task remain; final integrated journey and live-account/model verification remain. |
 | 5 | Workspace/account/source scope is inspectable near input; conversational/manual settings agree, including terminal preferences, with confirmed outcomes. | In progress | Ctrl+T and /request-context inspect workspace/model processing, selected accounts, inputs, mode and actual Go budgets. Missing account display metadata retains the selected identity. Appearance, navigation and recent-chat grouping now share Go configuration across manual controls, conversational tools, cached owners, CLI theme changes and restart. Legacy frontend values import once; failures do not report saved values. Native four-size settings journeys plus unreadable-import recovery and live-task preservation pass. Full permission explanations, broader account/settings integration and live-model/account verification remain; final combined acceptance journey pending. |
@@ -44,6 +44,57 @@ Preserve both phases across continuations and do not declare the expanded work
 finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
+
+- Reviewed goal controls in Following (`08bc8aea1`, `1bb9e8994`, 12 November):
+  active and paused goals expose retained-plan inspection and reviewed status
+  changes through the canonical Go goal store. A saved record digest binds the
+  responsibility, workspace, linked chat, notifications and current status.
+  All existing goal-record writers share one process-held lease, so status
+  changes cannot overwrite concurrent context/notification/conversation edits.
+  Missing, malformed, stale and wrong-target identities are rejected; current
+  records that change again after saving are not presented as a confirmed current
+  status. Completed goals cannot be resumed through this control. Canonical
+  uppercase hex identities remain supported without renaming existing records.
+  The manual bridge accepts only inspect/pause/resume; no source, account,
+  replacement policy, execution or approval grant travels in that frame.
+  Inspection reads current outcomes, workspace, plan steps, deadlines,
+  dependencies, evidence, recurrence and check health. It remains read-only in
+  the executing owner; its separate busy state does not take queue/task/approval
+  ownership or clear another control's busy state. Mutations during work reuse
+  the established management view. Status changes retain saved check definitions;
+  confirmations explain existing work may finish, other goals stay unchanged,
+  and resuming a goal does not start a task/service or re-enable paused/ended
+  check agreements. Post-save health failures explicitly report the saved status
+  and unavailable refresh rather than implying nothing changed.
+  Goal inspection reuses the cancellable read view: closing it retires late
+  success/failure, cannot reopen a dialog/change pages, and does not stop work.
+  Host runtime retention, reconnect/profile-maintenance and update guards include
+  its pending read. Scoped recovery clears only the earlier matching goal error.
+  Goal and check menus have distinct titles, preventing a same-title check's
+  filter from hiding the goal controls. Escape from the new status confirmation
+  restores the parent menu/filter. Following retains selected commitment identity
+  through reordered refreshes and keeps a tall card's title in view.
+  Native verification under NO_COLOR and reduced motion: **12 pass, 326
+  assertions**, four files, 40.07 seconds, in
+  `/tmp/gator-ux-20261112-goal-controls-native-safe-read.log`, observed exit 0.
+  Real Go / controlled-provider journeys at all four sizes cover paused-plan
+  inspection, cancelled and confirmed resume, a stale pause rejected after an
+  independent CLI correction, fresh pause, restart, multiline/plan drafts,
+  inspection during held work, management-view mutation, original task completion
+  and one provider request. Peer-goal and check-definition bytes and the retained
+  plan stay unchanged. Separate native fixtures at all four sizes close delayed
+  successful and failed inspections with Escape/Ctrl+C, then navigate away;
+  results stay retired and an unrelated issue/draft/running owner are preserved.
+  Full Go goal/store and workapp regressions pass (4.882/26.700 seconds); CLI
+  goal/follow-up/shortcut checks pass (35.091 seconds). Focused final Go checks
+  also verify canonical identity compatibility and current-status confirmation.
+  Host full regression: **133 pass, 1 existing skip, 0 failures**, 134 tests,
+  26.64 seconds; final policy/session ownership recheck: **40 pass**, 0 failures.
+  Typecheck, frontend bundle and final runtime build pass. This is native fixture,
+  real Go/store and controlled-provider evidence, not physical terminal/audio or
+  live account/model-quality verification. Advanced non-project schedule editing
+  is still open in row 2. The complete current terminal regression and final
+  combined acceptance journey remain pending. All fifteen criteria stay in scope.
 
 - Bounded long-history rendering (`03f743fb5`, 12 November): history remains in the original
   immutable snapshot and global transcript search. Only the native content
