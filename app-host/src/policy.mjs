@@ -71,7 +71,9 @@ export function validateFrame(frame) {
     const v = frame.memory;
     if (!v || typeof v !== "object" || Array.isArray(v) || Object.keys(v).some(key => !["conversation_id", "id", "updated", "action", "text", "request_id"].includes(key)) || typeof v.conversation_id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/.test(v.conversation_id) || typeof v.id !== "string" || !/^mem-[a-f0-9]{24}$/.test(v.id) || typeof v.updated !== "string" || v.updated.length > 64 || !Number.isFinite(Date.parse(v.updated)) || typeof v.request_id !== "string" || !/^[a-zA-Z0-9-]{1,64}$/.test(v.request_id) || !["correct", "forget", "undo"].includes(v.action) || (v.action === "correct" ? typeof v.text !== "string" || !v.text.trim() || Buffer.byteLength(v.text)>4096 : v.text !== undefined)) throw new Error("Invalid memory review");
   }
-  if (frame.type === "navigate" && (typeof frame.text !== "string" || frame.text.length > 4096 || !/^\/[a-z][a-z0-9-]*(?: [a-z][a-z0-9-]*)*$/.test(frame.text) || ["/approve", "/deny", "/quit", "/exit"].includes(frame.text))) throw new Error("Invalid destination");
+  // Exact answer-context IDs contain timestamp capitals and underscores. This
+  // route only admits their bounded syntax; Go revalidates original ownership.
+  if (frame.type === "navigate" && (typeof frame.text !== "string" || frame.text.length > 4096 || !(/^\/[a-z][a-z0-9-]*(?: [a-z][a-z0-9-]*)*$/.test(frame.text) || /^\/context [a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/.test(frame.text)) || ["/approve", "/deny", "/quit", "/exit"].includes(frame.text))) throw new Error("Invalid destination");
   if (frame.type === "key" && !["esc", "ctrl+o", "ctrl+p", "ctrl+x", "ctrl+b"].includes(frame.key)) throw new Error("Unsupported shortcut");
   if (frame.type === "approval" && (!Number.isSafeInteger(frame.interaction_id) || frame.interaction_id < 1 || typeof frame.approval_token !== "string" || !/^[a-f0-9]{64}$/.test(frame.approval_token) || typeof frame.approved !== "boolean")) throw new Error("Invalid approval");
   if (frame.type === "queue") {
@@ -133,7 +135,7 @@ export function validateFrame(frame) {
     if (Object.keys(panel).some((key) => !["id", "action", "row", "fields", "text"].includes(key))) throw new Error("Invalid view action");
     if (!["select", "activate", "key", "query", "filter", "next", "previous", "refresh", "rename", "pin", "unpin", "archive", "restore"].includes(panel.action)) throw new Error("Invalid view action");
     if (panel.row !== undefined && (!Number.isSafeInteger(panel.row) || panel.row < 0 || panel.row > 10000)) throw new Error("Invalid row");
-    if (panel.action === "key" && (typeof frame.key !== "string" || !/^(enter|esc|up|down|left|right|tab|shift\+tab|space|ctrl\+[ruo]|[a-z0-9])$/.test(frame.key))) throw new Error("Invalid view key");
+    if (panel.action === "key" && (typeof frame.key !== "string" || !/^(enter|esc|up|down|left|right|tab|shift\+tab|space|ctrl\+[ruoeax]|[a-z0-9])$/.test(frame.key))) throw new Error("Invalid view key");
     if (["query", "filter"].includes(panel.action) && (typeof panel.text !== "string" || panel.text.length > 4096)) throw new Error("Invalid search");
 	 if (["rename", "pin", "unpin", "archive", "restore"].includes(panel.action) && panel.row === undefined) throw new Error("Choose a conversation");
 	 if (panel.action === "rename" && (typeof panel.text !== "string" || !panel.text.trim() || Buffer.byteLength(panel.text, "utf8") > 256 || /[\r\n\0]/.test(panel.text))) throw new Error("Invalid conversation title");

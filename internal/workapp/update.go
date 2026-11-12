@@ -505,6 +505,14 @@ func (m Model) updateKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
+	// The context page owns its explicit Ctrl actions. In particular, forget
+	// and omit must not become the global chat picker or product-help shortcut.
+	if m.section == "context" && !m.launcher {
+		switch value.String() {
+		case "ctrl+e", "ctrl+x", "ctrl+o", "ctrl+a", "ctrl+r":
+			return m.updateContextKey(value)
+		}
+	}
 	if value.String() == "ctrl+o" && (m.section != "" || m.launcher) {
 		m.productHelp = true
 		return m, nil

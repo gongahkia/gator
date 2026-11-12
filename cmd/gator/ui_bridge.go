@@ -236,7 +236,7 @@ func bridgeKey(name string) (tea.KeyMsg, bool) {
 		"ctrl+c": tea.KeyCtrlC, "ctrl+p": tea.KeyCtrlP, "ctrl+x": tea.KeyCtrlX,
 		"ctrl+i": tea.KeyCtrlI, "ctrl+b": tea.KeyCtrlB, "ctrl+j": tea.KeyCtrlJ,
 		"ctrl+g": tea.KeyCtrlG, "ctrl+o": tea.KeyCtrlO, "ctrl+u": tea.KeyCtrlU, "ctrl+r": tea.KeyCtrlR,
-		"ctrl+q": tea.KeyCtrlQ,
+		"ctrl+q": tea.KeyCtrlQ, "ctrl+e": tea.KeyCtrlE, "ctrl+a": tea.KeyCtrlA,
 	}
 	if kind, ok := special[name]; ok {
 		return tea.KeyMsg{Type: kind}, true

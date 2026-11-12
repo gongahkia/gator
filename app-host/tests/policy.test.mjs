@@ -69,10 +69,18 @@ test("renderer cannot launch processes, acknowledge handoffs, or inject transpor
   assert.deepEqual(validateFrame({ type: "navigate", text: "/overview" }), { version: 1, type: "navigate", text: "/overview" });
 });
 
+test("answer context navigation admits exact run IDs without generalizing navigation arguments", () => {
+  const text = "/context work-20261112T030608-603cbcf614c5";
+  assert.equal(validateFrame({ type: "navigate", text }).text, text);
+  assert.equal(validateFrame({ type: "navigate", text: "/context Run_1" }).version, 1);
+  for (const text of ["/context ../other", "/context run;send", "/context Run_1 extra", "/context " + "A".repeat(97), "/settings Run_1"]) assert.throws(() => validateFrame({ type: "navigate", text }));
+});
+
 test("panel actions require a view identity and bounded typed values", () => {
   const frame = { type: "panel", key: "ctrl+r", panel: { id: "a".repeat(64), action: "key", fields: { 0: "review me" } } };
   assert.equal(validateFrame(frame).version, 1);
   assert.equal(validateFrame({ ...frame, key: "ctrl+o" }).version, 1);
+  for (const key of ["ctrl+e", "ctrl+x", "ctrl+a"]) assert.equal(validateFrame({ ...frame, key }).version, 1);
   assert.throws(() => validateFrame({ ...frame, key: "f1" }));
   assert.equal(validateFrame({ type: "panel", panel: { id: frame.panel.id, action: "filter", text: "completed" } }).version, 1);
   for (const text of [undefined, false, "x".repeat(4097)]) assert.throws(() => validateFrame({ type: "panel", panel: { id: frame.panel.id, action: "filter", text } }));

@@ -115,16 +115,20 @@ func (m Model) updateContextKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch key.String() {
 		case "esc":
 			m.contextDetail = nil
-		case "e":
+		case "e", "ctrl+e":
 			if m.contextDetail.Available && m.contextDetail.Kind != "update" {
 				m.contextEditing = true
 				m.contextEdit = m.contextDetail.CurrentText
 			}
-		case "f":
+		case "f", "ctrl+x":
 			if m.contextDetail.Available && m.contextDetail.Kind != "update" {
 				m.contextConfirm = true
 			}
-		case "o":
+		case "o", "ctrl+o":
+			if m.contextHasSeparateOwner() {
+				m.sectionNotice = "Return to the original conversation to change next-message recall. Saved corrections and forgetting here still affect future recall."
+				return m, nil
+			}
 			if m.contextDetail.Kind == "update" {
 				return m, nil
 			}
@@ -155,9 +159,9 @@ func (m Model) updateContextKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			copy := m.contextState.Items[m.selected]
 			m.contextDetail = &copy
 		}
-	case "a":
+	case "a", "ctrl+a":
 		return m.openContext("", true)
-	case "r":
+	case "r", "ctrl+r":
 		return m.openContext(m.contextWorkID, m.contextWorkID == "")
 	}
 	return m, nil
@@ -170,6 +174,9 @@ func (m Model) contextPanel() uisnapshot.Panel {
 		p.Blocks = []uisnapshot.Block{{Title: "Supplied excerpt", Role: "content", Lines: []string{item.Text}}, {Title: "Scope and provenance", Collapsible: true,
 			Fields: []uisnapshot.Field{{Label: "Scope", Value: knowledgeScope(item.Scope, m.contextState.GoalID)}, {Label: "Source labels", Value: valueOrNone(item.Source)}, {Label: "Updated", Value: item.Updated}},
 			Lines:  []string{"This is supplied context, not proof of hidden reasoning or that a source supports a claim."}}}
+		if item.Available && item.CurrentText != item.Text {
+			p.Blocks = append(p.Blocks, uisnapshot.Block{Title: "Current saved text", Lines: []string{item.CurrentText, "Corrections affect future recall. They do not rewrite what this earlier answer received."}})
+		}
 		if item.SourceReviewNeeded {
 			p.Blocks = append(p.Blocks, uisnapshot.Block{Title: "Source needs review", Lines: []string{"The linked file changed or is unavailable. Automatic recall skips this memory until you review the file and relink it.", "/memory correct " + item.ID + " --source-file PATH TEXT"}})
 		}
@@ -187,7 +194,11 @@ func (m Model) contextPanel() uisnapshot.Panel {
 			p.Blocks = append(p.Blocks, uisnapshot.Block{Title: "Effect", Lines: []string{"Remove this item and its retrieval vectors from future saved recall.", "Prior transcripts and retained Work evidence may contain earlier excerpts."}})
 			p.Hints = []uisnapshot.Hint{{Shortcut: "Enter", Action: "forget saved knowledge", Tone: "error"}, {Shortcut: "Esc", Action: "cancel"}}
 		} else {
-			p.Hints = []uisnapshot.Hint{{Shortcut: "E", Action: "correct"}, {Shortcut: "F", Action: "forget"}, {Shortcut: "O", Action: "omit/include next run"}, {Shortcut: "Esc", Action: "back"}}
+			p.Hints = []uisnapshot.Hint{{Shortcut: "Ctrl+E", Action: "correct"}, {Shortcut: "Ctrl+X", Action: "forget"}, {Shortcut: "Ctrl+O", Action: "omit/include next run"}, {Shortcut: "Esc", Action: "back"}}
+			if m.contextHasSeparateOwner() {
+				p.Hints = []uisnapshot.Hint{{Shortcut: "Ctrl+E", Action: "correct"}, {Shortcut: "Ctrl+X", Action: "forget"}, {Shortcut: "Esc", Action: "back"}}
+				p.Blocks = append(p.Blocks, uisnapshot.Block{Title: "Next-message recall", Lines: []string{"Change next-message omissions in the original conversation. Saved corrections and forgetting in this view still affect future recall."}})
+			}
 			if !item.Available || item.Kind == "update" {
 				p.Hints = []uisnapshot.Hint{{Shortcut: "Esc", Action: "back"}}
 			}
@@ -210,7 +221,7 @@ func (m Model) contextPanel() uisnapshot.Panel {
 		p.Subtitle = "Your saved notes and context"
 		p.Blocks[0].Lines = []string{"Scope: global plus " + valueOrNone(m.goalID), "Showing at most 100 saved items. /memory search and /note search find specific topics."}
 	}
-	p.Hints = []uisnapshot.Hint{{Shortcut: "↑/↓", Action: "choose"}, {Shortcut: "Enter", Action: "expand"}, {Shortcut: "A", Action: "all saved"}, {Shortcut: "R", Action: "refresh"}, {Shortcut: "Esc", Action: "back"}}
+	p.Hints = []uisnapshot.Hint{{Shortcut: "↑/↓", Action: "choose"}, {Shortcut: "Enter", Action: "expand"}, {Shortcut: "Ctrl+A", Action: "all saved"}, {Shortcut: "Ctrl+R", Action: "refresh"}, {Shortcut: "Esc", Action: "back"}}
 	return p
 }
 

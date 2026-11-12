@@ -128,6 +128,7 @@ export function useResultActions(controls: ReturnType<typeof useActions>) {
     menu(`${message.role} · ${displayDate(message.created_at) || "Retained message"}`, [
       { title: "Inspect complete result", description: message.text.slice(0, 100), run: () => { check(); details("Complete result", [text, bundle ? origin(bundle) : "", `Original conversation: ${context}`, message.revision_id ? `Revision: ${message.revision_id}` : ""].filter(Boolean).join("\n\n"), again) } },
       { title: "Copy result text", disabled: !text, run: async () => { check(); await clipboard.write(text); toast.show({ message: "Result copied.", variant: "success" }) } },
+      ...((message.run_id || bundle?.RunID) ? [{ title: "Inspect supplied memory and context", description: "See retained excerpts and provenance; correct or forget saved knowledge", run: () => { check(); return client.navigate("/context " + (message.run_id || bundle!.RunID)) } }] : []),
       ...(bundle?.Artifacts ?? []).map(file => ({ title: `File: ${file.Path}`, description: file.MediaType, run: () => { check(); fileMenu(bundle!, file, context, again) } })),
       ...((bundle?.RunID && bundle.ManifestSHA256) ? [{ title: "Inspect source evidence", run: () => { check(); return sources(bundle!, context, again) } }] : []),
       ...(bundle?.Candidates ?? []).map(candidate => ({ title: `Change ${candidate.ID}`, description: candidate.Status, run: () => { check(); return change(bundle!, candidate, context, again) } })),

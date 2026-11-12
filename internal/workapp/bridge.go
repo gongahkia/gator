@@ -418,10 +418,18 @@ func (m Model) RespondBridgeApproval(id int, token string, approved bool) (tea.M
 // label as a user prompt. The caller confirms abandoning an unsaved form.
 func (m Model) NavigateBridge(command string) (tea.Model, tea.Cmd) {
 	m.bridgeNotice = ""
+	scopedContext := false
+	if fields := strings.Fields(command); len(fields) > 1 && fields[0] == "/context" {
+		command, scopedContext = m.contextNavigation(command)
+		if !scopedContext {
+			m.bridgeNotice = "This answer's retained context is unavailable in the current conversation. Return to its original task and select it again."
+			return m, nil
+		}
+	}
 	switch command {
 	case "/gator", "/chat", "/knowledge", "/new", "/overview", "/goals", "/conversations", "/inbox", "/followup", "/history", "/memory", "/context", "/usage", "/data", "/recovery", "/connections", "/browser", "/model", "/settings", "/help", "/search":
 	default:
-		known := false
+		known := scopedContext
 		for _, entry := range m.availableCommandEntries() {
 			known = known || (entry.command == command && entry.kind == "command")
 		}
