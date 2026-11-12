@@ -15,7 +15,7 @@ import (
 )
 
 var retainedKnowledgeID = regexp.MustCompile(`^(mem|note)-[a-f0-9]{24}$`)
-var retainedKnowledgeLocator = regexp.MustCompile(`^knowledge:([a-zA-Z0-9][a-zA-Z0-9_-]{0,95})/(knowledge_read|knowledge_search)/[a-f0-9]{24}$`)
+var retainedKnowledgeLocator = regexp.MustCompile(`^knowledge:([a-zA-Z0-9][a-zA-Z0-9_-]{0,95})/(knowledge_read|knowledge_search|knowledge_refresh)/[a-f0-9]{24}$`)
 
 func retainedKnowledgeReplay(messages []agent.Message) map[string]bool {
 	result := map[string]bool{}
@@ -30,6 +30,8 @@ func retainedKnowledgeReplay(messages []agent.Message) map[string]bool {
 
 type suppliedKnowledge struct {
 	ID, Kind, Title, Text, Body, Source, Updated string
+	Status                                       string
+	Truncated                                    bool
 	GoalID                                       *string  `json:"goal_id"`
 	SourceRefs                                   []string `json:"source_refs"`
 	Origin                                       *struct {
@@ -49,7 +51,7 @@ func appendRetainedKnowledge(result *workapp.ContextState, bundle artifact.Bundl
 		if match == nil {
 			continue
 		}
-		read, inherited := match[2] == "knowledge_read", match[1] != result.WorkID
+		read, refresh, inherited := match[2] == "knowledge_read", match[2] == "knowledge_refresh", match[1] != result.WorkID
 		if inherited && !replayed[match[2]+":"+evidence.SHA256] {
 			continue
 		}
@@ -72,7 +74,15 @@ func appendRetainedKnowledge(result *workapp.ContextState, bundle artifact.Bundl
 			return errors.New("retained knowledge response is invalid")
 		}
 		var snapshots []suppliedKnowledge
-		if read {
+		if refresh {
+			var status struct {
+				Items []suppliedKnowledge `json:"items"`
+			}
+			if err := json.Unmarshal(response.Result, &status); err != nil {
+				return err
+			}
+			snapshots = status.Items
+		} else if read {
 			var item suppliedKnowledge
 			if err := json.Unmarshal(response.Result, &item); err != nil {
 				return err
@@ -100,9 +110,12 @@ func appendRetainedKnowledge(result *workapp.ContextState, bundle artifact.Bundl
 				return errors.New("retained knowledge has an invalid identity or goal scope")
 			}
 			var item workapp.KnowledgeItem
-			if foreign {
+			if foreign || refresh && snapshot.Status == "outside_scope" {
 				item.ID = snapshot.ID
 				item.UnavailableReason = "This excerpt was carried from another goal. Open its original conversation to inspect or correct its current saved record."
+				if refresh {
+					item.UnavailableReason = "This saved reference is outside the current goal. Open its original conversation to inspect or correct it."
+				}
 			} else {
 				item = load(snapshot.ID)
 			}
@@ -111,7 +124,24 @@ func appendRetainedKnowledge(result *workapp.ContextState, bundle artifact.Bundl
 				item.Kind, item.Title, item.Text = "note", snapshot.Title, snapshot.Body
 			}
 			method := "read during run"
-			if !read {
+			if refresh {
+				method = "refreshed for this run"
+				item.Title = snapshot.Title
+				if item.Title == "" {
+					item.Title = "Saved knowledge"
+				}
+				if snapshot.Status != "current" {
+					labels := map[string]string{"omitted": "Omitted for this request", "forgotten_or_missing": "No longer saved when this request started", "outside_scope": "Outside this request's goal", "expired": "Expired when this request started", "needs_review": "Saved source or memory needs review", "unavailable": "Current saved state could not be verified", "requires_read": "The complete current record needs an explicit read"}
+					label, known := labels[snapshot.Status]
+					if !known {
+						return errors.New("retained knowledge refresh has an invalid status")
+					}
+					item.Text = label + ". No current value was supplied by this refresh; older excerpts remain historical."
+				}
+				if snapshot.Truncated {
+					item.Text += "\n[Supplied preview shortened; inspect the complete current record before relying on omitted detail.]"
+				}
+			} else if !read {
 				method, item.Text = "search preview during run", snapshot.Title
 				if item.Kind == "memory" {
 					item.Title = snapshot.Kind
@@ -125,12 +155,19 @@ func appendRetainedKnowledge(result *workapp.ContextState, bundle artifact.Bundl
 			if snapshot.GoalID != nil {
 				item.Scope = contextScope(*snapshot.GoalID)
 			}
+			if refresh && snapshot.Status == "outside_scope" {
+				item.Scope = "outside this goal"
+			}
 			item.Source = strings.Join(append([]string{snapshot.Source}, snapshot.SourceRefs...), ", ")
 			item.Source = strings.Trim(item.Source, ", ")
 			if snapshot.Origin != nil {
 				item.Source = strings.TrimSpace(item.Source + " · Chat: " + snapshot.Origin.ConversationID + " · " + snapshot.Origin.Basis)
 			}
-			item.Updated = method + " · saved version " + snapshot.Updated + " · captured " + evidence.RetrievedAt.Local().Format("Jan 2 15:04:05")
+			item.Updated = method
+			if snapshot.Updated != "" {
+				item.Updated += " · saved version " + snapshot.Updated
+			}
+			item.Updated += " · captured " + evidence.RetrievedAt.Local().Format("Jan 2 15:04:05")
 			item.EvidenceID = evidence.ID
 			result.Items = append(result.Items, item)
 		}

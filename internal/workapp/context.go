@@ -176,13 +176,13 @@ func (m Model) contextPanel() uisnapshot.Panel {
 		p.PresentationID += "/" + item.ID + "/" + item.EvidenceID
 		p.Title = item.Title
 		p.Blocks = []uisnapshot.Block{{Title: "Supplied excerpt", Role: "content", Lines: []string{item.Text}}, {Title: "Scope and provenance", Collapsible: true,
-			Fields: []uisnapshot.Field{{Label: "Scope", Value: knowledgeScope(item.Scope, m.contextState.GoalID)}, {Label: "Source labels", Value: valueOrNone(item.Source)}, {Label: "Updated", Value: item.Updated}},
+			Fields: []uisnapshot.Field{{Label: "Saved item", Value: item.ID}, {Label: "Scope", Value: knowledgeScope(item.Scope, m.contextState.GoalID)}, {Label: "Source labels", Value: valueOrNone(item.Source)}, {Label: "Updated", Value: item.Updated}},
 			Lines:  []string{"This is supplied context, not proof of hidden reasoning or that a source supports a claim."}}}
 		if item.Available && item.CurrentText != item.Text {
 			p.Blocks = append(p.Blocks, uisnapshot.Block{Title: "Current saved text", Lines: []string{item.CurrentText, "Corrections affect future recall. They do not rewrite what this earlier answer received."}})
 		}
 		if item.EvidenceID != "" {
-			p.Blocks = append(p.Blocks, uisnapshot.Block{Title: "Retained tool response", Fields: []uisnapshot.Field{{Label: "Evidence", Value: item.EvidenceID}}, Lines: []string{"This excerpt came from a saved-knowledge tool response during this run. It is not proof the answer used or correctly interpreted it. The complete response is retained with this answer's source evidence."}})
+			p.Blocks = append(p.Blocks, uisnapshot.Block{Title: "Retained knowledge input", Fields: []uisnapshot.Field{{Label: "Evidence", Value: item.EvidenceID}}, Lines: []string{"This excerpt came from a saved-knowledge tool response or a current-status refresh supplied to this run. It is not proof the answer used or correctly interpreted it. The complete input is retained with this answer's source evidence."}})
 		}
 		if item.SourceReviewNeeded {
 			p.Blocks = append(p.Blocks, uisnapshot.Block{Title: "Source needs review", Lines: []string{"The linked file changed or is unavailable. Automatic recall skips this memory until you review the file and relink it.", "/memory correct " + item.ID + " --source-file PATH TEXT"}})

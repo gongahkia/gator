@@ -98,8 +98,28 @@ for (const [width, height] of [[110,34], [80,24], [60,20], [42,14]]) test(`dynam
     await until(() => !client.state?.running && !!client.state?.messages.some(message => message.role === "Gator" && message.run_id && message.run_id !== run), "follow-up with carried knowledge")
     shownRun = client.state!.messages.findLast(message => message.role === "Gator" && message.run_id)!.run_id!
     expect(calls).toHaveLength(count + 1); count = calls.length
+    const followupMessages = JSON.parse(calls.at(-1)!).messages as { role: string; content: string }[]
+    const currentInput = followupMessages.filter(message => message.role === "system").map(message => message.content).join("\n")
+    expect(currentInput).toContain(corrected); expect(currentInput).toContain("forgotten_or_missing"); expect(currentInput).not.toContain("Tail marker:")
+    expect(followupMessages.some(message => message.role === "tool" && message.content.includes(memory))).toBe(true)
     await client.edit("Keep my dynamic context draft"); await client.setPlanFirst(true); await inspect()
-    expect(client.state?.panel?.rows).toHaveLength(4); expect(client.state?.panel?.rows?.every(row => row.label.includes("carried from " + run))).toBe(true)
+    expect(client.state?.panel?.rows).toHaveLength(6)
+    expect(client.state?.panel?.rows?.filter(row => row.label.includes("carried from " + run))).toHaveLength(4)
+    expect(client.state?.panel?.rows?.filter(row => row.label.includes("refreshed for this run"))).toHaveLength(2)
+    const openRefresh = async (label: string) => {
+      const panel = client.state!.panel!, row = panel.rows!.findIndex(row => row.label.startsWith(label) && row.label.includes("refreshed for this run"))
+      expect(row).toBeGreaterThanOrEqual(0)
+      await client.send({ type: "panel", panel: { id: panel.id!, action: "select", row } }); await flush(); setup.mockInput.pressEnter()
+      await until(() => !!block("Supplied excerpt"), "current request snapshot"); await flush()
+    }
+    await openRefresh("fact"); expect(block("Supplied excerpt")).toBe(corrected); expect(setup.captureCharFrame()).toContain("Supplied excerpt")
+    const refreshedBundle = client.state!.messages.find(message => message.bundle?.RunID === shownRun)!.bundle!
+    const refreshedManifest = JSON.parse(await readFile(join(refreshedBundle.Path, "manifest.json"), "utf8"))
+    const refreshEvidence = refreshedManifest.evidence.find((entry: { locator: string }) => entry.locator.includes("knowledge:" + shownRun + "/knowledge_refresh/"))
+    const refreshSource = await host.sourcePreview({ context, run: shownRun, path: "evidence:" + refreshEvidence.id })
+    expect(refreshSource.notice).toContain("supplied before this request"); expect(refreshSource.text).toContain(corrected)
+    await press("escape"); await openRefresh("Saved knowledge"); expect(block("Supplied excerpt")).toContain("No longer saved"); expect(block("Supplied excerpt")).not.toContain("Tail marker:")
+    await press("escape")
     await openRead("Ceramic dossier"); expect(block("Supplied excerpt")).toBe(note); expect(block("Saved state")).toContain("no longer saved")
     await client.navigate("/chat"); await client.close(); await setup.dispose(); host = new Application(options); client = new GatorClient(host); setup = await render(); await client.start(); await flush()
     await inspect(); await openRead("Ceramic dossier"); expect(block("Supplied excerpt")).toBe(note); expect(block("Saved state")).toContain("no longer saved"); expect(calls).toHaveLength(count)

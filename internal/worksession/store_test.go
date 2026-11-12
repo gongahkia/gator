@@ -1,6 +1,7 @@
 package worksession
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -69,5 +70,26 @@ func TestLineageFollowsOnlyTheSelectedBranch(t *testing.T) {
 	}
 	if got, want := strings.Join(ids, ","), "rev-root,rev-right,rev-right-child"; got != want {
 		t.Fatalf("lineage = %q, want %q", got, want)
+	}
+}
+
+func TestReplayKnowledgeReferencesAreBoundedAndNeverPaths(t *testing.T) {
+	store, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := store.CreateChat("/source", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	valid := "mem-" + strings.Repeat("a", 24)
+	for index, refs := range [][]string{{"../private"}, {valid, valid}, {"mem-" + strings.Repeat("A", 24)}, make([]string, 129), {valid}} {
+		_, err = store.AddRevision(c.ID, Revision{ID: fmt.Sprint("rev-knowledge-", index), SnapshotID: "snap-test", Objective: "Inspect", BundlePath: "/bundle", Status: "completed", CreatedAt: time.Now(), Replay: &ReplayState{Version: 1, KnowledgeRefs: refs}})
+		if index < 4 && err == nil {
+			t.Fatal("invalid private knowledge reference accepted", refs)
+		}
+		if index == 4 && err != nil {
+			t.Fatal("valid reference rejected", err)
+		}
 	}
 }

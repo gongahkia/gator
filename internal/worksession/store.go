@@ -38,6 +38,8 @@ type Conversation struct {
 }
 
 type ReplayState struct {
+	KnowledgeRefs     []string        `json:"knowledge_refs,omitempty"`
+	KnowledgeOverflow bool            `json:"knowledge_overflow,omitempty"`
 	Version           int             `json:"version"`
 	Provider          string          `json:"provider,omitempty"`
 	Messages          []agent.Message `json:"messages,omitempty"`
@@ -333,6 +335,22 @@ func (s Store) writeConversation(conversation Conversation) error {
 func (s Store) revisionsPath(id string) string { return filepath.Join(s.root, id, "revisions") }
 
 func validateRevision(revision Revision) error {
+	if revision.Replay != nil {
+		if len(revision.Replay.KnowledgeRefs) > 128 {
+			return errors.New("too many retained knowledge references")
+		}
+		seen := map[string]bool{}
+		for _, id := range revision.Replay.KnowledgeRefs {
+			prefix, suffix, ok := strings.Cut(id, "-")
+			if !ok || (prefix != "mem" && prefix != "note") || len(suffix) != 24 || suffix != strings.ToLower(suffix) || seen[id] {
+				return errors.New("invalid retained knowledge reference")
+			}
+			if _, err := hex.DecodeString(suffix); err != nil {
+				return errors.New("invalid retained knowledge reference")
+			}
+			seen[id] = true
+		}
+	}
 	if revision.ReplyToUpdateID != "" && validID(revision.ReplyToUpdateID) != nil {
 		return errors.New("invalid update reply identity")
 	}

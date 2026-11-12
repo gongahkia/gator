@@ -147,13 +147,28 @@ func TestDynamicKnowledgeContextRetainsActualToolMessagesAndGuardedCorrections(t
 		t.Fatal(err)
 	}
 	carried, err := readWorkContext(state, next.Manifest.RunID, "")
-	if err != nil || len(carried.Items) != 4 {
+	if err != nil || len(carried.Items) != 6 {
 		t.Fatal("retained context continuity lost", carried, err)
 	}
+	prior, refreshed := 0, 0
 	for _, item := range carried.Items {
-		if !strings.Contains(item.Title, "carried from work-knowledge-context") {
+		switch {
+		case strings.Contains(item.Title, "carried from work-knowledge-context"):
+			prior++
+		case strings.Contains(item.Title, "refreshed for this run"):
+			refreshed++
+			if item.ID == m.ID && item.Text != "The ceramic delivery arrives Wednesday." {
+				t.Fatal("refresh did not supply the correction", item)
+			}
+			if item.ID == n.ID && !strings.Contains(item.Text, "No longer saved") {
+				t.Fatal("refresh did not withdraw the old note", item)
+			}
+		default:
 			t.Fatal("earlier evidence mislabeled as a fresh read", item)
 		}
+	}
+	if prior != 4 || refreshed != 2 {
+		t.Fatal("current and historical knowledge were collapsed", prior, refreshed)
 	}
 	// A modified response cannot replace the retained excerpt, and knowledge
 	// inspection never repairs it by reading the current saved record instead.

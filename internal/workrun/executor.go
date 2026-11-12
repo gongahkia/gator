@@ -682,12 +682,31 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		}
 	}
 
+	beforeCompactionRefs, beforeCompactionOverflow := retainedKnowledgeReferences(initial)
 	initial, summary, compacted, compactErr := compactRetainedContext(ctx, e.Model, initial)
 	if compactErr != nil {
 		return outcome, compactErr
 	}
 	if compacted {
 		emit(agent.Event{Kind: agent.EventContextCompacted, At: now(), Text: "Compacted retained Work context."})
+	}
+	var priorRefs []string
+	priorOverflow := false
+	if parent.Replay != nil {
+		priorRefs, priorOverflow = parent.Replay.KnowledgeRefs, parent.Replay.KnowledgeOverflow
+	}
+	if parent.ID != "" {
+		if record, err := history.Load(parent.ID); err == nil && record.ConversationID == parent.ConversationID && record.Decision != nil {
+			priorRefs = append(append([]string(nil), priorRefs...), record.Decision.ContextRefs...)
+		}
+	}
+	knowledgeRefs, refOverflow := retainedKnowledgeReferences(initial, beforeCompactionRefs, priorRefs)
+	refOverflow = refOverflow || beforeCompactionOverflow
+	knowledgeStatus := refreshKnowledge(knowledgeRefs, priorOverflow || refOverflow, request.GoalID, request.ExcludedKnowledgeIDs, knowledgeStore, memoryStore, now())
+	if len(knowledgeStatus.Items) > 0 {
+		if _, err := catalog.retain("knowledge:"+request.RunID+"/knowledge_refresh/"+telemetry.ID("refresh", 24), knowledgeStatus.payload(), now()); err != nil {
+			return outcome, fmt.Errorf("retain current knowledge status: %w", err)
+		}
 	}
 	initial = append(initial, agent.Message{Role: agent.RoleUser, Content: request.Objective, Images: request.Images, Attachments: request.Attachments})
 	if visual, ok := e.Model.(agent.VisualInputModel); ok && !visual.SupportsVisualInput() {
@@ -740,7 +759,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		Task:                  request.Objective,
 		Images:                request.Images,
 		Attachments:           request.Attachments,
-		System:                systemPrompt(request),
+		System:                systemPrompt(request) + knowledgeStatus.prompt(),
 		MaxSteps:              request.MaxSteps,
 		OnEvent:               emit,
 		Steering:              request.Steering,
@@ -822,6 +841,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	outcome.Activity = activity.Clone()
 	configuration, _ := json.Marshal(effectiveConfiguration(request))
 	replay := sanitizeComputerReplay(result.Messages, request.DesktopSession != "")
+	retainedRefs, retainedOverflow := retainedKnowledgeReferences(replay, request.ContextRefs, knowledgeRefs)
 	var inputNames []string
 	for _, image := range request.Images {
 		inputNames = append(inputNames, image.Name)
@@ -835,7 +855,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		Activity:     outcome.Activity,
 		AcceptedCode: integration.accepted,
 		Project:      request.Project,
-		Replay:       &worksession.ReplayState{Version: 1, Provider: request.Provider, Messages: replay, Configuration: configuration, CompactionVersion: 1, Summary: summary},
+		Replay:       &worksession.ReplayState{Version: 1, Provider: request.Provider, Messages: replay, KnowledgeRefs: retainedRefs, KnowledgeOverflow: retainedOverflow || refOverflow || priorOverflow, Configuration: configuration, CompactionVersion: 1, Summary: summary},
 		ID:           request.RunID, ParentRevisionID: request.ParentRevisionID, SnapshotID: sourceSnapshot.ID,
 		Objective: request.Objective, ReplyToUpdateID: request.ReplyToUpdateID, BundlePath: work.Path, Status: string(manifest.Status), FinalText: result.FinalText, CreatedAt: now(),
 	}); err != nil {
