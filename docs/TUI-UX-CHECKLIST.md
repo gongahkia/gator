@@ -45,8 +45,24 @@ finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
 
-- Shared frontend Back restoration (12 November, implementation verification in
-  progress): menu navigation retains presentation snapshots per parent/context,
+- Full terminal regression confirmed after `2b1f38392` (12 November): **140 pass,
+  3 unchanged skips, 0 failures**, 2,486 assertions, 143 tests / 70 files, 390.15
+  seconds. The process was polled to its successful exit; no implementation/test
+  edits occurred during that final run. Typecheck passes in
+  `/tmp/gator-ux-20261112-menu-restoration-final-typecheck.log`.
+  All fifteen criteria remain in scope. A green regression does not prove the
+  remaining product behavior or the final integrated acceptance journey.
+
+- Memory-surface investigation for the next implementation: Go's
+  `readWorkContext` already retains the supplied excerpt separately from current
+  saved text and revision-guards corrections/forgetting. However,
+  `NavigateBridge` currently accepts exact navigation commands; simply linking
+  an answer to `/context RUN_ID` through navigation would silently fail.
+  Answer-specific context needs an original-owner-validated path, including
+  managed views during work, before connecting contextual UI controls. Memory
+  origin receipts alone do not establish which memories a later answer received.
+
+- Shared frontend Back restoration (`2b1f38392`, 12 November): menu navigation retains presentation snapshots per parent/context,
   without copying execution authority. Back reconstructs explicit parent choices
   when available, restores search/selection/list position by stable choice key,
   and keeps input focus. Reopening a new root/context clears navigation. Retired
@@ -75,9 +91,12 @@ finished after only the terminal phase or a mobile scaffold.
   `menu-restoration-full-tui-verified.log`; the remaining plan editor journey now
   explicitly clears its restored query and passes **3 tests, 27 assertions** in
   `menu-restoration-plan-fixed.log`. Original failure logs are retained.
-  A final complete run is active in
-  `/tmp/gator-ux-20261112-menu-restoration-complete-tui.log`; do not report it as
-  passing before its process exits successfully. This is native-render/controlled
+  The final complete run exits successfully: **140 pass / 3 unchanged skips /
+  0 failures**, 2,486 assertions across 143 tests / 70 files in 390.15 seconds.
+  Log: `/tmp/gator-ux-20261112-menu-restoration-complete-tui.log`. No behavior or
+  test files changed during this final run. Commit typecheck also passes. The
+  image-paste/old-voice/managed-browser skips remain skips; controlled checks do
+  not become physical verification. This is native-render/controlled
   Go/provider evidence, with separately identified fixture navigation. Physical
   terminal verification and the final integrated journey remain unproven.
   All fifteen criteria remain in scope. Typed editors, file-editor restoration,
