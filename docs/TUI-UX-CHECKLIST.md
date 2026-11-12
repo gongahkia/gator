@@ -45,6 +45,16 @@ finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
 
+- Complete regression after reviewed goal controls (12 November): the interrupted
+  observation was revalidated against the terminal log and process table. The
+  runner is no longer live and its final summary reports **170 pass, 3 existing
+  skips, 0 failures**, 3,437 assertions across 173 tests / 77 files, 553.49
+  seconds, in `/tmp/gator-ux-20261112-goal-controls-full-tui.log`. Source and tests
+  stayed unchanged during the run. This includes the new real-Go goal controls
+  and cancelled-read journeys alongside the existing terminal regression. It
+  does not replace the final combined acceptance journey, physical audio, or
+  live account/model verification. All fifteen criteria remain in scope.
+
 - Reviewed goal controls in Following (`08bc8aea1`, `1bb9e8994`, 12 November):
   active and paused goals expose retained-plan inspection and reviewed status
   changes through the canonical Go goal store. A saved record digest binds the
@@ -93,8 +103,9 @@ finished after only the terminal phase or a mobile scaffold.
   Typecheck, frontend bundle and final runtime build pass. This is native fixture,
   real Go/store and controlled-provider evidence, not physical terminal/audio or
   live account/model-quality verification. Advanced non-project schedule editing
-  is still open in row 2. The complete current terminal regression and final
-  combined acceptance journey remain pending. All fifteen criteria stay in scope.
+  is still open in row 2. The complete terminal regression now passes as recorded
+  above; the final combined acceptance journey remains pending. All fifteen
+  criteria stay in scope.
 
 - Bounded long-history rendering (`03f743fb5`, 12 November): history remains in the original
   immutable snapshot and global transcript search. Only the native content
