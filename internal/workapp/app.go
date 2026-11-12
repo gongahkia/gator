@@ -512,6 +512,8 @@ type Model struct {
 	controlRootArgs         []string
 	controlScreen           ControlScreen
 	controlForm             *ControlAction
+	controlPreviewReturn    *controlPreviewReturn
+	controlReturnFollowup   bool
 	controlField            int
 	controlReview           bool
 	controlBusy             bool

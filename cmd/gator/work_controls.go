@@ -26,6 +26,8 @@ func workControlsWithConnections(stateDir string, connections *connectionControl
 			return workapp.ControlScreen{}, err
 		}
 		switch family {
+		case "check-timing":
+			return checkTimingControl(ctx, stateDir, action, args)
 		case "search":
 			return search.call(ctx, action, args)
 		case "browser":

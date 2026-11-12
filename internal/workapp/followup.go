@@ -129,6 +129,14 @@ func (m Model) updateFollowupKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "q":
 			m.openQuietChecks()
 		case "e":
+			if !m.checkDetail.Definition.GoalWatch && m.config.Controls != nil {
+				digest, err := m.checkDetail.Definition.PolicyDigest()
+				if err != nil {
+					m.sectionNotice = err.Error()
+					return m, nil
+				}
+				return m, m.openControls("check-timing", []string{m.checkDetail.ID, digest})
+			}
 			m.editFollowup()
 		case "p":
 			if m.checkDetail.State == "goal paused" {

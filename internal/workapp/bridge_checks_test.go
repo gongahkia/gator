@@ -1,16 +1,49 @@
 package workapp
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/followup"
 	"github.com/gongahkia/gator/internal/goal"
 	"github.com/gongahkia/gator/internal/jobs"
+	"github.com/gongahkia/gator/internal/uisnapshot"
 	"github.com/gongahkia/gator/internal/workhome"
 )
+
+func TestCommitmentLegacyTimingUsesExactReviewedControllerAndReturnsToCheck(t *testing.T) {
+	check := cardCheck(t)
+	check.Definition.GoalWatch = false
+	digest, _ := check.Definition.PolicyDigest()
+	reads := 0
+	m := New(Config{BridgeMode: true, CurrentFolder: t.TempDir(), ReadChecks: func() ([]workhome.Check, bool, error) { return []workhome.Check{check}, false, nil }, Controls: func(_ context.Context, family, action string, args []string) (ControlScreen, error) {
+		reads++
+		if family != "check-timing" || action != "status" || len(args) != 2 || args[0] != check.ID || args[1] != digest {
+			t.Fatalf("retargeted timing controller: %s %s %v", family, action, args)
+		}
+		return ControlScreen{Panel: uisnapshot.Panel{Kind: "controls", Title: "Check timing", ActionIdentity: digest}}, nil
+	}})
+	m.conversation = "work-original"
+	next, read := m.ApplyBridgeCheck(BridgeCheckAction{RequestID: "edit-legacy", ID: check.ID, Digest: digest, Action: "edit"})
+	next, controls := next.(Model).Update(read())
+	m = next.(Model)
+	if m.bridgeCheckResult.Error != "" || controls == nil || !m.controlBusy || m.checkDetail.ID != check.ID {
+		t.Fatal("legacy edit did not open its own controller")
+	}
+	next, _ = m.Update(controls())
+	m = next.(Model)
+	if reads != 1 || m.BridgeState().Panel.Navigation != "following" || m.BridgeState().Panel.BackLabel != "Back to check details" {
+		t.Fatal("timing editor lost Following navigation")
+	}
+	m, refresh := productKey(m, tea.KeyMsg{Type: tea.KeyEsc})
+	if m.section != "followup" || m.checkDetail.ID != check.ID || m.conversation != "work-original" || m.controlReturnFollowup || refresh == nil {
+		t.Fatal("Back lost the original commitment or conversation")
+	}
+}
 
 func TestCommitmentSetupUsesTheFreshGoalWithoutRetargetingTheConversation(t *testing.T) {
 	current, target := t.TempDir(), t.TempDir()

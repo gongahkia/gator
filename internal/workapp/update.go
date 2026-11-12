@@ -84,6 +84,12 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		if value.Err != nil {
 			m.sectionNotice = value.Err.Error()
 		} else {
+			if m.controlPreviewReturn != nil {
+				m.controlForm = nil
+				if value.Screen.Panel.Kind != "confirmation" {
+					m.controlPreviewReturn = nil
+				}
+			}
 			selection := 0
 			if m.controlFamily == "overview" || m.controlFamily == "connections" || m.controlFamily == "browser" {
 				selection = preservedControlSelection(m.controlScreen, value.Screen, m.selected)
@@ -107,6 +113,9 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		if m.pendingConnection() != "" && !m.connectionPolling {
 			m.connectionPolling = true
 			return m, nextConnectionTick()
+		}
+		if value.Err == nil && value.Screen.RefreshChecks {
+			return m, m.refreshChecksCommand()
 		}
 		return m, nil
 	case followupSaved:

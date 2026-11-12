@@ -61,7 +61,7 @@ func (m Model) panelNavigation(panel uisnapshot.Panel) string {
 	switch family {
 	case "conversations":
 		return "chats"
-	case "goals", "agenda", "plan", "suggestions", "followup", "inbox", "overview", "jobs":
+	case "goals", "agenda", "plan", "suggestions", "followup", "inbox", "overview", "jobs", "check-timing":
 		return "following"
 	case "context", "knowledge", "history", "learnings":
 		return "saved"
@@ -86,6 +86,12 @@ func (m Model) bridgeBackLabel(panel uisnapshot.Panel) string {
 	}
 	if m.controlBusy {
 		return "Stop operation"
+	}
+	if m.controlPreviewReturn != nil && panel.Kind == "confirmation" {
+		return "Edit timing details"
+	}
+	if m.section == "controls" && m.controlReturnFollowup && m.controlForm == nil {
+		return "Back to check details"
 	}
 	if m.controlForm != nil && m.section == "controls" {
 		if m.controlReview && len(m.controlForm.Fields) > 0 {

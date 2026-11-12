@@ -29,14 +29,18 @@ type ControlAction struct {
 	Args                            []string
 	Fields                          []ControlField
 	Review                          bool
-	ConnectorID                     string
-	ConnectorReview                 string
+	// Preview asks the authoritative controller for a computed review before a
+	// separate save action. Invalid previews retain the editable fields.
+	Preview         bool
+	ConnectorID     string
+	ConnectorReview string
 }
 type SourceMove struct{ From, To string }
 
 type BrowserGrant struct{ SessionID, Policy, ConversationID string }
 
 type ControlScreen struct {
+	RefreshChecks        bool
 	BrowserGrant         *BrowserGrant
 	Location             string
 	SourceMoves          []SourceMove
@@ -51,14 +55,21 @@ type controlDone struct {
 	Screen     ControlScreen
 	Err        error
 }
+type controlPreviewReturn struct {
+	Screen          ControlScreen
+	Form            ControlAction
+	Field, Selected int
+}
 
 func (m *Model) openControls(family string, args []string) tea.Cmd {
 	m.controlReturnHome = m.home && len(m.messages) == 0
+	m.controlReturnFollowup = family == "check-timing" && m.section == "followup" && m.checkDetail != nil
 	m.section, m.home, m.launcher = "controls", false, false
 	m.controlFamily = family
 	m.controlRootArgs = append([]string(nil), args...)
 	m.controlScreen = ControlScreen{}
 	m.controlForm = nil
+	m.controlPreviewReturn = nil
 	m.controlReview = false
 	m.controlResultNotice = ""
 	m.sectionNotice = ""
@@ -139,6 +150,7 @@ func (m Model) updateControls(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.controlReview = false
 			} else {
 				m.controlForm = nil
+				m.controlPreviewReturn = nil
 			}
 			return m, nil
 		}
@@ -172,6 +184,16 @@ func (m Model) updateControls(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		switch key.String() {
 		case "ctrl+r":
+			if f.Preview {
+				copy := *f
+				copy.Fields = append([]ControlField(nil), f.Fields...)
+				m.controlPreviewReturn = &controlPreviewReturn{m.controlScreen, copy, m.controlField, m.selected}
+				args := append([]string(nil), f.Args...)
+				for _, field := range f.Fields {
+					args = append(args, field.Value)
+				}
+				return m, m.controlCommand(f.Action, args)
+			}
 			m.controlReview = true
 		case "tab", "down":
 			m.controlField = (m.controlField + 1) % max(1, len(f.Fields))
@@ -185,6 +207,13 @@ func (m Model) updateControls(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if key.String() == "esc" {
+		if previous := m.controlPreviewReturn; previous != nil && m.controlScreen.Panel.Kind == "confirmation" {
+			m.controlScreen, m.controlForm = previous.Screen, &previous.Form
+			m.controlField, m.selected = previous.Field, previous.Selected
+			m.controlPreviewReturn = nil
+			m.sectionNotice = ""
+			return m, nil
+		}
 		if (m.controlFamily == "overview" || m.controlFamily == "connections" || m.controlFamily == "browser") && len(m.controlRootArgs) > 0 {
 			m.controlRootArgs = m.controlRootArgs[:len(m.controlRootArgs)-1]
 			cmd := m.controlCommand("status", m.controlRootArgs)
@@ -195,6 +224,10 @@ func (m Model) updateControls(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.section = ""
 		m.cancelControlBackground()
+		if m.controlReturnFollowup {
+			m.section, m.sectionNotice, m.controlReturnFollowup = "followup", "", false
+			return m, m.refreshChecksCommand()
+		}
 		if m.controlReturnHome && len(m.messages) == 0 {
 			m.home = true
 		}
@@ -260,6 +293,7 @@ func (m Model) controlsPanel() uisnapshot.Panel {
 	}
 	if f := m.controlForm; f != nil {
 		p = uisnapshot.Panel{Title: f.Label, Kind: "settings-form", Selected: m.controlField, Notice: m.sectionNotice, Subtitle: f.Description, Links: f.Links}
+		p.ActionIdentity = m.controlScreen.Panel.ActionIdentity + "\x00" + f.Action + "\x00" + strings.Join(f.Args, "\x00")
 		if m.controlReview {
 			p.Kind = "confirmation"
 			fields := []uisnapshot.Field{}

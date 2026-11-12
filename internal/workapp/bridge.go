@@ -320,7 +320,7 @@ func (m Model) BridgeState() BridgeState {
 	state.GoalBusy = m.bridgeGoalBusy
 	for _, check := range m.checks {
 		digest, _ := check.Definition.PolicyDigest()
-		state.Checks = append(state.Checks, BridgeCheck{ID: check.ID, Digest: digest, GoalID: check.GoalID, Title: singleLine(check.Title), Outcome: check.Outcome, Health: check.HealthLine(), State: check.State, Tone: checkTone(check.State), Source: check.Definition.SourcePath, Connectors: append([]string(nil), check.Definition.ConnectorIDs...), Timezone: check.Definition.Timezone, Schedule: check.Definition.Schedule, NextDue: bridgeCheckTime(check.NextDue), LastSuccess: bridgeCheckTime(check.LastSuccess), NextAction: check.NextAction, Issue: check.Issue, EndsAt: bridgeCheckTime(check.Definition.EndsAt), Enabled: check.Enabled, Editable: check.Definition.GoalWatch})
+		state.Checks = append(state.Checks, BridgeCheck{ID: check.ID, Digest: digest, GoalID: check.GoalID, Title: singleLine(check.Title), Outcome: check.Outcome, Health: check.HealthLine(), State: check.State, Tone: checkTone(check.State), Source: check.Definition.SourcePath, Connectors: append([]string(nil), check.Definition.ConnectorIDs...), Timezone: check.Definition.Timezone, Schedule: check.Definition.Schedule, NextDue: bridgeCheckTime(check.NextDue), LastSuccess: bridgeCheckTime(check.LastSuccess), NextAction: check.NextAction, Issue: check.Issue, EndsAt: bridgeCheckTime(check.Definition.EndsAt), Enabled: check.Enabled, Editable: check.Definition.GoalWatch || m.config.Controls != nil})
 		if m.conversation != "" && check.Definition.OriginConversationID == m.conversation {
 			state.ChatChecks = append(state.ChatChecks, BridgeChatCheck{ID: check.ID, Title: singleLine(check.Title), State: check.State, Issue: check.Issue, NextAction: check.NextAction, LastSuccess: bridgeCheckTime(check.LastSuccess), NextDue: bridgeCheckTime(check.NextDue), GapFrom: bridgeCheckTime(check.CoverageGap.From), GapTo: bridgeCheckTime(check.CoverageGap.To), Unsuccessful: check.Unsuccessful})
 		}
@@ -463,6 +463,8 @@ func (m Model) NavigateBridge(command string) (tea.Model, tea.Cmd) {
 	}
 	m.cancelControlBackground()
 	m.controlForm, m.followupForm, m.learningForm = nil, nil, nil
+	m.controlPreviewReturn = nil
+	m.controlReturnFollowup = false
 	m.pendingBundleAction = nil
 	m.section, m.launcher = "", false
 	m.contextEditing, m.contextConfirm = false, false

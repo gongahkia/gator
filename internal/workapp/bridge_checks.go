@@ -93,8 +93,8 @@ func (m Model) ApplyBridgeCheck(action BridgeCheckAction) (tea.Model, tea.Cmd) {
 				result.Err = fmt.Errorf("this check changed; refresh and review it again")
 				return result
 			}
-			if action.Action == "edit" && !check.Definition.GoalWatch {
-				result.Err = fmt.Errorf("this schedule uses advanced settings; open /jobs to edit it")
+			if action.Action == "edit" && !check.Definition.GoalWatch && m.config.Controls == nil {
+				result.Err = fmt.Errorf("schedule controls are unavailable")
 				return result
 			}
 			if action.Action == "pause" || action.Action == "resume" {
@@ -171,6 +171,9 @@ func (m Model) finishBridgeCheck(value bridgeCheckDone) (tea.Model, tea.Cmd) {
 			copy := check
 			m.section, m.checkDetail, m.selected, m.launcher, m.home = "followup", &copy, 0, false, false
 			if value.Action.Action == "edit" {
+				if !check.Definition.GoalWatch {
+					return m, m.openControls("check-timing", []string{check.ID, value.Action.Digest})
+				}
 				m.editFollowup()
 				if m.followupForm == nil {
 					m.bridgeCheckResult.Error = m.sectionNotice
