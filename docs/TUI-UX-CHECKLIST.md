@@ -83,7 +83,11 @@ finished after only the terminal phase or a mobile scaffold.
   regressions pass (94.287/32.765 seconds); full conversation persistence passes
   (38.548 seconds); focused context integration passes. Host: **129 pass,
   1 existing skip, 0 failures**, 130 tests, 24.97 seconds. Typecheck passes.
-  The complete terminal regression is the next verification gate. This is
+  After `994e57920`, the complete terminal regression passes: **152 pass,
+  3 unchanged skips, 0 failures**, 2,894 assertions across 155 tests / 73 files,
+  501.74 seconds. Log:
+  `/tmp/gator-ux-20261112-knowledge-refresh-full-tui.log`, polled to exit 0.
+  Production source and tests stayed unchanged during the complete run. This is
   controlled-provider/native-render and Go/store evidence, not physical
   terminal/audio or live-account/model-quality evidence. All fifteen criteria
   remain in scope. Row 3 is implemented with final combined journey pending.
