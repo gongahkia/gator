@@ -203,7 +203,7 @@ export function useProductActions(controls: ReturnType<typeof useActions>) {
     const exact = () => { const value = current(); if (!value || value.digest !== check.digest) throw new Error("This check changed. Refresh Following and review its current agreement."); return value }
     menu(check.title, [
       { title: "Inspect agreement and check health", description: check.issue || check.health, run: () => checkAction(exact(), "inspect") },
-      { title: "Edit outcome, sources and timing", description: check.editable ? "Review changes before saving" : "This schedule uses advanced settings; open /jobs", disabled: !check.editable, run: () => checkAction(exact(), "edit") },
+      { title: "Edit check agreement", description: check.editable ? "Review outcome, sources or supported timing changes before saving" : "Check editing is unavailable", disabled: !check.editable, run: () => checkAction(exact(), "edit") },
       { title: check.enabled ? "Pause this check" : "Resume this check", description: check.state === "goal paused" ? "Resume the goal first" : !check.enabled && check.state === "ended" ? "Review a new end date before resuming" : check.enabled ? "Stops future checks; a running check may finish" : "Uses the same saved agreement and existing service",
         disabled: !check.enabled && ["goal paused", "ended"].includes(check.state), run: () => {
           confirmCheckPause(exact())

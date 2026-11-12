@@ -27,7 +27,7 @@ export function Panel(props: { panel: BackendPanel }) {
     if (props.panel.catalog) return "Enter open · Ctrl+F search · Ctrl+E actions · Ctrl+O help"
     const submit = formSubmit()
     if (submit) return `↑/↓ select · Enter edit · Ctrl+R ${submit.label} · Esc back · Ctrl+O help`
-    const parts = (props.panel.footer ?? "").split("·").map(part => part.trim()).filter(Boolean)
+    const parts = (props.panel.footer ?? (props.panel.kind === "confirmation" ? "↑/↓ read · Ctrl+↓ page" : "")).split("·").map(part => part.trim()).filter(Boolean)
     for (const hint of props.panel.hints ?? []) {
       if (!parts.some(part => part.toLowerCase().startsWith(hint.shortcut.toLowerCase() + " "))) parts.push(`${hint.shortcut} ${hint.action}`)
     }
@@ -176,15 +176,17 @@ export function Panel(props: { panel: BackendPanel }) {
       return
     }
     if (["pageup", "pagedown"].includes(key)) {
+      if (props.panel.kind === "confirmation") { event.preventDefault(); scroll?.scrollBy((key === "pagedown" ? 1 : -1) * Math.max(1, (scroll?.viewport.height ?? 2) - 1)); return }
       event.preventDefault(); const rows = visible(), current = rows.findIndex(row => row.index === selectedRow())
       if (!rows.length) { scroll?.scrollBy((key === "pagedown" ? 1 : -1) * Math.max(1, (scroll?.viewport.height ?? 2) - 1)); return }
       const selected = rows[Math.max(0, Math.min(rows.length - 1, current + (key === "pagedown" ? 10 : -10)))]
       if (selected) void action({ action: "select", row: selected.index }); return
     }
-    if (!props.panel.rows?.length && ["up", "down", "ctrl+home", "ctrl+end"].includes(key)) {
+    if ((!props.panel.rows?.length || props.panel.kind === "confirmation" && (key.startsWith("ctrl+") || (props.panel.rows?.length ?? 0) <= 1)) && ["up", "down", "ctrl+up", "ctrl+down", "ctrl+home", "ctrl+end"].includes(key)) {
       event.preventDefault()
       if (key === "ctrl+home") scroll?.scrollTo(0)
       else if (key === "ctrl+end") scroll?.scrollTo(scroll.scrollHeight)
+      else if (key === "ctrl+up" || key === "ctrl+down") scroll?.scrollBy((key === "ctrl+down" ? 1 : -1) * Math.max(1, (scroll?.viewport.height ?? 2) - 1))
       else scroll?.scrollBy(key === "up" ? -1 : 1)
       return
     }
@@ -223,7 +225,7 @@ export function Panel(props: { panel: BackendPanel }) {
     <Show when={props.panel.catalog}><text fg={theme.text.muted}>{props.panel.filter?.options.find(option => option.value === props.panel.filter?.value)?.label || "Chats"} · {`${props.panel.rows?.length ?? 0} chats`}{props.panel.catalog?.has_previous || props.panel.catalog?.has_next ? ` · Page ${props.panel.catalog?.page} · Ctrl+←/→` : ""}</text></Show>
     <Show when={props.panel.catalog && props.panel.query}><text fg={theme.text.muted}>Search retained messages: {literal(props.panel.query)}</text></Show>
     <Show when={query()}><text fg={theme.text.muted}>Filter loaded entries: {literal(query())} · {visible().length} of {props.panel.rows?.length ?? 0} · Ctrl+F changes or clears</text></Show>
-    <scrollbox id="backend-panel-content" ref={node => { scroll = node }} flexGrow={1} minHeight={0}>
+    <scrollbox id="backend-panel-content" ref={node => { scroll = node }} flexGrow={1} minHeight={0} paddingRight={1}>
       <For each={props.panel.summary}>{field => <text fg={theme.text.base}>{literal(field.label)}: {literal(field.value)}</text>}</For>
       <Show when={query() && !visible().length}><text fg={theme.text.muted}>No matching loaded items. Clear the filter to choose an entry.</text></Show>
       <Show when={props.panel.catalog && !props.panel.catalog.loading && !props.panel.rows?.length}><text fg={theme.text.muted}>{props.panel.query ? "No chats match this search. Ctrl+F to change it." : "No chats in this view. Ctrl+L to change the filter."}</text></Show>
@@ -237,7 +239,7 @@ export function Panel(props: { panel: BackendPanel }) {
       </box>}</For>
       <For each={props.panel.blocks}>{block => <box marginTop={1}><text fg={theme.accent}>{literal(block.title)}</text><For each={block.fields}>{f => <text fg={theme.text.base}>{literal(f.label)}: {literal(f.value)}</text>}</For><For each={block.lines ?? []}>{line => <text fg={theme.text.base}>{literal(line)}</text>}</For></box>}</For>
       <For each={props.panel.links}>{link => <text fg={theme.accent}>{literal(link.label)}: {literal(link.url)}</text>}</For>
-      <Show when={props.panel.notice}><text fg={props.panel.notice_tone === "error" ? theme.text.feedback.error.base : theme.text.muted}>{literal(props.panel.notice)}</text></Show>
+      <Show when={props.panel.notice}><text fg={props.panel.notice_tone === "error" ? theme.text.feedback.error.base : props.panel.notice_tone === "success" ? theme.text.feedback.success.base : props.panel.notice_tone === "warning" ? theme.text.feedback.warning.base : theme.text.muted}>{literal(props.panel.notice)}</text></Show>
       <Show when={props.panel.usage}><text fg={theme.text.base}>{JSON.stringify(props.panel.usage, null, 2)}</text></Show>
     </scrollbox>
     <text fg={theme.text.muted} attributes={TextAttributes.DIM}>{footer()}</text>

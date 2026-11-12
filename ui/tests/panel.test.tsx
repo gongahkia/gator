@@ -1,11 +1,33 @@
 import { expect, test } from "bun:test"
 import { testRender } from "@opentui/solid"
+import { ScrollBoxRenderable } from "@opentui/core"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { App } from "../src/app"
 import { GatorClient } from "../src/gator/client"
 import { FixtureHost } from "./fixture"
+
+for (const [width, height] of [[110,34], [80,24], [60,20], [42,14]]) test(`long reviews with multiple actions scroll without selecting or executing at ${width}×${height}`, async () => {
+  const root = await mkdtemp(join(tmpdir(), "gator-review-reading-"))
+  const host = new FixtureHost({ binary: "/unused", workspace: root, userData: root, env: { GATOR_STATE_DIR: root } })
+  host.current.panel = { id: "exact-review", kind: "confirmation", title: "Review saved agreement", selected: 0,
+    rows: [{ label: "Save the exact change" }, { label: "Edit the proposed change" }, { label: "Keep the previous agreement" }],
+    blocks: [{ lines: [...Array.from({ length: 60 }, (_, index) => `Retained review line ${index}`), "END OF EXACT REVIEW"] }],
+    hints: [{ shortcut: "Enter", action: "select action" }, { shortcut: "Esc", action: "back" }] }
+  const client = new GatorClient(host)
+  const setup = await testRender(() => <App client={client} quit={() => client.close()} clipboard={{ read: async () => undefined, write: async () => {} }} />, { width, height, kittyKeyboard: true })
+  const flush = async () => { await setup.flush(); await Bun.sleep(25); await setup.flush() }
+  try {
+    await client.start(); await client.edit("Keep the independent draft"); await flush()
+    const scroll = setup.renderer.root.findDescendantById("backend-panel-content") as ScrollBoxRenderable
+    expect(scroll.viewport.height).toBeGreaterThanOrEqual(3)
+    setup.mockInput.pressArrow("down", { ctrl: true }); await flush(); expect(scroll.scrollTop).toBeGreaterThan(0)
+    setup.mockInput.pressKey("END", { ctrl: true }); await flush(); expect(setup.captureCharFrame()).toContain("END OF EXACT REVIEW")
+    setup.mockInput.pressKey("HOME", { ctrl: true }); await flush(); expect(scroll.scrollTop).toBe(0)
+    expect(client.state?.panel?.selected).toBe(0); expect(host.sent).toHaveLength(0); expect(client.draft.text).toBe("Keep the independent draft")
+  } finally { await client.close(); await setup.dispose(); await rm(root, { recursive: true, force: true }) }
+})
 
 test("credential keyboard and paste buffers paint only masks and preserve explicit form submission", async () => {
   const root = await mkdtemp(join(tmpdir(), "gator-secret-"))

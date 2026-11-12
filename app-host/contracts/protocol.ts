@@ -72,7 +72,7 @@ export type BackendPanel = {
   toggle?: { label: string; checked: boolean };
   selected?: number;
   notice?: string;
-  notice_tone?: "info" | "error";
+  notice_tone?: "info" | "error" | "success" | "warning";
   footer?: string;
   hints?: { shortcut: string; action: string; group?: string; tone?: ResultTone }[];
 };

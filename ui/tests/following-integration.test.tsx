@@ -47,7 +47,7 @@ test("commitment cards inspect, pause, resume and edit the real saved agreement 
     const request_id = randomUUID()
     await expect(client.result({ type: "check", check: { action: "pause", id, digest: stale.digest, request_id } }, request_id, state => state.check_result)).rejects.toThrow("changed")
     expect((await definitions())[0].enabled).toBe(true); expect((await definitions())[0].objective).toBe("Changed from another terminal")
-    await cardMenu(); await choose("Edit outcome"); await until(() => client.state?.panel?.kind === "followup-form", "canonical edit form")
+    await cardMenu(); await choose("Edit check agreement"); await until(() => client.state?.panel?.kind === "followup-form", "canonical edit form")
     expect(client.state?.panel?.rows?.[1].input?.value).toBe("Changed from another terminal")
     await client.send({ type: "panel", key: "ctrl+r", panel: { id: client.state!.panel!.id!, action: "key", fields: { 1: "Track accessibility and useful venue changes" } } })
     await until(() => client.state?.panel?.title === "Review ongoing check", "edited review"); expect((await definitions())[0].objective).toBe("Changed from another terminal")
