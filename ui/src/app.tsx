@@ -40,7 +40,7 @@ function Shell(props: { quit(): Promise<void>; voice?: VoiceSession }) {
   const client = useClient(), data = useData(), theme = useTheme(), dialog = useDialog()
   const controls = useActions()
   const product = useProductActions(controls)
-  useResultActions(controls)
+  useResultActions(controls, product.reviewNoise)
   const voice = useNative(controls, props.voice)
   const attempt = (operation: Promise<unknown>) => { void operation.catch(error => client.fail(error)) }
   const palette = () => dialog.replace(() => <CommandPaletteDialog />)

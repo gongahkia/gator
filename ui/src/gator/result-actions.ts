@@ -18,7 +18,7 @@ export type ResultTarget =
 
 // Every callback retains its original conversation and immutable result. An
 // equal-looking item, newer snapshot or switched chat never supplies authority.
-export function useResultActions(controls: ReturnType<typeof useActions>) {
+export function useResultActions(controls: ReturnType<typeof useActions>, reviewNoise: (update: ChatUpdate, context: string) => unknown) {
   const client = useClient(), clipboard = useClipboard(), toast = useToast(), readView = useReadView()
   const { menu, details, actions, openFile } = controls
   const receiptMenu = useReceiptActions(controls)
@@ -105,10 +105,12 @@ export function useResultActions(controls: ReturnType<typeof useActions>) {
       { title: "Mark read", disabled: update.read, run: () => receipt("read") },
       { title: update.resolved ? "Reopen" : "Mark done", run: () => receipt(update.resolved ? "reopen" : "resolve") },
       { title: "Reply in original chat", description: "Add reply context to your editable draft; sending remains explicit", run: async () => { updateIsCurrent(update, context); client.route = "chat"; await client.edit(client.draft.text, client.draft.uploads, update.id) } },
-      ...(["useful", "noise", "wrong", "clear"] as const).map(rating => ({ title: `Feedback: ${rating}`, description: "Saved for review; this does not change your checks automatically.", disabled: !update.can_rate || !!client.updateFeedback.get(context)?.saving, run: () => {
+      ...(["useful", "noise", "wrong", "clear"] as const).map(rating => ({ title: `Feedback: ${rating}`, description: rating === "noise" ? "Save feedback, then review changes to this check" : "Save your assessment; check behavior stays as agreed", disabled: !update.can_rate || !!client.updateFeedback.get(context)?.saving, run: async () => {
         updateIsCurrent(update, context)
         if (client.state?.chat_updates?.find(current => current.id === update.id)?.rating_version !== update.rating_version) throw new Error("This feedback changed. Select the update again.")
-        return client.rateUpdate(update, rating)
+        await client.rateUpdate(update, rating)
+        contextIsCurrent(context)
+        if (rating === "noise") return reviewNoise(update, context)
       } })),
     ], true, back)
   }

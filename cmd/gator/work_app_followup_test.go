@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -117,6 +118,13 @@ func TestChatFollowupReviewPersistsOwnedAgreementAndGuardsEdits(t *testing.T) {
 	pending, err := c.Prepare(ctx, followupToolChange(c, edit))
 	if err != nil {
 		t.Fatal(err)
+	}
+	agreement := pending.Preview.(workrun.AppAgreement)
+	text := strings.Join(agreement.Lines, "\n")
+	for _, expected := range []string{"Check: " + d.ID, "this check only", "Previous notification condition: " + d.AlertWhen, "Proposed notification condition: Only a price changes"} {
+		if !strings.Contains(text, expected) {
+			t.Fatal("missing scoped notification review", expected, text)
+		}
 	}
 	if _, _, err := store.Claim(d.ID, time.Now()); err != nil {
 		t.Fatal(err)

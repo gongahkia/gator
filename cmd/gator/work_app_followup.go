@@ -212,6 +212,18 @@ func (c gatorAppController) prepareFollowup(ctx context.Context, change workrun.
 		return workrun.AppMutation{}, err
 	}
 	lines := draft.ReviewLines()
+	if v.Action != "create" {
+		changes := []string{"Check: " + prior.ID, "Scope: this check only; other checks keep their saved agreements."}
+		if v.Action == "edit" {
+			if draft.AlertWhen != prior.AlertWhen {
+				changes = append(changes, "Previous notification condition: "+prior.AlertWhen, "Proposed notification condition: "+draft.AlertWhen)
+			}
+			if before, err := followup.FromDefinition(prior); err == nil && before.IntervalMinutes != draft.IntervalMinutes {
+				changes = append(changes, fmt.Sprintf("Check frequency: every %d minutes → every %d minutes", before.IntervalMinutes, draft.IntervalMinutes))
+			}
+		}
+		lines = append(changes, lines...)
+	}
 	availability := "Offline — saved checks wait until the local background engine runs."
 	if online {
 		availability = "Local background engine is running; this computer must remain on."

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 import { useClient } from "../context/client"
 import { useData } from "../context/data"
 import type { useActions } from "./actions"
-import type { CheckAction, FollowingCheck, PlanContent, TaskPlanReview, TaskPlanSummary } from "@gator/application-host/contracts/protocol"
+import type { ChatUpdate, CheckAction, FollowingCheck, PlanContent, TaskPlanReview, TaskPlanSummary } from "@gator/application-host/contracts/protocol"
 
 // Optional management stays behind commands. All mutations use the current
 // Go protocol, including its live tokens, revisions and acknowledgements.
@@ -148,16 +148,37 @@ export function useProductActions(controls: ReturnType<typeof useActions>) {
       { title: "Edit outcome, sources and timing", description: check.editable ? "Review changes before saving" : "This schedule uses advanced settings; open /jobs", disabled: !check.editable, run: () => checkAction(exact(), "edit") },
       { title: check.enabled ? "Pause this check" : "Resume this check", description: check.state === "goal paused" ? "Resume the goal first" : !check.enabled && check.state === "ended" ? "Review a new end date before resuming" : check.enabled ? "Stops future checks; a running check may finish" : "Uses the same saved agreement and existing service",
         disabled: !check.enabled && ["goal paused", "ended"].includes(check.state), run: () => {
-          const value = exact(), pause = value.enabled
-          confirm(`${pause ? "Pause" : "Resume"} ${value.title}?`, [value.outcome, `Sources: ${[value.source, ...(value.connectors ?? [])].filter(Boolean).join(", ") || "None"}`, `Timing: ${value.schedule} · ${value.timezone}`, pause ? "Future checks will stop. A check already running may finish. Its retained results remain available." : "Resume future checks using this saved agreement. This does not start the local service or run a check immediately. Checks require this computer to be awake and their sources accessible."].join("\n\n"), async () => {
-            await checkAction(value, pause ? "pause" : "resume")
-            controls.resetMenus()
-            details(value.title, pause ? "Check paused. Future checks are stopped; a check already running may finish." : client.state?.supervisor_running ? "Check enabled. The local service will evaluate its next due time while this computer is awake and its sources are accessible." : "Check enabled, but the local service is offline. Open /recovery to review starting it.")
-          })
+          confirmCheckPause(exact())
         } },
       { title: "Review local service", run: () => client.navigate("/recovery") },
       ...(check.goal_id ? [{ title: "Goal and plan", description: "Open this commitment's own conversation", run: () => client.openGoal(check.goal_id!) }] : []),
     ], true)
   }
-  return { commitment, refreshChecks: () => checkAction(undefined, "refresh") }
+  function confirmCheckPause(value: FollowingCheck) {
+    const pause = value.enabled
+    confirm(`${pause ? "Pause" : "Resume"} ${value.title}?`, [value.outcome, `Check: ${value.id}`, `Sources: ${[value.source, ...(value.connectors ?? [])].filter(Boolean).join(", ") || "None"}`, `Timing: ${value.schedule} · ${value.timezone}`, pause ? "Future checks will stop. A check already running may finish. Its retained results remain available. Other checks keep their saved agreements." : "Resume future checks using this saved agreement. This does not start the local service or run a check immediately. Checks require this computer to be awake and their sources accessible."].join("\n\n"), async () => {
+      await checkAction(value, pause ? "pause" : "resume")
+      controls.resetMenus()
+      details(value.title, pause ? "Check paused. Future checks are stopped; a check already running may finish. Other checks keep their saved agreements." : client.state?.supervisor_running ? "Check enabled. The local service will evaluate its next due time while this computer is awake and its sources are accessible." : "Check enabled, but the local service is offline. Open /recovery to review starting it.")
+    })
+  }
+  function reviewNoise(update: ChatUpdate, context: string) {
+    const retained = client.state?.chat_updates?.find(item => item.id === update.id)
+    if (client.context !== context || !retained || retained.version !== update.version || retained.job_id !== update.job_id) throw new Error("Return to the original update and review its current check.")
+    const check = client.state?.checks?.find(check => !!update.job_id && check.id === update.job_id)
+    if (!check) { details("Feedback saved", "Noise feedback was saved. The original check is not available here, so its behavior has not changed. Refresh Following to inspect the saved check before changing it."); return }
+    const exact = () => {
+      if (client.context !== context) throw new Error("Return to the original update before changing this check.")
+      const current = client.state?.checks?.find(item => item.id === check.id)
+      if (!current || current.digest !== check.digest) throw new Error("This check changed. Refresh Following and review its current agreement.")
+      return current
+    }
+    menu("Reduce interruptions", [
+      { title: "Review notification conditions and timing", description: `${check.title} · Review before saving; other checks stay unchanged`, disabled: !check.editable, run: () => checkAction(exact(), "edit") },
+      { title: "Review pausing this check", description: `${check.title} · Stops future checks; a running check may finish`, disabled: !check.enabled, run: () => confirmCheckPause(exact()) },
+      { title: "Inspect affected check", description: `${check.title} · ${check.id}`, run: () => checkAction(exact(), "inspect") },
+      { title: "Keep feedback only", description: "Your assessment is saved; no check behavior has changed", run: () => details("Feedback saved", `Noise feedback is saved for ${update.title}. No check behavior was changed. You can review ${check.title} in Following later.`) },
+    ], true)
+  }
+  return { commitment, reviewNoise, refreshChecks: () => checkAction(undefined, "refresh") }
 }
