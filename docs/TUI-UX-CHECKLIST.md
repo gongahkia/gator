@@ -18,7 +18,7 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 | 10 | Back restores menu/filter/selection, draft and reading position consistently; backend pages and file workflows retain context; rail marks the active page. | In progress | Host-managed navigation waits for the Go view acknowledgement; failed views retire and original work/focus is restored. Next-message plan-first intent now persists with text/files/reply context, including empty drafts, restart, commands and newer-draft admission races. Native restart → keyboard submission prepares review without starting work. Shared frontend menus and read-only inspections now restore parent query, selected choice and list position, including refreshed/reordered results at all four sizes. New commands/context owners start fresh navigation; successful check changes retire obsolete controls. Context list/detail/edit/review now retain local filter/reading positions through presentation-only IDs (`bda11baf3`); item-based transcript reading anchors now persist through the existing host across chat switching, page navigation, layout changes and restart; other typed-editor/file-editor and backend-page restoration across all flows remain open; active-page rail tests already pass. |
 | 11 | Ctrl+C cancels/stops without implicit quit; Ctrl+Q quits through guards; help/hints reflect configured bindings; no function-key shortcuts are introduced. | In progress | Idle stop/draft preservation, explicit quit, remapped help/composer/rail verified. Tab now explicitly queues a draft after the active task in its current owner; Enter remains conversational and routes clear corrections. Slash completion/forms retain Tab. The queue shortcut uses the same Go settings backend; four sizes, Ctrl remapping and real-Go queued attachments are checked. Saved-context actions use Ctrl+E/Ctrl+X/Ctrl+O, and context refresh is correctly labeled. Ctrl+L latest uses the same Go shortcut settings and configured hints (`614d89a1a`); controlled Kitty checks exercise a custom Ctrl+Shift+L. Other voice/approval/contextual hints and terminal modifier limitations remain. |
 | 12 | Disconnected/error states offer contextual reconnect/recovery with intact drafts/request identity; safe admission retries and uncertain external effects stay distinct. | Implemented; final journey pending | `d00952219`; `interaction-recovery.test.tsx`: real Go accepted request + lost acknowledgement retries once, reconnect keeps draft/owner, no model replay; receipts tests preserve unknown external outcomes. |
-| 13 | New-content/latest/catch-up affordances preserve stable reading anchors across navigation/restart; long-history rendering is benchmarked and optimized when justified. | In progress | `614d89a1a`: New-content counts, /catch-up, /latest and the configurable Ctrl+L latest binding share the composer hint row. Item identities and signed line offsets persist by profile/chat; layout changes, inserted history, chat switching, streaming revisions and restart preserve reading context in native fixtures. Original indexes/run IDs remain authoritative for actions. Cached immutable fingerprints and stable local-field projections avoid routine hint rebuilds. Fresh 5,000-message single samples: append 371→267 ms, startup 3,944→4,098 ms, scroll 361→395 ms, resize 597→750 ms; reproducible reports in `docs/benchmarks/tui-transcript-reading-{before,after}.json`. All messages still mount. Bounded rendering, further startup/scroll/resize work, and final combined/live verification remain; this row is not complete. |
+| 13 | New-content/latest/catch-up affordances preserve stable reading anchors across navigation/restart; long-history rendering is benchmarked and optimized when justified. | In progress | `614d89a1a`: New-content counts, /catch-up, /latest and the configurable Ctrl+L latest binding share the composer hint row. Item identities and signed line offsets persist by profile/chat; layout changes, inserted history, chat switching, streaming revisions and restart preserve reading context in native fixtures. Original indexes/run IDs remain authoritative for actions. Cached immutable fingerprints and stable local-field projections avoid routine hint rebuilds. Fresh 5,000-message single samples: append 371→267 ms, startup 3,944→4,098 ms, scroll 361→395 ms, resize 597→750 ms; reproducible reports in `docs/benchmarks/tui-transcript-reading-{before,after}.json`. `03f743fb5` now mounts an 80-item native window above 160 retained items, with measured/estimated spacers and original full-history search/action identities. Selected native consumers stay alive until selection clears. The unchanged benchmark reports 5,000-message startup 4,098→218 ms, scroll 395→39 ms, append 267→35 ms, resize 750→76 ms; RSS 841→316 MiB in single sequential samples (`docs/benchmarks/tui-transcript-windowed.json`). Native four-size journeys cover continuous scrolling, distant search/actions, selection lifetime, resizing, exact off-window review, disconnected state, view paging and restart. Complete-regression and final combined/live verification remain; this row is not complete. |
 | 14 | Voice has direct record/stop/cancel/transcribe/edit flow, visible processing destination and explicit consent; transcript is editable before sending. | Implemented; final journey pending | `09e74ef39`; `voice-controls.test.tsx`: all four sizes, native VoiceSession with controlled capture/transcription, route/chat consent, changed-route rejection, editable draft/no send, recording/transcription cancellation. Physical audio remains unverified on this host. |
 | 15 | Shared native typography/spacing/selection/focus/disabled treatments and readable summaries work with terminal colors, NO_COLOR and reduced motion; exact technical details remain inspectable. | In progress | `20e9b7cde`: Markdown cleanup destroys native consumers before their borrowed syntax style, including theme changes. Shared immutable field subscriptions prevent routine snapshots from invalidating unchanged native content; the reproduced conversation render stall clears without changing deadlines or renderer. Exact review objects remain frozen. Detail views reserve their scrollbar column and page by viewport height, retaining readable processing/budget text at all four sizes. Shared visual/state audit and full acceptance journey remain. |
 
@@ -44,6 +44,56 @@ Preserve both phases across continuations and do not declare the expanded work
 finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
+
+- Bounded long-history rendering (`03f743fb5`, 12 November): history remains in the original
+  immutable snapshot and global transcript search. Only the native content
+  window mounts: 80 items once history exceeds 160 items. Measured/estimated
+  spacers support ordinary scrolling and scrollbar jumps, not a truncated latest
+  page. Distant search reveals mount the original item before aligning it;
+  contextual actions retain its original backend message index/run/account data.
+  Ctrl+Home reaches earliest retained content; configured latest and catch-up
+  mount their actual target. Short histories retain their established native
+  scroll behavior. An active text selection pins its native consumers and lets
+  the mounted range expand; clearing it prunes back to the normal window.
+  Width changes, asynchronous Markdown sizing and shrinking/paged snapshots
+  preserve item anchors. The window owns estimated-geometry restoration; the
+  retained reader owns initial bookmark restoration. This prevents the old
+  reader from undoing a deliberate scroll while a window settles. Native
+  content/style lifetime uses the existing explicit cleanup, with no renderer
+  fallback or hidden history removal.
+  At all four sizes, native fixture journeys with 1,000 retained messages verify
+  earliest content, scrollbar movement into unmeasured history, distant search,
+  exact item actions, selected text/consumer identity across a window boundary,
+  pruning after clear, resizing, original off-window approval review, disconnected
+  state, paged snapshot reindexing, new content, restart and catch-up, while keeping
+  the original multiline/plan draft. Native approval rendering here is fixture
+  evidence; actual Go token enforcement remains covered by the existing
+  approval integration tests. The first fixture assertion explicitly waits on
+  the real native Markdown worker's clock (bounded by two seconds inside the
+  unchanged 20-second journey deadline), rather than exhausting synchronous
+  frame passes before the worker finishes. No data or keyboard assertion is
+  removed. Existing short-history/composer journeys pass alongside it.
+  The unchanged reproducible benchmark passes its actual-readable-latest and
+  exact reading-row-on-append assertions. Report:
+  `docs/benchmarks/tui-transcript-windowed.json`, compared with
+  `tui-transcript-reading-after.json`. Five thousand retained messages:
+  startup 4,098→218 ms, scroll 395→39 ms, append 267→35 ms, resize 750→76 ms;
+  JS heap 323→63 MiB, RSS 841→316 MiB. Single sequential synthetic samples, not
+  a statistical or physical-terminal claim; initial native/Markdown warmup
+  affects the first dataset. Selection can intentionally expand the normal
+  native window to preserve the selected content. Focused native regression:
+  **12 pass, 355 assertions**, four files, 35.83 seconds, under NO_COLOR and
+  reduced motion, in `/tmp/gator-ux-20261112-window-native-final.log`.
+  After clamping spacer indexes for shrinking snapshots and strengthening the
+  draft to multiline, final window journeys pass again: **4 pass, 156 assertions**,
+  22.63 seconds, in `/tmp/gator-ux-20261112-window-native-multiline.log`.
+  Both processes were observed to exit 0. Typecheck and frontend bundle pass in
+  `window-check-verified.log` / `window-build-verified.log`. Go/host code and
+  protocol/approval enforcement are unchanged by this commit. The complete
+  current terminal regression is the next gate; its log is
+  `/tmp/gator-ux-20261112-window-full-tui.log`. Final combined acceptance
+  remains pending. All fifteen criteria
+  remain in scope; this does not complete the goal.
 
 - Durable reading and catch-up (`614d89a1a`, 12 November): `/catch-up` starts at the first
   item since the last latest-view boundary; revisions of the same streamed
