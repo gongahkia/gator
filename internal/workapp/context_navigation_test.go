@@ -33,6 +33,19 @@ func TestAnswerContextNavigationRejectsForeignAndMalformedRuns(t *testing.T) {
 	}
 }
 
+func TestAnswerContextReadFailureExplainsMissingEvidenceWithoutSubstitution(t *testing.T) {
+	m := New(Config{ReadContext: func(string, string) (ContextState, error) {
+		return ContextState{}, errors.New("retained knowledge response changed")
+	}})
+	m.conversation = "chat-one"
+	m.messages = []message{{runID: "run-owned"}}
+	next, _ := m.NavigateBridge("/context run-owned")
+	m = next.(Model)
+	if !strings.Contains(m.bridgeNotice, "retained knowledge response changed") || m.section == "context" || len(m.contextState.Items) != 0 {
+		t.Fatal("failed historical read substituted saved context or hid its cause")
+	}
+}
+
 func TestBusyAnswerContextDelegatesViewAndRevalidatesOriginalAncestry(t *testing.T) {
 	m := New(Config{ManagedSessions: true})
 	m.conversation, m.running, m.input = "original-chat", true, "Keep original input"

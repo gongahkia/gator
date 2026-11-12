@@ -58,7 +58,13 @@ export function Transcript() {
   const reveal = (index: number) => {
     setRevealed(index)
     if (revealAfterLayout) renderer.off("frame", revealAfterLayout)
-    revealAfterLayout = () => { scroll?.scrollChildIntoView(`message-${index}`); revealedScrollTop = scroll?.scrollTop; remember(); revealAfterLayout = undefined }
+    revealAfterLayout = () => {
+      const node = scroll?.content.getChildren().find(node => node.id === `message-${index}`)
+      // Explicit reveal aligns the requested item's start. Native nearest-edge
+      // scrolling currently does nothing when item and viewport heights match.
+      if (scroll && node && !node.isDestroyed) scroll.scrollBy(node.screenY - scroll.viewport.screenY)
+      revealedScrollTop = scroll?.scrollTop; remember(); revealAfterLayout = undefined
+    }
     renderer.once("frame", revealAfterLayout)
   }
   const acknowledgeVisible = () => {

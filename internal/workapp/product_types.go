@@ -13,6 +13,8 @@ type KnowledgeItem struct {
 	SourceReviewNeeded                                                   bool
 	ID, Kind, Title, Text, Scope, Source, Updated, CurrentText, Revision string
 	Available                                                            bool
+	EvidenceID                                                           string
+	UnavailableReason                                                    string
 }
 
 type ContextState struct {

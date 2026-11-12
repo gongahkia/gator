@@ -95,3 +95,35 @@ func TestKnowledgeToolsKeepGoalBoundariesAndSkillsReadOnly(t *testing.T) {
 		t.Fatal("unknown tool argument accepted")
 	}
 }
+
+func TestKnowledgeSearchBoundsSourcePreviewsWithoutChangingSavedProvenance(t *testing.T) {
+	state := t.TempDir()
+	notes, _ := knowledge.Open(state)
+	memories, _ := memory.Open(state)
+	refs := make([]string, 16)
+	for i := range refs {
+		refs[i] = "label" + strings.Repeat("\t", 500)
+	}
+	note, err := notes.AddNoteWithRefs("Ceramic review", "Ceramic supplier details", "", refs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tools := (PersonalKnowledge{Notes: notes, Memories: memories}).Tools()
+	response, err := tools[0].Execute(context.Background(), json.RawMessage(`{"query":"ceramic"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result struct {
+		Result []struct{ Source, GoalID string }
+	}
+	if err := json.Unmarshal([]byte(response.Content), &result); err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Result) != 1 || len(result.Result[0].Source) > 515 || !strings.HasSuffix(result.Result[0].Source, "…") {
+		t.Fatal("unbounded source preview", result)
+	}
+	saved, _ := notes.LoadNote(note.ID)
+	if len(saved.SourceRefs) != 16 || saved.SourceRefs[0] != refs[0] {
+		t.Fatal("preview shortened the saved source record")
+	}
+}

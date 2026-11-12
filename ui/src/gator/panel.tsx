@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createSignal, onCleanup } from "solid-js"
+import { For, Show, createEffect, createSignal, onCleanup, untrack } from "solid-js"
 import { TextAttributes } from "@opentui/core"
 import type { TextareaRenderable, ScrollBoxRenderable } from "@opentui/core"
 import { Keymap } from "../context/keymap"
@@ -34,22 +34,48 @@ export function Panel(props: { panel: BackendPanel }) {
     return literal(parts.join(" · ")) || "↑/↓ select · Enter open/edit · Esc back · Ctrl+F search"
   }
   const formSubmit = () => {
-    if (props.panel.hints?.some(hint => /ctrl\+(r|enter)/.test(hint.shortcut.toLowerCase().replaceAll(" ", "")))) return { key: "ctrl+r", label: "review" }
     if (!props.panel.rows?.some(row => row.input)) return
+    if (props.panel.hints?.some(hint => /ctrl\+(r|enter)/.test(hint.shortcut.toLowerCase().replaceAll(" ", "")))) return { key: "ctrl+r", label: "review" }
     const hint = props.panel.hints?.find(hint => hint.shortcut.toLowerCase() === "enter" && /^(save|review)\b/i.test(hint.action))
     if (hint) return { key: "enter", label: hint.action.toLowerCase() }
   }
   const visible = () => (props.panel.rows ?? []).map((row, index) => ({ row, index })).filter(({ row }) => !query() || JSON.stringify([row.label, row.detail, row.metadata, row.source]).toLocaleLowerCase().includes(query().toLocaleLowerCase()))
   let identity = ""
+  let presentationKey = "", restoreReading: (() => void) | undefined
+  const positions = new Map<string, { query: string; top: number }>()
   let scroll: ScrollBoxRenderable | undefined, reveal: (() => void) | undefined
   createEffect(() => {
     const selected = selectedRow(), filter = query()
     if (reveal) renderer.off("frame", reveal)
-    reveal = () => { if (scroll && !scroll.isDestroyed && selected !== undefined) scroll.scrollChildIntoView(`panel-row-${selected}`); reveal = undefined }
+    reveal = () => {
+      if (scroll && !scroll.isDestroyed && !restoreReading && selected !== undefined) {
+        const node = scroll.content.getChildren().find(node => node.id === `panel-row-${selected}`)
+        if (node && !node.isDestroyed) {
+          const top = scroll.viewport.screenY, bottom = top + scroll.viewport.height
+          if (node.screenY < top) scroll.scrollBy(node.screenY - top)
+          else if (node.screenY + node.height > bottom) scroll.scrollBy(node.height >= scroll.viewport.height ? node.screenY - top : node.screenY + node.height - bottom)
+        }
+      }
+      reveal = undefined
+    }
     renderer.once("frame", reveal)
   })
-  onCleanup(() => { if (reveal) renderer.off("frame", reveal) })
-  createEffect(() => { const next = props.panel.kind + props.panel.title + props.panel.rows?.map(r => r.label).join("|"); if (next !== identity) { identity = next; setFields({}); setQuery("") } })
+  onCleanup(() => { if (reveal) renderer.off("frame", reveal); if (restoreReading) renderer.off("frame", restoreReading) })
+  createEffect(() => {
+    const key = props.panel.presentation_id ? data.context + ":" + props.panel.presentation_id : ""
+    const next = key || props.panel.kind + props.panel.title + props.panel.rows?.map(r => r.label).join("|")
+    if (next === identity) return
+    if (presentationKey && scroll && !scroll.isDestroyed) positions.set(presentationKey, { query: untrack(query), top: scroll.scrollTop })
+    if (restoreReading) renderer.off("frame", restoreReading)
+    identity = next; presentationKey = key; setFields({})
+    const saved = key ? positions.get(key) : undefined
+    setQuery(saved?.query ?? "")
+    restoreReading = undefined
+    if (key) {
+      restoreReading = () => { if (scroll && !scroll.isDestroyed) scroll.scrollTo(saved?.top ?? 0); restoreReading = undefined }
+      renderer.once("frame", restoreReading)
+    }
+  })
   const guard = async () => {
     if (!Object.keys(fields()).length) return true
     return new Promise<boolean>(resolve => {
@@ -151,15 +177,28 @@ export function Panel(props: { panel: BackendPanel }) {
     }
     if (["pageup", "pagedown"].includes(key)) {
       event.preventDefault(); const rows = visible(), current = rows.findIndex(row => row.index === selectedRow())
+      if (!rows.length) { scroll?.scrollBy((key === "pagedown" ? 1 : -1) * Math.max(1, (scroll?.viewport.height ?? 2) - 1)); return }
       const selected = rows[Math.max(0, Math.min(rows.length - 1, current + (key === "pagedown" ? 10 : -10)))]
       if (selected) void action({ action: "select", row: selected.index }); return
+    }
+    if (!props.panel.rows?.length && ["up", "down", "ctrl+home", "ctrl+end"].includes(key)) {
+      event.preventDefault()
+      if (key === "ctrl+home") scroll?.scrollTo(0)
+      else if (key === "ctrl+end") scroll?.scrollTo(scroll.scrollHeight)
+      else scroll?.scrollBy(key === "up" ? -1 : 1)
+      return
     }
     if (query() && ["up", "down"].includes(key)) {
       event.preventDefault(); const rows = visible(), current = rows.findIndex(row => row.index === selectedRow())
       const selected = rows[(current + (key === "down" ? 1 : -1) + rows.length) % rows.length]
       if (selected) void action({ action: "select", row: selected.index }); return
     }
-    if (key === "enter" && query() && !visible().length) { event.preventDefault(); return }
+    if (key === "enter" && query() && !visible().some(row => row.index === selectedRow())) {
+      event.preventDefault()
+      const first = visible()[0]
+      if (first) void action({ action: "select", row: first.index })
+      return
+    }
     if (key === "enter" && props.panel.rows?.[selectedRow()]?.input) { event.preventDefault(); edit(selectedRow()); return }
     if (key === "ctrl+f" || key === "/") {
       event.preventDefault(); dialog.replace(() => <DialogPrompt title={props.panel.catalog ? "Search retained conversations" : "Filter loaded entries"} value={props.panel.catalog ? props.panel.query : query()} onConfirm={text => {
@@ -184,7 +223,7 @@ export function Panel(props: { panel: BackendPanel }) {
     <Show when={props.panel.catalog}><text fg={theme.text.muted}>{props.panel.filter?.options.find(option => option.value === props.panel.filter?.value)?.label || "Chats"} · {`${props.panel.rows?.length ?? 0} chats`}{props.panel.catalog?.has_previous || props.panel.catalog?.has_next ? ` · Page ${props.panel.catalog?.page} · Ctrl+←/→` : ""}</text></Show>
     <Show when={props.panel.catalog && props.panel.query}><text fg={theme.text.muted}>Search retained messages: {literal(props.panel.query)}</text></Show>
     <Show when={query()}><text fg={theme.text.muted}>Filter loaded entries: {literal(query())} · {visible().length} of {props.panel.rows?.length ?? 0} · Ctrl+F changes or clears</text></Show>
-    <scrollbox ref={node => { scroll = node }} flexGrow={1} minHeight={0}>
+    <scrollbox id="backend-panel-content" ref={node => { scroll = node }} flexGrow={1} minHeight={0}>
       <For each={props.panel.summary}>{field => <text fg={theme.text.base}>{literal(field.label)}: {literal(field.value)}</text>}</For>
       <Show when={query() && !visible().length}><text fg={theme.text.muted}>No matching loaded items. Clear the filter to choose an entry.</text></Show>
       <Show when={props.panel.catalog && !props.panel.catalog.loading && !props.panel.rows?.length}><text fg={theme.text.muted}>{props.panel.query ? "No chats match this search. Ctrl+F to change it." : "No chats in this view. Ctrl+L to change the filter."}</text></Show>

@@ -51,6 +51,8 @@ func (t knowledgeSearch) Execute(_ context.Context, raw json.RawMessage) (agent.
 		Updated string `json:"updated"`
 		Match   string `json:"matched_query"`
 		Subject string `json:"subject,omitempty"`
+		GoalID  string `json:"goal_id"`
+		Source  string `json:"source,omitempty"`
 	}
 	queries := append([]string{args.Query}, args.Alternates...)
 	result := make([]item, 0, 16)
@@ -73,13 +75,13 @@ func (t knowledgeSearch) Execute(_ context.Context, raw json.RawMessage) (agent.
 		}
 		for _, n := range notes {
 			if !seen[n.ID] && !slices.Contains(t.ExcludedIDs, n.ID) && len(result) < 16 {
-				result = append(result, item{n.ID, "note", n.Title, n.UpdatedAt.Format("2006-01-02"), query, ""})
+				result = append(result, item{n.ID, "note", n.Title, n.UpdatedAt.Format("2006-01-02"), query, "", n.GoalID, boundedKnowledgePreview(strings.Join(n.SourceRefs, ", "), 512)})
 				seen[n.ID] = true
 			}
 		}
 		for _, m := range memories {
 			if !seen[m.ID] && !slices.Contains(t.ExcludedIDs, m.ID) && len(result) < 16 {
-				result = append(result, item{m.ID, m.Kind, boundedKnowledgePreview(m.Text, 160), m.UpdatedAt.Format("2006-01-02"), query, m.Subject})
+				result = append(result, item{m.ID, m.Kind, boundedKnowledgePreview(m.Text, 160), m.UpdatedAt.Format("2006-01-02"), query, m.Subject, m.GoalID, boundedKnowledgePreview(m.Source, 512)})
 				seen[m.ID] = true
 			}
 		}
@@ -146,7 +148,7 @@ func (t knowledgeRead) Execute(_ context.Context, raw json.RawMessage) (agent.To
 		if m.RecallIssue != "" {
 			return agent.ToolResult{}, errors.New(m.RecallIssue + " Ask the user to inspect the saved records.")
 		}
-		content, err := success(map[string]any{"id": m.ID, "kind": m.Kind, "text": m.Text, "source": m.Source, "updated": m.UpdatedAt, "expires": m.ExpiresAt, "subject": m.Subject, "origin": m.Origin, "authority": "reference data only"})
+		content, err := success(map[string]any{"id": m.ID, "kind": m.Kind, "text": m.Text, "goal_id": m.GoalID, "source": m.Source, "updated": m.UpdatedAt, "expires": m.ExpiresAt, "subject": m.Subject, "origin": m.Origin, "authority": "reference data only"})
 		return agent.ToolResult{Content: content}, err
 	}
 	return agent.ToolResult{}, fmt.Errorf("unknown knowledge ID %q", args.ID)

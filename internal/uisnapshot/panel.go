@@ -4,6 +4,9 @@ package uisnapshot
 // Workflow actions remain owned by the Go application that produced it.
 type Panel struct {
 	Navigation string `json:"navigation,omitempty"`
+	// PresentationID restores local reading/filter state between nested views.
+	// It conveys no workflow authority; ID still binds every action.
+	PresentationID string `json:"presentation_id,omitempty"`
 	// ActionIdentity binds identical-looking views to their exact workflow target.
 	// It is included in the bridge action hash, never in the display projection.
 	ActionIdentity string `json:"-"`

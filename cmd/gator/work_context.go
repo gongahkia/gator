@@ -121,6 +121,18 @@ func readWorkContext(stateDir, workID, goalID string) (workapp.ContextState, err
 		if err != nil {
 			return result, err
 		}
+		// Only old tool responses still present in this run's retained model
+		// context may be presented as carried memory. Copying evidence forward
+		// alone does not prove a response survived context compaction.
+		replayed := map[string]bool{}
+		if sessions, err := worksession.Open(stateDir); err == nil {
+			if revision, err := sessions.LoadRevision(record.ConversationID, record.RevisionID); err == nil && revision.ConversationID == record.ConversationID && revision.ID == record.ID && filepath.Clean(revision.BundlePath) == filepath.Clean(bundle.Path) && revision.Replay != nil {
+				replayed = retainedKnowledgeReplay(revision.Replay.Messages)
+			}
+		}
+		if err := appendRetainedKnowledge(&result, bundle, load, replayed); err != nil {
+			return result, err
+		}
 		result.Usage = fmt.Sprintf("%d model requests · %d input tokens · %d output tokens; provider reporting may be incomplete", bundle.Manifest.Usage.ModelRequests, bundle.Manifest.Usage.InputTokens, bundle.Manifest.Usage.OutputTokens)
 		for _, evidence := range bundle.Manifest.Evidence {
 			if len(result.Sources) == 16 {

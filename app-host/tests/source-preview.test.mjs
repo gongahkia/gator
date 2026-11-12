@@ -141,3 +141,19 @@ test("inherited sources use only host-bound original provenance and cannot inven
  assert.deepEqual((await read()).reads,[]);
  assert.equal((await read()).text,f.text);
 }));
+
+test("knowledge responses expose sealed bytes through exact evidence IDs without live saved-record reads", () => fixture(async f => {
+  const text = JSON.stringify({ ok: true, result: { id: "mem-" + "a".repeat(24), kind: "fact", text: "Original supplied fact", goal_id: "", source: "Planning call" } });
+  const digest = hash(text), file = `evidence/${digest}.txt`, id = "evidence-knowledge";
+  const locator = "knowledge:run-one/knowledge_read/" + "a".repeat(24);
+  const manifest = JSON.stringify({ run_id: "run-one", evidence: [{ id, locator, sha256: digest, snapshot_path: file, retrieved_at: "2026-11-12T04:00:00Z" }] });
+  await writeFile(join(f.path, file), text); await writeFile(join(f.path, "manifest.json"), manifest);
+  f.state.messages[0].bundle.ManifestSHA256 = hash(manifest);
+  const catalogue = await sourceCatalog({ context: f.request.context, run: f.request.run }, { state: f.state });
+  assert.equal(catalogue.references[0].kind, "knowledge"); assert.equal(catalogue.references[0].label, "Saved knowledge read");
+  const preview = await f.read({ context: f.request.context, run: f.request.run, path: "evidence:" + id });
+  assert.equal(preview.text, text); assert.equal(preview.path, locator); assert.match(preview.notice, /Earlier responses may be carried forward/); assert.deepEqual(preview.reads, []);
+  await assert.rejects(f.read({ ...f.request, path: locator }), /Choose a retained/);
+  await writeFile(join(f.path, file), "Changed saved memory cannot replace supplied bytes");
+  await assert.rejects(f.read({ context: f.request.context, run: f.request.run, path: "evidence:" + id }), /bytes have changed/);
+}));

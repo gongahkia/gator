@@ -48,6 +48,7 @@ export type QueueAction = {
   target_id?: string; placement?: "before" | "after";
 };
 export type BackendPanel = {
+  presentation_id?: string;
   navigation?: "chat" | "chats" | "following" | "saved" | "settings";
 	 catalog?: { loading?: boolean; page: number; has_next?: boolean; has_previous?: boolean; can_organize?: boolean };
   links?: { label: string; url: string }[];

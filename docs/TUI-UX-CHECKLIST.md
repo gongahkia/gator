@@ -8,7 +8,7 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 |---|---|---|---|
 | 1 | Conversation remains available during execution; ordinary messages can steer a specific live task or start independent work; ambiguous routing is clarified without losing task identity, files, or drafts. | In progress | `92cd471f4`/`485cd007c` plus result continuity: ordinary messages reply, steer, clarify, delegate and stop specific independent owners without moving focus. Pending-review text corrections now revise the same task asynchronously, preserve its frozen inputs/limits, and require fresh approval; failures/cancellation and restart retain the outcome. Preparing/reviewed plans can be cancelled conversationally; changed control epochs are rejected. Recent original-task summaries reach follow-up conversation/work/planning without acquiring controls. Explicit queues remain available. Corrections during initial preparation or plan-bound execution, changes to pending exact actions/new inputs, delegated exact-approval journeys, broader failure/account/goal journeys and live-model routing quality remain open. |
 | 2 | Following unifies commitments with outcome/state/next action, next and last successful checks, sources/timezone, pause/edit, and truthful foreground/service/offline limits. | In progress | `4b9edf091`/`a95289265`: commitment cards and exact check controls. Active goal cards open their exact canonical picker row and prepare a check for that goal's current workspace, including duplicate titles, other-chat origins and busy owners. Focused Go/host/native integration checks pass. Advanced non-project schedule editing and paused-goal controls remain; final integrated journey pending. |
-| 3 | Relevant answers expose supplied memory/provenance/correction; noise feedback offers a reviewed, scoped check/notification change and reports its actual outcome. | In progress | `cb095fcc4`: relevant answer actions open exact owned-run context, including managed inspection during execution. Run-start excerpts remain distinct from current saved text; revision-guarded correction/forgetting, provenance, next-message scope and restart pass native four-size Go/provider journeys. Noise feedback now leads to original-check notification/timing review or a reviewed pause, with correlated feedback acknowledgement, exact agreement checks and actual persisted outcomes. Conversational changes share the authoritative follow-up controller. Additional knowledge read/search excerpts supplied during execution and the final integrated journey remain open. |
+| 3 | Relevant answers expose supplied memory/provenance/correction; noise feedback offers a reviewed, scoped check/notification change and reports its actual outcome. | In progress | `cb095fcc4`/`08c12a19d`: relevant answers expose original context and reviewed noise changes use the authoritative check controller. Inspection now includes sealed knowledge-search previews, full reads and exact carried tool responses, with current saved state, revision-guarded correction/forgetting and native four-size restart coverage. Later corrections do not rewrite historical excerpts. Verified remaining gap: a continuation can receive the old tool response without the newly corrected fact; authoritative refresh/precedence for subsequent requests and the final integrated journey remain required. |
 | 4 | First task leads through only missing setup; host connectivity and model readiness are distinct; local/cloud processing, capabilities, and work budget are explained. | In progress | `d0fd58e48` provides Go-owned prerequisite/processing/budget projection. Ordinary first submissions offer missing setup while preserving private files/text and plan intent; Host connectivity and model setup have separate labels. Native fresh-profile → invalid provider form → repair → persisted selection → inspect context/limits → explicit useful task passes at all four sizes. Missing and subsequently changed credentials recover without replaying/admitting the rejected task. Request-specific connected-account/access setup handoffs and recovery after provider rejection during an admitted task remain; final integrated journey and live-account/model verification remain. |
 | 5 | Workspace/account/source scope is inspectable near input; conversational/manual settings agree, including terminal preferences, with confirmed outcomes. | In progress | Ctrl+T and /request-context inspect workspace/model processing, selected accounts, inputs, mode and actual Go budgets. Missing account display metadata retains the selected identity. Appearance, navigation and recent-chat grouping now share Go configuration across manual controls, conversational tools, cached owners, CLI theme changes and restart. Legacy frontend values import once; failures do not report saved values. Native four-size settings journeys plus unreadable-import recovery and live-task preservation pass. Full permission explanations, broader account/settings integration and live-model/account verification remain; final combined acceptance journey pending. |
 | 6 | Results/files/updates expose keyboard contextual actions to open/edit/reply/inspect evidence/mark done while retaining original identities and conversation context. | In progress | Configurable Ctrl+E and /actions expose original-item result/file/update controls. Answers join deliverables only by exact run identity. Native four-size journeys inspect retained evidence, copy answers, edit/save working file versions without changing sealed originals, reject other-chat targets, mark done with a correlated Go outcome, restore the original owner and explicitly send an update-bound reply while retaining the newer draft/review intent. Delayed source/file reads now close without reopening on late success/failure; exact file-action Back and explicit read retry pass at all four sizes, including an unrelated executing Go task. Original-answer request receipts now share /receipts controls, including exact-account Sent checks, permission repair, cancelled-read completion and restart at all four sizes. Conversation replies and delegated summaries now expose exact-turn/task contextual inspection, copying, retained inputs and original-owner navigation; four-size real-Go journeys preserve the parent draft/review intent without new model work. Structured connected-item actions and the final combined journey remain. |
@@ -44,6 +44,57 @@ Preserve both phases across continuations and do not declare the expanded work
 finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
+
+- Dynamic answer memory provenance (12 November): successful knowledge-search
+  and read tool messages are retained after lifecycle hooks in the existing
+  sealed evidence catalogue. Locators bind the originating run and call; raw
+  response text is not copied into history/telemetry metadata. Search previews
+  record their actual scope and bounded source labels; full reads keep the exact
+  original bytes. Context reconstructs those responses only after digest and run
+  checks. It distinguishes full reads, search previews and earlier responses
+  still present in the current revision's retained model context. Copying a
+  source forward alone does not claim it was supplied after compaction. Carried
+  excerpts from another goal stay inspectable without current-record access or
+  correction authority. Missing/changed evidence produces an explicit failure.
+  Current saved text/revision stays separate from historical input; corrections
+  and forgetting use the existing store guards. Sources can inspect the retained
+  response through its exact evidence ID. Long context lists show short summaries
+  while details preserve the complete supplied body and support keyboard scroll.
+  Context list/detail/edit/review frames have presentation-only reading identities;
+  Back restores the list filter/position without reusing action authority or form
+  secrets. Refresh cannot make Enter activate a hidden filtered row. Explicit
+  transcript reveal now handles an item exactly as tall as the viewport, fixing
+  wrong-item actions at 42×14. Context refresh is no longer mislabeled as review.
+  Native/real-Go/controlled-provider journeys: **8 pass, 252 assertions**, 45.62
+  seconds, at all four required sizes, including run-start and dynamic context,
+  correction, reviewed note forgetting, long-note keyboard reading, restored
+  filters, hidden-row safety, carried context, preserved drafts and restart.
+  Log: `/tmp/gator-ux-20261112-dynamic-context-native-final.log`.
+  Focused Go transaction/context/tool checks pass. Full `workrun` and `workapp`
+  regressions pass (107.090 and 39.559 seconds). The initial tools regression
+  exposed the valid escaped-metadata bound bug fixed by `86c1b562f`; the full
+  tools/knowledge rerun passes in `dynamic-context-tools-verified.log` (tools
+  10.416 seconds). Host: **128 pass, 1 existing skip, 0 failures**, 129 tests,
+  22.75 seconds. Typecheck passes. The complete native regression is running in
+  `/tmp/gator-ux-20261112-dynamic-context-full-tui.log`; inspect its live handle or
+  terminal result before relying on it. Source/test files stay frozen during it.
+  These are native-render/controlled-provider and Go/store checks, not physical
+  terminal/audio or live model/account verification. All fifteen criteria remain.
+
+- Verified remaining correction-precedence gap (12 November): an isolated real
+  Go host with a controlled model read a global fact through `knowledge_read`,
+  corrected it in the authoritative memory store, then continued in the same
+  owner. The saved correction succeeded, but the follow-up's model messages
+  included the old tool response and omitted the corrected fact. Diagnostic
+  result: `same_owner=true`, `saved_correction=true`,
+  `correction_supplied_to_followup=false`, `older_tool_response_supplied=true`,
+  three provider requests. Log:
+  `/tmp/gator-ux-20261112-memory-precedence-diagnostic.log`; reproducible isolated
+  driver: `/tmp/gator-memory-precedence-check.ts`. This is controlled transport
+  evidence, not a model-quality claim. Next work must make subsequent requests
+  receive authoritative scoped corrections/withdrawals, respecting exclusions,
+  provenance, goal boundaries and budgets while preserving historical evidence.
+  Row 3 remains in progress; successful persistence/provenance alone is not enough.
 
 - Saved-note metadata bounds (12 November): a new source-preview regression
   exposed that sixteen valid escaped source labels could be written successfully

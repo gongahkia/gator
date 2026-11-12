@@ -538,6 +538,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	request.researchTools = append(request.researchTools, connectedReads...)
 	activity := workactivity.New(startedAt)
 	events := make([]agent.Event, 0, 32)
+	var knowledgeEvidenceErr error
 	emit := func(event agent.Event) {
 		eventMu.Lock()
 		defer eventMu.Unlock()
@@ -545,6 +546,15 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		activity.Record(event)
 		if inspection != nil {
 			inspection.record(event)
+		}
+		// Observe the actual successful tool message, after lifecycle hooks.
+		// Store it in this run's existing sealed evidence catalogue, never in
+		// telemetry/history metadata or a second saved-knowledge database.
+		if event.Kind == agent.EventToolFinished && event.ToolError == "" && event.ToolCall != nil && (event.ToolCall.Name == "knowledge_read" || event.ToolCall.Name == "knowledge_search") {
+			locator := "knowledge:" + request.RunID + "/" + event.ToolCall.Name + "/" + telemetry.ID(event.TaskID+"\x00"+event.ToolCall.ID, 24)
+			if _, err := catalog.retain(locator, []byte(event.ToolResult), event.At); err != nil {
+				knowledgeEvidenceErr = errors.Join(knowledgeEvidenceErr, err)
+			}
 		}
 		if event.Kind != agent.EventTextDelta {
 			events = append(events, event)
@@ -741,6 +751,11 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		runErr = scopeErr
 	}
 	closeSpecialists()
+	eventMu.Lock()
+	if knowledgeEvidenceErr != nil {
+		runErr = errors.Join(runErr, fmt.Errorf("retain supplied knowledge context: %w", knowledgeEvidenceErr))
+	}
+	eventMu.Unlock()
 	if directCode != nil {
 		directCode.Close()
 	}

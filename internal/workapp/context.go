@@ -11,6 +11,7 @@ import (
 func (m Model) openContext(workID string, all bool) (tea.Model, tea.Cmd) {
 	if m.config.ReadContext == nil {
 		m.status = "Saved context unavailable."
+		m.bridgeNotice = m.status
 		return m, nil
 	}
 	if !all && workID == "" {
@@ -30,6 +31,7 @@ func (m Model) openContext(workID string, all bool) (tea.Model, tea.Cmd) {
 	state, err := m.config.ReadContext(workID, m.goalID)
 	if err != nil {
 		m.status = "Read context: " + err.Error()
+		m.bridgeNotice = m.status
 		return m, nil
 	}
 	m.contextState, m.contextWorkID = state, workID
@@ -169,7 +171,9 @@ func (m Model) updateContextKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) contextPanel() uisnapshot.Panel {
 	p := uisnapshot.Panel{Kind: "context", Title: "Context and sources", Subtitle: m.contextState.Outcome, Selected: m.selected, Notice: m.sectionNotice}
+	p.PresentationID = "knowledge/" + m.contextState.GoalID + "/" + m.contextWorkID + "/list"
 	if item := m.contextDetail; item != nil {
+		p.PresentationID += "/" + item.ID + "/" + item.EvidenceID
 		p.Title = item.Title
 		p.Blocks = []uisnapshot.Block{{Title: "Supplied excerpt", Role: "content", Lines: []string{item.Text}}, {Title: "Scope and provenance", Collapsible: true,
 			Fields: []uisnapshot.Field{{Label: "Scope", Value: knowledgeScope(item.Scope, m.contextState.GoalID)}, {Label: "Source labels", Value: valueOrNone(item.Source)}, {Label: "Updated", Value: item.Updated}},
@@ -177,19 +181,28 @@ func (m Model) contextPanel() uisnapshot.Panel {
 		if item.Available && item.CurrentText != item.Text {
 			p.Blocks = append(p.Blocks, uisnapshot.Block{Title: "Current saved text", Lines: []string{item.CurrentText, "Corrections affect future recall. They do not rewrite what this earlier answer received."}})
 		}
+		if item.EvidenceID != "" {
+			p.Blocks = append(p.Blocks, uisnapshot.Block{Title: "Retained tool response", Fields: []uisnapshot.Field{{Label: "Evidence", Value: item.EvidenceID}}, Lines: []string{"This excerpt came from a saved-knowledge tool response during this run. It is not proof the answer used or correctly interpreted it. The complete response is retained with this answer's source evidence."}})
+		}
 		if item.SourceReviewNeeded {
 			p.Blocks = append(p.Blocks, uisnapshot.Block{Title: "Source needs review", Lines: []string{"The linked file changed or is unavailable. Automatic recall skips this memory until you review the file and relink it.", "/memory correct " + item.ID + " --source-file PATH TEXT"}})
 		}
 		if !item.Available {
-			p.Blocks = append(p.Blocks, uisnapshot.Block{Title: "Saved state", Lines: []string{"This item is no longer saved. The excerpt remains part of this earlier Work record."}})
+			message := item.UnavailableReason
+			if message == "" {
+				message = "This item is no longer saved. The excerpt remains part of this earlier Work record."
+			}
+			p.Blocks = append(p.Blocks, uisnapshot.Block{Title: "Saved state", Lines: []string{message}})
 		}
 		if m.contextEditing {
+			p.PresentationID += "/edit"
 			p.Kind, p.Title = "knowledge-form", "Correct saved knowledge"
 			p.Selected = 0 // The list selection does not identify a field in this one-field form.
 			p.Blocks = p.Blocks[1:]
 			p.Rows = []uisnapshot.Row{{Label: "Current saved text", Detail: m.contextEdit, Input: bridgeInput(m.contextEdit, 4096, true)}}
 			p.Hints = []uisnapshot.Hint{{Shortcut: "Ctrl+U", Action: "clear"}, {Shortcut: "Enter", Action: "save correction"}, {Shortcut: "Esc", Action: "cancel"}}
 		} else if m.contextConfirm {
+			p.PresentationID += "/forget"
 			p.Kind, p.Title = "confirmation", "Forget saved knowledge?"
 			p.Blocks = append(p.Blocks, uisnapshot.Block{Title: "Effect", Lines: []string{"Remove this item and its retrieval vectors from future saved recall.", "Prior transcripts and retained Work evidence may contain earlier excerpts."}})
 			p.Hints = []uisnapshot.Hint{{Shortcut: "Enter", Action: "forget saved knowledge", Tone: "error"}, {Shortcut: "Esc", Action: "cancel"}}
@@ -202,6 +215,7 @@ func (m Model) contextPanel() uisnapshot.Panel {
 			if !item.Available || item.Kind == "update" {
 				p.Hints = []uisnapshot.Hint{{Shortcut: "Esc", Action: "back"}}
 			}
+			p.Hints = append(p.Hints, uisnapshot.Hint{Shortcut: "↑/↓", Action: "scroll"})
 		}
 		return p
 	}
@@ -210,12 +224,12 @@ func (m Model) contextPanel() uisnapshot.Panel {
 		if sliceContains(m.options.ExcludedKnowledgeIDs, item.ID) {
 			state += " · omitted next run"
 		}
-		p.Rows = append(p.Rows, uisnapshot.Row{Label: item.Title, Detail: item.Text, State: state})
+		p.Rows = append(p.Rows, uisnapshot.Row{Label: item.Title, Detail: truncate(strings.Join(strings.Fields(item.Text), " "), 160), State: state})
 		if item.Scope == "global" {
 			p.Rows[len(p.Rows)-1].StateLabel = strings.Replace(state, "Global · available across goals", "Global", 1)
 		}
 	}
-	p.Blocks = []uisnapshot.Block{{Title: "Work context", Lines: []string{"Goal: " + valueOrNone(m.contextState.GoalID), "Permitted actions: " + valueOrNone(m.contextState.Permission), "Recall: " + valueOrNone(m.contextState.Recall), m.contextState.Usage}}, {Title: "Observed source references", Lines: m.contextState.Sources}, {Title: "How to read this", Lines: []string{fmt.Sprintf("%d saved items supplied at run start or available in this goal.", len(m.contextState.Items)), "Source labels and retained references do not prove that an answer's claim is supported.", "Use Enter to inspect a saved item and correct, forget, or omit it from the next run."}}}
+	p.Blocks = []uisnapshot.Block{{Title: "Work context", Lines: []string{"Goal: " + valueOrNone(m.contextState.GoalID), "Permitted actions: " + valueOrNone(m.contextState.Permission), "Recall: " + valueOrNone(m.contextState.Recall), m.contextState.Usage}}, {Title: "Observed source references", Lines: m.contextState.Sources}, {Title: "How to read this", Lines: []string{fmt.Sprintf("%d saved excerpts: run-start context, retained tool responses, or knowledge available in this goal. Search previews are labeled separately from complete reads.", len(m.contextState.Items)), "Source labels and retained references do not prove that an answer's claim is supported.", "Use Enter to inspect a saved item and correct, forget, or omit it from the next run."}}}
 	if m.contextWorkID == "" {
 		p.Title = "Saved knowledge"
 		p.Subtitle = "Your saved notes and context"
