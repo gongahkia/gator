@@ -18,6 +18,7 @@ import { WorkingStatus } from "./working-status"
 import { ConversationTurn } from "./conversation-turn"
 import { useKeyHints } from "./key-hints"
 import { useTranscriptReader } from "./transcript-reader"
+import { useTranscriptWindow } from "./transcript-window"
 
 function Result(props: { value: BackendResult }) {
   const theme = useTheme()
@@ -40,15 +41,19 @@ export function Transcript() {
   const timeline = createMemo(() => reconcile(data.context, chatTimeline(data.state?.messages ?? [], data.state?.chat_updates ?? [], data.state?.dialogue ?? []).filter(item => item.kind !== "message" || item.message.role !== "Deliverables" || !!(item.message.text || item.message.result || item.message.activity || item.message.bundle?.Artifacts?.length))))
   const cards = new Map<string, Renderable>(), delivered = new Set<string>()
   let scroll: ScrollBoxRenderable | undefined
-  const reading = useTranscriptReader(timeline, () => scroll)
+  const window = useTranscriptWindow(timeline, () => scroll)
+  const reading = useTranscriptReader(timeline, () => scroll, window)
   let revealAfterLayout: (() => void) | undefined
   let revealedScrollTop: number | undefined
   const [revealed, setRevealed] = createSignal(-1)
   createEffect(() => { data.context; setRevealed(-1); revealedScrollTop = undefined })
   const reveal = (index: number) => {
     setRevealed(index)
+    const position = timeline().findIndex(item => item.kind === "message" && item.index === index)
+    if (position >= 0) window.ensure(position)
     if (revealAfterLayout) renderer.off("frame", revealAfterLayout)
     revealAfterLayout = () => {
+      if (!window.ready()) { renderer.once("frame", revealAfterLayout!); return }
       const node = scroll?.content.getChildren().find(node => node.id === `message-${index}`)
       // Explicit reveal aligns the requested item's start. Native nearest-edge
       // scrolling currently does nothing when item and viewport heights match.
@@ -90,6 +95,7 @@ export function Transcript() {
   renderer.on("frame", acknowledgeVisible)
   onCleanup(() => { if (revealAfterLayout) renderer.off("frame", revealAfterLayout); client.off("reveal-message", reveal); client.off("request-item-actions", visibleActions); renderer.off("frame", acknowledgeVisible) })
   Keymap.createLayer(() => ({ commands: [
+    { bind: "ctrl+home", title: "Jump to earliest retained content", run: () => { scroll?.scrollTo(0); reading.moved() } },
     { bind: "pageup", title: "Scroll earlier", run: () => { scroll?.scrollBy(-10); reading.moved() } },
     { bind: "pagedown", title: "Scroll later", run: () => { scroll?.scrollBy(10); reading.moved() } },
     { bind: "ctrl+end", title: "Jump to latest", run: reading.latest },
@@ -98,7 +104,8 @@ export function Transcript() {
     <Show when={data.state?.branch}><text fg={theme.text.muted} onMouseUp={() => void client.navigate("/original-chat")}>Branched chat · /original-chat returns to its source</text></Show>
     <Show when={!data.state?.messages?.length && !data.state?.dialogue?.length}><box paddingY={3} paddingX={3} gap={1}><text fg={theme.text.base}><b>What would you like to get done?</b></text>
       <text fg={theme.text.muted}>Ask a question, work with files, or follow an ongoing task.</text><Show when={!data.state?.provider || data.state?.composer?.readiness?.state !== undefined && data.state.composer.readiness.state !== "configured"} fallback={<text fg={theme.text.muted}>/request-context shows processing, sources and work limits.</text>}><text fg={theme.text.muted}>Write your first request. I’ll help with the missing model setup and keep your draft.</text></Show></box></Show>
-    <For each={timeline()}>{item => { const context = client.context; return <Show when={item.kind === "message" ? item : undefined} fallback={item.kind === "update" ? <box id={`update-${item.update.id}`} ref={node => { const id = item.update.id; cards.set(id, node); onCleanup(() => { if (cards.get(id) === node) cards.delete(id) }) }} paddingY={1}>
+    <box id="transcript-before" height={window.before()} minHeight={0} flexShrink={0} />
+    <For each={window.visible()}>{item => { const context = client.context; return <Show when={item.kind === "message" ? item : undefined} fallback={item.kind === "update" ? <box id={`update-${item.update.id}`} ref={node => { const id = item.update.id; cards.set(id, node); onCleanup(() => { if (cards.get(id) === node) cards.delete(id) }) }} paddingY={1}>
       <text fg={theme.accent}><b>{literal(item.update.title)}</b> · {literal(updateStatus(item.update.status))} · {item.update.read ? "read" : "unread"} · {item.update.resolved ? "done" : "open"}</text>
       <text fg={theme.text.base}>{literal(item.update.summary)}</text>
       <Show when={updateWarning(item.update.status)}>{warning => <text fg={theme.text.feedback.warning.base}>{warning()} Earlier results don’t confirm that nothing changed.</text>}</Show>
@@ -114,6 +121,7 @@ export function Transcript() {
       <Show when={message.inputs?.length}><text fg={theme.text.muted}>Inputs: {message.inputs?.map(literal).join(" · ")}</text></Show>
       <For each={message.bundle?.Artifacts}>{artifact => <text fg={theme.accent} onMouseUp={() => { if (!renderer.getSelection()?.getSelectedText()) client.emit("item-actions", { kind: "file", context, bundle: message.bundle, file: artifact }) }}>File: {literal(artifact.Path)} · {literal(artifact.MediaType)}</text>}</For>
     </box> }}</Show> }}</For>
+    <box id="transcript-after" height={window.after()} minHeight={0} flexShrink={0} />
     <For each={data.state?.task_plans}>{plan => <box paddingY={1}>
       <text fg={theme.accent} onMouseUp={() => void client.navigate("/task-plans")}>{literal(plan.outcome || plan.task)}</text>
       <text fg={theme.text.muted}>{literal(plan.state)} · {literal(plan.phase)}{plan.phase === "review" ? " · /task-plans to review before work starts" : " · /task-plans for details"}</text>

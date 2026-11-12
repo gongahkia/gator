@@ -6,10 +6,11 @@ import { useData } from "../context/data"
 import { useDialog } from "../ui/dialog"
 import type { TimelineItem } from "./timeline"
 import { readingItems, unreadStart, type ReadingAnchor } from "./transcript-reading"
+import type { TranscriptWindow } from "./transcript-window"
 
 // The native scrollbox owns scrolling/selection. This layer retains an item and
 // its line offset, so changes above it do not move the user's reading position.
-export function useTranscriptReader(timeline: Accessor<TimelineItem[]>, getScroll: () => ScrollBoxRenderable | undefined) {
+export function useTranscriptReader(timeline: Accessor<TimelineItem[]>, getScroll: () => ScrollBoxRenderable | undefined, window: TranscriptWindow) {
   const client = useClient(), data = useData(), dialog = useDialog(), renderer = useRenderer()
   const items = createMemo(() => readingItems(timeline()))
   const indexes = createMemo(() => new Map(items().map((item, index) => [item.node, index])))
@@ -21,7 +22,7 @@ export function useTranscriptReader(timeline: Accessor<TimelineItem[]>, getScrol
   const available = () => !dialog.stack.length && client.route === "chat" && !client.state?.panel && !client.state?.external && !client.snapshot.terminalBusy && !client.snapshot.sessionSwitching && client.snapshot.connection === "connected"
   const remember = (children?: Renderable[]) => {
     const scroll = getScroll(), all = items()
-    if (!ready || !context || client.context !== context || !scroll || scroll.isDestroyed || !all.length) return
+    if (!ready || !window.ready() || !context || client.context !== context || !scroll || scroll.isDestroyed || !all.length) return
     const viewport = scroll.viewport
     children ??= scroll.content.getChildren()
     // Native slot/Show placeholders can sit outside document order. Only the
@@ -58,15 +59,16 @@ export function useTranscriptReader(timeline: Accessor<TimelineItem[]>, getScrol
     void client.loadReading(next).then(() => {
       if (!alive || token !== generation) return
       anchor = client.readingAnchors.get(next); seen = anchor
+      if (anchor && !anchor.following) window.ensure(keys().get(anchor.key) ?? anchor.index)
       setFollowing(anchor?.following ?? true); ready = true; renderer.requestRender()
     })
   })
-  const jump = (intent: "latest" | "catch-up") => { pending = intent; manual = true; renderer.requestRender() }
+  const jump = (intent: "latest" | "catch-up") => { pending = intent; manual = true; window.ensure(intent === "latest" ? items().length - 1 : unreadStart(items(), seen)); renderer.requestRender() }
   const latest = () => jump("latest"), catchUp = () => jump("catch-up")
   const moved = () => { manual = true; renderer.requestRender() }
   const frame = () => {
     const scroll = getScroll(), all = items()
-    if (!ready || client.context !== context || !scroll || scroll.isDestroyed || scroll.viewport.height < 1) return
+    if (!ready || !window.ready() || client.context !== context || !scroll || scroll.isDestroyed || scroll.viewport.height < 1) return
     const children = scroll.content.getChildren(), nodes = new Map(children.map(node => [node.id, node]))
     const currentIndex = anchor && keys().get(anchor.key), currentNode = currentIndex === undefined ? undefined : nodes.get(all[currentIndex].node)
     const nextShape = `${scroll.viewport.width}:${scroll.viewport.height}:${scroll.scrollHeight}:${currentNode ? currentNode.screenY - scroll.viewport.screenY + scroll.scrollTop : 0}:${currentNode?.height ?? 0}`
@@ -77,7 +79,7 @@ export function useTranscriptReader(timeline: Accessor<TimelineItem[]>, getScrol
       const node = all[first] && nodes.get(all[first].node)
       if (node) scroll.scrollBy(node.screenY - scroll.viewport.screenY)
       else scroll.scrollTo(scroll.scrollHeight)
-    } else if (restoring || !manual && changedLayout && anchor && !following()) {
+    } else if (restoring || !window.active() && !manual && changedLayout && anchor && !following()) {
       if (following()) scroll.scrollTo(scroll.scrollHeight)
       else if (anchor && all.length) {
         const match = keys().get(anchor.key)
@@ -105,5 +107,5 @@ export function useTranscriptReader(timeline: Accessor<TimelineItem[]>, getScrol
   renderer.on("frame", frame)
   client.on("transcript-latest", latest); client.on("transcript-catch-up", catchUp); client.on("remember-reading", remember)
   onCleanup(() => { remember(); alive = false; renderer.off("frame", frame); client.off("transcript-latest", latest); client.off("transcript-catch-up", catchUp); client.off("remember-reading", remember); if (client.readingStatus?.context === context) client.setReadingStatus() })
-  return { following, newCount, notice, latest, catchUp, moved, remember, restoring: () => !ready || restoring }
+  return { following, newCount, notice, latest, catchUp, moved, remember, restoring: () => !ready || restoring || !window.ready() }
 }

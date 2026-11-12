@@ -1,0 +1,39 @@
+{
+  "runtime": "Bun 1.4.2",
+  "platform": "darwin/x64",
+  "viewport": "110x34 then 80x24",
+  "frame_settle_ms": 10,
+  "measurements": [
+    {
+      "messages": 100,
+      "startup_ms": 575,
+      "scroll_ms": 42,
+      "append_ms": 21,
+      "resize_ms": 62,
+      "js_heap_mib": 37,
+      "rss_mib": 242
+    },
+    {
+      "messages": 1000,
+      "startup_ms": 254,
+      "scroll_ms": 40,
+      "append_ms": 25,
+      "resize_ms": 97,
+      "js_heap_mib": 48,
+      "rss_mib": 283
+    },
+    {
+      "messages": 5000,
+      "startup_ms": 218,
+      "scroll_ms": 39,
+      "append_ms": 35,
+      "resize_ms": 76,
+      "js_heap_mib": 63,
+      "rss_mib": 316
+    }
+  ],
+  "implementation": "Native content window (80 items above 160 retained items), measured/estimated spacers, pinned native selection, and one owner for window geometry. Source is in the commit containing this report.",
+  "baseline": "tui-transcript-reading-after.json",
+  "command": "cd ui && bun --preload ./scripts/preload.ts scripts/bench-transcript.tsx",
+  "notes": "One sample per size, sequential datasets in one process; initial native/Markdown warmup affects the first dataset. Native synthetic history, no model/account calls. Identical benchmark and assertions to the baseline: actual latest text visible at startup and exact reading row stable on append. RSS includes native memory and allocator capacity. Selection can temporarily expand the mounted range to preserve selected consumers; clearing it prunes the window. Complete history remains in the authoritative snapshot and search/actions retain original identities."
+}
