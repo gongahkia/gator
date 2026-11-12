@@ -24,8 +24,8 @@ export function Following(props: { inspect(check: FollowingCheck): void; goal(go
   const cards = createMemo(() => {
     const checks = data.state?.checks ?? [], goals = data.state?.following_goals ?? [], known = new Set(goals.map(goal => goal.id))
     return [
-      ...goals.map(goal => ({ key: `goal-${goal.id}`, kind: "goal", title: goal.title, outcome: goal.outcome || checks.find(check => check.goal_id === goal.id)?.outcome, status: goal.status, goal: goal.id, checks: checks.filter(check => check.goal_id === goal.id) })),
-      ...checks.filter(check => !check.goal_id || !known.has(check.goal_id)).map(check => ({ key: `check-${check.id}`, kind: "check", title: check.title, outcome: check.outcome, status: check.state, goal: check.goal_id, checks: [check] })),
+      ...goals.map(goal => ({ key: `goal-${goal.id}`, kind: "goal", title: goal.title, outcome: goal.outcome || checks.find(check => check.goal_id === goal.id)?.outcome, source: goal.source, status: goal.status, goal: goal.id, checks: checks.filter(check => check.goal_id === goal.id) })),
+      ...checks.filter(check => !check.goal_id || !known.has(check.goal_id)).map(check => ({ key: `check-${check.id}`, kind: "check", title: check.title, outcome: check.outcome, source: check.source, status: check.state, goal: check.goal_id, checks: [check] })),
     ]
   })
   const utilities = () => [
@@ -98,7 +98,11 @@ export function Following(props: { inspect(check: FollowingCheck): void; goal(go
         <text height={1} wrapMode="none" truncate fg={selected() === index() ? theme.accent : theme.text.base}><b>{selected() === index() ? "› " : "  "}{literal(card.title)}</b></text>
         <Show when={card.outcome}><text fg={theme.text.base} maxHeight={2}>Outcome: {literal(card.outcome)}</text></Show>
         <Show when={card.kind === "goal" && card.checks.length}><text fg={theme.text.muted}>Goal: {literal(card.status)}</text></Show>
-        <Show when={!card.checks.length}><text fg={theme.text.muted}>{literal(card.status)} · {data.state?.checks_issue ? "Check status unavailable" : "No recurring check attached"}</text><text fg={theme.text.muted}>Next: review the goal or attach a check.</text></Show>
+        <Show when={!card.checks.length}>
+          <text fg={theme.text.muted}>{literal(card.status)} · {data.state?.checks_issue ? "Check status unavailable" : "No recurring check attached"}</text>
+          <text fg={theme.text.base} maxHeight={2}>Next: {data.state?.checks_issue ? "Refresh to verify check coverage." : card.status === "paused" ? "Inspect the retained plan or resume this goal." : "Review the plan or attach a recurring check."}</text>
+          <text fg={theme.text.muted} maxHeight={2}>Workspace: {literal(card.source || "Unavailable; inspect this goal before starting work")}</text>
+        </Show>
         <For each={card.checks}>{check => <box>
           <Show when={check.outcome && check.outcome !== card.outcome}><text fg={theme.text.base} maxHeight={2}>Checks for: {literal(check.outcome)}</text></Show>
           <text fg={check.tone === "error" ? theme.text.feedback.error.base : check.tone === "warning" ? theme.text.feedback.warning.base : theme.text.muted}>{card.checks.length > 1 ? `${literal(check.title)} · ` : ""}{literal(check.state)}{data.state?.checks_issue ? " · Last observed" : ""}</text>
