@@ -26,6 +26,12 @@ Closing or navigating away prevents a late response from reopening the view.
 An already started host read may still finish; closing its presentation does
 not recall an external request.
 
+An answer's contextual actions also expose its retained connected requests.
+Inspect the original account, destination and request record there, or through
+`/receipts`. Supported uncertain Gmail sends offer a saved-check inspection and
+an explicit read-only Sent check. These controls retain the original request
+identity even after changing accounts for future work; they never resend it.
+
 Use Go 1.25.13+, Node 22.12+ for build scripts/shared-host tests, and Bun 1.4.2.
 The selected frontend uses Solid 1.9.15 and OpenTUI 0.6.8 with native platform
 assets; a Node-only terminal launch is not claimed.

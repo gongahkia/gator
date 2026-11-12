@@ -77,6 +77,30 @@ func TestReceiptInspectionRejectsAmbiguityAndCompletedActions(t *testing.T) {
 	}
 }
 
+func TestLatestOnlyReceiptKeepsExactOwnedManifest(t *testing.T) {
+	m, a, calls, got := receiptModel(t)
+	m.lastBundle = cloneBundleSummary(*m.messages[0].bundle)
+	m.messages = nil
+	stale := a
+	stale.ManifestSHA256 = strings.Repeat("f", 64)
+	if next, cmd := m.ApplyReceiptAction(stale); cmd != nil || next.(Model).receiptResult.Error == "" || *calls != 0 {
+		t.Fatal("latest-only receipt accepted a changed manifest")
+	}
+	foreign := a
+	foreign.ConversationID = "other"
+	if next, cmd := m.ApplyReceiptAction(foreign); cmd != nil || next.(Model).receiptResult.Error == "" {
+		t.Fatal("latest-only receipt crossed owners")
+	}
+	next, cmd := m.ApplyReceiptAction(a)
+	if cmd == nil {
+		t.Fatal("latest-only retained receipt unavailable", next.(Model).receiptResult)
+	}
+	next, _ = next.Update(cmd())
+	if *calls != 1 || got.BundlePath != m.lastBundle.Path || next.(Model).receiptResult.Check.ProviderID != "message-one" {
+		t.Fatal("latest-only check lost its original bundle", got)
+	}
+}
+
 func TestReceiptInspectionSerializesAndIgnoresOtherCompletion(t *testing.T) {
 	m, a, calls, _ := receiptModel(t)
 	next, first := m.ApplyReceiptAction(a)

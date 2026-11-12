@@ -67,6 +67,9 @@ func (m Model) ApplyReceiptAction(a ReceiptAction) (tea.Model, tea.Cmd) {
 			break
 		}
 	}
+	if owned == nil && m.lastBundle.RunID == a.RunID && m.lastBundle.ManifestSHA256 == a.ManifestSHA256 {
+		owned = &m.lastBundle
+	}
 	if owned == nil {
 		return reject(errors.New("This retained request changed or belongs to another chat."))
 	}

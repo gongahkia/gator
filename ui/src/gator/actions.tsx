@@ -6,7 +6,6 @@ import { useDialog } from "../ui/dialog"
 import { DialogSelect } from "../ui/dialog-select"
 import { DialogPrompt } from "../ui/dialog-prompt"
 import { DialogConfirm } from "../ui/dialog-confirm"
-import type { BackendBundle, ActionReceipt } from "@gator/application-host/contracts/protocol"
 import { literal } from "./text"
 import { useFiles } from "./files"
 import { PathPicker } from "./path-picker"
@@ -79,25 +78,6 @@ export function useActions() {
       ])
     } })))
   }
-  function receipts() {
-    const state = client.state, conversation_id = state?.conversation_id
-    if (!conversation_id) return
-    const bundles = (state.messages ?? []).flatMap(m => m.bundle ? [m.bundle] : [])
-    const inspect = async (bundle: BackendBundle, receipt: ActionReceipt, action: "inspect" | "check_sent") => {
-      if (!bundle.RunID || !bundle.ManifestSHA256 || !receipt.CorrelationID) throw new Error("This retained receipt has no verifiable manifest for a Sent check. Inspect the connected service before retrying any external action.")
-      const request_id = randomUUID()
-      const result = await client.result({ type: "receipt", receipt: { conversation_id, run_id: bundle.RunID, action_id: receipt.ID, correlation_id: receipt.CorrelationID, manifest_sha256: bundle.ManifestSHA256, action, request_id } }, request_id, s => s.receipt_result)
-      const meaning = result.check?.status === "found" ? "Found in Sent. This confirms a matching Sent message, not recipient delivery." : result.check?.status === "not_checked" ? "No saved Sent check. Inspecting this record does not contact the provider." : "Sent outcome remains unconfirmed. Verify the connected service before considering a new send."
-      details("Saved receipt check", meaning + "\n\n" + JSON.stringify(result.check, null, 2))
-    }
-    const rows = bundles.flatMap(bundle => (bundle.Actions ?? []).map(receipt => ({ bundle, receipt })))
-    rows.push(...(state.action_recoveries ?? []).map(item => ({ bundle: { Path: "", Status: item.receipt.Status, Artifacts: null, Candidates: null, RunID: item.run_id }, receipt: item.receipt })))
-    menu("Connected request receipts", rows.map(({ bundle, receipt }) => ({ title: `${receipt.Operation} · ${receipt.Status}`, description: receipt.Recipient || receipt.Target, run: () => menu("Receipt: " + receipt.Status, [
-      { title: "Inspect recorded request", run: () => details("Request receipt", JSON.stringify(receipt, null, 2)) },
-      { title: "Inspect saved Sent check", disabled: !bundle.ManifestSHA256, run: () => inspect(bundle, receipt, "inspect") },
-      { title: "Check Sent (read only)", disabled: receipt.Operation !== "gmail_send" || receipt.Status !== "unknown" || !bundle.ManifestSHA256, run: () => inspect(bundle, receipt, "check_sent") },
-    ]) })))
-  }
   function models() {
     const chooseModel = () => menu("Models › Choose model", () => {
       const composer = data.state?.composer
@@ -157,7 +137,7 @@ export function useActions() {
       ...(client.state?.dialogue ?? []).filter(turn=>turn.task_chat).map(turn=>({key:turn.id,title:turn.text,description:client.state?.dialogue_peers?.find(peer=>peer.conversation_id===turn.task_chat)?.state || "Outcome unconfirmed",run:()=>client.openSession(turn.task_chat!)})),
     ]),
     "earlier-messages":async()=>{const state=client.state,before=state?.dialogue?.[0]?.sequence;if(!state?.dialogue_more || !before) return details("Earlier messages","All retained conversation messages are loaded.");await client.send({type:"dialogue_page",dialogue_before:before})},
-    drafts, queue, memories, receipts, models,
+    drafts, queue, memories, models,
     recover: () => {
       const context = client.context, disconnected = client.snapshot.connection === "disconnected"
       const sameChat = () => { if (client.context !== context) throw new Error("The conversation changed. Reopen recovery in the intended chat.") }
@@ -167,7 +147,7 @@ export function useActions() {
         ...(!disconnected && client.state?.composer?.readiness && client.state.composer.readiness.state !== "configured" ? [{ title: "Repair model setup", description: client.state.composer.readiness.issue, run: () => { sameChat(); return client.navigate("/setup") } }] : []),
         ...(!disconnected && client.canRetrySubmission ? [{ title: "Retry this message acknowledgement", description: "Uses the original request identity. An already accepted message will not start a second task.", run: () => { sameChat(); if (!client.canRetrySubmission) throw new Error("The draft changed. Send it as a new message when ready."); return client.submit() } }] : []),
         ...(!disconnected ? [{ title: "Inspect retained requests", description: "Review queued or interrupted work before resuming.", run: () => { sameChat(); return queue() } },
-          { title: "Inspect external receipts", description: "Check uncertain sends before considering another action.", run: () => { sameChat(); return receipts() } }] : []),
+          { title: "Inspect external receipts", description: "Check uncertain sends before considering another action.", run: () => { sameChat(); return actions.receipts() } }] : []),
         { title: "Inspect error details", run: () => details("Action details", client.issue || client.snapshot.error || client.snapshot.sessionIssue || "The connection is unavailable.") },
         ...(!disconnected && client.issue ? [{ title: "Dismiss error and keep editing", run: () => { sameChat(); client.issue = ""; client.emit("change") } }] : []),
       ])

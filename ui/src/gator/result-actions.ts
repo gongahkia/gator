@@ -8,6 +8,7 @@ import type { useActions } from "./actions"
 import { conversationBundles } from "./outputs"
 import { displayDate } from "./display"
 import { useReadView } from "./read-view"
+import { useReceiptActions } from "./receipt-actions"
 
 export type ResultTarget =
   | { kind: "message"; context: string; index: number; message: BackendMessage }
@@ -19,6 +20,7 @@ export type ResultTarget =
 export function useResultActions(controls: ReturnType<typeof useActions>) {
   const client = useClient(), clipboard = useClipboard(), toast = useToast(), readView = useReadView()
   const { menu, details, actions, openFile } = controls
+  const receiptMenu = useReceiptActions(controls)
   const contextIsCurrent = (context: string) => {
     if (context !== client.context) throw new Error("Return to the original conversation and select this item again.")
   }
@@ -128,6 +130,7 @@ export function useResultActions(controls: ReturnType<typeof useActions>) {
       ...(bundle?.Artifacts ?? []).map(file => ({ title: `File: ${file.Path}`, description: file.MediaType, run: () => { check(); fileMenu(bundle!, file, context, again) } })),
       ...((bundle?.RunID && bundle.ManifestSHA256) ? [{ title: "Inspect source evidence", run: () => { check(); return sources(bundle!, context, again) } }] : []),
       ...(bundle?.Candidates ?? []).map(candidate => ({ title: `Change ${candidate.ID}`, description: candidate.Status, run: () => { check(); return change(bundle!, candidate, context, again) } })),
+      ...(bundle?.Actions ?? []).map(receipt => ({ title: `Request: ${receipt.Operation}`, description: `${receipt.ConnectorID} · ${receipt.Status} · ${receipt.Recipient || receipt.Target}`, run: () => { check(); receiptMenu(bundle!, receipt, context, again) } })),
       ...(message.input_ids ?? []).map((id, i) => ({ title: `Input: ${message.inputs?.[i] || id}`, run: () => { check(); return openFile({ kind: "upload", id }, undefined, context) } })),
     ], true, back)
   }
