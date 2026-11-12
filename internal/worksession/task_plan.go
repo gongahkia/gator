@@ -163,7 +163,9 @@ func validateTaskPlan(r Request) error {
 		return errors.New("invalid plan boundary")
 	}
 	if p.Content == nil {
-		if p.Revision != 0 || p.Digest != "" || p.Approval != nil || p.Phase != "preparing" && p.Phase != "interrupted" {
+		initial := p.Edit == nil && p.Revision == 0 && p.Digest == "" && (p.Phase == "preparing" || p.Phase == "interrupted")
+		correcting := p.Edit != nil && p.Revision > 0 && p.Digest == p.contentDigest() && (p.Phase == "revising" || p.Phase == "interrupted") && p.Edit.State != "applied"
+		if (!initial && !correcting) || p.Approval != nil {
 			return errors.New("invalid pending plan")
 		}
 	} else if p.Revision == 0 || !validPlanContent(*p.Content, p.Sources) || p.Digest != p.contentDigest() {
@@ -174,7 +176,7 @@ func validateTaskPlan(r Request) error {
 	default:
 		return errors.New("invalid plan phase")
 	}
-	if p.Content == nil && p.Phase != "preparing" && p.Phase != "interrupted" {
+	if p.Content == nil && p.Phase != "preparing" && p.Phase != "revising" && p.Phase != "interrupted" {
 		return errors.New("missing reviewed plan")
 	}
 	if err := validatePlanEdit(r); err != nil {

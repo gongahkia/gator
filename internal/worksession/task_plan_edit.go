@@ -47,7 +47,8 @@ func validatePlanEdit(r Request) error {
 		return nil
 	}
 	e := p.Edit
-	if validID(e.ParentID) != nil || !planDigest(e.TurnID) || !boundedPlanText(e.Instruction, 64*1024) || e.BaseRevision == 0 || e.BaseRevision >= p.Revision || !planDigest(e.BaseDigest) || len(e.Issue) > 4096 {
+	validBase := e.BaseRevision == 0 && e.BaseDigest == "" || e.BaseRevision > 0 && planDigest(e.BaseDigest)
+	if validID(e.ParentID) != nil || !planDigest(e.TurnID) || !boundedPlanText(e.Instruction, 64*1024) || !validBase || e.BaseRevision >= p.Revision || len(e.Issue) > 4096 {
 		return errors.New("invalid plan revision reference")
 	}
 	switch e.State {
@@ -93,8 +94,18 @@ func (s Store) BeginTaskPlanEdit(id, request string, revision uint64, digest, pa
 	if err := s.CheckPlanBinding(id, *r); err != nil {
 		return j, Request{}, false, err
 	}
-	if r.State != "queued" || r.Plan.Content == nil || r.Plan.Phase != "review" && r.Plan.Phase != "approved" || revision >= math.MaxUint64-1 || !boundedPlanText(instruction, 64*1024) {
+	initial := r.State == "queued" && r.Plan.Phase == "preparing" && r.Plan.Content == nil
+	retryInitial := r.State == "interrupted" && r.Plan.Phase == "interrupted" && r.Plan.Content == nil && r.Plan.Approval == nil
+	review := r.State == "queued" && r.Plan.Content != nil && (r.Plan.Phase == "review" || r.Plan.Phase == "approved")
+	if (!initial && !retryInitial && !review) || revision >= math.MaxUint64-1 || !boundedPlanText(instruction, 64*1024) {
 		return j, Request{}, false, ErrPlanChanged
+	}
+	if r.Plan.Edit != nil && r.Plan.Edit.State != "preparing" {
+		// Retain the previous correction's actual receipt before its reference
+		// can be replaced by another explicit correction or retry.
+		if _, err := s.PublishPlanEditResult(id, request); err != nil {
+			return j, Request{}, false, err
+		}
 	}
 	ref := PlanEditReference{ParentID: parent, TurnID: turnID, Instruction: instruction, BaseRevision: revision, BaseDigest: digest}
 	if turn, err := s.planEditMessage(id, *r, ref); err != nil || turn.State != "editing_plan" {
@@ -108,7 +119,7 @@ func (s Store) BeginTaskPlanEdit(id, request string, revision uint64, digest, pa
 	p.Phase, p.Approval = "revising", nil
 	p.Edit = &PlanEdit{PlanEditReference: ref, State: "preparing"}
 	p.Digest = p.contentDigest()
-	r.Plan, r.UpdatedAt, r.Issue = p, time.Now().UTC(), ""
+	r.Plan, r.UpdatedAt, r.Issue, r.State = p, time.Now().UTC(), "", "queued"
 	saved, err := s.SaveRequests(id, j)
 	return saved, *r, err == nil, err
 }
@@ -167,6 +178,9 @@ func (s Store) FinishTaskPlanEdit(id, request string, revision uint64, digest, t
 		p.Edit.State, p.Edit.Issue = "failed", issue
 	}
 	p.Phase, p.Approval = "review", nil
+	if p.Content == nil {
+		p.Phase, r.State = "interrupted", "interrupted"
+	}
 	p.Digest = p.contentDigest()
 	if content != nil {
 		p.Edit.ResultDigest = p.Digest
@@ -213,6 +227,9 @@ func (s Store) PublishPlanEditResult(id, request string) (DialogueTurn, error) {
 			turn.Response = ""
 		default:
 			suffix := " The previous plan is retained for fresh review; no implementation was started."
+			if r.Plan.Content == nil {
+				suffix = " No proposal was saved. The original task and inputs are retained; ask to retry its plan. No implementation was started."
+			}
 			issue := e.Issue
 			for len(issue) > 4096-len(suffix) {
 				_, size := utf8.DecodeLastRuneInString(issue)
