@@ -34,7 +34,7 @@ test("chat commands retain exact plan reviews, frozen evidence and independent b
   const client = new GatorClient(new Application(options))
   const setup = await testRender(() => <App client={client} quit={() => client.close()} clipboard={{ read: async () => ({ data: "", mime: "text/plain" }), write: async () => {} }} />, { width: 110, height: 34 })
   const flush = async () => { await setup.flush(); await Bun.sleep(40); await setup.flush() }
-  const choose = async (text: string) => { await setup.mockInput.typeText(text); await flush(); setup.mockInput.pressEnter(); await flush() }
+  const choose = async (text: string) => { setup.mockInput.pressKey("u", { ctrl: true }); await setup.mockInput.typeText(text); await flush(); setup.mockInput.pressEnter(); await flush() }
   const review = async () => { await client.navigate("/task-plans"); await flush(); await choose("Explain the observed project") }
   try {
     await client.start(); await flush()
@@ -91,7 +91,7 @@ test("source choices and individual specialist controls use live IDs without ove
   }
   const setup = await testRender(() => <App client={client} quit={() => client.close()} clipboard={{ read: async () => ({ data: "", mime: "text/plain" }), write: async () => {} }} />, { width: 90, height: 28 })
   const flush = async () => { await setup.flush(); await Bun.sleep(40); await setup.flush() }
-  const choose = async (text: string) => { await setup.mockInput.typeText(text); await flush(); setup.mockInput.pressEnter(); await flush() }
+  const choose = async (text: string) => { setup.mockInput.pressKey("u", { ctrl: true }); await setup.mockInput.typeText(text); await flush(); setup.mockInput.pressEnter(); await flush() }
   try {
     await client.start(); await client.edit("Keep my unsent message")
     await client.navigate("/sources"); await flush(); await choose("My Gmail")

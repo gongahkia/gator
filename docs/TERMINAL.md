@@ -38,6 +38,11 @@ original inputs, or open the original task for full results, reviews and outputs
 The parent conversation's draft stays in its own composer while inspecting that
 task; `/tasks` returns to the requesting conversation.
 
+Esc from a nested menu or inspection returns to its parent, restoring the search,
+selected item and list position. A new command starts a fresh menu. Ctrl+U clears
+the focused search when choosing a different item after returning. Completed check changes return to the updated Following surface
+instead of reopening controls for an obsolete agreement.
+
 Use Go 1.25.13+, Node 22.12+ for build scripts/shared-host tests, and Bun 1.4.2.
 The selected frontend uses Solid 1.9.15 and OpenTUI 0.6.8 with native platform
 assets; a Node-only terminal launch is not claimed.

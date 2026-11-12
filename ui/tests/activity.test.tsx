@@ -24,7 +24,7 @@ test("real public tool activity folds before the answer, remains searchable when
   let setup = await render()
   const flush = async () => { await setup.flush(); await Bun.sleep(30); await setup.flush() }
   const until = async (predicate: () => boolean, label: string) => { const end = Date.now() + 12000; while (!predicate()) { if (Date.now() > end) throw new Error(label + ": " + client.issue + "\n" + setup.captureCharFrame()); await flush() } }
-  const choose = async (text: string) => { await setup.mockInput.typeText(text); await flush(); setup.mockInput.pressEnter(); await flush() }
+  const choose = async (text: string) => { setup.mockInput.pressKey("u", { ctrl: true }); await setup.mockInput.typeText(text); await flush(); setup.mockInput.pressEnter(); await flush() }
   const activity = async (live = false) => { setup.mockInput.pressKey("p", { ctrl: true }); await flush(); await choose("activity"); await choose(live ? "Inspect live" : "Worked") }
   const search = async () => { setup.mockInput.pressKey("f", { ctrl: true }); await flush(); await choose("check your notes") }
   try {
@@ -33,7 +33,7 @@ test("real public tool activity folds before the answer, remains searchable when
     await client.edit("Keep the next question"); await flush()
     expect(setup.captureCharFrame()).toContain("I will check your notes first.")
     expect(JSON.stringify(client.state?.activity)).not.toContain("Internal fixture body"); expect(JSON.stringify(client.state?.activity)).toContain("source/note.md")
-    await activity(true); expect(setup.captureCharFrame()).toContain("read_file"); setup.mockInput.pressEscape(); await flush()
+    await activity(true); expect(setup.captureCharFrame()).toContain("read_file"); setup.mockInput.pressEscape(); await flush(); setup.mockInput.pressEscape(); await flush()
     release(); await until(() => !client.state?.running, "completed answer"); await flush()
     expect(setup.captureCharFrame()).toContain("Worked for"); expect(setup.captureCharFrame()).not.toContain("I will check your notes first.")
     expect(setup.captureCharFrame()).toContain("Sage Tide is selected.")

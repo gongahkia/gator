@@ -40,6 +40,7 @@ export interface DialogSelectProps<T> {
   flat?: boolean
   filterThreshold?: number
   ref?: (ref: DialogSelectRef<T>) => void
+  restore?: DialogSelectView<T>
   onMove?: (option: DialogSelectOption<T>) => void
   onFilter?: (query: string) => void
   onSelect?: (option: DialogSelectOption<T>) => void
@@ -129,7 +130,9 @@ export function dialogSelectContentWidth(dialogWidth: number) {
   return dialogWidth - DIALOG_LIST_INSET * 2 - 4
 }
 
+export type DialogSelectView<T> = { filter: string; value?: T; scrollTop: number }
 export type DialogSelectRef<T> = {
+  readonly view: DialogSelectView<T>
   filter: string
   filtered: DialogSelectOption<T>[]
   selected: DialogSelectOption<T> | undefined
@@ -151,7 +154,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
 
   const [store, setStore] = createStore({
     selected: 0,
-    filter: "",
+    filter: props.restore?.filter ?? "",
   })
   let selection: { value: T; category?: string } | undefined
   let resetSelection = false
@@ -433,6 +436,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
     }
     if (option) props.onMove?.(option)
     scrollToSelection(center)
+    if (option) scrollAfterLayout(center, option.value)
   }
 
   function scrollToSelection(center: boolean) {
@@ -586,6 +590,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
 
   let scroll: ScrollBoxRenderable | undefined
   const ref: DialogSelectRef<T> = {
+    get view() { return { filter: store.filter, value: selected()?.value, scrollTop: scroll?.scrollTop ?? 0 } },
     get filter() {
       return store.filter
     },
@@ -611,7 +616,25 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
       if (index >= 0) moveTo(index, true)
     },
   }
-  onMount(() => props.ref?.(ref))
+  onMount(() => {
+    const saved = props.restore
+    if (saved) {
+      const index = flat().findIndex(option => isDeepEqual(option.value, saved.value))
+      if (index >= 0) { setStore("selected", index); selection = flat()[index]; resetSelection = false }
+      if (pendingScroll) renderer.off(CliRenderEvents.FRAME, pendingScroll)
+      pendingScroll = () => {
+        pendingScroll = undefined
+        if (store.filter !== saved.filter) return
+        const restored = flat().findIndex(option => isDeepEqual(option.value, saved.value))
+        if (restored >= 0) { setStore("selected", restored); selection = flat()[restored]; resetSelection = false }
+        scroll?.scrollTo(saved.scrollTop)
+        // A resized menu still keeps the restored selection in view.
+        scrollToSelection(false)
+      }
+      renderer.once(CliRenderEvents.FRAME, pendingScroll); renderer.requestRender()
+    }
+    props.ref?.(ref)
+  })
 
   const footerActions = createMemo(() =>
     visibleActions().map((item) => {
@@ -663,6 +686,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
 
   const searchInput = () => (
     <input
+      value={props.restore?.filter ?? ""}
       flexGrow={1}
       onInput={(e) => {
         if (props.locked) return

@@ -15,7 +15,7 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 | 7 | Input and useful transcript remain visible at 110×34, 80×24, 60×20, 42×14 with combined attachments/reply/plan/slash states and multiline drafts. | Implemented; final journey pending | `204386564`; `composer-budget.test.tsx`: 8 file names + plan/reply + multiline input and slash completion, ≥4 transcript rows at all four sizes. |
 | 8 | Approval surface shows exact live action/account/destination/content/consequences; long reviews scroll; changed/stale tokens cannot execute; edits require fresh review. | Implemented; final journey pending | `8ba3a9cb8`; `approval-review.test.tsx`: four sizes, scrolling/exact data, stale and missing previews; `approvals.test.tsx`: real Go token protection and controlled connected send. |
 | 9 | Root command search includes local/backend descriptions/names/aliases, grouped browsing remains usable, and commands requiring values have meaningful typed controls. | In progress | `5f54f7f17`; root search and common permission/theme/source/attachment controls verified in `commands.test.tsx`. Remaining advanced command families still expose explicit advanced syntax; typed controls remain required. |
-| 10 | Back restores menu/filter/selection, draft and reading position consistently; backend pages and file workflows retain context; rail marks the active page. | In progress | Host-managed navigation waits for the Go view acknowledgement; failed views retire and original work/focus is restored. Next-message plan-first intent now persists with text/files/reply context, including empty drafts, restart, commands and newer-draft admission races. Native restart → keyboard submission prepares review without starting work. Menu/filter/selection/back restoration across all flows remains open; active-page rail tests already pass. |
+| 10 | Back restores menu/filter/selection, draft and reading position consistently; backend pages and file workflows retain context; rail marks the active page. | In progress | Host-managed navigation waits for the Go view acknowledgement; failed views retire and original work/focus is restored. Next-message plan-first intent now persists with text/files/reply context, including empty drafts, restart, commands and newer-draft admission races. Native restart → keyboard submission prepares review without starting work. Shared frontend menus and read-only inspections now restore parent query, selected choice and list position, including refreshed/reordered results at all four sizes. New commands/context owners start fresh navigation; successful check changes retire obsolete controls. Typed-editor/file-editor and backend-page restoration across all flows, plus durable reading anchors, remain open; active-page rail tests already pass. |
 | 11 | Ctrl+C cancels/stops without implicit quit; Ctrl+Q quits through guards; help/hints reflect configured bindings; no function-key shortcuts are introduced. | In progress | Idle stop/draft preservation, explicit quit, remapped help/composer/rail verified. Tab now explicitly queues a draft after the active task in its current owner; Enter remains conversational and routes clear corrections. Slash completion/forms retain Tab. The queue shortcut uses the same Go settings backend; four sizes, Ctrl remapping and real-Go queued attachments are checked. Voice/approval/contextual hints and terminal modifier limitations remain. |
 | 12 | Disconnected/error states offer contextual reconnect/recovery with intact drafts/request identity; safe admission retries and uncertain external effects stay distinct. | Implemented; final journey pending | `d00952219`; `interaction-recovery.test.tsx`: real Go accepted request + lost acknowledgement retries once, reconnect keeps draft/owner, no model replay; receipts tests preserve unknown external outcomes. |
 | 13 | New-content/latest/catch-up affordances preserve stable reading anchors across navigation/restart; long-history rendering is benchmarked and optimized when justified. | In progress | Reproducible native benchmark and reports in `docs/benchmarks/`; unchanged entries retain DOM identity across complete Go snapshots. 5,000-message append improved 4,051→747 ms in single samples. Startup/scroll remain too slow; bounded rendering, persistent anchors, catch-up/latest UI still required. |
@@ -45,7 +45,45 @@ finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
 
-- Conversation/delegated-result contextual actions (12 November): the configured
+- Shared frontend Back restoration (12 November, implementation verification in
+  progress): menu navigation retains presentation snapshots per parent/context,
+  without copying execution authority. Back reconstructs explicit parent choices
+  when available, restores search/selection/list position by stable choice key,
+  and keeps input focus. Reopening a new root/context clears navigation. Retired
+  pickers release native references; pending layout restoration is cancelled on
+  cleanup. Selection scrolling now follows the native layout frame, including
+  narrow-list overflow changes. Following page entries start fresh navigation;
+  successful pause/resume retires old agreement controls before its result view.
+  Proposal labels and retained-run status remain explicit in result inspection.
+  Narrow custom queue hints keep the complete configured binding visible.
+  Eight focused native fixture journeys pass at all four sizes, including nested
+  preview → file → result-list Back, exact parent-frame equality and selected
+  identity after rows are removed/reordered. With NO_COLOR and reduced motion:
+  **8 pass, 92 assertions**, 20.36 seconds, in
+  `/tmp/gator-ux-20261112-menu-restoration-no-color.log`.
+  Related result/source/receipt/read/model/command journeys initially passed
+  **19 tests, 357 assertions**; the later Following/navigation/queue check passes
+  **16 tests, 209 assertions** in `menu-restoration-focused-final.log`.
+  First complete terminal run recorded **124 pass / 3 existing skips / 16 fail**
+  (143 tests / 70 files). It exposed old one-Escape-to-close expectations,
+  searches appending to now-restored queries, stale successful-check navigation,
+  missing proposal/status wording from earlier result work and a clipped long
+  custom queue binding. Those are corrected. Tests explicitly exercise Back then
+  close, or Ctrl+U to start a different search, without dropping assertions or
+  changing deadlines. File read failures are checked in their contextual recovery
+  view. The second complete run recorded **139 pass / 3 skips / 1 fail** in
+  `menu-restoration-full-tui-verified.log`; the remaining plan editor journey now
+  explicitly clears its restored query and passes **3 tests, 27 assertions** in
+  `menu-restoration-plan-fixed.log`. Original failure logs are retained.
+  A final complete run is active in
+  `/tmp/gator-ux-20261112-menu-restoration-complete-tui.log`; do not report it as
+  passing before its process exits successfully. This is native-render/controlled
+  Go/provider evidence, with separately identified fixture navigation. Physical
+  terminal verification and the final integrated journey remain unproven.
+  All fifteen criteria remain in scope. Typed editors, file-editor restoration,
+  backend pages and durable conversation reading positions remain under 10/13.
+
+- Conversation/delegated-result contextual actions (`ecd1d9094`, 12 November): the configured
   item shortcut and `/actions` include conversation replies and delegated task
   summaries. Their turn ID, original parent/task identities, retained input IDs
   and peer snapshot stay bound to the selected item; changed turns or mismatched

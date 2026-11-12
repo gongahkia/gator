@@ -23,7 +23,7 @@ test("work details expose latest-only outputs, checked proposals and failures wi
   const client = new GatorClient(host)
   const setup = await testRender(() => <App client={client} quit={() => client.close()} clipboard={{ read: async () => ({ data: "", mime: "text/plain" }), write: async () => {} }} />, { width: 130, height: 50 })
   const flush = async () => { await setup.flush(); await Bun.sleep(30); await setup.flush() }
-  const choose = async (label: string) => { await setup.mockInput.typeText(label); await flush(); setup.mockInput.pressEnter(); await flush() }
+  const choose = async (label: string) => { setup.mockInput.pressKey("u", { ctrl: true }); await setup.mockInput.typeText(label); await flush(); setup.mockInput.pressEnter(); await flush() }
   const command = async (name: string) => { setup.mockInput.pressKey("p", { ctrl: true }); await flush(); await choose(name) }
   const close = async () => { setup.mockInput.pressEscape(); await flush() }
   const transcript = () => { const node = setup.renderer.root.findDescendantById("transcript"); if (!(node instanceof ScrollBoxRenderable)) throw new Error("Missing transcript"); return node }
@@ -41,7 +41,7 @@ test("work details expose latest-only outputs, checked proposals and failures wi
     await command("outputs"); await choose("Change change-one"); expect(setup.captureCharFrame()).toContain("src/example.ts"); expect(setup.captureCharFrame()).toContain("this view does not apply them"); await close()
     await command("outputs"); await choose("report.md"); await choose("Show origin in chat"); expect(setup.captureCharFrame()).toContain("Original output"); expect(client.draft.text).toBe("Keep work-details draft")
     await client.navigate("/files"); await flush(); expect(setup.captureCharFrame()).toContain("failed-report.md"); await choose("failed-report.md")
-    expect(host.fileRequests).toHaveLength(1); expect(host.fileRequests[0]).toMatchObject({ context: "conversation:first", ref: { kind: "output", bundle: latest.Path, path: "failed-report.md" } }); expect(client.issue).toContain("Retained file is unavailable")
+    expect(host.fileRequests).toHaveLength(1); expect(host.fileRequests[0]).toMatchObject({ context: "conversation:first", ref: { kind: "output", bundle: latest.Path, path: "failed-report.md" } }); expect(setup.captureCharFrame()).toContain("Retained file is unavailable"); expect(setup.captureCharFrame()).toContain("Ctrl+R retry read")
     await command("outputs"); await choose("failed-report.md"); await choose("Inspect retained preview")
     host.change({ ...state("second"), following_goals: [{ id: "goal-saved", title: "Saved intention", status: "active" }], checks: [], checks_issue: "Check health is unavailable: schedule could not be read" }); await flush()
     expect(setup.captureCharFrame()).not.toContain("This retained draft needs review."); expect(setup.captureCharFrame()).not.toContain("used-drive"); expect(client.draft.text).toBe("")

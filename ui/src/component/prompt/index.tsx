@@ -26,7 +26,11 @@ export function Prompt() {
   const contextualHint = () => {
     const hasItems = !!data.state?.messages.length || !!data.state?.chat_updates?.length || !!data.state?.dialogue?.length
     const actions = `${hint("gator.context-actions")} actions`, context = `${hint("gator.draft-context")} context`, commands = `/ ${hint("command.palette.show")}`
-    if (dimensions().width < 60) return hasItems ? actions : "/ commands"
+    if (dimensions().width < 60) {
+      const right = hasItems ? actions : "/ commands"
+      const running = `${hint("gator.send")} talk · ${hint("gator.queue")} queue`
+      return data.state?.running && running.length + right.length + 2 > dimensions().width - 6 ? "" : right
+    }
     if (!hasItems) return `${context} · ${commands}`
     return dimensions().width < 100 ? `${actions} · ${commands}` : `${actions} · ${context} · ${commands}`
   }

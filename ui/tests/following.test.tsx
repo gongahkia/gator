@@ -22,7 +22,7 @@ test("Following groups checks with commitments, reveals controls at four sizes, 
   }
   const client = new GatorClient(host), setup = await testRender(() => <App client={client} quit={() => client.close()} clipboard={{ read: async () => ({ data: "", mime: "text/plain" }), write: async () => {} }} />, { width: 110, height: 34 })
   const flush = async () => { await setup.flush(); await Bun.sleep(20); await setup.flush() }
-  const choose = async (text: string) => { await setup.mockInput.typeText(text); await flush(); setup.mockInput.pressEnter(); await flush() }
+  const choose = async (text: string) => { setup.mockInput.pressKey("u", { ctrl: true }); await setup.mockInput.typeText(text); await flush(); setup.mockInput.pressEnter(); await flush() }
   try {
     await client.start(); await client.edit("Keep commitment draft"); await client.navigate("/following"); await flush()
     for (const text of ["Venue planning", "Confirm accessible venue", "Review local service", "Last success:", "mail-account", "Asia/Ho_Chi_Minh", "No recurring check attached", "Daily briefing", "Service offline"]) expect(setup.captureCharFrame()).toContain(text)

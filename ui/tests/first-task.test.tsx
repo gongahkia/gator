@@ -21,7 +21,7 @@ for (const [width, height] of [[110, 34], [80, 24], [60, 20], [42, 14]]) {
     const setup = await testRender(() => <App client={client} quit={() => client.close()} clipboard={{ read: async () => ({ data: "", mime: "text/plain" }), write: async () => {} }} />, { width, height })
     const flush = async () => { await setup.flush(); await Bun.sleep(25); await setup.flush() }
     const until = async (predicate: () => boolean | Promise<boolean>, label: string) => { const end = Date.now() + 10000; while (!await predicate()) { if (Date.now() > end) throw new Error(label + ": " + client.issue + "\n" + setup.captureCharFrame() + "\n" + JSON.stringify(client.state?.panel)); await flush() } }
-    const choose = async (label: string) => { await setup.mockInput.typeText(label); await flush(); setup.mockInput.pressEnter(); await flush() }
+    const choose = async (label: string) => { setup.mockInput.pressKey("u", { ctrl: true }); await setup.mockInput.typeText(label); await flush(); setup.mockInput.pressEnter(); await flush() }
     const select = async (label: string) => {
       await until(() => !!client.state?.panel?.rows?.some(row => row.label === label), "available " + label)
       setup.mockInput.pressKey("f", { ctrl: true }); await flush(); setup.mockInput.pressKey("u", { ctrl: true }); await setup.mockInput.typeText(label); setup.mockInput.pressEnter(); await flush()
@@ -81,7 +81,7 @@ for (const [width, height] of [[110, 34], [80, 24], [60, 20], [42, 14]]) {
       expect(inspected).toContain("Connected accounts selected: None")
       expect(inspected).toContain("may forward them elsewhere")
       expect(inspected).toContain("not token or monetary spending caps")
-      setup.mockInput.pressEscape(); await flush()
+      setup.mockInput.pressEscape(); await flush(); expect(setup.captureCharFrame()).toContain("Request context and limits"); setup.mockInput.pressEscape(); await flush()
       await writeFile(file, "Changed source after private import")
       setup.mockInput.pressEnter(); await until(() => !client.state?.running && !!client.state?.messages.some(message => message.text === "Confirm the venue on Friday."), "first useful result")
       expect(calls.length).toBeGreaterThan(0); expect(calls[0]).toContain("silver otter"); expect(calls.join("\n")).not.toContain("Changed source")
@@ -106,7 +106,7 @@ test("missing and changed model credentials recover without losing or replaying 
   const client = new GatorClient(new Application({ binary: process.env.GATOR_TEST_BINARY || resolve(import.meta.dir, "../runtime/" + (process.platform === "win32" ? "gator-runtime.exe" : "gator-runtime")), workspace: join(root, "workspace"), userData: join(root, "app"), env: { ...process.env, GATOR_STATE_DIR: join(root, "state"), GATOR_CONFIG_DIR: join(root, "config"), GATOR_FIRST_TASK_MISSING_KEY: "" } }))
   const setup = await testRender(() => <App client={client} quit={() => client.close()} clipboard={{ read: async () => ({ data: "", mime: "text/plain" }), write: async () => {} }} />, { width: 80, height: 24 })
   const flush = async () => { await setup.flush(); await Bun.sleep(25); await setup.flush() }
-  const choose = async (text: string) => { await setup.mockInput.typeText(text); await flush(); setup.mockInput.pressEnter(); await flush() }
+  const choose = async (text: string) => { setup.mockInput.pressKey("u", { ctrl: true }); await setup.mockInput.typeText(text); await flush(); setup.mockInput.pressEnter(); await flush() }
   const until = async (predicate: () => boolean) => { const end = Date.now() + 10000; while (!predicate()) { if (Date.now() > end) throw new Error(client.issue + "\n" + setup.captureCharFrame()); await flush() } }
   try {
     await client.start(); await flush()
@@ -114,7 +114,7 @@ test("missing and changed model credentials recover without losing or replaying 
     await setup.mockInput.typeText("Help with my first task"); setup.mockInput.pressEnter(); await flush()
     await choose("Why setup is needed")
     expect(setup.captureCharFrame().replace(/\s+/g, " ")).toContain("GATOR_FIRST_TASK_MISSING_KEY")
-    setup.mockInput.pressEscape(); await flush(); setup.mockInput.pressEnter(); await flush()
+    setup.mockInput.pressEscape(); await flush()
     expect(calls).toBe(0); expect(client.draft.text).toBe("Help with my first task")
     await choose("Choose an already configured model"); await choose("Choose model"); await choose("fixture")
     await until(() => client.state?.provider === "available")

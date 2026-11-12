@@ -69,7 +69,7 @@ test("ordinary messages converse, steer an original task and delegate work witho
     await send("Stop it");expect(routes.at(-1).tasks).toHaveLength(2);expect(client.state?.dialogue?.at(-1)?.state).toBe("clarification")
     expect(client.state?.running).toBe(true)
     releaseChild();await until(()=>!!client.state?.dialogue_peers?.some(peer=>peer.conversation_id===child && peer.state==="completed"),"child result returned")
-    const choose = async (text:string) => { await setup.mockInput.typeText(text); await flush(); setup.mockInput.pressEnter(); await flush() }
+    const choose = async (text:string) => { setup.mockInput.pressKey("u", { ctrl: true }); await setup.mockInput.typeText(text); await flush(); setup.mockInput.pressEnter(); await flush() }
     const childActions = async () => { await client.navigate("/actions"); await flush(); await choose("Read the separate brief") }
     const beforeInspect = work.length + routes.length
     await client.edit("Keep this parent draft"); await client.setPlanFirst(true)

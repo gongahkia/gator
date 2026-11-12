@@ -151,6 +151,7 @@ export function useProductActions(controls: ReturnType<typeof useActions>) {
           const value = exact(), pause = value.enabled
           confirm(`${pause ? "Pause" : "Resume"} ${value.title}?`, [value.outcome, `Sources: ${[value.source, ...(value.connectors ?? [])].filter(Boolean).join(", ") || "None"}`, `Timing: ${value.schedule} · ${value.timezone}`, pause ? "Future checks will stop. A check already running may finish. Its retained results remain available." : "Resume future checks using this saved agreement. This does not start the local service or run a check immediately. Checks require this computer to be awake and their sources accessible."].join("\n\n"), async () => {
             await checkAction(value, pause ? "pause" : "resume")
+            controls.resetMenus()
             details(value.title, pause ? "Check paused. Future checks are stopped; a check already running may finish." : client.state?.supervisor_running ? "Check enabled. The local service will evaluate its next due time while this computer is awake and its sources are accessible." : "Check enabled, but the local service is offline. Open /recovery to review starting it.")
           })
         } },

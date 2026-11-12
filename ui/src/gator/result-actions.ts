@@ -64,7 +64,7 @@ export function useResultActions(controls: ReturnType<typeof useActions>) {
   async function change(bundle: BackendBundle, candidate: NonNullable<BackendBundle["Candidates"]>[number], context: string, back?: () => void) {
     bundleIsCurrent(bundle, context)
     if (!bundle.RunID || !bundle.ManifestSHA256) {
-      details("Code changes", [origin(bundle), `Checks: ${candidate.Status || "Not reported"}`, ...candidate.ChangedPaths, candidate.PatchPath, "This older proposal has no verifiable sealed patch preview. This record does not apply changes."].filter(Boolean).join("\n\n"), back)
+      details("Code changes", ["Proposed changes; this view does not apply them.", origin(bundle), `Checks: ${candidate.Status || "Not reported"}`, ...candidate.ChangedPaths, candidate.PatchPath, "This older proposal has no verifiable sealed patch preview."].filter(Boolean).join("\n\n"), back)
       return
     }
     await readView({ title: "Code changes", context, description: "Reading the retained patch on this device. This does not apply changes.", back, read: () => client.host.codePreview({ context, run: bundle.RunID!, candidate: candidate.ID }), show: result => {
@@ -81,7 +81,7 @@ export function useResultActions(controls: ReturnType<typeof useActions>) {
     const again = () => attempt(() => fileMenu(bundle, file, context, back))
     menu(file.Path, [
       { title: "Open complete file / edit working version", description: "Keep the sealed original; save edits as a working version", run: () => { check(); return openFile({ kind: "output", bundle: bundle.Path, path: file.Path }, undefined, context, again) } },
-      { title: "Inspect retained preview and checks", run: () => { check(); details(file.Path, [file.Valid ? "Checks passed" : "Needs review", origin(bundle), `${file.MediaType} · ${file.Bytes ?? "Unknown"} bytes`, `File hash: ${file.SHA256 || "Unavailable"}`, file.Preview || "No text preview is available for this file.", file.Truncated ? "Showing a shortened preview." : "", "File checks do not confirm external delivery."].filter(Boolean).join("\n\n"), again) } },
+      { title: "Inspect retained preview and checks", run: () => { check(); details(file.Path, [file.Valid ? "Checks passed" : "Needs review", `Retained from a ${bundle.Status} run.`, origin(bundle), `${file.MediaType} · ${file.Bytes ?? "Unknown"} bytes`, `File hash: ${file.SHA256 || "Unavailable"}`, file.Preview || "No text preview is available for this file.", file.Truncated ? "Showing a shortened preview." : "", "File checks do not confirm external delivery."].filter(Boolean).join("\n\n"), again) } },
       { title: "Inspect source evidence", disabled: !bundle.RunID || !bundle.ManifestSHA256, run: () => { check(); return sources(bundle, context, again) } },
       { title: "Show origin in chat", disabled: !client.state?.messages.some(message => message.bundle?.Path === bundle.Path), run: () => {
         check(); const index = client.state!.messages.findIndex(message => message.bundle?.Path === bundle.Path)
@@ -173,7 +173,7 @@ export function useResultActions(controls: ReturnType<typeof useActions>) {
     const context = client.context
     menu("Retained outputs and proposed changes", conversationBundles(client.state).flatMap(bundle => [
       ...(bundle.Artifacts ?? []).map(file => ({ title: file.Path, description: `${file.Valid ? "Checks passed" : "Needs review"} · ${bundle.Status} run`, run: () => fileMenu(bundle, file, context, actions.outputs) })),
-      ...(bundle.Candidates ?? []).map(candidate => ({ title: `Change ${candidate.ID}`, description: candidate.Status, run: () => change(bundle, candidate, context, actions.outputs) })),
+      ...(bundle.Candidates ?? []).map(candidate => ({ title: `Change ${candidate.ID}`, description: `Proposal · ${candidate.Status}`, run: () => change(bundle, candidate, context, actions.outputs) })),
     ]))
   }
   actions.updates = () => {
@@ -197,6 +197,6 @@ export function useResultActions(controls: ReturnType<typeof useActions>) {
     const context = client.context
     menu("Retained code changes", conversationBundles(client.state).flatMap(bundle => (bundle.Candidates ?? []).map(candidate => ({ title: candidate.ID, description: `${candidate.Status} · ${candidate.ChangedPaths.join(", ")}`, run: () => change(bundle, candidate, context, actions.changes) }))))
   }
-  const open = (target?: ResultTarget) => attempt(() => show(target))
+  const open = (target?: ResultTarget) => { controls.resetMenus(); attempt(() => show(target)) }
   client.on("item-actions", open); onCleanup(() => client.off("item-actions", open))
 }

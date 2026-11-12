@@ -15,7 +15,7 @@ export const checkTime = (value?: string, timezone?: string) => {
   catch { return value }
 }
 
-export function Following(props: { inspect(check: FollowingCheck): void; refresh(): Promise<void>; controls: Pick<ReturnType<typeof useActions>, "menu" | "details"> }) {
+export function Following(props: { inspect(check: FollowingCheck): void; refresh(): Promise<void>; controls: Pick<ReturnType<typeof useActions>, "menu" | "details" | "resetMenus"> }) {
   const client = useClient(), data = useData(), theme = useTheme(), dialog = useDialog(), controls = props.controls
   const renderer = useRenderer(), dimensions = useTerminalDimensions()
   const [selected, setSelected] = createSignal(0), [refreshing, setRefreshing] = createSignal(false)
@@ -42,6 +42,7 @@ export function Following(props: { inspect(check: FollowingCheck): void; refresh
   onCleanup(() => { if (reveal) renderer.off("frame", reveal) })
   const attempt = (promise: Promise<unknown>) => { void promise.catch(error => client.fail(error)) }
   function open(index: number) {
+    controls.resetMenus()
     const card = cards()[index]
     if (card) {
       if (card.checks.length === 1) props.inspect(card.checks[0])

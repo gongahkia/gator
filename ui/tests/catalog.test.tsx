@@ -42,7 +42,7 @@ test("keyboard indexed catalog pages, renames, pins and archives by original ide
     setup.mockInput.pressKey("o", { ctrl: true }); await flush(); expect(setup.captureCharFrame()).toContain("Chat shortcuts")
     setup.mockInput.pressEscape(); await flush(); setup.resize(110, 36); await flush()
     await chooseAction("Conversation details"); expect(setup.captureCharFrame()).toContain(workspace)
-    setup.mockInput.pressEscape(); await flush()
+    setup.mockInput.pressEscape(); await flush(); expect(setup.captureCharFrame()).toContain("Conversation details"); setup.mockInput.pressEscape(); await flush()
     setup.mockInput.pressArrow("right", { ctrl: true }); await until(() => loaded() && client.state?.panel?.catalog?.page === 2, "second page")
     setup.mockInput.pressArrow("right", { ctrl: true }); await until(() => loaded() && client.state?.panel?.catalog?.page === 3, "third page")
     expect(client.state?.panel?.catalog?.has_next).toBeFalsy(); setup.mockInput.pressArrow("left", { ctrl: true }); await until(() => loaded() && client.state?.panel?.catalog?.page === 2, "previous page")

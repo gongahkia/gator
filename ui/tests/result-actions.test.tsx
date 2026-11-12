@@ -30,7 +30,7 @@ for (const [width, height] of [[110, 34], [80, 24], [60, 20], [42, 14]]) test(`o
   const setup = await testRender(() => <App client={client} quit={() => client.close()} clipboard={{ read: async () => undefined, write: async text => { copied.push(text) } }} />, { width, height })
   const flush = async () => { await setup.flush(); await Bun.sleep(35); await setup.flush() }
   const until = async (predicate: () => boolean | Promise<boolean>, label: string) => { const end = Date.now() + 20000; while (!await predicate()) { if (Date.now() > end) throw new Error(`${label}: ${client.issue}\n${setup.captureCharFrame()}`); await flush() } }
-  const choose = async (label: string) => { await setup.mockInput.typeText(label); await flush(); setup.mockInput.pressEnter(); await flush() }
+  const choose = async (label: string) => { setup.mockInput.pressKey("u", { ctrl: true }); await setup.mockInput.typeText(label); await flush(); setup.mockInput.pressEnter(); await flush() }
   const escape = async () => { setup.mockInput.pressEscape(); await flush() }
   try {
     await client.start(); await client.send({ type: "submit", text: "/mode draft" }); await client.send({ type: "submit", text: "/artifact report.md" })
@@ -55,7 +55,7 @@ for (const [width, height] of [[110, 34], [80, 24], [60, 20], [42, 14]]) test(`o
     expect(requests).toHaveLength(count)
     // Escape returns through evidence and the original item menu.
     await escape(); await until(() => setup.captureCharFrame().includes("Retained sources"), "back to exact evidence list")
-    await escape(); await until(() => setup.captureCharFrame().includes("Inspect complete result"), "back to original result actions")
+    await escape(); await until(() => setup.captureCharFrame().includes("Inspect source evidence"), "back to filtered original result actions")
     await choose("File: report.md"); await choose("Open complete file")
     await until(() => !!setup.renderer.root.findDescendantById("file-text-editor"), "exact file editor")
     const editor = setup.renderer.root.findDescendantById("file-text-editor") as TextareaRenderable

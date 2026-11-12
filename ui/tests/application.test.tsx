@@ -56,7 +56,7 @@ test("real Go chat admits pasted Unicode only on send, restores drafts and close
     client.emit("action", "work-details"); await setup.flush(); await Bun.sleep(30); setup.mockInput.pressEnter(); await setup.flush(); await Bun.sleep(30)
     expect(setup.captureCharFrame()).toContain("Future work mode")
     setup.mockInput.pressEscape(); await Bun.sleep(75); await setup.flush()
-    setup.resize(50, 20); await setup.flush(); expect(setup.captureCharFrame()).toContain("Gator")
+    expect(setup.captureCharFrame()).toContain("Conversation information"); setup.mockInput.pressEscape(); await Bun.sleep(75); await setup.flush(); setup.resize(50, 20); await setup.flush(); expect(setup.captureCharFrame()).toContain("Gator")
     await client.close(); await setup.dispose()
     const restarted = new GatorClient(new Application(options))
     try {

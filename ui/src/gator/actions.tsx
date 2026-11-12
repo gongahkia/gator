@@ -3,7 +3,6 @@ import { randomUUID } from "node:crypto"
 import { resolve } from "node:path"
 import { useClient } from "../context/client"
 import { useDialog } from "../ui/dialog"
-import { DialogSelect } from "../ui/dialog-select"
 import { DialogPrompt } from "../ui/dialog-prompt"
 import { DialogConfirm } from "../ui/dialog-confirm"
 import { literal } from "./text"
@@ -16,6 +15,7 @@ import { activityKey, activitySummary, activityText, searchableMessage } from ".
 import { useKeyHints } from "./key-hints"
 import { requestContext } from "./request-context"
 import productGuide from "../../../internal/productguide/capabilities.json"
+import { useMenuNavigation } from "./menu-navigation"
 
 export type Choice = { title: string; key?: string; description?: string; category?: string; disabled?: boolean; run(): unknown }
 export function useActions() {
@@ -23,15 +23,12 @@ export function useActions() {
   let previousContext = client.context
   createEffect(() => {
     const context = data.context
-    if (context !== previousContext) { previousContext = context; dialog.clear() }
+    if (context !== previousContext) { previousContext = context; navigation.reset(); dialog.clear() }
   })
   const attempt = (operation: unknown, label = "Working…") => { if (operation instanceof Promise) void client.track(label, operation).catch(e => client.fail(e)) }
-  const menu = (title: string, choices: Choice[] | (() => Choice[]), showDisabled = false, back?: () => void) => dialog.replace(() => <DialogSelect title={title} showDisabled={showDisabled} onCancel={back} options={(typeof choices === "function" ? choices() : choices).map((item, index) => ({
-    title: literal(item.title), description: literal(item.description), category: literal(item.category), disabled: item.disabled, value: item.key ?? index,
-    onSelect: () => { dialog.clear(); try { attempt(item.run(), literal(item.title) + "…") } catch (error) { client.fail(error) } },
-  }))} />)
+  const navigation = useMenuNavigation(attempt), menu = navigation.menu
   const prompt = (title: string, value: string, save: (text: string) => unknown, description?: string) => { const token = Symbol(title); dialog.replace(() => <ActionPrompt token={token} title={title} value={value} save={save} description={description} />, undefined, { key: token }) }
-  const details = (title: string, text: string, back?: () => void) => dialog.replace(() => <Details title={title} text={text} back={back} />, undefined, { size: "xlarge" })
+  const details = (title: string, text: string, back?: () => void) => { const restore = navigation.back(back); dialog.replace(() => <Details title={title} text={text} back={restore} />, undefined, { size: "xlarge" }) }
   const confirm = (title: string, message: string, run: () => unknown) => dialog.replace(() => <DialogConfirm title={title} message={literal(message)} onConfirm={() => { try { attempt(run(), literal(title) + "…") } catch (error) { client.fail(error) } }} />)
   async function drafts() {
     const saved = await client.host.drafts.request({ action: "list" })
@@ -210,10 +207,10 @@ export function useActions() {
   const fileWorkflows = useFiles(menu, prompt)
   actions.files = fileWorkflows.files
   actions["work-activity"] = actions.activity!
-  const trigger = (name: string) => { const action = actions[name]; if (action) { try { attempt(action(), name.replaceAll("-", " ") + "…") } catch (error) { client.fail(error) } } }
-  const clearNavigation = () => dialog.clear()
+  const trigger = (name: string) => { navigation.reset(); const action = actions[name]; if (action) { try { attempt(action(), name.replaceAll("-", " ") + "…") } catch (error) { client.fail(error) } } }
+  const clearNavigation = () => { navigation.reset(); dialog.clear() }
   client.on("navigation", clearNavigation); onCleanup(() => client.off("navigation", clearNavigation))
   client.on("action", trigger); onCleanup(() => client.off("action", trigger))
   client.actions = actions
-  return { menu, prompt, details, confirm, actions, trigger, openFile: fileWorkflows.open }
+  return { menu, prompt, details, confirm, actions, trigger, openFile: fileWorkflows.open, resetMenus: navigation.reset }
 }
