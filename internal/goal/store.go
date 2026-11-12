@@ -206,48 +206,34 @@ func (s Store) List() ([]Record, error) {
 }
 
 func (s Store) SetContext(id, context string) (Record, error) {
-	record, err := s.Load(id)
-	if err != nil {
-		return Record{}, err
-	}
-	record.Context = strings.TrimSpace(context)
-	return s.save(record)
+	return s.changeRecord(id, "", func(record *Record) error {
+		record.Context = strings.TrimSpace(context)
+		return nil
+	})
 }
 
 func (s Store) SetStatus(id string, status Status) (Record, error) {
-	record, err := s.Load(id)
-	if err != nil {
-		return Record{}, err
-	}
 	if status != Active && status != Paused && status != Completed {
 		return Record{}, errors.New("invalid goal status")
 	}
-	record.Status = status
-	return s.save(record)
+	return s.changeRecord(id, "", func(record *Record) error { record.Status = status; return nil })
 }
 
 func (s Store) SetNotificationPolicy(id string, policy NotificationPolicy) (Record, error) {
 	if err := policy.Validate(); err != nil {
 		return Record{}, err
 	}
-	record, err := s.Load(id)
-	if err != nil {
-		return Record{}, err
-	}
-	record.Notifications = policy
-	return s.save(record)
+	return s.changeRecord(id, "", func(record *Record) error { record.Notifications = policy; return nil })
 }
 
 func (s Store) AttachConversation(id, conversationID string) (Record, error) {
-	record, err := s.Load(id)
-	if err != nil {
-		return Record{}, err
-	}
-	if record.ConversationID != "" && record.ConversationID != conversationID {
-		return Record{}, errors.New("goal already has a different conversation")
-	}
-	record.ConversationID = conversationID
-	return s.save(record)
+	return s.changeRecord(id, "", func(record *Record) error {
+		if record.ConversationID != "" && record.ConversationID != conversationID {
+			return errors.New("goal already has a different conversation")
+		}
+		record.ConversationID = conversationID
+		return nil
+	})
 }
 
 func (s Store) save(record Record) (Record, error) {
