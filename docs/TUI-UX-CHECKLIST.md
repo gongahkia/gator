@@ -11,7 +11,7 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 | 3 | Relevant answers expose supplied memory/provenance/correction; noise feedback offers a reviewed, scoped check/notification change and reports its actual outcome. | Pending | |
 | 4 | First task leads through only missing setup; host connectivity and model readiness are distinct; local/cloud processing, capabilities, and work budget are explained. | In progress | `d0fd58e48` provides Go-owned prerequisite/processing/budget projection. Ordinary first submissions offer missing setup while preserving private files/text and plan intent; Host connectivity and model setup have separate labels. Native fresh-profile → invalid provider form → repair → persisted selection → inspect context/limits → explicit useful task passes at all four sizes. Missing and subsequently changed credentials recover without replaying/admitting the rejected task. Request-specific connected-account/access setup handoffs and recovery after provider rejection during an admitted task remain; final integrated journey and live-account/model verification remain. |
 | 5 | Workspace/account/source scope is inspectable near input; conversational/manual settings agree, including terminal preferences, with confirmed outcomes. | In progress | Ctrl+T and /request-context inspect workspace/model processing, selected accounts, inputs, mode and actual Go budgets. Missing account display metadata retains the selected identity. Appearance, navigation and recent-chat grouping now share Go configuration across manual controls, conversational tools, cached owners, CLI theme changes and restart. Legacy frontend values import once; failures do not report saved values. Native four-size settings journeys plus unreadable-import recovery and live-task preservation pass. Full permission explanations, broader account/settings integration and live-model/account verification remain; final combined acceptance journey pending. |
-| 6 | Results/files/updates expose keyboard contextual actions to open/edit/reply/inspect evidence/mark done while retaining original identities and conversation context. | In progress | Configurable Ctrl+E and /actions expose original-item result/file/update controls. Answers join deliverables only by exact run identity. Native four-size journeys inspect retained evidence, copy answers, edit/save working file versions without changing sealed originals, reject other-chat targets, mark done with a correlated Go outcome, restore the original owner and explicitly send an update-bound reply while retaining the newer draft/review intent. Connected-account contextual request/receipt journeys, delayed-read cancellation and broader failure states remain; final combined journey pending. |
+| 6 | Results/files/updates expose keyboard contextual actions to open/edit/reply/inspect evidence/mark done while retaining original identities and conversation context. | In progress | Configurable Ctrl+E and /actions expose original-item result/file/update controls. Answers join deliverables only by exact run identity. Native four-size journeys inspect retained evidence, copy answers, edit/save working file versions without changing sealed originals, reject other-chat targets, mark done with a correlated Go outcome, restore the original owner and explicitly send an update-bound reply while retaining the newer draft/review intent. Delayed source/file reads now close without reopening on late success/failure; exact file-action Back and explicit read retry pass at all four sizes, including an unrelated executing Go task. Connected-account contextual request/receipt journeys and broader failure states remain; final combined journey pending. |
 | 7 | Input and useful transcript remain visible at 110×34, 80×24, 60×20, 42×14 with combined attachments/reply/plan/slash states and multiline drafts. | Implemented; final journey pending | `204386564`; `composer-budget.test.tsx`: 8 file names + plan/reply + multiline input and slash completion, ≥4 transcript rows at all four sizes. |
 | 8 | Approval surface shows exact live action/account/destination/content/consequences; long reviews scroll; changed/stale tokens cannot execute; edits require fresh review. | Implemented; final journey pending | `8ba3a9cb8`; `approval-review.test.tsx`: four sizes, scrolling/exact data, stale and missing previews; `approvals.test.tsx`: real Go token protection and controlled connected send. |
 | 9 | Root command search includes local/backend descriptions/names/aliases, grouped browsing remains usable, and commands requiring values have meaningful typed controls. | In progress | `5f54f7f17`; root search and common permission/theme/source/attachment controls verified in `commands.test.tsx`. Remaining advanced command families still expose explicit advanced syntax; typed controls remain required. |
@@ -44,6 +44,35 @@ Preserve both phases across continuations and do not declare the expanded work
 finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
+
+- Retained-read cancellation and recovery (12 November; builds on the loading
+  view retained in `d0ce6e5e0`): native journeys use real Go-created sealed files
+  and source evidence, with controlled host response delays and one injected
+  temporary file-read failure. Ctrl+C retires the read view and its UI operation;
+  late success/failure cannot reopen it or surface an obsolete error after
+  navigation. Esc returns source reads to their source list, and file reads now
+  retain their original file-action Back callback. Ctrl+R explicitly retries the
+  same bound read. Draft text/review intent and sealed manifests stay intact.
+  Cancelling a file read during a real Go-owned, controlled-provider task leaves
+  that task running with its original owner/control identity, and it finishes
+  when the provider is released. Closing the view does not claim to recall an
+  already started host request. Four-size cancellation/recovery plus existing
+  result/evidence/reply/generated-file/Office journeys pass together: **11 tests,
+  249 assertions**, 85.64 seconds. Typecheck passes. Logs:
+  `/tmp/gator-ux-20261112-read-view-{integrated,final-check}.log`.
+  The same four-size cancellation/recovery journeys also pass with `NO_COLOR=1`
+  and `GATOR_REDUCED_MOTION=1`: **4 tests, 100 assertions**, 15.51 seconds,
+  in `/tmp/gator-ux-20261112-read-view-no-color.log`.
+  The initial test run failed on expecting `null` where the native lookup returns
+  `undefined`; the assertion now follows the observed API. Initial typecheck
+  caught the test wrapper's overloaded file signature; forwarding wrappers retain
+  the host overload type and production contracts remain unchanged. Earlier
+  failures remain in `read-view-{native,typecheck}.log`; the subsequent standalone
+  four-size run passed before adding the file-action Back assertion.
+  These are native/controlled-provider integrations, not physical terminal or
+  live-account checks. All fifteen criteria remain in scope. Contextual connected
+  receipt controls and their account/permission journeys are still open under 6;
+  full menu/filter/reading restoration remains under 10.
 
 - Contextual terminal result actions (11 November): Ctrl+E opens a visible item;
   an explicitly revealed message stays the target until reading moves. `/actions`

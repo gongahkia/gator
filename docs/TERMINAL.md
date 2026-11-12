@@ -19,6 +19,13 @@ as reply context to the current draft. Replies and attached file versions remain
 editable before an explicit send. Changed or unavailable item identities require
 selecting the current item again.
 
+Slow retained reads show a loading view. Ctrl+C closes that view while keeping
+the composer and running work intact; Esc backs out to the originating actions
+when available. A failed read offers Ctrl+R to retry that read explicitly.
+Closing or navigating away prevents a late response from reopening the view.
+An already started host read may still finish; closing its presentation does
+not recall an external request.
+
 Use Go 1.25.13+, Node 22.12+ for build scripts/shared-host tests, and Bun 1.4.2.
 The selected frontend uses Solid 1.9.15 and OpenTUI 0.6.8 with native platform
 assets; a Node-only terminal launch is not claimed.

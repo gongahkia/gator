@@ -19,11 +19,11 @@ import { useReadView } from "./read-view"
 
 export function useFiles(menu: (title: string, choices: Choice[]) => void, prompt: (title: string, value: string, save: (text: string) => unknown, description?: string) => void) {
   const client = useClient(), dialog = useDialog(), readView = useReadView()
-  async function open(ref: FileReference, version?: string, context = client.context) {
+  async function open(ref: FileReference, version?: string, context = client.context, back?: () => unknown) {
     if (context !== client.context) throw new Error("Return to the original conversation before opening this file.")
     const request: FileRequest = { action: "open", context, ref, version }
-    await readView({ title: "Open file", context, description: "Reading the retained file on this device. Your draft and original file are kept.", read: () => client.host.file(request), show: view => {
-      dialog.replace(() => <FileEditor view={view} request={request} reopen={version => open(ref, version, context)} menu={menu} prompt={prompt} />, undefined, { size: "xlarge" })
+    await readView({ title: "Open file", context, description: "Reading the retained file on this device. Your draft and original file are kept.", back, read: () => client.host.file(request), show: view => {
+      dialog.replace(() => <FileEditor view={view} request={request} reopen={version => open(ref, version, context, back)} menu={menu} prompt={prompt} />, undefined, { size: "xlarge" })
     } })
   }
   function files() {

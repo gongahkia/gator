@@ -77,7 +77,7 @@ export function useResultActions(controls: ReturnType<typeof useActions>) {
     check()
     const again = () => attempt(() => fileMenu(bundle, file, context, back))
     menu(file.Path, [
-      { title: "Open complete file / edit working version", description: "Keep the sealed original; save edits as a working version", run: () => { check(); return openFile({ kind: "output", bundle: bundle.Path, path: file.Path }, undefined, context) } },
+      { title: "Open complete file / edit working version", description: "Keep the sealed original; save edits as a working version", run: () => { check(); return openFile({ kind: "output", bundle: bundle.Path, path: file.Path }, undefined, context, again) } },
       { title: "Inspect retained preview and checks", run: () => { check(); details(file.Path, [file.Valid ? "Checks passed" : "Needs review", origin(bundle), `${file.MediaType} · ${file.Bytes ?? "Unknown"} bytes`, `File hash: ${file.SHA256 || "Unavailable"}`, file.Preview || "No text preview is available for this file.", file.Truncated ? "Showing a shortened preview." : "", "File checks do not confirm external delivery."].filter(Boolean).join("\n\n"), again) } },
       { title: "Inspect source evidence", disabled: !bundle.RunID || !bundle.ManifestSHA256, run: () => { check(); return sources(bundle, context, again) } },
       { title: "Show origin in chat", disabled: !client.state?.messages.some(message => message.bundle?.Path === bundle.Path), run: () => {
