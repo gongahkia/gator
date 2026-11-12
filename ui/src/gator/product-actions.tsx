@@ -2,14 +2,17 @@ import { randomUUID } from "node:crypto"
 import { useClient } from "../context/client"
 import { useData } from "../context/data"
 import type { useActions } from "./actions"
-import type { ChatUpdate, CheckAction, FollowingCheck, PlanContent, TaskPlanReview, TaskPlanSummary } from "@gator/application-host/contracts/protocol"
+import type { ChatUpdate, CheckAction, FollowingCheck, FollowingGoal, GoalAction, PlanContent, TaskPlanReview, TaskPlanSummary } from "@gator/application-host/contracts/protocol"
+import { useReadView } from "./read-view"
 
 // Optional management stays behind commands. All mutations use the current
 // Go protocol, including its live tokens, revisions and acknowledgements.
 export function useProductActions(controls: ReturnType<typeof useActions>) {
   const client = useClient(), data = useData()
+  const readView = useReadView()
   const { menu, prompt, details, confirm, actions } = controls
   const planEdits = new Map<string, PlanContent>()
+  let goalFailure: { id: string; context: string; message: string } | undefined
   const owner = () => {
     const id = client.state?.conversation_id
     if (!id) throw new Error("Wait for this conversation to open.")
@@ -140,8 +143,63 @@ export function useProductActions(controls: ReturnType<typeof useActions>) {
     await client.result({ type: "check", check: value }, request_id, s => s.check_result)
     client.route = action === "inspect" || action === "edit" ? "chat" : "following"; client.emit("change")
   }
+  async function goalAction(value: FollowingGoal, action: GoalAction["action"]) {
+    if (action !== "inspect" && client.state?.running && !await client.navigate("/followup")) return
+    if (action !== "inspect" && client.state?.running) throw new Error("Wait for the goal management view to open.")
+    const request_id = randomUUID()
+    const goal: GoalAction = action === "inspect" ? { request_id, id: value.id, action } : { request_id, id: value.id, action, digest: value.digest! }
+    const context = client.context, previousFailure = goalFailure
+    try {
+      const result = await client.result({ type: "goal", goal }, request_id, state => state.goal_result)
+      if (!result.review || result.review.id !== value.id) throw new Error("The selected goal was not confirmed. Refresh Following before retrying.")
+      if (goalFailure === previousFailure && goalFailure?.id === value.id && goalFailure.context === context && goalFailure.message === client.issue) { client.issue = ""; goalFailure = undefined }
+      if (action !== "inspect") client.route = "following"
+      client.emit("change")
+      return result.review
+    } catch (error) {
+      if (client.context === context) goalFailure = { id: value.id, context, message: error instanceof Error ? error.message : String(error) }
+      throw error
+    }
+  }
+  function goalCommitment(goal: FollowingGoal) {
+    const current = () => client.state?.following_goals?.find(item => item.id === goal.id)
+    const exact = () => {
+      const value = current()
+      if (!value?.controllable || !value.digest || value.digest !== goal.digest) {
+        const message = "This goal changed. Refresh Following and review its current responsibility."
+        goalFailure = { id: goal.id, context: client.context, message }
+        throw new Error(message)
+      }
+      return value
+    }
+    const checks = client.state?.checks?.filter(check => check.goal_id === goal.id) ?? []
+    menu(`Goal · ${goal.title}`, [
+      ...checks.map(check => ({ key: `check:${check.id}`, title: check.title, description: `${check.state} · ${check.next_action}`, run: () => commitment(check) })),
+      { key: "inspect-goal", title: "Inspect goal and retained plan", description: "Current outcome, workspace, plan steps and check coverage", disabled: !goal.controllable, run: () => readView({
+        title: "Inspect " + goal.title, context: client.context, description: "Reading this goal and its retained plan on this device. Current work and drafts are kept.",
+        back: () => { const value = current(); if (value) goalCommitment(value) },
+        read: async () => { const review = await goalAction(goal, "inspect"); if (!review) throw new Error("The goal read was not confirmed."); return review },
+        show: review => details(review.title, review.lines.join("\n\n"), () => { const value = current(); if (value) goalCommitment(value) }),
+      }) },
+      { key: "goal-chat", title: "Goal and plan", description: goal.status === "paused" ? "Resume before starting goal work; inspection remains available" : checks.length ? "Intended work and retained progress" : "Not monitored automatically", disabled: goal.status !== "active", run: () => client.openGoal(goal.id) },
+      { key: "goal-status", title: goal.status === "paused" ? "Resume this goal" : "Pause this goal", description: "Review the exact goal; saved check agreements stay intact", disabled: !goal.controllable, run: () => {
+        const value = exact(), pause = value.status === "active", context = client.context
+        confirm(`${pause ? "Pause" : "Resume"} goal: ${value.title}?`, [value.outcome, `Goal: ${value.id}`, `Workspace: ${value.source || "Unavailable"}`,
+          ...checks.map(check => `Check: ${check.title} · ${check.id} · ${check.schedule} · ${check.timezone}`),
+          pause ? "Future checks for this goal will not start. A foreground task or check already running may finish. Other goals and checks stay unchanged." : "The goal becomes active. Its enabled checks use their current saved agreements; paused or ended checks stay paused or ended. This does not start a foreground task or the local service. Checks require an awake computer and accessible sources.",
+          "Saved plans, history, drafts and check settings are retained."].filter(Boolean).join("\n\n"), async () => {
+          const review = await goalAction(value, pause ? "pause" : "resume")
+          if (!review) return
+          controls.resetMenus()
+          details(value.title, pause ? "Goal paused. Future checks for this goal are stopped; current work may finish. Its saved plan and check agreements are retained." : review.enabled_checks ? "Goal active. Enabled checks use their saved agreements when the service and sources are available. Paused or ended checks are not re-enabled." : "Goal active. No recurring check is enabled, so it is not monitored automatically. Attach or enable a reviewed check in Following.")
+        }, () => { if (client.context === context) goalCommitment(value) })
+      } },
+      ...(!checks.length ? [{ key: "attach-check", title: "Attach a recurring check", description: goal.status === "active" ? "Review sources and timing for this goal" : "Resume the goal before attaching a check", disabled: goal.status !== "active", run: () => client.prepareGoalCheck(goal.id) }] : []),
+    ], true)
+  }
   function commitment(check: FollowingCheck) {
     const current = () => client.state?.checks?.find(item => item.id === check.id)
+    const goal = client.state?.following_goals?.find(goal => goal.id === check.goal_id)
     const exact = () => { const value = current(); if (!value || value.digest !== check.digest) throw new Error("This check changed. Refresh Following and review its current agreement."); return value }
     menu(check.title, [
       { title: "Inspect agreement and check health", description: check.issue || check.health, run: () => checkAction(exact(), "inspect") },
@@ -151,7 +209,8 @@ export function useProductActions(controls: ReturnType<typeof useActions>) {
           confirmCheckPause(exact())
         } },
       { title: "Review local service", run: () => client.navigate("/recovery") },
-      ...(check.goal_id ? [{ title: "Goal and plan", description: "Open this commitment's own conversation", run: () => client.openGoal(check.goal_id!) }] : []),
+      ...(check.goal_id ? [{ title: "Goal and plan", description: "Open this commitment's own conversation", disabled: goal?.status === "paused", run: () => client.openGoal(check.goal_id!) }] : []),
+      ...(goal?.controllable ? [{ title: "Goal controls and retained plan", description: "Inspect, pause or resume this exact goal", run: () => goalCommitment(goal) }] : []),
     ], true)
   }
   function confirmCheckPause(value: FollowingCheck) {
@@ -180,5 +239,5 @@ export function useProductActions(controls: ReturnType<typeof useActions>) {
       { title: "Keep feedback only", description: "Your assessment is saved; no check behavior has changed", run: () => details("Feedback saved", `Noise feedback is saved for ${update.title}. No check behavior was changed. You can review ${check.title} in Following later.`) },
     ], true)
   }
-  return { commitment, reviewNoise, refreshChecks: () => checkAction(undefined, "refresh") }
+  return { commitment, goalCommitment, reviewNoise, refreshChecks: () => checkAction(undefined, "refresh") }
 }

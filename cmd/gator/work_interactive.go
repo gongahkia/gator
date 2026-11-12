@@ -244,6 +244,22 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			return workhome.Read(stateDir, freshGoals, freshInbox)
 		},
 		ListGoals: goalStore.List,
+		ReadGoalReview: func(id string) (goal.Record, goal.Plan, error) {
+			record, err := goalStore.Load(id)
+			if err != nil {
+				return record, goal.Plan{}, err
+			}
+			plan, err := goalStore.LoadPlan(id)
+			return record, plan, err
+		},
+		SetGoalStatusReviewed: func(id string, status goal.Status, digest string) (goal.Record, error) {
+			release, err := state.Guard(stateDir, false)
+			if err != nil {
+				return goal.Record{}, err
+			}
+			defer release()
+			return goalStore.SetStatusReviewed(id, status, digest)
+		},
 		SelectGoal: func(id string) (workapp.GoalState, error) {
 			record, err := goalStore.Load(id)
 			if err != nil {

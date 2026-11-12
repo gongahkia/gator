@@ -1,7 +1,7 @@
 import { For, Show, createMemo, createSignal, createEffect, onCleanup } from "solid-js"
 import { useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/solid"
 import { TextAttributes, type ScrollBoxRenderable } from "@opentui/core"
-import type { FollowingCheck } from "@gator/application-host/contracts/protocol"
+import type { FollowingCheck, FollowingGoal } from "@gator/application-host/contracts/protocol"
 import { useClient } from "../context/client"
 import { useData } from "../context/data"
 import { useTheme } from "../context/theme"
@@ -15,10 +15,11 @@ export const checkTime = (value?: string, timezone?: string) => {
   catch { return value }
 }
 
-export function Following(props: { inspect(check: FollowingCheck): void; refresh(): Promise<void>; controls: Pick<ReturnType<typeof useActions>, "menu" | "details" | "resetMenus"> }) {
+export function Following(props: { inspect(check: FollowingCheck): void; goal(goal: FollowingGoal): void; refresh(): Promise<void>; controls: Pick<ReturnType<typeof useActions>, "menu" | "details" | "resetMenus"> }) {
   const client = useClient(), data = useData(), theme = useTheme(), dialog = useDialog(), controls = props.controls
   const renderer = useRenderer(), dimensions = useTerminalDimensions()
   const [selected, setSelected] = createSignal(0), [refreshing, setRefreshing] = createSignal(false)
+  let previousKeys: string[] = []
   let scroll: ScrollBoxRenderable | undefined, reveal: (() => void) | undefined
   const cards = createMemo(() => {
     const checks = data.state?.checks ?? [], goals = data.state?.following_goals ?? [], known = new Set(goals.map(goal => goal.id))
@@ -33,10 +34,22 @@ export function Following(props: { inspect(check: FollowingCheck): void; refresh
   ]
   const count = () => cards().length + utilities().length + 1
   createEffect(() => {
-    dimensions(); const index = Math.min(selected(), count() - 1)
+    dimensions()
+    const keys = [...cards().map(card => card.key), ...utilities().map(item => `utility:${item[1]}`), "how-following-runs"]
+    const retained = previousKeys[selected()], restored = retained ? keys.indexOf(retained) : -1
+    const index = restored >= 0 ? restored : Math.min(selected(), count() - 1)
+    previousKeys = keys
     if (selected() !== index) setSelected(index)
     if (reveal) renderer.off("frame", reveal)
-    reveal = () => { if (scroll && !scroll.isDestroyed) scroll.scrollChildIntoView(`following-item-${index}`); reveal = undefined }
+    reveal = () => {
+      const node = scroll?.content.getChildren().find(node => node.id === `following-item-${index}`)
+      if (scroll && !scroll.isDestroyed && node) {
+        const top = scroll.viewport.screenY, bottom = top + scroll.viewport.height
+        if (node.height >= scroll.viewport.height || node.screenY < top) scroll.scrollBy(node.screenY - top)
+        else if (node.screenY + node.height > bottom) scroll.scrollBy(node.screenY + node.height - bottom)
+      }
+      reveal = undefined
+    }
     renderer.once("frame", reveal)
   })
   onCleanup(() => { if (reveal) renderer.off("frame", reveal) })
@@ -46,6 +59,7 @@ export function Following(props: { inspect(check: FollowingCheck): void; refresh
     const card = cards()[index]
     if (card) {
       if (card.checks.length === 1) props.inspect(card.checks[0])
+      else if (card.kind === "goal" && client.state?.following_goals?.find(goal => goal.id === card.goal)?.controllable) props.goal(client.state!.following_goals!.find(goal => goal.id === card.goal)!)
       else controls.menu(card.title, [
         ...card.checks.map(check => ({ title: check.title, description: `${check.state} · ${check.next_action}`, run: () => props.inspect(check) })),
         { title: "Goal and plan", description: card.checks.length ? "Intended work and retained progress" : "Not monitored automatically", run: () => client.openGoal(card.goal!) },

@@ -29,7 +29,7 @@ export function useActions() {
   const navigation = useMenuNavigation(attempt), menu = navigation.menu
   const prompt = (title: string, value: string, save: (text: string) => unknown, description?: string) => { const token = Symbol(title); dialog.replace(() => <ActionPrompt token={token} title={title} value={value} save={save} description={description} />, undefined, { key: token }) }
   const details = (title: string, text: string, back?: () => void) => { const restore = navigation.back(back); dialog.replace(() => <Details title={title} text={text} back={restore} />, undefined, { size: "xlarge" }) }
-  const confirm = (title: string, message: string, run: () => unknown) => dialog.replace(() => <DialogConfirm title={title} message={literal(message)} onConfirm={() => { try { attempt(run(), literal(title) + "…") } catch (error) { client.fail(error) } }} />)
+  const confirm = (title: string, message: string, run: () => unknown, cancel?: () => void) => dialog.replace(() => <DialogConfirm title={title} message={literal(message)} onCancel={cancel ? () => queueMicrotask(cancel) : undefined} onConfirm={() => { try { attempt(run(), literal(title) + "…") } catch (error) { client.fail(error) } }} />)
   async function drafts() {
     const saved = await client.host.drafts.request({ action: "list" })
     menu("Unsent drafts", [

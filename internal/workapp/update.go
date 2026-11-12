@@ -165,6 +165,8 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case bridgeCheckDone:
 		return m.finishBridgeCheck(value)
+	case bridgeGoalDone:
+		return m.finishBridgeGoal(value)
 	case checksTick:
 		m.refreshChatUpdates()
 		m.refreshChatMemories()

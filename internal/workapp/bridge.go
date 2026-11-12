@@ -31,6 +31,8 @@ type BridgeState struct {
 	DialogueTask            *DialogueTaskState      `json:"dialogue_task,omitempty"`
 	DialoguePeers           []DialoguePeer          `json:"dialogue_peers,omitempty"`
 	CheckResult             *BridgeCheckResult      `json:"check_result,omitempty"`
+	GoalResult              *BridgeGoalResult       `json:"goal_result,omitempty"`
+	GoalBusy                bool                    `json:"goal_busy,omitempty"`
 	SupervisorRunning       bool                    `json:"supervisor_running"`
 	TaskPlans               []TaskPlanSummary       `json:"task_plans,omitempty"`
 	TaskPlanResult          *TaskPlanResult         `json:"task_plan_result,omitempty"`
@@ -189,10 +191,13 @@ type BridgeCheck struct {
 }
 
 type BridgeFollowingGoal struct {
-	ID      string `json:"id"`
-	Title   string `json:"title"`
-	Status  string `json:"status"`
-	Outcome string `json:"outcome,omitempty"`
+	ID           string `json:"id"`
+	Title        string `json:"title"`
+	Status       string `json:"status"`
+	Outcome      string `json:"outcome,omitempty"`
+	Digest       string `json:"digest,omitempty"`
+	Source       string `json:"source,omitempty"`
+	Controllable bool   `json:"controllable,omitempty"`
 }
 
 // BridgeWorkDetails contains selections for new requests and the latest
@@ -300,7 +305,8 @@ func (m Model) BridgeState() BridgeState {
 	if m.bridgeFollowingIssue == "" {
 		for _, record := range m.config.Goals {
 			if record.Status == "active" || record.Status == "paused" {
-				state.FollowingGoals = append(state.FollowingGoals, BridgeFollowingGoal{ID: record.ID, Title: singleLine(record.Title), Status: string(record.Status), Outcome: record.Context})
+				digest, _ := record.ReviewDigest()
+				state.FollowingGoals = append(state.FollowingGoals, BridgeFollowingGoal{ID: record.ID, Title: singleLine(record.Title), Status: string(record.Status), Outcome: record.Context, Digest: digest, Source: record.SourcePath, Controllable: digest != "" && m.config.ReadGoalReview != nil && m.config.SetGoalStatusReviewed != nil && m.config.ListGoals != nil && m.config.ReadChecks != nil})
 			}
 		}
 	}
@@ -310,6 +316,8 @@ func (m Model) BridgeState() BridgeState {
 	}
 	state.OverviewIssue = m.overviewIssue
 	state.CheckResult, state.SupervisorRunning = m.bridgeCheckResult, m.config.SupervisorRunning
+	state.GoalResult = m.bridgeGoalResult
+	state.GoalBusy = m.bridgeGoalBusy
 	for _, check := range m.checks {
 		digest, _ := check.Definition.PolicyDigest()
 		state.Checks = append(state.Checks, BridgeCheck{ID: check.ID, Digest: digest, GoalID: check.GoalID, Title: singleLine(check.Title), Outcome: check.Outcome, Health: check.HealthLine(), State: check.State, Tone: checkTone(check.State), Source: check.Definition.SourcePath, Connectors: append([]string(nil), check.Definition.ConnectorIDs...), Timezone: check.Definition.Timezone, Schedule: check.Definition.Schedule, NextDue: bridgeCheckTime(check.NextDue), LastSuccess: bridgeCheckTime(check.LastSuccess), NextAction: check.NextAction, Issue: check.Issue, EndsAt: bridgeCheckTime(check.Definition.EndsAt), Enabled: check.Enabled, Editable: check.Definition.GoalWatch})

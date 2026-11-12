@@ -23,6 +23,7 @@ type uiFrame struct {
 	DialogueTurn    string                             `json:"dialogue_turn,omitempty"`
 	DialogueBefore  uint64                             `json:"dialogue_before,omitempty"`
 	Check           *workapp.BridgeCheckAction         `json:"check,omitempty"`
+	Goal            *workapp.BridgeGoalAction          `json:"goal,omitempty"`
 	TaskPlan        *workapp.TaskPlanAction            `json:"task_plan,omitempty"`
 	Branch          *workapp.BranchAction              `json:"branch,omitempty"`
 	Receipt         *workapp.ReceiptAction             `json:"receipt,omitempty"`
@@ -168,6 +169,10 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 		case "check":
 			if frame.Check != nil {
 				next, command = m.model.ApplyBridgeCheck(*frame.Check)
+			}
+		case "goal":
+			if frame.Goal != nil {
+				next, command = m.model.ApplyBridgeGoal(*frame.Goal)
 			}
 		case "branch":
 			if frame.Branch != nil {

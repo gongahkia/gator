@@ -120,11 +120,16 @@ export type FollowingCheck = {
   next_action: string; issue?: string; ends_at?: string; enabled: boolean; editable: boolean;
 };
 export type CheckAction = {request_id: string} & ({action: "refresh"} | {action: "setup"; id: string} | {action: "inspect" | "edit" | "pause" | "resume"; id: string; digest: string});
+export type FollowingGoal = {id: string; title: string; status: string; outcome?: string; source?: string; digest?: string; controllable?: boolean};
+export type GoalAction = {request_id: string; id: string} & ({action: "inspect"} | {action: "pause" | "resume"; digest: string});
+export type GoalReview = {id: string; digest: string; title: string; status: string; lines: string[]; enabled_checks: number};
 export type BackendState = {
  dialogue?: DialogueMessage[]; dialogue_more?: boolean; dialogue_issue?: string; dialogue_busy?: boolean; dialogue_active?: boolean;
  dialogue_peers?: DialoguePeer[];
  dialogue_task?: DialoguePeer & {parent_id:string};
  check_result?: {request_id: string; error?: string};
+ goal_result?: {request_id: string; error?: string; review?: GoalReview};
+ goal_busy?: boolean;
  supervisor_running?: boolean;
  task_plans?:TaskPlanSummary[];
  task_plan_result?:TaskPlanResult;
@@ -170,7 +175,7 @@ export type BackendState = {
   };
   checks?: FollowingCheck[];
   checks_issue?: string;
-  following_goals?: { id: string; title: string; status: string; outcome?: string }[];
+  following_goals?: FollowingGoal[];
   following_issue?: string;
   provider?: string;
   model?: string;
@@ -219,9 +224,10 @@ export type SpecialistAction = {
 };
 export type Frame = {
   version: 1;
-  type: "terminal_preferences" | "dialogue_page" | "receipt" | "memory" | "update" | "submit" | "upload_submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "specialist" | "conversation" | "composer" | "sources" | "branch" | "task_plan" | "check";
+  type: "terminal_preferences" | "dialogue_page" | "receipt" | "memory" | "update" | "submit" | "upload_submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "specialist" | "conversation" | "composer" | "sources" | "branch" | "task_plan" | "check" | "goal";
  dialogue_before?:number;
   check?: CheckAction;
+  goal?: GoalAction;
   specialist?: SpecialistAction;
   memory?: ChatMemoryAction;
   receipt?: {conversation_id: string; run_id: string; action_id: string; correlation_id: string; manifest_sha256: string; action: "inspect" | "check_sent"; request_id: string};

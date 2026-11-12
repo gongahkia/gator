@@ -130,6 +130,9 @@ func (m Model) finishBridgeCheck(value bridgeCheckDone) (tea.Model, tea.Cmd) {
 	m.followupSaving = false
 	next, _ := m.Update(value.Refreshed)
 	m = next.(Model)
+	if value.Action.Action == "refresh" {
+		m.refreshBridgeFollowing()
+	}
 	m.bridgeCheckResult = &BridgeCheckResult{RequestID: value.Action.RequestID}
 	if value.Err != nil {
 		m.bridgeCheckResult.Error = value.Err.Error()

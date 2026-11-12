@@ -42,6 +42,7 @@ export function validateFrame(frame) {
     memory: ["type", "memory"],
     receipt: ["type", "receipt"],
     check: ["type", "check"],
+    goal: ["type", "goal"],
     dialogue_page: ["type", "dialogue_before"],
   }[frame.type];
   if (!allowed || Object.keys(frame).some((key) => !allowed.includes(key))) throw new Error("Unsupported desktop action");
@@ -52,6 +53,10 @@ export function validateFrame(frame) {
     const v = frame.check;
     if (!v || typeof v !== "object" || Array.isArray(v) || Object.keys(v).some(key => !["request_id", "action", "id", "digest"].includes(key)) || typeof v.request_id !== "string" || !/^[a-zA-Z0-9-]{1,64}$/.test(v.request_id) || !["refresh", "setup", "inspect", "edit", "pause", "resume"].includes(v.action)) throw new Error("Invalid check action");
     if (v.action === "refresh" ? v.id !== undefined || v.digest !== undefined : typeof v.id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/.test(v.id) || (v.action === "setup" ? v.digest !== undefined : typeof v.digest !== "string" || !/^[a-f0-9]{64}$/.test(v.digest))) throw new Error("Invalid check identity");
+  }
+  if (frame.type === "goal") {
+    const v = frame.goal;
+    if (!v || typeof v !== "object" || Array.isArray(v) || Object.keys(v).some(key => !["request_id", "action", "id", "digest"].includes(key)) || typeof v.request_id !== "string" || !/^[a-zA-Z0-9-]{1,64}$/.test(v.request_id) || typeof v.id !== "string" || !/^goal-[a-fA-F0-9]{24}$/.test(v.id) || !["inspect", "pause", "resume"].includes(v.action) || (v.action === "inspect" ? v.digest !== undefined : typeof v.digest !== "string" || !/^[a-f0-9]{64}$/.test(v.digest))) throw new Error("Invalid goal control");
   }
   if (frame.type === "upload_submit") {
     const value = frame.upload;

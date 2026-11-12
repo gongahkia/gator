@@ -93,7 +93,7 @@ function Shell(props: { quit(): Promise<void>; voice?: VoiceSession }) {
   return <box width="100%" height="100%" backgroundColor={theme.background.base}>
     <box height={1} marginY={1} paddingX={2} gap={2} flexDirection="row" justifyContent="space-between"><text flexGrow={1} flexShrink={1} minWidth={0} height={1} wrapMode="none" truncate fg={theme.text.muted}><b style={{ fg: theme.text.base }}>🐊 Gator</b>  {literal(data.state?.title) || "Opening chat…"}</text><ConnectionStatus connection={data.snapshot.connection} error={!!data.snapshot.error} /></box>
     <SessionFrame sidebar={!data.preferences.sidebarCollapsed} search={palette}>
-      <Show when={data.route === "chat"} fallback={<Show when={data.route === "following"} fallback={<Hub />}><Following controls={controls} inspect={product.commitment} refresh={product.refreshChecks} /></Show>}><Show when={data.state?.panel} fallback={<><Transcript /><Prompt /></>}>{panel => <Panel panel={panel()} />}</Show></Show>
+      <Show when={data.route === "chat"} fallback={<Show when={data.route === "following"} fallback={<Hub />}><Following controls={controls} inspect={product.commitment} goal={product.goalCommitment} refresh={product.refreshChecks} /></Show>}><Show when={data.state?.panel} fallback={<><Transcript /><Prompt /></>}>{panel => <Panel panel={panel()} />}</Show></Show>
     </SessionFrame>
     <RecoveryNotice open={() => controls.trigger("recover")} />
     <VoiceNotice />

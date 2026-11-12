@@ -11,6 +11,22 @@ import { FixtureHost, state } from "./fixture"
 
 const check = (id: string, goal_id?: string): FollowingCheck => ({ id, goal_id, digest: "a".repeat(64), title: id === "job-venue" ? "Venue check" : "Daily briefing", outcome: "Keep useful venue changes together", state: "offline", health: "No successful check yet", enabled: true, editable: true, source: "/work/venue", connectors: ["mail-account"], timezone: "Asia/Ho_Chi_Minh", schedule: "*/15 * * * *", next_action: "Review local service", last_success: "2026-11-08T01:00:00Z" })
 
+test("Following retains the selected commitment identity after refreshed goals reorder", async () => {
+  const root = await mkdtemp(join(tmpdir(), "gator-following-selection-")), host = new FixtureHost({ binary: "/unused", workspace: root, userData: root, env: { GATOR_STATE_DIR: root } })
+  const goals = ["Alpha", "Beta", "Gamma"].map(title => ({ id: "goal-" + title, title, status: "paused" }))
+  host.current = { ...state(), following_goals: goals }
+  const client = new GatorClient(host), setup = await testRender(() => <App client={client} quit={() => client.close()} clipboard={{ read: async () => ({ data: "", mime: "text/plain" }), write: async () => {} }} />, { width: 80, height: 24 })
+  const flush = async () => { await setup.flush(); await Bun.sleep(20); await setup.flush() }
+  try {
+    await client.start(); await client.navigate("/following"); await flush()
+    setup.mockInput.pressArrow("down"); await flush(); expect(setup.captureCharFrame()).toContain("› Beta")
+    host.change({ ...host.current, following_goals: [goals[2]!, goals[0]!, goals[1]!] }); await flush()
+    expect(setup.captureCharFrame()).toContain("› Beta")
+    setup.mockInput.pressEnter(); await flush(); expect(setup.captureCharFrame()).toContain("Beta")
+    expect(host.sent).toHaveLength(0)
+  } finally { await client.close(); await setup.dispose(); await rm(root, { recursive: true, force: true }) }
+})
+
 test("Following groups checks with commitments, reveals controls at four sizes, and explains actual service limits", async () => {
   const root = await mkdtemp(join(tmpdir(), "gator-following-")), host = new FixtureHost({ binary: "/unused", workspace: root, userData: root, env: { GATOR_STATE_DIR: root } })
   const venue = check("job-venue", "goal-venue"), briefing = check("job-briefing")

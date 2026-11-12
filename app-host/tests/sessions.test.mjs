@@ -288,7 +288,7 @@ test("profile maintenance closes idle cached chats and refuses pending backgroun
 });
 
 
-for (const busyFlag of ["receipt_busy", "catalog_busy"]) test(`${busyFlag} retains its runtime and blocks profile maintenance and restart`, async () => {
+for (const busyFlag of ["receipt_busy", "catalog_busy", "goal_busy"]) test(`${busyFlag} retains its runtime and blocks profile maintenance and restart`, async () => {
  const sessions=setup();await sessions.open();const owner=sessions.current;
  owner.change({[busyFlag]:true});assert.equal(sessions.busy,true);
  await assert.rejects(sessions.restart(),/current operation/);

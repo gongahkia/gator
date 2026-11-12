@@ -24,6 +24,16 @@ test("commitment controls accept only current identities, never replacement poli
   for (const change of [{id: "../job"}, {id: ""}, {digest: "old"}, {digest: "A".repeat(64)}, {request_id: ""}, {action: "run"}, {action: "refresh"}, {source: "/other"}, {enabled: true}, {connector_ids: ["other"]}, {approved: true}]) assert.throws(() => validateFrame({type: "check", check: {...check, ...change}}));
 });
 
+test("goal controls carry only the original goal and reviewed status identity", () => {
+  const goal = { request_id: "goal-review-1", id: "goal-" + "a".repeat(24), action: "pause", digest: "b".repeat(64) };
+  for (const action of ["pause", "resume"]) assert.equal(validateFrame({ type: "goal", goal: { ...goal, action } }).version, 1);
+  assert.equal(validateFrame({ type: "goal", goal: { ...goal, id: "goal-" + "A".repeat(24) } }).version, 1);
+  const inspect = { request_id: goal.request_id, id: goal.id, action: "inspect" };
+  assert.equal(validateFrame({ type: "goal", goal: inspect }).version, 1);
+  assert.throws(() => validateFrame({ type: "goal", goal: { ...inspect, digest: goal.digest } }));
+  for (const change of [{ action: "complete" }, { action: "run" }, { digest: "" }, { digest: "B".repeat(64) }, { id: "../other" }, { id: "goal-other" }, { request_id: "" }, { status: "active" }, { source: "/another" }, { account: "other" }, { approved: true }]) assert.throws(() => validateFrame({ type: "goal", goal: { ...goal, ...change } }));
+});
+
 test("specialist controls accept bounded actions without renderer-supplied authority", () => {
   const specialist = { id: "subagent-001", token: "a".repeat(64), request_id: "guide-one", action: "guide", text: "Use primary sources" };
   assert.equal(validateFrame({ type: "specialist", specialist }).version, 1);

@@ -239,6 +239,8 @@ type Config struct {
 	ReadOverview             func(context.Context) (workhome.Overview, error)
 	ControlCommand           func([]string) *exec.Cmd
 	ListGoals                func() ([]goal.Record, error)
+	ReadGoalReview           func(string) (goal.Record, goal.Plan, error)
+	SetGoalStatusReviewed    func(string, goal.Status, string) (goal.Record, error)
 	SelectGoal               func(id string) (GoalState, error)
 	ClearGoal                func()
 	MemoryAction             func(arguments []string) (string, error)
@@ -388,6 +390,8 @@ type Model struct {
 	dialogueBootstrapResult *DialogueDispatchResult
 	dialogueControls        map[string]DialogueControlResult
 	bridgeCheckResult       *BridgeCheckResult
+	bridgeGoalResult        *BridgeGoalResult
+	bridgeGoalBusy          bool
 	planPreparing           string
 	planRevising            string
 	planEditTurn            string
