@@ -11,7 +11,7 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 | 3 | Relevant answers expose supplied memory/provenance/correction; noise feedback offers a reviewed, scoped check/notification change and reports its actual outcome. | Pending | |
 | 4 | First task leads through only missing setup; host connectivity and model readiness are distinct; local/cloud processing, capabilities, and work budget are explained. | In progress | `d0fd58e48` provides Go-owned prerequisite/processing/budget projection. Ordinary first submissions offer missing setup while preserving private files/text and plan intent; Host connectivity and model setup have separate labels. Native fresh-profile → invalid provider form → repair → persisted selection → inspect context/limits → explicit useful task passes at all four sizes. Missing and subsequently changed credentials recover without replaying/admitting the rejected task. Request-specific connected-account/access setup handoffs and recovery after provider rejection during an admitted task remain; final integrated journey and live-account/model verification remain. |
 | 5 | Workspace/account/source scope is inspectable near input; conversational/manual settings agree, including terminal preferences, with confirmed outcomes. | In progress | Ctrl+T and /request-context inspect workspace/model processing, selected accounts, inputs, mode and actual Go budgets. Missing account display metadata retains the selected identity. Appearance, navigation and recent-chat grouping now share Go configuration across manual controls, conversational tools, cached owners, CLI theme changes and restart. Legacy frontend values import once; failures do not report saved values. Native four-size settings journeys plus unreadable-import recovery and live-task preservation pass. Full permission explanations, broader account/settings integration and live-model/account verification remain; final combined acceptance journey pending. |
-| 6 | Results/files/updates expose keyboard contextual actions to open/edit/reply/inspect evidence/mark done while retaining original identities and conversation context. | In progress | Configurable Ctrl+E and /actions expose original-item result/file/update controls. Answers join deliverables only by exact run identity. Native four-size journeys inspect retained evidence, copy answers, edit/save working file versions without changing sealed originals, reject other-chat targets, mark done with a correlated Go outcome, restore the original owner and explicitly send an update-bound reply while retaining the newer draft/review intent. Delayed source/file reads now close without reopening on late success/failure; exact file-action Back and explicit read retry pass at all four sizes, including an unrelated executing Go task. Original-answer request receipts now share /receipts controls, including exact-account Sent checks, permission repair, cancelled-read completion and restart at all four sizes. Structured connected-item actions, delegated-result coverage and the final combined journey remain. |
+| 6 | Results/files/updates expose keyboard contextual actions to open/edit/reply/inspect evidence/mark done while retaining original identities and conversation context. | In progress | Configurable Ctrl+E and /actions expose original-item result/file/update controls. Answers join deliverables only by exact run identity. Native four-size journeys inspect retained evidence, copy answers, edit/save working file versions without changing sealed originals, reject other-chat targets, mark done with a correlated Go outcome, restore the original owner and explicitly send an update-bound reply while retaining the newer draft/review intent. Delayed source/file reads now close without reopening on late success/failure; exact file-action Back and explicit read retry pass at all four sizes, including an unrelated executing Go task. Original-answer request receipts now share /receipts controls, including exact-account Sent checks, permission repair, cancelled-read completion and restart at all four sizes. Conversation replies and delegated summaries now expose exact-turn/task contextual inspection, copying, retained inputs and original-owner navigation; four-size real-Go journeys preserve the parent draft/review intent without new model work. Structured connected-item actions and the final combined journey remain. |
 | 7 | Input and useful transcript remain visible at 110×34, 80×24, 60×20, 42×14 with combined attachments/reply/plan/slash states and multiline drafts. | Implemented; final journey pending | `204386564`; `composer-budget.test.tsx`: 8 file names + plan/reply + multiline input and slash completion, ≥4 transcript rows at all four sizes. |
 | 8 | Approval surface shows exact live action/account/destination/content/consequences; long reviews scroll; changed/stale tokens cannot execute; edits require fresh review. | Implemented; final journey pending | `8ba3a9cb8`; `approval-review.test.tsx`: four sizes, scrolling/exact data, stale and missing previews; `approvals.test.tsx`: real Go token protection and controlled connected send. |
 | 9 | Root command search includes local/backend descriptions/names/aliases, grouped browsing remains usable, and commands requiring values have meaningful typed controls. | In progress | `5f54f7f17`; root search and common permission/theme/source/attachment controls verified in `commands.test.tsx`. Remaining advanced command families still expose explicit advanced syntax; typed controls remain required. |
@@ -45,7 +45,44 @@ finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
 
-- Contextual connected-request receipts (12 November): an answer or warning card
+- Conversation/delegated-result contextual actions (12 November): the configured
+  item shortcut and `/actions` include conversation replies and delegated task
+  summaries. Their turn ID, original parent/task identities, retained input IDs
+  and peer snapshot stay bound to the selected item; changed turns or mismatched
+  task metadata require a fresh selection. Inspection/copying uses retained
+  content. Complete outputs and reviews open through the existing canonical task
+  owner, retaining the parent's independent draft and next-message plan intent.
+  Ordinary replies with no legacy transcript messages also expose the configured
+  action hint near the composer. No extra model request, execution owner or
+  settings store is introduced.
+  Native real-Go conversation journey now inspects/copies the delegated result,
+  opens its retained input, navigates to the original child and back, and rejects
+  foreign-owner/task targets at all four sizes while the parent task keeps
+  running. Contextual Ctrl actions also copy the current conversational reply.
+  Existing steering, ambiguous routing, isolated task stop, retained results,
+  durable request counts and restart assertions remain in the same journey.
+  Combined conversation/read-cancellation/composer/command checks: **10 pass,
+  335 assertions**, 41.08 seconds, in
+  `/tmp/gator-ux-20261112-delegated-actions-regression.log`.
+  With `NO_COLOR=1 GATOR_REDUCED_MOTION=1`, conversation/composer checks plus
+  four-size dialogue-only render fixtures with Ctrl+K and stale-turn rejection:
+  **8 pass, 222 assertions**, 25.27 seconds, in
+  `/tmp/gator-ux-20261112-delegated-actions-verified-native.log`. Typecheck passes.
+  Earlier runs exposed test assumptions about wrapped words and restoration
+  before the native layout frame; the journey now reads wrapped text and waits
+  for that frame before keyboard navigation. A new fixture initially omitted
+  its required binary argument; typecheck and the failed render caught it. The
+  fixture is isolated to its temporary profile with an unused binary. Logs for
+  earlier failures remain under `/tmp/gator-ux-20261112-delegated-actions-*`.
+  Final isolated-profile fixtures pass **4 tests, 36 assertions**, 5.67 seconds,
+  in `delegated-actions-fixtures.log`; commit typecheck passes in
+  `/tmp/gator-ux-20261112-delegated-actions-commit-check.log`.
+  This is controlled-provider/native-render evidence, with explicit render-only
+  fixtures. It is not physical terminal, audio or live-account verification.
+  Structured connected-item actions, complete navigation/reading restoration,
+  the final combined journey and all other open findings remain in scope.
+
+- Contextual connected-request receipts (`c4af06b90`, 12 November): an answer or warning card
   exposes requests through its exact run ID; `/receipts` reuses those controls.
   Both retain original account/destination/action/correlation/manifest/context,
   reject changed or unavailable records and preserve metadata-only crashed
@@ -83,7 +120,7 @@ finished after only the terminal phase or a mobile scaffold.
   **6 pass, 125 assertions**, 27.46 seconds, in
   `/tmp/gator-ux-20261112-context-receipts-no-color.log`.
 
-- Retained-read cancellation and recovery (12 November; builds on the loading
+- Retained-read cancellation and recovery (`cb07b35fe`, 12 November; builds on the loading
   view retained in `d0ce6e5e0`): native journeys use real Go-created sealed files
   and source evidence, with controlled host response delays and one injected
   temporary file-read failure. Ctrl+C retires the read view and its UI operation;

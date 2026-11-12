@@ -24,7 +24,7 @@ export function Prompt() {
   const modelState = () => data.state?.composer?.readiness?.state
   const modelSummary = () => modelState() && modelState() !== "configured" ? "Model setup needed" : model()
   const contextualHint = () => {
-    const hasItems = !!data.state?.messages.length || !!data.state?.chat_updates?.length
+    const hasItems = !!data.state?.messages.length || !!data.state?.chat_updates?.length || !!data.state?.dialogue?.length
     const actions = `${hint("gator.context-actions")} actions`, context = `${hint("gator.draft-context")} context`, commands = `/ ${hint("command.palette.show")}`
     if (dimensions().width < 60) return hasItems ? actions : "/ commands"
     if (!hasItems) return `${context} · ${commands}`

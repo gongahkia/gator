@@ -47,8 +47,8 @@ test("ordinary messages converse, steer an original task and delegate work witho
   cli(["config","set","default-provider","dialogue-fixture"])
   const options={binary,env,userData:join(root,"app"),workspace:join(root,"workspace")}
   const client=new GatorClient(new Application(options))
-  const warnings:string[]=[];const warning=spyOn(console,"warn").mockImplementation((...args)=>{warnings.push(args.map(String).join(" "))})
-  const setup=await testRender(()=><App client={client} quit={()=>client.close()} clipboard={{read:async()=>({data:"",mime:"text/plain"}),write:async()=>{}}}/>,{width:110,height:34})
+  const warnings:string[]=[],copied:string[]=[];const warning=spyOn(console,"warn").mockImplementation((...args)=>{warnings.push(args.map(String).join(" "))})
+  const setup=await testRender(()=><App client={client} quit={()=>client.close()} clipboard={{read:async()=>({data:"",mime:"text/plain"}),write:async text=>{copied.push(text)}}}/>,{width:110,height:34})
   const flush=async()=>{await setup.flush();await Bun.sleep(30);await setup.flush()}
   const send=async(text:string)=>{await client.edit(text);await flush();await client.submit();await until(()=>!client.state?.dialogue_busy,"conversation response: "+text);if(client.state?.dialogue?.at(-1)?.issue)throw new Error(JSON.stringify(client.state.dialogue.at(-1)));await flush()}
   try{
@@ -69,6 +69,37 @@ test("ordinary messages converse, steer an original task and delegate work witho
     await send("Stop it");expect(routes.at(-1).tasks).toHaveLength(2);expect(client.state?.dialogue?.at(-1)?.state).toBe("clarification")
     expect(client.state?.running).toBe(true)
     releaseChild();await until(()=>!!client.state?.dialogue_peers?.some(peer=>peer.conversation_id===child && peer.state==="completed"),"child result returned")
+    const choose = async (text:string) => { await setup.mockInput.typeText(text); await flush(); setup.mockInput.pressEnter(); await flush() }
+    const childActions = async () => { await client.navigate("/actions"); await flush(); await choose("Read the separate brief") }
+    const beforeInspect = work.length + routes.length
+    await client.edit("Keep this parent draft"); await client.setPlanFirst(true)
+    for (const [width,height] of [[110,34],[80,24],[60,20],[42,14]]) {
+      setup.resize(width,height); await flush()
+      await childActions(); await choose("Inspect retained reply and task")
+      const readable = () => setup.captureCharFrame().replaceAll("│"," ").replace(/\s+/g," ")
+      for (let page=0;page<20 && !readable().includes("jade heron");page++){setup.mockInput.pressKey("\x1b[6~");await flush()}
+      expect(readable()).toContain("jade heron")
+      setup.mockInput.pressEscape(); await flush(); await choose("Copy retained reply")
+      expect(copied.at(-1)).toContain("jade heron"); expect(client.draft.text).toBe("Keep this parent draft")
+      await childActions(); await choose("Input:")
+      await until(()=>!!setup.renderer.root.findDescendantById("file-text-editor"),"original delegated input");await flush()
+      expect(setup.captureCharFrame()).toContain("jade heron");setup.mockInput.pressEscape();await flush()
+      await childActions(); await choose("Open original task")
+      await until(()=>client.state?.conversation_id===child && !client.snapshot.sessionSwitching,"contextual exact task")
+      expect(client.state?.dialogue_task?.parent_id).toBe(parent);expect(client.state?.messages.some(message=>message.text.includes("jade heron"))).toBe(true)
+      client.emit("item-actions",{kind:"dialogue",context:"conversation:"+parent,turn,peer:undefined});await flush()
+      expect(client.issue).toContain("original conversation")
+      await client.navigate("/tasks");await flush();await choose("Return to the requesting conversation")
+      await until(()=>client.state?.conversation_id===parent && !client.snapshot.sessionSwitching,"contextual return to parent");await client.loadDraft();await flush()
+      expect(client.draft.text).toBe("Keep this parent draft");expect(client.draft.plan_first).toBe(true);expect(client.state?.running).toBe(true)
+      setup.mockInput.pressKey("\x1b[1;5F");await flush();setup.mockInput.pressKey("e",{ctrl:true});await flush();await choose("Copy retained reply")
+      expect(copied.at(-1)).toContain("Should I stop the venue comparison")
+      const currentTurn = client.state!.dialogue!.find(item=>item.id===turn.id)!, peer = client.state!.dialogue_peers!.find(item=>item.conversation_id===child)!
+      client.emit("item-actions",{kind:"dialogue",context:client.context,turn:currentTurn,peer:{...peer,conversation_id:"other-task"}});await flush()
+      expect(client.issue).toContain("original task result changed")
+      expect(work.length+routes.length).toBe(beforeInspect);client.issue=""
+    }
+    setup.resize(110,34);await flush();await client.setPlanFirst(false)
     await send("Research a stop target");const stopChild=client.state!.dialogue!.at(-1)!.task_chat!
     await until(()=>!!client.state?.dialogue_peers?.some(peer=>peer.conversation_id===stopChild && peer.can_stop),"independent stop target ready")
     await send("Stop the research task");expect(client.state?.dialogue?.at(-1)?.state).toBe("stopped");releaseStop()

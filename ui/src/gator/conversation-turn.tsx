@@ -5,11 +5,13 @@ import { useTheme } from "../context/theme"
 import { Markdown } from "./markdown"
 import { literal } from "./text"
 import { displayDate } from "./display"
+import { useKeyHints } from "./key-hints"
+import { useRenderer } from "@opentui/solid"
 
 export const dialogueStatus = (state: string) => ({ running: "Working", review: "Needs your review", queued: "Waiting", completed: "Finished", failed: "Needs attention", stopped: "Stopped", interrupted: "Interrupted", unconfirmed: "Outcome unconfirmed", discarded: "Stopped" })[state] || state
 
 export function ConversationTurn(props: { turn: DialogueMessage; task?:DialoguePeer; busy?:boolean }) {
-  const client = useClient(), theme = useTheme()
+  const client = useClient(), theme = useTheme(), hint = useKeyHints(), renderer = useRenderer(), context = client.context
   const task = createMemo(() => props.task)
   return <box id={`dialogue-${props.turn.id}`} marginY={1} gap={1}>
     <box paddingY={1} paddingX={2} border={["left"]} borderColor={theme.accent} backgroundColor={theme.background.raised.base}>
@@ -18,6 +20,7 @@ export function ConversationTurn(props: { turn: DialogueMessage; task?:DialogueP
       <Show when={props.turn.input_ids?.length}><text fg={theme.text.muted}>Inputs: {props.turn.input_ids?.map(id => literal(id.split("/").at(-1))).join(" · ")}</text></Show>
     </box>
     <box paddingLeft={3} paddingRight={2} gap={1}>
+      <text fg={theme.text.muted} onMouseUp={() => { if (!renderer.getSelection()?.getSelectedText()) client.emit("item-actions", { kind: "dialogue", context, turn: props.turn, peer: task() }) }}>{hint("gator.context-actions")} actions · /actions chooses an item</text>
       <Show when={props.turn.response}><Markdown text={props.turn.response!} /></Show>
       <Show when={props.turn.task_chat}>
         <text fg={theme.accent} onMouseUp={() => void client.openSession(props.turn.task_chat!).catch(error => client.fail(error))}>{dialogueStatus(task()?.state || "unconfirmed")} · /tasks opens the original task, reviews and outputs</text>

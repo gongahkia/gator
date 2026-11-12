@@ -82,10 +82,11 @@ export function Transcript() {
     // until reading moves, rather than choosing a neighbouring footer/notice.
     const selected = scroll?.scrollTop === revealedScrollTop ? timeline().find(item => item.kind === "message" && item.index === revealed()) : undefined
     for (const item of [...(selected ? [selected] : []), ...timeline().toReversed()]) {
-      const node = item.kind === "message" ? nodes.get(`message-${item.index}`) : item.kind === "update" ? cards.get(item.update.id) : undefined
+      const node = item.kind === "message" ? nodes.get(`message-${item.index}`) : item.kind === "update" ? cards.get(item.update.id) : nodes.get(`dialogue-${item.turn.id}`)
       if (!viewport || !node || node.isDestroyed || node.height < 1 || node.screenY >= viewport.screenY + viewport.height || node.screenY + node.height <= viewport.screenY) continue
       if (item.kind === "message") { client.emit("item-actions", { kind: "message", context: client.context, message: item.message, index: item.index }); return }
       if (item.kind === "update") { client.emit("item-actions", { kind: "update", context: client.context, update: item.update }); return }
+      if (item.kind === "dialogue") { client.emit("item-actions", { kind: "dialogue", context: client.context, turn: item.turn, peer: client.state?.dialogue_peers?.find(peer => peer.conversation_id === item.turn.task_chat && peer.turn_id === item.turn.id) }); return }
     }
     client.emit("item-actions")
   }

@@ -1,6 +1,6 @@
 import { onCleanup } from "solid-js"
 import { randomUUID } from "node:crypto"
-import type { BackendBundle, BackendMessage, ChatUpdate } from "@gator/application-host/contracts/protocol"
+import type { BackendBundle, BackendMessage, ChatUpdate, DialogueMessage, DialoguePeer } from "@gator/application-host/contracts/protocol"
 import { useClient } from "../context/client"
 import { useClipboard } from "../context/clipboard"
 import { useToast } from "../ui/toast"
@@ -14,6 +14,7 @@ export type ResultTarget =
   | { kind: "message"; context: string; index: number; message: BackendMessage }
   | { kind: "update"; context: string; update: ChatUpdate }
   | { kind: "file"; context: string; bundle: BackendBundle; file: NonNullable<BackendBundle["Artifacts"]>[number] }
+  | { kind: "dialogue"; context: string; turn: DialogueMessage; peer?: DialoguePeer }
 
 // Every callback retains its original conversation and immutable result. An
 // equal-looking item, newer snapshot or switched chat never supplies authority.
@@ -134,16 +135,36 @@ export function useResultActions(controls: ReturnType<typeof useActions>) {
       ...(message.input_ids ?? []).map((id, i) => ({ title: `Input: ${message.inputs?.[i] || id}`, run: () => { check(); return openFile({ kind: "upload", id }, undefined, context) } })),
     ], true, back)
   }
+  function dialogueMenu(target: Extract<ResultTarget, { kind: "dialogue" }>, back?: () => void) {
+    const { context, turn, peer } = target, identity = JSON.stringify(turn)
+    const check = () => {
+      contextIsCurrent(context)
+      const current = client.state?.dialogue?.find(current => current.id === turn.id)
+      if (!current || JSON.stringify(current) !== identity) throw new Error("This conversation item changed or is unavailable. Select it again.")
+      if (peer && (peer.conversation_id !== turn.task_chat || peer.turn_id !== turn.id || !client.state?.dialogue_peers?.some(current => JSON.stringify(current) === JSON.stringify(peer)))) throw new Error("The original task result changed. Select it again.")
+    }
+    check()
+    const again = () => attempt(() => dialogueMenu(target, back))
+    const text = [turn.response, peer?.summary].filter(Boolean).join("\n\n")
+    menu("Conversation item actions", [
+      { title: "Inspect retained reply and task", description: turn.text, run: () => { check(); details("Conversation item", [turn.text, text, turn.issue, `Original conversation: ${context}`, `Message: ${turn.id} · ${turn.updated_at}`, `State: ${peer?.state || turn.state}`, turn.task_chat ? `Original task: ${turn.task_chat}` : "", peer?.run_id ? `Run: ${peer.run_id}` : "", turn.task_chat ? "The summary belongs to the original task. Open that task to inspect its complete results, reviews and outputs." : ""].filter(Boolean).join("\n\n"), again) } },
+      { title: "Copy retained reply", disabled: !text, run: async () => { check(); await clipboard.write(text); toast.show({ message: "Reply copied.", variant: "success" }) } },
+      ...(turn.task_chat ? [{ title: "Open original task, reviews and outputs", description: peer?.state || "Outcome unconfirmed", run: () => { check(); return client.openSession(turn.task_chat!) } }] : []),
+      ...(turn.input_ids ?? []).map(id => ({ title: `Input: ${id.split("/").at(-1) || id}`, run: () => { check(); return openFile({ kind: "upload", id }, undefined, context, again) } })),
+    ], true, back)
+  }
   function show(target?: ResultTarget) {
     if (!target) return list()
     if (target.kind === "message") return messageMenu(target, list)
     if (target.kind === "update") return updateMenu(target.update, target.context, list)
+    if (target.kind === "dialogue") return dialogueMenu(target, list)
     return fileMenu(target.bundle, target.file, target.context, list)
   }
   function list() {
     const context = client.context
     menu("Actions in this conversation", [
       ...(client.state?.chat_updates ?? []).toReversed().map(update => ({ key: `update:${update.id}`, title: update.title, category: "Updates", description: `${update.status} · ${update.resolved ? "done" : "open"}`, run: () => updateMenu(update, context, list) })),
+      ...(client.state?.dialogue ?? []).toReversed().map(turn => ({ key: `dialogue:${turn.id}`, title: turn.text, category: "Conversation and delegated work", description: turn.response || turn.state, run: () => dialogueMenu({ kind: "dialogue", context, turn, peer: client.state?.dialogue_peers?.find(peer => peer.conversation_id === turn.task_chat && peer.turn_id === turn.id) }, list) })),
       ...(client.state?.messages ?? []).map((message, index) => ({ message, index })).filter(({ message }) => message.text || message.result || message.bundle || message.input_ids?.length).toReversed().map(({ message, index }) => ({ key: `message:${index}`, title: `${message.role}: ${message.text.slice(0, 90) || message.result?.title || "Retained result"}`, category: "Messages and results", description: message.created_at, run: () => messageMenu({ kind: "message", context, message, index }, list) })),
     ])
   }

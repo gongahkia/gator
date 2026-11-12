@@ -32,6 +32,12 @@ Inspect the original account, destination and request record there, or through
 an explicit read-only Sent check. These controls retain the original request
 identity even after changing accounts for future work; they never resend it.
 
+Conversation replies and delegated-task summaries have the same contextual
+shortcut and appear in `/actions`. Inspect or copy the retained reply, open its
+original inputs, or open the original task for full results, reviews and outputs.
+The parent conversation's draft stays in its own composer while inspecting that
+task; `/tasks` returns to the requesting conversation.
+
 Use Go 1.25.13+, Node 22.12+ for build scripts/shared-host tests, and Bun 1.4.2.
 The selected frontend uses Solid 1.9.15 and OpenTUI 0.6.8 with native platform
 assets; a Node-only terminal launch is not claimed.
