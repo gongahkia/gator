@@ -53,6 +53,58 @@ task correction, pending-action correction, stale rejection, fresh exact approva
 connected-item results and restart/disconnection. Physical/live prerequisites
 remain to be inspected; prior fixture checks do not establish them.
 
+## Existing contracts and client coupling inventory (13 November)
+
+This is an implementation inventory for backend workstream 5 and a record of
+what a future native client can reuse. It does not replace the seven-workstream
+objective or mark any original audit finding complete. The user has questioned
+the value of completing every backend edge case before Swift integration; no
+provider-item framework, new transport or Swift frontend was implemented during
+this inventory. A scope decision is pending.
+
+Inspected at `4dc5c4d72`: the Go application bridge in
+`cmd/gator/ui_bridge.go`, automation in `cmd/gator/work_headless.go`, public
+contracts in `app-host/contracts/`, the command catalogue in
+`internal/workapp/commands.go`, controller assembly in `cmd/gator/work_controls.go`,
+and `app-host/src/{application,backend,sessions,policy,drafts,files,voice-session}.mjs`.
+This evidence is code inspection, not another live-provider or runtime test.
+
+| Workflow group | Existing contract and authoritative behavior | Remaining coupling / concrete migration boundary |
+|---|---|---|
+| Conversation, submission, queue, streaming and history | `upload_submit` carries request/context/file/reply/review identities; `queue`, `conversation`, `dialogue_page` and `branch` are typed. Go owns admitted requests, replay, execution and revisions; bridge updates emit JSON state snapshots. | `Backend` launches the Go `ui-backend` process over stdio. `Sessions` coordinates per-chat owners and delegated handoffs in JavaScript. A Swift host needs that ownership behavior, rather than a second agent loop. Presentation fields still coexist with domain state. |
+| Task corrections, plans and setup repair | Go dialogue controls, `task_plan`, `request_recovery` and `specialist` carry exact owner/epoch identities. They retain inputs and enforce reviewed execution and safe retry. | Parent/child bootstrap and control acknowledgements are private host messages, not unrestricted renderer actions. Port that boundary when implementing simultaneous conversations; keep established Go validation. |
+| Exact external approval and receipts | `approval` binds interaction ID and approval token; `receipt` binds conversation/run/action/correlation/manifest identity. Go owns broker enforcement, action journals and uncertain outcomes. | A native approval view must display the actual backend preview and send its exact token. Do not replace it with an unbound yes/no response or retry uncertain effects on reconnect. |
+| Models, source selection and foreground effort | `composer` and `sources` have typed actions and stale-selection identities. Go config and conversation preferences are canonical; conversational settings share those stores. | Provider creation/login/download, connection operation permissions and some advanced processing choices still use model/control panels, positional arguments or commands. They are not all independent typed native workflows yet. |
+| Following, schedules, goals and inbox | `check`, `goal` and `update` provide typed inspection/status/feedback actions. Go jobs/follow-up/goal/inbox stores remain authoritative. | Creation and timing editors still combine typed review identities with controller families and ordered string fields. Goal plan/agenda/notification commands have additional argument-based workflows. A Swift view must reuse the scheduler rather than create another one. |
+| Memory, provenance, notes, skills and learning | `memory` provides typed correction/forget/undo; Go owns memory/knowledge stores. Source catalogue/preview contracts retain evidence identities. | Saved-context browsing and advanced note/skill/learning/suggestion actions still depend partly on command parsing and panel state. Preserve provenance and original scope when exposing them; they are not prerequisites for the first text-chat slice. |
+| Unsent drafts and reply intent | `DraftRequest` and `Draft` include context, uploads, update-reply and plan-first intent. | Persistence is implemented by JavaScript `DraftStore` in the application user-data directory, not solely in Go. A Swift+Go replacement must preserve or migrate these records, including profile separation and upload retention. |
+| File import, working versions, edits and export | `FileRequest`, `FileReference`, `FileView`, source preview and code preview are typed. Go seals original run evidence. | `UploadStore`, `FileStore` and `ExportStore` in the JavaScript host implement substantial non-rendering behavior: original bytes, versions, drafts, path checks and export review. Deleting the terminal renderer does not replace these services. Port/adapt them as file workflows enter the native client. |
+| Voice | `VoiceRequest`/`VoiceStatus` and Go speech helpers provide configuration, provider routes, authorization and transcription. | JavaScript `VoiceSession` owns capture/transcription/playback lifecycle and editable handoff. Swift should use native capture with the same destination/consent/cancellation boundaries. Existing controlled evidence does not prove physical microphone behavior. |
+| Usage, privacy, retention, backup and service recovery | Conversational `AppChange` values are decoded in Go; canonical usage/lifecycle/config stores enforce saved policies. | Manual `usage`, `data` and `recovery` controls use `family/action/[]string`, including serialized prior policy for stale review. Public `PanelAction` has indexed fields; it is not yet a domain-specific settings API for every operation. |
+| Browser sessions, account consent and computer actions | Go owns browser/runtime permissions and connector authority. Native host handoffs come from validated backend descriptors. | Browser/search/connection control families still mix forms, external processes and positional arguments. Preserve account/grant identity and explicit consent when replacing those host flows. Do not infer authority from browser state or displayed labels. |
+| Results and connected provider items | Local output/evidence/file/receipt contracts already exist. Connector results retain source, operation, resource, retrieval time and content hash; external mutations use the existing broker. | There is no general typed connected-item reference/action workflow covering inspect/open/edit/reply/done. This remains workstream 4; the inventory is not its implementation. Build the concrete item flow required by the product before attempting a cross-provider abstraction. |
+| Advanced execution and integrations | Go services support work contracts, allowed origins, source-instruction exclusions, code scopes, extensions, hooks, LSP, MCP and specialist configuration. | `/artifact`, `/web-origin`, source ignore/unignore, `/apply`, delivery `/retry`, and standalone developer command families retain argument-oriented paths. The catalogue also exposes `/pilot`, `/agenda`, `/plan`, `/notifications`, `/note`, `/skill`, `/suggestions` and `/feedback`. Inventory their actual handlers before requiring feature parity or removing the CLI. |
+| Native host conveniences and appearance | Go retains settings and validated external handoff descriptions. | Clipboard, local process/editor launching, file selection, application shutdown and platform presentation belong to the client/host boundary. Terminal rail, keys and layout are presentation concerns, not backend prerequisites for Swift. Retired ACP is not a feature to recreate. |
+
+Two important distinctions follow from the inspected implementation:
+
+- `work-rpc` is a separate automation protocol (`start` plus operation controls).
+  It is not a drop-in replacement for the application bridge's conversations,
+  drafts, delegated ownership, settings and recovery workflows. Both reuse Go
+  work services, but their product contracts differ.
+- `ui-backend` already runs the Go application without terminal rendering.
+  Its state still includes panel/section/key presentation concepts, and service
+  assembly remains in `cmd/gator`. A first Swift conversation/approval/history
+  integration can exercise the existing typed intents before deciding which
+  concrete coupling needs extraction. This does not justify a speculative new
+  server or generic UI/command framework.
+
+No runtime change or regression-test rerun is implied by this documentation-only
+checkpoint. Existing implementation evidence remains in the sections below.
+All original backend requirements and frontend-only outstanding criteria remain
+visible. Neither beginning a native client nor deprecating CLI/TUI is authorized
+by the current backend-only objective itself; a revised scope is required.
+
 ## Canonical foreground work effort (13 November, backend only)
 
 - Implementation: `4d8dd5a91` (`feat(agent): share persisted work effort across conversational and manual settings`).
