@@ -331,3 +331,14 @@ test("action corrections reuse the exact local or delegated owner without alloca
     assert.equal(spawned, 2);
   } finally { await sessions.stop(); }
 });
+
+test("confirmed preference changes refresh cached owners once without replaying tasks",async()=>{
+ const sessions=setup();try{
+  await sessions.open({conversation_id:"parent"});const parent=sessions.current;parent.change({running:true,queued:1,preferences_revision:0});let refreshes=0
+  parent.refreshPreferences=async()=>{refreshes++;parent.change({title:"Refreshed saved defaults"})}
+  await sessions.open({conversation_id:"child"});const child=sessions.current;child.change({preferences_revision:0});child.change({preferences_revision:1});await Promise.resolve()
+  assert.equal(refreshes,1);assert.equal(parent.state.running,true);assert.equal(parent.state.queued,1);assert.deepEqual(parent.frames,[]);assert.equal(sessions.current,child)
+  child.change({title:"Another unrelated snapshot"});await Promise.resolve();assert.equal(refreshes,1)
+  parent.refreshPreferences=async()=>{refreshes++;throw Error("Preference store unavailable")};child.change({preferences_revision:2});await Promise.resolve();assert.match(sessions.issue,/cached chat could not refresh/);assert.equal(parent.state.running,true);assert.deepEqual(parent.frames,[])
+ }finally{await sessions.stop()}
+})

@@ -485,6 +485,8 @@ type Model struct {
 	composerModelsIssue     string
 	composerResult          *ComposerResult
 	terminal                TerminalPreferencesState
+	preferencesRevision     uint64
+	preferencesIssue        string
 	terminalResult          *TerminalPreferencesResult
 	sourceChoices           []ComposerSource
 	sourcesIssue            string
@@ -654,6 +656,9 @@ func New(config Config) Model {
 	model.refreshChatMemories()
 	model.refreshActionRecoveries()
 	model.restoreDialogue()
+	if err := model.refreshConversationPreferences(); err != nil {
+		model.bridgeNotice = err.Error()
+	}
 	return model
 }
 

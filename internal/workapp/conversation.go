@@ -121,6 +121,9 @@ func (m *Model) restoreConversation(conversationID, announcement string) {
 		}
 		m.options = retainedRunOptions(options)
 	}
+	if err := m.refreshConversationPreferences(); err != nil {
+		m.bridgeNotice = err.Error()
+	}
 	if m.config.CreateConversation != nil {
 		m.home = len(m.messages) == 0
 	}

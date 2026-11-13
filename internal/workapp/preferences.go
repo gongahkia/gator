@@ -1,7 +1,37 @@
 package workapp
 
-// RefreshDesktopPreferences is a private host notification after a user edits
-// voice preferences. It exposes no command or settings payload to the renderer.
+import (
+	"fmt"
+	"slices"
+
+	"github.com/gongahkia/gator/internal/worksession"
+)
+
+func (m *Model) refreshConversationPreferences() error {
+	if !m.retainsRequests() {
+		return nil
+	}
+	p, err := m.config.SessionStore.LoadPreferences(m.conversation)
+	if err != nil {
+		m.preferencesIssue = "Could not load saved request preferences: " + err.Error()
+		return fmt.Errorf("%s", m.preferencesIssue)
+	}
+	m.preferencesIssue = ""
+	if p.ConnectorIDs != nil {
+		m.options.ConnectorIDs = slices.Clone(*p.ConnectorIDs)
+	}
+	if p.WorkEffort != nil {
+		budget, err := worksession.WorkEffortBudget(*p.WorkEffort)
+		if err != nil {
+			return err
+		}
+		m.options.MaxSteps, m.options.Code.MaxSteps = budget.MaxSteps, budget.CodeMaxSteps
+	}
+	return nil
+}
+
+// RefreshDesktopPreferences handles the existing private host notification for
+// saved preferences. It refreshes future defaults without changing live work.
 func (m Model) RefreshDesktopPreferences() Model {
 	if m.config.ReadDesktop != nil {
 		if preferences, err := m.config.ReadDesktop(); err == nil {
@@ -11,5 +41,8 @@ func (m Model) RefreshDesktopPreferences() Model {
 		}
 	}
 	m.refreshTerminalPreferences()
+	if err := m.refreshConversationPreferences(); err != nil {
+		m.bridgeNotice = err.Error()
+	}
 	return m
 }

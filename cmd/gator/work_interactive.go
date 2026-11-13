@@ -201,7 +201,13 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			}
 			defer release()
 			selected := append([]string{}, ids...)
-			return sessions.SavePreferences(id, worksession.Preferences{ConnectorIDs: &selected}, nil)
+			prior, err := sessions.LoadPreferences(id)
+			if err != nil {
+				return err
+			}
+			next := prior
+			next.ConnectorIDs = &selected
+			return sessions.SavePreferences(id, next, &prior)
 		},
 		Desktop: settings.Desktop,
 		ReadTerminal: func() (config.TerminalPreferences, bool, error) {
@@ -1305,6 +1311,14 @@ func loadWorkTUIConversationOptions(store worksession.Store, conversationID stri
 			}
 			if preferences.ConnectorIDs != nil {
 				options.ConnectorIDs = append([]string{}, (*preferences.ConnectorIDs)...)
+			}
+			if preferences.WorkEffort != nil {
+				budget, err := worksession.WorkEffortBudget(*preferences.WorkEffort)
+				if err != nil {
+					resultErr = err
+					return
+				}
+				options.MaxSteps, options.Code.MaxSteps = budget.MaxSteps, budget.CodeMaxSteps
 			}
 		}
 	}()

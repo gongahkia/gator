@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/gongahkia/gator/internal/worksession"
 )
 
 // ComposerModel contains display metadata, never endpoint or credential values.
@@ -78,7 +79,9 @@ func (m Model) composerSettings() ComposerSettings {
 		state.Readiness.State = "needs_setup"
 	}
 	state.Budget = ComposerBudget{WorkSteps: m.options.MaxSteps, CodeSteps: m.options.Code.MaxSteps}
-	if m.running || len(m.queue) > 0 {
+	if m.preferencesIssue != "" {
+		state.Issue, state.Disabled = m.preferencesIssue, m.preferencesIssue
+	} else if m.running || len(m.queue) > 0 {
 		state.Disabled = "Available after current and queued work finishes."
 	} else if m.models != nil || m.launcher || m.section != "" || m.bridgeExternal != nil || m.pendingBundleAction != nil || m.controlBusy || m.recallBusy {
 		state.Disabled = "Return to the conversation to change these settings."
@@ -108,6 +111,9 @@ func (m Model) composerModelIssue() string {
 func (m Model) ApplyComposerSettings(action ComposerAction) (tea.Model, tea.Cmd) {
 	m.composerResult = &ComposerResult{RequestID: action.RequestID}
 	fail := func(text string) (tea.Model, tea.Cmd) { m.composerResult.Error = text; return m, nil }
+	if err := m.refreshConversationPreferences(); err != nil {
+		return fail(err.Error())
+	}
 	state := m.composerSettings()
 	if action.RequestID == "" || len(action.RequestID) > 64 || action.ID != state.ID {
 		return fail("These settings changed. Review the current selection and try again.")
@@ -155,15 +161,31 @@ func (m Model) ApplyComposerSettings(action ComposerAction) (tea.Model, tea.Cmd)
 }
 
 func (m *Model) setWorkEffort(value string) error {
-	switch strings.ToLower(value) {
-	case "low":
-		m.options.MaxSteps, m.options.Code.MaxSteps = 12, 8
-	case "standard":
-		m.options.MaxSteps, m.options.Code.MaxSteps = 24, 16
-	case "high":
-		m.options.MaxSteps, m.options.Code.MaxSteps = 48, 32
-	default:
-		return fmt.Errorf("unknown effort %q; use low, standard, or high", value)
+	value = strings.ToLower(value)
+	budget, err := worksession.WorkEffortBudget(value)
+	if err != nil {
+		return err
 	}
+	if m.retainsRequests() {
+		if m.config.BeforeLocalCommand != nil {
+			release, err := m.config.BeforeLocalCommand()
+			if err != nil {
+				return err
+			}
+			defer release()
+		}
+		prior, err := m.config.SessionStore.LoadPreferences(m.conversation)
+		if err != nil {
+			return err
+		}
+		next := prior
+		next.WorkEffort = &value
+		if err := m.config.SessionStore.SavePreferences(m.conversation, next, &prior); err != nil {
+			return err
+		}
+	}
+	m.options.MaxSteps, m.options.Code.MaxSteps = budget.MaxSteps, budget.CodeMaxSteps
+	m.preferencesIssue = ""
+	m.preferencesRevision++
 	return nil
 }

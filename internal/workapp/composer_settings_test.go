@@ -3,8 +3,87 @@ package workapp
 import (
 	"errors"
 	"fmt"
+	"github.com/gongahkia/gator/internal/worksession"
+	"os"
+	"path/filepath"
 	"testing"
+	"time"
 )
+
+func TestEffortActionRejectsAStalePreferenceSnapshotAndKeepsDraft(t *testing.T) {
+	config, store := requestConfig(t, func(string, string, string, RunOptions) RunResult {
+		t.Fatal("settings started Work")
+		return RunResult{}
+	})
+	m := New(config)
+	m.input = "Keep this draft"
+	before := m.composerSettings()
+	high := "high"
+	if err := store.SavePreferences(m.conversation, worksession.Preferences{WorkEffort: &high}, nil); err != nil {
+		t.Fatal(err)
+	}
+	next, _ := m.ApplyComposerSettings(ComposerAction{ID: before.ID, RequestID: "stale-effort", Action: "effort", Effort: "low"})
+	m = next.(Model)
+	if m.composerResult.Error == "" || m.options.MaxSteps != 48 || m.options.Code.MaxSteps != 32 || m.input != "Keep this draft" {
+		t.Fatal("stale setting overwrote canonical effort or draft", m.composerResult)
+	}
+	p, _ := store.LoadPreferences(m.conversation)
+	if p.WorkEffort == nil || *p.WorkEffort != "high" {
+		t.Fatal("stale choice was persisted")
+	}
+}
+
+func TestEffortCannotSaveWhenPrivateDataGuardRejectsTheChange(t *testing.T) {
+	config, store := requestConfig(t, func(string, string, string, RunOptions) RunResult {
+		t.Fatal("settings started Work")
+		return RunResult{}
+	})
+	m := New(config)
+	m.config.BeforeLocalCommand = func() (func(), error) { return nil, errors.New("private data is being restored") }
+	if err := m.setWorkEffort("high"); err == nil {
+		t.Fatal("unguarded effort update succeeded")
+	}
+	p, err := store.LoadPreferences(m.conversation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.WorkEffort != nil || m.options.MaxSteps != 24 || m.preferencesRevision != 0 {
+		t.Fatal("failed guard changed persisted settings or reported success")
+	}
+}
+
+func TestUnreadableEffortPreferenceCannotReportSavedOrAdmitWork(t *testing.T) {
+	root := t.TempDir()
+	store, err := worksession.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chat, err := store.CreateChat(t.TempDir(), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	config := Config{CurrentFolder: chat.SourcePath, StartConversationID: chat.ID, Conversations: []worksession.Conversation{chat}, SessionStore: &store, Run: func(string, string, string, RunOptions) RunResult {
+		t.Fatal("corrupt preferences admitted Work")
+		return RunResult{}
+	}}
+	m := New(config)
+	m.input = "Keep this draft"
+	before := m.composerSettings()
+	path := filepath.Join(root, "gator", "conversations", chat.ID, "preferences.json")
+	if err := os.WriteFile(path, []byte(`{"work_effort":"unsupported"}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	next, _ := m.ApplyComposerSettings(ComposerAction{ID: before.ID, RequestID: "failed-effort", Action: "effort", Effort: "high"})
+	m = next.(Model)
+	if m.composerResult.Error == "" || m.options.MaxSteps != 24 || m.input != "Keep this draft" {
+		t.Fatal("failed save reported success or changed draft")
+	}
+	next, run := m.SubmitBridgeUploads(BridgeUploadSubmission{RequestID: "blocked-effort-request", Context: "conversation:" + chat.ID, Text: "A task"})
+	m = next.(Model)
+	if run != nil || m.bridgeUploadResult.Error == "" || m.composerSettings().Disabled == "" {
+		t.Fatal("unreadable preferences silently used stale limits")
+	}
+}
 
 func TestComposerProjectsReadinessAndActualBudgetsWithoutClaimingConnectivity(t *testing.T) {
 	status := ModelStatus{}

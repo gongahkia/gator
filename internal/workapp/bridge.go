@@ -20,6 +20,7 @@ import (
 // BridgeState is a display-only projection for the desktop.
 // The Go model remains the sole owner of commands, runs, approvals and history.
 type BridgeState struct {
+	PreferencesRevision     uint64                  `json:"preferences_revision"`
 	Dialogue                []DialogueMessage       `json:"dialogue,omitempty"`
 	DialogueMore            bool                    `json:"dialogue_more,omitempty"`
 	DialogueIssue           string                  `json:"dialogue_issue,omitempty"`
@@ -218,7 +219,8 @@ func (m Model) BridgeState() BridgeState {
 	desktop := m.desktop
 	desktop.Shortcuts = m.desktop.ResolvedShortcuts()
 	state := BridgeState{
-		Dialogue: m.dialogueMessages(), DialogueMore: m.dialogueMore, DialogueIssue: m.dialogueIssue,
+		PreferencesRevision: m.preferencesRevision,
+		Dialogue:            m.dialogueMessages(), DialogueMore: m.dialogueMore, DialogueIssue: m.dialogueIssue,
 		DialogueActive: m.conversationActive(), DialogueBusy: m.dialogueRouting != "" || len(m.dialogueQueue) > 0 || m.dialogueDispatch != nil,
 		DialogueDispatch: m.dialogueDispatch, DialogueBootstrapResult: m.dialogueBootstrapResult, DialogueControlResult: m.dialogueControlResult,
 		DialogueTask: m.dialogueTaskState(), DialoguePeers: append([]DialoguePeer(nil), m.dialoguePeers...),

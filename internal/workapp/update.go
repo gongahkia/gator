@@ -333,6 +333,7 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 		m.messages = append(m.messages, reportMessage("Gator app updated", text, "success"))
 	}
 	if len(value.AppChanges) > 0 {
+		m.preferencesRevision++
 		m = m.RefreshDesktopPreferences()
 		m.refreshModelStatus()
 	}
@@ -652,7 +653,10 @@ func (m Model) updateSectionKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.selected++
 			}
 		case "enter":
-			_ = m.setWorkEffort([]string{"low", "standard", "high"}[m.selected])
+			if err := m.setWorkEffort([]string{"low", "standard", "high"}[m.selected]); err != nil {
+				m.sectionNotice = err.Error()
+				return m, nil
+			}
 			m.section = ""
 			m.messages = append(m.messages, message{role: "Gator", text: "Effort set to " + effortName(m.options.MaxSteps) + ".", result: &uisnapshot.Result{Kind: "notice", Title: "Effort", Tone: "success", Summary: "Set to " + effortName(m.options.MaxSteps)}})
 		}
@@ -791,6 +795,12 @@ func (m Model) updateRunningKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) submitRunningInput() (tea.Model, tea.Cmd) {
 	prompt := strings.TrimSpace(m.input)
+	if prompt != "" && !strings.HasPrefix(prompt, "/") && prompt != "exit" {
+		if err := m.refreshConversationPreferences(); err != nil {
+			m.bridgeNotice = err.Error()
+			return m, nil
+		}
+	}
 	if prompt == "" {
 		return m, nil
 	}
@@ -953,6 +963,12 @@ func (m Model) updateComposerKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) submitComposerInput() (tea.Model, tea.Cmd) {
 	prompt := strings.TrimSpace(m.input)
+	if prompt != "" && !strings.HasPrefix(prompt, "/") && prompt != "exit" {
+		if err := m.refreshConversationPreferences(); err != nil {
+			m.bridgeNotice = err.Error()
+			return m, nil
+		}
+	}
 	if prompt == "" {
 		return m, nil
 	}

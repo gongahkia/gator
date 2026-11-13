@@ -78,7 +78,9 @@ func (c gatorAppController) prepareManagement(ctx context.Context, change workru
 					return nil, errors.New("a connection was removed; inspect connections again")
 				}
 			}
-			return v, store.SavePreferences(change.ConversationID, worksession.Preferences{ConnectorIDs: &v.IDs}, &prior)
+			next := prior
+			next.ConnectorIDs = &v.IDs
+			return v, store.SavePreferences(change.ConversationID, next, &prior)
 		}}, nil
 	case "data_action":
 		return c.prepareDataAction(change)

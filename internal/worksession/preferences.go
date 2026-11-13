@@ -13,6 +13,22 @@ import (
 
 type Preferences struct {
 	ConnectorIDs *[]string `json:"connector_ids,omitempty"`
+	WorkEffort   *string   `json:"work_effort,omitempty"`
+}
+
+// WorkEffortBudget is shared by manual and conversational settings. These
+// presets bound future foreground work, never existing tasks or scheduled jobs.
+func WorkEffortBudget(effort string) (PlanBudget, error) {
+	switch effort {
+	case "low":
+		return PlanBudget{MaxSteps: 12, CodeMaxSteps: 8}, nil
+	case "standard":
+		return PlanBudget{MaxSteps: 24, CodeMaxSteps: 16}, nil
+	case "high":
+		return PlanBudget{MaxSteps: 48, CodeMaxSteps: 32}, nil
+	default:
+		return PlanBudget{}, errors.New("work effort must be low, standard, or high")
+	}
 }
 
 var preferencesMu sync.Mutex
@@ -33,6 +49,11 @@ func (s Store) LoadPreferences(id string) (Preferences, error) {
 }
 
 func validatePreferences(p Preferences) error {
+	if p.WorkEffort != nil {
+		if _, err := WorkEffortBudget(*p.WorkEffort); err != nil {
+			return err
+		}
+	}
 	if p.ConnectorIDs == nil {
 		return nil
 	}
@@ -79,7 +100,7 @@ func (s Store) SavePreferences(id string, next Preferences, expected *Preference
 		return err
 	}
 	if expected != nil && !reflect.DeepEqual(prior, *expected) {
-		return errors.New("connection selection changed; inspect connections and try again")
+		return errors.New("conversation preferences changed; inspect the current settings and try again")
 	}
 	return writeJSON(filepath.Join(s.root, id, "preferences.json"), next)
 }

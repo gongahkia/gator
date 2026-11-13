@@ -44,9 +44,10 @@ export class Sessions extends EventEmitter {
   }
   #changed(worker) {
     const before = this.#previous.get(worker), state = worker.state;
-    if (before?.terminal_preferences?.id && state?.terminal_preferences?.initialized && !state.terminal_preferences.issue && before.terminal_preferences.id !== state.terminal_preferences.id) {
+    const changedPreferences = before?.preferences_revision !== undefined && state?.preferences_revision !== undefined && before.preferences_revision !== state.preferences_revision;
+    if (changedPreferences || before?.terminal_preferences?.id && state?.terminal_preferences?.initialized && !state.terminal_preferences.issue && before.terminal_preferences.id !== state.terminal_preferences.id) {
       for (const other of this.workers) if (other !== worker && !other.closed && other.refreshPreferences) {
-        void other.refreshPreferences().catch(error => { this.issue = "Terminal preferences changed, but a cached chat could not refresh: " + error.message; this.emit("change"); });
+        void other.refreshPreferences().catch(error => { this.issue = "Saved preferences changed, but a cached chat could not refresh: " + error.message; this.emit("change"); });
       }
     }
     if (before?.running && !state?.running && state?.conversation_id && worker !== this.current) {

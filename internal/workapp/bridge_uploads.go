@@ -78,6 +78,9 @@ func (m Model) SubmitBridgeUploads(request BridgeUploadSubmission) (tea.Model, t
 		}
 		return m, nil
 	}
+	if err := m.refreshConversationPreferences(); err != nil {
+		return fail(err.Error())
+	}
 	if !m.running {
 		previous := m.modelStatus
 		m.refreshModelStatus()

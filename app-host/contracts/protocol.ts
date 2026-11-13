@@ -136,6 +136,7 @@ export type FollowingGoal = {id: string; title: string; status: string; outcome?
 export type GoalAction = {request_id: string; id: string} & ({action: "inspect"} | {action: "pause" | "resume"; digest: string});
 export type GoalReview = {id: string; digest: string; title: string; status: string; lines: string[]; enabled_checks: number};
 export type BackendState = {
+	preferences_revision?: number;
  dialogue?: DialogueMessage[]; dialogue_more?: boolean; dialogue_issue?: string; dialogue_busy?: boolean; dialogue_active?: boolean;
  dialogue_peers?: DialoguePeer[];
  dialogue_task?: DialoguePeer & {parent_id:string};

@@ -110,5 +110,7 @@ func selectComposerSources(settings config.Store, stateDir, id string, expected,
 		return errors.New("connection selection changed in another request; reopen this chat")
 	}
 	selected := append([]string{}, ids...)
-	return sessions.SavePreferences(id, worksession.Preferences{ConnectorIDs: &selected}, &prior)
+	next := prior
+	next.ConnectorIDs = &selected
+	return sessions.SavePreferences(id, next, &prior)
 }
