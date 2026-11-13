@@ -213,3 +213,70 @@ func TestPlanEditFailureCancellationAndStaleProposalsPreserveReviewBoundaries(t 
 		}
 	}
 }
+
+func TestPlanCorrectionHistorySurvivesFailureRetryAndRestart(t *testing.T) {
+	s, id, initial := planFixture(t)
+	if _, err := s.ReviseTaskPlan(id, initial.ID, 0, "", proposedPlan()); err != nil {
+		t.Fatal(err)
+	}
+	original := retainedPlan(t, s, id, initial.ID)
+	first := editMessage(t, s, id, original.ID, "first-history-correction")
+	_, pending, _, err := s.BeginTaskPlanEdit(id, original.ID, original.Plan.Revision, original.Plan.Digest, id, first.ID, first.Text)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.FinishTaskPlanEdit(id, original.ID, pending.Plan.Revision, pending.Plan.Digest, first.ID, nil, "Provider disconnected"); err != nil {
+		t.Fatal(err)
+	}
+	failed := retainedPlan(t, s, id, original.ID)
+	second := editMessage(t, s, id, original.ID, "second-history-correction")
+	_, next, _, err := s.BeginTaskPlanEdit(id, original.ID, failed.Plan.Revision, failed.Plan.Digest, id, second.ID, second.Text)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(next.Plan.Edit.Prior) != 1 || next.Plan.Edit.Prior[0].TurnID != first.ID || next.Plan.Edit.Prior[0].Instruction != first.Text {
+		t.Fatal("failed correction was discarded")
+	}
+	prior, err := s.ReadDialogue(id, first.ID)
+	if err != nil || prior.State != "failed" {
+		t.Fatal("earlier actual outcome was overwritten", err)
+	}
+	reloaded := retainedPlan(t, s, id, original.ID)
+	if reloaded.Plan.Digest != next.Plan.Digest || len(reloaded.Plan.Edit.Prior) != 1 {
+		t.Fatal("persisted history lost")
+	}
+	clone := reloaded.Plan.Clone()
+	clone.Edit.Prior[0].Instruction = "mutated"
+	if reloaded.Plan.Edit.Prior[0].Instruction != first.Text {
+		t.Fatal("clone aliases immutable history")
+	}
+	reloaded.Plan.Edit.Prior[0].Instruction = "tampered"
+	if err := validateTaskPlan(reloaded); err == nil {
+		t.Fatal("history changed without invalidating review digest")
+	}
+	if _, _, err := s.ApproveTaskPlan(id, original.ID, failed.Plan.Revision, failed.Plan.Digest); err == nil {
+		t.Fatal("prior review approved replacement")
+	}
+	if _, err := s.FinishTaskPlanEdit(id, original.ID, next.Plan.Revision, next.Plan.Digest, second.ID, ptrPlanContent(proposedPlan()), ""); err != nil {
+		t.Fatal(err)
+	}
+	applied := retainedPlan(t, s, id, original.ID)
+	if applied.Plan.Phase != "review" || applied.Plan.Approval != nil || len(applied.Plan.Edit.Prior) != 1 {
+		t.Fatal("history granted approval or vanished")
+	}
+}
+
+func ptrPlanContent(value PlanContent) *PlanContent { return &value }
+
+func TestCorrectionHistoryRejectsDuplicatesAndUnboundedContext(t *testing.T) {
+	current := PlanCorrection{ParentID: "chat", TurnID: strings.Repeat("a", 64), Instruction: "Latest instruction"}
+	earlier := PlanCorrection{ParentID: "chat", TurnID: strings.Repeat("b", 64), Instruction: "Earlier instruction"}
+	if !validCorrectionHistory([]PlanCorrection{earlier}, current) {
+		t.Fatal("bounded history rejected")
+	}
+	for _, prior := range [][]PlanCorrection{{current}, {earlier, earlier}, {{ParentID: "chat", TurnID: "invalid", Instruction: "Earlier"}}, {{ParentID: "chat", TurnID: earlier.TurnID, Instruction: strings.Repeat("x", 64*1024)}}} {
+		if validCorrectionHistory(prior, current) {
+			t.Fatal("unsafe correction history accepted")
+		}
+	}
+}

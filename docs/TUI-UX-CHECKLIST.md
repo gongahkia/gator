@@ -68,6 +68,23 @@ finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
 
+- Backend correction-history retention (13 November): later sequential plan
+  corrections now retain earlier user instructions, including failed attempts,
+  in the canonical digest-bound plan. Earlier dialogue outcomes remain intact;
+  retaining an instruction does not relabel its failed attempt as successful.
+  Planning receives instruction text without private parent/turn controls, and
+  reviewed execution receives the retained context with current-plan precedence.
+  Histories are bounded to 32 prior instructions and 64 KiB combined text;
+  overflow is rejected explicitly rather than silently dropping constraints.
+  Clone isolation, persistence/reload, tamper rejection, stale approval, failed
+  correction/retry, duplicate identity and size guards pass in
+  `/tmp/gator-backend-20261113-correction-history-verified.log` and
+  `/tmp/gator-backend-20261113-history-guards.log`. These are controlled Go checks;
+  no physical/live verification is claimed. Full session/app/run regression is
+  running in `/tmp/gator-backend-20261113-history-full.log`. Active-revision
+  correction admission and serialization remain open; this fixes the instruction
+  retention gap needed for that transition without claiming it implemented.
+
 - Backend pending-action corrections (13 November, implementation in progress):
   `f44026a12`: the original operation accepts a correction only for its single exact pending
   external action, with unchanged plan restrictions. It denies the old proposal,

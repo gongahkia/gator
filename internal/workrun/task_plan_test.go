@@ -82,6 +82,7 @@ func TestTaskPlanRevisionUsesOriginalBudgetAndPublicProposalWithoutControlAuthor
 	}
 	request.Plan.Content = &previous
 	request.Plan.Edit = &worksession.PlanEdit{PlanEditReference: worksession.PlanEditReference{ParentID: "host-private-parent", TurnID: "host-private-control", Instruction: "Keep the parser small"}, State: "preparing"}
+	request.Plan.Edit.Prior = []worksession.PlanCorrection{{ParentID: "host-private-older", TurnID: "host-private-prior-control", Instruction: "Keep all receipts"}}
 	calls := 0
 	model := taskPlanModel(func(_ context.Context, turn agent.TurnRequest) (agent.Turn, error) {
 		calls++
@@ -89,6 +90,9 @@ func TestTaskPlanRevisionUsesOriginalBudgetAndPublicProposalWithoutControlAuthor
 			t.Fatal("revision received execution tools")
 		}
 		raw, _ := json.Marshal(turn)
+		if !strings.Contains(string(raw), "Keep all receipts") {
+			t.Fatal("earlier instruction lost before model request")
+		}
 		if strings.Contains(string(raw), "host-private-") {
 			t.Fatal("control references entered the model context")
 		}

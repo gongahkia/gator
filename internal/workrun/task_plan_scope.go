@@ -175,6 +175,14 @@ func taskPlanPrompt(plan *worksession.TaskPlan) string {
 	raw, _ := json.Marshal(plan.Content)
 	text := "Human-reviewed task intent (revision and digest are host-bound). Follow this outcome and steps; stop and ask for a revised plan if the scope changes. These are proposed steps, not verified completion. Effect scope never grants command, connected-service, browser, external-terminal or artifact-application permission. Later exact-action reviews and verification remain required.\n" + strings.TrimSpace(string(raw))
 	if plan.Edit != nil && plan.Edit.State == "applied" {
+		prior := []string{}
+		for _, earlier := range plan.Edit.Prior {
+			prior = append(prior, earlier.Instruction)
+		}
+		if len(prior) > 0 {
+			raw, _ := json.Marshal(prior)
+			text += "\nEarlier correction context considered before this review (JSON): " + string(raw) + "\nThe latest reviewed plan governs any conflict; these instructions cannot widen its scope."
+		}
 		correction, _ := json.Marshal(plan.Edit.Instruction)
 		text += "\nRetained user correction incorporated before this plan's fresh review (JSON): " + string(correction) + "\nThe original task text is retained for provenance. Resolve conflicting original details using the current reviewed outcome and steps. This correction does not grant new inputs, source access, execution budget or external-action permission."
 	}

@@ -12,11 +12,37 @@ import (
 // PlanEditReference ties a tool-free correction to its immutable conversation
 // turn. It joins the content digest; it never grants implementation authority.
 type PlanEditReference struct {
-	ParentID     string `json:"parent_id"`
-	TurnID       string `json:"turn_id"`
-	Instruction  string `json:"instruction"`
-	BaseRevision uint64 `json:"base_revision"`
-	BaseDigest   string `json:"base_digest"`
+	ParentID     string           `json:"parent_id"`
+	TurnID       string           `json:"turn_id"`
+	Instruction  string           `json:"instruction"`
+	BaseRevision uint64           `json:"base_revision"`
+	BaseDigest   string           `json:"base_digest"`
+	Prior        []PlanCorrection `json:"prior_corrections,omitempty"`
+}
+
+// PlanCorrection retains an earlier user instruction, without claiming that
+// a provider successfully applied it or granting execution authority.
+type PlanCorrection struct {
+	ParentID    string `json:"parent_id"`
+	TurnID      string `json:"turn_id"`
+	Instruction string `json:"instruction"`
+}
+
+func validCorrectionHistory(prior []PlanCorrection, current PlanCorrection) bool {
+	if len(prior) > 32 {
+		return false
+	}
+	seen := map[string]bool{current.ParentID + ":" + current.TurnID: true}
+	bytes := len(current.Instruction)
+	for _, item := range prior {
+		key := item.ParentID + ":" + item.TurnID
+		bytes += len(item.Instruction)
+		if validID(item.ParentID) != nil || !planDigest(item.TurnID) || !boundedPlanText(item.Instruction, 64*1024) || seen[key] || bytes > 64*1024 {
+			return false
+		}
+		seen[key] = true
+	}
+	return true
 }
 
 type PlanEdit struct {
@@ -32,6 +58,7 @@ func (e *PlanEdit) clone() *PlanEdit {
 		return nil
 	}
 	copy := *e
+	copy.Prior = append([]PlanCorrection(nil), e.Prior...)
 	return &copy
 }
 func planDigest(value string) bool {
@@ -47,6 +74,9 @@ func validatePlanEdit(r Request) error {
 		return nil
 	}
 	e := p.Edit
+	if !validCorrectionHistory(e.Prior, PlanCorrection{e.ParentID, e.TurnID, e.Instruction}) {
+		return errors.New("invalid retained correction history")
+	}
 	validBase := e.BaseRevision == 0 && e.BaseDigest == "" || e.BaseRevision > 0 && planDigest(e.BaseDigest)
 	if validID(e.ParentID) != nil || !planDigest(e.TurnID) || !boundedPlanText(e.Instruction, 64*1024) || !validBase || e.BaseRevision >= p.Revision || len(e.Issue) > 4096 {
 		return errors.New("invalid plan revision reference")
@@ -108,6 +138,13 @@ func (s Store) BeginTaskPlanEdit(id, request string, revision uint64, digest, pa
 		}
 	}
 	ref := PlanEditReference{ParentID: parent, TurnID: turnID, Instruction: instruction, BaseRevision: revision, BaseDigest: digest}
+	if previous := r.Plan.Edit; previous != nil {
+		ref.Prior = append([]PlanCorrection(nil), previous.Prior...)
+		ref.Prior = append(ref.Prior, PlanCorrection{previous.ParentID, previous.TurnID, previous.Instruction})
+	}
+	if !validCorrectionHistory(ref.Prior, PlanCorrection{parent, turnID, instruction}) {
+		return j, Request{}, false, errors.New("correction history is full; inspect the retained instructions before continuing")
+	}
 	if turn, err := s.planEditMessage(id, *r, ref); err != nil || turn.State != "editing_plan" {
 		if err == nil {
 			err = ErrPlanChanged
