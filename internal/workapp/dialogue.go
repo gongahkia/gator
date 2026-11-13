@@ -32,14 +32,15 @@ type ConversationInput struct {
 // DialoguePeer comes from another native owner through the host-only channel.
 // Every peer is checked against this conversation's durable task origin.
 type DialoguePeer struct {
-	ConversationID string `json:"conversation_id"`
-	TurnID         string `json:"turn_id"`
-	RunID          string `json:"run_id,omitempty"`
-	State          string `json:"state"`
-	CanGuide       bool   `json:"can_guide"`
-	CanStop        bool   `json:"can_stop"`
-	CanRevisePlan  bool   `json:"can_revise_plan"`
-	Summary        string `json:"summary,omitempty"`
+	ConversationID       string `json:"conversation_id"`
+	TurnID               string `json:"turn_id"`
+	RunID                string `json:"run_id,omitempty"`
+	State                string `json:"state"`
+	CanGuide             bool   `json:"can_guide"`
+	CanStop              bool   `json:"can_stop"`
+	CanRevisePlan        bool   `json:"can_revise_plan"`
+	PreparationControlID string `json:"preparation_control_id,omitempty"`
+	Summary              string `json:"summary,omitempty"`
 }
 type DialogueHost struct {
 	CanStart  bool           `json:"can_start"`
@@ -101,7 +102,7 @@ func (m Model) conversationActive() bool {
 		}
 	}
 	for _, peer := range m.dialoguePeers {
-		if peer.State == "running" || peer.State == "review" || peer.State == "queued" {
+		if peer.State == "running" || peer.State == "review" || peer.State == "queued" || peer.CanRevisePlan {
 			return true
 		}
 	}
@@ -214,7 +215,7 @@ func (m Model) conversationTasks() []workrun.ConversationTask {
 		}
 	}
 	for _, peer := range m.dialoguePeers {
-		if peer.State == "running" || peer.State == "review" || peer.State == "queued" {
+		if peer.State == "running" || peer.State == "review" || peer.State == "queued" || peer.CanRevisePlan {
 			if seen[peer.ConversationID] || len(tasks) >= 16 {
 				continue
 			}
@@ -222,7 +223,7 @@ func (m Model) conversationTasks() []workrun.ConversationTask {
 			if err != nil || turn.TaskChat != peer.ConversationID {
 				continue
 			}
-			tasks = append(tasks, workrun.ConversationTask{ID: peer.ConversationID, Title: boundedConversation(turn.Text, 256), State: peer.State, Summary: boundedConversation(peer.Summary, 2048), CanGuide: peer.CanGuide && peer.RunID != "", CanStop: peer.CanStop && peer.RunID != "", CanRevisePlan: peer.CanRevisePlan && peer.RunID != "", ControlID: peer.RunID})
+			tasks = append(tasks, workrun.ConversationTask{ID: peer.ConversationID, Title: boundedConversation(turn.Text, 256), State: peer.State, Summary: boundedConversation(peer.Summary, 2048), CanGuide: peer.CanGuide && peer.RunID != "", CanStop: peer.CanStop && peer.RunID != "", CanRevisePlan: peer.CanRevisePlan && peer.RunID != "", ControlID: peer.RunID, PreparationControlID: peer.PreparationControlID})
 			seen[peer.ConversationID] = true
 		}
 	}
@@ -261,7 +262,7 @@ func (m Model) ConfigureDialogueHost(host DialogueHost) Model {
 	}
 	seen := map[string]bool{}
 	for _, peer := range host.Peers {
-		if seen[peer.ConversationID] || !slices.Contains([]string{"running", "review", "queued", "completed", "failed", "stopped", "unconfirmed"}, peer.State) || len(peer.Summary) > 8192 {
+		if seen[peer.ConversationID] || !slices.Contains([]string{"running", "review", "queued", "interrupted", "completed", "failed", "stopped", "unconfirmed"}, peer.State) || len(peer.Summary) > 8192 {
 			continue
 		}
 		origin, err := m.config.SessionStore.DialogueTask(peer.ConversationID)
@@ -325,6 +326,7 @@ func (m Model) admitConversation(request BridgeUploadSubmission, text string) (t
 	for index := range input.TaskContext {
 		input.TaskContext[index].CanGuide, input.TaskContext[index].CanStop = false, false
 		input.TaskContext[index].CanRevisePlan = false
+		input.TaskContext[index].PreparationControlID = ""
 	}
 	if m.config.CaptureConversationInput != nil {
 		var err error
@@ -427,7 +429,7 @@ func (m Model) finishConversationRoute(value conversationRouted) (tea.Model, tea
 		}
 		matched := false
 		for _, task := range current.Tasks {
-			if task.ID == value.Decision.Target && controlID != "" && task.ControlID == controlID {
+			if task.ID == value.Decision.Target && controlID != "" && (task.ControlID == controlID || value.Decision.Kind == "revise_plan" && task.PreparationControlID == controlID) {
 				matched = true
 			}
 		}

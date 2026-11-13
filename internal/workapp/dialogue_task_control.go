@@ -29,7 +29,7 @@ func (m Model) localConversationTask(request worksession.Request) (workrun.Conve
 		return task, true
 	}
 	p := request.Plan
-	if p == nil || request.State != "queued" {
+	if p == nil || request.State != "queued" && !(request.State == "interrupted" && p.Phase == "interrupted" && p.Content == nil) {
 		return task, false
 	}
 	switch p.Phase {
@@ -44,6 +44,10 @@ func (m Model) localConversationTask(request worksession.Request) (workrun.Conve
 		}
 		task.State = "preparing a plan"
 		task.CanStop = m.cancel != nil && !m.cancelling
+		task.CanRevisePlan = m.config.RevisePlan != nil && m.planRevising == "" && task.CanStop && !m.controlBusy && !m.followupSaving && !m.receiptBusy && m.requestsIssue == ""
+	case "interrupted":
+		task.State, task.CanStop = "plan preparation interrupted", true
+		task.CanRevisePlan = m.config.RevisePlan != nil && !m.running && !m.controlBusy && !m.followupSaving && !m.receiptBusy && m.requestsIssue == "" && (!m.dialogueHost || m.dialogueCanStart)
 	case "review", "approved":
 		task.State = "plan awaiting review"
 		if p.Phase == "approved" {
@@ -57,9 +61,21 @@ func (m Model) localConversationTask(request worksession.Request) (workrun.Conve
 	if p.Content != nil {
 		task.Summary = boundedConversation(p.Content.Outcome, 2048)
 	}
+	task.PreparationControlID = initialPreparationControl(request)
 	// Revision, digest and phase must all still match after tool-free routing.
 	task.ControlID = fmt.Sprintf("plan-%x", sha256.Sum256([]byte(fmt.Sprintf("%s:%d:%s:%s", request.ID, p.Revision, p.Digest, p.Phase))))
 	return task, true
+}
+
+// Only the automatic transition to the first unapproved proposal can inherit
+// its preparation correction identity. Edits, approvals, dispatch and later
+// revisions continue to require their exact current control epoch.
+func initialPreparationControl(request worksession.Request) string {
+	p := request.Plan
+	if request.State != "queued" || p == nil || p.Phase != "review" || p.Revision != 1 || p.Content == nil || p.Edit != nil || p.Approval != nil {
+		return ""
+	}
+	return fmt.Sprintf("plan-%x", sha256.Sum256([]byte(fmt.Sprintf("%s:0::preparing", request.ID))))
 }
 
 func (m Model) ownsConversationTask(id string) bool {
@@ -90,7 +106,7 @@ func (m *Model) stopConversationTask(id, controlID string) (bool, error) {
 		if !ok || !task.CanStop || controlID == "" || task.ControlID != controlID {
 			return false, errors.New("the selected task or plan changed; no different task was stopped")
 		}
-		if request.Plan != nil && request.State == "queued" {
+		if request.Plan != nil && (request.State == "queued" || request.State == "interrupted") {
 			journal, err = m.config.SessionStore.CancelTaskPlan(m.conversation, id, request.Plan.Revision, request.Plan.Digest)
 			if err != nil {
 				return false, err

@@ -53,6 +53,140 @@ async function fixture(respond: (body: any) => string | Response | Promise<strin
   return { root, env, options, client, setup, requests, flush, choose, send, plan, review, close }
 }
 
+for (const [width,height] of [[110,34],[80,24],[60,20],[42,14]]) test(`ordinary correction during initial preparation retires the old proposal and keeps exact review at ${width}×${height}`, async () => {
+  let releaseInitial = () => {}, releaseCorrection = () => {}
+  const initial = new Promise<void>(resolve => { releaseInitial = resolve }), revised = new Promise<void>(resolve => { releaseCorrection = resolve })
+  const proposals: any[] = [], executions: string[] = []
+  const f = await fixture(async body => {
+    if (system(body).includes("You handle the conversation with Gator")) {
+      const meta = metadata(body)
+      return JSON.stringify(meta.message === "Hello during the revision" ? { kind:"reply",text:"We can keep talking while the corrected plan is prepared." } : { kind:"revise_plan",target:meta.tasks.find((task:any) => task.can_revise_plan).id,instruction:meta.message })
+    }
+    if (system(body).includes("Propose a plan")) {
+      const meta = metadata(body); proposals.push(meta)
+      await (meta.correction ? revised : initial)
+      return JSON.stringify(meta.correction ? correctedPlan : originalPlan)
+    }
+    executions.push(JSON.stringify(body)); return "The reviewed comparison uses the corrected budget."
+  })
+  try {
+    await f.client.start(); f.setup.resize(width,height); await f.flush(); await f.client.send({ type:"submit",text:"/mode inspect" })
+    const input = await f.plan(), owner = f.client.state!.conversation_id!
+    await until(() => proposals.length === 1 && f.client.state?.task_plans?.[0]?.phase === "preparing", "initial proposal running")
+    const original = f.client.state!.task_plans![0]!
+    await f.send(correction)
+    await until(() => proposals.length === 2 && f.client.state?.task_plans?.[0]?.phase === "revising", "correction replaces the still-held initial proposal")
+    expect(f.client.state?.task_plans?.[0]?.id).toBe(original.id); expect(executions).toHaveLength(0)
+    expect(proposals[1].correction).toBe(correction); expect(proposals[1].previous_plan).toBeUndefined()
+    expect(proposals[1].work_limits).toEqual(proposals[0].work_limits); expect(proposals[1].selected_source_ids).toEqual(proposals[0].selected_source_ids)
+    expect(JSON.stringify(proposals)).not.toContain("silver otter")
+    await f.send("Hello during the revision"); expect(f.client.state?.dialogue?.at(-1)?.state).toBe("answered"); expect(f.client.state?.running).toBe(true)
+    const future = join(f.root,"future-initial-note.txt"); await writeFile(future,"Future draft only: amber finch"); await f.client.attach([future])
+    const futureInput = f.client.draft.uploads![0]!.id, draft = "Keep my next question\nAfter correcting the initial plan"
+    await f.client.edit(draft); await f.client.setPlanFirst(true); await f.flush()
+    expect(f.setup.renderer.root.findDescendantById("transcript")!.height).toBeGreaterThanOrEqual(4)
+    releaseCorrection()
+    await until(() => !f.client.state?.running && f.client.state?.task_plans?.[0]?.revision === 2 && f.client.state?.dialogue?.[0]?.state === "guided", "corrected initial plan saved")
+    releaseInitial(); await f.flush()
+    expect(f.client.state?.task_plans?.[0]?.outcome).toBe(correctedPlan.outcome); expect(executions).toHaveLength(0)
+    const request_id = randomUUID()
+    await expect(f.client.result({type:"task_plan",task_plan:{conversation_id:owner,task_id:original.id,revision:original.revision,digest:original.digest,action:"approve",request_id}},request_id,state=>state.task_plan_result)).rejects.toThrow()
+    await f.review(); await f.choose("Read exact proposed plan")
+    // Exact content remains inspectable at a small viewport through native scroll.
+    expect(f.setup.captureCharFrame()).toContain("Proposed plan")
+    f.setup.mockInput.pressEscape(); await f.flush(); await f.review(); await f.choose("Approve plan and start"); f.setup.mockInput.pressEnter()
+    await until(() => !f.client.state?.running && f.client.state?.task_plans?.[0]?.state === "completed", "only the corrected plan executes")
+    expect(executions).toHaveLength(1); expect(executions[0]).toContain("Retained user correction"); expect(executions[0]).toContain("silver otter"); expect(executions[0]).not.toContain("amber finch")
+    const journal = JSON.parse(await readFile(join(f.env.GATOR_STATE_DIR,"gator/conversations",owner,"requests.json"),"utf8"))
+    expect(journal.requests).toHaveLength(1); expect(journal.requests[0].id).toBe(original.id); expect(journal.requests[0].options.Uploads).toEqual([input]); expect(proposals).toHaveLength(2)
+    expect(f.client.draft.text).toBe(draft); expect(f.client.draft.uploads?.map(file=>file.id)).toEqual([futureInput]); expect(f.client.draft.plan_first).toBe(true)
+    await f.client.close(); await f.setup.dispose(); const count = f.requests.length, restarted = new GatorClient(new Application(f.options))
+    try { await restarted.start(); expect(restarted.state?.task_plans?.[0]?.id).toBe(original.id); expect(restarted.state?.dialogue?.[0]?.state).toBe("guided"); expect(restarted.draft.text).toBe(draft); expect(restarted.draft.uploads?.map(file=>file.id)).toEqual([futureInput]); expect(restarted.draft.plan_first).toBe(true); expect(f.requests).toHaveLength(count) }
+    finally { await restarted.close() }
+  } finally { releaseInitial(); releaseCorrection(); await f.close() }
+},30000)
+
+for (const [width,height] of [[110,34],[80,24],[60,20],[42,14]]) for (const scenario of ["cancel","failure and retry"] as const) test(`initial correction ${scenario} retains original task through restart at ${width}×${height}`, async () => {
+  let releaseInitial = () => {}, releaseCorrection = () => {}, revisionCalls = 0, executions = 0
+  const initial = new Promise<void>(resolve=>{releaseInitial=resolve}), revised = new Promise<void>(resolve=>{releaseCorrection=resolve})
+  const f = await fixture(async body => {
+    if (system(body).includes("You handle the conversation with Gator")) {
+      const meta = metadata(body)
+      return JSON.stringify(meta.message === "Stop the venue plan" ? {kind:"stop",target:meta.tasks.find((task:any)=>task.can_stop).id} : {kind:"revise_plan",target:meta.tasks.find((task:any)=>task.can_revise_plan).id,instruction:meta.message})
+    }
+    if (system(body).includes("Propose a plan")) {
+      if (!metadata(body).correction) { await initial; return JSON.stringify(originalPlan) }
+      revisionCalls++
+      if (scenario === "failure and retry" && revisionCalls === 1) return new Response("Controlled initial revision unavailable",{status:503})
+      if (scenario === "cancel") await revised
+      return JSON.stringify(correctedPlan)
+    }
+    executions++; return "Unexpected unreviewed execution"
+  })
+  let restarted: GatorClient | undefined, setup: Awaited<ReturnType<typeof testRender>> | undefined
+  try {
+    await f.client.start(); f.setup.resize(width,height); await f.flush(); await f.client.send({type:"submit",text:"/mode inspect"})
+    const input = await f.plan(), owner = f.client.state!.conversation_id!
+    await until(()=>f.client.state?.task_plans?.[0]?.phase === "preparing","initial preparation started")
+    const task = f.client.state!.task_plans![0]!
+    await f.client.edit(correction); await f.client.submit()
+    await until(()=>revisionCalls === 1,"initial correction started")
+    if (scenario === "cancel") { await f.send("Stop the venue plan"); await until(()=>!f.client.state?.running && f.client.state?.dialogue?.[0]?.state === "interrupted","initial correction cancelled") }
+    else { await until(()=>!f.client.state?.running && f.client.state?.dialogue?.[0]?.state === "failed","initial correction failure retained"); expect(f.client.state?.dialogue?.[0]?.issue).toContain("No proposal was saved") }
+    await f.client.edit("Keep my correction recovery\ndraft",[],undefined,true)
+    releaseInitial(); releaseCorrection(); await f.flush(); expect(revisionCalls).toBe(1); expect(executions).toBe(0)
+    await f.client.close(); await f.setup.dispose(); const count = f.requests.length
+    const client = restarted = new GatorClient(new Application(f.options))
+    setup = await testRender(()=><App client={client} quit={()=>client.close()} clipboard={{read:async()=>undefined,write:async()=>{}}}/>,{width,height})
+    await client.start(); await setup.flush(); expect(client.state?.task_plans?.[0]?.id).toBe(task.id); expect(f.requests).toHaveLength(count)
+    expect(client.draft.text).toBe("Keep my correction recovery\ndraft"); expect(client.draft.plan_first).toBe(true)
+    if (scenario === "failure and retry") {
+      await client.edit("Retry that original venue plan",[],undefined,false); await setup.flush(); await Bun.sleep(25); await setup.flush(); setup.mockInput.pressEnter()
+      await until(()=>client.state?.dialogue?.at(-1)?.state === "guided" && !client.state?.running,"explicit retry uses same task")
+      expect(revisionCalls).toBe(2); expect(client.state?.task_plans?.[0]?.outcome).toBe(correctedPlan.outcome)
+    } else expect(client.state?.task_plans?.[0]?.state).toBe("discarded")
+    const journal = JSON.parse(await readFile(join(f.env.GATOR_STATE_DIR,"gator/conversations",owner,"requests.json"),"utf8"))
+    expect(journal.requests).toHaveLength(1); expect(journal.requests[0].id).toBe(task.id); expect(journal.requests[0].options.Uploads).toEqual([input]); expect(executions).toBe(0)
+  } finally { releaseInitial();releaseCorrection();if(restarted)await restarted.close();if(setup&&!setup.renderer.isDestroyed)await setup.dispose();await f.close() }
+},30000)
+
+for (const [width,height] of [[110,34],[80,24],[60,20],[42,14]]) test.skipIf(process.platform === "win32")(`crashed initial correction stays interrupted until explicit retry at ${width}×${height}`, async () => {
+  let releaseInitial=()=>{},releaseRevision=()=>{},revisionCalls=0,executions=0
+  const initial=new Promise<void>(resolve=>{releaseInitial=resolve}),revision=new Promise<void>(resolve=>{releaseRevision=resolve})
+  const f=await fixture(async body=>{
+    if(system(body).includes("You handle the conversation with Gator")){const meta=metadata(body);return JSON.stringify({kind:"revise_plan",target:meta.tasks.find((task:any)=>task.can_revise_plan).id,instruction:meta.message})}
+    if(system(body).includes("Propose a plan")){
+      if(!metadata(body).correction){await initial;return JSON.stringify(originalPlan)}
+      revisionCalls++;if(revisionCalls===1)await revision;return JSON.stringify(correctedPlan)
+    }
+    executions++;return "Unexpected execution"
+  })
+  let restarted:GatorClient|undefined,setup:Awaited<ReturnType<typeof testRender>>|undefined
+  try{
+    await f.client.start();f.setup.resize(width,height);await f.flush();await f.client.send({type:"submit",text:"/mode inspect"})
+    const input=await f.plan(),owner=f.client.state!.conversation_id!
+    await until(()=>f.client.state?.task_plans?.[0]?.phase==="preparing","initial proposal started")
+    const task=f.client.state!.task_plans![0]!
+    await f.send(correction);await until(()=>revisionCalls===1&&f.client.state?.task_plans?.[0]?.phase==="revising","correction request held")
+    await f.client.edit("Draft kept after an interrupted\ninitial correction",[],undefined,true)
+    const children=execFileSync("ps",["-axo","pid=,ppid=,command="],{encoding:"utf8"}).split("\n").map(line=>line.trim().match(/^(\d+)\s+(\d+)\s+(.+)$/)).filter(match=>match&&Number(match[2])===process.pid&&match[3].includes(f.options.binary)&&match[3].includes("ui-backend"))
+    expect(children).toHaveLength(1);process.kill(Number(children[0]![1]),"SIGKILL")
+    await until(()=>f.client.snapshot.connection==="disconnected","exact isolated runtime crashed")
+    releaseInitial();releaseRevision();await f.client.close();await f.setup.dispose();const count=f.requests.length
+    const client=restarted=new GatorClient(new Application(f.options))
+    setup=await testRender(()=><App client={client} quit={()=>client.close()} clipboard={{read:async()=>undefined,write:async()=>{}}}/>,{width,height})
+    await client.start();await setup.flush()
+    expect(client.state?.task_plans?.[0]?.id).toBe(task.id);expect(client.state?.task_plans?.[0]?.phase).toBe("interrupted");expect(client.state?.task_plans?.[0]?.state).toBe("interrupted")
+    expect(client.state?.dialogue?.[0]?.state).toBe("failed");expect(client.state?.dialogue?.[0]?.issue).toContain("will not replay automatically")
+    expect(client.draft.text).toBe("Draft kept after an interrupted\ninitial correction");expect(client.draft.plan_first).toBe(true);expect(f.requests).toHaveLength(count);expect(executions).toBe(0)
+    await client.edit("Retry that original venue plan",[],undefined,false);await setup.flush();await Bun.sleep(25);await setup.flush();setup.mockInput.pressEnter()
+    await until(()=>client.state?.dialogue?.at(-1)?.state==="guided"&&!client.state?.running,"explicit retry after crash")
+    expect(revisionCalls).toBe(2);expect(client.state?.task_plans?.[0]?.id).toBe(task.id);expect(client.state?.task_plans?.[0]?.outcome).toBe(correctedPlan.outcome)
+    const journal=JSON.parse(await readFile(join(f.env.GATOR_STATE_DIR,"gator/conversations",owner,"requests.json"),"utf8"))
+    expect(journal.requests).toHaveLength(1);expect(journal.requests[0].options.Uploads).toEqual([input]);expect(executions).toBe(0)
+  }finally{releaseInitial();releaseRevision();if(restarted)await restarted.close();if(setup&&!setup.renderer.isDestroyed)await setup.dispose();await f.close()}
+},30000)
+
 test("an empty plan-first draft survives restart and keyboard submission still prepares review", async () => {
   let proposals = 0, executions = 0
   const f = await fixture(body => {
@@ -214,8 +348,10 @@ test("conversational cancellation stops an in-flight plan correction without rev
   } finally { release(); await f.close() }
 }, 60000)
 
-test("a delegated plan correction returns its real result to the requesting chat without disturbing other work", async () => {
+for (const phase of ["preparing","review"] as const) test(`a delegated ${phase} plan correction returns its real result to the requesting chat without disturbing other work`, async () => {
   let releaseMain!: () => void, releaseRevision!: () => void
+	let releaseInitial = () => {}
+	const initialGate = new Promise<void>(resolve => { releaseInitial = resolve })
   const mainGate = new Promise<void>(resolve => { releaseMain = resolve }), revisionGate = new Promise<void>(resolve => { releaseRevision = resolve })
   let work = 0
   const proposals: any[] = []
@@ -229,6 +365,7 @@ test("a delegated plan correction returns its real result to the requesting chat
     if (system(body).includes("Propose a plan")) {
       const meta = metadata(body); proposals.push(meta)
       if (meta.correction) { await revisionGate; return JSON.stringify(correctedPlan) }
+      if (phase === "preparing") await initialGate
       return JSON.stringify(originalPlan)
     }
     work++; if (work === 1) await mainGate
@@ -239,10 +376,11 @@ test("a delegated plan correction returns its real result to the requesting chat
     const parent = f.client.state!.conversation_id!
     await f.client.edit("Research another topic"); await f.client.submit(); await until(() => work === 1, "main work")
     const input = await f.plan()
-    await until(() => f.client.state?.dialogue?.[0]?.state === "delegated" && !!f.client.state?.dialogue_peers?.some(peer => peer.can_revise_plan), "child plan review")
+    await until(() => f.client.state?.dialogue?.[0]?.state === "delegated" && !!f.client.state?.dialogue_peers?.some(peer => peer.can_revise_plan && peer.state === (phase === "preparing" ? "running" : "review")), "child plan " + phase)
     const child = f.client.state!.dialogue![0]!.task_chat!
     await f.send(correction)
     await until(() => proposals.some(plan => plan.correction) && !f.client.state?.dialogue_busy, "child revision admitted")
+    releaseInitial()
     expect(f.client.state?.conversation_id).toBe(parent); expect(f.client.state?.running).toBe(true)
     await f.send("Hello during the revision")
     expect(f.client.state?.dialogue?.at(-1)?.state).toBe("answered"); expect(work).toBe(1)
@@ -254,6 +392,7 @@ test("a delegated plan correction returns its real result to the requesting chat
     expect(journal.requests).toHaveLength(1); expect(journal.requests[0].plan.phase).toBe("review")
     expect(journal.requests[0].plan.approval).toBeUndefined(); expect(journal.requests[0].options.Uploads).toEqual([input])
     expect(journal.requests[0].options.DialogueParent).toBe(parent); expect(journal.requests[0].plan.edit.instruction).toBe(correction)
+    expect(journal.requests[0].plan.edit.base_revision).toBe(phase === "preparing" ? 0 : 1)
     expect(f.client.draft.text).toBe("Keep the requesting chat draft")
     await f.client.navigate("/tasks"); await f.flush(); await f.choose("Compare venues")
     await until(() => f.client.state?.conversation_id === child && !f.client.snapshot.sessionSwitching, "open original task")
@@ -265,5 +404,5 @@ test("a delegated plan correction returns its real result to the requesting chat
     expect(f.client.draft.text).toBe("Keep the requesting chat draft")
     releaseMain(); await until(() => !f.client.snapshot.allChatsBusy, "other work finished")
     expect(work).toBe(1)
-  } finally { releaseMain(); releaseRevision(); await f.close() }
+  } finally { releaseInitial(); releaseMain(); releaseRevision(); await f.close() }
 }, 60000)

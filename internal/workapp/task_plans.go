@@ -111,6 +111,7 @@ func (m Model) finishTaskPlan(value taskPlanPrepared) (tea.Model, tea.Cmd) {
 	if value.ID != m.planPreparing {
 		return m, nil
 	}
+	stopRequested := m.cancelling
 	m.planPreparing = ""
 	m.running = false
 	m.live = nil
@@ -132,6 +133,32 @@ func (m Model) finishTaskPlan(value taskPlanPrepared) (tea.Model, tea.Cmd) {
 	}
 	if r.Plan == nil {
 		m.bridgeNotice = "The retained plan is unavailable. No implementation was started."
+		return m, nil
+	}
+	if m.planRevising == value.ID && m.planEditTurn != "" {
+		if stopRequested && r.State == "queued" && r.Plan.Phase == "revising" && r.Plan.Edit != nil && r.Plan.Edit.TurnID == m.planEditTurn {
+			saved, err := m.config.SessionStore.CancelTaskPlan(m.conversation, r.ID, r.Plan.Revision, r.Plan.Digest)
+			m.planRevising, m.planEditTurn = "", ""
+			if err != nil {
+				m.requests = j
+				m.bridgeNotice = "Could not confirm cancellation of this plan. No replacement was started; inspect its retained state: " + err.Error()
+				return m, nil
+			}
+			m.requests = saved
+			m.publishPlanEditOutcome(r.ID)
+			m.status = "Plan cancelled before implementation."
+			return m, nil
+		}
+		if r.State == "queued" && r.Plan.Phase == "revising" && r.Plan.Edit != nil && r.Plan.Edit.State == "preparing" && r.Plan.Edit.TurnID == m.planEditTurn {
+			m.requests = j
+			return m.continueInitialPlanRevision(r)
+		}
+		m.planRevising, m.planEditTurn = "", ""
+		m.requests = j
+		if r.Plan.Edit != nil {
+			m.publishPlanEditOutcome(r.ID)
+		}
+		m.status = "Plan preparation ended without implementation. Inspect its retained outcome."
 		return m, nil
 	}
 	interrupt := func() {

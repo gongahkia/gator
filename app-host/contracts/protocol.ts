@@ -210,7 +210,7 @@ export type BackendState = {
 };
 
 export type DialogueMessage = {id:string;sequence:number;text:string;response?:string;state:string;issue?:string;task_chat?:string;input_ids?:string[];reply_to_update_id?:string;created_at:string;updated_at:string};
-export type DialoguePeer = {conversation_id:string;turn_id:string;run_id?:string;state:string;can_guide:boolean;can_stop:boolean;can_revise_plan?:boolean;summary?:string};
+export type DialoguePeer = {conversation_id:string;turn_id:string;run_id?:string;state:string;can_guide:boolean;can_stop:boolean;can_revise_plan?:boolean;preparation_control_id?:string;summary?:string};
 export type PanelAction = {
   id: string; action: "select" | "activate" | "key" | "query" | "filter" | "next" | "previous" | "refresh" | "rename" | "pin" | "unpin" | "archive" | "restore";
   row?: number; fields?: Record<number, string>; text?: string;

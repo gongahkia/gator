@@ -71,6 +71,7 @@ func (m Model) dialogueTaskState() *DialogueTaskState {
 		if task, ok := m.localConversationTask(r); ok {
 			result.RunID, result.CanGuide, result.CanStop, result.CanRevisePlan = task.ControlID, task.CanGuide, task.CanStop, task.CanRevisePlan
 			result.Summary = task.Summary
+			result.PreparationControlID = task.PreparationControlID
 		}
 		if r.ID == m.activeRequest && m.running {
 			result.State = "running"
@@ -78,7 +79,7 @@ func (m Model) dialogueTaskState() *DialogueTaskState {
 				result.State = "review"
 			}
 		}
-		if r.ID == m.planRevising && m.running {
+		if (r.ID == m.planPreparing || r.ID == m.planRevising) && m.running {
 			result.State = "running"
 		}
 		if !r.Pending() {
@@ -248,7 +249,7 @@ func (m Model) ControlDialogue(control DialogueControl) (Model, tea.Cmd) {
 		for _, r := range m.requests.Requests {
 			if r.ID == control.TurnID {
 				if task, ok := m.localConversationTask(r); ok {
-					state = &DialogueTaskState{ParentID: m.conversation, DialoguePeer: DialoguePeer{ConversationID: m.conversation, TurnID: r.ID, RunID: task.ControlID, CanRevisePlan: task.CanRevisePlan}}
+					state = &DialogueTaskState{ParentID: m.conversation, DialoguePeer: DialoguePeer{ConversationID: m.conversation, TurnID: r.ID, RunID: task.ControlID, CanRevisePlan: task.CanRevisePlan, PreparationControlID: task.PreparationControlID}}
 					ownerRequest = r.ID
 				}
 				break
@@ -262,7 +263,7 @@ func (m Model) ControlDialogue(control DialogueControl) (Model, tea.Cmd) {
 			}
 		}
 	}
-	if !m.config.ManagedSessions || state == nil || state.ParentID != control.ParentID || state.TurnID != control.TurnID || state.RunID == "" || state.RunID != control.RunID {
+	if !m.config.ManagedSessions || state == nil || state.ParentID != control.ParentID || state.TurnID != control.TurnID || state.RunID == "" || state.RunID != control.RunID && !(control.Action == "revise_plan" && control.RunID != "" && state.PreparationControlID == control.RunID) {
 		return fail("the selected task or operation changed; no different task was controlled")
 	}
 	var command tea.Cmd

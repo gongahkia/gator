@@ -80,6 +80,9 @@ func (m *Model) restoreRequests() {
 			if r.State == "queued" && r.Plan.Phase == "revising" && r.Plan.Edit != nil {
 				r.Plan = r.Plan.Clone()
 				r.Plan.Phase, r.Plan.Edit.State = "review", "failed"
+				if r.Plan.Content == nil {
+					r.Plan.Phase, r.State = "interrupted", "interrupted"
+				}
 				r.Plan.Edit.Issue = "The session ended while preparing the revised plan. It will not replay automatically."
 				r.Issue = r.Plan.Edit.Issue
 				r.UpdatedAt = time.Now().UTC()

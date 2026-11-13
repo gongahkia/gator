@@ -3,6 +3,7 @@ package workapp
 import (
 	"context"
 	"errors"
+	"os"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -17,10 +18,11 @@ type taskPlanRevised struct {
 }
 
 func (m Model) startTaskPlanRevision(id, controlID, parent, turnID, instruction string) (Model, tea.Cmd, error) {
-	if !m.retainsRequests() || m.config.RevisePlan == nil || m.running || m.controlBusy || m.followupSaving || m.receiptBusy || m.requestsIssue != "" {
+	preparing := m.running && id == m.planPreparing && m.planRevising == "" && m.cancel != nil && !m.cancelling
+	if !m.retainsRequests() || m.config.RevisePlan == nil || m.running && !preparing || m.controlBusy || m.followupSaving || m.receiptBusy || m.requestsIssue != "" {
 		return m, nil, errors.New("this owner is not ready to revise its retained plan")
 	}
-	if m.dialogueHost && !m.dialogueCanStart {
+	if !preparing && m.dialogueHost && !m.dialogueCanStart {
 		return m, nil, errors.New("three tasks are working; wait for one to finish before revising this plan")
 	}
 	release := func() {}
@@ -32,13 +34,22 @@ func (m Model) startTaskPlanRevision(id, controlID, parent, turnID, instruction 
 		}
 	}
 	defer release()
-	lease, err := m.config.SessionStore.AcquireExecution(m.conversation)
-	if err != nil {
-		return m, nil, err
+	var lease *os.File
+	if !preparing {
+		var err error
+		lease, err = m.config.SessionStore.AcquireExecution(m.conversation)
+		if err != nil {
+			return m, nil, err
+		}
+	}
+	closeLease := func() {
+		if lease != nil {
+			lease.Close()
+		}
 	}
 	journal, err := m.config.SessionStore.LoadRequests(m.conversation)
 	if err != nil {
-		lease.Close()
+		closeLease()
 		return m, nil, err
 	}
 	var original worksession.Request
@@ -49,20 +60,34 @@ func (m Model) startTaskPlanRevision(id, controlID, parent, turnID, instruction 
 		}
 	}
 	task, ok := m.localConversationTask(original)
-	if !ok || !task.CanRevisePlan || task.ControlID == "" || task.ControlID != controlID {
-		lease.Close()
+	if !ok || !task.CanRevisePlan || task.ControlID == "" || task.ControlID != controlID && (controlID == "" || task.PreparationControlID != controlID) {
+		closeLease()
 		return m, nil, worksession.ErrPlanChanged
 	}
 	journal, request, claimed, err := m.config.SessionStore.BeginTaskPlanEdit(m.conversation, id, original.Plan.Revision, original.Plan.Digest, parent, turnID, instruction)
 	if err != nil {
-		lease.Close()
+		closeLease()
 		return m, nil, err
 	}
 	m.requests = journal
 	if !claimed {
-		lease.Close()
+		closeLease()
 		return m, nil, nil
 	}
+	if preparing {
+		// Retire the first proposal only after its correction is durable. Its
+		// completion releases the original execution lease before the replacement
+		// starts; an obsolete result can never become a reviewable plan.
+		m.planRevising, m.planEditTurn = id, turnID
+		m.cancel()
+		m.status = "Applying your correction before presenting the plan…"
+		return m, nil, nil
+	}
+	return m.launchTaskPlanRevision(request, lease)
+}
+
+func (m Model) launchTaskPlanRevision(request worksession.Request, lease *os.File) (Model, tea.Cmd, error) {
+	id, turnID := request.ID, request.Plan.Edit.TurnID
 	ctx, cancel := context.WithCancel(context.Background())
 	m.cancel, m.running, m.cancelling = cancel, true, false
 	m.planRevising, m.planEditTurn = id, turnID
@@ -85,6 +110,26 @@ func (m Model) startTaskPlanRevision(id, controlID, parent, turnID, instruction 
 		return m, tea.Batch(command, m.nextLoadingTick()), nil
 	}
 	return m, command, nil
+}
+
+func (m Model) continueInitialPlanRevision(request worksession.Request) (tea.Model, tea.Cmd) {
+	fail := func(err error) (tea.Model, tea.Cmd) {
+		return m.finishTaskPlanRevision(taskPlanRevised{ID: request.ID, TurnID: m.planEditTurn, Revision: request.Plan.Revision, Digest: request.Plan.Digest, Err: err})
+	}
+	lease, err := m.config.SessionStore.AcquireExecution(m.conversation)
+	if err != nil {
+		return fail(err)
+	}
+	if err := m.config.SessionStore.CheckPlanBinding(m.conversation, request); err != nil {
+		lease.Close()
+		return fail(err)
+	}
+	next, cmd, err := m.launchTaskPlanRevision(request, lease)
+	if err != nil {
+		lease.Close()
+		return fail(err)
+	}
+	return next, cmd
 }
 
 func (m Model) finishTaskPlanRevision(value taskPlanRevised) (tea.Model, tea.Cmd) {

@@ -126,6 +126,17 @@ test("a plan correction rechecks the task limit while stop remains available", a
     await sessions.settled();
     assert.deepEqual(parent.controls.at(-1), { parent_id: "parent", turn_id: "local-plan", request_id: "local-with-capacity", run_id: "local-plan-epoch", action: "revise_plan", instruction: "Keep it small" });
     assert.equal(parent.results.at(-1).revising_plan, true); assert.equal(sessions.current, parent);
+    // Replacing an active initial preparation reuses its existing task slot.
+    parent.change({ running: true, dialogue_dispatch: { sequence: 6, kind: "revise_plan", turn_id: "correct-preparing-local", child_id: "parent", owner_task: "local-plan", target_run: "initial-plan-epoch", instruction: "Use the smaller budget" } });
+    await sessions.settled();
+    assert.equal(parent.controls.length, 2); assert.equal(parent.results.at(-1).revising_plan, true);
+    assert.equal(parent.controls.at(-1).run_id, "initial-plan-epoch");
+    parent.change({ running: false }); child.change({ running: true });
+    child.controlDialogue = async control => { child.controls.push(control); return { request_id: control.request_id, revising_plan: true }; };
+    parent.change({ dialogue_dispatch: { sequence: 7, kind: "revise_plan", turn_id: "correct-preparing-child", child_id: "child", target_run: "initial-child-epoch", instruction: "Use the smaller budget" } });
+    await sessions.settled();
+    assert.equal(child.controls.at(-1).action, "revise_plan"); assert.equal(parent.results.at(-1).revising_plan, true);
+    assert.ok(others.every(worker => worker.state.running)); assert.equal(sessions.current, parent);
   } finally { await sessions.stop(); }
 });
 
