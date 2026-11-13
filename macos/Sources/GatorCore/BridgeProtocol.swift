@@ -101,7 +101,7 @@ public struct BridgeSnapshot: Sendable, Equatable {
     public var unsupportedNotice: String? {
         if hasExternal { return "This step requires a terminal handoff. Native handoffs are not available yet; no external process has been launched." }
         if value["dialogue_dispatch"] != .null || value["session_request"] != .null { return "This workflow requires managed sessions, which are not available in this native version." }
-        if value["task_plans"].array.contains(where: { ["review", "interrupted", "approved", "preparing", "revising"].contains($0["phase"].string) }) { return "Retained task plans are available in the terminal app. Native plan editing and starting are not available yet." }
+        if value["task_plans"].array.contains(where: { ["review", "interrupted", "approved", "preparing", "revising"].contains($0["phase"].string) }) { return "Inspect the proposed plan before any execution. Manual plan editing and plan execution controls are available in the terminal app." }
         if value["queued"].int > 0 { return "Retained queued work is Go-owned. Native queue editing and resuming are not available yet." }
         return nil
     }
@@ -168,7 +168,8 @@ struct BridgeFramer {
 /// Host-only finite commands. Native views never receive this type or a raw send method.
 enum BridgeCommand: Sendable {
     case host(HostCommand)
-    case submission(id: String, context: String, text: String)
+    case submission(id: String, context: String, text: String, planFirst: Bool = false)
+    case inspectPlan(NativePlanIdentity, request: String)
     case conversation(id: String, listID: String)
     case newConversation
     case model(id: String, request: String, provider: String, model: String)
@@ -182,10 +183,13 @@ enum BridgeCommand: Sendable {
         switch self {
         case .host(let command):
             for (key, value) in command.fields { v[key] = value }
-        case let .submission(id, context, text):
+        case let .submission(id, context, text, planFirst):
             guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, text.utf8.count <= 128 * 1024 else { throw BridgeFailure("Messages must contain text and fit within 128 KiB.") }
             v["type"] = .string("upload_submit")
-            v["upload"] = .object(["request_id": .string(id), "context": .string(context), "text": .string(text), "files": .array([])])
+            v["upload"] = .object(["request_id": .string(id), "context": .string(context), "text": .string(text), "files": .array([]), "plan_first": .bool(planFirst)])
+        case let .inspectPlan(identity, request):
+            v["type"] = .string("task_plan")
+            v["task_plan"] = .object(["action": .string("inspect"), "conversation_id": .string(identity.conversationID), "task_id": .string(identity.taskID), "revision": .number(Decimal(identity.revision)), "digest": .string(identity.digest), "request_id": .string(request)])
         case let .conversation(id, listID):
             v["type"] = .string("conversation"); v["conversation"] = .object(["id": .string(id), "list_id": .string(listID)])
         case .newConversation: v["type"] = .string("navigate"); v["text"] = .string("/new")

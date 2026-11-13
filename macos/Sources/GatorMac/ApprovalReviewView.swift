@@ -6,39 +6,42 @@ struct ApprovalReviewView: View {
     @Environment(ManagedSessionCoordinator.self) private var sessions
     let review: ApprovalReview
     var compact: Bool
+    private var current: Bool { sessions.current === application && application.isCurrentReview(review) }
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Review this exact action", systemImage: "hand.raised").font(.headline)
-            Text("Conversation: \(review.conversationID)").font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Review this exact action", systemImage: "hand.raised").font(.headline).accessibilityAddTraits(.isHeader)
+            Text("Owner: " + application.title).font(.caption).textSelection(.enabled)
             ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
-                    if review.inspectable {
-                        Text(verbatim: review.result["title"].string).font(.headline)
-                        Text(verbatim: review.result["summary"].string)
-                        // All structured data remains literal and inspectable, including unknown fields.
-                        Text(verbatim: review.result.pretty).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
-                    } else {
-                        Text("Exact action details are missing. Approval is disabled; you can decline this pending request.")
-                    }
+                VStack(alignment: .leading, spacing: 12) {
+                    if review.inspectable { ExactReviewContent(value: review.result) }
+                    else { Text("The exact reviewed message is missing. Decisions are disabled. Inspect retained state or reconnect explicitly.") }
+                    Text("Approving permits exactly this proposed operation. Only Gator's retained outcome can confirm execution or delivery.").font(.caption).foregroundStyle(.secondary)
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(10)
-            }
-            .frame(maxHeight: compact ? 280 : 420)
-            .background(.background, in: RoundedRectangle(cornerRadius: 10))
-            if !application.isCurrentReview(review) {
-                Text("This review changed or disconnected. Close it and review the current action.").foregroundStyle(.orange).font(.callout)
+            }.frame(minHeight: 80, maxHeight: compact ? 290 : 500)
+                .background(.background, in: RoundedRectangle(cornerRadius: 10))
+            if application.approvalSending {
+                Label("Decision submitted · awaiting the original owner's outcome", systemImage: "clock").font(.caption)
+            } else if !current {
+                Label("This review is stale, unavailable or already submitted. Inspect the current proposal before deciding.", systemImage: "exclamationmark.triangle").font(.caption)
             }
             HStack {
-                Button("Close") { application.closeApprovalReview() }.disabled(application.approvalSending)
+                Button("Back to Conversation") { application.closeApprovalReview() }.keyboardShortcut(.escape, modifiers: []).disabled(application.approvalSending)
                 Spacer()
-                Button("Decline", role: .destructive) { let owner = application; Task { await owner.respondToApproval(review, approved: false) } }
-                    .disabled(sessions.switching || !application.isCurrentReview(review) || application.approvalSending)
-                Button("Approve Exact Action") { let owner = application; Task { await owner.respondToApproval(review, approved: true) } }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(sessions.switching || !review.inspectable || !application.isCurrentReview(review) || application.approvalSending)
+                Button("Request Correction") { let owner = application; Task { await sessions.requestActionCorrection(owner: owner, review: review) } }
+                    .disabled(!current || application.approvalSending || sessions.switching)
+                    .help("Open an editable correction draft. Nothing is approved or sent.")
             }
-            if application.approvalSending { Text("Waiting for Go to confirm the outcome…").font(.caption).foregroundStyle(.secondary) }
-        }
-        .padding(14)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+            HStack {
+                Text("Space or click chooses · Return never approves").font(.caption2).foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+                ExactDecisionButton(title: "Decline", enabled: current && !application.approvalSending && !sessions.switching) {
+                    let owner = application; Task { await sessions.respondToApproval(owner: owner, review: review, approved: false) }
+                }.fixedSize()
+                ExactDecisionButton(title: "Approve Exact Action", enabled: current && review.inspectable && !application.approvalSending && !sessions.switching) {
+                    let owner = application; Task { await sessions.respondToApproval(owner: owner, review: review, approved: true) }
+                }.fixedSize()
+            }
+        }.padding(14).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .accessibilityIdentifier("gator.exact.review." + review.conversationID)
     }
 }

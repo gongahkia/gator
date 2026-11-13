@@ -62,7 +62,7 @@ actor SessionFixture: BridgeTransport {
                 fields["state"] = .string(error.isEmpty ? "delegated" : "failed"); return .object(fields)
             } ?? []
             patch(["dialogue_dispatch": .null, "dialogue_busy": .bool(false), "dialogue": .array(turns)])
-        case .submission(let id, _, _):
+        case .submission(let id, _, _, _):
             if autoAdmit { patch(["upload_result": .object(["request_id": .string(id)])]) }
         default: break
         }

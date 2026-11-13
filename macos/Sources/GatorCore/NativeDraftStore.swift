@@ -10,6 +10,8 @@ struct NativeDraft: Codable, Sendable, Equatable {
     var text = ""
     var revision = UUID()
     var updated = Date()
+    var correction: NativeCorrectionDraft?
+    var planFirst: Bool?
 }
 
 public struct PendingSubmission: Codable, Sendable, Equatable {
@@ -18,6 +20,8 @@ public struct PendingSubmission: Codable, Sendable, Equatable {
     public var text: String
     var draftRevision: UUID
     public var phase: SubmissionPhase
+    var planFirst: Bool?
+    var correctionTarget: NativeCorrectionTarget?
 }
 
 struct NativeArchive: Codable, Sendable {
@@ -42,7 +46,7 @@ actor NativeDraftStore {
         let data = try Data(contentsOf: file)
         guard data.count <= 6 * 1024 * 1024 else { throw BridgeFailure("Native drafts are oversized; the saved file was kept unchanged.") }
         var archive = try JSONDecoder().decode(NativeArchive.self, from: data)
-        guard [1, 2].contains(archive.version), archive.drafts.count <= 128, archive.drafts.allSatisfy({ validContext($0.key) && $0.value.text.utf8.count <= 128 * 1024 }), archive.pending.map({ validContext($0.context) && !$0.id.isEmpty && $0.id.count <= 64 && $0.text.utf8.count <= 128 * 1024 }) ?? true else { throw BridgeFailure("Native drafts could not be read safely; the saved file was kept unchanged.") }
+        guard [1, 2, 3].contains(archive.version), archive.drafts.count <= 128, archive.drafts.allSatisfy({ validContext($0.key) && $0.value.text.utf8.count <= 128 * 1024 && ($0.value.correction?.text.utf8.count ?? 0) <= 120 * 1024 }), archive.pending.map({ validContext($0.context) && !$0.id.isEmpty && $0.id.count <= 64 && $0.text.utf8.count <= 128 * 1024 }) ?? true else { throw BridgeFailure("Native drafts could not be read safely; the saved file was kept unchanged.") }
         if archive.pending != nil { archive.pending?.phase = .uncertain }
         if let pending = archive.pendingByContext {
             guard pending.count <= 128, pending.allSatisfy({ validContext($0.key) && $0.value.context == $0.key && !$0.value.id.isEmpty && $0.value.id.count <= 64 && $0.value.text.utf8.count <= 128 * 1024 }) else { throw BridgeFailure("Invalid native pending submissions; original file kept.") }
@@ -55,11 +59,12 @@ actor NativeDraftStore {
         var merged = try load()
         // Older native bundles must fail closed instead of ignoring the new
         // per-owner pending IDs and offering a fresh submission identity.
-        merged.version = 2
+        merged.version = max(2, merged.version)
         if let legacy = merged.pending { merged.pendingByContext = (merged.pendingByContext ?? [:]).merging([legacy.context: legacy]) { current, _ in current }; merged.pending = nil }
         if let draft = original.drafts[context] { merged.drafts[context] = draft }
         if merged.pendingByContext == nil { merged.pendingByContext = [:] }
         merged.pendingByContext?[context] = original.pending
+        if merged.drafts.values.contains(where: { $0.correction != nil || $0.planFirst == true }) || merged.pendingByContext?.values.contains(where: { $0.planFirst == true }) == true { merged.version = 3 }
         try save(merged)
     }
     func selectConversation(_ id: String) throws {
@@ -70,6 +75,7 @@ actor NativeDraftStore {
     }
     func save(_ original: NativeArchive) throws {
         var archive = original
+        if archive.drafts.values.contains(where: { $0.correction != nil || $0.planFirst == true }) { archive.version = 3 }
         let cutoff = Date().addingTimeInterval(-7 * 86400)
         let keep = archive.drafts.filter { $0.value.updated >= cutoff || $0.key == archive.pending?.context || archive.pendingByContext?[$0.key] != nil }
             .sorted { $0.value.updated > $1.value.updated }

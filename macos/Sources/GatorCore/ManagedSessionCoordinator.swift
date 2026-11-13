@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import CryptoKit
 
 public struct NativeChatActivity: Identifiable, Equatable {
     public let id: String
@@ -18,6 +19,7 @@ public final class ManagedSessionCoordinator {
     public private(set) var issue = ""
     public private(set) var started = false
     public private(set) var stopping = false
+    private var inspections: [String: NativeTaskInspection] = [:]
     private var records: [UUID: GatorApplicationState] = [:]
     private var order: [UUID] = []
     private var attention: [String: NativeChatActivity] = [:]
@@ -87,7 +89,7 @@ public final class ManagedSessionCoordinator {
         }
         return rows.values.sorted { $0.id < $1.id }
     }
-    public var canSubmit: Bool { !switching && !stopping && current.canSend && (current.snapshot?.value["dialogue_active"].bool == true || current.snapshot?.running == true || workingCount < 3) }
+    public var canSubmit: Bool { !switching && !stopping && correctionUnavailableReason == nil && current.canSend && (current.snapshot?.value["dialogue_active"].bool == true || current.snapshot?.running == true || workingCount < 3) }
 
     private func key(for owner: GatorApplicationState) -> UUID? { records.first(where: { $0.value === owner })?.key }
     private func observe(_ owner: GatorApplicationState) {
@@ -202,6 +204,7 @@ public final class ManagedSessionCoordinator {
         let generation = owner.generation, revision = owner.draftRevision
         await enqueue { [self] in
             guard owner.generation == generation, owner.draftRevision == revision else { throw BridgeFailure("The owner or draft changed before sending. Your current draft is kept; review it and send again.") }
+            if let reason = correctionUnavailableReason { throw BridgeFailure(reason) }
             guard owner === current, canSubmit else { throw BridgeFailure(workingCount >= 3 ? "Three tasks are working. Conversation remains available when Go projects dialogue readiness; wait for that readiness or stop a task." : "Wait for the selected chat to be ready. Your draft is kept.") }
             await owner.submit()
             // Serialize capacity-changing admissions through their actual result,
@@ -214,9 +217,94 @@ public final class ManagedSessionCoordinator {
         await enqueue { [self] in
             guard owner.generation == generation else { throw BridgeFailure("The original owner changed. Inspect the retained admission before retrying.") }
             guard owner === current, !switching, owner.snapshot?.value["dialogue_active"].bool == true || owner.snapshot?.running == true || workingCount < 3 else { throw BridgeFailure("Three tasks are working. Inspect the original admission before retrying.") }
+            if let target = owner.pendingSubmission?.correctionTarget, !isCurrentCorrectionTarget(target) { throw BridgeFailure("The original correction target changed. Inspect its retained outcome; the uncertain request was not resent.") }
             await owner.retryOriginalAdmission(); await owner.awaitAdmissionResolution()
         }.value
     }
+    public var inspection: NativeTaskInspection? { inspections[current.conversationID] }
+    public var inspectedOwner: GatorApplicationState? { inspection.flatMap { owners[$0.ownerID] } }
+    public var isInspectionCurrent: Bool { guard let inspection, let owner = inspectedOwner else { return false }; return owner.generation == inspection.generation && owner.conversationID == inspection.ownerID }
+    public func inspectTask(_ id: String) {
+        guard canNavigate, canOpenActivity(id, from: current), let owner = owners[id] else { issue = "Open the original chat to load its retained task state."; return }
+        inspections[current.conversationID] = NativeTaskInspection(ownerID: id, generation: owner.generation)
+    }
+    public func closeTaskInspection() { inspections.removeValue(forKey: current.conversationID); current.requestComposerFocus() }
+    public func focusComposer() { current.closeApprovalReview(); closeTaskInspection(); current.requestComposerFocus() }
+    public func loadPlan(_ identity: NativePlanIdentity, owner: GatorApplicationState) async {
+        await enqueue { [self] in
+            guard owner === current, owners[identity.conversationID] === owner else { throw BridgeFailure("Open the original owner before loading its exact plan review.") }
+            await owner.inspectPlan(identity)
+        }.value
+    }
+    public func respondToApproval(owner: GatorApplicationState, review: ApprovalReview, approved: Bool) async {
+        guard !switching, !stopping, owner === current, owners[review.conversationID] === owner, owner.isCurrentReview(review) else { issue = "The selected owner or exact review changed. Inspect it again before deciding."; return }
+        await owner.respondToApproval(review, approved: approved)
+    }
+    public func isCurrentCorrectionTarget(_ target: NativeCorrectionTarget) -> Bool {
+        guard let owner = owners[target.ownerID], owner.isConnected, owner.generation == target.generation else { return false }
+        if !target.taskTurnID.isEmpty, owner.snapshot?.value["dialogue_task"]["turn_id"].string != target.taskTurnID { return false }
+        if target.kind == .action {
+            guard let review = owner.currentApprovalReview, owner.isCurrentReview(review), review.token == target.reviewToken else { return false }
+            return owner.snapshot?.value["dialogue_active"].bool == true
+        }
+        guard let plan = target.plan, let review = owner.planReviews[plan.taskID], review.identity == plan, owner.isCurrentPlanReview(review) else { return false }
+        return owner.snapshot?.value["dialogue_active"].bool == true
+    }
+    public var correctionUnavailableReason: String? {
+        guard let target = current.correctionTarget else { return nil }
+        return isCurrentCorrectionTarget(target) ? nil : "This correction's owner or reviewed proposal changed. Your text is kept. Cancel this correction, inspect the current proposal and request a new correction."
+    }
+    public func requestActionCorrection(owner: GatorApplicationState, review: ApprovalReview) async {
+        await enqueue { [self] in
+            guard owners[owner.conversationID] === owner, owner.isCurrentReview(review) else { throw BridgeFailure("The exact proposal changed or disconnected. Inspect it again; no correction was submitted.") }
+            let target = NativeCorrectionTarget(kind: .action, ownerID: owner.conversationID, generation: owner.generation, reviewToken: review.token, plan: nil, taskTurnID: owner.snapshot?.value["dialogue_task"]["turn_id"].string ?? "")
+            try await prepareCorrection(target, owner: owner)
+        }.value
+    }
+    public func requestPlanRevision(owner: GatorApplicationState, review: NativePlanReview) async {
+        await enqueue { [self] in
+            guard owners[owner.conversationID] === owner, owner.isCurrentPlanReview(review) else { throw BridgeFailure("This plan revision is stale. Inspect the current proposal before requesting a change.") }
+            let target = NativeCorrectionTarget(kind: .plan, ownerID: owner.conversationID, generation: owner.generation, reviewToken: nil, plan: review.identity, taskTurnID: owner.snapshot?.value["dialogue_task"]["turn_id"].string ?? "")
+            try await prepareCorrection(target, owner: owner)
+        }.value
+    }
+    private func prepareCorrection(_ target: NativeCorrectionTarget, owner: GatorApplicationState) async throws {
+        guard !switching, !stopping, isCurrentCorrectionTarget(target) else { throw BridgeFailure("Gator has not confirmed conversation readiness for this proposal. No correction was sent.") }
+        let parentID = owner.snapshot?.value["dialogue_task"]["parent_id"].string ?? ""
+        let requester: GatorApplicationState
+        if parentID.isEmpty { requester = owner }
+        else {
+            guard let parent = owners[parentID], parent.isConnected else { throw BridgeFailure("The original requesting chat is unavailable. Open and reconnect it before requesting a correction.") }
+            requester = parent
+        }
+        guard requester.correctionTarget == nil, requester.pendingSubmission == nil else { throw BridgeFailure("The requesting chat already has a correction or unconfirmed submission. Its draft was kept.") }
+        if current !== requester { try await select(id: requester.conversationID) }
+        guard isCurrentCorrectionTarget(target), requester.beginCorrection(target) else { throw BridgeFailure("The proposal changed while opening its requesting chat. Inspect it again.") }
+        if requester === owner { requester.closeApprovalReview() }
+        inspections.removeValue(forKey: requester.conversationID)
+        issue = "Correction draft opened. Submit explicitly; Go will decide whether and how to apply it. Nothing was approved."
+    }
+    public var correctionStatus: String? {
+        guard let request = current.submission, let target = request.correctionTarget else { return nil }
+        if request.phase == .uncertain { return "Correction admission uncertain · retained identity; no automatic retry" }
+        let turnID = SHA256.hash(data: Data(request.id.utf8)).map { String(format: "%02x", $0) }.joined()
+        guard let turn = current.snapshot?.value["dialogue"].array.first(where: { $0["id"].string == turnID }) else { return "Correction submitted · acceptance is not execution" }
+        switch turn["state"].string {
+        case "received", "routing", "ready": return "Correction admitted · Gator is considering it"
+        case "dispatching": return "Correction routed · original owner's outcome pending"
+        case "editing_plan": return "Revision requested · replacement is being prepared"
+        case "failed", "interrupted": return "Correction not confirmed: " + turn["issue"].string
+        case "guided":
+            if target.kind == .action {
+                let token = owners[target.ownerID]?.snapshot?.value["pending_approval"]["token"].string ?? ""
+                return !token.isEmpty && token != target.reviewToken ? "Replacement action needs a fresh exact review · nothing approved" : "Previous proposal withdrawn · correction accepted; replacement is not yet confirmed"
+            }
+            if let plan = target.plan, let summary = owners[target.ownerID]?.snapshot?.value["task_plans"].array.first(where: { $0["id"].string == plan.taskID }), summary["phase"].string == "review", summary["revision"].int > plan.revision { return "Replacement plan available · inspect the new revision before any execution" }
+            return "Revision outcome retained · inspect the original task"
+        default: return "Correction outcome: " + turn["state"].string + " · inspect the retained response"
+        }
+    }
+
     public func reconnect() async {
         let owner = current
         await enqueue { [self] in

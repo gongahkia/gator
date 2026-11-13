@@ -8,17 +8,30 @@ struct ComposerView: View {
     var compact: Bool
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if let target = application.correctionTarget {
+                HStack {
+                    Text(target.label).font(.caption.weight(.medium))
+                    Spacer()
+                    Button("Cancel Correction") { application.cancelCorrection() }.disabled(application.pendingSubmission != nil)
+                }
+                if let issue = sessions.correctionUnavailableReason { Text(verbatim: issue).font(.caption).foregroundStyle(.orange) }
+                Button("Inspect Correction Target") { sessions.inspectTask(target.ownerID) }.font(.caption)
+            }
             ZStack(alignment: .topLeading) {
                 if application.draftText.isEmpty {
                     Text("Message Gator…").font(.system(size: 14)).foregroundStyle(.tertiary).padding(.top, 4).padding(.leading, 2).allowsHitTesting(false)
                 }
-                NativeComposer(text: application.draftText, editable: application.canEditDraft, onEdit: application.editDraft) {
+                NativeComposer(text: application.draftText, editable: application.canEditDraft, focusRequest: application.focusRequest, onEdit: application.editDraft) {
                     if sessions.canSubmit { let owner = application; Task { await sessions.submit(from: owner) } }
                 }
             }
             .frame(height: compact ? 68 : 88)
             HStack {
-                Text("Text only · ⇧ Return for a new line")
+                if application.correctionTarget == nil {
+                    Toggle("Plan first", isOn: Binding(get: { application.planFirst }, set: { value in application.setPlanFirst(value) })).toggleStyle(.checkbox).font(.caption)
+                        .help("Request a proposed plan for review before any implementation")
+                }
+                Text("⇧ Return: new line")
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button {
@@ -39,6 +52,7 @@ struct ComposerView: View {
 private struct NativeComposer: NSViewRepresentable {
     var text: String
     var editable: Bool
+    var focusRequest: UUID
     var onEdit: (String) -> Void
     var onSend: () -> Void
 
@@ -56,6 +70,7 @@ private struct NativeComposer: NSViewRepresentable {
         view.isVerticallyResizable = true; view.isHorizontallyResizable = false
         view.autoresizingMask = [.width]; view.textContainer?.widthTracksTextView = true
         view.setAccessibilityLabel("Message Gator")
+        view.setAccessibilityHelp("Return sends. Shift Return inserts a newline. Composing text is not submitted until composition ends.")
         scroll.documentView = view
         return scroll
     }
@@ -63,6 +78,10 @@ private struct NativeComposer: NSViewRepresentable {
         context.coordinator.parent = self
         guard let view = scroll.documentView as? NSTextView else { return }
         view.isEditable = editable
+        if editable, context.coordinator.focusRequest != focusRequest, let window = view.window, window.isKeyWindow, !view.hasMarkedText() {
+            context.coordinator.focusRequest = focusRequest
+            DispatchQueue.main.async { if window.isKeyWindow && !view.hasMarkedText() { window.makeFirstResponder(view) } }
+        }
         if !view.hasMarkedText(), view.string != text {
             let selection = view.selectedRange()
             view.string = text
@@ -73,13 +92,14 @@ private struct NativeComposer: NSViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: NativeComposer
+        var focusRequest: UUID?
         init(_ parent: NativeComposer) { self.parent = parent }
         func textDidChange(_ notification: Notification) {
             guard let view = notification.object as? NSTextView else { return }
             parent.onEdit(view.string)
         }
         func textView(_ textView: NSTextView, doCommandBy selector: Selector) -> Bool {
-            if selector == #selector(NSResponder.insertNewline(_:)), !textView.hasMarkedText(), NSApp.currentEvent?.modifierFlags.contains(.shift) != true {
+            if selector == #selector(NSResponder.insertNewline(_:)), NativeInteractionSemantics.sendOnReturn(hasMarkedText: textView.hasMarkedText(), shift: NSApp.currentEvent?.modifierFlags.contains(.shift) == true) {
                 parent.onEdit(textView.string); parent.onSend(); return true
             }
             return false

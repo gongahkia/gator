@@ -7,6 +7,7 @@ private let gatorAccent = Color(red: 0.18, green: 0.48, blue: 0.37)
 struct ConversationView: View {
     @Environment(ManagedSessionCoordinator.self) private var sessions
     private var application: GatorApplicationState { sessions.current }
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.openWindow) private var openWindow
     let compact: Bool
     let quit: () -> Void
@@ -21,22 +22,25 @@ struct ConversationView: View {
             header.padding(.horizontal, 16).padding(.vertical, 12)
             Divider()
             if sessions.activity.count > 1 { sessionActivity.padding(.horizontal, 14).padding(.vertical, 6) }
-            if let review = application.review {
+            if let inspection = sessions.inspection {
+                TaskInspectorView(inspection: inspection, owner: sessions.inspectedOwner, compact: compact).padding(12)
+            } else if let review = application.review {
                 ApprovalReviewView(review: review, compact: compact).padding(12)
                 Spacer(minLength: 0)
             } else {
                 transcript
             }
             notices.padding(.horizontal, 14)
-            if application.snapshot?.hasApproval == true && application.review == nil {
+            if application.hasReviewableApproval && application.review == nil && sessions.inspection == nil {
                 Button { application.openApprovalReview() } label: { Label("An action needs your review", systemImage: "hand.raised").frame(maxWidth: .infinity) }
                     .buttonStyle(.bordered).padding(.horizontal, 14).padding(.top, 6)
             }
-            if application.review == nil { ComposerView(compact: compact).padding(12) }
+            if application.review == nil && sessions.inspection == nil { ComposerView(compact: compact).padding(12) }
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .environment(application)
         .tint(gatorAccent)
+        .transaction { if reduceMotion { $0.animation = nil; $0.disablesAnimations = true } }
         .environment(\.openURL, OpenURLAction { url in
             guard ["https", "http"].contains(url.scheme?.lowercased() ?? ""), url.user == nil, url.password == nil else { return .discarded }
             NSWorkspace.shared.open(url); return .handled
@@ -51,6 +55,8 @@ struct ConversationView: View {
                 Text(application.title).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 4)
+            Button { sessions.inspectTask(application.conversationID) } label: { Image(systemName: "doc.text.magnifyingglass").frame(width: 24, height: 26) }
+                .help("Inspect the current task · ⌘I").accessibilityLabel("Inspect Current Task").disabled(application.snapshot == nil || sessions.switching)
             if let parent = application.snapshot?.value["dialogue_task"]["parent_id"].string, !parent.isEmpty {
                 Button { Task { await sessions.openConversation(parent) } } label: { Image(systemName: "arrow.uturn.backward").frame(width: 24, height: 26) }
                     .disabled(sessions.switching).help("Return to the requesting chat").accessibilityLabel("Return to Requesting Chat")
@@ -96,6 +102,7 @@ struct ConversationView: View {
             ScrollView {
                 VStack(spacing: 4) {
                     ForEach(sessions.activity) { item in
+                        HStack {
                         Button {
                             let id = item.id
                             Task { await sessions.openConversation(id) }
@@ -114,6 +121,9 @@ struct ConversationView: View {
                         }.buttonStyle(.plain).disabled(sessions.switching)
                             .accessibilityLabel("Open chat: " + item.title + " · " + item.status)
                             .accessibilityIdentifier("gator.chat." + item.id)
+                        Button { sessions.inspectTask(item.id) } label: { Image(systemName: "info.circle").frame(width: 24, height: 28) }
+                            .accessibilityLabel("Inspect task: " + item.title).disabled(sessions.switching || sessions.owners[item.id] == nil)
+                        }
                     }
                 }
             }.frame(maxHeight: compact ? 130 : 170)
@@ -139,7 +149,7 @@ struct ConversationView: View {
                     ForEach(application.transcript.filter(\.hasVisibleContent)) { message in MessageRow(message: message).equatable() }
                     if application.snapshot?.running == true {
                         VStack(alignment: .leading, spacing: 8) {
-                            HStack { ProgressView().controlSize(.small); Text(application.snapshot?.value["status"].string ?? "Working…").font(.callout).foregroundStyle(.secondary) }
+                            HStack { if reduceMotion { Image(systemName: "clock").accessibilityLabel(NativeInteractionSemantics.workingLabel(reduceMotion: true)) } else { ProgressView().controlSize(.small) }; Text(application.snapshot?.value["status"].string ?? "Working…").font(.callout).foregroundStyle(.secondary) }
                             ForEach(Array((application.snapshot?.value["activity"]["entries"].array ?? []).enumerated()), id: \.offset) { _, entry in
                                 if entry["kind"].string == "text" { Text(verbatim: entry["text"].string).textSelection(.enabled) }
                             }
@@ -176,6 +186,7 @@ struct ConversationView: View {
                 Spacer()
                 Text(application.modelLabel).lineLimit(1)
             }.font(.caption).foregroundStyle(.secondary)
+            if let status = sessions.correctionStatus { Text(verbatim: status).font(.caption).textSelection(.enabled).accessibilityLabel("Correction status: " + status) }
             if let submission = application.submission {
                 Text("Request: \(submission.phase.rawValue)").font(.caption).foregroundStyle(.secondary)
             }
@@ -187,7 +198,7 @@ struct ConversationView: View {
                     Text("Explicit retry uses the same admission ID. It does not repeat an external action.").font(.caption)
                 }.font(.caption)
             }
-            if application.snapshot?.value["dialogue_busy"].bool == true { ProgressView("Considering your message…").controlSize(.small).font(.caption) }
+            if application.snapshot?.value["dialogue_busy"].bool == true { Label("Considering your message…", systemImage: "clock").font(.caption) }
             if !sessions.canSubmit, application.canSend, sessions.workingCount >= 3 { Text("Three tasks are working. Wait for conversation readiness or stop a task before starting more work.").font(.caption).foregroundStyle(.secondary) }
             if sessions.switching { Text("Opening chat… Original work continues.").font(.caption) }
             if !sessions.issue.isEmpty { Text(verbatim: sessions.issue).font(.caption).foregroundStyle(.orange).textSelection(.enabled) }

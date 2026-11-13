@@ -21,6 +21,12 @@ public final class GatorApplicationState {
     public private(set) var draftText = ""
     public private(set) var messages: [BridgeMessage] = []
     public private(set) var transcript: [BridgeMessage] = []
+    public private(set) var correctionTarget: NativeCorrectionTarget?
+    public private(set) var planFirst = false
+    public private(set) var focusRequest = UUID()
+    public private(set) var planReviews: [String: NativePlanReview] = [:]
+    @ObservationIgnored private var retiredApprovalTokens: Set<String> = []
+    @ObservationIgnored private var planReadRequest: (id: String, identity: NativePlanIdentity, generation: UUID)?
 
     @ObservationIgnored var changed: (@MainActor (GatorApplicationState, BridgeSnapshot?) -> Void)?
     var managed: Bool { configuration.managed }
@@ -92,6 +98,7 @@ public final class GatorApplicationState {
         if draftText.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("/") { return "Native slash commands are not available yet. Use New chat, Recents and model controls above." }
         return nil
     }
+    public var hasReviewableApproval: Bool { snapshot?.hasApproval == true && !retiredApprovalTokens.contains(snapshot?.value["pending_approval"]["token"].string ?? "") }
     public var canSend: Bool { sendUnavailableReason == nil && !draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     public var canStop: Bool {
         isConnected && snapshot?.running == true && snapshot?.cancelling == false && snapshot?.value["mode"].string == "chat" && snapshot?.value["queued"].int == 0 && snapshot?.hasExternal == false && snapshot?.value["task_plans"].array.contains(where: { ["preparing", "revising"].contains($0["phase"].string) }) != true && !stopping && operation.isEmpty
@@ -117,7 +124,7 @@ public final class GatorApplicationState {
             }
             submission = archive.pending
             restoringContext = configuration.conversationID.isEmpty ? "" : "conversation:" + configuration.conversationID
-            draftText = archive.drafts[restoringContext]?.text ?? ""
+            restoreDraft(restoringContext)
         } catch { persistenceIssue = "Native drafts could not be loaded: " + error.localizedDescription }
         await connect()
     }
@@ -150,11 +157,13 @@ public final class GatorApplicationState {
             startupDeadline?.cancel()
             connectionStatus = .connected
             let previous = snapshot
+            let previousToken = previous?.value["pending_approval"]["token"].string ?? ""
+            if !previousToken.isEmpty, previousToken != next.value["pending_approval"]["token"].string { retiredApprovalTokens.insert(previousToken) }
             snapshot = next
             if messages != next.messages { messages = next.messages }
             if previous?.value["messages"] != next.value["messages"] || previous?.value["dialogue"] != next.value["dialogue"] || previous?.value["dialogue_peers"] != next.value["dialogue_peers"] || previous?.context != next.context { transcript = next.transcript }
             if !next.conversationID.isEmpty { archive.selectedConversationID = next.conversationID; configuration.conversationID = next.conversationID; configuration.bootMode = "" }
-            if previous?.context != next.context { draftText = archive.drafts[next.context]?.text ?? "" }
+            if previous?.context != next.context { restoreDraft(next.context) }
             if let pending = archive.pending, next.value["upload_result"]["request_id"].string == pending.id {
                 deadlineTask?.cancel()
                 let error = next.value["upload_result"]["error"].string
@@ -162,8 +171,10 @@ public final class GatorApplicationState {
                     var accepted = pending; accepted.phase = next.running ? .running : .accepted; submission = accepted
                     // Compare revision, not text: typing and then undoing is still a newer draft.
                     if archive.drafts[pending.context]?.revision == pending.draftRevision {
-                        archive.drafts[pending.context] = NativeDraft()
-                        if context == pending.context { draftText = "" }
+                        if var retained = archive.drafts[pending.context], retained.correction != nil {
+                            retained.correction = nil; retained.revision = UUID(); retained.updated = Date(); archive.drafts[pending.context] = retained
+                        } else { archive.drafts[pending.context] = NativeDraft() }
+                        if context == pending.context { restoreDraft(context) }
                     }
                     archive.pending = nil
                 } else {
@@ -210,6 +221,14 @@ public final class GatorApplicationState {
                 else { issue = "" }
                 self.setting = nil; operation = ""; deadlineTask?.cancel()
             }
+            if let reading = planReadRequest, reading.generation == generation, next.value["task_plan_result"]["request_id"].string == reading.id {
+                let result = next.value["task_plan_result"], value = result["review"]
+                if !result["error"].string.isEmpty { issue = result["error"].string }
+                else if isCurrentPlan(reading.identity), reading.identity.matches(value) {
+                    planReviews[reading.identity.taskID] = NativePlanReview(identity: reading.identity, generation: generation, value: value)
+                } else { issue = "The plan changed while loading. Inspect its current revision again." }
+                planReadRequest = nil; operation = ""; deadlineTask?.cancel()
+            }
             if !next.running { stopping = false }
             if approvalSending && (previous?.value["pending_approval"] != next.value["pending_approval"]) { approvalSending = false; operation = ""; deadlineTask?.cancel(); review = nil }
             if !next.value["notice"].string.isEmpty { issue = next.value["notice"].string }
@@ -221,7 +240,7 @@ public final class GatorApplicationState {
             }
         case .disconnected(let reason):
             connectionStatus = .disconnected; issue = reason
-            markUncertain(); operation = ""; setting = nil; approvalSending = false; stopping = false
+            markUncertain(); operation = ""; setting = nil; planReadRequest = nil; approvalSending = false; stopping = false
             deadlineTask?.cancel(); startupDeadline?.cancel()
         case .updateReady: break
         }
@@ -229,8 +248,11 @@ public final class GatorApplicationState {
 
     public func editDraft(_ text: String) {
         guard loaded, !context.isEmpty else { return }
-        guard text.utf8.count <= 128 * 1024 else { issue = "The draft exceeds 128 KiB. Previous text is kept."; return }
-        draftText = text; archive.drafts[context] = NativeDraft(text: text); persist()
+        guard text.utf8.count <= (correctionTarget == nil ? 128 : 120) * 1024 else { issue = "The draft exceeds 128 KiB. Previous text is kept."; return }
+        var draft = archive.drafts[context] ?? NativeDraft()
+        if draft.correction != nil { draft.correction?.text = text } else { draft.text = text }
+        draft.revision = UUID(); draft.updated = Date(); archive.drafts[context] = draft
+        draftText = text; persist()
     }
     private func persist() {
         guard loaded else { return }
@@ -256,7 +278,8 @@ public final class GatorApplicationState {
     }
     public func submit() async {
         guard canSend, let draft = archive.drafts[context] else { issue = sendUnavailableReason ?? "Type a message first."; return }
-        let pending = PendingSubmission(id: UUID().uuidString, context: context, text: draft.text, draftRevision: draft.revision, phase: .submitted)
+        let text = draft.correction.map { $0.target.message($0.text) } ?? draft.text
+        let pending = PendingSubmission(id: UUID().uuidString, context: context, text: text, draftRevision: draft.revision, phase: .submitted, planFirst: draft.correction == nil ? draft.planFirst : false, correctionTarget: draft.correction?.target)
         archive.pending = pending; submission = pending; issue = ""; persist()
         guard await flushDrafts() else { markUncertain(); return }
         await dispatchSubmission(pending)
@@ -274,7 +297,7 @@ public final class GatorApplicationState {
             guard self?.archive.pending?.id == pending.id else { return }
             self?.markUncertain(); self?.issue = "Admission is unconfirmed. The original identity is kept. Reconnect and inspect before explicitly retrying."
         }
-        do { try await owner.send(.submission(id: pending.id, context: pending.context, text: pending.text), nonce: nonce) }
+        do { try await owner.send(.submission(id: pending.id, context: pending.context, text: pending.text, planFirst: pending.planFirst == true), nonce: nonce) }
         catch {
             guard generation == ownerGeneration, archive.pending?.id == pending.id else { return }
             markUncertain(); issue = error.localizedDescription
@@ -329,24 +352,26 @@ public final class GatorApplicationState {
             if snapshot?.cancelling == true { stopping = true }
         } catch { if generation == ownerGeneration { issue = error.localizedDescription; stopping = false } }
     }
-    public func openApprovalReview() {
-        guard let snapshot, snapshot.hasApproval else { return }
+    public var currentApprovalReview: ApprovalReview? {
+        guard let snapshot, hasReviewableApproval else { return nil }
         let pending = snapshot.value["pending_approval"], index = pending["message_index"].int
         let result = index >= 0 && index < messages.count ? messages[index].result : .null
-        review = ApprovalReview(conversationID: conversationID, context: context, generation: generation, interactionID: pending["id"].int, token: pending["token"].string, messageIndex: index, result: result)
+        return ApprovalReview(conversationID: conversationID, context: context, generation: generation, interactionID: pending["id"].int, token: pending["token"].string, messageIndex: index, result: result)
     }
-    public func closeApprovalReview() { if !approvalSending { review = nil } }
+    public func openApprovalReview() { review = currentApprovalReview }
+    public func closeApprovalReview() { if !approvalSending { review = nil; requestComposerFocus() } }
     public func isCurrentReview(_ candidate: ApprovalReview) -> Bool {
         guard isConnected, candidate.generation == generation, candidate.context == context, candidate.conversationID == conversationID, let snapshot else { return false }
         let pending = snapshot.value["pending_approval"]
-        let exactResult = candidate.result == .null || (candidate.messageIndex >= 0 && candidate.messageIndex < messages.count && messages[candidate.messageIndex].result == candidate.result)
-        return exactResult && candidate.interactionID > 0 && candidate.interactionID == pending["id"].int && candidate.token.count == 64 && candidate.token == pending["token"].string && candidate.messageIndex == pending["message_index"].int
+        let exactResult = candidate.result != .null && candidate.messageIndex >= 0 && candidate.messageIndex < messages.count && messages[candidate.messageIndex].result == candidate.result
+        return !retiredApprovalTokens.contains(candidate.token) && exactResult && candidate.interactionID > 0 && candidate.interactionID == pending["id"].int && candidate.token.count == 64 && candidate.token == pending["token"].string && candidate.messageIndex == pending["message_index"].int
     }
     public func respondToApproval(_ candidate: ApprovalReview, approved: Bool) async {
         guard !approvalSending, isCurrentReview(candidate), !approved || candidate.inspectable, let owner = transport else { return }
         if approved {
             guard candidate.messageIndex >= 0, candidate.messageIndex < messages.count, messages[candidate.messageIndex].result == candidate.result else { issue = "Approval details changed. Reopen the exact review."; return }
         }
+        retiredApprovalTokens.insert(candidate.token)
         approvalSending = true; operation = "Waiting for the approval outcome…"
         startDeadline { [weak self] in self?.approvalSending = false; self?.operation = ""; self?.issue = "The approval outcome is unconfirmed. Inspect retained work; do not repeat an external action." }
         do { try await owner.send(.approval(id: candidate.interactionID, token: candidate.token, approved: approved), nonce: UUID().uuidString) }
@@ -370,6 +395,43 @@ public final class GatorApplicationState {
         deadlineTask?.cancel(); startupDeadline?.cancel()
         await transport?.shutdown(); eventTask?.cancel(); transport = nil
         connectionStatus = .closed; review = nil; return true
+    }
+
+    private func restoreDraft(_ context: String) {
+        let draft = archive.drafts[context]
+        correctionTarget = draft?.correction?.target
+        draftText = draft?.correction?.text ?? draft?.text ?? ""
+        planFirst = draft?.correction == nil && draft?.planFirst == true
+    }
+    public func setPlanFirst(_ value: Bool) {
+        guard canEditDraft, correctionTarget == nil else { return }
+        var draft = archive.drafts[context] ?? NativeDraft()
+        draft.planFirst = value; draft.revision = UUID(); draft.updated = Date(); archive.drafts[context] = draft
+        planFirst = value; persist()
+    }
+    func beginCorrection(_ target: NativeCorrectionTarget) -> Bool {
+        guard canEditDraft, archive.pending == nil, correctionTarget == nil else { issue = "An existing draft submission or correction is kept. Finish or cancel it before starting another correction."; return false }
+        var draft = archive.drafts[context] ?? NativeDraft()
+        draft.correction = NativeCorrectionDraft(target: target); draft.revision = UUID(); draft.updated = Date(); archive.drafts[context] = draft
+        restoreDraft(context); persist(); requestComposerFocus(); return true
+    }
+    public func cancelCorrection() {
+        guard archive.pending == nil, var draft = archive.drafts[context] else { return }
+        draft.correction = nil; draft.revision = UUID(); draft.updated = Date(); archive.drafts[context] = draft
+        restoreDraft(context); persist(); requestComposerFocus()
+    }
+    public func requestComposerFocus() { focusRequest = UUID() }
+    public func isCurrentPlan(_ identity: NativePlanIdentity) -> Bool {
+        isConnected && identity.conversationID == conversationID && snapshot?.value["task_plans"].array.contains(where: identity.matches) == true
+    }
+    public func isCurrentPlanReview(_ value: NativePlanReview) -> Bool { value.generation == generation && isCurrentPlan(value.identity) }
+    func inspectPlan(_ identity: NativePlanIdentity) async {
+        guard managed, isCurrentPlan(identity), snapshot?.value["foreground"].bool == true, archive.pending == nil, operation.isEmpty, let owner = transport else { issue = "Open the original chat and inspect its current plan revision."; return }
+        let request = UUID().uuidString, original = generation
+        planReadRequest = (request, identity, original); operation = "Loading exact proposed plan…"; issue = ""
+        startDeadline { [weak self] in self?.planReadRequest = nil; self?.operation = ""; self?.issue = "Plan inspection was not confirmed. Your draft is kept; inspect again explicitly." }
+        do { try await owner.send(.inspectPlan(identity, request: request), nonce: UUID().uuidString) }
+        catch { if generation == original { planReadRequest = nil; operation = ""; issue = error.localizedDescription } }
     }
 
     // Host-only operations retain this owner's generation through every await.

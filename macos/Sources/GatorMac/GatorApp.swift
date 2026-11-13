@@ -26,6 +26,11 @@ struct GatorApp: App {
         .defaultSize(width: 820, height: 740)
         .defaultLaunchBehavior(ProcessInfo.processInfo.arguments.contains("--open-window") ? .presented : .suppressed)
         .commands {
+            CommandMenu("Conversation") {
+                Button("Focus Message") { application.focusComposer() }.keyboardShortcut("l")
+                Button("Inspect Current Task") { application.inspectTask(application.current.conversationID) }.keyboardShortcut("i")
+                Button("Review Pending Action") { application.closeTaskInspection(); application.current.openApprovalReview() }.keyboardShortcut("r", modifiers: [.command, .shift]).disabled(!application.current.hasReviewableApproval)
+            }
             CommandGroup(replacing: .appTermination) {
                 Button("Quit Gator") { delegate.requestQuit(application) }.keyboardShortcut("q")
             }
