@@ -44,6 +44,7 @@ func (m Model) localConversationTask(request worksession.Request) (workrun.Conve
 			return task, false
 		}
 		task.State, task.CanStop = "preparing a revised plan", m.cancel != nil && !m.cancelling
+		task.CanRevisePlan = m.config.RevisePlan != nil && task.CanStop && !m.controlBusy && !m.followupSaving && !m.receiptBusy && m.requestsIssue == ""
 	case "preparing":
 		if request.ID != m.planPreparing || !m.running {
 			return task, false // Stored preparation is not evidence of a live owner.

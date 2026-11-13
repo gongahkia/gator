@@ -19,10 +19,11 @@ type taskPlanRevised struct {
 
 func (m Model) startTaskPlanRevision(id, controlID, parent, turnID, instruction string) (Model, tea.Cmd, error) {
 	preparing := m.running && id == m.planPreparing && m.planRevising == "" && m.cancel != nil && !m.cancelling
-	if !m.retainsRequests() || m.config.RevisePlan == nil || m.running && !preparing || m.controlBusy || m.followupSaving || m.receiptBusy || m.requestsIssue != "" {
+	revising := m.running && id == m.planRevising && m.cancel != nil && !m.cancelling
+	if !m.retainsRequests() || m.config.RevisePlan == nil || m.running && !preparing && !revising || m.controlBusy || m.followupSaving || m.receiptBusy || m.requestsIssue != "" {
 		return m, nil, errors.New("this owner is not ready to revise its retained plan")
 	}
-	if !preparing && m.dialogueHost && !m.dialogueCanStart {
+	if !preparing && !revising && m.dialogueHost && !m.dialogueCanStart {
 		return m, nil, errors.New("three tasks are working; wait for one to finish before revising this plan")
 	}
 	release := func() {}
@@ -35,7 +36,7 @@ func (m Model) startTaskPlanRevision(id, controlID, parent, turnID, instruction 
 	}
 	defer release()
 	var lease *os.File
-	if !preparing {
+	if !preparing && !revising {
 		var err error
 		lease, err = m.config.SessionStore.AcquireExecution(m.conversation)
 		if err != nil {
@@ -72,6 +73,22 @@ func (m Model) startTaskPlanRevision(id, controlID, parent, turnID, instruction 
 	m.requests = journal
 	if !claimed {
 		closeLease()
+		return m, nil, nil
+	}
+	if err := m.config.SessionStore.PublishPriorPlanEdits(m.conversation, id); err != nil {
+		m.bridgeNotice = "Correction retained, but an earlier correction receipt needs reconciliation: " + err.Error()
+	}
+	m.refreshPlanEditMessages()
+	if revising {
+		// Keep the draining call's identity until its completion releases its
+		// lease. The canonical plan already rejects that obsolete result.
+		if m.planPreparing == id {
+			// The original preparation has no edit-turn callback; its handoff
+			// selects the latest retained edit directly.
+			m.planEditTurn = turnID
+		}
+		m.cancel()
+		m.status = "Correction saved. Waiting for the superseded proposal to stop…"
 		return m, nil, nil
 	}
 	if preparing {
@@ -135,6 +152,33 @@ func (m Model) continueInitialPlanRevision(request worksession.Request) (tea.Mod
 func (m Model) finishTaskPlanRevision(value taskPlanRevised) (tea.Model, tea.Cmd) {
 	if value.ID != m.planRevising || value.TurnID != m.planEditTurn {
 		return m, nil
+	}
+	// A correction can supersede this tool-free call while it drains. Start
+	// only the latest retained edit, after the old command released its lease.
+	if journal, err := m.config.SessionStore.LoadRequests(m.conversation); err == nil {
+		for _, r := range journal.Requests {
+			if r.ID != value.ID || r.Plan == nil || r.Plan.Edit == nil || r.Plan.Edit.TurnID == value.TurnID {
+				continue
+			}
+			m.requests = journal
+			if r.State == "queued" && r.Plan.Phase == "revising" && r.Plan.Edit.State == "preparing" && !m.cancelling {
+				m.planEditTurn = r.Plan.Edit.TurnID
+				return m.continueInitialPlanRevision(r)
+			}
+			if m.cancelling && r.State == "queued" && r.Plan.Phase == "revising" {
+				var err error
+				m.requests, err = m.config.SessionStore.CancelTaskPlan(m.conversation, r.ID, r.Plan.Revision, r.Plan.Digest)
+				if err != nil {
+					m.requestsIssue = err.Error()
+				}
+			}
+			m.planRevising, m.planEditTurn = "", ""
+			m.running, m.cancelling, m.cancel = false, false, nil
+			m.loadingRun++
+			m.publishPlanEditOutcome(r.ID)
+			m.status = "Plan revision stopped without implementation. Inspect its retained outcome."
+			return m, nil
+		}
 	}
 	m.planRevising, m.planEditTurn = "", ""
 	m.running, m.cancelling, m.cancel = false, false, nil

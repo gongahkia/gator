@@ -127,7 +127,8 @@ func (s Store) BeginTaskPlanEdit(id, request string, revision uint64, digest, pa
 	initial := r.State == "queued" && r.Plan.Phase == "preparing" && r.Plan.Content == nil
 	retryInitial := r.State == "interrupted" && r.Plan.Phase == "interrupted" && r.Plan.Content == nil && r.Plan.Approval == nil
 	review := r.State == "queued" && r.Plan.Content != nil && (r.Plan.Phase == "review" || r.Plan.Phase == "approved")
-	if (!initial && !retryInitial && !review) || revision >= math.MaxUint64-1 || !boundedPlanText(instruction, 64*1024) {
+	revising := r.State == "queued" && r.Plan.Phase == "revising" && r.Plan.Edit != nil && r.Plan.Edit.State == "preparing" && r.Plan.Approval == nil
+	if (!initial && !retryInitial && !review && !revising) || revision >= math.MaxUint64-1 || !boundedPlanText(instruction, 64*1024) {
 		return j, Request{}, false, ErrPlanChanged
 	}
 	if r.Plan.Edit != nil && r.Plan.Edit.State != "preparing" {
@@ -230,6 +231,9 @@ func (s Store) FinishTaskPlanEdit(id, request string, revision uint64, digest, t
 // The plan owner may finish after its parent view closes; neither journal needs
 // to hold the other's execution lease. Final turns cannot be rewritten/replayed.
 func (s Store) PublishPlanEditResult(id, request string) (DialogueTurn, error) {
+	if err := s.PublishPriorPlanEdits(id, request); err != nil {
+		return DialogueTurn{}, err
+	}
 	j, err := s.LoadRequests(id)
 	if err != nil {
 		return DialogueTurn{}, err
@@ -278,4 +282,35 @@ func (s Store) PublishPlanEditResult(id, request string) (DialogueTurn, error) {
 		return s.UpdateDialogue(turn, turn.Revision)
 	}
 	return DialogueTurn{}, ErrPlanChanged
+}
+
+// PublishPriorPlanEdits reconciles displaced, still-pending revision receipts
+// from the durable history. Completed or failed receipts are never rewritten.
+func (s Store) PublishPriorPlanEdits(id, request string) error {
+	j, err := s.LoadRequests(id)
+	if err != nil {
+		return err
+	}
+	for _, r := range j.Requests {
+		if r.ID != request || r.Plan == nil || r.Plan.Edit == nil {
+			continue
+		}
+		for _, prior := range r.Plan.Edit.Prior {
+			turn, err := s.planEditMessage(id, r, PlanEditReference{ParentID: prior.ParentID, TurnID: prior.TurnID, Instruction: prior.Instruction})
+			if err != nil {
+				return err
+			}
+			if turn.State != "editing_plan" {
+				continue
+			}
+			turn.State, turn.Response = "interrupted", ""
+			turn.Issue = "A later correction superseded this proposal attempt. Your instruction is retained for the replacement; no implementation was started."
+			turn.UpdatedAt = time.Now().UTC()
+			if _, err := s.UpdateDialogue(turn, turn.Revision); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	return ErrPlanChanged
 }

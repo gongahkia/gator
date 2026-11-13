@@ -31,7 +31,7 @@ outside this goal. Preserve the CLI/TUI as a client; no Swift UI is being built.
 
 | Backend workstream | Original findings | Current evidence and remaining acceptance |
 |---|---|---|
-| Conversational control | 1, 8, 12 | Initial preparation corrections exist. Pending external-action correction now has controlled Go/service and local-client evidence: same operation, exact old review withdrawn, fresh approval required; delegated control is verified with concurrent original work and parent-draft continuity. Repeated in-flight plan corrections, plan-bound pause/replan/review, reviewed input changes, delegated/race/failure/restart coverage remain. |
+| Conversational control | 1, 8, 12 | Initial preparation corrections exist. Pending external-action correction now has controlled Go/service and local-client evidence: same operation, exact old review withdrawn, fresh approval required; delegated control is verified with concurrent original work and parent-draft continuity. Repeated in-flight plan corrections now have local owner and controlled-client evidence; delegated/failure/restart coverage remains. Plan-bound pause/replan/review, reviewed input changes, delegated/race/failure/restart coverage remain. |
 | Request-specific setup/recovery | 4, 12 | Existing provider setup/admission safeguards remain. Account/source/permission handoffs and provider rejection after admission need end-to-end verification and demonstrated gaps resolved; preserve request inputs and reject uncertain-effect replay. |
 | Authoritative settings/scope | 5, 8 | Existing canonical terminal/model settings remain. Inventory broader account/source/permission/processing/budget contracts, saved outcomes, cached-owner propagation, restart and current/future/background effects; reject changed identities and unauthorized expansion. |
 | Structured connected-item actions | 6, 8 | Existing local files/evidence/receipts retained. Complete supported provider item references and inspect/open/edit/reply/done paths with version/account/permission review and uncertain outcomes. |
@@ -67,6 +67,38 @@ Preserve both phases across continuations and do not declare the expanded work
 finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
+
+- Repeated corrections during revision (13 November): the canonical store admits
+  a later correction against the exact in-flight plan epoch, carries all earlier
+  instructions forward, and invalidates the obsolete proposal before cancellation.
+  The owner waits for that call to release its execution lease, then starts only
+  the latest retained edit in the same task. Further corrections while draining
+  do not start concurrent calls. Superseded attempts receive durable interrupted
+  receipts; completed/failed outcomes remain intact. Initial-preparation handoff
+  also selects the latest edit. Keyboard stop while draining cancels the latest
+  retained proposal instead of launching it. Local receipt projections refresh
+  after reconciliation. No reviewed-plan enforcement or approval gate is removed.
+  Controlled Go owner checks pass for three corrections and cancellation in
+  `/tmp/gator-backend-20261113-repeat-owner.log`; initial-cutover and latest owner
+  checks pass in `/tmp/gator-backend-20261113-repeat-cutover-final.log`, and focused
+  race checks pass in `/tmp/gator-backend-20261113-repeat-race.log`. The native
+  host/client with a controlled model confirms ordinary second correction,
+  earlier instruction text, unchanged sources/limits/uploads/task, responsive
+  unrelated dialogue, superseded receipt and fresh unapproved result (1 pass,
+  15 assertions): `/tmp/gator-backend-20261113-repeat-client-final.log`.
+  TypeScript and runtime builds pass. Full session/app/run regression passes
+  (70.238 / 64.355 / 118.976 seconds) in
+  `/tmp/gator-backend-20261113-repeat-full.log`; this preceded the final small
+  receipt-refresh/initial-handoff changes covered by the focused checks above.
+  The full native plan-correction file is running in
+  `/tmp/gator-backend-20261113-repeat-plan-client-full.log`. Delegated repeated
+  correction, provider failure/restart and broader integrated journeys remain
+  open. This is controlled-provider/process evidence, not live account/model
+  quality or physical audio/terminal verification.
+
+- The prior correction-history full session/app/run regression also passed,
+  observed exit 0 (67.062 / 55.241 / 120.941 seconds), in
+  `/tmp/gator-backend-20261113-history-full.log`.
 
 - Backend correction-history retention (13 November): later sequential plan
   corrections now retain earlier user instructions, including failed attempts,

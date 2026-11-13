@@ -257,3 +257,84 @@ func TestPlanRevisionRechecksCapacityWithoutChangingTheRetainedReview(t *testing
 		t.Fatal("capacity rejection changed the old plan or launched work")
 	}
 }
+
+func TestAdditionalCorrectionsDrainOriginalRevisionBeforeLatestStarts(t *testing.T) {
+	for _, stop := range []bool{false, true} {
+		t.Run(map[bool]string{false: "replace", true: "stop while draining"}[stop], func(t *testing.T) {
+			config, store := dialogueConfig(t)
+			config.PreparePlan = func(context.Context, worksession.Request) (worksession.PlanContent, error) {
+				return dialoguePlanContent(), nil
+			}
+			config.RouteConversation = revisionRoute
+			entered := make(chan worksession.Request, 3)
+			drain := make(chan struct{})
+			config.RevisePlan = func(ctx context.Context, r worksession.Request) (worksession.PlanContent, error) {
+				entered <- r
+				if len(r.Plan.Edit.Prior) == 0 {
+					<-ctx.Done()
+					<-drain
+					return worksession.PlanContent{}, ctx.Err()
+				}
+				content := dialoguePlanContent()
+				content.Outcome = "Latest corrected comparison"
+				return content, nil
+			}
+			m := prepareRevisionFixture(t, config, "Compare venues")
+			original := m.requests.Requests[0]
+			m, route := dialogueSubmit(t, m, "first-running-correction", "Keep the budget small")
+			m, first := admitLocalRevision(t, m, route)
+			done := make(chan tea.Msg, 1)
+			go func() { done <- first() }()
+			<-entered
+			m, route = dialogueSubmit(t, m, "second-running-correction", "Also keep the original sources")
+			m, second := admitLocalRevision(t, m, route)
+			if second != nil {
+				t.Fatal("replacement started before old lease released")
+			}
+			m, route = dialogueSubmit(t, m, "third-running-correction", "Include accessible venues")
+			m, third := admitLocalRevision(t, m, route)
+			if third != nil {
+				t.Fatal("third correction started another concurrent call")
+			}
+			retained := m.requests.Requests[0]
+			if len(retained.Plan.Edit.Prior) != 2 || retained.Plan.Edit.Prior[0].Instruction != "Keep the budget small" || retained.Plan.Approval != nil {
+				t.Fatal("earlier instructions or review boundary lost")
+			}
+			select {
+			case <-entered:
+				t.Fatal("concurrent revision call")
+			default:
+			}
+			if stop {
+				m.interruptRun()
+			}
+			close(drain)
+			next, latest := m.Update(<-done)
+			m = next.(Model)
+			if stop {
+				if latest != nil || m.running || m.requests.Requests[0].State != "discarded" {
+					t.Fatal("stopped handoff revived work")
+				}
+			} else {
+				if latest == nil {
+					t.Fatal("latest retained correction did not start after drain")
+				}
+				next, _ = m.Update(latest())
+				m = next.(Model)
+				final := m.requests.Requests[0]
+				if final.ID != original.ID || final.Plan.Phase != "review" || final.Plan.Approval != nil || final.Plan.Content.Outcome != "Latest corrected comparison" || len(final.Plan.Edit.Prior) != 2 {
+					t.Fatal("replacement not retained in same task for fresh review")
+				}
+				if _, _, err := store.ApproveTaskPlan(m.conversation, original.ID, retained.Plan.Revision, retained.Plan.Digest); err == nil {
+					t.Fatal("pre-result approval accepted")
+				}
+			}
+			for _, prior := range retained.Plan.Edit.Prior {
+				turn, err := store.ReadDialogue(prior.ParentID, prior.TurnID)
+				if err != nil || turn.State != "interrupted" {
+					t.Fatal("superseded attempt outcome lost", err)
+				}
+			}
+		})
+	}
+}

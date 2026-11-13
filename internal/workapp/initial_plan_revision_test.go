@@ -14,7 +14,7 @@ import (
 )
 
 func TestInitialPlanCorrectionWaitsForOldOwnerThenRequiresFreshReview(t *testing.T) {
-	for _, scenario := range []string{"success", "failure and retry", "cancel before cutover", "keyboard cancel before cutover", "mismatched keyboard cancellation"} {
+	for _, scenario := range []string{"success", "second correction before cutover", "failure and retry", "cancel before cutover", "keyboard cancel before cutover", "mismatched keyboard cancellation"} {
 		t.Run(scenario, func(t *testing.T) {
 			config, store := dialogueConfig(t)
 			config.RouteConversation = revisionRoute
@@ -31,6 +31,9 @@ func TestInitialPlanCorrectionWaitsForOldOwnerThenRequiresFreshReview(t *testing
 			revisions, fail := 0, scenario == "failure and retry"
 			config.RevisePlan = func(_ context.Context, request worksession.Request) (worksession.PlanContent, error) {
 				revisions++
+				if scenario == "second correction before cutover" && (len(request.Plan.Edit.Prior) != 1 || request.Plan.Edit.Instruction != "Also include accessible venues") {
+					t.Fatal("initial handoff lost latest correction or history")
+				}
 				if lease, err := store.AcquireExecution(request.Plan.Binding.ConversationID); err == nil {
 					lease.Close()
 					t.Fatal("replacement did not own the execution lease")
@@ -69,6 +72,13 @@ func TestInitialPlanCorrectionWaitsForOldOwnerThenRequiresFreshReview(t *testing
 			m = routeDialogue(t, m, hello)
 			if m.dialogueTurns[1].State != "answered" || !m.running {
 				t.Fatal("conversation stalled behind preparation cutover")
+			}
+			if scenario == "second correction before cutover" {
+				m, route = dialogueSubmit(t, m, "second-initial-cutover", "Also include accessible venues")
+				m, revision = admitLocalRevision(t, m, route)
+				if revision != nil {
+					t.Fatal("second correction raced initial preparation")
+				}
 			}
 			if scenario == "cancel before cutover" {
 				r := m.requests.Requests[0]

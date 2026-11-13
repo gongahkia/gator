@@ -406,3 +406,46 @@ for (const phase of ["preparing","review"] as const) test(`a delegated ${phase} 
     expect(work).toBe(1)
   } finally { releaseInitial(); releaseMain(); releaseRevision(); await f.close() }
 }, 60000)
+
+test("a second ordinary correction replaces an active revision in the same real Go owner", async () => {
+  let releaseFirst = () => {}, releaseLatest = () => {}
+  const first = new Promise<void>(resolve => { releaseFirst = resolve }), latest = new Promise<void>(resolve => { releaseLatest = resolve })
+  const proposals:any[] = []; let work = 0
+  const f = await fixture(async body => {
+    if (system(body).includes("You handle the conversation with Gator")) {
+      const context = metadata(body)
+      return JSON.stringify(context.message === "Hello during the revision" ? {kind:"reply",text:"We can keep talking."} : {kind:"revise_plan",target:context.tasks.find((task:any)=>task.can_revise_plan).id,instruction:context.message})
+    }
+    if (system(body).includes("Propose a plan")) {
+      const meta = metadata(body); proposals.push(meta)
+      if (!meta.correction) return JSON.stringify(originalPlan)
+      await (meta.prior_corrections?.length ? latest : first)
+      return JSON.stringify(correctedPlan)
+    }
+    work++; return "Freshly reviewed work completed."
+  })
+  try {
+    await f.client.start(); await f.client.send({type:"submit",text:"/mode inspect"})
+    const input = await f.plan(); await until(()=>f.client.state?.task_plans?.[0]?.phase==="review","original plan")
+    const original = f.client.state!.task_plans![0]!, owner = f.client.state!.conversation_id
+    await f.send(correction); await until(()=>proposals.length===2,"first revision held")
+    await f.send("Also preserve the original selected sources")
+    await until(()=>proposals.length===3,"latest revision starts after obsolete call stops")
+    expect(proposals[2].prior_corrections).toEqual([correction])
+    expect(proposals[2].correction).toBe("Also preserve the original selected sources")
+    expect(proposals[2].work_limits).toEqual(proposals[0].work_limits)
+    expect(proposals[2].selected_source_ids).toEqual(proposals[0].selected_source_ids)
+    expect(f.client.state?.conversation_id).toBe(owner); expect(work).toBe(0)
+    await f.send("Hello during the revision")
+    expect(f.client.state?.dialogue?.at(-1)?.state).toBe("answered")
+    releaseFirst(); releaseLatest()
+    await until(()=>f.client.state?.task_plans?.[0]?.phase==="review"&&!f.client.state?.running,"latest proposal saved")
+    const journal = JSON.parse(await readFile(join(f.env.GATOR_STATE_DIR,"gator/conversations",owner!,"requests.json"),"utf8"))
+    expect(journal.requests).toHaveLength(1); expect(journal.requests[0].id).toBe(original.id)
+    expect(journal.requests[0].options.Uploads).toEqual([input]); expect(journal.requests[0].plan.approval).toBeUndefined()
+    expect(journal.requests[0].plan.edit.prior_corrections[0].instruction).toBe(correction)
+    expect(f.client.state?.dialogue?.find(turn=>turn.text===correction)?.state).toBe("interrupted")
+    expect(f.client.state?.dialogue?.find(turn=>turn.text==="Also preserve the original selected sources")?.state).toBe("guided")
+    expect(work).toBe(0)
+  } finally {releaseFirst(); releaseLatest(); await f.close()}
+},45000)
