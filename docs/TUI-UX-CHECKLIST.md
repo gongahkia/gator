@@ -29,10 +29,18 @@ The original fifteen findings above remain intact and are not claimed complete.
 Terminal presentation work and the previously queued mobile implementation are
 outside this goal. Preserve the CLI/TUI as a client; no Swift UI is being built.
 
+The user's subsequent scope clarification excludes new CLI/TUI controls and
+terminal rendering/keyboard-size work. Continue only Go backend, existing host
+contracts, persistence, permission enforcement and headless backend integration.
+The current terminal client is retained; no Swift frontend is being built yet.
+Temporary terminal controls/tests written during task-access work were removed
+before committing that workflow. Earlier terminal evidence is historical.
+
+
 | Backend workstream | Original findings | Current evidence and remaining acceptance |
 |---|---|---|
 | Conversational control | 1, 8, 12 | Initial preparation corrections exist. Pending external-action correction now has controlled Go/service and local-client evidence: same operation, exact old review withdrawn, fresh approval required; delegated control is verified with concurrent original work and parent-draft continuity. Repeated in-flight plan corrections have local and delegated controlled-provider evidence, including concurrent owners, provider failure and process-crash/restart without replay. Plan-bound pause/replan/review has local and delegated controlled journeys with retained evidence and remaining-budget enforcement; original uncertain effects block replacement approval across restart. Broader lifecycle/account/coding paths remain. Reviewed input additions on existing plan tasks have local/delegated provider and retry evidence. Typed input removal from retained plan review now narrows the selected set with fresh approval, original retention and scoped replay. Ordinary running tasks can now promote explicit file corrections into the same reviewed task, with original boundary and budget evidence. Broader account/coding/failure/restart combinations remain. |
-| Request-specific setup/recovery | 4, 12 | Provider HTTP rejection now retains typed native outcomes and an explicit original-task recovery path through tool-free planning and fresh review. Original inputs, attempts, processing/account scope and remaining budget remain bound; actions with possible effects cannot be replayed through this path. Verification is recorded below. Request-specific missing-account/source/permission handoffs, broader provider/capability failures and the complete journey remain open. |
+| Request-specific setup/recovery | 4, 12 | Provider rejection recovery is retained. Task-bound access requirements now support missing configured accounts, bearer credential repair and denied read permissions through a typed Go/host scope review, original-task planning and fresh exact approval. Source changes are digest-bound, and configured model/processing identity and spent budget stay fixed. Headless integration evidence is below. Early failures before a retained run, re-review after later changes to an already prepared recovery plan, broader OAuth/provider permission repair, mixed-effect continuation and the complete journey remain open. |
 | Authoritative settings/scope | 5, 8 | Existing canonical terminal/model settings remain. Inventory broader account/source/permission/processing/budget contracts, saved outcomes, cached-owner propagation, restart and current/future/background effects; reject changed identities and unauthorized expansion. |
 | Structured connected-item actions | 6, 8 | Existing local files/evidence/receipts retained. Complete supported provider item references and inspect/open/edit/reply/done paths with version/account/permission review and uncertain outcomes. |
 | Typed workflows | 9 | Inventory opaque public workflows; complete supported Go/host typed fields, defaults, choices, validation, reviews, operation results and recovery without a new command engine. |
@@ -44,6 +52,68 @@ journey must cover setup/access, persisted scope, commitment, unrelated dialogue
 task correction, pending-action correction, stale rejection, fresh exact approval,
 connected-item results and restart/disconnection. Physical/live prerequisites
 remain to be inspected; prior fixture checks do not establish them.
+
+## Task-bound connection setup (13 November, backend only)
+
+- `e2b57a5c9` retains typed connector credential failures and begins reviewed
+  account binding. `a445d9651` completes descriptor/destination binding and the
+  Go/host request-access workflow; terminal UI wiring is excluded.
+- `gator_request_access` records a supported missing account/operation requirement
+  without granting it. Denied operations remain unavailable. Once setup is
+  requested, later task tools cannot dispatch. Native read credential and HTTP
+  401/403 failures can retain an equivalent requirement without trusting prose.
+- Recovery reports locally configured account/operation readiness separately from
+  application connectivity, model configuration and actual remote access. The
+  backend supplies canonical choices, destination, effective permission and
+  actionable issues. The existing sign-in/token/permission controllers perform
+  setup; no credentials enter chat and no second permission store is introduced.
+- `review_access` and `prepare_access` bind a current review to the original task
+  and selected account identities. Changed reviews cannot prepare work. Accepted
+  setup only starts tool-free planning; a fresh exact plan is still required.
+  Options evolve through the existing digest-bound history, retaining originals,
+  earlier instructions, attempts, inputs, receipts and spent budget. Saved source
+  selection for future messages and background commitments is not rewritten.
+- Original processing/execution configuration is checked separately from the
+  explicitly reviewed account/permission transition. Descriptor, destination,
+  bearer credential and OAuth grant bindings are checked at native calls. OAuth
+  access-token refresh keeps its grant identity; an OAuth token with no refresh
+  grant remains bound to its actual credential. Delegated tasks retain their
+  original parent references and may use only the reviewed scope evolution.
+- Evidence logs use `/tmp/gator-backend-20261113-task-access-`:
+  - `go-full.log`: all six connector/tools/session/app/runner/CLI packages passed
+    (5.022/20.852/88.699/107.412/211.495/311.291 seconds). Subsequent scope and
+    account refinements are covered by focused gates and rebuilt native journeys.
+  - `backend-guards.log`: current focused checks pass in all six packages.
+    `account-bindings.log` verifies account/destination rejection and OAuth
+    refresh behavior under `-race`. `guards.log` and `race.log` also cover typed
+    requirements, option/history integrity and original-evidence retention.
+    `final-race.log` passes the final runner/connector/session guards
+    (3.048/1.736/3.704 seconds), including a real executor run that requests setup
+    and then tries another registered mutating tool in the same model response:
+    the later tool cannot run, and the original failed revision is retained.
+  - `descriptor-repro.log` demonstrated that a replaced endpoint with the same
+    token could bypass the initial credential-only binding. Descriptor and
+    destination are now included; the added negative test passes. This was a
+    reproduced backend boundary issue, not a rendering issue.
+  - `host-full.log`: 139 pass, one existing platform skip, zero failures across
+    140 host tests. Typed frames reject raw grants, arbitrary options, scope
+    fingerprints and malformed account selections.
+  - `headless-verified.log`: 23 pass, 655 assertions in 69.42 seconds across
+    access repair, provider recovery, running-plan correction and pending-action
+    correction. No renderer or keyboard interaction is used.
+  - `standalone.log`: `bun run test:backend` from app-host passes 8 tests and
+    220 assertions in 24.40 seconds without terminal preload. Direct/reviewed
+    tasks cover missing-account creation, real local credential-store repair and
+    permission repair, stale review rejection, retained inputs/drafts/review
+    intent, restart without replay, unchanged future-source selection, and
+    delegated child completion while independent parent work/drafts remain.
+- Remaining acceptance is explicit: handle selected-source/configuration failures
+  before a durable execution result; allow another exact scope review if settings
+  change after recovery planning; exercise broader OAuth/provider-grant upgrades
+  and safe continuation after confirmed/uncertain effects; verify available live
+  read-only accounts/model routing and the final combined backend journey. Live
+  provider account identity and physical audio are not proven by these fixtures.
+  All seven backend workstreams and the original audit criteria remain tracked.
 
 ## Provider rejection recovery (13 November, controlled verification)
 
