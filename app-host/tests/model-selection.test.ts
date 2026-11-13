@@ -28,7 +28,9 @@ for(const via of ["manual","conversation"] as const)test(`${via} model change re
   if(via==="manual"){
    await client.send({type:"submit",text:"/new"});await until(()=>!!client.state?.conversation_id&&client.state.conversation_id!==parent,"independent settings owner")
    const request_id="save-provider-b";await client.result({type:"composer",composer:{id:client.state!.composer!.id,request_id,action:"model",provider:"fixture-b",model:"fixture"}},request_id,s=>s.composer_result)
-   await until(()=>[...application.sessions.workers].some((w:any)=>w.state?.conversation_id===parent&&w.state?.provider==="fixture-b"),"background owner receives model-default refresh");await client.openSession(parent)
+   // Test-only observation of the host registry before focus can refresh it.
+   const registry=application.sessions as unknown as {workers:Set<{state?:{conversation_id?:string;provider?:string}}>}
+   await until(()=>[...registry.workers].some(w=>w.state?.conversation_id===parent&&w.state?.provider==="fixture-b"),"background owner receives model-default refresh");await client.openSession(parent)
   }else{
    await client.edit("Use provider B for future requests");await client.submit()
    await until(()=>client.state?.dialogue?.some(d=>d.task_chat&&client.state!.dialogue_peers?.some(p=>p.conversation_id===d.task_chat&&p.state==="completed"))??false,"delegated model change completes")

@@ -53,6 +53,45 @@ task correction, pending-action correction, stale rejection, fresh exact approva
 connected-item results and restart/disconnection. Physical/live prerequisites
 remain to be inspected; prior fixture checks do not establish them.
 
+## Backend handoff and user-directed pause (13 November)
+
+The user has directed this backend phase to pause after the in-flight model
+refresh fix is verified and committed. All seven backend workstreams and the
+original fifteen-item acceptance journey remain incomplete. They are not
+prerequisites to starting the first Swift integration. The next phase is to
+review the user's two reference codebases and build a first native vertical
+slice; no Swift implementation or further backend item was started here.
+
+The model-default feature is preserved in `67ad1b38b`. Its controlled reproduction
+failed both manual and conversational changes: a busy cached owner retained the
+old model for new work. Saved defaults now propagate to cached owners and are
+read back before reporting success. Running, queued and reviewed requests retain
+their captured provider/model. Background commitments retain explicit fields;
+missing fields can inherit defaults on their next run.
+
+The final compatibility fix preserves configured embedded runners that provide
+`Run` without a model-settings reader; preference refresh must not incorrectly
+send those runners into first-run setup. The host integration test's private
+registry observation is explicitly typed without widening the public contract.
+No assertion, deadline or skip was weakened.
+
+Verification after that fix:
+
+- `go test ./internal/workapp`: passes (38.038 seconds).
+- Focused application/controller race checks: pass (13.745 / 10.148 seconds).
+- Rebuilt real-Go host model-selection journey: three tests, 35 assertions pass
+  (7.58 seconds). Manual and conversational default changes preserve the active
+  and queued model, route new work to the saved model, preserve reviewed plans,
+  and retain drafts/restart without replay.
+- Backend contract/test TypeScript check: passes. Existing host session regression:
+  21 pass, no failures or skips.
+
+These are controlled loopback-provider and actual Go/host process checks, not
+live-account/model-quality, physical-terminal or microphone verification. The
+full seven-workstream integrated journey was not completed. No CLI/TUI layout,
+keyboard or rendering changes, new transport, or provider framework were added
+in this cleanup. README remains unchanged; nothing was pushed.
+
 ## Existing contracts and client coupling inventory (13 November)
 
 This is an implementation inventory for backend workstream 5 and a record of

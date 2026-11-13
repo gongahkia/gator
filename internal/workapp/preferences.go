@@ -46,7 +46,11 @@ func (m Model) RefreshDesktopPreferences() Model {
 	}
 	// This is the model for future submissions. Active operations, retained
 	// queues and reviewed plans already own their immutable RunOptions.
-	m.refreshModelStatus()
-	m.firstRun = m.modelStatus.Provider == ""
+	// Embedders can supply an already configured Run callback without model
+	// settings. Absence of a settings reader does not mean setup is missing.
+	if m.config.ModelStatus != nil || m.config.SelectedModel != nil {
+		m.refreshModelStatus()
+		m.firstRun = m.modelStatus.Provider == ""
+	}
 	return m
 }
