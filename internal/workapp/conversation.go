@@ -164,6 +164,8 @@ func retainedRunOptions(options RunOptions) RunOptions {
 	options.OnEvent = nil
 	options.OnOperation = nil
 	options.Steering = nil
+	options.RuntimeRequestID = ""
+	options.TaskPlanRequestID = ""
 	return options
 }
 

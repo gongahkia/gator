@@ -54,6 +54,7 @@ func (m Model) startWork(source, conversation, prompt string, options RunOptions
 		m.admissionFailed(err)
 		return m, nil
 	}
+	options.RuntimeRequestID = m.activeRequest
 	if options.PlanFirst {
 		options.TaskPlanRequestID = m.activeRequest
 	}

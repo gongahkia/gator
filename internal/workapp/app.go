@@ -129,6 +129,7 @@ type BundleActionRequest struct {
 // one prompt. They configure Gator and bound its internal Code specialist;
 // they are never editable by the manager model itself.
 type RunOptions struct {
+	RuntimeRequestID        string `json:"-"`
 	DialogueParent          string `json:"DialogueParent,omitempty"`
 	DialogueTurn            string `json:"DialogueTurn,omitempty"`
 	PlanFirst               bool   `json:"PlanFirst,omitempty"`

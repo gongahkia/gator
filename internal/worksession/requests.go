@@ -71,6 +71,9 @@ func (r Request) Pending() bool {
 }
 
 func validateRequest(r Request) error {
+	if err := validatePreparation(r); err != nil {
+		return err
+	}
 	if err := validateRequestRecovery(r.Recovery); err != nil {
 		return err
 	}

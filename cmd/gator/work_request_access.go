@@ -50,7 +50,7 @@ func reviewRequestAccess(r worksession.Request, selected []string) (workapp.Requ
 		row := workapp.RequestAccessRequirement{Need: need, Selected: id, Choices: []workapp.RequestAccessChoice{}}
 		available := false
 		for _, d := range settings.Connectors {
-			if d.Kind != need.Kind {
+			if need.Kind != "unconfigured" && d.Kind != need.Kind {
 				continue
 			}
 			// Inventory all supported operations so an OAuth scope missing from the
@@ -60,7 +60,7 @@ func reviewRequestAccess(r worksession.Request, selected []string) (workapp.Requ
 			supported := false
 			var capability action.Capability
 			for _, op := range inventory.Operations() {
-				if op.ID == need.Operation {
+				if op.ID == need.Operation || need.Kind == "unconfigured" && need.Operation == "configure" {
 					supported = true
 					capability = op.Capability
 				}
@@ -71,8 +71,20 @@ func reviewRequestAccess(r worksession.Request, selected []string) (workapp.Requ
 			permission := connector.PermissionSet(settings.ConnectorPermissions).Resolve(d.ID, need.Operation, capability)
 			choice := workapp.RequestAccessChoice{ID: d.ID, Label: d.Name, Kind: d.Kind, Destination: d.Resource, Operation: need.Operation, Permission: string(permission)}
 			configured := false
+			generic := need.Kind == "unconfigured" && need.Operation == "configure"
+			usable := false
 			for _, op := range d.Operations() {
-				configured = configured || op.ID == need.Operation
+				if op.ID == need.Operation || generic {
+					configured = true
+					actual := connector.PermissionSet(settings.ConnectorPermissions).Resolve(d.ID, op.ID, op.Capability)
+					usable = usable || actual != connector.PermissionDeny && (options.Mode != "inspect" || !action.RequiresFreshApproval(op.Capability))
+				}
+			}
+			if generic {
+				// A removed descriptor no longer tells us which operation the task
+				// needed. Readiness requires at least one actually usable operation;
+				// the fresh plan and normal per-operation policies remain authoritative.
+				choice.Permission = "per-operation"
 			}
 			credential, err := connectionCredential(credentials, d)
 			if err != nil {
@@ -85,6 +97,10 @@ func reviewRequestAccess(r worksession.Request, selected []string) (workapp.Requ
 				choice.Issue = "Sign in or add this account's token in Connections."
 			case credential != nil && credential.Expired(time.Now()) && credential.Refresh == "":
 				choice.Issue = "Reconnect this expired account in Connections."
+			case generic && !usable:
+				choice.Issue = "No configured operation is available under this task's original mode and saved permissions. Review Connections and Permissions before continuing."
+			case generic:
+				// No synthetic configure permission grants execution authority.
 			case permission == connector.PermissionDeny:
 				choice.Issue = "This operation is denied by Gator's saved permissions. Review Permissions before continuing."
 			case options.Mode == "inspect" && action.RequiresFreshApproval(capability):

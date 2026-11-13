@@ -22,6 +22,10 @@ func ValidateTaskAccessNeeds(needs []TaskAccessNeed) error {
 	seen := map[string]bool{}
 	for _, need := range needs {
 		key := need.ConnectorID + ":" + need.Kind + ":" + need.Operation
+		if need.Kind == "unconfigured" && need.Operation == "configure" && need.ConnectorID != "" && planSourceID(need.ConnectorID) && !seen[key] {
+			seen[key] = true
+			continue
+		}
 		if seen[key] || need.ConnectorID != "" && !planSourceID(need.ConnectorID) || !slices.Contains([]string{"http_json", "http_webhook", "google_workspace", "slack", "atlassian", "notion", "remote_mcp"}, need.Kind) || need.Operation == "" || len(need.Operation) > 128 || strings.ContainsAny(need.Operation, "\x00\r\n") {
 			return errors.New("invalid task access requirement")
 		}

@@ -9,6 +9,7 @@ import (
 // RequestRecovery describes an admitted task's actual failure outcome, never
 // a model claim. A safe retry still requires explicit review and original scope.
 type RequestRecovery struct {
+	Preparation      *PlanBinding     `json:"preparation,omitempty"`
 	Needs            []TaskAccessNeed `json:"needs,omitempty"`
 	ProcessingDigest string           `json:"processing_digest,omitempty"`
 	ScopeDigest      string           `json:"scope_digest,omitempty"`
@@ -31,6 +32,11 @@ func validateRequestRecovery(value *RequestRecovery) error {
 	if err := ValidateTaskAccessNeeds(value.Needs); err != nil {
 		return err
 	}
+	for _, need := range value.Needs {
+		if need.Kind == "unconfigured" && value.Preparation == nil {
+			return errors.New("a removed-source requirement needs native preparation evidence")
+		}
+	}
 	if value.ProcessingDigest != "" && !planDigest(value.ProcessingDigest) {
 		return errors.New("invalid original processing scope")
 	}
@@ -46,7 +52,7 @@ func validateRequestRecovery(value *RequestRecovery) error {
 // CanReviewPendingAccess permits only an idle, undispatched recovery with
 // retained execution accounting. Cancellation never grants another retry.
 func (r Request) CanReviewPendingAccess() bool {
-	if r.Recovery == nil || !r.Recovery.RetrySafe || len(r.Recovery.Needs) == 0 || r.Plan == nil || len(r.Plan.Attempts) == 0 || r.Plan.LatestAccessChange() == nil || r.Plan.DrainingRun != "" {
+	if r.Recovery == nil || !r.Recovery.RetrySafe || len(r.Recovery.Needs) == 0 || r.Plan == nil || len(r.Plan.Attempts) == 0 && r.Recovery.Preparation == nil || r.Plan.LatestAccessChange() == nil || r.Plan.DrainingRun != "" {
 		return false
 	}
 	if r.State == "queued" {
@@ -77,8 +83,14 @@ func (s Store) PrepareFailedRequestAccessReview(id, request, parent, turnID, ins
 	}
 	r := &j.Requests[index]
 	pending := access != nil && r.CanReviewPendingAccess()
-	if (r.State != "failed" && !pending) || r.Recovery == nil || !r.Recovery.RetrySafe || r.Plan == nil && r.ExecutionBoundary == nil || validID(r.WorkID) != nil || validID(r.RevisionID) != nil {
+	unstarted := r.Recovery != nil && r.Recovery.Preparation != nil
+	if (r.State != "failed" && !pending) || r.Recovery == nil || !r.Recovery.RetrySafe || r.Plan == nil && r.ExecutionBoundary == nil || !unstarted && (validID(r.WorkID) != nil || validID(r.RevisionID) != nil) {
 		return j, Request{}, errors.New("inspect the original outcome before preparing a retry")
+	}
+	if unstarted {
+		if err := s.checkPreparationContext(id, *r); err != nil {
+			return j, Request{}, err
+		}
 	}
 	if access != nil {
 		if err := access.validate(); err != nil {
@@ -166,13 +178,13 @@ func (s Store) PrepareFailedRequestAccessReview(id, request, parent, turnID, ins
 		recovery.ScopeDigest = access.AfterScope
 		r.Recovery = &recovery
 	}
-	if !pending && len(p.Attempts) >= 32 || !validCorrectionHistory(ref.Prior, PlanCorrection{parent, turnID, instruction}) {
+	if !pending && !unstarted && len(p.Attempts) >= 32 || !validCorrectionHistory(ref.Prior, PlanCorrection{parent, turnID, instruction}) {
 		return j, Request{}, errors.New("retained attempt or correction history is full")
 	}
 	p.Revision++
 	p.Phase, p.Approval = "revising", nil
 	p.Edit = &PlanEdit{PlanEditReference: ref, State: "preparing"}
-	if pending {
+	if pending || unstarted {
 		p.Digest = p.contentDigest()
 	} else {
 		p.DrainingRun = r.WorkID

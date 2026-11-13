@@ -21,6 +21,12 @@ import (
 // account probe or recording credentials in a conversation. The existing runtime
 // also enforces the captured OAuth grant pins when each connector is used.
 func captureConversationInput(input workapp.ConversationInput) (workapp.ConversationInput, error) {
+	return captureConversationSetup(input, false)
+}
+
+// The native preparation failure alone may capture missing source references.
+// Normal routing/execution continues to reject them.
+func captureConversationSetup(input workapp.ConversationInput, allowMissing bool) (workapp.ConversationInput, error) {
 	settings, err := loadSettings()
 	if err != nil {
 		return input, err
@@ -34,12 +40,17 @@ func captureConversationInput(input workapp.ConversationInput) (workapp.Conversa
 		return input, err
 	}
 	selected := []connector.Descriptor{}
+	missing := []string{}
 	grants := map[string]string{}
 	pins := map[string]string{}
 	credentialPins := map[string]string{}
 	for _, id := range input.RunOptions.ConnectorIDs {
 		descriptor, ok := registry.Get(id)
 		if !ok {
+			if allowMissing {
+				missing = append(missing, id)
+				continue
+			}
 			return input, fmt.Errorf("selected source %q is no longer configured", id)
 		}
 		selected = append(selected, descriptor)
@@ -67,13 +78,16 @@ func captureConversationInput(input workapp.ConversationInput) (workapp.Conversa
 	// These settings can change execution authority or processing destination.
 	// Cosmetic preferences/default-model changes do not invalidate captured work.
 	scope := map[string]any{"connectors": selected, "grants": grants, "permissions": settings.ConnectorPermissions, "endpoints": settings.ProviderEndpoints, "provider_options": settings.ProviderOptions, "custom_providers": settings.CustomProviders, "extensions": settings.Extensions, "extension_trusts": settings.ExtensionTrusts, "hooks": settings.HookTrusts, "lsp": settings.LSPTrusts, "mcp": settings.MCPTrusts, "execution": settings.Execution, "roles": settings.WorkRoles, "external_agents": settings.ExternalAgents}
+	if len(missing) > 0 {
+		scope["missing_sources"] = missing
+	}
 	data, err := json.Marshal(scope)
 	if err != nil {
 		return input, err
 	}
 	processing := map[string]any{}
 	for key, value := range scope {
-		if key != "connectors" && key != "grants" && key != "permissions" {
+		if key != "connectors" && key != "grants" && key != "permissions" && key != "missing_sources" {
 			processing[key] = value
 		}
 	}
@@ -137,6 +151,12 @@ func routeInteractiveConversation(stateDir string) func(context.Context, workrun
 // Execution uses the child's own lease/replay/approval owner. Parent context is
 // a bounded public reference, never the parent's replay or authorization.
 func resolveDialogueExecution(stateDir, source, conversation, text string, options workapp.RunOptions) (*workapp.ConversationInput, goal.Record, error) {
+	return resolveDialogueExecutionScope(stateDir, source, conversation, text, options, false)
+}
+func resolveDialogueExecutionForPreparation(stateDir, source, conversation, text string, options workapp.RunOptions) (*workapp.ConversationInput, goal.Record, error) {
+	return resolveDialogueExecutionScope(stateDir, source, conversation, text, options, true)
+}
+func resolveDialogueExecutionScope(stateDir, source, conversation, text string, options workapp.RunOptions, unstarted bool) (*workapp.ConversationInput, goal.Record, error) {
 	if options.DialogueParent == "" && options.DialogueTurn == "" {
 		return nil, goal.Record{}, nil
 	}
@@ -211,7 +231,15 @@ func resolveDialogueExecution(stateDir, source, conversation, text string, optio
 			input.CredentialPins = access.CredentialPins
 		}
 	}
-	if err := verifyConversationScope(input); err != nil {
+	if unstarted {
+		current, err := captureConversationSetup(input, true)
+		if err != nil {
+			return nil, goal.Record{}, err
+		}
+		if input.ProcessingDigest == "" || input.ProcessingDigest != current.ProcessingDigest {
+			return nil, goal.Record{}, errors.New("original task processing configuration changed before preparation")
+		}
+	} else if err := verifyConversationScope(input); err != nil {
 		return nil, goal.Record{}, err
 	}
 	var record goal.Record

@@ -578,11 +578,9 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		},
 		Run: func(source, conversationID, prompt string, options workapp.RunOptions) workapp.RunResult {
 			if options.DialogueParent != "" || options.DialogueTurn != "" {
-				_, record, err := resolveDialogueExecution(stateDir, source, conversationID, prompt, options)
-				if err != nil {
-					return workapp.RunResult{Error: err.Error()}
-				}
-				return runInteractiveWorkGoal(source, conversationID, prompt, stateDir, options, record)
+				// Validate delegated ownership and scope inside the native execution
+				// boundary, after its non-executing source-setup preflight.
+				return runInteractiveWorkGoal(source, conversationID, prompt, stateDir, options, goal.Record{})
 			}
 			// runInteractiveWorkGoal owns the run's data lease and releases it
 			// before reviewed maintenance. Do not wrap it in a second lease.
@@ -733,9 +731,15 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 		ctx = context.Background()
 	}
 	ctx = sharedusage.WithState(sharedusage.WithCategory(ctx, "chat"), stateDir)
-	dialogue, _, err := resolveDialogueExecution(stateDir, source, conversationID, prompt, options)
+	if failure := sourcePreparationFailure(stateDir, source, conversationID, prompt, options); failure != nil {
+		return *failure
+	}
+	dialogue, dialogueGoal, err := resolveDialogueExecution(stateDir, source, conversationID, prompt, options)
 	if err != nil {
 		return workapp.RunResult{Error: err.Error()}
+	}
+	if dialogue != nil {
+		currentGoal = dialogueGoal
 	}
 	mode, paths, decisionOrigin, decisionReason, err := resolveInteractiveWork(ctx, prompt, options)
 	if err != nil {
