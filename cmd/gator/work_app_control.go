@@ -7,7 +7,9 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/config"
+	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/model"
 	"github.com/gongahkia/gator/internal/workhistory"
 	"github.com/gongahkia/gator/internal/workrun"
@@ -57,15 +59,25 @@ func (c gatorAppController) Inspect(ctx context.Context, query workrun.AppQuery)
 		screen, err := workControls(c.stateDir)(ctx, query.Topic, "status", nil)
 		return screen.Panel, err
 	case "connections":
+		credentials, err := auth.New(c.stateDir)
+		if err != nil {
+			return nil, err
+		}
 		choices := []map[string]any{}
 		for _, descriptor := range settings.Connectors {
 			operations := []string{}
+			operationAccess := []map[string]any{}
 			for _, operation := range descriptor.Operations() {
 				operations = append(operations, operation.ID)
+				operationAccess = append(operationAccess, map[string]any{"id": operation.ID, "capability": operation.Capability, "permission": connector.PermissionSet(settings.ConnectorPermissions).Resolve(descriptor.ID, operation.ID, operation.Capability)})
 			}
-			choices = append(choices, map[string]any{"id": descriptor.ID, "name": descriptor.Name, "operations": operations, "selected_for_this_run": slices.Contains(c.request.ConnectorIDs, descriptor.ID)})
+			status, err := nativeCredentialStatus(descriptor, credentials)
+			if err != nil {
+				return nil, err
+			}
+			choices = append(choices, map[string]any{"id": descriptor.ID, "name": descriptor.Name, "kind": descriptor.Kind, "account_status": status, "operations": operations, "operation_access": operationAccess, "selected_for_this_run": slices.Contains(c.request.ConnectorIDs, descriptor.ID)})
 		}
-		return map[string]any{"connections": choices, "note": "Manage accounts in Settings → Connections. Sign-in, live access checks and reconnect happen there; never ask for credentials in chat. Selection applies to future requests; it does not authenticate or authorize external changes."}, nil
+		return map[string]any{"connections": choices, "task_setup": "Use gator_request_access to retain this task’s missing account or operation requirement. This does not grant access; the user repairs setup and reviews the original task before continuing.", "note": "Manage accounts in Settings → Connections. Sign-in, live access checks and reconnect happen there; never ask for credentials in chat. Selection applies to future requests; it does not authenticate or authorize external changes."}, nil
 	case "outputs":
 		return c.inspectOutputs(query.ID)
 	case "shortcuts":

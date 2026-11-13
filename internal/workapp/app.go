@@ -184,6 +184,7 @@ type ModelStatus struct {
 type GoalState struct{ Title, SourcePath, ConversationID string }
 
 type Config struct {
+	ReviewRequestAccess      func(worksession.Request, []string) (RequestAccessReview, error)
 	CaptureConversationInput func(ConversationInput) (ConversationInput, error)
 	RouteConversation        func(context.Context, workrun.ConversationRequest, ConversationInput) (workrun.ConversationDecision, error)
 	BindConversationTask     func(conversation, turn, source string, revision uint64) (worksession.DialogueTurn, worksession.Conversation, bool, error)

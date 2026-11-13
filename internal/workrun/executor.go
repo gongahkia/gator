@@ -465,10 +465,23 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 			connectedSources = append(connectedSources, retained)
 		}
 	}
+	accessNeeds := &taskAccessNeeds{}
+	if request.ForegroundApp {
+		surface = append(surface, taskAccessTool{registry: e.Connectors.Registry, needs: accessNeeds})
+	}
 	actions := make([]action.Record, 0, 4)
 	connectorPolicy := tools.ConnectorPolicy{
 		Mode: request.Mode, ExternalActions: request.Contract.ExternalActions, Approve: request.ApproveAction, ApproveRead: request.ApproveConnectorRead,
 		Permissions: request.ConnectorPermissions,
+		OnFailure: func(id, operation string, err error) {
+			var access connector.AccessError
+			var status connector.HTTPStatusError
+			if errors.As(err, &access) || errors.As(err, &status) && (status.StatusCode == 401 || status.StatusCode == 403) {
+				if d, ok := e.Connectors.Registry.Get(id); ok {
+					_ = accessNeeds.add(worksession.TaskAccessNeed{ConnectorID: id, Kind: d.Kind, Operation: operation})
+				}
+			}
+		},
 		BeginAction: func(proposal action.Proposal) (tools.ActionAttempt, error) {
 			journal, err := actionlog.Open(request.StateDir)
 			if err != nil {
@@ -521,6 +534,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		return root.ReadRegularFile(relative, limit)
 	}
 	connectedRuntime.OAuthRefreshPins = request.OAuthRefreshPins
+	connectedRuntime.CredentialPins = request.CredentialPins
 	connectedRuntime.OAuthAccountPins = request.OAuthAccountPins
 	connectorSurface, err := tools.ConnectorTools(connectedRuntime, request.ConnectorIDs, connectorPolicy)
 	if err != nil {
@@ -767,6 +781,16 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 			return nil
 		}
 	}
+	originalBeforeTool := beforeTool
+	beforeTool = func(ctx context.Context, call agent.ToolCall) error {
+		if len(accessNeeds.snapshot()) > 0 && call.Name != "gator_request_access" && call.Name != "gator_app_inspect" {
+			return errTaskAccess
+		}
+		if originalBeforeTool != nil {
+			return originalBeforeTool(ctx, call)
+		}
+		return nil
+	}
 	readOnlyAttempt := true
 	registeredRecoveryTools := map[string]agent.Tool{}
 	for _, tool := range surface {
@@ -831,6 +855,12 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	}
 	outcome.Result = result
 	outcome.Recovery = classifyRequestRecovery(runErr, readOnlyAttempt)
+	if needs := accessNeeds.snapshot(); len(needs) > 0 {
+		if runErr == nil {
+			runErr = errTaskAccess
+		}
+		outcome.Recovery = &worksession.RequestRecovery{Kind: "source_access", Needs: needs, Summary: "This task needs connection setup or access repair.", Repair: "Open task recovery, repair the required account or permission, then review its exact sources and prepare a fresh plan.", RetrySafe: readOnlyAttempt}
+	}
 	outcome.Events = append([]agent.Event(nil), events...)
 
 	failure := ""

@@ -50,6 +50,25 @@ func (e AccessError) Error() string {
 	}
 }
 
+// CredentialPin binds a reviewed connection's exact descriptor and account.
+// OAuth access-token refresh preserves the refresh grant identity; replacing a
+// descriptor, bearer token or OAuth grant requires a new review.
+func CredentialPin(descriptor Descriptor, credential auth.Credential) string {
+	switch descriptor.Authentication {
+	case AuthNone:
+		credential = auth.Credential{}
+	case AuthOAuth:
+		if credential.Refresh != "" {
+			credential = auth.Credential{Type: "oauth", Refresh: credential.Refresh}
+		}
+	}
+	data, _ := json.Marshal(struct {
+		Descriptor Descriptor
+		Credential auth.Credential
+	}{descriptor, credential})
+	return fmt.Sprintf("%x", sha256.Sum256(data))
+}
+
 // PreparedAction contains a proposal and connector-private payload. Callers
 // can review the proposal but can execute the payload only through Runtime,
 // which revalidates their binding before any network request.
@@ -96,7 +115,7 @@ type Runtime struct {
 	// source/output/previous roots or selected input originals. It never accepts
 	// arbitrary local paths or unrestricted access to the private upload store.
 	ResolveAttachment func(source string, maxBytes int64) ([]byte, error)
-	// CredentialPins bind an explicitly reviewed bearer account to each read.
+	// CredentialPins bind an explicitly reviewed descriptor and account to each call.
 	CredentialPins map[string]string
 	// OAuthRefreshPins bind unattended reads to the grant selected when a
 	// recurring job was created. The check occurs on the credential used for
@@ -1310,13 +1329,13 @@ func (r Runtime) googleAccountWithToken(ctx context.Context, descriptor Descript
 }
 
 func (r Runtime) unverifiedBearerToken(ctx context.Context, descriptor Descriptor) (string, error) {
-	if r.CredentialPins[descriptor.ID] != "" && descriptor.Authentication != AuthBearer {
-		return "", AccessError{ConnectorID: descriptor.ID, Kind: "changed_account"}
-	}
 	if r.OAuthRefreshPins[descriptor.ID] != "" && descriptor.Authentication != AuthOAuth {
 		return "", fmt.Errorf("connector %q authorization mode changed since this Work run was configured", descriptor.ID)
 	}
 	if descriptor.Authentication != AuthBearer && descriptor.Authentication != AuthOAuth {
+		if pin := r.CredentialPins[descriptor.ID]; pin != "" && pin != CredentialPin(descriptor, auth.Credential{}) {
+			return "", AccessError{ConnectorID: descriptor.ID, Kind: "changed_account"}
+		}
 		return "", nil
 	}
 	credential, found, err := r.Credentials.Read(descriptor.CredentialRef())
@@ -1327,8 +1346,7 @@ func (r Runtime) unverifiedBearerToken(ctx context.Context, descriptor Descripto
 		return "", AccessError{ConnectorID: descriptor.ID, Kind: "missing_credentials"}
 	}
 	if pin := r.CredentialPins[descriptor.ID]; pin != "" {
-		data, _ := json.Marshal(credential)
-		if descriptor.Authentication != AuthBearer || fmt.Sprintf("%x", sha256.Sum256(data)) != pin {
+		if CredentialPin(descriptor, credential) != pin {
 			return "", AccessError{ConnectorID: descriptor.ID, Kind: "changed_account"}
 		}
 	}

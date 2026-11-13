@@ -20,16 +20,19 @@ type RequestRecoveryView struct {
 	Recovery worksession.RequestRecovery `json:"recovery"`
 }
 type RequestRecoveryAction struct {
-	ConversationID string `json:"conversation_id"`
-	TaskID         string `json:"task_id"`
-	Token          string `json:"token"`
-	Action         string `json:"action"`
-	RequestID      string `json:"request_id"`
+	ConversationID string   `json:"conversation_id"`
+	TaskID         string   `json:"task_id"`
+	Token          string   `json:"token"`
+	AccessToken    string   `json:"access_token,omitempty"`
+	Connections    []string `json:"connections,omitempty"`
+	Action         string   `json:"action"`
+	RequestID      string   `json:"request_id"`
 }
 type RequestRecoveryResult struct {
-	RequestID string `json:"request_id"`
-	Accepted  bool   `json:"accepted,omitempty"`
-	Error     string `json:"error,omitempty"`
+	RequestID    string               `json:"request_id"`
+	AccessReview *RequestAccessReview `json:"access_review,omitempty"`
+	Accepted     bool                 `json:"accepted,omitempty"`
+	Error        string               `json:"error,omitempty"`
 }
 
 func recoveryToken(conversation string, r worksession.Request) string {
@@ -54,8 +57,17 @@ func (m Model) requestRecoveryViews() []RequestRecoveryView {
 func (m Model) ApplyRequestRecovery(action RequestRecoveryAction) (tea.Model, tea.Cmd) {
 	m.requestRecoveryResult = &RequestRecoveryResult{RequestID: action.RequestID}
 	fail := func(err error) (tea.Model, tea.Cmd) { m.requestRecoveryResult.Error = err.Error(); return m, nil }
-	if action.ConversationID != m.conversation || !branchIdentity.MatchString(action.RequestID) || len(action.RequestID) > 64 || len(action.TaskID) != 32 || !branchIdentity.MatchString(action.TaskID) || !m.retainsRequests() || m.background || m.running || m.dialogueRouting != "" || len(m.dialogueQueue) > 0 || m.dialogueHost && !m.dialogueCanStart || m.section != "" || m.launcher || m.models != nil || m.controlBusy || m.followupSaving || m.recallBusy || m.receiptBusy || m.pendingBundleAction != nil || m.bridgeExternal != nil {
+	if action.ConversationID != m.conversation || !branchIdentity.MatchString(action.RequestID) || len(action.RequestID) > 64 || len(action.TaskID) != 32 || !branchIdentity.MatchString(action.TaskID) || !m.retainsRequests() || m.background || m.running || m.dialogueRouting != "" || len(m.dialogueQueue) > 0 || m.dialogueHost && !m.dialogueCanStart && action.Action != "review_access" && action.Action != "discard" || m.section != "" || m.launcher || m.models != nil || m.controlBusy || m.followupSaving || m.recallBusy || m.receiptBusy || m.pendingBundleAction != nil || m.bridgeExternal != nil {
 		return fail(errors.New("return to the idle original task owner before reviewing recovery"))
+	}
+	accessAction := action.Action == "review_access" || action.Action == "prepare_access"
+	if !accessAction && (action.Connections != nil || action.AccessToken != "") || action.Action == "review_access" && action.AccessToken != "" || len(action.Connections) > 16 {
+		return fail(errors.New("account selections require an exact task access review"))
+	}
+	for _, id := range action.Connections {
+		if id != "" && (len(id) > 64 || !branchIdentity.MatchString(id)) {
+			return fail(errors.New("invalid task account identity"))
+		}
 	}
 	release := func() {}
 	if m.config.BeforeLocalCommand != nil {
@@ -80,6 +92,27 @@ func (m Model) ApplyRequestRecovery(action RequestRecoveryAction) (tea.Model, te
 	if original.ID == "" || original.State != "failed" || original.Recovery == nil || action.Token != recoveryToken(m.conversation, original) {
 		return fail(errors.New("the original recovery outcome changed; inspect its current task"))
 	}
+	var access *worksession.PlanAccessChange
+	if action.Action == "review_access" || action.Action == "prepare_access" {
+		if m.config.ReviewRequestAccess == nil {
+			return fail(errors.New("task access review is unavailable"))
+		}
+		review, err := m.config.ReviewRequestAccess(original, action.Connections)
+		if err != nil {
+			return fail(err)
+		}
+		if action.Action == "review_access" {
+			m.requestRecoveryResult.AccessReview = &review
+			return m, nil
+		}
+		if action.AccessToken == "" || action.AccessToken != review.Token {
+			return fail(errors.New("account access changed; review the current accounts and permissions again"))
+		}
+		if !review.Ready {
+			return fail(errors.New("repair each required account or permission before preparing this task"))
+		}
+		access = review.Change
+	}
 	if action.Action == "discard" {
 		for i := range journal.Requests {
 			if journal.Requests[i].ID == original.ID {
@@ -93,8 +126,11 @@ func (m Model) ApplyRequestRecovery(action RequestRecoveryAction) (tea.Model, te
 		m.requestRecoveryResult.Accepted = true
 		return m, nil
 	}
-	if action.Action != "prepare_retry" || !original.Recovery.RetrySafe || m.config.RevisePlan == nil {
+	if (action.Action != "prepare_retry" && action.Action != "prepare_access") || !original.Recovery.RetrySafe || m.config.RevisePlan == nil {
 		return fail(errors.New("inspect original work and action receipts before any additional execution"))
+	}
+	if len(original.Recovery.Needs) > 0 && access == nil {
+		return fail(errors.New("review this task’s required accounts and permissions first"))
 	}
 	var frozen RunOptions
 	if json.Unmarshal(original.Options, &frozen) != nil {
@@ -107,6 +143,9 @@ func (m Model) ApplyRequestRecovery(action RequestRecoveryAction) (tea.Model, te
 	if frozen.ModelProvider != "" && (m.modelStatus.Provider != frozen.ModelProvider || m.modelStatus.Model != frozen.ModelName) {
 		return fail(errors.New("select the original provider and model after repair; changed processing needs its own scope review"))
 	}
+	if access != nil {
+		frozen.ConnectorIDs = append([]string{}, access.ConnectorIDs...)
+	}
 	input := ConversationInput{Version: 1, Source: m.source, RunOptions: frozen}
 	if err := m.validateDialogueInputs(input); err != nil {
 		return fail(err)
@@ -117,8 +156,11 @@ func (m Model) ApplyRequestRecovery(action RequestRecoveryAction) (tea.Model, te
 			return fail(err)
 		}
 	}
-	if original.Recovery.ScopeDigest == "" || input.ScopeDigest != original.Recovery.ScopeDigest {
+	if access == nil && (original.Recovery.ScopeDigest == "" || input.ScopeDigest != original.Recovery.ScopeDigest) {
 		return fail(errors.New("the original accounts, permissions or processing configuration changed; review scope before preparing more work"))
+	}
+	if access != nil && input.ScopeDigest != access.AfterScope {
+		return fail(errors.New("task access changed after review; inspect the current account scope again"))
 	}
 	lease, err := m.config.SessionStore.AcquireExecution(m.conversation)
 	if err != nil {
@@ -126,6 +168,9 @@ func (m Model) ApplyRequestRecovery(action RequestRecoveryAction) (tea.Model, te
 	}
 	raw, _ := json.Marshal(input)
 	text := "Prepare a reviewed retry of the original request after provider setup repair. Preserve its inputs, scope and remaining budget."
+	if access != nil {
+		text = "Prepare the original task using the explicitly reviewed account access. Preserve its original inputs, previous results, instructions and remaining budget. Earlier account failures are evidence, not new grants or reasons to repeat completed actions."
+	}
 	turn, err := m.config.SessionStore.AdmitDialogue(m.conversation, "request-recovery-"+action.RequestID, text, raw, time.Now())
 	if err != nil {
 		lease.Close()
@@ -147,7 +192,7 @@ func (m Model) ApplyRequestRecovery(action RequestRecoveryAction) (tea.Model, te
 		}
 	}
 	m.rememberDialogue(turn)
-	retained, request, err := m.config.SessionStore.PrepareFailedRequestReview(m.conversation, original.ID, m.conversation, turn.ID, text)
+	retained, request, err := m.config.SessionStore.PrepareFailedRequestAccessReview(m.conversation, original.ID, m.conversation, turn.ID, text, access)
 	if err != nil {
 		lease.Close()
 		turn.State, turn.Response, turn.Issue = "failed", "", boundedConversation(err.Error(), 3500)

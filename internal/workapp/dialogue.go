@@ -25,6 +25,8 @@ type ConversationInput struct {
 	RunOptions       RunOptions                    `json:"run_options"`
 	Recent           []workrun.ConversationMessage `json:"recent,omitempty"`
 	TaskContext      []workrun.ConversationTask    `json:"task_context,omitempty"`
+	ProcessingDigest string                        `json:"processing_digest,omitempty"`
+	CredentialPins   map[string]string             `json:"credential_pins,omitempty"`
 	ScopeDigest      string                        `json:"scope_digest,omitempty"`
 	OAuthRefreshPins map[string]string             `json:"oauth_refresh_pins,omitempty"`
 }

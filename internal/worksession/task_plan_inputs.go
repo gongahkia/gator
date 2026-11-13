@@ -14,16 +14,17 @@ import (
 // PlanInputChange retains the original immutable options and the exact additions
 // requiring the replacement review. It never changes accounts or other grants.
 type PlanInputChange struct {
-	ParentID           string          `json:"parent_id"`
-	TurnID             string          `json:"turn_id"`
-	BeforeOptions      json.RawMessage `json:"before_options"`
-	AddedUploads       []string        `json:"added_uploads,omitempty"`
-	AddedAttachments   []string        `json:"added_attachments,omitempty"`
-	RemovedUploads     []string        `json:"removed_uploads,omitempty"`
-	RemovedAttachments []string        `json:"removed_attachments,omitempty"`
-	Manual             bool            `json:"manual,omitempty"`
-	Promoted           bool            `json:"promoted,omitempty"`
-	AfterSHA256        string          `json:"after_sha256"`
+	ParentID           string            `json:"parent_id"`
+	TurnID             string            `json:"turn_id"`
+	BeforeOptions      json.RawMessage   `json:"before_options"`
+	AddedUploads       []string          `json:"added_uploads,omitempty"`
+	AddedAttachments   []string          `json:"added_attachments,omitempty"`
+	RemovedUploads     []string          `json:"removed_uploads,omitempty"`
+	RemovedAttachments []string          `json:"removed_attachments,omitempty"`
+	Manual             bool              `json:"manual,omitempty"`
+	Access             *PlanAccessChange `json:"access,omitempty"`
+	Promoted           bool              `json:"promoted,omitempty"`
+	AfterSHA256        string            `json:"after_sha256"`
 }
 
 // OriginalAdmissionOptions identifies a transport repeat, never current task
@@ -111,16 +112,33 @@ func validatePlanInputChanges(r Request) error {
 		return errors.New("too many input scope changes")
 	}
 	previous := ""
+	accessScope, processingScope := "", ""
 	seen := map[string]bool{}
 	for _, change := range r.Plan.InputChanges {
 		key := change.ParentID + ":" + change.TurnID
-		if validID(change.ParentID) != nil || !planDigest(change.TurnID) || seen[key] || len(change.BeforeOptions) > 128*1024 || len(change.AddedUploads)+len(change.AddedAttachments)+len(change.RemovedUploads)+len(change.RemovedAttachments) == 0 && !change.Promoted || previous != "" && optionsHash(change.BeforeOptions) != previous {
+		if validID(change.ParentID) != nil || !planDigest(change.TurnID) || seen[key] || len(change.BeforeOptions) > 128*1024 || len(change.AddedUploads)+len(change.AddedAttachments)+len(change.RemovedUploads)+len(change.RemovedAttachments) == 0 && !change.Promoted && change.Access == nil || previous != "" && optionsHash(change.BeforeOptions) != previous {
 			return errors.New("invalid input scope history")
+		}
+		if err := change.Access.validate(); err != nil {
+			return err
+		}
+		if access := change.Access; access != nil {
+			if accessScope != "" && (access.BeforeScope != accessScope || access.ProcessingDigest != processingScope) {
+				return errors.New("reviewed account scope chain changed")
+			}
+			accessScope, processingScope = access.AfterScope, access.ProcessingDigest
 		}
 		base := change.BeforeOptions
 		if change.Promoted {
 			var err error
 			base, err = promotePlanOptions(base)
+			if err != nil {
+				return err
+			}
+		}
+		if change.Access != nil {
+			var err error
+			base, err = updatePlanConnections(base, change.Access.ConnectorIDs)
 			if err != nil {
 				return err
 			}

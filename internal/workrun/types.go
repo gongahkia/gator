@@ -150,6 +150,7 @@ type Request struct {
 	OnEvent              agent.EventSink
 	Steering             <-chan string
 	ConnectorIDs         []string
+	CredentialPins       map[string]string
 	OAuthRefreshPins     map[string]string
 	OAuthAccountPins     map[string]string
 	ApproveAction        action.Approver

@@ -149,6 +149,10 @@ func bindDesktopTaskPlan(stateDir string, options workapp.RunOptions, request *w
 		if err := verifyRecoveredRequestScope(r, options); err != nil {
 			return err
 		}
+		if access := r.Plan.LatestAccessChange(); access != nil {
+			request.OAuthRefreshPins = access.OAuthPins
+			request.CredentialPins = access.CredentialPins
+		}
 		request.TaskPlan = &workrun.TaskPlanReference{RequestID: r.ID, Revision: r.Plan.Revision, Digest: r.Plan.Digest}
 		request.ConnectorIDs = append([]string{}, r.Plan.Content.Sources...)
 		if len(r.Plan.Attempts) > 0 {

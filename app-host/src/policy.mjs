@@ -96,7 +96,11 @@ export function validateFrame(frame) {
   }
   if(frame.type==="request_recovery") {
     const v=frame.request_recovery;
-    if(!v || typeof v!=="object" || Array.isArray(v) || Object.keys(v).some(key=>!["conversation_id","task_id","token","action","request_id"].includes(key)) || typeof v.conversation_id!=="string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/.test(v.conversation_id) || typeof v.task_id!=="string" || !/^[a-f0-9]{32}$/.test(v.task_id) || typeof v.token!=="string" || !/^[a-f0-9]{64}$/.test(v.token) || !["prepare_retry","discard"].includes(v.action) || typeof v.request_id!=="string" || !/^[a-zA-Z0-9-]{1,64}$/.test(v.request_id)) throw new Error("Invalid request recovery action");
+    if(!v || typeof v!=="object" || Array.isArray(v) || Object.keys(v).some(key=>!["conversation_id","task_id","token","action","request_id","connections","access_token"].includes(key)) || typeof v.conversation_id!=="string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/.test(v.conversation_id) || typeof v.task_id!=="string" || !/^[a-f0-9]{32}$/.test(v.task_id) || typeof v.token!=="string" || !/^[a-f0-9]{64}$/.test(v.token) || !["prepare_retry","discard","review_access","prepare_access"].includes(v.action) || typeof v.request_id!=="string" || !/^[a-zA-Z0-9-]{1,64}$/.test(v.request_id)) throw new Error("Invalid request recovery action");
+    if(["review_access","prepare_access"].includes(v.action)) {
+      if(v.connections!==undefined&&(!Array.isArray(v.connections)||v.connections.length>16||v.connections.some(id=>typeof id!=="string"||id!==""&&!/^[a-z][a-z0-9-]{0,63}$/.test(id))))throw new Error("Invalid task access selection");
+      if(v.action==="prepare_access" ? typeof v.access_token!=="string"||!/^[a-f0-9]{64}$/.test(v.access_token) : v.access_token!==undefined)throw new Error("Invalid task access review identity");
+    } else if(v.connections!==undefined||v.access_token!==undefined)throw new Error("Recovery cannot replace task access without a review");
   }
   if(frame.type==="task_plan") {
     const v=frame.task_plan;

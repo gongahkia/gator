@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"maps"
 
+	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/goal"
 	sharedusage "github.com/gongahkia/gator/internal/usage"
@@ -35,6 +36,7 @@ func captureConversationInput(input workapp.ConversationInput) (workapp.Conversa
 	selected := []connector.Descriptor{}
 	grants := map[string]string{}
 	pins := map[string]string{}
+	credentialPins := map[string]string{}
 	for _, id := range input.RunOptions.ConnectorIDs {
 		descriptor, ok := registry.Get(id)
 		if !ok {
@@ -45,7 +47,11 @@ func captureConversationInput(input workapp.ConversationInput) (workapp.Conversa
 		if err != nil {
 			return input, err
 		}
+		if !found && descriptor.Authentication == connector.AuthNone {
+			credentialPins[id] = connector.CredentialPin(descriptor, auth.Credential{})
+		}
 		if found {
+			credentialPins[id] = connector.CredentialPin(descriptor, credential)
 			data, err := json.Marshal(credential)
 			if err != nil {
 				return input, err
@@ -65,6 +71,15 @@ func captureConversationInput(input workapp.ConversationInput) (workapp.Conversa
 	if err != nil {
 		return input, err
 	}
+	processing := map[string]any{}
+	for key, value := range scope {
+		if key != "connectors" && key != "grants" && key != "permissions" {
+			processing[key] = value
+		}
+	}
+	processingData, _ := json.Marshal(processing)
+	input.ProcessingDigest = fmt.Sprintf("%x", sha256.Sum256(processingData))
+	input.CredentialPins = credentialPins
 	input.ScopeDigest = fmt.Sprintf("%x", sha256.Sum256(data))
 	input.OAuthRefreshPins = pins
 	return input, nil
@@ -167,6 +182,33 @@ func resolveDialogueExecution(stateDir, source, conversation, text string, optio
 		}
 		if !matched {
 			return nil, goal.Record{}, errors.New("independent task execution settings changed")
+		}
+	}
+	// A source/account transition is authority only when retained in the
+	// original request's digest-bound scope chain after explicit human review.
+	journal, err := store.LoadRequests(conversation)
+	if err != nil {
+		return nil, goal.Record{}, err
+	}
+	for _, retained := range journal.Requests {
+		if retained.ClientID != origin.TurnID || retained.Text != text || !worksession.MatchesPlanInputEvolution(retained, a, b) {
+			continue
+		}
+		if access := retained.Plan.LatestAccessChange(); access != nil {
+			first := ""
+			for _, change := range retained.Plan.InputChanges {
+				if change.Access != nil {
+					first = change.Access.BeforeScope
+					break
+				}
+			}
+			if first != input.ScopeDigest || input.ProcessingDigest == "" || access.ProcessingDigest != input.ProcessingDigest {
+				return nil, goal.Record{}, errors.New("reviewed account access does not match the original task")
+			}
+			input.RunOptions = options
+			input.ScopeDigest = access.AfterScope
+			input.OAuthRefreshPins = access.OAuthPins
+			input.CredentialPins = access.CredentialPins
 		}
 	}
 	if err := verifyConversationScope(input); err != nil {

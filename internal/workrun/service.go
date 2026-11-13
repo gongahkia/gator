@@ -85,6 +85,7 @@ func effectiveConfiguration(request Request) any {
 		Mode                 action.Mode
 		Code                 CodePolicy
 		Connectors           []string
+		CredentialPins       map[string]string `json:",omitempty"`
 		OAuthRefreshPins     map[string]string
 		OAuthAccountPins     map[string]string
 		Permissions          any
@@ -114,7 +115,7 @@ func effectiveConfiguration(request Request) any {
 		MaintainMemory       bool              `json:",omitempty"`
 		DisableChatHistory   bool              `json:",omitempty"`
 		ExternalAgents       []cliagent.Config `json:",omitempty"`
-	}{request.TaskPlan, request.Contract, request.Mode, request.Code, request.ConnectorIDs, request.OAuthRefreshPins, request.OAuthAccountPins, request.ConnectorPermissions, request.WebOrigins, request.IgnoredInstructionPaths, request.Limits, request.MaxSteps, request.Provider, request.GoalContext, request.GoalPlanContext, request.GoalID, request.MemoryContext, request.NoteContext, request.RoleConfiguration, func() string {
+	}{request.TaskPlan, request.Contract, request.Mode, request.Code, request.ConnectorIDs, request.CredentialPins, request.OAuthRefreshPins, request.OAuthAccountPins, request.ConnectorPermissions, request.WebOrigins, request.IgnoredInstructionPaths, request.Limits, request.MaxSteps, request.Provider, request.GoalContext, request.GoalPlanContext, request.GoalID, request.MemoryContext, request.NoteContext, request.RoleConfiguration, func() string {
 		if request.Project != nil {
 			return request.Project.SHA256
 		}

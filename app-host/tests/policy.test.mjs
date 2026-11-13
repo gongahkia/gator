@@ -194,3 +194,12 @@ test("task recovery carries the retained outcome identity without execution auth
  for(const action of ["prepare_retry","discard"])assert.equal(validateFrame({type:"request_recovery",request_recovery:{...recovery,action}}).version,1);
  for(const change of [{conversation_id:"../other"},{task_id:"old"},{token:"old"},{request_id:""},{action:"execute"},{approved:true},{options:{}},{accounts:["other"]},{retry_safe:true}])assert.throws(()=>validateFrame({type:"request_recovery",request_recovery:{...recovery,...change}}));
 });
+
+test("task access review carries selected account identities but cannot grant raw scope",()=>{
+ const base={conversation_id:"chat-one",task_id:"a".repeat(32),token:"b".repeat(64),request_id:"access-review",action:"review_access",connections:["reports",""]};
+ assert.equal(validateFrame({type:"request_recovery",request_recovery:base}).version,1);
+ const prepare={...base,action:"prepare_access",connections:["reports"],access_token:"c".repeat(64)};
+ assert.equal(validateFrame({type:"request_recovery",request_recovery:prepare}).version,1);
+ for(const change of [{connections:["../other"]},{access_token:"old"},{approved:true},{scope_digest:"x"},{processing_digest:"x"},{credential_pins:{}},{options:{}},{action:"prepare_retry"},{connections:new Array(17).fill("reports")}])assert.throws(()=>validateFrame({type:"request_recovery",request_recovery:{...prepare,...change}}));
+ assert.throws(()=>validateFrame({type:"request_recovery",request_recovery:{...base,access_token:"c".repeat(64)}}));
+});

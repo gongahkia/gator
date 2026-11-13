@@ -108,6 +108,9 @@ func loadReviewedTaskPlan(request Request) (*worksession.TaskPlan, error) {
 }
 
 func planToolEffects(tool agent.Tool, call agent.ToolCall) ([]string, error) {
+	if _, native := tool.(taskAccessTool); native {
+		return []string{"read"}, nil
+	}
 	if _, native := tool.(evidenceSearchTool); native {
 		return []string{"read"}, nil
 	}

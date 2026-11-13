@@ -9,12 +9,14 @@ import (
 // RequestRecovery describes an admitted task's actual failure outcome, never
 // a model claim. A safe retry still requires explicit review and original scope.
 type RequestRecovery struct {
-	ScopeDigest string `json:"scope_digest,omitempty"`
-	Kind        string `json:"kind"`
-	Status      int    `json:"status,omitempty"`
-	Summary     string `json:"summary"`
-	Repair      string `json:"repair"`
-	RetrySafe   bool   `json:"retry_safe"`
+	Needs            []TaskAccessNeed `json:"needs,omitempty"`
+	ProcessingDigest string           `json:"processing_digest,omitempty"`
+	ScopeDigest      string           `json:"scope_digest,omitempty"`
+	Kind             string           `json:"kind"`
+	Status           int              `json:"status,omitempty"`
+	Summary          string           `json:"summary"`
+	Repair           string           `json:"repair"`
+	RetrySafe        bool             `json:"retry_safe"`
 }
 
 func validateRequestRecovery(value *RequestRecovery) error {
@@ -22,9 +24,15 @@ func validateRequestRecovery(value *RequestRecovery) error {
 		return nil
 	}
 	switch value.Kind {
-	case "credentials", "model_access", "rate_limit", "provider_budget", "work_budget":
+	case "source_access", "credentials", "model_access", "rate_limit", "provider_budget", "work_budget":
 	default:
 		return errors.New("invalid request recovery kind")
+	}
+	if err := ValidateTaskAccessNeeds(value.Needs); err != nil {
+		return err
+	}
+	if value.ProcessingDigest != "" && !planDigest(value.ProcessingDigest) {
+		return errors.New("invalid original processing scope")
 	}
 	if value.ScopeDigest != "" && !planDigest(value.ScopeDigest) {
 		return errors.New("invalid request recovery scope")
@@ -38,6 +46,9 @@ func validateRequestRecovery(value *RequestRecovery) error {
 // PrepareFailedRequestReview keeps the logical request while accounting its
 // failed read-only attempt. It cannot replay work; only tool-free planning follows.
 func (s Store) PrepareFailedRequestReview(id, request, parent, turnID, instruction string) (RequestJournal, Request, error) {
+	return s.PrepareFailedRequestAccessReview(id, request, parent, turnID, instruction, nil)
+}
+func (s Store) PrepareFailedRequestAccessReview(id, request, parent, turnID, instruction string, access *PlanAccessChange) (RequestJournal, Request, error) {
 	j, err := s.LoadRequests(id)
 	if err != nil {
 		return j, Request{}, err
@@ -55,6 +66,14 @@ func (s Store) PrepareFailedRequestReview(id, request, parent, turnID, instructi
 	r := &j.Requests[index]
 	if r.State != "failed" || r.Recovery == nil || !r.Recovery.RetrySafe || r.Plan == nil && r.ExecutionBoundary == nil || validID(r.WorkID) != nil || validID(r.RevisionID) != nil {
 		return j, Request{}, errors.New("inspect the original outcome before preparing a retry")
+	}
+	if access != nil {
+		if err := access.validate(); err != nil {
+			return j, Request{}, err
+		}
+		if len(r.Recovery.Needs) == 0 || access.BeforeScope != r.Recovery.ScopeDigest || access.ProcessingDigest != r.Recovery.ProcessingDigest {
+			return j, Request{}, errors.New("task access review differs from the original recovery scope")
+		}
 	}
 	c, err := s.Load(id)
 	if err != nil {
@@ -97,6 +116,29 @@ func (s Store) PrepareFailedRequestReview(id, request, parent, turnID, instructi
 			ref.Prior = append(ref.Prior, previous.Prior...)
 			ref.Prior = append(ref.Prior, PlanCorrection{previous.ParentID, previous.TurnID, previous.Instruction})
 		}
+	}
+	if access != nil {
+		before := append(json.RawMessage(nil), r.Options...)
+		after, err := updatePlanConnections(before, access.ConnectorIDs)
+		if err != nil {
+			return j, Request{}, err
+		}
+		if r.Plan == nil {
+			change := &p.InputChanges[0]
+			change.Access = access
+			change.AfterSHA256 = optionsHash(after)
+		} else {
+			if len(p.InputChanges) >= 32 {
+				return j, Request{}, errors.New("reviewed task scope history is full")
+			}
+			p.InputChanges = append(p.InputChanges, PlanInputChange{ParentID: parent, TurnID: turnID, BeforeOptions: before, AfterSHA256: optionsHash(after), Access: access})
+		}
+		r.Options = after
+		p.Sources = append([]string{}, access.ConnectorIDs...)
+		p.Binding.OptionsSHA256 = optionsHash(after)
+		recovery := *r.Recovery
+		recovery.ScopeDigest = access.AfterScope
+		r.Recovery = &recovery
 	}
 	if len(p.Attempts) >= 32 || !validCorrectionHistory(ref.Prior, PlanCorrection{parent, turnID, instruction}) {
 		return j, Request{}, errors.New("retained attempt or correction history is full")

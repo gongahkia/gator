@@ -24,6 +24,7 @@ type ConnectorPolicy struct {
 	Approve         action.Approver
 	ApproveRead     func(context.Context, string, string, json.RawMessage) (bool, error)
 	OnSource        func(connector.Provenance)
+	OnFailure       func(string, string, error)
 	OnContent       func(connector.Result) error
 	OnAction        func(action.Record)
 	// BeginAction flushes an uncertain receipt before the first mutation.
@@ -124,6 +125,9 @@ func (t connectorTool) Execute(ctx context.Context, arguments json.RawMessage) (
 	result, err := t.runtime.Invoke(ctx, t.policy.Mode, t.descriptor.ID, t.operation.ID, arguments)
 	if err != nil {
 		t.budget.release()
+		if t.policy.OnFailure != nil {
+			t.policy.OnFailure(t.descriptor.ID, t.operation.ID, err)
+		}
 		return agent.ToolResult{}, err
 	}
 	content, err := success(result)

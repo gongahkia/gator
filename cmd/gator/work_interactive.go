@@ -180,6 +180,7 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 	connections := &connectionControls{stateDir: stateDir}
 	application := workapp.New(workapp.Config{
 		CaptureConversationInput: captureConversationInput,
+		ReviewRequestAccess:      reviewRequestAccess,
 		RouteConversation:        routeInteractiveConversation(stateDir),
 		BindConversationTask: func(parent, turn, source string, revision uint64) (worksession.DialogueTurn, worksession.Conversation, bool, error) {
 			release, err := state.Guard(stateDir, false)
@@ -876,6 +877,7 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 		}
 		if recoveryScopeErr == nil {
 			outcome.Recovery.ScopeDigest = recoveryScope.ScopeDigest
+			outcome.Recovery.ProcessingDigest = recoveryScope.ProcessingDigest
 		} else {
 			outcome.Recovery.RetrySafe = false
 			outcome.Recovery.Repair = "Original account and processing scope could not be verified. Inspect this task before preparing further work."
