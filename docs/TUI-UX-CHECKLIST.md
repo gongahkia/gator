@@ -45,6 +45,16 @@ finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
 
+- Complete initial-correction regression (13 November): the isolated checkout
+  at `7c909f99a` (same implementation as main `af242b3f8`) finishes with
+  **196 pass, 3 existing skips, 0 failures**, 4,046 assertions across 199 tests /
+  78 files, 607.16 seconds, in
+  `/tmp/gator-ux-20261113-preparing-full-tui.log`. The process was observed to exit
+  0, and all 1,963 captured source, dependency and runtime hashes match the
+  pre-run manifest. Main's runtime rebuild also passes. This verifies the full
+  terminal regression through initial-plan corrections; it does not complete
+  the all-fifteen combined journey or physical/live verification.
+
 - Initial preparation corrections (`871cb971a`, `af242b3f8`, 13 November):
   ordinary composer messages correct an initially preparing plan in its original
   task. The canonical store persists the correction before its owner cancels
