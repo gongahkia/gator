@@ -31,7 +31,7 @@ outside this goal. Preserve the CLI/TUI as a client; no Swift UI is being built.
 
 | Backend workstream | Original findings | Current evidence and remaining acceptance |
 |---|---|---|
-| Conversational control | 1, 8, 12 | Initial preparation corrections exist. Pending external-action correction now has controlled Go/service and local-client evidence: same operation, exact old review withdrawn, fresh approval required; delegated control is verified with concurrent original work and parent-draft continuity. Repeated in-flight plan corrections now have local owner and controlled-client evidence; delegated/failure/restart coverage remains. Plan-bound pause/replan/review, reviewed input changes, delegated/race/failure/restart coverage remain. |
+| Conversational control | 1, 8, 12 | Initial preparation corrections exist. Pending external-action correction now has controlled Go/service and local-client evidence: same operation, exact old review withdrawn, fresh approval required; delegated control is verified with concurrent original work and parent-draft continuity. Repeated in-flight plan corrections have local and delegated controlled-provider evidence, including concurrent owners, provider failure and process-crash/restart without replay. Plan-bound pause/replan/review, reviewed input changes, delegated/race/failure/restart coverage remain. |
 | Request-specific setup/recovery | 4, 12 | Existing provider setup/admission safeguards remain. Account/source/permission handoffs and provider rejection after admission need end-to-end verification and demonstrated gaps resolved; preserve request inputs and reject uncertain-effect replay. |
 | Authoritative settings/scope | 5, 8 | Existing canonical terminal/model settings remain. Inventory broader account/source/permission/processing/budget contracts, saved outcomes, cached-owner propagation, restart and current/future/background effects; reject changed identities and unauthorized expansion. |
 | Structured connected-item actions | 6, 8 | Existing local files/evidence/receipts retained. Complete supported provider item references and inspect/open/edit/reply/done paths with version/account/permission review and uncertain outcomes. |
@@ -67,6 +67,28 @@ Preserve both phases across continuations and do not declare the expanded work
 finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
+
+- Delegated repeated-correction verification (13 November): a headless existing
+  host/client with real Go owners and loopback model service exercises an original
+  foreground task plus a delegated plan. Two ordinary corrections retain the same
+  child task, source/account scope, budget and uploaded input; unrelated dialogue
+  and the parent draft stay available. Three journeys cover successful replacement,
+  invalid provider proposal, and SIGKILL of the exact isolated child runtime.
+  Reopening the child retains the original task and correction history without
+  replaying planning or work. A crash with an existing proposal retains that old
+  content for fresh review, marks the new edit failed with a no-replay diagnostic,
+  and leaves approval absent. Reopening the parent retains its draft and shows
+  superseded/failed/actual-success receipts rather than an acceptance claim.
+  `/tmp/gator-backend-20261113-repeat-delegated-verified.log`: **3 pass, 0 failures,
+  83 assertions**, observed exit 0. A natural stale-projection race was rejected
+  without changing work; the success journey waits for the child's refreshed
+  exact epoch. No production safeguard was weakened to make that test pass.
+  The earlier full native plan-correction file also passed, observed exit 0:
+  `/tmp/gator-backend-20261113-repeat-plan-client-full.log`, **23 pass, 0 failures,
+  429 assertions**, 93.11 seconds. These are controlled-provider and actual-process
+  checks; they do not establish live-model quality, live account operations or
+  physical microphone/terminal behavior. All backend workstreams remain open,
+  including plan-bound pause/replan/review and explicit changed-input transitions.
 
 - Repeated corrections during revision (13 November): the canonical store admits
   a later correction against the exact in-flight plan epoch, carries all earlier
