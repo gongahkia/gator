@@ -40,7 +40,7 @@ before committing that workflow. Earlier terminal evidence is historical.
 | Backend workstream | Original findings | Current evidence and remaining acceptance |
 |---|---|---|
 | Conversational control | 1, 8, 12 | Initial preparation corrections exist. Pending external-action correction now has controlled Go/service and local-client evidence: same operation, exact old review withdrawn, fresh approval required; delegated control is verified with concurrent original work and parent-draft continuity. Repeated in-flight plan corrections have local and delegated controlled-provider evidence, including concurrent owners, provider failure and process-crash/restart without replay. Plan-bound pause/replan/review has local and delegated controlled journeys with retained evidence and remaining-budget enforcement; original uncertain effects block replacement approval across restart. Broader lifecycle/account/coding paths remain. Reviewed input additions on existing plan tasks have local/delegated provider and retry evidence. Typed input removal from retained plan review now narrows the selected set with fresh approval, original retention and scoped replay. Ordinary running tasks can now promote explicit file corrections into the same reviewed task, with original boundary and budget evidence. Broader account/coding/failure/restart combinations remain. |
-| Request-specific setup/recovery | 4, 12 | Provider rejection recovery is retained. Task-bound access requirements now support missing configured accounts, bearer credential repair and denied read permissions through a typed Go/host scope review, original-task planning and fresh exact approval. Source changes are digest-bound, and configured model/processing identity and spent budget stay fixed. Headless integration evidence is below. Prepared or interrupted recovery plans can now receive another exact account review without repeating execution or budget accounting; prior proposals/approvals and per-requirement account choices remain inspectable. Selected-source removal before Work execution now has native preparation evidence and the same reviewed recovery path, including delegated owners. Other early configuration/constructor failures, broader OAuth/provider permission repair, mixed-effect continuation and the complete journey remain open. |
+| Request-specific setup/recovery | 4, 12 | Provider rejection recovery is retained. Task-bound access requirements now support missing configured accounts, bearer credential repair and denied read permissions through a typed Go/host scope review, original-task planning and fresh exact approval. Source changes are digest-bound, and configured model/processing identity and spent budget stay fixed. Headless integration evidence is below. Prepared or interrupted recovery plans can now receive another exact account review without repeating execution or budget accounting; prior proposals/approvals and per-requirement account choices remain inspectable. Selected-source removal before Work execution or the first plan proposal now has native preparation evidence and the same reviewed recovery path, including delegated admission. Other early configuration/constructor failures, broader OAuth/provider permission repair, mixed-effect continuation and the complete journey remain open. |
 | Authoritative settings/scope | 5, 8 | Existing canonical terminal/model settings remain. Inventory broader account/source/permission/processing/budget contracts, saved outcomes, cached-owner propagation, restart and current/future/background effects; reject changed identities and unauthorized expansion. |
 | Structured connected-item actions | 6, 8 | Existing local files/evidence/receipts retained. Complete supported provider item references and inspect/open/edit/reply/done paths with version/account/permission review and uncertain outcomes. |
 | Typed workflows | 9 | Inventory opaque public workflows; complete supported Go/host typed fields, defaults, choices, validation, reviews, operation results and recovery without a new command engine. |
@@ -52,6 +52,58 @@ journey must cover setup/access, persisted scope, commitment, unrelated dialogue
 task correction, pending-action correction, stale rejection, fresh exact approval,
 connected-item results and restart/disconnection. Physical/live prerequisites
 remain to be inspected; prior fixture checks do not establish them.
+
+## Source setup before admission and the first proposal (13 November, backend only)
+
+- Implementation: `da4be7ca5` (`fix(agent): preserve task setup before the first plan proposal`).
+- Four native reproductions failed before this change: initial plan submission
+  did not surface setup for a missing selected source; delegated submission
+  rejected the message outright; removal during routing left the child interrupted
+  with no task-specific setup outcome. Repair and replacement variants exercise
+  the same original task rather than submitting another request.
+- Conversation capture now retains unavailable selections as bounded identity
+  references. Its tool-free router can answer an unrelated question without
+  connector access. The conversation digest still rejects account/permission/
+  processing changes after admission, and actual execution retains strict source
+  validation. Restoring a source changes the old task's scope and requires its
+  explicit access review.
+- Initial tool-free preparation checks selected sources before any plan-model
+  call. Native preparation evidence is limited to the exact queued, unproposed
+  plan: no previous content, approval, edit or actual Work attempt can obtain that
+  certificate. A structured native error retains actionable setup metadata in
+  the original request. No empty execution attempt or fresh allowance is invented.
+- Account repair/replacement then proposes the first actual plan in that task,
+  retaining its text, files, budgets and newer draft. It requires independent
+  exact review before the first execution. Delegated paths retain the parent
+  admission scope and independent parent work. Cancellation takes precedence
+  over a late setup callback, which cannot revive the cancelled plan.
+- Verification: `GATOR_TEST_BINARY=/tmp/gator-backend-20261113-admission-access-runtime bun run test:backend`
+  from `app-host` passed all 21 tests / 561 assertions in 59.26s. Nine preparation
+  cases include first-proposal repair/replacement, removal before delegated
+  submission or during routing, unrelated conversation, original-file execution,
+  stale scope reviews, restart and draft retention. The prior twelve access
+  recovery cases remain in the combined gate. Two fixture mistakes in the added
+  unrelated-message case (request field and fixed dialogue position) were
+  corrected without changing product checks, deadlines or acceptance criteria.
+- Full `go test ./internal/worksession ./internal/workapp ./cmd/gator` passed
+  (157.112s / 107.547s / 278.357s); focused `-race` checks passed all three
+  (78.110s / 54.461s / 2.645s). Fixtures cover exact preparation identities,
+  rejection of previously reviewed/cancelled tasks, retained initial scope and
+  allowance, and cancellation before a late setup result is applied. Backend
+  contract plus all three headless test files passed TypeScript checking.
+- Logs share `/tmp/gator-backend-20261113-admission-access-`: `repro.log`,
+  `go-focused.log`, `app.log`, `native-initial.log`, `native-all.log`,
+  `backend-verified.log`, `backend-final.log`, `go-full.log`, `race.log` and
+  `types-final.log`. The final backend log is the corrected passing gate;
+  earlier fixture failures are retained as such.
+- This is Go/backend and headless host work only. Providers/accounts are
+  synthetic loopback fixtures; process/restart checks are actual native Go
+  processes. No terminal presentation, keyboard, renderer, Swift surface,
+  physical microphone or live-account verification is included.
+- Other early provider/configuration failures, source removal during an existing
+  initial/corrected proposal, broader OAuth/grant repair and mixed-effect
+  continuation remain to be checked or completed. All seven backend workstreams
+  and the final combined journey remain open.
 
 ## Source removal before execution (13 November, backend only)
 
