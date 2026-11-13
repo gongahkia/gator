@@ -1,0 +1,346 @@
+import Foundation
+import Observation
+
+public enum NativeConnectionStatus: String, Sendable { case idle, starting, connected, disconnected, stopping, closed }
+
+/// One instance lives above both scenes. It owns the connection; views own only presentation.
+@MainActor @Observable
+public final class GatorApplicationState {
+    public private(set) var connectionStatus: NativeConnectionStatus = .idle
+    public private(set) var snapshot: BridgeSnapshot?
+    public private(set) var issue = ""
+    public private(set) var persistenceIssue = ""
+    public private(set) var submission: PendingSubmission?
+    public private(set) var review: ApprovalReview?
+    public private(set) var operation = ""
+    public private(set) var approvalSending = false
+    public private(set) var stopping = false
+    public private(set) var generation = UUID()
+    public private(set) var started = false
+    public private(set) var draftText = ""
+    public private(set) var messages: [BridgeMessage] = []
+    public private(set) var transcript: [BridgeMessage] = []
+
+    @ObservationIgnored private var configuration: BridgeLaunchConfiguration
+    @ObservationIgnored private let store: NativeDraftStore
+    @ObservationIgnored private let factory: @Sendable () -> any BridgeTransport
+    @ObservationIgnored private var transport: (any BridgeTransport)?
+    @ObservationIgnored private var eventTask: Task<Void, Never>?
+    @ObservationIgnored private var archive = NativeArchive()
+    @ObservationIgnored private var loaded = false
+    @ObservationIgnored private var saveTask: Task<Void, Never>?
+    @ObservationIgnored private var deadlineTask: Task<Void, Never>?
+    @ObservationIgnored private var startupDeadline: Task<Void, Never>?
+    @ObservationIgnored private var submissionNonce: String?
+    @ObservationIgnored private var setting: SettingChange?
+    @ObservationIgnored private let responseTimeout: Duration
+    @ObservationIgnored private var restoringContext = ""
+
+    private struct SettingChange {
+        let request: String
+        let generation: UUID
+        let context: String
+        let provider: String?
+        let model: String?
+        let effort: String?
+    }
+
+    public init(configuration: BridgeLaunchConfiguration, nativeDraftDirectory: URL, profile: String) {
+        self.configuration = configuration
+        self.store = NativeDraftStore(directory: nativeDraftDirectory, profile: profile)
+        self.factory = { GoBridgeConnection() }
+        self.responseTimeout = .seconds(20)
+    }
+    init(configuration: BridgeLaunchConfiguration, store: NativeDraftStore, responseTimeout: Duration = .seconds(20), factory: @escaping @Sendable () -> any BridgeTransport) {
+        self.configuration = configuration; self.store = store; self.factory = factory; self.responseTimeout = responseTimeout
+    }
+
+    public var context: String { snapshot?.context ?? restoringContext }
+    public var conversationID: String { snapshot?.conversationID ?? archive.selectedConversationID }
+    public var title: String { snapshot?.title ?? "Gator" }
+    public var pendingSubmission: PendingSubmission? { archive.pending }
+    public var isConnected: Bool { connectionStatus == .connected }
+    public var canEditDraft: Bool { loaded && !context.isEmpty }
+    public var readiness: JSONValue { snapshot?.composer["readiness"] ?? .null }
+    public var composerModels: [JSONValue] { snapshot?.composer["models"].array ?? [] }
+    public var modelLabel: String {
+        guard let snapshot else { return "Model unavailable" }
+        return [snapshot.value["provider"].string, snapshot.value["model"].string].filter { !$0.isEmpty }.joined(separator: " / ")
+    }
+    public var canNavigate: Bool {
+        isConnected && operation.isEmpty && !approvalSending && archive.pending == nil && !(snapshot?.unsafeToNavigate ?? true)
+    }
+    public var canConfigureModel: Bool {
+        canNavigate && snapshot?.value["mode"].string == "chat" && snapshot?.composer["disabled"].string.isEmpty == true
+    }
+    public var sendUnavailableReason: String? {
+        if !persistenceIssue.isEmpty { return "Draft storage needs attention. Sending is disabled to preserve your request." }
+        if !isConnected { return "Reconnect to Gator before sending." }
+        guard let snapshot, !context.isEmpty else { return "Opening the conversation…" }
+        if archive.pending != nil { return "An earlier submission is unconfirmed. Inspect it before an explicit retry." }
+        if !operation.isEmpty { return operation }
+        if snapshot.busy || snapshot.hasApproval || snapshot.value["queued"].int > 0 { return "Work or review is in progress. You can keep drafting; conversation during work and queue controls arrive later." }
+        if snapshot.unsupportedNotice != nil { return snapshot.unsupportedNotice }
+        if !snapshot.value["requests_issue"].string.isEmpty { return snapshot.value["requests_issue"].string }
+        if snapshot.value["mode"].string != "chat" { return "Return to the conversation before sending." }
+        if readiness["state"].string != "configured" { return readiness["issue"].string.isEmpty ? "Choose an already configured model. Provider setup is available in Gator’s terminal app." : readiness["issue"].string }
+        if draftText.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("/") { return "Native slash commands are not available yet. Use New chat, Recents and model controls above." }
+        return nil
+    }
+    public var canSend: Bool { sendUnavailableReason == nil && !draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    public var canStop: Bool {
+        isConnected && snapshot?.running == true && snapshot?.cancelling == false && snapshot?.value["mode"].string == "chat" && snapshot?.value["queued"].int == 0 && snapshot?.hasExternal == false && snapshot?.value["task_plans"].array.contains(where: { ["preparing", "revising"].contains($0["phase"].string) }) != true && !stopping && operation.isEmpty
+    }
+    public var canRetryAdmission: Bool {
+        isConnected && archive.pending?.phase == .uncertain && archive.pending?.context == context && snapshot?.unsafeToNavigate == false && operation.isEmpty && persistenceIssue.isEmpty
+    }
+    public var quitGuard: String? {
+        if archive.pending != nil { return "A submission has an unconfirmed outcome. Its identity and draft will be kept; it will not be resent on restart." }
+        if snapshot?.hasApproval == true { return "An exact action is waiting for review. Quitting cancels this Go owner; the approval will not be replayed." }
+        if snapshot?.unsafeToNavigate == true || !operation.isEmpty { return "Gator is working or holding retained work. Quitting cancels this Go owner and keeps its durable history. Recovered work is not resumed automatically." }
+        return nil
+    }
+
+    public func start() async {
+        guard !started else { return }; started = true
+        do {
+            archive = try await store.load(); loaded = true
+            submission = archive.pending
+            if configuration.conversationID.isEmpty { configuration.conversationID = archive.selectedConversationID }
+            restoringContext = configuration.conversationID.isEmpty ? "" : "conversation:" + configuration.conversationID
+            draftText = archive.drafts[restoringContext]?.text ?? ""
+        } catch { persistenceIssue = "Native drafts could not be loaded: " + error.localizedDescription }
+        await connect()
+    }
+    private func connect() async {
+        connectionStatus = .starting; generation = UUID(); let ownerGeneration = generation
+        let owner = factory(); transport = owner
+        eventTask = Task { [weak self] in
+            for await event in owner.events {
+                guard let self, self.generation == ownerGeneration else { return }
+                self.receive(event, generation: ownerGeneration)
+            }
+        }
+        do {
+            try await owner.start(configuration)
+            startupDeadline?.cancel()
+            startupDeadline = Task { [weak self, responseTimeout] in
+                try? await Task.sleep(for: responseTimeout)
+                guard !Task.isCancelled, let self, self.generation == ownerGeneration, self.connectionStatus == .starting else { return }
+                self.issue = "Gator did not publish an initial state. Reconnect to try opening the conversation again."
+                await owner.shutdown()
+            }
+        } catch { receive(.disconnected(error.localizedDescription), generation: ownerGeneration) }
+    }
+    func receive(_ event: BridgeEvent, generation ownerGeneration: UUID) {
+        guard ownerGeneration == generation, connectionStatus != .closed else { return }
+        switch event {
+        case .state(let next):
+            startupDeadline?.cancel()
+            connectionStatus = .connected
+            let previous = snapshot
+            snapshot = next
+            if messages != next.messages { messages = next.messages }
+            if previous?.value["messages"] != next.value["messages"] || previous?.value["dialogue"] != next.value["dialogue"] || previous?.value["dialogue_peers"] != next.value["dialogue_peers"] || previous?.context != next.context { transcript = next.transcript }
+            if !next.conversationID.isEmpty { archive.selectedConversationID = next.conversationID; configuration.conversationID = next.conversationID }
+            if previous?.context != next.context { draftText = archive.drafts[next.context]?.text ?? "" }
+            if let pending = archive.pending, next.value["upload_result"]["request_id"].string == pending.id {
+                deadlineTask?.cancel()
+                let error = next.value["upload_result"]["error"].string
+                if error.isEmpty {
+                    var accepted = pending; accepted.phase = next.running ? .running : .accepted; submission = accepted
+                    // Compare revision, not text: typing and then undoing is still a newer draft.
+                    if archive.drafts[pending.context]?.revision == pending.draftRevision {
+                        archive.drafts[pending.context] = NativeDraft()
+                        if context == pending.context { draftText = "" }
+                    }
+                    archive.pending = nil
+                } else {
+                    var rejected = pending; rejected.phase = .failed; submission = rejected
+                    archive.pending = nil; issue = error
+                }
+                submissionNonce = nil
+            }
+            if var current = submission, !current.phase.awaitingAcceptance, current.phase != .failed, current.phase != .stopped, current.phase != .completed {
+                if next.running { current.phase = .running }
+                else if previous?.running == true {
+                    let activityState = next.messages.last(where: { $0.value["activity"] != .null })?.value["activity"]["state"].string ?? ""
+                    if activityState == "failed" { current.phase = .failed }
+                    else if activityState == "stopped" { current.phase = .stopped }
+                    else if activityState == "completed" { current.phase = .completed }
+                }
+                submission = current
+            }
+            if let setting, setting.generation == generation, setting.context == context, next.value["composer_result"]["request_id"].string == setting.request {
+                let resultError = next.value["composer_result"]["error"].string
+                if !resultError.isEmpty { issue = resultError }
+                else if let provider = setting.provider, (next.value["provider"].string != provider || next.value["model"].string != setting.model) { issue = "The saved model selection was not confirmed. Review settings before sending." }
+                else if let effort = setting.effort, next.composer["effort"].string != effort { issue = "The saved effort was not confirmed." }
+                else { issue = "" }
+                self.setting = nil; operation = ""; deadlineTask?.cancel()
+            }
+            if !next.running { stopping = false }
+            if approvalSending && (previous?.value["pending_approval"] != next.value["pending_approval"]) { approvalSending = false; operation = ""; deadlineTask?.cancel(); review = nil }
+            if !next.value["notice"].string.isEmpty { issue = next.value["notice"].string }
+            // State ticks can be frequent: persistence is required only for durable client changes.
+            if archive.selectedConversationID != previous?.conversationID || (submissionNonce == nil && previous?.value["upload_result"] != next.value["upload_result"]) { persist() }
+        case .acknowledged(let nonce):
+            if nonce == submissionNonce, var pending = archive.pending, pending.phase == .submitted {
+                pending.phase = .acknowledged; archive.pending = pending; submission = pending; persist()
+            }
+        case .disconnected(let reason):
+            connectionStatus = .disconnected; issue = reason
+            markUncertain(); operation = ""; setting = nil; approvalSending = false; stopping = false
+            deadlineTask?.cancel(); startupDeadline?.cancel()
+        case .updateReady: break
+        }
+    }
+
+    public func editDraft(_ text: String) {
+        guard loaded, !context.isEmpty else { return }
+        guard text.utf8.count <= 128 * 1024 else { issue = "The draft exceeds 128 KiB. Previous text is kept."; return }
+        draftText = text; archive.drafts[context] = NativeDraft(text: text); persist()
+    }
+    private func persist() {
+        guard loaded else { return }
+        let value = archive, previous = saveTask, store = store
+        saveTask = Task { [weak self] in
+            await previous?.value
+            do { try await store.save(value); self?.persistenceIssue = "" }
+            catch { self?.persistenceIssue = "Native drafts could not be saved: " + error.localizedDescription }
+        }
+    }
+    public func flushDrafts() async -> Bool {
+        await saveTask?.value
+        // An unreadable store disables editing/sending. It must still be possible
+        // to quit without rewriting that original file.
+        return !loaded || persistenceIssue.isEmpty
+    }
+    private func markUncertain() {
+        if var pending = archive.pending { pending.phase = .uncertain; archive.pending = pending; submission = pending; persist() }
+    }
+    public func submit() async {
+        guard canSend, let draft = archive.drafts[context] else { issue = sendUnavailableReason ?? "Type a message first."; return }
+        let pending = PendingSubmission(id: UUID().uuidString, context: context, text: draft.text, draftRevision: draft.revision, phase: .submitted)
+        archive.pending = pending; submission = pending; issue = ""; persist()
+        guard await flushDrafts() else { markUncertain(); return }
+        await dispatchSubmission(pending)
+    }
+    public func retryOriginalAdmission() async {
+        guard canRetryAdmission, var pending = archive.pending else { return }
+        pending.phase = .submitted; archive.pending = pending; submission = pending; persist()
+        guard await flushDrafts() else { markUncertain(); return }
+        await dispatchSubmission(pending)
+    }
+    private func dispatchSubmission(_ pending: PendingSubmission) async {
+        guard let owner = transport, isConnected, pending.context == context else { markUncertain(); return }
+        let ownerGeneration = generation, nonce = UUID().uuidString
+        submissionNonce = nonce; startDeadline { [weak self] in
+            guard self?.archive.pending?.id == pending.id else { return }
+            self?.markUncertain(); self?.issue = "Admission is unconfirmed. The original identity is kept. Reconnect and inspect before explicitly retrying."
+        }
+        do { try await owner.send(.submission(id: pending.id, context: pending.context, text: pending.text), nonce: nonce) }
+        catch {
+            guard generation == ownerGeneration, archive.pending?.id == pending.id else { return }
+            markUncertain(); issue = error.localizedDescription
+        }
+    }
+
+    public func openConversation(_ id: String) async {
+        guard canNavigate, let snapshot, snapshot.value["recent_conversations"].array.contains(where: { $0["id"].string == id }), let owner = transport else { return }
+        await navigate(.conversation(id: id, listID: snapshot.value["recent_id"].string), owner: owner, expected: id)
+    }
+    public func newConversation() async {
+        guard canNavigate, let owner = transport else { return }
+        await navigate(.newConversation, owner: owner, expected: nil)
+    }
+    private func navigate(_ command: BridgeCommand, owner: any BridgeTransport, expected: String?) async {
+        guard await flushDrafts() else { return }
+        guard canNavigate else { return }
+        operation = "Opening conversation…"; let ownerGeneration = generation, previous = context
+        defer { if generation == ownerGeneration { operation = "" } }
+        do {
+            try await owner.send(command, nonce: UUID().uuidString)
+            if let expected, conversationID != expected { issue = snapshot?.value["notice"].string ?? "The conversation did not open. Choose it from the refreshed list." }
+            else if expected == nil && context == previous { issue = "Go did not confirm a new conversation. Your original conversation is kept." }
+        } catch { if generation == ownerGeneration { issue = error.localizedDescription } }
+    }
+
+    public func selectModel(provider: String, model: String) async {
+        guard canConfigureModel, let snapshot, composerModels.contains(where: { $0["provider"].string == provider && $0["model"].string == model && $0["unavailable"].string.isEmpty }) else { return }
+        let request = UUID().uuidString
+        await changeSetting(.model(id: snapshot.composer["id"].string, request: request, provider: provider, model: model), setting: SettingChange(request: request, generation: generation, context: context, provider: provider, model: model, effort: nil))
+    }
+    public func selectEffort(_ effort: String) async {
+        guard canConfigureModel, let snapshot, ["low", "standard", "high"].contains(effort) else { return }
+        let request = UUID().uuidString
+        await changeSetting(.effort(id: snapshot.composer["id"].string, request: request, effort: effort), setting: SettingChange(request: request, generation: generation, context: context, provider: nil, model: nil, effort: effort))
+    }
+    private func changeSetting(_ command: BridgeCommand, setting: SettingChange) async {
+        guard let owner = transport else { return }; self.setting = setting; operation = "Waiting for saved settings…"; issue = ""
+        startDeadline { [weak self] in self?.setting = nil; self?.operation = ""; self?.issue = "Settings outcome is unconfirmed. Inspect the current selection before trying again." }
+        do { try await owner.send(command, nonce: UUID().uuidString) }
+        catch { if generation == setting.generation, self.setting != nil { self.setting = nil; operation = ""; issue = error.localizedDescription } }
+    }
+
+    public func stopWork() async {
+        guard canStop, let owner = transport else { return }
+        let ownerGeneration = generation, originalContext = context
+        stopping = true; issue = ""
+        do {
+            try await owner.send(.stop, nonce: UUID().uuidString)
+            guard generation == ownerGeneration, context == originalContext else { return }
+            // The acknowledgement is not a cancellation receipt. Wait for Go's state.
+            if snapshot?.cancelling == true { stopping = true }
+        } catch { if generation == ownerGeneration { issue = error.localizedDescription; stopping = false } }
+    }
+    public func openApprovalReview() {
+        guard let snapshot, snapshot.hasApproval else { return }
+        let pending = snapshot.value["pending_approval"], index = pending["message_index"].int
+        let result = index >= 0 && index < messages.count ? messages[index].result : .null
+        review = ApprovalReview(conversationID: conversationID, context: context, generation: generation, interactionID: pending["id"].int, token: pending["token"].string, messageIndex: index, result: result)
+    }
+    public func closeApprovalReview() { if !approvalSending { review = nil } }
+    public func isCurrentReview(_ candidate: ApprovalReview) -> Bool {
+        guard isConnected, candidate.generation == generation, candidate.context == context, candidate.conversationID == conversationID, let snapshot else { return false }
+        let pending = snapshot.value["pending_approval"]
+        let exactResult = candidate.result == .null || (candidate.messageIndex >= 0 && candidate.messageIndex < messages.count && messages[candidate.messageIndex].result == candidate.result)
+        return exactResult && candidate.interactionID > 0 && candidate.interactionID == pending["id"].int && candidate.token.count == 64 && candidate.token == pending["token"].string && candidate.messageIndex == pending["message_index"].int
+    }
+    public func respondToApproval(_ candidate: ApprovalReview, approved: Bool) async {
+        guard !approvalSending, isCurrentReview(candidate), !approved || candidate.inspectable, let owner = transport else { return }
+        if approved {
+            guard candidate.messageIndex >= 0, candidate.messageIndex < messages.count, messages[candidate.messageIndex].result == candidate.result else { issue = "Approval details changed. Reopen the exact review."; return }
+        }
+        approvalSending = true; operation = "Waiting for the approval outcome…"
+        startDeadline { [weak self] in self?.approvalSending = false; self?.operation = ""; self?.issue = "The approval outcome is unconfirmed. Inspect retained work; do not repeat an external action." }
+        do { try await owner.send(.approval(id: candidate.interactionID, token: candidate.token, approved: approved), nonce: UUID().uuidString) }
+        catch { if generation == candidate.generation { approvalSending = false; operation = ""; issue = error.localizedDescription } }
+    }
+
+    public func reconnect() async {
+        guard connectionStatus == .disconnected || connectionStatus == .idle else { return }
+        markUncertain(); guard await flushDrafts() else { return }
+        operation = "Reconnecting…"
+        await transport?.shutdown(); eventTask?.cancel(); transport = nil
+        configuration.conversationID = archive.selectedConversationID
+        review = nil; operation = ""; issue = ""
+        await connect()
+        // Deliberately no send here: restore is not a resubmission or approval replay.
+    }
+    public func shutdown(confirmed: Bool = false) async -> Bool {
+        guard confirmed || quitGuard == nil else { return false }
+        markUncertain(); guard await flushDrafts() else { return false }
+        connectionStatus = .stopping
+        deadlineTask?.cancel(); startupDeadline?.cancel()
+        await transport?.shutdown(); eventTask?.cancel(); transport = nil
+        connectionStatus = .closed; review = nil; return true
+    }
+    private func startDeadline(_ action: @escaping @MainActor () -> Void) {
+        deadlineTask?.cancel()
+        deadlineTask = Task { [responseTimeout] in
+            try? await Task.sleep(for: responseTimeout)
+            if !Task.isCancelled { action() }
+        }
+    }
+}
