@@ -17,6 +17,16 @@ type TransientError struct {
 	Err error
 }
 
+// ProviderHTTPError retains safe status metadata through runner wrappers. The
+// original diagnostic stays available; recovery never parses provider prose.
+type ProviderHTTPError struct {
+	Status int
+	Err    error
+}
+
+func (e ProviderHTTPError) Error() string { return e.Err.Error() }
+func (e ProviderHTTPError) Unwrap() error { return e.Err }
+
 // RetryAfterError carries a bounded provider-supplied wait for a transient
 // response. Runner waits without mutating conversation history.
 type RetryAfterError struct {
@@ -65,11 +75,12 @@ func IsTransient(err error) bool {
 }
 
 // HTTPStatusError wraps a provider HTTP error. 429 and 503 are transient;
-// every other status is returned unchanged.
+// other statuses retain their diagnostic and structured status metadata.
 func HTTPStatusError(status int, err error) error {
 	if err == nil {
 		return nil
 	}
+	err = ProviderHTTPError{Status: status, Err: err}
 	if status == 429 || status == 503 {
 		return TransientError{Err: err}
 	}
