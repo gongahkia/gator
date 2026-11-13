@@ -26,6 +26,12 @@ func (m Model) localConversationTask(request worksession.Request) (workrun.Conve
 		}
 		task.CanGuide = m.bridgeGuidanceID() != "" && m.interaction == nil && !m.cancelling
 		task.CanStop = m.cancel != nil && !m.cancelling
+		if request.Plan == nil && !m.cancelling && m.operation != nil && m.interaction != nil && len(m.pendingInteractions) == 0 {
+			digest, err := workrun.InteractionDigest(*m.interaction)
+			if err == nil && m.operation.CanCorrectAction(m.interaction.ID, digest) {
+				task.CanCorrectAction, task.ReviewControlID = true, m.bridgeApprovalToken()
+			}
+		}
 		return task, true
 	}
 	p := request.Plan
@@ -65,6 +71,24 @@ func (m Model) localConversationTask(request worksession.Request) (workrun.Conve
 	// Revision, digest and phase must all still match after tool-free routing.
 	task.ControlID = fmt.Sprintf("plan-%x", sha256.Sum256([]byte(fmt.Sprintf("%s:%d:%s:%s", request.ID, p.Revision, p.Digest, p.Phase))))
 	return task, true
+}
+
+const actionCorrectionAccepted = "I withdrew that pending proposal and passed your correction to the same task. Any replacement still needs a fresh exact review; this correction did not send or approve anything."
+
+func (m *Model) correctPendingAction(token, instruction string) error {
+	if m.operation == nil || m.interaction == nil || !m.running || m.cancelling || token == "" || token != m.bridgeApprovalToken() {
+		return errors.New("the pending action changed; inspect its current review or receipt")
+	}
+	digest, err := workrun.InteractionDigest(*m.interaction)
+	if err != nil {
+		return err
+	}
+	if err := m.operation.CorrectAction(m.interaction.ID, digest, instruction); err != nil {
+		return err
+	}
+	m.interaction = nil
+	m.status = "Previous proposal withdrawn. Preparing a correction within the same task; fresh review is still required."
+	return nil
 }
 
 // Only the automatic transition to the first unapproved proposal can inherit

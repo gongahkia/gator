@@ -94,15 +94,13 @@ func TestTaskPlanApprovalStillRequiresExactConnectedActionReview(t *testing.T) {
 			if scenario.want == action.Executed && result.Err != nil {
 				t.Fatal(result.Err)
 			}
-			// Service records a refusal as a resolved interaction before durable
-			// mutation admission. Preserve that convention; no action attempt or
-			// fabricated dispatch receipt is required for an unadmitted denial.
-			wantReceipts := 1
-			if !scenario.allow {
-				wantReceipts = 0
-			}
-			if dispatched.Load() != scenario.calls || len(result.Outcome.Manifest.Actions) != wantReceipts || wantReceipts > 0 && result.Outcome.Manifest.Actions[0].Status != scenario.want {
+			// Refusal is a resolved domain decision, retained alongside its exact
+			// interaction. A denied proposal has no fabricated provider receipt.
+			if dispatched.Load() != scenario.calls || len(result.Outcome.Manifest.Actions) != 1 || result.Outcome.Manifest.Actions[0].Status != scenario.want {
 				t.Fatal("exact review or uncertainty was lost")
+			}
+			if !scenario.allow && result.Outcome.Manifest.Actions[0].ReceiptID != "" {
+				t.Fatal("denied proposal acquired a dispatch receipt")
 			}
 			if scenario.want == action.Unknown && result.Err == nil {
 				t.Fatal("unknown action was treated as completed Work")
@@ -117,6 +115,12 @@ func TestTaskPlanApprovalStillRequiresExactConnectedActionReview(t *testing.T) {
 			journal, err := actionlog.Open(state)
 			if err != nil {
 				t.Fatal(err)
+			}
+			// The manifest records the denied proposal, while the dispatch journal
+			// contains only admitted external attempts. Rejection admits none.
+			wantReceipts := 1
+			if !scenario.allow {
+				wantReceipts = 0
 			}
 			for range 3 {
 				entries, err := journal.List(request.RunID)

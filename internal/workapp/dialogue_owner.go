@@ -72,6 +72,7 @@ func (m Model) dialogueTaskState() *DialogueTaskState {
 			result.RunID, result.CanGuide, result.CanStop, result.CanRevisePlan = task.ControlID, task.CanGuide, task.CanStop, task.CanRevisePlan
 			result.Summary = task.Summary
 			result.PreparationControlID = task.PreparationControlID
+			result.CanCorrectAction, result.ReviewControlID = task.CanCorrectAction, task.ReviewControlID
 		}
 		if r.ID == m.activeRequest && m.running {
 			result.State = "running"
@@ -219,8 +220,8 @@ func (m Model) validateDialogueInputs(input ConversationInput) error {
 }
 
 // ControlDialogue checks provenance and the live operation in its own owner.
-// It cannot grant approval or change an exact external-action review. A pending
-// plan correction revokes the old plan review before preparing new content.
+// It cannot grant approval. Corrections retire an exact old review before the
+// original owner prepares new content requiring fresh review.
 func (m Model) ControlDialogue(control DialogueControl) (Model, tea.Cmd) {
 	result := DialogueControlResult{RequestID: control.RequestID, control: control}
 	if m.dialogueControls == nil {
@@ -244,12 +245,12 @@ func (m Model) ControlDialogue(control DialogueControl) (Model, tea.Cmd) {
 	}
 	state := m.dialogueTaskState()
 	ownerRequest := ""
-	if control.Action == "revise_plan" && control.ParentID == m.conversation {
+	if (control.Action == "revise_plan" || control.Action == "revise_action") && control.ParentID == m.conversation {
 		state = nil
 		for _, r := range m.requests.Requests {
 			if r.ID == control.TurnID {
 				if task, ok := m.localConversationTask(r); ok {
-					state = &DialogueTaskState{ParentID: m.conversation, DialoguePeer: DialoguePeer{ConversationID: m.conversation, TurnID: r.ID, RunID: task.ControlID, CanRevisePlan: task.CanRevisePlan, PreparationControlID: task.PreparationControlID}}
+					state = &DialogueTaskState{ParentID: m.conversation, DialoguePeer: DialoguePeer{ConversationID: m.conversation, TurnID: r.ID, RunID: task.ControlID, CanRevisePlan: task.CanRevisePlan, PreparationControlID: task.PreparationControlID, CanCorrectAction: task.CanCorrectAction, ReviewControlID: task.ReviewControlID}}
 					ownerRequest = r.ID
 				}
 				break
@@ -263,11 +264,25 @@ func (m Model) ControlDialogue(control DialogueControl) (Model, tea.Cmd) {
 			}
 		}
 	}
-	if !m.config.ManagedSessions || state == nil || state.ParentID != control.ParentID || state.TurnID != control.TurnID || state.RunID == "" || state.RunID != control.RunID && !(control.Action == "revise_plan" && control.RunID != "" && state.PreparationControlID == control.RunID) {
+	matches := state != nil && state.RunID != "" && state.RunID == control.RunID
+	if state != nil && control.Action == "revise_plan" && control.RunID != "" && state.PreparationControlID == control.RunID {
+		matches = true
+	}
+	if control.Action == "revise_action" {
+		matches = state != nil && control.RunID != "" && state.ReviewControlID == control.RunID
+	}
+	if !m.config.ManagedSessions || state == nil || state.ParentID != control.ParentID || state.TurnID != control.TurnID || !matches {
 		return fail("the selected task or operation changed; no different task was controlled")
 	}
 	var command tea.Cmd
 	switch control.Action {
+	case "revise_action":
+		if !state.CanCorrectAction {
+			return fail("this task has no single correctable pending action")
+		}
+		if err := m.correctPendingAction(control.RunID, control.Instruction); err != nil {
+			return fail(err.Error())
+		}
 	case "revise_plan":
 		if !state.CanRevisePlan {
 			return fail("the selected plan cannot be revised in its current state")

@@ -22,6 +22,29 @@ an available command alone is not evidence of an enjoyable end-to-end flow.
 | 14 | Voice has direct record/stop/cancel/transcribe/edit flow, visible processing destination and explicit consent; transcript is editable before sending. | Implemented; final journey pending | `09e74ef39`; `voice-controls.test.tsx`: all four sizes, native VoiceSession with controlled capture/transcription, route/chat consent, changed-route rejection, editable draft/no send, recording/transcription cancellation. Physical audio remains unverified on this host. |
 | 15 | Shared native typography/spacing/selection/focus/disabled treatments and readable summaries work with terminal colors, NO_COLOR and reduced motion; exact technical details remain inspectable. | In progress | `20e9b7cde`: Markdown cleanup destroys native consumers before their borrowed syntax style, including theme changes. Shared immutable field subscriptions prevent routine snapshots from invalidating unchanged native content; the reproduced conversation render stall clears without changing deadlines or renderer. Exact review objects remain frozen. Detail views reserve their scrollbar column and page by viewport height, retaining readable processing/budget text at all four sizes. Shared visual/state audit and full acceptance journey remain. |
 
+## Backend-only completion ledger (13 November scope change)
+
+The active goal is now the backend objective in the supplied goal attachment.
+The original fifteen findings above remain intact and are not claimed complete.
+Terminal presentation work and the previously queued mobile implementation are
+outside this goal. Preserve the CLI/TUI as a client; no Swift UI is being built.
+
+| Backend workstream | Original findings | Current evidence and remaining acceptance |
+|---|---|---|
+| Conversational control | 1, 8, 12 | Initial preparation corrections exist. Pending external-action correction now has controlled Go/service and local-client evidence: same operation, exact old review withdrawn, fresh approval required; delegated control is verified with concurrent original work and parent-draft continuity. Repeated in-flight plan corrections, plan-bound pause/replan/review, reviewed input changes, delegated/race/failure/restart coverage remain. |
+| Request-specific setup/recovery | 4, 12 | Existing provider setup/admission safeguards remain. Account/source/permission handoffs and provider rejection after admission need end-to-end verification and demonstrated gaps resolved; preserve request inputs and reject uncertain-effect replay. |
+| Authoritative settings/scope | 5, 8 | Existing canonical terminal/model settings remain. Inventory broader account/source/permission/processing/budget contracts, saved outcomes, cached-owner propagation, restart and current/future/background effects; reject changed identities and unauthorized expansion. |
+| Structured connected-item actions | 6, 8 | Existing local files/evidence/receipts retained. Complete supported provider item references and inspect/open/edit/reply/done paths with version/account/permission review and uncertain outcomes. |
+| Typed workflows | 9 | Inventory opaque public workflows; complete supported Go/host typed fields, defaults, choices, validation, reviews, operation results and recovery without a new command engine. |
+| Continuity/lifecycle | 1, 10, 11, 12, 13 | Prior draft, request, reading and receipt checks are a baseline. Verify affected workflow/file/chat/disconnect/restart boundaries, cancelled asynchronous results and foreground versus durable commitment semantics. |
+| Integrated verification | 2, 3, 4, 5, 6, 8, 12, 14 | Full backend journey and relevant regression checks remain. Recheck existing memory/noise/scheduling/voice/history with new work; separate controlled providers and process restart from physical microphone and live account/model evidence. |
+
+No workstream is complete merely because its contract or router exists. The final
+journey must cover setup/access, persisted scope, commitment, unrelated dialogue,
+task correction, pending-action correction, stale rejection, fresh exact approval,
+connected-item results and restart/disconnection. Physical/live prerequisites
+remain to be inspected; prior fixture checks do not establish them.
+
 ## Implementation rules
 
 - Reuse Solid/OpenTUI styling and Go/host safeguards; keep CLI/TUI only, optional rail, no mascot or Electron.
@@ -44,6 +67,34 @@ Preserve both phases across continuations and do not declare the expanded work
 finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
+
+- Backend pending-action corrections (13 November, implementation in progress):
+  the original operation accepts a correction only for its single exact pending
+  external action, with unchanged plan restrictions. It denies the old proposal,
+  enqueues guidance without blocking concurrent remote ingress, and requires a
+  fresh exact replacement review. Router inputs never receive review tokens;
+  historical task references strip correction capabilities. Explicit denials now
+  remain in the action manifest as denied proposals, while the external dispatch
+  journal continues to contain only admitted attempts, with no fabricated provider
+  receipt. Race-detector checks cover approval versus correction (100 races),
+  stale/missing identities, wrong review kinds, multiple reviews, reviewed plans,
+  stopped operations, full queues and invalid instructions. The real service
+  loopback Google test proves zero sends before fresh approval, one corrected
+  send, same run, original/replacement decisions and retained manifest records:
+  `/tmp/gator-backend-20261113-action-safety.log` (pass). Host regression:
+  `/tmp/gator-backend-20261113-action-host-full.log` (134 pass, 1 existing skip).
+  Go/host/client local-process journey and exact-approval regression:
+  `/tmp/gator-backend-20261113-action-native-final.log` (2 pass, 30 assertions),
+  including ordinary unrelated dialogue, correction, old-token rejection,
+  corrected send, retained draft and restart without replay. These are controlled
+  loopback providers and process checks, not physical terminal/audio or live
+  account/model evidence. Delegated/local client journeys also pass in
+  `/tmp/gator-backend-20261113-action-delegated.log` (2 pass, 39 assertions):
+  the original requesting owner keeps running, the background owner receives the
+  correction, fresh exact approval reaches that owner, and parent draft/restart
+  continuity survives. TypeScript checks, bundle/runtime builds, focused CLI
+  task-plan reference checks and focused race checks pass. The final full Go
+  regression outcome will be recorded after completion; all seven workstreams remain open.
 
 - Complete initial-correction regression (13 November): the isolated checkout
   at `7c909f99a` (same implementation as main `af242b3f8`) finishes with

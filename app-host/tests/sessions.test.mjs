@@ -312,3 +312,22 @@ for (const busyFlag of ["receipt_busy", "catalog_busy", "goal_busy"]) test(`${bu
  owner.change({[busyFlag]:false});assert.equal(sessions.busy,false);
  await sessions.stop();
 });
+
+test("action corrections reuse the exact local or delegated owner without allocating work", async () => {
+  const parent = new DialogueWorker("parent"), child = new DialogueWorker("child");
+  let spawned = 0;
+  const sessions = new Sessions(request => { spawned++; return request.conversation_id === "child" ? child : parent; });
+  try {
+    await sessions.open();
+    parent.change({ running: true, dialogue_dispatch: { sequence: 1, kind: "task", turn_id: "original", child_id: "child" } });
+    await sessions.settled();
+    for (const [index, owner] of [child, parent].entries()) {
+      parent.change({ dialogue_dispatch: { sequence: index + 2, kind: "revise_action", turn_id: "correction-" + index, child_id: owner.state.conversation_id, ...(owner === parent ? { owner_task: "local-original" } : {}), target_run: "exact-review-" + index, instruction: "Change only the subject" } });
+      await sessions.settled();
+      assert.deepEqual(owner.controls.at(-1), { parent_id: "parent", turn_id: owner === parent ? "local-original" : "original", request_id: "correction-" + index, run_id: "exact-review-" + index, action: "revise_action", instruction: "Change only the subject" });
+      assert.equal(parent.results.at(-1).error, undefined);
+      assert.equal(sessions.current, parent);
+    }
+    assert.equal(spawned, 2);
+  } finally { await sessions.stop(); }
+});

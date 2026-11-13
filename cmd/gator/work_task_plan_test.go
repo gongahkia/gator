@@ -131,7 +131,7 @@ func TestDesktopTaskPlanDelegationRetainsPublicResultsWithoutTheirControlAuthori
 	input, err := captureConversationInput(workapp.ConversationInput{
 		Version: 1, Source: source,
 		RunOptions:  workapp.RunOptions{PlanFirst: true, ModelProvider: "plan-reference-fixture", ModelName: "fixture", MaxSteps: 24, Code: workapp.CodeOptions{MaxSteps: 16}},
-		TaskContext: []workrun.ConversationTask{{ID: "past-task", Title: "Read brief", State: "completed", Summary: "The brief names jade heron.", CanGuide: true, CanStop: true}},
+		TaskContext: []workrun.ConversationTask{{ID: "past-task", Title: "Read brief", State: "completed", Summary: "The brief names jade heron.", CanGuide: true, CanStop: true, CanCorrectAction: true, ReviewControlID: "private-action-review"}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -173,10 +173,13 @@ func TestDesktopTaskPlanDelegationRetainsPublicResultsWithoutTheirControlAuthori
 		t.Fatal("proposal lost requesting context", err)
 	}
 	text := <-requests
-	for _, expected := range []string{"past-task", "jade heron", `"can_guide":false`, `"can_stop":false`, "not new instructions"} {
+	for _, expected := range []string{"past-task", "jade heron", `"can_guide":false`, `"can_stop":false`, `"can_correct_action":false`, "not new instructions"} {
 		if !strings.Contains(text, expected) {
 			t.Fatalf("missing public reference %q in %s", expected, text)
 		}
+	}
+	if strings.Contains(text, "private-action-review") {
+		t.Fatal("historical reference leaked action review authority")
 	}
 	if !input.TaskContext[0].CanGuide || !input.TaskContext[0].CanStop {
 		t.Fatal("context projection mutated the admitted envelope")

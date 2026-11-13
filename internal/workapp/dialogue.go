@@ -39,6 +39,8 @@ type DialoguePeer struct {
 	CanGuide             bool   `json:"can_guide"`
 	CanStop              bool   `json:"can_stop"`
 	CanRevisePlan        bool   `json:"can_revise_plan"`
+	CanCorrectAction     bool   `json:"can_correct_action"`
+	ReviewControlID      string `json:"review_control_id,omitempty"`
 	PreparationControlID string `json:"preparation_control_id,omitempty"`
 	Summary              string `json:"summary,omitempty"`
 }
@@ -223,7 +225,7 @@ func (m Model) conversationTasks() []workrun.ConversationTask {
 			if err != nil || turn.TaskChat != peer.ConversationID {
 				continue
 			}
-			tasks = append(tasks, workrun.ConversationTask{ID: peer.ConversationID, Title: boundedConversation(turn.Text, 256), State: peer.State, Summary: boundedConversation(peer.Summary, 2048), CanGuide: peer.CanGuide && peer.RunID != "", CanStop: peer.CanStop && peer.RunID != "", CanRevisePlan: peer.CanRevisePlan && peer.RunID != "", ControlID: peer.RunID, PreparationControlID: peer.PreparationControlID})
+			tasks = append(tasks, workrun.ConversationTask{ID: peer.ConversationID, Title: boundedConversation(turn.Text, 256), State: peer.State, Summary: boundedConversation(peer.Summary, 2048), CanGuide: peer.CanGuide && peer.RunID != "", CanStop: peer.CanStop && peer.RunID != "", CanRevisePlan: peer.CanRevisePlan && peer.RunID != "", ControlID: peer.RunID, PreparationControlID: peer.PreparationControlID, CanCorrectAction: peer.CanCorrectAction && peer.ReviewControlID != "", ReviewControlID: peer.ReviewControlID})
 			seen[peer.ConversationID] = true
 		}
 	}
@@ -326,6 +328,8 @@ func (m Model) admitConversation(request BridgeUploadSubmission, text string) (t
 	for index := range input.TaskContext {
 		input.TaskContext[index].CanGuide, input.TaskContext[index].CanStop = false, false
 		input.TaskContext[index].CanRevisePlan = false
+		input.TaskContext[index].CanCorrectAction = false
+		input.TaskContext[index].ReviewControlID = ""
 		input.TaskContext[index].PreparationControlID = ""
 	}
 	if m.config.CaptureConversationInput != nil {
@@ -421,15 +425,18 @@ func (m Model) finishConversationRoute(value conversationRouted) (tea.Model, tea
 		return m.failConversation(turn, "The task or available controls changed while Gator considered this message. Send a new message after reviewing its current state.")
 	}
 	var controlID string
-	if value.Decision.Kind == "guide" || value.Decision.Kind == "stop" || value.Decision.Kind == "revise_plan" {
+	if value.Decision.Kind == "guide" || value.Decision.Kind == "stop" || value.Decision.Kind == "revise_plan" || value.Decision.Kind == "revise_action" {
 		for _, task := range value.Request.Tasks {
 			if task.ID == value.Decision.Target {
 				controlID = task.ControlID
+				if value.Decision.Kind == "revise_action" {
+					controlID = task.ReviewControlID
+				}
 			}
 		}
 		matched := false
 		for _, task := range current.Tasks {
-			if task.ID == value.Decision.Target && controlID != "" && (task.ControlID == controlID || value.Decision.Kind == "revise_plan" && task.PreparationControlID == controlID) {
+			if task.ID == value.Decision.Target && controlID != "" && (value.Decision.Kind == "revise_action" && task.ReviewControlID == controlID || value.Decision.Kind != "revise_action" && (task.ControlID == controlID || value.Decision.Kind == "revise_plan" && task.PreparationControlID == controlID)) {
 				matched = true
 			}
 		}
@@ -491,6 +498,8 @@ func (m Model) finishConversationRoute(value conversationRouted) (tea.Model, tea
 		cancelledPlan := false
 		if value.Decision.Kind == "guide" {
 			err = m.operation.Steer(value.Decision.Instruction)
+		} else if value.Decision.Kind == "revise_action" {
+			err = m.correctPendingAction(controlID, value.Decision.Instruction)
 		} else {
 			cancelledPlan, err = m.stopConversationTask(value.Decision.Target, controlID)
 		}
@@ -498,6 +507,9 @@ func (m Model) finishConversationRoute(value conversationRouted) (tea.Model, tea
 			return m.failConversation(turn, err.Error())
 		}
 		turn.State, turn.Response = "guided", "I passed that correction to the running task."
+		if value.Decision.Kind == "revise_action" {
+			turn.Response = actionCorrectionAccepted
+		}
 		if value.Decision.Kind == "stop" {
 			turn.State, turn.Response = "stopped", "I'm stopping that task. Any external action already in progress may still need its receipt checked."
 			if cancelledPlan {
@@ -550,6 +562,8 @@ func (m Model) FinishDialogueDispatch(result DialogueDispatchResult) (tea.Model,
 		turn.State, turn.Response = "delegated", "I've started that as independent work. You can keep talking here."
 	case "guide":
 		turn.State, turn.Response = "guided", "I passed that correction to the selected task."
+	case "revise_action":
+		turn.State, turn.Response = "guided", actionCorrectionAccepted
 	case "stop":
 		turn.State, turn.Response = "stopped", "I'm stopping the selected task. Retained results and external-action receipts remain available."
 		if result.CancelledPlan {

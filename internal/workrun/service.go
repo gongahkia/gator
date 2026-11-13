@@ -167,6 +167,8 @@ type pendingInteraction struct {
 
 func (o *Operation) Cancel() { o.cancel() }
 func (o *Operation) Steer(text string) error {
+	o.mu.Lock()
+	defer o.mu.Unlock()
 	if o.planBound {
 		return errors.New("stop and review a new plan before steering this work")
 	}
@@ -184,6 +186,63 @@ func (o *Operation) Steer(text string) error {
 	default:
 		return errors.New("steering queue is full")
 	}
+}
+
+// CanCorrectAction reports only an exact, single pending external-action
+// proposal. Plan-bound work needs a revised plan, not in-place guidance.
+func (o *Operation) CanCorrectAction(id int, digest string) bool {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.correctableAction(id, digest) == nil
+}
+
+func (o *Operation) correctableAction(id int, digest string) error {
+	if o.planBound {
+		return errors.New("review a revised plan before changing this planned action")
+	}
+	select {
+	case <-o.stopped:
+		return errors.New("operation has stopped")
+	default:
+	}
+	pending, ok := o.pending[id]
+	if !ok || digest == "" || pending.digest != digest || pending.interaction.Kind != "action" {
+		return errors.New("this exact action is no longer pending; inspect its current outcome")
+	}
+	if len(o.pending) != 1 {
+		return errors.New("several reviews are pending; select and resolve the intended review before correcting this task")
+	}
+	if cap(pending.response) != 1 || len(pending.response) != 0 {
+		return errors.New("this action already has a decision")
+	}
+	return nil
+}
+
+// CorrectAction atomically retires an unapproved proposal and passes an
+// instruction through the original runner's bounded guidance channel. It never
+// edits action arguments or approves a replacement. The next proposal must pass
+// the same account, permission, budget and exact-review boundaries as before.
+func (o *Operation) CorrectAction(id int, digest, instruction string) error {
+	if !conversationText(instruction, 64*1024, false) {
+		return errors.New("invalid action correction")
+	}
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if err := o.correctableAction(id, digest); err != nil {
+		return err
+	}
+	// Remote controls can also enqueue guidance. Reserve its slot without waiting;
+	// on failure the original action must remain reviewable. The sole runner cannot
+	// consume this correction until its pending action receives the denial below.
+	pending := o.pending[id]
+	select {
+	case o.steering <- instruction:
+	default:
+		return errors.New("guidance is full; the original action is still awaiting review")
+	}
+	delete(o.pending, id)
+	pending.response <- false
+	return nil
 }
 func (o *Operation) Respond(id int, approved bool) error {
 	return o.respond(id, "", approved)
@@ -344,7 +403,9 @@ func (s Service) Start(ctx context.Context, request Request) *Operation {
 			return action.Deny, err
 		}
 		if !approved {
-			return action.Deny, errors.New("action denied")
+			// A human rejection is a resolved domain decision, not a failed
+			// approval transport. Let the broker retain its denied receipt.
+			return action.Deny, nil
 		}
 		return action.Allow, nil
 	}
