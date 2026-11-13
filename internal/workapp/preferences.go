@@ -44,5 +44,9 @@ func (m Model) RefreshDesktopPreferences() Model {
 	if err := m.refreshConversationPreferences(); err != nil {
 		m.bridgeNotice = err.Error()
 	}
+	// This is the model for future submissions. Active operations, retained
+	// queues and reviewed plans already own their immutable RunOptions.
+	m.refreshModelStatus()
+	m.firstRun = m.modelStatus.Provider == ""
 	return m
 }

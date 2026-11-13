@@ -147,6 +147,10 @@ func (m Model) ApplyComposerSettings(action ComposerAction) (tea.Model, tea.Cmd)
 		}
 		m.refreshModelStatus()
 		m.firstRun = m.modelStatus.Provider == ""
+		if m.modelStatus.Provider != action.Provider || m.modelStatus.Model != action.Model {
+			return fail("Could not confirm the saved model selection. Inspect the current model settings before submitting work.")
+		}
+		m.preferencesRevision++
 	case "effort":
 		if action.Provider != "" || action.Model != "" {
 			return fail("Invalid work effort selection.")

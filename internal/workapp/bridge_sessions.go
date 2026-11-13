@@ -41,9 +41,6 @@ func (m Model) FocusBridgeSession(foreground bool) Model {
 				m.theme = normalizeTheme(name)
 			}
 		}
-		if !m.running && len(m.queue) == 0 {
-			m.refreshModelStatus()
-		}
 		m.refreshBridgeConversations()
 		m.refreshChatUpdates()
 		m.refreshChatMemories()

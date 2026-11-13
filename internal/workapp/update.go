@@ -335,7 +335,6 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 	if len(value.AppChanges) > 0 {
 		m.preferencesRevision++
 		m = m.RefreshDesktopPreferences()
-		m.refreshModelStatus()
 	}
 	activity := m.activity
 	activityState := "completed"

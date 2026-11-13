@@ -11,6 +11,8 @@ import (
 	"github.com/gongahkia/gator/internal/workrun"
 )
 
+const modelDefaultsEffect = "Applies to future request defaults. Running, queued and reviewed requests retain their captured provider/model. Background commitments keep explicitly configured fields; missing provider/model fields can inherit the new defaults on their next run."
+
 func (c gatorAppController) prepareSettings(ctx context.Context, change workrun.AppChange) (workrun.AppMutation, error) {
 	if err := ctx.Err(); err != nil {
 		return workrun.AppMutation{}, err
@@ -65,7 +67,7 @@ func (c gatorAppController) prepareSettings(ctx context.Context, change workrun.
 		if !knownAppModel(prior, next) {
 			return workrun.AppMutation{}, errors.New("choose an existing provider/model from gator_app_inspect models; configure new providers and downloads in Models")
 		}
-		return workrun.AppMutation{Preview: map[string]any{"setting": "model", "before": prior.Defaults, "after": next}, Apply: func(ctx context.Context) (any, error) {
+		return workrun.AppMutation{Summary: "Default model saved for future requests: " + next.Provider + "/" + next.Model + ". Running, queued and reviewed requests retain their captured model.", Preview: map[string]any{"setting": "model", "before": prior.Defaults, "after": next, "effect": modelDefaultsEffect}, Apply: func(ctx context.Context) (any, error) {
 			err := c.settings.Update(func(current *config.Settings) error {
 				if current.Defaults != prior.Defaults || !knownAppModel(*current, next) {
 					return errors.New("model settings changed; inspect models and try again")

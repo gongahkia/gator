@@ -44,7 +44,11 @@ func (c gatorAppController) Inspect(ctx context.Context, query workrun.AppQuery)
 		// Exact endpoint routing is available in the trusted terminal context
 		// view. It must not be uploaded through a model-facing settings tool.
 		selected.Processing.Destination = ""
-		return map[string]any{"work_effort": effort, "model": selected, "theme": settings.Theme, "terminal": settings.TerminalPreferences(), "retrieval": settings.Embeddings, "learn_from_chats": settings.Desktop.LearnsFromChats(), "refer_to_chats": settings.Desktop.RefersToChats(), "storage": "Private Gator content is stored locally. Cloud retrieval uploads eligible saved text and queries; cloud chat processes supplied context remotely.", "settings_pages": []string{"Connections", "Memory & privacy", "Models", "Usage & limits", "Data & backups", "Recovery", "About & updates"}}, err
+		currentModel := ""
+		if c.request != nil {
+			currentModel = c.request.Provider
+		}
+		return map[string]any{"work_effort": effort, "model": selected, "model_effect": modelDefaultsEffect, "current_task_model": currentModel, "theme": settings.Theme, "terminal": settings.TerminalPreferences(), "retrieval": settings.Embeddings, "learn_from_chats": settings.Desktop.LearnsFromChats(), "refer_to_chats": settings.Desktop.RefersToChats(), "storage": "Private Gator content is stored locally. Cloud retrieval uploads eligible saved text and queries; cloud chat processes supplied context remotely.", "settings_pages": []string{"Connections", "Memory & privacy", "Models", "Usage & limits", "Data & backups", "Recovery", "About & updates"}}, err
 	case "models":
 		type choice struct {
 			Provider string   `json:"provider"`

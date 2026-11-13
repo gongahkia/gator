@@ -211,3 +211,42 @@ func TestComposerRejectsStaleBusyAndUnavailableChoices(t *testing.T) {
 		})
 	}
 }
+
+func TestComposerModelSelectionRequiresAnObservedSavedOutcome(t *testing.T) {
+	m := New(Config{SelectedModel: func() (string, string, error) { return "custom", "first", nil }, ComposerModels: func() ([]ComposerModel, error) {
+		return []ComposerModel{{Provider: "custom", Model: "first"}, {Provider: "custom", Model: "second"}}, nil
+	}, SelectComposerModel: func(string, string) error { return nil }})
+	m.input = "Keep the original draft"
+	state := m.composerSettings()
+	next, _ := m.ApplyComposerSettings(ComposerAction{ID: state.ID, RequestID: "unconfirmed-model", Action: "model", Provider: "custom", Model: "second"})
+	m = next.(Model)
+	if m.composerResult.Error == "" || m.modelStatus.Model != "first" || m.preferencesRevision != 0 || m.input != "Keep the original draft" {
+		t.Fatal("callback acknowledgement was presented as a saved model", m.composerResult)
+	}
+}
+
+func TestPreferenceRefreshChangesFutureModelWhileKeepingCapturedWork(t *testing.T) {
+	provider := "first"
+	config, store := requestConfig(t, func(string, string, string, RunOptions) RunResult {
+		t.Fatal("refresh replayed work")
+		return RunResult{}
+	})
+	config.ManagedSessions = true
+	config.ModelStatus = func() (ModelStatus, error) {
+		return ModelStatus{Provider: provider, Model: "model", Processing: ModelProcessing{Kind: "remote", Destination: provider + ".example", Description: "Configured route"}}, nil
+	}
+	m := New(config).FocusBridgeSession(true)
+	m.input = "Keep the draft"
+	captured := m.submissionOptions()
+	m.running = true
+	m.queue = []queuedRun{{prompt: "queued", options: captured}}
+	provider = "second"
+	m = m.RefreshDesktopPreferences()
+	if m.modelStatus.Provider != "second" || m.modelStatus.Processing.Destination != "second.example" || !m.running || m.input != "Keep the draft" || m.queue[0].options.ModelProvider != "first" || captured.ModelProvider != "first" {
+		t.Fatal("refresh changed ownership, draft or captured model")
+	}
+	journal, err := store.LoadRequests(m.conversation)
+	if err != nil || len(journal.Requests) != 0 {
+		t.Fatal("preference refresh admitted work", err)
+	}
+}
