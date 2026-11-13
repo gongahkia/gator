@@ -1,5 +1,12 @@
 import Foundation
 
+public enum NativeWorkMode: String, CaseIterable, Sendable {
+    case auto, inspect, draft, act
+    public var label: String {
+        switch self { case .auto: return "Automatic"; case .inspect: return "Read and Inspect"; case .draft: return "Prepare Drafts"; case .act: return "Propose Actions" }
+    }
+}
+
 public struct NativeTaskInspection: Equatable, Sendable, Identifiable {
     public let ownerID: String
     public let generation: UUID
@@ -61,6 +68,7 @@ public struct NativeReviewField: Identifiable, Equatable, Sendable {
     public let id: String
     public let label: String
     public let text: String
+    public var isTechnical: Bool { [".payload_sha256", ".correlation_id", ".id"].contains(where: id.hasSuffix) }
 }
 
 public enum NativeReviewPresentation {
@@ -73,10 +81,22 @@ public enum NativeReviewPresentation {
             guard fields.count < 256, depth < 12 else { complete = false; return }
             switch value {
             case .object(let values):
-                for key in values.keys.sorted() { flatten(values[key]!, path + "." + key, label.isEmpty ? key : label + " / " + key, depth + 1) }
+                let priority = ["connector_id", "account", "from", "to", "cc", "bcc", "destination", "target", "operation", "subject", "title", "capability", "preview", "payload", "body", "content"]
+                let keys = values.keys.sorted { left, right in
+                    let a = priority.firstIndex(of: left) ?? 100, b = priority.firstIndex(of: right) ?? 100
+                    return a == b ? left < right : a < b
+                }
+                for key in keys { flatten(values[key]!, path + "." + key, label.isEmpty ? key : label + " / " + key, depth + 1) }
             case .array(let values):
                 for (index, item) in values.enumerated() { flatten(item, path + ".\(index)", label + " [\(index + 1)]", depth + 1) }
-            case .string(let text): add(path, label.replacingOccurrences(of: "_", with: " "), text)
+            case .string(let text):
+                // Go's action agreement carries its public preview as encoded
+                // JSON. Decode only that known envelope for literal display;
+                // user body strings remain untouched. Authority is the original
+                // review/token, never this presentation projection.
+                if path == "preview.preview", let decoded = try? JSONDecoder().decode(JSONValue.self, from: Data(text.utf8)), case .object = decoded {
+                    flatten(decoded, path + ".content", label, depth + 1)
+                } else { add(path, label.replacingOccurrences(of: "_", with: " "), text) }
             default: add(path, label.replacingOccurrences(of: "_", with: " "), value.pretty)
             }
         }
@@ -105,8 +125,18 @@ public struct NativeTaskPresentation: Sendable {
         ownerID = snapshot.conversationID; title = snapshot.title
         parentID = snapshot.value["dialogue_task"]["parent_id"].string
         turnID = snapshot.value["dialogue_task"]["turn_id"].string
-        state = connection == .disconnected ? "Disconnected · retained state" : snapshot.hasApproval ? "Waiting for exact action review" : snapshot.running ? snapshot.cancelling ? "Stopping" : snapshot.value["status"].string.isEmpty ? "Working" : snapshot.value["status"].string : snapshot.value["dialogue_task"]["state"].string.isEmpty ? snapshot.value["task_plans"].array.isEmpty ? "Idle · inspect retained results" : "Proposed plan · not evidence of completion" : snapshot.value["dialogue_task"]["state"].string.capitalized
-        summary = String(snapshot.value["dialogue_task"]["summary"].string.prefix(2000))
+        let terminal = snapshot.messages.last(where: { $0.value["activity"] != .null })?.value["activity"]["state"].string ?? ""
+        let peer = snapshot.value["dialogue_task"]["state"].string
+        if connection == .disconnected { state = "Disconnected · retained state" }
+        else if snapshot.hasApproval { state = "Waiting for exact action review" }
+        else if snapshot.running { state = snapshot.cancelling ? "Stopping" : snapshot.value["status"].string.isEmpty ? "Working" : snapshot.value["status"].string }
+        else if snapshot.value["task_plans"].array.contains(where: { ["review", "approved", "preparing", "revising"].contains($0["phase"].string) }) { state = "Proposed plan · not evidence of completion" }
+        else if !peer.isEmpty { state = peer.capitalized }
+        else if ["completed", "failed", "stopped"].contains(terminal) { state = terminal.capitalized }
+        else { state = "Idle · inspect retained results" }
+        let peerSummary = snapshot.value["dialogue_task"]["summary"].string
+        let prose = snapshot.messages.last(where: { ["gator", "assistant"].contains($0.role.lowercased()) && !$0.text.isEmpty })?.text ?? ""
+        summary = String((peerSummary.isEmpty ? prose : peerSummary).prefix(2000))
         publicActivity = snapshot.value["activity"]["entries"].array.filter { $0["kind"].string == "tool" }.suffix(8).map { $0["tool"].string + " · " + $0["state"].string }
         self.issue = [issue, snapshot.value["requests_issue"].string, snapshot.value["dialogue_issue"].string].filter { !$0.isEmpty }.joined(separator: "\n")
     }

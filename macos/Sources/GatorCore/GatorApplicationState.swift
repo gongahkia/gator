@@ -334,6 +334,19 @@ public final class GatorApplicationState {
         let request = UUID().uuidString
         await changeSetting(.effort(id: snapshot.composer["id"].string, request: request, effort: effort), setting: SettingChange(request: request, generation: generation, context: context, provider: nil, model: nil, effort: effort))
     }
+    public func selectWorkMode(_ mode: NativeWorkMode) async {
+        guard canNavigate, let owner = transport else { issue = "Finish the current operation before changing this chat's work mode."; return }
+        let original = generation, deadline = ContinuousClock.now + .seconds(5)
+        operation = "Waiting for Gator's work mode…"
+        defer { if generation == original { operation = "" } }
+        do {
+            try await owner.send(.workMode(mode), nonce: UUID().uuidString)
+            while generation == original, isConnected, snapshot?.value["work_details"]["mode"].string != mode.rawValue {
+                guard ContinuousClock.now < deadline else { throw BridgeFailure("Work mode was not confirmed. Inspect its current value before sending.") }
+                try await Task.sleep(for: .milliseconds(10))
+            }
+        } catch { if generation == original { issue = error.localizedDescription } }
+    }
     private func changeSetting(_ command: BridgeCommand, setting: SettingChange) async {
         guard let owner = transport else { return }; self.setting = setting; operation = "Waiting for saved settings…"; issue = ""
         startDeadline { [weak self] in self?.setting = nil; self?.operation = ""; self?.issue = "Settings outcome is unconfirmed. Inspect the current selection before trying again." }

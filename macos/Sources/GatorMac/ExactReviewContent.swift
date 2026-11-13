@@ -7,11 +7,11 @@ struct ExactReviewContent: View {
         VStack(alignment: .leading, spacing: 14) {
             Text(verbatim: value["title"].string).font(.headline).accessibilityAddTraits(.isHeader)
             if !value["summary"].string.isEmpty { Text(verbatim: value["summary"].string) }
-            ForEach(NativeReviewPresentation.fields(value)) { field in
+            ForEach(NativeReviewPresentation.fields(value).filter { !$0.isTechnical }) { field in
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(verbatim: field.label).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    Text(verbatim: field.label.capitalized).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                     Text(verbatim: field.text).fixedSize(horizontal: false, vertical: true)
-                }.accessibilityElement(children: .combine)
+                }.accessibilityRepresentation { Text(verbatim: field.label + ": " + field.text) }
             }
             if !value["footer"].string.isEmpty, !value["footer"].string.hasPrefix("/") { Text(verbatim: value["footer"].string).font(.caption) }
             DisclosureGroup("Complete exact review data") {

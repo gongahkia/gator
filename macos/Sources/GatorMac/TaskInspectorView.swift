@@ -20,8 +20,9 @@ struct TaskInspectorView: View {
                         Text(verbatim: task.title).font(.title3.weight(.medium)).textSelection(.enabled)
                         Label(task.state, systemImage: snapshot.hasApproval ? "hand.raised" : snapshot.running ? "clock" : "text.bubble")
                             .accessibilityLabel("Task status: " + task.state)
+                            .background(NativeAccessibilityStatus(status: "Task: " + task.title + ". " + task.state).frame(width: 0, height: 0))
                         if !sessions.isInspectionCurrent { Text("This owner changed. Close these details and inspect the task again before requesting any controls.").foregroundStyle(.orange) }
-                        if !task.summary.isEmpty { Text(verbatim: task.summary).textSelection(.enabled) }
+                        if !task.summary.isEmpty { Text("Public retained summary · open the conversation for full output").font(.caption).foregroundStyle(.secondary); Text(verbatim: task.summary).textSelection(.enabled) }
                         if !task.issue.isEmpty { Label("Task needs attention", systemImage: "exclamationmark.triangle"); Text(verbatim: task.issue).textSelection(.enabled) }
                         if owner !== sessions.current {
                             Text("Work stays in its original Go owner while you inspect it.").font(.caption).foregroundStyle(.secondary)

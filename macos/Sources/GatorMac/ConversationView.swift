@@ -85,6 +85,12 @@ struct ConversationView: View {
                         Button(effort.capitalized) { let owner = application; Task { await owner.selectEffort(effort) } }.disabled(sessions.switching || !application.canConfigureModel)
                     }
                 }
+                Section("Work Mode · This Chat") {
+                    ForEach(NativeWorkMode.allCases, id: \.rawValue) { mode in
+                        Button((application.snapshot?.value["work_details"]["mode"].string == mode.rawValue ? "✓ " : "") + mode.label) { let owner = application; Task { await owner.selectWorkMode(mode) } }.disabled(!application.canNavigate || sessions.switching)
+                    }
+                    Text("Proposed actions still require exact review. Reconnected chats use Gator's default mode.")
+                }
                 Divider()
                 Button("Reconnect and Inspect") { Task { await sessions.reconnect() } }.disabled(application.connectionStatus != .disconnected)
                 Button("Quit Gator", role: .destructive, action: quit).keyboardShortcut("q")
@@ -122,7 +128,7 @@ struct ConversationView: View {
                             .accessibilityLabel("Open chat: " + item.title + " · " + item.status)
                             .accessibilityIdentifier("gator.chat." + item.id)
                         Button { sessions.inspectTask(item.id) } label: { Image(systemName: "info.circle").frame(width: 24, height: 28) }
-                            .accessibilityLabel("Inspect task: " + item.title).disabled(sessions.switching || sessions.owners[item.id] == nil)
+                            .accessibilityLabel("Inspect task: " + item.title).accessibilityIdentifier("gator.inspect." + item.id).disabled(sessions.switching || sessions.owners[item.id] == nil)
                         }
                     }
                 }

@@ -23,6 +23,9 @@ struct ApprovalReviewView: View {
                 Label("Decision submitted · awaiting the original owner's outcome", systemImage: "clock").font(.caption)
             } else if !current {
                 Label("This review is stale, unavailable or already submitted. Inspect the current proposal before deciding.", systemImage: "exclamationmark.triangle").font(.caption)
+                if application.hasReviewableApproval {
+                    Button("Inspect Current Proposal") { application.openApprovalReview() }
+                }
             }
             HStack {
                 Button("Back to Conversation") { application.closeApprovalReview() }.keyboardShortcut(.escape, modifiers: []).disabled(application.approvalSending)
@@ -43,5 +46,6 @@ struct ApprovalReviewView: View {
             }
         }.padding(14).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
             .accessibilityIdentifier("gator.exact.review." + review.conversationID)
+            .background(NativeAccessibilityStatus(status: application.approvalSending ? "Exact decision submitted; outcome pending" : current ? "Exact action review. No action has been approved." : "Review changed; decisions unavailable").frame(width: 0, height: 0))
     }
 }

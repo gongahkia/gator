@@ -33,12 +33,14 @@ const server=http.createServer(async(req,res)=>{
   message={role:'assistant',content:JSON.stringify({outcome:context.correction?'Venue comparison under $2,000':'A reviewed venue comparison',steps:[{id:'compare',text:context.correction?'Compare venues within the $2,000 budget':'Compare venues in the selected scope'}],sources:[],effects:['read']})};
  }else if(system.includes("Classify the user's immediate request")){
   message={role:'assistant',content:'{"mode":"act"}'};
- }else if(JSON.stringify(messages).includes('Hold another task')){
+ }else if(messages.filter(m=>m.role==='user').at(-1)?.content==='Prepare controlled fixture scope'){
+  message={role:'assistant',content:'Fixture scope retained.'};
+ }else if(messages.filter(m=>m.role==='user').at(-1)?.content==='Hold another task'){
   await trace({kind:'held-work'});
   while(!res.destroyed){try{await access(join(root,'release-main'));break;}catch{}await new Promise(r=>setTimeout(r,20));}
   message={role:'assistant',content:'The unrelated task finished.'};
  }else{
-  actionCalls++;await trace({kind:'action-model',call:actionCalls});
+  actionCalls++;await trace({kind:'action-model',call:actionCalls,system:system.slice(0,500),tools:(body.tools||[]).map(t=>t.function?.name),users:messages.filter(m=>m.role==='user').map(m=>m.content)});
   message=actionCalls<=2?{role:'assistant',tool_calls:[{id:'proposal-'+actionCalls,type:'function',function:{name:'connector_google_gmail_send',arguments:JSON.stringify({payload:{from:'me@example.com',to:'venue@example.com',subject:actionCalls===1?'Original subject':'Project Update',body:'Preserved body\n'+('Long review paragraph.\n'.repeat(35))+'FINAL REVIEW LINE'}})}}]}:{role:'assistant',content:'The reviewed action outcome is retained. Inspect its receipt; declined proposals were not sent.'};
  }
  if(!res.destroyed){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({choices:[{message,finish_reason:message.tool_calls?'tool_calls':'stop'}],usage:{prompt_tokens:10,completion_tokens:10,total_tokens:20}}));}

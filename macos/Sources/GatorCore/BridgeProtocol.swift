@@ -170,6 +170,7 @@ enum BridgeCommand: Sendable {
     case host(HostCommand)
     case submission(id: String, context: String, text: String, planFirst: Bool = false)
     case inspectPlan(NativePlanIdentity, request: String)
+    case workMode(NativeWorkMode)
     case conversation(id: String, listID: String)
     case newConversation
     case model(id: String, request: String, provider: String, model: String)
@@ -190,6 +191,7 @@ enum BridgeCommand: Sendable {
         case let .inspectPlan(identity, request):
             v["type"] = .string("task_plan")
             v["task_plan"] = .object(["action": .string("inspect"), "conversation_id": .string(identity.conversationID), "task_id": .string(identity.taskID), "revision": .number(Decimal(identity.revision)), "digest": .string(identity.digest), "request_id": .string(request)])
+        case .workMode(let mode): v["type"] = .string("submit"); v["text"] = .string("/mode " + mode.rawValue)
         case let .conversation(id, listID):
             v["type"] = .string("conversation"); v["conversation"] = .object(["id": .string(id), "list_id": .string(listID)])
         case .newConversation: v["type"] = .string("navigate"); v["text"] = .string("/new")

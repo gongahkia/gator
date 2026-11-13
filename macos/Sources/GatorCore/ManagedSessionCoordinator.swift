@@ -256,14 +256,14 @@ public final class ManagedSessionCoordinator {
     }
     public func requestActionCorrection(owner: GatorApplicationState, review: ApprovalReview) async {
         await enqueue { [self] in
-            guard owners[owner.conversationID] === owner, owner.isCurrentReview(review) else { throw BridgeFailure("The exact proposal changed or disconnected. Inspect it again; no correction was submitted.") }
+            guard owner === current, owners[owner.conversationID] === owner, owner.isCurrentReview(review) else { throw BridgeFailure("The exact proposal changed or disconnected. Inspect it again; no correction was submitted.") }
             let target = NativeCorrectionTarget(kind: .action, ownerID: owner.conversationID, generation: owner.generation, reviewToken: review.token, plan: nil, taskTurnID: owner.snapshot?.value["dialogue_task"]["turn_id"].string ?? "")
             try await prepareCorrection(target, owner: owner)
         }.value
     }
     public func requestPlanRevision(owner: GatorApplicationState, review: NativePlanReview) async {
         await enqueue { [self] in
-            guard owners[owner.conversationID] === owner, owner.isCurrentPlanReview(review) else { throw BridgeFailure("This plan revision is stale. Inspect the current proposal before requesting a change.") }
+            guard owner === current, owners[owner.conversationID] === owner, owner.isCurrentPlanReview(review) else { throw BridgeFailure("This plan revision is stale. Inspect the current proposal before requesting a change.") }
             let target = NativeCorrectionTarget(kind: .plan, ownerID: owner.conversationID, generation: owner.generation, reviewToken: nil, plan: review.identity, taskTurnID: owner.snapshot?.value["dialogue_task"]["turn_id"].string ?? "")
             try await prepareCorrection(target, owner: owner)
         }.value
