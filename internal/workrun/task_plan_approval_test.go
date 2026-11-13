@@ -213,3 +213,70 @@ func TestTaskPlanApprovalStillRequiresExactCodingCommandReview(t *testing.T) {
 		})
 	}
 }
+
+func TestRevokedRunningPlanCannotReleasePreviouslyPendingAction(t *testing.T) {
+	state, store, request := claimedPlanFixture(t, []string{"read", "connected_write"}, "release")
+	request.RunID = "pausing-plan-run"
+	request.Mode = action.Act
+	request.Contract = artifact.InspectionContract()
+	request.Contract.ExternalActions = action.Approve
+	var effects atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { effects.Add(1); w.WriteHeader(http.StatusNoContent) }))
+	defer server.Close()
+	registry, err := connector.NewRegistry([]connector.Descriptor{{Version: 1, ID: "release", Name: "Controlled", Kind: connector.KindHTTPWebhook, Resource: server.URL, Authentication: connector.AuthNone}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	model := &scriptedModel{turns: []agent.Turn{{ToolCalls: []agent.ToolCall{{ID: "pending", Name: "connector_release_publish", Arguments: json.RawMessage(`{"payload":{"version":"v1"}}`)}}}, {Text: "Inspect the retained outcome."}}}
+	operation := (Service{Executor: Executor{Model: model, StateDir: state, Connectors: connector.Runtime{Registry: registry, HTTPClient: server.Client()}}}).Start(context.Background(), request)
+	defer func() {
+		operation.Cancel()
+		for range operation.Events {
+		}
+		<-operation.Done
+	}()
+	var review Interaction
+	select {
+	case review = <-operation.Interactions:
+	case <-time.After(10 * time.Second):
+		t.Fatal("review did not arrive")
+	}
+	turn, err := store.AdmitDialogue(request.ConversationID, "pause-running-task", "Correct that plan", json.RawMessage(`{"scope":"unchanged"}`), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, phase := range []string{"routing", "ready", "editing_plan"} {
+		turn.State = phase
+		if phase == "editing_plan" {
+			turn.Response = "Requesting a revised plan for review…"
+		}
+		if phase == "ready" {
+			turn.Decision, _ = json.Marshal(map[string]string{"kind": "revise_plan", "target": request.TaskPlan.RequestID, "instruction": turn.Text})
+		}
+		turn, err = store.UpdateDialogue(turn, turn.Revision)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, paused, claimed, err := store.BeginRunningPlanEdit(request.ConversationID, request.TaskPlan.RequestID, request.TaskPlan.Revision, request.TaskPlan.Digest, request.ConversationID, turn.ID, turn.Text, operation.RunID)
+	if err != nil || !claimed || paused.Plan.DrainingRun != operation.RunID || paused.Plan.Approval != nil {
+		t.Fatal("running dispatch was not fenced", err)
+	}
+	digest, _ := InteractionDigest(review)
+	if err := operation.respondBound(review.ID, digest, true); err != nil {
+		t.Fatal(err)
+	}
+	for range operation.Events {
+	}
+	<-operation.Done
+	if effects.Load() != 0 {
+		t.Fatal("old exact approval escaped revoked plan")
+	}
+	content := *paused.Plan.Content
+	if _, err := store.FinishTaskPlanEdit(request.ConversationID, paused.ID, paused.Plan.Revision, paused.Plan.Digest, turn.ID, &content, ""); err == nil {
+		t.Fatal("draining run acquired a replacement review before accounting")
+	}
+	if _, _, err := store.ApproveTaskPlan(request.ConversationID, paused.ID, paused.Plan.Revision, paused.Plan.Digest); err == nil {
+		t.Fatal("unaccounted draining run acquired execution approval")
+	}
+}

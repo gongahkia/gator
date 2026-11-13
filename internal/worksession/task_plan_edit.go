@@ -104,6 +104,19 @@ func validatePlanEdit(r Request) error {
 // budgets, original task text/options, and the execution owner remain frozen.
 // Transport repeats return the original attempt and never start a second call.
 func (s Store) BeginTaskPlanEdit(id, request string, revision uint64, digest, parent, turnID, instruction string) (RequestJournal, Request, bool, error) {
+	return s.beginTaskPlanEdit(id, request, revision, digest, parent, turnID, instruction, "")
+}
+
+// BeginRunningPlanEdit revokes the exact dispatch before its owner cancels the
+// runner. It cannot approve, restart execution, or discard that run's evidence.
+func (s Store) BeginRunningPlanEdit(id, request string, revision uint64, digest, parent, turnID, instruction, runID string) (RequestJournal, Request, bool, error) {
+	if validID(runID) != nil {
+		return RequestJournal{}, Request{}, false, ErrPlanChanged
+	}
+	return s.beginTaskPlanEdit(id, request, revision, digest, parent, turnID, instruction, runID)
+}
+
+func (s Store) beginTaskPlanEdit(id, request string, revision uint64, digest, parent, turnID, instruction, runID string) (RequestJournal, Request, bool, error) {
 	j, err := s.LoadRequests(id)
 	if err != nil {
 		return j, Request{}, false, err
@@ -111,7 +124,7 @@ func (s Store) BeginTaskPlanEdit(id, request string, revision uint64, digest, pa
 	for _, r := range j.Requests {
 		if r.ID == request && r.Plan != nil && r.Plan.Edit != nil {
 			e := r.Plan.Edit
-			if e.ParentID == parent && e.TurnID == turnID && e.Instruction == instruction && e.BaseRevision == revision && e.BaseDigest == digest {
+			if e.ParentID == parent && e.TurnID == turnID && e.Instruction == instruction && e.BaseRevision == revision && e.BaseDigest == digest && r.Plan.DrainingRun == runID {
 				return j, r, false, nil
 			}
 		}
@@ -128,7 +141,8 @@ func (s Store) BeginTaskPlanEdit(id, request string, revision uint64, digest, pa
 	retryInitial := r.State == "interrupted" && r.Plan.Phase == "interrupted" && r.Plan.Content == nil && r.Plan.Approval == nil
 	review := r.State == "queued" && r.Plan.Content != nil && (r.Plan.Phase == "review" || r.Plan.Phase == "approved")
 	revising := r.State == "queued" && r.Plan.Phase == "revising" && r.Plan.Edit != nil && r.Plan.Edit.State == "preparing" && r.Plan.Approval == nil
-	if (!initial && !retryInitial && !review && !revising) || revision >= math.MaxUint64-1 || !boundedPlanText(instruction, 64*1024) {
+	executing := runID != "" && r.State == "running" && r.Plan.Phase == "dispatching" && r.Plan.Approval != nil
+	if runID != "" && !executing || (!initial && !retryInitial && !review && !revising && !executing) || revision >= math.MaxUint64-1 || !boundedPlanText(instruction, 64*1024) {
 		return j, Request{}, false, ErrPlanChanged
 	}
 	if r.Plan.Edit != nil && r.Plan.Edit.State != "preparing" {
@@ -156,6 +170,9 @@ func (s Store) BeginTaskPlanEdit(id, request string, revision uint64, digest, pa
 	p.Revision++
 	p.Phase, p.Approval = "revising", nil
 	p.Edit = &PlanEdit{PlanEditReference: ref, State: "preparing"}
+	if executing {
+		p.DrainingRun = runID
+	}
 	p.Digest = p.contentDigest()
 	r.Plan, r.UpdatedAt, r.Issue, r.State = p, time.Now().UTC(), "", "queued"
 	saved, err := s.SaveRequests(id, j)
@@ -193,7 +210,7 @@ func (s Store) FinishTaskPlanEdit(id, request string, revision uint64, digest, t
 	}
 	r := &j.Requests[index]
 	p := r.Plan.Clone()
-	if r.State != "queued" || p.Phase != "revising" || p.Edit == nil || p.Edit.TurnID != turnID || p.Edit.State != "preparing" {
+	if r.State != "queued" || p.Phase != "revising" || p.Edit == nil || p.Edit.TurnID != turnID || p.Edit.State != "preparing" || p.DrainingRun != "" {
 		return j, ErrPlanChanged
 	}
 	if content != nil {
@@ -270,6 +287,9 @@ func (s Store) PublishPlanEditResult(id, request string) (DialogueTurn, error) {
 			suffix := " The previous plan is retained for fresh review; no implementation was started."
 			if r.Plan.Content == nil {
 				suffix = " No proposal was saved. The original task and inputs are retained; ask to retry its plan. No implementation was started."
+			}
+			if r.Plan.DrainingRun != "" {
+				suffix = " The original execution and its receipts must be accounted before a replacement can be reviewed. It will not replay automatically."
 			}
 			issue := e.Issue
 			for len(issue) > 4096-len(suffix) {

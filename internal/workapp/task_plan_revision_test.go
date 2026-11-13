@@ -338,3 +338,57 @@ func TestAdditionalCorrectionsDrainOriginalRevisionBeforeLatestStarts(t *testing
 		})
 	}
 }
+
+func TestRestartRetainsUnaccountedPlanExecutionWithoutReviewOrReplay(t *testing.T) {
+	config, store := dialogueConfig(t)
+	config.PreparePlan = func(context.Context, worksession.Request) (worksession.PlanContent, error) {
+		return dialoguePlanContent(), nil
+	}
+	m := prepareRevisionFixture(t, config, "Compare venues")
+	r := m.requests.Requests[0]
+	j, _, err := store.ApproveTaskPlan(m.conversation, r.ID, r.Plan.Revision, r.Plan.Digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	j.Requests[0].State = "running"
+	j.Requests[0].Plan.Phase = "dispatching"
+	if _, err := store.SaveRequests(m.conversation, j); err != nil {
+		t.Fatal(err)
+	}
+	turn, err := store.AdmitDialogue(m.conversation, "pause-for-recovery", "Correct the running plan", json.RawMessage(`{"scope":"same"}`), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, phase := range []string{"routing", "ready", "editing_plan"} {
+		turn.State = phase
+		if phase == "ready" {
+			turn.Decision, _ = json.Marshal(map[string]string{"kind": "revise_plan", "target": r.ID, "instruction": turn.Text})
+		}
+		if phase == "editing_plan" {
+			turn.Response = "Requesting a revised plan"
+		}
+		turn, err = store.UpdateDialogue(turn, turn.Revision)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, _, _, err := store.BeginRunningPlanEdit(m.conversation, r.ID, r.Plan.Revision, r.Plan.Digest, m.conversation, turn.ID, turn.Text, "unaccounted-work-run"); err != nil {
+		t.Fatal(err)
+	}
+	config.StartConversationID = m.conversation
+	config.RevisePlan = func(context.Context, worksession.Request) (worksession.PlanContent, error) {
+		t.Fatal("restart replayed plan")
+		return worksession.PlanContent{}, nil
+	}
+	restored := New(config)
+	if restored.requestsIssue != "" || restored.running {
+		t.Fatal("could not recover unaccounted execution", restored.requestsIssue)
+	}
+	saved := restored.requests.Requests[0]
+	if saved.State != "interrupted" || saved.Plan.Phase != "interrupted" || saved.Plan.DrainingRun != "unaccounted-work-run" || saved.Plan.Approval != nil {
+		t.Fatal("unaccounted execution became reviewable or lost identity")
+	}
+	if _, _, err := store.ApproveTaskPlan(m.conversation, r.ID, saved.Plan.Revision, saved.Plan.Digest); err == nil {
+		t.Fatal("unaccounted execution acquired approval")
+	}
+}

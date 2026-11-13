@@ -338,6 +338,13 @@ func (s Service) Start(ctx context.Context, request Request) *Operation {
 			if err := persistInteraction(InteractionRecord{Version: 1, Status: "resolved", Interaction: interaction, Approved: &approved}, id); err != nil {
 				return false, err
 			}
+			// An exact review can wait while its plan is revoked. Recheck the
+			// canonical dispatch after that wait, before releasing any effect.
+			if approved && request.TaskPlan != nil {
+				if _, err := loadReviewedTaskPlan(request); err != nil {
+					return false, err
+				}
+			}
 			return approved, nil
 		case <-ctx.Done():
 			return false, errors.Join(ctx.Err(), persistInteraction(InteractionRecord{Version: 1, Status: "cancelled", Interaction: interaction}, id))

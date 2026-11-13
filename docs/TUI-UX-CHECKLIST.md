@@ -68,6 +68,31 @@ finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
 
+- Plan-bound correction handoff safeguards (13 November, workflow incomplete):
+  the canonical store can now revoke an exact running dispatch and retain its
+  run identity as `draining_run` before the owner requests cancellation. This
+  state cannot finish a proposal or acquire approval until original execution
+  evidence and budget accounting are attached. It is not exposed as a completed
+  conversational workflow. The service now rechecks canonical reviewed-plan
+  authority after an exact decision wait, closing the gap between the earlier
+  tool check and a later approval. A real Service with loopback external action
+  proves that approving its old exact interaction after dispatch revocation
+  produces zero external effects; replacement review and approval remain denied.
+  `/tmp/gator-backend-20261113-plan-pause-fence-final.log` passes. Restart keeps
+  an unaccounted run interrupted/unapproved without invoking planning:
+  `/tmp/gator-backend-20261113-plan-pause-restart.log` passes. Related session/app
+  checks pass in `/tmp/gator-backend-20261113-plan-pause-recovery.log`.
+  Remaining work: ordinary local/delegated correction admission; drain the actual
+  Work owner; retain each original result/receipt; bind only that run's verified
+  resulting head; persist and enforce remaining steps, model/token/time budgets;
+  expose uncertain-effect reconciliation; prepare and review the replacement;
+  verify races, cancellation, failure and restart through the complete client.
+  Focused race checks also pass in
+  `/tmp/gator-backend-20261113-plan-pause-race.log`; full Go session/app/run
+  regression is running in `/tmp/gator-backend-20261113-plan-pause-full.log`.
+  Existing unrestricted-steering guards remain. No plan-bound correction
+  acceptance criterion is marked complete by this safety boundary alone.
+
 - Delegated repeated-correction verification (13 November): a headless existing
   host/client with real Go owners and loopback model service exercises an original
   foreground task plus a delegated plan. Two ordinary corrections retain the same

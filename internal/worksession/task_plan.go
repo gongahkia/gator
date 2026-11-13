@@ -25,6 +25,9 @@ type TaskPlan struct {
 	Content  *PlanContent  `json:"content,omitempty"`
 	Approval *PlanApproval `json:"approval,omitempty"`
 	Edit     *PlanEdit     `json:"edit,omitempty"`
+	// DrainingRun fences a reviewed execution before its tool-free replan.
+	// The owner must retain that run's result and measured budget before review.
+	DrainingRun string `json:"draining_run,omitempty"`
 }
 type PlanBinding struct {
 	UpdatedAt      time.Time `json:"conversation_updated_at"`
@@ -127,14 +130,15 @@ func (p TaskPlan) contentDigest() string {
 		edit = &ref
 	}
 	data, _ := json.Marshal(struct {
-		Version  int
-		Revision uint64
-		Binding  PlanBinding
-		Sources  []string
-		Budget   PlanBudget
-		Content  *PlanContent
-		Edit     *PlanEditReference `json:",omitempty"`
-	}{p.Version, p.Revision, p.Binding, p.Sources, p.Budget, p.Content, edit})
+		Version     int
+		Revision    uint64
+		Binding     PlanBinding
+		Sources     []string
+		Budget      PlanBudget
+		Content     *PlanContent
+		Edit        *PlanEditReference `json:",omitempty"`
+		DrainingRun string             `json:",omitempty"`
+	}{p.Version, p.Revision, p.Binding, p.Sources, p.Budget, p.Content, edit, p.DrainingRun})
 	return planHash(data)
 }
 func validateTaskPlan(r Request) error {
@@ -181,6 +185,9 @@ func validateTaskPlan(r Request) error {
 	}
 	if err := validatePlanEdit(r); err != nil {
 		return err
+	}
+	if p.DrainingRun != "" && (validID(p.DrainingRun) != nil || p.Phase != "revising" && p.Phase != "interrupted" || p.Approval != nil || p.Edit == nil) {
+		return errors.New("invalid draining plan execution")
 	}
 	if p.Approval != nil {
 		if p.Approval.Revision != p.Revision || p.Approval.Digest != p.Digest || p.Approval.At.IsZero() {
