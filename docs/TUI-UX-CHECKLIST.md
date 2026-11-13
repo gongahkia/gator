@@ -69,7 +69,7 @@ finished after only the terminal phase or a mobile scaffold.
 ## Verification journal
 
 - Backend pending-action corrections (13 November, implementation in progress):
-  the original operation accepts a correction only for its single exact pending
+  `f44026a12`: the original operation accepts a correction only for its single exact pending
   external action, with unchanged plan restrictions. It denies the old proposal,
   enqueues guidance without blocking concurrent remote ingress, and requires a
   fresh exact replacement review. Router inputs never receive review tokens;
@@ -94,7 +94,10 @@ finished after only the terminal phase or a mobile scaffold.
   correction, fresh exact approval reaches that owner, and parent draft/restart
   continuity survives. TypeScript checks, bundle/runtime builds, focused CLI
   task-plan reference checks and focused race checks pass. The final full Go
-  regression outcome will be recorded after completion; all seven workstreams remain open.
+  regression passes (`workapp` cached; `workrun` 118.940 seconds), observed exit 0,
+  in `/tmp/gator-backend-20261113-action-go-verified.log`. The focused combined
+  race gate passes in `/tmp/gator-backend-20261113-action-race-final.log`.
+  All seven workstreams remain open.
 
 - Complete initial-correction regression (13 November): the isolated checkout
   at `7c909f99a` (same implementation as main `af242b3f8`) finishes with
