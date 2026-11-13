@@ -41,7 +41,7 @@ before committing that workflow. Earlier terminal evidence is historical.
 |---|---|---|
 | Conversational control | 1, 8, 12 | Initial preparation corrections exist. Pending external-action correction now has controlled Go/service and local-client evidence: same operation, exact old review withdrawn, fresh approval required; delegated control is verified with concurrent original work and parent-draft continuity. Repeated in-flight plan corrections have local and delegated controlled-provider evidence, including concurrent owners, provider failure and process-crash/restart without replay. Plan-bound pause/replan/review has local and delegated controlled journeys with retained evidence and remaining-budget enforcement; original uncertain effects block replacement approval across restart. Broader lifecycle/account/coding paths remain. Reviewed input additions on existing plan tasks have local/delegated provider and retry evidence. Typed input removal from retained plan review now narrows the selected set with fresh approval, original retention and scoped replay. Ordinary running tasks can now promote explicit file corrections into the same reviewed task, with original boundary and budget evidence. Broader account/coding/failure/restart combinations remain. |
 | Request-specific setup/recovery | 4, 12 | Provider rejection recovery is retained. Task-bound access requirements now support missing configured accounts, bearer credential repair and denied read permissions through a typed Go/host scope review, original-task planning and fresh exact approval. Source changes are digest-bound, and configured model/processing identity and spent budget stay fixed. Headless integration evidence is below. Prepared or interrupted recovery plans can now receive another exact account review without repeating execution or budget accounting; prior proposals/approvals and per-requirement account choices remain inspectable. Selected-source removal before Work execution or the first plan proposal now has native preparation evidence and the same reviewed recovery path, including delegated admission. Other early configuration/constructor failures, broader OAuth/provider permission repair, mixed-effect continuation and the complete journey remain open. |
-| Authoritative settings/scope | 5, 8 | Existing canonical terminal/model settings remain. Inventory broader account/source/permission/processing/budget contracts, saved outcomes, cached-owner propagation, restart and current/future/background effects; reject changed identities and unauthorized expansion. |
+| Authoritative settings/scope | 5, 8 | Existing canonical terminal/model settings remain. Foreground effort presets now share the conversation preference store across manual and conversational controls, source changes, cached owners and restart; running, queued and reviewed budgets remain frozen. Broader account/source/permission/model/processing contracts, effective runtime ceilings and the combined settings/scope journey remain open; reject changed identities and unauthorized expansion. |
 | Structured connected-item actions | 6, 8 | Existing local files/evidence/receipts retained. Complete supported provider item references and inspect/open/edit/reply/done paths with version/account/permission review and uncertain outcomes. |
 | Typed workflows | 9 | Inventory opaque public workflows; complete supported Go/host typed fields, defaults, choices, validation, reviews, operation results and recovery without a new command engine. |
 | Continuity/lifecycle | 1, 10, 11, 12, 13 | Prior draft, request, reading and receipt checks are a baseline. Verify affected workflow/file/chat/disconnect/restart boundaries, cancelled asynchronous results and foreground versus durable commitment semantics. |
@@ -52,6 +52,61 @@ journey must cover setup/access, persisted scope, commitment, unrelated dialogue
 task correction, pending-action correction, stale rejection, fresh exact approval,
 connected-item results and restart/disconnection. Physical/live prerequisites
 remain to be inspected; prior fixture checks do not establish them.
+
+## Canonical foreground work effort (13 November, backend only)
+
+- Implementation: `4d8dd5a91` (`feat(agent): share persisted work effort across conversational and manual settings`).
+- Reproduced two actual-process failures: manual effort was transient and could
+  disappear before any task executed, while conversational settings did not
+  support effort. Both now use `work_effort` in the existing canonical conversation
+  preference record, with the established low 12/8, standard 24/16 and high 48/32
+  Work/Code step presets. No new settings store or execution path is introduced.
+- Existing manual composer/command paths and `gator_app_update` with typed
+  `work_effort {effort}` use the same Go validation and persistence. Settings
+  inspection reports the saved/effective future request budgets, supported
+  choices, target conversation, captured current request limits and effect.
+  Runtime role policies can narrow request ceilings; applied limits remain in
+  execution accounting. Step presets are not provider-price or billing estimates.
+- A conversational mutation applies after its own run and targets the host-bound
+  originating conversation. It changes future foreground defaults; admitted
+  running, queued and reviewed tasks retain original options/approvals. Existing
+  background commitment definitions and shared provider limits are not rewritten.
+- All source-selection writers preserve other canonical preference fields and use
+  compare-and-swap. Invalid, stale, unreadable or guard-rejected settings cannot
+  report a successful save or silently admit work with stale preferences. Existing
+  manual selection reports persistence errors rather than ignoring them.
+- Confirmed mutations reuse the host's existing private preference-refresh channel
+  and notify cached owners without replaying work or moving focus. Refresh updates
+  future options while preserving drafts, queued requests and execution ownership.
+  Foreground focus and new admission also reload canonical conversation choices.
+- Verification: `GATOR_TEST_BINARY=/tmp/gator-backend-20261113-work-effort-runtime bun run test:backend`
+  from `app-host` passed 25 tests / 599 assertions in 131.98s. Final focused native
+  verification after clarifying captured/runtime ceilings and adding private-data
+  guards passed all four effort journeys / 38 assertions in 8.10s. These exercise
+  manual/chat save, source changes, restart, future execution, a delegated change
+  to a busy cached parent and a pending plan's unchanged actual execution budget.
+- Full `go test ./internal/worksession ./internal/workapp ./internal/workrun ./cmd/gator`
+  passed (94.815s / 82.108s / 173.789s / 294.332s). Focused race checks passed all
+  four packages; final guarded-setting race checks passed session/application/
+  command (2.417s / 3.700s / 3.201s). Fixtures cover invalid/stale preferences,
+  source-field preservation, rejected private-data guards and unreadable settings
+  retaining drafts without admitting work or reporting success.
+- Host regression: 140 passed, one existing platform skip / 141 tests. The added
+  cached-owner test also checks refresh failure reporting, no event loop, no
+  task replay and retained focus/queue ownership. Backend contract plus all four
+  headless test files passed TypeScript checking.
+- Logs share `/tmp/gator-backend-20261113-work-effort-`: `repro.log`,
+  `native-initial.log`, `native-expanded.log`, `backend-verified.log`,
+  `native-final.log`, `go-full.log`, `race.log`, `guards-final.log`,
+  `host-full.log` and `types.log`. Providers/accounts are synthetic loopback
+  fixtures; native processes, store boundaries and restart are real. Physical
+  audio and live model/account behavior are not established by these tests.
+- No terminal layout/keyboard presentation or Swift UI work is included.
+- Workstreams 3 and 5 remain open for broader settings/permission/processing
+  integration, the public workflow inventory, other typed contracts and effective
+  runtime inspection. Workstreams 1, 2, 4, 6 and 7 retain all their remaining
+  criteria and final integrated journey; this preset workflow does not complete
+  the backend goal or the original fifteen-item product audit.
 
 ## Source setup before admission and the first proposal (13 November, backend only)
 
