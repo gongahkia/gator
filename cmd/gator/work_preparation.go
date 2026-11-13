@@ -13,6 +13,10 @@ import (
 // This runs before Work classification/model calls or constructing its service. It can
 // attest an unstarted preparation; failures after dispatch never use this path.
 func sourcePreparationFailure(stateDir, source, conversation, prompt string, options workapp.RunOptions) *workapp.RunResult {
+	return missingSourcePreparation(stateDir, source, conversation, prompt, options, false)
+}
+
+func missingSourcePreparation(stateDir, source, conversation, prompt string, options workapp.RunOptions, planning bool) *workapp.RunResult {
 	if options.RuntimeRequestID == "" || len(options.ConnectorIDs) == 0 {
 		return nil
 	}
@@ -44,7 +48,11 @@ func sourcePreparationFailure(stateDir, source, conversation, prompt string, opt
 		failure.Error = err.Error()
 		return &failure
 	}
-	boundary, err := store.PreparationBoundary(conversation, options.RuntimeRequestID, prompt, source, raw)
+	capture := store.PreparationBoundary
+	if planning {
+		capture = store.PlanningPreparationBoundary
+	}
+	boundary, err := capture(conversation, options.RuntimeRequestID, prompt, source, raw)
 	if err != nil {
 		failure.Error = fmt.Sprintf("could not verify original preparation: %v", err)
 		return &failure
@@ -65,6 +73,9 @@ func sourcePreparationFailure(stateDir, source, conversation, prompt string, opt
 		}
 	}
 	recovery := &worksession.RequestRecovery{Preparation: &boundary, Kind: "source_access", ScopeDigest: scope.ScopeDigest, ProcessingDigest: scope.ProcessingDigest, RetrySafe: true, Summary: "This attempt was rejected before Work execution because a selected source is no longer configured.", Repair: "Repair the original source or explicitly choose a replacement account. Review the exact scope and a fresh plan before starting the retained task."}
+	if planning {
+		recovery.Summary = "This task needs source setup before its first plan proposal. No planning model call or Work execution was started."
+	}
 	for _, id := range missing {
 		recovery.Needs = append(recovery.Needs, worksession.TaskAccessNeed{ConnectorID: id, Kind: "unconfigured", Operation: "configure"})
 	}

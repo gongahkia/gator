@@ -24,8 +24,13 @@ func captureConversationInput(input workapp.ConversationInput) (workapp.Conversa
 	return captureConversationSetup(input, false)
 }
 
-// The native preparation failure alone may capture missing source references.
-// Normal routing/execution continues to reject them.
+// Conversation admission can retain unavailable selections without granting
+// source access. The router has no tools; execution uses the strict capture.
+func captureConversationAdmission(input workapp.ConversationInput) (workapp.ConversationInput, error) {
+	return captureConversationSetup(input, true)
+}
+
+// Missing selections are bounded references, never fabricated descriptors.
 func captureConversationSetup(input workapp.ConversationInput, allowMissing bool) (workapp.ConversationInput, error) {
 	settings, err := loadSettings()
 	if err != nil {
@@ -100,7 +105,11 @@ func captureConversationSetup(input workapp.ConversationInput, allowMissing bool
 }
 
 func verifyConversationScope(input workapp.ConversationInput) error {
-	current, err := captureConversationInput(input)
+	return verifyConversationScopeFor(input, false)
+}
+
+func verifyConversationScopeFor(input workapp.ConversationInput, conversationOnly bool) error {
+	current, err := captureConversationSetup(input, conversationOnly)
 	if err != nil {
 		return err
 	}
@@ -133,7 +142,7 @@ func dialogueReferenceContext(input *workapp.ConversationInput) (string, error) 
 
 func routeInteractiveConversation(stateDir string) func(context.Context, workrun.ConversationRequest, workapp.ConversationInput) (workrun.ConversationDecision, error) {
 	return func(ctx context.Context, request workrun.ConversationRequest, input workapp.ConversationInput) (workrun.ConversationDecision, error) {
-		if err := verifyConversationScope(input); err != nil {
+		if err := verifyConversationScopeFor(input, true); err != nil {
 			return workrun.ConversationDecision{}, err
 		}
 		provider, model, err := resolveConfiguredProvider(input.RunOptions.ModelProvider, input.RunOptions.ModelName)

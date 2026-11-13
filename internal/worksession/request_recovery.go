@@ -135,7 +135,8 @@ func (s Store) PrepareFailedRequestAccessReview(id, request, parent, turnID, ins
 		p.Binding.SourceSHA256 = r.ExecutionBoundary.SourceSHA256
 		p.InputChanges = []PlanInputChange{{ParentID: parent, TurnID: turnID, BeforeOptions: original, AfterSHA256: optionsHash(gated), Promoted: true}}
 	} else {
-		if (!pending && (p.Phase != "finished" || p.Approval == nil)) || p.Revision >= ^uint64(0)-1 {
+		initialPreparation := unstarted && p.Phase == "interrupted" && p.Revision == 0 && p.Content == nil && p.Edit == nil && p.Approval == nil
+		if (!pending && !initialPreparation && (p.Phase != "finished" || p.Approval == nil)) || p.Revision >= ^uint64(0)-1 {
 			return j, Request{}, ErrPlanChanged
 		}
 		ref.BaseRevision, ref.BaseDigest = p.Revision, p.Digest

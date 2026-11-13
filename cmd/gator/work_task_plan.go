@@ -61,11 +61,20 @@ func proposeDesktopTaskPlan(ctx context.Context, stateDir string, r worksession.
 	if json.Unmarshal(r.Options, &options) != nil || !options.PlanFirst {
 		return worksession.PlanContent{}, errors.New("invalid plan preparation settings")
 	}
-	if err := verifyRecoveredRequestScope(r, options); err != nil {
-		return worksession.PlanContent{}, err
-	}
 	chat, err := store.Load(r.Plan.Binding.ConversationID)
 	if err != nil {
+		return worksession.PlanContent{}, err
+	}
+	if !revising {
+		options.RuntimeRequestID = r.ID
+		if failure := missingSourcePreparation(stateDir, chat.SourcePath, r.Plan.Binding.ConversationID, r.Text, options, true); failure != nil {
+			if failure.Recovery != nil {
+				return worksession.PlanContent{}, &worksession.PreparationError{Issue: failure.Error, Recovery: *failure.Recovery}
+			}
+			return worksession.PlanContent{}, errors.New(failure.Error)
+		}
+	}
+	if err := verifyRecoveredRequestScope(r, options); err != nil {
 		return worksession.PlanContent{}, err
 	}
 	dialogue, _, err := resolveDialogueExecution(stateDir, chat.SourcePath, r.Plan.Binding.ConversationID, r.Text, options)

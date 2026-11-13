@@ -87,6 +87,74 @@ func TestPreparationBoundaryRequiresTheOriginalRunningOwnerAndInputs(t *testing.
 	}
 }
 
+func TestPlanningPreparationEvidenceCannotAttestReviewedOrCancelledTasks(t *testing.T) {
+	s, id, r := planFixture(t)
+	c, _ := s.Load(id)
+	b, err := s.PlanningPreparationBoundary(id, r.ID, r.Text, c.SourcePath, r.Options)
+	if err != nil || b.RequestID != r.ID {
+		t.Fatal("new planning boundary unavailable", err)
+	}
+	if _, err := s.PreparationBoundary(id, r.ID, r.Text, c.SourcePath, r.Options); err == nil {
+		t.Fatal("unapproved planning attested as dispatched work")
+	}
+	for _, bad := range []json.RawMessage{json.RawMessage(`{"PlanFirst":true,"MaxSteps":99}`), nil} {
+		if _, err := s.PlanningPreparationBoundary(id, r.ID, r.Text, c.SourcePath, bad); err == nil {
+			t.Fatal("different options attested")
+		}
+	}
+	if _, err := s.ReviseTaskPlan(id, r.ID, 0, "", proposedPlan()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.PlanningPreparationBoundary(id, r.ID, r.Text, c.SourcePath, r.Options); err == nil {
+		t.Fatal("retained proposal used first-preparation evidence")
+	}
+	current := retainedPlan(t, s, id, r.ID)
+	if _, err := s.CancelTaskPlan(id, r.ID, current.Plan.Revision, current.Plan.Digest); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.PlanningPreparationBoundary(id, r.ID, r.Text, c.SourcePath, r.Options); err == nil {
+		t.Fatal("cancelled proposal attested")
+	}
+}
+
+func TestInitialSourceSetupRecoveryKeepsUnproposedPlanIdentity(t *testing.T) {
+	s, id, r := planFixture(t)
+	c, _ := s.Load(id)
+	b, err := s.PlanningPreparationBoundary(id, r.ID, r.Text, c.SourcePath, r.Options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.State = "failed"
+	r.Plan.Phase = "interrupted"
+	r.Recovery = &RequestRecovery{Preparation: &b, Kind: "source_access", RetrySafe: true, Needs: []TaskAccessNeed{{ConnectorID: "docs", Kind: "unconfigured", Operation: "configure"}}, ScopeDigest: strings.Repeat("a", 64), ProcessingDigest: strings.Repeat("b", 64), Summary: "Source missing before proposal", Repair: "Review repaired source"}
+	j, _ := s.LoadRequests(id)
+	j.Requests[0] = r
+	if _, err := s.SaveRequests(id, j); err != nil {
+		t.Fatal(err)
+	}
+	turn := editMessage(t, s, id, r.ID, "first-source-recovery-0001")
+	access := &PlanAccessChange{ConnectorIDs: []string{"replacement"}, BeforeScope: r.Recovery.ScopeDigest, AfterScope: strings.Repeat("c", 64), ProcessingDigest: r.Recovery.ProcessingDigest, ReviewID: strings.Repeat("d", 64)}
+	_, next, err := s.PrepareFailedRequestAccessReview(id, r.ID, id, turn.ID, turn.Text, access)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if next.ID != r.ID || next.Text != r.Text || next.Plan.Content != nil || next.Plan.Approval != nil || len(next.Plan.Attempts) != 0 || next.Plan.Edit.BaseRevision != 0 || next.Plan.Edit.BaseDigest != "" || next.Plan.Budget != r.Plan.Budget {
+		t.Fatal("setup invented prior work, review or allowance", next)
+	}
+	if s.CheckPlanDispatch(id, next) == nil {
+		t.Fatal("first source review started work")
+	}
+	content := proposedPlan()
+	content.Sources = []string{"replacement"}
+	if _, err := s.FinishTaskPlanEdit(id, r.ID, next.Plan.Revision, next.Plan.Digest, turn.ID, &content, ""); err != nil {
+		t.Fatal(err)
+	}
+	next = retainedPlan(t, s, id, r.ID)
+	if next.Plan.Content == nil || next.Plan.Approval != nil || next.Plan.Phase != "review" {
+		t.Fatal("first actual proposal not independently reviewable")
+	}
+}
+
 func savePreparationFailure(t *testing.T, s Store, id string, r Request, b PlanBinding) Request {
 	t.Helper()
 	r.State = "failed"

@@ -6,9 +6,28 @@ import (
 	"path/filepath"
 )
 
+// PreparationError carries a native setup outcome through an existing tool-free
+// planning callback. Provider/model prose never creates this error or evidence.
+type PreparationError struct {
+	Issue    string
+	Recovery RequestRecovery
+}
+
+func (e *PreparationError) Error() string { return e.Issue }
+
 // PreparationBoundary is captured by the native owner before any Work runner
 // starts. An absent bundle alone never establishes this fact.
 func (s Store) PreparationBoundary(id, request, text, source string, options json.RawMessage) (PlanBinding, error) {
+	return s.preparationBoundary(id, request, text, source, options, false)
+}
+
+// PlanningPreparationBoundary is restricted to a new, unproposed plan. It is
+// captured before model setup; no prior proposal or execution can use this path.
+func (s Store) PlanningPreparationBoundary(id, request, text, source string, options json.RawMessage) (PlanBinding, error) {
+	return s.preparationBoundary(id, request, text, source, options, true)
+}
+
+func (s Store) preparationBoundary(id, request, text, source string, options json.RawMessage, planning bool) (PlanBinding, error) {
 	j, err := s.LoadRequests(id)
 	if err != nil {
 		return PlanBinding{}, err
@@ -25,10 +44,19 @@ func (s Store) PreparationBoundary(id, request, text, source string, options jso
 		if r.ID != request {
 			continue
 		}
-		if r.State != "running" || r.Text != text || optionsHash(options) != optionsHash(r.Options) {
+		if r.Text != text || optionsHash(options) != optionsHash(r.Options) {
 			return PlanBinding{}, ErrPlanChanged
 		}
-		if r.Plan != nil {
+		if planning {
+			if r.State != "queued" || r.Plan == nil || r.Plan.Phase != "preparing" || r.Plan.Revision != 0 || r.Plan.Content != nil || r.Plan.Edit != nil || len(r.Plan.Attempts) > 0 || r.WorkID != "" || r.RevisionID != "" {
+				return PlanBinding{}, ErrPlanChanged
+			}
+			if err := s.CheckPlanBinding(id, r); err != nil {
+				return PlanBinding{}, err
+			}
+		} else if r.State != "running" {
+			return PlanBinding{}, ErrPlanChanged
+		} else if r.Plan != nil {
 			if err := s.CheckPlanDispatch(id, r); err != nil {
 				return PlanBinding{}, err
 			}

@@ -176,6 +176,10 @@ func (m Model) finishTaskPlan(value taskPlanPrepared) (tea.Model, tea.Cmd) {
 				r.Plan = r.Plan.Clone()
 				r.Plan.Phase = "interrupted"
 				r.Issue = "Plan preparation ended without a retained proposal. No implementation was started."
+				var setup *worksession.PreparationError
+				if !stopRequested && errors.As(value.Err, &setup) {
+					r.State, r.Recovery, r.Issue = "failed", &setup.Recovery, setup.Issue
+				}
 				r.UpdatedAt = time.Now().UTC()
 			}
 		}

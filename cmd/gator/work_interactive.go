@@ -179,7 +179,7 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 	defer localModels.Close()
 	connections := &connectionControls{stateDir: stateDir}
 	application := workapp.New(workapp.Config{
-		CaptureConversationInput: captureConversationInput,
+		CaptureConversationInput: captureConversationAdmission,
 		ReviewRequestAccess:      reviewRequestAccess,
 		RouteConversation:        routeInteractiveConversation(stateDir),
 		BindConversationTask: func(parent, turn, source string, revision uint64) (worksession.DialogueTurn, worksession.Conversation, bool, error) {
