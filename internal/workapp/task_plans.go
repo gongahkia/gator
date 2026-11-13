@@ -271,6 +271,12 @@ func (m Model) ApplyTaskPlan(action TaskPlanAction) (tea.Model, tea.Cmd) {
 		if json.Unmarshal(r.Options, &frozen) == nil {
 			added, removed := map[string]bool{}, map[string]bool{}
 			for _, change := range p.InputChanges {
+				if change.Access != nil {
+					var before RunOptions
+					if json.Unmarshal(change.BeforeOptions, &before) == nil {
+						m.planResult.Review.AccessChanges = append(m.planResult.Review.AccessChanges, TaskPlanAccessReview{Before: append([]string{}, before.ConnectorIDs...), After: append([]string{}, change.Access.ConnectorIDs...), Requirements: change.Access.Requirements, PriorPlan: change.Access.PriorPlan})
+					}
+				}
 				for _, id := range change.AddedUploads {
 					if slices.Contains(frozen.Uploads, id) && !added[id] {
 						m.planResult.Review.InputAdditions = append(m.planResult.Review.InputAdditions, uploadNames([]string{id})...)
@@ -381,7 +387,15 @@ type TaskPlanSummary struct {
 	At       time.Time              `json:"at"`
 	Issue    string                 `json:"issue,omitempty"`
 }
+type TaskPlanAccessReview struct {
+	Before       []string                          `json:"before"`
+	After        []string                          `json:"after"`
+	Requirements []worksession.TaskAccessSelection `json:"requirements,omitempty"`
+	PriorPlan    *worksession.PlanReviewSnapshot   `json:"prior_plan,omitempty"`
+}
+
 type TaskPlanReview struct {
+	AccessChanges  []TaskPlanAccessReview     `json:"access_changes,omitempty"`
 	ID             string                     `json:"id"`
 	Revision       uint64                     `json:"revision"`
 	Digest         string                     `json:"digest"`

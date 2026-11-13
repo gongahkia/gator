@@ -52,6 +52,14 @@ func proposeTaskPlan(ctx context.Context, model agent.Model, request worksession
 	meta := metadata{Task: request.Text, Sources: request.Plan.Sources, Budget: request.Plan.Budget}
 	if request.Plan.Edit != nil && request.Plan.Phase == "revising" {
 		meta.Previous, meta.Correction = request.Plan.Content, request.Plan.Edit.Instruction
+		if meta.Previous == nil {
+			for i := len(request.Plan.InputChanges) - 1; i >= 0; i-- {
+				if access := request.Plan.InputChanges[i].Access; access != nil && access.PriorPlan != nil {
+					meta.Previous = access.PriorPlan.Content
+					break
+				}
+			}
+		}
 		for _, earlier := range request.Plan.Edit.Prior {
 			meta.Prior = append(meta.Prior, earlier.Instruction)
 		}

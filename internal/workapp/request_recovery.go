@@ -12,12 +12,14 @@ import (
 )
 
 type RequestRecoveryView struct {
-	TaskID   string                      `json:"task_id"`
-	Token    string                      `json:"token"`
-	Text     string                      `json:"text"`
-	Provider string                      `json:"provider"`
-	Model    string                      `json:"model"`
-	Recovery worksession.RequestRecovery `json:"recovery"`
+	State     string                      `json:"state"`
+	PlanPhase string                      `json:"plan_phase,omitempty"`
+	TaskID    string                      `json:"task_id"`
+	Token     string                      `json:"token"`
+	Text      string                      `json:"text"`
+	Provider  string                      `json:"provider"`
+	Model     string                      `json:"model"`
+	Recovery  worksession.RequestRecovery `json:"recovery"`
 }
 type RequestRecoveryAction struct {
 	ConversationID string   `json:"conversation_id"`
@@ -43,14 +45,18 @@ func (m Model) requestRecoveryViews() []RequestRecoveryView {
 	result := []RequestRecoveryView{}
 	for i := len(m.requests.Requests) - 1; i >= 0 && len(result) < 16; i-- {
 		r := m.requests.Requests[i]
-		if r.State != "failed" || r.Recovery == nil {
+		if (r.State != "failed" && !r.CanReviewPendingAccess()) || r.Recovery == nil {
 			continue
 		}
 		var options RunOptions
 		if json.Unmarshal(r.Options, &options) != nil {
 			continue
 		}
-		result = append(result, RequestRecoveryView{TaskID: r.ID, Token: recoveryToken(m.conversation, r), Text: boundedConversation(r.Text, 1024), Provider: options.ModelProvider, Model: options.ModelName, Recovery: *r.Recovery})
+		phase := ""
+		if r.Plan != nil {
+			phase = r.Plan.Phase
+		}
+		result = append(result, RequestRecoveryView{State: r.State, PlanPhase: phase, TaskID: r.ID, Token: recoveryToken(m.conversation, r), Text: boundedConversation(r.Text, 1024), Provider: options.ModelProvider, Model: options.ModelName, Recovery: *r.Recovery})
 	}
 	return result
 }
@@ -89,7 +95,7 @@ func (m Model) ApplyRequestRecovery(action RequestRecoveryAction) (tea.Model, te
 			break
 		}
 	}
-	if original.ID == "" || original.State != "failed" || original.Recovery == nil || action.Token != recoveryToken(m.conversation, original) {
+	if original.ID == "" || (original.State != "failed" && !(accessAction && original.CanReviewPendingAccess())) || original.Recovery == nil || action.Token != recoveryToken(m.conversation, original) {
 		return fail(errors.New("the original recovery outcome changed; inspect its current task"))
 	}
 	var access *worksession.PlanAccessChange

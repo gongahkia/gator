@@ -122,6 +122,9 @@ func validatePlanInputChanges(r Request) error {
 		if err := change.Access.validate(); err != nil {
 			return err
 		}
+		if err := change.Access.validatePriorPlan(change.BeforeOptions); err != nil {
+			return err
+		}
 		if access := change.Access; access != nil {
 			if accessScope != "" && (access.BeforeScope != accessScope || access.ProcessingDigest != processingScope) {
 				return errors.New("reviewed account scope chain changed")

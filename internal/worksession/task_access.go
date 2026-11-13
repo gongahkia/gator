@@ -32,14 +32,28 @@ func ValidateTaskAccessNeeds(needs []TaskAccessNeed) error {
 
 // PlanAccessChange records an explicitly reviewed source/configuration change
 // while preserving earlier options and the original processing destination.
+type TaskAccessSelection struct {
+	Need        TaskAccessNeed `json:"need"`
+	ConnectorID string         `json:"connector_id"`
+}
+
+type PlanReviewSnapshot struct {
+	Revision uint64        `json:"revision"`
+	Digest   string        `json:"digest"`
+	Content  *PlanContent  `json:"content"`
+	Approval *PlanApproval `json:"approval,omitempty"`
+}
+
 type PlanAccessChange struct {
-	ConnectorIDs     []string          `json:"connector_ids"`
-	BeforeScope      string            `json:"before_scope"`
-	AfterScope       string            `json:"after_scope"`
-	ProcessingDigest string            `json:"processing_digest"`
-	ReviewID         string            `json:"review_id"`
-	OAuthPins        map[string]string `json:"oauth_pins,omitempty"`
-	CredentialPins   map[string]string `json:"credential_pins,omitempty"`
+	PriorPlan        *PlanReviewSnapshot   `json:"prior_plan,omitempty"`
+	Requirements     []TaskAccessSelection `json:"requirements,omitempty"`
+	ConnectorIDs     []string              `json:"connector_ids"`
+	BeforeScope      string                `json:"before_scope"`
+	AfterScope       string                `json:"after_scope"`
+	ProcessingDigest string                `json:"processing_digest"`
+	ReviewID         string                `json:"review_id"`
+	OAuthPins        map[string]string     `json:"oauth_pins,omitempty"`
+	CredentialPins   map[string]string     `json:"credential_pins,omitempty"`
 }
 
 func (a *PlanAccessChange) validate() error {
@@ -55,6 +69,19 @@ func (a *PlanAccessChange) validate() error {
 			return errors.New("invalid reviewed connection selection")
 		}
 		seen[id] = true
+	}
+	if len(a.Requirements) > 16 {
+		return errors.New("too many reviewed task access selections")
+	}
+	needs := []TaskAccessNeed{}
+	for _, selection := range a.Requirements {
+		if !seen[selection.ConnectorID] {
+			return errors.New("task requirement references an unselected account")
+		}
+		needs = append(needs, selection.Need)
+	}
+	if err := ValidateTaskAccessNeeds(needs); err != nil {
+		return err
 	}
 	for _, pins := range []map[string]string{a.OAuthPins, a.CredentialPins} {
 		for id, pin := range pins {
@@ -88,6 +115,34 @@ func (p *TaskPlan) LatestAccessChange() *PlanAccessChange {
 		if a := p.InputChanges[i].Access; a != nil {
 			return a
 		}
+	}
+	return nil
+}
+
+// SelectionFor is keyed by the retained requirement, not a title or array row.
+func (a *PlanAccessChange) SelectionFor(need TaskAccessNeed) (string, bool) {
+	if a == nil {
+		return "", false
+	}
+	for _, selection := range a.Requirements {
+		if selection.Need == need {
+			return selection.ConnectorID, true
+		}
+	}
+	return "", false
+}
+
+func (a *PlanAccessChange) validatePriorPlan(before json.RawMessage) error {
+	if a == nil || a.PriorPlan == nil {
+		return nil
+	}
+	prior := a.PriorPlan
+	var options struct{ ConnectorIDs []string }
+	if json.Unmarshal(before, &options) != nil || prior.Revision == 0 || !planDigest(prior.Digest) || prior.Content == nil || !validPlanContent(*prior.Content, options.ConnectorIDs) {
+		return errors.New("invalid retained account-review proposal")
+	}
+	if prior.Approval != nil && (prior.Approval.Revision != prior.Revision || prior.Approval.Digest != prior.Digest || prior.Approval.At.IsZero()) {
+		return errors.New("invalid historical plan approval")
 	}
 	return nil
 }

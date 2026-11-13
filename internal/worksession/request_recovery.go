@@ -43,6 +43,18 @@ func validateRequestRecovery(value *RequestRecovery) error {
 	return nil
 }
 
+// CanReviewPendingAccess permits only an idle, undispatched recovery with
+// retained execution accounting. Cancellation never grants another retry.
+func (r Request) CanReviewPendingAccess() bool {
+	if r.Recovery == nil || !r.Recovery.RetrySafe || len(r.Recovery.Needs) == 0 || r.Plan == nil || len(r.Plan.Attempts) == 0 || r.Plan.LatestAccessChange() == nil || r.Plan.DrainingRun != "" {
+		return false
+	}
+	if r.State == "queued" {
+		return r.Plan.Phase == "review" || r.Plan.Phase == "approved"
+	}
+	return r.State == "interrupted" && r.Plan.Phase == "interrupted" && r.Plan.Edit != nil && r.Plan.Edit.State == "failed"
+}
+
 // PrepareFailedRequestReview keeps the logical request while accounting its
 // failed read-only attempt. It cannot replay work; only tool-free planning follows.
 func (s Store) PrepareFailedRequestReview(id, request, parent, turnID, instruction string) (RequestJournal, Request, error) {
@@ -64,7 +76,8 @@ func (s Store) PrepareFailedRequestAccessReview(id, request, parent, turnID, ins
 		return j, Request{}, ErrPlanChanged
 	}
 	r := &j.Requests[index]
-	if r.State != "failed" || r.Recovery == nil || !r.Recovery.RetrySafe || r.Plan == nil && r.ExecutionBoundary == nil || validID(r.WorkID) != nil || validID(r.RevisionID) != nil {
+	pending := access != nil && r.CanReviewPendingAccess()
+	if (r.State != "failed" && !pending) || r.Recovery == nil || !r.Recovery.RetrySafe || r.Plan == nil && r.ExecutionBoundary == nil || validID(r.WorkID) != nil || validID(r.RevisionID) != nil {
 		return j, Request{}, errors.New("inspect the original outcome before preparing a retry")
 	}
 	if access != nil {
@@ -73,6 +86,11 @@ func (s Store) PrepareFailedRequestAccessReview(id, request, parent, turnID, ins
 		}
 		if len(r.Recovery.Needs) == 0 || access.BeforeScope != r.Recovery.ScopeDigest || access.ProcessingDigest != r.Recovery.ProcessingDigest {
 			return j, Request{}, errors.New("task access review differs from the original recovery scope")
+		}
+	}
+	if pending {
+		if err := s.CheckPlanBinding(id, *r); err != nil {
+			return j, Request{}, err
 		}
 	}
 	c, err := s.Load(id)
@@ -105,7 +123,7 @@ func (s Store) PrepareFailedRequestAccessReview(id, request, parent, turnID, ins
 		p.Binding.SourceSHA256 = r.ExecutionBoundary.SourceSHA256
 		p.InputChanges = []PlanInputChange{{ParentID: parent, TurnID: turnID, BeforeOptions: original, AfterSHA256: optionsHash(gated), Promoted: true}}
 	} else {
-		if p.Phase != "finished" || p.Approval == nil || p.Revision >= ^uint64(0)-1 {
+		if (!pending && (p.Phase != "finished" || p.Approval == nil)) || p.Revision >= ^uint64(0)-1 {
 			return j, Request{}, ErrPlanChanged
 		}
 		ref.BaseRevision, ref.BaseDigest = p.Revision, p.Digest
@@ -116,6 +134,11 @@ func (s Store) PrepareFailedRequestAccessReview(id, request, parent, turnID, ins
 			ref.Prior = append(ref.Prior, previous.Prior...)
 			ref.Prior = append(ref.Prior, PlanCorrection{previous.ParentID, previous.TurnID, previous.Instruction})
 		}
+	}
+	if access != nil && p.Content != nil {
+		copied := *access
+		copied.PriorPlan = &PlanReviewSnapshot{Revision: p.Revision, Digest: p.Digest, Content: p.Content, Approval: p.Approval}
+		access = &copied
 	}
 	if access != nil {
 		before := append(json.RawMessage(nil), r.Options...)
@@ -135,21 +158,28 @@ func (s Store) PrepareFailedRequestAccessReview(id, request, parent, turnID, ins
 		}
 		r.Options = after
 		p.Sources = append([]string{}, access.ConnectorIDs...)
+		if p.Content != nil && !validPlanContent(*p.Content, p.Sources) {
+			p.Content = nil
+		}
 		p.Binding.OptionsSHA256 = optionsHash(after)
 		recovery := *r.Recovery
 		recovery.ScopeDigest = access.AfterScope
 		r.Recovery = &recovery
 	}
-	if len(p.Attempts) >= 32 || !validCorrectionHistory(ref.Prior, PlanCorrection{parent, turnID, instruction}) {
+	if !pending && len(p.Attempts) >= 32 || !validCorrectionHistory(ref.Prior, PlanCorrection{parent, turnID, instruction}) {
 		return j, Request{}, errors.New("retained attempt or correction history is full")
 	}
 	p.Revision++
 	p.Phase, p.Approval = "revising", nil
-	p.DrainingRun = r.WorkID
 	p.Edit = &PlanEdit{PlanEditReference: ref, State: "preparing"}
-	p, err = s.accountDrainedPlanRun(id, *r, p, r.WorkID, r.RevisionID)
-	if err != nil {
-		return j, Request{}, err
+	if pending {
+		p.Digest = p.contentDigest()
+	} else {
+		p.DrainingRun = r.WorkID
+		p, err = s.accountDrainedPlanRun(id, *r, p, r.WorkID, r.RevisionID)
+		if err != nil {
+			return j, Request{}, err
+		}
 	}
 	if err := s.checkPlanAttemptEffects(p); err != nil {
 		return j, Request{}, err

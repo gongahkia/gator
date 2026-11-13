@@ -72,6 +72,16 @@ for(const scenario of ["missing","permission"] as const)test(`delegated ${scenar
   const request_id="review-delegated-access",frame={conversation_id:owner,task_id:task.task_id,token:task.token,connections:["reports"]}
   const review=(await client.result({type:"request_recovery",request_recovery:{...frame,action:"review_access",request_id}},request_id,s=>s.request_recovery_result)).access_review!;expect(review.ready).toBe(true)
   await client.edit("Keep child draft");const prepare="prepare-delegated-access";await client.result({type:"request_recovery",request_recovery:{...frame,action:"prepare_access",access_token:review.token,request_id:prepare}},prepare,s=>s.request_recovery_result);await until(()=>client.state?.task_plans?.[0]?.phase==="review"&&!client.state?.running,"revised delegated task")
+  if(scenario==="missing"){
+   const previous=client.state!.task_plans![0]!,before=JSON.parse(await readFile(path,"utf8")).requests[0]
+   cli("provider","connector","permission","reports","fetch","read","allow")
+   const stale="stale-delegated-scope";await expect(client.result({type:"task_plan",task_plan:{conversation_id:owner,task_id:previous.id,revision:previous.revision,digest:previous.digest,action:"approve",request_id:stale}},stale,s=>s.task_plan_result)).rejects.toThrow("scope changed");expect(reads).toBe(0)
+   const current=client.state!.request_recoveries!.find(r=>r.task_id===task.task_id)!,reviewID="rereview-delegated-scope",next={conversation_id:owner,task_id:task.task_id,token:current.token}
+   const updated=(await client.result({type:"request_recovery",request_recovery:{...next,action:"review_access",request_id:reviewID}},reviewID,s=>s.request_recovery_result)).access_review!;expect(updated.requirements[0]!.selected).toBe("reports")
+   const prepareID="prepare-delegated-scope";await client.result({type:"request_recovery",request_recovery:{...next,action:"prepare_access",connections:["reports"],access_token:updated.token,request_id:prepareID}},prepareID,s=>s.request_recovery_result)
+   await until(()=>client.state?.task_plans?.[0]?.phase==="review"&&!client.state?.running&&client.state.task_plans[0].revision>previous.revision,"delegated scope refreshed")
+   expect(JSON.parse(await readFile(path,"utf8")).requests[0].plan.attempts).toEqual(before.plan.attempts)
+  }
   resumed=true;const plan=client.state!.task_plans![0]!;await client.send({type:"task_plan",task_plan:{conversation_id:owner,task_id:plan.id,revision:plan.revision,digest:plan.digest,action:"approve",request_id:"approve-delegated-access"}});await until(()=>reads===1&&!client.state?.running,"delegated read executes under new reviewed scope")
   const completed=JSON.parse(await readFile(path,"utf8")).requests[0];expect(completed.state).toBe("completed");expect(completed.id).toBe(original.id);expect(client.draft.text).toBe("Keep child draft");await client.openSession(parent);expect(client.draft.text).toBe("Preserve parent draft");expect(client.draft.plan_first).toBe(true);expect(client.state?.running).toBe(true);expect(parentCalls).toBe(1)
  }finally{release();await client.close();server.stop(true);await rm(root,{recursive:true,force:true})}

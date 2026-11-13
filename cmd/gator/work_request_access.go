@@ -36,8 +36,14 @@ func reviewRequestAccess(r worksession.Request, selected []string) (workapp.Requ
 		return review, err
 	}
 	ids := append([]string{}, options.ConnectorIDs...)
+	replaced := map[string]bool{}
+	chosen := []string{}
 	for index, need := range r.Recovery.Needs {
 		id := need.ConnectorID
+		if previous, ok := r.Plan.LatestAccessChange().SelectionFor(need); ok {
+			id = previous
+		}
+		priorID := id
 		if len(selected) > 0 {
 			id = selected[index]
 		}
@@ -92,13 +98,21 @@ func reviewRequestAccess(r worksession.Request, selected []string) (workapp.Requ
 		if !available {
 			review.Ready = false
 		}
-		if available && need.ConnectorID != "" && need.ConnectorID != id {
-			ids = slices.DeleteFunc(ids, func(value string) bool { return value == need.ConnectorID })
+		if available && priorID != "" && priorID != id {
+			replaced[priorID] = true
 		}
-		if available && !slices.Contains(ids, id) {
-			ids = append(ids, id)
+		if available && !slices.Contains(chosen, id) {
+			chosen = append(chosen, id)
 		}
 		review.Requirements = append(review.Requirements, row)
+	}
+	// Assemble the union after every requirement is known. A replacement must
+	// not remove an account that another requirement explicitly keeps.
+	ids = slices.DeleteFunc(ids, func(id string) bool { return replaced[id] && !slices.Contains(chosen, id) })
+	for _, id := range chosen {
+		if !slices.Contains(ids, id) {
+			ids = append(ids, id)
+		}
 	}
 	if len(ids) > 16 {
 		return review, errors.New("the original task and selected accounts exceed the connection limit")
@@ -134,8 +148,13 @@ func reviewRequestAccess(r worksession.Request, selected []string) (workapp.Requ
 		}
 		review.Summary += "\n" + d.Name + " (" + d.ID + "): " + strings.Join(operations, ", ")
 	}
-	identity, _ := json.Marshal([]any{r.ID, r.State, r.WorkID, r.RevisionID, r.Options, r.Recovery, review, captured.ScopeDigest, captured.OAuthRefreshPins, captured.CredentialPins})
+	identity, _ := json.Marshal([]any{r, review, captured.ScopeDigest, captured.OAuthRefreshPins, captured.CredentialPins})
 	review.Token = fmt.Sprintf("%x", sha256.Sum256(identity))
 	review.Change = &worksession.PlanAccessChange{ConnectorIDs: ids, BeforeScope: r.Recovery.ScopeDigest, AfterScope: captured.ScopeDigest, ProcessingDigest: captured.ProcessingDigest, ReviewID: review.Token, OAuthPins: captured.OAuthRefreshPins, CredentialPins: captured.CredentialPins}
+	for _, row := range review.Requirements {
+		if row.Selected != "" {
+			review.Change.Requirements = append(review.Change.Requirements, worksession.TaskAccessSelection{Need: row.Need, ConnectorID: row.Selected})
+		}
+	}
 	return review, nil
 }
