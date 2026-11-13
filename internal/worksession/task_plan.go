@@ -27,8 +27,9 @@ type TaskPlan struct {
 	Edit     *PlanEdit     `json:"edit,omitempty"`
 	// DrainingRun fences a reviewed execution before its tool-free replan.
 	// The owner must retain that run's result and measured budget before review.
-	DrainingRun string        `json:"draining_run,omitempty"`
-	Attempts    []PlanAttempt `json:"attempts,omitempty"`
+	DrainingRun  string            `json:"draining_run,omitempty"`
+	Attempts     []PlanAttempt     `json:"attempts,omitempty"`
+	InputChanges []PlanInputChange `json:"input_changes,omitempty"`
 }
 type PlanBinding struct {
 	UpdatedAt      time.Time `json:"conversation_updated_at"`
@@ -131,16 +132,17 @@ func (p TaskPlan) contentDigest() string {
 		edit = &ref
 	}
 	data, _ := json.Marshal(struct {
-		Version     int
-		Revision    uint64
-		Binding     PlanBinding
-		Sources     []string
-		Budget      PlanBudget
-		Content     *PlanContent
-		Edit        *PlanEditReference `json:",omitempty"`
-		DrainingRun string             `json:",omitempty"`
-		Attempts    []PlanAttempt      `json:",omitempty"`
-	}{p.Version, p.Revision, p.Binding, p.Sources, p.Budget, p.Content, edit, p.DrainingRun, p.Attempts})
+		Version      int
+		Revision     uint64
+		Binding      PlanBinding
+		Sources      []string
+		Budget       PlanBudget
+		Content      *PlanContent
+		Edit         *PlanEditReference `json:",omitempty"`
+		DrainingRun  string             `json:",omitempty"`
+		Attempts     []PlanAttempt      `json:",omitempty"`
+		InputChanges []PlanInputChange  `json:",omitempty"`
+	}{p.Version, p.Revision, p.Binding, p.Sources, p.Budget, p.Content, edit, p.DrainingRun, p.Attempts, p.InputChanges})
 	return planHash(data)
 }
 func validateTaskPlan(r Request) error {
@@ -149,6 +151,9 @@ func validateTaskPlan(r Request) error {
 		return nil
 	}
 	if err := validatePlanAttempts(p.Attempts); err != nil {
+		return err
+	}
+	if err := validatePlanInputChanges(r); err != nil {
 		return err
 	}
 	if p.Version != 1 || !catalogIdentity.MatchString(p.Binding.ConversationID) || p.Binding.UpdatedAt.IsZero() || p.Binding.RequestID != r.ID || p.Binding.OptionsSHA256 != optionsHash(r.Options) || p.Binding.PromptSHA256 != planHash([]byte(r.Text)) || (len(p.Binding.SourceSHA256) != 64 || strings.Trim(p.Binding.SourceSHA256, "0123456789abcdef") != "") || len(p.Sources) > 16 || p.Budget.MaxSteps < 0 || p.Budget.MaxSteps > 100000 || p.Budget.CodeMaxSteps < 0 || p.Budget.CodeMaxSteps > 100000 {
@@ -218,7 +223,7 @@ func (s Store) AdmitPlanRequest(id, text string, options json.RawMessage, client
 	}
 	for _, r := range j.Requests {
 		if clientID != "" && r.ClientID == clientID {
-			if r.Plan == nil || r.Text != strings.TrimSpace(text) || optionsHash(r.Options) != optionsHash(options) || !slices.Equal(r.Plan.Sources, sources) || r.Plan.Budget != budget {
+			if r.Plan == nil || r.Text != strings.TrimSpace(text) || optionsHash(r.OriginalAdmissionOptions()) != optionsHash(options) || !slices.Equal(r.Plan.Sources, sources) || r.Plan.Budget != budget {
 				return j, Request{}, ErrPlanChanged
 			}
 			return j, r, nil

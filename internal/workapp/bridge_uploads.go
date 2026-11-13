@@ -73,7 +73,7 @@ func (m Model) SubmitBridgeUploads(request BridgeUploadSubmission) (tea.Model, t
 			continue
 		}
 		var options RunOptions
-		if json.Unmarshal(retained.Options, &options) != nil || retained.Text != text || options.ReplyToUpdateID != request.ReplyToUpdateID || options.PlanFirst != request.PlanFirst || !slices.Equal(options.Uploads, request.Files) {
+		if json.Unmarshal(retained.OriginalAdmissionOptions(), &options) != nil || retained.Text != text || options.ReplyToUpdateID != request.ReplyToUpdateID || options.PlanFirst != request.PlanFirst || !slices.Equal(options.Uploads, request.Files) {
 			return fail("This message identity was already used. Review the retained request before sending a different message.")
 		}
 		return m, nil

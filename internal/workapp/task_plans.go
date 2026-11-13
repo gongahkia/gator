@@ -249,9 +249,13 @@ func (m Model) ApplyTaskPlan(action TaskPlanAction) (tea.Model, tea.Cmd) {
 		if p.Edit != nil {
 			m.planResult.Review.Correction, m.planResult.Review.EditState = p.Edit.Instruction, p.Edit.State
 		}
+		for _, change := range p.InputChanges {
+			m.planResult.Review.InputAdditions = append(m.planResult.Review.InputAdditions, uploadNames(change.AddedUploads)...)
+			m.planResult.Review.InputAdditions = append(m.planResult.Review.InputAdditions, change.AddedAttachments...)
+		}
 		var frozen RunOptions
 		if json.Unmarshal(r.Options, &frozen) == nil {
-			m.planResult.Review.InputNames = uploadNames(frozen.Uploads)
+			m.planResult.Review.InputNames = append(uploadNames(frozen.Uploads), frozen.Attachments...)
 		}
 		return m, nil
 	case "edit":
@@ -341,6 +345,7 @@ type TaskPlanReview struct {
 	Sources        []string                  `json:"sources"`
 	Content        *worksession.PlanContent  `json:"content,omitempty"`
 	InputNames     []string                  `json:"input_names,omitempty"`
+	InputAdditions []string                  `json:"input_additions,omitempty"`
 	Issue          string                    `json:"issue,omitempty"`
 	Correction     string                    `json:"correction,omitempty"`
 	EditState      string                    `json:"edit_state,omitempty"`

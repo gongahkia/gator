@@ -154,7 +154,19 @@ func resolveDialogueExecution(stateDir, source, conversation, text string, optio
 		return nil, goal.Record{}, err
 	}
 	if string(a) != string(b) {
-		return nil, goal.Record{}, errors.New("independent task execution settings changed")
+		journal, err := store.LoadRequests(conversation)
+		if err != nil {
+			return nil, goal.Record{}, err
+		}
+		matched := false
+		for _, retained := range journal.Requests {
+			if retained.ClientID == origin.TurnID && retained.Text == text && worksession.MatchesPlanInputEvolution(retained, a, b) {
+				matched = true
+			}
+		}
+		if !matched {
+			return nil, goal.Record{}, errors.New("independent task execution settings changed")
+		}
 	}
 	if err := verifyConversationScope(input); err != nil {
 		return nil, goal.Record{}, err

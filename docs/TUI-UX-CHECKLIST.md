@@ -31,7 +31,7 @@ outside this goal. Preserve the CLI/TUI as a client; no Swift UI is being built.
 
 | Backend workstream | Original findings | Current evidence and remaining acceptance |
 |---|---|---|
-| Conversational control | 1, 8, 12 | Initial preparation corrections exist. Pending external-action correction now has controlled Go/service and local-client evidence: same operation, exact old review withdrawn, fresh approval required; delegated control is verified with concurrent original work and parent-draft continuity. Repeated in-flight plan corrections have local and delegated controlled-provider evidence, including concurrent owners, provider failure and process-crash/restart without replay. Plan-bound pause/replan/review has local and delegated controlled journeys with retained evidence and remaining-budget enforcement; original uncertain effects block replacement approval across restart. Broader lifecycle/account/coding paths remain. Reviewed input changes, delegated/race/failure/restart coverage remain. |
+| Conversational control | 1, 8, 12 | Initial preparation corrections exist. Pending external-action correction now has controlled Go/service and local-client evidence: same operation, exact old review withdrawn, fresh approval required; delegated control is verified with concurrent original work and parent-draft continuity. Repeated in-flight plan corrections have local and delegated controlled-provider evidence, including concurrent owners, provider failure and process-crash/restart without replay. Plan-bound pause/replan/review has local and delegated controlled journeys with retained evidence and remaining-budget enforcement; original uncertain effects block replacement approval across restart. Broader lifecycle/account/coding paths remain. Reviewed input additions on existing plan tasks have local/delegated provider and retry evidence. Input removals/non-plan transitions and broader race/failure/restart coverage remain. |
 | Request-specific setup/recovery | 4, 12 | Existing provider setup/admission safeguards remain. Account/source/permission handoffs and provider rejection after admission need end-to-end verification and demonstrated gaps resolved; preserve request inputs and reject uncertain-effect replay. |
 | Authoritative settings/scope | 5, 8 | Existing canonical terminal/model settings remain. Inventory broader account/source/permission/processing/budget contracts, saved outcomes, cached-owner propagation, restart and current/future/background effects; reject changed identities and unauthorized expansion. |
 | Structured connected-item actions | 6, 8 | Existing local files/evidence/receipts retained. Complete supported provider item references and inspect/open/edit/reply/done paths with version/account/permission review and uncertain outcomes. |
@@ -67,6 +67,40 @@ Preserve both phases across continuations and do not declare the expanded work
 finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
+
+- Reviewed input additions on original plan tasks (13 November): a correction
+  carrying uploads or selected source files can now retain those additions in
+  the same plan task. The canonical store preserves each original option
+  envelope, records only appended file references, binds the full evolution into
+  the review digest, and changes no other captured options. Invalid/path-escaping
+  references, duplicate case-folded option aliases, history tampering and combined
+  attachment overflow are rejected. The owner validates the combined selection;
+  old running work remains fenced until drain/accounting and fresh exact review.
+  Delegated execution accepts only the validated canonical input evolution from
+  its original immutable admission; original account/scope pin checks still run.
+  Review exposes selected files and explicit additions requiring approval. The
+  original transport identity acknowledges its original payload after evolution;
+  reusing it with changed files fails instead of creating or executing work.
+  Native controlled-provider/process evidence:
+  `/tmp/gator-backend-20261113-input-scope-final-client.log` passes **5 tests,
+  114 assertions**, observed exit 0. Local/delegated journeys verify the old run
+  sees only its original file, the fresh-reviewed replacement receives both
+  versions, original options remain inspectable, additions appear in exact
+  review, stale approval is rejected, original admission repeats safely, changed
+  repeats fail, reduced budgets persist, and draft/restart avoids replay. The gate
+  includes pending-action correction and uncertain-effect restart regression.
+  Runtime build and TypeScript checks pass. Canonical scope and alias/bounds
+  tests pass with the race detector in
+  `/tmp/gator-backend-20261113-input-scope-race-final.log`; admission regressions
+  pass in `/tmp/gator-backend-20261113-input-scope-admission.log`.
+  Full session/app/run/CLI regression passes with exit 0 (86.052 / 83.326 /
+  160.451 / 233.760 seconds) in
+  `/tmp/gator-backend-20261113-input-scope-go-full.log`; that full run preceded
+  the final original-admission retry and general option-alias guards covered by
+  focused gates above. Input removal/replacement selection and conversion of
+  non-plan tasks to a reviewed input transition remain open, alongside broader
+  account/permission/provider-failure and integrated journeys. This is controlled
+  loopback and process evidence, not physical/live verification.
 
 - Running-plan delegated ownership and uncertain-effect recovery (13 November):
   controlled Go/host/client journeys now cover a corrected background execution

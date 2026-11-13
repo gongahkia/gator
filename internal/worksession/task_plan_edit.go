@@ -160,13 +160,39 @@ func (s Store) beginTaskPlanEdit(id, request string, revision uint64, digest, pa
 	if !validCorrectionHistory(ref.Prior, PlanCorrection{parent, turnID, instruction}) {
 		return j, Request{}, false, errors.New("correction history is full; inspect the retained instructions before continuing")
 	}
-	if turn, err := s.planEditMessage(id, *r, ref); err != nil || turn.State != "editing_plan" {
+	turn, err := s.planEditMessage(id, *r, ref)
+	if err != nil || turn.State != "editing_plan" {
 		if err == nil {
 			err = ErrPlanChanged
 		}
 		return j, Request{}, false, err
 	}
 	p := r.Plan.Clone()
+	var input struct {
+		RunOptions struct {
+			Uploads         []string
+			Attachments     []string
+			ReplyToUpdateID string
+		} `json:"run_options"`
+	}
+	if json.Unmarshal(turn.Options, &input) != nil {
+		return j, Request{}, false, ErrPlanChanged
+	}
+	if input.RunOptions.ReplyToUpdateID != "" {
+		return j, Request{}, false, errors.New("an update reply needs its own scoped task; no existing task inputs were changed")
+	}
+	after, uploads, attachments, err := mergePlanInputs(r.Options, input.RunOptions.Uploads, input.RunOptions.Attachments)
+	if err != nil {
+		return j, Request{}, false, err
+	}
+	if len(uploads)+len(attachments) > 0 {
+		if len(p.InputChanges) >= 32 {
+			return j, Request{}, false, errors.New("input scope history is full; inspect the retained changes")
+		}
+		p.InputChanges = append(p.InputChanges, PlanInputChange{ParentID: parent, TurnID: turnID, BeforeOptions: append(json.RawMessage(nil), r.Options...), AddedUploads: uploads, AddedAttachments: attachments, AfterSHA256: optionsHash(after)})
+		r.Options = after
+		p.Binding.OptionsSHA256 = optionsHash(after)
+	}
 	p.Revision++
 	p.Phase, p.Approval = "revising", nil
 	p.Edit = &PlanEdit{PlanEditReference: ref, State: "preparing"}

@@ -2,6 +2,7 @@ package workapp
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"time"
@@ -65,6 +66,35 @@ func (m Model) startTaskPlanRevision(id, controlID, parent, turnID, instruction 
 	if !ok || !task.CanRevisePlan || task.ControlID == "" || task.ControlID != controlID && (controlID == "" || task.PreparationControlID != controlID) {
 		closeLease()
 		return m, nil, worksession.ErrPlanChanged
+	}
+	correction, err := m.config.SessionStore.ReadDialogue(parent, turnID)
+	if err != nil {
+		closeLease()
+		return m, nil, err
+	}
+	var input ConversationInput
+	if json.Unmarshal(correction.Options, &input) != nil {
+		closeLease()
+		return m, nil, errors.New("the correction's captured inputs are unavailable")
+	}
+	if len(input.RunOptions.Uploads)+len(input.RunOptions.Attachments) > 0 {
+		if input.Source != m.source {
+			closeLease()
+			return m, nil, errors.New("the correction belongs to a different workspace")
+		}
+		var frozen RunOptions
+		if json.Unmarshal(original.Options, &frozen) != nil {
+			closeLease()
+			return m, nil, errors.New("original task input scope is unavailable")
+		}
+		frozen.Uploads = append(frozen.Uploads, input.RunOptions.Uploads...)
+		frozen.Attachments = append(frozen.Attachments, input.RunOptions.Attachments...)
+		frozen.Uploads = uniquePlanInputs(frozen.Uploads)
+		frozen.Attachments = uniquePlanInputs(frozen.Attachments)
+		if err := m.validateDialogueInputs(ConversationInput{Source: m.source, RunOptions: frozen}); err != nil {
+			closeLease()
+			return m, nil, err
+		}
 	}
 	var request worksession.Request
 	var claimed bool
@@ -257,4 +287,16 @@ func (m *Model) refreshPlanEditMessages() {
 			m.rememberDialogue(fresh)
 		}
 	}
+}
+
+func uniquePlanInputs(values []string) []string {
+	result := []string{}
+	seen := map[string]bool{}
+	for _, value := range values {
+		if !seen[value] {
+			seen[value] = true
+			result = append(result, value)
+		}
+	}
+	return result
 }
