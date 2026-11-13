@@ -95,7 +95,10 @@ export function validateFrame(frame) {
   }
   if(frame.type==="task_plan") {
     const v=frame.task_plan;
-    if(!v || typeof v!=="object" || Array.isArray(v) || Object.keys(v).some(key=>!["conversation_id","task_id","revision","digest","action","request_id","content"].includes(key)) || typeof v.conversation_id!=="string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/.test(v.conversation_id) || typeof v.task_id!=="string" || !/^[a-f0-9]{32}$/.test(v.task_id) || !Number.isSafeInteger(v.revision) || v.revision<0 || typeof v.digest!=="string" || (v.revision===0?v.digest!=="":!/^[a-f0-9]{64}$/.test(v.digest)) || !["inspect","edit","approve","start","cancel"].includes(v.action) || typeof v.request_id!=="string" || !/^[a-zA-Z0-9-]{1,64}$/.test(v.request_id)) throw new Error("Invalid task plan action");
+    if(!v || typeof v!=="object" || Array.isArray(v) || Object.keys(v).some(key=>!["conversation_id","task_id","revision","digest","action","request_id","content","inputs"].includes(key)) || typeof v.conversation_id!=="string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/.test(v.conversation_id) || typeof v.task_id!=="string" || !/^[a-f0-9]{32}$/.test(v.task_id) || !Number.isSafeInteger(v.revision) || v.revision<0 || typeof v.digest!=="string" || (v.revision===0?v.digest!=="":!/^[a-f0-9]{64}$/.test(v.digest)) || !["inspect","edit","remove_inputs","approve","start","cancel"].includes(v.action) || typeof v.request_id!=="string" || !/^[a-zA-Z0-9-]{1,64}$/.test(v.request_id)) throw new Error("Invalid task plan action");
+    if(v.action==="remove_inputs") {
+      if(!Array.isArray(v.inputs)||v.inputs.length<1||v.inputs.length>12||v.inputs.some(input=>!input||typeof input!=="object"||Array.isArray(input)||Object.keys(input).some(key=>!["kind","id"].includes(key))||!["upload","source"].includes(input.kind)||typeof input.id!=="string"||!input.id||input.id.length>4096||input.id.includes("\0"))) throw new Error("Invalid plan input selection");
+    } else if(v.inputs!==undefined) throw new Error("Only input removal can select inputs");
     if(v.action==="edit") {
       const c=v.content;
       const text=(value,max)=>typeof value==="string"&&value.trim()&&Buffer.byteLength(value)<=max&&!value.includes("\0");

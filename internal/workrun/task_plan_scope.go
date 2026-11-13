@@ -24,6 +24,33 @@ type TaskPlanReference struct {
 	Digest    string
 }
 
+// Input withdrawal keeps public conversational outcomes available but does not
+// retransmit old attachment bytes, extracted tool bodies or provider handles.
+// Originals and exact tool evidence remain inspectable in their saved revisions.
+func scopedPlanReplay(messages []agent.Message, plan *worksession.TaskPlan) []agent.Message {
+	if plan == nil {
+		return messages
+	}
+	withdrawn := false
+	for _, change := range plan.InputChanges {
+		withdrawn = withdrawn || len(change.RemovedUploads)+len(change.RemovedAttachments) > 0
+	}
+	if !withdrawn {
+		return messages
+	}
+	result := []agent.Message{}
+	for _, message := range messages {
+		if (message.Role != agent.RoleUser && message.Role != agent.RoleAgent) || len(message.ToolCalls) > 0 {
+			continue
+		}
+		message.Images = nil
+		message.Attachments = nil
+		message.ProviderData = nil
+		result = append(result, message)
+	}
+	return result
+}
+
 func loadReviewedTaskPlan(request Request) (*worksession.TaskPlan, error) {
 	if request.TaskPlan == nil {
 		return nil, nil

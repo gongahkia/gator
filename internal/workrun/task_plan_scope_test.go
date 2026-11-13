@@ -158,3 +158,18 @@ func TestTaskPlanControlRejectsSteeringButPreservesStop(t *testing.T) {
 		t.Fatal("stop was only cosmetic")
 	}
 }
+
+func TestInputWithdrawalScopesReplayWithoutDiscardingSavedPublicResults(t *testing.T) {
+	messages := []agent.Message{{Role: agent.RoleUser, Content: "Compare the files", Attachments: []agent.Attachment{{Name: "old.txt", Data: []byte("private original bytes")}}, ProviderData: json.RawMessage(`{"old":"provider-handle"}`)}, {Role: agent.RoleAgent, ToolCalls: []agent.ToolCall{{ID: "extract-old", Name: "read_file"}}}, {Role: agent.RoleTool, Content: "private extracted bytes"}, {Role: agent.RoleAgent, Content: "A retained public result"}}
+	plan := &worksession.TaskPlan{InputChanges: []worksession.PlanInputChange{{RemovedUploads: []string{strings.Repeat("a", 32) + "/old.txt"}}}}
+	scoped := scopedPlanReplay(messages, plan)
+	if len(scoped) != 2 || scoped[1].Content != "A retained public result" || len(scoped[0].Attachments) != 0 || len(scoped[0].ProviderData) != 0 {
+		t.Fatal("withdrawal lost public results or retransmitted private inputs")
+	}
+	if len(messages[0].Attachments) != 1 || messages[2].Content != "private extracted bytes" {
+		t.Fatal("scoped replay mutated original retained evidence")
+	}
+	if len(scopedPlanReplay(messages, &worksession.TaskPlan{})) != len(messages) {
+		t.Fatal("ordinary replay changed without an input withdrawal")
+	}
+}

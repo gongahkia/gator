@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 import { useClient } from "../context/client"
 import { useData } from "../context/data"
 import type { useActions } from "./actions"
-import type { ChatUpdate, CheckAction, FollowingCheck, FollowingGoal, GoalAction, PlanContent, TaskPlanReview, TaskPlanSummary } from "@gator/application-host/contracts/protocol"
+import type { ChatUpdate, CheckAction, FollowingCheck, FollowingGoal, GoalAction, PlanContent, PlanInputRef, TaskPlanReview, TaskPlanSummary } from "@gator/application-host/contracts/protocol"
 import { useReadView } from "./read-view"
 
 // Optional management stays behind commands. All mutations use the current
@@ -67,9 +67,9 @@ export function useProductActions(controls: ReturnType<typeof useActions>) {
       { title: "Work directly on my next message", run: () => client.setPlanFirst(false, context) },
     ])
   }
-  async function planAction(plan: TaskPlanSummary | TaskPlanReview, action: "inspect" | "edit" | "approve" | "start" | "cancel", content?: PlanContent) {
+  async function planAction(plan: TaskPlanSummary | TaskPlanReview, action: "inspect" | "edit" | "remove_inputs" | "approve" | "start" | "cancel", content?: PlanContent, inputs?:PlanInputRef[]) {
     const request_id = randomUUID()
-    const result = await client.result({ type: "task_plan", task_plan: { conversation_id: owner(), task_id: plan.id, revision: plan.revision, digest: plan.digest, request_id, action, content } }, request_id, s => s.task_plan_result)
+    const result = await client.result({ type: "task_plan", task_plan: { conversation_id: owner(), task_id: plan.id, revision: plan.revision, digest: plan.digest, request_id, action, content, inputs } }, request_id, s => s.task_plan_result)
     return result.review
   }
   const planText = (plan: TaskPlanReview) => [plan.phase === "revising" ? "A revision is being prepared. The previous proposal below is retained for reference; approval is disabled." : "", plan.task, plan.content?.outcome,
@@ -78,6 +78,7 @@ export function useProductActions(controls: ReturnType<typeof useActions>) {
     `Effects: ${plan.content?.effects.join(", ") || "None"}`, `Sources: ${plan.content?.sources.join(", ") || "None"}`,
     `Selected inputs: ${plan.input_names?.join(", ") || "None"}`,
     plan.input_additions?.length ? `Added inputs requiring this fresh review: ${plan.input_additions.join(", ")}. Original inputs remain retained. Accounts, permissions and original budget are unchanged.` : "",
+    plan.input_removals?.length ? `Inputs withdrawn from future task use: ${plan.input_removals.join(", ")}. Originals remain in history; earlier runs may already have processed them.` : "",
     `Execution limits: manager ${plan.budget.max_steps || "default"} steps; coding assignment ${plan.budget.code_max_steps || "default"} steps.`,
     `Revision ${plan.revision} · ${plan.state} · ${plan.phase}`,
     "A plan describes intended work. Activity and retained outputs show actual results. External actions keep their separate approvals.",
@@ -104,6 +105,7 @@ export function useProductActions(controls: ReturnType<typeof useActions>) {
     const editable = plan.state === "queued" && plan.phase === "review" && !!plan.content
     menu("Task plan review", [
       { title: "Read exact proposed plan", run: () => details("Proposed plan", planText(plan)) },
+      { title: "Remove selected inputs", disabled: !editable || !!client.state?.running || !plan.inputs?.length, run: () => menu("Selected task inputs", (plan.inputs ?? []).map(input => ({ title: input.name || input.id, description: input.kind === "upload" ? "Selected upload" : "Selected source file", run: () => confirm("Remove this input from future execution?", `${input.name || input.id}\nThe original stays in history. A new exact plan review is required before execution. Earlier runs may already have processed it.`, async () => { await planAction(plan,"remove_inputs",undefined,[{kind:input.kind,id:input.id}]); const next=client.state?.task_plans?.find(item=>item.id===plan.id); if(next){ const review=await planAction(next,"inspect");if(review)reviewPlan(review) } }) })),true) },
       { title: "Edit plan", disabled: !editable || !!client.state?.running, run: () => editPlan(plan) },
       { title: "Approve plan and start", disabled: !editable || !!client.state?.running, run: () => confirm("Approve this plan and start?", planText(plan), () => planAction(plan, "approve")) },
       { title: "Start approved work", disabled: plan.state !== "queued" || plan.phase !== "approved" || !!client.state?.running, run: () => confirm("Start reviewed work?", planText(plan), () => planAction(plan, "start")) },

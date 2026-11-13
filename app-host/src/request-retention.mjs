@@ -49,6 +49,14 @@ export async function retainedRequestUploads(conversations) {
     for (const request of journal?.requests ?? []) {
       if (!["queued", "running", "interrupted"].includes(request.state)) continue;
       retainInputs(retained, request.options);
+			if (request.plan?.input_changes !== undefined) {
+				const changes = request.plan.input_changes;
+				if (!Array.isArray(changes) || changes.length > 32) throw new Error("Invalid retained input scope history");
+				for (const change of changes) {
+					if (!change || typeof change !== "object" || !change.before_options || typeof change.before_options !== "object" || Array.isArray(change.before_options)) throw new Error("Invalid retained original inputs");
+					retainInputs(retained, change.before_options);
+				}
+			}
     }
     await retainDialogueUploads(conversations, entry.name, retained);
   }

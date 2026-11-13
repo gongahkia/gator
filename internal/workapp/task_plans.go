@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -12,13 +13,14 @@ import (
 )
 
 type TaskPlanAction struct {
-	ConversationID string                   `json:"conversation_id"`
-	TaskID         string                   `json:"task_id"`
-	Revision       uint64                   `json:"revision"`
-	Digest         string                   `json:"digest"`
-	Action         string                   `json:"action"`
-	Content        *worksession.PlanContent `json:"content,omitempty"`
-	RequestID      string                   `json:"request_id"`
+	ConversationID string                     `json:"conversation_id"`
+	TaskID         string                     `json:"task_id"`
+	Revision       uint64                     `json:"revision"`
+	Digest         string                     `json:"digest"`
+	Action         string                     `json:"action"`
+	Content        *worksession.PlanContent   `json:"content,omitempty"`
+	Inputs         []worksession.PlanInputRef `json:"inputs,omitempty"`
+	RequestID      string                     `json:"request_id"`
 }
 type TaskPlanResult struct {
 	Review    *TaskPlanReview `json:"review,omitempty"`
@@ -228,6 +230,9 @@ func (m Model) ApplyTaskPlan(action TaskPlanAction) (tea.Model, tea.Cmd) {
 	if action.Action != "edit" && action.Content != nil {
 		return fail(errors.New("only an edit can change plan content"))
 	}
+	if action.Action != "remove_inputs" && len(action.Inputs) > 0 {
+		return fail(errors.New("only input removal can provide an input selection"))
+	}
 	switch action.Action {
 	case "inspect":
 		p := r.Plan.Clone()
@@ -249,13 +254,42 @@ func (m Model) ApplyTaskPlan(action TaskPlanAction) (tea.Model, tea.Cmd) {
 		if p.Edit != nil {
 			m.planResult.Review.Correction, m.planResult.Review.EditState = p.Edit.Instruction, p.Edit.State
 		}
-		for _, change := range p.InputChanges {
-			m.planResult.Review.InputAdditions = append(m.planResult.Review.InputAdditions, uploadNames(change.AddedUploads)...)
-			m.planResult.Review.InputAdditions = append(m.planResult.Review.InputAdditions, change.AddedAttachments...)
-		}
 		var frozen RunOptions
 		if json.Unmarshal(r.Options, &frozen) == nil {
+			added, removed := map[string]bool{}, map[string]bool{}
+			for _, change := range p.InputChanges {
+				for _, id := range change.AddedUploads {
+					if slices.Contains(frozen.Uploads, id) && !added[id] {
+						m.planResult.Review.InputAdditions = append(m.planResult.Review.InputAdditions, uploadNames([]string{id})...)
+						added[id] = true
+					}
+				}
+				for _, id := range change.AddedAttachments {
+					if slices.Contains(frozen.Attachments, id) && !added[id] {
+						m.planResult.Review.InputAdditions = append(m.planResult.Review.InputAdditions, id)
+						added[id] = true
+					}
+				}
+				for _, id := range change.RemovedUploads {
+					if !slices.Contains(frozen.Uploads, id) && !removed[id] {
+						m.planResult.Review.InputRemovals = append(m.planResult.Review.InputRemovals, uploadNames([]string{id})...)
+						removed[id] = true
+					}
+				}
+				for _, id := range change.RemovedAttachments {
+					if !slices.Contains(frozen.Attachments, id) && !removed[id] {
+						m.planResult.Review.InputRemovals = append(m.planResult.Review.InputRemovals, id)
+						removed[id] = true
+					}
+				}
+			}
 			m.planResult.Review.InputNames = append(uploadNames(frozen.Uploads), frozen.Attachments...)
+			for _, id := range frozen.Uploads {
+				m.planResult.Review.Inputs = append(m.planResult.Review.Inputs, worksession.PlanInputRef{Kind: "upload", ID: id, Name: uploadNames([]string{id})[0]})
+			}
+			for _, id := range frozen.Attachments {
+				m.planResult.Review.Inputs = append(m.planResult.Review.Inputs, worksession.PlanInputRef{Kind: "source", ID: id, Name: id})
+			}
 		}
 		return m, nil
 	case "edit":
@@ -263,6 +297,8 @@ func (m Model) ApplyTaskPlan(action TaskPlanAction) (tea.Model, tea.Cmd) {
 			return fail(errors.New("review the edited plan content"))
 		}
 		j, err = m.config.SessionStore.ReviseTaskPlan(m.conversation, r.ID, action.Revision, action.Digest, *action.Content)
+	case "remove_inputs":
+		j, err = m.config.SessionStore.RemoveTaskPlanInputs(m.conversation, r.ID, action.Revision, action.Digest, action.RequestID, action.Inputs)
 	case "cancel":
 		j, err = m.config.SessionStore.CancelTaskPlan(m.conversation, r.ID, action.Revision, action.Digest)
 	case "approve":
@@ -333,22 +369,24 @@ type TaskPlanSummary struct {
 	Issue    string                 `json:"issue,omitempty"`
 }
 type TaskPlanReview struct {
-	ID             string                    `json:"id"`
-	Revision       uint64                    `json:"revision"`
-	Digest         string                    `json:"digest"`
-	Task           string                    `json:"task"`
-	State          string                    `json:"state"`
-	Phase          string                    `json:"phase"`
-	Budget         worksession.PlanBudget    `json:"budget"`
-	OriginalBudget *worksession.PlanBudget   `json:"original_budget,omitempty"`
-	Attempts       []worksession.PlanAttempt `json:"attempts,omitempty"`
-	Sources        []string                  `json:"sources"`
-	Content        *worksession.PlanContent  `json:"content,omitempty"`
-	InputNames     []string                  `json:"input_names,omitempty"`
-	InputAdditions []string                  `json:"input_additions,omitempty"`
-	Issue          string                    `json:"issue,omitempty"`
-	Correction     string                    `json:"correction,omitempty"`
-	EditState      string                    `json:"edit_state,omitempty"`
+	ID             string                     `json:"id"`
+	Revision       uint64                     `json:"revision"`
+	Digest         string                     `json:"digest"`
+	Task           string                     `json:"task"`
+	State          string                     `json:"state"`
+	Phase          string                     `json:"phase"`
+	Budget         worksession.PlanBudget     `json:"budget"`
+	OriginalBudget *worksession.PlanBudget    `json:"original_budget,omitempty"`
+	Attempts       []worksession.PlanAttempt  `json:"attempts,omitempty"`
+	Sources        []string                   `json:"sources"`
+	Content        *worksession.PlanContent   `json:"content,omitempty"`
+	InputNames     []string                   `json:"input_names,omitempty"`
+	InputAdditions []string                   `json:"input_additions,omitempty"`
+	InputRemovals  []string                   `json:"input_removals,omitempty"`
+	Inputs         []worksession.PlanInputRef `json:"inputs,omitempty"`
+	Issue          string                     `json:"issue,omitempty"`
+	Correction     string                     `json:"correction,omitempty"`
+	EditState      string                     `json:"edit_state,omitempty"`
 }
 
 func (m Model) taskPlanSummaries() []TaskPlanSummary {

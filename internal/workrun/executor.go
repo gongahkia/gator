@@ -251,6 +251,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 			if err != nil {
 				return Outcome{}, err
 			}
+			initial = scopedPlanReplay(initial, request.reviewedPlan)
 		}
 		if request.RefreshSource {
 			options := request.SnapshotOptions

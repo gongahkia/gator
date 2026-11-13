@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestInputEvolutionPreservesAllOtherAuthorityAndOriginalBytes(t *testing.T) {
@@ -70,5 +71,45 @@ func TestInputEvolutionRejectsUnsafeOrOversizedSelections(t *testing.T) {
 				t.Fatal("unsafe selection accepted")
 			}
 		})
+	}
+}
+
+func TestRemovingPlanInputsRetainsOriginalAdmissionAndRequiresFreshApproval(t *testing.T) {
+	s, id, _ := requestTestStore(t)
+	oldID := strings.Repeat("a", 32) + "/old.txt"
+	keptID := strings.Repeat("b", 32) + "/keep.txt"
+	raw := json.RawMessage(`{"PlanFirst":true,"Uploads":["` + oldID + `","` + keptID + `"],"ConnectorIDs":["docs"],"MaxSteps":24,"Code":{"MaxSteps":16}}`)
+	_, r, err := s.AdmitPlanRequest(id, "Compare files", raw, "original-admission", []string{"docs"}, PlanBudget{MaxSteps: 24, CodeMaxSteps: 16}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ReviseTaskPlan(id, r.ID, 0, "", proposedPlan()); err != nil {
+		t.Fatal(err)
+	}
+	original := retainedPlan(t, s, id, r.ID)
+	if _, _, err := s.ApproveTaskPlan(id, r.ID, original.Plan.Revision, original.Plan.Digest); err != nil {
+		t.Fatal(err)
+	}
+	j, err := s.RemoveTaskPlanInputs(id, r.ID, original.Plan.Revision, original.Plan.Digest, "remove-one", []PlanInputRef{{Kind: "upload", ID: oldID}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	changed := j.Requests[0]
+	var selected struct{ Uploads []string }
+	_ = json.Unmarshal(changed.Options, &selected)
+	if len(selected.Uploads) != 1 || selected.Uploads[0] != keptID || changed.ID != original.ID || changed.Plan.Approval != nil || changed.Plan.Phase != "review" || optionsHash(changed.OriginalAdmissionOptions()) != optionsHash(raw) {
+		t.Fatal("input removal lost identity, originals, or fresh review")
+	}
+	if _, _, err := s.ApproveTaskPlan(id, r.ID, original.Plan.Revision, original.Plan.Digest); err == nil {
+		t.Fatal("old approval executed changed inputs")
+	}
+	if _, _, err := s.AdmitPlanRequest(id, r.Text, raw, "original-admission", []string{"docs"}, r.Plan.Budget, time.Now()); err != nil {
+		t.Fatal("original admission identity changed", err)
+	}
+	if _, err := s.RemoveTaskPlanInputs(id, r.ID, changed.Plan.Revision, changed.Plan.Digest, "wrong-input", []PlanInputRef{{Kind: "upload", ID: strings.Repeat("c", 32) + "/foreign.txt"}}); err == nil {
+		t.Fatal("unselected input acquired authority")
+	}
+	if _, _, err := s.ApproveTaskPlan(id, r.ID, changed.Plan.Revision, changed.Plan.Digest); err != nil {
+		t.Fatal("fresh exact narrowed review rejected", err)
 	}
 }

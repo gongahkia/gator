@@ -449,3 +449,27 @@ test("a second ordinary correction replaces an active revision in the same real 
     expect(work).toBe(0)
   } finally {releaseFirst(); releaseLatest(); await f.close()}
 },45000)
+
+test("typed input removal retains originals and executes only the freshly reviewed selection",async()=>{
+ const executions:string[]=[]
+ const f=await fixture(body=>{
+  if(system(body).includes("Propose a plan"))return JSON.stringify(originalPlan)
+  executions.push(JSON.stringify(body));return "The narrowed input selection was processed."
+ })
+ try{
+  await f.client.start();await f.client.send({type:"submit",text:"/mode inspect"})
+  const removed=join(f.root,"remove.txt");await writeFile(removed,"Withdraw this selected input: amber finch");await f.client.attach([removed]);const removedID=f.client.draft.uploads![0]!.id
+  await f.plan();await until(()=>f.client.state?.task_plans?.[0]?.phase==="review","original two-file review")
+  const before=f.client.state!.task_plans![0]!,owner=f.client.state!.conversation_id!
+  await f.client.navigate("/task-plans");await f.flush();await f.choose(originalPlan.outcome)
+  await f.choose("Remove selected inputs");await f.choose("remove.txt");f.setup.mockInput.pressEnter();await f.flush()
+  await until(()=>(f.client.state?.task_plans?.[0]?.revision??0)>before.revision,"narrowed exact review")
+  const saved=JSON.parse(await readFile(join(f.env.GATOR_STATE_DIR,"gator/conversations",owner,"requests.json"),"utf8")).requests[0]
+  expect(saved.plan.approval).toBeUndefined();expect(saved.options.Uploads).not.toContain(removedID);expect(saved.plan.input_changes[0].before_options.Uploads).toContain(removedID)
+  expect(executions).toHaveLength(0)
+  await expect(f.client.result({type:"task_plan",task_plan:{conversation_id:owner,task_id:before.id,revision:before.revision,digest:before.digest,action:"approve",request_id:"stale-input-selection"}},"stale-input-selection",state=>state.task_plan_result)).rejects.toThrow()
+  await f.choose("Read exact proposed plan");expect(f.setup.captureCharFrame()).toContain("withdrawn");f.setup.mockInput.pressEscape();await f.flush();f.setup.mockInput.pressEscape();await f.flush();await f.client.navigate("/task-plans");await f.flush();await f.choose(originalPlan.outcome)
+  await f.choose("Approve plan and start");f.setup.mockInput.pressEnter();await until(()=>!f.client.state?.running&&executions.length===1,"fresh narrowed execution").catch(error=>{throw Error(String(error)+"\n"+JSON.stringify({plan:f.client.state?.task_plan_result,tasks:f.client.state?.task_plans,issue:f.client.issue})+"\n"+f.setup.captureCharFrame())})
+  expect(executions[0]).toContain("silver otter");expect(executions[0]).not.toContain("amber finch")
+ }finally{await f.close()}
+},45000)

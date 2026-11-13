@@ -138,3 +138,16 @@ test("larger document intake and all attachment guards share the Go runtime limi
     assert.throws(() => validateFrame({ ...submission, upload: { ...submission.upload, files: [...submission.upload.files, file.id] } }), /Invalid/);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+test("pending input scope history protects withdrawn originals during cleanup",async()=>{
+ const root=await mkdtemp(join(tmpdir(),"gator-original-input-retention-"));
+ try{
+  const uploads=new UploadStore(join(root,"uploads")),chats=join(root,"conversations"),original=await uploads.importContent("original.txt",Buffer.from("Preserve pending scope original"));
+  await utimes(join(uploads.root,original.id.split("/")[0]),0,0);await mkdir(join(chats,"one"),{recursive:true});
+  const path=join(chats,"one","requests.json");
+  await writeFile(path,JSON.stringify({version:1,requests:[{state:"queued",options:{Uploads:[]},plan:{input_changes:[{before_options:{Uploads:[original.id]}}]}}]}));
+  await uploads.prune(Date.now(),await retainedRequestUploads(chats));await uploads.check([original.id]);
+  await writeFile(path,JSON.stringify({version:1,requests:[{state:"queued",options:{Uploads:[]},plan:{input_changes:[{before_options:"broken"}]}}]}));
+  await assert.rejects(retainedRequestUploads(chats));await uploads.check([original.id]);
+ }finally{await rm(root,{recursive:true,force:true})}
+});

@@ -181,3 +181,10 @@ test("plan-first message admission is a boolean opt-in with no renderer plan gra
  assert.equal(validateFrame({type:"upload_submit",upload}).version,1);
  for(const change of [{plan_first:"yes"},{plan:{approved:true}},{TaskPlanRequestID:"a".repeat(32)}]) assert.throws(()=>validateFrame({type:"upload_submit",upload:{...upload,...change}}));
 });
+
+test("input removals accept typed identities without extra authority",()=>{
+ const task={conversation_id:"chat",task_id:"a".repeat(32),revision:2,digest:"b".repeat(64),action:"remove_inputs",request_id:"remove-one",inputs:[{kind:"upload",id:"c".repeat(32)+"/file.txt"}]};
+ assert.equal(validateFrame({type:"task_plan",task_plan:task}).version,1);
+ for(const inputs of [[],[{kind:"account",id:"other"}],[{kind:"upload",id:"file",approved:true}],Array(13).fill(task.inputs[0])])assert.throws(()=>validateFrame({type:"task_plan",task_plan:{...task,inputs}}));
+ assert.throws(()=>validateFrame({type:"task_plan",task_plan:{...task,action:"approve"}}));
+});

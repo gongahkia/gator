@@ -31,7 +31,7 @@ outside this goal. Preserve the CLI/TUI as a client; no Swift UI is being built.
 
 | Backend workstream | Original findings | Current evidence and remaining acceptance |
 |---|---|---|
-| Conversational control | 1, 8, 12 | Initial preparation corrections exist. Pending external-action correction now has controlled Go/service and local-client evidence: same operation, exact old review withdrawn, fresh approval required; delegated control is verified with concurrent original work and parent-draft continuity. Repeated in-flight plan corrections have local and delegated controlled-provider evidence, including concurrent owners, provider failure and process-crash/restart without replay. Plan-bound pause/replan/review has local and delegated controlled journeys with retained evidence and remaining-budget enforcement; original uncertain effects block replacement approval across restart. Broader lifecycle/account/coding paths remain. Reviewed input additions on existing plan tasks have local/delegated provider and retry evidence. Input removals/non-plan transitions and broader race/failure/restart coverage remain. |
+| Conversational control | 1, 8, 12 | Initial preparation corrections exist. Pending external-action correction now has controlled Go/service and local-client evidence: same operation, exact old review withdrawn, fresh approval required; delegated control is verified with concurrent original work and parent-draft continuity. Repeated in-flight plan corrections have local and delegated controlled-provider evidence, including concurrent owners, provider failure and process-crash/restart without replay. Plan-bound pause/replan/review has local and delegated controlled journeys with retained evidence and remaining-budget enforcement; original uncertain effects block replacement approval across restart. Broader lifecycle/account/coding paths remain. Reviewed input additions on existing plan tasks have local/delegated provider and retry evidence. Typed input removal from retained plan review now narrows the selected set with fresh approval, original retention and scoped replay. Non-plan transitions and broader race/failure/restart coverage remain. |
 | Request-specific setup/recovery | 4, 12 | Existing provider setup/admission safeguards remain. Account/source/permission handoffs and provider rejection after admission need end-to-end verification and demonstrated gaps resolved; preserve request inputs and reject uncertain-effect replay. |
 | Authoritative settings/scope | 5, 8 | Existing canonical terminal/model settings remain. Inventory broader account/source/permission/processing/budget contracts, saved outcomes, cached-owner propagation, restart and current/future/background effects; reject changed identities and unauthorized expansion. |
 | Structured connected-item actions | 6, 8 | Existing local files/evidence/receipts retained. Complete supported provider item references and inspect/open/edit/reply/done paths with version/account/permission review and uncertain outcomes. |
@@ -67,6 +67,43 @@ Preserve both phases across continuations and do not declare the expanded work
 finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
+
+- Typed selected-input removal (13 November): retained plan review exposes exact
+  upload/source-file identities and a keyboard-accessible removal control. Go
+  accepts only current selected identities in the exact idle plan/revision; it
+  preserves the original options, narrows only the file set, increments the
+  review identity and revokes approval. Neither invented references nor extra
+  renderer authority can widen scope. Original admission repeats still bind the
+  original file set. Scope history retains withdrawals as distinct from active
+  additions. Pending-task cleanup now protects references in original scope
+  envelopes, and malformed history defers pruning; existing expiry policy after
+  terminal work is preserved. Input withdrawal also scopes later provider replay:
+  old attachment/image bytes, extracted tool bodies and provider handles are not
+  retransmitted; prior conversational outcomes stay available and saved evidence
+  is not mutated. This is file-selection withdrawal, not erasure of earlier
+  processing or conversation history.
+  Go scope/plan checks with the race detector pass in
+  `/tmp/gator-backend-20261113-input-removal-go.log`; final replay checks pass in
+  `/tmp/gator-backend-20261113-input-removal-replay.log`. The host policy/upload
+  gate passes **30 tests** in
+  `/tmp/gator-backend-20261113-input-removal-host-final.log`, including original
+  reference retention and malformed-history recovery. Full Go session/app/run/CLI
+  regression passes with exit 0 (82.362 / 84.598 / 183.023 / 374.368 seconds) in
+  `/tmp/gator-backend-20261113-input-removal-go-full.log`; this preceded the final
+  review-projection and scoped-replay refinements covered by focused checks.
+  Native keyboard fixture checks removal, original-reference retention, stale
+  review rejection, exact withdrawal explanation, fresh approval, and actual
+  execution receiving the kept file without the removed file's contents. The
+  initial concurrent run reached all functional assertions but hit its 45-second
+  deadline. The unchanged isolated check passes (1 test, 8 assertions, 5.364
+  seconds) in `/tmp/gator-backend-20261113-input-removal-client-isolated.log`;
+  no deadline was increased and no check skipped. Final rebuilt replay/native
+  verification also passes (1 test, 8 assertions, 4.926 seconds) in
+  `/tmp/gator-backend-20261113-input-removal-replay-client.log`. Runtime build
+  and final TypeScript checks pass. These are
+  controlled-provider and native-fixture checks, not physical/live verification.
+  Broader running/delegated withdrawal and conversion of non-plan tasks to reviewed
+  scope remain open; all other backend workstreams remain in scope.
 
 - Reviewed input additions on original plan tasks (13 November): a correction
   carrying uploads or selected source files can now retain those additions in
