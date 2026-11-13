@@ -40,7 +40,7 @@ before committing that workflow. Earlier terminal evidence is historical.
 | Backend workstream | Original findings | Current evidence and remaining acceptance |
 |---|---|---|
 | Conversational control | 1, 8, 12 | Initial preparation corrections exist. Pending external-action correction now has controlled Go/service and local-client evidence: same operation, exact old review withdrawn, fresh approval required; delegated control is verified with concurrent original work and parent-draft continuity. Repeated in-flight plan corrections have local and delegated controlled-provider evidence, including concurrent owners, provider failure and process-crash/restart without replay. Plan-bound pause/replan/review has local and delegated controlled journeys with retained evidence and remaining-budget enforcement; original uncertain effects block replacement approval across restart. Broader lifecycle/account/coding paths remain. Reviewed input additions on existing plan tasks have local/delegated provider and retry evidence. Typed input removal from retained plan review now narrows the selected set with fresh approval, original retention and scoped replay. Ordinary running tasks can now promote explicit file corrections into the same reviewed task, with original boundary and budget evidence. Broader account/coding/failure/restart combinations remain. |
-| Request-specific setup/recovery | 4, 12 | Provider rejection recovery is retained. Task-bound access requirements now support missing configured accounts, bearer credential repair and denied read permissions through a typed Go/host scope review, original-task planning and fresh exact approval. Source changes are digest-bound, and configured model/processing identity and spent budget stay fixed. Headless integration evidence is below. Prepared or interrupted recovery plans can now receive another exact account review without repeating execution or budget accounting; prior proposals/approvals and per-requirement account choices remain inspectable. Early failures before a retained run, broader OAuth/provider permission repair, mixed-effect continuation and the complete journey remain open. |
+| Request-specific setup/recovery | 4, 12 | Provider rejection recovery is retained. Task-bound access requirements now support missing configured accounts, bearer credential repair and denied read permissions through a typed Go/host scope review, original-task planning and fresh exact approval. Source changes are digest-bound, and configured model/processing identity and spent budget stay fixed. Headless integration evidence is below. Prepared or interrupted recovery plans can now receive another exact account review without repeating execution or budget accounting; prior proposals/approvals and per-requirement account choices remain inspectable. Selected-source removal before Work execution now has native preparation evidence and the same reviewed recovery path, including delegated owners. Other early configuration/constructor failures, broader OAuth/provider permission repair, mixed-effect continuation and the complete journey remain open. |
 | Authoritative settings/scope | 5, 8 | Existing canonical terminal/model settings remain. Inventory broader account/source/permission/processing/budget contracts, saved outcomes, cached-owner propagation, restart and current/future/background effects; reject changed identities and unauthorized expansion. |
 | Structured connected-item actions | 6, 8 | Existing local files/evidence/receipts retained. Complete supported provider item references and inspect/open/edit/reply/done paths with version/account/permission review and uncertain outcomes. |
 | Typed workflows | 9 | Inventory opaque public workflows; complete supported Go/host typed fields, defaults, choices, validation, reviews, operation results and recovery without a new command engine. |
@@ -52,6 +52,59 @@ journey must cover setup/access, persisted scope, commitment, unrelated dialogue
 task correction, pending-action correction, stale rejection, fresh exact approval,
 connected-item results and restart/disconnection. Physical/live prerequisites
 remain to be inspected; prior fixture checks do not establish them.
+
+## Source removal before execution (13 November, backend only)
+
+- Implementation: `a0989aa48` (`fix(agent): retain reviewed recovery for unstarted source failures`).
+- Reproduced four direct/reviewed, repair/replacement failures with a real Go
+  process and loopback provider: a removed selected source left the original
+  request failed without actionable recovery metadata. A separate delegated
+  reproduction exposed an earlier wrapper that returned before recovery ran.
+- The native owner now checks selected-source existence before Work classification,
+  execution model calls or Work construction. It records an exact preparation boundary over the
+  admitted running request, original text/options, workspace and conversation
+  context. Delegated origin/goal and processing identity still require native
+  validation. Normal execution retains strict current-scope checks.
+- A preparation failure may receive explicit account review and a fresh tool-free
+  proposal in the same task. A missing run/bundle alone never establishes safe
+  retry. No fictitious manifest or empty execution attempt is created. Already
+  charged attempts and remaining budgets survive; stale context, mismatched
+  identities, stopped tasks and unresolved external effects remain rejected.
+- Original uploads, plan/review history, per-requirement source choices and newer
+  drafts survive repair and restart. Pending unstarted recovery can be reviewed
+  again after a later source/permission change, without inventing spent work or
+  silently acquiring another execution allowance. Future source defaults and
+  durable background commitments are not changed by this task-specific review.
+- A removed descriptor has no trustworthy operation inventory. Recovery exposes
+  that limitation as an unconfigured-source prerequisite. Replacement readiness
+  requires an actual configured operation usable under original mode/permissions;
+  the fresh plan and existing per-operation approval policies still enforce access.
+- Headless native/host evidence: `GATOR_TEST_BINARY=/tmp/gator-backend-20261113-preparation-recovery-runtime bun run test:backend`
+  from `app-host` passed 17 tests / 472 assertions, including five preparation
+  cases, repeated pending account review and the existing twelve access-repair
+  cases. These are actual Go processes, store/restart boundaries and loopback
+  providers, with no renderer or keyboard harness.
+- Store fixtures reject mismatched request/options, a certificate attached to
+  an actual run, absent native evidence, stale context and stopped owners without
+  mutating the journal. Charged prior attempts and their measured remaining
+  budgets stay equal across an unstarted repair. Replacement readiness fixtures
+  reject denied real reads and write-only replacements for an inspect task.
+- Full `go test ./internal/worksession ./internal/workapp ./internal/workrun ./cmd/gator`
+  passed (68.773s / 88.060s / 228.739s / 337.748s). Focused `-race` checks passed
+  for all four packages after the final preparation-validation refinements
+  (66.698s / 21.355s / 5.450s / 2.807s). The host suite passed 139 tests
+  with one existing platform skip; backend contract and all three headless test
+  files passed TypeScript checking. Logs share `/tmp/gator-backend-20261113-preparation-recovery-`:
+  `repro.log`, `delegated-repro.log`, `race-final.log`, `backend-verified.log`,
+  `host.log`, `types-verified.log` and `go-full.log`.
+- Tests use synthetic providers, credentials and accounts. No terminal
+  layout/keyboard/rendering changes, physical audio check or live-account
+  verification are part of this evidence.
+- Remaining workstream 2 includes malformed/global configuration failures,
+  provider construction before a run, source removal before delegated admission
+  or initial tool-free proposal, broader OAuth/grant repair and mixed-effect
+  continuation. All seven backend workstreams and the full integrated journey
+  remain open. The original fifteen frontend/product criteria above are retained.
 
 ## Account re-review after recovery planning (13 November, backend only)
 
