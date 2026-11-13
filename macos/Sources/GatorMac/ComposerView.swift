@@ -19,7 +19,7 @@ struct ComposerView: View {
             }
             ZStack(alignment: .topLeading) {
                 if application.draftText.isEmpty {
-                    Text("Message Gator…").font(.system(size: 14)).foregroundStyle(.tertiary).padding(.top, 4).padding(.leading, 2).allowsHitTesting(false)
+                    Text("Message Gator…").font(.body).foregroundStyle(.tertiary).padding(.top, 4).padding(.leading, 2).allowsHitTesting(false)
                 }
                 NativeComposer(text: application.draftText, editable: application.canEditDraft, focusRequest: application.focusRequest, onEdit: application.editDraft) {
                     if sessions.canSubmit { let owner = application; Task { await sessions.submit(from: owner) } }
@@ -60,9 +60,9 @@ private struct NativeComposer: NSViewRepresentable {
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSScrollView(); scroll.drawsBackground = false
         scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
-        let view = NSTextView(); view.delegate = context.coordinator
+        let view = FocusTextView(); view.delegate = context.coordinator
         view.isRichText = false; view.allowsUndo = true; view.drawsBackground = false
-        view.font = .systemFont(ofSize: 14); view.textColor = .labelColor
+        view.font = .preferredFont(forTextStyle: .body); view.textColor = .labelColor
         view.isAutomaticQuoteSubstitutionEnabled = false; view.isAutomaticDashSubstitutionEnabled = false
         view.textContainerInset = NSSize(width: 2, height: 4)
         view.minSize = NSSize(width: 0, height: 0)
@@ -76,12 +76,9 @@ private struct NativeComposer: NSViewRepresentable {
     }
     func updateNSView(_ scroll: NSScrollView, context: Context) {
         context.coordinator.parent = self
-        guard let view = scroll.documentView as? NSTextView else { return }
+        guard let view = scroll.documentView as? FocusTextView else { return }
         view.isEditable = editable
-        if editable, context.coordinator.focusRequest != focusRequest, let window = view.window, window.isKeyWindow, !view.hasMarkedText() {
-            context.coordinator.focusRequest = focusRequest
-            DispatchQueue.main.async { if window.isKeyWindow && !view.hasMarkedText() { window.makeFirstResponder(view) } }
-        }
+        if editable { view.requestComposerFocus(focusRequest) }
         if !view.hasMarkedText(), view.string != text {
             let selection = view.selectedRange()
             view.string = text
@@ -92,7 +89,6 @@ private struct NativeComposer: NSViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: NativeComposer
-        var focusRequest: UUID?
         init(_ parent: NativeComposer) { self.parent = parent }
         func textDidChange(_ notification: Notification) {
             guard let view = notification.object as? NSTextView else { return }
@@ -105,4 +101,37 @@ private struct NativeComposer: NSViewRepresentable {
             return false
         }
     }
+}
+
+/// Focus can be requested before SwiftUI attaches the new composer to a window.
+/// Keep that request until attachment/key activation; streaming never creates one.
+@MainActor
+private final class FocusTextView: NSTextView {
+    private var requested: UUID?
+    private var handled: UUID?
+    private var observation: WindowFocusObservation?
+    func requestComposerFocus(_ token: UUID) { requested = token; scheduleFocus() }
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        observation = nil
+        if let window {
+            let token = NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.applyFocus() }
+            }
+            observation = WindowFocusObservation(token)
+        }
+        scheduleFocus()
+    }
+    private func scheduleFocus() { DispatchQueue.main.async { [weak self] in self?.applyFocus() } }
+    private func applyFocus() {
+        guard let requested, requested != handled, let window, window.isKeyWindow, window.isVisible, !hasMarkedText() else { return }
+        if window.makeFirstResponder(self) { handled = requested }
+    }
+}
+
+/// NotificationCenter removal is thread safe; the callback itself runs on main.
+private final class WindowFocusObservation: @unchecked Sendable {
+    let token: NSObjectProtocol
+    init(_ token: NSObjectProtocol) { self.token = token }
+    deinit { NotificationCenter.default.removeObserver(token) }
 }

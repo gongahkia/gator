@@ -12,6 +12,7 @@ struct ExactDecisionButton: NSViewRepresentable {
     func makeNSView(context: Context) -> DecisionButton {
         let button = DecisionButton(title: title, target: context.coordinator, action: #selector(Coordinator.invokeDecision))
         button.bezelStyle = .rounded; button.keyEquivalent = ""; button.setAccessibilityLabel(title)
+        button.focusRingType = .exterior
         button.setAccessibilityHelp("Click or press Space to choose this exact action. Return does not make a decision.")
         return button
     }
@@ -24,9 +25,19 @@ struct ExactDecisionButton: NSViewRepresentable {
         @objc func invokeDecision() { action() }
     }
     final class DecisionButton: NSButton {
+        override var acceptsFirstResponder: Bool { isEnabled }
         override func keyDown(with event: NSEvent) {
             guard NativeInteractionSemantics.decisionKeyAllowed(event.keyCode) else { return }
+            if event.keyCode == 49 {
+                let modified = !event.modifierFlags.intersection([.command, .control, .option, .shift]).isEmpty
+                if isEnabled && NativeInteractionSemantics.activateDecisionOnSpace(code: event.keyCode, repeating: event.isARepeat, modified: modified) { performClick(nil) }
+                return
+            }
             super.keyDown(with: event)
+        }
+        override func keyUp(with event: NSEvent) {
+            if event.keyCode == 49 || !NativeInteractionSemantics.decisionKeyAllowed(event.keyCode) { return }
+            super.keyUp(with: event)
         }
         override func performKeyEquivalent(with event: NSEvent) -> Bool {
             guard NativeInteractionSemantics.decisionKeyAllowed(event.keyCode) else { return false }

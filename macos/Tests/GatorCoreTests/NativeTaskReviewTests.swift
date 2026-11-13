@@ -44,6 +44,7 @@ func planValue(_ summary: JSONValue) -> JSONValue {
     owner.editDraft("My unrelated question"); owner.setPlanFirst(true)
     await app.requestActionCorrection(owner: owner, review: exact)
     #expect(owner.draftText.isEmpty); #expect(owner.correctionTarget?.kind == .action); #expect(!owner.planFirst)
+    #expect(app.issue.isEmpty)
     #expect(await fixture.sent("upload_submit").isEmpty); #expect(await fixture.sent("dialogue_control").isEmpty); #expect(await fixture.sent("approval").isEmpty)
     owner.editDraft("Change only the subject"); await app.submit(from: owner)
     let request = try #require(await fixture.sent("upload_submit").last)
@@ -147,6 +148,9 @@ func planValue(_ summary: JSONValue) -> JSONValue {
     #expect(fields.contains { $0.label == "Action" && $0.text == "connector" })
     #expect(!NativeInteractionSemantics.decisionKeyAllowed(36)); #expect(!NativeInteractionSemantics.decisionKeyAllowed(76))
     #expect(NativeInteractionSemantics.decisionKeyAllowed(49)) // Space remains explicit keyboard access.
+    #expect(NativeInteractionSemantics.activateDecisionOnSpace(code: 49, repeating: false, modified: false))
+    #expect(!NativeInteractionSemantics.activateDecisionOnSpace(code: 49, repeating: true, modified: false))
+    #expect(!NativeInteractionSemantics.activateDecisionOnSpace(code: 49, repeating: false, modified: true))
     #expect(!NativeInteractionSemantics.sendOnReturn(hasMarkedText: true, shift: false))
     #expect(!NativeInteractionSemantics.sendOnReturn(hasMarkedText: false, shift: true))
     #expect(NativeInteractionSemantics.sendOnReturn(hasMarkedText: false, shift: false))

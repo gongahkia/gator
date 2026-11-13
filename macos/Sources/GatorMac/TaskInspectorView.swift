@@ -59,7 +59,8 @@ struct TaskInspectorView: View {
                         } else if let retained = owner.messages.last(where: { $0.result["kind"].string == "approval" }) {
                             DisclosureGroup("Retained proposal · no approval authority") { ExactReviewContent(value: retained.result) }
                         }
-                        ForEach(snapshot.value["task_plans"].array, id: \.self) { summary in
+                        ForEach(snapshot.value["task_plans"].array.compactMap(NativePlanSummary.init)) { card in
+                            let summary = card.value
                             if let identity = NativePlanIdentity(conversationID: task.ownerID, summary: summary) {
                                 plan(summary, identity: identity, owner: owner)
                             }

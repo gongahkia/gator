@@ -129,6 +129,8 @@ func seedReviewConversation(runtime: String, root: URL, environment: [String: St
         #expect(child.draftText == "Keep the child's unrelated draft")
         #expect(!child.hasReviewableApproval)
         #expect(fixture.trace().filter { $0["kind"].string == "route" }.allSatisfy { !$0.pretty.contains(original.token) })
+        await app.openConversation(parent.conversationID)
+        #expect(app.correctionStatus?.contains("task completed") == true)
         await fixture.close()
     } catch { print("Review fixture failure", app.issue, app.current.issue, fixture.trace()); await fixture.close(); throw error }
 }
@@ -160,6 +162,7 @@ func seedReviewConversation(runtime: String, root: URL, environment: [String: St
         let updated = try #require(owner.snapshot?.value["task_plans"].array.first)
         let fresh = try #require(NativePlanIdentity(conversationID: owner.conversationID, summary: updated))
         #expect(fresh.taskID == identity.taskID); #expect(fresh.revision > identity.revision); #expect(fresh.digest != identity.digest)
+        #expect(NativePlanSummary(updated)?.id == NativePlanSummary(summary)?.id) // One native row survives revision.
         #expect(!owner.isCurrentPlan(identity))
         await app.loadPlan(identity, owner: owner); #expect(!owner.isCurrentPlanReview(original))
         await app.loadPlan(fresh, owner: owner)

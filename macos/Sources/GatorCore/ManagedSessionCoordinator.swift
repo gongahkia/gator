@@ -282,7 +282,9 @@ public final class ManagedSessionCoordinator {
         guard isCurrentCorrectionTarget(target), requester.beginCorrection(target) else { throw BridgeFailure("The proposal changed while opening its requesting chat. Inspect it again.") }
         if requester === owner { requester.closeApprovalReview() }
         inspections.removeValue(forKey: requester.conversationID)
-        issue = "Correction draft opened. Submit explicitly; Go will decide whether and how to apply it. Nothing was approved."
+        // The composer itself explains this draft. Do not retain an informational
+        // message as a warning after Go has admitted or completed the correction.
+        issue = ""
     }
     public var correctionStatus: String? {
         guard let request = current.submission, let target = request.correctionTarget else { return nil }
@@ -296,7 +298,15 @@ public final class ManagedSessionCoordinator {
         case "failed", "interrupted": return "Correction not confirmed: " + turn["issue"].string
         case "guided":
             if target.kind == .action {
-                let token = owners[target.ownerID]?.snapshot?.value["pending_approval"]["token"].string ?? ""
+                guard let owner = owners[target.ownerID], owner.generation == target.generation else { return "Correction outcome retained · inspect the original task after reconnecting" }
+                if !owner.isConnected { return "Original task disconnected · correction outcome requires inspection" }
+                let token = owner.snapshot?.value["pending_approval"]["token"].string ?? ""
+                let taskState = owner.snapshot?.value["dialogue_task"]["state"].string ?? ""
+                let activityState = owner.messages.last(where: { $0.value["activity"] != .null })?.value["activity"]["state"].string ?? ""
+                let terminal = taskState.isEmpty ? activityState : taskState
+                if token.isEmpty, owner.snapshot?.running == false, ["completed", "failed", "stopped", "interrupted"].contains(terminal) {
+                    return "Correction outcome retained · task " + terminal + "; inspect its result for execution or delivery evidence"
+                }
                 return !token.isEmpty && token != target.reviewToken ? "Replacement action needs a fresh exact review · nothing approved" : "Previous proposal withdrawn · correction accepted; replacement is not yet confirmed"
             }
             if let plan = target.plan, let summary = owners[target.ownerID]?.snapshot?.value["task_plans"].array.first(where: { $0["id"].string == plan.taskID }), summary["phase"].string == "review", summary["revision"].int > plan.revision { return "Replacement plan available · inspect the new revision before any execution" }

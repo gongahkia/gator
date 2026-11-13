@@ -27,6 +27,15 @@ public struct NativePlanIdentity: Codable, Equatable, Sendable, Identifiable {
     public func matches(_ summary: JSONValue) -> Bool { summary["id"].string == taskID && summary["revision"].int == revision && summary["digest"].string == digest }
 }
 
+public struct NativePlanSummary: Identifiable, Sendable, Equatable {
+    public let id: String
+    public let value: JSONValue
+    public init?(_ value: JSONValue) {
+        guard validConversationID(value["id"].string) else { return nil }
+        id = value["id"].string; self.value = value
+    }
+}
+
 public struct NativePlanReview: Sendable, Equatable {
     public let identity: NativePlanIdentity
     public let generation: UUID
@@ -61,6 +70,7 @@ struct NativeCorrectionDraft: Codable, Equatable, Sendable {
 public enum NativeInteractionSemantics {
     public static func sendOnReturn(hasMarkedText: Bool, shift: Bool) -> Bool { !hasMarkedText && !shift }
     public static func decisionKeyAllowed(_ code: UInt16) -> Bool { code != 36 && code != 76 }
+    public static func activateDecisionOnSpace(code: UInt16, repeating: Bool, modified: Bool) -> Bool { code == 49 && !repeating && !modified }
     public static func workingLabel(reduceMotion: Bool) -> String { reduceMotion ? "Working · progress updates continue" : "Working" }
 }
 
