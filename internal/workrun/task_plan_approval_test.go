@@ -215,87 +215,105 @@ func TestTaskPlanApprovalStillRequiresExactCodingCommandReview(t *testing.T) {
 }
 
 func TestRevokedRunningPlanCannotReleasePreviouslyPendingAction(t *testing.T) {
-	state, store, request := claimedPlanFixture(t, []string{"read", "connected_write"}, "release")
-	request.RunID = "pausing-plan-run"
-	request.Mode = action.Act
-	request.Contract = artifact.InspectionContract()
-	request.Contract.ExternalActions = action.Approve
-	var effects atomic.Int32
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { effects.Add(1); w.WriteHeader(http.StatusNoContent) }))
-	defer server.Close()
-	registry, err := connector.NewRegistry([]connector.Descriptor{{Version: 1, ID: "release", Name: "Controlled", Kind: connector.KindHTTPWebhook, Resource: server.URL, Authentication: connector.AuthNone}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	model := &scriptedModel{turns: []agent.Turn{{ToolCalls: []agent.ToolCall{{ID: "pending", Name: "connector_release_publish", Arguments: json.RawMessage(`{"payload":{"version":"v1"}}`)}}}, {Text: "Inspect the retained outcome."}}}
-	operation := (Service{Executor: Executor{Model: model, StateDir: state, Connectors: connector.Runtime{Registry: registry, HTTPClient: server.Client()}}}).Start(context.Background(), request)
-	defer func() {
-		operation.Cancel()
-		for range operation.Events {
-		}
-		<-operation.Done
-	}()
-	var review Interaction
-	select {
-	case review = <-operation.Interactions:
-	case <-time.After(10 * time.Second):
-		t.Fatal("review did not arrive")
-	}
-	turn, err := store.AdmitDialogue(request.ConversationID, "pause-running-task", "Correct that plan", json.RawMessage(`{"scope":"unchanged"}`), time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, phase := range []string{"routing", "ready", "editing_plan"} {
-		turn.State = phase
-		if phase == "editing_plan" {
-			turn.Response = "Requesting a revised plan for review…"
-		}
-		if phase == "ready" {
-			turn.Decision, _ = json.Marshal(map[string]string{"kind": "revise_plan", "target": request.TaskPlan.RequestID, "instruction": turn.Text})
-		}
-		turn, err = store.UpdateDialogue(turn, turn.Revision)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	_, paused, claimed, err := store.BeginRunningPlanEdit(request.ConversationID, request.TaskPlan.RequestID, request.TaskPlan.Revision, request.TaskPlan.Digest, request.ConversationID, turn.ID, turn.Text, operation.RunID)
-	if err != nil || !claimed || paused.Plan.DrainingRun != operation.RunID || paused.Plan.Approval != nil {
-		t.Fatal("running dispatch was not fenced", err)
-	}
-	digest, _ := InteractionDigest(review)
-	if err := operation.respondBound(review.ID, digest, true); err != nil {
-		t.Fatal(err)
-	}
-	for range operation.Events {
-	}
-	completion := <-operation.Done
-	if effects.Load() != 0 {
-		t.Fatal("old exact approval escaped revoked plan")
-	}
-	content := *paused.Plan.Content
-	if _, err := store.FinishTaskPlanEdit(request.ConversationID, paused.ID, paused.Plan.Revision, paused.Plan.Digest, turn.ID, &content, ""); err == nil {
-		t.Fatal("draining run acquired a replacement review before accounting")
-	}
-	if _, _, err := store.ApproveTaskPlan(request.ConversationID, paused.ID, paused.Plan.Revision, paused.Plan.Digest); err == nil {
-		t.Fatal("unaccounted draining run acquired execution approval")
-	}
-	if completion.Outcome.RevisionID == "" {
-		t.Fatal("stopped run did not retain a revision")
-	}
-	accounted, err := store.RetainDrainedPlanRun(request.ConversationID, paused.ID, paused.Plan.Revision, paused.Plan.Digest, operation.RunID, completion.Outcome.RevisionID)
-	if err != nil {
-		t.Fatal("could not attach original run accounting", err)
-	}
-	retained := accounted.Requests[0]
-	if retained.Plan.DrainingRun != "" || len(retained.Plan.Attempts) != 1 || retained.Plan.Budget != paused.Plan.Budget || retained.Text != paused.Text {
-		t.Fatal("accounting lost frozen task or original budget")
-	}
-	remaining, limits, err := retained.Plan.RemainingExecutionBudget()
-	if err != nil || remaining.MaxSteps != paused.Plan.Budget.MaxSteps-completion.Outcome.Result.Steps || limits.ModelRequests != 256-completion.Outcome.Manifest.Usage.ModelRequests {
-		t.Fatal("spent work was restored", err)
-	}
-	if _, err := store.FinishTaskPlanEdit(request.ConversationID, retained.ID, retained.Plan.Revision, retained.Plan.Digest, turn.ID, &content, ""); err != nil {
-		t.Fatal("accounted task could not prepare fresh review", err)
-	}
+	for _, cancelled := range []bool{false, true} {
+		t.Run(map[bool]string{false: "replan", true: "cancel during handoff"}[cancelled], func(t *testing.T) {
+			state, store, request := claimedPlanFixture(t, []string{"read", "connected_write"}, "release")
+			request.RunID = "pausing-plan-run"
+			request.Mode = action.Act
+			request.Contract = artifact.InspectionContract()
+			request.Contract.ExternalActions = action.Approve
+			var effects atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { effects.Add(1); w.WriteHeader(http.StatusNoContent) }))
+			defer server.Close()
+			registry, err := connector.NewRegistry([]connector.Descriptor{{Version: 1, ID: "release", Name: "Controlled", Kind: connector.KindHTTPWebhook, Resource: server.URL, Authentication: connector.AuthNone}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			model := &scriptedModel{turns: []agent.Turn{{ToolCalls: []agent.ToolCall{{ID: "pending", Name: "connector_release_publish", Arguments: json.RawMessage(`{"payload":{"version":"v1"}}`)}}}, {Text: "Inspect the retained outcome."}}}
+			operation := (Service{Executor: Executor{Model: model, StateDir: state, Connectors: connector.Runtime{Registry: registry, HTTPClient: server.Client()}}}).Start(context.Background(), request)
+			defer func() {
+				operation.Cancel()
+				for range operation.Events {
+				}
+				<-operation.Done
+			}()
+			var review Interaction
+			select {
+			case review = <-operation.Interactions:
+			case <-time.After(10 * time.Second):
+				t.Fatal("review did not arrive")
+			}
+			turn, err := store.AdmitDialogue(request.ConversationID, "pause-running-task", "Correct that plan", json.RawMessage(`{"scope":"unchanged"}`), time.Now())
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, phase := range []string{"routing", "ready", "editing_plan"} {
+				turn.State = phase
+				if phase == "editing_plan" {
+					turn.Response = "Requesting a revised plan for review…"
+				}
+				if phase == "ready" {
+					turn.Decision, _ = json.Marshal(map[string]string{"kind": "revise_plan", "target": request.TaskPlan.RequestID, "instruction": turn.Text})
+				}
+				turn, err = store.UpdateDialogue(turn, turn.Revision)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			_, paused, claimed, err := store.BeginRunningPlanEdit(request.ConversationID, request.TaskPlan.RequestID, request.TaskPlan.Revision, request.TaskPlan.Digest, request.ConversationID, turn.ID, turn.Text, operation.RunID)
+			if err != nil || !claimed || paused.Plan.DrainingRun != operation.RunID || paused.Plan.Approval != nil {
+				t.Fatal("running dispatch was not fenced", err)
+			}
+			if cancelled {
+				if _, err := store.CancelTaskPlan(request.ConversationID, paused.ID, paused.Plan.Revision, paused.Plan.Digest); err != nil {
+					t.Fatal(err)
+				}
+			}
+			digest, _ := InteractionDigest(review)
+			if err := operation.respondBound(review.ID, digest, true); err != nil {
+				t.Fatal(err)
+			}
+			for range operation.Events {
+			}
+			completion := <-operation.Done
+			if effects.Load() != 0 {
+				t.Fatal("old exact approval escaped revoked plan")
+			}
+			content := *paused.Plan.Content
+			if _, err := store.FinishTaskPlanEdit(request.ConversationID, paused.ID, paused.Plan.Revision, paused.Plan.Digest, turn.ID, &content, ""); err == nil {
+				t.Fatal("draining run acquired a replacement review before accounting")
+			}
+			if _, _, err := store.ApproveTaskPlan(request.ConversationID, paused.ID, paused.Plan.Revision, paused.Plan.Digest); err == nil {
+				t.Fatal("unaccounted draining run acquired execution approval")
+			}
+			if completion.Outcome.RevisionID == "" {
+				t.Fatal("stopped run did not retain a revision")
+			}
+			accounted, err := store.RetainDrainedPlanRun(request.ConversationID, paused.ID, paused.Plan.Revision, paused.Plan.Digest, operation.RunID, completion.Outcome.RevisionID)
+			if err != nil {
+				t.Fatal("could not attach original run accounting", err)
+			}
+			retained := accounted.Requests[0]
+			if retained.Plan.DrainingRun != "" || len(retained.Plan.Attempts) != 1 || retained.Plan.Budget != paused.Plan.Budget || retained.Text != paused.Text {
+				t.Fatal("accounting lost frozen task or original budget")
+			}
+			remaining, limits, err := retained.Plan.RemainingExecutionBudget()
+			if err != nil || remaining.MaxSteps != paused.Plan.Budget.MaxSteps-completion.Outcome.Result.Steps || limits.ModelRequests != 256-completion.Outcome.Manifest.Usage.ModelRequests {
+				t.Fatal("spent work was restored", err)
+			}
+			if cancelled {
+				if retained.State != "discarded" || retained.Plan.Edit.State != "cancelled" {
+					t.Fatal("accounting replaced the user's cancellation")
+				}
+				if _, _, err := store.ApproveTaskPlan(request.ConversationID, retained.ID, retained.Plan.Revision, retained.Plan.Digest); err == nil {
+					t.Fatal("cancelled task acquired fresh approval")
+				}
+				return
+			}
+			if _, err := store.FinishTaskPlanEdit(request.ConversationID, retained.ID, retained.Plan.Revision, retained.Plan.Digest, turn.ID, &content, ""); err != nil {
+				t.Fatal("accounted task could not prepare fresh review", err)
+			}
 
+		})
+	}
 }

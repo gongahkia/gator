@@ -114,7 +114,9 @@ func (s Store) RetainDrainedPlanRun(id, request string, revision uint64, digest,
 	}
 	r := &j.Requests[index]
 	p := r.Plan.Clone()
-	if p.DrainingRun == "" || p.DrainingRun != runID || r.State != "queued" || p.Phase != "revising" || p.Edit == nil || p.Edit.State != "preparing" || len(p.Attempts) >= 32 {
+	pending := r.State == "queued" && p.Phase == "revising" && p.Edit != nil && p.Edit.State == "preparing"
+	cancelled := r.State == "discarded" && p.Phase == "interrupted" && p.Edit != nil && p.Edit.State == "cancelled"
+	if p.DrainingRun == "" || p.DrainingRun != runID || !pending && !cancelled || len(p.Attempts) >= 32 {
 		return j, ErrPlanChanged
 	}
 	retained, err := s.LoadRevision(id, revisionID)

@@ -31,7 +31,7 @@ outside this goal. Preserve the CLI/TUI as a client; no Swift UI is being built.
 
 | Backend workstream | Original findings | Current evidence and remaining acceptance |
 |---|---|---|
-| Conversational control | 1, 8, 12 | Initial preparation corrections exist. Pending external-action correction now has controlled Go/service and local-client evidence: same operation, exact old review withdrawn, fresh approval required; delegated control is verified with concurrent original work and parent-draft continuity. Repeated in-flight plan corrections have local and delegated controlled-provider evidence, including concurrent owners, provider failure and process-crash/restart without replay. Plan-bound pause/replan/review now has a local controlled journey with evidence and remaining-budget enforcement; delegated and broader lifecycle/account/effect paths remain. Reviewed input changes, delegated/race/failure/restart coverage remain. |
+| Conversational control | 1, 8, 12 | Initial preparation corrections exist. Pending external-action correction now has controlled Go/service and local-client evidence: same operation, exact old review withdrawn, fresh approval required; delegated control is verified with concurrent original work and parent-draft continuity. Repeated in-flight plan corrections have local and delegated controlled-provider evidence, including concurrent owners, provider failure and process-crash/restart without replay. Plan-bound pause/replan/review has local and delegated controlled journeys with retained evidence and remaining-budget enforcement; original uncertain effects block replacement approval across restart. Broader lifecycle/account/coding paths remain. Reviewed input changes, delegated/race/failure/restart coverage remain. |
 | Request-specific setup/recovery | 4, 12 | Existing provider setup/admission safeguards remain. Account/source/permission handoffs and provider rejection after admission need end-to-end verification and demonstrated gaps resolved; preserve request inputs and reject uncertain-effect replay. |
 | Authoritative settings/scope | 5, 8 | Existing canonical terminal/model settings remain. Inventory broader account/source/permission/processing/budget contracts, saved outcomes, cached-owner propagation, restart and current/future/background effects; reject changed identities and unauthorized expansion. |
 | Structured connected-item actions | 6, 8 | Existing local files/evidence/receipts retained. Complete supported provider item references and inspect/open/edit/reply/done paths with version/account/permission review and uncertain outcomes. |
@@ -67,6 +67,27 @@ Preserve both phases across continuations and do not declare the expanded work
 finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
+
+- Running-plan delegated ownership and uncertain-effect recovery (13 November):
+  controlled Go/host/client journeys now cover a corrected background execution
+  while its requesting owner remains busy. Navigation preserves each owner's
+  draft, correction returns to the original child, stale review cannot start
+  another run, and fresh review uses the measured remainder. A real loopback
+  external endpoint receives one exact-approved request before correction cancels
+  the call; its uncertain receipt blocks replacement approval both before and
+  after process restart. No second request or automatic execution occurs.
+  `/tmp/gator-backend-20261113-running-recovery-client.log`: **3 pass, 0 failures,
+  53 assertions**, observed exit 0. Runtime build and TypeScript checks pass.
+  A demonstrated cancellation gap is fixed: an explicitly discarded correction
+  can still attach the exact original run's accounting while retaining its
+  cancelled state. It cannot acquire approval. Real-Service/race cases pass in
+  `/tmp/gator-backend-20261113-running-cancel-race.log` (3.727 seconds).
+  Full session/run/app regression is running in
+  `/tmp/gator-backend-20261113-running-recovery-go-full.log`.
+  These are controlled-provider, actual-process and loopback-effect checks;
+  they do not establish physical audio or live-account/model quality. Explicit
+  input changes, staged-handoff crash/account/permission/coding cases, receipt
+  reconciliation and the other six backend workstreams remain open.
 
 - Plan-bound pause/replan accounting (13 November, local integrated behavior):
   ordinary correction now fences and cancels its exact running owner, retains
