@@ -813,6 +813,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		return outcome, fmt.Errorf("seal work artifacts: %w", sealErr)
 	}
 	manifest.PolicySHA256, _ = PolicyDigest(request)
+	manifest.Execution = &artifact.ExecutionAccounting{Limits: request.Limits, MaxSteps: request.MaxSteps, CodeMaxSteps: request.Code.MaxSteps, Steps: result.Steps}
 	manifest.Usage = request.Budget.Usage()
 	manifest.Usage.ModelRequests -= usageBefore.ModelRequests
 	manifest.Usage.UnknownRequests -= usageBefore.UnknownRequests

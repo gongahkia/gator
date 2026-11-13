@@ -232,7 +232,20 @@ func (m Model) ApplyTaskPlan(action TaskPlanAction) (tea.Model, tea.Cmd) {
 	case "inspect":
 		p := r.Plan.Clone()
 		m.planResult.Review = &TaskPlanReview{ID: r.ID, Revision: p.Revision, Digest: p.Digest, Task: r.Text, State: r.State, Phase: p.Phase, Budget: p.Budget, Sources: append([]string{}, p.Sources...), Content: p.Content}
-		m.planResult.Review.Issue = r.Issue
+		if len(p.Attempts) > 0 {
+			original := p.Budget
+			m.planResult.Review.OriginalBudget = &original
+			m.planResult.Review.Attempts = p.Clone().Attempts
+			remaining, _, err := p.RemainingExecutionBudget()
+			if err != nil {
+				m.planResult.Review.Issue = err.Error()
+			} else {
+				m.planResult.Review.Budget = remaining
+			}
+		}
+		if m.planResult.Review.Issue == "" {
+			m.planResult.Review.Issue = r.Issue
+		}
 		if p.Edit != nil {
 			m.planResult.Review.Correction, m.planResult.Review.EditState = p.Edit.Instruction, p.Edit.State
 		}
@@ -316,19 +329,21 @@ type TaskPlanSummary struct {
 	Issue    string                 `json:"issue,omitempty"`
 }
 type TaskPlanReview struct {
-	ID         string                   `json:"id"`
-	Revision   uint64                   `json:"revision"`
-	Digest     string                   `json:"digest"`
-	Task       string                   `json:"task"`
-	State      string                   `json:"state"`
-	Phase      string                   `json:"phase"`
-	Budget     worksession.PlanBudget   `json:"budget"`
-	Sources    []string                 `json:"sources"`
-	Content    *worksession.PlanContent `json:"content,omitempty"`
-	InputNames []string                 `json:"input_names,omitempty"`
-	Issue      string                   `json:"issue,omitempty"`
-	Correction string                   `json:"correction,omitempty"`
-	EditState  string                   `json:"edit_state,omitempty"`
+	ID             string                    `json:"id"`
+	Revision       uint64                    `json:"revision"`
+	Digest         string                    `json:"digest"`
+	Task           string                    `json:"task"`
+	State          string                    `json:"state"`
+	Phase          string                    `json:"phase"`
+	Budget         worksession.PlanBudget    `json:"budget"`
+	OriginalBudget *worksession.PlanBudget   `json:"original_budget,omitempty"`
+	Attempts       []worksession.PlanAttempt `json:"attempts,omitempty"`
+	Sources        []string                  `json:"sources"`
+	Content        *worksession.PlanContent  `json:"content,omitempty"`
+	InputNames     []string                  `json:"input_names,omitempty"`
+	Issue          string                    `json:"issue,omitempty"`
+	Correction     string                    `json:"correction,omitempty"`
+	EditState      string                    `json:"edit_state,omitempty"`
 }
 
 func (m Model) taskPlanSummaries() []TaskPlanSummary {

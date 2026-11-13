@@ -27,7 +27,8 @@ type TaskPlan struct {
 	Edit     *PlanEdit     `json:"edit,omitempty"`
 	// DrainingRun fences a reviewed execution before its tool-free replan.
 	// The owner must retain that run's result and measured budget before review.
-	DrainingRun string `json:"draining_run,omitempty"`
+	DrainingRun string        `json:"draining_run,omitempty"`
+	Attempts    []PlanAttempt `json:"attempts,omitempty"`
 }
 type PlanBinding struct {
 	UpdatedAt      time.Time `json:"conversation_updated_at"`
@@ -138,13 +139,17 @@ func (p TaskPlan) contentDigest() string {
 		Content     *PlanContent
 		Edit        *PlanEditReference `json:",omitempty"`
 		DrainingRun string             `json:",omitempty"`
-	}{p.Version, p.Revision, p.Binding, p.Sources, p.Budget, p.Content, edit, p.DrainingRun})
+		Attempts    []PlanAttempt      `json:",omitempty"`
+	}{p.Version, p.Revision, p.Binding, p.Sources, p.Budget, p.Content, edit, p.DrainingRun, p.Attempts})
 	return planHash(data)
 }
 func validateTaskPlan(r Request) error {
 	p := r.Plan
 	if p == nil {
 		return nil
+	}
+	if err := validatePlanAttempts(p.Attempts); err != nil {
+		return err
 	}
 	if p.Version != 1 || !catalogIdentity.MatchString(p.Binding.ConversationID) || p.Binding.UpdatedAt.IsZero() || p.Binding.RequestID != r.ID || p.Binding.OptionsSHA256 != optionsHash(r.Options) || p.Binding.PromptSHA256 != planHash([]byte(r.Text)) || (len(p.Binding.SourceSHA256) != 64 || strings.Trim(p.Binding.SourceSHA256, "0123456789abcdef") != "") || len(p.Sources) > 16 || p.Budget.MaxSteps < 0 || p.Budget.MaxSteps > 100000 || p.Budget.CodeMaxSteps < 0 || p.Budget.CodeMaxSteps > 100000 {
 		return errors.New("invalid retained plan binding")
@@ -320,6 +325,14 @@ func (s Store) ApproveTaskPlan(id, request string, revision uint64, digest strin
 		return j, false, err
 	}
 	r := &j.Requests[index]
+	if err := s.checkPlanAttemptEffects(r.Plan); err != nil {
+		return j, false, err
+	}
+	if len(r.Plan.Attempts) > 0 {
+		if _, _, err := r.Plan.RemainingExecutionBudget(); err != nil {
+			return j, false, err
+		}
+	}
 	if r.Plan.Approval != nil && r.Plan.Approval.Revision == revision && r.Plan.Approval.Digest == digest {
 		return j, false, nil
 	}
@@ -368,6 +381,11 @@ func (s Store) CancelTaskPlan(id, request string, revision uint64, digest string
 // CheckPlanDispatch is rechecked under the execution lease and again at the
 // Work boundary. Inspecting or approving a plan does not dispatch anything.
 func (s Store) CheckPlanDispatch(id string, r Request) error {
+	if r.Plan != nil {
+		if err := s.checkPlanAttemptEffects(r.Plan); err != nil {
+			return err
+		}
+	}
 	if err := s.CheckPlanBinding(id, r); err != nil {
 		return err
 	}

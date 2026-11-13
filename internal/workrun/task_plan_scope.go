@@ -66,6 +66,15 @@ func loadReviewedTaskPlan(request Request) (*worksession.TaskPlan, error) {
 		if r.Plan.Budget.MaxSteps > 0 && request.MaxSteps > r.Plan.Budget.MaxSteps || r.Plan.Budget.CodeMaxSteps > 0 && request.Code.MaxSteps > r.Plan.Budget.CodeMaxSteps {
 			return nil, errors.New("execution limits exceed the reviewed plan")
 		}
+		if len(r.Plan.Attempts) > 0 {
+			remaining, limits, err := r.Plan.RemainingExecutionBudget()
+			if err != nil {
+				return nil, err
+			}
+			if request.MaxSteps > remaining.MaxSteps || request.EnableCode && request.Code.MaxSteps > remaining.CodeMaxSteps || request.Limits.ModelRequests <= 0 || request.Limits.ModelRequests > limits.ModelRequests || request.Limits.WallSeconds <= 0 || request.Limits.WallSeconds > limits.WallSeconds || limits.Tokens > 0 && (request.Limits.Tokens <= 0 || request.Limits.Tokens > limits.Tokens) {
+				return nil, errors.New("execution limits exceed the original task's remaining budget")
+			}
+		}
 		return r.Plan.Clone(), nil
 	}
 	return nil, worksession.ErrPlanChanged
@@ -161,6 +170,15 @@ func taskPlanToolCheck(request Request, surface []agent.Tool) func(context.Conte
 			return err
 		}
 		for _, effect := range effects {
+			if effect == "code" && len(plan.Attempts) > 0 {
+				remaining, _, err := plan.RemainingExecutionBudget()
+				if err != nil {
+					return err
+				}
+				if remaining.CodeMaxSteps == 0 {
+					return errors.New("original coding step budget exhausted")
+				}
+			}
 			if !slices.Contains(plan.Content.Effects, effect) {
 				return fmt.Errorf("the reviewed plan does not include %s effects; stop and review a revised plan before continuing", effect)
 			}

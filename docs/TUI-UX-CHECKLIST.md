@@ -31,7 +31,7 @@ outside this goal. Preserve the CLI/TUI as a client; no Swift UI is being built.
 
 | Backend workstream | Original findings | Current evidence and remaining acceptance |
 |---|---|---|
-| Conversational control | 1, 8, 12 | Initial preparation corrections exist. Pending external-action correction now has controlled Go/service and local-client evidence: same operation, exact old review withdrawn, fresh approval required; delegated control is verified with concurrent original work and parent-draft continuity. Repeated in-flight plan corrections have local and delegated controlled-provider evidence, including concurrent owners, provider failure and process-crash/restart without replay. Plan-bound pause/replan/review, reviewed input changes, delegated/race/failure/restart coverage remain. |
+| Conversational control | 1, 8, 12 | Initial preparation corrections exist. Pending external-action correction now has controlled Go/service and local-client evidence: same operation, exact old review withdrawn, fresh approval required; delegated control is verified with concurrent original work and parent-draft continuity. Repeated in-flight plan corrections have local and delegated controlled-provider evidence, including concurrent owners, provider failure and process-crash/restart without replay. Plan-bound pause/replan/review now has a local controlled journey with evidence and remaining-budget enforcement; delegated and broader lifecycle/account/effect paths remain. Reviewed input changes, delegated/race/failure/restart coverage remain. |
 | Request-specific setup/recovery | 4, 12 | Existing provider setup/admission safeguards remain. Account/source/permission handoffs and provider rejection after admission need end-to-end verification and demonstrated gaps resolved; preserve request inputs and reject uncertain-effect replay. |
 | Authoritative settings/scope | 5, 8 | Existing canonical terminal/model settings remain. Inventory broader account/source/permission/processing/budget contracts, saved outcomes, cached-owner propagation, restart and current/future/background effects; reject changed identities and unauthorized expansion. |
 | Structured connected-item actions | 6, 8 | Existing local files/evidence/receipts retained. Complete supported provider item references and inspect/open/edit/reply/done paths with version/account/permission review and uncertain outcomes. |
@@ -67,6 +67,48 @@ Preserve both phases across continuations and do not declare the expanded work
 finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
+
+- Plan-bound pause/replan accounting (13 November, local integrated behavior):
+  ordinary correction now fences and cancels its exact running owner, retains
+  the stopped result and sealed bundle, then prepares a replacement in that same
+  task. The handoff accepts only that run's verified newly retained head; missing
+  accounting, an unrelated head, missing evidence or accounting failure leaves
+  the execution interrupted and unapproved. Immutable attempt records join later
+  review digests and preserve original files, receipts and frozen task/options.
+  Native manifests now record actual outer steps and effective model/time limits.
+  Replacement admission subtracts measured steps, coding steps, aggregate model
+  requests, tokens and runtime; zero remaining cannot become default fresh limits.
+  Both the Go execution boundary and plan tool checks enforce the remainder.
+  Unknown/live original action receipts prevent replacement approval/dispatch;
+  inspection or restart does not replay them. Typed plan review exposes the
+  original budget, remaining step budget and original-attempt provenance.
+  The real Service fence/retention test passes in
+  `/tmp/gator-backend-20261113-plan-accounting-service.log`; bounds/exhaustion,
+  overflow and related gates pass in
+  `/tmp/gator-backend-20261113-plan-accounting-focused.log`. The first native
+  Go/host/client journey passes (1 test, 16 assertions) in
+  `/tmp/gator-backend-20261113-plan-accounting-client.log`: ordinary correction
+  during approved work, same task, retained evidence, stale review rejected,
+  fresh review, reduced actual manifest limits and draft/restart without replay.
+  Full session/app/run/artifact regression passes (79.658 / 72.098 / 127.830 /
+  4.464 seconds), observed exit 0, in
+  `/tmp/gator-backend-20261113-plan-accounting-full.log`. Focused race gates pass
+  in `/tmp/gator-backend-20261113-plan-accounting-race.log`. The small final review
+  projection is covered by focused app checks. Rebuilt client verification passes
+  in `/tmp/gator-backend-20261113-plan-accounting-client-final.log`: 3 tests,
+  58 assertions, including original/remaining budget inspection and pending-action
+  correction regression. TypeScript checks pass. Final guards pass in
+  `/tmp/gator-backend-20261113-plan-accounting-final-guards.log`, including the
+  final exact-head-epoch check; prior full/native runs preceded that small guard.
+  Delegated plan-bound correction, repeated/cancel/crash/account-change paths,
+  actual uncertain-effect reconciliation, coding/aggregate-limit journeys and
+  changed-input transitions still need integrated verification. This is
+  controlled-provider and process evidence; no physical/live verification is
+  claimed, and the backend goal is not complete.
+
+- Prior running-plan-fence regression passed with exit 0: session/app/run
+  73.458 / 66.849 / 132.381 seconds in
+  `/tmp/gator-backend-20261113-plan-pause-full.log`.
 
 - Plan-bound correction handoff safeguards (13 November, workflow incomplete):
   the canonical store can now revoke an exact running dispatch and retain its

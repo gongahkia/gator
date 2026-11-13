@@ -145,6 +145,18 @@ func bindDesktopTaskPlan(stateDir string, options workapp.RunOptions, request *w
 		}
 		request.TaskPlan = &workrun.TaskPlanReference{RequestID: r.ID, Revision: r.Plan.Revision, Digest: r.Plan.Digest}
 		request.ConnectorIDs = append([]string{}, r.Plan.Content.Sources...)
+		if len(r.Plan.Attempts) > 0 {
+			remaining, limits, err := r.Plan.RemainingExecutionBudget()
+			if err != nil {
+				return err
+			}
+			request.MaxSteps, request.Limits = remaining.MaxSteps, limits
+			request.Code.MaxSteps = max(1, remaining.CodeMaxSteps)
+			if remaining.CodeMaxSteps == 0 {
+				request.EnableCode = false
+				request.DisabledRoles = append(request.DisabledRoles, "code")
+			}
+		}
 		return nil
 	}
 	return worksession.ErrPlanChanged

@@ -307,6 +307,23 @@ func (m *Model) finishRequest(value runDone, stopped bool) {
 		if r.ID != m.activeRequest {
 			continue
 		}
+		if r.Plan != nil && r.Plan.DrainingRun != "" {
+			retained, err := m.config.SessionStore.RetainDrainedPlanRun(m.conversation, r.ID, r.Plan.Revision, r.Plan.Digest, m.lastWorkID, value.RevisionID)
+			if err == nil {
+				m.requests = retained
+				m.activeRequest = ""
+				return
+			}
+			r.Plan = r.Plan.Clone()
+			r.State, r.Plan.Phase = "interrupted", "interrupted"
+			r.Plan.Edit.State, r.Plan.Edit.Issue = "failed", "Could not verify the stopped execution and its remaining budget: "+err.Error()
+			r.Issue = r.Plan.Edit.Issue
+			r.WorkID, r.RevisionID = m.lastWorkID, value.RevisionID
+			r.UpdatedAt = time.Now().UTC()
+			_ = m.saveRequests(j)
+			m.activeRequest = ""
+			return
+		}
 		r.State = "completed"
 		if value.Error != "" {
 			r.State = "failed"

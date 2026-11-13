@@ -442,6 +442,26 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
+	if m.planRevising == requestID && requestID != "" {
+		for _, r := range m.requests.Requests {
+			if r.ID != requestID || r.Plan == nil {
+				continue
+			}
+			if r.State == "queued" && r.Plan.Phase == "revising" && r.Plan.DrainingRun == "" && !wasCancelling {
+				return m.continueInitialPlanRevision(r)
+			}
+			if r.State == "queued" && wasCancelling {
+				if saved, err := m.config.SessionStore.CancelTaskPlan(m.conversation, r.ID, r.Plan.Revision, r.Plan.Digest); err == nil {
+					m.requests = saved
+				} else {
+					m.requestsIssue = err.Error()
+				}
+			}
+			m.planRevising, m.planEditTurn = "", ""
+			m.publishPlanEditOutcome(r.ID)
+			return m, nil
+		}
+	}
 	if value.Error == "" && !wasCancelling && len(m.queue) > 0 && m.config.Run != nil && !m.requestsRecovered && m.requestsIssue == "" && !m.queue[0].interrupted {
 		return m.runQueued(0)
 	}

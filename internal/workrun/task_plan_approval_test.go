@@ -268,7 +268,7 @@ func TestRevokedRunningPlanCannotReleasePreviouslyPendingAction(t *testing.T) {
 	}
 	for range operation.Events {
 	}
-	<-operation.Done
+	completion := <-operation.Done
 	if effects.Load() != 0 {
 		t.Fatal("old exact approval escaped revoked plan")
 	}
@@ -279,4 +279,23 @@ func TestRevokedRunningPlanCannotReleasePreviouslyPendingAction(t *testing.T) {
 	if _, _, err := store.ApproveTaskPlan(request.ConversationID, paused.ID, paused.Plan.Revision, paused.Plan.Digest); err == nil {
 		t.Fatal("unaccounted draining run acquired execution approval")
 	}
+	if completion.Outcome.RevisionID == "" {
+		t.Fatal("stopped run did not retain a revision")
+	}
+	accounted, err := store.RetainDrainedPlanRun(request.ConversationID, paused.ID, paused.Plan.Revision, paused.Plan.Digest, operation.RunID, completion.Outcome.RevisionID)
+	if err != nil {
+		t.Fatal("could not attach original run accounting", err)
+	}
+	retained := accounted.Requests[0]
+	if retained.Plan.DrainingRun != "" || len(retained.Plan.Attempts) != 1 || retained.Plan.Budget != paused.Plan.Budget || retained.Text != paused.Text {
+		t.Fatal("accounting lost frozen task or original budget")
+	}
+	remaining, limits, err := retained.Plan.RemainingExecutionBudget()
+	if err != nil || remaining.MaxSteps != paused.Plan.Budget.MaxSteps-completion.Outcome.Result.Steps || limits.ModelRequests != 256-completion.Outcome.Manifest.Usage.ModelRequests {
+		t.Fatal("spent work was restored", err)
+	}
+	if _, err := store.FinishTaskPlanEdit(request.ConversationID, retained.ID, retained.Plan.Revision, retained.Plan.Digest, turn.ID, &content, ""); err != nil {
+		t.Fatal("accounted task could not prepare fresh review", err)
+	}
+
 }

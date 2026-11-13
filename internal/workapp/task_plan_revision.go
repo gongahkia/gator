@@ -20,10 +20,11 @@ type taskPlanRevised struct {
 func (m Model) startTaskPlanRevision(id, controlID, parent, turnID, instruction string) (Model, tea.Cmd, error) {
 	preparing := m.running && id == m.planPreparing && m.planRevising == "" && m.cancel != nil && !m.cancelling
 	revising := m.running && id == m.planRevising && m.cancel != nil && !m.cancelling
-	if !m.retainsRequests() || m.config.RevisePlan == nil || m.running && !preparing && !revising || m.controlBusy || m.followupSaving || m.receiptBusy || m.requestsIssue != "" {
+	executing := m.running && id == m.activeRequest && m.operation != nil && m.cancel != nil && !m.cancelling
+	if !m.retainsRequests() || m.config.RevisePlan == nil || m.running && !preparing && !revising && !executing || m.controlBusy || m.followupSaving || m.receiptBusy || m.requestsIssue != "" {
 		return m, nil, errors.New("this owner is not ready to revise its retained plan")
 	}
-	if !preparing && !revising && m.dialogueHost && !m.dialogueCanStart {
+	if !preparing && !revising && !executing && m.dialogueHost && !m.dialogueCanStart {
 		return m, nil, errors.New("three tasks are working; wait for one to finish before revising this plan")
 	}
 	release := func() {}
@@ -36,7 +37,7 @@ func (m Model) startTaskPlanRevision(id, controlID, parent, turnID, instruction 
 	}
 	defer release()
 	var lease *os.File
-	if !preparing && !revising {
+	if !preparing && !revising && !executing {
 		var err error
 		lease, err = m.config.SessionStore.AcquireExecution(m.conversation)
 		if err != nil {
@@ -65,7 +66,13 @@ func (m Model) startTaskPlanRevision(id, controlID, parent, turnID, instruction 
 		closeLease()
 		return m, nil, worksession.ErrPlanChanged
 	}
-	journal, request, claimed, err := m.config.SessionStore.BeginTaskPlanEdit(m.conversation, id, original.Plan.Revision, original.Plan.Digest, parent, turnID, instruction)
+	var request worksession.Request
+	var claimed bool
+	if executing && original.Plan != nil && original.Plan.Phase == "dispatching" {
+		journal, request, claimed, err = m.config.SessionStore.BeginRunningPlanEdit(m.conversation, id, original.Plan.Revision, original.Plan.Digest, parent, turnID, instruction, m.operation.RunID)
+	} else {
+		journal, request, claimed, err = m.config.SessionStore.BeginTaskPlanEdit(m.conversation, id, original.Plan.Revision, original.Plan.Digest, parent, turnID, instruction)
+	}
 	if err != nil {
 		closeLease()
 		return m, nil, err
@@ -79,6 +86,12 @@ func (m Model) startTaskPlanRevision(id, controlID, parent, turnID, instruction 
 		m.bridgeNotice = "Correction retained, but an earlier correction receipt needs reconciliation: " + err.Error()
 	}
 	m.refreshPlanEditMessages()
+	if executing {
+		m.planRevising, m.planEditTurn = id, turnID
+		m.cancel()
+		m.status = "Correction retained. Stopping the reviewed run and accounting its results before replanning…"
+		return m, nil, nil
+	}
 	if revising {
 		// Keep the draining call's identity until its completion releases its
 		// lease. The canonical plan already rejects that obsolete result.

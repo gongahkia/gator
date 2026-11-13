@@ -38,6 +38,7 @@ type Evidence struct {
 }
 
 type Manifest struct {
+	Execution        *ExecutionAccounting   `json:"execution_accounting,omitempty"`
 	Research         *ResearchEvidence      `json:"research,omitempty"`
 	Usage            agent.Usage            `json:"usage"`
 	Evidence         []Evidence             `json:"evidence,omitempty"`
@@ -60,6 +61,15 @@ type Manifest struct {
 	Failure          string                 `json:"failure,omitempty"`
 	StartedAt        time.Time              `json:"started_at"`
 	FinishedAt       time.Time              `json:"finished_at"`
+}
+
+// ExecutionAccounting is recorded by the native runner, never by model prose.
+// Older manifests omit it and cannot establish a remaining execution budget.
+type ExecutionAccounting struct {
+	Limits       agent.Limits `json:"limits"`
+	MaxSteps     int          `json:"max_steps"`
+	CodeMaxSteps int          `json:"code_max_steps"`
+	Steps        int          `json:"steps"`
 }
 
 // ResearchEvidence is a historical usage record, never a reusable web grant.
@@ -135,6 +145,9 @@ type ValidationResult struct {
 // exported. It intentionally does not touch artifact bytes; Seal is the only
 // constructor that establishes their evidence.
 func (m Manifest) Validate() error {
+	if e := m.Execution; e != nil && (e.Steps < 0 || e.MaxSteps < 1 || e.Steps > e.MaxSteps || e.CodeMaxSteps < 0 || e.Limits.ModelRequests < 1 || e.Limits.ModelRequests > 4096 || e.Limits.Tokens < 0 || e.Limits.WallSeconds < 1 || e.Limits.WallSeconds > 86400) {
+		return errors.New("invalid native execution accounting")
+	}
 	if r := m.Research; r != nil {
 		if r.MaxRequests < 1 || r.MaxRequests > 64 || r.MaxSearches < 0 || r.MaxSearches > r.MaxRequests || r.Requests < 0 || r.Requests > r.MaxRequests || r.Searches < 0 || r.Searches > r.MaxSearches || r.Searches > r.Requests || r.ScopeReviews < 0 || r.ScopeReviews > 4 || len(r.Origins) > 16 || len(r.SearchProvider) > 128 {
 			return errors.New("invalid retained web research usage")
