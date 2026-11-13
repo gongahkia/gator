@@ -22,19 +22,20 @@ import (
 // An owner that disappears leaves an interrupted request for explicit review;
 // reading this journal never starts work.
 type Request struct {
-	Plan       *TaskPlan       `json:"plan,omitempty"`
-	ID         string          `json:"id"`
-	ClientID   string          `json:"client_id,omitempty"`
-	RetryOf    string          `json:"retry_of,omitempty"`
-	Edit       uint64          `json:"edit"`
-	Text       string          `json:"text"`
-	Options    json.RawMessage `json:"options"`
-	State      string          `json:"state"`
-	WorkID     string          `json:"work_id,omitempty"`
-	RevisionID string          `json:"revision_id,omitempty"`
-	Issue      string          `json:"issue,omitempty"`
-	CreatedAt  time.Time       `json:"created_at"`
-	UpdatedAt  time.Time       `json:"updated_at"`
+	ExecutionBoundary *PlanBinding    `json:"execution_boundary,omitempty"`
+	Plan              *TaskPlan       `json:"plan,omitempty"`
+	ID                string          `json:"id"`
+	ClientID          string          `json:"client_id,omitempty"`
+	RetryOf           string          `json:"retry_of,omitempty"`
+	Edit              uint64          `json:"edit"`
+	Text              string          `json:"text"`
+	Options           json.RawMessage `json:"options"`
+	State             string          `json:"state"`
+	WorkID            string          `json:"work_id,omitempty"`
+	RevisionID        string          `json:"revision_id,omitempty"`
+	Issue             string          `json:"issue,omitempty"`
+	CreatedAt         time.Time       `json:"created_at"`
+	UpdatedAt         time.Time       `json:"updated_at"`
 }
 
 type RequestJournal struct {
@@ -66,6 +67,16 @@ func (r Request) Pending() bool {
 }
 
 func validateRequest(r Request) error {
+	if b := r.ExecutionBoundary; b != nil {
+		if validID(b.ConversationID) != nil || b.RequestID != r.ID || b.UpdatedAt.IsZero() || !planDigest(b.SourceSHA256) || !planDigest(b.OptionsSHA256) || !planDigest(b.PromptSHA256) {
+			return errors.New("invalid original execution boundary")
+		}
+		// A stopped ordinary request may be explicitly edited for a future
+		// retry. Admission captures a new boundary before it runs again.
+		if (r.State == "running" || r.Plan != nil) && (b.OptionsSHA256 != optionsHash(r.OriginalAdmissionOptions()) || b.PromptSHA256 != planHash([]byte(r.Text))) {
+			return errors.New("running task differs from its captured execution boundary")
+		}
+	}
 	if err := validateTaskPlan(r); err != nil {
 		return err
 	}

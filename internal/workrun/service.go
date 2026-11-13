@@ -146,6 +146,7 @@ type Completion struct {
 }
 type Operation struct {
 	planBound    bool
+	reviewFence  bool
 	RunID        string
 	tasks        *orchestrator.Supervisor
 	Events       <-chan agent.Event
@@ -166,9 +167,38 @@ type pendingInteraction struct {
 }
 
 func (o *Operation) Cancel() { o.cancel() }
+
+// FreezeForReview fences new effect admission while the owner persists a
+// transition. The rollback is used only when that durable transition fails.
+func (o *Operation) FreezeForReview() (func(), error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	select {
+	case <-o.stopped:
+		return nil, errors.New("operation has stopped")
+	default:
+	}
+	if o.reviewFence {
+		return nil, errors.New("operation already awaits scope review")
+	}
+	o.reviewFence = true
+	var once sync.Once
+	return func() { once.Do(func() { o.mu.Lock(); defer o.mu.Unlock(); o.reviewFence = false }) }, nil
+}
+func (o *Operation) checkReviewFence() error {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if o.reviewFence {
+		return errors.New("operation paused for explicit scope review")
+	}
+	return nil
+}
 func (o *Operation) Steer(text string) error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
+	if o.reviewFence {
+		return errors.New("operation paused for explicit scope review")
+	}
 	if o.planBound {
 		return errors.New("stop and review a new plan before steering this work")
 	}
@@ -197,6 +227,9 @@ func (o *Operation) CanCorrectAction(id int, digest string) bool {
 }
 
 func (o *Operation) correctableAction(id int, digest string) error {
+	if o.reviewFence {
+		return errors.New("operation paused for explicit scope review")
+	}
 	if o.planBound {
 		return errors.New("review a revised plan before changing this planned action")
 	}
@@ -258,6 +291,9 @@ func (o *Operation) respondBound(id int, digest string, approved bool) error {
 func (o *Operation) respond(id int, digest string, approved bool) error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
+	if approved && o.reviewFence {
+		return errors.New("operation paused for explicit scope review")
+	}
 	pending, ok := o.pending[id]
 	if !ok {
 		return errors.New("interaction is no longer pending")
@@ -301,6 +337,7 @@ func (s Service) Start(ctx context.Context, request Request) *Operation {
 	interactions := make(chan Interaction, 8)
 	done := make(chan Completion, 1)
 	o := &Operation{planBound: request.TaskPlan != nil, RunID: request.RunID, Events: events, Interactions: interactions, Done: done, cancel: cancel, steering: make(chan string, 16), pending: map[int]pendingInteraction{}, stopped: ctx.Done()}
+	request.controlExecutionCheck = o.checkReviewFence
 	var lockOnce sync.Once
 	var liveLock *os.File
 	var lockErr error
@@ -337,6 +374,11 @@ func (s Service) Start(ctx context.Context, request Request) *Operation {
 		case approved := <-response:
 			if err := persistInteraction(InteractionRecord{Version: 1, Status: "resolved", Interaction: interaction, Approved: &approved}, id); err != nil {
 				return false, err
+			}
+			if approved {
+				if err := o.checkReviewFence(); err != nil {
+					return false, err
+				}
 			}
 			// An exact review can wait while its plan is revoked. Recheck the
 			// canonical dispatch after that wait, before releasing any effect.

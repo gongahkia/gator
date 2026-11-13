@@ -63,7 +63,7 @@ func (m Model) startTaskPlanRevision(id, controlID, parent, turnID, instruction 
 		}
 	}
 	task, ok := m.localConversationTask(original)
-	if !ok || !task.CanRevisePlan || task.ControlID == "" || task.ControlID != controlID && (controlID == "" || task.PreparationControlID != controlID) {
+	if !ok || !task.CanRevisePlan && !task.CanReviewInputs || task.ControlID == "" || task.ControlID != controlID && (controlID == "" || task.PreparationControlID != controlID) {
 		closeLease()
 		return m, nil, worksession.ErrPlanChanged
 	}
@@ -76,6 +76,10 @@ func (m Model) startTaskPlanRevision(id, controlID, parent, turnID, instruction 
 	if json.Unmarshal(correction.Options, &input) != nil {
 		closeLease()
 		return m, nil, errors.New("the correction's captured inputs are unavailable")
+	}
+	if original.Plan == nil && (input.RunOptions.ReplyToUpdateID != "" || len(input.RunOptions.Uploads)+len(input.RunOptions.Attachments) == 0) {
+		closeLease()
+		return m, nil, errors.New("a review transition requires the correction's explicit files; update replies retain their separate scope")
 	}
 	if len(input.RunOptions.Uploads)+len(input.RunOptions.Attachments) > 0 {
 		if input.Source != m.source {
@@ -98,7 +102,34 @@ func (m Model) startTaskPlanRevision(id, controlID, parent, turnID, instruction 
 	}
 	var request worksession.Request
 	var claimed bool
-	if executing && original.Plan != nil && original.Plan.Phase == "dispatching" {
+	if executing && original.Plan == nil {
+		rollback, freezeErr := m.operation.FreezeForReview()
+		if freezeErr != nil {
+			closeLease()
+			return m, nil, freezeErr
+		}
+		journal, request, err = m.config.SessionStore.PromoteRunningTaskInputs(m.conversation, id, parent, turnID, instruction, m.operation.RunID)
+		if err != nil {
+			// A failed write acknowledgement does not prove that no transition
+			// was persisted. Unfence only after confirming the original task.
+			confirmed := false
+			if retained, readErr := m.config.SessionStore.LoadRequests(m.conversation); readErr == nil {
+				for _, candidate := range retained.Requests {
+					if candidate.ID == id && candidate.Plan == nil && candidate.State == "running" && string(candidate.Options) == string(original.Options) {
+						confirmed = true
+					}
+				}
+			}
+			if confirmed {
+				rollback()
+			} else {
+				m.cancel()
+			}
+			closeLease()
+			return m, nil, err
+		}
+		claimed = true
+	} else if executing && original.Plan != nil && original.Plan.Phase == "dispatching" {
 		journal, request, claimed, err = m.config.SessionStore.BeginRunningPlanEdit(m.conversation, id, original.Plan.Revision, original.Plan.Digest, parent, turnID, instruction, m.operation.RunID)
 	} else {
 		journal, request, claimed, err = m.config.SessionStore.BeginTaskPlanEdit(m.conversation, id, original.Plan.Revision, original.Plan.Digest, parent, turnID, instruction)

@@ -187,3 +187,20 @@ func fmtConversationGuide(id string) string {
 	data, _ := json.Marshal(ConversationDecision{Kind: "guide", Target: id, Instruction: "Keep the comparison under $2,000."})
 	return string(data)
 }
+
+func TestUnplannedTaskOnlyOffersReviewTransitionForExplicitInputs(t *testing.T) {
+	request := ConversationRequest{Text: "Use the new file in this task", HasFiles: true, Tasks: []ConversationTask{{ID: "original", Title: "Analyze files", State: "running", CanReviewInputs: true}}}
+	decision := ConversationDecision{Kind: "revise_plan", Target: "original", Instruction: request.Text}
+	if err := decision.Validate(request); err != nil {
+		t.Fatal("explicit file correction could not enter review", err)
+	}
+	request.HasFiles = false
+	if decision.Validate(request) == nil {
+		t.Fatal("plain guidance silently promoted an ordinary task")
+	}
+	request.HasFiles = true
+	request.Tasks[0].CanReviewInputs = false
+	if decision.Validate(request) == nil {
+		t.Fatal("input transition invented owner authority")
+	}
+}

@@ -91,6 +91,7 @@ func dialogueReferenceContext(input *workapp.ConversationInput) (string, error) 
 	for index := range tasks {
 		tasks[index].CanGuide, tasks[index].CanStop = false, false
 		tasks[index].CanRevisePlan = false
+		tasks[index].CanReviewInputs = false
 		tasks[index].CanCorrectAction = false
 		tasks[index].ReviewControlID = ""
 	}

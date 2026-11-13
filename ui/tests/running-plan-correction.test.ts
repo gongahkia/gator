@@ -5,12 +5,12 @@ import {join,resolve} from "node:path"
 import {Application} from "@gator/application-host/application"
 import {GatorClient} from "../src/gator/client"
 async function until(check:()=>boolean,label:string){const end=Date.now()+15000;while(!check()){if(Date.now()>end)throw Error("Timed out: "+label);await Bun.sleep(20)}}
-for(const delegated of [false,true])test(`${delegated?"delegated":"local"} ordinary correction retains evidence and spends only remaining budget after fresh review`,async()=>{
+for(const direct of [false,true])for(const delegated of [false,true])test(`${direct?"direct":"planned"} ${delegated?"delegated":"local"} ordinary correction retains evidence and spends only remaining budget after fresh review`,async()=>{
  const root=await mkdtemp(join(tmpdir(),"gator-running-plan-"));let release!:()=>void;const held=new Promise<void>(r=>{release=r});let executions=0,parentExecutions=0;const proposals:any[]=[],workBodies:string[]=[]
  const plan={outcome:"Compare venues",steps:[{id:"compare",text:"Compare venues"}],sources:[],effects:["read"]}
  const server=Bun.serve({hostname:"127.0.0.1",port:0,async fetch(request){
   const body=await request.json() as any,system=body.messages.find((m:any)=>m.role==="system")?.content??"";let content:string
-  if(system.includes("You handle the conversation with Gator")){const meta=JSON.parse(body.messages.at(-1).content);content=JSON.stringify(meta.message==="Compare venues"?{kind:"task"}:meta.message==="Hello during reviewed work"?{kind:"reply",text:"The original owners are still working."}:{kind:"revise_plan",target:meta.tasks.find((t:any)=>t.can_revise_plan).id,instruction:meta.message})}
+  if(system.includes("You handle the conversation with Gator")){const meta=JSON.parse(body.messages.at(-1).content);content=JSON.stringify(meta.message==="Compare venues"?{kind:"task"}:meta.message==="Hello during reviewed work"?{kind:"reply",text:"The original owners are still working."}:{kind:"revise_plan",target:meta.tasks.find((t:any)=>t.title.includes("Compare venues")&&(t.can_revise_plan||meta.has_new_files&&t.can_review_inputs)).id,instruction:meta.message})}
   else if(system.includes("Propose a plan")){const meta=JSON.parse(body.messages.at(-1).content);proposals.push(meta);content=JSON.stringify({...plan,outcome:meta.correction?"Venues under $2,000":plan.outcome})}
   else if(body.messages.some((m:any)=>m.role==="user"&&m.content==="Research an unrelated topic")){parentExecutions++;await held;content="Unrelated original work completed."}
   else{executions++;workBodies.push(JSON.stringify(body));if(executions===1)await held;content="Reviewed venue comparison completed."}
@@ -23,26 +23,30 @@ for(const delegated of [false,true])test(`${delegated?"delegated":"local"} ordin
   const parent=client.state!.conversation_id!
   if(delegated){await client.edit("Research an unrelated topic");await client.submit();await until(()=>parentExecutions===1,"parent work held")}
   const originalFile=join(root,"original.txt");await writeFile(originalFile,"Original input: silver otter");await client.attach([originalFile]);const originalInput=client.draft.uploads![0]!.id
-  await client.edit("Compare venues",client.draft.uploads,undefined,true);await client.submit()
-  if(delegated){await until(()=>!!client.state?.dialogue_peers?.some(p=>p.can_revise_plan),"child review");const child=client.state!.dialogue![0]!.task_chat!;await client.host.sessions.open({conversation_id:child});await client.loadDraft()}
-  await until(()=>client.state?.task_plans?.[0]?.phase==="review","initial review")
-  const original=client.state!.task_plans![0]!,owner=client.state!.conversation_id!
+  await client.edit("Compare venues",client.draft.uploads,undefined,!direct);await client.submit()
+  if(delegated){await until(()=>!!client.state?.dialogue_peers?.some(p=>direct?p.can_review_inputs:p.can_revise_plan),"child review");const child=client.state!.dialogue![0]!.task_chat!;await client.host.sessions.open({conversation_id:child});await client.loadDraft()}
+  if(direct)await until(()=>executions===1,"direct original execution")
+  else await until(()=>client.state?.task_plans?.[0]?.phase==="review","initial review")
+  const owner=client.state!.conversation_id!
+  const firstRequest=JSON.parse(await readFile(join(root,"state/gator/conversations",owner,"requests.json"),"utf8")).requests[0]
+  const original=direct?{id:firstRequest.id,revision:0,digest:""}:client.state!.task_plans![0]!
   const approve=async(value:typeof original,id:string)=>client.send({type:"task_plan",task_plan:{conversation_id:owner,task_id:value.id,revision:value.revision,digest:value.digest,action:"approve",request_id:id}})
-  await approve(original,"initial-plan-approval");await until(()=>executions===1&&!!client.state?.running,"reviewed execution held")
-  if(delegated){await client.host.sessions.open({conversation_id:parent});await client.loadDraft();await until(()=>!!client.state?.dialogue_peers?.some(p=>p.conversation_id===owner&&p.can_revise_plan),"running child control")}
+  if(!direct)await approve(original,"initial-plan-approval");await until(()=>executions===1&&!!client.state?.running,"original execution held")
+  if(delegated){await client.host.sessions.open({conversation_id:parent});await client.loadDraft();await until(()=>!!client.state?.dialogue_peers?.some(p=>p.conversation_id===owner&&(direct?p.can_review_inputs:p.can_revise_plan)),"running child control")}
   const revisedFile=join(root,"revised.txt");await writeFile(revisedFile,"Revised input: golden heron");await client.attach([revisedFile]);const addedInput=client.draft.uploads![0]!.id
   await client.edit("Keep venues under $2,000 and use the revised input");await client.submit()
-  if(delegated){await until(()=>client.state?.dialogue?.at(-1)?.state==="guided","delegated correction result");expect(client.state?.conversation_id).toBe(parent);expect(client.state?.running).toBe(true);await client.edit("Hello during reviewed work");await client.submit();await until(()=>client.state?.dialogue?.at(-1)?.state==="answered","unrelated conversation");await client.edit("Preserve requesting chat draft");await client.host.sessions.open({conversation_id:owner});await client.loadDraft()}
-  await until(()=>client.state?.task_plans?.[0]?.phase==="review"&&!client.state?.running&&proposals.length===2,"corrected plan after accounting")
+  if(delegated){await until(()=>client.state?.dialogue?.at(-1)?.state==="guided","delegated correction result");expect(client.state?.conversation_id).toBe(parent);if(!client.state?.running)throw Error("Original parent execution ended: "+JSON.stringify(client.state?.messages.slice(-4)));expect(client.state?.running).toBe(true);await client.edit("Hello during reviewed work");await client.submit();await until(()=>client.state?.dialogue?.at(-1)?.state==="answered","unrelated conversation");await client.edit("Preserve requesting chat draft");await client.host.sessions.open({conversation_id:owner});await client.loadDraft()}
+  await until(()=>client.state?.task_plans?.[0]?.phase==="review"&&!client.state?.running&&proposals.length===(direct?1:2),"corrected plan after accounting")
   if(!delegated)expect(client.state?.dialogue?.at(-1)?.state).toBe("guided");expect(executions).toBe(1)
   const path=join(root,"state/gator/conversations",owner,"requests.json"),saved=JSON.parse(await readFile(path,"utf8")),r=saved.requests[0]
   expect(saved.requests).toHaveLength(1);expect(r.id).toBe(original.id);expect(r.plan.approval).toBeUndefined();expect(r.plan.attempts).toHaveLength(1);expect(r.plan.draining_run).toBeUndefined()
   expect(r.plan.attempts[0].usage.model_requests).toBeGreaterThan(0)
+  expect(!!r.plan.input_changes[0].before_options.PlanFirst).toBe(!direct);if(direct)expect(r.plan.input_changes[0].promoted).toBe(true);
   expect(r.options.Uploads).toEqual([originalInput,addedInput]);expect(r.plan.input_changes[0].added_uploads).toEqual([addedInput]);expect(r.plan.input_changes[0].before_options.Uploads).toEqual([originalInput])
   expect(workBodies[0]).toContain("silver otter");expect(workBodies[0]).not.toContain("golden heron")
-  await client.send({type:"upload_submit",upload:{request_id:r.client_id,context:"conversation:"+owner,text:r.text,files:[originalInput],plan_first:true}})
-  expect(executions).toBe(1);expect(proposals).toHaveLength(2)
-  await expect(client.send({type:"upload_submit",upload:{request_id:r.client_id,context:"conversation:"+owner,text:r.text,files:[originalInput,addedInput],plan_first:true}})).rejects.toThrow("identity")
+  await client.send({type:"upload_submit",upload:{request_id:r.client_id,context:"conversation:"+owner,text:r.text,files:[originalInput],plan_first:!direct}})
+  expect(executions).toBe(1);expect(proposals).toHaveLength(direct?1:2)
+  await expect(client.send({type:"upload_submit",upload:{request_id:r.client_id,context:"conversation:"+owner,text:r.text,files:[originalInput,addedInput],plan_first:!direct}})).rejects.toThrow("identity")
 
   await approve(original,"stale-plan-approval");expect(executions).toBe(1)
   const fresh=client.state!.task_plans![0]!
@@ -62,7 +66,7 @@ for(const delegated of [false,true])test(`${delegated?"delegated":"local"} ordin
   expect(manifest.execution_accounting.limits.model_requests).toBe(256-r.plan.attempts[0].usage.model_requests)
   expect(manifest.execution_accounting.max_steps).toBe(r.plan.budget.max_steps-r.plan.attempts[0].execution.steps)
   release();await client.close();client=new GatorClient(new Application(options));await client.start(owner)
-  expect(client.draft.text).toBe("Preserve this unrelated draft");expect(executions).toBe(2);expect(proposals).toHaveLength(2)
+  expect(client.draft.text).toBe("Preserve this unrelated draft");expect(executions).toBe(2);expect(proposals).toHaveLength(direct?1:2)
   if(delegated){await client.host.sessions.open({conversation_id:parent});await client.loadDraft();expect(client.draft.text).toBe("Preserve requesting chat draft");expect(parentExecutions).toBe(1)}
  }finally{release();await client.close();server.stop(true);await rm(root,{recursive:true,force:true})}
 },45000)
@@ -73,7 +77,7 @@ test("an uncertain original effect blocks replacement approval without replay",a
  const server=Bun.serve({hostname:"127.0.0.1",port:0,async fetch(request){
   if(new URL(request.url).pathname==="/effect"){effects++;await effect;return Response.json({id:"unconfirmed"})}
   const body=await request.json() as any,system=body.messages.find((m:any)=>m.role==="system")?.content??"";let message:any
-  if(system.includes("You handle the conversation with Gator")){const meta=JSON.parse(body.messages.at(-1).content);message={role:"assistant",content:JSON.stringify({kind:"revise_plan",target:meta.tasks.find((t:any)=>t.can_revise_plan).id,instruction:meta.message})}}
+  if(system.includes("You handle the conversation with Gator")){const meta=JSON.parse(body.messages.at(-1).content);message={role:"assistant",content:JSON.stringify({kind:"revise_plan",target:meta.tasks.find((t:any)=>t.can_revise_plan||meta.has_new_files&&t.can_review_inputs).id,instruction:meta.message})}}
   else if(system.includes("Propose a plan")){message={role:"assistant",content:JSON.stringify(plan)}}
   else{work++;message=work===1?{role:"assistant",tool_calls:[{id:"original-publish",type:"function",function:{name:"connector_release_publish",arguments:JSON.stringify({payload:{version:"v1"}})}}]}:{role:"assistant",content:"Inspect the original receipt before retrying."}}
   return Response.json({choices:[{message,finish_reason:message.tool_calls?"tool_calls":"stop"}],usage:{prompt_tokens:10,completion_tokens:10}})

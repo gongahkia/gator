@@ -116,6 +116,32 @@ func TestServiceActionCorrectionRetainsRunAndRequiresFreshExactApproval(t *testi
 	}
 	first := nextReview()
 	digest, _ := InteractionDigest(first)
+	rollback, err := operation.FreezeForReview()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if operation.CanCorrectAction(first.ID, digest) {
+		t.Fatal("fenced action still advertised corrections")
+	}
+	if err := operation.respondBound(first.ID, digest, true); err == nil {
+		t.Fatal("scope fence released an old approval")
+	}
+	if err := operation.Steer("new instruction"); err == nil {
+		t.Fatal("guidance bypassed scope fence")
+	}
+	if effects.Load() != 0 {
+		t.Fatal("fenced review dispatched an effect")
+	}
+	rollback()
+	laterRollback, err := operation.FreezeForReview()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rollback()
+	if err := operation.respondBound(first.ID, digest, true); err == nil {
+		t.Fatal("replayed rollback removed a later scope fence")
+	}
+	laterRollback()
 	if !operation.CanCorrectAction(first.ID, digest) || effects.Load() != 0 {
 		t.Fatal("action not held for review")
 	}

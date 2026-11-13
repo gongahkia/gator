@@ -26,6 +26,9 @@ func (m Model) localConversationTask(request worksession.Request) (workrun.Conve
 		}
 		task.CanGuide = m.bridgeGuidanceID() != "" && m.interaction == nil && !m.cancelling
 		task.CanStop = m.cancel != nil && !m.cancelling
+		if request.Plan == nil && request.ExecutionBoundary != nil && m.operation != nil && task.CanStop && m.config.RevisePlan != nil && m.config.ValidateUploads != nil {
+			task.CanReviewInputs = !m.controlBusy && !m.followupSaving && !m.receiptBusy && m.requestsIssue == ""
+		}
 		if request.Plan != nil && m.operation != nil && task.CanStop && m.config.RevisePlan != nil && (request.Plan.Phase == "dispatching" || request.Plan.DrainingRun == m.operation.RunID) {
 			task.CanRevisePlan = !m.controlBusy && !m.followupSaving && !m.receiptBusy && m.requestsIssue == ""
 		}

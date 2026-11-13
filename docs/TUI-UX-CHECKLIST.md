@@ -31,7 +31,7 @@ outside this goal. Preserve the CLI/TUI as a client; no Swift UI is being built.
 
 | Backend workstream | Original findings | Current evidence and remaining acceptance |
 |---|---|---|
-| Conversational control | 1, 8, 12 | Initial preparation corrections exist. Pending external-action correction now has controlled Go/service and local-client evidence: same operation, exact old review withdrawn, fresh approval required; delegated control is verified with concurrent original work and parent-draft continuity. Repeated in-flight plan corrections have local and delegated controlled-provider evidence, including concurrent owners, provider failure and process-crash/restart without replay. Plan-bound pause/replan/review has local and delegated controlled journeys with retained evidence and remaining-budget enforcement; original uncertain effects block replacement approval across restart. Broader lifecycle/account/coding paths remain. Reviewed input additions on existing plan tasks have local/delegated provider and retry evidence. Typed input removal from retained plan review now narrows the selected set with fresh approval, original retention and scoped replay. Non-plan transitions and broader race/failure/restart coverage remain. |
+| Conversational control | 1, 8, 12 | Initial preparation corrections exist. Pending external-action correction now has controlled Go/service and local-client evidence: same operation, exact old review withdrawn, fresh approval required; delegated control is verified with concurrent original work and parent-draft continuity. Repeated in-flight plan corrections have local and delegated controlled-provider evidence, including concurrent owners, provider failure and process-crash/restart without replay. Plan-bound pause/replan/review has local and delegated controlled journeys with retained evidence and remaining-budget enforcement; original uncertain effects block replacement approval across restart. Broader lifecycle/account/coding paths remain. Reviewed input additions on existing plan tasks have local/delegated provider and retry evidence. Typed input removal from retained plan review now narrows the selected set with fresh approval, original retention and scoped replay. Ordinary running tasks can now promote explicit file corrections into the same reviewed task, with original boundary and budget evidence. Broader account/coding/failure/restart combinations remain. |
 | Request-specific setup/recovery | 4, 12 | Existing provider setup/admission safeguards remain. Account/source/permission handoffs and provider rejection after admission need end-to-end verification and demonstrated gaps resolved; preserve request inputs and reject uncertain-effect replay. |
 | Authoritative settings/scope | 5, 8 | Existing canonical terminal/model settings remain. Inventory broader account/source/permission/processing/budget contracts, saved outcomes, cached-owner propagation, restart and current/future/background effects; reject changed identities and unauthorized expansion. |
 | Structured connected-item actions | 6, 8 | Existing local files/evidence/receipts retained. Complete supported provider item references and inspect/open/edit/reply/done paths with version/account/permission review and uncertain outcomes. |
@@ -67,6 +67,42 @@ Preserve both phases across continuations and do not declare the expanded work
 finished after only the terminal phase or a mobile scaffold.
 
 ## Verification journal
+
+- Ordinary execution to reviewed input scope (13 November): a direct task now
+  captures its original execution boundary before dispatch. A correction carrying
+  explicit files can fence that exact owner and promote the same retained request
+  into tool-free planning, preserving original options, inputs, request identity,
+  accounts and limits. Only review intent and file selection evolve through the
+  canonical digest-bound history. The old run is cancelled and accounted before
+  a replacement proposal can become reviewable; actual execution needs fresh
+  approval and uses the measured remaining budget. Plain guidance does not
+  silently opt into this transition, and update-reply scope is kept separate.
+  Local/delegated controlled-provider journeys pass alongside the existing plan
+  and uncertain-effect flows: **5 tests, 144 assertions**, observed exit 0, in
+  `/tmp/gator-backend-20261113-promote-client-verified.log`. They cover original
+  admission repeats, changed-payload rejection, uploaded originals/additions,
+  exact review, unrelated parent work, scope inspection, fresh execution with
+  reduced limits, retained drafts and restart without replay. The fixture selects
+  the named task when multiple owners offer review transitions; scope capability
+  alone never substitutes a different target. No live routing-quality claim is
+  made from this controlled decision fixture.
+  The runner's review fence blocks new main-loop tool admission, guidance and
+  pending approval release during persistence. Failed persistence rolls back only
+  after confirming the original unmodified running task; uncertain writes stop
+  the owner. Rollback is one-shot and cannot remove a later fence. Actual service
+  tests with the race detector pass in
+  `/tmp/gator-backend-20261113-promote-final-race.log`. Request boundary, promotion,
+  explicit retry/queue and router guards pass in
+  `/tmp/gator-backend-20261113-promote-store-final.log`,
+  `/tmp/gator-backend-20261113-promote-retry-final.log` and
+  `/tmp/gator-backend-20261113-promote-final-guards.log`. Full session/app/run/CLI
+  regression passes (63.109 / 93.661 / 183.422 / 280.282 seconds), observed exit 0,
+  in `/tmp/gator-backend-20261113-promote-go-full.log`; later small prevalidation,
+  one-shot rollback and interrupted-edit refinements have the focused gates above.
+  Runtime build and TypeScript checks pass. This is controlled provider/process
+  evidence; staged-persistence crash/failure and broader account/permission/coding
+  combinations and the other backend workstreams remain open. Legacy work without
+  a captured live boundary is not granted new authority by guessing its origin.
 
 - Typed selected-input removal (13 November): retained plan review exposes exact
   upload/source-file identities and a keyboard-accessible removal control. Go

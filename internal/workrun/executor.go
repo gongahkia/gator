@@ -735,7 +735,20 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	}
 	var scopeErr error
 	var beforeTool func(context.Context, agent.ToolCall) error
-	if check := taskPlanToolCheck(request, planSurface); check != nil {
+	checkScope := taskPlanToolCheck(request, planSurface)
+	if request.controlExecutionCheck != nil {
+		planCheck := checkScope
+		checkScope = func(ctx context.Context, call agent.ToolCall) error {
+			if err := request.controlExecutionCheck(); err != nil {
+				return err
+			}
+			if planCheck != nil {
+				return planCheck(ctx, call)
+			}
+			return nil
+		}
+	}
+	if check := checkScope; check != nil {
 		scopeCtx, stopScope := context.WithCancel(ctx)
 		defer stopScope()
 		ctx = scopeCtx

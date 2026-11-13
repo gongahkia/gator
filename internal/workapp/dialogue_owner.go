@@ -73,6 +73,7 @@ func (m Model) dialogueTaskState() *DialogueTaskState {
 			result.Summary = task.Summary
 			result.PreparationControlID = task.PreparationControlID
 			result.CanCorrectAction, result.ReviewControlID = task.CanCorrectAction, task.ReviewControlID
+			result.CanReviewInputs = task.CanReviewInputs
 		}
 		if r.ID == m.activeRequest && m.running {
 			result.State = "running"
@@ -250,7 +251,7 @@ func (m Model) ControlDialogue(control DialogueControl) (Model, tea.Cmd) {
 		for _, r := range m.requests.Requests {
 			if r.ID == control.TurnID {
 				if task, ok := m.localConversationTask(r); ok {
-					state = &DialogueTaskState{ParentID: m.conversation, DialoguePeer: DialoguePeer{ConversationID: m.conversation, TurnID: r.ID, RunID: task.ControlID, CanRevisePlan: task.CanRevisePlan, PreparationControlID: task.PreparationControlID, CanCorrectAction: task.CanCorrectAction, ReviewControlID: task.ReviewControlID}}
+					state = &DialogueTaskState{ParentID: m.conversation, DialoguePeer: DialoguePeer{ConversationID: m.conversation, TurnID: r.ID, RunID: task.ControlID, CanRevisePlan: task.CanRevisePlan, CanReviewInputs: task.CanReviewInputs, PreparationControlID: task.PreparationControlID, CanCorrectAction: task.CanCorrectAction, ReviewControlID: task.ReviewControlID}}
 					ownerRequest = r.ID
 				}
 				break
@@ -284,7 +285,7 @@ func (m Model) ControlDialogue(control DialogueControl) (Model, tea.Cmd) {
 			return fail(err.Error())
 		}
 	case "revise_plan":
-		if !state.CanRevisePlan {
+		if !state.CanRevisePlan && !state.CanReviewInputs {
 			return fail("the selected plan cannot be revised in its current state")
 		}
 		if ownerRequest == "" {

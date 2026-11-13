@@ -22,6 +22,7 @@ type PlanInputChange struct {
 	RemovedUploads     []string        `json:"removed_uploads,omitempty"`
 	RemovedAttachments []string        `json:"removed_attachments,omitempty"`
 	Manual             bool            `json:"manual,omitempty"`
+	Promoted           bool            `json:"promoted,omitempty"`
 	AfterSHA256        string          `json:"after_sha256"`
 }
 
@@ -113,10 +114,17 @@ func validatePlanInputChanges(r Request) error {
 	seen := map[string]bool{}
 	for _, change := range r.Plan.InputChanges {
 		key := change.ParentID + ":" + change.TurnID
-		if validID(change.ParentID) != nil || !planDigest(change.TurnID) || seen[key] || len(change.BeforeOptions) > 128*1024 || len(change.AddedUploads)+len(change.AddedAttachments)+len(change.RemovedUploads)+len(change.RemovedAttachments) == 0 || previous != "" && optionsHash(change.BeforeOptions) != previous {
+		if validID(change.ParentID) != nil || !planDigest(change.TurnID) || seen[key] || len(change.BeforeOptions) > 128*1024 || len(change.AddedUploads)+len(change.AddedAttachments)+len(change.RemovedUploads)+len(change.RemovedAttachments) == 0 && !change.Promoted || previous != "" && optionsHash(change.BeforeOptions) != previous {
 			return errors.New("invalid input scope history")
 		}
 		base := change.BeforeOptions
+		if change.Promoted {
+			var err error
+			base, err = promotePlanOptions(base)
+			if err != nil {
+				return err
+			}
+		}
 		if len(change.RemovedUploads)+len(change.RemovedAttachments) > 0 {
 			var err error
 			base, err = removePlanInputs(base, change.RemovedUploads, change.RemovedAttachments)

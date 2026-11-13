@@ -38,6 +38,7 @@ type DialoguePeer struct {
 	State                string `json:"state"`
 	CanGuide             bool   `json:"can_guide"`
 	CanStop              bool   `json:"can_stop"`
+	CanReviewInputs      bool   `json:"can_review_inputs"`
 	CanRevisePlan        bool   `json:"can_revise_plan"`
 	CanCorrectAction     bool   `json:"can_correct_action"`
 	ReviewControlID      string `json:"review_control_id,omitempty"`
@@ -225,7 +226,7 @@ func (m Model) conversationTasks() []workrun.ConversationTask {
 			if err != nil || turn.TaskChat != peer.ConversationID {
 				continue
 			}
-			tasks = append(tasks, workrun.ConversationTask{ID: peer.ConversationID, Title: boundedConversation(turn.Text, 256), State: peer.State, Summary: boundedConversation(peer.Summary, 2048), CanGuide: peer.CanGuide && peer.RunID != "", CanStop: peer.CanStop && peer.RunID != "", CanRevisePlan: peer.CanRevisePlan && peer.RunID != "", ControlID: peer.RunID, PreparationControlID: peer.PreparationControlID, CanCorrectAction: peer.CanCorrectAction && peer.ReviewControlID != "", ReviewControlID: peer.ReviewControlID})
+			tasks = append(tasks, workrun.ConversationTask{ID: peer.ConversationID, Title: boundedConversation(turn.Text, 256), State: peer.State, Summary: boundedConversation(peer.Summary, 2048), CanGuide: peer.CanGuide && peer.RunID != "", CanStop: peer.CanStop && peer.RunID != "", CanRevisePlan: peer.CanRevisePlan && peer.RunID != "", CanReviewInputs: peer.CanReviewInputs && peer.RunID != "", ControlID: peer.RunID, PreparationControlID: peer.PreparationControlID, CanCorrectAction: peer.CanCorrectAction && peer.ReviewControlID != "", ReviewControlID: peer.ReviewControlID})
 			seen[peer.ConversationID] = true
 		}
 	}
@@ -328,6 +329,7 @@ func (m Model) admitConversation(request BridgeUploadSubmission, text string) (t
 	for index := range input.TaskContext {
 		input.TaskContext[index].CanGuide, input.TaskContext[index].CanStop = false, false
 		input.TaskContext[index].CanRevisePlan = false
+		input.TaskContext[index].CanReviewInputs = false
 		input.TaskContext[index].CanCorrectAction = false
 		input.TaskContext[index].ReviewControlID = ""
 		input.TaskContext[index].PreparationControlID = ""

@@ -281,6 +281,14 @@ func (m *Model) admitRun(prompt string, options RunOptions) (func(), error) {
 		j.Requests = append(j.Requests, retry)
 		index = len(j.Requests) - 1
 	}
+	if j.Requests[index].Plan == nil {
+		boundary, err := m.config.SessionStore.ExecutionBoundary(m.conversation, j.Requests[index])
+		if err != nil {
+			release()
+			return nil, err
+		}
+		j.Requests[index].ExecutionBoundary = &boundary
+	}
 	j.Requests[index].State, j.Requests[index].UpdatedAt = "running", time.Now().UTC()
 	if err := m.saveRequests(j); err != nil {
 		release()
