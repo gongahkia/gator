@@ -32,7 +32,7 @@ outside this goal. Preserve the CLI/TUI as a client; no Swift UI is being built.
 | Backend workstream | Original findings | Current evidence and remaining acceptance |
 |---|---|---|
 | Conversational control | 1, 8, 12 | Initial preparation corrections exist. Pending external-action correction now has controlled Go/service and local-client evidence: same operation, exact old review withdrawn, fresh approval required; delegated control is verified with concurrent original work and parent-draft continuity. Repeated in-flight plan corrections have local and delegated controlled-provider evidence, including concurrent owners, provider failure and process-crash/restart without replay. Plan-bound pause/replan/review has local and delegated controlled journeys with retained evidence and remaining-budget enforcement; original uncertain effects block replacement approval across restart. Broader lifecycle/account/coding paths remain. Reviewed input additions on existing plan tasks have local/delegated provider and retry evidence. Typed input removal from retained plan review now narrows the selected set with fresh approval, original retention and scoped replay. Ordinary running tasks can now promote explicit file corrections into the same reviewed task, with original boundary and budget evidence. Broader account/coding/failure/restart combinations remain. |
-| Request-specific setup/recovery | 4, 12 | Existing provider setup/admission safeguards remain. Account/source/permission handoffs and provider rejection after admission need end-to-end verification and demonstrated gaps resolved; preserve request inputs and reject uncertain-effect replay. |
+| Request-specific setup/recovery | 4, 12 | Provider HTTP rejection now retains typed native outcomes and an explicit original-task recovery path through tool-free planning and fresh review. Original inputs, attempts, processing/account scope and remaining budget remain bound; actions with possible effects cannot be replayed through this path. Verification is recorded below. Request-specific missing-account/source/permission handoffs, broader provider/capability failures and the complete journey remain open. |
 | Authoritative settings/scope | 5, 8 | Existing canonical terminal/model settings remain. Inventory broader account/source/permission/processing/budget contracts, saved outcomes, cached-owner propagation, restart and current/future/background effects; reject changed identities and unauthorized expansion. |
 | Structured connected-item actions | 6, 8 | Existing local files/evidence/receipts retained. Complete supported provider item references and inspect/open/edit/reply/done paths with version/account/permission review and uncertain outcomes. |
 | Typed workflows | 9 | Inventory opaque public workflows; complete supported Go/host typed fields, defaults, choices, validation, reviews, operation results and recovery without a new command engine. |
@@ -44,6 +44,65 @@ journey must cover setup/access, persisted scope, commitment, unrelated dialogue
 task correction, pending-action correction, stale rejection, fresh exact approval,
 connected-item results and restart/disconnection. Physical/live prerequisites
 remain to be inspected; prior fixture checks do not establish them.
+
+## Provider rejection recovery (13 November, controlled verification)
+
+- Commits: `d306debf8` (native provider status) and `343197210` (retained
+  request recovery, host/client wiring and integration checks).
+- Native provider errors preserve HTTP status through runner wrappers without
+  parsing provider prose or changing existing transient retry limits. Admitted
+  credential, model-access, provider-credit, rate-limit and work-budget failures
+  have bounded backend recovery information; application connectivity and
+  configured model readiness remain separate from that task's remote outcome.
+- The host exposes an identity-bound recovery operation and `/request-recovery`
+  supplies minimal existing-client access. Preparation retains the same logical
+  request and exact original inputs. It accounts immutable failed-run evidence
+  before one journal save, invokes tool-free planning, and requires fresh exact
+  review. Both direct and previously reviewed tasks use the existing plan owner.
+  Earlier correction instructions and cumulative execution costs remain retained.
+- Recovery checks original model selection, workspace boundary and canonical
+  account/permission/processing configuration. Changed scope is rejected before
+  preparation, approval and native dispatch. No field in the client action can
+  replace accounts, options, budgets, grants or backend retry-safety decisions.
+- Retry safety uses actual registered native tool attempts. Any attempted
+  operation outside known read effects prevents this recovery path from replaying
+  it; original action-log unknown/live outcomes remain an independent guard.
+  Missing durable run/revision evidence also disables reviewed retry. Failed
+  recovery inputs remain protected during journal/upload cleanup until dismissal.
+- Verification: rebuilt the native Go runtime (`node scripts/build-runtime.mjs`
+  from `ui`); `bun run check` passed. All evidence logs for this slice use the
+  `/tmp/gator-backend-20261113-recovery-` prefix.
+  - `go-full.log`: `go test ./internal/agent ./internal/worksession
+    ./internal/workapp ./internal/workrun ./cmd/gator` passed all five packages
+    (4.276/64.316/67.078/218.214/314.285 seconds respectively). Final identity,
+    scope and evidence-retention refinements were subsequently covered by
+    `final-guards.log`, `dispatch-final.log`, `store-verified.log` and the rebuilt
+    native journeys; no claim that the earlier broad run included those refinements.
+  - `race.log`: focused request/plan/service checks in workapp/workrun passed
+    under `-race` (6.565/14.591 seconds).
+  - `host-full-verified.log`: 138 pass, one existing platform skip, zero failures
+    across 139 host tests. Policy rejects injected execution/scope fields;
+    cleanup preserves failed-task inputs and defers malformed recovery records.
+  - `complete-verified.log`: 12 pass, zero failures, 296 assertions in 57.06
+    seconds for request-recovery and native keyboard-control suites. Covers
+    direct/reviewed HTTP 401/402/403 failures, a real controlled Authorization
+    header credential replacement across restart, repeated failures with
+    cumulative usage, original private inputs and draft/review intent, changed
+    scope before preparation and approval, fresh exact review, immutable original
+    revisions, and completed/uncertain loopback effects rejected for replay.
+    Keyboard journeys pass at 110×34, 80×24, 60×20 and 42×14.
+  - `regression.log`: existing first-task, pending-action correction and
+    running-plan correction suites passed: 12 tests, 336 assertions in 63.74
+    seconds, including local/delegated owners and unknown-effect restart guards.
+  - Initial native checks caught short operation IDs that did not satisfy the
+    existing persisted-dialogue identity contract; recovery now maps them into a
+    bounded namespaced dialogue ID. The 42-column fixture assertion was corrected
+    to account for wrapped titles with an inline Escape hint. The complete
+    unfiltered recovery rerun above passes; no failed check was skipped.
+- This is controlled-provider/process evidence, not live account/model routing
+  quality or physical terminal/audio verification. Connector prerequisite
+  handoffs, changes that require a new source/account scope review, other backend
+  workstreams and the final combined journey are still open.
 
 ## Implementation rules
 
