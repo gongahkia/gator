@@ -39,7 +39,7 @@ struct GatorApp: App {
 
 @MainActor
 enum NativeEnvironment {
-    static func application() -> GatorApplicationState {
+    static func application() -> ManagedSessionCoordinator {
         let env = ProcessInfo.processInfo.environment, home = FileManager.default.homeDirectoryForCurrentUser
         let data = env["GATOR_NATIVE_USER_DATA"].map { URL(fileURLWithPath: $0, isDirectory: true) }
             ?? home.appendingPathComponent("Library/Application Support/Gator", isDirectory: true)
@@ -49,6 +49,6 @@ enum NativeEnvironment {
             ?? (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("gator-runtime")
         let state = env["GATOR_STATE_DIR"] ?? env["XDG_STATE_HOME"] ?? home.appendingPathComponent(".local/state").path
         let profile = URL(fileURLWithPath: state, relativeTo: workspace).standardizedFileURL.path
-        return GatorApplicationState(configuration: BridgeLaunchConfiguration(runtime: runtime, workspace: workspace, environment: env), nativeDraftDirectory: data.appendingPathComponent("native/drafts", isDirectory: true), profile: profile)
+        return ManagedSessionCoordinator(configuration: BridgeLaunchConfiguration(runtime: runtime, workspace: workspace, environment: env), nativeDraftDirectory: data.appendingPathComponent("native/drafts", isDirectory: true), profile: profile)
     }
 }

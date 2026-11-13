@@ -80,7 +80,7 @@ public struct BridgeSnapshot: Sendable, Equatable {
                 result.append(BridgeMessage(id: prefix + ":summary", value: .object(["role": .string("Gator"), "text": peer["summary"]])))
             }
             if !turn["issue"].string.isEmpty || !turn["task_chat"].string.isEmpty {
-                let summary = [turn["issue"].string, turn["task_chat"].string.isEmpty ? "" : "Original task: \(turn["task_chat"].string). Task navigation is available in the terminal app."].filter { !$0.isEmpty }.joined(separator: "\n")
+                let summary = [turn["issue"].string, turn["task_chat"].string.isEmpty ? "" : "Original task: \(turn["task_chat"].string)."].filter { !$0.isEmpty }.joined(separator: "\n")
                 result.append(BridgeMessage(id: prefix + ":details", value: .object(["role": .string("Gator"), "result": .object(["kind": .string("notice"), "title": .string("Retained conversation context"), "summary": .string(summary), "preview": turn])])))
             }
         }
@@ -167,6 +167,7 @@ struct BridgeFramer {
 
 /// Host-only finite commands. Native views never receive this type or a raw send method.
 enum BridgeCommand: Sendable {
+    case host(HostCommand)
     case submission(id: String, context: String, text: String)
     case conversation(id: String, listID: String)
     case newConversation
@@ -179,6 +180,8 @@ enum BridgeCommand: Sendable {
     func data(nonce: String) throws -> Data {
         var v: [String: JSONValue] = ["version": .number(1), "nonce": .string(nonce)]
         switch self {
+        case .host(let command):
+            for (key, value) in command.fields { v[key] = value }
         case let .submission(id, context, text):
             guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, text.utf8.count <= 128 * 1024 else { throw BridgeFailure("Messages must contain text and fit within 128 KiB.") }
             v["type"] = .string("upload_submit")

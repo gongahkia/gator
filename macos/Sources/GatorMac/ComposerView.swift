@@ -4,6 +4,7 @@ import GatorCore
 
 struct ComposerView: View {
     @Environment(GatorApplicationState.self) private var application
+    @Environment(ManagedSessionCoordinator.self) private var sessions
     var compact: Bool
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -12,7 +13,7 @@ struct ComposerView: View {
                     Text("Message Gator…").font(.system(size: 14)).foregroundStyle(.tertiary).padding(.top, 4).padding(.leading, 2).allowsHitTesting(false)
                 }
                 NativeComposer(text: application.draftText, editable: application.canEditDraft, onEdit: application.editDraft) {
-                    if application.canSend { Task { await application.submit() } }
+                    if sessions.canSubmit { let owner = application; Task { await sessions.submit(from: owner) } }
                 }
             }
             .frame(height: compact ? 68 : 88)
@@ -21,10 +22,10 @@ struct ComposerView: View {
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button {
-                    Task { await application.submit() }
+                    let owner = application; Task { await sessions.submit(from: owner) }
                 } label: { Image(systemName: "arrow.up").font(.system(size: 15, weight: .semibold)).frame(width: 30, height: 28) }
                 .buttonStyle(.borderedProminent).clipShape(RoundedRectangle(cornerRadius: 9))
-                .disabled(!application.canSend).help(application.sendUnavailableReason ?? "Send message")
+                .disabled(!sessions.canSubmit).help(application.sendUnavailableReason ?? "Send message")
                 .accessibilityLabel("Send message")
             }
         }

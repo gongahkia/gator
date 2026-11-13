@@ -5,7 +5,8 @@ import GatorCore
 private let gatorAccent = Color(red: 0.18, green: 0.48, blue: 0.37)
 
 struct ConversationView: View {
-    @Environment(GatorApplicationState.self) private var application
+    @Environment(ManagedSessionCoordinator.self) private var sessions
+    private var application: GatorApplicationState { sessions.current }
     @Environment(\.openWindow) private var openWindow
     let compact: Bool
     let quit: () -> Void
@@ -13,11 +14,13 @@ struct ConversationView: View {
     @State private var nearBottom = true
     @State private var phase = ScrollPhase.idle
     @State private var activityExpanded = false
+    @State private var sessionsExpanded = false
 
     var body: some View {
         VStack(spacing: 0) {
             header.padding(.horizontal, 16).padding(.vertical, 12)
             Divider()
+            if sessions.activity.count > 1 { sessionActivity.padding(.horizontal, 14).padding(.vertical, 6) }
             if let review = application.review {
                 ApprovalReviewView(review: review, compact: compact).padding(12)
                 Spacer(minLength: 0)
@@ -32,6 +35,7 @@ struct ConversationView: View {
             if application.review == nil { ComposerView(compact: compact).padding(12) }
         }
         .background(Color(nsColor: .windowBackgroundColor))
+        .environment(application)
         .tint(gatorAccent)
         .environment(\.openURL, OpenURLAction { url in
             guard ["https", "http"].contains(url.scheme?.lowercased() ?? ""), url.user == nil, url.password == nil else { return .discarded }
@@ -47,32 +51,36 @@ struct ConversationView: View {
                 Text(application.title).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 4)
+            if let parent = application.snapshot?.value["dialogue_task"]["parent_id"].string, !parent.isEmpty {
+                Button { Task { await sessions.openConversation(parent) } } label: { Image(systemName: "arrow.uturn.backward").frame(width: 24, height: 26) }
+                    .disabled(sessions.switching).help("Return to the requesting chat").accessibilityLabel("Return to Requesting Chat")
+            }
             if application.canStop || application.stopping || application.snapshot?.cancelling == true {
-                Button { Task { await application.stopWork() } } label: { Label(application.stopping || application.snapshot?.cancelling == true ? "Stopping…" : "Stop", systemImage: "stop.fill") }
-                    .disabled(!application.canStop).help("Stop current Go-owned work and retain its evidence")
+                Button { let owner = application; Task { await owner.stopWork() } } label: { Label(application.stopping || application.snapshot?.cancelling == true ? "Stopping…" : "Stop", systemImage: "stop.fill") }
+                    .disabled(sessions.switching || !application.canStop).help("Stop current Go-owned work and retain its evidence")
             }
             Menu {
-                Button("New Conversation", systemImage: "square.and.pencil") { Task { await application.newConversation() } }.disabled(!application.canNavigate)
+                Button("New Conversation", systemImage: "square.and.pencil") { Task { await sessions.newConversation() } }.disabled(!sessions.canNavigate)
                 Section("Recent Conversations") {
                     ForEach(application.snapshot?.value["recent_conversations"].array ?? [], id: \.self) { item in
-                        Button(item["title"].string.isEmpty ? item["id"].string : item["title"].string) { Task { await application.openConversation(item["id"].string) } }
-                            .disabled(!application.canNavigate)
+                        Button(item["title"].string.isEmpty ? item["id"].string : item["title"].string) { Task { await sessions.openConversation(item["id"].string) } }
+                            .disabled(!sessions.canNavigate)
                     }
                     if application.snapshot?.value["recent_conversations"].array.isEmpty != false { Text("No recent conversations") }
                 }
                 Section("Configured Models") {
                     ForEach(application.composerModels, id: \.self) { model in
-                        Button(model["label"].string.isEmpty ? model["model"].string : model["label"].string) { Task { await application.selectModel(provider: model["provider"].string, model: model["model"].string) } }
-                            .disabled(!application.canConfigureModel || !model["unavailable"].string.isEmpty)
+                        Button(model["label"].string.isEmpty ? model["model"].string : model["label"].string) { let owner = application; Task { await owner.selectModel(provider: model["provider"].string, model: model["model"].string) } }
+                            .disabled(sessions.switching || !application.canConfigureModel || !model["unavailable"].string.isEmpty)
                     }
                 }
                 Section("Effort") {
                     ForEach(["low", "standard", "high"], id: \.self) { effort in
-                        Button(effort.capitalized) { Task { await application.selectEffort(effort) } }.disabled(!application.canConfigureModel)
+                        Button(effort.capitalized) { let owner = application; Task { await owner.selectEffort(effort) } }.disabled(sessions.switching || !application.canConfigureModel)
                     }
                 }
                 Divider()
-                Button("Reconnect and Inspect") { Task { await application.reconnect() } }.disabled(application.connectionStatus != .disconnected)
+                Button("Reconnect and Inspect") { Task { await sessions.reconnect() } }.disabled(application.connectionStatus != .disconnected)
                 Button("Quit Gator", role: .destructive, action: quit).keyboardShortcut("q")
             } label: { Image(systemName: "ellipsis").frame(width: 28, height: 28) }
             .menuStyle(.borderlessButton).fixedSize().help("Conversations, models and Gator controls")
@@ -81,6 +89,38 @@ struct ConversationView: View {
                     .buttonStyle(.plain).help("Expand this conversation").accessibilityLabel("Open full Gator window")
             }
         }
+    }
+
+    private var sessionActivity: some View {
+        DisclosureGroup(isExpanded: $sessionsExpanded) {
+            ScrollView {
+                VStack(spacing: 4) {
+                    ForEach(sessions.activity) { item in
+                        Button {
+                            let id = item.id
+                            Task { await sessions.openConversation(id) }
+                        } label: {
+                            HStack(alignment: .top, spacing: 8) {
+                                Image(systemName: item.id == application.conversationID ? "checkmark.circle.fill" : item.needsAttention ? "circle.fill" : "bubble.left")
+                                    .font(.caption).frame(width: 16)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(verbatim: item.title).fontWeight(item.id == application.conversationID ? .semibold : .regular).lineLimit(1)
+                                    Text(verbatim: item.status).foregroundStyle(.secondary)
+                                    if !item.summary.isEmpty { Text(verbatim: item.summary).foregroundStyle(.secondary).lineLimit(2) }
+                                }
+                                Spacer(minLength: 0)
+                            }.padding(6).frame(maxWidth: .infinity, alignment: .leading)
+                                .background(item.id == application.conversationID ? gatorAccent.opacity(0.10) : .clear, in: RoundedRectangle(cornerRadius: 6))
+                        }.buttonStyle(.plain).disabled(sessions.switching)
+                            .accessibilityLabel("Open chat: " + item.title + " · " + item.status)
+                            .accessibilityIdentifier("gator.chat." + item.id)
+                    }
+                }
+            }.frame(maxHeight: compact ? 130 : 170)
+        } label: {
+            let others = sessions.activity.filter { $0.id != application.conversationID }
+            Label(others.contains(where: { $0.status == "Working" || $0.status == "Stopping" }) ? "Work continues in another chat" : others.contains(where: \.needsAttention) ? "Another chat needs attention" : "Open chats and retained tasks", systemImage: "bubble.left.and.bubble.right")
+        }.font(.caption).help("Inspect or return to an original chat without moving its work")
     }
 
     private var transcript: some View {
@@ -143,17 +183,21 @@ struct ConversationView: View {
                 DisclosureGroup("Original submission has an unconfirmed outcome") {
                     Text(verbatim: pending.text).font(.caption).textSelection(.enabled)
                     Text(verbatim: "Request ID: " + pending.id).font(.caption2).textSelection(.enabled)
-                    Button("Retry Original Admission") { Task { await application.retryOriginalAdmission() } }.disabled(!application.canRetryAdmission)
+                    Button("Retry Original Admission") { let owner = application; Task { await sessions.retryAdmission(from: owner) } }.disabled(!application.canRetryAdmission || sessions.switching)
                     Text("Explicit retry uses the same admission ID. It does not repeat an external action.").font(.caption)
                 }.font(.caption)
             }
+            if application.snapshot?.value["dialogue_busy"].bool == true { ProgressView("Considering your message…").controlSize(.small).font(.caption) }
+            if !sessions.canSubmit, application.canSend, sessions.workingCount >= 3 { Text("Three tasks are working. Wait for conversation readiness or stop a task before starting more work.").font(.caption).foregroundStyle(.secondary) }
+            if sessions.switching { Text("Opening chat… Original work continues.").font(.caption) }
+            if !sessions.issue.isEmpty { Text(verbatim: sessions.issue).font(.caption).foregroundStyle(.orange).textSelection(.enabled) }
             if !application.issue.isEmpty { Text(verbatim: application.issue).font(.caption).foregroundStyle(.orange).textSelection(.enabled).lineLimit(3) }
             if !application.persistenceIssue.isEmpty { Text(verbatim: application.persistenceIssue).font(.caption).foregroundStyle(.red).textSelection(.enabled) }
-            if application.connectionStatus == .disconnected { Button("Reconnect and Inspect") { Task { await application.reconnect() } } }
+            if application.connectionStatus == .disconnected { Button("Reconnect and Inspect") { Task { await sessions.reconnect() } } }
             if application.snapshot?.running == true && application.review == nil {
-                Text("You can keep drafting. Sending another request is available after this work finishes.").font(.caption).foregroundStyle(.secondary)
+                Text(application.snapshot?.value["dialogue_active"].bool == true ? "Work continues independently. You can keep talking here; Gator decides how to route your message." : "Preparing conversation during work… Your draft is kept.").font(.caption).foregroundStyle(.secondary)
             }
-            if let notice = application.snapshot?.unsupportedNotice { Text(verbatim: notice).font(.caption).foregroundStyle(.secondary).lineLimit(3) }
+            if let notice = application.snapshot?.unsupportedNotice, application.snapshot?.value["dialogue_dispatch"] == .null, application.snapshot?.value["session_request"] == .null { Text(verbatim: notice).font(.caption).foregroundStyle(.secondary).lineLimit(3) }
             if application.readiness["state"].string != "configured", application.isConnected {
                 Text("\(application.readiness["issue"].string) Provider setup is available in Gator’s terminal app; your draft stays here.").font(.caption).foregroundStyle(.secondary)
             } else if !application.readiness["processing"]["description"].string.isEmpty {
@@ -166,7 +210,9 @@ struct ConversationView: View {
 }
 
 private struct MessageRow: View, Equatable {
+    @Environment(ManagedSessionCoordinator.self) private var sessions
     let message: BridgeMessage
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool { lhs.message == rhs.message }
     var body: some View {
         HStack(alignment: .top) {
             if message.isUser { Spacer(minLength: 40) }
@@ -176,6 +222,12 @@ private struct MessageRow: View, Equatable {
                     Text(verbatim: message.result["title"].string).font(.headline)
                     Text(verbatim: message.result["summary"].string)
                     DisclosureGroup("Exact details") { Text(verbatim: message.result.pretty).font(.system(.caption, design: .monospaced)) }
+                    if validTaskLink {
+                        Button("Open Original Task", systemImage: "arrow.up.forward.square") {
+                            let id = message.result["preview"]["task_chat"].string
+                            Task { await sessions.openConversation(id) }
+                        }.disabled(sessions.switching)
+                    }
                 } else if message.isUser || message.text.hasPrefix("/") {
                     Text(verbatim: message.text)
                 } else if message.text.isEmpty {
@@ -190,5 +242,9 @@ private struct MessageRow: View, Equatable {
             .background(message.isUser ? gatorAccent.opacity(0.10) : Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 14))
             if !message.isUser { Spacer(minLength: 20) }
         }.frame(maxWidth: .infinity)
+    }
+    private var validTaskLink: Bool {
+        let id = message.result["preview"]["task_chat"].string
+        return !id.isEmpty && sessions.current.snapshot?.value["dialogue"].array.contains(where: { $0["task_chat"].string == id }) == true
     }
 }

@@ -3,6 +3,7 @@ import GatorCore
 
 struct ApprovalReviewView: View {
     @Environment(GatorApplicationState.self) private var application
+    @Environment(ManagedSessionCoordinator.self) private var sessions
     let review: ApprovalReview
     var compact: Bool
     var body: some View {
@@ -29,11 +30,11 @@ struct ApprovalReviewView: View {
             HStack {
                 Button("Close") { application.closeApprovalReview() }.disabled(application.approvalSending)
                 Spacer()
-                Button("Decline", role: .destructive) { Task { await application.respondToApproval(review, approved: false) } }
-                    .disabled(!application.isCurrentReview(review) || application.approvalSending)
-                Button("Approve Exact Action") { Task { await application.respondToApproval(review, approved: true) } }
+                Button("Decline", role: .destructive) { let owner = application; Task { await owner.respondToApproval(review, approved: false) } }
+                    .disabled(sessions.switching || !application.isCurrentReview(review) || application.approvalSending)
+                Button("Approve Exact Action") { let owner = application; Task { await owner.respondToApproval(review, approved: true) } }
                     .buttonStyle(.borderedProminent)
-                    .disabled(!review.inspectable || !application.isCurrentReview(review) || application.approvalSending)
+                    .disabled(sessions.switching || !review.inspectable || !application.isCurrentReview(review) || application.approvalSending)
             }
             if application.approvalSending { Text("Waiting for Go to confirm the outcome…").font(.caption).foregroundStyle(.secondary) }
         }

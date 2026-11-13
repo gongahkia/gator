@@ -3,7 +3,7 @@ import GatorCore
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    var application: GatorApplicationState?
+    var application: ManagedSessionCoordinator?
     private var terminating = false
     private var mayTerminate = false
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -17,7 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     // Native controls and Cmd+Q enter this guard directly. Termination is only
     // requested again after the draft flush and child cleanup have succeeded.
-    func requestQuit(_ state: GatorApplicationState? = nil) {
+    func requestQuit(_ state: ManagedSessionCoordinator? = nil) {
         if let state { application = state }
         guard !terminating else { return }
         guard let application else { mayTerminate = true; NSApp.terminate(nil); return }

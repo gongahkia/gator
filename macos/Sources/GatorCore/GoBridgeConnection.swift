@@ -5,6 +5,11 @@ public struct BridgeLaunchConfiguration: Sendable {
     public var workspace: URL
     public var environment: [String: String]
     public var conversationID: String
+    var managed = false
+    var bootMode = ""
+    var startSource = ""
+    var viewOrigin = ""
+    var goalID = ""
     public init(runtime: URL, workspace: URL, environment: [String: String] = ProcessInfo.processInfo.environment, conversationID: String = "") {
         self.runtime = runtime; self.workspace = workspace; self.environment = environment; self.conversationID = conversationID
     }
@@ -47,10 +52,16 @@ actor GoBridgeConnection: BridgeTransport {
         try FileManager.default.createDirectory(at: configuration.workspace, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         let p = Process(), stdin = Pipe(), stdout = Pipe(), stderr = Pipe()
         p.executableURL = configuration.runtime
-        p.arguments = ["ui-backend", configuration.conversationID, ""]
+        p.arguments = ["ui-backend", configuration.conversationID, configuration.goalID]
         p.currentDirectoryURL = configuration.workspace
         var environment = configuration.environment
         for key in ["GATOR_UI_SESSION_HOST", "GATOR_UI_BOOT_MODE", "GATOR_UI_VIEW_ORIGIN", "GATOR_UI_START_SOURCE"] { environment.removeValue(forKey: key) }
+        if configuration.managed {
+            environment["GATOR_UI_SESSION_HOST"] = "1"
+            environment["GATOR_UI_BOOT_MODE"] = configuration.bootMode
+            environment["GATOR_UI_START_SOURCE"] = configuration.startSource
+            environment["GATOR_UI_VIEW_ORIGIN"] = configuration.viewOrigin
+        }
         environment["GATOR_UI_BACKEND"] = "1"
         p.environment = environment; p.standardInput = stdin; p.standardOutput = stdout; p.standardError = stderr
         process = p; input = stdin.fileHandleForWriting
@@ -119,6 +130,15 @@ actor GoBridgeConnection: BridgeTransport {
     func send(_ command: BridgeCommand, nonce: String) async throws {
         guard !closed, let input, process?.isRunning == true else { throw BridgeFailure("Gator is disconnected.") }
         let bytes = try command.data(nonce: nonce)
+        // focus_session deliberately publishes state without action_applied.
+        // Its caller must await the exact foreground projection, not a nonce.
+        if case .host(.focus) = command {
+            writeQueue.async { [weak self] in
+                do { try input.write(contentsOf: bytes) }
+                catch { Task { await self?.fail("Gator did not confirm focus. Original work was not moved.") } }
+            }
+            return
+        }
         guard waiters[nonce] == nil else { throw BridgeFailure("Duplicate transport identity.") }
         try await withCheckedThrowingContinuation { waiter in
             waiters[nonce] = waiter
