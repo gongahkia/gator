@@ -122,6 +122,10 @@ export function Transcript() {
       <For each={message.bundle?.Artifacts}>{artifact => <text fg={theme.accent} onMouseUp={() => { if (!renderer.getSelection()?.getSelectedText()) client.emit("item-actions", { kind: "file", context, bundle: message.bundle, file: artifact }) }}>File: {literal(artifact.Path)} · {literal(artifact.MediaType)}</text>}</For>
     </box> }}</Show> }}</For>
     <box id="transcript-after" height={window.after()} minHeight={0} flexShrink={0} />
+    <For each={data.state?.request_recoveries?.slice(0,1)}>{task => <box paddingY={1}>
+      <text fg={theme.text.base}>{literal(task.recovery.summary)}</text>
+      <text fg={theme.accent} onMouseUp={() => void client.navigate("/request-recovery")}>/request-recovery · inspect setup and retained task</text>
+    </box>}</For>
     <For each={data.state?.task_plans}>{plan => <box paddingY={1}>
       <text fg={theme.accent} onMouseUp={() => void client.navigate("/task-plans")}>{literal(plan.outcome || plan.task)}</text>
       <text fg={theme.text.muted}>{literal(plan.state)} · {literal(plan.phase)}{plan.phase === "review" ? " · /task-plans to review before work starts" : " · /task-plans for details"}</text>

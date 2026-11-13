@@ -767,8 +767,30 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 			return nil
 		}
 	}
+	readOnlyAttempt := true
+	registeredRecoveryTools := map[string]agent.Tool{}
+	for _, tool := range surface {
+		registeredRecoveryTools[tool.Definition().Name] = tool
+	}
 	result, runErr := runner.Run(ctx, agent.RunOptions{
-		BeforeTool:            beforeTool,
+		BeforeTool: beforeTool,
+		AfterTool: func(_ context.Context, call agent.ToolCall, _ agent.ToolResult, _ error) error {
+			tool, ok := registeredRecoveryTools[call.Name]
+			if !ok {
+				readOnlyAttempt = false
+				return nil
+			}
+			effects, err := planToolEffects(tool, call)
+			if err != nil || len(effects) == 0 {
+				readOnlyAttempt = false
+			}
+			for _, effect := range effects {
+				if effect != "read" {
+					readOnlyAttempt = false
+				}
+			}
+			return nil
+		},
 		InitialMessages:       initial,
 		Task:                  request.Objective,
 		Images:                request.Images,
@@ -808,6 +830,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		}
 	}
 	outcome.Result = result
+	outcome.Recovery = classifyRequestRecovery(runErr, readOnlyAttempt)
 	outcome.Events = append([]agent.Event(nil), events...)
 
 	failure := ""

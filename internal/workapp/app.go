@@ -27,6 +27,7 @@ import (
 )
 
 type RunResult struct {
+	Recovery        *worksession.RequestRecovery
 	AppScreen       *ControlScreen
 	AppScreenFamily string
 	AppScreenAction string
@@ -396,6 +397,7 @@ type Model struct {
 	planRevising            string
 	planEditTurn            string
 	planResult              *TaskPlanResult
+	requestRecoveryResult   *RequestRecoveryResult
 	catalog                 *conversationCatalog
 	catalogSequence         uint64
 	catalogSaving           uint64

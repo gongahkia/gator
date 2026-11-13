@@ -188,3 +188,9 @@ test("input removals accept typed identities without extra authority",()=>{
  for(const inputs of [[],[{kind:"account",id:"other"}],[{kind:"upload",id:"file",approved:true}],Array(13).fill(task.inputs[0])])assert.throws(()=>validateFrame({type:"task_plan",task_plan:{...task,inputs}}));
  assert.throws(()=>validateFrame({type:"task_plan",task_plan:{...task,action:"approve"}}));
 });
+
+test("task recovery carries the retained outcome identity without execution authority",()=>{
+ const recovery={conversation_id:"chat-one",task_id:"a".repeat(32),token:"b".repeat(64),request_id:"repair-one",action:"prepare_retry"};
+ for(const action of ["prepare_retry","discard"])assert.equal(validateFrame({type:"request_recovery",request_recovery:{...recovery,action}}).version,1);
+ for(const change of [{conversation_id:"../other"},{task_id:"old"},{token:"old"},{request_id:""},{action:"execute"},{approved:true},{options:{}},{accounts:["other"]},{retry_safe:true}])assert.throws(()=>validateFrame({type:"request_recovery",request_recovery:{...recovery,...change}}));
+});

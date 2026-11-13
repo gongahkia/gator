@@ -833,6 +833,7 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 	if err != nil {
 		return workapp.RunResult{Error: err.Error()}
 	}
+	recoveryScope, recoveryScopeErr := captureConversationInput(workapp.ConversationInput{Version: 1, Source: source, RunOptions: options})
 	var outcome workrun.Outcome
 	if options.OnOperation != nil {
 		operation := service.Start(ctx, request)
@@ -868,7 +869,19 @@ func runInteractiveWorkGoal(source, conversationID, prompt, stateDir string, opt
 	appChangesMu.Lock()
 	changes := append([]workrun.AppChange(nil), appChanges...)
 	appChangesMu.Unlock()
-	result := workapp.RunResult{AppScreen: appScreen, AppScreenFamily: appScreenFamily, AppScreenAction: appScreenAction, AppChanges: changes, Activity: outcome.Activity, WorkID: outcome.Manifest.RunID, ConversationID: outcome.ConversationID, RevisionID: outcome.RevisionID, SnapshotID: outcome.SnapshotID, FinalText: outcome.Result.FinalText}
+	if outcome.Recovery != nil {
+		if outcome.Manifest.RunID == "" || outcome.RevisionID == "" {
+			outcome.Recovery.RetrySafe = false
+			outcome.Recovery.Repair = "The original failed run could not be fully retained. Inspect its local outputs and action receipts before any further execution."
+		}
+		if recoveryScopeErr == nil {
+			outcome.Recovery.ScopeDigest = recoveryScope.ScopeDigest
+		} else {
+			outcome.Recovery.RetrySafe = false
+			outcome.Recovery.Repair = "Original account and processing scope could not be verified. Inspect this task before preparing further work."
+		}
+	}
+	result := workapp.RunResult{Recovery: outcome.Recovery, AppScreen: appScreen, AppScreenFamily: appScreenFamily, AppScreenAction: appScreenAction, AppChanges: changes, Activity: outcome.Activity, WorkID: outcome.Manifest.RunID, ConversationID: outcome.ConversationID, RevisionID: outcome.RevisionID, SnapshotID: outcome.SnapshotID, FinalText: outcome.Result.FinalText}
 	if outcome.Work.Path != "" {
 		result.OutputPath = outcome.Work.Output.Path()
 		if summary, summaryErr := summarizeWorkBundle(outcome.Work.Path); summaryErr == nil {

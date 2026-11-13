@@ -47,7 +47,8 @@ export async function retainedRequestUploads(conversations) {
     catch (error) { if (error.code !== "ENOENT") throw error; }
     if (journal !== undefined && (!journal || typeof journal !== "object" || Array.isArray(journal) || journal.version !== 1 || !Array.isArray(journal.requests) || journal.requests.length > 128)) throw new Error("Unknown retained message journal");
     for (const request of journal?.requests ?? []) {
-      if (!["queued", "running", "interrupted"].includes(request.state)) continue;
+      if (!["queued", "running", "interrupted"].includes(request.state) && !(request.state === "failed" && request.recovery !== undefined)) continue;
+      if (request.recovery !== undefined && (!request.recovery || typeof request.recovery !== "object" || Array.isArray(request.recovery) || typeof request.recovery.retry_safe !== "boolean")) throw new Error("Invalid retained request recovery");
       retainInputs(retained, request.options);
 			if (request.plan?.input_changes !== undefined) {
 				const changes = request.plan.input_changes;

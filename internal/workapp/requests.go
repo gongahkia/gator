@@ -27,7 +27,7 @@ func (m *Model) saveRequests(j worksession.RequestJournal) error {
 	for len(j.Requests) > worksession.MaxRetainedRequests {
 		removed := false
 		for i, r := range j.Requests {
-			if !r.Pending() {
+			if !r.Pending() && !r.AwaitingRecovery() {
 				j.Requests = append(j.Requests[:i], j.Requests[i+1:]...)
 				removed = true
 				break
@@ -332,6 +332,7 @@ func (m *Model) finishRequest(value runDone, stopped bool) {
 			m.activeRequest = ""
 			return
 		}
+		r.Recovery = value.Recovery
 		r.State = "completed"
 		if value.Error != "" {
 			r.State = "failed"

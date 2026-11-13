@@ -22,20 +22,21 @@ import (
 // An owner that disappears leaves an interrupted request for explicit review;
 // reading this journal never starts work.
 type Request struct {
-	ExecutionBoundary *PlanBinding    `json:"execution_boundary,omitempty"`
-	Plan              *TaskPlan       `json:"plan,omitempty"`
-	ID                string          `json:"id"`
-	ClientID          string          `json:"client_id,omitempty"`
-	RetryOf           string          `json:"retry_of,omitempty"`
-	Edit              uint64          `json:"edit"`
-	Text              string          `json:"text"`
-	Options           json.RawMessage `json:"options"`
-	State             string          `json:"state"`
-	WorkID            string          `json:"work_id,omitempty"`
-	RevisionID        string          `json:"revision_id,omitempty"`
-	Issue             string          `json:"issue,omitempty"`
-	CreatedAt         time.Time       `json:"created_at"`
-	UpdatedAt         time.Time       `json:"updated_at"`
+	Recovery          *RequestRecovery `json:"recovery,omitempty"`
+	ExecutionBoundary *PlanBinding     `json:"execution_boundary,omitempty"`
+	Plan              *TaskPlan        `json:"plan,omitempty"`
+	ID                string           `json:"id"`
+	ClientID          string           `json:"client_id,omitempty"`
+	RetryOf           string           `json:"retry_of,omitempty"`
+	Edit              uint64           `json:"edit"`
+	Text              string           `json:"text"`
+	Options           json.RawMessage  `json:"options"`
+	State             string           `json:"state"`
+	WorkID            string           `json:"work_id,omitempty"`
+	RevisionID        string           `json:"revision_id,omitempty"`
+	Issue             string           `json:"issue,omitempty"`
+	CreatedAt         time.Time        `json:"created_at"`
+	UpdatedAt         time.Time        `json:"updated_at"`
 }
 
 type RequestJournal struct {
@@ -62,11 +63,17 @@ func NewRequest(text string, options json.RawMessage, now time.Time) (Request, e
 	return request, validateRequest(request)
 }
 
+// AwaitingRecovery retains failed inputs until the user explicitly dismisses recovery.
+func (r Request) AwaitingRecovery() bool { return r.State == "failed" && r.Recovery != nil }
+
 func (r Request) Pending() bool {
 	return r.State == "queued" || r.State == "running" || r.State == "interrupted"
 }
 
 func validateRequest(r Request) error {
+	if err := validateRequestRecovery(r.Recovery); err != nil {
+		return err
+	}
 	if b := r.ExecutionBoundary; b != nil {
 		if validID(b.ConversationID) != nil || b.RequestID != r.ID || b.UpdatedAt.IsZero() || !planDigest(b.SourceSHA256) || !planDigest(b.OptionsSHA256) || !planDigest(b.PromptSHA256) {
 			return errors.New("invalid original execution boundary")

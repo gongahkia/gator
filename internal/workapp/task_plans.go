@@ -233,6 +233,19 @@ func (m Model) ApplyTaskPlan(action TaskPlanAction) (tea.Model, tea.Cmd) {
 	if action.Action != "remove_inputs" && len(action.Inputs) > 0 {
 		return fail(errors.New("only input removal can provide an input selection"))
 	}
+	if (action.Action == "approve" || action.Action == "start") && r.Recovery != nil {
+		var frozen RunOptions
+		if json.Unmarshal(r.Options, &frozen) != nil || m.config.CaptureConversationInput == nil {
+			return fail(errors.New("original recovery scope is unavailable"))
+		}
+		input, err := m.config.CaptureConversationInput(ConversationInput{Version: 1, Source: m.source, RunOptions: frozen})
+		if err != nil {
+			return fail(err)
+		}
+		if r.Recovery.ScopeDigest == "" || input.ScopeDigest != r.Recovery.ScopeDigest {
+			return fail(errors.New("original recovery scope changed; review accounts, permissions and processing before approval"))
+		}
+	}
 	switch action.Action {
 	case "inspect":
 		p := r.Plan.Clone()

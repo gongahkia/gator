@@ -113,6 +113,20 @@ export function useProductActions(controls: ReturnType<typeof useActions>) {
       { title: "Reuse request in message box", run: () => client.edit([client.draft.text, plan.task].filter(Boolean).join("\n\n")) },
     ], true)
   }
+  actions["request-recovery"] = () => menu("Task setup and recovery", (data.state?.request_recoveries ?? []).map(task => ({ title: task.text, description: task.recovery.summary, run: () => {
+    const act = async (action: "prepare_retry" | "discard") => {
+      const request_id = randomUUID()
+      await client.result({type:"request_recovery",request_recovery:{conversation_id:owner(),task_id:task.task_id,token:task.token,action,request_id}},request_id,s=>s.request_recovery_result)
+    }
+    menu("Original task recovery", [
+      {title:"Inspect failure and repair",run:()=>details("Original task",[task.text,`${task.provider} · ${task.model}`,task.recovery.summary,task.recovery.repair,"No task is replayed automatically. A prepared retry still requires a fresh exact plan review."].join("\n\n"))},
+      {title:"Repair original model setup",run:()=>client.navigate("/models")},
+      {title:"Prepare retry for review",disabled:!task.recovery.retry_safe || !!client.state?.running,run:()=>confirm("Prepare this task for fresh review?",`${task.text}\n\nKeep its original inputs, scope and remaining budget. This prepares a plan; it does not execute the task.`,()=>act("prepare_retry"))},
+      {title:"Inspect original receipts",run:()=>client.navigate("/receipts")},
+      {title:"Review prepared task plans",run:()=>client.navigate("/task-plans")},
+      {title:"Discard retained retry",run:()=>confirm("Discard this retry?","Keep the original results and receipts. The task will not be retried.",()=>act("discard"))},
+    ],true)
+  }})))
   actions["task-plans"] = () => menu("Reviewed task plans", (data.state?.task_plans ?? []).map(plan => ({ title: plan.outcome || plan.task, description: `${plan.state} · ${plan.phase} · revision ${plan.revision}${plan.issue ? " · " + plan.issue : ""}`, run: async () => { const review = await planAction(plan, "inspect"); if (review) reviewPlan(review) } })))
   actions.specialists = () => menu("Specialists in this task", (data.state?.specialists ?? []).map(task => ({ title: task.name, description: task.status, run: () => {
     const act = (action: "guide" | "stop", text?: string) => {

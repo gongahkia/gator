@@ -119,27 +119,40 @@ func (s Store) RetainDrainedPlanRun(id, request string, revision uint64, digest,
 	if p.DrainingRun == "" || p.DrainingRun != runID || !pending && !cancelled || len(p.Attempts) >= 32 {
 		return j, ErrPlanChanged
 	}
-	retained, err := s.LoadRevision(id, revisionID)
+	p, err = s.accountDrainedPlanRun(id, *r, p, runID, revisionID)
 	if err != nil {
 		return j, err
+	}
+	r.Plan = p
+	r.WorkID, r.RevisionID = runID, revisionID
+	r.UpdatedAt = time.Now().UTC()
+	return s.SaveRequests(id, j)
+}
+
+// Evidence is verified before changing the journal. Failed-task recovery can
+// therefore account its original attempt and prepare review in one save.
+func (s Store) accountDrainedPlanRun(id string, r Request, p *TaskPlan, runID, revisionID string) (*TaskPlan, error) {
+	retained, err := s.LoadRevision(id, revisionID)
+	if err != nil {
+		return nil, err
 	}
 	c, err := s.Load(id)
 	if err != nil {
-		return j, err
+		return nil, err
 	}
 	if c.HeadRevision != retained.ID || !c.UpdatedAt.Equal(retained.CreatedAt) || retained.ParentRevisionID != p.Binding.HeadRevision || retained.Objective != r.Text || planHash([]byte(c.SourcePath)) != p.Binding.SourceSHA256 || retained.SnapshotID != c.SnapshotID {
-		return j, ErrPlanChanged
+		return nil, ErrPlanChanged
 	}
 	bundle, err := artifact.OpenBundle(retained.BundlePath)
 	if err != nil {
-		return j, err
+		return nil, err
 	}
 	if err := artifact.VerifyBundle(bundle); err != nil {
-		return j, err
+		return nil, err
 	}
 	m := bundle.Manifest
 	if m.RunID != runID || m.Objective != r.Text || m.Execution == nil {
-		return j, errors.New("original execution has no verified budget accounting")
+		return nil, errors.New("original execution has no verified budget accounting")
 	}
 	a := PlanAttempt{RunID: runID, RevisionID: revisionID, ManifestSHA256: bundle.ManifestSHA256, Execution: *m.Execution, Usage: m.Usage, WallSeconds: int(math.Ceil(m.FinishedAt.Sub(m.StartedAt).Seconds()))}
 	for _, sub := range m.Subagents {
@@ -152,15 +165,12 @@ func (s Store) RetainDrainedPlanRun(id, request string, revision uint64, digest,
 	}
 	for _, old := range p.Attempts {
 		if old.RunID == runID {
-			return j, ErrPlanChanged
+			return nil, ErrPlanChanged
 		}
 	}
 	p.Attempts = append(p.Attempts, a)
 	p.DrainingRun = ""
 	p.Binding.HeadRevision, p.Binding.SnapshotID, p.Binding.UpdatedAt = c.HeadRevision, c.SnapshotID, c.UpdatedAt
 	p.Digest = p.contentDigest()
-	r.Plan = p
-	r.WorkID, r.RevisionID = runID, revisionID
-	r.UpdatedAt = time.Now().UTC()
-	return s.SaveRequests(id, j)
+	return p, nil
 }

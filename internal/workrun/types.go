@@ -212,6 +212,7 @@ func (r Request) externalEditsEnabled() bool {
 // Outcome retains staged files and trusted evidence even when model execution
 // fails. Source is never modified by the executor.
 type Outcome struct {
+	Recovery *worksession.RequestRecovery
 	// ParentArtifacts is copied from the independently verified parent bundle.
 	// It distinguishes retained output from changes made by this execution.
 	ParentArtifacts  []artifact.File

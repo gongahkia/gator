@@ -16,6 +16,7 @@ import (
 )
 
 type uiFrame struct {
+	RequestRecovery *workapp.RequestRecoveryAction     `json:"request_recovery,omitempty"`
 	DialogueHost    *workapp.DialogueHost              `json:"dialogue_host,omitempty"`
 	DialogueResult  *workapp.DialogueDispatchResult    `json:"dialogue_result,omitempty"`
 	DialogueControl *workapp.DialogueControl           `json:"dialogue_control,omitempty"`
@@ -161,6 +162,10 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 		case "receipt":
 			if frame.Receipt != nil {
 				next, command = m.model.ApplyReceiptAction(*frame.Receipt)
+			}
+		case "request_recovery":
+			if frame.RequestRecovery != nil {
+				next, command = m.model.ApplyRequestRecovery(*frame.RequestRecovery)
 			}
 		case "task_plan":
 			if frame.TaskPlan != nil {

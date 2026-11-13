@@ -1,13 +1,13 @@
 // Navigation labels are frontend concerns; availability and execution stay in Go.
 export const commandGroups = ["Chats", "Following", "Saved", "Files", "Settings", "Help and application"] as const
 export function commandDescription(name: string): string | undefined {
-  return ({ latest: "Jump to the newest content in this chat", "catch-up": "Read from the first unseen message in this chat" } as Record<string, string>)[name]
+  return ({ "request-recovery": "Repair a failed task’s setup and prepare a safe reviewed retry", latest: "Jump to the newest content in this chat", "catch-up": "Read from the first unseen message in this chat" } as Record<string, string>)[name]
 }
 const groups: Record<string, string[]> = {
   Following: ["following", "goals", "followup", "jobs", "inbox", "overview", "updates", "pilot", "plan", "notifications", "check-health", "cancel-update-reply"],
   Saved: ["saved", "knowledge", "history", "drafts", "memories", "receipts", "note", "skill", "learnings", "suggestions", "prompt-history"],
   Files: ["actions", "files", "outputs", "attach", "attach-file", "attachments", "detach", "draft-context", "review", "save", "apply", "retry", "artifact", "paste-image", "source", "source-refresh", "source ignore", "source unignore", "source ignored"],
-  Settings: ["settings", "models", "model", "mode", "effort", "sources", "connections", "connector", "browser", "memory", "appearance", "theme", "usage", "data", "recovery", "voice", "web-origin", "permissions", "statusline"],
+  Settings: ["settings", "models", "model", "mode", "effort", "sources", "connections", "connector", "browser", "memory", "appearance", "theme", "usage", "data", "recovery", "request-recovery", "voice", "web-origin", "permissions", "statusline"],
   "Help and application": ["help", "about", "doctor", "exit", "quit", "sidebar", "reconnect", "recover", "links", "continue-external", "setup", "request-context", "terminal-settings"],
 }
 export function commandAliases(name: string): string[] {

@@ -113,6 +113,10 @@ export type PlanAttempt = {run_id:string;revision_id:string;manifest_sha256:stri
 export type TaskPlanReview = {id:string;revision:number;digest:string;task:string;state:string;phase:string;budget:{max_steps:number;code_max_steps:number};original_budget?:{max_steps:number;code_max_steps:number};attempts?:PlanAttempt[];sources:string[];content?:PlanContent;input_names?:string[];input_additions?:string[];input_removals?:string[];inputs?:PlanInputRef[];issue?:string;correction?:string;edit_state?:string};
 export type PlanInputRef = {kind:"upload"|"source";id:string;name?:string};
 export type TaskPlanAction = {conversation_id:string;task_id:string;revision:number;digest:string;action:"inspect"|"edit"|"remove_inputs"|"approve"|"start"|"cancel";request_id:string;content?:PlanContent;inputs?:PlanInputRef[]};
+export type RequestRecovery = {scope_digest?:string;kind:"credentials"|"model_access"|"rate_limit"|"provider_budget"|"work_budget";status?:number;summary:string;repair:string;retry_safe:boolean};
+export type RequestRecoveryView = {task_id:string;token:string;text:string;provider:string;model:string;recovery:RequestRecovery};
+export type RequestRecoveryAction = {conversation_id:string;task_id:string;token:string;action:"prepare_retry"|"discard";request_id:string};
+export type RequestRecoveryResult = {request_id:string;accepted?:boolean;error?:string};
 export type TaskPlanResult = {request_id:string;error?:string;review?:TaskPlanReview};
 export type BranchAction = {conversation_id:string; revision_id:string; run_id:string; request_id:string};
 export type BranchResult = {request_id:string; conversation_id?:string; error?:string};
@@ -133,6 +137,8 @@ export type BackendState = {
  goal_result?: {request_id: string; error?: string; review?: GoalReview};
  goal_busy?: boolean;
  supervisor_running?: boolean;
+ request_recoveries?:RequestRecoveryView[];
+ request_recovery_result?:RequestRecoveryResult;
  task_plans?:TaskPlanSummary[];
  task_plan_result?:TaskPlanResult;
  branch?: {conversation_id:string; revision_id:string};
@@ -226,7 +232,7 @@ export type SpecialistAction = {
 };
 export type Frame = {
   version: 1;
-  type: "terminal_preferences" | "dialogue_page" | "receipt" | "memory" | "update" | "submit" | "upload_submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "specialist" | "conversation" | "composer" | "sources" | "branch" | "task_plan" | "check" | "goal";
+  type: "terminal_preferences" | "dialogue_page" | "receipt" | "memory" | "update" | "submit" | "upload_submit" | "navigate" | "key" | "resize" | "exit" | "external_done" | "panel" | "approval" | "queue" | "specialist" | "conversation" | "composer" | "sources" | "branch" | "task_plan" | "request_recovery" | "check" | "goal";
  dialogue_before?:number;
   check?: CheckAction;
   goal?: GoalAction;
@@ -237,6 +243,7 @@ export type Frame = {
   upload?: { queue_only?:boolean; plan_first?:boolean; request_id: string; context: string; text: string; files: string[]; reply_to_update_id?: string };
   text?: string; key?: string; error?: string; width?: number; height?: number;
   task_plan?:TaskPlanAction;
+  request_recovery?:RequestRecoveryAction;
   branch?: BranchAction;
   sources?: SourceAction;
   composer?: ComposerAction;

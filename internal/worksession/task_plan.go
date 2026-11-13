@@ -248,7 +248,7 @@ func (s Store) AdmitPlanRequest(id, text string, options json.RawMessage, client
 	// Match ordinary request retention. Only terminal records can leave the
 	// bounded journal; pending/uncertain requests are never discarded for space.
 	for len(j.Requests) > MaxRetainedRequests {
-		index := slices.IndexFunc(j.Requests, func(candidate Request) bool { return !candidate.Pending() })
+		index := slices.IndexFunc(j.Requests, func(candidate Request) bool { return !candidate.Pending() && !candidate.AwaitingRecovery() })
 		if index < 0 {
 			return j, Request{}, errors.New("too many retained pending messages")
 		}

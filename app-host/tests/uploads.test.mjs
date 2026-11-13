@@ -151,3 +151,15 @@ test("pending input scope history protects withdrawn originals during cleanup",a
   await assert.rejects(retainedRequestUploads(chats));await uploads.check([original.id]);
  }finally{await rm(root,{recursive:true,force:true})}
 });
+
+test("failed tasks awaiting explicit setup repair retain original attachments until discarded",async()=>{
+ const root=await mkdtemp(join(tmpdir(),"gator-failed-input-retention-"));
+ try{
+  const uploads=new UploadStore(join(root,"uploads")),chats=join(root,"conversations"),original=await uploads.importContent("original.txt",Buffer.from("Preserve failed original"));
+  await utimes(join(uploads.root,original.id.split("/")[0]),0,0);await mkdir(join(chats,"one"),{recursive:true});const path=join(chats,"one","requests.json");
+  const request={state:"failed",options:{Uploads:[original.id]},recovery:{retry_safe:true}};
+  await writeFile(path,JSON.stringify({version:1,requests:[request]}));await uploads.prune(Date.now(),await retainedRequestUploads(chats));await uploads.check([original.id]);
+  await writeFile(path,JSON.stringify({version:1,requests:[{...request,recovery:"broken"}]}));await assert.rejects(retainedRequestUploads(chats));
+  await writeFile(path,JSON.stringify({version:1,requests:[{...request,state:"discarded"}]}));await uploads.prune(Date.now(),await retainedRequestUploads(chats));await assert.rejects(uploads.check([original.id]));
+ }finally{await rm(root,{recursive:true,force:true})}
+});

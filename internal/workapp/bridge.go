@@ -35,6 +35,8 @@ type BridgeState struct {
 	GoalBusy                bool                    `json:"goal_busy,omitempty"`
 	SupervisorRunning       bool                    `json:"supervisor_running"`
 	TaskPlans               []TaskPlanSummary       `json:"task_plans,omitempty"`
+	RequestRecoveries       []RequestRecoveryView   `json:"request_recoveries,omitempty"`
+	RequestRecoveryResult   *RequestRecoveryResult  `json:"request_recovery_result,omitempty"`
 	TaskPlanResult          *TaskPlanResult         `json:"task_plan_result,omitempty"`
 	Branch                  *BranchLink             `json:"branch,omitempty"`
 	BranchResult            *BranchResult           `json:"branch_result,omitempty"`
@@ -221,7 +223,7 @@ func (m Model) BridgeState() BridgeState {
 		DialogueDispatch: m.dialogueDispatch, DialogueBootstrapResult: m.dialogueBootstrapResult, DialogueControlResult: m.dialogueControlResult,
 		DialogueTask: m.dialogueTaskState(), DialoguePeers: append([]DialoguePeer(nil), m.dialoguePeers...),
 		CatalogBusy: m.catalogSaving != 0,
-		TaskPlans:   m.taskPlanSummaries(), TaskPlanResult: m.planResult,
+		TaskPlans:   m.taskPlanSummaries(), TaskPlanResult: m.planResult, RequestRecoveries: m.requestRecoveryViews(), RequestRecoveryResult: m.requestRecoveryResult,
 		Branch: m.branchLink, BranchResult: m.branchResult,
 		ReceiptBusy: m.receiptBusy, ReceiptResult: m.receiptResult,
 		ActionRecoveries: m.actionRecoveries, ActionRecoveryIssue: m.actionRecoveryIssue, ActionRecoveryTruncated: m.actionRecoveryTruncated,

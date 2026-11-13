@@ -61,6 +61,9 @@ func proposeDesktopTaskPlan(ctx context.Context, stateDir string, r worksession.
 	if json.Unmarshal(r.Options, &options) != nil || !options.PlanFirst {
 		return worksession.PlanContent{}, errors.New("invalid plan preparation settings")
 	}
+	if err := verifyRecoveredRequestScope(r, options); err != nil {
+		return worksession.PlanContent{}, err
+	}
 	chat, err := store.Load(r.Plan.Binding.ConversationID)
 	if err != nil {
 		return worksession.PlanContent{}, err
@@ -143,6 +146,9 @@ func bindDesktopTaskPlan(stateDir string, options workapp.RunOptions, request *w
 		if err := store.CheckPlanDispatch(request.ConversationID, r); err != nil {
 			return err
 		}
+		if err := verifyRecoveredRequestScope(r, options); err != nil {
+			return err
+		}
 		request.TaskPlan = &workrun.TaskPlanReference{RequestID: r.ID, Revision: r.Plan.Revision, Digest: r.Plan.Digest}
 		request.ConnectorIDs = append([]string{}, r.Plan.Content.Sources...)
 		if len(r.Plan.Attempts) > 0 {
@@ -160,4 +166,20 @@ func bindDesktopTaskPlan(stateDir string, options workapp.RunOptions, request *w
 		return nil
 	}
 	return worksession.ErrPlanChanged
+}
+
+// A reviewed recovery retains its original account/processing boundary even
+// after setup repair. Review is not authority to silently repoint sources.
+func verifyRecoveredRequestScope(r worksession.Request, options workapp.RunOptions) error {
+	if r.Recovery == nil {
+		return nil
+	}
+	input, err := captureConversationInput(workapp.ConversationInput{Version: 1, RunOptions: options})
+	if err != nil {
+		return err
+	}
+	if r.Recovery.ScopeDigest == "" || input.ScopeDigest != r.Recovery.ScopeDigest {
+		return errors.New("original recovery scope changed; inspect accounts, permissions and processing before further work")
+	}
+	return nil
 }

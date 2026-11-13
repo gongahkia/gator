@@ -36,6 +36,7 @@ export function validateFrame(frame) {
     sources: ["type", "sources"],
     branch: ["type", "branch"],
     task_plan:["type","task_plan"],
+    request_recovery:["type","request_recovery"],
     conversation: ["type", "conversation"],
     upload_submit: ["type", "upload"],
     update: ["type", "update"],
@@ -92,6 +93,10 @@ export function validateFrame(frame) {
   if (frame.type === "specialist") {
     const v = frame.specialist;
     if (!v || typeof v !== "object" || Array.isArray(v) || Object.keys(v).some(key => !["request_id", "id", "token", "action", "text"].includes(key)) || typeof v.request_id !== "string" || !/^[a-zA-Z0-9-]{1,64}$/.test(v.request_id) || typeof v.id !== "string" || !/^subagent-[0-9]{3,}$/.test(v.id) || typeof v.token !== "string" || !/^[a-f0-9]{64}$/.test(v.token) || !["guide", "stop"].includes(v.action) || (v.action === "guide" ? typeof v.text !== "string" || !v.text.trim() || Buffer.byteLength(v.text) > 8192 || v.text.includes("\0") : v.text !== undefined)) throw new Error("Invalid specialist action");
+  }
+  if(frame.type==="request_recovery") {
+    const v=frame.request_recovery;
+    if(!v || typeof v!=="object" || Array.isArray(v) || Object.keys(v).some(key=>!["conversation_id","task_id","token","action","request_id"].includes(key)) || typeof v.conversation_id!=="string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/.test(v.conversation_id) || typeof v.task_id!=="string" || !/^[a-f0-9]{32}$/.test(v.task_id) || typeof v.token!=="string" || !/^[a-f0-9]{64}$/.test(v.token) || !["prepare_retry","discard"].includes(v.action) || typeof v.request_id!=="string" || !/^[a-zA-Z0-9-]{1,64}$/.test(v.request_id)) throw new Error("Invalid request recovery action");
   }
   if(frame.type==="task_plan") {
     const v=frame.task_plan;
