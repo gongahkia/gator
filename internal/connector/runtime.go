@@ -36,6 +36,20 @@ func (e HTTPStatusError) Error() string {
 	return fmt.Sprintf("connector %q returned HTTP %d", e.ConnectorID, e.StatusCode)
 }
 
+// AccessError identifies a local credential prerequisite without parsing prose.
+type AccessError struct{ ConnectorID, Kind string }
+
+func (e AccessError) Error() string {
+	switch e.Kind {
+	case "missing_credentials":
+		return fmt.Sprintf("connector %q is not authenticated", e.ConnectorID)
+	case "expired_credentials":
+		return fmt.Sprintf("connector %q credential has expired", e.ConnectorID)
+	default:
+		return fmt.Sprintf("connector %q authorization changed; review this account (%s)", e.ConnectorID, e.Kind)
+	}
+}
+
 // PreparedAction contains a proposal and connector-private payload. Callers
 // can review the proposal but can execute the payload only through Runtime,
 // which revalidates their binding before any network request.
@@ -82,6 +96,8 @@ type Runtime struct {
 	// source/output/previous roots or selected input originals. It never accepts
 	// arbitrary local paths or unrestricted access to the private upload store.
 	ResolveAttachment func(source string, maxBytes int64) ([]byte, error)
+	// CredentialPins bind an explicitly reviewed bearer account to each read.
+	CredentialPins map[string]string
 	// OAuthRefreshPins bind unattended reads to the grant selected when a
 	// recurring job was created. The check occurs on the credential used for
 	// each request, rather than only at job startup.
@@ -963,7 +979,7 @@ func (r Runtime) fetchHTTPJSON(ctx context.Context, descriptor Descriptor) (Resu
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return Result{}, fmt.Errorf("connector %q returned HTTP %d", descriptor.ID, response.StatusCode)
+		return Result{}, HTTPStatusError{ConnectorID: descriptor.ID, StatusCode: response.StatusCode}
 	}
 	mediaType, _, err := mime.ParseMediaType(response.Header.Get("Content-Type"))
 	if err != nil || mediaType != "application/json" && !strings.HasSuffix(mediaType, "+json") {
@@ -1294,6 +1310,9 @@ func (r Runtime) googleAccountWithToken(ctx context.Context, descriptor Descript
 }
 
 func (r Runtime) unverifiedBearerToken(ctx context.Context, descriptor Descriptor) (string, error) {
+	if r.CredentialPins[descriptor.ID] != "" && descriptor.Authentication != AuthBearer {
+		return "", AccessError{ConnectorID: descriptor.ID, Kind: "changed_account"}
+	}
 	if r.OAuthRefreshPins[descriptor.ID] != "" && descriptor.Authentication != AuthOAuth {
 		return "", fmt.Errorf("connector %q authorization mode changed since this Work run was configured", descriptor.ID)
 	}
@@ -1305,7 +1324,13 @@ func (r Runtime) unverifiedBearerToken(ctx context.Context, descriptor Descripto
 		return "", fmt.Errorf("read connector credential: %w", err)
 	}
 	if !found {
-		return "", fmt.Errorf("connector %q is not authenticated", descriptor.ID)
+		return "", AccessError{ConnectorID: descriptor.ID, Kind: "missing_credentials"}
+	}
+	if pin := r.CredentialPins[descriptor.ID]; pin != "" {
+		data, _ := json.Marshal(credential)
+		if descriptor.Authentication != AuthBearer || fmt.Sprintf("%x", sha256.Sum256(data)) != pin {
+			return "", AccessError{ConnectorID: descriptor.ID, Kind: "changed_account"}
+		}
 	}
 	if pin := r.OAuthRefreshPins[descriptor.ID]; pin != "" {
 		if descriptor.Authentication != AuthOAuth || !credential.IsOAuth() || credential.Refresh == "" || OAuthGrantPin(descriptor, credential.Refresh) != pin {
@@ -1314,7 +1339,7 @@ func (r Runtime) unverifiedBearerToken(ctx context.Context, descriptor Descripto
 	}
 	if credential.Expired(r.now()) {
 		if descriptor.Authentication != AuthOAuth || !credential.IsOAuth() || credential.Refresh == "" {
-			return "", fmt.Errorf("connector %q credential has expired", descriptor.ID)
+			return "", AccessError{ConnectorID: descriptor.ID, Kind: "expired_credentials"}
 		}
 		flow := auth.BrowserFlow{ClientID: descriptor.OAuthClientID, ClientSecret: credential.OAuthClientSecret, TokenURL: descriptor.OAuthTokenURL, AllowMissingExpiry: true, RequireBearerToken: true, HTTPClient: r.HTTPClient}
 		refreshed, refreshErr := flow.Refresh(ctx, credential)
