@@ -192,9 +192,19 @@ struct ConversationView: View {
                 Spacer()
                 Text(application.modelLabel).lineLimit(1)
             }.font(.caption).foregroundStyle(.secondary)
+            if let plan = application.planOperation {
+                Label(plan.status, systemImage: plan.phase == .uncertain ? "exclamationmark.triangle" : "list.bullet.rectangle")
+                    .font(.caption).textSelection(.enabled)
+                if plan.phase == .uncertain {
+                    DisclosureGroup("Retained plan authorization identity") {
+                        Text(verbatim: "Request: " + plan.id + "\nTask: " + plan.identity.taskID + "\nRevision: \(plan.identity.revision)\n" + plan.error).textSelection(.enabled)
+                        Text("Nothing is automatically retried. Quit/reopen or reconnect the original owner, then inspect the canonical plan before a new explicit decision.")
+                    }.font(.caption)
+                }
+            }
             if let status = sessions.correctionStatus { Text(verbatim: status).font(.caption).textSelection(.enabled).accessibilityLabel("Correction status: " + status) }
             if let submission = application.submission {
-                Text("Request: \(submission.phase.rawValue)").font(.caption).foregroundStyle(.secondary)
+                Text((submission.planFirst == true ? "Plan preparation request: " : "Request: ") + submission.phase.rawValue).font(.caption).foregroundStyle(.secondary)
             }
             if let pending = application.pendingSubmission, pending.phase == .uncertain {
                 DisclosureGroup("Original submission has an unconfirmed outcome") {

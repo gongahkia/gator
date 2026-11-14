@@ -55,7 +55,7 @@ public final class ManagedSessionCoordinator {
         return result
     }
     public var ownerCount: Int { records.count }
-    public var workingCount: Int { records.values.filter { $0.connectionStatus != .closed && $0.snapshot?.running == true }.count }
+    public var workingCount: Int { records.values.filter { $0.connectionStatus != .closed && ($0.snapshot?.running == true || $0.reservesPlanCapacity) }.count }
     public var canNavigate: Bool { !switching && !stopping && started }
     public var persistenceIssue: String { records.values.map(\.persistenceIssue).first(where: { !$0.isEmpty }) ?? "" }
     public var quitGuard: String? {
@@ -126,7 +126,7 @@ public final class ManagedSessionCoordinator {
         try await owner.host(.focus(foreground), timeout: operationTimeout) { $0.value["foreground"].bool == foreground && $0.value["session_request"] == .null }
     }
     private func disposable(_ owner: GatorApplicationState) -> Bool {
-        guard let key = key(for: owner), !uncertain.contains(key), owner !== current, owner.pendingSubmission == nil, owner.operation.isEmpty, !owner.approvalSending else { return false }
+        guard let key = key(for: owner), !uncertain.contains(key), owner !== current, owner.pendingSubmission == nil, owner.operation.isEmpty, !owner.approvalSending, owner.planOperation?.blocksAuthorization != true else { return false }
         // Even a disconnected owner can retain uncertain work or an exact review.
         return owner.snapshot?.unsafeToNavigate == false && owner.snapshot?.unsupportedNotice == nil
     }
@@ -234,6 +234,26 @@ public final class ManagedSessionCoordinator {
         await enqueue { [self] in
             guard owner === current, owners[identity.conversationID] === owner else { throw BridgeFailure("Open the original owner before loading its exact plan review.") }
             await owner.inspectPlan(identity)
+        }.value
+    }
+    public func planAuthorizationUnavailable(owner: GatorApplicationState, review: NativePlanReview, action: NativePlanAction) -> String? {
+        guard owner === current, owners[review.identity.conversationID] === owner, !switching, !stopping else { return "Select the original owner and inspect its current plan. Navigation never authorizes execution." }
+        if let key = key(for: owner), uncertain.contains(key) { return "This owner has an unconfirmed task control. Inspect it before authorizing more work." }
+        if workingCount >= 3 { return "Three tasks are working or have unconfirmed admissions. Finish or inspect one before starting reviewed work." }
+        return owner.planAuthorizationUnavailable(review, action: action)
+    }
+    public func authorizePlan(owner: GatorApplicationState, review: NativePlanReview, action: NativePlanAction) async {
+        let previousOperation = owner.planOperation?.id
+        await enqueue { [self] in
+            guard owner.planOperation?.id == previousOperation else { throw BridgeFailure("A plan decision changed while this input waited. Inspect its outcome before another explicit decision.") }
+            if let reason = planAuthorizationUnavailable(owner: owner, review: review, action: action) { throw BridgeFailure(reason) }
+            issue = ""
+            await owner.authorizePlan(review, action: action) { [self] in
+                owner === current && !switching && !stopping && workingCount <= 3 && owners[review.identity.conversationID] === owner
+            }
+            // Capacity and transitions are serialized through the operation-specific
+            // result or truthful uncertainty, never through nonce acknowledgement.
+            await owner.awaitPlanAuthorizationResult()
         }.value
     }
     public func respondToApproval(owner: GatorApplicationState, review: ApprovalReview, approved: Bool) async {

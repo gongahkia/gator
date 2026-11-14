@@ -11,7 +11,7 @@ struct TaskInspectorView: View {
             HStack {
                 Text("Task details").font(.headline).accessibilityAddTraits(.isHeader)
                 Spacer()
-                Button("Back to Conversation") { sessions.closeTaskInspection() }.keyboardShortcut(.escape, modifiers: [])
+                Button("Back to Conversation") { sessions.closeTaskInspection() }.focusable().keyboardShortcut(.escape, modifiers: [])
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
@@ -78,16 +78,16 @@ struct TaskInspectorView: View {
     }
     @ViewBuilder private func plan(_ summary: JSONValue, identity: NativePlanIdentity, owner: GatorApplicationState) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("Proposed plan", systemImage: "list.number").font(.headline)
+            Label("Task plan", systemImage: "list.number").font(.headline)
             Text(verbatim: summary["task"].string).textSelection(.enabled)
             Text("Phase: " + summary["phase"].string + " · revision " + String(identity.revision)).font(.caption)
             if !summary["issue"].string.isEmpty { Text(verbatim: summary["issue"].string).textSelection(.enabled) }
             if let review = owner.planReviews[identity.taskID] {
                 let fresh = owner.isCurrentPlanReview(review)
-                Text(fresh ? review.status : "This read belongs to an older plan. Inspect the current proposal again.").font(.callout).foregroundStyle(fresh ? Color.primary : .orange)
-                PlanReviewContent(review: review)
+                Text(fresh ? review.status : "This read belongs to an older plan, scope or task state. Inspect the current review again.").font(.callout).foregroundStyle(fresh ? Color.primary : .orange)
+                PlanReviewContent(review: review, owner: owner)
                 if fresh, owner === sessions.current, summary["phase"].string == "review" {
-                    Button("Request Plan Revision") { Task { await sessions.requestPlanRevision(owner: owner, review: review) } }
+                    Button("Request Plan Revision") { Task { await sessions.requestPlanRevision(owner: owner, review: review) } }.focusable()
                         .disabled(sessions.switching || !sessions.isInspectionCurrent)
                         .help("Open an editable correction draft. This does not approve or execute the plan.")
                 }
@@ -96,38 +96,10 @@ struct TaskInspectorView: View {
                 ForEach(Array(summary["steps"].array.enumerated()), id: \.offset) { i, step in Text(verbatim: "\(i + 1). " + step["text"].string).textSelection(.enabled) }
             }
             if owner === sessions.current {
-                Button("Inspect Current Plan") { Task { await sessions.loadPlan(identity, owner: owner) } }
+                Button("Inspect Current Plan") { Task { await sessions.loadPlan(identity, owner: owner) } }.focusable()
                     .disabled(!sessions.isInspectionCurrent || !owner.isConnected || !owner.operation.isEmpty)
             } else { Text("Open the owning chat to load its complete revision-bound review.").font(.caption) }
-            Text("This is proposed work, not verified completion. Plan approval and execution controls remain in the terminal app.").font(.caption).foregroundStyle(.secondary)
+            Text(NativePlanPresentation.phaseLabel(summary)).font(.caption).foregroundStyle(.secondary)
         }.padding(12).background(.background, in: RoundedRectangle(cornerRadius: 10))
-    }
-}
-
-private struct PlanReviewContent: View {
-    let review: NativePlanReview
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Objective").font(.caption.weight(.semibold)); Text(verbatim: review.value["content"]["outcome"].string)
-            ForEach(Array(review.value["content"]["steps"].array.enumerated()), id: \.offset) { i, step in Text(verbatim: "\(i + 1). " + step["text"].string) }
-            strings("Inputs", review.value["input_names"])
-            strings("Selected sources", review.value["sources"])
-            strings("Plan sources", review.value["content"]["sources"])
-            strings("Proposed external effects", review.value["content"]["effects"])
-            if !review.value["correction"].string.isEmpty { Text("Requested change").font(.caption.weight(.semibold)); Text(verbatim: review.value["correction"].string) }
-            if !review.value["issue"].string.isEmpty { Text(verbatim: review.value["issue"].string) }
-            DisclosureGroup("Review identity, limits and access context") {
-                Text(verbatim: "Task: " + review.identity.taskID + "\nRevision: \(review.identity.revision)\nDigest: " + review.identity.digest).font(.caption)
-                // Read-only Go review: captured budgets, sources and access changes,
-                // not a tool payload or execution grant.
-                Text(verbatim: review.value.pretty).font(.system(.caption, design: .monospaced))
-            }
-        }.textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
-    }
-    @ViewBuilder private func strings(_ label: String, _ value: JSONValue) -> some View {
-        if !value.array.isEmpty {
-            Text(label).font(.caption.weight(.semibold))
-            ForEach(Array(value.array.enumerated()), id: \.offset) { _, item in Text(verbatim: item.string) }
-        }
     }
 }

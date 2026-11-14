@@ -101,7 +101,7 @@ public struct BridgeSnapshot: Sendable, Equatable {
     public var unsupportedNotice: String? {
         if hasExternal { return "This step requires a terminal handoff. Native handoffs are not available yet; no external process has been launched." }
         if value["dialogue_dispatch"] != .null || value["session_request"] != .null { return "This workflow requires managed sessions, which are not available in this native version." }
-        if value["task_plans"].array.contains(where: { ["review", "interrupted", "approved", "preparing", "revising"].contains($0["phase"].string) }) { return "Inspect the proposed plan before any execution. Manual plan editing and plan execution controls are available in the terminal app." }
+        if value["task_plans"].array.contains(where: { ["review", "interrupted", "approved", "preparing", "revising"].contains($0["phase"].string) }) { return "Inspect the proposed plan before any execution. Inspect its latest full review to authorize execution. Manual plan editing remains available in the terminal app." }
         if value["queued"].int > 0 { return "Retained queued work is Go-owned. Native queue editing and resuming are not available yet." }
         return nil
     }
@@ -170,6 +170,7 @@ enum BridgeCommand: Sendable {
     case host(HostCommand)
     case submission(id: String, context: String, text: String, planFirst: Bool = false)
     case inspectPlan(NativePlanIdentity, request: String)
+    case authorizePlan(NativePlanIdentity, action: NativePlanAction, request: String)
     case workMode(NativeWorkMode)
     case conversation(id: String, listID: String)
     case newConversation
@@ -191,6 +192,9 @@ enum BridgeCommand: Sendable {
         case let .inspectPlan(identity, request):
             v["type"] = .string("task_plan")
             v["task_plan"] = .object(["action": .string("inspect"), "conversation_id": .string(identity.conversationID), "task_id": .string(identity.taskID), "revision": .number(Decimal(identity.revision)), "digest": .string(identity.digest), "request_id": .string(request)])
+        case let .authorizePlan(identity, action, request):
+            v["type"] = .string("task_plan")
+            v["task_plan"] = .object(["action": .string(action.rawValue), "conversation_id": .string(identity.conversationID), "task_id": .string(identity.taskID), "revision": .number(Decimal(identity.revision)), "digest": .string(identity.digest), "request_id": .string(request)])
         case .workMode(let mode): v["type"] = .string("submit"); v["text"] = .string("/mode " + mode.rawValue)
         case let .conversation(id, listID):
             v["type"] = .string("conversation"); v["conversation"] = .object(["id": .string(id), "list_id": .string(listID)])

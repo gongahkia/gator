@@ -40,6 +40,9 @@ public struct NativePlanReview: Sendable, Equatable {
     public let identity: NativePlanIdentity
     public let generation: UUID
     public let value: JSONValue
+    public var summaryAtInspection: JSONValue? = nil
+    public var scopeAtInspection: JSONValue? = nil
+    public var focusEpoch: UUID? = nil
     public var status: String {
         if value["edit_state"].string == "preparing" || value["phase"].string == "revising" { return "Revision requested · replacement is being prepared" }
         if value["phase"].string == "review" { return "Proposed plan · new review required before execution" }

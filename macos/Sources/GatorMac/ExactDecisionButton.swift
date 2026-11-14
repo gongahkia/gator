@@ -4,7 +4,28 @@ import GatorCore
 
 /// Approve/decline require a click, explicit accessibility press, or Space.
 /// Return from a review or an IME composition can never activate a decision.
-struct ExactDecisionButton: NSViewRepresentable {
+struct ExactDecisionButton: View {
+    let title: String
+    let enabled: Bool
+    let action: () -> Void
+    var body: some View {
+        NativeDecisionControl(title: title, enabled: enabled, action: action)
+            .focusable(enabled)
+            .disabled(!enabled)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(title)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint("Space or an explicit press chooses this exact decision. Return never authorizes.")
+            .accessibilityAction { if enabled { action() } }
+            .onKeyPress(.return) { .handled }
+            .onKeyPress(.space, phases: .down) { press in
+                guard enabled, press.modifiers.isEmpty else { return .ignored }
+                action(); return .handled
+            }
+    }
+}
+
+private struct NativeDecisionControl: NSViewRepresentable {
     let title: String
     let enabled: Bool
     let action: () -> Void
@@ -26,7 +47,17 @@ struct ExactDecisionButton: NSViewRepresentable {
     }
     final class DecisionButton: NSButton {
         override var acceptsFirstResponder: Bool { isEnabled }
+        override func becomeFirstResponder() -> Bool {
+            let accepted = super.becomeFirstResponder()
+            if accepted { scrollToVisible(bounds) }
+            return accepted
+        }
         override func keyDown(with event: NSEvent) {
+            if event.keyCode == 48 {
+                if event.modifierFlags.contains(.shift) { window?.selectPreviousKeyView(self) }
+                else { window?.selectNextKeyView(self) }
+                return
+            }
             guard NativeInteractionSemantics.decisionKeyAllowed(event.keyCode) else { return }
             if event.keyCode == 49 {
                 let modified = !event.modifierFlags.intersection([.command, .control, .option, .shift]).isEmpty

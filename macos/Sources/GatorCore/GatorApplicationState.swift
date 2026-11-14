@@ -25,6 +25,9 @@ public final class GatorApplicationState {
     public private(set) var planFirst = false
     public private(set) var focusRequest = UUID()
     public private(set) var planReviews: [String: NativePlanReview] = [:]
+    public private(set) var planOperation: NativePlanOperation?
+    private var planReviewEpoch = UUID()
+    @ObservationIgnored private var planControlDeadline: Task<Void, Never>?
     @ObservationIgnored private var retiredApprovalTokens: Set<String> = []
     @ObservationIgnored private var planReadRequest: (id: String, identity: NativePlanIdentity, generation: UUID)?
 
@@ -106,7 +109,14 @@ public final class GatorApplicationState {
     public var canRetryAdmission: Bool {
         isConnected && archive.pending?.phase == .uncertain && archive.pending?.context == context && snapshot?.unsafeToNavigate == false && operation.isEmpty && persistenceIssue.isEmpty
     }
+    public var reservesPlanCapacity: Bool {
+        guard let pending = planOperation else { return false }
+        if pending.phase == .accepted, pending.resultConfirmed,
+           snapshot?.value["task_plans"].array.contains(where: { pending.identity.matches($0) && $0["state"].string == "queued" && $0["phase"].string == "approved" }) == true { return false }
+        return pending.reservesCapacity
+    }
     public var quitGuard: String? {
+        if planOperation?.blocksAuthorization == true { return "A plan authorization outcome is unconfirmed. Its identity is retained and is never replayed. Quitting stops this owner." }
         if archive.pending != nil { return "A submission has an unconfirmed outcome. Its identity and draft will be kept; it will not be resent on restart." }
         if snapshot?.hasApproval == true { return "An exact action is waiting for review. Quitting cancels this Go owner; the approval will not be replayed." }
         if snapshot?.unsafeToNavigate == true || !operation.isEmpty { return "Gator is working or holding retained work. Quitting cancels this Go owner and keeps its durable history. Recovered work is not resumed automatically." }
@@ -123,6 +133,7 @@ public final class GatorApplicationState {
                 archive.pending = archive.pendingByContext?[requested] ?? (archive.pending?.context == requested ? archive.pending : nil)
             }
             submission = archive.pending
+            planOperation = archive.planOperationsByContext?["conversation:" + configuration.conversationID]
             restoringContext = configuration.conversationID.isEmpty ? "" : "conversation:" + configuration.conversationID
             restoreDraft(restoringContext)
         } catch { persistenceIssue = "Native drafts could not be loaded: " + error.localizedDescription }
@@ -160,6 +171,7 @@ public final class GatorApplicationState {
             let previousToken = previous?.value["pending_approval"]["token"].string ?? ""
             if !previousToken.isEmpty, previousToken != next.value["pending_approval"]["token"].string { retiredApprovalTokens.insert(previousToken) }
             snapshot = next
+            if previous?.value["foreground"].bool == true && !next.value["foreground"].bool { planReviewEpoch = UUID() }
             if messages != next.messages { messages = next.messages }
             if previous?.value["messages"] != next.value["messages"] || previous?.value["dialogue"] != next.value["dialogue"] || previous?.value["dialogue_peers"] != next.value["dialogue_peers"] || previous?.context != next.context { transcript = next.transcript }
             if !next.conversationID.isEmpty { archive.selectedConversationID = next.conversationID; configuration.conversationID = next.conversationID; configuration.bootMode = "" }
@@ -168,7 +180,7 @@ public final class GatorApplicationState {
                 deadlineTask?.cancel()
                 let error = next.value["upload_result"]["error"].string
                 if error.isEmpty {
-                    var accepted = pending; accepted.phase = next.running ? .running : .accepted; submission = accepted
+                    var accepted = pending; accepted.phase = pending.planFirst == true ? .accepted : next.running ? .running : .accepted; submission = accepted
                     // Compare revision, not text: typing and then undoing is still a newer draft.
                     if archive.drafts[pending.context]?.revision == pending.draftRevision {
                         if var retained = archive.drafts[pending.context], retained.correction != nil {
@@ -185,7 +197,11 @@ public final class GatorApplicationState {
             }
             if var current = submission, !current.phase.awaitingAcceptance, current.phase != .failed, current.phase != .stopped, current.phase != .completed {
                 let turnID = SHA256.hash(data: Data(current.id.utf8)).map { String(format: "%02x", $0) }.joined()
-                if managed, let turn = next.value["dialogue"].array.first(where: { $0["id"].string == turnID }) {
+                if current.planFirst == true {
+                    // Preparing a proposal uses Go's running flag too. Admission
+                    // of plan preparation is not authorization or execution.
+                    current.phase = .accepted
+                } else if managed, let turn = next.value["dialogue"].array.first(where: { $0["id"].string == turnID }) {
                     // A reply during Work belongs to its own retained turn. The
                     // unrelated Work's running flag cannot label it as running.
                     switch turn["state"].string {
@@ -225,23 +241,35 @@ public final class GatorApplicationState {
                 let result = next.value["task_plan_result"], value = result["review"]
                 if !result["error"].string.isEmpty { issue = result["error"].string }
                 else if isCurrentPlan(reading.identity), reading.identity.matches(value) {
-                    planReviews[reading.identity.taskID] = NativePlanReview(identity: reading.identity, generation: generation, value: value)
+                    var inspected = NativePlanReview(identity: reading.identity, generation: generation, value: value)
+                    inspected.summaryAtInspection = next.value["task_plans"].array.first(where: reading.identity.matches)
+                    inspected.scopeAtInspection = NativePlanPresentation.scope(next)
+                    inspected.focusEpoch = planReviewEpoch
+                    planReviews[reading.identity.taskID] = inspected
+                    // A replacement owner plus a fresh Go inspection can reconcile
+                    // a retained uncertain request; it never resends that request.
+                    if var pending = planOperation, pending.phase == .uncertain, pending.generation != generation, pending.identity.taskID == reading.identity.taskID {
+                        pending.phase = .reconciled; pending.error = "Prior operation retained for inspection; reconnected owner inspected canonical state. No request was replayed."
+                        setPlanOperation(pending)
+                    }
                 } else { issue = "The plan changed while loading. Inspect its current revision again." }
                 planReadRequest = nil; operation = ""; deadlineTask?.cancel()
             }
+            receivePlanOperation(next)
             if !next.running { stopping = false }
             if approvalSending && (previous?.value["pending_approval"] != next.value["pending_approval"]) { approvalSending = false; operation = ""; deadlineTask?.cancel(); review = nil }
             if !next.value["notice"].string.isEmpty { issue = next.value["notice"].string }
             // State ticks can be frequent: persistence is required only for durable client changes.
             if archive.selectedConversationID != previous?.conversationID || (submissionNonce == nil && previous?.value["upload_result"] != next.value["upload_result"]) { persist() }
         case .acknowledged(let nonce):
+            if var pending = planOperation, pending.nonce == nonce, pending.phase == .submitted { pending.phase = .acknowledged; setPlanOperation(pending) }
             if nonce == submissionNonce, var pending = archive.pending, pending.phase == .submitted {
                 pending.phase = .acknowledged; archive.pending = pending; submission = pending; persist()
             }
         case .disconnected(let reason):
             connectionStatus = .disconnected; issue = reason
-            markUncertain(); operation = ""; setting = nil; planReadRequest = nil; approvalSending = false; stopping = false
-            deadlineTask?.cancel(); startupDeadline?.cancel()
+            markUncertain(); markPlanUncertain("Original Go owner disconnected."); operation = ""; setting = nil; planReadRequest = nil; approvalSending = false; stopping = false
+            deadlineTask?.cancel(); startupDeadline?.cancel(); planControlDeadline?.cancel()
         case .updateReady: break
         }
     }
@@ -393,7 +421,7 @@ public final class GatorApplicationState {
 
     public func reconnect() async {
         guard connectionStatus == .disconnected || connectionStatus == .idle else { return }
-        markUncertain(); guard await flushDrafts() else { return }
+        markUncertain(); markPlanUncertain("Owner reconnect requested."); guard await flushDrafts() else { return }
         operation = "Reconnecting…"
         await transport?.shutdown(); eventTask?.cancel(); transport = nil
         configuration.conversationID = archive.selectedConversationID
@@ -403,9 +431,9 @@ public final class GatorApplicationState {
     }
     public func shutdown(confirmed: Bool = false) async -> Bool {
         guard confirmed || quitGuard == nil else { return false }
-        markUncertain(); guard await flushDrafts() else { return false }
+        markUncertain(); markPlanUncertain("Application shutdown requested."); guard await flushDrafts() else { return false }
         connectionStatus = .stopping
-        deadlineTask?.cancel(); startupDeadline?.cancel()
+        deadlineTask?.cancel(); startupDeadline?.cancel(); planControlDeadline?.cancel()
         await transport?.shutdown(); eventTask?.cancel(); transport = nil
         connectionStatus = .closed; review = nil; return true
     }
@@ -437,7 +465,13 @@ public final class GatorApplicationState {
     public func isCurrentPlan(_ identity: NativePlanIdentity) -> Bool {
         isConnected && identity.conversationID == conversationID && snapshot?.value["task_plans"].array.contains(where: identity.matches) == true
     }
-    public func isCurrentPlanReview(_ value: NativePlanReview) -> Bool { value.generation == generation && isCurrentPlan(value.identity) }
+    public func isCurrentPlanReview(_ value: NativePlanReview) -> Bool {
+        guard value.generation == generation, isCurrentPlan(value.identity), let snapshot else { return false }
+        if let epoch = value.focusEpoch, epoch != planReviewEpoch { return false }
+        if let captured = value.summaryAtInspection, snapshot.value["task_plans"].array.first(where: value.identity.matches) != captured { return false }
+        if let captured = value.scopeAtInspection, captured != NativePlanPresentation.scope(snapshot) { return false }
+        return true
+    }
     func inspectPlan(_ identity: NativePlanIdentity) async {
         guard managed, isCurrentPlan(identity), snapshot?.value["foreground"].bool == true, archive.pending == nil, operation.isEmpty, let owner = transport else { issue = "Open the original chat and inspect its current plan revision."; return }
         let request = UUID().uuidString, original = generation
@@ -445,6 +479,83 @@ public final class GatorApplicationState {
         startDeadline { [weak self] in self?.planReadRequest = nil; self?.operation = ""; self?.issue = "Plan inspection was not confirmed. Your draft is kept; inspect again explicitly." }
         do { try await owner.send(.inspectPlan(identity, request: request), nonce: UUID().uuidString) }
         catch { if generation == original { planReadRequest = nil; operation = ""; issue = error.localizedDescription } }
+    }
+
+    public func planAuthorizationUnavailable(_ review: NativePlanReview, action: NativePlanAction) -> String? { planAuthorizationIssue(review, action: action) }
+    private func planAuthorizationIssue(_ review: NativePlanReview, action: NativePlanAction, permittedPendingID: String? = nil) -> String? {
+        let ownPrepared = permittedPendingID != nil && planOperation?.id == permittedPendingID && planOperation?.phase == .submitted
+        guard managed, isConnected, let snapshot, snapshot.value["foreground"].bool else { return "Open and focus the original connected owner, then inspect again." }
+        guard isCurrentPlanReview(review), planReviews[review.identity.taskID] == review else { return "This review changed. Inspect the exact current plan again." }
+        guard review.summaryAtInspection != nil, review.scopeAtInspection != nil, NativePlanPresentation.complete(review) else { return "The full authoritative review is incomplete. Approval is unavailable." }
+        if planOperation?.blocksAuthorization == true && !ownPrepared { return "A prior authorization is unconfirmed. Reconnect and inspect; do not repeat it." }
+        if !ownPrepared, let prior = planOperation, prior.identity == review.identity, prior.action == action,
+           ![NativePlanOperationPhase.rejected, .notSubmitted, .reconciled].contains(prior.phase) {
+            return "This exact authorization was already submitted. Inspect its retained outcome; it will not be sent twice."
+        }
+        if (!operation.isEmpty && !ownPrepared) || archive.pending != nil || approvalSending || snapshot.running || snapshot.hasApproval || snapshot.hasExternal || snapshot.value["dialogue_busy"].bool || snapshot.value["dialogue_dispatch"] != .null || snapshot.value["pending_operation"].string.isEmpty == false || snapshot.value["receipt_busy"].bool || snapshot.value["catalog_busy"].bool { return "Finish the current operation or exact action review before authorizing this plan." }
+        guard snapshot.value["mode"].string == "chat", snapshot.value["panel"] == .null, snapshot.value["session_request"] == .null else { return "Return to the original idle conversation and inspect again." }
+        if !persistenceIssue.isEmpty { return "Native operation storage needs attention. Nothing will be submitted." }
+        if !snapshot.value["requests_issue"].string.isEmpty { return snapshot.value["requests_issue"].string }
+        guard review.value["state"].string == "queued", review.value["phase"].string == (action == .approve ? "review" : "approved") else { return action == .start ? "Start requires an approved, undispatched queued plan." : "Only a queued proposed plan can be approved." }
+        if review.value["edit_state"].string == "preparing" { return "Wait for the replacement proposal and inspect it." }
+        if review.value["attempts"].array.contains(where: { $0["uncertain"].bool }) { return "Prior effects are uncertain. Inspect retained evidence; authorization is unavailable." }
+        return nil
+    }
+    func authorizePlan(_ review: NativePlanReview, action: NativePlanAction, finalAdmissionAllowed: @MainActor () -> Bool) async {
+        guard planAuthorizationUnavailable(review, action: action) == nil, let transport else { return }
+        let pending = NativePlanOperation(id: UUID().uuidString, nonce: UUID().uuidString, identity: review.identity, generation: generation, action: action)
+        setPlanOperation(pending); operation = "Awaiting exact plan authorization confirmation…"; issue = ""
+        guard await flushDrafts() else {
+            var unsent = pending; unsent.phase = .notSubmitted; unsent.error = "Operation could not be durably recorded. No send was attempted."; setPlanOperation(unsent); operation = ""; return
+        }
+        // Recheck after persistence without using the pending-operation guard.
+        guard generation == pending.generation, finalAdmissionAllowed(), planAuthorizationIssue(review, action: action, permittedPendingID: pending.id) == nil else {
+            var unsent = pending; unsent.phase = .notSubmitted; unsent.error = "Owner, proposal, capacity or application state changed before send. Inspect again."; setPlanOperation(unsent); operation = ""; return
+        }
+        planControlDeadline?.cancel()
+        planControlDeadline = Task { [weak self, responseTimeout] in
+            try? await Task.sleep(for: responseTimeout)
+            guard !Task.isCancelled, let self, self.planOperation?.id == pending.id, self.planOperation?.phase.awaitingResult == true else { return }
+            self.markPlanUncertain("Go did not confirm the request ID."); self.operation = ""
+        }
+        do { try await transport.send(.authorizePlan(pending.identity, action: action, request: pending.id), nonce: pending.nonce) }
+        catch { if generation == pending.generation { markPlanUncertain(error.localizedDescription); operation = "" } }
+    }
+    private func setPlanOperation(_ value: NativePlanOperation) {
+        planOperation = value
+        if archive.planOperationsByContext == nil { archive.planOperationsByContext = [:] }
+        archive.planOperationsByContext?["conversation:" + value.identity.conversationID] = value
+        persist()
+    }
+    private func markPlanUncertain(_ reason: String) {
+        guard var value = planOperation, value.phase.awaitingResult || value.phase == .accepted else { return }
+        value.phase = .uncertain; value.error = reason; setPlanOperation(value); planControlDeadline?.cancel()
+    }
+    private func receivePlanOperation(_ next: BridgeSnapshot) {
+        guard var pending = planOperation else { return }
+        let old = pending
+        let result = next.value["task_plan_result"]
+        if !pending.resultConfirmed, pending.generation == generation, result["request_id"].string == pending.id {
+            pending.resultConfirmed = true; pending.error = result["error"].string
+            pending.phase = pending.error.isEmpty ? .accepted : .rejected
+            if !pending.error.isEmpty { planReviewEpoch = UUID() } // Retain the read, invalidate its controls until fresh inspection.
+            operation = ""; planControlDeadline?.cancel()
+        }
+        if pending.resultConfirmed, pending.phase != .rejected,
+           let summary = next.value["task_plans"].array.first(where: pending.identity.matches) {
+            pending.workID = summary["work_id"].string
+            switch summary["state"].string {
+            case "running": if summary["phase"].string == "dispatching" && next.running { pending.phase = next.hasApproval ? .waitingReview : .working }
+            case "completed": pending.phase = .completed
+            case "failed", "interrupted": pending.phase = .failed
+            case "stopped", "cancelled": pending.phase = .stopped
+            default: break
+            }
+        }
+        if pending != old { setPlanOperation(pending) }
+    }
+    func awaitPlanAuthorizationResult() async {
+        while planOperation?.phase.awaitingResult == true && isConnected { try? await Task.sleep(for: .milliseconds(10)) }
     }
 
     // Host-only operations retain this owner's generation through every await.
